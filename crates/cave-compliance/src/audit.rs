@@ -3,7 +3,13 @@
 use crate::models::AuditEvent;
 use uuid::Uuid;
 
-pub fn record_event(actor: &str, action: &str, resource_type: &str, resource_id: &str, details: serde_json::Value) -> AuditEvent {
+pub fn record_event(
+    actor: &str,
+    action: &str,
+    resource_type: &str,
+    resource_id: &str,
+    details: serde_json::Value,
+) -> AuditEvent {
     AuditEvent {
         id: Uuid::new_v4(),
         actor: actor.to_string(),
@@ -17,11 +23,18 @@ pub fn record_event(actor: &str, action: &str, resource_type: &str, resource_id:
     }
 }
 
-pub fn filter_events<'a>(events: &'a [AuditEvent], resource_type: Option<&str>, actor: Option<&str>) -> Vec<&'a AuditEvent> {
-    events.iter().filter(|e| {
-        resource_type.map_or(true, |rt| e.resource_type == rt) &&
-        actor.map_or(true, |a| e.actor == a)
-    }).collect()
+pub fn filter_events<'a>(
+    events: &'a [AuditEvent],
+    resource_type: Option<&str>,
+    actor: Option<&str>,
+) -> Vec<&'a AuditEvent> {
+    events
+        .iter()
+        .filter(|e| {
+            resource_type.map_or(true, |rt| e.resource_type == rt)
+                && actor.map_or(true, |a| e.actor == a)
+        })
+        .collect()
 }
 
 #[cfg(test)]

@@ -179,7 +179,10 @@ mod tests {
     #[test]
     fn select_records_columns() {
         let b = ScanBuilder::new(meta()).select(["a", "b"]);
-        assert_eq!(b.selected_columns(), Some(&["a".to_string(), "b".to_string()][..]));
+        assert_eq!(
+            b.selected_columns(),
+            Some(&["a".to_string(), "b".to_string()][..])
+        );
     }
 
     #[test]

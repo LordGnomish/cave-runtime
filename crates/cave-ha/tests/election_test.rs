@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cave_ha::{
+    MembershipConfig,
     config::NodeConfig,
     metrics::Metrics,
     raft::{
@@ -14,7 +15,6 @@ use cave_ha::{
         types::{NodeId, NodeInfo, Role},
     },
     transport::memory::MemNetwork,
-    MembershipConfig,
 };
 use prometheus_client::registry::Registry;
 
@@ -26,7 +26,11 @@ async fn spawn_cluster(n: u32) -> (Vec<RaftHandle>, Arc<MemNetwork>) {
 
     // Collect all members first.
     let members: Vec<NodeInfo> = (1..=n)
-        .map(|id| NodeInfo { id: id as NodeId, addr: format!("mem:{id}"), is_learner: false })
+        .map(|id| NodeInfo {
+            id: id as NodeId,
+            addr: format!("mem:{id}"),
+            is_learner: false,
+        })
         .collect();
 
     for id in 1..=n {
@@ -117,7 +121,9 @@ async fn test_three_node_election() {
         let mut l = vec![];
         for h in &handles {
             if let Ok(s) = h.status().await {
-                if s.role == "Leader" { l.push(s.id); }
+                if s.role == "Leader" {
+                    l.push(s.id);
+                }
             }
         }
         l
@@ -137,7 +143,8 @@ async fn test_five_node_election() {
 #[tokio::test]
 async fn test_leader_failover() {
     let (handles, _net) = spawn_cluster(3).await;
-    let leader_id = wait_for_leader(&handles, Duration::from_secs(5)).await
+    let leader_id = wait_for_leader(&handles, Duration::from_secs(5))
+        .await
         .expect("initial election should succeed");
 
     // Shut down the leader.
@@ -145,9 +152,7 @@ async fn test_leader_failover() {
     leader_handle.shutdown().await;
 
     // Remaining nodes should elect a new leader.
-    let remaining: Vec<&RaftHandle> = handles.iter()
-        .filter(|h| h.node_id != leader_id)
-        .collect();
+    let remaining: Vec<&RaftHandle> = handles.iter().filter(|h| h.node_id != leader_id).collect();
 
     let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
     let mut new_leader = None;
@@ -160,10 +165,15 @@ async fn test_leader_failover() {
                 }
             }
         }
-        if new_leader.is_some() { break; }
+        if new_leader.is_some() {
+            break;
+        }
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
-    assert!(new_leader.is_some(), "new leader should be elected after failover");
+    assert!(
+        new_leader.is_some(),
+        "new leader should be elected after failover"
+    );
     assert_ne!(new_leader.unwrap(), leader_id, "should be a different node");
 }
 
@@ -171,14 +181,17 @@ async fn test_leader_failover() {
 #[tokio::test]
 async fn test_pre_vote_prevents_term_inflation() {
     let (handles, network) = spawn_cluster(3).await;
-    let leader_id = wait_for_leader(&handles, Duration::from_secs(5)).await
+    let leader_id = wait_for_leader(&handles, Duration::from_secs(5))
+        .await
         .expect("leader elected");
 
     // Record initial term.
-    let initial_term = handles.iter()
+    let initial_term = handles
+        .iter()
         .find(|h| h.node_id == leader_id)
         .unwrap()
-        .status().await
+        .status()
+        .await
         .unwrap()
         .term;
 
@@ -195,15 +208,20 @@ async fn test_pre_vote_prevents_term_inflation() {
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Leader's term should not have been disrupted significantly.
-    if let Ok(s) = handles.iter()
+    if let Ok(s) = handles
+        .iter()
         .find(|h| h.node_id == leader_id)
         .unwrap()
-        .status().await
+        .status()
+        .await
     {
         // With pre-vote, isolated node's attempts should not have caused a term bump
         // (it can't get pre-votes). Without pre-vote it could disrupt the leader.
-        assert!(s.term <= initial_term + 2,
-            "pre-vote should prevent large term inflation, term={}", s.term);
+        assert!(
+            s.term <= initial_term + 2,
+            "pre-vote should prevent large term inflation, term={}",
+            s.term
+        );
     }
 }
 
@@ -211,11 +229,13 @@ async fn test_pre_vote_prevents_term_inflation() {
 #[tokio::test]
 async fn test_leadership_transfer() {
     let (handles, _net) = spawn_cluster(3).await;
-    let leader_id = wait_for_leader(&handles, Duration::from_secs(5)).await
+    let leader_id = wait_for_leader(&handles, Duration::from_secs(5))
+        .await
         .expect("leader elected");
 
     // Find a non-leader node to transfer to.
-    let target = handles.iter()
+    let target = handles
+        .iter()
         .find(|h| h.node_id != leader_id)
         .unwrap()
         .node_id;
@@ -229,18 +249,23 @@ async fn test_leadership_transfer() {
     tokio::time::sleep(Duration::from_millis(1000)).await;
     let new_leader = get_leader(&handles).await;
     // Either target became leader or another election happened.
-    assert!(new_leader.is_some(), "cluster should still have a leader after transfer");
+    assert!(
+        new_leader.is_some(),
+        "cluster should still have a leader after transfer"
+    );
 }
 
 /// Quorum loss: when majority is partitioned, leader steps down (check-quorum).
 #[tokio::test]
 async fn test_check_quorum_stepdown() {
     let (handles, network) = spawn_cluster(3).await;
-    let leader_id = wait_for_leader(&handles, Duration::from_secs(5)).await
+    let leader_id = wait_for_leader(&handles, Duration::from_secs(5))
+        .await
         .expect("leader elected");
 
     // Partition the leader from both followers.
-    let followers: Vec<NodeId> = handles.iter()
+    let followers: Vec<NodeId> = handles
+        .iter()
         .filter(|h| h.node_id != leader_id)
         .map(|h| h.node_id)
         .collect();

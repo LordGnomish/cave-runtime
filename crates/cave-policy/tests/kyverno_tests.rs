@@ -3,19 +3,20 @@
 //! Kyverno engine integration tests.
 
 use cave_policy::kyverno::{
-    jmespath,
+    KyvernoEngine, jmespath,
     models::{
         ClusterPolicy, Conditions, MatchResources, Mutation, ObjectMeta, PolicyException,
-        PolicyExceptionEntry, PolicyExceptionSpec, PolicySpec, ResourceDescription,
-        ResourceFilter, Validation, ValidationFailureAction,
+        PolicyExceptionEntry, PolicyExceptionSpec, PolicySpec, ResourceDescription, ResourceFilter,
+        Validation, ValidationFailureAction,
     },
-    KyvernoEngine,
 };
 use serde_json::json;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-fn make_engine() -> KyvernoEngine { KyvernoEngine::new() }
+fn make_engine() -> KyvernoEngine {
+    KyvernoEngine::new()
+}
 
 fn pod_resource(namespace: &str, name: &str, labels: serde_json::Value) -> serde_json::Value {
     json!({
@@ -32,7 +33,11 @@ fn pod_resource(namespace: &str, name: &str, labels: serde_json::Value) -> serde
     })
 }
 
-fn make_policy(name: &str, rules: Vec<cave_policy::kyverno::models::KyvernoRule>, action: ValidationFailureAction) -> ClusterPolicy {
+fn make_policy(
+    name: &str,
+    rules: Vec<cave_policy::kyverno::models::KyvernoRule>,
+    action: ValidationFailureAction,
+) -> ClusterPolicy {
     ClusterPolicy {
         api_version: "kyverno.io/v1".into(),
         kind: "ClusterPolicy".into(),
@@ -292,15 +297,19 @@ fn validate_rule(name: &str, match_res: MatchResources, validation: Validation) 
 fn test_validate_required_labels() {
     let mut engine = make_engine();
 
-    let policy = make_policy("require-labels", vec![validate_rule(
-        "check-team-label",
-        match_pods("default"),
-        Validation {
-            message: Some("Pod must have 'team' label".to_string()),
-            pattern: Some(json!({"metadata": {"labels": {"team": "?*"}}})),
-            ..Default::default()
-        },
-    )], ValidationFailureAction::Enforce);
+    let policy = make_policy(
+        "require-labels",
+        vec![validate_rule(
+            "check-team-label",
+            match_pods("default"),
+            Validation {
+                message: Some("Pod must have 'team' label".to_string()),
+                pattern: Some(json!({"metadata": {"labels": {"team": "?*"}}})),
+                ..Default::default()
+            },
+        )],
+        ValidationFailureAction::Enforce,
+    );
 
     engine.add_cluster_policy(policy);
 
@@ -319,18 +328,22 @@ fn test_validate_required_labels() {
 fn test_validate_any_pattern() {
     let mut engine = make_engine();
 
-    let policy = make_policy("require-resources", vec![validate_rule(
-        "check-resources",
-        match_pods("default"),
-        Validation {
-            message: Some("Must have limits or requests".to_string()),
-            any_pattern: Some(vec![
-                json!({"spec": {"containers": [{"resources": {"limits": {"memory": "?*"}}}]}}),
-                json!({"spec": {"containers": [{"resources": {"requests": {"memory": "?*"}}}]}}),
-            ]),
-            ..Default::default()
-        },
-    )], ValidationFailureAction::Enforce);
+    let policy = make_policy(
+        "require-resources",
+        vec![validate_rule(
+            "check-resources",
+            match_pods("default"),
+            Validation {
+                message: Some("Must have limits or requests".to_string()),
+                any_pattern: Some(vec![
+                    json!({"spec": {"containers": [{"resources": {"limits": {"memory": "?*"}}}]}}),
+                    json!({"spec": {"containers": [{"resources": {"requests": {"memory": "?*"}}}]}}),
+                ]),
+                ..Default::default()
+            },
+        )],
+        ValidationFailureAction::Enforce,
+    );
 
     engine.add_cluster_policy(policy);
 
@@ -351,15 +364,19 @@ fn test_validate_any_pattern() {
 fn test_validate_audit_mode() {
     let mut engine = make_engine();
 
-    let policy = make_policy("audit-labels", vec![validate_rule(
-        "check-env-label",
-        match_pods("default"),
-        Validation {
-            message: Some("Pod must have 'env' label".to_string()),
-            pattern: Some(json!({"metadata": {"labels": {"env": "?*"}}})),
-            ..Default::default()
-        },
-    )], ValidationFailureAction::Audit);
+    let policy = make_policy(
+        "audit-labels",
+        vec![validate_rule(
+            "check-env-label",
+            match_pods("default"),
+            Validation {
+                message: Some("Pod must have 'env' label".to_string()),
+                pattern: Some(json!({"metadata": {"labels": {"env": "?*"}}})),
+                ..Default::default()
+            },
+        )],
+        ValidationFailureAction::Audit,
+    );
 
     engine.add_cluster_policy(policy);
 
@@ -367,34 +384,47 @@ fn test_validate_audit_mode() {
     let pod = pod_resource("default", "untagged", json!({}));
     let result = engine.evaluate(&pod, Some("default"), "CREATE", None);
     assert!(result.allowed, "audit mode should allow violations");
-    assert!(!result.violations.is_empty(), "audit mode should report violations");
+    assert!(
+        !result.violations.is_empty(),
+        "audit mode should report violations"
+    );
 }
 
 #[test]
 fn test_validate_namespace_scope() {
     let mut engine = make_engine();
 
-    let policy = make_policy("ns-scoped", vec![validate_rule(
-        "check-in-restricted",
-        match_pods("restricted"),
-        Validation {
-            message: Some("Must have security label".to_string()),
-            pattern: Some(json!({"metadata": {"labels": {"security": "?*"}}})),
-            ..Default::default()
-        },
-    )], ValidationFailureAction::Enforce);
+    let policy = make_policy(
+        "ns-scoped",
+        vec![validate_rule(
+            "check-in-restricted",
+            match_pods("restricted"),
+            Validation {
+                message: Some("Must have security label".to_string()),
+                pattern: Some(json!({"metadata": {"labels": {"security": "?*"}}})),
+                ..Default::default()
+            },
+        )],
+        ValidationFailureAction::Enforce,
+    );
 
     engine.add_cluster_policy(policy);
 
     // Pod in "default" — not subject to this policy
     let pod_default = pod_resource("default", "any-pod", json!({}));
     let result = engine.evaluate(&pod_default, Some("default"), "CREATE", None);
-    assert!(result.allowed, "pod in default ns should bypass restricted-ns policy");
+    assert!(
+        result.allowed,
+        "pod in default ns should bypass restricted-ns policy"
+    );
 
     // Pod in "restricted" — must have label
     let pod_restricted = pod_resource("restricted", "unlabeled", json!({}));
     let result = engine.evaluate(&pod_restricted, Some("restricted"), "CREATE", None);
-    assert!(!result.allowed, "pod in restricted ns without label should be denied");
+    assert!(
+        !result.allowed,
+        "pod in restricted ns without label should be denied"
+    );
 }
 
 #[test]
@@ -403,33 +433,40 @@ fn test_validate_label_selector() {
 
     let mut engine = make_engine();
 
-    let policy = make_policy("selector-policy", vec![validate_rule(
-        "check-selected",
-        MatchResources {
-            resources: Some(ResourceDescription {
-                kinds: vec!["Pod".to_string()],
-                namespaces: vec!["default".to_string()],
-                selector: Some(LabelSelector {
-                    match_labels: [("tier".to_string(), "frontend".to_string())].into(),
-                    match_expressions: vec![],
+    let policy = make_policy(
+        "selector-policy",
+        vec![validate_rule(
+            "check-selected",
+            MatchResources {
+                resources: Some(ResourceDescription {
+                    kinds: vec!["Pod".to_string()],
+                    namespaces: vec!["default".to_string()],
+                    selector: Some(LabelSelector {
+                        match_labels: [("tier".to_string(), "frontend".to_string())].into(),
+                        match_expressions: vec![],
+                    }),
+                    ..Default::default()
                 }),
                 ..Default::default()
-            }),
-            ..Default::default()
-        },
-        Validation {
-            message: Some("Frontend pods must have version label".to_string()),
-            pattern: Some(json!({"metadata": {"labels": {"version": "?*"}}})),
-            ..Default::default()
-        },
-    )], ValidationFailureAction::Enforce);
+            },
+            Validation {
+                message: Some("Frontend pods must have version label".to_string()),
+                pattern: Some(json!({"metadata": {"labels": {"version": "?*"}}})),
+                ..Default::default()
+            },
+        )],
+        ValidationFailureAction::Enforce,
+    );
 
     engine.add_cluster_policy(policy);
 
     // Frontend pod without version — denied
     let frontend = pod_resource("default", "fe-pod", json!({"tier": "frontend"}));
     let result = engine.evaluate(&frontend, Some("default"), "CREATE", None);
-    assert!(!result.allowed, "frontend pod without version should be denied");
+    assert!(
+        !result.allowed,
+        "frontend pod without version should be denied"
+    );
 
     // Backend pod — not selected
     let backend = pod_resource("default", "be-pod", json!({"tier": "backend"}));
@@ -443,24 +480,28 @@ fn test_validate_label_selector() {
 fn test_mutate_add_label() {
     let mut engine = make_engine();
 
-    let policy = make_policy("add-managed-label", vec![KyvernoRule {
-        name: "add-label".to_string(),
-        match_resources: match_pods("default"),
-        exclude: None,
-        context: vec![],
-        preconditions: None,
-        validate: None,
-        mutate: Some(Mutation {
-            patch_strategic_merge: Some(json!({
-                "metadata": {"labels": {"managed-by": "kyverno"}}
-            })),
-            patches_json6902: None,
-            foreach: vec![],
-            targets: vec![],
-        }),
-        generate: None,
-        verify_images: vec![],
-    }], ValidationFailureAction::Enforce);
+    let policy = make_policy(
+        "add-managed-label",
+        vec![KyvernoRule {
+            name: "add-label".to_string(),
+            match_resources: match_pods("default"),
+            exclude: None,
+            context: vec![],
+            preconditions: None,
+            validate: None,
+            mutate: Some(Mutation {
+                patch_strategic_merge: Some(json!({
+                    "metadata": {"labels": {"managed-by": "kyverno"}}
+                })),
+                patches_json6902: None,
+                foreach: vec![],
+                targets: vec![],
+            }),
+            generate: None,
+            verify_images: vec![],
+        }],
+        ValidationFailureAction::Enforce,
+    );
 
     engine.add_cluster_policy(policy);
 
@@ -474,26 +515,33 @@ fn test_mutate_add_label() {
 fn test_mutate_json_patch() {
     let mut engine = make_engine();
 
-    let policy = make_policy("add-annotation", vec![KyvernoRule {
-        name: "add-annotation".to_string(),
-        match_resources: match_pods("default"),
-        exclude: None,
-        context: vec![],
-        preconditions: None,
-        validate: None,
-        mutate: Some(Mutation {
-            patch_strategic_merge: None,
-            patches_json6902: Some(r#"
+    let policy = make_policy(
+        "add-annotation",
+        vec![KyvernoRule {
+            name: "add-annotation".to_string(),
+            match_resources: match_pods("default"),
+            exclude: None,
+            context: vec![],
+            preconditions: None,
+            validate: None,
+            mutate: Some(Mutation {
+                patch_strategic_merge: None,
+                patches_json6902: Some(
+                    r#"
 - op: add
   path: /metadata/annotations/policy-applied
   value: kyverno
-"#.to_string()),
-            foreach: vec![],
-            targets: vec![],
-        }),
-        generate: None,
-        verify_images: vec![],
-    }], ValidationFailureAction::Enforce);
+"#
+                    .to_string(),
+                ),
+                foreach: vec![],
+                targets: vec![],
+            }),
+            generate: None,
+            verify_images: vec![],
+        }],
+        ValidationFailureAction::Enforce,
+    );
 
     engine.add_cluster_policy(policy);
 
@@ -510,38 +558,42 @@ fn test_generate_configmap() {
 
     let mut engine = make_engine();
 
-    let policy = make_policy("gen-configmap", vec![KyvernoRule {
-        name: "create-default-cm".to_string(),
-        match_resources: MatchResources {
-            resources: Some(ResourceDescription {
-                kinds: vec!["Namespace".to_string()],
-                operations: vec!["CREATE".to_string()],
+    let policy = make_policy(
+        "gen-configmap",
+        vec![KyvernoRule {
+            name: "create-default-cm".to_string(),
+            match_resources: MatchResources {
+                resources: Some(ResourceDescription {
+                    kinds: vec!["Namespace".to_string()],
+                    operations: vec!["CREATE".to_string()],
+                    ..Default::default()
+                }),
                 ..Default::default()
+            },
+            exclude: None,
+            context: vec![],
+            preconditions: None,
+            validate: None,
+            mutate: None,
+            generate: Some(Generation {
+                api_version: "v1".to_string(),
+                kind: "ConfigMap".to_string(),
+                name: "default-config".to_string(),
+                namespace: Some("{{request.object.metadata.name}}".to_string()),
+                synchronize: true,
+                data: Some(json!({
+                    "apiVersion": "v1",
+                    "kind": "ConfigMap",
+                    "metadata": {"name": "default-config"},
+                    "data": {"env": "production"}
+                })),
+                clone: None,
+                clone_list: None,
             }),
-            ..Default::default()
-        },
-        exclude: None,
-        context: vec![],
-        preconditions: None,
-        validate: None,
-        mutate: None,
-        generate: Some(Generation {
-            api_version: "v1".to_string(),
-            kind: "ConfigMap".to_string(),
-            name: "default-config".to_string(),
-            namespace: Some("{{request.object.metadata.name}}".to_string()),
-            synchronize: true,
-            data: Some(json!({
-                "apiVersion": "v1",
-                "kind": "ConfigMap",
-                "metadata": {"name": "default-config"},
-                "data": {"env": "production"}
-            })),
-            clone: None,
-            clone_list: None,
-        }),
-        verify_images: vec![],
-    }], ValidationFailureAction::Enforce);
+            verify_images: vec![],
+        }],
+        ValidationFailureAction::Enforce,
+    );
 
     engine.add_cluster_policy(policy);
 
@@ -552,7 +604,10 @@ fn test_generate_configmap() {
     });
     let result = engine.evaluate(&ns, None, "CREATE", None);
     assert!(result.allowed);
-    assert!(!result.generated.is_empty(), "should have generated resources");
+    assert!(
+        !result.generated.is_empty(),
+        "should have generated resources"
+    );
     let generated = &result.generated[0];
     assert_eq!(generated.resource["kind"], json!("ConfigMap"));
 }
@@ -563,15 +618,19 @@ fn test_generate_configmap() {
 fn test_policy_exception() {
     let mut engine = make_engine();
 
-    let policy = make_policy("require-team-label", vec![validate_rule(
-        "check-team",
-        match_pods("default"),
-        Validation {
-            message: Some("Must have team label".to_string()),
-            pattern: Some(json!({"metadata": {"labels": {"team": "?*"}}})),
-            ..Default::default()
-        },
-    )], ValidationFailureAction::Enforce);
+    let policy = make_policy(
+        "require-team-label",
+        vec![validate_rule(
+            "check-team",
+            match_pods("default"),
+            Validation {
+                message: Some("Must have team label".to_string()),
+                pattern: Some(json!({"metadata": {"labels": {"team": "?*"}}})),
+                ..Default::default()
+            },
+        )],
+        ValidationFailureAction::Enforce,
+    );
 
     engine.add_cluster_policy(policy);
 
@@ -624,41 +683,45 @@ fn test_exclude_resources() {
 
     let mut engine = make_engine();
 
-    let policy = make_policy("exclude-kube-system", vec![KyvernoRule {
-        name: "require-team".to_string(),
-        match_resources: MatchResources {
-            resources: Some(ResourceDescription {
-                kinds: vec!["Pod".to_string()],
-                ..Default::default()
-            }),
-            ..Default::default()
-        },
-        exclude: Some(ExcludeResources {
-            any: vec![ResourceFilter {
+    let policy = make_policy(
+        "exclude-kube-system",
+        vec![KyvernoRule {
+            name: "require-team".to_string(),
+            match_resources: MatchResources {
                 resources: Some(ResourceDescription {
                     kinds: vec!["Pod".to_string()],
-                    namespaces: vec!["kube-system".to_string()],
                     ..Default::default()
                 }),
+                ..Default::default()
+            },
+            exclude: Some(ExcludeResources {
+                any: vec![ResourceFilter {
+                    resources: Some(ResourceDescription {
+                        kinds: vec!["Pod".to_string()],
+                        namespaces: vec!["kube-system".to_string()],
+                        ..Default::default()
+                    }),
+                    subjects: vec![],
+                    roles: vec![],
+                    cluster_roles: vec![],
+                }],
+                all: vec![],
+                resources: None,
                 subjects: vec![],
-                roles: vec![],
-                cluster_roles: vec![],
-            }],
-            all: vec![],
-            resources: None,
-            subjects: vec![],
-        }),
-        context: vec![],
-        preconditions: None,
-        validate: Some(Validation {
-            message: Some("Must have team label".to_string()),
-            pattern: Some(json!({"metadata": {"labels": {"team": "?*"}}})),
-            ..Default::default()
-        }),
-        mutate: None,
-        generate: None,
-        verify_images: vec![],
-    }], ValidationFailureAction::Enforce);
+            }),
+            context: vec![],
+            preconditions: None,
+            validate: Some(Validation {
+                message: Some("Must have team label".to_string()),
+                pattern: Some(json!({"metadata": {"labels": {"team": "?*"}}})),
+                ..Default::default()
+            }),
+            mutate: None,
+            generate: None,
+            verify_images: vec![],
+        }],
+        ValidationFailureAction::Enforce,
+    );
 
     engine.add_cluster_policy(policy);
 
@@ -670,7 +733,10 @@ fn test_exclude_resources() {
     // Pod in default — must have label
     let app_pod = pod_resource("default", "app", json!({}));
     let result = engine.evaluate(&app_pod, Some("default"), "CREATE", None);
-    assert!(!result.allowed, "default pod without label should be denied");
+    assert!(
+        !result.allowed,
+        "default pod without label should be denied"
+    );
 }
 
 // ─── Multiple Rules Tests ─────────────────────────────────────────────────────
@@ -679,18 +745,30 @@ fn test_exclude_resources() {
 fn test_multiple_rules_all_must_pass() {
     let mut engine = make_engine();
 
-    let policy = make_policy("multi-rule", vec![
-        validate_rule("check-team", match_pods("default"), Validation {
-            message: Some("Must have team label".to_string()),
-            pattern: Some(json!({"metadata": {"labels": {"team": "?*"}}})),
-            ..Default::default()
-        }),
-        validate_rule("check-env", match_pods("default"), Validation {
-            message: Some("Must have env label".to_string()),
-            pattern: Some(json!({"metadata": {"labels": {"env": "?*"}}})),
-            ..Default::default()
-        }),
-    ], ValidationFailureAction::Enforce);
+    let policy = make_policy(
+        "multi-rule",
+        vec![
+            validate_rule(
+                "check-team",
+                match_pods("default"),
+                Validation {
+                    message: Some("Must have team label".to_string()),
+                    pattern: Some(json!({"metadata": {"labels": {"team": "?*"}}})),
+                    ..Default::default()
+                },
+            ),
+            validate_rule(
+                "check-env",
+                match_pods("default"),
+                Validation {
+                    message: Some("Must have env label".to_string()),
+                    pattern: Some(json!({"metadata": {"labels": {"env": "?*"}}})),
+                    ..Default::default()
+                },
+            ),
+        ],
+        ValidationFailureAction::Enforce,
+    );
 
     engine.add_cluster_policy(policy);
 
@@ -718,15 +796,19 @@ fn test_multiple_rules_all_must_pass() {
 fn test_add_remove_policy() {
     let mut engine = make_engine();
 
-    let policy = make_policy("temp-policy", vec![validate_rule(
-        "check",
-        match_pods("default"),
-        Validation {
-            message: Some("Must have label".to_string()),
-            pattern: Some(json!({"metadata": {"labels": {"x": "?*"}}})),
-            ..Default::default()
-        },
-    )], ValidationFailureAction::Enforce);
+    let policy = make_policy(
+        "temp-policy",
+        vec![validate_rule(
+            "check",
+            match_pods("default"),
+            Validation {
+                message: Some("Must have label".to_string()),
+                pattern: Some(json!({"metadata": {"labels": {"x": "?*"}}})),
+                ..Default::default()
+            },
+        )],
+        ValidationFailureAction::Enforce,
+    );
 
     engine.add_cluster_policy(policy);
 
@@ -747,9 +829,21 @@ fn test_add_remove_policy() {
 fn test_list_policies() {
     let mut engine = make_engine();
 
-    engine.add_cluster_policy(make_policy("policy-a", vec![], ValidationFailureAction::Audit));
-    engine.add_cluster_policy(make_policy("policy-b", vec![], ValidationFailureAction::Audit));
-    engine.add_cluster_policy(make_policy("policy-c", vec![], ValidationFailureAction::Audit));
+    engine.add_cluster_policy(make_policy(
+        "policy-a",
+        vec![],
+        ValidationFailureAction::Audit,
+    ));
+    engine.add_cluster_policy(make_policy(
+        "policy-b",
+        vec![],
+        ValidationFailureAction::Audit,
+    ));
+    engine.add_cluster_policy(make_policy(
+        "policy-c",
+        vec![],
+        ValidationFailureAction::Audit,
+    ));
 
     let policies = engine.list_cluster_policies();
     assert_eq!(policies.len(), 3);
@@ -763,7 +857,11 @@ fn test_list_policies() {
 fn test_get_policy() {
     let mut engine = make_engine();
 
-    engine.add_cluster_policy(make_policy("my-policy", vec![], ValidationFailureAction::Audit));
+    engine.add_cluster_policy(make_policy(
+        "my-policy",
+        vec![],
+        ValidationFailureAction::Audit,
+    ));
 
     assert!(engine.get_cluster_policy("my-policy").is_some());
     assert!(engine.get_cluster_policy("nonexistent").is_none());

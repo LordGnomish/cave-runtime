@@ -41,7 +41,11 @@ pub struct OciProcess {
 pub struct OciUser {
     pub uid: u32,
     pub gid: u32,
-    #[serde(rename = "additionalGids", skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(
+        rename = "additionalGids",
+        skip_serializing_if = "Vec::is_empty",
+        default
+    )]
     pub additional_gids: Vec<u32>,
 }
 
@@ -190,19 +194,36 @@ fn default_mounts() -> Vec<OciMount> {
             destination: "/dev".into(),
             mount_type: "tmpfs".into(),
             source: "tmpfs".into(),
-            options: vec!["nosuid".into(), "strictatime".into(), "mode=755".into(), "size=65536k".into()],
+            options: vec![
+                "nosuid".into(),
+                "strictatime".into(),
+                "mode=755".into(),
+                "size=65536k".into(),
+            ],
         },
         OciMount {
             destination: "/dev/pts".into(),
             mount_type: "devpts".into(),
             source: "devpts".into(),
-            options: vec!["nosuid".into(), "noexec".into(), "newinstance".into(), "ptmxmode=0666".into(), "mode=0620".into()],
+            options: vec![
+                "nosuid".into(),
+                "noexec".into(),
+                "newinstance".into(),
+                "ptmxmode=0666".into(),
+                "mode=0620".into(),
+            ],
         },
         OciMount {
             destination: "/dev/shm".into(),
             mount_type: "tmpfs".into(),
             source: "shm".into(),
-            options: vec!["nosuid".into(), "noexec".into(), "nodev".into(), "mode=1777".into(), "size=65536k".into()],
+            options: vec![
+                "nosuid".into(),
+                "noexec".into(),
+                "nodev".into(),
+                "mode=1777".into(),
+                "size=65536k".into(),
+            ],
         },
         OciMount {
             destination: "/dev/mqueue".into(),
@@ -214,13 +235,23 @@ fn default_mounts() -> Vec<OciMount> {
             destination: "/sys".into(),
             mount_type: "sysfs".into(),
             source: "sysfs".into(),
-            options: vec!["nosuid".into(), "noexec".into(), "nodev".into(), "ro".into()],
+            options: vec![
+                "nosuid".into(),
+                "noexec".into(),
+                "nodev".into(),
+                "ro".into(),
+            ],
         },
         OciMount {
             destination: "/sys/fs/cgroup".into(),
             mount_type: "cgroup2".into(),
             source: "cgroup2".into(),
-            options: vec!["nosuid".into(), "noexec".into(), "nodev".into(), "relatime".into()],
+            options: vec![
+                "nosuid".into(),
+                "noexec".into(),
+                "nodev".into(),
+                "relatime".into(),
+            ],
         },
     ]
 }
@@ -228,56 +259,176 @@ fn default_mounts() -> Vec<OciMount> {
 fn default_seccomp() -> OciSeccomp {
     OciSeccomp {
         default_action: "SCMP_ACT_ERRNO".into(),
-        architectures: vec!["SCMP_ARCH_X86_64".into(), "SCMP_ARCH_X86".into(), "SCMP_ARCH_X32".into()],
-        syscalls: vec![
-            OciSyscall {
-                names: vec![
-                    "accept".into(), "accept4".into(), "access".into(), "arch_prctl".into(),
-                    "bind".into(), "brk".into(), "capget".into(), "capset".into(),
-                    "chdir".into(), "chmod".into(), "chown".into(), "clone".into(),
-                    "close".into(), "connect".into(), "dup".into(), "dup2".into(), "dup3".into(),
-                    "epoll_create".into(), "epoll_create1".into(), "epoll_ctl".into(),
-                    "epoll_pwait".into(), "epoll_wait".into(), "eventfd".into(), "eventfd2".into(),
-                    "execve".into(), "execveat".into(), "exit".into(), "exit_group".into(),
-                    "faccessat".into(), "fchmod".into(), "fchmodat".into(), "fchown".into(),
-                    "fchownat".into(), "fcntl".into(), "fdatasync".into(), "fgetxattr".into(),
-                    "flistxattr".into(), "flock".into(), "fork".into(), "fsetxattr".into(),
-                    "fstat".into(), "fstatfs".into(), "fsync".into(), "ftruncate".into(),
-                    "futex".into(), "getcwd".into(), "getdents".into(), "getdents64".into(),
-                    "getegid".into(), "geteuid".into(), "getgid".into(), "getgroups".into(),
-                    "getpeername".into(), "getpgrp".into(), "getpid".into(), "getppid".into(),
-                    "getrandom".into(), "getrlimit".into(), "getsockname".into(),
-                    "getsockopt".into(), "gettid".into(), "gettimeofday".into(), "getuid".into(),
-                    "kill".into(), "lchown".into(), "listen".into(), "lseek".into(),
-                    "lstat".into(), "madvise".into(), "mkdir".into(), "mkdirat".into(),
-                    "mknod".into(), "mknodat".into(), "mlock".into(), "mmap".into(),
-                    "mount".into(), "mprotect".into(), "munlock".into(), "munmap".into(),
-                    "nanosleep".into(), "newfstatat".into(), "open".into(), "openat".into(),
-                    "pause".into(), "pipe".into(), "pipe2".into(), "poll".into(), "ppoll".into(),
-                    "prctl".into(), "pread64".into(), "prlimit64".into(), "pwrite64".into(),
-                    "read".into(), "readlink".into(), "readlinkat".into(), "readv".into(),
-                    "recv".into(), "recvfrom".into(), "recvmmsg".into(), "recvmsg".into(),
-                    "rename".into(), "renameat".into(), "renameat2".into(), "rmdir".into(),
-                    "rt_sigaction".into(), "rt_sigprocmask".into(), "rt_sigreturn".into(),
-                    "rt_sigsuspend".into(), "rt_sigtimedwait".into(), "sched_getaffinity".into(),
-                    "sched_getparam".into(), "sched_getscheduler".into(), "sched_yield".into(),
-                    "send".into(), "sendfile".into(), "sendmmsg".into(), "sendmsg".into(),
-                    "sendto".into(), "set_robust_list".into(), "setgid".into(), "setgroups".into(),
-                    "setitimer".into(), "setpgid".into(), "setrlimit".into(), "setsid".into(),
-                    "setsockopt".into(), "setuid".into(), "sigaltstack".into(), "socket".into(),
-                    "socketpair".into(), "stat".into(), "statfs".into(), "statx".into(),
-                    "symlink".into(), "symlinkat".into(), "sysinfo".into(), "tgkill".into(),
-                    "time".into(), "timer_create".into(), "timer_delete".into(),
-                    "timer_getoverrun".into(), "timer_gettime".into(), "timer_settime".into(),
-                    "timerfd_create".into(), "timerfd_gettime".into(), "timerfd_settime".into(),
-                    "tkill".into(), "truncate".into(), "umask".into(), "uname".into(),
-                    "unlink".into(), "unlinkat".into(), "utime".into(), "utimensat".into(),
-                    "utimes".into(), "vfork".into(), "wait4".into(), "waitid".into(),
-                    "write".into(), "writev".into(),
-                ],
-                action: "SCMP_ACT_ALLOW".into(),
-            },
+        architectures: vec![
+            "SCMP_ARCH_X86_64".into(),
+            "SCMP_ARCH_X86".into(),
+            "SCMP_ARCH_X32".into(),
         ],
+        syscalls: vec![OciSyscall {
+            names: vec![
+                "accept".into(),
+                "accept4".into(),
+                "access".into(),
+                "arch_prctl".into(),
+                "bind".into(),
+                "brk".into(),
+                "capget".into(),
+                "capset".into(),
+                "chdir".into(),
+                "chmod".into(),
+                "chown".into(),
+                "clone".into(),
+                "close".into(),
+                "connect".into(),
+                "dup".into(),
+                "dup2".into(),
+                "dup3".into(),
+                "epoll_create".into(),
+                "epoll_create1".into(),
+                "epoll_ctl".into(),
+                "epoll_pwait".into(),
+                "epoll_wait".into(),
+                "eventfd".into(),
+                "eventfd2".into(),
+                "execve".into(),
+                "execveat".into(),
+                "exit".into(),
+                "exit_group".into(),
+                "faccessat".into(),
+                "fchmod".into(),
+                "fchmodat".into(),
+                "fchown".into(),
+                "fchownat".into(),
+                "fcntl".into(),
+                "fdatasync".into(),
+                "fgetxattr".into(),
+                "flistxattr".into(),
+                "flock".into(),
+                "fork".into(),
+                "fsetxattr".into(),
+                "fstat".into(),
+                "fstatfs".into(),
+                "fsync".into(),
+                "ftruncate".into(),
+                "futex".into(),
+                "getcwd".into(),
+                "getdents".into(),
+                "getdents64".into(),
+                "getegid".into(),
+                "geteuid".into(),
+                "getgid".into(),
+                "getgroups".into(),
+                "getpeername".into(),
+                "getpgrp".into(),
+                "getpid".into(),
+                "getppid".into(),
+                "getrandom".into(),
+                "getrlimit".into(),
+                "getsockname".into(),
+                "getsockopt".into(),
+                "gettid".into(),
+                "gettimeofday".into(),
+                "getuid".into(),
+                "kill".into(),
+                "lchown".into(),
+                "listen".into(),
+                "lseek".into(),
+                "lstat".into(),
+                "madvise".into(),
+                "mkdir".into(),
+                "mkdirat".into(),
+                "mknod".into(),
+                "mknodat".into(),
+                "mlock".into(),
+                "mmap".into(),
+                "mount".into(),
+                "mprotect".into(),
+                "munlock".into(),
+                "munmap".into(),
+                "nanosleep".into(),
+                "newfstatat".into(),
+                "open".into(),
+                "openat".into(),
+                "pause".into(),
+                "pipe".into(),
+                "pipe2".into(),
+                "poll".into(),
+                "ppoll".into(),
+                "prctl".into(),
+                "pread64".into(),
+                "prlimit64".into(),
+                "pwrite64".into(),
+                "read".into(),
+                "readlink".into(),
+                "readlinkat".into(),
+                "readv".into(),
+                "recv".into(),
+                "recvfrom".into(),
+                "recvmmsg".into(),
+                "recvmsg".into(),
+                "rename".into(),
+                "renameat".into(),
+                "renameat2".into(),
+                "rmdir".into(),
+                "rt_sigaction".into(),
+                "rt_sigprocmask".into(),
+                "rt_sigreturn".into(),
+                "rt_sigsuspend".into(),
+                "rt_sigtimedwait".into(),
+                "sched_getaffinity".into(),
+                "sched_getparam".into(),
+                "sched_getscheduler".into(),
+                "sched_yield".into(),
+                "send".into(),
+                "sendfile".into(),
+                "sendmmsg".into(),
+                "sendmsg".into(),
+                "sendto".into(),
+                "set_robust_list".into(),
+                "setgid".into(),
+                "setgroups".into(),
+                "setitimer".into(),
+                "setpgid".into(),
+                "setrlimit".into(),
+                "setsid".into(),
+                "setsockopt".into(),
+                "setuid".into(),
+                "sigaltstack".into(),
+                "socket".into(),
+                "socketpair".into(),
+                "stat".into(),
+                "statfs".into(),
+                "statx".into(),
+                "symlink".into(),
+                "symlinkat".into(),
+                "sysinfo".into(),
+                "tgkill".into(),
+                "time".into(),
+                "timer_create".into(),
+                "timer_delete".into(),
+                "timer_getoverrun".into(),
+                "timer_gettime".into(),
+                "timer_settime".into(),
+                "timerfd_create".into(),
+                "timerfd_gettime".into(),
+                "timerfd_settime".into(),
+                "tkill".into(),
+                "truncate".into(),
+                "umask".into(),
+                "uname".into(),
+                "unlink".into(),
+                "unlinkat".into(),
+                "utime".into(),
+                "utimensat".into(),
+                "utimes".into(),
+                "vfork".into(),
+                "wait4".into(),
+                "waitid".into(),
+                "write".into(),
+                "writev".into(),
+            ],
+            action: "SCMP_ACT_ALLOW".into(),
+        }],
     }
 }
 
@@ -298,35 +449,63 @@ pub fn generate(spec: &ContainerSpec, rootfs: &PathBuf, container_id: &str) -> O
         oci_version: "1.0.2-dev".into(),
         process: OciProcess {
             terminal: false,
-            user: OciUser { uid: 0, gid: 0, additional_gids: vec![] },
+            user: OciUser {
+                uid: 0,
+                gid: 0,
+                additional_gids: vec![],
+            },
             args,
             env,
             cwd,
             capabilities: OciCapabilities::default_container(),
             no_new_privileges: true,
-            rlimits: vec![
-                OciRlimit { kind: "RLIMIT_NOFILE".into(), hard: 1024, soft: 1024 },
-            ],
+            rlimits: vec![OciRlimit {
+                kind: "RLIMIT_NOFILE".into(),
+                hard: 1024,
+                soft: 1024,
+            }],
         },
         root: OciRoot {
             path: rootfs.to_string_lossy().into_owned(),
             readonly: false,
         },
-        hostname: spec.hostname.clone().unwrap_or_else(|| container_id[..12.min(container_id.len())].to_string()),
+        hostname: spec
+            .hostname
+            .clone()
+            .unwrap_or_else(|| container_id[..12.min(container_id.len())].to_string()),
         mounts,
         linux: OciLinux {
             namespaces: vec![
-                OciNamespace { kind: "pid".into(),  path: None },
-                OciNamespace { kind: "ipc".into(),  path: None },
-                OciNamespace { kind: "uts".into(),  path: None },
-                OciNamespace { kind: "mount".into(), path: None },
-                OciNamespace { kind: "network".into(), path: None },
+                OciNamespace {
+                    kind: "pid".into(),
+                    path: None,
+                },
+                OciNamespace {
+                    kind: "ipc".into(),
+                    path: None,
+                },
+                OciNamespace {
+                    kind: "uts".into(),
+                    path: None,
+                },
+                OciNamespace {
+                    kind: "mount".into(),
+                    path: None,
+                },
+                OciNamespace {
+                    kind: "network".into(),
+                    path: None,
+                },
             ],
             resources: OciResources {
                 cpu: OciCpu {
                     shares: spec.resources.cpu_shares,
                     quota: spec.resources.cpu_quota,
-                    period: if spec.resources.cpu_quota.is_some() { Some(100_000) } else { None },
+                    period: if spec.resources.cpu_quota.is_some() {
+                        Some(100_000)
+                    } else {
+                        None
+                    },
                 },
                 memory: OciMemory {
                     limit: spec.resources.memory_limit.map(|v| v as i64),
@@ -379,7 +558,9 @@ fn build_args(spec: &ContainerSpec) -> Vec<String> {
 }
 
 fn build_env(spec: &ContainerSpec) -> Vec<String> {
-    let mut env: Vec<String> = spec.env.iter()
+    let mut env: Vec<String> = spec
+        .env
+        .iter()
         .map(|(k, v)| format!("{}={}", k, v))
         .collect();
     // Always inject PATH if not set
@@ -391,16 +572,19 @@ fn build_env(spec: &ContainerSpec) -> Vec<String> {
 
 fn user_mount(m: &Mount) -> OciMount {
     let (mount_type, mut options) = match m.mount_type {
-        MountType::Bind  => ("bind".to_string(), vec!["rbind".to_string()]),
-        MountType::Tmpfs => ("tmpfs".to_string(), vec!["nosuid".to_string(), "noexec".to_string()]),
+        MountType::Bind => ("bind".to_string(), vec!["rbind".to_string()]),
+        MountType::Tmpfs => (
+            "tmpfs".to_string(),
+            vec!["nosuid".to_string(), "noexec".to_string()],
+        ),
         MountType::Volume => ("bind".to_string(), vec!["rbind".to_string()]),
     };
     // Translate CRI mount propagation → OCI options. Cite: containerd v2.2.3
     // `pkg/cri/server/container_create_linux.go` (mount propagation map).
     let prop = match m.propagation {
-        crate::models::MountPropagation::Private        => "rprivate",
+        crate::models::MountPropagation::Private => "rprivate",
         crate::models::MountPropagation::HostToContainer => "rslave",
-        crate::models::MountPropagation::Bidirectional   => "rshared",
+        crate::models::MountPropagation::Bidirectional => "rshared",
     };
     options.push(prop.into());
     if m.read_only {
@@ -438,8 +622,12 @@ pub fn apply_volume_mounts(spec: &mut OciSpec, user_mounts: &[Mount]) {
 /// `pkg/cri/server/container_create_linux.go::setOCISecurityContext` and
 /// runc v1.4.2 `libcontainer/specconv/spec_linux.go`.
 pub fn apply_security_context(spec: &mut OciSpec, sec: &crate::models::SecurityContext) {
-    if let Some(uid) = sec.run_as_user { spec.process.user.uid = uid; }
-    if let Some(gid) = sec.run_as_group { spec.process.user.gid = gid; }
+    if let Some(uid) = sec.run_as_user {
+        spec.process.user.uid = uid;
+    }
+    if let Some(gid) = sec.run_as_group {
+        spec.process.user.gid = gid;
+    }
     if !sec.supplemental_groups.is_empty() {
         spec.process.user.additional_gids = sec.supplemental_groups.clone();
     }
@@ -472,11 +660,19 @@ pub fn apply_security_context(spec: &mut OciSpec, sec: &crate::models::SecurityC
             caps.remove(&normalise_cap(drop));
         }
         // Special-case: "ALL" in drops removes everything
-        if sec.capabilities_drop.iter().any(|c| normalise_cap(c) == "ALL") {
+        if sec
+            .capabilities_drop
+            .iter()
+            .any(|c| normalise_cap(c) == "ALL")
+        {
             caps.clear();
         }
         // And "ALL" in adds expands to the full set
-        if sec.capabilities_add.iter().any(|c| normalise_cap(c) == "ALL") {
+        if sec
+            .capabilities_add
+            .iter()
+            .any(|c| normalise_cap(c) == "ALL")
+        {
             caps = full_capability_set().into_iter().collect();
         }
         let cap_vec: Vec<String> = caps.into_iter().collect();
@@ -508,22 +704,60 @@ pub fn apply_security_context(spec: &mut OciSpec, sec: &crate::models::SecurityC
 
 fn normalise_cap(s: &str) -> String {
     let s = s.trim().to_uppercase();
-    if s.starts_with("CAP_") || s == "ALL" { s } else { format!("CAP_{}", s) }
+    if s.starts_with("CAP_") || s == "ALL" {
+        s
+    } else {
+        format!("CAP_{}", s)
+    }
 }
 
 fn full_capability_set() -> Vec<String> {
     [
-        "CAP_AUDIT_CONTROL", "CAP_AUDIT_READ", "CAP_AUDIT_WRITE", "CAP_BLOCK_SUSPEND",
-        "CAP_BPF", "CAP_CHECKPOINT_RESTORE", "CAP_CHOWN", "CAP_DAC_OVERRIDE",
-        "CAP_DAC_READ_SEARCH", "CAP_FOWNER", "CAP_FSETID", "CAP_IPC_LOCK", "CAP_IPC_OWNER",
-        "CAP_KILL", "CAP_LEASE", "CAP_LINUX_IMMUTABLE", "CAP_MAC_ADMIN", "CAP_MAC_OVERRIDE",
-        "CAP_MKNOD", "CAP_NET_ADMIN", "CAP_NET_BIND_SERVICE", "CAP_NET_BROADCAST",
-        "CAP_NET_RAW", "CAP_PERFMON", "CAP_SETFCAP", "CAP_SETGID", "CAP_SETPCAP",
-        "CAP_SETUID", "CAP_SYS_ADMIN", "CAP_SYS_BOOT", "CAP_SYS_CHROOT", "CAP_SYS_MODULE",
-        "CAP_SYS_NICE", "CAP_SYS_PACCT", "CAP_SYS_PTRACE", "CAP_SYS_RAWIO",
-        "CAP_SYS_RESOURCE", "CAP_SYS_TIME", "CAP_SYS_TTY_CONFIG", "CAP_SYSLOG",
+        "CAP_AUDIT_CONTROL",
+        "CAP_AUDIT_READ",
+        "CAP_AUDIT_WRITE",
+        "CAP_BLOCK_SUSPEND",
+        "CAP_BPF",
+        "CAP_CHECKPOINT_RESTORE",
+        "CAP_CHOWN",
+        "CAP_DAC_OVERRIDE",
+        "CAP_DAC_READ_SEARCH",
+        "CAP_FOWNER",
+        "CAP_FSETID",
+        "CAP_IPC_LOCK",
+        "CAP_IPC_OWNER",
+        "CAP_KILL",
+        "CAP_LEASE",
+        "CAP_LINUX_IMMUTABLE",
+        "CAP_MAC_ADMIN",
+        "CAP_MAC_OVERRIDE",
+        "CAP_MKNOD",
+        "CAP_NET_ADMIN",
+        "CAP_NET_BIND_SERVICE",
+        "CAP_NET_BROADCAST",
+        "CAP_NET_RAW",
+        "CAP_PERFMON",
+        "CAP_SETFCAP",
+        "CAP_SETGID",
+        "CAP_SETPCAP",
+        "CAP_SETUID",
+        "CAP_SYS_ADMIN",
+        "CAP_SYS_BOOT",
+        "CAP_SYS_CHROOT",
+        "CAP_SYS_MODULE",
+        "CAP_SYS_NICE",
+        "CAP_SYS_PACCT",
+        "CAP_SYS_PTRACE",
+        "CAP_SYS_RAWIO",
+        "CAP_SYS_RESOURCE",
+        "CAP_SYS_TIME",
+        "CAP_SYS_TTY_CONFIG",
+        "CAP_SYSLOG",
         "CAP_WAKE_ALARM",
-    ].into_iter().map(String::from).collect()
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect()
 }
 
 #[cfg(test)]
@@ -591,7 +825,12 @@ mod tests {
         let mut s = basic_spec();
         s.env.insert("PATH".into(), "/custom/bin".into());
         let spec = generate(&s, &PathBuf::from("/merged"), "abc123");
-        let path_count = spec.process.env.iter().filter(|e| e.starts_with("PATH=")).count();
+        let path_count = spec
+            .process
+            .env
+            .iter()
+            .filter(|e| e.starts_with("PATH="))
+            .count();
         assert_eq!(path_count, 1);
     }
 
@@ -611,7 +850,11 @@ mod tests {
 
     #[test]
     fn generate_root_path_matches_rootfs() {
-        let spec = generate(&basic_spec(), &PathBuf::from("/var/lib/cave/containers/abc/merged"), "abc123");
+        let spec = generate(
+            &basic_spec(),
+            &PathBuf::from("/var/lib/cave/containers/abc/merged"),
+            "abc123",
+        );
         assert!(spec.root.path.contains("merged"));
     }
 
@@ -650,7 +893,11 @@ mod tests {
             propagation: crate::models::MountPropagation::Private,
         });
         let spec = generate(&s, &PathBuf::from("/merged"), "abc123");
-        let data_mount = spec.mounts.iter().find(|m| m.destination == "/data").unwrap();
+        let data_mount = spec
+            .mounts
+            .iter()
+            .find(|m| m.destination == "/data")
+            .unwrap();
         assert_eq!(data_mount.mount_type, "bind");
         assert!(data_mount.options.contains(&"rbind".to_string()));
     }
@@ -666,7 +913,11 @@ mod tests {
             propagation: crate::models::MountPropagation::Private,
         });
         let spec = generate(&s, &PathBuf::from("/merged"), "abc123");
-        let m = spec.mounts.iter().find(|m| m.destination == "/etc/cfg").unwrap();
+        let m = spec
+            .mounts
+            .iter()
+            .find(|m| m.destination == "/etc/cfg")
+            .unwrap();
         assert!(m.options.contains(&"ro".to_string()));
     }
 
@@ -681,14 +932,23 @@ mod tests {
             propagation: crate::models::MountPropagation::Private,
         });
         let spec = generate(&s, &PathBuf::from("/merged"), "abc123");
-        let m = spec.mounts.iter().find(|m| m.destination == "/tmp").unwrap();
+        let m = spec
+            .mounts
+            .iter()
+            .find(|m| m.destination == "/tmp")
+            .unwrap();
         assert_eq!(m.mount_type, "tmpfs");
     }
 
     #[test]
     fn generate_namespaces_include_all_required() {
         let spec = generate(&basic_spec(), &PathBuf::from("/merged"), "abc123");
-        let kinds: Vec<&str> = spec.linux.namespaces.iter().map(|n| n.kind.as_str()).collect();
+        let kinds: Vec<&str> = spec
+            .linux
+            .namespaces
+            .iter()
+            .map(|n| n.kind.as_str())
+            .collect();
         assert!(kinds.contains(&"pid"));
         assert!(kinds.contains(&"network"));
         assert!(kinds.contains(&"mount"));
@@ -744,7 +1004,11 @@ mod tests {
     #[test]
     fn generate_capabilities_include_net_bind() {
         let spec = generate(&basic_spec(), &PathBuf::from("/merged"), "abc123");
-        assert!(spec.process.capabilities.bounding.contains(&"CAP_NET_BIND_SERVICE".to_string()));
+        assert!(spec
+            .process
+            .capabilities
+            .bounding
+            .contains(&"CAP_NET_BIND_SERVICE".to_string()));
     }
 
     #[test]
@@ -758,7 +1022,9 @@ mod tests {
     fn generate_seccomp_allows_common_syscalls() {
         let spec = generate(&basic_spec(), &PathBuf::from("/merged"), "abc123");
         let seccomp = spec.linux.seccomp.unwrap();
-        let allowed: Vec<&str> = seccomp.syscalls.iter()
+        let allowed: Vec<&str> = seccomp
+            .syscalls
+            .iter()
             .filter(|s| s.action == "SCMP_ACT_ALLOW")
             .flat_map(|s| s.names.iter().map(|n| n.as_str()))
             .collect();

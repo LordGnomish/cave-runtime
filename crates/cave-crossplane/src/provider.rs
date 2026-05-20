@@ -138,11 +138,31 @@ impl ProviderStore {
     /// Return well-known providers as a catalog.
     pub fn catalog(&self) -> Vec<Provider> {
         let catalog_entries = vec![
-            ("provider-aws", "xpkg.upbound.io/upbound/provider-aws:latest", ProviderType::Official),
-            ("provider-gcp", "xpkg.upbound.io/upbound/provider-gcp:latest", ProviderType::Official),
-            ("provider-azure", "xpkg.upbound.io/upbound/provider-azure:latest", ProviderType::Official),
-            ("provider-kubernetes", "xpkg.upbound.io/crossplane-contrib/provider-kubernetes:latest", ProviderType::Community),
-            ("provider-helm", "xpkg.upbound.io/crossplane-contrib/provider-helm:latest", ProviderType::Community),
+            (
+                "provider-aws",
+                "xpkg.upbound.io/upbound/provider-aws:latest",
+                ProviderType::Official,
+            ),
+            (
+                "provider-gcp",
+                "xpkg.upbound.io/upbound/provider-gcp:latest",
+                ProviderType::Official,
+            ),
+            (
+                "provider-azure",
+                "xpkg.upbound.io/upbound/provider-azure:latest",
+                ProviderType::Official,
+            ),
+            (
+                "provider-kubernetes",
+                "xpkg.upbound.io/crossplane-contrib/provider-kubernetes:latest",
+                ProviderType::Community,
+            ),
+            (
+                "provider-helm",
+                "xpkg.upbound.io/crossplane-contrib/provider-helm:latest",
+                ProviderType::Community,
+            ),
         ];
 
         catalog_entries

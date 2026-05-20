@@ -36,7 +36,11 @@ impl PersistentLogStore {
             "log store recovered from WAL"
         );
 
-        Ok(Self { mem, wal, hard_state })
+        Ok(Self {
+            mem,
+            wal,
+            hard_state,
+        })
     }
 
     // ── Write ops ─────────────────────────────────────────────────────────
@@ -72,11 +76,21 @@ impl PersistentLogStore {
 
     // ── Read ops ──────────────────────────────────────────────────────────
 
-    pub fn hard_state(&self) -> &HardState { &self.hard_state }
-    pub fn last_index(&self) -> LogIndex { self.mem.last_index() }
-    pub fn last_term(&self) -> Term { self.mem.last_term() }
-    pub fn snapshot_index(&self) -> LogIndex { self.mem.snapshot_index() }
-    pub fn snapshot_term(&self) -> Term { self.mem.snapshot_term() }
+    pub fn hard_state(&self) -> &HardState {
+        &self.hard_state
+    }
+    pub fn last_index(&self) -> LogIndex {
+        self.mem.last_index()
+    }
+    pub fn last_term(&self) -> Term {
+        self.mem.last_term()
+    }
+    pub fn snapshot_index(&self) -> LogIndex {
+        self.mem.snapshot_index()
+    }
+    pub fn snapshot_term(&self) -> Term {
+        self.mem.snapshot_term()
+    }
 
     pub fn entry(&self, index: LogIndex) -> HaResult<&LogEntry> {
         self.mem.entry(index)
@@ -90,6 +104,10 @@ impl PersistentLogStore {
         self.mem.slice(lo, hi)
     }
 
-    pub fn mem(&self) -> &MemLog { &self.mem }
-    pub fn wal_size(&self) -> u64 { self.wal.size() }
+    pub fn mem(&self) -> &MemLog {
+        &self.mem
+    }
+    pub fn wal_size(&self) -> u64 {
+        self.wal.size()
+    }
 }

@@ -38,9 +38,18 @@ impl NodePortAllocator {
 
     pub fn with_range(tenant_id: impl Into<String>, min: u16, max: u16) -> KubeProxyResult<Self> {
         if min == 0 || max < min {
-            return Err(KubeProxyError::PortNotInRange { port: min, min, max });
+            return Err(KubeProxyError::PortNotInRange {
+                port: min,
+                min,
+                max,
+            });
         }
-        Ok(Self { tenant_id: tenant_id.into(), min, max, allocated: BTreeSet::new() })
+        Ok(Self {
+            tenant_id: tenant_id.into(),
+            min,
+            max,
+            allocated: BTreeSet::new(),
+        })
     }
 
     /// Cite: `pkg/registry/core/service/portallocator/allocator.go:123`
@@ -48,7 +57,11 @@ impl NodePortAllocator {
     /// ErrNotInRange, double-allocate returns ErrAllocated.
     pub fn allocate(&mut self, port: u16) -> KubeProxyResult<()> {
         if port < self.min || port > self.max {
-            return Err(KubeProxyError::PortNotInRange { port, min: self.min, max: self.max });
+            return Err(KubeProxyError::PortNotInRange {
+                port,
+                min: self.min,
+                max: self.max,
+            });
         }
         if !self.allocated.insert(port) {
             return Err(KubeProxyError::PortAlreadyAllocated(port));

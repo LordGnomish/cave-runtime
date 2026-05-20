@@ -41,7 +41,11 @@ pub struct LabelSelector {
 }
 
 impl LabelSelector {
-    pub fn empty() -> Self { Self { requirements: vec![] } }
+    pub fn empty() -> Self {
+        Self {
+            requirements: vec![],
+        }
+    }
 
     /// Parse a label selector in the upstream syntax. Subset implemented:
     ///   `key=value`, `key!=value`,
@@ -61,13 +65,15 @@ impl LabelSelector {
                 let key = part[..idx].trim();
                 let values = parse_value_set(part[idx + 7..].trim())?;
                 reqs.push(LabelRequirement {
-                    key: key.into(), op: LabelOperator::NotIn(values),
+                    key: key.into(),
+                    op: LabelOperator::NotIn(values),
                 });
             } else if let Some(idx) = part.find(" in ") {
                 let key = part[..idx].trim();
                 let values = parse_value_set(part[idx + 4..].trim())?;
                 reqs.push(LabelRequirement {
-                    key: key.into(), op: LabelOperator::In(values),
+                    key: key.into(),
+                    op: LabelOperator::In(values),
                 });
             } else if let Some(idx) = part.find("!=") {
                 let key = part[..idx].trim();
@@ -80,16 +86,19 @@ impl LabelSelector {
                 let key = part[..idx].trim();
                 let value = part[idx + 1..].trim();
                 reqs.push(LabelRequirement {
-                    key: key.into(), op: LabelOperator::Equals(value.into()),
+                    key: key.into(),
+                    op: LabelOperator::Equals(value.into()),
                 });
             } else if let Some(stripped) = part.strip_prefix('!') {
                 let key = stripped.trim();
                 reqs.push(LabelRequirement {
-                    key: key.into(), op: LabelOperator::DoesNotExist,
+                    key: key.into(),
+                    op: LabelOperator::DoesNotExist,
                 });
             } else if !part.is_empty() {
                 reqs.push(LabelRequirement {
-                    key: part.into(), op: LabelOperator::Exists,
+                    key: part.into(),
+                    op: LabelOperator::Exists,
                 });
             }
         }
@@ -114,7 +123,9 @@ impl LabelSelector {
                 (LabelOperator::DoesNotExist, None) => true,
                 (LabelOperator::DoesNotExist, Some(_)) => false,
             };
-            if !ok { return false; }
+            if !ok {
+                return false;
+            }
         }
         true
     }
@@ -138,7 +149,11 @@ pub struct FieldSelector {
 }
 
 impl FieldSelector {
-    pub fn empty() -> Self { Self { requirements: vec![] } }
+    pub fn empty() -> Self {
+        Self {
+            requirements: vec![],
+        }
+    }
 
     /// Parse a field selector — only `=` and `!=` per upstream
     /// `apimachinery/pkg/fields/selector.go::Parse`.
@@ -166,7 +181,9 @@ impl FieldSelector {
                 });
             } else if !part.is_empty() {
                 return Err(format!(
-                    "field selector requires `=` or `!=`, got `{}`", part));
+                    "field selector requires `=` or `!=`, got `{}`",
+                    part
+                ));
             }
         }
         Ok(Self { requirements: reqs })
@@ -183,7 +200,9 @@ impl FieldSelector {
                 (FieldOp::NotEquals(want), Some(v)) => v != want,
                 (FieldOp::NotEquals(_), None) => true,
             };
-            if !ok { return false; }
+            if !ok {
+                return false;
+            }
         }
         true
     }
@@ -197,8 +216,14 @@ fn split_top_level_commas(s: &str) -> Vec<String> {
     let mut buf = String::new();
     for c in s.chars() {
         match c {
-            '(' => { depth += 1; buf.push(c); }
-            ')' => { depth -= 1; buf.push(c); }
+            '(' => {
+                depth += 1;
+                buf.push(c);
+            }
+            ')' => {
+                depth -= 1;
+                buf.push(c);
+            }
             ',' if depth == 0 => {
                 out.push(buf.clone());
                 buf.clear();
@@ -206,7 +231,9 @@ fn split_top_level_commas(s: &str) -> Vec<String> {
             _ => buf.push(c),
         }
     }
-    if !buf.is_empty() { out.push(buf); }
+    if !buf.is_empty() {
+        out.push(buf);
+    }
     out
 }
 
@@ -215,7 +242,7 @@ fn parse_value_set(input: &str) -> Result<Vec<String>, String> {
     if !s.starts_with('(') || !s.ends_with(')') {
         return Err(format!("value set must be parenthesised, got `{}`", s));
     }
-    Ok(s[1..s.len()-1]
+    Ok(s[1..s.len() - 1]
         .split(',')
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty())
@@ -227,11 +254,17 @@ mod tests {
     use super::*;
 
     fn lbls(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
     fn flds(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
     /// Upstream parity: `TestLabelSelector_Equals`
@@ -240,86 +273,100 @@ mod tests {
     #[test]
     fn test_label_equals_matches_only_present_equal_value() {
         let sel = LabelSelector::parse("env=prod").unwrap();
-        assert!( sel.matches(&lbls(&[("env","prod"), ("tier","web")])));
-        assert!(!sel.matches(&lbls(&[("env","staging")])));
-        assert!(!sel.matches(&lbls(&[("tier","web")])),
-            "missing key fails the equals selector");
+        assert!(sel.matches(&lbls(&[("env", "prod"), ("tier", "web")])));
+        assert!(!sel.matches(&lbls(&[("env", "staging")])));
+        assert!(
+            !sel.matches(&lbls(&[("tier", "web")])),
+            "missing key fails the equals selector"
+        );
         // tenant_id invariant: selector evaluation is pure — same label set
         // for two tenants returns identical results, but the caller must
         // pre-filter by tenant.
-        let acme_pods   = vec![lbls(&[("env","prod"), ("tenant","acme")])];
-        let globex_pods = vec![lbls(&[("env","prod"), ("tenant","globex")])];
+        let acme_pods = vec![lbls(&[("env", "prod"), ("tenant", "acme")])];
+        let globex_pods = vec![lbls(&[("env", "prod"), ("tenant", "globex")])];
         let acme_match = acme_pods.iter().filter(|l| sel.matches(l)).count();
         let globex_match = globex_pods.iter().filter(|l| sel.matches(l)).count();
         assert_eq!(acme_match, 1);
         assert_eq!(globex_match, 1);
         // The `tenant` label is a hint only — the real isolation is the
         // upstream slice. We assert the slices are disjoint.
-        assert!(!acme_pods.iter().any(|l| l.get("tenant") == Some(&"globex".to_string())),
-            "tenant_id invariant: caller's slice must be tenant-pure");
+        assert!(
+            !acme_pods
+                .iter()
+                .any(|l| l.get("tenant") == Some(&"globex".to_string())),
+            "tenant_id invariant: caller's slice must be tenant-pure"
+        );
     }
 
     /// Upstream parity: `TestLabelSelector_NotEquals`.
     #[test]
     fn test_label_not_equals_passes_when_absent_or_different() {
         let sel = LabelSelector::parse("env != staging").unwrap();
-        assert!( sel.matches(&lbls(&[("env","prod")])));
-        assert!( sel.matches(&lbls(&[("tier","web")])),
-            "absent key passes !=");
-        assert!(!sel.matches(&lbls(&[("env","staging")])));
+        assert!(sel.matches(&lbls(&[("env", "prod")])));
+        assert!(
+            sel.matches(&lbls(&[("tier", "web")])),
+            "absent key passes !="
+        );
+        assert!(!sel.matches(&lbls(&[("env", "staging")])));
         // tenant_id invariant smoke: identical execution across tenants.
-        assert_eq!(sel.matches(&lbls(&[("tenant","acme"), ("env","prod")])), true);
+        assert_eq!(
+            sel.matches(&lbls(&[("tenant", "acme"), ("env", "prod")])),
+            true
+        );
     }
 
     /// Upstream parity: `TestLabelSelector_In`.
     #[test]
     fn test_label_in_set_matches_any_listed_value() {
         let sel = LabelSelector::parse("region in (us, eu, ap)").unwrap();
-        assert!( sel.matches(&lbls(&[("region","us")])));
-        assert!( sel.matches(&lbls(&[("region","ap")])));
-        assert!(!sel.matches(&lbls(&[("region","sa")])));
+        assert!(sel.matches(&lbls(&[("region", "us")])));
+        assert!(sel.matches(&lbls(&[("region", "ap")])));
+        assert!(!sel.matches(&lbls(&[("region", "sa")])));
         assert!(!sel.matches(&lbls(&[]))); // missing key
-        // tenant_id invariant: parsed selector is shared across tenants;
-        // callers must pre-segregate input.
-        assert!(sel.matches(&lbls(&[("region","us"), ("tenant","acme")])));
-        assert!(sel.matches(&lbls(&[("region","us"), ("tenant","globex")])));
+                                           // tenant_id invariant: parsed selector is shared across tenants;
+                                           // callers must pre-segregate input.
+        assert!(sel.matches(&lbls(&[("region", "us"), ("tenant", "acme")])));
+        assert!(sel.matches(&lbls(&[("region", "us"), ("tenant", "globex")])));
     }
 
     /// Upstream parity: `TestLabelSelector_NotIn`.
     #[test]
     fn test_label_notin_set_excludes_only_listed_values() {
         let sel = LabelSelector::parse("tier notin (canary, dev)").unwrap();
-        assert!( sel.matches(&lbls(&[("tier","prod")])));
-        assert!( sel.matches(&lbls(&[])),
-            "absent key passes notin");
-        assert!(!sel.matches(&lbls(&[("tier","canary")])));
+        assert!(sel.matches(&lbls(&[("tier", "prod")])));
+        assert!(sel.matches(&lbls(&[])), "absent key passes notin");
+        assert!(!sel.matches(&lbls(&[("tier", "canary")])));
         // tenant_id invariant smoke.
-        assert!(sel.matches(&lbls(&[("tier","prod"),("tenant","acme")])));
+        assert!(sel.matches(&lbls(&[("tier", "prod"), ("tenant", "acme")])));
     }
 
     /// Upstream parity: `TestLabelSelector_ExistsAndDoesNotExist`.
     #[test]
     fn test_label_exists_and_does_not_exist() {
         let sel_exists = LabelSelector::parse("app").unwrap();
-        let sel_not    = LabelSelector::parse("!app").unwrap();
-        assert!( sel_exists.matches(&lbls(&[("app","frontend")])));
-        assert!(!sel_exists.matches(&lbls(&[("tier","web")])));
-        assert!( sel_not.matches(&lbls(&[("tier","web")])));
-        assert!(!sel_not.matches(&lbls(&[("app","backend")])));
+        let sel_not = LabelSelector::parse("!app").unwrap();
+        assert!(sel_exists.matches(&lbls(&[("app", "frontend")])));
+        assert!(!sel_exists.matches(&lbls(&[("tier", "web")])));
+        assert!(sel_not.matches(&lbls(&[("tier", "web")])));
+        assert!(!sel_not.matches(&lbls(&[("app", "backend")])));
         // tenant_id invariant smoke: both work identically across tenants.
-        assert!(sel_exists.matches(&lbls(&[("app","x"), ("tenant","acme")])));
+        assert!(sel_exists.matches(&lbls(&[("app", "x"), ("tenant", "acme")])));
     }
 
     /// Upstream parity: `TestLabelSelector_ConjunctionAcrossRequirements`.
     #[test]
     fn test_multiple_requirements_form_an_and_conjunction() {
         let sel = LabelSelector::parse("env=prod, tier in (web,api), !canary").unwrap();
-        assert!( sel.matches(&lbls(&[("env","prod"), ("tier","web")])));
-        assert!( sel.matches(&lbls(&[("env","prod"), ("tier","api")])));
-        assert!(!sel.matches(&lbls(&[("env","prod"), ("tier","worker")])));
-        assert!(!sel.matches(&lbls(&[("env","prod"), ("tier","web"), ("canary","yes")])));
+        assert!(sel.matches(&lbls(&[("env", "prod"), ("tier", "web")])));
+        assert!(sel.matches(&lbls(&[("env", "prod"), ("tier", "api")])));
+        assert!(!sel.matches(&lbls(&[("env", "prod"), ("tier", "worker")])));
+        assert!(!sel.matches(&lbls(&[
+            ("env", "prod"),
+            ("tier", "web"),
+            ("canary", "yes")
+        ])));
         // tenant_id invariant smoke.
-        let mut hit = lbls(&[("env","prod"), ("tier","web"), ("tenant","acme")]);
+        let mut hit = lbls(&[("env", "prod"), ("tier", "web"), ("tenant", "acme")]);
         assert!(sel.matches(&hit));
         hit.insert("tenant".into(), "globex".into());
         assert!(sel.matches(&hit), "selector evaluation pure across tenants");
@@ -330,7 +377,7 @@ mod tests {
     fn test_empty_label_selector_matches_everything() {
         let sel = LabelSelector::parse("").unwrap();
         assert!(sel.matches(&lbls(&[])));
-        assert!(sel.matches(&lbls(&[("env","prod")])));
+        assert!(sel.matches(&lbls(&[("env", "prod")])));
         assert!(sel.requirements.is_empty());
     }
 
@@ -340,23 +387,29 @@ mod tests {
     #[test]
     fn test_field_selector_supports_equality_only_and_rejects_other_ops() {
         let sel = FieldSelector::parse("metadata.name=cm-1, status.phase!=Failed").unwrap();
-        assert!( sel.matches(&flds(&[
-            ("metadata.name","cm-1"), ("status.phase","Running"),
+        assert!(sel.matches(&flds(&[
+            ("metadata.name", "cm-1"),
+            ("status.phase", "Running"),
         ])));
         assert!(!sel.matches(&flds(&[
-            ("metadata.name","cm-2"), ("status.phase","Running"),
+            ("metadata.name", "cm-2"),
+            ("status.phase", "Running"),
         ])));
         assert!(!sel.matches(&flds(&[
-            ("metadata.name","cm-1"), ("status.phase","Failed"),
+            ("metadata.name", "cm-1"),
+            ("status.phase", "Failed"),
         ])));
         // Missing operator — parse error per upstream.
-        assert!(FieldSelector::parse("metadata.name in (a,b)").is_err(),
-            "field selector rejects `in` operator");
+        assert!(
+            FieldSelector::parse("metadata.name in (a,b)").is_err(),
+            "field selector rejects `in` operator"
+        );
         // tenant_id invariant smoke: distinct tenants' field maps evaluated
         // identically — caller must pre-scope the slice.
         assert!(sel.matches(&flds(&[
-            ("metadata.name","cm-1"), ("status.phase","Running"),
-            ("metadata.namespace","acme"),
+            ("metadata.name", "cm-1"),
+            ("status.phase", "Running"),
+            ("metadata.namespace", "acme"),
         ])));
     }
 
@@ -368,14 +421,21 @@ mod tests {
     fn test_selectors_never_invent_data_outside_caller_provided_slice() {
         let sel = LabelSelector::parse("env=prod").unwrap();
         let acme_slice = vec![
-            lbls(&[("env","prod"), ("tenant","acme")]),
-            lbls(&[("env","staging"), ("tenant","acme")]),
+            lbls(&[("env", "prod"), ("tenant", "acme")]),
+            lbls(&[("env", "staging"), ("tenant", "acme")]),
         ];
         let matched: Vec<_> = acme_slice.iter().filter(|l| sel.matches(l)).collect();
-        assert_eq!(matched.len(), 1,
-            "tenant_id invariant: result is a strict subset of caller's slice");
-        assert!(matched.iter().all(|l| l.get("tenant") == Some(&"acme".to_string())),
-            "tenant_id invariant: results never include other-tenant rows");
+        assert_eq!(
+            matched.len(),
+            1,
+            "tenant_id invariant: result is a strict subset of caller's slice"
+        );
+        assert!(
+            matched
+                .iter()
+                .all(|l| l.get("tenant") == Some(&"acme".to_string())),
+            "tenant_id invariant: results never include other-tenant rows"
+        );
     }
 
     /// Upstream parity: `TestLabelSelector_ParseTrimsWhitespaceAroundTokens`
@@ -383,10 +443,14 @@ mod tests {
     #[test]
     fn test_label_selector_parse_trims_whitespace() {
         let sel = LabelSelector::parse("  env  =  prod  ,  tier in (  web , api )").unwrap();
-        assert!( sel.matches(&lbls(&[("env","prod"), ("tier","web")])));
-        assert!( sel.matches(&lbls(&[("env","prod"), ("tier","api")])));
-        assert!(!sel.matches(&lbls(&[("env","prod"), ("tier","worker")])));
+        assert!(sel.matches(&lbls(&[("env", "prod"), ("tier", "web")])));
+        assert!(sel.matches(&lbls(&[("env", "prod"), ("tier", "api")])));
+        assert!(!sel.matches(&lbls(&[("env", "prod"), ("tier", "worker")])));
         // tenant_id invariant smoke.
-        assert!(sel.matches(&lbls(&[("env","prod"),("tier","web"),("tenant","acme")])));
+        assert!(sel.matches(&lbls(&[
+            ("env", "prod"),
+            ("tier", "web"),
+            ("tenant", "acme")
+        ])));
     }
 }

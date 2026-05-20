@@ -46,7 +46,10 @@ pub struct StateStore {
 
 impl StateStore {
     pub fn new(name: &str) -> Self {
-        Self { name: name.to_string(), map: HashMap::new() }
+        Self {
+            name: name.to_string(),
+            map: HashMap::new(),
+        }
     }
     pub fn put(&mut self, k: &[u8], v: &[u8]) {
         self.map.insert(k.to_vec(), v.to_vec());
@@ -57,8 +60,12 @@ impl StateStore {
     pub fn delete(&mut self, k: &[u8]) -> Option<Vec<u8>> {
         self.map.remove(k)
     }
-    pub fn len(&self) -> usize { self.map.len() }
-    pub fn is_empty(&self) -> bool { self.map.is_empty() }
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
     pub fn keys(&self) -> Vec<Vec<u8>> {
         self.map.keys().cloned().collect()
     }
@@ -96,7 +103,9 @@ impl ProcessorContext {
 }
 
 impl Default for ProcessorContext {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -117,7 +126,12 @@ pub struct ScheduledPunctuator {
 
 impl ScheduledPunctuator {
     pub fn new(kind: PunctuationKind, interval_ms: i64, name: &str) -> Self {
-        Self { kind, interval_ms, last_fired_ms: 0, name: name.to_string() }
+        Self {
+            kind,
+            interval_ms,
+            last_fired_ms: 0,
+            name: name.to_string(),
+        }
     }
 
     /// Returns true if the punctuator should fire at `now_ms` (wall-clock
@@ -139,7 +153,9 @@ pub trait Processor: Send {
     fn process(&mut self, record: Record, ctx: &mut ProcessorContext, stores: &mut StoreRegistry);
     fn close(&mut self) {}
     fn name(&self) -> &str;
-    fn connected_stores(&self) -> &[String] { &[] }
+    fn connected_stores(&self) -> &[String] {
+        &[]
+    }
 }
 
 #[derive(Default)]
@@ -148,7 +164,9 @@ pub struct StoreRegistry {
 }
 
 impl StoreRegistry {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
     pub fn add(&mut self, s: StateStore) {
         self.stores.insert(s.name.clone(), s);
     }
@@ -163,7 +181,7 @@ pub struct Topology {
     nodes: Vec<TopologyNode>,
     pub stores: StoreRegistry,
     pub source_topics: HashMap<String, String>, // topic → source node name
-    pub sink_topics: HashMap<String, String>, // node name → topic
+    pub sink_topics: HashMap<String, String>,   // node name → topic
 }
 
 struct TopologyNode {
@@ -173,14 +191,19 @@ struct TopologyNode {
 }
 
 impl Topology {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn add_source(&mut self, name: &str, topic: &str) {
-        self.source_topics.insert(topic.to_string(), name.to_string());
+        self.source_topics
+            .insert(topic.to_string(), name.to_string());
         self.nodes.push(TopologyNode {
             name: name.to_string(),
             parents: Vec::new(),
-            processor: Box::new(SourceNode { name: name.to_string() }),
+            processor: Box::new(SourceNode {
+                name: name.to_string(),
+            }),
         });
     }
 
@@ -188,7 +211,11 @@ impl Topology {
         // Validate parents exist.
         let known: HashSet<String> = self.nodes.iter().map(|n| n.name.clone()).collect();
         for parent in parents {
-            assert!(known.contains(*parent), "parent {} unknown in topology", parent);
+            assert!(
+                known.contains(*parent),
+                "parent {} unknown in topology",
+                parent
+            );
         }
         self.nodes.push(TopologyNode {
             name: name.to_string(),
@@ -203,7 +230,9 @@ impl Topology {
         self.nodes.push(TopologyNode {
             name: name.to_string(),
             parents: parents_vec,
-            processor: Box::new(SinkNode { name: name.to_string() }),
+            processor: Box::new(SinkNode {
+                name: name.to_string(),
+            }),
         });
     }
 
@@ -241,7 +270,8 @@ impl Topology {
             ctx.current_node = node_name.clone();
             ctx.stream_time_ms = rec.timestamp_ms;
             if let Some(node) = self.nodes.iter_mut().find(|n| n.name == node_name) {
-                node.processor.process(rec.clone(), &mut ctx, &mut self.stores);
+                node.processor
+                    .process(rec.clone(), &mut ctx, &mut self.stores);
             }
             // If processor didn't forward, propagate `rec` to every child unchanged.
             if ctx.forwarded.is_empty() {
@@ -259,16 +289,24 @@ impl Topology {
     }
 }
 
-struct SourceNode { name: String }
+struct SourceNode {
+    name: String,
+}
 impl Processor for SourceNode {
     fn process(&mut self, _r: Record, _ctx: &mut ProcessorContext, _s: &mut StoreRegistry) {}
-    fn name(&self) -> &str { &self.name }
+    fn name(&self) -> &str {
+        &self.name
+    }
 }
 
-struct SinkNode { name: String }
+struct SinkNode {
+    name: String,
+}
 impl Processor for SinkNode {
     fn process(&mut self, _r: Record, _ctx: &mut ProcessorContext, _s: &mut StoreRegistry) {}
-    fn name(&self) -> &str { &self.name }
+    fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 #[cfg(test)]
@@ -299,9 +337,9 @@ mod tests {
     #[test]
     fn punctuator_fires_on_interval_elapsed() {
         let mut p = ScheduledPunctuator::new(PunctuationKind::WallClock, 1_000, "tick");
-        assert!(p.should_fire(1_000));   // first time the interval has elapsed
+        assert!(p.should_fire(1_000)); // first time the interval has elapsed
         assert!(!p.should_fire(1_500));
-        assert!(p.should_fire(2_500));   // 1000 ms after last firing at 1000
+        assert!(p.should_fire(2_500)); // 1000 ms after last firing at 1000
     }
 
     #[test]
@@ -317,16 +355,29 @@ mod tests {
         store_name: String,
     }
     impl Processor for CountingProcessor {
-        fn name(&self) -> &str { &self.name_ }
-        fn connected_stores(&self) -> &[String] { std::slice::from_ref(&self.store_name) }
-        fn process(&mut self, record: Record, ctx: &mut ProcessorContext, stores: &mut StoreRegistry) {
+        fn name(&self) -> &str {
+            &self.name_
+        }
+        fn connected_stores(&self) -> &[String] {
+            std::slice::from_ref(&self.store_name)
+        }
+        fn process(
+            &mut self,
+            record: Record,
+            ctx: &mut ProcessorContext,
+            stores: &mut StoreRegistry,
+        ) {
             let store = stores.get_mut(&self.store_name).unwrap();
-            let prev: u64 = store.get(&record.key)
+            let prev: u64 = store
+                .get(&record.key)
                 .map(|b| u64::from_le_bytes(b.try_into().unwrap_or([0u8; 8])))
                 .unwrap_or(0);
             let next = prev + 1;
             store.put(&record.key, &next.to_le_bytes());
-            ctx.forward("sink", Record::new(&record.key, &next.to_le_bytes(), record.timestamp_ms));
+            ctx.forward(
+                "sink",
+                Record::new(&record.key, &next.to_le_bytes(), record.timestamp_ms),
+            );
         }
     }
 
@@ -335,10 +386,14 @@ mod tests {
         let mut topo = Topology::new();
         topo.add_source("source", "input-topic");
         topo.add_state_store("counts");
-        topo.add_processor("counter", &["source"], CountingProcessor {
-            name_: "counter".into(),
-            store_name: "counts".into(),
-        });
+        topo.add_processor(
+            "counter",
+            &["source"],
+            CountingProcessor {
+                name_: "counter".into(),
+                store_name: "counts".into(),
+            },
+        );
         topo.add_sink("sink", &["counter"], "output-topic");
 
         let out = topo.process("input-topic", Record::new(b"alpha", b"x", 100));
@@ -364,10 +419,14 @@ mod tests {
         let mut topo = Topology::new();
         topo.add_source("source", "input");
         topo.add_state_store("counts");
-        topo.add_processor("counter", &["source"], CountingProcessor {
-            name_: "counter".into(),
-            store_name: "counts".into(),
-        });
+        topo.add_processor(
+            "counter",
+            &["source"],
+            CountingProcessor {
+                name_: "counter".into(),
+                store_name: "counts".into(),
+            },
+        );
         topo.add_sink("sink", &["counter"], "output");
 
         topo.process("input", Record::new(b"k", b"v", 0));
@@ -398,7 +457,11 @@ mod tests {
     #[test]
     fn context_schedule_records_punctuator() {
         let mut ctx = ProcessorContext::new();
-        ctx.schedule(ScheduledPunctuator::new(PunctuationKind::WallClock, 1000, "tick"));
+        ctx.schedule(ScheduledPunctuator::new(
+            PunctuationKind::WallClock,
+            1000,
+            "tick",
+        ));
         assert_eq!(ctx.scheduled_punctuators.len(), 1);
     }
 }

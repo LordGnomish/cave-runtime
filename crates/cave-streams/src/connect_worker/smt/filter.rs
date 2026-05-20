@@ -41,29 +41,28 @@ pub struct Filter {
 
 impl Filter {
     pub fn from_config(cfg: &BTreeMap<String, String>) -> StreamsResult<Self> {
-        let pred_type = cfg.get("predicate").map(|s| s.as_str()).unwrap_or("RecordIsTombstone");
+        let pred_type = cfg
+            .get("predicate")
+            .map(|s| s.as_str())
+            .unwrap_or("RecordIsTombstone");
         let predicate = match pred_type {
             "RecordIsTombstone" => FilterPredicate::RecordIsTombstone,
             "TopicNameMatches" => {
                 let p = cfg.get("pattern").cloned().ok_or_else(|| {
-                    StreamsError::Internal(
-                        "Filter[TopicNameMatches]: 'pattern' is required".into(),
-                    )
+                    StreamsError::Internal("Filter[TopicNameMatches]: 'pattern' is required".into())
                 })?;
                 FilterPredicate::TopicNameMatches(p)
             }
             "HasHeaderKey" => {
                 let k = cfg.get("header.key").cloned().ok_or_else(|| {
-                    StreamsError::Internal(
-                        "Filter[HasHeaderKey]: 'header.key' is required".into(),
-                    )
+                    StreamsError::Internal("Filter[HasHeaderKey]: 'header.key' is required".into())
                 })?;
                 FilterPredicate::HasHeaderKey(k)
             }
             other => {
                 return Err(StreamsError::Internal(format!(
                     "Filter: unknown predicate '{other}'"
-                )))
+                )));
             }
         };
         let negate = cfg
@@ -103,11 +102,7 @@ impl Smt for Filter {
         // Default semantics: matches() → drop; with negate → keep matches only.
         let matched = self.matches(&r);
         let drop = if self.negate { !matched } else { matched };
-        if drop {
-            Ok(None)
-        } else {
-            Ok(Some(r))
-        }
+        if drop { Ok(None) } else { Ok(Some(r)) }
     }
 }
 
@@ -130,14 +125,16 @@ mod tests {
         cfg.insert("predicate".into(), "TopicNameMatches".into());
         cfg.insert("pattern".into(), "junk".into());
         let f = Filter::from_config(&cfg).unwrap();
-        assert!(f
-            .apply(RecordEnvelope::new("junk", Value::Int(1)))
-            .unwrap()
-            .is_none());
-        assert!(f
-            .apply(RecordEnvelope::new("keep", Value::Int(1)))
-            .unwrap()
-            .is_some());
+        assert!(
+            f.apply(RecordEnvelope::new("junk", Value::Int(1)))
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            f.apply(RecordEnvelope::new("keep", Value::Int(1)))
+                .unwrap()
+                .is_some()
+        );
     }
 
     #[test]
@@ -148,14 +145,16 @@ mod tests {
         cfg.insert("negate".into(), "true".into());
         let f = Filter::from_config(&cfg).unwrap();
         // With negate: keep records that match the pattern, drop the rest.
-        assert!(f
-            .apply(RecordEnvelope::new("keep", Value::Int(1)))
-            .unwrap()
-            .is_some());
-        assert!(f
-            .apply(RecordEnvelope::new("drop-me", Value::Int(1)))
-            .unwrap()
-            .is_none());
+        assert!(
+            f.apply(RecordEnvelope::new("keep", Value::Int(1)))
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            f.apply(RecordEnvelope::new("drop-me", Value::Int(1)))
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

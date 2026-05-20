@@ -43,17 +43,17 @@ pub mod traceql;
 pub mod types;
 
 pub use error::{Result, TraceError};
-pub use types::{Span, SpanKind, SpanStatus, TagValue, Trace, TraceId, SpanId};
+pub use types::{Span, SpanId, SpanKind, SpanStatus, TagValue, Trace, TraceId};
 
+use axum::Router;
 use std::sync::Arc;
 use std::time::Duration;
-use axum::Router;
 use tokio::sync::RwLock;
 
-use sampling::{build_sampler, SamplingConfig};
+use multi_tenant::TenantRegistry;
+use sampling::{SamplingConfig, build_sampler};
 use spm::SpmRegistry;
 use storage::{RetentionPolicy, TraceStore};
-use multi_tenant::TenantRegistry;
 
 // ─── TraceConfig ───────────────────────────────────────────────────────────
 
@@ -109,7 +109,13 @@ impl TraceState {
         let tenant_registry = Arc::new(TenantRegistry::new(config.auto_register_tenants));
         let query = Arc::new(query::QueryEngine::new(store.clone()));
 
-        TraceState { store, sampler, spm_registry, tenant_registry, query }
+        TraceState {
+            store,
+            sampler,
+            spm_registry,
+            tenant_registry,
+            query,
+        }
     }
 }
 
@@ -117,9 +123,9 @@ impl TraceState {
 
 /// Build the combined axum Router for all trace endpoints.
 pub fn router(state: Arc<TraceState>) -> Router {
-    let ingest_router  = routes::ingest::create_router(state.clone());
-    let jaeger_router  = routes::jaeger::create_router(state.clone());
-    let tempo_router   = routes::tempo::create_router(state.clone());
+    let ingest_router = routes::ingest::create_router(state.clone());
+    let jaeger_router = routes::jaeger::create_router(state.clone());
+    let tempo_router = routes::tempo::create_router(state.clone());
 
     Router::new()
         .merge(ingest_router)
@@ -226,9 +232,9 @@ async fn run_jaeger_udp_agent(
         match result {
             Ok(spans) if !spans.is_empty() => {
                 // Apply sampling
-                let keep = spans.iter().any(|s| {
-                    sampler.should_sample(s.trace_id, s).is_sample()
-                });
+                let keep = spans
+                    .iter()
+                    .any(|s| sampler.should_sample(s.trace_id, s).is_sample());
                 if keep {
                     spm.record_spans(&spans);
                     store.write().await.ingest_spans(spans);

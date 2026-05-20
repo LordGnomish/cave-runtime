@@ -31,7 +31,11 @@ pub enum TopologyError {
     #[error("CPU request {requested} > available {available}")]
     InsufficientCpu { requested: u32, available: u32 },
     #[error("memory request {requested} > available {available} on node {node}")]
-    InsufficientMemory { requested: u64, available: u64, node: u32 },
+    InsufficientMemory {
+        requested: u64,
+        available: u64,
+        node: u32,
+    },
     #[error("container '{0}' has no exclusive CPU assignment")]
     NoCpuAssignment(String),
 }
@@ -103,7 +107,11 @@ pub fn merge_hints(per_resource: &[Vec<TopologyHint>]) -> Option<TopologyHint> {
     frontier.sort_by(|a, b| {
         b.preferred
             .cmp(&a.preferred)
-            .then(a.numa_affinity.count_ones().cmp(&b.numa_affinity.count_ones()))
+            .then(
+                a.numa_affinity
+                    .count_ones()
+                    .cmp(&b.numa_affinity.count_ones()),
+            )
             .then(a.numa_affinity.cmp(&b.numa_affinity))
     });
     frontier.into_iter().next()
@@ -392,7 +400,9 @@ mod tests {
     fn cpu_manager_allocates_exclusive_set() {
         let mut m = CpuManager::new(&[(0, vec![0, 1, 2, 3]), (1, vec![4, 5, 6, 7])]);
         let pod = Uuid::new_v4();
-        let cpus = m.allocate_exclusive(pod, "main", 2, Some(&hint(0b01, true))).unwrap();
+        let cpus = m
+            .allocate_exclusive(pod, "main", 2, Some(&hint(0b01, true)))
+            .unwrap();
         assert_eq!(cpus, vec![0, 1]);
         assert_eq!(m.available_total(), 6);
     }
@@ -401,7 +411,9 @@ mod tests {
     fn cpu_manager_falls_back_to_other_nodes() {
         let mut m = CpuManager::new(&[(0, vec![0, 1]), (1, vec![4, 5])]);
         let pod = Uuid::new_v4();
-        let cpus = m.allocate_exclusive(pod, "c", 3, Some(&hint(0b01, true))).unwrap();
+        let cpus = m
+            .allocate_exclusive(pod, "c", 3, Some(&hint(0b01, true)))
+            .unwrap();
         assert_eq!(cpus.len(), 3);
     }
 
@@ -429,7 +441,9 @@ mod tests {
     fn memory_manager_single_node_satisfies() {
         let mut m = MemoryManager::new(&[(0, 8_000_000_000), (1, 8_000_000_000)]);
         let pod = Uuid::new_v4();
-        let v = m.allocate(pod, "c", 2_000_000_000, Some(&hint(0b10, true))).unwrap();
+        let v = m
+            .allocate(pod, "c", 2_000_000_000, Some(&hint(0b10, true)))
+            .unwrap();
         assert_eq!(v, vec![(1, 2_000_000_000)]);
     }
 

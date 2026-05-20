@@ -73,7 +73,7 @@ impl HeaderFrom {
             other => {
                 return Err(StreamsError::Internal(format!(
                     "HeaderFrom: bad operation '{other}' — want 'copy' or 'move'"
-                )))
+                )));
             }
         };
         let mappings = fields.into_iter().zip(headers).collect();
@@ -117,9 +117,7 @@ impl Smt for HeaderFrom {
 
     fn apply(&self, mut r: RecordEnvelope) -> StreamsResult<Option<RecordEnvelope>> {
         let obj = r.value.as_object_mut().ok_or_else(|| {
-            StreamsError::Internal(
-                "HeaderFrom: cannot read field from non-object value".into(),
-            )
+            StreamsError::Internal("HeaderFrom: cannot read field from non-object value".into())
         })?;
         for (field, header) in &self.mappings {
             // `move` removes; `copy` only reads.

@@ -9,7 +9,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
     pub id: Uuid,
-    pub key: String,           // e.g., "CAVE", "PLAT"
+    pub key: String, // e.g., "CAVE", "PLAT"
     pub name: String,
     pub description: String,
     pub project_type: ProjectType,
@@ -24,7 +24,11 @@ pub struct Project {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ProjectType { Scrum, Kanban, Business }
+pub enum ProjectType {
+    Scrum,
+    Kanban,
+    Business,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectMember {
@@ -35,12 +39,24 @@ pub struct ProjectMember {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ProjectRole { Admin, Developer, Viewer, QA }
+pub enum ProjectRole {
+    Admin,
+    Developer,
+    Viewer,
+    QA,
+}
 
 // ===== Issue Types =====
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
-pub enum IssueType { Epic, Story, Task, Bug, Subtask, Custom(String) }
+pub enum IssueType {
+    Epic,
+    Story,
+    Task,
+    Bug,
+    Subtask,
+    Custom(String),
+}
 
 impl std::fmt::Display for IssueType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -59,13 +75,13 @@ impl std::fmt::Display for IssueType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Issue {
     pub id: Uuid,
-    pub key: String,               // e.g., "CAVE-42"
+    pub key: String, // e.g., "CAVE-42"
     pub project_id: Uuid,
     pub project_key: String,
     pub issue_type: IssueType,
     pub summary: String,
     pub description: Option<String>,
-    pub status: String,            // current status name
+    pub status: String, // current status name
     pub priority: Priority,
     pub assignee: Option<String>,
     pub reporter: String,
@@ -74,7 +90,7 @@ pub struct Issue {
     pub fix_versions: Vec<String>,
     pub affects_versions: Vec<String>,
     pub epic_id: Option<Uuid>,
-    pub parent_id: Option<Uuid>,   // for subtasks
+    pub parent_id: Option<Uuid>, // for subtasks
     pub sprint_id: Option<Uuid>,
     pub story_points: Option<f64>,
     pub time_estimate_seconds: Option<u64>,
@@ -82,7 +98,7 @@ pub struct Issue {
     pub custom_fields: HashMap<String, serde_json::Value>,
     pub watchers: Vec<String>,
     pub votes: u64,
-    pub rank: i64,                 // for backlog ordering
+    pub rank: i64, // for backlog ordering
     pub resolution: Option<String>,
     pub due_date: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
@@ -92,7 +108,13 @@ pub struct Issue {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
-pub enum Priority { Critical, High, Medium, Low, Trivial }
+pub enum Priority {
+    Critical,
+    High,
+    Medium,
+    Low,
+    Trivial,
+}
 
 // ===== Workflow =====
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,13 +135,17 @@ pub struct WorkflowStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum StatusCategory { Todo, InProgress, Done }
+pub enum StatusCategory {
+    Todo,
+    InProgress,
+    Done,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transition {
     pub id: String,
     pub name: String,
-    pub from_status: Vec<String>,   // empty = from any
+    pub from_status: Vec<String>, // empty = from any
     pub to_status: String,
     pub conditions: Vec<TransitionCondition>,
     pub validators: Vec<TransitionValidator>,
@@ -128,15 +154,31 @@ pub struct Transition {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TransitionCondition { RequireComment, RequireResolution, UserInRole(String) }
+pub enum TransitionCondition {
+    RequireComment,
+    RequireResolution,
+    UserInRole(String),
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TransitionValidator { FieldRequired(String), SubtasksResolved }
+pub enum TransitionValidator {
+    FieldRequired(String),
+    SubtasksResolved,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum PostFunction { SetResolution(String), ClearAssignee, NotifyAssignee, NotifyWatchers, SetField { field: String, value: serde_json::Value } }
+pub enum PostFunction {
+    SetResolution(String),
+    ClearAssignee,
+    NotifyAssignee,
+    NotifyWatchers,
+    SetField {
+        field: String,
+        value: serde_json::Value,
+    },
+}
 
 // ===== Sprint =====
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -150,13 +192,17 @@ pub struct Sprint {
     pub start_date: Option<DateTime<Utc>>,
     pub end_date: Option<DateTime<Utc>>,
     pub completed_at: Option<DateTime<Utc>>,
-    pub velocity: Option<f64>,     // story points completed
+    pub velocity: Option<f64>, // story points completed
     pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum SprintState { Future, Active, Closed }
+pub enum SprintState {
+    Future,
+    Active,
+    Closed,
+}
 
 // ===== Board =====
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -173,12 +219,15 @@ pub struct Board {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum BoardType { Scrum, Kanban }
+pub enum BoardType {
+    Scrum,
+    Kanban,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoardColumn {
     pub name: String,
-    pub statuses: Vec<String>,     // workflow statuses mapped to this column
+    pub statuses: Vec<String>, // workflow statuses mapped to this column
     pub wip_limit: Option<u32>,
 }
 
@@ -190,13 +239,22 @@ pub struct CustomFieldDef {
     pub field_type: CustomFieldType,
     pub description: String,
     pub required: bool,
-    pub options: Vec<String>,      // for select/multi-select
+    pub options: Vec<String>, // for select/multi-select
     pub default_value: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum CustomFieldType { Text, Number, Select, MultiSelect, Date, User, Labels, Checkbox }
+pub enum CustomFieldType {
+    Text,
+    Number,
+    Select,
+    MultiSelect,
+    Date,
+    User,
+    Labels,
+    Checkbox,
+}
 
 // ===== Comments =====
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -235,7 +293,15 @@ pub struct IssueLink {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum LinkType { Blocks, IsBlockedBy, RelatesTo, Duplicates, IsDuplicatedBy, Clones, IsClonedBy }
+pub enum LinkType {
+    Blocks,
+    IsBlockedBy,
+    RelatesTo,
+    Duplicates,
+    IsDuplicatedBy,
+    Clones,
+    IsClonedBy,
+}
 
 // ===== Time Tracking =====
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -263,7 +329,17 @@ pub struct ActivityEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ActivityEventType { IssueCreated, IssueUpdated, StatusChanged, CommentAdded, AssigneeChanged, SprintStarted, SprintCompleted, AttachmentAdded, IssueLinked }
+pub enum ActivityEventType {
+    IssueCreated,
+    IssueUpdated,
+    StatusChanged,
+    CommentAdded,
+    AssigneeChanged,
+    SprintStarted,
+    SprintCompleted,
+    AttachmentAdded,
+    IssueLinked,
+}
 
 // ===== Notifications =====
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -279,4 +355,11 @@ pub struct Notification {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum NotificationType { Assigned, Mentioned, Watched, StatusChanged, CommentAdded, DueSoon }
+pub enum NotificationType {
+    Assigned,
+    Mentioned,
+    Watched,
+    StatusChanged,
+    CommentAdded,
+    DueSoon,
+}

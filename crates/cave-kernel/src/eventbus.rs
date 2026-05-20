@@ -42,7 +42,9 @@ impl<T: Clone + Send + 'static> EventBus<T> {
 
     /// Subscribe; receivers see only events published *after* subscription.
     pub fn subscribe(&self) -> Subscription<T> {
-        Subscription { rx: self.tx.subscribe() }
+        Subscription {
+            rx: self.tx.subscribe(),
+        }
     }
 
     /// Publish an event. Returns the number of subscribers that received it.
@@ -67,7 +69,9 @@ impl<T: Clone + Send + 'static> EventBus<T> {
 
 impl<T: Clone + Send + 'static> Clone for EventBus<T> {
     fn clone(&self) -> Self {
-        Self { tx: self.tx.clone() }
+        Self {
+            tx: self.tx.clone(),
+        }
     }
 }
 

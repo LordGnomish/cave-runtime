@@ -93,8 +93,18 @@ mod tests {
 
     #[test]
     fn render_includes_all_five_tabs() {
-        let html = render(&AdminState::seeded(), &ctx(&[Permission::EtcdRead, Permission::EtcdWatch])).unwrap();
-        for anchor in ["#etcd-members", "#etcd-keyspace", "#etcd-leases", "#etcd-alarms", "#etcd-metrics"] {
+        let html = render(
+            &AdminState::seeded(),
+            &ctx(&[Permission::EtcdRead, Permission::EtcdWatch]),
+        )
+        .unwrap();
+        for anchor in [
+            "#etcd-members",
+            "#etcd-keyspace",
+            "#etcd-leases",
+            "#etcd-alarms",
+            "#etcd-metrics",
+        ] {
             assert!(html.contains(anchor));
         }
         assert!(html.contains("etcd.io"));

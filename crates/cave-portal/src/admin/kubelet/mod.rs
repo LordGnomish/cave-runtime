@@ -31,8 +31,8 @@ pub mod volumes;
 
 // Legacy re-exports.
 pub use pods::{
-    list_pods, pod_summary, pods_on_node, pods_with_status, restart_pod, PodSummary,
-    RESTART_HOT_THRESHOLD,
+    PodSummary, RESTART_HOT_THRESHOLD, list_pods, pod_summary, pods_on_node, pods_with_status,
+    restart_pod,
 };
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]

@@ -13,11 +13,11 @@
 
 use std::io::{Read, Write};
 
-use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD as B64;
+use flate2::Compression;
 use flate2::read::DeflateDecoder;
 use flate2::write::DeflateEncoder;
-use flate2::Compression;
 
 use crate::saml::SamlError;
 
@@ -96,7 +96,12 @@ mod tests {
     fn encoding_compresses_repetitive_xml() {
         // Repetitive payload — DEFLATE should win meaningfully
         // against the raw-base64 alternative.
-        let repeated: Vec<u8> = SAMPLE.iter().cycle().take(SAMPLE.len() * 4).copied().collect();
+        let repeated: Vec<u8> = SAMPLE
+            .iter()
+            .cycle()
+            .take(SAMPLE.len() * 4)
+            .copied()
+            .collect();
         let enc = encode(&repeated).unwrap();
         let raw_b64 = B64.encode(&repeated);
         assert!(
@@ -120,12 +125,7 @@ mod tests {
 
     #[test]
     fn signing_payload_with_relay_state() {
-        let p = signing_payload(
-            "SAMLRequest",
-            "abc%3D",
-            Some("rs%2F1"),
-            "http%3A%2F%2Falg",
-        );
+        let p = signing_payload("SAMLRequest", "abc%3D", Some("rs%2F1"), "http%3A%2F%2Falg");
         assert_eq!(
             p,
             "SAMLRequest=abc%3D&RelayState=rs%2F1&SigAlg=http%3A%2F%2Falg"
@@ -144,12 +144,7 @@ mod tests {
         // §3.4.4.1: the same payload shape works for both
         // SAMLRequest and SAMLResponse — the param name is the
         // only thing that changes.
-        let p = signing_payload(
-            "SAMLResponse",
-            "xyz%3D",
-            None,
-            "http%3A%2F%2Frsa-sha256",
-        );
+        let p = signing_payload("SAMLResponse", "xyz%3D", None, "http%3A%2F%2Frsa-sha256");
         assert!(p.starts_with("SAMLResponse="));
     }
 }

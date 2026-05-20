@@ -21,7 +21,10 @@ pub enum JobState {
 
 impl JobState {
     pub fn is_terminal(&self) -> bool {
-        matches!(self, JobState::Succeeded | JobState::Failed | JobState::Cancelled)
+        matches!(
+            self,
+            JobState::Succeeded | JobState::Failed | JobState::Cancelled
+        )
     }
 }
 
@@ -83,14 +86,14 @@ impl JobStore {
         Self::default()
     }
 
-    pub fn list(
-        &self,
-        principal: Option<&Principal>,
-        tenant: &str,
-    ) -> Result<Vec<Job>, JobsError> {
+    pub fn list(&self, principal: Option<&Principal>, tenant: &str) -> Result<Vec<Job>, JobsError> {
         Guard::cross_persona(None).authorize(principal, Some(tenant))?;
         let guard = self.inner.lock().unwrap();
-        let mut out: Vec<Job> = guard.values().filter(|j| j.tenant == tenant).cloned().collect();
+        let mut out: Vec<Job> = guard
+            .values()
+            .filter(|j| j.tenant == tenant)
+            .cloned()
+            .collect();
         out.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(out)
     }
@@ -118,8 +121,7 @@ impl JobStore {
         principal: Option<&Principal>,
         req: SubmitJobRequest,
     ) -> Result<Job, JobsError> {
-        Guard::cross_persona(Some("jobs:submit"))
-            .authorize(principal, Some(&req.tenant))?;
+        Guard::cross_persona(Some("jobs:submit")).authorize(principal, Some(&req.tenant))?;
         if !VALID_JOB_KINDS.contains(&req.kind.as_str()) {
             return Err(JobsError::InvalidKind(req.kind));
         }
@@ -149,7 +151,9 @@ impl JobStore {
     ) -> Result<Job, JobsError> {
         Guard::operator_only().authorize(principal, None)?;
         let mut guard = self.inner.lock().unwrap();
-        let job = guard.get_mut(id).ok_or_else(|| JobsError::NotFound(id.into()))?;
+        let job = guard
+            .get_mut(id)
+            .ok_or_else(|| JobsError::NotFound(id.into()))?;
         if job.state.is_terminal() {
             return Err(JobsError::AlreadyTerminal(job.state));
         }
@@ -167,10 +171,11 @@ impl JobStore {
         tenant: &str,
         id: &str,
     ) -> Result<Job, JobsError> {
-        Guard::cross_persona(Some("jobs:cancel"))
-            .authorize(principal, Some(tenant))?;
+        Guard::cross_persona(Some("jobs:cancel")).authorize(principal, Some(tenant))?;
         let mut guard = self.inner.lock().unwrap();
-        let job = guard.get_mut(id).ok_or_else(|| JobsError::NotFound(id.into()))?;
+        let job = guard
+            .get_mut(id)
+            .ok_or_else(|| JobsError::NotFound(id.into()))?;
         if job.tenant != tenant {
             return Err(JobsError::NotFound(id.into()));
         }
@@ -201,11 +206,16 @@ mod tests {
         Principal::new("o", Persona::Operator)
     }
     fn admin() -> Principal {
-        Principal::new("a", Persona::Admin).with_role("jobs:submit").with_role("jobs:cancel")
+        Principal::new("a", Persona::Admin)
+            .with_role("jobs:submit")
+            .with_role("jobs:cancel")
     }
 
     fn req(t: &str, k: &str) -> SubmitJobRequest {
-        SubmitJobRequest { tenant: t.into(), kind: k.into() }
+        SubmitJobRequest {
+            tenant: t.into(),
+            kind: k.into(),
+        }
     }
 
     #[test]
@@ -227,7 +237,9 @@ mod tests {
     #[test]
     fn submit_without_role_denied() {
         let s = JobStore::new();
-        let err = s.submit(Some(&dev_no_role("acme")), req("acme", "build")).unwrap_err();
+        let err = s
+            .submit(Some(&dev_no_role("acme")), req("acme", "build"))
+            .unwrap_err();
         assert!(matches!(err, JobsError::Guard(GuardError::MissingRole(_))));
     }
 
@@ -243,7 +255,9 @@ mod tests {
     #[test]
     fn submit_invalid_kind_rejected() {
         let s = JobStore::new();
-        let err = s.submit(Some(&dev("acme")), req("acme", "evil")).unwrap_err();
+        let err = s
+            .submit(Some(&dev("acme")), req("acme", "evil"))
+            .unwrap_err();
         assert!(matches!(err, JobsError::InvalidKind(_)));
     }
 
@@ -259,8 +273,13 @@ mod tests {
     #[test]
     fn submit_cross_tenant_denied() {
         let s = JobStore::new();
-        let err = s.submit(Some(&dev("globex")), req("acme", "build")).unwrap_err();
-        assert!(matches!(err, JobsError::Guard(GuardError::TenantMismatch { .. })));
+        let err = s
+            .submit(Some(&dev("globex")), req("acme", "build"))
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            JobsError::Guard(GuardError::TenantMismatch { .. })
+        ));
     }
 
     #[test]
@@ -300,15 +319,22 @@ mod tests {
     fn transition_requires_operator() {
         let s = JobStore::new();
         let j = s.submit(Some(&dev("acme")), req("acme", "build")).unwrap();
-        let err = s.transition(Some(&dev("acme")), &j.id, JobState::Running, 50).unwrap_err();
-        assert!(matches!(err, JobsError::Guard(GuardError::PersonaForbidden { .. })));
+        let err = s
+            .transition(Some(&dev("acme")), &j.id, JobState::Running, 50)
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            JobsError::Guard(GuardError::PersonaForbidden { .. })
+        ));
     }
 
     #[test]
     fn transition_to_running_updates_progress() {
         let s = JobStore::new();
         let j = s.submit(Some(&dev("acme")), req("acme", "build")).unwrap();
-        let updated = s.transition(Some(&op()), &j.id, JobState::Running, 50).unwrap();
+        let updated = s
+            .transition(Some(&op()), &j.id, JobState::Running, 50)
+            .unwrap();
         assert_eq!(updated.state, JobState::Running);
         assert_eq!(updated.progress_pct, 50);
         assert!(updated.finished_at.is_none());
@@ -318,7 +344,9 @@ mod tests {
     fn transition_to_succeeded_sets_finished_at() {
         let s = JobStore::new();
         let j = s.submit(Some(&dev("acme")), req("acme", "build")).unwrap();
-        let updated = s.transition(Some(&op()), &j.id, JobState::Succeeded, 100).unwrap();
+        let updated = s
+            .transition(Some(&op()), &j.id, JobState::Succeeded, 100)
+            .unwrap();
         assert!(updated.finished_at.is_some());
     }
 
@@ -326,7 +354,9 @@ mod tests {
     fn transition_clamps_progress_to_100() {
         let s = JobStore::new();
         let j = s.submit(Some(&dev("acme")), req("acme", "build")).unwrap();
-        let updated = s.transition(Some(&op()), &j.id, JobState::Running, 250).unwrap();
+        let updated = s
+            .transition(Some(&op()), &j.id, JobState::Running, 250)
+            .unwrap();
         assert_eq!(updated.progress_pct, 100);
     }
 
@@ -334,9 +364,15 @@ mod tests {
     fn transition_after_terminal_rejected() {
         let s = JobStore::new();
         let j = s.submit(Some(&dev("acme")), req("acme", "build")).unwrap();
-        s.transition(Some(&op()), &j.id, JobState::Succeeded, 100).unwrap();
-        let err = s.transition(Some(&op()), &j.id, JobState::Running, 0).unwrap_err();
-        assert!(matches!(err, JobsError::AlreadyTerminal(JobState::Succeeded)));
+        s.transition(Some(&op()), &j.id, JobState::Succeeded, 100)
+            .unwrap();
+        let err = s
+            .transition(Some(&op()), &j.id, JobState::Running, 0)
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            JobsError::AlreadyTerminal(JobState::Succeeded)
+        ));
     }
 
     #[test]
@@ -351,7 +387,8 @@ mod tests {
     fn cancel_already_terminal_rejected() {
         let s = JobStore::new();
         let j = s.submit(Some(&dev("acme")), req("acme", "build")).unwrap();
-        s.transition(Some(&op()), &j.id, JobState::Failed, 0).unwrap();
+        s.transition(Some(&op()), &j.id, JobState::Failed, 0)
+            .unwrap();
         let err = s.cancel(Some(&dev("acme")), "acme", &j.id).unwrap_err();
         assert!(matches!(err, JobsError::AlreadyTerminal(JobState::Failed)));
     }
@@ -361,7 +398,10 @@ mod tests {
         let s = JobStore::new();
         let j = s.submit(Some(&admin()), req("acme", "build")).unwrap();
         let err = s.cancel(Some(&dev("globex")), "acme", &j.id).unwrap_err();
-        assert!(matches!(err, JobsError::Guard(GuardError::TenantMismatch { .. })));
+        assert!(matches!(
+            err,
+            JobsError::Guard(GuardError::TenantMismatch { .. })
+        ));
     }
 
     #[test]

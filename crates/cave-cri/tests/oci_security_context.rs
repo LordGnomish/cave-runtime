@@ -38,12 +38,15 @@ fn base_spec() -> ContainerSpec {
 #[test]
 fn run_as_user_group_supplemental_groups_applied() {
     let mut spec = generate(&base_spec(), &PathBuf::from("/merged"), "ctr-001");
-    apply_security_context(&mut spec, &SecurityContext {
-        run_as_user: Some(1000),
-        run_as_group: Some(1001),
-        supplemental_groups: vec![100, 200, 300],
-        ..Default::default()
-    });
+    apply_security_context(
+        &mut spec,
+        &SecurityContext {
+            run_as_user: Some(1000),
+            run_as_group: Some(1001),
+            supplemental_groups: vec![100, 200, 300],
+            ..Default::default()
+        },
+    );
     assert_eq!(spec.process.user.uid, 1000);
     assert_eq!(spec.process.user.gid, 1001);
     assert_eq!(spec.process.user.additional_gids, vec![100, 200, 300]);
@@ -56,20 +59,26 @@ fn run_as_user_group_supplemental_groups_applied() {
 #[test]
 fn readonly_rootfs_and_no_new_privs_flags_propagate() {
     let mut spec = generate(&base_spec(), &PathBuf::from("/merged"), "ctr-002");
-    apply_security_context(&mut spec, &SecurityContext {
-        readonly_rootfs: true,
-        allow_privilege_escalation: false,
-        ..Default::default()
-    });
+    apply_security_context(
+        &mut spec,
+        &SecurityContext {
+            readonly_rootfs: true,
+            allow_privilege_escalation: false,
+            ..Default::default()
+        },
+    );
     assert!(spec.root.readonly);
     assert!(spec.process.no_new_privileges);
 
     // Explicit allow → no_new_privileges = false (matches Kubernetes default).
-    apply_security_context(&mut spec, &SecurityContext {
-        readonly_rootfs: false,
-        allow_privilege_escalation: true,
-        ..Default::default()
-    });
+    apply_security_context(
+        &mut spec,
+        &SecurityContext {
+            readonly_rootfs: false,
+            allow_privilege_escalation: true,
+            ..Default::default()
+        },
+    );
     assert!(!spec.root.readonly);
     assert!(!spec.process.no_new_privileges);
 }
@@ -81,15 +90,24 @@ fn readonly_rootfs_and_no_new_privs_flags_propagate() {
 #[test]
 fn capabilities_add_then_drop_yields_drop() {
     let mut spec = generate(&base_spec(), &PathBuf::from("/merged"), "ctr-003");
-    apply_security_context(&mut spec, &SecurityContext {
-        capabilities_add: vec!["NET_ADMIN".into(), "SYS_PTRACE".into()],
-        capabilities_drop: vec!["SYS_PTRACE".into(), "MKNOD".into()],
-        ..Default::default()
-    });
+    apply_security_context(
+        &mut spec,
+        &SecurityContext {
+            capabilities_add: vec!["NET_ADMIN".into(), "SYS_PTRACE".into()],
+            capabilities_drop: vec!["SYS_PTRACE".into(), "MKNOD".into()],
+            ..Default::default()
+        },
+    );
     let caps = &spec.process.capabilities.bounding;
     assert!(caps.contains(&"CAP_NET_ADMIN".to_string()), "Add applied");
-    assert!(!caps.contains(&"CAP_SYS_PTRACE".to_string()), "Drop overrides Add");
-    assert!(!caps.contains(&"CAP_MKNOD".to_string()), "Default cap dropped");
+    assert!(
+        !caps.contains(&"CAP_SYS_PTRACE".to_string()),
+        "Drop overrides Add"
+    );
+    assert!(
+        !caps.contains(&"CAP_MKNOD".to_string()),
+        "Default cap dropped"
+    );
     // Drops must apply uniformly to all four cap sets that runc sets.
     assert_eq!(spec.process.capabilities.effective, *caps);
     assert_eq!(spec.process.capabilities.permitted, *caps);
@@ -100,21 +118,36 @@ fn capabilities_add_then_drop_yields_drop() {
 #[test]
 fn capabilities_add_all_expands_drop_all_clears() {
     let mut spec = generate(&base_spec(), &PathBuf::from("/merged"), "ctr-004");
-    apply_security_context(&mut spec, &SecurityContext {
-        capabilities_add: vec!["ALL".into()],
-        ..Default::default()
-    });
-    assert!(spec.process.capabilities.bounding.len() >= 30,
-        "ALL expands to ~40 caps, got {}", spec.process.capabilities.bounding.len());
-    assert!(spec.process.capabilities.bounding.contains(&"CAP_SYS_ADMIN".to_string()));
+    apply_security_context(
+        &mut spec,
+        &SecurityContext {
+            capabilities_add: vec!["ALL".into()],
+            ..Default::default()
+        },
+    );
+    assert!(
+        spec.process.capabilities.bounding.len() >= 30,
+        "ALL expands to ~40 caps, got {}",
+        spec.process.capabilities.bounding.len()
+    );
+    assert!(spec
+        .process
+        .capabilities
+        .bounding
+        .contains(&"CAP_SYS_ADMIN".to_string()));
 
     let mut spec = generate(&base_spec(), &PathBuf::from("/merged"), "ctr-005");
-    apply_security_context(&mut spec, &SecurityContext {
-        capabilities_drop: vec!["ALL".into()],
-        ..Default::default()
-    });
-    assert!(spec.process.capabilities.bounding.is_empty(),
-        "ALL clears every cap");
+    apply_security_context(
+        &mut spec,
+        &SecurityContext {
+            capabilities_drop: vec!["ALL".into()],
+            ..Default::default()
+        },
+    );
+    assert!(
+        spec.process.capabilities.bounding.is_empty(),
+        "ALL clears every cap"
+    );
 }
 
 /// Cite: containerd `setOCISecurityContext` privileged path — `Privileged
@@ -124,20 +157,44 @@ fn capabilities_add_all_expands_drop_all_clears() {
 fn privileged_grants_all_caps_and_disables_confinement() {
     let mut spec = generate(&base_spec(), &PathBuf::from("/merged"), "ctr-006");
     // Pre-condition: default spec has masked paths + seccomp set
-    assert!(!spec.linux.masked_paths.is_empty(), "default masked_paths populated");
+    assert!(
+        !spec.linux.masked_paths.is_empty(),
+        "default masked_paths populated"
+    );
     assert!(spec.linux.seccomp.is_some(), "default seccomp populated");
 
-    apply_security_context(&mut spec, &SecurityContext {
-        privileged: true,
-        ..Default::default()
-    });
+    apply_security_context(
+        &mut spec,
+        &SecurityContext {
+            privileged: true,
+            ..Default::default()
+        },
+    );
 
-    assert!(spec.process.capabilities.bounding.contains(&"CAP_SYS_ADMIN".to_string()));
-    assert!(spec.process.capabilities.ambient.contains(&"CAP_SYS_ADMIN".to_string()),
-        "ambient set granted in privileged mode");
-    assert!(spec.linux.masked_paths.is_empty(), "privileged ⇒ no masked paths");
-    assert!(spec.linux.readonly_paths.is_empty(), "privileged ⇒ no read-only paths");
-    assert!(spec.linux.seccomp.is_none(), "privileged ⇒ seccomp disabled");
+    assert!(spec
+        .process
+        .capabilities
+        .bounding
+        .contains(&"CAP_SYS_ADMIN".to_string()));
+    assert!(
+        spec.process
+            .capabilities
+            .ambient
+            .contains(&"CAP_SYS_ADMIN".to_string()),
+        "ambient set granted in privileged mode"
+    );
+    assert!(
+        spec.linux.masked_paths.is_empty(),
+        "privileged ⇒ no masked paths"
+    );
+    assert!(
+        spec.linux.readonly_paths.is_empty(),
+        "privileged ⇒ no read-only paths"
+    );
+    assert!(
+        spec.linux.seccomp.is_none(),
+        "privileged ⇒ seccomp disabled"
+    );
 }
 
 /// Cite: containerd `setOCISecurityContext` seccomp profile mapping —
@@ -149,26 +206,37 @@ fn seccomp_profile_dispatch() {
     // Unconfined → no filter
     let mut spec = generate(&base_spec(), &PathBuf::from("/merged"), "ctr-007");
     assert!(spec.linux.seccomp.is_some(), "default starts populated");
-    apply_security_context(&mut spec, &SecurityContext {
-        seccomp_profile: Some(SeccompProfile::Unconfined),
-        ..Default::default()
-    });
+    apply_security_context(
+        &mut spec,
+        &SecurityContext {
+            seccomp_profile: Some(SeccompProfile::Unconfined),
+            ..Default::default()
+        },
+    );
     assert!(spec.linux.seccomp.is_none());
 
     // RuntimeDefault → filter stays / is restored
     let mut spec = generate(&base_spec(), &PathBuf::from("/merged"), "ctr-008");
-    apply_security_context(&mut spec, &SecurityContext {
-        seccomp_profile: Some(SeccompProfile::RuntimeDefault),
-        ..Default::default()
-    });
+    apply_security_context(
+        &mut spec,
+        &SecurityContext {
+            seccomp_profile: Some(SeccompProfile::RuntimeDefault),
+            ..Default::default()
+        },
+    );
     assert!(spec.linux.seccomp.is_some());
 
     // Localhost(profile.json) → filter populated (runtime loads from path)
     let mut spec = generate(&base_spec(), &PathBuf::from("/merged"), "ctr-009");
-    apply_security_context(&mut spec, &SecurityContext {
-        seccomp_profile: Some(SeccompProfile::Localhost("/etc/seccomp/strict.json".into())),
-        ..Default::default()
-    });
-    assert!(spec.linux.seccomp.is_some(),
-        "Localhost profile ⇒ generator does NOT fall back to no-seccomp");
+    apply_security_context(
+        &mut spec,
+        &SecurityContext {
+            seccomp_profile: Some(SeccompProfile::Localhost("/etc/seccomp/strict.json".into())),
+            ..Default::default()
+        },
+    );
+    assert!(
+        spec.linux.seccomp.is_some(),
+        "Localhost profile ⇒ generator does NOT fall back to no-seccomp"
+    );
 }

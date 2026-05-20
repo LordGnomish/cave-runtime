@@ -251,7 +251,7 @@ pub enum OutputFormat {
 //     reconfigured per-call with a rustls cert + key; that's outside the
 //     scope of this dispatcher. Tracked as a follow-up.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::path::PathBuf;
 
 use super::request::{HttpVerb, PreparedRequest};
@@ -300,98 +300,85 @@ impl AuthCmd {
     /// `Err(...)` for combinations the dispatcher cannot fulfil.
     pub fn prepare(&self) -> Result<Option<PreparedRequest>> {
         match self {
-            AuthCmd::Login(args) => match args.method {
-                LoginMethod::Token => {
-                    let token = args
-                        .token
-                        .clone()
-                        .ok_or_else(|| anyhow!("--token is required with --method=token"))?;
-                    let realm = realm_or_default(args.realm.as_deref()).to_string();
-                    write_session(&realm, &token)?;
-                    Ok(None)
-                }
-                LoginMethod::Userpass => {
-                    let username = args
-                        .username
-                        .as_deref()
-                        .ok_or_else(|| anyhow!("--username is required with --method=userpass"))?;
-                    let password = args
-                        .password
-                        .as_deref()
-                        .ok_or_else(|| {
+            AuthCmd::Login(args) => {
+                match args.method {
+                    LoginMethod::Token => {
+                        let token = args
+                            .token
+                            .clone()
+                            .ok_or_else(|| anyhow!("--token is required with --method=token"))?;
+                        let realm = realm_or_default(args.realm.as_deref()).to_string();
+                        write_session(&realm, &token)?;
+                        Ok(None)
+                    }
+                    LoginMethod::Userpass => {
+                        let username = args.username.as_deref().ok_or_else(|| {
+                            anyhow!("--username is required with --method=userpass")
+                        })?;
+                        let password = args.password.as_deref().ok_or_else(|| {
                             anyhow!(
                                 "--password is required with --method=userpass \
                                  (or set CAVE_PASSWORD)"
                             )
                         })?;
-                    let realm = realm_or_default(args.realm.as_deref());
-                    let body = serde_json::json!({
-                        "grant_type": "password",
-                        "client_id": args.client_id,
-                        "username": username,
-                        "password": password,
-                    });
-                    Ok(Some(
-                        PreparedRequest::new(
-                            HttpVerb::Post,
-                            format!(
-                                "/api/auth/realms/{realm}/protocol/openid-connect/token"
-                            ),
-                        )
-                        .with_body(body),
-                    ))
-                }
-                LoginMethod::Oidc => {
-                    // The PKCE/auth-code dance has to happen out-of-band: the
-                    // browser hits the IdP, redirects back with a code, and a
-                    // separate `cavectl auth login --method=token --token=…`
-                    // call seals the session. Print the authorization URL so
-                    // the operator can paste it into a browser; no server hop
-                    // happens here, hence no PreparedRequest.
-                    let realm = realm_or_default(args.realm.as_deref());
-                    let server = std::env::var("CAVE_SERVER")
-                        .unwrap_or_else(|_| "http://localhost:3000".into());
-                    let url = format!(
-                        "{server}/api/auth/realms/{realm}/protocol/openid-connect/auth\
+                        let realm = realm_or_default(args.realm.as_deref());
+                        let body = serde_json::json!({
+                            "grant_type": "password",
+                            "client_id": args.client_id,
+                            "username": username,
+                            "password": password,
+                        });
+                        Ok(Some(
+                            PreparedRequest::new(
+                                HttpVerb::Post,
+                                format!("/api/auth/realms/{realm}/protocol/openid-connect/token"),
+                            )
+                            .with_body(body),
+                        ))
+                    }
+                    LoginMethod::Oidc => {
+                        // The PKCE/auth-code dance has to happen out-of-band: the
+                        // browser hits the IdP, redirects back with a code, and a
+                        // separate `cavectl auth login --method=token --token=…`
+                        // call seals the session. Print the authorization URL so
+                        // the operator can paste it into a browser; no server hop
+                        // happens here, hence no PreparedRequest.
+                        let realm = realm_or_default(args.realm.as_deref());
+                        let server = std::env::var("CAVE_SERVER")
+                            .unwrap_or_else(|_| "http://localhost:3000".into());
+                        let url = format!(
+                            "{server}/api/auth/realms/{realm}/protocol/openid-connect/auth\
                          ?client_id={cid}&response_type=code\
                          &scope=openid+profile+email\
                          &redirect_uri=http://localhost:8765/callback",
-                        cid = args.client_id,
-                    );
-                    eprintln!("OIDC authorization URL — open in a browser:\n  {url}");
-                    eprintln!(
-                        "After the IdP redirects with ?code=…&state=…, exchange via:\n  \
+                            cid = args.client_id,
+                        );
+                        eprintln!("OIDC authorization URL — open in a browser:\n  {url}");
+                        eprintln!(
+                            "After the IdP redirects with ?code=…&state=…, exchange via:\n  \
                          cavectl auth login --method=token --token <bearer-from-callback> \
                          --realm {realm}"
-                    );
-                    Ok(None)
-                }
-                LoginMethod::Cert => {
-                    let cert = args
-                        .cert
-                        .as_deref()
-                        .ok_or_else(|| {
+                        );
+                        Ok(None)
+                    }
+                    LoginMethod::Cert => {
+                        let cert = args.cert.as_deref().ok_or_else(|| {
                             anyhow!("--cert PEM path is required with --method=cert")
                         })?;
-                    let _key = args
-                        .key
-                        .as_deref()
-                        .ok_or_else(|| {
+                        let _key = args.key.as_deref().ok_or_else(|| {
                             anyhow!("--key PEM path is required with --method=cert")
                         })?;
-                    if !cert.exists() {
-                        return Err(anyhow!(
-                            "--cert path does not exist: {}",
-                            cert.display()
-                        ));
-                    }
-                    Err(anyhow!(
-                        "--method=cert (mTLS) requires reqwest to be reconstructed with a \
+                        if !cert.exists() {
+                            return Err(anyhow!("--cert path does not exist: {}", cert.display()));
+                        }
+                        Err(anyhow!(
+                            "--method=cert (mTLS) requires reqwest to be reconstructed with a \
                          rustls Identity per call — not yet wired in cave-cli's shared \
                          ApiClient. Use --method=token with a cert-bound bearer for now."
-                    ))
+                        ))
+                    }
                 }
-            },
+            }
 
             AuthCmd::Logout(args) => {
                 let realm = realm_or_default(args.realm.as_deref());
@@ -401,9 +388,7 @@ impl AuthCmd {
                 }
                 Ok(Some(PreparedRequest::new(
                     HttpVerb::Post,
-                    format!(
-                        "/api/auth/realms/{realm}/protocol/openid-connect/logout"
-                    ),
+                    format!("/api/auth/realms/{realm}/protocol/openid-connect/logout"),
                 )))
             }
 
@@ -432,10 +417,7 @@ impl AuthCmd {
                 let realm = realm_or_default(a.realm.as_deref());
                 Ok(Some(PreparedRequest::new(
                     HttpVerb::Delete,
-                    format!(
-                        "/api/auth/realms/{realm}/admin/tokens/{id}",
-                        id = a.id
-                    ),
+                    format!("/api/auth/realms/{realm}/admin/tokens/{id}", id = a.id),
                 )))
             }
 
@@ -451,10 +433,7 @@ impl AuthCmd {
 
             AuthCmd::Users(UsersCmd::List(a)) => {
                 let realm = realm_or_default(a.realm.as_deref());
-                let mut path = format!(
-                    "/api/auth/realms/{realm}/users?limit={lim}",
-                    lim = a.limit
-                );
+                let mut path = format!("/api/auth/realms/{realm}/users?limit={lim}", lim = a.limit);
                 if let Some(q) = &a.query {
                     path.push_str(&format!("&q={}", urlencode(q)));
                 }
@@ -570,7 +549,9 @@ mod tests {
 
     #[test]
     fn login_userpass_with_short_flags() {
-        let r = parse(&["login", "--method", "userpass", "-u", "alice", "-p", "hunter2"]);
+        let r = parse(&[
+            "login", "--method", "userpass", "-u", "alice", "-p", "hunter2",
+        ]);
         match r.cmd {
             AuthCmd::Login(a) => {
                 assert_eq!(a.method, LoginMethod::Userpass);
@@ -584,14 +565,27 @@ mod tests {
     #[test]
     fn login_cert_method_takes_pem_paths() {
         let r = parse(&[
-            "login", "--method", "cert", "--cert", "/etc/cave/client.pem",
-            "--key", "/etc/cave/client.key", "--realm", "acme",
+            "login",
+            "--method",
+            "cert",
+            "--cert",
+            "/etc/cave/client.pem",
+            "--key",
+            "/etc/cave/client.key",
+            "--realm",
+            "acme",
         ]);
         match r.cmd {
             AuthCmd::Login(a) => {
                 assert_eq!(a.method, LoginMethod::Cert);
-                assert_eq!(a.cert.as_deref().and_then(|p| p.to_str()), Some("/etc/cave/client.pem"));
-                assert_eq!(a.key.as_deref().and_then(|p| p.to_str()), Some("/etc/cave/client.key"));
+                assert_eq!(
+                    a.cert.as_deref().and_then(|p| p.to_str()),
+                    Some("/etc/cave/client.pem")
+                );
+                assert_eq!(
+                    a.key.as_deref().and_then(|p| p.to_str()),
+                    Some("/etc/cave/client.key")
+                );
                 assert_eq!(a.realm.as_deref(), Some("acme"));
             }
             other => panic!("expected Login, got {other:?}"),
@@ -607,7 +601,11 @@ mod tests {
         assert!(ok.is_ok(), "no-browser alone parses");
 
         let bad = try_parse(&[
-            "login", "--method", "oidc", "--open-browser", "--no-browser",
+            "login",
+            "--method",
+            "oidc",
+            "--open-browser",
+            "--no-browser",
         ]);
         assert!(bad.is_err(), "explicit both flags must conflict");
     }

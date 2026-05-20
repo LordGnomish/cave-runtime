@@ -56,7 +56,10 @@ pub struct PartitionField {
 
 impl Default for PartitionSpec {
     fn default() -> Self {
-        Self { spec_id: 0, fields: vec![] }
+        Self {
+            spec_id: 0,
+            fields: vec![],
+        }
     }
 }
 
@@ -88,7 +91,11 @@ pub struct TableMetadata {
     pub default_sort_order_id: i32,
     #[serde(default)]
     pub properties: HashMap<String, String>,
-    #[serde(rename = "current-snapshot-id", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "current-snapshot-id",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub current_snapshot_id: Option<i64>,
     #[serde(default)]
     pub snapshots: Vec<Snapshot>,
@@ -180,19 +187,16 @@ impl TableMetadataBuilder {
         let location = self
             .location
             .ok_or_else(|| Error::InvalidMetadata("location required".into()))?;
-        let table_uuid = self.table_uuid.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+        let table_uuid = self
+            .table_uuid
+            .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
         Ok(TableMetadata {
             format_version,
             table_uuid,
             location,
             last_sequence_number: 0,
             last_updated_ms: 0,
-            last_column_id: schema
-                .fields
-                .iter()
-                .map(|f| f.id)
-                .max()
-                .unwrap_or(0),
+            last_column_id: schema.fields.iter().map(|f| f.id).max().unwrap_or(0),
             current_schema_id: schema.schema_id,
             schemas: vec![schema],
             partition_specs: vec![PartitionSpec::default()],
@@ -236,8 +240,16 @@ mod tests {
     #[test]
     fn builder_assigns_last_column_id_from_schema() {
         let schema = Schema::builder()
-            .with_field(NestedField::required(1, "a", Type::Primitive(PrimitiveType::Long)))
-            .with_field(NestedField::required(7, "b", Type::Primitive(PrimitiveType::Long)))
+            .with_field(NestedField::required(
+                1,
+                "a",
+                Type::Primitive(PrimitiveType::Long),
+            ))
+            .with_field(NestedField::required(
+                7,
+                "b",
+                Type::Primitive(PrimitiveType::Long),
+            ))
             .build()
             .unwrap();
         let m = TableMetadataBuilder::new()
@@ -252,7 +264,11 @@ mod tests {
     #[test]
     fn current_schema_and_snapshot_lookup() {
         let schema = Schema::builder()
-            .with_field(NestedField::required(1, "id", Type::Primitive(PrimitiveType::Long)))
+            .with_field(NestedField::required(
+                1,
+                "id",
+                Type::Primitive(PrimitiveType::Long),
+            ))
             .build()
             .unwrap();
         let m = TableMetadataBuilder::new()
@@ -267,7 +283,11 @@ mod tests {
     #[test]
     fn metadata_json_round_trip() {
         let schema = Schema::builder()
-            .with_field(NestedField::required(1, "id", Type::Primitive(PrimitiveType::Long)))
+            .with_field(NestedField::required(
+                1,
+                "id",
+                Type::Primitive(PrimitiveType::Long),
+            ))
             .build()
             .unwrap();
         let m = TableMetadataBuilder::new()

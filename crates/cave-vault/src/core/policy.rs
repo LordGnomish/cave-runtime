@@ -90,7 +90,8 @@ impl PolicyRule {
         I: IntoIterator,
         I::Item: AsRef<str>,
     {
-        let keys: Vec<String> = body_keys.into_iter()
+        let keys: Vec<String> = body_keys
+            .into_iter()
             .map(|s| s.as_ref().to_string())
             .collect();
 
@@ -108,8 +109,7 @@ impl PolicyRule {
             }
         }
 
-        if !self.allowed_parameters.is_empty()
-            && !self.allowed_parameters.iter().any(|a| a == "*")
+        if !self.allowed_parameters.is_empty() && !self.allowed_parameters.iter().any(|a| a == "*")
         {
             for k in &keys {
                 if !self.allowed_parameters.iter().any(|a| a == k) {
@@ -149,7 +149,9 @@ impl Policy {
             if let Some(cap_match) = cap_re.captures(body) {
                 for cap_str in split_csv_keep_quoted(&cap_match[1]) {
                     let cap_str = cap_str.trim().trim_matches('"').trim();
-                    if cap_str.is_empty() { continue; }
+                    if cap_str.is_empty() {
+                        continue;
+                    }
                     if let Some(cap) = Capability::from_str(cap_str) {
                         capabilities.push(cap);
                     }
@@ -157,17 +159,23 @@ impl Policy {
             }
 
             let allowed_parameters = extract_inner_block(body, "allowed_parameters")
-                .map(|inner| extract_param_keys(&inner)).unwrap_or_default();
-            let denied_parameters = extract_inner_block(body, "denied_parameters")
-                .map(|inner| extract_param_keys(&inner)).unwrap_or_default();
-            let required_parameters = required_re.captures(body)
-                .map(|m| split_csv_keep_quoted(&m[1])
-                    .into_iter()
-                    .map(|s| s.trim().trim_matches('"').trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect())
+                .map(|inner| extract_param_keys(&inner))
                 .unwrap_or_default();
-            let min_wrapping_ttl_seconds = min_wrap_re.captures(body)
+            let denied_parameters = extract_inner_block(body, "denied_parameters")
+                .map(|inner| extract_param_keys(&inner))
+                .unwrap_or_default();
+            let required_parameters = required_re
+                .captures(body)
+                .map(|m| {
+                    split_csv_keep_quoted(&m[1])
+                        .into_iter()
+                        .map(|s| s.trim().trim_matches('"').trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect()
+                })
+                .unwrap_or_default();
+            let min_wrapping_ttl_seconds = min_wrap_re
+                .captures(body)
                 .map(|m| {
                     let n: i64 = m[1].parse().unwrap_or(0);
                     let unit = m.get(2).map(|x| x.as_str()).unwrap_or("");
@@ -175,7 +183,7 @@ impl Policy {
                         "m" => n * 60,
                         "h" => n * 3600,
                         "d" => n * 86_400,
-                        _   => n,
+                        _ => n,
                     }
                 })
                 .unwrap_or(0);
@@ -189,7 +197,11 @@ impl Policy {
                 min_wrapping_ttl_seconds,
             });
         }
-        Ok(Policy { name: name.to_string(), rules, raw: hcl.to_string() })
+        Ok(Policy {
+            name: name.to_string(),
+            rules,
+            raw: hcl.to_string(),
+        })
     }
 
     pub fn allows(&self, path: &str, cap: &Capability) -> bool {
@@ -226,22 +238,65 @@ impl PolicyStore {
             }],
             raw: r#"path "*" { capabilities = ["create", "read", "update", "delete", "list", "sudo"] }"#.to_string(),
         });
-        store.policies.insert("default".to_string(), Policy {
-            name: "default".to_string(),
-            rules: vec![
-                PolicyRule { path: "auth/token/lookup-self".to_string(), capabilities: vec![Capability::Read] , ..Default::default() },
-                PolicyRule { path: "auth/token/renew-self".to_string(), capabilities: vec![Capability::Update] , ..Default::default() },
-                PolicyRule { path: "auth/token/revoke-self".to_string(), capabilities: vec![Capability::Update] , ..Default::default() },
-                PolicyRule { path: "sys/capabilities-self".to_string(), capabilities: vec![Capability::Update] , ..Default::default() },
-                PolicyRule { path: "sys/leases/lookup".to_string(), capabilities: vec![Capability::Update] , ..Default::default() },
-                PolicyRule { path: "sys/leases/renew".to_string(), capabilities: vec![Capability::Update] , ..Default::default() },
-                PolicyRule { path: "sys/renew".to_string(), capabilities: vec![Capability::Update] , ..Default::default() },
-                PolicyRule { path: "sys/tools/hash".to_string(), capabilities: vec![Capability::Update] , ..Default::default() },
-                PolicyRule { path: "sys/tools/random/*".to_string(), capabilities: vec![Capability::Update] , ..Default::default() },
-                PolicyRule { path: "identity/oidc/provider/+/userinfo".to_string(), capabilities: vec![Capability::Read, Capability::Update] , ..Default::default() },
-            ],
-            raw: String::new(),
-        });
+        store.policies.insert(
+            "default".to_string(),
+            Policy {
+                name: "default".to_string(),
+                rules: vec![
+                    PolicyRule {
+                        path: "auth/token/lookup-self".to_string(),
+                        capabilities: vec![Capability::Read],
+                        ..Default::default()
+                    },
+                    PolicyRule {
+                        path: "auth/token/renew-self".to_string(),
+                        capabilities: vec![Capability::Update],
+                        ..Default::default()
+                    },
+                    PolicyRule {
+                        path: "auth/token/revoke-self".to_string(),
+                        capabilities: vec![Capability::Update],
+                        ..Default::default()
+                    },
+                    PolicyRule {
+                        path: "sys/capabilities-self".to_string(),
+                        capabilities: vec![Capability::Update],
+                        ..Default::default()
+                    },
+                    PolicyRule {
+                        path: "sys/leases/lookup".to_string(),
+                        capabilities: vec![Capability::Update],
+                        ..Default::default()
+                    },
+                    PolicyRule {
+                        path: "sys/leases/renew".to_string(),
+                        capabilities: vec![Capability::Update],
+                        ..Default::default()
+                    },
+                    PolicyRule {
+                        path: "sys/renew".to_string(),
+                        capabilities: vec![Capability::Update],
+                        ..Default::default()
+                    },
+                    PolicyRule {
+                        path: "sys/tools/hash".to_string(),
+                        capabilities: vec![Capability::Update],
+                        ..Default::default()
+                    },
+                    PolicyRule {
+                        path: "sys/tools/random/*".to_string(),
+                        capabilities: vec![Capability::Update],
+                        ..Default::default()
+                    },
+                    PolicyRule {
+                        path: "identity/oidc/provider/+/userinfo".to_string(),
+                        capabilities: vec![Capability::Read, Capability::Update],
+                        ..Default::default()
+                    },
+                ],
+                raw: String::new(),
+            },
+        );
         store
     }
 
@@ -291,7 +346,8 @@ fn extract_path_blocks(hcl: &str) -> Vec<(String, String)> {
     let mut cursor = 0usize;
     while let Some(m) = path_header.find_at(hcl, cursor) {
         let header_end = m.end();
-        let path = path_header.captures(&hcl[m.start()..])
+        let path = path_header
+            .captures(&hcl[m.start()..])
             .and_then(|c| c.get(1))
             .map(|g| g.as_str().to_string())
             .unwrap_or_default();
@@ -324,8 +380,8 @@ fn extract_path_blocks(hcl: &str) -> Vec<(String, String)> {
 /// Locate `<key> = { … }` inside a path body and return the inner text.
 /// Brace-aware so further nested blocks don't truncate.
 fn extract_inner_block(body: &str, key: &str) -> Option<String> {
-    let header = regex::Regex::new(&format!(r#"{key}\s*=\s*\{{"#, key = regex::escape(key)))
-        .ok()?;
+    let header =
+        regex::Regex::new(&format!(r#"{key}\s*=\s*\{{"#, key = regex::escape(key))).ok()?;
     let m = header.find(body)?;
     let header_end = m.end();
     let bytes = body.as_bytes();
@@ -363,7 +419,9 @@ fn strip_hcl_comments(hcl: &str) -> String {
         if !in_string {
             if c == '#' {
                 while let Some(&n) = iter.peek() {
-                    if n == '\n' { break; }
+                    if n == '\n' {
+                        break;
+                    }
                     iter.next();
                 }
                 continue;
@@ -371,7 +429,9 @@ fn strip_hcl_comments(hcl: &str) -> String {
             if c == '/' && iter.peek() == Some(&'/') {
                 iter.next();
                 while let Some(&n) = iter.peek() {
-                    if n == '\n' { break; }
+                    if n == '\n' {
+                        break;
+                    }
                     iter.next();
                 }
                 continue;
@@ -391,15 +451,22 @@ fn split_csv_keep_quoted(input: &str) -> Vec<String> {
     let mut in_quotes = false;
     for c in input.chars() {
         match c {
-            '"' => { in_quotes = !in_quotes; cur.push(c); }
+            '"' => {
+                in_quotes = !in_quotes;
+                cur.push(c);
+            }
             ',' if !in_quotes => {
-                if !cur.trim().is_empty() { out.push(cur.trim().to_string()); }
+                if !cur.trim().is_empty() {
+                    out.push(cur.trim().to_string());
+                }
                 cur.clear();
             }
             _ => cur.push(c),
         }
     }
-    if !cur.trim().is_empty() { out.push(cur.trim().to_string()); }
+    if !cur.trim().is_empty() {
+        out.push(cur.trim().to_string());
+    }
     out
 }
 
@@ -407,7 +474,8 @@ fn split_csv_keep_quoted(input: &str) -> Vec<String> {
 /// form `"key" = [...values...]`; we only care about the keys here.
 fn extract_param_keys(body: &str) -> Vec<String> {
     let key_re = regex::Regex::new(r#""([^"]+)"\s*=\s*\["#).expect("static regex");
-    key_re.captures_iter(body)
+    key_re
+        .captures_iter(body)
         .map(|c| c[1].to_string())
         .collect()
 }
@@ -548,7 +616,9 @@ path "secret/admin/*" {
 
     #[test]
     fn test_policy_capability_from_str_all_variants() {
-        for s in ["create", "read", "update", "delete", "list", "sudo", "deny", "patch"] {
+        for s in [
+            "create", "read", "update", "delete", "list", "sudo", "deny", "patch",
+        ] {
             assert!(Capability::from_str(s).is_some(), "missing {s}");
         }
         assert!(Capability::from_str("invalid").is_none());

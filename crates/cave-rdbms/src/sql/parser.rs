@@ -99,10 +99,7 @@ impl Parser {
                 let table = self.parse_ident()?;
                 self.expect(Token::From)?;
                 self.expect(Token::Stdin)?;
-                Ok(Statement::Copy {
-                    table,
-                    stdin: true,
-                })
+                Ok(Statement::Copy { table, stdin: true })
             }
             _ => Err(format!("unexpected token: {:?}", self.current())),
         }
@@ -291,7 +288,8 @@ impl Parser {
 
     fn parse_order_by(&mut self) -> Result<OrderBy, String> {
         let expr = self.parse_expr()?;
-        let descending = if matches!(self.current(), Token::Identifier(s) if s.to_uppercase() == "DESC") {
+        let descending = if matches!(self.current(), Token::Identifier(s) if s.to_uppercase() == "DESC")
+        {
             self.advance();
             true
         } else if matches!(self.current(), Token::Identifier(s) if s.to_uppercase() == "ASC") {
@@ -386,7 +384,10 @@ impl Parser {
         } else {
             None
         };
-        Ok(Statement::Delete(DeleteStmt { table, where_clause }))
+        Ok(Statement::Delete(DeleteStmt {
+            table,
+            where_clause,
+        }))
     }
 
     fn parse_create(&mut self) -> Result<Statement, String> {
@@ -547,7 +548,10 @@ impl Parser {
                 default,
                 primary_key: false,
             };
-            Ok(Statement::AlterTable(AlterTableStmt::AddColumn { table, column }))
+            Ok(Statement::AlterTable(AlterTableStmt::AddColumn {
+                table,
+                column,
+            }))
         } else {
             Err("expected ADD COLUMN".to_string())
         }
@@ -795,7 +799,10 @@ impl Parser {
                     type_name,
                 })
             }
-            _ => Err(format!("unexpected token in expression: {:?}", self.current())),
+            _ => Err(format!(
+                "unexpected token in expression: {:?}",
+                self.current()
+            )),
         }
     }
 
@@ -870,12 +877,21 @@ mod tests {
     #[test]
     fn test_parser_begin_commit_rollback() {
         let mut parser = Parser::new("BEGIN");
-        assert!(matches!(parser.parse().unwrap().statement, Statement::Begin));
+        assert!(matches!(
+            parser.parse().unwrap().statement,
+            Statement::Begin
+        ));
 
         let mut parser = Parser::new("COMMIT");
-        assert!(matches!(parser.parse().unwrap().statement, Statement::Commit));
+        assert!(matches!(
+            parser.parse().unwrap().statement,
+            Statement::Commit
+        ));
 
         let mut parser = Parser::new("ROLLBACK");
-        assert!(matches!(parser.parse().unwrap().statement, Statement::Rollback));
+        assert!(matches!(
+            parser.parse().unwrap().statement,
+            Statement::Rollback
+        ));
     }
 }

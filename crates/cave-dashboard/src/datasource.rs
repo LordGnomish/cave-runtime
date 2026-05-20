@@ -8,8 +8,8 @@
 //!   - Run variable/label queries (for template variable population)
 
 use crate::models::{
-    DataSource, DataSourceHealthStatus, DataSourceType, DataFrame, DataFrameData,
-    DataFrameSchema, DsQuery, FieldSchema, QueryResult,
+    DataFrame, DataFrameData, DataFrameSchema, DataSource, DataSourceHealthStatus, DataSourceType,
+    DsQuery, FieldSchema, QueryResult,
 };
 use std::collections::HashMap;
 
@@ -26,7 +26,13 @@ pub fn prometheus_query_url(base_url: &str, expr: &str, time: &str) -> String {
 }
 
 /// Build the Prometheus range-query URL.
-pub fn prometheus_range_url(base_url: &str, expr: &str, start: &str, end: &str, step: &str) -> String {
+pub fn prometheus_range_url(
+    base_url: &str,
+    expr: &str,
+    start: &str,
+    end: &str,
+    step: &str,
+) -> String {
     format!(
         "{}/api/v1/query_range?query={}&start={}&end={}&step={}",
         base_url.trim_end_matches('/'),
@@ -39,12 +45,20 @@ pub fn prometheus_range_url(base_url: &str, expr: &str, start: &str, end: &str, 
 
 /// Build the Prometheus label values URL (used by variable queries).
 pub fn prometheus_label_values_url(base_url: &str, label: &str) -> String {
-    format!("{}/api/v1/label/{}/values", base_url.trim_end_matches('/'), urlencoded(label))
+    format!(
+        "{}/api/v1/label/{}/values",
+        base_url.trim_end_matches('/'),
+        urlencoded(label)
+    )
 }
 
 /// Build the Prometheus series URL (used by `label_values(metric, label)` variable queries).
 pub fn prometheus_series_url(base_url: &str, selector: &str) -> String {
-    format!("{}/api/v1/series?match[]={}", base_url.trim_end_matches('/'), urlencoded(selector))
+    format!(
+        "{}/api/v1/series?match[]={}",
+        base_url.trim_end_matches('/'),
+        urlencoded(selector)
+    )
 }
 
 /// Build the Loki log-query URL.
@@ -70,11 +84,13 @@ pub fn tempo_trace_url(base_url: &str, trace_id: &str) -> String {
 }
 
 fn urlencoded(s: &str) -> String {
-    s.chars().map(|c| match c {
-        ' ' => "+".to_string(),
-        c if c.is_alphanumeric() || "-._~".contains(c) => c.to_string(),
-        c => format!("%{:02X}", c as u32),
-    }).collect()
+    s.chars()
+        .map(|c| match c {
+            ' ' => "+".to_string(),
+            c if c.is_alphanumeric() || "-._~".contains(c) => c.to_string(),
+            c => format!("%{:02X}", c as u32),
+        })
+        .collect()
 }
 
 // ─── Health check ─────────────────────────────────────────────────────────────
@@ -83,11 +99,16 @@ fn urlencoded(s: &str) -> String {
 /// Returns the URL to GET; a 200 response means healthy.
 pub fn health_check_url(ds: &DataSource) -> Option<String> {
     match ds.ds_type {
-        DataSourceType::Prometheus => Some(format!("{}/api/v1/query?query=1", ds.url.trim_end_matches('/'))),
+        DataSourceType::Prometheus => Some(format!(
+            "{}/api/v1/query?query=1",
+            ds.url.trim_end_matches('/')
+        )),
         DataSourceType::Loki => Some(format!("{}/ready", ds.url.trim_end_matches('/'))),
         DataSourceType::Jaeger => Some(format!("{}/api/services", ds.url.trim_end_matches('/'))),
         DataSourceType::Tempo => Some(format!("{}/ready", ds.url.trim_end_matches('/'))),
-        DataSourceType::Elasticsearch => Some(format!("{}/_cluster/health", ds.url.trim_end_matches('/'))),
+        DataSourceType::Elasticsearch => {
+            Some(format!("{}/_cluster/health", ds.url.trim_end_matches('/')))
+        }
         DataSourceType::InfluxDb => Some(format!("{}/ping", ds.url.trim_end_matches('/'))),
         DataSourceType::Postgres | DataSourceType::Mysql | DataSourceType::Mssql => {
             // SQL health checks need a DB connection — not applicable for HTTP proxy
@@ -137,7 +158,10 @@ pub async fn check_health(ds: &DataSource) -> DataSourceHealthStatus {
 /// Parse a Prometheus variable query (e.g. `label_values(metric, label)` or `label_names()`).
 pub fn parse_prometheus_variable_query(query: &str) -> PrometheusVariableQuery {
     let q = query.trim();
-    if let Some(inner) = q.strip_prefix("label_values(").and_then(|s| s.strip_suffix(')')) {
+    if let Some(inner) = q
+        .strip_prefix("label_values(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
         let parts: Vec<&str> = inner.splitn(2, ',').collect();
         if parts.len() == 2 {
             return PrometheusVariableQuery::LabelValues {
@@ -151,7 +175,10 @@ pub fn parse_prometheus_variable_query(query: &str) -> PrometheusVariableQuery {
             };
         }
     }
-    if let Some(inner) = q.strip_prefix("label_names(").and_then(|s| s.strip_suffix(')')) {
+    if let Some(inner) = q
+        .strip_prefix("label_names(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
         return PrometheusVariableQuery::LabelNames {
             selector: inner.trim().to_string(),
         };
@@ -161,7 +188,10 @@ pub fn parse_prometheus_variable_query(query: &str) -> PrometheusVariableQuery {
             filter: inner.trim().to_string(),
         };
     }
-    if let Some(inner) = q.strip_prefix("query_result(").and_then(|s| s.strip_suffix(')')) {
+    if let Some(inner) = q
+        .strip_prefix("query_result(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
         return PrometheusVariableQuery::QueryResult {
             expr: inner.trim().to_string(),
         };
@@ -184,7 +214,9 @@ pub enum PrometheusVariableQuery {
 /// A production implementation would forward to the actual backend.
 pub async fn execute_query(ds: &DataSource, query: &DsQuery) -> QueryResult {
     // Extract common fields
-    let expr = query.params.get("expr")
+    let expr = query
+        .params
+        .get("expr")
         .or_else(|| query.params.get("query"))
         .and_then(|v| v.as_str())
         .unwrap_or("");
@@ -208,12 +240,10 @@ async fn execute_prometheus_query(ds: &DataSource, ref_id: &str, expr: &str) -> 
         .unwrap_or_default();
 
     match client.get(&url).send().await {
-        Ok(resp) if resp.status().is_success() => {
-            match resp.json::<serde_json::Value>().await {
-                Ok(json) => parse_prometheus_response(ref_id, &json),
-                Err(e) => error_result(ref_id, &e.to_string()),
-            }
-        }
+        Ok(resp) if resp.status().is_success() => match resp.json::<serde_json::Value>().await {
+            Ok(json) => parse_prometheus_response(ref_id, &json),
+            Err(e) => error_result(ref_id, &e.to_string()),
+        },
         Ok(resp) => error_result(ref_id, &format!("HTTP {}", resp.status())),
         Err(e) => error_result(ref_id, &e.to_string()),
     }
@@ -221,10 +251,18 @@ async fn execute_prometheus_query(ds: &DataSource, ref_id: &str, expr: &str) -> 
 
 fn parse_prometheus_response(ref_id: &str, json: &serde_json::Value) -> QueryResult {
     let mut frames = Vec::new();
-    if let Some(results) = json.get("data").and_then(|d| d.get("result")).and_then(|r| r.as_array()) {
+    if let Some(results) = json
+        .get("data")
+        .and_then(|d| d.get("result"))
+        .and_then(|r| r.as_array())
+    {
         for result in results {
-            let metric = result.get("metric").cloned().unwrap_or(serde_json::json!({}));
-            let labels: HashMap<String, String> = serde_json::from_value(metric).unwrap_or_default();
+            let metric = result
+                .get("metric")
+                .cloned()
+                .unwrap_or(serde_json::json!({}));
+            let labels: HashMap<String, String> =
+                serde_json::from_value(metric).unwrap_or_default();
 
             let mut times: Vec<serde_json::Value> = Vec::new();
             let mut values: Vec<serde_json::Value> = Vec::new();
@@ -248,16 +286,36 @@ fn parse_prometheus_response(ref_id: &str, json: &serde_json::Value) -> QueryRes
                     ref_id: ref_id.to_string(),
                     name: labels.get("__name__").cloned().unwrap_or_default(),
                     fields: vec![
-                        FieldSchema { name: "Time".into(), field_type: "time".into(), type_info: None, labels: None, config: None },
-                        FieldSchema { name: "Value".into(), field_type: "number".into(), type_info: None, labels: Some(labels), config: None },
+                        FieldSchema {
+                            name: "Time".into(),
+                            field_type: "time".into(),
+                            type_info: None,
+                            labels: None,
+                            config: None,
+                        },
+                        FieldSchema {
+                            name: "Value".into(),
+                            field_type: "number".into(),
+                            type_info: None,
+                            labels: Some(labels),
+                            config: None,
+                        },
                     ],
                     meta: None,
                 },
-                data: DataFrameData { values: vec![times, values], entities: None },
+                data: DataFrameData {
+                    values: vec![times, values],
+                    entities: None,
+                },
             });
         }
     }
-    QueryResult { frames, status: 200, error: None, error_source: None }
+    QueryResult {
+        frames,
+        status: 200,
+        error: None,
+        error_source: None,
+    }
 }
 
 async fn execute_loki_query(ds: &DataSource, ref_id: &str, expr: &str) -> QueryResult {
@@ -268,12 +326,10 @@ async fn execute_loki_query(ds: &DataSource, ref_id: &str, expr: &str) -> QueryR
         .unwrap_or_default();
 
     match client.get(&url).send().await {
-        Ok(resp) if resp.status().is_success() => {
-            match resp.json::<serde_json::Value>().await {
-                Ok(json) => parse_loki_response(ref_id, &json),
-                Err(e) => error_result(ref_id, &e.to_string()),
-            }
-        }
+        Ok(resp) if resp.status().is_success() => match resp.json::<serde_json::Value>().await {
+            Ok(json) => parse_loki_response(ref_id, &json),
+            Err(e) => error_result(ref_id, &e.to_string()),
+        },
         Ok(resp) => error_result(ref_id, &format!("HTTP {}", resp.status())),
         Err(e) => error_result(ref_id, &e.to_string()),
     }
@@ -283,7 +339,11 @@ fn parse_loki_response(ref_id: &str, json: &serde_json::Value) -> QueryResult {
     let mut times = Vec::new();
     let mut lines = Vec::new();
 
-    if let Some(streams) = json.get("data").and_then(|d| d.get("result")).and_then(|r| r.as_array()) {
+    if let Some(streams) = json
+        .get("data")
+        .and_then(|d| d.get("result"))
+        .and_then(|r| r.as_array())
+    {
         for stream in streams {
             if let Some(values) = stream.get("values").and_then(|v| v.as_array()) {
                 for entry in values {
@@ -306,14 +366,34 @@ fn parse_loki_response(ref_id: &str, json: &serde_json::Value) -> QueryResult {
             ref_id: ref_id.to_string(),
             name: "logs".into(),
             fields: vec![
-                FieldSchema { name: "Time".into(), field_type: "time".into(), type_info: None, labels: None, config: None },
-                FieldSchema { name: "Line".into(), field_type: "string".into(), type_info: None, labels: None, config: None },
+                FieldSchema {
+                    name: "Time".into(),
+                    field_type: "time".into(),
+                    type_info: None,
+                    labels: None,
+                    config: None,
+                },
+                FieldSchema {
+                    name: "Line".into(),
+                    field_type: "string".into(),
+                    type_info: None,
+                    labels: None,
+                    config: None,
+                },
             ],
             meta: Some(serde_json::json!({"type": "log"})),
         },
-        data: DataFrameData { values: vec![times, lines], entities: None },
+        data: DataFrameData {
+            values: vec![times, lines],
+            entities: None,
+        },
     };
-    QueryResult { frames: vec![frame], status: 200, error: None, error_source: None }
+    QueryResult {
+        frames: vec![frame],
+        status: 200,
+        error: None,
+        error_source: None,
+    }
 }
 
 fn empty_result(ref_id: &str) -> QueryResult {
@@ -325,7 +405,10 @@ fn empty_result(ref_id: &str) -> QueryResult {
                 fields: vec![],
                 meta: None,
             },
-            data: DataFrameData { values: vec![], entities: None },
+            data: DataFrameData {
+                values: vec![],
+                entities: None,
+            },
         }],
         status: 200,
         error: None,

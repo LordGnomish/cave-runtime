@@ -92,7 +92,11 @@ mod tests {
     use crate::test_ctx;
 
     fn sp(name: &str, port: u16) -> ServicePort {
-        ServicePort { name: name.into(), port, protocol: "TCP".into() }
+        ServicePort {
+            name: name.into(),
+            port,
+            protocol: "TCP".into(),
+        }
     }
     fn ep(addr: &str, ports: PortSet, addr_type: AddressType) -> EndpointInput {
         EndpointInput {
@@ -172,7 +176,13 @@ mod tests {
         let ps = PortSet::new(vec![sp("http", 80)]);
         let n = MAX_ENDPOINTS_PER_SLICE + 5;
         let eps: Vec<_> = (0..n)
-            .map(|i| ep(&format!("10.0.{}.{}", i / 256, i % 256), ps.clone(), AddressType::IPv4))
+            .map(|i| {
+                ep(
+                    &format!("10.0.{}.{}", i / 256, i % 256),
+                    ps.clone(),
+                    AddressType::IPv4,
+                )
+            })
             .collect();
         let buckets = bucket(&eps);
         assert_eq!(buckets.len(), 2);
@@ -200,7 +210,10 @@ mod tests {
             "tenant-eps-mp-multi-port"
         );
         let ps = PortSet::new(vec![sp("http", 80), sp("https", 443)]);
-        let eps = vec![ep("10.0.0.1", ps.clone(), AddressType::IPv4), ep("10.0.0.2", ps, AddressType::IPv4)];
+        let eps = vec![
+            ep("10.0.0.1", ps.clone(), AddressType::IPv4),
+            ep("10.0.0.2", ps, AddressType::IPv4),
+        ];
         assert_eq!(bucket(&eps).len(), 1);
     }
 

@@ -6,16 +6,21 @@
 use super::CacheViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::table;
-use crate::admin::state::{scope, AdminState, CacheEntry};
+use crate::admin::state::{AdminState, CacheEntry, scope};
 
-pub fn list_entries(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<CacheEntry>, CacheViewError> {
+pub fn list_entries(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<CacheEntry>, CacheViewError> {
     ctx.authorise(Permission::CacheRead)?;
-    Ok(scope(&state.cache_entries.read().unwrap(), &ctx.tenant, |r| {
-        &r.tenant
-    })
-    .into_iter()
-    .cloned()
-    .collect())
+    Ok(
+        scope(&state.cache_entries.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect(),
+    )
 }
 
 pub fn entries_in_namespace(

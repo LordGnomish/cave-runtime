@@ -39,10 +39,15 @@ impl CloudConfig {
                 reason: "region must not be empty".into(),
             });
         }
-        if !self.credential_ref.starts_with("vault://") && !self.credential_ref.starts_with("secret://") {
+        if !self.credential_ref.starts_with("vault://")
+            && !self.credential_ref.starts_with("secret://")
+        {
             return Err(CloudError::InvalidConfig {
                 provider: self.provider,
-                reason: format!("credential_ref must use vault:// or secret://, got {:?}", self.credential_ref),
+                reason: format!(
+                    "credential_ref must use vault:// or secret://, got {:?}",
+                    self.credential_ref
+                ),
             });
         }
         Ok(())
@@ -56,7 +61,12 @@ pub trait CloudProvider {
 
     /// Authorise a (tenant, kind, name) triple before any sub-trait method is
     /// invoked. Default implementation refuses cross-tenant access.
-    fn authorise(&self, tenant: &TenantId, kind: &'static str, name: &str) -> Result<(), CloudError> {
+    fn authorise(
+        &self,
+        tenant: &TenantId,
+        kind: &'static str,
+        name: &str,
+    ) -> Result<(), CloudError> {
         if tenant != &self.config().tenant {
             return Err(CloudError::TenantDenied {
                 tenant: tenant.clone(),
@@ -190,7 +200,10 @@ pub struct ZoneInfo {
 
 impl ZoneInfo {
     pub fn new(region: impl Into<String>, failure_domain: impl Into<String>) -> Self {
-        Self { region: region.into(), failure_domain: failure_domain.into() }
+        Self {
+            region: region.into(),
+            failure_domain: failure_domain.into(),
+        }
     }
 }
 
@@ -281,7 +294,9 @@ mod tests {
             "Interface",
             "tenant-attacker"
         );
-        let p = StubProvider { cfg: cfg("acme", "fsn1", "vault://kv/hcloud") };
+        let p = StubProvider {
+            cfg: cfg("acme", "fsn1", "vault://kv/hcloud"),
+        };
         let err = p.authorise(&attacker, "LoadBalancer", "web").unwrap_err();
         assert!(matches!(err, CloudError::TenantDenied { .. }));
     }
@@ -293,7 +308,9 @@ mod tests {
             "Interface",
             "acme"
         );
-        let p = StubProvider { cfg: cfg("acme", "fsn1", "vault://kv/hcloud") };
+        let p = StubProvider {
+            cfg: cfg("acme", "fsn1", "vault://kv/hcloud"),
+        };
         assert!(p.authorise(&owner, "LoadBalancer", "web").is_ok());
     }
 
@@ -421,10 +438,13 @@ mod tests {
         }
         fn instance_metadata(&self, t: &TenantId, n: &str) -> Result<InstanceMetadata, CloudError> {
             self.authorise(t, "Instance", n)?;
-            self.meta.get(n).cloned().ok_or_else(|| CloudError::Upstream {
-                provider: ProviderName::Hetzner,
-                reason: format!("instance {n} not found"),
-            })
+            self.meta
+                .get(n)
+                .cloned()
+                .ok_or_else(|| CloudError::Upstream {
+                    provider: ProviderName::Hetzner,
+                    reason: format!("instance {n} not found"),
+                })
         }
     }
 
@@ -440,7 +460,10 @@ mod tests {
         let mut nf = InstanceMetadata::new("", "", "", "", vec![]);
         nf.not_found = true;
         meta.insert("ghost".into(), nf);
-        StubV2 { cfg: cfg(tenant, "fsn1", "vault://kv/hcloud"), meta }
+        StubV2 {
+            cfg: cfg(tenant, "fsn1", "vault://kv/hcloud"),
+            meta,
+        }
     }
 
     #[test]

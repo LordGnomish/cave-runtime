@@ -7,10 +7,10 @@
 //!
 //! Upstream: <https://docs.erpnext.com/docs/v15/user/manual/en/projects>
 
+use super::ErpViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
-use super::ErpViewError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectRow {
@@ -89,7 +89,13 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ErpViewErr
         n = rows.len(),
         done = done,
         tbl = table(
-            &["project_id", "customer", "invoices", "committed", "complete%"],
+            &[
+                "project_id",
+                "customer",
+                "invoices",
+                "committed",
+                "complete%"
+            ],
             &table_rows
         ),
     );
@@ -110,8 +116,13 @@ mod tests {
 
     #[test]
     fn list_one_project_per_customer() {
-        let invoices = super::super::invoices::list_invoices(&AdminState::seeded(), &ctx(&[Permission::ErpRead])).unwrap();
-        let customers: std::collections::HashSet<_> = invoices.iter().map(|i| i.customer.clone()).collect();
+        let invoices = super::super::invoices::list_invoices(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ErpRead]),
+        )
+        .unwrap();
+        let customers: std::collections::HashSet<_> =
+            invoices.iter().map(|i| i.customer.clone()).collect();
         let rows = list_projects(&AdminState::seeded(), &ctx(&[Permission::ErpRead])).unwrap();
         assert_eq!(rows.len(), customers.len());
     }
@@ -133,7 +144,11 @@ mod tests {
 
     #[test]
     fn committed_matches_invoice_sums() {
-        let invoices = super::super::invoices::list_invoices(&AdminState::seeded(), &ctx(&[Permission::ErpRead])).unwrap();
+        let invoices = super::super::invoices::list_invoices(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ErpRead]),
+        )
+        .unwrap();
         let rows = list_projects(&AdminState::seeded(), &ctx(&[Permission::ErpRead])).unwrap();
         let inv_total: u64 = invoices.iter().map(|i| i.amount_cents).sum();
         let proj_total: u64 = rows.iter().map(|r| r.committed_cents).sum();

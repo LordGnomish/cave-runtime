@@ -15,10 +15,10 @@
 //! Every metadata object carries a `tenant_id` invariant matching the cave-cri
 //! tenant model so that tables are scoped per tenant in the catalog.
 
-pub mod schema;
-pub mod partition;
+pub mod error;
 pub mod manifest;
+pub mod partition;
+pub mod schema;
 pub mod snapshot;
 pub mod table_metadata;
 pub mod tenant;
-pub mod error;

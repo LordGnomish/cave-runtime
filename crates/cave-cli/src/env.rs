@@ -6,7 +6,7 @@
 //! tenant suspended ise env de implicit suspended sayılır. `cascade=true` ile
 //! tenant suspend olduğunda tüm env'ler birlikte askıya alınır.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
@@ -242,9 +242,16 @@ mod tests {
         b.seed(record(tenant_id, "pr-1", EnvLifecycleState::Active));
         b.seed(record(tenant_id, "pr-2", EnvLifecycleState::Active));
         b.seed(record(tenant_id, "pr-3", EnvLifecycleState::Archived));
-        let changed = b.cascade_suspend(tenant_id, "burak", "tenant-suspend").await.unwrap();
+        let changed = b
+            .cascade_suspend(tenant_id, "burak", "tenant-suspend")
+            .await
+            .unwrap();
         assert_eq!(changed.len(), 2);
-        assert!(changed.iter().all(|r| r.state == EnvLifecycleState::Suspended));
+        assert!(
+            changed
+                .iter()
+                .all(|r| r.state == EnvLifecycleState::Suspended)
+        );
     }
 
     /// cite: ADR-012 v7 — cascade does not touch other tenants' envs
@@ -254,7 +261,9 @@ mod tests {
         let b = InMemoryEnvBackend::new();
         b.seed(record(tenant_id, "pr-1", EnvLifecycleState::Active));
         b.seed(record("globex", "pr-1", EnvLifecycleState::Active));
-        b.cascade_suspend(tenant_id, "burak", "tenant-suspend").await.unwrap();
+        b.cascade_suspend(tenant_id, "burak", "tenant-suspend")
+            .await
+            .unwrap();
         let globex = b.get("globex", "pr-1").await.unwrap();
         assert_eq!(globex.state, EnvLifecycleState::Active);
     }

@@ -40,8 +40,14 @@ pub enum Effect {
 #[serde(untagged)]
 pub enum PrincipalDef {
     Wildcard(String),
-    Aws { #[serde(rename = "AWS")] aws: OneOrMany },
-    Service { #[serde(rename = "Service")] service: OneOrMany },
+    Aws {
+        #[serde(rename = "AWS")]
+        aws: OneOrMany,
+    },
+    Service {
+        #[serde(rename = "Service")]
+        service: OneOrMany,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,9 +68,9 @@ impl OneOrMany {
 
 /// Request context for policy evaluation.
 pub struct PolicyContext<'a> {
-    pub principal: &'a str,   // IAM ARN or "*"
-    pub action: &'a str,      // e.g. "s3:GetObject"
-    pub resource: &'a str,    // e.g. "arn:aws:s3:::my-bucket/my-key"
+    pub principal: &'a str, // IAM ARN or "*"
+    pub action: &'a str,    // e.g. "s3:GetObject"
+    pub resource: &'a str,  // e.g. "arn:aws:s3:::my-bucket/my-key"
 }
 
 /// Evaluate if the request is allowed by a bucket policy.
@@ -115,8 +121,7 @@ fn glob_match_inner(p: &[char], t: &[char]) -> bool {
         (None, None) => true,
         (Some(&'*'), _) => {
             // Match zero or more chars
-            glob_match_inner(&p[1..], t)
-                || (!t.is_empty() && glob_match_inner(p, &t[1..]))
+            glob_match_inner(&p[1..], t) || (!t.is_empty() && glob_match_inner(p, &t[1..]))
         }
         (Some(&'?'), Some(_)) => glob_match_inner(&p[1..], &t[1..]),
         (Some(pc), Some(tc)) if pc == tc => glob_match_inner(&p[1..], &t[1..]),

@@ -86,11 +86,7 @@ pub struct CalendarEventAttendee {
 }
 
 impl CalendarEventAttendee {
-    pub fn new(
-        workspace_id: Uuid,
-        calendar_event_id: Uuid,
-        email: impl Into<String>,
-    ) -> Self {
+    pub fn new(workspace_id: Uuid, calendar_event_id: Uuid, email: impl Into<String>) -> Self {
         Self {
             id: Uuid::new_v4(),
             workspace_id,

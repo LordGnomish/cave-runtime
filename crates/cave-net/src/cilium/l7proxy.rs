@@ -112,7 +112,9 @@ impl L7Proxy {
         mut req: ProxyRequest,
     ) -> Result<RedirectVerdict, L7ProxyError> {
         if &self.tenant != tenant {
-            return Err(L7ProxyError::TenantDenied { tenant: tenant.clone() });
+            return Err(L7ProxyError::TenantDenied {
+                tenant: tenant.clone(),
+            });
         }
         // mTLS termination.
         match peer_spiffe_id {
@@ -194,7 +196,9 @@ impl L7Filter for DnsRewriteFilter {
     fn evaluate(&self, req: &mut ProxyRequest) -> FilterDecision {
         if let Some((_, ip)) = self.table.iter().find(|(host, _)| host == &req.host) {
             req.resolved_upstream = Some(ip.clone());
-            FilterDecision::Redirect { upstream: ip.clone() }
+            FilterDecision::Redirect {
+                upstream: ip.clone(),
+            }
         } else {
             FilterDecision::Continue
         }
@@ -232,18 +236,18 @@ mod tests {
     }
 
     fn proxy(tenant: &str, strict: bool) -> L7Proxy {
-        let mut p = L7Proxy::new(TenantId::new(tenant).expect("test fixture"), "cluster.local");
+        let mut p = L7Proxy::new(
+            TenantId::new(tenant).expect("test fixture"),
+            "cluster.local",
+        );
         p.strict_mtls = strict;
         p
     }
 
     #[test]
     fn strict_mtls_refuses_request_without_peer_cert() {
-        let (_cite, tenant) = cilium_test_ctx!(
-            "pkg/proxy/proxy.go",
-            "TerminateTLS",
-            "tenant-l7p-no-cert"
-        );
+        let (_cite, tenant) =
+            cilium_test_ctx!("pkg/proxy/proxy.go", "TerminateTLS", "tenant-l7p-no-cert");
         let mut p = proxy("tenant-l7p-no-cert", true);
         p.add_filter(Box::new(AlwaysForward));
         let err = p.handle(&tenant, None, req("GET", "web", "/")).unwrap_err();
@@ -260,7 +264,12 @@ mod tests {
         let mut p = proxy("tenant-l7p-permissive", false);
         p.add_filter(Box::new(AlwaysForward));
         let v = p.handle(&tenant, None, req("GET", "web", "/")).unwrap();
-        assert_eq!(v, RedirectVerdict::Forward { upstream: "web".into() });
+        assert_eq!(
+            v,
+            RedirectVerdict::Forward {
+                upstream: "web".into()
+            }
+        );
     }
 
     #[test]
@@ -273,22 +282,27 @@ mod tests {
         let mut p = proxy("tenant-l7p-untrusted", true);
         p.add_filter(Box::new(AlwaysForward));
         let err = p
-            .handle(&tenant, Some("spiffe://other.local/ns/x/sa/y"), req("GET", "web", "/"))
+            .handle(
+                &tenant,
+                Some("spiffe://other.local/ns/x/sa/y"),
+                req("GET", "web", "/"),
+            )
             .unwrap_err();
         assert!(matches!(err, L7ProxyError::UntrustedPeer { .. }));
     }
 
     #[test]
     fn cross_tenant_proxy_use_is_refused() {
-        let (_cite, attacker) = cilium_test_ctx!(
-            "pkg/proxy/proxy.go",
-            "tenantCheck",
-            "tenant-attacker"
-        );
+        let (_cite, attacker) =
+            cilium_test_ctx!("pkg/proxy/proxy.go", "tenantCheck", "tenant-attacker");
         let mut p = proxy("acme", true);
         p.add_filter(Box::new(AlwaysForward));
         let err = p
-            .handle(&attacker, Some("spiffe://cluster.local/ns/acme/sa/web"), req("GET", "web", "/"))
+            .handle(
+                &attacker,
+                Some("spiffe://cluster.local/ns/acme/sa/web"),
+                req("GET", "web", "/"),
+            )
             .unwrap_err();
         assert!(matches!(err, L7ProxyError::TenantDenied { .. }));
     }
@@ -302,7 +316,11 @@ mod tests {
         );
         let p = proxy("tenant-l7p-empty-chain", true);
         let err = p
-            .handle(&tenant, Some("spiffe://cluster.local/ns/x/sa/y"), req("GET", "web", "/"))
+            .handle(
+                &tenant,
+                Some("spiffe://cluster.local/ns/x/sa/y"),
+                req("GET", "web", "/"),
+            )
             .unwrap_err();
         assert!(matches!(err, L7ProxyError::NoFilters));
     }
@@ -315,21 +333,24 @@ mod tests {
             "tenant-l7p-method"
         );
         let mut p = proxy("tenant-l7p-method", true);
-        p.add_filter(Box::new(HttpMethodFilter { allowed: vec!["GET".into()] }));
+        p.add_filter(Box::new(HttpMethodFilter {
+            allowed: vec!["GET".into()],
+        }));
         p.add_filter(Box::new(AlwaysForward));
         let v = p
-            .handle(&tenant, Some("spiffe://cluster.local/ns/x/sa/y"), req("DELETE", "web", "/"))
+            .handle(
+                &tenant,
+                Some("spiffe://cluster.local/ns/x/sa/y"),
+                req("DELETE", "web", "/"),
+            )
             .unwrap();
         assert!(matches!(v, RedirectVerdict::Drop { http_code: 405, .. }));
     }
 
     #[test]
     fn dns_filter_rewrites_upstream_target_when_table_hits() {
-        let (_cite, tenant) = cilium_test_ctx!(
-            "pkg/proxy/dns/dns.go",
-            "RewriteUpstream",
-            "tenant-l7p-dns"
-        );
+        let (_cite, tenant) =
+            cilium_test_ctx!("pkg/proxy/dns/dns.go", "RewriteUpstream", "tenant-l7p-dns");
         let mut p = proxy("tenant-l7p-dns", true);
         p.add_filter(Box::new(DnsRewriteFilter {
             table: vec![("api.acme.local".into(), "10.0.0.7".into())],
@@ -341,7 +362,12 @@ mod tests {
                 req("GET", "api.acme.local", "/"),
             )
             .unwrap();
-        assert_eq!(v, RedirectVerdict::Forward { upstream: "10.0.0.7".into() });
+        assert_eq!(
+            v,
+            RedirectVerdict::Forward {
+                upstream: "10.0.0.7".into()
+            }
+        );
     }
 
     #[test]
@@ -352,7 +378,9 @@ mod tests {
             "tenant-l7p-chain"
         );
         let mut p = proxy("tenant-l7p-chain", true);
-        p.add_filter(Box::new(HttpMethodFilter { allowed: vec!["GET".into()] }));
+        p.add_filter(Box::new(HttpMethodFilter {
+            allowed: vec!["GET".into()],
+        }));
         // Even though there's a filter after the drop, it must not run.
         p.add_filter(Box::new(DnsRewriteFilter {
             table: vec![("web".into(), "10.0.0.99".into())],

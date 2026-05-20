@@ -39,7 +39,11 @@ pub struct Cite {
 
 impl Cite {
     pub const fn new(path: &'static str, symbol: &'static str) -> Self {
-        Self { path, symbol, version: UPSTREAM_VERSION }
+        Self {
+            path,
+            symbol,
+            version: UPSTREAM_VERSION,
+        }
     }
 
     pub fn url(&self) -> String {
@@ -125,11 +129,7 @@ mod tests {
 
     #[test]
     fn tenant_id_round_trips_through_serde() {
-        let (_cite, tenant) = test_ctx!(
-            "pkg/controller/types.go",
-            "TenantId",
-            "tenant-serde"
-        );
+        let (_cite, tenant) = test_ctx!("pkg/controller/types.go", "TenantId", "tenant-serde");
         let json = serde_json::to_string(&tenant).unwrap();
         let back: TenantId = serde_json::from_str(&json).unwrap();
         assert_eq!(tenant, back);

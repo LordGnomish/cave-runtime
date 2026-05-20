@@ -30,13 +30,7 @@ pub struct ProduceResult {
 /// `cave_streams::Broker` reference; tests use the `MemorySink`
 /// implementation in this module.
 pub trait SinkBackend {
-    fn produce(
-        &mut self,
-        topic: &str,
-        partition: i32,
-        key: &[u8],
-        value: &[u8],
-    ) -> CdcResult<i64>;
+    fn produce(&mut self, topic: &str, partition: i32, key: &[u8], value: &[u8]) -> CdcResult<i64>;
 }
 
 /// Tenant-scoped sink. Cite: debezium `EventDispatcher::dispatch` —
@@ -72,10 +66,12 @@ impl<B: SinkBackend> StreamsSink<B> {
         }
         self.router.assert_tenant_prefix(&record.topic)?;
 
-        let partition = self.router.partition_for(&record.key, self.partitions_per_topic);
-        let offset = self.backend.produce(
-            &record.topic, partition, &record.key, &record.value,
-        )?;
+        let partition = self
+            .router
+            .partition_for(&record.key, self.partitions_per_topic);
+        let offset = self
+            .backend
+            .produce(&record.topic, partition, &record.key, &record.value)?;
         Ok(ProduceResult {
             topic: record.topic.clone(),
             partition,
@@ -106,27 +102,28 @@ pub struct MemorySink {
 }
 
 impl SinkBackend for MemorySink {
-    fn produce(
-        &mut self,
-        topic: &str,
-        partition: i32,
-        key: &[u8],
-        value: &[u8],
-    ) -> CdcResult<i64> {
+    fn produce(&mut self, topic: &str, partition: i32, key: &[u8], value: &[u8]) -> CdcResult<i64> {
         let key_pair = (topic.to_string(), partition);
         let entry = self.next_offset.entry(key_pair.clone()).or_insert(0);
         let offset = *entry;
         *entry += 1;
-        self.log.entry(key_pair).or_default()
+        self.log
+            .entry(key_pair)
+            .or_default()
             .push((key.to_vec(), value.to_vec()));
         Ok(offset)
     }
 }
 
 impl MemorySink {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn count_for(&self, topic: &str, partition: i32) -> usize {
-        self.log.get(&(topic.to_string(), partition)).map(Vec::len).unwrap_or(0)
+        self.log
+            .get(&(topic.to_string(), partition))
+            .map(Vec::len)
+            .unwrap_or(0)
     }
 }

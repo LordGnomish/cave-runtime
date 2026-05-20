@@ -12,7 +12,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::config::Allowlist;
-use crate::finding::{redact, Finding};
+use crate::finding::{Finding, redact};
 use crate::rule::Rule;
 
 /// Stateful scanner. Holds compiled rules + global allowlist.
@@ -225,8 +225,7 @@ mod tests {
     fn multiple_rules_on_one_line_each_emit_a_finding() {
         let d = Detector::with_builtins();
         // github-pat = `ghp_` + 36 alnum: 26 letters + 10 digits = 36 exactly.
-        let content =
-            "AKIAIOSFODNN7EXAMPLE ghp_abcdefghijklmnopqrstuvwxyz0123456789";
+        let content = "AKIAIOSFODNN7EXAMPLE ghp_abcdefghijklmnopqrstuvwxyz0123456789";
         let ids: Vec<String> = d
             .scan_str("f", content)
             .into_iter()

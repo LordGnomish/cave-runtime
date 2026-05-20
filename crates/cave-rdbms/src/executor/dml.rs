@@ -2,7 +2,6 @@
 // Copyright 2026 Cave Runtime contributors
 //! DML helpers (project, filter, sort, group).
 
-
 #[cfg(test)]
 mod tests {
     #[test]

@@ -6,7 +6,7 @@
 //! `pkg/controller/certificates/trigger/trigger_controller.go::shouldReissue`
 //! — the trigger is `now >= notAfter - renewBefore`.
 
-use crate::crds::{renewal_due_at, CertificateSpec, CertificateStatus};
+use crate::crds::{CertificateSpec, CertificateStatus, renewal_due_at};
 use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,7 +31,9 @@ pub struct RenewalController {
 
 impl RenewalController {
     pub fn new(tenant_id: impl Into<String>) -> Self {
-        Self { tenant_id: tenant_id.into() }
+        Self {
+            tenant_id: tenant_id.into(),
+        }
     }
 
     /// Cite: cert-manager
@@ -58,7 +60,9 @@ impl RenewalController {
         if now >= due_at {
             RenewalDecision::Due
         } else {
-            RenewalDecision::NotYet { next_eval_at: due_at }
+            RenewalDecision::NotYet {
+                next_eval_at: due_at,
+            }
         }
     }
 }

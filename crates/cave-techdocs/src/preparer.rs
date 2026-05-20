@@ -17,10 +17,7 @@ pub trait TechDocsPreparer: Send + Sync {
     /// Prepare the source, placing it under `output_dir`.
     ///
     /// Upstream: prepare(entity, output) in TechDocsPreparer.ts
-    async fn prepare(
-        &self,
-        output_dir: &Path,
-    ) -> Result<(), TechDocsError>;
+    async fn prepare(&self, output_dir: &Path) -> Result<(), TechDocsError>;
 }
 
 /// No-op preparer — assumes source is already available; no cloning required.
@@ -30,10 +27,7 @@ pub struct NoopPreparer;
 
 #[async_trait]
 impl TechDocsPreparer for NoopPreparer {
-    async fn prepare(
-        &self,
-        _output_dir: &Path,
-    ) -> Result<(), TechDocsError> {
+    async fn prepare(&self, _output_dir: &Path) -> Result<(), TechDocsError> {
         Ok(())
     }
 }

@@ -100,7 +100,10 @@ impl EscalationChain {
     }
 
     pub fn sla_for_level(&self, level: u8) -> Option<u32> {
-        self.rungs.iter().find(|r| r.level == level).map(|r| r.sla_minutes)
+        self.rungs
+            .iter()
+            .find(|r| r.level == level)
+            .map(|r| r.sla_minutes)
     }
 }
 
@@ -157,7 +160,9 @@ impl ChainRegistry {
     }
 
     pub fn find(&self, tenant: &str, id: &str) -> Option<&EscalationChain> {
-        self.chains.iter().find(|c| c.tenant == tenant && c.id == id)
+        self.chains
+            .iter()
+            .find(|c| c.tenant == tenant && c.id == id)
     }
 
     pub fn count(&self) -> usize {
@@ -295,11 +300,7 @@ impl ReflexAdvancedConsole {
 
     /// Bulk-approve all pending actions for which `approver` is on the
     /// current rung. Returns the count approved.
-    pub fn bulk_approve(
-        &mut self,
-        registry: &ChainRegistry,
-        approver: &str,
-    ) -> usize {
+    pub fn bulk_approve(&mut self, registry: &ChainRegistry, approver: &str) -> usize {
         let mut n = 0;
         for action in self.pending.iter_mut() {
             if action.state != PendingState::Pending {
@@ -327,7 +328,11 @@ impl ReflexAdvancedConsole {
 
     pub fn breach_summary(&self) -> HashMap<u8, u32> {
         let mut acc: HashMap<u8, u32> = HashMap::new();
-        for a in self.pending.iter().filter(|a| a.state == PendingState::Expired) {
+        for a in self
+            .pending
+            .iter()
+            .filter(|a| a.state == PendingState::Expired)
+        {
             *acc.entry(a.current_level).or_insert(0) += 1;
         }
         acc
@@ -432,7 +437,9 @@ mod tests {
     #[test]
     fn registry_upsert_admin_only() {
         let mut r = ChainRegistry::new();
-        let err = r.upsert(ViewPersona::Operator, chain_with_rungs()).unwrap_err();
+        let err = r
+            .upsert(ViewPersona::Operator, chain_with_rungs())
+            .unwrap_err();
         assert!(matches!(err, AdvancedReflexError::Forbidden(_)));
     }
 
@@ -491,7 +498,10 @@ mod tests {
         let mut c = ReflexAdvancedConsole::new();
         let id = c.submit(&r, "acme", "approval", 1000).unwrap().id.clone();
         let err = c.approve(&r, &id, "bob").unwrap_err();
-        assert!(matches!(err, AdvancedReflexError::UnauthorizedApprover { .. }));
+        assert!(matches!(
+            err,
+            AdvancedReflexError::UnauthorizedApprover { .. }
+        ));
     }
 
     #[test]
@@ -519,7 +529,10 @@ mod tests {
         let mut c = ReflexAdvancedConsole::new();
         let id = c.submit(&r, "acme", "approval", 1000).unwrap().id.clone();
         let err = c.deny(&r, &id, "carol").unwrap_err();
-        assert!(matches!(err, AdvancedReflexError::UnauthorizedApprover { .. }));
+        assert!(matches!(
+            err,
+            AdvancedReflexError::UnauthorizedApprover { .. }
+        ));
     }
 
     #[test]

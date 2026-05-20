@@ -73,7 +73,11 @@ impl GitOpsStore {
     pub fn list_resource_requests(&self, promise_name: Option<&str>) -> Vec<ResourceRequest> {
         let store = self.resource_requests.lock().unwrap();
         match promise_name {
-            Some(name) => store.iter().filter(|r| r.promise_name == name).cloned().collect(),
+            Some(name) => store
+                .iter()
+                .filter(|r| r.promise_name == name)
+                .cloned()
+                .collect(),
             None => store.clone(),
         }
     }
@@ -364,10 +368,7 @@ mod tests {
             req.name = format!("db-{i}");
             store.create_resource_request(req);
         }
-        assert_eq!(
-            store.list_resource_requests(Some("postgresql")).len(),
-            3
-        );
+        assert_eq!(store.list_resource_requests(Some("postgresql")).len(), 3);
     }
 
     #[test]

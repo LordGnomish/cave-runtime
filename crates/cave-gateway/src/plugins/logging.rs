@@ -4,7 +4,7 @@
 
 use super::{GatewayPlugin, PluginCtx, PluginResult};
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tracing::info;
 
 fn build_log_entry(ctx: &PluginCtx) -> Value {

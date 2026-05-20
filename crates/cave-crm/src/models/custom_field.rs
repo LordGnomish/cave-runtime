@@ -122,7 +122,9 @@ impl FieldMetadata {
     /// Validate the snake-case identifier rule.
     pub fn is_valid_name(name: &str) -> bool {
         let mut chars = name.chars();
-        let Some(first) = chars.next() else { return false };
+        let Some(first) = chars.next() else {
+            return false;
+        };
         if !first.is_ascii_lowercase() {
             return false;
         }
@@ -136,7 +138,12 @@ mod tests {
 
     #[test]
     fn field_metadata_new_defaults_nullable() {
-        let f = FieldMetadata::new(Uuid::nil(), Uuid::nil(), "annual_revenue", FieldKind::Currency);
+        let f = FieldMetadata::new(
+            Uuid::nil(),
+            Uuid::nil(),
+            "annual_revenue",
+            FieldKind::Currency,
+        );
         assert!(f.is_nullable);
         assert!(!f.is_unique);
         assert_eq!(f.label, "annual_revenue");

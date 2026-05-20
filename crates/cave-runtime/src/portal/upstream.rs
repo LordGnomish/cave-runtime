@@ -26,14 +26,14 @@ use std::{
 };
 
 use axum::{
+    Json, Router,
     extract::Path,
     http::StatusCode,
     response::{Html, IntoResponse, Redirect, Response},
     routing::get,
-    Json, Router,
 };
 use cave_kernel::parity::{discover::DiscoveredReport, types::ParityReport};
-use cave_upstream::{adr_links, projects::TrackedProject, TRACKED_PROJECTS};
+use cave_upstream::{TRACKED_PROJECTS, adr_links, projects::TrackedProject};
 use serde::Serialize;
 use serde_json::json;
 use tokio::sync::RwLock;
@@ -123,7 +123,6 @@ pub async fn page() -> Response {
     Redirect::permanent("/admin/upstream").into_response()
 }
 
-
 /// GET /api/upstream/tracker — JSON rows, gated identically to the
 /// HTML page so a tenant admin can't bypass via the API.
 pub fn is_platform_admin(
@@ -207,10 +206,7 @@ pub async fn api_details(
     let manifest_path = crate_dir.join("parity.manifest.toml");
     let manifest_toml = std::fs::read_to_string(&manifest_path).ok();
     let recent_commits = git_recent_commits(project.cave_module, 5);
-    let parity = build_parity_index()
-        .await
-        .get(project.cave_module)
-        .cloned();
+    let parity = build_parity_index().await.get(project.cave_module).cloned();
 
     Json(json!({
         "project": project,
@@ -487,7 +483,9 @@ crates/cave-runtime/src/main.rs
             .lock()
             .unwrap_or_else(|p| p.into_inner());
         // SAFETY: guarded by WORKSPACE_ROOT_TEST_GUARD.
-        unsafe { std::env::set_var("CAVE_WORKSPACE_ROOT", repo_root()); }
+        unsafe {
+            std::env::set_var("CAVE_WORKSPACE_ROOT", repo_root());
+        }
         let app = router_as_platform();
         let resp = app
             .oneshot(
@@ -507,7 +505,10 @@ crates/cave-runtime/src/main.rs
         );
         let rows = v["rows"].as_array().unwrap();
         // At least one row should carry an ADR ref (we hardcoded several).
-        assert!(rows.iter().any(|r| !r["adr_refs"].as_array().unwrap().is_empty()));
+        assert!(
+            rows.iter()
+                .any(|r| !r["adr_refs"].as_array().unwrap().is_empty())
+        );
         // Cilium row must have ADR-004
         let cilium = rows
             .iter()
@@ -543,7 +544,9 @@ crates/cave-runtime/src/main.rs
             .lock()
             .unwrap_or_else(|p| p.into_inner());
         // SAFETY: guarded by WORKSPACE_ROOT_TEST_GUARD.
-        unsafe { std::env::set_var("CAVE_WORKSPACE_ROOT", repo_root()); }
+        unsafe {
+            std::env::set_var("CAVE_WORKSPACE_ROOT", repo_root());
+        }
         let app = router_as_platform();
         let resp = app
             .oneshot(
@@ -558,7 +561,13 @@ crates/cave-runtime/src/main.rs
         let bytes = resp.into_body().collect().await.unwrap().to_bytes();
         let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(v["project"]["github_repo"], "cilium/cilium");
-        assert!(v["adr_refs"].as_array().unwrap().iter().any(|a| a == "ADR-004"));
+        assert!(
+            v["adr_refs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|a| a == "ADR-004")
+        );
     }
 
     fn repo_root() -> String {

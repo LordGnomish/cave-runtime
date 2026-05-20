@@ -7,11 +7,11 @@ pub mod block;
 pub mod compaction;
 pub mod wal;
 
+use parking_lot::RwLock;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
-use parking_lot::RwLock;
 
-use crate::model::{Labels, LabelMatcher, Sample, TimeSeries};
+use crate::model::{LabelMatcher, Labels, Sample, TimeSeries};
 
 // ─── In-memory head chunk ───────────────────────────────────────────────────
 
@@ -30,15 +30,28 @@ pub struct HeadSeries {
 impl HeadSeries {
     pub fn new(labels: Labels) -> Self {
         let fp = labels.fingerprint();
-        Self { labels, fingerprint: fp, samples: Vec::new(), first_ts: i64::MAX, last_ts: i64::MIN }
+        Self {
+            labels,
+            fingerprint: fp,
+            samples: Vec::new(),
+            first_ts: i64::MAX,
+            last_ts: i64::MIN,
+        }
     }
 
     pub fn append(&mut self, sample: Sample) {
-        if sample.timestamp_ms < self.first_ts { self.first_ts = sample.timestamp_ms; }
-        if sample.timestamp_ms > self.last_ts  { self.last_ts  = sample.timestamp_ms; }
+        if sample.timestamp_ms < self.first_ts {
+            self.first_ts = sample.timestamp_ms;
+        }
+        if sample.timestamp_ms > self.last_ts {
+            self.last_ts = sample.timestamp_ms;
+        }
         // Keep sorted; typically samples arrive in order.
-        match self.samples.binary_search_by_key(&sample.timestamp_ms, |s| s.timestamp_ms) {
-            Ok(i)  => self.samples[i] = sample,   // duplicate ts → overwrite
+        match self
+            .samples
+            .binary_search_by_key(&sample.timestamp_ms, |s| s.timestamp_ms)
+        {
+            Ok(i) => self.samples[i] = sample, // duplicate ts → overwrite
             Err(i) => self.samples.insert(i, sample),
         }
     }
@@ -66,8 +79,11 @@ struct InvertedIndex {
 impl InvertedIndex {
     fn add(&mut self, labels: &Labels, fp: u64) {
         for (name, value) in labels.iter() {
-            self.index.entry(name.to_string()).or_default()
-                .entry(value.to_string()).or_default()
+            self.index
+                .entry(name.to_string())
+                .or_default()
+                .entry(value.to_string())
+                .or_default()
                 .insert(fp);
         }
     }
@@ -89,7 +105,11 @@ impl InvertedIndex {
     }
 
     fn label_values(&self, name: &str) -> Vec<String> {
-        let mut vals: Vec<_> = self.index.get(name).map(|m| m.keys().cloned().collect()).unwrap_or_default();
+        let mut vals: Vec<_> = self
+            .index
+            .get(name)
+            .map(|m| m.keys().cloned().collect())
+            .unwrap_or_default();
         vals.sort();
         vals
     }
@@ -112,21 +132,25 @@ impl InvertedIndex {
         for matcher in matchers {
             use crate::model::MatchOp;
             let candidates: HashSet<u64> = match &matcher.op {
-                MatchOp::Equal => {
-                    self.index.get(&matcher.name)
-                        .and_then(|vals| vals.get(&matcher.value))
-                        .cloned()
-                        .unwrap_or_default()
-                }
+                MatchOp::Equal => self
+                    .index
+                    .get(&matcher.name)
+                    .and_then(|vals| vals.get(&matcher.value))
+                    .cloned()
+                    .unwrap_or_default(),
                 MatchOp::NotEqual => {
                     // All fps that do NOT have this exact label value
-                    let exclude: HashSet<u64> = self.index.get(&matcher.name)
+                    let exclude: HashSet<u64> = self
+                        .index
+                        .get(&matcher.name)
                         .and_then(|vals| vals.get(&matcher.value))
                         .cloned()
                         .unwrap_or_default();
                     let mut all = HashSet::new();
                     for vals in self.index.values() {
-                        for fps in vals.values() { all.extend(fps); }
+                        for fps in vals.values() {
+                            all.extend(fps);
+                        }
                     }
                     all.difference(&exclude).cloned().collect()
                 }
@@ -144,7 +168,9 @@ impl InvertedIndex {
                     if matcher.op == MatchOp::RegexNotMatch {
                         let mut all = HashSet::new();
                         for vals in self.index.values() {
-                            for fps in vals.values() { all.extend(fps); }
+                            for fps in vals.values() {
+                                all.extend(fps);
+                            }
                         }
                         all.difference(&matched_fps).cloned().collect()
                     } else {
@@ -154,7 +180,7 @@ impl InvertedIndex {
             };
 
             result = Some(match result {
-                None    => candidates,
+                None => candidates,
                 Some(r) => r.intersection(&candidates).cloned().collect(),
             });
         }
@@ -174,11 +200,22 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn select(&self, matchers: &[LabelMatcher], start_ms: i64, end_ms: i64) -> Vec<(Labels, Vec<Sample>)> {
-        self.series.iter()
+    pub fn select(
+        &self,
+        matchers: &[LabelMatcher],
+        start_ms: i64,
+        end_ms: i64,
+    ) -> Vec<(Labels, Vec<Sample>)> {
+        self.series
+            .iter()
             .filter(|s| s.last_ts >= start_ms && s.first_ts <= end_ms)
             .filter(|s| matchers.iter().all(|m| m.matches(&s.labels)))
-            .map(|s| (s.labels.clone(), s.samples_in_range(start_ms, end_ms).to_vec()))
+            .map(|s| {
+                (
+                    s.labels.clone(),
+                    s.samples_in_range(start_ms, end_ms).to_vec(),
+                )
+            })
             .filter(|(_, samples)| !samples.is_empty())
             .collect()
     }
@@ -200,11 +237,11 @@ pub struct TsdbConfig {
 impl Default for TsdbConfig {
     fn default() -> Self {
         Self {
-            retention_ms:        15 * 24 * 60 * 60 * 1000, // 15 days
-            block_duration_ms:    2 * 60 * 60 * 1000,       // 2 h
+            retention_ms: 15 * 24 * 60 * 60 * 1000, // 15 days
+            block_duration_ms: 2 * 60 * 60 * 1000,  // 2 h
             downsample_resolutions: vec![
-                5  * 60 * 1000,  // 5 m
-                60 * 60 * 1000,  // 1 h
+                5 * 60 * 1000,       // 5 m
+                60 * 60 * 1000,      // 1 h
                 24 * 60 * 60 * 1000, // 1 d
             ],
         }
@@ -225,8 +262,8 @@ impl Tsdb {
     pub fn new(config: TsdbConfig) -> Self {
         Self {
             config,
-            head:   Arc::new(RwLock::new(HashMap::new())),
-            index:  Arc::new(RwLock::new(InvertedIndex::default())),
+            head: Arc::new(RwLock::new(HashMap::new())),
+            index: Arc::new(RwLock::new(InvertedIndex::default())),
             blocks: Arc::new(RwLock::new(Vec::new())),
         }
     }
@@ -251,7 +288,12 @@ impl Tsdb {
     }
 
     /// Select series matching matchers within [start_ms, end_ms].
-    pub fn select(&self, matchers: &[LabelMatcher], start_ms: i64, end_ms: i64) -> Vec<(Labels, Vec<Sample>)> {
+    pub fn select(
+        &self,
+        matchers: &[LabelMatcher],
+        start_ms: i64,
+        end_ms: i64,
+    ) -> Vec<(Labels, Vec<Sample>)> {
         let fps = self.index.read().matching(matchers);
         let head = self.head.read();
         let blocks = self.blocks.read();
@@ -273,7 +315,10 @@ impl Tsdb {
             for (labels, samps) in block.select(matchers, start_ms, end_ms) {
                 let fp = labels.fingerprint();
                 if fps.contains(&fp) {
-                    out.entry(fp).or_insert_with(|| (labels, Vec::new())).1.extend(samps);
+                    out.entry(fp)
+                        .or_insert_with(|| (labels, Vec::new()))
+                        .1
+                        .extend(samps);
                 }
             }
         }
@@ -288,9 +333,15 @@ impl Tsdb {
     }
 
     /// Get the latest sample for each series at `ts_ms` within a lookback window.
-    pub fn select_at(&self, matchers: &[LabelMatcher], ts_ms: i64, lookback_ms: i64) -> Vec<(Labels, Sample)> {
+    pub fn select_at(
+        &self,
+        matchers: &[LabelMatcher],
+        ts_ms: i64,
+        lookback_ms: i64,
+    ) -> Vec<(Labels, Sample)> {
         let range = self.select(matchers, ts_ms - lookback_ms, ts_ms);
-        range.into_iter()
+        range
+            .into_iter()
             .filter_map(|(labels, samps)| samps.last().copied().map(|s| (labels, s)))
             .collect()
     }
@@ -305,7 +356,9 @@ impl Tsdb {
         let mut names = HashSet::new();
         for fp in fps {
             if let Some(s) = head.get(&fp) {
-                for (k, _) in s.labels.iter() { names.insert(k.to_string()); }
+                for (k, _) in s.labels.iter() {
+                    names.insert(k.to_string());
+                }
             }
         }
         let mut v: Vec<_> = names.into_iter().collect();
@@ -323,7 +376,9 @@ impl Tsdb {
         let mut vals = HashSet::new();
         for fp in fps {
             if let Some(s) = head.get(&fp) {
-                if let Some(v) = s.labels.get(name) { vals.insert(v.to_string()); }
+                if let Some(v) = s.labels.get(name) {
+                    vals.insert(v.to_string());
+                }
             }
         }
         let mut v: Vec<_> = vals.into_iter().collect();
@@ -354,7 +409,7 @@ impl Tsdb {
                 to_remove.push(*fp);
             } else {
                 series.first_ts = series.samples[0].timestamp_ms;
-                series.last_ts  = series.samples.last().unwrap().timestamp_ms;
+                series.last_ts = series.samples.last().unwrap().timestamp_ms;
             }
         }
 
@@ -374,12 +429,15 @@ impl Tsdb {
         let threshold = now_ms() - self.config.block_duration_ms;
         let mut head = self.head.write();
 
-        let flush_fps: Vec<u64> = head.iter()
+        let flush_fps: Vec<u64> = head
+            .iter()
             .filter(|(_, s)| s.last_ts < threshold)
             .map(|(fp, _)| *fp)
             .collect();
 
-        if flush_fps.is_empty() { return; }
+        if flush_fps.is_empty() {
+            return;
+        }
 
         let mut block_series = Vec::new();
         for fp in flush_fps {
@@ -388,12 +446,18 @@ impl Tsdb {
             }
         }
 
-        if block_series.is_empty() { return; }
+        if block_series.is_empty() {
+            return;
+        }
 
         let min_ts = block_series.iter().map(|s| s.first_ts).min().unwrap_or(0);
         let max_ts = block_series.iter().map(|s| s.last_ts).max().unwrap_or(0);
 
-        let block = Block { min_ts, max_ts, series: block_series };
+        let block = Block {
+            min_ts,
+            max_ts,
+            series: block_series,
+        };
         self.blocks.write().push(block);
     }
 
@@ -436,4 +500,3 @@ impl Default for Tsdb {
         Self::new(TsdbConfig::default())
     }
 }
-

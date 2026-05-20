@@ -7,7 +7,7 @@
 //! to carry an `X-Scope-OrgID` header (Cortex/Mimir/Loki convention),
 //! which the runtime parses with `tenant_from_headers`.
 
-use crate::types::{SpanData, DEFAULT_TENANT, TENANT_LABEL};
+use crate::types::{DEFAULT_TENANT, SpanData, TENANT_LABEL};
 use std::collections::HashMap;
 
 pub const X_SCOPE_ORG_ID: &str = "X-Scope-OrgID";

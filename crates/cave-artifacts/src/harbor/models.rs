@@ -9,24 +9,16 @@ use std::collections::HashMap;
 
 // ── Media types ──────────────────────────────────────────────────────────────
 
-pub const MEDIA_TYPE_MANIFEST_V2: &str =
-    "application/vnd.docker.distribution.manifest.v2+json";
+pub const MEDIA_TYPE_MANIFEST_V2: &str = "application/vnd.docker.distribution.manifest.v2+json";
 pub const MEDIA_TYPE_MANIFEST_LIST: &str =
     "application/vnd.docker.distribution.manifest.list.v2+json";
-pub const MEDIA_TYPE_OCI_MANIFEST: &str =
-    "application/vnd.oci.image.manifest.v1+json";
-pub const MEDIA_TYPE_OCI_INDEX: &str =
-    "application/vnd.oci.image.index.v1+json";
-pub const MEDIA_TYPE_OCI_CONFIG: &str =
-    "application/vnd.oci.image.config.v1+json";
-pub const MEDIA_TYPE_OCI_LAYER_GZIP: &str =
-    "application/vnd.oci.image.layer.v1.tar+gzip";
-pub const MEDIA_TYPE_OCI_EMPTY: &str =
-    "application/vnd.oci.empty.v1+json";
-pub const MEDIA_TYPE_DOCKER_CONFIG: &str =
-    "application/vnd.docker.container.image.v1+json";
-pub const MEDIA_TYPE_DOCKER_LAYER: &str =
-    "application/vnd.docker.image.rootfs.diff.tar.gzip";
+pub const MEDIA_TYPE_OCI_MANIFEST: &str = "application/vnd.oci.image.manifest.v1+json";
+pub const MEDIA_TYPE_OCI_INDEX: &str = "application/vnd.oci.image.index.v1+json";
+pub const MEDIA_TYPE_OCI_CONFIG: &str = "application/vnd.oci.image.config.v1+json";
+pub const MEDIA_TYPE_OCI_LAYER_GZIP: &str = "application/vnd.oci.image.layer.v1.tar+gzip";
+pub const MEDIA_TYPE_OCI_EMPTY: &str = "application/vnd.oci.empty.v1+json";
+pub const MEDIA_TYPE_DOCKER_CONFIG: &str = "application/vnd.docker.container.image.v1+json";
+pub const MEDIA_TYPE_DOCKER_LAYER: &str = "application/vnd.docker.image.rootfs.diff.tar.gzip";
 
 // ── OCI Descriptor ────────────────────────────────────────────────────────────
 
@@ -205,8 +197,7 @@ impl RegistryErrors {
 
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).unwrap_or_else(|_| {
-            r#"{"errors":[{"code":"INTERNAL_ERROR","message":"serialization failed"}]}"#
-                .to_string()
+            r#"{"errors":[{"code":"INTERNAL_ERROR","message":"serialization failed"}]}"#.to_string()
         })
     }
 }
@@ -294,10 +285,10 @@ mod tests {
 
     #[test]
     fn classify_manifest_by_digest() {
-        let op = classify_v2_path(
-            "library/ubuntu/manifests/sha256:abc123",
+        let op = classify_v2_path("library/ubuntu/manifests/sha256:abc123");
+        assert!(
+            matches!(op, V2Op::Manifest(n, r) if n == "library/ubuntu" && r == "sha256:abc123")
         );
-        assert!(matches!(op, V2Op::Manifest(n, r) if n == "library/ubuntu" && r == "sha256:abc123"));
     }
 
     #[test]
@@ -314,8 +305,7 @@ mod tests {
 
     #[test]
     fn classify_blob_upload_session() {
-        let op =
-            classify_v2_path("myrepo/myimage/blobs/uploads/some-uuid-here");
+        let op = classify_v2_path("myrepo/myimage/blobs/uploads/some-uuid-here");
         assert!(
             matches!(op, V2Op::BlobUploadSession(n, u) if n == "myrepo/myimage" && u == "some-uuid-here")
         );

@@ -51,7 +51,9 @@ pub struct IdentityProvider {
 
 impl IdentityProvider {
     pub fn new(tenant_id: impl Into<String>) -> Self {
-        Self { tenant_id: tenant_id.into() }
+        Self {
+            tenant_id: tenant_id.into(),
+        }
     }
     pub const PREFIX: &'static str = "identity";
 }
@@ -73,13 +75,19 @@ impl Aes256GcmProvider {
         let rng = SystemRandom::new();
         let mut key = vec![0u8; 32];
         rng.fill(&mut key).expect("ring rng must succeed");
-        Self { tenant_id: tenant_id.into(), key }
+        Self {
+            tenant_id: tenant_id.into(),
+            key,
+        }
     }
 
     /// Construct from a fixed key — only useful for cross-instance
     /// decrypt tests.
     pub fn with_key(tenant_id: impl Into<String>, key: [u8; 32]) -> Self {
-        Self { tenant_id: tenant_id.into(), key: key.to_vec() }
+        Self {
+            tenant_id: tenant_id.into(),
+            key: key.to_vec(),
+        }
     }
 }
 
@@ -90,11 +98,12 @@ pub trait EncryptionProvider: Send + Sync {
 }
 
 impl EncryptionProvider for IdentityProvider {
-    fn tenant_id(&self) -> &str { &self.tenant_id }
+    fn tenant_id(&self) -> &str {
+        &self.tenant_id
+    }
 
     fn encrypt(&self, plaintext: &[u8]) -> Result<Vec<u8>, EncryptionError> {
-        let mut out = format!("{}:{}:", IdentityProvider::PREFIX, self.tenant_id)
-            .into_bytes();
+        let mut out = format!("{}:{}:", IdentityProvider::PREFIX, self.tenant_id).into_bytes();
         out.extend_from_slice(plaintext);
         Ok(out)
     }
@@ -115,7 +124,9 @@ impl EncryptionProvider for IdentityProvider {
 }
 
 impl EncryptionProvider for Aes256GcmProvider {
-    fn tenant_id(&self) -> &str { &self.tenant_id }
+    fn tenant_id(&self) -> &str {
+        &self.tenant_id
+    }
 
     fn encrypt(&self, plaintext: &[u8]) -> Result<Vec<u8>, EncryptionError> {
         let rng = SystemRandom::new();
@@ -131,8 +142,8 @@ impl EncryptionProvider for Aes256GcmProvider {
         // between tenants is caught at decrypt time.
         key.seal_in_place_append_tag(nonce, Aad::from(self.tenant_id.as_bytes()), &mut in_out)
             .map_err(|_| EncryptionError::Crypto("seal failed".into()))?;
-        let mut envelope = format!("{}:{}:", Aes256GcmProvider::PREFIX, self.tenant_id)
-            .into_bytes();
+        let mut envelope =
+            format!("{}:{}:", Aes256GcmProvider::PREFIX, self.tenant_id).into_bytes();
         envelope.extend_from_slice(&nonce_bytes);
         envelope.extend_from_slice(&in_out);
         Ok(envelope)
@@ -168,13 +179,17 @@ impl EncryptionProvider for Aes256GcmProvider {
 }
 
 fn parse_envelope(envelope: &[u8]) -> Result<(String, String, &[u8]), EncryptionError> {
-    let first = envelope.iter().position(|b| *b == b':')
+    let first = envelope
+        .iter()
+        .position(|b| *b == b':')
         .ok_or(EncryptionError::Malformed)?;
     let provider = std::str::from_utf8(&envelope[..first])
         .map_err(|_| EncryptionError::Malformed)?
         .to_string();
     let rest = &envelope[first + 1..];
-    let second = rest.iter().position(|b| *b == b':')
+    let second = rest
+        .iter()
+        .position(|b| *b == b':')
         .ok_or(EncryptionError::Malformed)?;
     let tenant = std::str::from_utf8(&rest[..second])
         .map_err(|_| EncryptionError::Malformed)?
@@ -196,8 +211,11 @@ mod tests {
         let ct = p.encrypt(b"top-secret-config-value").unwrap();
         let pt = p.decrypt(&ct).unwrap();
         assert_eq!(pt, b"top-secret-config-value");
-        assert_eq!(p.tenant_id(), "acme",
-            "tenant_id invariant: provider exposes its owning tenant");
+        assert_eq!(
+            p.tenant_id(),
+            "acme",
+            "tenant_id invariant: provider exposes its owning tenant"
+        );
     }
 
     /// Upstream parity: `TestAesGcm_NonceUnique`
@@ -208,8 +226,10 @@ mod tests {
         let p = Aes256GcmProvider::new("acme");
         let ct1 = p.encrypt(b"hello").unwrap();
         let ct2 = p.encrypt(b"hello").unwrap();
-        assert_ne!(ct1, ct2,
-            "AES-GCM nonces are random — same plaintext yields distinct envelopes");
+        assert_ne!(
+            ct1, ct2,
+            "AES-GCM nonces are random — same plaintext yields distinct envelopes"
+        );
         assert_eq!(p.decrypt(&ct1).unwrap(), b"hello");
         assert_eq!(p.decrypt(&ct2).unwrap(), b"hello");
     }
@@ -225,8 +245,10 @@ mod tests {
         let last = ct.len() - 1;
         ct[last] ^= 0x01;
         let err = p.decrypt(&ct).unwrap_err();
-        assert!(matches!(err, EncryptionError::Decrypt),
-            "tamper detection: corrupted byte trips GCM tag");
+        assert!(
+            matches!(err, EncryptionError::Decrypt),
+            "tamper detection: corrupted byte trips GCM tag"
+        );
     }
 
     /// Upstream parity: `TestEnvelope_TenantIdBoundIntoCiphertext`
@@ -241,7 +263,10 @@ mod tests {
         let ct_from_acme = acme.encrypt(b"acme-secret").unwrap();
         let err = globex.decrypt(&ct_from_acme).unwrap_err();
         match err {
-            EncryptionError::TenantMismatch { ct_tenant, expected } => {
+            EncryptionError::TenantMismatch {
+                ct_tenant,
+                expected,
+            } => {
                 assert_eq!(ct_tenant, "acme");
                 assert_eq!(expected, "globex");
             }
@@ -262,8 +287,11 @@ mod tests {
         assert!(ct.starts_with(b"identity:acme:"));
         let pt = p.decrypt(&ct).unwrap();
         assert_eq!(pt, b"plain-bytes");
-        assert_eq!(p.tenant_id(), "acme",
-            "tenant_id invariant: identity provider exposes tenant_id");
+        assert_eq!(
+            p.tenant_id(),
+            "acme",
+            "tenant_id invariant: identity provider exposes tenant_id"
+        );
     }
 
     /// Upstream parity: `TestEnvelope_UnknownProviderPrefixRejected`

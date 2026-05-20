@@ -56,7 +56,13 @@ pub struct PluginCtx {
 }
 
 impl PluginCtx {
-    pub fn new(method: String, path: String, headers: HashMap<String, String>, body: Bytes, client_ip: String) -> Self {
+    pub fn new(
+        method: String,
+        path: String,
+        headers: HashMap<String, String>,
+        body: Bytes,
+        client_ip: String,
+    ) -> Self {
         let query = path.splitn(2, '?').nth(1).unwrap_or("").to_string();
         let path = path.splitn(2, '?').next().unwrap_or(&path).to_string();
         Self {
@@ -124,26 +130,59 @@ impl PluginChain {
     pub fn new() -> Arc<Self> {
         let mut plugins: HashMap<String, Arc<dyn GatewayPlugin>> = HashMap::new();
 
-        plugins.insert("rate-limiting".to_string(), Arc::new(rate_limiting::RateLimitingPlugin));
+        plugins.insert(
+            "rate-limiting".to_string(),
+            Arc::new(rate_limiting::RateLimitingPlugin),
+        );
         plugins.insert("key-auth".to_string(), Arc::new(key_auth::KeyAuthPlugin));
         plugins.insert("jwt".to_string(), Arc::new(jwt::JwtPlugin));
         plugins.insert("oauth2".to_string(), Arc::new(oauth2::OAuth2Plugin));
-        plugins.insert("basic-auth".to_string(), Arc::new(basic_auth::BasicAuthPlugin));
+        plugins.insert(
+            "basic-auth".to_string(),
+            Arc::new(basic_auth::BasicAuthPlugin),
+        );
         plugins.insert("hmac-auth".to_string(), Arc::new(hmac_auth::HmacAuthPlugin));
         plugins.insert("acl".to_string(), Arc::new(acl::AclPlugin));
         plugins.insert("cors".to_string(), Arc::new(cors::CorsPlugin));
-        plugins.insert("request-transformer".to_string(), Arc::new(request_transformer::RequestTransformerPlugin));
-        plugins.insert("response-transformer".to_string(), Arc::new(response_transformer::ResponseTransformerPlugin));
-        plugins.insert("ip-restriction".to_string(), Arc::new(ip_restriction::IpRestrictionPlugin));
-        plugins.insert("bot-detection".to_string(), Arc::new(bot_detection::BotDetectionPlugin));
-        plugins.insert("request-size-limiting".to_string(), Arc::new(request_size_limiting::RequestSizeLimitingPlugin));
-        plugins.insert("proxy-cache".to_string(), Arc::new(proxy_cache::ProxyCachePlugin::new()));
-        plugins.insert("request-termination".to_string(), Arc::new(request_termination::RequestTerminationPlugin));
+        plugins.insert(
+            "request-transformer".to_string(),
+            Arc::new(request_transformer::RequestTransformerPlugin),
+        );
+        plugins.insert(
+            "response-transformer".to_string(),
+            Arc::new(response_transformer::ResponseTransformerPlugin),
+        );
+        plugins.insert(
+            "ip-restriction".to_string(),
+            Arc::new(ip_restriction::IpRestrictionPlugin),
+        );
+        plugins.insert(
+            "bot-detection".to_string(),
+            Arc::new(bot_detection::BotDetectionPlugin),
+        );
+        plugins.insert(
+            "request-size-limiting".to_string(),
+            Arc::new(request_size_limiting::RequestSizeLimitingPlugin),
+        );
+        plugins.insert(
+            "proxy-cache".to_string(),
+            Arc::new(proxy_cache::ProxyCachePlugin::new()),
+        );
+        plugins.insert(
+            "request-termination".to_string(),
+            Arc::new(request_termination::RequestTerminationPlugin),
+        );
         plugins.insert("http-log".to_string(), Arc::new(logging::HttpLogPlugin));
         plugins.insert("file-log".to_string(), Arc::new(logging::FileLogPlugin));
-        plugins.insert("prometheus".to_string(), Arc::new(prometheus::PrometheusPlugin::new()));
+        plugins.insert(
+            "prometheus".to_string(),
+            Arc::new(prometheus::PrometheusPlugin::new()),
+        );
         plugins.insert("zipkin".to_string(), Arc::new(zipkin::ZipkinPlugin));
-        plugins.insert("grpc-gateway".to_string(), Arc::new(grpc_gateway::GrpcGatewayPlugin));
+        plugins.insert(
+            "grpc-gateway".to_string(),
+            Arc::new(grpc_gateway::GrpcGatewayPlugin),
+        );
 
         Arc::new(Self { plugins })
     }

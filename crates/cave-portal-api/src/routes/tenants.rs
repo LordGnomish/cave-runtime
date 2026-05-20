@@ -62,7 +62,9 @@ pub struct TenantStore {
 
 impl Default for TenantStore {
     fn default() -> Self {
-        Self { inner: Mutex::new(HashMap::new()) }
+        Self {
+            inner: Mutex::new(HashMap::new()),
+        }
     }
 }
 
@@ -94,11 +96,7 @@ impl TenantStore {
         Ok(out)
     }
 
-    pub fn get(
-        &self,
-        principal: Option<&Principal>,
-        id: &str,
-    ) -> Result<Tenant, TenantsError> {
+    pub fn get(&self, principal: Option<&Principal>, id: &str) -> Result<Tenant, TenantsError> {
         Guard::cross_persona(None).authorize(principal, Some(id))?;
         let guard = self.inner.lock().unwrap();
         guard
@@ -152,11 +150,7 @@ impl TenantStore {
         Ok(tenant.clone())
     }
 
-    pub fn delete(
-        &self,
-        principal: Option<&Principal>,
-        id: &str,
-    ) -> Result<(), TenantsError> {
+    pub fn delete(&self, principal: Option<&Principal>, id: &str) -> Result<(), TenantsError> {
         Guard::admin_only().authorize(principal, None)?;
         let mut guard = self.inner.lock().unwrap();
         guard
@@ -202,8 +196,13 @@ mod tests {
     #[test]
     fn create_requires_admin() {
         let s = TenantStore::new();
-        let err = s.create(Some(&operator()), make_create("acme")).unwrap_err();
-        assert!(matches!(err, TenantsError::Guard(GuardError::PersonaForbidden { .. })));
+        let err = s
+            .create(Some(&operator()), make_create("acme"))
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            TenantsError::Guard(GuardError::PersonaForbidden { .. })
+        ));
     }
 
     #[test]
@@ -263,7 +262,10 @@ mod tests {
     fn list_requires_operator_or_admin() {
         let s = TenantStore::new();
         let err = s.list(Some(&tenant_p("acme"))).unwrap_err();
-        assert!(matches!(err, TenantsError::Guard(GuardError::PersonaForbidden { .. })));
+        assert!(matches!(
+            err,
+            TenantsError::Guard(GuardError::PersonaForbidden { .. })
+        ));
     }
 
     #[test]
@@ -279,7 +281,12 @@ mod tests {
         s.create(Some(&admin()), make_create("zenith")).unwrap();
         s.create(Some(&admin()), make_create("acme")).unwrap();
         s.create(Some(&admin()), make_create("monolith")).unwrap();
-        let ids: Vec<String> = s.list(Some(&operator())).unwrap().into_iter().map(|t| t.id).collect();
+        let ids: Vec<String> = s
+            .list(Some(&operator()))
+            .unwrap()
+            .into_iter()
+            .map(|t| t.id)
+            .collect();
         assert_eq!(ids, vec!["acme", "monolith", "zenith"]);
     }
 
@@ -303,7 +310,10 @@ mod tests {
         let s = TenantStore::new();
         s.create(Some(&admin()), make_create("acme")).unwrap();
         let err = s.get(Some(&tenant_p("globex")), "acme").unwrap_err();
-        assert!(matches!(err, TenantsError::Guard(GuardError::TenantMismatch { .. })));
+        assert!(matches!(
+            err,
+            TenantsError::Guard(GuardError::TenantMismatch { .. })
+        ));
     }
 
     #[test]
@@ -318,11 +328,17 @@ mod tests {
     fn update_requires_admin() {
         let s = TenantStore::new();
         s.create(Some(&admin()), make_create("acme")).unwrap();
-        let err = s.update(Some(&operator()), "acme", UpdateTenantRequest {
-            display_name: Some("X".into()),
-            plan: None,
-            status: None,
-        }).unwrap_err();
+        let err = s
+            .update(
+                Some(&operator()),
+                "acme",
+                UpdateTenantRequest {
+                    display_name: Some("X".into()),
+                    plan: None,
+                    status: None,
+                },
+            )
+            .unwrap_err();
         assert!(matches!(err, TenantsError::Guard(_)));
     }
 
@@ -330,11 +346,17 @@ mod tests {
     fn update_changes_fields() {
         let s = TenantStore::new();
         s.create(Some(&admin()), make_create("acme")).unwrap();
-        let upd = s.update(Some(&admin()), "acme", UpdateTenantRequest {
-            display_name: Some("Acme Inc".into()),
-            plan: Some("enterprise".into()),
-            status: Some(TenantStatus::Suspended),
-        }).unwrap();
+        let upd = s
+            .update(
+                Some(&admin()),
+                "acme",
+                UpdateTenantRequest {
+                    display_name: Some("Acme Inc".into()),
+                    plan: Some("enterprise".into()),
+                    status: Some(TenantStatus::Suspended),
+                },
+            )
+            .unwrap();
         assert_eq!(upd.display_name, "Acme Inc");
         assert_eq!(upd.plan, "enterprise");
         assert_eq!(upd.status, TenantStatus::Suspended);
@@ -344,11 +366,17 @@ mod tests {
     fn update_partial_keeps_others() {
         let s = TenantStore::new();
         s.create(Some(&admin()), make_create("acme")).unwrap();
-        let upd = s.update(Some(&admin()), "acme", UpdateTenantRequest {
-            display_name: None,
-            plan: Some("pro".into()),
-            status: None,
-        }).unwrap();
+        let upd = s
+            .update(
+                Some(&admin()),
+                "acme",
+                UpdateTenantRequest {
+                    display_name: None,
+                    plan: Some("pro".into()),
+                    status: None,
+                },
+            )
+            .unwrap();
         assert_eq!(upd.display_name, "ACME"); // unchanged
         assert_eq!(upd.plan, "pro");
         assert_eq!(upd.status, TenantStatus::Active);
@@ -357,11 +385,17 @@ mod tests {
     #[test]
     fn update_unknown_returns_not_found() {
         let s = TenantStore::new();
-        let err = s.update(Some(&admin()), "ghost", UpdateTenantRequest {
-            display_name: Some("X".into()),
-            plan: None,
-            status: None,
-        }).unwrap_err();
+        let err = s
+            .update(
+                Some(&admin()),
+                "ghost",
+                UpdateTenantRequest {
+                    display_name: Some("X".into()),
+                    plan: None,
+                    status: None,
+                },
+            )
+            .unwrap_err();
         assert!(matches!(err, TenantsError::NotFound(_)));
     }
 

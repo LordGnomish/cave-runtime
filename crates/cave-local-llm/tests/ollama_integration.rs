@@ -45,7 +45,10 @@ async fn test_list_models_parses_response() {
     let base_url = spawn_mock_server(app).await;
     let client = OllamaClient::new(base_url);
 
-    let models = client.list_models().await.expect("list_models should succeed");
+    let models = client
+        .list_models()
+        .await
+        .expect("list_models should succeed");
     assert_eq!(models.len(), 1);
     assert_eq!(models[0].name, "qwen2.5-coder:32b");
     assert_eq!(models[0].size, 20_000_000_000);
@@ -126,7 +129,10 @@ async fn test_generate_stream_collects_all_chunks() {
         keep_alive: None,
     };
 
-    let mut stream = client.generate_stream(req).await.expect("stream should open");
+    let mut stream = client
+        .generate_stream(req)
+        .await
+        .expect("stream should open");
     let mut chunks = Vec::new();
     while let Some(item) = stream.next().await {
         chunks.push(item.expect("chunk should deserialise"));
@@ -193,7 +199,10 @@ async fn test_chat_returns_response() {
     let base_url = spawn_mock_server(app).await;
     let req = ChatRequest {
         model: "qwen2.5-coder:32b".into(),
-        messages: vec![ChatMessage { role: "user".into(), content: "hi".into() }],
+        messages: vec![ChatMessage {
+            role: "user".into(),
+            content: "hi".into(),
+        }],
         stream: Some(false),
         options: None,
     };
@@ -226,7 +235,10 @@ async fn test_chat_stream_collects_chunks() {
     let base_url = spawn_mock_server(app).await;
     let req = ChatRequest {
         model: "m".into(),
-        messages: vec![ChatMessage { role: "user".into(), content: "hey".into() }],
+        messages: vec![ChatMessage {
+            role: "user".into(),
+            content: "hey".into(),
+        }],
         stream: Some(true),
         options: None,
     };

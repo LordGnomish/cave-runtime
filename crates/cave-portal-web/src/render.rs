@@ -98,7 +98,10 @@ mod tests {
 
     #[test]
     fn render_page_includes_title() {
-        let p = Page::builder("a", "/a").title("Home").scope(Scope::Public).build();
+        let p = Page::builder("a", "/a")
+            .title("Home")
+            .scope(Scope::Public)
+            .build();
         let resp = PageResponse::ok("Home", "<p>hi</p>");
         let html = render_page(&p, &PageRequest::new("/a"), &resp);
         assert!(html.contains("<title>Home</title>"));
@@ -130,7 +133,10 @@ mod tests {
 
     #[test]
     fn render_page_escapes_path_and_icon_in_attrs() {
-        let p = Page::builder("a", "/a\"x").icon("ic\"on").scope(Scope::Public).build();
+        let p = Page::builder("a", "/a\"x")
+            .icon("ic\"on")
+            .scope(Scope::Public)
+            .build();
         let html = render_page(&p, &PageRequest::new("/a\"x"), &PageResponse::ok("T", ""));
         assert!(html.contains("data-path=\"/a&quot;x\""));
         assert!(html.contains("data-icon=\"ic&quot;on\""));

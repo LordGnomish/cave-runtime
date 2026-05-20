@@ -25,7 +25,11 @@ pub struct ChainValidator<'a> {
 
 impl<'a> ChainValidator<'a> {
     pub fn new(ca: &'a Ca) -> Self {
-        Self { ca, crl: None, now: Utc::now() }
+        Self {
+            ca,
+            crl: None,
+            now: Utc::now(),
+        }
     }
 
     pub fn with_crl(mut self, crl: &'a CrlResponder) -> Self {
@@ -54,12 +58,14 @@ impl<'a> ChainValidator<'a> {
         for cert in &chain {
             if cert.is_expired(self.now) {
                 return Ok(ValidationResult::Invalid(format!(
-                    "{} expired at {}", cert.serial, cert.not_after
+                    "{} expired at {}",
+                    cert.serial, cert.not_after
                 )));
             }
             if cert.not_before > self.now {
                 return Ok(ValidationResult::Invalid(format!(
-                    "{} not yet valid (starts {})", cert.serial, cert.not_before
+                    "{} not yet valid (starts {})",
+                    cert.serial, cert.not_before
                 )));
             }
             // Revocation only applies to non-root elements
@@ -89,7 +95,8 @@ impl<'a> ChainValidator<'a> {
             }
             if !legal_issuer(parent.kind, child.kind) {
                 return Ok(ValidationResult::Invalid(format!(
-                    "{:?} cannot issue {:?}", parent.kind, child.kind,
+                    "{:?} cannot issue {:?}",
+                    parent.kind, child.kind,
                 )));
             }
         }
@@ -98,7 +105,8 @@ impl<'a> ChainValidator<'a> {
         let anchor = chain.last().unwrap();
         if anchor.kind != CaKind::Root {
             return Ok(ValidationResult::Invalid(format!(
-                "trust anchor {} is not a Root CA", anchor.serial,
+                "trust anchor {} is not a Root CA",
+                anchor.serial,
             )));
         }
 
@@ -121,4 +129,6 @@ fn legal_issuer(parent: CaKind, child: CaKind) -> bool {
 }
 
 #[allow(dead_code)]
-fn _silence_unused(c: &CertHandle) -> &str { &c.serial }
+fn _silence_unused(c: &CertHandle) -> &str {
+    &c.serial
+}

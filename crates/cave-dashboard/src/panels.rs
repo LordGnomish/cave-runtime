@@ -120,7 +120,10 @@ pub fn load_directory(dir: impl AsRef<Path>) -> Result<Vec<PanelCatalog>, PanelE
 
 fn validate(cat: &PanelCatalog) -> Result<(), PanelError> {
     if cat.panels.is_empty() {
-        return Err(PanelError::Validation(format!("{} has no panels", cat.crate_)));
+        return Err(PanelError::Validation(format!(
+            "{} has no panels",
+            cat.crate_
+        )));
     }
     let mut ids = std::collections::HashSet::new();
     for p in &cat.panels {
@@ -237,7 +240,13 @@ panels:
     fn test_each_catalog_has_ten_panels() {
         let cats = load_directory(dashboards_dir()).unwrap();
         for c in &cats {
-            assert_eq!(c.panels.len(), 10, "crate {} has {} panels", c.crate_, c.panels.len());
+            assert_eq!(
+                c.panels.len(),
+                10,
+                "crate {} has {} panels",
+                c.crate_,
+                c.panels.len()
+            );
         }
     }
 
@@ -254,7 +263,11 @@ panels:
     fn test_every_catalog_has_observability_tag() {
         let cats = load_directory(dashboards_dir()).unwrap();
         for c in &cats {
-            assert!(c.tags.contains(&"observability".to_string()), "{} missing observability tag", c.crate_);
+            assert!(
+                c.tags.contains(&"observability".to_string()),
+                "{} missing observability tag",
+                c.crate_
+            );
         }
     }
 
@@ -270,8 +283,12 @@ panels:
         let cats = load_directory(dashboards_dir()).unwrap();
         for c in &cats {
             assert!(
-                c.panels.iter().any(|p| p.title.to_lowercase().contains("tenant")
-                    || p.query.as_deref().map_or(false, |q| q.contains("tenant_id"))),
+                c.panels
+                    .iter()
+                    .any(|p| p.title.to_lowercase().contains("tenant")
+                        || p.query
+                            .as_deref()
+                            .map_or(false, |q| q.contains("tenant_id"))),
                 "{} missing tenant breakdown panel",
                 c.crate_
             );

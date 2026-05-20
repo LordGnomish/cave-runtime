@@ -39,9 +39,7 @@ impl DataFrame {
                 Self::from_plan(*input.clone()).schema()
             }
             LogicalPlan::Join { left, .. } => Self::from_plan(*left.clone()).schema(),
-            LogicalPlan::Union { inputs } => {
-                Self::from_plan(inputs[0].clone()).schema()
-            }
+            LogicalPlan::Union { inputs } => Self::from_plan(inputs[0].clone()).schema(),
         }
     }
 
@@ -111,7 +109,11 @@ mod tests {
     fn scan() -> DataFrame {
         DataFrame::from_plan(LogicalPlan::TableScan {
             table_name: "T".into(),
-            schema: Arc::new(TableSchema::new(vec![Field::new("a", DataType::Int64, false)])),
+            schema: Arc::new(TableSchema::new(vec![Field::new(
+                "a",
+                DataType::Int64,
+                false,
+            )])),
             projection: None,
             filters: vec![],
         })
@@ -137,7 +139,10 @@ mod tests {
             vec![(LogicalExpr::col("a"), LogicalExpr::col("a"))],
         );
         match df.plan {
-            LogicalPlan::Join { kind: JoinKind::Inner, .. } => {}
+            LogicalPlan::Join {
+                kind: JoinKind::Inner,
+                ..
+            } => {}
             _ => panic!("expected Join"),
         }
     }

@@ -10,7 +10,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, RdbmsOperatorBackup, RdbmsOperatorCluster};
+use crate::admin::state::{AdminState, RdbmsOperatorBackup, RdbmsOperatorCluster, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -32,10 +32,14 @@ pub fn list_clusters(
     ctx: &RequestCtx,
 ) -> Result<Vec<RdbmsOperatorCluster>, RdbmsOperatorViewError> {
     ctx.authorise(Permission::RdbmsOperatorRead)?;
-    Ok(scope(&state.rdbms_operator_clusters.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter()
-        .cloned()
-        .collect())
+    Ok(scope(
+        &state.rdbms_operator_clusters.read().unwrap(),
+        &ctx.tenant,
+        |r| &r.tenant,
+    )
+    .into_iter()
+    .cloned()
+    .collect())
 }
 
 pub fn list_backups(
@@ -43,10 +47,14 @@ pub fn list_backups(
     ctx: &RequestCtx,
 ) -> Result<Vec<RdbmsOperatorBackup>, RdbmsOperatorViewError> {
     ctx.authorise(Permission::RdbmsOperatorRead)?;
-    Ok(scope(&state.rdbms_operator_backups.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter()
-        .cloned()
-        .collect())
+    Ok(scope(
+        &state.rdbms_operator_backups.read().unwrap(),
+        &ctx.tenant,
+        |r| &r.tenant,
+    )
+    .into_iter()
+    .cloned()
+    .collect())
 }
 
 pub fn inspect_cluster(
@@ -76,7 +84,9 @@ pub fn trigger_failover(
         .find(|c| c.tenant == ctx.tenant && c.name == cluster)
         .ok_or_else(|| RdbmsOperatorViewError::ClusterNotFound(cluster.into()))?;
     if target.instances < 2 {
-        return Err(RdbmsOperatorViewError::SinglePrimaryNoFailover(cluster.into()));
+        return Err(RdbmsOperatorViewError::SinglePrimaryNoFailover(
+            cluster.into(),
+        ));
     }
     let new_primary = format!("{}-2", target.name);
     target.primary_pod = new_primary.clone();
@@ -141,7 +151,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, RdbmsOpera
                 b.backup_id.clone(),
                 b.state.into(),
                 b.started_unix.to_string(),
-                b.finished_unix.map(|f| f.to_string()).unwrap_or_else(|| "—".into()),
+                b.finished_unix
+                    .map(|f| f.to_string())
+                    .unwrap_or_else(|| "—".into()),
                 format!("{} MiB", b.size_mib),
             ]
         })
@@ -152,7 +164,15 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, RdbmsOpera
         n_c = clusters.len(),
         n_b = backups.len(),
         c_tbl = table(
-            &["name", "upstream", "version", "instances", "primary", "state", "lag"],
+            &[
+                "name",
+                "upstream",
+                "version",
+                "instances",
+                "primary",
+                "state",
+                "lag"
+            ],
             &c_rows,
         ),
         b_tbl = table(
@@ -217,7 +237,10 @@ mod tests {
             "acme"
         );
         let s = AdminState::seeded();
-        let c = ctx(&[Permission::RdbmsOperatorRead, Permission::RdbmsOperatorFailover]);
+        let c = ctx(&[
+            Permission::RdbmsOperatorRead,
+            Permission::RdbmsOperatorFailover,
+        ]);
         let new_primary = trigger_failover(&s, &c, "primary-prod").unwrap();
         assert_eq!(new_primary, "primary-prod-2");
         let cluster = inspect_cluster(&s, &c, "primary-prod").unwrap();
@@ -243,11 +266,17 @@ mod tests {
             .instances = 1;
         let err = trigger_failover(
             &s,
-            &ctx(&[Permission::RdbmsOperatorRead, Permission::RdbmsOperatorFailover]),
+            &ctx(&[
+                Permission::RdbmsOperatorRead,
+                Permission::RdbmsOperatorFailover,
+            ]),
             "analytics",
         )
         .unwrap_err();
-        assert!(matches!(err, RdbmsOperatorViewError::SinglePrimaryNoFailover(_)));
+        assert!(matches!(
+            err,
+            RdbmsOperatorViewError::SinglePrimaryNoFailover(_)
+        ));
     }
 
     #[test]
@@ -258,16 +287,24 @@ mod tests {
             "acme"
         );
         let s = AdminState::seeded();
-        let c = ctx(&[Permission::RdbmsOperatorRead, Permission::RdbmsOperatorBackup]);
+        let c = ctx(&[
+            Permission::RdbmsOperatorRead,
+            Permission::RdbmsOperatorBackup,
+        ]);
         // primary-prod already has a Running backup in seed → should reject.
         let err = trigger_backup(&s, &c, "primary-prod", "bk-new", 1_002_500).unwrap_err();
-        assert!(matches!(err, RdbmsOperatorViewError::BackupAlreadyRunning(_)));
+        assert!(matches!(
+            err,
+            RdbmsOperatorViewError::BackupAlreadyRunning(_)
+        ));
         // analytics has no Running backup → should accept.
         trigger_backup(&s, &c, "analytics", "bk-an-1", 1_002_600).unwrap();
         let backups = list_backups(&s, &c).unwrap();
-        assert!(backups
-            .iter()
-            .any(|b| b.cluster == "analytics" && b.state == "Running"));
+        assert!(
+            backups
+                .iter()
+                .any(|b| b.cluster == "analytics" && b.state == "Running")
+        );
     }
 
     #[test]
@@ -278,7 +315,10 @@ mod tests {
             "acme"
         );
         let s = AdminState::seeded();
-        let c_full = ctx(&[Permission::RdbmsOperatorRead, Permission::RdbmsOperatorBackup]);
+        let c_full = ctx(&[
+            Permission::RdbmsOperatorRead,
+            Permission::RdbmsOperatorBackup,
+        ]);
         assert!(matches!(
             trigger_backup(&s, &c_full, "analytics", "  ", 0).unwrap_err(),
             RdbmsOperatorViewError::EmptyBackupId

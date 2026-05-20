@@ -97,12 +97,22 @@ impl ClusterState {
                 ("cluster_my_epoch".into(), "0".into()),
                 ("cluster_stats_messages_sent".into(), "0".into()),
                 ("cluster_stats_messages_received".into(), "0".into()),
-                ("total_cluster_links_buffer_limit_exceeded".into(), "0".into()),
+                (
+                    "total_cluster_links_buffer_limit_exceeded".into(),
+                    "0".into(),
+                ),
             ];
         }
         vec![
             ("cluster_enabled".into(), "1".into()),
-            ("cluster_state".into(), match self.state { ClusterStatus::Ok => "ok", ClusterStatus::Fail => "fail" }.into()),
+            (
+                "cluster_state".into(),
+                match self.state {
+                    ClusterStatus::Ok => "ok",
+                    ClusterStatus::Fail => "fail",
+                }
+                .into(),
+            ),
             ("cluster_slots_assigned".into(), "16384".into()),
             ("cluster_slots_ok".into(), "16384".into()),
             ("cluster_slots_pfail".into(), "0".into()),
@@ -113,7 +123,10 @@ impl ClusterState {
             ("cluster_my_epoch".into(), self.epoch.to_string()),
             ("cluster_stats_messages_sent".into(), "0".into()),
             ("cluster_stats_messages_received".into(), "0".into()),
-            ("total_cluster_links_buffer_limit_exceeded".into(), "0".into()),
+            (
+                "total_cluster_links_buffer_limit_exceeded".into(),
+                "0".into(),
+            ),
         ]
     }
 

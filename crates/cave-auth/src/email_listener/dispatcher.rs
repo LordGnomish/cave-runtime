@@ -12,12 +12,12 @@ use std::sync::Arc;
 
 use serde::Serialize;
 
+use super::EmailError;
 use super::events::{
     AccountLockedPayload, AuthEvent, GdprDataExportPayload, LoginAlertPayload,
     MfaEnrollmentPayload, PasswordChangePayload,
 };
 use super::smtp_outbox::SmtpOutbox;
-use super::EmailError;
 use crate::audit::AuditEvent;
 
 /// Listener registered against cave-auth's audit pipeline.
@@ -108,10 +108,7 @@ fn login_payload_from_audit(a: &AuditEvent, to: &str) -> LoginAlertPayload {
             .and_then(|v| v.as_str())
             .unwrap_or(to)
             .to_string(),
-        ip_address: a
-            .ip_address
-            .clone()
-            .unwrap_or_else(|| "-".into()),
+        ip_address: a.ip_address.clone().unwrap_or_else(|| "-".into()),
         user_agent: a
             .details
             .get("user_agent")
@@ -206,9 +203,9 @@ fn gdpr_payload_from_audit(a: &AuditEvent, to: &str) -> GdprDataExportPayload {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::events::EmailAttachment;
     use super::super::smtp_outbox::{OutboxConfig, SmtpOutbox, TestStubTransport};
+    use super::*;
     use crate::audit::{AuditEvent, AuthDecision};
     use chrono::Utc;
     use uuid::Uuid;

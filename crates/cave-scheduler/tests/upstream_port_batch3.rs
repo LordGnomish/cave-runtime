@@ -18,9 +18,9 @@
 //!   * pkg/scheduler/framework/plugins/noderesources/{fit,most_allocated}_test.go
 
 use cave_scheduler::framework::{
-    ClusterSnapshot, Code, FilterPlugin, MAX_NODE_SCORE, NodeAffinitySpec, NodeSelectorOp,
-    NodeSelectorRequirement, NodeSelectorTerm, Pod, PodAffinityTerm, ScorePlugin,
-    TopologySpreadConstraint, UnsatisfiableAction,
+    ClusterSnapshot, Code, FilterPlugin, NodeAffinitySpec, NodeSelectorOp, NodeSelectorRequirement,
+    NodeSelectorTerm, Pod, PodAffinityTerm, ScorePlugin, TopologySpreadConstraint,
+    UnsatisfiableAction, MAX_NODE_SCORE,
 };
 use cave_scheduler::models::{
     Node, NodeStatus, ResourceCapacity, ResourceRequest, Taint, TaintEffect, Toleration,
@@ -90,9 +90,7 @@ fn upstream_node_affinity_gt_operator_passes_when_node_value_greater() {
         }],
         ..Default::default()
     });
-    assert!(NodeAffinity
-        .filter(&pod, &node, &snap(vec![]))
-        .is_success());
+    assert!(NodeAffinity.filter(&pod, &node, &snap(vec![])).is_success());
 }
 
 /// Upstream: TestNodeAffinity / `Lt_operator_blocks_when_node_value_greater_or_equal`.
@@ -351,8 +349,7 @@ fn upstream_node_resources_fit_blocks_when_extended_resource_insufficient() {
     let mut extended = ExtendedResourcesState::default();
     extended.set_capacity("gpu-1", "nvidia.com/gpu", 4);
     extended.set_allocated("gpu-1", "nvidia.com/gpu", 3);
-    let plugin = NodeResourcesFit::new(NodeResourcesFitArgs::default())
-        .with_extended(extended);
+    let plugin = NodeResourcesFit::new(NodeResourcesFitArgs::default()).with_extended(extended);
 
     let mut pod = Pod::new("t", "ns", "p");
     pod.spec

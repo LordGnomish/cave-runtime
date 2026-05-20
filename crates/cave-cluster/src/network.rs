@@ -59,11 +59,14 @@ pub struct NetworkPolicyPort {
 
 /// Generate the default network policies for a new namespace.
 pub fn default_namespace_policies(namespace: &str) -> Vec<NetworkPolicy> {
-    let mut deny_all_ingress_labels: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut deny_all_ingress_labels: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
     let deny_all = NetworkPolicy {
         name: format!("{namespace}-default-deny-ingress"),
         namespace: namespace.to_string(),
-        pod_selector: PodSelector { match_labels: std::collections::HashMap::new() },
+        pod_selector: PodSelector {
+            match_labels: std::collections::HashMap::new(),
+        },
         policy_types: vec![PolicyType::Ingress],
         ingress_rules: vec![],
         egress_rules: vec![],
@@ -75,12 +78,16 @@ pub fn default_namespace_policies(namespace: &str) -> Vec<NetworkPolicy> {
     let allow_same_namespace = NetworkPolicy {
         name: format!("{namespace}-allow-same-namespace"),
         namespace: namespace.to_string(),
-        pod_selector: PodSelector { match_labels: std::collections::HashMap::new() },
+        pod_selector: PodSelector {
+            match_labels: std::collections::HashMap::new(),
+        },
         policy_types: vec![PolicyType::Ingress],
         ingress_rules: vec![IngressRule {
             from: vec![NetworkPolicyPeer {
                 namespace_selector: None,
-                pod_selector: Some(PodSelector { match_labels: std::collections::HashMap::new() }),
+                pod_selector: Some(PodSelector {
+                    match_labels: std::collections::HashMap::new(),
+                }),
                 ip_block: None,
             }],
             ports: vec![],
@@ -92,7 +99,9 @@ pub fn default_namespace_policies(namespace: &str) -> Vec<NetworkPolicy> {
     let allow_dns_egress = NetworkPolicy {
         name: format!("{namespace}-allow-dns"),
         namespace: namespace.to_string(),
-        pod_selector: PodSelector { match_labels: std::collections::HashMap::new() },
+        pod_selector: PodSelector {
+            match_labels: std::collections::HashMap::new(),
+        },
         policy_types: vec![PolicyType::Egress],
         ingress_rules: vec![],
         egress_rules: vec![EgressRule {
@@ -114,8 +123,14 @@ pub fn default_namespace_policies(namespace: &str) -> Vec<NetworkPolicy> {
                 ip_block: None,
             }],
             ports: vec![
-                NetworkPolicyPort { protocol: "UDP".into(), port: Some(53) },
-                NetworkPolicyPort { protocol: "TCP".into(), port: Some(53) },
+                NetworkPolicyPort {
+                    protocol: "UDP".into(),
+                    port: Some(53),
+                },
+                NetworkPolicyPort {
+                    protocol: "TCP".into(),
+                    port: Some(53),
+                },
             ],
         }],
     };
@@ -138,7 +153,12 @@ spec:
 "#,
         name = policy.name,
         namespace = policy.namespace,
-        types = policy.policy_types.iter().map(|t| format!("    - {:?}", t)).collect::<Vec<_>>().join("\n"),
+        types = policy
+            .policy_types
+            .iter()
+            .map(|t| format!("    - {:?}", t))
+            .collect::<Vec<_>>()
+            .join("\n"),
     )
 }
 

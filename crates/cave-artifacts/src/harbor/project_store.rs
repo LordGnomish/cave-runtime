@@ -182,7 +182,12 @@ mod tests {
     fn create_round_trips_and_assigns_id_and_now() {
         let s = store();
         let p = s
-            .create("library".into(), true, "admin".into(), ProjectMetadata::default())
+            .create(
+                "library".into(),
+                true,
+                "admin".into(),
+                ProjectMetadata::default(),
+            )
             .unwrap();
         assert_eq!(p.name, "library");
         assert!(p.public);
@@ -196,9 +201,20 @@ mod tests {
     #[test]
     fn create_rejects_duplicate_name() {
         let s = store();
-        s.create("library".into(), true, "admin".into(), ProjectMetadata::default()).unwrap();
+        s.create(
+            "library".into(),
+            true,
+            "admin".into(),
+            ProjectMetadata::default(),
+        )
+        .unwrap();
         let err = s
-            .create("library".into(), false, "admin".into(), ProjectMetadata::default())
+            .create(
+                "library".into(),
+                false,
+                "admin".into(),
+                ProjectMetadata::default(),
+            )
             .unwrap_err();
         assert_eq!(err, ProjectError::Conflict("library".into()));
     }
@@ -207,7 +223,8 @@ mod tests {
     fn list_filters_by_name_substring() {
         let s = store();
         for n in ["library", "alpha", "beta-svc", "alpha-staging"] {
-            s.create(n.into(), false, "admin".into(), ProjectMetadata::default()).unwrap();
+            s.create(n.into(), false, "admin".into(), ProjectMetadata::default())
+                .unwrap();
         }
         let alpha = s.list(Some("alpha"), None);
         assert_eq!(alpha.len(), 2);
@@ -217,8 +234,20 @@ mod tests {
     #[test]
     fn list_filters_by_public_flag() {
         let s = store();
-        s.create("pub".into(), true, "admin".into(), ProjectMetadata::default()).unwrap();
-        s.create("priv".into(), false, "admin".into(), ProjectMetadata::default()).unwrap();
+        s.create(
+            "pub".into(),
+            true,
+            "admin".into(),
+            ProjectMetadata::default(),
+        )
+        .unwrap();
+        s.create(
+            "priv".into(),
+            false,
+            "admin".into(),
+            ProjectMetadata::default(),
+        )
+        .unwrap();
         let pubs = s.list(None, Some(true));
         assert_eq!(pubs.len(), 1);
         assert_eq!(pubs[0].name, "pub");
@@ -230,9 +259,21 @@ mod tests {
     #[test]
     fn list_orders_by_update_time_desc() {
         let s = store();
-        s.create("old".into(), false, "admin".into(), ProjectMetadata::default()).unwrap();
+        s.create(
+            "old".into(),
+            false,
+            "admin".into(),
+            ProjectMetadata::default(),
+        )
+        .unwrap();
         std::thread::sleep(std::time::Duration::from_millis(10));
-        s.create("new".into(), false, "admin".into(), ProjectMetadata::default()).unwrap();
+        s.create(
+            "new".into(),
+            false,
+            "admin".into(),
+            ProjectMetadata::default(),
+        )
+        .unwrap();
         let l = s.list(None, None);
         assert_eq!(l[0].name, "new", "newest should sort first");
     }
@@ -243,7 +284,8 @@ mod tests {
         let mut initial_meta = ProjectMetadata::default();
         initial_meta.auto_scan = Some("true".into());
         initial_meta.severity = Some("high".into());
-        s.create("library".into(), true, "admin".into(), initial_meta).unwrap();
+        s.create("library".into(), true, "admin".into(), initial_meta)
+            .unwrap();
 
         let mut patch = ProjectMetadata::default();
         patch.severity = Some("critical".into()); // override severity only
@@ -263,7 +305,13 @@ mod tests {
     #[test]
     fn delete_rejects_when_repos_remain() {
         let s = store();
-        s.create("library".into(), false, "admin".into(), ProjectMetadata::default()).unwrap();
+        s.create(
+            "library".into(),
+            false,
+            "admin".into(),
+            ProjectMetadata::default(),
+        )
+        .unwrap();
         s.adjust_repo_count("library", 3).unwrap();
         let err = s.delete("library").unwrap_err();
         assert_eq!(err, ProjectError::HasRepos("library".into(), 3));
@@ -273,7 +321,13 @@ mod tests {
     #[test]
     fn delete_succeeds_when_empty() {
         let s = store();
-        s.create("temp".into(), false, "admin".into(), ProjectMetadata::default()).unwrap();
+        s.create(
+            "temp".into(),
+            false,
+            "admin".into(),
+            ProjectMetadata::default(),
+        )
+        .unwrap();
         s.delete("temp").unwrap();
         assert!(s.get("temp").is_none());
     }
@@ -281,7 +335,13 @@ mod tests {
     #[test]
     fn adjust_repo_count_floors_at_zero() {
         let s = store();
-        s.create("temp".into(), false, "admin".into(), ProjectMetadata::default()).unwrap();
+        s.create(
+            "temp".into(),
+            false,
+            "admin".into(),
+            ProjectMetadata::default(),
+        )
+        .unwrap();
         s.adjust_repo_count("temp", -5).unwrap();
         assert_eq!(s.get("temp").unwrap().repo_count, 0);
     }

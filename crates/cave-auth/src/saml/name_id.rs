@@ -241,10 +241,8 @@ mod tests {
 
     #[test]
     fn name_id_matches_rejects_qualifier_mismatch() {
-        let a =
-            NameId::new("x", NameIdFormat::Persistent).with_sp_name_qualifier("sp-a");
-        let b =
-            NameId::new("x", NameIdFormat::Persistent).with_sp_name_qualifier("sp-b");
+        let a = NameId::new("x", NameIdFormat::Persistent).with_sp_name_qualifier("sp-a");
+        let b = NameId::new("x", NameIdFormat::Persistent).with_sp_name_qualifier("sp-b");
         assert!(!a.matches(&b));
     }
 

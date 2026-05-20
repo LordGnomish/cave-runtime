@@ -14,8 +14,8 @@
 
 use crate::error::{EtcdError, EtcdResult};
 use crate::models::{
-    Compare, CompareResult, CompareTarget, DeleteRangeRequest, KeyValue, PutRequest,
-    RangeRequest, RangeResponse, RequestOp, TxnRequest,
+    Compare, CompareResult, CompareTarget, DeleteRangeRequest, KeyValue, PutRequest, RangeRequest,
+    RangeResponse, RequestOp, TxnRequest,
 };
 use crate::store::KvStore;
 use serde::{Deserialize, Serialize};
@@ -155,11 +155,12 @@ impl TxnBuilder {
     }
 
     pub fn then_delete(mut self, key: &str) -> Self {
-        self.success.push(RequestOp::DeleteRange(DeleteRangeRequest {
-            key: key.into(),
-            range_end: None,
-            prev_kv: false,
-        }));
+        self.success
+            .push(RequestOp::DeleteRange(DeleteRangeRequest {
+                key: key.into(),
+                range_end: None,
+                prev_kv: false,
+            }));
         self
     }
 
@@ -174,11 +175,12 @@ impl TxnBuilder {
     }
 
     pub fn else_delete(mut self, key: &str) -> Self {
-        self.failure.push(RequestOp::DeleteRange(DeleteRangeRequest {
-            key: key.into(),
-            range_end: None,
-            prev_kv: false,
-        }));
+        self.failure
+            .push(RequestOp::DeleteRange(DeleteRangeRequest {
+                key: key.into(),
+                range_end: None,
+                prev_kv: false,
+            }));
         self
     }
 
@@ -248,12 +250,15 @@ mod tests {
     }
 
     fn pk_put(store: &KvStore, key: &str, value: &str) -> u64 {
-        store.put(&PutRequest {
-            key: key.into(),
-            value: value.into(),
-            lease: None,
-            prev_kv: false,
-        }).header.revision
+        store
+            .put(&PutRequest {
+                key: key.into(),
+                value: value.into(),
+                lease: None,
+                prev_kv: false,
+            })
+            .header
+            .revision
     }
 
     fn make_kv(key: &str, value: &str, version: u64, create: u64, mod_rev: u64) -> KeyValue {

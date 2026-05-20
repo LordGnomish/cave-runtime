@@ -37,7 +37,12 @@ pub fn changed_paths(old: &serde_json::Value, new: &serde_json::Value) -> HashSe
     out
 }
 
-fn diff_walk(o: &serde_json::Value, n: &serde_json::Value, prefix: &str, out: &mut HashSet<String>) {
+fn diff_walk(
+    o: &serde_json::Value,
+    n: &serde_json::Value,
+    prefix: &str,
+    out: &mut HashSet<String>,
+) {
     match (o, n) {
         (serde_json::Value::Object(ao), serde_json::Value::Object(an)) => {
             let keys: HashSet<&String> = ao.keys().chain(an.keys()).collect();
@@ -45,7 +50,9 @@ fn diff_walk(o: &serde_json::Value, n: &serde_json::Value, prefix: &str, out: &m
                 let path = format!("{prefix}/{}", escape_json_pointer(k));
                 match (ao.get(k), an.get(k)) {
                     (Some(a), Some(b)) => diff_walk(a, b, &path, out),
-                    _ => { out.insert(path); }
+                    _ => {
+                        out.insert(path);
+                    }
                 }
             }
         }
@@ -55,12 +62,16 @@ fn diff_walk(o: &serde_json::Value, n: &serde_json::Value, prefix: &str, out: &m
                 let path = format!("{prefix}/{i}");
                 match (ao.get(i), an.get(i)) {
                     (Some(a), Some(b)) => diff_walk(a, b, &path, out),
-                    _ => { out.insert(path); }
+                    _ => {
+                        out.insert(path);
+                    }
                 }
             }
         }
         (a, b) => {
-            if a != b { out.insert(prefix.to_string()); }
+            if a != b {
+                out.insert(prefix.to_string());
+            }
         }
     }
 }
@@ -79,15 +90,19 @@ pub struct ValidationFailure {
 /// is below at least one changed path. Failures rooted only in unchanged
 /// subtrees are tolerated.
 pub fn ratchet_failures(
-    failures: Vec<ValidationFailure>, changed: &HashSet<String>,
+    failures: Vec<ValidationFailure>,
+    changed: &HashSet<String>,
 ) -> Vec<ValidationFailure> {
-    failures.into_iter()
+    failures
+        .into_iter()
         .filter(|f| failure_in_changed_subtree(&f.field_path, changed))
         .collect()
 }
 
 fn failure_in_changed_subtree(field: &str, changed: &HashSet<String>) -> bool {
-    changed.iter().any(|c| field == c || field.starts_with(&format!("{c}/")) || c.starts_with(&format!("{field}/")))
+    changed.iter().any(|c| {
+        field == c || field.starts_with(&format!("{c}/")) || c.starts_with(&format!("{field}/"))
+    })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -105,7 +120,9 @@ pub enum ResourceResizeRestartPolicy {
 }
 
 impl Default for ResourceResizeRestartPolicy {
-    fn default() -> Self { ResourceResizeRestartPolicy::NotRequired }
+    fn default() -> Self {
+        ResourceResizeRestartPolicy::NotRequired
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -149,26 +166,34 @@ pub enum ResizeDecision {
 
 pub fn evaluate_resize(
     container: &str,
-    old_res: &ContainerResources, new_res: &ContainerResources,
+    old_res: &ContainerResources,
+    new_res: &ContainerResources,
     policies: &[ContainerResizePolicy],
     node_allocatable: &HashMap<String, i64>,
 ) -> ResizeDecision {
     let mut changed_resources: Vec<String> = vec![];
     for k in old_res.requests.keys().chain(new_res.requests.keys()) {
-        if old_res.requests.get(k) != new_res.requests.get(k) { changed_resources.push(k.clone()); }
+        if old_res.requests.get(k) != new_res.requests.get(k) {
+            changed_resources.push(k.clone());
+        }
     }
     for k in old_res.limits.keys().chain(new_res.limits.keys()) {
-        if old_res.limits.get(k) != new_res.limits.get(k) { changed_resources.push(k.clone()); }
+        if old_res.limits.get(k) != new_res.limits.get(k) {
+            changed_resources.push(k.clone());
+        }
     }
     changed_resources.sort();
     changed_resources.dedup();
-    if changed_resources.is_empty() { return ResizeDecision::NoChange; }
+    if changed_resources.is_empty() {
+        return ResizeDecision::NoChange;
+    }
     // Feasibility: each new request must be <= allocatable.
     for (k, v) in &new_res.requests {
         if let Some(alloc) = node_allocatable.get(k) {
             if v > alloc {
-                return ResizeDecision::Infeasible(
-                    format!("requested {k} {v} exceeds node allocatable {alloc}"));
+                return ResizeDecision::Infeasible(format!(
+                    "requested {k} {v} exceeds node allocatable {alloc}"
+                ));
             }
         }
     }
@@ -177,10 +202,15 @@ pub fn evaluate_resize(
         let policy = policies.iter().find(|p| p.resource_name == *r);
         let restart = policy.map(|p| &p.restart_policy)
             == Some(&ResourceResizeRestartPolicy::RestartContainer);
-        if restart { needs_restart = true; break; }
+        if restart {
+            needs_restart = true;
+            break;
+        }
     }
     if needs_restart {
-        ResizeDecision::RestartRequired { containers: vec![container.into()] }
+        ResizeDecision::RestartRequired {
+            containers: vec![container.into()],
+        }
     } else {
         ResizeDecision::InPlaceNoRestart
     }
@@ -253,7 +283,9 @@ pub enum AuthnConfigError {
 }
 
 pub fn validate_authn_config(c: &AuthenticationConfiguration) -> Result<(), AuthnConfigError> {
-    if c.jwt.is_empty() { return Err(AuthnConfigError::NoJWT); }
+    if c.jwt.is_empty() {
+        return Err(AuthnConfigError::NoJWT);
+    }
     let mut seen: HashSet<&String> = HashSet::new();
     for jwt in &c.jwt {
         if !jwt.issuer.url.starts_with("https://") {
@@ -277,11 +309,13 @@ pub fn validate_authn_config(c: &AuthenticationConfiguration) -> Result<(), Auth
 /// Apply claim mappings to extracted JWT claims. Returns the (username,
 /// groups, uid) tuple. Missing groups / uid yields empty values.
 pub fn apply_claim_mappings(
-    mappings: &ClaimMappings, claims: &serde_json::Value,
+    mappings: &ClaimMappings,
+    claims: &serde_json::Value,
 ) -> (String, Vec<String>, String) {
     let username = read_claim(&mappings.username, claims).unwrap_or_default();
     let groups = match claims.get(&mappings.groups.claim) {
-        Some(serde_json::Value::Array(a)) => a.iter()
+        Some(serde_json::Value::Array(a)) => a
+            .iter()
             .filter_map(|v| v.as_str().map(String::from))
             .map(|g| match &mappings.groups.prefix {
                 Some(p) => format!("{p}{g}"),

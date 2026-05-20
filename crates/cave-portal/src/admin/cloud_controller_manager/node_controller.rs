@@ -6,7 +6,7 @@
 use super::CloudControllerViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::table;
-use crate::admin::state::{scope, AdminState};
+use crate::admin::state::{AdminState, scope};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NodeControllerRow {
@@ -68,7 +68,12 @@ pub(super) fn render_section(
                 r.provider.into(),
                 r.provider_id.clone(),
                 r.zone.into(),
-                if r.initialized { "Initialized" } else { "Pending" }.into(),
+                if r.initialized {
+                    "Initialized"
+                } else {
+                    "Pending"
+                }
+                .into(),
             ]
         })
         .collect();

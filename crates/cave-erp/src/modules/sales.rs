@@ -3,11 +3,11 @@
 use crate::models::*;
 use crate::store::ErpStore;
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -119,19 +119,22 @@ async fn confirm_sale_order(
             (StatusCode::BAD_REQUEST, Json(order.clone()))
         }
     } else {
-        (StatusCode::NOT_FOUND, Json(SaleOrder {
-            id: Uuid::nil(),
-            number: String::new(),
-            partner_id: Uuid::nil(),
-            lines: vec![],
-            state: SaleOrderState::Draft,
-            created_at: Utc::now(),
-            confirmed_at: None,
-            delivery_date: None,
-            amount_total: 0.0,
-            currency: String::new(),
-            salesperson_id: None,
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(SaleOrder {
+                id: Uuid::nil(),
+                number: String::new(),
+                partner_id: Uuid::nil(),
+                lines: vec![],
+                state: SaleOrderState::Draft,
+                created_at: Utc::now(),
+                confirmed_at: None,
+                delivery_date: None,
+                amount_total: 0.0,
+                currency: String::new(),
+                salesperson_id: None,
+            }),
+        )
     }
 }
 
@@ -144,19 +147,22 @@ async fn cancel_sale_order(
         order.state = SaleOrderState::Cancelled;
         (StatusCode::OK, Json(order.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(SaleOrder {
-            id: Uuid::nil(),
-            number: String::new(),
-            partner_id: Uuid::nil(),
-            lines: vec![],
-            state: SaleOrderState::Draft,
-            created_at: Utc::now(),
-            confirmed_at: None,
-            delivery_date: None,
-            amount_total: 0.0,
-            currency: String::new(),
-            salesperson_id: None,
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(SaleOrder {
+                id: Uuid::nil(),
+                number: String::new(),
+                partner_id: Uuid::nil(),
+                lines: vec![],
+                state: SaleOrderState::Draft,
+                created_at: Utc::now(),
+                confirmed_at: None,
+                delivery_date: None,
+                amount_total: 0.0,
+                currency: String::new(),
+                salesperson_id: None,
+            }),
+        )
     }
 }
 
@@ -220,17 +226,20 @@ async fn send_quotation(
         quote.sent_at = Some(Utc::now());
         (StatusCode::OK, Json(quote.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(Quotation {
-            id: Uuid::nil(),
-            number: String::new(),
-            partner_id: Uuid::nil(),
-            lines: vec![],
-            state: QuotationState::Draft,
-            created_at: Utc::now(),
-            sent_at: None,
-            amount_total: 0.0,
-            currency: String::new(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(Quotation {
+                id: Uuid::nil(),
+                number: String::new(),
+                partner_id: Uuid::nil(),
+                lines: vec![],
+                state: QuotationState::Draft,
+                created_at: Utc::now(),
+                sent_at: None,
+                amount_total: 0.0,
+                currency: String::new(),
+            }),
+        )
     }
 }
 
@@ -269,7 +278,11 @@ async fn convert_quotation(
         drop(quotations);
 
         let order_id = order.id;
-        store.sale_orders.write().await.insert(order_id, order.clone());
+        store
+            .sale_orders
+            .write()
+            .await
+            .insert(order_id, order.clone());
 
         let mut quotes = store.quotations.write().await;
         if let Some(quote) = quotes.get_mut(&id) {
@@ -278,19 +291,22 @@ async fn convert_quotation(
 
         (StatusCode::CREATED, Json(order))
     } else {
-        (StatusCode::NOT_FOUND, Json(SaleOrder {
-            id: Uuid::nil(),
-            number: String::new(),
-            partner_id: Uuid::nil(),
-            lines: vec![],
-            state: SaleOrderState::Draft,
-            created_at: Utc::now(),
-            confirmed_at: None,
-            delivery_date: None,
-            amount_total: 0.0,
-            currency: String::new(),
-            salesperson_id: None,
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(SaleOrder {
+                id: Uuid::nil(),
+                number: String::new(),
+                partner_id: Uuid::nil(),
+                lines: vec![],
+                state: SaleOrderState::Draft,
+                created_at: Utc::now(),
+                confirmed_at: None,
+                delivery_date: None,
+                amount_total: 0.0,
+                currency: String::new(),
+                salesperson_id: None,
+            }),
+        )
     }
 }
 
@@ -327,15 +343,18 @@ async fn ship_delivery(
         delivery.state = DeliveryState::InProgress;
         (StatusCode::OK, Json(delivery.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(Delivery {
-            id: Uuid::nil(),
-            sale_order_id: Uuid::nil(),
-            state: DeliveryState::Pending,
-            scheduled: None,
-            completed_at: None,
-            tracking_ref: None,
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(Delivery {
+                id: Uuid::nil(),
+                sale_order_id: Uuid::nil(),
+                state: DeliveryState::Pending,
+                scheduled: None,
+                completed_at: None,
+                tracking_ref: None,
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -349,15 +368,18 @@ async fn complete_delivery(
         delivery.completed_at = Some(Utc::now());
         (StatusCode::OK, Json(delivery.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(Delivery {
-            id: Uuid::nil(),
-            sale_order_id: Uuid::nil(),
-            state: DeliveryState::Pending,
-            scheduled: None,
-            completed_at: None,
-            tracking_ref: None,
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(Delivery {
+                id: Uuid::nil(),
+                sale_order_id: Uuid::nil(),
+                state: DeliveryState::Pending,
+                scheduled: None,
+                completed_at: None,
+                tracking_ref: None,
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -367,20 +389,29 @@ pub fn create_router(state: Arc<ErpStore>) -> Router {
             "/api/erp/sales/orders",
             post(create_sale_order).get(list_sale_orders),
         )
-        .route("/api/erp/sales/orders/{id}/confirm", post(confirm_sale_order))
+        .route(
+            "/api/erp/sales/orders/{id}/confirm",
+            post(confirm_sale_order),
+        )
         .route("/api/erp/sales/orders/{id}/cancel", post(cancel_sale_order))
         .route(
             "/api/erp/sales/quotations",
             post(create_quotation).get(list_quotations),
         )
         .route("/api/erp/sales/quotations/{id}/send", post(send_quotation))
-        .route("/api/erp/sales/quotations/{id}/convert", post(convert_quotation))
+        .route(
+            "/api/erp/sales/quotations/{id}/convert",
+            post(convert_quotation),
+        )
         .route(
             "/api/erp/sales/deliveries",
             post(create_delivery).get(list_deliveries),
         )
         .route("/api/erp/sales/deliveries/{id}/ship", post(ship_delivery))
-        .route("/api/erp/sales/deliveries/{id}/complete", post(complete_delivery))
+        .route(
+            "/api/erp/sales/deliveries/{id}/complete",
+            post(complete_delivery),
+        )
         .with_state(state)
 }
 

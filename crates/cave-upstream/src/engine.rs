@@ -37,7 +37,11 @@ pub fn generate_alerts(service: &UpstreamService) -> Vec<UpstreamAlert> {
                     "Service '{}' reaches end-of-life in {} days",
                     service.name, days
                 ),
-                severity: if days <= 14 { "critical".to_string() } else { "warning".to_string() },
+                severity: if days <= 14 {
+                    "critical".to_string()
+                } else {
+                    "warning".to_string()
+                },
                 created_at: now,
                 resolved_at: None,
             });
@@ -53,7 +57,11 @@ pub fn generate_alerts(service: &UpstreamService) -> Vec<UpstreamAlert> {
                     "Service '{}' will be deprecated in {} days",
                     service.name, days
                 ),
-                severity: if days <= 7 { "critical".to_string() } else { "warning".to_string() },
+                severity: if days <= 7 {
+                    "critical".to_string()
+                } else {
+                    "warning".to_string()
+                },
                 created_at: now,
                 resolved_at: None,
             });

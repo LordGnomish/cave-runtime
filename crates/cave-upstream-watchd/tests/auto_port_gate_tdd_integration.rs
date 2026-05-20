@@ -51,7 +51,9 @@ fn init_repo() -> tempfile::TempDir {
 
 fn bump_manifest(repo: &Path, ratio: f64) {
     fs::write(
-        repo.join("crates").join("cave-x").join("parity.manifest.toml"),
+        repo.join("crates")
+            .join("cave-x")
+            .join("parity.manifest.toml"),
         format!("[parity]\nfill_ratio = {ratio}\nlast_audit = \"2026-05-13\"\n"),
     )
     .unwrap();

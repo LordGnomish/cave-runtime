@@ -81,14 +81,23 @@ pub fn admit(req: &WebhookRequest, uid: &str) -> WebhookResponse {
             }
             // Defaulting: if name is empty, inject a placeholder & emit warning.
             if svc.metadata.name.is_empty() {
-                response.warnings.push("Ksvc name is empty; controller will reject".into());
+                response
+                    .warnings
+                    .push("Ksvc name is empty; controller will reject".into());
             }
             // Defaulting: ensure the autoscaler class annotation is set.
-            if svc.metadata.annotations.get(crate::meta::ANNOTATION_AUTOSCALER_CLASS).is_none() {
+            if svc
+                .metadata
+                .annotations
+                .get(crate::meta::ANNOTATION_AUTOSCALER_CLASS)
+                .is_none()
+            {
                 response.patch.push(PatchOp {
                     op: "add".into(),
-                    path: format!("/metadata/annotations/{}",
-                        json_pointer_escape(crate::meta::ANNOTATION_AUTOSCALER_CLASS)),
+                    path: format!(
+                        "/metadata/annotations/{}",
+                        json_pointer_escape(crate::meta::ANNOTATION_AUTOSCALER_CLASS)
+                    ),
                     value: "kpa.autoscaling.knative.dev".into(),
                 });
             }
@@ -179,7 +188,12 @@ mod tests {
         };
         let res = admit(&req, "uid");
         assert!(!res.allowed);
-        assert!(res.status_message.as_deref().unwrap().contains("validation failed"));
+        assert!(
+            res.status_message
+                .as_deref()
+                .unwrap()
+                .contains("validation failed")
+        );
     }
 
     #[test]
@@ -192,7 +206,10 @@ mod tests {
             object: AdmissionObject::Service(Box::new(good_svc("svc"))),
         };
         let res = admit(&req, "uid");
-        let any_class_patch = res.patch.iter().any(|p| p.path.contains("autoscaling.knative.dev~1class"));
+        let any_class_patch = res
+            .patch
+            .iter()
+            .any(|p| p.path.contains("autoscaling.knative.dev~1class"));
         assert!(any_class_patch);
     }
 
@@ -213,8 +230,16 @@ mod tests {
     #[test]
     fn admit_traffic_rejects_sum_not_100() {
         let targets = vec![
-            TrafficTarget { revision_name: Some("a".into()), percent: Some(40), ..Default::default() },
-            TrafficTarget { revision_name: Some("b".into()), percent: Some(40), ..Default::default() },
+            TrafficTarget {
+                revision_name: Some("a".into()),
+                percent: Some(40),
+                ..Default::default()
+            },
+            TrafficTarget {
+                revision_name: Some("b".into()),
+                percent: Some(40),
+                ..Default::default()
+            },
         ];
         let req = WebhookRequest {
             kind: "Route".into(),
@@ -231,8 +256,16 @@ mod tests {
     #[test]
     fn admit_traffic_accepts_valid_split() {
         let targets = vec![
-            TrafficTarget { revision_name: Some("a".into()), percent: Some(50), ..Default::default() },
-            TrafficTarget { revision_name: Some("b".into()), percent: Some(50), ..Default::default() },
+            TrafficTarget {
+                revision_name: Some("a".into()),
+                percent: Some(50),
+                ..Default::default()
+            },
+            TrafficTarget {
+                revision_name: Some("b".into()),
+                percent: Some(50),
+                ..Default::default()
+            },
         ];
         let req = WebhookRequest {
             kind: "Route".into(),
@@ -249,6 +282,9 @@ mod tests {
     fn json_pointer_escape_handles_slash_and_tilde() {
         assert_eq!(json_pointer_escape("foo/bar"), "foo~1bar");
         assert_eq!(json_pointer_escape("a~b"), "a~0b");
-        assert_eq!(json_pointer_escape("autoscaling.knative.dev/class"), "autoscaling.knative.dev~1class");
+        assert_eq!(
+            json_pointer_escape("autoscaling.knative.dev/class"),
+            "autoscaling.knative.dev~1class"
+        );
     }
 }

@@ -15,8 +15,8 @@
 
 use cave_etcd::lease_id_gen::{LeaseIdGenerator, MAX_LEASE_ID_RETRIES};
 use cave_etcd::models::{
-    Compare, CompareResult, CompareTarget, DeleteRangeRequest, PutRequest, RangeRequest,
-    RequestOp, TxnRequest,
+    Compare, CompareResult, CompareTarget, DeleteRangeRequest, PutRequest, RangeRequest, RequestOp,
+    TxnRequest,
 };
 use cave_etcd::store::KvStore;
 use cave_etcd::wal::{Wal, WalOp};
@@ -213,18 +213,24 @@ fn upstream_wal_append_entry_assigns_monotonic_index() {
     let tmp = tempfile::tempdir().unwrap();
     let mut wal = Wal::open(tmp.path()).unwrap();
     let i1 = wal
-        .append_entry(1, WalOp::Put {
-            key: b"/a".to_vec(),
-            value: b"1".to_vec(),
-            lease: None,
-        })
+        .append_entry(
+            1,
+            WalOp::Put {
+                key: b"/a".to_vec(),
+                value: b"1".to_vec(),
+                lease: None,
+            },
+        )
         .unwrap();
     let i2 = wal
-        .append_entry(1, WalOp::Put {
-            key: b"/b".to_vec(),
-            value: b"2".to_vec(),
-            lease: None,
-        })
+        .append_entry(
+            1,
+            WalOp::Put {
+                key: b"/b".to_vec(),
+                value: b"2".to_vec(),
+                lease: None,
+            },
+        )
         .unwrap();
     assert_eq!(i1, 1);
     assert_eq!(i2, 2);
@@ -238,11 +244,14 @@ fn upstream_wal_reopen_preserves_last_entry_index() {
     {
         let mut wal = Wal::open(tmp.path()).unwrap();
         let _ = wal
-            .append_entry(1, WalOp::Put {
-                key: b"/k".to_vec(),
-                value: b"v".to_vec(),
-                lease: None,
-            })
+            .append_entry(
+                1,
+                WalOp::Put {
+                    key: b"/k".to_vec(),
+                    value: b"v".to_vec(),
+                    lease: None,
+                },
+            )
             .unwrap();
     }
     // Reopen — etcd's contract: replay restores last_entry_index.
@@ -259,11 +268,14 @@ fn upstream_wal_truncate_through_drops_entries_up_to_index() {
     let mut wal = Wal::open(tmp.path()).unwrap();
     for i in 0..5 {
         let _ = wal
-            .append_entry(1, WalOp::Put {
-                key: format!("/k{i}").into_bytes(),
-                value: vec![i],
-                lease: None,
-            })
+            .append_entry(
+                1,
+                WalOp::Put {
+                    key: format!("/k{i}").into_bytes(),
+                    value: vec![i],
+                    lease: None,
+                },
+            )
             .unwrap();
     }
     wal.truncate_through(3).unwrap();

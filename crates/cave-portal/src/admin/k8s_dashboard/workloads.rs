@@ -108,7 +108,11 @@ pub(super) fn render_section(
         .map(|r| {
             vec![
                 escape(&r.node),
-                if r.node_ready { "Ready".into() } else { "NotReady".into() },
+                if r.node_ready {
+                    "Ready".into()
+                } else {
+                    "NotReady".into()
+                },
                 escape(&r.pod_name),
                 r.status.into(),
                 r.restart_count.to_string(),
@@ -134,7 +138,10 @@ pub(super) fn render_section(
         tp = summary.total_pods,
         rp = summary.running_pods,
         fp = summary.failing_pods,
-        tbl = table(&["node", "node_state", "pod", "status", "restarts"], &table_rows),
+        tbl = table(
+            &["node", "node_state", "pod", "status", "restarts"],
+            &table_rows
+        ),
     ))
 }
 
@@ -154,7 +161,8 @@ mod tests {
             "JoinNodesAndPods",
             "acme"
         );
-        let rows = list_workloads(&AdminState::seeded(), &ctx(&[Permission::K8sDashboardRead])).unwrap();
+        let rows =
+            list_workloads(&AdminState::seeded(), &ctx(&[Permission::K8sDashboardRead])).unwrap();
         let nodes_seen: std::collections::HashSet<_> = rows.iter().map(|r| &r.node).collect();
         assert!(nodes_seen.contains(&"node-a".to_string()));
         assert!(nodes_seen.contains(&"node-b".to_string()));
@@ -167,13 +175,15 @@ mod tests {
 
     #[test]
     fn list_workloads_excludes_other_tenant() {
-        let rows = list_workloads(&AdminState::seeded(), &ctx(&[Permission::K8sDashboardRead])).unwrap();
+        let rows =
+            list_workloads(&AdminState::seeded(), &ctx(&[Permission::K8sDashboardRead])).unwrap();
         assert!(rows.iter().all(|r| r.node != "evil-node"));
     }
 
     #[test]
     fn summary_counts_pods_only_when_present() {
-        let rows = list_workloads(&AdminState::seeded(), &ctx(&[Permission::K8sDashboardRead])).unwrap();
+        let rows =
+            list_workloads(&AdminState::seeded(), &ctx(&[Permission::K8sDashboardRead])).unwrap();
         let s = workload_summary(&rows);
         let manual_pods = rows.iter().filter(|r| !r.pod_name.is_empty()).count() as u32;
         assert_eq!(s.total_pods, manual_pods);
@@ -181,14 +191,16 @@ mod tests {
 
     #[test]
     fn rows_for_node_filters_correctly() {
-        let rows = list_workloads(&AdminState::seeded(), &ctx(&[Permission::K8sDashboardRead])).unwrap();
+        let rows =
+            list_workloads(&AdminState::seeded(), &ctx(&[Permission::K8sDashboardRead])).unwrap();
         let on_a = rows_for_node(&rows, "node-a");
         assert!(on_a.iter().all(|r| r.node == "node-a"));
     }
 
     #[test]
     fn render_section_shows_summary_cards() {
-        let html = render_section(&AdminState::seeded(), &ctx(&[Permission::K8sDashboardRead])).unwrap();
+        let html =
+            render_section(&AdminState::seeded(), &ctx(&[Permission::K8sDashboardRead])).unwrap();
         for label in ["NODES", "READY", "PODS", "RUNNING", "FAILING"] {
             assert!(html.contains(label));
         }

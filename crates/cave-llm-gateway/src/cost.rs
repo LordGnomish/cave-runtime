@@ -27,20 +27,68 @@ impl ModelPricing {
 pub fn default_pricing() -> Vec<ModelPricing> {
     vec![
         // OpenAI
-        ModelPricing { model: "gpt-4o".into(), input_per_million: 2.50, output_per_million: 10.00 },
-        ModelPricing { model: "gpt-4o-mini".into(), input_per_million: 0.15, output_per_million: 0.60 },
-        ModelPricing { model: "gpt-4-turbo".into(), input_per_million: 10.00, output_per_million: 30.00 },
-        ModelPricing { model: "gpt-4".into(), input_per_million: 30.00, output_per_million: 60.00 },
-        ModelPricing { model: "gpt-3.5-turbo".into(), input_per_million: 0.50, output_per_million: 1.50 },
+        ModelPricing {
+            model: "gpt-4o".into(),
+            input_per_million: 2.50,
+            output_per_million: 10.00,
+        },
+        ModelPricing {
+            model: "gpt-4o-mini".into(),
+            input_per_million: 0.15,
+            output_per_million: 0.60,
+        },
+        ModelPricing {
+            model: "gpt-4-turbo".into(),
+            input_per_million: 10.00,
+            output_per_million: 30.00,
+        },
+        ModelPricing {
+            model: "gpt-4".into(),
+            input_per_million: 30.00,
+            output_per_million: 60.00,
+        },
+        ModelPricing {
+            model: "gpt-3.5-turbo".into(),
+            input_per_million: 0.50,
+            output_per_million: 1.50,
+        },
         // Anthropic
-        ModelPricing { model: "claude-opus-4-6".into(), input_per_million: 15.00, output_per_million: 75.00 },
-        ModelPricing { model: "claude-sonnet-4-6".into(), input_per_million: 3.00, output_per_million: 15.00 },
-        ModelPricing { model: "claude-haiku-4-5-20251001".into(), input_per_million: 0.80, output_per_million: 4.00 },
-        ModelPricing { model: "claude-3-5-sonnet-20241022".into(), input_per_million: 3.00, output_per_million: 15.00 },
-        ModelPricing { model: "claude-3-5-haiku-20241022".into(), input_per_million: 0.80, output_per_million: 4.00 },
+        ModelPricing {
+            model: "claude-opus-4-6".into(),
+            input_per_million: 15.00,
+            output_per_million: 75.00,
+        },
+        ModelPricing {
+            model: "claude-sonnet-4-6".into(),
+            input_per_million: 3.00,
+            output_per_million: 15.00,
+        },
+        ModelPricing {
+            model: "claude-haiku-4-5-20251001".into(),
+            input_per_million: 0.80,
+            output_per_million: 4.00,
+        },
+        ModelPricing {
+            model: "claude-3-5-sonnet-20241022".into(),
+            input_per_million: 3.00,
+            output_per_million: 15.00,
+        },
+        ModelPricing {
+            model: "claude-3-5-haiku-20241022".into(),
+            input_per_million: 0.80,
+            output_per_million: 4.00,
+        },
         // Local / mock — free
-        ModelPricing { model: "llama3".into(), input_per_million: 0.0, output_per_million: 0.0 },
-        ModelPricing { model: "mock-model".into(), input_per_million: 0.0, output_per_million: 0.0 },
+        ModelPricing {
+            model: "llama3".into(),
+            input_per_million: 0.0,
+            output_per_million: 0.0,
+        },
+        ModelPricing {
+            model: "mock-model".into(),
+            input_per_million: 0.0,
+            output_per_million: 0.0,
+        },
     ]
 }
 
@@ -110,10 +158,20 @@ impl CostTracker {
     }
 
     pub fn cost_for(&self, model: &str, input_tokens: u32, output_tokens: u32) -> f64 {
-        self.pricing.get(model).map(|p| p.cost(input_tokens, output_tokens)).unwrap_or(0.0)
+        self.pricing
+            .get(model)
+            .map(|p| p.cost(input_tokens, output_tokens))
+            .unwrap_or(0.0)
     }
 
-    pub fn record(&self, consumer: &str, model: &str, provider: &str, input_tokens: u32, output_tokens: u32) -> UsageRecord {
+    pub fn record(
+        &self,
+        consumer: &str,
+        model: &str,
+        provider: &str,
+        input_tokens: u32,
+        output_tokens: u32,
+    ) -> UsageRecord {
         let cost = self.cost_for(model, input_tokens, output_tokens);
         let record = UsageRecord {
             consumer: consumer.to_string(),
@@ -126,8 +184,14 @@ impl CostTracker {
             timestamp_ms: chrono::Utc::now().timestamp_millis(),
         };
 
-        self.consumer_stats.entry(consumer.to_string()).or_default().add(&record);
-        self.model_stats.entry(model.to_string()).or_default().add(&record);
+        self.consumer_stats
+            .entry(consumer.to_string())
+            .or_default()
+            .add(&record);
+        self.model_stats
+            .entry(model.to_string())
+            .or_default()
+            .add(&record);
 
         if let Ok(mut g) = self.global.write() {
             g.add(&record);
@@ -137,11 +201,17 @@ impl CostTracker {
     }
 
     pub fn consumer_stats(&self, consumer: &str) -> UsageStats {
-        self.consumer_stats.get(consumer).map(|s| s.clone()).unwrap_or_default()
+        self.consumer_stats
+            .get(consumer)
+            .map(|s| s.clone())
+            .unwrap_or_default()
     }
 
     pub fn model_stats(&self, model: &str) -> UsageStats {
-        self.model_stats.get(model).map(|s| s.clone()).unwrap_or_default()
+        self.model_stats
+            .get(model)
+            .map(|s| s.clone())
+            .unwrap_or_default()
     }
 
     pub fn global_stats(&self) -> UsageStats {
@@ -149,7 +219,10 @@ impl CostTracker {
     }
 
     pub fn list_consumers(&self) -> Vec<String> {
-        self.consumer_stats.iter().map(|e| e.key().clone()).collect()
+        self.consumer_stats
+            .iter()
+            .map(|e| e.key().clone())
+            .collect()
     }
 }
 

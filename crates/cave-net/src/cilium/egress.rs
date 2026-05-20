@@ -42,7 +42,11 @@ pub struct GatewayNode {
 
 impl GatewayNode {
     pub fn new(name: impl Into<String>, node_ip: IpAddr) -> Self {
-        Self { name: name.into(), node_ip, state: GatewayState::Healthy }
+        Self {
+            name: name.into(),
+            node_ip,
+            state: GatewayState::Healthy,
+        }
     }
     pub fn eligible(&self) -> bool {
         matches!(self.state, GatewayState::Healthy)
@@ -129,7 +133,11 @@ impl EgressManager {
         if policy.gateway_nodes.is_empty() {
             return Err(EgressError::NoGatewayNodes(policy.name.clone()));
         }
-        for c in policy.destination_cidrs.iter().chain(policy.excluded_cidrs.iter()) {
+        for c in policy
+            .destination_cidrs
+            .iter()
+            .chain(policy.excluded_cidrs.iter())
+        {
             IpNet::from_str(c).map_err(|_| EgressError::BadCidr(c.clone()))?;
         }
         if let Some(idx) = self.policies.iter().position(|p| p.name == policy.name) {
@@ -180,7 +188,8 @@ impl EgressManager {
                 continue;
             }
             // Pick a healthy gateway via flow_hash for stickiness.
-            let healthy: Vec<&GatewayNode> = p.gateway_nodes.iter().filter(|g| g.eligible()).collect();
+            let healthy: Vec<&GatewayNode> =
+                p.gateway_nodes.iter().filter(|g| g.eligible()).collect();
             if healthy.is_empty() {
                 return Ok(None);
             }
@@ -228,16 +237,29 @@ mod tests {
 
     fn endpoint_sel(pairs: &[(&str, &str)]) -> EndpointSelector {
         EndpointSelector {
-            match_labels: pairs.iter().map(|(k, v)| ((*k).into(), (*v).into())).collect(),
+            match_labels: pairs
+                .iter()
+                .map(|(k, v)| ((*k).into(), (*v).into()))
+                .collect(),
             match_expressions: Vec::new(),
         }
     }
 
-    fn make_policy(name: &str, tenant: TenantId, sel: EndpointSelector, dest: &str, egress: IpAddr, gw: IpAddr) -> EgressGatewayPolicy {
+    fn make_policy(
+        name: &str,
+        tenant: TenantId,
+        sel: EndpointSelector,
+        dest: &str,
+        egress: IpAddr,
+        gw: IpAddr,
+    ) -> EgressGatewayPolicy {
         EgressGatewayPolicy {
-            name: name.into(), tenant, source_selector: sel,
+            name: name.into(),
+            tenant,
+            source_selector: sel,
             source_namespace_selector: None,
-            destination_cidrs: vec![dest.into()], excluded_cidrs: vec![],
+            destination_cidrs: vec![dest.into()],
+            excluded_cidrs: vec![],
             egress_ip: egress,
             gateway_nodes: vec![GatewayNode::new("gw1", gw)],
         }
@@ -247,9 +269,20 @@ mod tests {
 
     #[test]
     fn egw_upsert_with_no_destination_cidrs_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.Upsert.Validate", "tenant-egw-no-dest");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.Upsert.Validate",
+            "tenant-egw-no-dest"
+        );
         let mut mgr = EgressManager::new();
-        let mut p = make_policy("p", tenant, EndpointSelector::empty(), "0.0.0.0/0", ip(192, 0, 2, 1), ip(10, 0, 0, 1));
+        let mut p = make_policy(
+            "p",
+            tenant,
+            EndpointSelector::empty(),
+            "0.0.0.0/0",
+            ip(192, 0, 2, 1),
+            ip(10, 0, 0, 1),
+        );
         p.destination_cidrs.clear();
         let err = mgr.upsert(p).unwrap_err();
         assert_eq!(err, EgressError::NoDestinationCidrs("p".into()));
@@ -257,9 +290,20 @@ mod tests {
 
     #[test]
     fn egw_upsert_with_no_gateway_nodes_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.Upsert.Validate", "tenant-egw-no-gw");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.Upsert.Validate",
+            "tenant-egw-no-gw"
+        );
         let mut mgr = EgressManager::new();
-        let mut p = make_policy("p", tenant, EndpointSelector::empty(), "0.0.0.0/0", ip(192, 0, 2, 1), ip(10, 0, 0, 1));
+        let mut p = make_policy(
+            "p",
+            tenant,
+            EndpointSelector::empty(),
+            "0.0.0.0/0",
+            ip(192, 0, 2, 1),
+            ip(10, 0, 0, 1),
+        );
         p.gateway_nodes.clear();
         let err = mgr.upsert(p).unwrap_err();
         assert_eq!(err, EgressError::NoGatewayNodes("p".into()));
@@ -267,9 +311,20 @@ mod tests {
 
     #[test]
     fn egw_upsert_with_bad_cidr_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.Upsert.Validate", "tenant-egw-bad-cidr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.Upsert.Validate",
+            "tenant-egw-bad-cidr"
+        );
         let mut mgr = EgressManager::new();
-        let mut p = make_policy("p", tenant, EndpointSelector::empty(), "not-a-cidr", ip(192, 0, 2, 1), ip(10, 0, 0, 1));
+        let mut p = make_policy(
+            "p",
+            tenant,
+            EndpointSelector::empty(),
+            "not-a-cidr",
+            ip(192, 0, 2, 1),
+            ip(10, 0, 0, 1),
+        );
         p.destination_cidrs = vec!["nope".into()];
         let err = mgr.upsert(p).unwrap_err();
         assert!(matches!(err, EgressError::BadCidr(_)));
@@ -279,98 +334,177 @@ mod tests {
 
     #[test]
     fn egw_policy_matches_source_pod_by_labels() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.Lookup", "tenant-egw-match");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.Lookup",
+            "tenant-egw-match"
+        );
         let mut mgr = EgressManager::new();
         mgr.upsert(make_policy(
-            "tenant-A", tenant, endpoint_sel(&[("app", "billing")]),
-            "1.0.0.0/8", ip(192, 0, 2, 100), ip(10, 0, 0, 1),
-        )).unwrap();
-        let dec = mgr.evaluate(&ls(&[("app", "billing")]), &ls(&[]), ip(1, 1, 1, 1), 0).unwrap().unwrap();
+            "tenant-A",
+            tenant,
+            endpoint_sel(&[("app", "billing")]),
+            "1.0.0.0/8",
+            ip(192, 0, 2, 100),
+            ip(10, 0, 0, 1),
+        ))
+        .unwrap();
+        let dec = mgr
+            .evaluate(&ls(&[("app", "billing")]), &ls(&[]), ip(1, 1, 1, 1), 0)
+            .unwrap()
+            .unwrap();
         assert_eq!(dec.policy_name, "tenant-A");
         assert_eq!(dec.egress_ip, ip(192, 0, 2, 100));
     }
 
     #[test]
     fn egw_policy_does_not_match_unrelated_pod() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.Lookup.NoMatch", "tenant-egw-nomatch");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.Lookup.NoMatch",
+            "tenant-egw-nomatch"
+        );
         let mut mgr = EgressManager::new();
         mgr.upsert(make_policy(
-            "tenant-A", tenant, endpoint_sel(&[("app", "billing")]),
-            "1.0.0.0/8", ip(192, 0, 2, 100), ip(10, 0, 0, 1),
-        )).unwrap();
-        let dec = mgr.evaluate(&ls(&[("app", "metrics")]), &ls(&[]), ip(1, 1, 1, 1), 0).unwrap();
+            "tenant-A",
+            tenant,
+            endpoint_sel(&[("app", "billing")]),
+            "1.0.0.0/8",
+            ip(192, 0, 2, 100),
+            ip(10, 0, 0, 1),
+        ))
+        .unwrap();
+        let dec = mgr
+            .evaluate(&ls(&[("app", "metrics")]), &ls(&[]), ip(1, 1, 1, 1), 0)
+            .unwrap();
         assert!(dec.is_none());
     }
 
     #[test]
     fn egw_excluded_cidr_overrides_destination_cidr() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.Lookup.Excluded", "tenant-egw-excl");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.Lookup.Excluded",
+            "tenant-egw-excl"
+        );
         let mut mgr = EgressManager::new();
         let mut p = make_policy(
-            "egw", tenant, endpoint_sel(&[("app", "x")]),
-            "1.0.0.0/8", ip(192, 0, 2, 1), ip(10, 0, 0, 1),
+            "egw",
+            tenant,
+            endpoint_sel(&[("app", "x")]),
+            "1.0.0.0/8",
+            ip(192, 0, 2, 1),
+            ip(10, 0, 0, 1),
         );
         p.excluded_cidrs = vec!["1.10.0.0/16".into()];
         mgr.upsert(p).unwrap();
         // Inside destination but inside excluded → no SNAT.
-        let dec = mgr.evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 10, 0, 5), 0).unwrap();
+        let dec = mgr
+            .evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 10, 0, 5), 0)
+            .unwrap();
         assert!(dec.is_none());
         // Inside destination but outside excluded → match.
-        let dec = mgr.evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 11, 0, 5), 0).unwrap().unwrap();
+        let dec = mgr
+            .evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 11, 0, 5), 0)
+            .unwrap()
+            .unwrap();
         assert_eq!(dec.policy_name, "egw");
     }
 
     #[test]
     fn egw_destination_cidr_outside_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.Lookup.NoCidr", "tenant-egw-nocidr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.Lookup.NoCidr",
+            "tenant-egw-nocidr"
+        );
         let mut mgr = EgressManager::new();
         mgr.upsert(make_policy(
-            "egw", tenant, endpoint_sel(&[("app", "x")]),
-            "10.0.0.0/8", ip(192, 0, 2, 1), ip(10, 0, 0, 1),
-        )).unwrap();
-        let dec = mgr.evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(8, 8, 8, 8), 0).unwrap();
+            "egw",
+            tenant,
+            endpoint_sel(&[("app", "x")]),
+            "10.0.0.0/8",
+            ip(192, 0, 2, 1),
+            ip(10, 0, 0, 1),
+        ))
+        .unwrap();
+        let dec = mgr
+            .evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(8, 8, 8, 8), 0)
+            .unwrap();
         assert!(dec.is_none());
     }
 
     #[test]
     fn egw_first_matching_policy_wins() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.Lookup.Order", "tenant-egw-order");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.Lookup.Order",
+            "tenant-egw-order"
+        );
         let mut mgr = EgressManager::new();
         mgr.upsert(make_policy(
-            "first", tenant.clone(), endpoint_sel(&[("app", "x")]),
-            "1.0.0.0/8", ip(192, 0, 2, 1), ip(10, 0, 0, 1),
-        )).unwrap();
+            "first",
+            tenant.clone(),
+            endpoint_sel(&[("app", "x")]),
+            "1.0.0.0/8",
+            ip(192, 0, 2, 1),
+            ip(10, 0, 0, 1),
+        ))
+        .unwrap();
         mgr.upsert(make_policy(
-            "second", tenant, endpoint_sel(&[("app", "x")]),
-            "1.0.0.0/8", ip(192, 0, 2, 2), ip(10, 0, 0, 2),
-        )).unwrap();
-        let dec = mgr.evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 1, 1, 1), 0).unwrap().unwrap();
+            "second",
+            tenant,
+            endpoint_sel(&[("app", "x")]),
+            "1.0.0.0/8",
+            ip(192, 0, 2, 2),
+            ip(10, 0, 0, 2),
+        ))
+        .unwrap();
+        let dec = mgr
+            .evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 1, 1, 1), 0)
+            .unwrap()
+            .unwrap();
         assert_eq!(dec.policy_name, "first");
     }
 
     #[test]
     fn egw_namespace_selector_filters_pods() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.Lookup.Namespace", "tenant-egw-ns");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.Lookup.Namespace",
+            "tenant-egw-ns"
+        );
         let mut mgr = EgressManager::new();
         let mut p = make_policy(
-            "egw", tenant, endpoint_sel(&[("app", "x")]),
-            "1.0.0.0/8", ip(192, 0, 2, 1), ip(10, 0, 0, 1),
+            "egw",
+            tenant,
+            endpoint_sel(&[("app", "x")]),
+            "1.0.0.0/8",
+            ip(192, 0, 2, 1),
+            ip(10, 0, 0, 1),
         );
-        p.source_namespace_selector = Some(endpoint_sel(&[("kubernetes.io/metadata.name", "prod")]));
+        p.source_namespace_selector =
+            Some(endpoint_sel(&[("kubernetes.io/metadata.name", "prod")]));
         mgr.upsert(p).unwrap();
         // Pod in `prod` namespace → match.
-        let dec = mgr.evaluate(
-            &ls(&[("app", "x")]),
-            &ls(&[("kubernetes.io/metadata.name", "prod")]),
-            ip(1, 1, 1, 1), 0,
-        ).unwrap();
+        let dec = mgr
+            .evaluate(
+                &ls(&[("app", "x")]),
+                &ls(&[("kubernetes.io/metadata.name", "prod")]),
+                ip(1, 1, 1, 1),
+                0,
+            )
+            .unwrap();
         assert!(dec.is_some());
         // Pod in `dev` namespace → no match.
-        let dec = mgr.evaluate(
-            &ls(&[("app", "x")]),
-            &ls(&[("kubernetes.io/metadata.name", "dev")]),
-            ip(1, 1, 1, 1), 0,
-        ).unwrap();
+        let dec = mgr
+            .evaluate(
+                &ls(&[("app", "x")]),
+                &ls(&[("kubernetes.io/metadata.name", "dev")]),
+                ip(1, 1, 1, 1),
+                0,
+            )
+            .unwrap();
         assert!(dec.is_none());
     }
 
@@ -378,11 +512,19 @@ mod tests {
 
     #[test]
     fn egw_ha_uses_hash_to_pick_gateway() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.SelectGateway", "tenant-egw-ha");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.SelectGateway",
+            "tenant-egw-ha"
+        );
         let mut mgr = EgressManager::new();
         let mut p = make_policy(
-            "egw", tenant, endpoint_sel(&[("app", "x")]),
-            "1.0.0.0/8", ip(192, 0, 2, 1), ip(10, 0, 0, 1),
+            "egw",
+            tenant,
+            endpoint_sel(&[("app", "x")]),
+            "1.0.0.0/8",
+            ip(192, 0, 2, 1),
+            ip(10, 0, 0, 1),
         );
         p.gateway_nodes = vec![
             GatewayNode::new("gw1", ip(10, 0, 0, 1)),
@@ -392,7 +534,10 @@ mod tests {
         mgr.upsert(p).unwrap();
         let mut hits = std::collections::HashSet::new();
         for h in 0..30u64 {
-            let dec = mgr.evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 1, 1, 1), h).unwrap().unwrap();
+            let dec = mgr
+                .evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 1, 1, 1), h)
+                .unwrap()
+                .unwrap();
             hits.insert(dec.gateway_node);
         }
         assert!(hits.len() >= 2);
@@ -400,55 +545,103 @@ mod tests {
 
     #[test]
     fn egw_ha_failover_skips_unhealthy_gateway() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.SelectGateway.Failover", "tenant-egw-fover");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.SelectGateway.Failover",
+            "tenant-egw-fover"
+        );
         let mut mgr = EgressManager::new();
         let mut p = make_policy(
-            "egw", tenant, endpoint_sel(&[("app", "x")]),
-            "1.0.0.0/8", ip(192, 0, 2, 1), ip(10, 0, 0, 1),
+            "egw",
+            tenant,
+            endpoint_sel(&[("app", "x")]),
+            "1.0.0.0/8",
+            ip(192, 0, 2, 1),
+            ip(10, 0, 0, 1),
         );
         p.gateway_nodes = vec![
-            GatewayNode { name: "gw1".into(), node_ip: ip(10, 0, 0, 1), state: GatewayState::Unhealthy },
+            GatewayNode {
+                name: "gw1".into(),
+                node_ip: ip(10, 0, 0, 1),
+                state: GatewayState::Unhealthy,
+            },
             GatewayNode::new("gw2", ip(10, 0, 0, 2)),
         ];
         mgr.upsert(p).unwrap();
         for h in 0..10u64 {
-            let dec = mgr.evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 1, 1, 1), h).unwrap().unwrap();
+            let dec = mgr
+                .evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 1, 1, 1), h)
+                .unwrap()
+                .unwrap();
             assert_eq!(dec.gateway_node, "gw2");
         }
     }
 
     #[test]
     fn egw_ha_all_unhealthy_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.SelectGateway.NoHealthy", "tenant-egw-nh");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.SelectGateway.NoHealthy",
+            "tenant-egw-nh"
+        );
         let mut mgr = EgressManager::new();
         let mut p = make_policy(
-            "egw", tenant, endpoint_sel(&[("app", "x")]),
-            "1.0.0.0/8", ip(192, 0, 2, 1), ip(10, 0, 0, 1),
+            "egw",
+            tenant,
+            endpoint_sel(&[("app", "x")]),
+            "1.0.0.0/8",
+            ip(192, 0, 2, 1),
+            ip(10, 0, 0, 1),
         );
         p.gateway_nodes = vec![
-            GatewayNode { name: "gw1".into(), node_ip: ip(10, 0, 0, 1), state: GatewayState::Unhealthy },
-            GatewayNode { name: "gw2".into(), node_ip: ip(10, 0, 0, 2), state: GatewayState::Draining },
+            GatewayNode {
+                name: "gw1".into(),
+                node_ip: ip(10, 0, 0, 1),
+                state: GatewayState::Unhealthy,
+            },
+            GatewayNode {
+                name: "gw2".into(),
+                node_ip: ip(10, 0, 0, 2),
+                state: GatewayState::Draining,
+            },
         ];
         mgr.upsert(p).unwrap();
-        let dec = mgr.evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 1, 1, 1), 0).unwrap();
+        let dec = mgr
+            .evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 1, 1, 1), 0)
+            .unwrap();
         assert!(dec.is_none());
     }
 
     #[test]
     fn egw_ha_draining_excluded_from_pool() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.SelectGateway.Draining", "tenant-egw-drain");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.SelectGateway.Draining",
+            "tenant-egw-drain"
+        );
         let mut mgr = EgressManager::new();
         let mut p = make_policy(
-            "egw", tenant, endpoint_sel(&[("app", "x")]),
-            "1.0.0.0/8", ip(192, 0, 2, 1), ip(10, 0, 0, 1),
+            "egw",
+            tenant,
+            endpoint_sel(&[("app", "x")]),
+            "1.0.0.0/8",
+            ip(192, 0, 2, 1),
+            ip(10, 0, 0, 1),
         );
         p.gateway_nodes = vec![
-            GatewayNode { name: "gw1".into(), node_ip: ip(10, 0, 0, 1), state: GatewayState::Draining },
+            GatewayNode {
+                name: "gw1".into(),
+                node_ip: ip(10, 0, 0, 1),
+                state: GatewayState::Draining,
+            },
             GatewayNode::new("gw2", ip(10, 0, 0, 2)),
         ];
         mgr.upsert(p).unwrap();
         for h in 0..10u64 {
-            let dec = mgr.evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 1, 1, 1), h).unwrap().unwrap();
+            let dec = mgr
+                .evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 1, 1, 1), h)
+                .unwrap()
+                .unwrap();
             assert_eq!(dec.gateway_node, "gw2");
         }
     }
@@ -457,39 +650,71 @@ mod tests {
 
     #[test]
     fn egw_remove_policy_drops_route() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.Remove", "tenant-egw-rm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.Remove",
+            "tenant-egw-rm"
+        );
         let mut mgr = EgressManager::new();
         mgr.upsert(make_policy(
-            "p", tenant, endpoint_sel(&[("app", "x")]),
-            "1.0.0.0/8", ip(192, 0, 2, 1), ip(10, 0, 0, 1),
-        )).unwrap();
+            "p",
+            tenant,
+            endpoint_sel(&[("app", "x")]),
+            "1.0.0.0/8",
+            ip(192, 0, 2, 1),
+            ip(10, 0, 0, 1),
+        ))
+        .unwrap();
         assert!(mgr.remove("p"));
         assert!(mgr.is_empty());
-        let dec = mgr.evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 1, 1, 1), 0).unwrap();
+        let dec = mgr
+            .evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 1, 1, 1), 0)
+            .unwrap();
         assert!(dec.is_none());
     }
 
     #[test]
     fn egw_remove_unknown_returns_false() {
-        let (_c, _t) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.Remove.NotFound", "tenant-egw-rm-nf");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.Remove.NotFound",
+            "tenant-egw-rm-nf"
+        );
         let mut mgr = EgressManager::new();
         assert!(!mgr.remove("nope"));
     }
 
     #[test]
     fn egw_upsert_replaces_existing_policy_in_place() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.Upsert.Replace", "tenant-egw-upd");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.Upsert.Replace",
+            "tenant-egw-upd"
+        );
         let mut mgr = EgressManager::new();
         mgr.upsert(make_policy(
-            "p", tenant.clone(), endpoint_sel(&[("app", "x")]),
-            "1.0.0.0/8", ip(192, 0, 2, 1), ip(10, 0, 0, 1),
-        )).unwrap();
+            "p",
+            tenant.clone(),
+            endpoint_sel(&[("app", "x")]),
+            "1.0.0.0/8",
+            ip(192, 0, 2, 1),
+            ip(10, 0, 0, 1),
+        ))
+        .unwrap();
         mgr.upsert(make_policy(
-            "p", tenant, endpoint_sel(&[("app", "x")]),
-            "1.0.0.0/8", ip(192, 0, 2, 99), ip(10, 0, 0, 1),
-        )).unwrap();
+            "p",
+            tenant,
+            endpoint_sel(&[("app", "x")]),
+            "1.0.0.0/8",
+            ip(192, 0, 2, 99),
+            ip(10, 0, 0, 1),
+        ))
+        .unwrap();
         assert_eq!(mgr.len(), 1);
-        let dec = mgr.evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 1, 1, 1), 0).unwrap().unwrap();
+        let dec = mgr
+            .evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 1, 1, 1), 0)
+            .unwrap()
+            .unwrap();
         assert_eq!(dec.egress_ip, ip(192, 0, 2, 99));
     }
 
@@ -497,33 +722,54 @@ mod tests {
 
     #[test]
     fn egw_source_selector_uses_match_expressions() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.SourceSelector.Expr", "tenant-egw-expr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.SourceSelector.Expr",
+            "tenant-egw-expr"
+        );
         let mut mgr = EgressManager::new();
         let sel = EndpointSelector {
             match_labels: HashMap::new(),
             match_expressions: vec![MatchExpression {
-                key: "tier".into(), op: SelectorOp::In, values: vec!["frontend".into(), "edge".into()],
+                key: "tier".into(),
+                op: SelectorOp::In,
+                values: vec!["frontend".into(), "edge".into()],
             }],
         };
         mgr.upsert(EgressGatewayPolicy {
-            name: "p".into(), tenant, source_selector: sel,
+            name: "p".into(),
+            tenant,
+            source_selector: sel,
             source_namespace_selector: None,
-            destination_cidrs: vec!["1.0.0.0/8".into()], excluded_cidrs: vec![],
+            destination_cidrs: vec!["1.0.0.0/8".into()],
+            excluded_cidrs: vec![],
             egress_ip: ip(192, 0, 2, 1),
             gateway_nodes: vec![GatewayNode::new("gw", ip(10, 0, 0, 1))],
-        }).unwrap();
-        assert!(mgr.evaluate(&ls(&[("tier", "frontend")]), &ls(&[]), ip(1, 1, 1, 1), 0).unwrap().is_some());
-        assert!(mgr.evaluate(&ls(&[("tier", "backend")]), &ls(&[]), ip(1, 1, 1, 1), 0).unwrap().is_none());
+        })
+        .unwrap();
+        assert!(mgr
+            .evaluate(&ls(&[("tier", "frontend")]), &ls(&[]), ip(1, 1, 1, 1), 0)
+            .unwrap()
+            .is_some());
+        assert!(mgr
+            .evaluate(&ls(&[("tier", "backend")]), &ls(&[]), ip(1, 1, 1, 1), 0)
+            .unwrap()
+            .is_none());
     }
 
     // ── IPv6 ─────────────────────────────────────────────────────────────────
 
     #[test]
     fn egw_destination_cidr_v6_match() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.Lookup.V6", "tenant-egw-v6");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.Lookup.V6",
+            "tenant-egw-v6"
+        );
         let mut mgr = EgressManager::new();
         let p = EgressGatewayPolicy {
-            name: "v6".into(), tenant,
+            name: "v6".into(),
+            tenant,
             source_selector: endpoint_sel(&[("app", "x")]),
             source_namespace_selector: None,
             destination_cidrs: vec!["2001:db8::/32".into()],
@@ -533,7 +779,10 @@ mod tests {
         };
         mgr.upsert(p).unwrap();
         let dst: IpAddr = "2001:db8:abcd::1".parse().unwrap();
-        let dec = mgr.evaluate(&ls(&[("app", "x")]), &ls(&[]), dst, 0).unwrap().unwrap();
+        let dec = mgr
+            .evaluate(&ls(&[("app", "x")]), &ls(&[]), dst, 0)
+            .unwrap()
+            .unwrap();
         assert_eq!(dec.policy_name, "v6");
     }
 
@@ -541,29 +790,50 @@ mod tests {
 
     #[test]
     fn egw_multiple_destination_cidrs_first_inside_match_wins() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.Lookup.MultiDest", "tenant-egw-multi");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.Lookup.MultiDest",
+            "tenant-egw-multi"
+        );
         let mut mgr = EgressManager::new();
         let mut p = make_policy(
-            "p", tenant, endpoint_sel(&[("app", "x")]),
-            "1.0.0.0/8", ip(192, 0, 2, 1), ip(10, 0, 0, 1),
+            "p",
+            tenant,
+            endpoint_sel(&[("app", "x")]),
+            "1.0.0.0/8",
+            ip(192, 0, 2, 1),
+            ip(10, 0, 0, 1),
         );
         p.destination_cidrs = vec!["1.0.0.0/8".into(), "2.0.0.0/8".into(), "3.0.0.0/8".into()];
         mgr.upsert(p).unwrap();
         for octet in [1u8, 2, 3] {
-            let dec = mgr.evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(octet, 0, 0, 1), 0).unwrap();
+            let dec = mgr
+                .evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(octet, 0, 0, 1), 0)
+                .unwrap();
             assert!(dec.is_some(), "octet {octet}");
         }
-        assert!(mgr.evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(4, 0, 0, 1), 0).unwrap().is_none());
+        assert!(mgr
+            .evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(4, 0, 0, 1), 0)
+            .unwrap()
+            .is_none());
     }
 
     // ── Serde round-trip ─────────────────────────────────────────────────────
 
     #[test]
     fn egw_policy_round_trips_through_serde() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2/ciliumegressgatewaypolicy_types.go", "CiliumEgressGatewayPolicy", "tenant-egw-serde");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2/ciliumegressgatewaypolicy_types.go",
+            "CiliumEgressGatewayPolicy",
+            "tenant-egw-serde"
+        );
         let p = make_policy(
-            "p", tenant, endpoint_sel(&[("app", "x")]),
-            "1.0.0.0/8", ip(192, 0, 2, 1), ip(10, 0, 0, 1),
+            "p",
+            tenant,
+            endpoint_sel(&[("app", "x")]),
+            "1.0.0.0/8",
+            ip(192, 0, 2, 1),
+            ip(10, 0, 0, 1),
         );
         let json = serde_json::to_string(&p).unwrap();
         let back: EgressGatewayPolicy = serde_json::from_str(&json).unwrap();
@@ -572,20 +842,34 @@ mod tests {
 
     #[test]
     fn egw_evaluate_empty_manager_returns_none() {
-        let (_c, _t) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.Lookup.Empty", "tenant-egw-empty");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.Lookup.Empty",
+            "tenant-egw-empty"
+        );
         let mgr = EgressManager::new();
-        let dec = mgr.evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 1, 1, 1), 0).unwrap();
+        let dec = mgr
+            .evaluate(&ls(&[("app", "x")]), &ls(&[]), ip(1, 1, 1, 1), 0)
+            .unwrap();
         assert!(dec.is_none());
     }
 
     #[test]
     fn egw_len_tracks_upserts() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/egressgateway/manager.go", "Manager.Len", "tenant-egw-len");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/egressgateway/manager.go",
+            "Manager.Len",
+            "tenant-egw-len"
+        );
         let mut mgr = EgressManager::new();
         for i in 0..5 {
             let p = make_policy(
-                &format!("p-{i}"), tenant.clone(), endpoint_sel(&[("app", "x")]),
-                "1.0.0.0/8", ip(192, 0, 2, 1 + i), ip(10, 0, 0, 1),
+                &format!("p-{i}"),
+                tenant.clone(),
+                endpoint_sel(&[("app", "x")]),
+                "1.0.0.0/8",
+                ip(192, 0, 2, 1 + i),
+                ip(10, 0, 0, 1),
             );
             mgr.upsert(p).unwrap();
         }

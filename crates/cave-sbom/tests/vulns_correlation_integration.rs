@@ -13,7 +13,7 @@ use uuid::Uuid;
 /// Trait shape mirroring the cave-vulns finding-correlator contract.
 trait FindingCorrelator {
     fn correlate(&self, components: &[ComponentRecord], vulns: &[VulnIntel])
-        -> Vec<(Uuid, String)>;
+    -> Vec<(Uuid, String)>;
 }
 
 /// Mock implementation: matches a component to a vuln when the component's

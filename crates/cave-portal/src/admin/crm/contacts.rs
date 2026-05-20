@@ -6,18 +6,22 @@
 //!
 //! Upstream: <https://twenty.com/docs>
 
+use super::CrmViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, CrmAccount};
-use super::CrmViewError;
+use crate::admin::state::{AdminState, CrmAccount, scope};
 
-pub fn list_contacts(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<CrmAccount>, CrmViewError> {
+pub fn list_contacts(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<CrmAccount>, CrmViewError> {
     ctx.authorise(Permission::CrmRead)?;
-    let mut rows: Vec<CrmAccount> =
-        scope(&state.crm_accounts.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-            .into_iter()
-            .cloned()
-            .collect();
+    let mut rows: Vec<CrmAccount> = scope(&state.crm_accounts.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
+    .into_iter()
+    .cloned()
+    .collect();
     rows.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(rows)
 }
@@ -65,7 +69,12 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, CrmViewErr
         n = rows.len(),
         tbl = table(&["id", "name", "plan", "mrr"], &table_rows),
     );
-    Ok(page_shell_full(ctx, "/admin/crm/contacts", &format!("crm/contacts · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/crm/contacts",
+        &format!("crm/contacts · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
 }
 
 #[cfg(test)]

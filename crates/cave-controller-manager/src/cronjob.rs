@@ -110,11 +110,11 @@ pub enum ScheduleError {
 
 #[derive(Debug, Clone)]
 struct CronSchedule {
-    minute: Vec<u32>,  // sorted, 0..=59
-    hour: Vec<u32>,    // sorted, 0..=23
-    dom: Vec<u32>,     // sorted, 1..=31
-    month: Vec<u32>,   // sorted, 1..=12
-    dow: Vec<u32>,     // sorted, 0..=6 (Sun=0)
+    minute: Vec<u32>, // sorted, 0..=59
+    hour: Vec<u32>,   // sorted, 0..=23
+    dom: Vec<u32>,    // sorted, 1..=31
+    month: Vec<u32>,  // sorted, 1..=12
+    dow: Vec<u32>,    // sorted, 0..=6 (Sun=0)
     dom_was_star: bool,
     dow_was_star: bool,
 }
@@ -347,12 +347,18 @@ pub fn next_fire_time(
     }
     Err(ControllerError::InvalidSpec {
         kind: "CronJob",
-        reason: format!("schedule {:?} never fires within look-ahead window", spec.schedule),
+        reason: format!(
+            "schedule {:?} never fires within look-ahead window",
+            spec.schedule
+        ),
     })
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::new("pkg/controller/cronjob/cronjob_controllerv2.go", "ControllerV2");
+const FILE_CITE: Cite = Cite::new(
+    "pkg/controller/cronjob/cronjob_controllerv2.go",
+    "ControllerV2",
+);
 
 #[cfg(test)]
 mod tests {
@@ -390,7 +396,10 @@ mod tests {
             "tenant-cron-forbid"
         );
         let s = cj("0 * * * *", ConcurrencyPolicy::Forbid, false);
-        let st = CronJobStatus { active_jobs: 1, ..Default::default() };
+        let st = CronJobStatus {
+            active_jobs: 1,
+            ..Default::default()
+        };
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::NoOp);
     }
 
@@ -402,7 +411,10 @@ mod tests {
             "tenant-cron-replace"
         );
         let s = cj("0 * * * *", ConcurrencyPolicy::Replace, false);
-        let st = CronJobStatus { active_jobs: 2, ..Default::default() };
+        let st = CronJobStatus {
+            active_jobs: 2,
+            ..Default::default()
+        };
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::Delete(2));
     }
 

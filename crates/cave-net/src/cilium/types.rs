@@ -32,16 +32,28 @@ pub struct Cite {
 
 impl Cite {
     pub const fn cilium(path: &'static str, symbol: &'static str) -> Self {
-        Self { repo: UPSTREAM_REPO, path, symbol, version: UPSTREAM_VERSION }
+        Self {
+            repo: UPSTREAM_REPO,
+            path,
+            symbol,
+            version: UPSTREAM_VERSION,
+        }
     }
     pub fn url(&self) -> String {
-        format!("https://github.com/{}/blob/{}/{}", self.repo, self.version, self.path)
+        format!(
+            "https://github.com/{}/blob/{}/{}",
+            self.repo, self.version, self.path
+        )
     }
 }
 
 impl fmt::Display for Cite {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}::{}::{} @ {}", self.repo, self.path, self.symbol, self.version)
+        write!(
+            f,
+            "{}::{}::{} @ {}",
+            self.repo, self.path, self.symbol, self.version
+        )
     }
 }
 
@@ -79,11 +91,8 @@ mod tests {
 
     #[test]
     fn tenant_id_round_trips_through_serde() {
-        let (_cite, tenant) = cilium_test_ctx!(
-            "pkg/identity/identity.go",
-            "Identity",
-            "tenant-types-serde"
-        );
+        let (_cite, tenant) =
+            cilium_test_ctx!("pkg/identity/identity.go", "Identity", "tenant-types-serde");
         let json = serde_json::to_string(&tenant).unwrap();
         let back: TenantId = serde_json::from_str(&json).unwrap();
         assert_eq!(tenant, back);
@@ -91,11 +100,8 @@ mod tests {
 
     #[test]
     fn cite_display_includes_repo_path_symbol_and_version() {
-        let (cite, _t) = cilium_test_ctx!(
-            "pkg/policy/api/l7.go",
-            "PortRule",
-            "tenant-types-display"
-        );
+        let (cite, _t) =
+            cilium_test_ctx!("pkg/policy/api/l7.go", "PortRule", "tenant-types-display");
         let s = format!("{}", cite);
         assert!(s.contains("cilium/cilium"));
         assert!(s.contains("pkg/policy/api/l7.go"));

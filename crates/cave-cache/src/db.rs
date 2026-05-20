@@ -3,11 +3,11 @@
 //! Core database structures and shared server state.
 
 use std::collections::{HashMap, VecDeque};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::sync::{RwLock, broadcast, mpsc};
 
 use crate::acl::AclState;
 use crate::cluster::ClusterState;
@@ -29,7 +29,7 @@ pub struct Db {
 #[derive(Debug)]
 pub struct BlockedPop {
     pub tx: mpsc::Sender<(Vec<u8>, Vec<u8>)>, // (key, value)
-    pub from_right: bool,                       // true = BRPOP
+    pub from_right: bool,                     // true = BRPOP
 }
 
 impl Db {
@@ -75,7 +75,9 @@ impl Db {
     pub fn get_typed_mut(&mut self, key: &[u8], expected: &str) -> CacheResult<Option<&mut Entry>> {
         // Check expiry and type first
         let expired = self.keys.get(key).map(|e| e.is_expired()).unwrap_or(false);
-        if expired { self.keys.remove(key); }
+        if expired {
+            self.keys.remove(key);
+        }
 
         match self.keys.get(key) {
             Some(e) if e.value.type_name() != expected => Err(CacheError::WrongType),
@@ -164,11 +166,24 @@ pub enum PubSubKind {
 }
 
 impl PubSubRegistry {
-    pub fn subscribe(&mut self, client_id: u64, channel: Vec<u8>, tx: mpsc::UnboundedSender<PubSubMessage>) {
-        self.channels.entry(channel).or_default().push((client_id, tx));
+    pub fn subscribe(
+        &mut self,
+        client_id: u64,
+        channel: Vec<u8>,
+        tx: mpsc::UnboundedSender<PubSubMessage>,
+    ) {
+        self.channels
+            .entry(channel)
+            .or_default()
+            .push((client_id, tx));
     }
 
-    pub fn psubscribe(&mut self, client_id: u64, pattern: Vec<u8>, tx: mpsc::UnboundedSender<PubSubMessage>) {
+    pub fn psubscribe(
+        &mut self,
+        client_id: u64,
+        pattern: Vec<u8>,
+        tx: mpsc::UnboundedSender<PubSubMessage>,
+    ) {
         self.patterns.push((pattern, client_id, tx));
     }
 
@@ -182,7 +197,8 @@ impl PubSubRegistry {
     }
 
     pub fn punsubscribe(&mut self, client_id: u64, pattern: &[u8]) {
-        self.patterns.retain(|(p, id, _)| !(*id == client_id && p.as_slice() == pattern));
+        self.patterns
+            .retain(|(p, id, _)| !(*id == client_id && p.as_slice() == pattern));
     }
 
     pub fn unsubscribe_all(&mut self, client_id: u64) {
@@ -194,11 +210,17 @@ impl PubSubRegistry {
     }
 
     pub fn channel_count(&self, client_id: u64) -> usize {
-        self.channels.values().filter(|subs| subs.iter().any(|(id, _)| *id == client_id)).count()
+        self.channels
+            .values()
+            .filter(|subs| subs.iter().any(|(id, _)| *id == client_id))
+            .count()
     }
 
     pub fn pattern_count(&self, client_id: u64) -> usize {
-        self.patterns.iter().filter(|(_, id, _)| *id == client_id).count()
+        self.patterns
+            .iter()
+            .filter(|(_, id, _)| *id == client_id)
+            .count()
     }
 
     /// Publish to channel. Returns number of receivers.
@@ -250,7 +272,11 @@ impl PubSubRegistry {
         channels
             .iter()
             .map(|ch| {
-                let count = self.channels.get(ch.as_slice()).map(|s| s.len()).unwrap_or(0);
+                let count = self
+                    .channels
+                    .get(ch.as_slice())
+                    .map(|s| s.len())
+                    .unwrap_or(0);
                 (ch.clone(), count)
             })
             .collect()

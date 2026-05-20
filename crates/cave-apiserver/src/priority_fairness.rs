@@ -90,10 +90,16 @@ pub struct RequestDigest {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DispatchOutcome {
     /// Routed to `level_name` and admitted immediately.
-    Admitted { level_name: String, flow_key: String },
+    Admitted {
+        level_name: String,
+        flow_key: String,
+    },
     /// Routed to `level_name` but the queue is full — caller must reject
     /// with HTTP 429. Mirrors `apf.Dispatcher.QueueLengthLimitExceeded`.
-    Rejected { level_name: String, reason: &'static str },
+    Rejected {
+        level_name: String,
+        reason: &'static str,
+    },
     /// No FlowSchema matched — caller must reject (system fallback).
     NoMatch,
 }
@@ -113,18 +119,24 @@ struct ApfInner {
 
 impl ApfRegistry {
     pub fn new() -> Self {
-        Self { inner: Mutex::new(ApfInner::default()) }
+        Self {
+            inner: Mutex::new(ApfInner::default()),
+        }
     }
 
     pub fn upsert_level(&self, level: PriorityLevelConfiguration) {
         let mut inner = self.inner.lock().unwrap();
-        inner.levels.insert((level.tenant_id.clone(), level.name.clone()), level);
+        inner
+            .levels
+            .insert((level.tenant_id.clone(), level.name.clone()), level);
     }
 
     pub fn upsert_schema(&self, schema: FlowSchema) {
         let mut inner = self.inner.lock().unwrap();
         // Replace by (tenant, name) if present.
-        inner.schemas.retain(|s| !(s.tenant_id == schema.tenant_id && s.name == schema.name));
+        inner
+            .schemas
+            .retain(|s| !(s.tenant_id == schema.tenant_id && s.name == schema.name));
         inner.schemas.push(schema);
         inner.schemas.sort_by_key(|s| s.matching_precedence);
     }
@@ -136,10 +148,16 @@ impl ApfRegistry {
         let mut inner = self.inner.lock().unwrap();
         let schemas = inner.schemas.clone();
         for schema in &schemas {
-            if schema.tenant_id != digest.tenant_id { continue; }
-            if !schema_matches(schema, digest) { continue; }
+            if schema.tenant_id != digest.tenant_id {
+                continue;
+            }
+            if !schema_matches(schema, digest) {
+                continue;
+            }
             let key = (schema.tenant_id.clone(), schema.priority_level_name.clone());
-            let Some(level) = inner.levels.get(&key).cloned() else { continue; };
+            let Some(level) = inner.levels.get(&key).cloned() else {
+                continue;
+            };
             // Exempt → admit unconditionally.
             if level.kind == PriorityLevelType::Exempt {
                 let flow_key = compute_flow_key(schema.distinguisher, digest);
@@ -182,30 +200,36 @@ impl ApfRegistry {
 
     pub fn in_flight_for(&self, tenant_id: &str, level_name: &str) -> usize {
         let key = (tenant_id.into(), level_name.into());
-        self.inner.lock().unwrap()
-            .in_flight.get(&key).map(|q| q.len()).unwrap_or(0)
+        self.inner
+            .lock()
+            .unwrap()
+            .in_flight
+            .get(&key)
+            .map(|q| q.len())
+            .unwrap_or(0)
     }
 }
 
 impl Default for ApfRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn schema_matches(schema: &FlowSchema, d: &RequestDigest) -> bool {
     schema.matches.iter().any(|m| {
-        let user_ok = m.users.is_empty()
-            || m.users.iter().any(|u| u == "*" || u == &d.user);
+        let user_ok = m.users.is_empty() || m.users.iter().any(|u| u == "*" || u == &d.user);
         let verb_ok = m.verbs.iter().any(|v| v == "*" || v == &d.verb);
-        let res_ok  = m.resources.iter().any(|r| r == "*" || r == &d.resource);
-        let ns_ok   = m.namespaces.is_empty()
-            || m.namespaces.iter().any(|n| n == "*" || n == &d.namespace);
+        let res_ok = m.resources.iter().any(|r| r == "*" || r == &d.resource);
+        let ns_ok =
+            m.namespaces.is_empty() || m.namespaces.iter().any(|n| n == "*" || n == &d.namespace);
         user_ok && verb_ok && res_ok && ns_ok
     })
 }
 
 fn compute_flow_key(d: FlowDistinguisher, req: &RequestDigest) -> String {
     match d {
-        FlowDistinguisher::ByUser      => format!("u:{}", req.user),
+        FlowDistinguisher::ByUser => format!("u:{}", req.user),
         FlowDistinguisher::ByNamespace => format!("n:{}", req.namespace),
     }
 }
@@ -214,17 +238,32 @@ fn compute_flow_key(d: FlowDistinguisher, req: &RequestDigest) -> String {
 mod tests {
     use super::*;
 
-    fn level(tenant: &str, name: &str, kind: PriorityLevelType, conc: u32) -> PriorityLevelConfiguration {
+    fn level(
+        tenant: &str,
+        name: &str,
+        kind: PriorityLevelType,
+        conc: u32,
+    ) -> PriorityLevelConfiguration {
         PriorityLevelConfiguration {
-            tenant_id: tenant.into(), name: name.into(),
-            kind, nominal_concurrency_shares: 30,
+            tenant_id: tenant.into(),
+            name: name.into(),
+            kind,
+            nominal_concurrency_shares: 30,
             allowed_concurrency: conc,
         }
     }
 
-    fn schema(tenant: &str, name: &str, prio: u32, level: &str, m: MatchRule, dist: FlowDistinguisher) -> FlowSchema {
+    fn schema(
+        tenant: &str,
+        name: &str,
+        prio: u32,
+        level: &str,
+        m: MatchRule,
+        dist: FlowDistinguisher,
+    ) -> FlowSchema {
         FlowSchema {
-            tenant_id: tenant.into(), name: name.into(),
+            tenant_id: tenant.into(),
+            name: name.into(),
             matching_precedence: prio,
             priority_level_name: level.into(),
             matches: vec![m],
@@ -234,8 +273,11 @@ mod tests {
 
     fn digest(tenant: &str, user: &str, ns: &str, verb: &str, res: &str) -> RequestDigest {
         RequestDigest {
-            tenant_id: tenant.into(), user: user.into(), namespace: ns.into(),
-            verb: verb.into(), resource: res.into(),
+            tenant_id: tenant.into(),
+            user: user.into(),
+            namespace: ns.into(),
+            verb: verb.into(),
+            resource: res.into(),
         }
     }
 
@@ -246,16 +288,25 @@ mod tests {
     fn test_flow_schema_routes_request_to_named_priority_level() {
         let r = ApfRegistry::new();
         r.upsert_level(level("acme", "workload-low", PriorityLevelType::Limited, 4));
-        r.upsert_schema(schema("acme", "fs-pods", 100, "workload-low",
+        r.upsert_schema(schema(
+            "acme",
+            "fs-pods",
+            100,
+            "workload-low",
             MatchRule {
                 users: vec![],
                 verbs: vec!["list".into()],
                 resources: vec!["pods".into()],
                 namespaces: vec![],
-            }, FlowDistinguisher::ByUser));
+            },
+            FlowDistinguisher::ByUser,
+        ));
         let outcome = r.dispatch(&digest("acme", "alice", "default", "list", "pods"));
         match outcome {
-            DispatchOutcome::Admitted { level_name, flow_key } => {
+            DispatchOutcome::Admitted {
+                level_name,
+                flow_key,
+            } => {
                 assert_eq!(level_name, "workload-low");
                 assert_eq!(flow_key, "u:alice");
             }
@@ -270,16 +321,25 @@ mod tests {
     fn test_dispatch_does_not_match_other_tenants_schemas() {
         let r = ApfRegistry::new();
         r.upsert_level(level("acme", "workload-low", PriorityLevelType::Limited, 4));
-        r.upsert_schema(schema("acme", "fs-pods", 100, "workload-low",
+        r.upsert_schema(schema(
+            "acme",
+            "fs-pods",
+            100,
+            "workload-low",
             MatchRule {
                 users: vec![],
                 verbs: vec!["*".into()],
                 resources: vec!["*".into()],
                 namespaces: vec![],
-            }, FlowDistinguisher::ByUser));
+            },
+            FlowDistinguisher::ByUser,
+        ));
         let outcome = r.dispatch(&digest("globex", "alice", "default", "list", "pods"));
-        assert_eq!(outcome, DispatchOutcome::NoMatch,
-            "tenant_id invariant: globex MUST NOT match acme's FlowSchema");
+        assert_eq!(
+            outcome,
+            DispatchOutcome::NoMatch,
+            "tenant_id invariant: globex MUST NOT match acme's FlowSchema"
+        );
         // acme's own request still matches.
         let acme_out = r.dispatch(&digest("acme", "alice", "default", "list", "pods"));
         assert!(matches!(acme_out, DispatchOutcome::Admitted { .. }));
@@ -292,19 +352,34 @@ mod tests {
     fn test_exempt_priority_level_admits_unconditionally() {
         let r = ApfRegistry::new();
         r.upsert_level(level("acme", "exempt", PriorityLevelType::Exempt, 0));
-        r.upsert_schema(schema("acme", "fs-system", 1, "exempt",
+        r.upsert_schema(schema(
+            "acme",
+            "fs-system",
+            1,
+            "exempt",
             MatchRule {
                 users: vec!["system:masters".into()],
                 verbs: vec!["*".into()],
                 resources: vec!["*".into()],
                 namespaces: vec![],
-            }, FlowDistinguisher::ByUser));
+            },
+            FlowDistinguisher::ByUser,
+        ));
         for _ in 0..5 {
-            let out = r.dispatch(&digest("acme", "system:masters", "default", "create", "pods"));
+            let out = r.dispatch(&digest(
+                "acme",
+                "system:masters",
+                "default",
+                "create",
+                "pods",
+            ));
             assert!(matches!(out, DispatchOutcome::Admitted { .. }));
         }
-        assert_eq!(r.in_flight_for("acme", "exempt"), 0,
-            "Exempt level does not consume queue slots");
+        assert_eq!(
+            r.in_flight_for("acme", "exempt"),
+            0,
+            "Exempt level does not consume queue slots"
+        );
     }
 
     /// Upstream parity: `TestAPF_LimitedLevelEnforcesAllowedConcurrency`
@@ -314,13 +389,19 @@ mod tests {
     fn test_limited_level_rejects_when_concurrency_exhausted() {
         let r = ApfRegistry::new();
         r.upsert_level(level("acme", "low", PriorityLevelType::Limited, 2));
-        r.upsert_schema(schema("acme", "fs-low", 100, "low",
+        r.upsert_schema(schema(
+            "acme",
+            "fs-low",
+            100,
+            "low",
             MatchRule {
                 users: vec![],
                 verbs: vec!["*".into()],
                 resources: vec!["*".into()],
                 namespaces: vec![],
-            }, FlowDistinguisher::ByUser));
+            },
+            FlowDistinguisher::ByUser,
+        ));
         let a = r.dispatch(&digest("acme", "u1", "default", "get", "pods"));
         let b = r.dispatch(&digest("acme", "u2", "default", "get", "pods"));
         let c = r.dispatch(&digest("acme", "u3", "default", "get", "pods"));
@@ -333,8 +414,11 @@ mod tests {
             }
             other => panic!("expected Rejected at 3rd request, got {:?}", other),
         }
-        assert_eq!(r.in_flight_for("acme", "low"), 2,
-            "tenant_id invariant: in-flight count scoped per (acme, low)");
+        assert_eq!(
+            r.in_flight_for("acme", "low"),
+            2,
+            "tenant_id invariant: in-flight count scoped per (acme, low)"
+        );
     }
 
     /// Upstream parity: `TestAPF_PrecedenceOrderingPicksLowestNumber`
@@ -344,16 +428,34 @@ mod tests {
     fn test_matching_precedence_picks_lowest_number_first() {
         let r = ApfRegistry::new();
         r.upsert_level(level("acme", "high", PriorityLevelType::Limited, 4));
-        r.upsert_level(level("acme", "low",  PriorityLevelType::Limited, 4));
+        r.upsert_level(level("acme", "low", PriorityLevelType::Limited, 4));
         // Two schemas match the same digest; the one with lower precedence wins.
-        r.upsert_schema(schema("acme", "fs-low", 200, "low",
-            MatchRule { users: vec![], verbs: vec!["*".into()],
-                        resources: vec!["pods".into()], namespaces: vec![] },
-            FlowDistinguisher::ByUser));
-        r.upsert_schema(schema("acme", "fs-high", 1, "high",
-            MatchRule { users: vec![], verbs: vec!["*".into()],
-                        resources: vec!["pods".into()], namespaces: vec![] },
-            FlowDistinguisher::ByUser));
+        r.upsert_schema(schema(
+            "acme",
+            "fs-low",
+            200,
+            "low",
+            MatchRule {
+                users: vec![],
+                verbs: vec!["*".into()],
+                resources: vec!["pods".into()],
+                namespaces: vec![],
+            },
+            FlowDistinguisher::ByUser,
+        ));
+        r.upsert_schema(schema(
+            "acme",
+            "fs-high",
+            1,
+            "high",
+            MatchRule {
+                users: vec![],
+                verbs: vec!["*".into()],
+                resources: vec!["pods".into()],
+                namespaces: vec![],
+            },
+            FlowDistinguisher::ByUser,
+        ));
         match r.dispatch(&digest("acme", "alice", "default", "get", "pods")) {
             DispatchOutcome::Admitted { level_name, .. } => assert_eq!(level_name, "high"),
             other => panic!("expected Admitted, got {:?}", other),
@@ -367,20 +469,34 @@ mod tests {
     fn test_flow_key_derives_from_distinguisher_choice() {
         let r = ApfRegistry::new();
         r.upsert_level(level("acme", "by-ns", PriorityLevelType::Limited, 8));
-        r.upsert_schema(schema("acme", "fs-by-ns", 1, "by-ns",
-            MatchRule { users: vec![], verbs: vec!["*".into()],
-                        resources: vec!["*".into()], namespaces: vec![] },
-            FlowDistinguisher::ByNamespace));
+        r.upsert_schema(schema(
+            "acme",
+            "fs-by-ns",
+            1,
+            "by-ns",
+            MatchRule {
+                users: vec![],
+                verbs: vec!["*".into()],
+                resources: vec!["*".into()],
+                namespaces: vec![],
+            },
+            FlowDistinguisher::ByNamespace,
+        ));
         let out = r.dispatch(&digest("acme", "alice", "billing", "get", "pods"));
         match out {
             DispatchOutcome::Admitted { flow_key, .. } => {
-                assert_eq!(flow_key, "n:billing",
-                    "ByNamespace distinguisher uses n:<ns> key");
+                assert_eq!(
+                    flow_key, "n:billing",
+                    "ByNamespace distinguisher uses n:<ns> key"
+                );
             }
             other => panic!("expected Admitted, got {:?}", other),
         }
-        assert_eq!(r.in_flight_for("acme", "by-ns"), 1,
-            "tenant_id invariant: in-flight scoped to acme/by-ns");
+        assert_eq!(
+            r.in_flight_for("acme", "by-ns"),
+            1,
+            "tenant_id invariant: in-flight scoped to acme/by-ns"
+        );
     }
 
     /// Upstream parity: `TestAPF_ReleaseFreesConcurrencySlot`
@@ -390,20 +506,33 @@ mod tests {
     fn test_release_returns_concurrency_slot_to_pool() {
         let r = ApfRegistry::new();
         r.upsert_level(level("acme", "low", PriorityLevelType::Limited, 1));
-        r.upsert_schema(schema("acme", "fs-low", 1, "low",
-            MatchRule { users: vec![], verbs: vec!["*".into()],
-                        resources: vec!["*".into()], namespaces: vec![] },
-            FlowDistinguisher::ByUser));
+        r.upsert_schema(schema(
+            "acme",
+            "fs-low",
+            1,
+            "low",
+            MatchRule {
+                users: vec![],
+                verbs: vec!["*".into()],
+                resources: vec!["*".into()],
+                namespaces: vec![],
+            },
+            FlowDistinguisher::ByUser,
+        ));
         let first = r.dispatch(&digest("acme", "alice", "default", "get", "pods"));
         let second = r.dispatch(&digest("acme", "bob", "default", "get", "pods"));
         assert!(matches!(first, DispatchOutcome::Admitted { .. }));
-        assert!(matches!(second, DispatchOutcome::Rejected { .. }),
-            "second request rejected at concurrency=1");
+        assert!(
+            matches!(second, DispatchOutcome::Rejected { .. }),
+            "second request rejected at concurrency=1"
+        );
         // Release alice; bob can now go through.
         let released = r.release("acme", "low", "u:alice");
         assert!(released);
         let third = r.dispatch(&digest("acme", "bob", "default", "get", "pods"));
-        assert!(matches!(third, DispatchOutcome::Admitted { .. }),
-            "tenant_id invariant: freed slot reusable within acme/low");
+        assert!(
+            matches!(third, DispatchOutcome::Admitted { .. }),
+            "tenant_id invariant: freed slot reusable within acme/low"
+        );
     }
 }

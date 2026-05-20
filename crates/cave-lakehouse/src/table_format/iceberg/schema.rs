@@ -136,10 +136,7 @@ impl Schema {
         let mut seen_names = std::collections::HashSet::new();
         for f in &self.fields {
             if !seen_ids.insert(f.id) {
-                return Err(IcebergError::Schema(format!(
-                    "duplicate field id {}",
-                    f.id
-                )));
+                return Err(IcebergError::Schema(format!("duplicate field id {}", f.id)));
             }
             if !seen_names.insert(f.name.clone()) {
                 return Err(IcebergError::Schema(format!(

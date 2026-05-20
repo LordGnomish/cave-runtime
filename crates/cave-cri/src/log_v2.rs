@@ -145,7 +145,12 @@ pub fn parse_line(line: &str) -> CriResult<CriLogEntry> {
     let tag = LogTag::parse(tag_str)
         .ok_or_else(|| CriError::Runtime(format!("invalid CRI log tag {:?}", tag_str)))?;
 
-    Ok(CriLogEntry { timestamp, stream, tag, message })
+    Ok(CriLogEntry {
+        timestamp,
+        stream,
+        tag,
+        message,
+    })
 }
 
 /// Append a CRI-formatted log line to `path`, splitting into multiple
@@ -191,7 +196,11 @@ pub fn write_log_line(
         }
         let chunk = std::str::from_utf8(&bytes[start..end])
             .map_err(|e| CriError::Runtime(format!("invalid utf8 in log message: {}", e)))?;
-        let tag = if end == bytes.len() { LogTag::Full } else { LogTag::Partial };
+        let tag = if end == bytes.len() {
+            LogTag::Full
+        } else {
+            LogTag::Partial
+        };
         let line = encode_line(timestamp, stream, tag, chunk);
         writeln!(file, "{}", line).map_err(CriError::Io)?;
         start = end;
@@ -225,7 +234,11 @@ fn read_rotated_chain(path: &Path) -> CriResult<Vec<CriLogEntry>> {
     let mut rotated_paths: Vec<PathBuf> = Vec::new();
     for i in 1..=10u32 {
         let p = PathBuf::from(format!("{}.{}", stem, i));
-        if p.exists() { rotated_paths.push(p); } else { break; }
+        if p.exists() {
+            rotated_paths.push(p);
+        } else {
+            break;
+        }
     }
     for p in rotated_paths.iter().rev() {
         all.extend(read_file(p)?);
@@ -302,7 +315,9 @@ pub fn stitch_partials(entries: Vec<CriLogEntry>) -> Vec<CriLogEntry> {
             }
         }
     }
-    if let Some(b) = buf { out.push(b); }
+    if let Some(b) = buf {
+        out.push(b);
+    }
     out
 }
 
@@ -350,7 +365,11 @@ mod tests {
         let when = Utc.timestamp_nanos(1_700_000_000_123_456_789);
         let line = encode_line(when, Stream::Stderr, LogTag::Partial, "x");
         // Should contain nanosecond precision and the Z suffix.
-        assert!(line.contains(".123456789Z"), "missing nano precision: {}", line);
+        assert!(
+            line.contains(".123456789Z"),
+            "missing nano precision: {}",
+            line
+        );
         assert!(line.contains(" stderr P "));
     }
 
@@ -389,7 +408,15 @@ mod tests {
     fn write_then_read_single_line() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("c.log");
-        write_log_line(&path, Stream::Stdout, "first", ts(1_700_000_000), u64::MAX, 5).unwrap();
+        write_log_line(
+            &path,
+            Stream::Stdout,
+            "first",
+            ts(1_700_000_000),
+            u64::MAX,
+            5,
+        )
+        .unwrap();
         let entries = read_file(&path).unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].message, "first");
@@ -465,7 +492,10 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("c.log");
         seed_log(&path, 10);
-        let opts = LogOptions { tail_lines: Some(3), ..Default::default() };
+        let opts = LogOptions {
+            tail_lines: Some(3),
+            ..Default::default()
+        };
         let entries = read_logs(&path, &opts).unwrap();
         assert_eq!(entries.len(), 3);
         assert_eq!(entries[0].message, "line-7");
@@ -508,7 +538,10 @@ mod tests {
         let path = dir.path().join("c.log");
         // Each "line-N" message is 6–7 bytes.
         seed_log(&path, 10);
-        let opts = LogOptions { limit_bytes: Some(20), ..Default::default() };
+        let opts = LogOptions {
+            limit_bytes: Some(20),
+            ..Default::default()
+        };
         let entries = read_logs(&path, &opts).unwrap();
         let total: usize = entries.iter().map(|e| e.message.len()).sum();
         assert!(total <= 20);
@@ -605,8 +638,18 @@ mod tests {
     #[test]
     fn stitch_passthrough_for_full_lines() {
         let entries = vec![
-            CriLogEntry { timestamp: ts(1), stream: Stream::Stdout, tag: LogTag::Full, message: "a".into() },
-            CriLogEntry { timestamp: ts(2), stream: Stream::Stdout, tag: LogTag::Full, message: "b".into() },
+            CriLogEntry {
+                timestamp: ts(1),
+                stream: Stream::Stdout,
+                tag: LogTag::Full,
+                message: "a".into(),
+            },
+            CriLogEntry {
+                timestamp: ts(2),
+                stream: Stream::Stdout,
+                tag: LogTag::Full,
+                message: "b".into(),
+            },
         ];
         let out = stitch_partials(entries.clone());
         assert_eq!(out.len(), 2);

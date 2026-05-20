@@ -140,10 +140,7 @@ fn aggregate(
     // group key → rows
     let mut groups: BTreeMap<Vec<String>, Vec<&Vec<Value>>> = BTreeMap::new();
     for row in &batch.rows {
-        let key: Vec<String> = group_indices
-            .iter()
-            .map(|&i| value_key(&row[i]))
-            .collect();
+        let key: Vec<String> = group_indices.iter().map(|&i| value_key(&row[i])).collect();
         groups.entry(key).or_default().push(row);
     }
     let mut out_rows: Vec<Vec<Value>> = Vec::new();
@@ -208,11 +205,7 @@ fn decode_key(k: &str) -> Value {
     Value::Null
 }
 
-fn compute_agg(
-    batch: &RecordBatch,
-    rows: &[&Vec<Value>],
-    a: &AggregateExpr,
-) -> DfResult<Value> {
+fn compute_agg(batch: &RecordBatch, rows: &[&Vec<Value>], a: &AggregateExpr) -> DfResult<Value> {
     match a.func {
         AggregateFunc::Count => {
             // COUNT(*) → all rows; COUNT(col) → non-null rows of col
@@ -225,9 +218,10 @@ fn compute_agg(
             Ok(Value::Int64(n as i64))
         }
         AggregateFunc::Sum => {
-            let col = a.column.as_ref().ok_or_else(|| {
-                DataFusionError::Plan("SUM requires a column".into())
-            })?;
+            let col = a
+                .column
+                .as_ref()
+                .ok_or_else(|| DataFusionError::Plan("SUM requires a column".into()))?;
             let idx = batch.column_index(col)?;
             let mut total: i64 = 0;
             for r in rows {
@@ -238,9 +232,10 @@ fn compute_agg(
             Ok(Value::Int64(total))
         }
         AggregateFunc::Min => {
-            let col = a.column.as_ref().ok_or_else(|| {
-                DataFusionError::Plan("MIN requires a column".into())
-            })?;
+            let col = a
+                .column
+                .as_ref()
+                .ok_or_else(|| DataFusionError::Plan("MIN requires a column".into()))?;
             let idx = batch.column_index(col)?;
             let mut m: Option<i64> = None;
             for r in rows {
@@ -251,9 +246,10 @@ fn compute_agg(
             Ok(m.map(Value::Int64).unwrap_or(Value::Null))
         }
         AggregateFunc::Max => {
-            let col = a.column.as_ref().ok_or_else(|| {
-                DataFusionError::Plan("MAX requires a column".into())
-            })?;
+            let col = a
+                .column
+                .as_ref()
+                .ok_or_else(|| DataFusionError::Plan("MAX requires a column".into()))?;
             let idx = batch.column_index(col)?;
             let mut m: Option<i64> = None;
             for r in rows {
@@ -264,9 +260,10 @@ fn compute_agg(
             Ok(m.map(Value::Int64).unwrap_or(Value::Null))
         }
         AggregateFunc::Avg => {
-            let col = a.column.as_ref().ok_or_else(|| {
-                DataFusionError::Plan("AVG requires a column".into())
-            })?;
+            let col = a
+                .column
+                .as_ref()
+                .ok_or_else(|| DataFusionError::Plan("AVG requires a column".into()))?;
             let idx = batch.column_index(col)?;
             let mut total: i64 = 0;
             let mut n: i64 = 0;
@@ -336,10 +333,26 @@ mod tests {
         RecordBatch::new(
             vec!["id".into(), "dept".into(), "salary".into()],
             vec![
-                vec![Value::Int64(1), Value::Utf8("eng".into()), Value::Int64(100)],
-                vec![Value::Int64(2), Value::Utf8("eng".into()), Value::Int64(120)],
-                vec![Value::Int64(3), Value::Utf8("sales".into()), Value::Int64(80)],
-                vec![Value::Int64(4), Value::Utf8("sales".into()), Value::Int64(90)],
+                vec![
+                    Value::Int64(1),
+                    Value::Utf8("eng".into()),
+                    Value::Int64(100),
+                ],
+                vec![
+                    Value::Int64(2),
+                    Value::Utf8("eng".into()),
+                    Value::Int64(120),
+                ],
+                vec![
+                    Value::Int64(3),
+                    Value::Utf8("sales".into()),
+                    Value::Int64(80),
+                ],
+                vec![
+                    Value::Int64(4),
+                    Value::Utf8("sales".into()),
+                    Value::Int64(90),
+                ],
                 vec![Value::Int64(5), Value::Utf8("ops".into()), Value::Int64(70)],
             ],
         )
@@ -378,7 +391,10 @@ mod tests {
             columns: vec!["dept".into(), "id".into()],
         };
         let out = p.execute().unwrap();
-        assert_eq!(out.rows[0], vec![Value::Utf8("eng".into()), Value::Int64(1)]);
+        assert_eq!(
+            out.rows[0],
+            vec![Value::Utf8("eng".into()), Value::Int64(1)]
+        );
     }
 
     #[test]
@@ -448,7 +464,11 @@ mod tests {
         // SQL: predicate = null → row is dropped (only true keeps)
         let b = RecordBatch::new(
             vec!["x".into()],
-            vec![vec![Value::Null], vec![Value::Int64(1)], vec![Value::Int64(2)]],
+            vec![
+                vec![Value::Null],
+                vec![Value::Int64(1)],
+                vec![Value::Int64(2)],
+            ],
         )
         .unwrap();
         let p = ExecutionPlan::Filter {

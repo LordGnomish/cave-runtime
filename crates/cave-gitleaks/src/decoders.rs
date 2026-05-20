@@ -124,11 +124,7 @@ pub fn decode_base64_runs_bytes(input: &[u8]) -> Option<Vec<u8>> {
             i += 1;
         }
     }
-    if out.is_empty() {
-        None
-    } else {
-        Some(out)
-    }
+    if out.is_empty() { None } else { Some(out) }
 }
 
 /// String convenience wrapper around [`decode_base64_runs_bytes`].
@@ -204,9 +200,8 @@ mod tests {
         let mut out = String::new();
         let mut i = 0;
         while i + 3 <= input.len() {
-            let n = ((input[i] as u32) << 16)
-                | ((input[i + 1] as u32) << 8)
-                | (input[i + 2] as u32);
+            let n =
+                ((input[i] as u32) << 16) | ((input[i + 1] as u32) << 8) | (input[i + 2] as u32);
             out.push(TABLE[((n >> 18) & 0x3f) as usize] as char);
             out.push(TABLE[((n >> 12) & 0x3f) as usize] as char);
             out.push(TABLE[((n >> 6) & 0x3f) as usize] as char);

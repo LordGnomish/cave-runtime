@@ -28,7 +28,10 @@ pub struct OAuth2Plugin;
 
 fn extract_bearer_token(ctx: &PluginCtx, header_name: &str) -> Option<String> {
     if let Some(v) = ctx.headers.get(header_name) {
-        if let Some(token) = v.strip_prefix("Bearer ").or_else(|| v.strip_prefix("bearer ")) {
+        if let Some(token) = v
+            .strip_prefix("Bearer ")
+            .or_else(|| v.strip_prefix("bearer "))
+        {
             return Some(token.to_string());
         }
     }
@@ -49,12 +52,15 @@ impl GatewayPlugin for OAuth2Plugin {
     }
 
     async fn access(&self, ctx: &mut PluginCtx, config: &Value) -> PluginResult {
-        let header_name = config["auth_header_name"].as_str().unwrap_or("authorization");
+        let header_name = config["auth_header_name"]
+            .as_str()
+            .unwrap_or("authorization");
 
         match extract_bearer_token(ctx, header_name) {
             Some(token) => {
                 // Token validation happens at the handler level where the store is accessible
-                ctx.ctx.insert("oauth2_token".to_string(), Value::String(token));
+                ctx.ctx
+                    .insert("oauth2_token".to_string(), Value::String(token));
                 PluginResult::Continue
             }
             None => {
@@ -78,8 +84,8 @@ impl GatewayPlugin for OAuth2Plugin {
 
 /// Generate an access token (used by the /oauth2/token endpoint).
 pub fn generate_access_token() -> String {
-    use rand::distributions::Alphanumeric;
     use rand::Rng;
+    use rand::distributions::Alphanumeric;
     rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(64)

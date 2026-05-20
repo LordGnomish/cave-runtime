@@ -39,7 +39,7 @@ pub struct Bundle {
     pub name: String,
     pub manifest: BundleManifest,
     pub policies: HashMap<String, String>, // path -> rego source
-    pub data: serde_json::Value,            // merged data document
+    pub data: serde_json::Value,           // merged data document
 }
 
 impl Bundle {
@@ -57,7 +57,7 @@ impl Bundle {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BundleConfig {
     pub name: String,
-    pub service: String, // service name
+    pub service: String,  // service name
     pub resource: String, // path on the service
     #[serde(default = "default_poll_interval")]
     pub polling_min_delay_seconds: u64,
@@ -67,7 +67,9 @@ pub struct BundleConfig {
     pub signing: Option<BundleSigningConfig>,
 }
 
-fn default_poll_interval() -> u64 { 60 }
+fn default_poll_interval() -> u64 {
+    60
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BundleSigningConfig {
@@ -93,13 +95,16 @@ impl BundleManager {
     pub fn add_config(&mut self, config: BundleConfig) {
         let name = config.name.clone();
         self.configs.insert(name.clone(), config);
-        self.active.insert(name.clone(), BundleStatus {
-            name,
-            active_revision: None,
-            last_successful_activation: None,
-            last_successful_download: None,
-            last_successful_request: None,
-        });
+        self.active.insert(
+            name.clone(),
+            BundleStatus {
+                name,
+                active_revision: None,
+                last_successful_activation: None,
+                last_successful_download: None,
+                last_successful_request: None,
+            },
+        );
     }
 
     pub fn get_status(&self, name: &str) -> Option<&BundleStatus> {
@@ -120,15 +125,20 @@ impl BundleManager {
 
         let mut bundle = Bundle::new(name.to_string());
 
-        for entry in archive.entries().map_err(|e| PolicyError::Bundle(e.to_string()))? {
+        for entry in archive
+            .entries()
+            .map_err(|e| PolicyError::Bundle(e.to_string()))?
+        {
             let mut entry = entry.map_err(|e| PolicyError::Bundle(e.to_string()))?;
-            let path = entry.path()
+            let path = entry
+                .path()
                 .map_err(|e| PolicyError::Bundle(e.to_string()))?
                 .to_string_lossy()
                 .into_owned();
 
             let mut contents = String::new();
-            entry.read_to_string(&mut contents)
+            entry
+                .read_to_string(&mut contents)
                 .map_err(|e| PolicyError::Bundle(e.to_string()))?;
 
             if path == ".manifest" || path == "/.manifest" {
@@ -210,7 +220,9 @@ impl BundleManager {
 }
 
 impl Default for BundleManager {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ─── Tar/gzip helpers ─────────────────────────────────────────────────────────
@@ -232,7 +244,9 @@ struct TarStub<R> {
 }
 
 impl<R: std::io::Read> TarStub<R> {
-    fn entries(&mut self) -> Result<std::vec::IntoIter<Result<TarEntryStub, std::io::Error>>, std::io::Error> {
+    fn entries(
+        &mut self,
+    ) -> Result<std::vec::IntoIter<Result<TarEntryStub, std::io::Error>>, std::io::Error> {
         Ok(vec![].into_iter())
     }
 }

@@ -35,19 +35,31 @@ pub struct AuthRevision {
 }
 
 impl AuthRevision {
-    pub fn new() -> Self { Self { counter: AtomicU64::new(0) } }
+    pub fn new() -> Self {
+        Self {
+            counter: AtomicU64::new(0),
+        }
+    }
 
-    pub fn current(&self) -> u64 { self.counter.load(Ordering::SeqCst) }
+    pub fn current(&self) -> u64 {
+        self.counter.load(Ordering::SeqCst)
+    }
 
     /// Bump the counter and return the new value.
-    pub fn bump(&self) -> u64 { self.counter.fetch_add(1, Ordering::SeqCst) + 1 }
+    pub fn bump(&self) -> u64 {
+        self.counter.fetch_add(1, Ordering::SeqCst) + 1
+    }
 
     /// Check whether `seen` is stale relative to the current revision.
-    pub fn is_stale(&self, seen: u64) -> bool { self.current() > seen }
+    pub fn is_stale(&self, seen: u64) -> bool {
+        self.current() > seen
+    }
 }
 
 impl Default for AuthRevision {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── Range-permission cache ───────────────────────────────────────────────
@@ -70,7 +82,10 @@ pub enum PermKind {
 impl PermKind {
     /// True if this perm grants the `desired` access type.
     pub fn covers(&self, desired: PermKind) -> bool {
-        matches!((self, desired), (Self::ReadWrite, _) | (Self::Read, Self::Read) | (Self::Write, Self::Write))
+        matches!(
+            (self, desired),
+            (Self::ReadWrite, _) | (Self::Read, Self::Read) | (Self::Write, Self::Write)
+        )
     }
 }
 
@@ -92,7 +107,9 @@ impl PermInterval {
     /// True if this interval covers prefix `key+\xff`.
     pub fn covers_prefix(&self, prefix: &[u8]) -> bool {
         let key_match = self.key.starts_with(prefix);
-        let end_after_prefix = self.key_end.as_ref()
+        let end_after_prefix = self
+            .key_end
+            .as_ref()
             .map(|e| e.as_slice() > prefix)
             .unwrap_or(false);
         key_match && end_after_prefix
@@ -108,11 +125,17 @@ pub struct RangePermCache {
 
 impl RangePermCache {
     pub fn new() -> Self {
-        Self { inner: RwLock::new(HashMap::new()), revision: RwLock::new(0) }
+        Self {
+            inner: RwLock::new(HashMap::new()),
+            revision: RwLock::new(0),
+        }
     }
 
     pub fn replace_user(&self, username: &str, intervals: Vec<PermInterval>) {
-        self.inner.write().unwrap().insert(username.to_string(), intervals);
+        self.inner
+            .write()
+            .unwrap()
+            .insert(username.to_string(), intervals);
     }
 
     pub fn invalidate_user(&self, username: &str) {
@@ -133,9 +156,13 @@ impl RangePermCache {
     /// requested key+access.
     pub fn allows(&self, username: &str, key: &[u8], desired: PermKind) -> bool {
         let g = self.inner.read().unwrap();
-        let Some(intervals) = g.get(username) else { return false; };
+        let Some(intervals) = g.get(username) else {
+            return false;
+        };
         for iv in intervals {
-            if iv.kind.covers(desired) && iv.matches(key) { return true; }
+            if iv.kind.covers(desired) && iv.matches(key) {
+                return true;
+            }
         }
         false
     }
@@ -151,7 +178,9 @@ impl RangePermCache {
 }
 
 impl Default for RangePermCache {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── TLS client-cert auth ─────────────────────────────────────────────────
@@ -199,8 +228,12 @@ pub fn parse_subject(s: &str) -> Result<CertSubject, CertAuthError> {
     for part in s.split(',') {
         let part = part.trim();
         let mut it = part.splitn(2, '=');
-        let k = it.next().ok_or_else(|| CertAuthError::BadSubject(part.into()))?;
-        let v = it.next().ok_or_else(|| CertAuthError::BadSubject(part.into()))?;
+        let k = it
+            .next()
+            .ok_or_else(|| CertAuthError::BadSubject(part.into()))?;
+        let v = it
+            .next()
+            .ok_or_else(|| CertAuthError::BadSubject(part.into()))?;
         match k.trim() {
             "CN" => cn = Some(v.trim().to_string()),
             "OU" => ou = Some(v.trim().to_string()),
@@ -209,7 +242,11 @@ pub fn parse_subject(s: &str) -> Result<CertSubject, CertAuthError> {
         }
     }
     let common_name = cn.ok_or(CertAuthError::NoCommonName)?;
-    Ok(CertSubject { common_name, organisational_unit: ou, organisation: o })
+    Ok(CertSubject {
+        common_name,
+        organisational_unit: ou,
+        organisation: o,
+    })
 }
 
 /// Authenticator that maps cert subjects → user names.  Holds an explicit
@@ -219,11 +256,18 @@ pub struct CertAuthenticator {
 }
 
 impl CertAuthenticator {
-    pub fn new() -> Self { Self { allow_list: RwLock::new(HashMap::new()) } }
+    pub fn new() -> Self {
+        Self {
+            allow_list: RwLock::new(HashMap::new()),
+        }
+    }
 
     /// Map a CN to an etcd user.
     pub fn allow(&self, cn: impl Into<String>, user: impl Into<String>) {
-        self.allow_list.write().unwrap().insert(cn.into(), user.into());
+        self.allow_list
+            .write()
+            .unwrap()
+            .insert(cn.into(), user.into());
     }
 
     pub fn revoke_cn(&self, cn: &str) -> bool {
@@ -241,7 +285,8 @@ impl CertAuthenticator {
     pub fn authenticate(&self, subject_str: &str) -> Result<String, CertAuthError> {
         let s = parse_subject(subject_str)?;
         let g = self.allow_list.read().unwrap();
-        let user = g.get(&s.common_name)
+        let user = g
+            .get(&s.common_name)
             .cloned()
             .ok_or_else(|| CertAuthError::NotAllowListed(s.common_name.clone()))?;
         Ok(user)
@@ -257,7 +302,9 @@ impl CertAuthenticator {
 }
 
 impl Default for CertAuthenticator {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── Root-role bootstrap intervals ─────────────────────────────────────────
@@ -329,7 +376,11 @@ mod tests {
     #[test]
     fn test_perm_interval_exact_key_match() {
         // cite: range_perm_cache.go (single-key match)
-        let iv = PermInterval { key: b"k".to_vec(), key_end: None, kind: PermKind::Read };
+        let iv = PermInterval {
+            key: b"k".to_vec(),
+            key_end: None,
+            kind: PermKind::Read,
+        };
         assert!(iv.matches(b"k"));
         assert!(!iv.matches(b"l"));
     }
@@ -337,7 +388,11 @@ mod tests {
     #[test]
     fn test_perm_interval_range_match() {
         // cite: range_perm_cache.go (interval [a,c))
-        let iv = PermInterval { key: b"a".to_vec(), key_end: Some(b"c".to_vec()), kind: PermKind::Read };
+        let iv = PermInterval {
+            key: b"a".to_vec(),
+            key_end: Some(b"c".to_vec()),
+            kind: PermKind::Read,
+        };
         assert!(iv.matches(b"a"));
         assert!(iv.matches(b"b"));
         assert!(!iv.matches(b"c"));
@@ -347,7 +402,11 @@ mod tests {
     #[test]
     fn test_perm_interval_full_range_sentinel() {
         // cite: server/auth/store.go (key=00, end=00 ⇒ full range)
-        let iv = PermInterval { key: vec![0], key_end: Some(vec![0]), kind: PermKind::ReadWrite };
+        let iv = PermInterval {
+            key: vec![0],
+            key_end: Some(vec![0]),
+            kind: PermKind::ReadWrite,
+        };
         assert!(iv.matches(b"anything"));
         assert!(iv.matches(b"\x7f"));
     }
@@ -358,9 +417,14 @@ mod tests {
     fn test_perm_cache_replace_and_lookup() {
         // cite: range_perm_cache.go (cached lookup)
         let c = RangePermCache::new();
-        c.replace_user("alice", vec![PermInterval {
-            key: b"/keys/".to_vec(), key_end: Some(b"/keys0".to_vec()), kind: PermKind::Read,
-        }]);
+        c.replace_user(
+            "alice",
+            vec![PermInterval {
+                key: b"/keys/".to_vec(),
+                key_end: Some(b"/keys0".to_vec()),
+                kind: PermKind::Read,
+            }],
+        );
         assert!(c.allows("alice", b"/keys/x", PermKind::Read));
         assert!(!c.allows("alice", b"/keys/x", PermKind::Write));
         assert!(!c.allows("alice", b"/other", PermKind::Read));
@@ -376,7 +440,14 @@ mod tests {
     fn test_perm_cache_invalidate_user_removes() {
         // cite: range_perm_cache.go (invalidate on role change)
         let c = RangePermCache::new();
-        c.replace_user("a", vec![PermInterval { key: b"k".to_vec(), key_end: None, kind: PermKind::Read }]);
+        c.replace_user(
+            "a",
+            vec![PermInterval {
+                key: b"k".to_vec(),
+                key_end: None,
+                kind: PermKind::Read,
+            }],
+        );
         c.invalidate_user("a");
         assert!(!c.allows("a", b"k", PermKind::Read));
     }
@@ -385,8 +456,22 @@ mod tests {
     fn test_perm_cache_invalidate_all() {
         // cite: range_perm_cache.go (full invalidation)
         let c = RangePermCache::new();
-        c.replace_user("a", vec![PermInterval { key: b"k".to_vec(), key_end: None, kind: PermKind::Read }]);
-        c.replace_user("b", vec![PermInterval { key: b"k".to_vec(), key_end: None, kind: PermKind::Read }]);
+        c.replace_user(
+            "a",
+            vec![PermInterval {
+                key: b"k".to_vec(),
+                key_end: None,
+                kind: PermKind::Read,
+            }],
+        );
+        c.replace_user(
+            "b",
+            vec![PermInterval {
+                key: b"k".to_vec(),
+                key_end: None,
+                kind: PermKind::Read,
+            }],
+        );
         c.invalidate_all();
         assert_eq!(c.known_users(), Vec::<String>::new());
     }
@@ -413,9 +498,14 @@ mod tests {
     fn test_perm_cache_readwrite_grants_both() {
         // cite: range_perm_cache.go (RW perm covers both)
         let c = RangePermCache::new();
-        c.replace_user("alice", vec![PermInterval {
-            key: b"k".to_vec(), key_end: None, kind: PermKind::ReadWrite,
-        }]);
+        c.replace_user(
+            "alice",
+            vec![PermInterval {
+                key: b"k".to_vec(),
+                key_end: None,
+                kind: PermKind::ReadWrite,
+            }],
+        );
         assert!(c.allows("alice", b"k", PermKind::Read));
         assert!(c.allows("alice", b"k", PermKind::Write));
     }
@@ -442,12 +532,18 @@ mod tests {
     #[test]
     fn test_parse_subject_no_cn_errors() {
         // cite: AuthInfoFromTLS (CN required)
-        assert_eq!(parse_subject("OU=admins").unwrap_err(), CertAuthError::NoCommonName);
+        assert_eq!(
+            parse_subject("OU=admins").unwrap_err(),
+            CertAuthError::NoCommonName
+        );
     }
 
     #[test]
     fn test_parse_subject_bad_format_errors() {
-        assert!(matches!(parse_subject("bad-format").unwrap_err(), CertAuthError::BadSubject(_)));
+        assert!(matches!(
+            parse_subject("bad-format").unwrap_err(),
+            CertAuthError::BadSubject(_)
+        ));
     }
 
     #[test]
@@ -472,7 +568,10 @@ mod tests {
         // cite: AuthInfoFromTLS (CN matches user)
         let a = CertAuthenticator::new();
         a.allow("alice", "alice");
-        assert_eq!(a.authenticate("CN=alice,OU=admins,O=cave").unwrap(), "alice");
+        assert_eq!(
+            a.authenticate("CN=alice,OU=admins,O=cave").unwrap(),
+            "alice"
+        );
     }
 
     #[test]
@@ -488,7 +587,10 @@ mod tests {
     #[test]
     fn test_cert_auth_bad_subject_rejected() {
         let a = CertAuthenticator::new();
-        assert!(matches!(a.authenticate("not-a-subject").unwrap_err(), CertAuthError::BadSubject(_)));
+        assert!(matches!(
+            a.authenticate("not-a-subject").unwrap_err(),
+            CertAuthError::BadSubject(_)
+        ));
     }
 
     #[test]
@@ -530,7 +632,11 @@ mod tests {
         // cite: AuthInfoFromTLS (already-parsed subject)
         let a = CertAuthenticator::new();
         a.allow("alice", "alice");
-        let s = CertSubject { common_name: "alice".into(), organisational_unit: None, organisation: None };
+        let s = CertSubject {
+            common_name: "alice".into(),
+            organisational_unit: None,
+            organisation: None,
+        };
         assert_eq!(a.authenticate_subject(&s).unwrap(), "alice");
     }
 

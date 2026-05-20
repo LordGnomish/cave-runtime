@@ -93,7 +93,10 @@ impl Connector {
 
         let tasks = (0..tasks_max)
             .map(|i| Task {
-                id: TaskId { connector: name.clone(), task: i },
+                id: TaskId {
+                    connector: name.clone(),
+                    task: i,
+                },
                 config: config.clone(),
                 state: TaskState::Unassigned,
                 trace: None,
@@ -134,7 +137,11 @@ impl Connector {
                     .filter(|(k, _)| k.starts_with(&prefix))
                     .map(|(k, v)| (k[prefix.len()..].to_string(), v.clone()))
                     .collect();
-                Transform { name, transform_type, config: transform_config }
+                Transform {
+                    name,
+                    transform_type,
+                    config: transform_config,
+                }
             })
             .collect()
     }
@@ -401,9 +408,15 @@ mod tests {
 
     fn jdbc_source_config() -> HashMap<String, String> {
         let mut c = HashMap::new();
-        c.insert("connector.class".into(), "cave.connect.JdbcSourceConnector".into());
+        c.insert(
+            "connector.class".into(),
+            "cave.connect.JdbcSourceConnector".into(),
+        );
         c.insert("tasks.max".into(), "2".into());
-        c.insert("connection.url".into(), "jdbc:postgresql://localhost/mydb".into());
+        c.insert(
+            "connection.url".into(),
+            "jdbc:postgresql://localhost/mydb".into(),
+        );
         c.insert("topic.prefix".into(), "db-".into());
         c
     }
@@ -411,7 +424,8 @@ mod tests {
     #[test]
     fn create_and_list_connectors() {
         let c = cluster();
-        c.create_connector("jdbc-source".into(), jdbc_source_config()).unwrap();
+        c.create_connector("jdbc-source".into(), jdbc_source_config())
+            .unwrap();
         let names = c.list_connectors();
         assert!(names.contains(&"jdbc-source".to_string()));
     }
@@ -419,7 +433,9 @@ mod tests {
     #[test]
     fn connector_starts_running() {
         let c = cluster();
-        let conn = c.create_connector("my-conn".into(), jdbc_source_config()).unwrap();
+        let conn = c
+            .create_connector("my-conn".into(), jdbc_source_config())
+            .unwrap();
         assert_eq!(conn.state, ConnectorState::Running);
         assert!(conn.tasks.iter().all(|t| t.state == TaskState::Running));
     }
@@ -427,17 +443,25 @@ mod tests {
     #[test]
     fn pause_and_resume() {
         let c = cluster();
-        c.create_connector("pausable".into(), jdbc_source_config()).unwrap();
+        c.create_connector("pausable".into(), jdbc_source_config())
+            .unwrap();
         c.pause_connector("pausable").unwrap();
-        assert_eq!(c.get_connector("pausable").unwrap().state, ConnectorState::Paused);
+        assert_eq!(
+            c.get_connector("pausable").unwrap().state,
+            ConnectorState::Paused
+        );
         c.resume_connector("pausable").unwrap();
-        assert_eq!(c.get_connector("pausable").unwrap().state, ConnectorState::Running);
+        assert_eq!(
+            c.get_connector("pausable").unwrap().state,
+            ConnectorState::Running
+        );
     }
 
     #[test]
     fn duplicate_connector_fails() {
         let c = cluster();
-        c.create_connector("dup".into(), jdbc_source_config()).unwrap();
+        c.create_connector("dup".into(), jdbc_source_config())
+            .unwrap();
         assert!(matches!(
             c.create_connector("dup".into(), jdbc_source_config()),
             Err(StreamsError::ConnectorAlreadyExists(_))
@@ -447,7 +471,9 @@ mod tests {
     #[test]
     fn tasks_created_from_config() {
         let c = cluster();
-        let conn = c.create_connector("multi-task".into(), jdbc_source_config()).unwrap();
+        let conn = c
+            .create_connector("multi-task".into(), jdbc_source_config())
+            .unwrap();
         assert_eq!(conn.tasks.len(), 2);
     }
 

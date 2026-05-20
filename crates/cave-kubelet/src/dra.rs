@@ -288,7 +288,10 @@ mod tests {
             allowed_tenants: vec![],
         });
         let c = mk_claim("c1", "acme", "x", AllocationMode::Immediate);
-        assert!(matches!(m.allocate(&c), Err(DraError::NoDevicesForDriver(_))));
+        assert!(matches!(
+            m.allocate(&c),
+            Err(DraError::NoDevicesForDriver(_))
+        ));
     }
 
     #[test]
@@ -297,7 +300,10 @@ mod tests {
         let a = mk_claim("a", "acme", "nvidia-a100", AllocationMode::Immediate);
         m.allocate(&a).unwrap();
         let b = mk_claim("b", "acme", "nvidia-a100", AllocationMode::Immediate);
-        assert!(matches!(m.allocate(&b), Err(DraError::NoDevicesForDriver(_))));
+        assert!(matches!(
+            m.allocate(&b),
+            Err(DraError::NoDevicesForDriver(_))
+        ));
     }
 
     #[test]
@@ -324,7 +330,10 @@ mod tests {
     fn deallocate_unknown_errors() {
         let m = DraManager::new();
         let bogus = Uuid::new_v4();
-        assert!(matches!(m.deallocate(&bogus), Err(DraError::NotAllocated(_))));
+        assert!(matches!(
+            m.deallocate(&bogus),
+            Err(DraError::NotAllocated(_))
+        ));
     }
 
     #[test]

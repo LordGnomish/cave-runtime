@@ -144,7 +144,10 @@ impl CrmStore {
         // person/company/opportunity writers).
         drop(leads);
 
-        self.companies.write().await.insert(company.id, company.clone());
+        self.companies
+            .write()
+            .await
+            .insert(company.id, company.clone());
         self.people.write().await.insert(person.id, person.clone());
 
         // First pipeline step in the workspace becomes the new opp's lane.

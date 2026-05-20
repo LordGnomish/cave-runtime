@@ -16,9 +16,7 @@
 //!   - HalfOpen → Closed after `success_threshold` consecutive successes.
 //!   - Any failure in HalfOpen → Open (resets the timer).
 
-use cave_kernel::circuitbreaker::{
-    BreakerConfig, BreakerState, CircuitBreaker, PerKeyBreakers,
-};
+use cave_kernel::circuitbreaker::{BreakerConfig, BreakerState, CircuitBreaker, PerKeyBreakers};
 use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;

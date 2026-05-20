@@ -26,12 +26,13 @@ pub fn apply_order(specs: &[ResourceSpec]) -> InfraResult<Vec<&ResourceSpec>> {
     for spec in specs {
         let from = name_to_idx[spec.name.as_str()];
         for dep_name in &spec.depends_on {
-            let to = name_to_idx.get(dep_name.as_str()).ok_or_else(|| {
-                InfraError::DependencyNotMet {
-                    resource: spec.name.clone(),
-                    depends_on: dep_name.clone(),
-                }
-            })?;
+            let to =
+                name_to_idx
+                    .get(dep_name.as_str())
+                    .ok_or_else(|| InfraError::DependencyNotMet {
+                        resource: spec.name.clone(),
+                        depends_on: dep_name.clone(),
+                    })?;
             // Edge from spec → dep (spec depends on dep, dep must come first)
             graph.add_edge(*to, from, ()); // dep → spec in apply order
         }
@@ -44,7 +45,10 @@ pub fn apply_order(specs: &[ResourceSpec]) -> InfraResult<Vec<&ResourceSpec>> {
         InfraError::DependencyCycle(specs[spec_idx].name.clone())
     })?;
 
-    Ok(sorted.into_iter().map(|n| &specs[idx_to_spec[&n]]).collect())
+    Ok(sorted
+        .into_iter()
+        .map(|n| &specs[idx_to_spec[&n]])
+        .collect())
 }
 
 /// Return the destroy order (reverse of apply order).
@@ -110,17 +114,20 @@ mod tests {
 
     #[test]
     fn cycle_detected() {
-        let specs = vec![
-            spec("a", vec!["b"]),
-            spec("b", vec!["a"]),
-        ];
-        assert!(matches!(apply_order(&specs), Err(InfraError::DependencyCycle(_))));
+        let specs = vec![spec("a", vec!["b"]), spec("b", vec!["a"])];
+        assert!(matches!(
+            apply_order(&specs),
+            Err(InfraError::DependencyCycle(_))
+        ));
     }
 
     #[test]
     fn missing_dependency_fails() {
         let specs = vec![spec("web", vec!["missing-resource"])];
-        assert!(matches!(apply_order(&specs), Err(InfraError::DependencyNotMet { .. })));
+        assert!(matches!(
+            apply_order(&specs),
+            Err(InfraError::DependencyNotMet { .. })
+        ));
     }
 
     #[test]

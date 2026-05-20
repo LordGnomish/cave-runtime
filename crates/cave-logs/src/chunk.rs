@@ -6,8 +6,8 @@
 //! On flush it is compressed and written to the chunk store; the in-memory
 //! "head chunk" accumulates writes until it reaches a size/age threshold.
 
-use std::io::{Read, Write};
 use serde::{Deserialize, Serialize};
+use std::io::{Read, Write};
 
 use crate::models::{Chunk, Codec, LogEntry, TimestampNs};
 
@@ -31,7 +31,11 @@ struct WireEntry {
 pub fn encode_chunk(entries: &[LogEntry], codec: Codec) -> anyhow::Result<Vec<u8>> {
     let mut raw: Vec<u8> = Vec::with_capacity(entries.len() * 128);
     for e in entries {
-        let wire = WireEntry { ts: e.ts, line: e.line.clone(), meta: e.metadata.clone() };
+        let wire = WireEntry {
+            ts: e.ts,
+            line: e.line.clone(),
+            meta: e.metadata.clone(),
+        };
         serde_json::to_writer(&mut raw, &wire)?;
         raw.push(b'\n');
     }
@@ -47,7 +51,11 @@ pub fn decode_chunk(chunk: &Chunk) -> anyhow::Result<Vec<LogEntry>> {
             continue;
         }
         let wire: WireEntry = serde_json::from_slice(line)?;
-        entries.push(LogEntry { ts: wire.ts, line: wire.line, metadata: wire.meta });
+        entries.push(LogEntry {
+            ts: wire.ts,
+            line: wire.line,
+            metadata: wire.meta,
+        });
     }
     Ok(entries)
 }
@@ -147,8 +155,7 @@ impl HeadChunk {
     }
 
     pub fn should_flush(&self, target: usize, max_age_secs: u64) -> bool {
-        self.uncompressed_size >= target
-            || self.created_at.elapsed().as_secs() >= max_age_secs
+        self.uncompressed_size >= target || self.created_at.elapsed().as_secs() >= max_age_secs
     }
 
     pub fn min_ts(&self) -> Option<TimestampNs> {
@@ -189,14 +196,21 @@ mod tests {
     use crate::models::LogEntry;
 
     fn sample_entries(n: usize) -> Vec<LogEntry> {
-        (0..n).map(|i| LogEntry::new(i as i64 * 1_000_000_000, format!("log line {}", i))).collect()
+        (0..n)
+            .map(|i| LogEntry::new(i as i64 * 1_000_000_000, format!("log line {}", i)))
+            .collect()
     }
 
     #[test]
     fn roundtrip_none() {
         let entries = sample_entries(10);
-        let chunk = HeadChunk { stream_fp: 1, tenant: "t".into(), entries: entries.clone(),
-            created_at: std::time::Instant::now(), uncompressed_size: 100 };
+        let chunk = HeadChunk {
+            stream_fp: 1,
+            tenant: "t".into(),
+            entries: entries.clone(),
+            created_at: std::time::Instant::now(),
+            uncompressed_size: 100,
+        };
         let sealed = chunk.flush(Codec::None).unwrap();
         let decoded = decode_chunk(&sealed).unwrap();
         assert_eq!(decoded.len(), 10);
@@ -206,8 +220,13 @@ mod tests {
     #[test]
     fn roundtrip_snappy() {
         let entries = sample_entries(100);
-        let chunk = HeadChunk { stream_fp: 2, tenant: "t".into(), entries: entries.clone(),
-            created_at: std::time::Instant::now(), uncompressed_size: 1000 };
+        let chunk = HeadChunk {
+            stream_fp: 2,
+            tenant: "t".into(),
+            entries: entries.clone(),
+            created_at: std::time::Instant::now(),
+            uncompressed_size: 1000,
+        };
         let sealed = chunk.flush(Codec::Snappy).unwrap();
         assert!(sealed.data.len() < sealed.uncompressed_size as usize);
         let decoded = decode_chunk(&sealed).unwrap();
@@ -218,8 +237,13 @@ mod tests {
     fn roundtrip_gzip() {
         let entries = sample_entries(50);
         let sz: usize = entries.iter().map(|e| e.size_bytes()).sum();
-        let chunk = HeadChunk { stream_fp: 3, tenant: "t".into(), entries,
-            created_at: std::time::Instant::now(), uncompressed_size: sz };
+        let chunk = HeadChunk {
+            stream_fp: 3,
+            tenant: "t".into(),
+            entries,
+            created_at: std::time::Instant::now(),
+            uncompressed_size: sz,
+        };
         let sealed = chunk.flush(Codec::Gzip).unwrap();
         let decoded = decode_chunk(&sealed).unwrap();
         assert_eq!(decoded.len(), 50);
@@ -229,8 +253,13 @@ mod tests {
     fn roundtrip_lz4() {
         let entries = sample_entries(50);
         let sz: usize = entries.iter().map(|e| e.size_bytes()).sum();
-        let chunk = HeadChunk { stream_fp: 4, tenant: "t".into(), entries,
-            created_at: std::time::Instant::now(), uncompressed_size: sz };
+        let chunk = HeadChunk {
+            stream_fp: 4,
+            tenant: "t".into(),
+            entries,
+            created_at: std::time::Instant::now(),
+            uncompressed_size: sz,
+        };
         let sealed = chunk.flush(Codec::Lz4).unwrap();
         let decoded = decode_chunk(&sealed).unwrap();
         assert_eq!(decoded.len(), 50);
@@ -240,8 +269,13 @@ mod tests {
     fn roundtrip_zstd() {
         let entries = sample_entries(50);
         let sz: usize = entries.iter().map(|e| e.size_bytes()).sum();
-        let chunk = HeadChunk { stream_fp: 5, tenant: "t".into(), entries,
-            created_at: std::time::Instant::now(), uncompressed_size: sz };
+        let chunk = HeadChunk {
+            stream_fp: 5,
+            tenant: "t".into(),
+            entries,
+            created_at: std::time::Instant::now(),
+            uncompressed_size: sz,
+        };
         let sealed = chunk.flush(Codec::Zstd).unwrap();
         let decoded = decode_chunk(&sealed).unwrap();
         assert_eq!(decoded.len(), 50);

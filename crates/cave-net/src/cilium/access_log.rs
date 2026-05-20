@@ -104,7 +104,8 @@ pub struct AccessLog {
 impl AccessLog {
     pub fn new(tenant: TenantId, capacity: usize) -> Self {
         Self {
-            tenant, capacity,
+            tenant,
+            capacity,
             entries: VecDeque::with_capacity(capacity.min(1024)),
             overflow: 0,
             counters: BTreeMap::new(),
@@ -113,7 +114,9 @@ impl AccessLog {
 
     pub fn ingest(&mut self, entry: AccessLogEntry) -> Result<(), AccessLogError> {
         if entry.tenant != self.tenant {
-            return Err(AccessLogError::TenantDenied { tenant: entry.tenant });
+            return Err(AccessLogError::TenantDenied {
+                tenant: entry.tenant,
+            });
         }
         if self.entries.len() >= self.capacity {
             self.entries.pop_front();
@@ -161,14 +164,21 @@ mod tests {
 
     fn http_req(tenant: &str, status: u16, verdict: AccessLogVerdict) -> AccessLogEntry {
         AccessLogEntry {
-            tenant: TenantId::new(tenant).expect("test fixture"), time: Utc::now(),
-            flow_type: FlowType::Request, verdict,
+            tenant: TenantId::new(tenant).expect("test fixture"),
+            time: Utc::now(),
+            flow_type: FlowType::Request,
+            verdict,
             protocol: AccessLogProtocol::Http,
-            source_identity: 256, destination_identity: 257,
-            source_pod: "ns/client".into(), destination_pod: "ns/server".into(),
+            source_identity: 256,
+            destination_identity: 257,
+            source_pod: "ns/client".into(),
+            destination_pod: "ns/server".into(),
             l7: L7Protocol::Http(HttpDetails {
-                method: "GET".into(), path: "/api/users".into(), host: "api.example.com".into(),
-                status, headers: vec![("user-agent".into(), "test".into())],
+                method: "GET".into(),
+                path: "/api/users".into(),
+                host: "api.example.com".into(),
+                status,
+                headers: vec![("user-agent".into(), "test".into())],
                 bytes: 1024,
             }),
             policy_name: Some("allow-api".into()),
@@ -178,17 +188,23 @@ mod tests {
 
     fn dns_req(tenant: &str) -> AccessLogEntry {
         AccessLogEntry {
-            tenant: TenantId::new(tenant).expect("test fixture"), time: Utc::now(),
-            flow_type: FlowType::Request, verdict: AccessLogVerdict::Allowed,
+            tenant: TenantId::new(tenant).expect("test fixture"),
+            time: Utc::now(),
+            flow_type: FlowType::Request,
+            verdict: AccessLogVerdict::Allowed,
             protocol: AccessLogProtocol::Dns,
-            source_identity: 256, destination_identity: 2 /* world */,
-            source_pod: "ns/client".into(), destination_pod: "kube-system/kube-dns".into(),
+            source_identity: 256,
+            destination_identity: 2, /* world */
+            source_pod: "ns/client".into(),
+            destination_pod: "kube-system/kube-dns".into(),
             l7: L7Protocol::Dns(DnsDetails {
-                qname: "api.example.com".into(), qtype: "A".into(),
+                qname: "api.example.com".into(),
+                qtype: "A".into(),
                 rcode: "NOERROR".into(),
                 answers: vec!["1.2.3.4".into()],
             }),
-            policy_name: None, redirect_port: None,
+            policy_name: None,
+            redirect_port: None,
         }
     }
 
@@ -196,7 +212,11 @@ mod tests {
 
     #[test]
     fn http_entry_carries_status_and_method() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "LogRecord.Http", "tenant-al-h");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "LogRecord.Http",
+            "tenant-al-h"
+        );
         let e = http_req("tenant-al-h", 200, AccessLogVerdict::Allowed);
         match e.l7 {
             L7Protocol::Http(d) => {
@@ -209,7 +229,11 @@ mod tests {
 
     #[test]
     fn dns_entry_carries_qname_and_answers() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "LogRecord.Dns", "tenant-al-d");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "LogRecord.Dns",
+            "tenant-al-d"
+        );
         let e = dns_req("tenant-al-d");
         match e.l7 {
             L7Protocol::Dns(d) => {
@@ -222,8 +246,17 @@ mod tests {
 
     #[test]
     fn kafka_entry_round_trips() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "LogRecord.Kafka", "tenant-al-k");
-        let k = KafkaDetails { api_key: "Produce".into(), topic: "orders".into(), correlation_id: 42, error_code: 0 };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "LogRecord.Kafka",
+            "tenant-al-k"
+        );
+        let k = KafkaDetails {
+            api_key: "Produce".into(),
+            topic: "orders".into(),
+            correlation_id: 42,
+            error_code: 0,
+        };
         let s = serde_json::to_string(&k).unwrap();
         let back: KafkaDetails = serde_json::from_str(&s).unwrap();
         assert_eq!(back, k);
@@ -233,26 +266,40 @@ mod tests {
 
     #[test]
     fn ingest_records_entry() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "Ingest", "tenant-al-ing");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/proxy/accesslog/record.go", "Ingest", "tenant-al-ing");
         let mut log = AccessLog::new(tenant.clone(), 100);
-        log.ingest(http_req(tenant.as_str(), 200, AccessLogVerdict::Allowed)).unwrap();
+        log.ingest(http_req(tenant.as_str(), 200, AccessLogVerdict::Allowed))
+            .unwrap();
         assert_eq!(log.entries().len(), 1);
     }
 
     #[test]
     fn ingest_cross_tenant_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "Ingest.Tenant", "tenant-al-iso");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "Ingest.Tenant",
+            "tenant-al-iso"
+        );
         let mut log = AccessLog::new(tenant, 100);
-        let err = log.ingest(http_req("other", 200, AccessLogVerdict::Allowed)).unwrap_err();
+        let err = log
+            .ingest(http_req("other", 200, AccessLogVerdict::Allowed))
+            .unwrap_err();
         assert!(matches!(err, AccessLogError::TenantDenied { .. }));
     }
 
     #[test]
     fn ingest_increments_protocol_counter() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "Ingest.Counter", "tenant-al-cnt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "Ingest.Counter",
+            "tenant-al-cnt"
+        );
         let mut log = AccessLog::new(tenant.clone(), 100);
-        log.ingest(http_req(tenant.as_str(), 200, AccessLogVerdict::Allowed)).unwrap();
-        log.ingest(http_req(tenant.as_str(), 404, AccessLogVerdict::Allowed)).unwrap();
+        log.ingest(http_req(tenant.as_str(), 200, AccessLogVerdict::Allowed))
+            .unwrap();
+        log.ingest(http_req(tenant.as_str(), 404, AccessLogVerdict::Allowed))
+            .unwrap();
         log.ingest(dns_req(tenant.as_str())).unwrap();
         assert_eq!(log.count_for(AccessLogProtocol::Http), 2);
         assert_eq!(log.count_for(AccessLogProtocol::Dns), 1);
@@ -260,10 +307,15 @@ mod tests {
 
     #[test]
     fn ingest_evicts_oldest_when_full() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "Ingest.Eviction", "tenant-al-ev");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "Ingest.Eviction",
+            "tenant-al-ev"
+        );
         let mut log = AccessLog::new(tenant.clone(), 3);
         for s in [200u16, 201, 202, 203, 204] {
-            log.ingest(http_req(tenant.as_str(), s, AccessLogVerdict::Allowed)).unwrap();
+            log.ingest(http_req(tenant.as_str(), s, AccessLogVerdict::Allowed))
+                .unwrap();
         }
         assert_eq!(log.entries().len(), 3);
         assert_eq!(log.overflow_count(), 2);
@@ -273,10 +325,13 @@ mod tests {
 
     #[test]
     fn drain_returns_all_in_order() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "Drain", "tenant-al-drn");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/proxy/accesslog/record.go", "Drain", "tenant-al-drn");
         let mut log = AccessLog::new(tenant.clone(), 100);
-        log.ingest(http_req(tenant.as_str(), 200, AccessLogVerdict::Allowed)).unwrap();
-        log.ingest(http_req(tenant.as_str(), 201, AccessLogVerdict::Allowed)).unwrap();
+        log.ingest(http_req(tenant.as_str(), 200, AccessLogVerdict::Allowed))
+            .unwrap();
+        log.ingest(http_req(tenant.as_str(), 201, AccessLogVerdict::Allowed))
+            .unwrap();
         let drained = log.drain();
         assert_eq!(drained.len(), 2);
         assert_eq!(log.entries().len(), 0);
@@ -286,11 +341,18 @@ mod tests {
 
     #[test]
     fn by_verdict_returns_only_matches() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "Filter.Verdict", "tenant-al-fv");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "Filter.Verdict",
+            "tenant-al-fv"
+        );
         let mut log = AccessLog::new(tenant.clone(), 100);
-        log.ingest(http_req(tenant.as_str(), 200, AccessLogVerdict::Allowed)).unwrap();
-        log.ingest(http_req(tenant.as_str(), 403, AccessLogVerdict::Denied)).unwrap();
-        log.ingest(http_req(tenant.as_str(), 500, AccessLogVerdict::Error)).unwrap();
+        log.ingest(http_req(tenant.as_str(), 200, AccessLogVerdict::Allowed))
+            .unwrap();
+        log.ingest(http_req(tenant.as_str(), 403, AccessLogVerdict::Denied))
+            .unwrap();
+        log.ingest(http_req(tenant.as_str(), 500, AccessLogVerdict::Error))
+            .unwrap();
         assert_eq!(log.by_verdict(AccessLogVerdict::Denied).len(), 1);
         assert_eq!(log.by_verdict(AccessLogVerdict::Allowed).len(), 1);
         assert_eq!(log.by_verdict(AccessLogVerdict::Error).len(), 1);
@@ -298,10 +360,16 @@ mod tests {
 
     #[test]
     fn by_protocol_returns_only_matches() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "Filter.Protocol", "tenant-al-fp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "Filter.Protocol",
+            "tenant-al-fp"
+        );
         let mut log = AccessLog::new(tenant.clone(), 100);
-        log.ingest(http_req(tenant.as_str(), 200, AccessLogVerdict::Allowed)).unwrap();
-        log.ingest(http_req(tenant.as_str(), 200, AccessLogVerdict::Allowed)).unwrap();
+        log.ingest(http_req(tenant.as_str(), 200, AccessLogVerdict::Allowed))
+            .unwrap();
+        log.ingest(http_req(tenant.as_str(), 200, AccessLogVerdict::Allowed))
+            .unwrap();
         log.ingest(dns_req(tenant.as_str())).unwrap();
         assert_eq!(log.by_protocol(AccessLogProtocol::Http).len(), 2);
         assert_eq!(log.by_protocol(AccessLogProtocol::Dns).len(), 1);
@@ -309,7 +377,11 @@ mod tests {
 
     #[test]
     fn by_protocol_empty_when_no_matches() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "Filter.Protocol.None", "tenant-al-fpn");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "Filter.Protocol.None",
+            "tenant-al-fpn"
+        );
         let mut log = AccessLog::new(tenant.clone(), 100);
         log.ingest(dns_req(tenant.as_str())).unwrap();
         assert!(log.by_protocol(AccessLogProtocol::Http).is_empty());
@@ -319,7 +391,11 @@ mod tests {
 
     #[test]
     fn l7_protocol_none_for_l4_only_traffic() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "L7Protocol.None", "tenant-al-l4");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "L7Protocol.None",
+            "tenant-al-l4"
+        );
         let p = L7Protocol::None;
         let s = serde_json::to_string(&p).unwrap();
         let back: L7Protocol = serde_json::from_str(&s).unwrap();
@@ -330,16 +406,25 @@ mod tests {
 
     #[test]
     fn count_for_returns_zero_for_unrecorded_protocol() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "Counter.Zero", "tenant-al-cz");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "Counter.Zero",
+            "tenant-al-cz"
+        );
         let log = AccessLog::new(tenant, 100);
         assert_eq!(log.count_for(AccessLogProtocol::Kafka), 0);
     }
 
     #[test]
     fn overflow_count_zero_when_under_capacity() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "Overflow.Zero", "tenant-al-ovz");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "Overflow.Zero",
+            "tenant-al-ovz"
+        );
         let mut log = AccessLog::new(tenant.clone(), 100);
-        log.ingest(http_req(tenant.as_str(), 200, AccessLogVerdict::Allowed)).unwrap();
+        log.ingest(http_req(tenant.as_str(), 200, AccessLogVerdict::Allowed))
+            .unwrap();
         assert_eq!(log.overflow_count(), 0);
     }
 
@@ -347,7 +432,11 @@ mod tests {
 
     #[test]
     fn access_log_entry_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "Entry.Serde", "tenant-al-eserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "Entry.Serde",
+            "tenant-al-eserde"
+        );
         let e = http_req("tenant-al-eserde", 200, AccessLogVerdict::Allowed);
         let s = serde_json::to_string(&e).unwrap();
         let back: AccessLogEntry = serde_json::from_str(&s).unwrap();
@@ -358,10 +447,17 @@ mod tests {
 
     #[test]
     fn http_details_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "HttpDetails.Serde", "tenant-al-hserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "HttpDetails.Serde",
+            "tenant-al-hserde"
+        );
         let h = HttpDetails {
-            method: "POST".into(), path: "/api".into(), host: "api.example.com".into(),
-            status: 201, headers: vec![("content-type".into(), "application/json".into())],
+            method: "POST".into(),
+            path: "/api".into(),
+            host: "api.example.com".into(),
+            status: 201,
+            headers: vec![("content-type".into(), "application/json".into())],
             bytes: 512,
         };
         let s = serde_json::to_string(&h).unwrap();
@@ -371,9 +467,14 @@ mod tests {
 
     #[test]
     fn dns_details_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "DnsDetails.Serde", "tenant-al-dserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "DnsDetails.Serde",
+            "tenant-al-dserde"
+        );
         let d = DnsDetails {
-            qname: "api.example.com".into(), qtype: "A".into(),
+            qname: "api.example.com".into(),
+            qtype: "A".into(),
             rcode: "NOERROR".into(),
             answers: vec!["1.2.3.4".into(), "1.2.3.5".into()],
         };
@@ -384,8 +485,16 @@ mod tests {
 
     #[test]
     fn verdict_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "Verdict.Serde", "tenant-al-vserde");
-        for v in [AccessLogVerdict::Allowed, AccessLogVerdict::Denied, AccessLogVerdict::Error] {
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "Verdict.Serde",
+            "tenant-al-vserde"
+        );
+        for v in [
+            AccessLogVerdict::Allowed,
+            AccessLogVerdict::Denied,
+            AccessLogVerdict::Error,
+        ] {
             let s = serde_json::to_string(&v).unwrap();
             let back: AccessLogVerdict = serde_json::from_str(&s).unwrap();
             assert_eq!(back, v);
@@ -394,8 +503,18 @@ mod tests {
 
     #[test]
     fn protocol_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "Protocol.Serde", "tenant-al-pserde");
-        for p in [AccessLogProtocol::Http, AccessLogProtocol::Grpc, AccessLogProtocol::Dns, AccessLogProtocol::Kafka, AccessLogProtocol::Tcp] {
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "Protocol.Serde",
+            "tenant-al-pserde"
+        );
+        for p in [
+            AccessLogProtocol::Http,
+            AccessLogProtocol::Grpc,
+            AccessLogProtocol::Dns,
+            AccessLogProtocol::Kafka,
+            AccessLogProtocol::Tcp,
+        ] {
             let s = serde_json::to_string(&p).unwrap();
             let back: AccessLogProtocol = serde_json::from_str(&s).unwrap();
             assert_eq!(back, p);
@@ -406,7 +525,11 @@ mod tests {
 
     #[test]
     fn entry_with_response_flow_type() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/accesslog/record.go", "FlowType.Response", "tenant-al-resp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/accesslog/record.go",
+            "FlowType.Response",
+            "tenant-al-resp"
+        );
         let mut log = AccessLog::new(tenant.clone(), 100);
         let mut e = http_req(tenant.as_str(), 200, AccessLogVerdict::Allowed);
         e.flow_type = FlowType::Response;

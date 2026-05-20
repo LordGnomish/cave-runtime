@@ -120,9 +120,12 @@ impl Tenant {
         let mut manifests = Vec::new();
 
         // Namespace
-        let labels_yaml: String = self.labels.iter()
+        let labels_yaml: String = self
+            .labels
+            .iter()
             .map(|(k, v)| format!("    {k}: {v}"))
-            .collect::<Vec<_>>().join("\n");
+            .collect::<Vec<_>>()
+            .join("\n");
         manifests.push(format!(
             r#"apiVersion: v1
 kind: Namespace
@@ -139,7 +142,10 @@ metadata:
         quota_hard.push(format!("    limits.cpu: {}", self.quota.cpu_limit));
         quota_hard.push(format!("    limits.memory: {}", self.quota.memory_limit));
         quota_hard.push(format!("    requests.cpu: {}", self.quota.cpu_request));
-        quota_hard.push(format!("    requests.memory: {}", self.quota.memory_request));
+        quota_hard.push(format!(
+            "    requests.memory: {}",
+            self.quota.memory_request
+        ));
         if let Some(pods) = self.quota.max_pods {
             quota_hard.push(format!("    pods: {pods}"));
         }

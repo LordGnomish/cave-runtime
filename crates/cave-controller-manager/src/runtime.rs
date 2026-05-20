@@ -74,7 +74,11 @@ where
         reconcile_fn: fn(&S, &O, &TenantId) -> Result<Reconcile, ControllerError>,
         requeue_delay: Duration,
     ) -> Self {
-        Self { snapshot_fn, reconcile_fn, requeue_delay }
+        Self {
+            snapshot_fn,
+            reconcile_fn,
+            requeue_delay,
+        }
     }
 }
 
@@ -109,11 +113,12 @@ where
 ///     `requeue_delay`.
 pub fn reconcile_to_outcome(r: Reconcile, requeue_delay: Duration) -> ReconcileOutcome {
     match r {
-        Reconcile::NoOp
-        | Reconcile::Create(_)
-        | Reconcile::Delete(_)
-        | Reconcile::Update(_) => ReconcileOutcome::Done,
-        Reconcile::Requeue => ReconcileOutcome::Requeue { delay: requeue_delay },
+        Reconcile::NoOp | Reconcile::Create(_) | Reconcile::Delete(_) | Reconcile::Update(_) => {
+            ReconcileOutcome::Done
+        }
+        Reconcile::Requeue => ReconcileOutcome::Requeue {
+            delay: requeue_delay,
+        },
     }
 }
 
@@ -132,8 +137,15 @@ pub fn run_deployment<F>(
     cancel: CancellationToken,
 ) -> (ReconcileQueue<String>, JoinHandle<()>)
 where
-    F: Fn(&str) -> Option<(crate::deployment::DeploymentSpec, crate::deployment::DeploymentStatus, TenantId)>
-        + Send + Sync + 'static,
+    F: Fn(
+            &str,
+        ) -> Option<(
+            crate::deployment::DeploymentSpec,
+            crate::deployment::DeploymentStatus,
+            TenantId,
+        )> + Send
+        + Sync
+        + 'static,
 {
     let r = Arc::new(ScaffoldReconciler::new(
         snapshot_fn,
@@ -150,8 +162,15 @@ pub fn run_replicaset<F>(
     cancel: CancellationToken,
 ) -> (ReconcileQueue<String>, JoinHandle<()>)
 where
-    F: Fn(&str) -> Option<(crate::replicaset::ReplicaSetSpec, crate::replicaset::ReplicaSetStatus, TenantId)>
-        + Send + Sync + 'static,
+    F: Fn(
+            &str,
+        ) -> Option<(
+            crate::replicaset::ReplicaSetSpec,
+            crate::replicaset::ReplicaSetStatus,
+            TenantId,
+        )> + Send
+        + Sync
+        + 'static,
 {
     let r = Arc::new(ScaffoldReconciler::new(
         snapshot_fn,
@@ -168,8 +187,15 @@ pub fn run_statefulset<F>(
     cancel: CancellationToken,
 ) -> (ReconcileQueue<String>, JoinHandle<()>)
 where
-    F: Fn(&str) -> Option<(crate::statefulset::StatefulSetSpec, crate::statefulset::StatefulSetStatus, TenantId)>
-        + Send + Sync + 'static,
+    F: Fn(
+            &str,
+        ) -> Option<(
+            crate::statefulset::StatefulSetSpec,
+            crate::statefulset::StatefulSetStatus,
+            TenantId,
+        )> + Send
+        + Sync
+        + 'static,
 {
     let r = Arc::new(ScaffoldReconciler::new(
         snapshot_fn,
@@ -187,8 +213,15 @@ pub fn run_daemonset<F>(
     cancel: CancellationToken,
 ) -> (ReconcileQueue<String>, JoinHandle<()>)
 where
-    F: Fn(&str) -> Option<(crate::daemonset::DaemonSetSpec, Vec<crate::daemonset::NodeView>, TenantId)>
-        + Send + Sync + 'static,
+    F: Fn(
+            &str,
+        ) -> Option<(
+            crate::daemonset::DaemonSetSpec,
+            Vec<crate::daemonset::NodeView>,
+            TenantId,
+        )> + Send
+        + Sync
+        + 'static,
 {
     let r = Arc::new(DaemonSetReconciler { snapshot_fn });
     run_reconciler(r, config, cancel)
@@ -196,8 +229,15 @@ where
 
 struct DaemonSetReconciler<F>
 where
-    F: Fn(&str) -> Option<(crate::daemonset::DaemonSetSpec, Vec<crate::daemonset::NodeView>, TenantId)>
-        + Send + Sync + 'static,
+    F: Fn(
+            &str,
+        ) -> Option<(
+            crate::daemonset::DaemonSetSpec,
+            Vec<crate::daemonset::NodeView>,
+            TenantId,
+        )> + Send
+        + Sync
+        + 'static,
 {
     snapshot_fn: F,
 }
@@ -205,8 +245,15 @@ where
 #[async_trait]
 impl<F> Reconciler for DaemonSetReconciler<F>
 where
-    F: Fn(&str) -> Option<(crate::daemonset::DaemonSetSpec, Vec<crate::daemonset::NodeView>, TenantId)>
-        + Send + Sync + 'static,
+    F: Fn(
+            &str,
+        ) -> Option<(
+            crate::daemonset::DaemonSetSpec,
+            Vec<crate::daemonset::NodeView>,
+            TenantId,
+        )> + Send
+        + Sync
+        + 'static,
 {
     type Key = String;
 
@@ -230,7 +277,9 @@ pub fn run_job<F>(
 ) -> (ReconcileQueue<String>, JoinHandle<()>)
 where
     F: Fn(&str) -> Option<(crate::job::JobSpec, crate::job::JobStatus, TenantId)>
-        + Send + Sync + 'static,
+        + Send
+        + Sync
+        + 'static,
 {
     let r = Arc::new(ScaffoldReconciler::new(
         snapshot_fn,
@@ -248,8 +297,15 @@ pub fn run_cronjob<F>(
     cancel: CancellationToken,
 ) -> (ReconcileQueue<String>, JoinHandle<()>)
 where
-    F: Fn(&str) -> Option<(crate::cronjob::CronJobSpec, crate::cronjob::CronJobStatus, TenantId)>
-        + Send + Sync + 'static,
+    F: Fn(
+            &str,
+        ) -> Option<(
+            crate::cronjob::CronJobSpec,
+            crate::cronjob::CronJobStatus,
+            TenantId,
+        )> + Send
+        + Sync
+        + 'static,
 {
     let r = Arc::new(ScaffoldReconciler::new(
         snapshot_fn,
@@ -268,7 +324,9 @@ pub fn run_hpa<F>(
 ) -> (ReconcileQueue<String>, JoinHandle<()>)
 where
     F: Fn(&str) -> Option<(crate::hpa::HpaSpec, crate::hpa::HpaStatus, TenantId)>
-        + Send + Sync + 'static,
+        + Send
+        + Sync
+        + 'static,
 {
     let r = Arc::new(ScaffoldReconciler::new(
         snapshot_fn,
@@ -286,7 +344,9 @@ pub fn run_pdb<F>(
 ) -> (ReconcileQueue<String>, JoinHandle<()>)
 where
     F: Fn(&str) -> Option<(crate::pdb::PdbSpec, crate::pdb::PdbStatus, TenantId)>
-        + Send + Sync + 'static,
+        + Send
+        + Sync
+        + 'static,
 {
     let r = Arc::new(ScaffoldReconciler::new(
         snapshot_fn,
@@ -303,8 +363,15 @@ pub fn run_service<F>(
     cancel: CancellationToken,
 ) -> (ReconcileQueue<String>, JoinHandle<()>)
 where
-    F: Fn(&str) -> Option<(crate::service::ServiceSpec, crate::service::ServiceStatus, TenantId)>
-        + Send + Sync + 'static,
+    F: Fn(
+            &str,
+        ) -> Option<(
+            crate::service::ServiceSpec,
+            crate::service::ServiceStatus,
+            TenantId,
+        )> + Send
+        + Sync
+        + 'static,
 {
     let r = Arc::new(ScaffoldReconciler::new(
         snapshot_fn,
@@ -322,8 +389,15 @@ pub fn run_endpointslice<F>(
     cancel: CancellationToken,
 ) -> (ReconcileQueue<String>, JoinHandle<()>)
 where
-    F: Fn(&str) -> Option<(crate::endpointslice::EndpointSliceSpec, crate::endpointslice::EndpointObservation, TenantId)>
-        + Send + Sync + 'static,
+    F: Fn(
+            &str,
+        ) -> Option<(
+            crate::endpointslice::EndpointSliceSpec,
+            crate::endpointslice::EndpointObservation,
+            TenantId,
+        )> + Send
+        + Sync
+        + 'static,
 {
     let r = Arc::new(ScaffoldReconciler::new(
         snapshot_fn,
@@ -358,8 +432,10 @@ mod tests {
             Reconcile::Delete(1),
             Reconcile::Update(2),
         ] {
-            assert!(matches!(reconcile_to_outcome(r, d), ReconcileOutcome::Done),
-                "terminal decisions become ReconcileOutcome::Done");
+            assert!(
+                matches!(reconcile_to_outcome(r, d), ReconcileOutcome::Done),
+                "terminal decisions become ReconcileOutcome::Done"
+            );
         }
     }
 
@@ -381,18 +457,28 @@ mod tests {
     // namespace/name, drives a few keys through the kernel reconcile loop,
     // and asserts call count + tenant_id invariants.
 
-    fn deployment_fixture(replicas: u32, observed: u32, paused: bool, t: &str)
-        -> (DeploymentSpec, DeploymentStatus, TenantId)
-    {
+    fn deployment_fixture(
+        replicas: u32,
+        observed: u32,
+        paused: bool,
+        t: &str,
+    ) -> (DeploymentSpec, DeploymentStatus, TenantId) {
         (
             DeploymentSpec {
-                name: "web".into(), namespace: "default".into(),
+                name: "web".into(),
+                namespace: "default".into(),
                 replicas,
-                strategy: Strategy::RollingUpdate { max_surge: 1, max_unavailable: 0 },
+                strategy: Strategy::RollingUpdate {
+                    max_surge: 1,
+                    max_unavailable: 0,
+                },
                 paused,
                 progress_deadline_seconds: None,
             },
-            DeploymentStatus { observed_replicas: observed, ..Default::default() },
+            DeploymentStatus {
+                observed_replicas: observed,
+                ..Default::default()
+            },
             tenant(t),
         )
     }
@@ -404,24 +490,29 @@ mod tests {
         let calls = Arc::new(AtomicUsize::new(0));
         let calls2 = calls.clone();
         let mut fixtures = HashMap::new();
-        fixtures.insert("default/web-1".to_string(),
-            deployment_fixture(3, 0, false, "tenant-a"));
-        fixtures.insert("default/web-2".to_string(),
-            deployment_fixture(2, 2, false, "tenant-a"));
+        fixtures.insert(
+            "default/web-1".to_string(),
+            deployment_fixture(3, 0, false, "tenant-a"),
+        );
+        fixtures.insert(
+            "default/web-2".to_string(),
+            deployment_fixture(2, 2, false, "tenant-a"),
+        );
         let fixtures = Arc::new(fixtures);
         let snap = move |k: &str| -> Option<_> {
             calls2.fetch_add(1, Ordering::SeqCst);
             fixtures.get(k).cloned()
         };
         let cancel = CancellationToken::new();
-        let (queue, handle) = run_deployment(
-            snap, ReconcileLoopConfig::default(), cancel.clone(),
-        );
+        let (queue, handle) = run_deployment(snap, ReconcileLoopConfig::default(), cancel.clone());
         queue.enqueue("default/web-1".into()).await.unwrap();
         queue.enqueue("default/web-2".into()).await.unwrap();
         tokio::time::sleep(Duration::from_millis(50)).await;
-        assert_eq!(calls.load(Ordering::SeqCst), 2,
-            "every enqueued key triggers exactly one snapshot lookup");
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            2,
+            "every enqueued key triggers exactly one snapshot lookup"
+        );
         cancel.cancel();
         let _ = handle.await;
     }
@@ -432,9 +523,7 @@ mod tests {
     async fn run_deployment_treats_missing_snapshot_as_done() {
         let snap = |_k: &str| None;
         let cancel = CancellationToken::new();
-        let (queue, handle) = run_deployment(
-            snap, ReconcileLoopConfig::default(), cancel.clone(),
-        );
+        let (queue, handle) = run_deployment(snap, ReconcileLoopConfig::default(), cancel.clone());
         queue.enqueue("missing/web".into()).await.unwrap();
         tokio::time::sleep(Duration::from_millis(20)).await;
         cancel.cancel();
@@ -450,22 +539,28 @@ mod tests {
         let observed_tenants = Arc::new(Mutex::new(Vec::new()));
         let observed_clone = observed_tenants.clone();
         let snap = move |k: &str| -> Option<(DeploymentSpec, DeploymentStatus, TenantId)> {
-            let t = if k.starts_with("acme/") { "acme" } else { "globex" };
+            let t = if k.starts_with("acme/") {
+                "acme"
+            } else {
+                "globex"
+            };
             observed_clone.lock().unwrap().push(t.to_string());
             Some(deployment_fixture(2, 0, false, t))
         };
         let cancel = CancellationToken::new();
-        let (queue, handle) = run_deployment(
-            snap, ReconcileLoopConfig::default(), cancel.clone(),
-        );
+        let (queue, handle) = run_deployment(snap, ReconcileLoopConfig::default(), cancel.clone());
         queue.enqueue("acme/web".into()).await.unwrap();
         queue.enqueue("globex/db".into()).await.unwrap();
         tokio::time::sleep(Duration::from_millis(50)).await;
         let seen = observed_tenants.lock().unwrap().clone();
-        assert!(seen.contains(&"acme".to_string()),
-            "tenant_id invariant: acme key resolved to acme tenant");
-        assert!(seen.contains(&"globex".to_string()),
-            "tenant_id invariant: globex key resolved to globex tenant");
+        assert!(
+            seen.contains(&"acme".to_string()),
+            "tenant_id invariant: acme key resolved to acme tenant"
+        );
+        assert!(
+            seen.contains(&"globex".to_string()),
+            "tenant_id invariant: globex key resolved to globex tenant"
+        );
         cancel.cancel();
         let _ = handle.await;
     }
@@ -478,9 +573,7 @@ mod tests {
             Some(deployment_fixture(1, 1, false, "tenant"))
         };
         let cancel = CancellationToken::new();
-        let (_queue, handle) = run_deployment(
-            snap, ReconcileLoopConfig::default(), cancel.clone(),
-        );
+        let (_queue, handle) = run_deployment(snap, ReconcileLoopConfig::default(), cancel.clone());
         cancel.cancel();
         handle.await.expect("loop terminates cleanly on cancel");
     }
@@ -496,17 +589,20 @@ mod tests {
             calls2.fetch_add(1, Ordering::SeqCst);
             Some((
                 ReplicaSetSpec {
-                    name: "rs".into(), namespace: "default".into(),
-                    replicas: 3, selector: vec![],
+                    name: "rs".into(),
+                    namespace: "default".into(),
+                    replicas: 3,
+                    selector: vec![],
                 },
-                ReplicaSetStatus { running_pods: 3, failed_pods: 0 },
+                ReplicaSetStatus {
+                    running_pods: 3,
+                    failed_pods: 0,
+                },
                 tenant("tenant-rs"),
             ))
         };
         let cancel = CancellationToken::new();
-        let (queue, handle) = run_replicaset(
-            snap, ReconcileLoopConfig::default(), cancel.clone(),
-        );
+        let (queue, handle) = run_replicaset(snap, ReconcileLoopConfig::default(), cancel.clone());
         queue.enqueue("default/rs-a".into()).await.unwrap();
         tokio::time::sleep(Duration::from_millis(30)).await;
         assert_eq!(calls.load(Ordering::SeqCst), 1);
@@ -517,21 +613,24 @@ mod tests {
     /// Upstream parity: StatefulSet reconcile reachable through the kernel.
     #[tokio::test(flavor = "multi_thread")]
     async fn run_statefulset_smoke_reaches_reconcile() {
-        use crate::statefulset::{StatefulSetSpec, StatefulSetStatus, PodManagementPolicy};
+        use crate::statefulset::{PodManagementPolicy, StatefulSetSpec, StatefulSetStatus};
         let snap = |_k: &str| -> Option<(StatefulSetSpec, StatefulSetStatus, TenantId)> {
             Some((
                 StatefulSetSpec {
-                    name: "ss".into(), namespace: "default".into(),
-                    replicas: 2, policy: PodManagementPolicy::OrderedReady,
+                    name: "ss".into(),
+                    namespace: "default".into(),
+                    replicas: 2,
+                    policy: PodManagementPolicy::OrderedReady,
                 },
-                StatefulSetStatus { current_replicas: 2, ready_replicas: 2 },
+                StatefulSetStatus {
+                    current_replicas: 2,
+                    ready_replicas: 2,
+                },
                 tenant("tenant-ss"),
             ))
         };
         let cancel = CancellationToken::new();
-        let (queue, handle) = run_statefulset(
-            snap, ReconcileLoopConfig::default(), cancel.clone(),
-        );
+        let (queue, handle) = run_statefulset(snap, ReconcileLoopConfig::default(), cancel.clone());
         queue.enqueue("default/ss".into()).await.unwrap();
         tokio::time::sleep(Duration::from_millis(20)).await;
         cancel.cancel();
@@ -554,10 +653,11 @@ mod tests {
             ))
         };
         let cancel = CancellationToken::new();
-        let (queue, handle) = run_daemonset(
-            snap, ReconcileLoopConfig::default(), cancel.clone(),
-        );
-        queue.enqueue("kube-system/node-exporter".into()).await.unwrap();
+        let (queue, handle) = run_daemonset(snap, ReconcileLoopConfig::default(), cancel.clone());
+        queue
+            .enqueue("kube-system/node-exporter".into())
+            .await
+            .unwrap();
         tokio::time::sleep(Duration::from_millis(20)).await;
         cancel.cancel();
         let _ = handle.await;
@@ -570,8 +670,11 @@ mod tests {
         let snap = |_k: &str| -> Option<(JobSpec, JobStatus, TenantId)> {
             Some((
                 JobSpec {
-                    name: "migrate".into(), namespace: "default".into(),
-                    completions: 1, parallelism: 1, backoff_limit: 6,
+                    name: "migrate".into(),
+                    namespace: "default".into(),
+                    completions: 1,
+                    parallelism: 1,
+                    backoff_limit: 6,
                     suspended: false,
                     active_deadline_seconds: None,
                 },
@@ -580,9 +683,7 @@ mod tests {
             ))
         };
         let cancel = CancellationToken::new();
-        let (queue, handle) = run_job(
-            snap, ReconcileLoopConfig::default(), cancel.clone(),
-        );
+        let (queue, handle) = run_job(snap, ReconcileLoopConfig::default(), cancel.clone());
         queue.enqueue("default/migrate".into()).await.unwrap();
         tokio::time::sleep(Duration::from_millis(20)).await;
         cancel.cancel();
@@ -619,7 +720,8 @@ mod tests {
         let snap = |_k: &str| -> Option<(PdbSpec, PdbStatus, TenantId)> {
             Some((
                 PdbSpec {
-                    name: "web-pdb".into(), namespace: "default".into(),
+                    name: "web-pdb".into(),
+                    namespace: "default".into(),
                     min_available: Some(Threshold::Count(1)),
                     max_unavailable: None,
                 },
@@ -628,9 +730,7 @@ mod tests {
             ))
         };
         let cancel = CancellationToken::new();
-        let (queue, handle) = run_pdb(
-            snap, ReconcileLoopConfig::default(), cancel.clone(),
-        );
+        let (queue, handle) = run_pdb(snap, ReconcileLoopConfig::default(), cancel.clone());
         queue.enqueue("default/web-pdb".into()).await.unwrap();
         tokio::time::sleep(Duration::from_millis(20)).await;
         cancel.cancel();
@@ -644,7 +744,8 @@ mod tests {
         let snap = |_k: &str| -> Option<(ServiceSpec, ServiceStatus, TenantId)> {
             Some((
                 ServiceSpec {
-                    name: "web".into(), namespace: "default".into(),
+                    name: "web".into(),
+                    namespace: "default".into(),
                     service_type: ServiceType::ClusterIP,
                     deletion_pending: false,
                 },
@@ -653,9 +754,7 @@ mod tests {
             ))
         };
         let cancel = CancellationToken::new();
-        let (queue, handle) = run_service(
-            snap, ReconcileLoopConfig::default(), cancel.clone(),
-        );
+        let (queue, handle) = run_service(snap, ReconcileLoopConfig::default(), cancel.clone());
         queue.enqueue("default/web".into()).await.unwrap();
         tokio::time::sleep(Duration::from_millis(20)).await;
         cancel.cancel();
@@ -665,7 +764,7 @@ mod tests {
     /// Upstream parity: EndpointSlice reconcile (EndpointObservation shape).
     #[tokio::test(flavor = "multi_thread")]
     async fn run_endpointslice_smoke_reaches_reconcile() {
-        use crate::endpointslice::{EndpointSliceSpec, EndpointObservation};
+        use crate::endpointslice::{EndpointObservation, EndpointSliceSpec};
         let snap = |_k: &str| -> Option<(EndpointSliceSpec, EndpointObservation, TenantId)> {
             Some((
                 EndpointSliceSpec {
@@ -673,14 +772,16 @@ mod tests {
                     namespace: "default".into(),
                     selector: vec![],
                 },
-                EndpointObservation { ready_pod_count: 0, current_slice_count: 0 },
+                EndpointObservation {
+                    ready_pod_count: 0,
+                    current_slice_count: 0,
+                },
                 tenant("tenant-eps"),
             ))
         };
         let cancel = CancellationToken::new();
-        let (queue, handle) = run_endpointslice(
-            snap, ReconcileLoopConfig::default(), cancel.clone(),
-        );
+        let (queue, handle) =
+            run_endpointslice(snap, ReconcileLoopConfig::default(), cancel.clone());
         queue.enqueue("default/web-eps".into()).await.unwrap();
         tokio::time::sleep(Duration::from_millis(20)).await;
         cancel.cancel();
@@ -701,10 +802,15 @@ mod tests {
             use crate::replicaset::{ReplicaSetSpec, ReplicaSetStatus};
             Some((
                 ReplicaSetSpec {
-                    name: "rs".into(), namespace: "ns".into(),
-                    replicas: 1, selector: vec![],
+                    name: "rs".into(),
+                    namespace: "ns".into(),
+                    replicas: 1,
+                    selector: vec![],
                 },
-                ReplicaSetStatus { running_pods: 1, failed_pods: 0 },
+                ReplicaSetStatus {
+                    running_pods: 1,
+                    failed_pods: 0,
+                },
                 tenant("t"),
             ))
         };
@@ -729,13 +835,20 @@ mod tests {
             calls2.fetch_add(1, Ordering::SeqCst);
             Some((
                 DeploymentSpec {
-                    name: "x".into(), namespace: "ns".into(),
+                    name: "x".into(),
+                    namespace: "ns".into(),
                     replicas: 5,
-                    strategy: Strategy::RollingUpdate { max_surge: 1, max_unavailable: 0 },
+                    strategy: Strategy::RollingUpdate {
+                        max_surge: 1,
+                        max_unavailable: 0,
+                    },
                     paused: false,
                     progress_deadline_seconds: None,
                 },
-                DeploymentStatus { observed_replicas: 0, ..Default::default() },
+                DeploymentStatus {
+                    observed_replicas: 0,
+                    ..Default::default()
+                },
                 tenant("t"),
             ))
         };
@@ -762,7 +875,10 @@ mod tests {
         // prove the kernel loop honored the Requeue decision.
         tokio::time::sleep(Duration::from_millis(50)).await;
         let n = calls.load(Ordering::SeqCst);
-        assert!(n >= 2, "Requeue decision triggered re-enqueue: only {n} call(s)");
+        assert!(
+            n >= 2,
+            "Requeue decision triggered re-enqueue: only {n} call(s)"
+        );
         cancel.cancel();
         let _ = handle.await;
     }

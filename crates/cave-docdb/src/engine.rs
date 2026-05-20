@@ -40,7 +40,10 @@ impl Collection {
             .get("_id")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
-            .or_else(|| doc.get("_id").and_then(|v| v.as_i64().map(|n| n.to_string())))
+            .or_else(|| {
+                doc.get("_id")
+                    .and_then(|v| v.as_i64().map(|n| n.to_string()))
+            })
             .ok_or_else(|| "missing _id".to_string())?;
 
         let mut docs = self.documents.write().await;
@@ -106,11 +109,7 @@ impl Collection {
                 } else {
                     true
                 };
-                if matches {
-                    Some(id.clone())
-                } else {
-                    None
-                }
+                if matches { Some(id.clone()) } else { None }
             })
             .collect();
 
@@ -136,11 +135,7 @@ impl Collection {
                 } else {
                     true
                 };
-                if matches {
-                    Some(id.clone())
-                } else {
-                    None
-                }
+                if matches { Some(id.clone()) } else { None }
             })
             .collect();
 
@@ -222,13 +217,7 @@ impl Database {
     }
 
     pub async fn list_collections(&self) -> Result<Vec<String>, String> {
-        Ok(self
-            .collections
-            .read()
-            .await
-            .keys()
-            .cloned()
-            .collect())
+        Ok(self.collections.read().await.keys().cloned().collect())
     }
 
     pub async fn drop_collection(&self, name: &str) -> Result<(), String> {
@@ -316,7 +305,6 @@ pub struct EngineStats {
 }
 
 use serde::{Deserialize, Serialize};
-
 
 #[cfg(test)]
 mod tests {

@@ -113,10 +113,7 @@ mod tests {
         let m = json!({"kind": "Pod", "metadata": {"name": "x"}});
         let r = prepare(&args(), &m).unwrap();
         assert_eq!(r.verb, HttpVerb::Post);
-        assert_eq!(
-            r.path,
-            "/api/compat/kubectl/v1/namespaces/default/pods"
-        );
+        assert_eq!(r.path, "/api/compat/kubectl/v1/namespaces/default/pods");
     }
 
     #[test]

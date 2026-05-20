@@ -13,8 +13,8 @@
 
 use crate::framework::Pod;
 use chrono::{DateTime, Duration, Utc};
-use std::collections::{BinaryHeap, HashMap};
 use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashMap};
 
 /// PriorityClass — non-preemptive priority value attached to a pod.
 #[derive(Debug, Clone)]
@@ -26,7 +26,10 @@ pub struct PriorityClass {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PreemptionPolicy { PreemptLowerPriority, Never }
+pub enum PreemptionPolicy {
+    PreemptLowerPriority,
+    Never,
+}
 
 #[derive(Debug, Clone)]
 struct QueuedPod {
@@ -37,13 +40,24 @@ struct QueuedPod {
     attempts: u32,
 }
 
-impl PartialEq for QueuedPod { fn eq(&self, other: &Self) -> bool { self.pod.uid == other.pod.uid } }
+impl PartialEq for QueuedPod {
+    fn eq(&self, other: &Self) -> bool {
+        self.pod.uid == other.pod.uid
+    }
+}
 impl Eq for QueuedPod {}
-impl PartialOrd for QueuedPod { fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) } }
+impl PartialOrd for QueuedPod {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
 impl Ord for QueuedPod {
     fn cmp(&self, other: &Self) -> Ordering {
         // BinaryHeap is max-heap → higher priority first; older pods first on tie.
-        self.pod.spec.priority.cmp(&other.pod.spec.priority)
+        self.pod
+            .spec
+            .priority
+            .cmp(&other.pod.spec.priority)
             .then_with(|| other.enqueued_at.cmp(&self.enqueued_at))
             .then_with(|| other.pod.uid.cmp(&self.pod.uid))
     }
@@ -73,30 +87,60 @@ impl PriorityQueue {
     }
 
     pub fn with_backoff(mut self, initial: Duration, max: Duration) -> Self {
-        self.initial_backoff = initial; self.max_backoff = max; self
+        self.initial_backoff = initial;
+        self.max_backoff = max;
+        self
     }
 
-    pub fn len(&self) -> usize { self.active.len() + self.backoff.len() + self.unschedulable.len() }
-    pub fn is_empty(&self) -> bool { self.len() == 0 }
-    pub fn active_len(&self) -> usize { self.active.len() }
-    pub fn backoff_len(&self) -> usize { self.backoff.len() }
-    pub fn unschedulable_len(&self) -> usize { self.unschedulable.len() }
+    pub fn len(&self) -> usize {
+        self.active.len() + self.backoff.len() + self.unschedulable.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+    pub fn active_len(&self) -> usize {
+        self.active.len()
+    }
+    pub fn backoff_len(&self) -> usize {
+        self.backoff.len()
+    }
+    pub fn unschedulable_len(&self) -> usize {
+        self.unschedulable.len()
+    }
 
     pub fn add(&mut self, pod: Pod) {
-        self.active.push(QueuedPod { pod, enqueued_at: Utc::now(), backoff_until: None, attempts: 0 });
+        self.active.push(QueuedPod {
+            pod,
+            enqueued_at: Utc::now(),
+            backoff_until: None,
+            attempts: 0,
+        });
     }
 
     /// Pop the highest-priority pod from `active`. Returns None if empty.
-    pub fn pop(&mut self) -> Option<Pod> { self.active.pop().map(|q| q.pod) }
+    pub fn pop(&mut self) -> Option<Pod> {
+        self.active.pop().map(|q| q.pod)
+    }
 
     /// Mark a pod as failed in a recoverable way → moves to backoff with exponential delay.
     /// Returns the new backoff_until.
     pub fn mark_backoff(&mut self, pod: Pod, now: DateTime<Utc>) -> DateTime<Utc> {
         self.unschedulable.remove(&pod.uid);
-        let attempts = self.attempts_by_uid.entry(pod.uid.clone()).and_modify(|n| *n += 1).or_insert(1).clone();
-        let exp = (self.initial_backoff * 2_i32.saturating_pow(attempts.saturating_sub(1).min(10))).min(self.max_backoff);
+        let attempts = self
+            .attempts_by_uid
+            .entry(pod.uid.clone())
+            .and_modify(|n| *n += 1)
+            .or_insert(1)
+            .clone();
+        let exp = (self.initial_backoff * 2_i32.saturating_pow(attempts.saturating_sub(1).min(10)))
+            .min(self.max_backoff);
         let until = now + exp;
-        self.backoff.push(QueuedPod { pod, enqueued_at: now, backoff_until: Some(until), attempts });
+        self.backoff.push(QueuedPod {
+            pod,
+            enqueued_at: now,
+            backoff_until: Some(until),
+            attempts,
+        });
         until
     }
 
@@ -105,8 +149,15 @@ impl PriorityQueue {
     /// flips between backoff and unschedulable counts each backoff as one failure.
     pub fn mark_unschedulable(&mut self, pod: Pod, now: DateTime<Utc>) {
         let attempts = self.attempts_by_uid.get(&pod.uid).copied().unwrap_or(0);
-        self.unschedulable.insert(pod.uid.clone(),
-            QueuedPod { pod, enqueued_at: now, backoff_until: None, attempts });
+        self.unschedulable.insert(
+            pod.uid.clone(),
+            QueuedPod {
+                pod,
+                enqueued_at: now,
+                backoff_until: None,
+                attempts,
+            },
+        );
     }
 
     /// Flush expired backoff entries back to active.
@@ -114,7 +165,10 @@ impl PriorityQueue {
         let mut keep: Vec<QueuedPod> = vec![];
         for q in self.backoff.drain(..) {
             if q.backoff_until.map_or(true, |t| t <= now) {
-                self.active.push(QueuedPod { backoff_until: None, ..q });
+                self.active.push(QueuedPod {
+                    backoff_until: None,
+                    ..q
+                });
             } else {
                 keep.push(q);
             }
@@ -132,7 +186,9 @@ impl PriorityQueue {
 }
 
 impl Default for PriorityQueue {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -172,8 +228,7 @@ mod tests {
 
     #[test]
     fn backoff_attempts_persist_via_unschedulable() {
-        let mut q = PriorityQueue::new()
-            .with_backoff(Duration::seconds(1), Duration::seconds(8));
+        let mut q = PriorityQueue::new().with_backoff(Duration::seconds(1), Duration::seconds(8));
         let now = Utc::now();
         let p = pod("p", 1);
         // First failure → backoff (attempts=1, 1s)
@@ -196,8 +251,7 @@ mod tests {
 
     #[test]
     fn flush_backoff_returns_to_active_after_deadline() {
-        let mut q = PriorityQueue::new()
-            .with_backoff(Duration::seconds(1), Duration::seconds(10));
+        let mut q = PriorityQueue::new().with_backoff(Duration::seconds(1), Duration::seconds(10));
         let now = Utc::now();
         let until = q.mark_backoff(pod("p", 1), now);
         assert_eq!(q.backoff_len(), 1);

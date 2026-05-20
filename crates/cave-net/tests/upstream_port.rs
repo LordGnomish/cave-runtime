@@ -17,16 +17,18 @@
 //! around identity, selector, policy distillation, and endpoint state
 //! map cleanly to the cave-net public API.
 
-use cave_net::cilium::endpoint::{BpfProgram, Endpoint, EndpointError, EndpointManager, EndpointState};
+use cave_net::cilium::endpoint::{
+    BpfProgram, Endpoint, EndpointError, EndpointManager, EndpointState,
+};
 use cave_net::cilium::identity::{
-    LabelSet, LocalIdentityCache, MIN_LOCAL_IDENTITY, reserved_identity_for, ID_HOST, ID_WORLD,
+    reserved_identity_for, LabelSet, LocalIdentityCache, ID_HOST, ID_WORLD, MIN_LOCAL_IDENTITY,
+};
+use cave_net::cilium::l7policy::{
+    evaluate as l7_evaluate, CnpRule, HttpRule, L4Verdict, L7Request, PortRule,
 };
 use cave_net::cilium::policy::{
     CidrRule, Direction, EndpointSelector, L4Protocol, MatchExpression, PolicyKey, PolicyMap,
     PortProtocol, SelectorOp, Verdict, ID_ALL,
-};
-use cave_net::cilium::l7policy::{
-    evaluate as l7_evaluate, CnpRule, HttpRule, L4Verdict, L7Request, PortRule,
 };
 use cave_net::cilium::types::TenantId;
 use std::collections::HashMap;
@@ -110,7 +112,9 @@ fn upstream_reserved_identity_for_unknown_reserved_label_is_none() {
 #[test]
 fn upstream_reserved_label_does_not_consume_local_slot() {
     let mut cache = LocalIdentityCache::new(tenant("acme"));
-    let host = cache.lookup_or_allocate(&ls(&[("reserved", "host")])).unwrap();
+    let host = cache
+        .lookup_or_allocate(&ls(&[("reserved", "host")]))
+        .unwrap();
     assert_eq!(host, ID_HOST);
     let real = cache.lookup_or_allocate(&ls(&[("app", "web")])).unwrap();
     assert_eq!(real, MIN_LOCAL_IDENTITY);
@@ -128,7 +132,8 @@ fn upstream_endpoint_state_transitions_creating_to_ready() {
     let ip: IpAddr = "10.0.0.1".parse().unwrap();
     let id = mgr.create(tenant("acme"), "web-1", "default", ip);
     assert_eq!(mgr.lookup(id).unwrap().state, EndpointState::Creating);
-    mgr.transition(id, EndpointState::WaitingForIdentity).unwrap();
+    mgr.transition(id, EndpointState::WaitingForIdentity)
+        .unwrap();
     mgr.transition(id, EndpointState::Ready).unwrap();
     assert_eq!(mgr.lookup(id).unwrap().state, EndpointState::Ready);
 }
@@ -138,15 +143,8 @@ fn upstream_endpoint_state_transitions_creating_to_ready() {
 #[test]
 fn upstream_endpoint_bad_state_transition_rejected() {
     let mut mgr = EndpointManager::new();
-    let id = mgr.create(
-        tenant("acme"),
-        "w",
-        "default",
-        "10.0.0.2".parse().unwrap(),
-    );
-    let err = mgr
-        .transition(id, EndpointState::Ready)
-        .unwrap_err();
+    let id = mgr.create(tenant("acme"), "w", "default", "10.0.0.2".parse().unwrap());
+    let err = mgr.transition(id, EndpointState::Ready).unwrap_err();
     assert!(
         matches!(err, EndpointError::BadTransition { .. }),
         "expected BadTransition, got {err:?}"
@@ -179,12 +177,7 @@ fn upstream_endpoint_manager_insert_duplicate_id_errors() {
 #[test]
 fn upstream_endpoint_set_program_chain_persists() {
     let mut mgr = EndpointManager::new();
-    let id = mgr.create(
-        tenant("acme"),
-        "w",
-        "default",
-        "10.0.0.5".parse().unwrap(),
-    );
+    let id = mgr.create(tenant("acme"), "w", "default", "10.0.0.5".parse().unwrap());
     let chain = vec![
         BpfProgram::FromContainer,
         BpfProgram::Conntrack,
@@ -203,10 +196,8 @@ fn upstream_endpoint_set_program_chain_persists() {
 #[test]
 fn upstream_endpoint_selector_match_labels_AND_semantics() {
     let mut sel = EndpointSelector::empty();
-    sel.match_labels
-        .insert("app".into(), "web".into());
-    sel.match_labels
-        .insert("env".into(), "prod".into());
+    sel.match_labels.insert("app".into(), "web".into());
+    sel.match_labels.insert("env".into(), "prod".into());
     assert!(sel.matches(&ls(&[("app", "web"), ("env", "prod")])));
     // Missing one label → no match.
     assert!(!sel.matches(&ls(&[("app", "web")])));
@@ -415,7 +406,10 @@ fn upstream_l7_http_match_method_path_host_header() {
         host: "orders.svc.cluster.local".into(),
         headers: vec![("x-team".into(), "payments".into())],
     };
-    assert_eq!(l7_evaluate(&rule, &tenant, &bad_method).unwrap(), L4Verdict::Deny);
+    assert_eq!(
+        l7_evaluate(&rule, &tenant, &bad_method).unwrap(),
+        L4Verdict::Deny
+    );
 
     // (3) Wrong path → Deny.
     let bad_path = L7Request::Http {
@@ -424,7 +418,10 @@ fn upstream_l7_http_match_method_path_host_header() {
         host: "orders.svc.cluster.local".into(),
         headers: vec![("x-team".into(), "payments".into())],
     };
-    assert_eq!(l7_evaluate(&rule, &tenant, &bad_path).unwrap(), L4Verdict::Deny);
+    assert_eq!(
+        l7_evaluate(&rule, &tenant, &bad_path).unwrap(),
+        L4Verdict::Deny
+    );
 
     // (4) Wrong host → Deny.
     let bad_host = L7Request::Http {
@@ -433,7 +430,10 @@ fn upstream_l7_http_match_method_path_host_header() {
         host: "evil.example.com".into(),
         headers: vec![("x-team".into(), "payments".into())],
     };
-    assert_eq!(l7_evaluate(&rule, &tenant, &bad_host).unwrap(), L4Verdict::Deny);
+    assert_eq!(
+        l7_evaluate(&rule, &tenant, &bad_host).unwrap(),
+        L4Verdict::Deny
+    );
 
     // (5) Missing required header → Deny.
     let bad_header = L7Request::Http {
@@ -442,7 +442,10 @@ fn upstream_l7_http_match_method_path_host_header() {
         host: "orders.svc.cluster.local".into(),
         headers: vec![],
     };
-    assert_eq!(l7_evaluate(&rule, &tenant, &bad_header).unwrap(), L4Verdict::Deny);
+    assert_eq!(
+        l7_evaluate(&rule, &tenant, &bad_header).unwrap(),
+        L4Verdict::Deny
+    );
 
     // (6) Header value mismatch → Deny (key matches case-insensitively
     // but value is exact).
@@ -452,5 +455,8 @@ fn upstream_l7_http_match_method_path_host_header() {
         host: "orders.svc.cluster.local".into(),
         headers: vec![("x-team".into(), "fraud".into())],
     };
-    assert_eq!(l7_evaluate(&rule, &tenant, &wrong_value).unwrap(), L4Verdict::Deny);
+    assert_eq!(
+        l7_evaluate(&rule, &tenant, &wrong_value).unwrap(),
+        L4Verdict::Deny
+    );
 }

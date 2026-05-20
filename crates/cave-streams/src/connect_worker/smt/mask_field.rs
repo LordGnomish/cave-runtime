@@ -84,9 +84,7 @@ impl Smt for MaskField {
 
     fn apply(&self, mut r: RecordEnvelope) -> StreamsResult<Option<RecordEnvelope>> {
         let obj = r.value.as_object_mut().ok_or_else(|| {
-            StreamsError::Internal(
-                "MaskField: cannot mask field on non-object value".into(),
-            )
+            StreamsError::Internal("MaskField: cannot mask field on non-object value".into())
         })?;
         for field in &self.fields {
             if let Some(existing) = obj.get(field) {
@@ -115,10 +113,7 @@ mod tests {
         let mut cfg = BTreeMap::new();
         cfg.insert("fields".into(), "password".into());
         let s = MaskField::from_config(&cfg).unwrap();
-        let r = RecordEnvelope::new(
-            "t",
-            obj(&[("password", Value::String("secret".into()))]),
-        );
+        let r = RecordEnvelope::new("t", obj(&[("password", Value::String("secret".into()))]));
         let out = s.apply(r).unwrap().unwrap();
         assert_eq!(
             out.value.as_object().unwrap().get("password"),
@@ -158,10 +153,7 @@ mod tests {
         cfg.insert("fields".into(), "password".into());
         cfg.insert("replacement".into(), "****".into());
         let s = MaskField::from_config(&cfg).unwrap();
-        let r = RecordEnvelope::new(
-            "t",
-            obj(&[("password", Value::String("secret".into()))]),
-        );
+        let r = RecordEnvelope::new("t", obj(&[("password", Value::String("secret".into()))]));
         let out = s.apply(r).unwrap().unwrap();
         assert_eq!(
             out.value.as_object().unwrap().get("password"),

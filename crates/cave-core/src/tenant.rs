@@ -195,11 +195,14 @@ impl Default for PrVclusterConfig {
 
 /// Tenant namespace naming convention.
 pub fn tenant_namespace(tenant_id: &str, env: TenantEnvironment) -> String {
-    format!("tenant-{tenant_id}-{env}", env = match env {
-        TenantEnvironment::Dev => "dev",
-        TenantEnvironment::Staging => "staging",
-        TenantEnvironment::Prod => "prod",
-    })
+    format!(
+        "tenant-{tenant_id}-{env}",
+        env = match env {
+            TenantEnvironment::Dev => "dev",
+            TenantEnvironment::Staging => "staging",
+            TenantEnvironment::Prod => "prod",
+        }
+    )
 }
 
 /// Tenant API subdomain: <tenant-id>.api.caveplatform.dev
@@ -239,9 +242,18 @@ mod tests {
 
     #[test]
     fn test_autonomy_thresholds() {
-        assert_eq!(EgressState::autonomy_confidence_threshold(TenantTier::Soft), 0.0);
-        assert_eq!(EgressState::autonomy_confidence_threshold(TenantTier::Hard), 0.7);
-        assert_eq!(EgressState::autonomy_confidence_threshold(TenantTier::Dedicated), 0.9);
+        assert_eq!(
+            EgressState::autonomy_confidence_threshold(TenantTier::Soft),
+            0.0
+        );
+        assert_eq!(
+            EgressState::autonomy_confidence_threshold(TenantTier::Hard),
+            0.7
+        );
+        assert_eq!(
+            EgressState::autonomy_confidence_threshold(TenantTier::Dedicated),
+            0.9
+        );
     }
 
     #[test]

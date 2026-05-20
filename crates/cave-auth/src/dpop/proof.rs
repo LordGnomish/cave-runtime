@@ -65,9 +65,15 @@ pub enum DpopProofError {
     #[error("DPoP proof must have 3 dot-separated segments, found {0}")]
     MalformedSegments(usize),
     #[error("DPoP proof segment {segment} is not valid base64url: {detail}")]
-    Base64 { segment: &'static str, detail: String },
+    Base64 {
+        segment: &'static str,
+        detail: String,
+    },
     #[error("DPoP proof segment {segment} is not valid JSON: {detail}")]
-    Json { segment: &'static str, detail: String },
+    Json {
+        segment: &'static str,
+        detail: String,
+    },
     #[error("DPoP proof header typ MUST be \"dpop+jwt\", found {0:?}")]
     BadTyp(String),
     #[error("DPoP proof header alg {0:?} is not in the allowed list {1:?}")]
@@ -88,18 +94,16 @@ impl DpopProof {
         let payload_bytes = b64url_decode("payload", parts[1])?;
         let signature = b64url_decode("signature", parts[2])?;
 
-        let header: DpopHeader = serde_json::from_slice(&header_bytes).map_err(|e| {
-            DpopProofError::Json {
+        let header: DpopHeader =
+            serde_json::from_slice(&header_bytes).map_err(|e| DpopProofError::Json {
                 segment: "header",
                 detail: e.to_string(),
-            }
-        })?;
-        let payload: DpopPayload = serde_json::from_slice(&payload_bytes).map_err(|e| {
-            DpopProofError::Json {
+            })?;
+        let payload: DpopPayload =
+            serde_json::from_slice(&payload_bytes).map_err(|e| DpopProofError::Json {
                 segment: "payload",
                 detail: e.to_string(),
-            }
-        })?;
+            })?;
 
         if header.typ != "dpop+jwt" {
             return Err(DpopProofError::BadTyp(header.typ.clone()));
@@ -147,7 +151,8 @@ mod tests {
         let h = format!(
             r#"{{"alg":"{alg}","typ":"{typ}","jwk":{{"kty":"EC","crv":"P-256","x":"AAAA","y":"BBBB"}}}}"#
         );
-        let p = r#"{"jti":"abc","htm":"POST","htu":"https://server.example/token","iat":1700000000}"#;
+        let p =
+            r#"{"jti":"abc","htm":"POST","htu":"https://server.example/token","iat":1700000000}"#;
         let sig = b64url_encode(&[0u8; 64]);
         format!("{}.{}.{}", encode_part(&h), encode_part(p), sig)
     }
@@ -183,7 +188,13 @@ mod tests {
     #[test]
     fn reject_invalid_base64() {
         let err = DpopProof::parse("!!!.payload.sig").unwrap_err();
-        assert!(matches!(err, DpopProofError::Base64 { segment: "header", .. }));
+        assert!(matches!(
+            err,
+            DpopProofError::Base64 {
+                segment: "header",
+                ..
+            }
+        ));
     }
 
     #[test]

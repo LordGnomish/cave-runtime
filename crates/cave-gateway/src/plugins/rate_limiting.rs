@@ -27,7 +27,6 @@ fn now_secs() -> u64 {
         .as_secs()
 }
 
-
 /// In-process counter store (local policy).
 #[derive(Clone)]
 struct LocalCounterStore {
@@ -37,7 +36,9 @@ struct LocalCounterStore {
 
 impl LocalCounterStore {
     fn new() -> Self {
-        Self { counters: Arc::new(DashMap::new()) }
+        Self {
+            counters: Arc::new(DashMap::new()),
+        }
     }
 
     fn increment(&self, identifier: &str, window: &'static str, window_start: u64) -> u64 {
@@ -66,12 +67,36 @@ struct WindowConfig {
 
 fn window_configs(config: &Value) -> Vec<WindowConfig> {
     vec![
-        WindowConfig { name: "second", secs: 1, limit: config["second"].as_u64() },
-        WindowConfig { name: "minute", secs: 60, limit: config["minute"].as_u64() },
-        WindowConfig { name: "hour", secs: 3600, limit: config["hour"].as_u64() },
-        WindowConfig { name: "day", secs: 86400, limit: config["day"].as_u64() },
-        WindowConfig { name: "month", secs: 2592000, limit: config["month"].as_u64() },
-        WindowConfig { name: "year", secs: 31536000, limit: config["year"].as_u64() },
+        WindowConfig {
+            name: "second",
+            secs: 1,
+            limit: config["second"].as_u64(),
+        },
+        WindowConfig {
+            name: "minute",
+            secs: 60,
+            limit: config["minute"].as_u64(),
+        },
+        WindowConfig {
+            name: "hour",
+            secs: 3600,
+            limit: config["hour"].as_u64(),
+        },
+        WindowConfig {
+            name: "day",
+            secs: 86400,
+            limit: config["day"].as_u64(),
+        },
+        WindowConfig {
+            name: "month",
+            secs: 2592000,
+            limit: config["month"].as_u64(),
+        },
+        WindowConfig {
+            name: "year",
+            secs: 31536000,
+            limit: config["year"].as_u64(),
+        },
     ]
     .into_iter()
     .filter(|w| w.limit.is_some())
@@ -88,7 +113,10 @@ fn rate_limit_key(ctx: &PluginCtx, limit_by: &str, header_name: Option<&str>) ->
         "service" => ctx.service_id.map(|id| id.to_string()).unwrap_or_default(),
         "header" => {
             let h = header_name.unwrap_or("x-consumer-id");
-            ctx.headers.get(h).cloned().unwrap_or_else(|| ctx.client_ip.clone())
+            ctx.headers
+                .get(h)
+                .cloned()
+                .unwrap_or_else(|| ctx.client_ip.clone())
         }
         "path" => ctx.path.clone(),
         _ => ctx.client_ip.clone(),
@@ -121,14 +149,17 @@ impl GatewayPlugin for RateLimitingPlugin {
             let count = store.increment(&identifier, window.name, window_start);
 
             if count > limit {
-                let mut response = axum::response::Response::builder()
-                    .status(StatusCode::TOO_MANY_REQUESTS);
+                let mut response =
+                    axum::response::Response::builder().status(StatusCode::TOO_MANY_REQUESTS);
 
                 if !hide_headers {
                     response = response
                         .header("X-RateLimit-Limit-{}", limit.to_string())
                         .header("X-RateLimit-Remaining-{}", "0")
-                        .header("X-RateLimit-Reset", (window_start + window.secs).to_string())
+                        .header(
+                            "X-RateLimit-Reset",
+                            (window_start + window.secs).to_string(),
+                        )
                         .header("Retry-After", window.secs.to_string());
                 }
 
@@ -174,7 +205,13 @@ mod tests {
     use std::collections::HashMap;
 
     fn make_ctx(ip: &str) -> PluginCtx {
-        PluginCtx::new("GET".into(), "/test".into(), HashMap::new(), Bytes::new(), ip.into())
+        PluginCtx::new(
+            "GET".into(),
+            "/test".into(),
+            HashMap::new(),
+            Bytes::new(),
+            ip.into(),
+        )
     }
 
     #[tokio::test]

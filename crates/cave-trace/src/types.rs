@@ -5,8 +5,8 @@
 //! TraceId is a 128-bit unsigned integer (wire format: lowercase 32-char hex or base64).
 //! SpanId is a 64-bit unsigned integer (wire format: lowercase 16-char hex or base64).
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use crate::{Result, TraceError};
 
@@ -82,7 +82,11 @@ pub enum TagValue {
 
 impl TagValue {
     pub fn as_str(&self) -> Option<&str> {
-        if let TagValue::String(s) = self { Some(s) } else { None }
+        if let TagValue::String(s) = self {
+            Some(s)
+        } else {
+            None
+        }
     }
 
     pub fn display(&self) -> String {
@@ -359,7 +363,10 @@ impl SpanNode {
 
         // Find child whose critical sub-path ends latest
         let best = self.children.iter().max_by_key(|c| {
-            let start_offset = c.span.start_time_unix_nano.saturating_sub(self.span.start_time_unix_nano);
+            let start_offset = c
+                .span
+                .start_time_unix_nano
+                .saturating_sub(self.span.start_time_unix_nano);
             start_offset + c.critical_path_length()
         });
 
@@ -374,10 +381,18 @@ impl SpanNode {
         if self.children.is_empty() {
             return self.span.duration_ns;
         }
-        let child_max = self.children.iter().map(|c| {
-            let start_offset = c.span.start_time_unix_nano.saturating_sub(self.span.start_time_unix_nano);
-            start_offset + c.critical_path_length()
-        }).max().unwrap_or(0);
+        let child_max = self
+            .children
+            .iter()
+            .map(|c| {
+                let start_offset = c
+                    .span
+                    .start_time_unix_nano
+                    .saturating_sub(self.span.start_time_unix_nano);
+                start_offset + c.critical_path_length()
+            })
+            .max()
+            .unwrap_or(0);
         self.span.duration_ns.max(child_max)
     }
 }
@@ -431,16 +446,16 @@ pub struct HistogramBucket {
 
 /// Standard Prometheus-style latency buckets in nanoseconds.
 pub const LATENCY_BUCKETS_NS: &[u64] = &[
-    500_000,      // 0.5 ms
-    1_000_000,    // 1 ms
-    2_500_000,    // 2.5 ms
-    5_000_000,    // 5 ms
-    10_000_000,   // 10 ms
-    25_000_000,   // 25 ms
-    50_000_000,   // 50 ms
-    100_000_000,  // 100 ms
-    250_000_000,  // 250 ms
-    500_000_000,  // 500 ms
+    500_000,       // 0.5 ms
+    1_000_000,     // 1 ms
+    2_500_000,     // 2.5 ms
+    5_000_000,     // 5 ms
+    10_000_000,    // 10 ms
+    25_000_000,    // 25 ms
+    50_000_000,    // 50 ms
+    100_000_000,   // 100 ms
+    250_000_000,   // 250 ms
+    500_000_000,   // 500 ms
     1_000_000_000, // 1 s
     2_500_000_000, // 2.5 s
     5_000_000_000, // 5 s
@@ -457,7 +472,13 @@ pub fn build_histogram(
         return LatencyHistogram {
             service,
             operation,
-            buckets: LATENCY_BUCKETS_NS.iter().map(|&le| HistogramBucket { le_ns: le, count: 0 }).collect(),
+            buckets: LATENCY_BUCKETS_NS
+                .iter()
+                .map(|&le| HistogramBucket {
+                    le_ns: le,
+                    count: 0,
+                })
+                .collect(),
             count: 0,
             sum_ns: 0,
             p50_ns: 0,
@@ -590,7 +611,7 @@ mod tests {
             operation_name: "op".into(),
             service_name: "svc".into(),
             start_time_unix_nano: 1_000_000_000,
-            end_time_unix_nano:   1_001_000_000,
+            end_time_unix_nano: 1_001_000_000,
             duration_ns: 1_000_000,
             status: SpanStatus::Ok,
             kind: SpanKind::Server,

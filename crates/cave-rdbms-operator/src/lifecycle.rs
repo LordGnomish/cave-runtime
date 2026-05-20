@@ -42,10 +42,7 @@ impl InstanceManager {
 
         let id = Uuid::new_v4().to_string();
         let now = Utc::now();
-        let connection_string = format!(
-            "postgres://{}@{}:{}/{}",
-            username, host, port, database
-        );
+        let connection_string = format!("postgres://{}@{}:{}/{}", username, host, port, database);
 
         let instance = PgInstance {
             id: id.clone(),

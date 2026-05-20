@@ -6,8 +6,8 @@
 // The web portal at crates/cave-runtime/src/portal_index.html remains the
 // primary UI; this binary is a GPUI-based companion for power-admins.
 
-mod ui;
 mod screens;
+mod ui;
 
 #[cfg(feature = "gpui-runtime")]
 fn main() {

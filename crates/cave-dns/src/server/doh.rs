@@ -4,12 +4,12 @@
 use std::sync::Arc;
 
 use axum::{
+    Router,
     body::Bytes,
     extract::{Query as AxumQuery, State},
-    http::{header, HeaderValue, StatusCode},
+    http::{HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{get, post},
-    Router,
 };
 use base64::Engine;
 use serde::Deserialize;
@@ -69,7 +69,8 @@ async fn handle_post(
                     ),
                     (
                         header::CACHE_CONTROL,
-                        HeaderValue::from_str(&format!("max-age={min_ttl}")).unwrap_or_else(|_| HeaderValue::from_static("max-age=0")),
+                        HeaderValue::from_str(&format!("max-age={min_ttl}"))
+                            .unwrap_or_else(|_| HeaderValue::from_static("max-age=0")),
                     ),
                 ],
                 resp_bytes,
@@ -135,11 +136,6 @@ async fn process_doh_query(
 fn min_ttl_from_response(buf: &[u8]) -> u32 {
     parse_message(buf)
         .ok()
-        .and_then(|msg| {
-            msg.answers()
-                .iter()
-                .map(|r| r.ttl())
-                .min()
-        })
+        .and_then(|msg| msg.answers().iter().map(|r| r.ttl()).min())
         .unwrap_or(0)
 }

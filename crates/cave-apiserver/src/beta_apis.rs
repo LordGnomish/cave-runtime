@@ -64,7 +64,9 @@ struct BetaInner {
 
 impl BetaApiRegistry {
     pub fn new() -> Self {
-        Self { inner: Mutex::new(BetaInner::default()) }
+        Self {
+            inner: Mutex::new(BetaInner::default()),
+        }
     }
 
     /// Register a known API version under `tenant_id`. Mirrors upstream
@@ -94,12 +96,7 @@ impl BetaApiRegistry {
 
     /// Final effective enablement for `(tenant, group, version)`. Returns
     /// `None` for unknown versions.
-    pub fn is_enabled(
-        &self,
-        tenant_id: &str,
-        group: &str,
-        version: &str,
-    ) -> Option<bool> {
+    pub fn is_enabled(&self, tenant_id: &str, group: &str, version: &str) -> Option<bool> {
         let inner = self.inner.lock().unwrap();
         let key = (tenant_id.into(), group.into(), version.into());
         let v = inner.known.get(&key)?;
@@ -110,7 +107,9 @@ impl BetaApiRegistry {
     /// Every enabled version under `tenant_id`, sorted for stable output.
     pub fn enabled_for_tenant(&self, tenant_id: &str) -> Vec<ApiVersion> {
         let inner = self.inner.lock().unwrap();
-        let mut out: Vec<ApiVersion> = inner.known.iter()
+        let mut out: Vec<ApiVersion> = inner
+            .known
+            .iter()
             .filter(|((t, _, _), _)| t == tenant_id)
             .filter(|((_, g, v), api)| {
                 let key = (tenant_id.into(), g.clone(), v.clone());
@@ -125,7 +124,9 @@ impl BetaApiRegistry {
 }
 
 impl Default for BetaApiRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -133,7 +134,11 @@ mod tests {
     use super::*;
 
     fn v(group: &str, version: &str, s: ApiStability) -> ApiVersion {
-        ApiVersion { group: group.into(), version: version.into(), stability: s }
+        ApiVersion {
+            group: group.into(),
+            version: version.into(),
+            stability: s,
+        }
     }
 
     /// Upstream parity: `TestBetaAPIs_DisabledByDefault`
@@ -142,11 +147,19 @@ mod tests {
     #[test]
     fn test_beta_api_is_disabled_by_default_under_kep_3136() {
         let r = BetaApiRegistry::new();
-        r.register("acme", v("flowcontrol.apiserver.k8s.io", "v1beta3", ApiStability::Beta));
+        r.register(
+            "acme",
+            v(
+                "flowcontrol.apiserver.k8s.io",
+                "v1beta3",
+                ApiStability::Beta,
+            ),
+        );
         assert_eq!(
             r.is_enabled("acme", "flowcontrol.apiserver.k8s.io", "v1beta3"),
             Some(false),
-            "tenant_id invariant: acme's beta surface defaults to disabled");
+            "tenant_id invariant: acme's beta surface defaults to disabled"
+        );
     }
 
     /// Upstream parity: `TestGAEnabledByDefault`
@@ -166,13 +179,21 @@ mod tests {
     #[test]
     fn test_explicit_runtime_config_can_enable_beta_api() {
         let r = BetaApiRegistry::new();
-        r.register("acme", v("flowcontrol.apiserver.k8s.io", "v1beta3", ApiStability::Beta));
+        r.register(
+            "acme",
+            v(
+                "flowcontrol.apiserver.k8s.io",
+                "v1beta3",
+                ApiStability::Beta,
+            ),
+        );
         r.override_enabled("acme", "flowcontrol.apiserver.k8s.io", "v1beta3", true)
             .unwrap();
         assert_eq!(
             r.is_enabled("acme", "flowcontrol.apiserver.k8s.io", "v1beta3"),
             Some(true),
-            "explicit opt-in overrides the disabled-by-default policy");
+            "explicit opt-in overrides the disabled-by-default policy"
+        );
     }
 
     /// Upstream parity: `TestRuntimeConfig_OverrideUnknownVersionFails`
@@ -191,16 +212,33 @@ mod tests {
     #[test]
     fn test_opt_in_does_not_cross_tenant_boundaries() {
         let r = BetaApiRegistry::new();
-        r.register("acme", v("flowcontrol.apiserver.k8s.io", "v1beta3", ApiStability::Beta));
-        r.register("globex", v("flowcontrol.apiserver.k8s.io", "v1beta3", ApiStability::Beta));
-        r.override_enabled("acme", "flowcontrol.apiserver.k8s.io", "v1beta3", true).unwrap();
+        r.register(
+            "acme",
+            v(
+                "flowcontrol.apiserver.k8s.io",
+                "v1beta3",
+                ApiStability::Beta,
+            ),
+        );
+        r.register(
+            "globex",
+            v(
+                "flowcontrol.apiserver.k8s.io",
+                "v1beta3",
+                ApiStability::Beta,
+            ),
+        );
+        r.override_enabled("acme", "flowcontrol.apiserver.k8s.io", "v1beta3", true)
+            .unwrap();
         assert_eq!(
             r.is_enabled("acme", "flowcontrol.apiserver.k8s.io", "v1beta3"),
-            Some(true));
+            Some(true)
+        );
         assert_eq!(
             r.is_enabled("globex", "flowcontrol.apiserver.k8s.io", "v1beta3"),
             Some(false),
-            "tenant_id invariant: globex still sees the default-disabled state");
+            "tenant_id invariant: globex still sees the default-disabled state"
+        );
     }
 
     /// Upstream parity: `TestEnabledList_StableOrderingForDiscovery`
@@ -213,21 +251,32 @@ mod tests {
         r.register("acme", v("", "v1", ApiStability::GA));
         // beta + opt-in → also enabled
         r.register("acme", v("policy", "v1beta1", ApiStability::Beta));
-        r.override_enabled("acme", "policy", "v1beta1", true).unwrap();
+        r.override_enabled("acme", "policy", "v1beta1", true)
+            .unwrap();
         // alpha left default-off
-        r.register("acme", v("scheduling.k8s.io", "v1alpha1", ApiStability::Alpha));
+        r.register(
+            "acme",
+            v("scheduling.k8s.io", "v1alpha1", ApiStability::Alpha),
+        );
         // cross-tenant decoy
         r.register("globex", v("apps", "v1", ApiStability::GA));
         let list = r.enabled_for_tenant("acme");
         let ids: Vec<_> = list.iter().map(|a| a.id()).collect();
-        assert_eq!(ids, vec![
-            "v1".to_string(),               // core
-            "apps/v1".to_string(),
-            "policy/v1beta1".to_string(),
-        ]);
-        assert!(!ids.iter().any(|i| i.contains("v1alpha1")),
-            "alpha disabled-by-default still off");
-        assert!(list.iter().all(|_| true),
-            "tenant_id invariant smoke: list scoped to acme by construction");
+        assert_eq!(
+            ids,
+            vec![
+                "v1".to_string(), // core
+                "apps/v1".to_string(),
+                "policy/v1beta1".to_string(),
+            ]
+        );
+        assert!(
+            !ids.iter().any(|i| i.contains("v1alpha1")),
+            "alpha disabled-by-default still off"
+        );
+        assert!(
+            list.iter().all(|_| true),
+            "tenant_id invariant smoke: list scoped to acme by construction"
+        );
     }
 }

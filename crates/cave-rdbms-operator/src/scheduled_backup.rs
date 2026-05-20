@@ -123,7 +123,9 @@ fn parse_field(spec: &str, lo: u32, hi: u32) -> Result<FieldSet, ScheduledBackup
                 .parse()
                 .map_err(|_| ScheduledBackupError::InvalidCron(format!("bad step in {part:?}")))?;
             if step == 0 {
-                return Err(ScheduledBackupError::InvalidCron("step must be >= 1".into()));
+                return Err(ScheduledBackupError::InvalidCron(
+                    "step must be >= 1".into(),
+                ));
             }
             (r, step)
         } else {
@@ -132,12 +134,12 @@ fn parse_field(spec: &str, lo: u32, hi: u32) -> Result<FieldSet, ScheduledBackup
         let (start, end) = if range_spec == "*" {
             (lo, hi)
         } else if let Some((a, b)) = range_spec.split_once('-') {
-            let a: u32 = a.parse().map_err(|_| {
-                ScheduledBackupError::InvalidCron(format!("bad range start {a:?}"))
-            })?;
-            let b: u32 = b.parse().map_err(|_| {
-                ScheduledBackupError::InvalidCron(format!("bad range end {b:?}"))
-            })?;
+            let a: u32 = a
+                .parse()
+                .map_err(|_| ScheduledBackupError::InvalidCron(format!("bad range start {a:?}")))?;
+            let b: u32 = b
+                .parse()
+                .map_err(|_| ScheduledBackupError::InvalidCron(format!("bad range end {b:?}")))?;
             (a, b)
         } else {
             let v: u32 = range_spec.parse().map_err(|_| {
@@ -511,11 +513,17 @@ mod tests {
         m.create("nightly", spec("0 2 * * *"), ts(2026, 5, 13, 0, 0))
             .unwrap();
         m.suspend("nightly").unwrap();
-        assert_eq!(m.get("nightly").unwrap().phase, ScheduledBackupPhase::Suspended);
+        assert_eq!(
+            m.get("nightly").unwrap().phase,
+            ScheduledBackupPhase::Suspended
+        );
         // Resume on the 14th at 3am — next run is the 15th at 2am.
         let next = m.resume("nightly", ts(2026, 5, 14, 3, 0)).unwrap();
         assert_eq!(next, ts(2026, 5, 15, 2, 0));
-        assert_eq!(m.get("nightly").unwrap().phase, ScheduledBackupPhase::Active);
+        assert_eq!(
+            m.get("nightly").unwrap().phase,
+            ScheduledBackupPhase::Active
+        );
     }
 
     #[test]
@@ -538,7 +546,10 @@ mod tests {
         m.create("nightly", spec("0 2 * * *"), ts(2026, 5, 13, 0, 0))
             .unwrap();
         m.delete("nightly").unwrap();
-        assert!(matches!(m.get("nightly").unwrap_err(), ScheduledBackupError::NotFound(_)));
+        assert!(matches!(
+            m.get("nightly").unwrap_err(),
+            ScheduledBackupError::NotFound(_)
+        ));
     }
 
     #[test]

@@ -100,7 +100,11 @@ mod tests {
 
     #[test]
     fn ws_action_roundtrips() {
-        for a in [WsAction::Signin, WsAction::Signout, WsAction::SignoutCleanup] {
+        for a in [
+            WsAction::Signin,
+            WsAction::Signout,
+            WsAction::SignoutCleanup,
+        ] {
             assert_eq!(WsAction::from_str(a.as_str()).unwrap(), a);
         }
     }

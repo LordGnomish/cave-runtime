@@ -2,17 +2,17 @@
 // Copyright 2026 Cave Runtime contributors
 //! HTTP routes for cave-pg.
 
+use crate::PgState;
 use crate::manager;
 use crate::models::*;
-use crate::PgState;
 use axum::{
+    Json, Router,
     extract::{Path, Query, State as AxumState},
     http::StatusCode,
     routing::{delete, get, post, put},
-    Json, Router,
 };
 use chrono::Utc;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -29,7 +29,10 @@ pub fn create_router(state: Arc<PgState>) -> Router {
             "/api/pg/databases/{id}",
             get(get_database).delete(delete_database),
         )
-        .route("/api/pg/databases/{id}/healthcheck", post(healthcheck_database))
+        .route(
+            "/api/pg/databases/{id}/healthcheck",
+            post(healthcheck_database),
+        )
         // Schema migrations
         .route(
             "/api/pg/migrations",
@@ -54,10 +57,7 @@ pub fn create_router(state: Arc<PgState>) -> Router {
         .route("/api/pg/replication/{id}", put(update_replication))
         // Table / index statistics
         .route("/api/pg/tables/bloat", get(bloated_tables))
-        .route(
-            "/api/pg/tables",
-            get(list_tables).post(record_table_stat),
-        )
+        .route("/api/pg/tables", get(list_tables).post(record_table_stat))
         // User / role management
         .route("/api/pg/users", get(list_users).post(create_user))
         .route("/api/pg/users/{id}", delete(delete_user))
@@ -114,7 +114,10 @@ async fn get_database(
     let dbs = state.databases.lock().unwrap();
     match dbs.get(&id) {
         Some(db) => (StatusCode::OK, Json(json!({ "database": db }))),
-        None => (StatusCode::NOT_FOUND, Json(json!({ "error": "database not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "database not found" })),
+        ),
     }
 }
 
@@ -127,7 +130,10 @@ async fn delete_database(
         tracing::info!(id = %id, "deregistered database");
         (StatusCode::OK, Json(json!({ "deleted": id })))
     } else {
-        (StatusCode::NOT_FOUND, Json(json!({ "error": "database not found" })))
+        (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "database not found" })),
+        )
     }
 }
 
@@ -151,7 +157,10 @@ async fn healthcheck_database(
                 })),
             )
         }
-        None => (StatusCode::NOT_FOUND, Json(json!({ "error": "database not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "database not found" })),
+        ),
     }
 }
 
@@ -190,7 +199,10 @@ async fn get_migration(
     let migs = state.migrations.lock().unwrap();
     match migs.get(&id) {
         Some(m) => (StatusCode::OK, Json(json!({ "migration": m }))),
-        None => (StatusCode::NOT_FOUND, Json(json!({ "error": "migration not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "migration not found" })),
+        ),
     }
 }
 
@@ -233,9 +245,15 @@ async fn get_pool(
     match pools.get(&id) {
         Some(p) => {
             let utilisation = manager::pool_utilisation_pct(p.current_size, p.max_size);
-            (StatusCode::OK, Json(json!({ "pool": p, "utilisation_pct": utilisation })))
+            (
+                StatusCode::OK,
+                Json(json!({ "pool": p, "utilisation_pct": utilisation })),
+            )
         }
-        None => (StatusCode::NOT_FOUND, Json(json!({ "error": "pool not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "pool not found" })),
+        ),
     }
 }
 
@@ -257,7 +275,10 @@ async fn update_pool(
             let updated = p.clone();
             (StatusCode::OK, Json(json!({ "pool": updated })))
         }
-        None => (StatusCode::NOT_FOUND, Json(json!({ "error": "pool not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "pool not found" })),
+        ),
     }
 }
 
@@ -290,7 +311,10 @@ async fn record_query(
     };
     let id = stat.id;
     state.query_stats.lock().unwrap().push(stat.clone());
-    (StatusCode::CREATED, Json(json!({ "query_stat": stat, "id": id })))
+    (
+        StatusCode::CREATED,
+        Json(json!({ "query_stat": stat, "id": id })),
+    )
 }
 
 async fn slow_queries(
@@ -348,7 +372,10 @@ async fn get_backup(
     let backups = state.backups.lock().unwrap();
     match backups.get(&id) {
         Some(b) => (StatusCode::OK, Json(json!({ "backup": b }))),
-        None => (StatusCode::NOT_FOUND, Json(json!({ "error": "backup not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "backup not found" })),
+        ),
     }
 }
 
@@ -374,7 +401,10 @@ async fn restore_backup(
             StatusCode::CONFLICT,
             Json(json!({ "error": "backup is not in completed state" })),
         ),
-        None => (StatusCode::NOT_FOUND, Json(json!({ "error": "backup not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "backup not found" })),
+        ),
     }
 }
 
@@ -429,9 +459,15 @@ async fn update_replication(
                     "replication lag threshold exceeded"
                 );
             }
-            (StatusCode::OK, Json(json!({ "replication": updated, "healthy": healthy })))
+            (
+                StatusCode::OK,
+                Json(json!({ "replication": updated, "healthy": healthy })),
+            )
         }
-        None => (StatusCode::NOT_FOUND, Json(json!({ "error": "replication record not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "replication record not found" })),
+        ),
     }
 }
 
@@ -463,7 +499,10 @@ async fn record_table_stat(
     };
     let id = stat.id;
     state.table_stats.lock().unwrap().push(stat.clone());
-    (StatusCode::CREATED, Json(json!({ "table_stat": stat, "id": id })))
+    (
+        StatusCode::CREATED,
+        Json(json!({ "table_stat": stat, "id": id })),
+    )
 }
 
 async fn bloated_tables(
@@ -522,7 +561,10 @@ async fn delete_user(
         tracing::info!(id = %id, "deleted database user");
         (StatusCode::OK, Json(json!({ "deleted": id })))
     } else {
-        (StatusCode::NOT_FOUND, Json(json!({ "error": "user not found" })))
+        (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "user not found" })),
+        )
     }
 }
 
@@ -548,7 +590,10 @@ async fn record_size(
     };
     let id = record.id;
     state.sizes.lock().unwrap().push(record.clone());
-    (StatusCode::CREATED, Json(json!({ "size_record": record, "id": id })))
+    (
+        StatusCode::CREATED,
+        Json(json!({ "size_record": record, "id": id })),
+    )
 }
 
 async fn size_alerts(

@@ -183,8 +183,11 @@ impl SlotMap {
     }
 
     pub fn top_slots_by_keys(&self, top_n: usize) -> Vec<(u16, u64)> {
-        let mut all: Vec<(u16, u64)> =
-            self.stats.iter().map(|(s, st)| (*s, st.key_count)).collect();
+        let mut all: Vec<(u16, u64)> = self
+            .stats
+            .iter()
+            .map(|(s, st)| (*s, st.key_count))
+            .collect();
         all.sort_by(|a, b| b.1.cmp(&a.1));
         all.truncate(top_n);
         all
@@ -223,7 +226,14 @@ mod tests {
         m.assign_range(101, 200, "b", "2");
         m.assign_range(201, 300, "a", "1");
         let r = m.ownership_ranges();
-        assert_eq!(r, vec![(0, 100, "a".into()), (101, 200, "b".into()), (201, 300, "a".into())]);
+        assert_eq!(
+            r,
+            vec![
+                (0, 100, "a".into()),
+                (101, 200, "b".into()),
+                (201, 300, "a".into())
+            ]
+        );
     }
 
     #[test]

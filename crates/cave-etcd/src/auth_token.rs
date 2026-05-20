@@ -39,7 +39,9 @@ impl std::fmt::Display for TokenError {
             Self::Invalid => write!(f, "invalid token"),
             Self::Expired => write!(f, "token expired"),
             Self::Malformed(m) => write!(f, "malformed token: {m}"),
-            Self::AlgorithmMismatch { expected, got } => write!(f, "algorithm mismatch: expected {expected}, got {got}"),
+            Self::AlgorithmMismatch { expected, got } => {
+                write!(f, "algorithm mismatch: expected {expected}, got {got}")
+            }
         }
     }
 }
@@ -66,7 +68,10 @@ impl TokenClaims {
 }
 
 fn now_secs() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 // ── Simple-token issuer ──────────────────────────────────────────────────
@@ -162,16 +167,23 @@ impl SimpleTokenIssuer {
     pub fn sweep(&self) -> usize {
         let now = now_secs();
         let mut w = self.inner.write().unwrap();
-        let stale: Vec<String> = w.iter()
+        let stale: Vec<String> = w
+            .iter()
             .filter(|(_, c)| c.is_expired(now))
             .map(|(k, _)| k.clone())
             .collect();
-        for s in &stale { w.remove(s); }
+        for s in &stale {
+            w.remove(s);
+        }
         stale.len()
     }
 
-    pub fn len(&self) -> usize { self.inner.read().unwrap().len() }
-    pub fn is_empty(&self) -> bool { self.len() == 0 }
+    pub fn len(&self) -> usize {
+        self.inner.read().unwrap().len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 // ── JWT issuer (HS256) ────────────────────────────────────────────────────
@@ -192,7 +204,11 @@ pub struct JwtIssuer {
 
 impl JwtIssuer {
     pub fn new(issuer: impl Into<String>, secret: impl Into<Vec<u8>>, ttl: Duration) -> Self {
-        Self { issuer: issuer.into(), secret: secret.into(), ttl }
+        Self {
+            issuer: issuer.into(),
+            secret: secret.into(),
+            ttl,
+        }
     }
 
     /// Build header.payload string (data to sign).  Public so tests can
@@ -241,7 +257,10 @@ impl JwtIssuer {
     pub fn verify(&self, token: &str) -> Result<TokenClaims, TokenError> {
         let parts: Vec<&str> = token.split('.').collect();
         if parts.len() != 3 {
-            return Err(TokenError::Malformed(format!("expected 3 segments, got {}", parts.len())));
+            return Err(TokenError::Malformed(format!(
+                "expected 3 segments, got {}",
+                parts.len()
+            )));
         }
         let header_bytes = b64url_decode(parts[0])
             .map_err(|e| TokenError::Malformed(format!("header b64: {e}")))?;
@@ -267,15 +286,24 @@ impl JwtIssuer {
             .map_err(|e| TokenError::Malformed(format!("payload b64: {e}")))?;
         let payload: serde_json::Value = serde_json::from_slice(&payload_bytes)
             .map_err(|e| TokenError::Malformed(format!("payload json: {e}")))?;
-        let username = payload.get("username")
+        let username = payload
+            .get("username")
             .and_then(|v| v.as_str())
             .ok_or_else(|| TokenError::Malformed("missing username".into()))?;
-        let roles: Vec<String> = payload.get("roles")
+        let roles: Vec<String> = payload
+            .get("roles")
             .and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
         let expires_at = payload.get("exp").and_then(|v| v.as_u64());
-        let iss = payload.get("iss").and_then(|v| v.as_str()).map(String::from);
+        let iss = payload
+            .get("iss")
+            .and_then(|v| v.as_str())
+            .map(String::from);
 
         let claims = TokenClaims {
             username: username.to_string(),
@@ -289,7 +317,9 @@ impl JwtIssuer {
         Ok(claims)
     }
 
-    pub fn issuer(&self) -> &str { &self.issuer }
+    pub fn issuer(&self) -> &str {
+        &self.issuer
+    }
 }
 
 // ── Unified token enum ────────────────────────────────────────────────────
@@ -339,9 +369,13 @@ fn b64url_decode(s: &str) -> Result<Vec<u8>, String> {
 }
 
 fn ct_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() { return false; }
+    if a.len() != b.len() {
+        return false;
+    }
     let mut acc = 0u8;
-    for (x, y) in a.iter().zip(b.iter()) { acc |= x ^ y; }
+    for (x, y) in a.iter().zip(b.iter()) {
+        acc |= x ^ y;
+    }
     acc == 0
 }
 
@@ -358,7 +392,9 @@ fn mix(key: &[u8], pad: &[u8], msg: &[u8]) -> [u8; 32] {
     let mut s: u64 = 0xcbf29ce484222325;
     for (i, slot) in state.iter_mut().enumerate() {
         for &k in key.iter() {
-            s = s.wrapping_mul(0x100000001b3).wrapping_add((k ^ pad[0] ^ (i as u8)) as u64);
+            s = s
+                .wrapping_mul(0x100000001b3)
+                .wrapping_add((k ^ pad[0] ^ (i as u8)) as u64);
         }
         for &m in msg.iter() {
             s = s.wrapping_mul(0x100000001b3).wrapping_add(m as u64);
@@ -376,8 +412,12 @@ fn mix(key: &[u8], pad: &[u8], msg: &[u8]) -> [u8; 32] {
 mod tests {
     use super::*;
 
-    fn fresh_simple() -> SimpleTokenIssuer { SimpleTokenIssuer::new(Duration::from_secs(60)) }
-    fn fresh_jwt() -> JwtIssuer { JwtIssuer::new("cave-etcd", b"secret-key".to_vec(), Duration::from_secs(60)) }
+    fn fresh_simple() -> SimpleTokenIssuer {
+        SimpleTokenIssuer::new(Duration::from_secs(60))
+    }
+    fn fresh_jwt() -> JwtIssuer {
+        JwtIssuer::new("cave-etcd", b"secret-key".to_vec(), Duration::from_secs(60))
+    }
 
     // ── SimpleToken ───────────────────────────────────────────────────
 
@@ -547,7 +587,8 @@ mod tests {
     fn test_jwt_verify_alg_mismatch() {
         // cite: jwt.go (alg field must match server policy)
         let j = fresh_jwt();
-        let header = b64url(serde_json::to_vec(&serde_json::json!({"alg": "RS256", "typ": "JWT"})).unwrap());
+        let header =
+            b64url(serde_json::to_vec(&serde_json::json!({"alg": "RS256", "typ": "JWT"})).unwrap());
         let payload = b64url(serde_json::to_vec(&serde_json::json!({"username": "x"})).unwrap());
         let token = format!("{header}.{payload}.signature");
         match j.verify(&token) {
@@ -632,19 +673,34 @@ mod tests {
 
     #[test]
     fn test_claims_is_expired_no_exp() {
-        let c = TokenClaims { username: "x".into(), roles: vec![], expires_at: None, issuer: None };
+        let c = TokenClaims {
+            username: "x".into(),
+            roles: vec![],
+            expires_at: None,
+            issuer: None,
+        };
         assert!(!c.is_expired(u64::MAX));
     }
 
     #[test]
     fn test_claims_is_expired_in_future() {
-        let c = TokenClaims { username: "x".into(), roles: vec![], expires_at: Some(now_secs() + 60), issuer: None };
+        let c = TokenClaims {
+            username: "x".into(),
+            roles: vec![],
+            expires_at: Some(now_secs() + 60),
+            issuer: None,
+        };
         assert!(!c.is_expired(now_secs()));
     }
 
     #[test]
     fn test_claims_is_expired_in_past() {
-        let c = TokenClaims { username: "x".into(), roles: vec![], expires_at: Some(now_secs().saturating_sub(60)), issuer: None };
+        let c = TokenClaims {
+            username: "x".into(),
+            roles: vec![],
+            expires_at: Some(now_secs().saturating_sub(60)),
+            issuer: None,
+        };
         assert!(c.is_expired(now_secs()));
     }
 }

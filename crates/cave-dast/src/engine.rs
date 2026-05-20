@@ -22,11 +22,17 @@ pub fn count_by_risk(findings: &[DastFinding]) -> HashMap<String, usize> {
 }
 
 pub fn high_risk_findings(findings: &[DastFinding]) -> Vec<&DastFinding> {
-    findings.iter().filter(|f| f.risk == RiskLevel::High).collect()
+    findings
+        .iter()
+        .filter(|f| f.risk == RiskLevel::High)
+        .collect()
 }
 
 pub fn scan_score(scan: &DastScan) -> u32 {
-    scan.findings.iter().map(|f| risk_rank(&f.risk) as u32).sum()
+    scan.findings
+        .iter()
+        .map(|f| risk_rank(&f.risk) as u32)
+        .sum()
 }
 
 pub fn is_valid_url(url: &str) -> bool {
@@ -41,8 +47,8 @@ pub fn findings_with_cwe(findings: &[DastFinding]) -> Vec<&DastFinding> {
 mod tests {
     use super::*;
     use crate::models::{DastScan, ScanStatus, ScanType};
-    use uuid::Uuid;
     use chrono::Utc;
+    use uuid::Uuid;
 
     fn make_finding(risk: RiskLevel, cwe_id: Option<u32>) -> DastFinding {
         DastFinding {

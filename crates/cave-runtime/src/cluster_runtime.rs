@@ -19,7 +19,7 @@
 //! The unified runtime HTTP server on port 8080 (portal, admin endpoints,
 //! and the legacy merged routers) continues to run side-by-side.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::{get, post};
@@ -39,8 +39,8 @@ use crate::cluster::ClusterManifest;
 use crate::raft_core::RaftCore;
 use crate::raft_driver::{self, RaftHandle};
 use crate::raft_transport::{
-    handle_members, handle_raft_message, heartbeat_loop, election_timer_loop, Peer, PeerRegistry,
-    RaftListenerState,
+    Peer, PeerRegistry, RaftListenerState, election_timer_loop, handle_members,
+    handle_raft_message, heartbeat_loop,
 };
 
 const ETCD_PORT: u16 = 2379;
@@ -179,8 +179,8 @@ impl ClusterRuntime {
         // is derived as `apiserver_port - 4064` so a single-host 3-node
         // smoke test fits without colliding on 2379. The default
         // (6443 → 2379) keeps single-node operators unchanged.
-        let advertise_port = parse_advertise_port(&self.manifest.advertise_address)
-            .unwrap_or(APISERVER_PORT);
+        let advertise_port =
+            parse_advertise_port(&self.manifest.advertise_address).unwrap_or(APISERVER_PORT);
         let etcd_port = advertise_port
             .checked_sub(APISERVER_PORT - ETCD_PORT)
             .unwrap_or(ETCD_PORT);
@@ -205,15 +205,12 @@ impl ClusterRuntime {
                     kv: self.etcd_store.clone(),
                     resources: self.apiserver_store.clone(),
                 });
-                let metrics =
-                    std::sync::Arc::new(crate::raft_apply::ApplyMetrics::default());
-                let source: std::sync::Arc<
-                    dyn crate::raft_apply::CommittedEntrySource,
-                > = std::sync::Arc::new(crate::raft_apply::RaftCoreSource {
-                    core: self.raft.core.clone(),
-                });
-                let (_apply_shutdown_tx, apply_shutdown_rx) =
-                    tokio::sync::watch::channel(false);
+                let metrics = std::sync::Arc::new(crate::raft_apply::ApplyMetrics::default());
+                let source: std::sync::Arc<dyn crate::raft_apply::CommittedEntrySource> =
+                    std::sync::Arc::new(crate::raft_apply::RaftCoreSource {
+                        core: self.raft.core.clone(),
+                    });
+                let (_apply_shutdown_tx, apply_shutdown_rx) = tokio::sync::watch::channel(false);
                 let notifier_for_loop = notifier.clone();
                 tokio::spawn(async move {
                     crate::raft_apply::run_apply_loop_with_notifier(
@@ -235,8 +232,7 @@ impl ClusterRuntime {
                     peers = self.manifest.peers.len(),
                     "raft bridge mounted — etcd writes will propose through Raft"
                 );
-                Some(std::sync::Arc::new(bridge)
-                    as cave_etcd::raft_bridge::SharedRaftBridge)
+                Some(std::sync::Arc::new(bridge) as cave_etcd::raft_bridge::SharedRaftBridge)
             };
         let etcd_router = etcd_router_with_bridge(self.etcd_store.clone(), raft_bridge);
         let api_router = apiserver_router(
@@ -309,8 +305,7 @@ impl ClusterRuntime {
             loop {
                 tick.tick().await;
                 if let Err(e) =
-                    apiserver_persist::persist_snapshot(&api_snap_dd, &api_store_for_snapshot)
-                        .await
+                    apiserver_persist::persist_snapshot(&api_snap_dd, &api_store_for_snapshot).await
                 {
                     warn!(error = %e, "periodic apiserver snapshot failed");
                 }
@@ -556,8 +551,7 @@ fn etcd_router_with_bridge(
     state: Arc<cave_etcd::store::KvStore>,
     bridge: Option<cave_etcd::raft_bridge::SharedRaftBridge>,
 ) -> Router {
-    cave_etcd::router_with_bridge(state, bridge)
-        .route("/healthz", get(|| async { "ok\n" }))
+    cave_etcd::router_with_bridge(state, bridge).route("/healthz", get(|| async { "ok\n" }))
 }
 
 #[derive(Clone)]
@@ -679,7 +673,14 @@ async fn bootstrap_join(
 
 async fn bootstrap_ca(
     State(state): State<ApiserverListenerState>,
-) -> Result<(StatusCode, [(axum::http::HeaderName, &'static str); 1], String), (StatusCode, String)> {
+) -> Result<
+    (
+        StatusCode,
+        [(axum::http::HeaderName, &'static str); 1],
+        String,
+    ),
+    (StatusCode, String),
+> {
     if state.ca_cert_pem.is_empty() {
         return Err((
             StatusCode::SERVICE_UNAVAILABLE,
@@ -724,7 +725,10 @@ async fn submit_csr(
     if req.usage != "kubelet-client" {
         return Err((
             StatusCode::BAD_REQUEST,
-            format!("usage `{}` not supported (only `kubelet-client`)", req.usage),
+            format!(
+                "usage `{}` not supported (only `kubelet-client`)",
+                req.usage
+            ),
         ));
     }
     if state.ca_cert_pem.is_empty() || state.ca_key_pem.is_empty() {
@@ -733,8 +737,13 @@ async fn submit_csr(
             "cluster CA not loaded — cannot sign CSRs".into(),
         ));
     }
-    let signed_pem = sign_kubelet_csr(&state.ca_cert_pem, &state.ca_key_pem, &req.csr_pem, &req.node_name)
-        .map_err(|e| (StatusCode::BAD_REQUEST, format!("sign CSR: {e}")))?;
+    let signed_pem = sign_kubelet_csr(
+        &state.ca_cert_pem,
+        &state.ca_key_pem,
+        &req.csr_pem,
+        &req.node_name,
+    )
+    .map_err(|e| (StatusCode::BAD_REQUEST, format!("sign CSR: {e}")))?;
 
     let csr_name = format!("csr-{}-{}", req.node_name, uuid::Uuid::new_v4().simple());
     let record = CsrRecord {
@@ -786,14 +795,13 @@ pub fn sign_kubelet_csr(
     };
 
     let ca_kp = KeyPair::from_pem(ca_key_pem).context("parse CA private key")?;
-    let ca_params =
-        CertificateParams::from_ca_cert_pem(ca_cert_pem).context("parse CA cert as rcgen params")?;
+    let ca_params = CertificateParams::from_ca_cert_pem(ca_cert_pem)
+        .context("parse CA cert as rcgen params")?;
     let ca_cert = ca_params
         .self_signed(&ca_kp)
         .context("reconstruct rcgen::Certificate from CA params")?;
 
-    let mut csr =
-        CertificateSigningRequestParams::from_pem(csr_pem).context("parse CSR PEM")?;
+    let mut csr = CertificateSigningRequestParams::from_pem(csr_pem).context("parse CSR PEM")?;
     csr.params.distinguished_name = rcgen::DistinguishedName::new();
     csr.params
         .distinguished_name
@@ -807,7 +815,8 @@ pub fn sign_kubelet_csr(
         KeyUsagePurpose::DigitalSignature,
         KeyUsagePurpose::KeyEncipherment,
     ];
-    csr.params.insert_extended_key_usage(ExtendedKeyUsagePurpose::ClientAuth);
+    csr.params
+        .insert_extended_key_usage(ExtendedKeyUsagePurpose::ClientAuth);
 
     let signed = csr
         .signed_by(&ca_cert, &ca_kp)
@@ -1023,7 +1032,10 @@ mod wal {
 
             let store = KvStore::new();
             let n = replay_into(&buf, &store, 2);
-            assert_eq!(n, 1, "only rev=3 should replay (rev<=2 already snapshotted)");
+            assert_eq!(
+                n, 1,
+                "only rev=3 should replay (rev<=2 already snapshotted)"
+            );
         }
 
         #[test]
@@ -1126,11 +1138,7 @@ mod apiserver_persist {
                 .with_context(|| format!("read {}", wal_path.display()))?;
             let replayed = replay_into(&bytes, &store);
             if replayed > 0 {
-                info!(
-                    replayed,
-                    wal_bytes = bytes.len(),
-                    "apiserver WAL replayed"
-                );
+                info!(replayed, wal_bytes = bytes.len(), "apiserver WAL replayed");
             }
         }
         Ok(store)
@@ -1509,9 +1517,7 @@ mod tests {
     /// chains back to the CA.
     #[test]
     fn sign_kubelet_csr_emits_valid_chained_leaf() {
-        use rcgen::{
-            BasicConstraints, CertificateParams, DnType, IsCa, KeyPair, KeyUsagePurpose,
-        };
+        use rcgen::{BasicConstraints, CertificateParams, DnType, IsCa, KeyPair, KeyUsagePurpose};
         // Cluster CA
         let ca_kp = KeyPair::generate().unwrap();
         let mut ca_params = CertificateParams::default();
@@ -1649,7 +1655,9 @@ mod tests {
         // Worker-side CSR
         let kp = KeyPair::generate().unwrap();
         let mut params = CertificateParams::default();
-        params.distinguished_name.push(DnType::CommonName, "ignored");
+        params
+            .distinguished_name
+            .push(DnType::CommonName, "ignored");
         let csr_pem = params.serialize_request(&kp).unwrap().pem().unwrap();
 
         let resp = submit_csr(
@@ -1742,13 +1750,13 @@ mod tests {
     }
 
     fn mint_test_ca() -> (String, String) {
-        use rcgen::{
-            BasicConstraints, CertificateParams, DnType, IsCa, KeyPair, KeyUsagePurpose,
-        };
+        use rcgen::{BasicConstraints, CertificateParams, DnType, IsCa, KeyPair, KeyUsagePurpose};
         let kp = KeyPair::generate().unwrap();
         let mut params = CertificateParams::default();
         params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
-        params.distinguished_name.push(DnType::CommonName, "test CA");
+        params
+            .distinguished_name
+            .push(DnType::CommonName, "test CA");
         params.key_usages.push(KeyUsagePurpose::KeyCertSign);
         let cert = params.self_signed(&kp).unwrap();
         (cert.pem(), kp.serialize_pem())

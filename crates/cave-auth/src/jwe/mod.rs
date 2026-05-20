@@ -25,4 +25,4 @@ pub mod serialize;
 pub use content_encryption::{ContentEncAlg, ContentEncError};
 pub use header::{JweHeader, KeyAgreementAlg};
 pub use key_agreement::{KeyAgreementError, WrappedKey};
-pub use serialize::{compact_decode, compact_encode, JweCompact, JweError};
+pub use serialize::{JweCompact, JweError, compact_decode, compact_encode};

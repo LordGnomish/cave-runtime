@@ -32,9 +32,15 @@ pub enum SamlCmd {
     /// Parse an `<md:EntityDescriptor>` and dump its bindings.
     ParseMetadata { source: String },
     /// Sign an `<AuthnRequest>` XML body with the given RSA key.
-    SignRequest { xml_path: PathBuf, key_path: PathBuf },
+    SignRequest {
+        xml_path: PathBuf,
+        key_path: PathBuf,
+    },
     /// Verify a `<Response>` XML signature against a certificate.
-    VerifyResponse { xml_path: PathBuf, cert_path: PathBuf },
+    VerifyResponse {
+        xml_path: PathBuf,
+        cert_path: PathBuf,
+    },
 }
 
 impl SamlCmd {

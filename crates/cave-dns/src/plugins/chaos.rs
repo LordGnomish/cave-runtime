@@ -30,9 +30,9 @@ impl ChaosPlugin {
         r.set_ttl(0);
         r.set_record_type(RecordType::TXT);
         r.set_dns_class(DNSClass::CH);
-        r.set_data(Some(RData::TXT(
-            hickory_proto::rr::rdata::TXT::new(vec![text.to_string()]),
-        )));
+        r.set_data(Some(RData::TXT(hickory_proto::rr::rdata::TXT::new(vec![
+            text.to_string(),
+        ]))));
         ctx.response.add_answer(r);
     }
 }

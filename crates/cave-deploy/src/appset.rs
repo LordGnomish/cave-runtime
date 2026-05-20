@@ -353,7 +353,10 @@ pub fn evaluate_list_generator(list_gen: &ListGenerator) -> Vec<GeneratorParams>
 }
 
 /// Evaluate a git directory generator (simplified — real impl would clone repo).
-pub fn evaluate_git_directory_generator(git_gen: &GitGenerator, paths: &[&str]) -> Vec<GeneratorParams> {
+pub fn evaluate_git_directory_generator(
+    git_gen: &GitGenerator,
+    paths: &[&str],
+) -> Vec<GeneratorParams> {
     let mut params = Vec::new();
     for path in paths {
         for filter in &git_gen.directories {
@@ -362,7 +365,10 @@ pub fn evaluate_git_directory_generator(git_gen: &GitGenerator, paths: &[&str]) 
                 let mut p = git_gen.values.clone();
                 p.insert("path".to_string(), path.to_string());
                 p.insert("path.basename".to_string(), dir_name.to_string());
-                p.insert("path.basenameNormalized".to_string(), normalize_name(dir_name));
+                p.insert(
+                    "path.basenameNormalized".to_string(),
+                    normalize_name(dir_name),
+                );
                 p.extend(git_gen.values.clone());
                 params.push(p);
             }
@@ -377,18 +383,18 @@ pub fn evaluate_merge_generator(
     override_params: &[GeneratorParams],
     merge_keys: &[String],
 ) -> Vec<GeneratorParams> {
-    base.iter().map(|b| {
-        let mut merged = b.clone();
-        for ov in override_params {
-            let keys_match = merge_keys.iter().all(|k| {
-                b.get(k) == ov.get(k)
-            });
-            if keys_match {
-                merged.extend(ov.clone());
+    base.iter()
+        .map(|b| {
+            let mut merged = b.clone();
+            for ov in override_params {
+                let keys_match = merge_keys.iter().all(|k| b.get(k) == ov.get(k));
+                if keys_match {
+                    merged.extend(ov.clone());
+                }
             }
-        }
-        merged
-    }).collect()
+            merged
+        })
+        .collect()
 }
 
 /// Cartesian product of two parameter sets (matrix generator).
@@ -408,7 +414,9 @@ pub fn evaluate_matrix_generator(
 }
 
 fn matches_glob(pattern: &str, path: &str) -> bool {
-    if pattern == "*" { return true; }
+    if pattern == "*" {
+        return true;
+    }
     if pattern.ends_with("/*") {
         let prefix = &pattern[..pattern.len() - 2];
         return path.starts_with(prefix);
@@ -430,7 +438,13 @@ fn matches_glob(pattern: &str, path: &str) -> bool {
 
 fn normalize_name(name: &str) -> String {
     name.chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' { c.to_lowercase().next().unwrap() } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' {
+                c.to_lowercase().next().unwrap()
+            } else {
+                '-'
+            }
+        })
         .collect()
 }
 
@@ -449,7 +463,10 @@ mod tests {
         };
         let params = evaluate_list_generator(&list_gen);
         assert_eq!(params.len(), 2);
-        assert_eq!(params[0].get("cluster").map(|s| s.as_str()), Some("staging"));
+        assert_eq!(
+            params[0].get("cluster").map(|s| s.as_str()),
+            Some("staging")
+        );
     }
 
     #[test]
@@ -469,10 +486,18 @@ mod tests {
     #[test]
     fn merge_generator_merges_on_key() {
         let base = vec![
-            [("cluster".to_string(), "prod".to_string()), ("region".to_string(), "us".to_string())].into(),
+            [
+                ("cluster".to_string(), "prod".to_string()),
+                ("region".to_string(), "us".to_string()),
+            ]
+            .into(),
         ];
         let overrides = vec![
-            [("cluster".to_string(), "prod".to_string()), ("replicas".to_string(), "5".to_string())].into(),
+            [
+                ("cluster".to_string(), "prod".to_string()),
+                ("replicas".to_string(), "5".to_string()),
+            ]
+            .into(),
         ];
         let result = evaluate_merge_generator(&base, &overrides, &["cluster".to_string()]);
         assert_eq!(result.len(), 1);
@@ -482,11 +507,13 @@ mod tests {
 
     #[test]
     fn merge_generator_no_key_match() {
-        let base = vec![
-            [("cluster".to_string(), "prod".to_string())].into(),
-        ];
+        let base = vec![[("cluster".to_string(), "prod".to_string())].into()];
         let overrides = vec![
-            [("cluster".to_string(), "staging".to_string()), ("extra".to_string(), "val".to_string())].into(),
+            [
+                ("cluster".to_string(), "staging".to_string()),
+                ("extra".to_string(), "val".to_string()),
+            ]
+            .into(),
         ];
         let result = evaluate_merge_generator(&base, &overrides, &["cluster".to_string()]);
         assert_eq!(result[0].get("extra"), None);
@@ -497,7 +524,10 @@ mod tests {
         let git_gen = GitGenerator {
             repo_url: "https://github.com/example/config".to_string(),
             revision: Some("main".to_string()),
-            directories: vec![GitDirectoryFilter { path: "clusters/*".to_string(), exclude: false }],
+            directories: vec![GitDirectoryFilter {
+                path: "clusters/*".to_string(),
+                exclude: false,
+            }],
             files: vec![],
             values: HashMap::new(),
             template: None,

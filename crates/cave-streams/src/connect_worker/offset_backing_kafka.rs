@@ -191,10 +191,7 @@ impl KafkaBackedOffsetStore {
         Ok(())
     }
 
-    pub fn commit_batch(
-        &mut self,
-        items: Vec<(OffsetKey, OffsetValue)>,
-    ) -> StreamsResult<()> {
+    pub fn commit_batch(&mut self, items: Vec<(OffsetKey, OffsetValue)>) -> StreamsResult<()> {
         // Durable-first: publish every record before updating the
         // materialised view. If a publish fails mid-batch, the in-memory
         // view stays consistent with the published prefix and the
@@ -360,11 +357,8 @@ mod tests {
     fn commit_batch_is_durable_first() {
         let client = Arc::new(InMemoryOffsetTopicClient::new());
         let mut s = KafkaBackedOffsetStore::open(client.clone()).unwrap();
-        s.commit_batch(vec![
-            (key("c", "a"), val("1")),
-            (key("c", "b"), val("2")),
-        ])
-        .unwrap();
+        s.commit_batch(vec![(key("c", "a"), val("1")), (key("c", "b"), val("2"))])
+            .unwrap();
         assert_eq!(client.len(), 2);
         assert_eq!(s.len(), 2);
     }

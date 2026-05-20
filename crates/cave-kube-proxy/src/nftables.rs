@@ -28,7 +28,9 @@ pub struct NftablesProxier {
 
 impl NftablesProxier {
     pub fn new(tenant_id: impl Into<String>) -> Self {
-        Self { tenant_id: tenant_id.into() }
+        Self {
+            tenant_id: tenant_id.into(),
+        }
     }
 
     /// Cite: `pkg/proxy/nftables/proxier.go:410` (setupNFTables) — the
@@ -40,8 +42,12 @@ impl NftablesProxier {
             format!("table inet {TABLE_NAME} {{"),
             format!("    chain {SERVICES_CHAIN} {{}}"),
             format!("    chain {NODEPORTS_CHAIN} {{}}"),
-            format!("    map {SERVICE_IPS_MAP} {{ type ipv4_addr . inet_proto . inet_service : verdict; }}"),
-            format!("    map {SERVICE_NODEPORTS_MAP} {{ type inet_proto . inet_service : verdict; }}"),
+            format!(
+                "    map {SERVICE_IPS_MAP} {{ type ipv4_addr . inet_proto . inet_service : verdict; }}"
+            ),
+            format!(
+                "    map {SERVICE_NODEPORTS_MAP} {{ type inet_proto . inet_service : verdict; }}"
+            ),
             "}".to_string(),
         ]
     }
@@ -142,16 +148,22 @@ impl NftablesProxier {
 
         if n == 0 {
             // No endpoints — drop or REJECT. cave matches upstream "REJECT".
-            out.push(format!("add rule inet {TABLE_NAME} {chain} reject with icmp type host-unreachable"));
+            out.push(format!(
+                "add rule inet {TABLE_NAME} {chain} reject with icmp type host-unreachable"
+            ));
             return Ok(out);
         }
 
         for (i, ep) in eps.iter().enumerate() {
-            let addr = ep.addresses.first().expect("endpoint has at least one address");
+            let addr = ep
+                .addresses
+                .first()
+                .expect("endpoint has at least one address");
             if i + 1 == n {
                 out.push(format!(
                     "add rule inet {TABLE_NAME} {chain} dnat to {addr}:{port}",
-                    addr = addr, port = ep.port,
+                    addr = addr,
+                    port = ep.port,
                 ));
             } else {
                 out.push(format!(

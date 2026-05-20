@@ -63,7 +63,8 @@ pub struct KeyRotationController {
 impl KeyRotationController {
     pub fn new(tenant: TenantId, drain_seconds: u64, initial_spi: u32) -> Self {
         Self {
-            tenant, drain_seconds,
+            tenant,
+            drain_seconds,
             states: BTreeMap::new(),
             next_spi: initial_spi,
         }
@@ -73,24 +74,43 @@ impl KeyRotationController {
         let target = target.into();
         let spi = self.next_spi;
         self.next_spi += 1;
-        self.states.insert(target, RotationState {
-            current: KeyVersion { spi, key, installed_ns: now_ns },
-            previous: None,
-            phase: RotationPhase::Stable,
-            drain_started_ns: 0,
-        });
+        self.states.insert(
+            target,
+            RotationState {
+                current: KeyVersion {
+                    spi,
+                    key,
+                    installed_ns: now_ns,
+                },
+                previous: None,
+                phase: RotationPhase::Stable,
+                drain_started_ns: 0,
+            },
+        );
         spi
     }
 
     /// Begin rotation: install the new key alongside, move to Drain.
-    pub fn begin_rotation(&mut self, target: &str, new_key: Vec<u8>, now_ns: u64) -> Result<u32, RotationError> {
-        let state = self.states.get_mut(target).ok_or(RotationError::NotRotating)?;
+    pub fn begin_rotation(
+        &mut self,
+        target: &str,
+        new_key: Vec<u8>,
+        now_ns: u64,
+    ) -> Result<u32, RotationError> {
+        let state = self
+            .states
+            .get_mut(target)
+            .ok_or(RotationError::NotRotating)?;
         if !matches!(state.phase, RotationPhase::Stable) {
             return Err(RotationError::AlreadyRotating(state.phase));
         }
         let new_spi = self.next_spi;
         self.next_spi += 1;
-        let new_version = KeyVersion { spi: new_spi, key: new_key, installed_ns: now_ns };
+        let new_version = KeyVersion {
+            spi: new_spi,
+            key: new_key,
+            installed_ns: now_ns,
+        };
         state.previous = Some(state.current.clone());
         state.current = new_version;
         state.phase = RotationPhase::Drain;
@@ -102,7 +122,10 @@ impl KeyRotationController {
     /// window has elapsed.
     pub fn complete_rotation(&mut self, target: &str, now_ns: u64) -> Result<(), RotationError> {
         let drain_ns = self.drain_seconds * 1_000_000_000;
-        let state = self.states.get_mut(target).ok_or(RotationError::NotRotating)?;
+        let state = self
+            .states
+            .get_mut(target)
+            .ok_or(RotationError::NotRotating)?;
         if !matches!(state.phase, RotationPhase::Drain) {
             return Err(RotationError::NotRotating);
         }
@@ -117,7 +140,10 @@ impl KeyRotationController {
 
     /// Re-stabilise (mark Switched → Stable so the next rotation can begin).
     pub fn stabilise(&mut self, target: &str) -> Result<(), RotationError> {
-        let state = self.states.get_mut(target).ok_or(RotationError::NotRotating)?;
+        let state = self
+            .states
+            .get_mut(target)
+            .ok_or(RotationError::NotRotating)?;
         if !matches!(state.phase, RotationPhase::Switched | RotationPhase::Stable) {
             return Err(RotationError::AlreadyRotating(state.phase));
         }
@@ -131,7 +157,9 @@ impl KeyRotationController {
     }
 
     pub fn previous_spi(&self, target: &str) -> Option<u32> {
-        self.states.get(target).and_then(|s| s.previous.as_ref().map(|p| p.spi))
+        self.states
+            .get(target)
+            .and_then(|s| s.previous.as_ref().map(|p| p.spi))
     }
 
     pub fn phase(&self, target: &str) -> Option<RotationPhase> {
@@ -164,7 +192,11 @@ mod tests {
 
     #[test]
     fn install_initial_records_stable_phase() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "Install.Initial", "tenant-kr-init");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/keyrotation.go",
+            "Install.Initial",
+            "tenant-kr-init"
+        );
         let mut c = ctrl(tenant);
         let spi = c.install_initial("node-a", vec![1, 2, 3], 100);
         assert_eq!(spi, 100);
@@ -173,7 +205,11 @@ mod tests {
 
     #[test]
     fn install_initial_assigns_monotonic_spi() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "Install.MonotonicSPI", "tenant-kr-mono");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/keyrotation.go",
+            "Install.MonotonicSPI",
+            "tenant-kr-mono"
+        );
         let mut c = ctrl(tenant);
         let a = c.install_initial("node-a", vec![1], 100);
         let b = c.install_initial("node-b", vec![2], 100);
@@ -182,7 +218,8 @@ mod tests {
 
     #[test]
     fn target_count_tracks_installs() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "TargetCount", "tenant-kr-cnt");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/ipsec/keyrotation.go", "TargetCount", "tenant-kr-cnt");
         let mut c = ctrl(tenant);
         c.install_initial("a", vec![1], 100);
         c.install_initial("b", vec![2], 100);
@@ -204,7 +241,11 @@ mod tests {
 
     #[test]
     fn begin_rotation_on_unknown_target_errors() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "Begin.Unknown", "tenant-kr-bgnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/keyrotation.go",
+            "Begin.Unknown",
+            "tenant-kr-bgnf"
+        );
         let mut c = ctrl(tenant);
         let err = c.begin_rotation("ghost", vec![1], 100).unwrap_err();
         assert_eq!(err, RotationError::NotRotating);
@@ -212,7 +253,11 @@ mod tests {
 
     #[test]
     fn begin_rotation_while_in_drain_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "Begin.AlreadyRotating", "tenant-kr-bgar");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/keyrotation.go",
+            "Begin.AlreadyRotating",
+            "tenant-kr-bgar"
+        );
         let mut c = ctrl(tenant);
         c.install_initial("node-a", vec![1], 100);
         c.begin_rotation("node-a", vec![2], 200).unwrap();
@@ -224,17 +269,27 @@ mod tests {
 
     #[test]
     fn complete_within_drain_window_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "Complete.WithinDrain", "tenant-kr-cwd");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/keyrotation.go",
+            "Complete.WithinDrain",
+            "tenant-kr-cwd"
+        );
         let mut c = ctrl(tenant);
         c.install_initial("node-a", vec![1], 100);
         c.begin_rotation("node-a", vec![2], 200).unwrap();
-        let err = c.complete_rotation("node-a", 200 + 10_000_000_000).unwrap_err();
+        let err = c
+            .complete_rotation("node-a", 200 + 10_000_000_000)
+            .unwrap_err();
         assert!(matches!(err, RotationError::DrainNotElapsed(_)));
     }
 
     #[test]
     fn complete_after_drain_succeeds_and_revokes_old() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "Complete.AfterDrain", "tenant-kr-cad");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/keyrotation.go",
+            "Complete.AfterDrain",
+            "tenant-kr-cad"
+        );
         let mut c = ctrl(tenant);
         c.install_initial("node-a", vec![1], 100);
         c.begin_rotation("node-a", vec![2], 200).unwrap();
@@ -245,7 +300,11 @@ mod tests {
 
     #[test]
     fn complete_when_not_rotating_errors() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "Complete.NotRotating", "tenant-kr-cnr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/keyrotation.go",
+            "Complete.NotRotating",
+            "tenant-kr-cnr"
+        );
         let mut c = ctrl(tenant);
         c.install_initial("node-a", vec![1], 100);
         let err = c.complete_rotation("node-a", 1000).unwrap_err();
@@ -254,7 +313,11 @@ mod tests {
 
     #[test]
     fn complete_unknown_target_errors() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "Complete.Unknown", "tenant-kr-cu");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/keyrotation.go",
+            "Complete.Unknown",
+            "tenant-kr-cu"
+        );
         let mut c = ctrl(tenant);
         let err = c.complete_rotation("ghost", 1000).unwrap_err();
         assert_eq!(err, RotationError::NotRotating);
@@ -264,7 +327,8 @@ mod tests {
 
     #[test]
     fn stabilise_after_switched_returns_to_stable() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "Stabilise", "tenant-kr-stb");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/ipsec/keyrotation.go", "Stabilise", "tenant-kr-stb");
         let mut c = ctrl(tenant);
         c.install_initial("node-a", vec![1], 100);
         c.begin_rotation("node-a", vec![2], 200).unwrap();
@@ -275,17 +339,28 @@ mod tests {
 
     #[test]
     fn stabilise_during_drain_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "Stabilise.Drain", "tenant-kr-stbd");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/keyrotation.go",
+            "Stabilise.Drain",
+            "tenant-kr-stbd"
+        );
         let mut c = ctrl(tenant);
         c.install_initial("node-a", vec![1], 100);
         c.begin_rotation("node-a", vec![2], 200).unwrap();
         let err = c.stabilise("node-a").unwrap_err();
-        assert!(matches!(err, RotationError::AlreadyRotating(RotationPhase::Drain)));
+        assert!(matches!(
+            err,
+            RotationError::AlreadyRotating(RotationPhase::Drain)
+        ));
     }
 
     #[test]
     fn stabilise_unknown_returns_not_rotating() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "Stabilise.Unknown", "tenant-kr-stbu");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/keyrotation.go",
+            "Stabilise.Unknown",
+            "tenant-kr-stbu"
+        );
         let mut c = ctrl(tenant);
         let err = c.stabilise("ghost").unwrap_err();
         assert_eq!(err, RotationError::NotRotating);
@@ -295,13 +370,15 @@ mod tests {
 
     #[test]
     fn second_rotation_after_stabilise_succeeds() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "Sequential", "tenant-kr-seq");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/ipsec/keyrotation.go", "Sequential", "tenant-kr-seq");
         let mut c = ctrl(tenant);
         c.install_initial("node-a", vec![1], 100);
         c.begin_rotation("node-a", vec![2], 200).unwrap();
         c.complete_rotation("node-a", 200 + 31_000_000_000).unwrap();
         c.stabilise("node-a").unwrap();
-        c.begin_rotation("node-a", vec![3], 100_000_000_000).unwrap();
+        c.begin_rotation("node-a", vec![3], 100_000_000_000)
+            .unwrap();
         assert_eq!(c.phase("node-a"), Some(RotationPhase::Drain));
     }
 
@@ -309,7 +386,8 @@ mod tests {
 
     #[test]
     fn current_spi_advances_on_rotation() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "SPI.Advance", "tenant-kr-spi");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/ipsec/keyrotation.go", "SPI.Advance", "tenant-kr-spi");
         let mut c = ctrl(tenant);
         let initial = c.install_initial("node-a", vec![1], 100);
         let next = c.begin_rotation("node-a", vec![2], 200).unwrap();
@@ -319,7 +397,8 @@ mod tests {
 
     #[test]
     fn previous_spi_set_during_drain_cleared_after_complete() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "SPI.Previous", "tenant-kr-prev");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/ipsec/keyrotation.go", "SPI.Previous", "tenant-kr-prev");
         let mut c = ctrl(tenant);
         c.install_initial("node-a", vec![1], 100);
         c.begin_rotation("node-a", vec![2], 200).unwrap();
@@ -330,7 +409,11 @@ mod tests {
 
     #[test]
     fn current_spi_unknown_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "SPI.Current.NotFound", "tenant-kr-snf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/keyrotation.go",
+            "SPI.Current.NotFound",
+            "tenant-kr-snf"
+        );
         let c = ctrl(tenant);
         assert!(c.current_spi("ghost").is_none());
     }
@@ -348,7 +431,11 @@ mod tests {
 
     #[test]
     fn forget_unknown_returns_false() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "Forget.NotFound", "tenant-kr-fgtnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/keyrotation.go",
+            "Forget.NotFound",
+            "tenant-kr-fgtnf"
+        );
         let mut c = ctrl(tenant);
         assert!(!c.forget("ghost"));
     }
@@ -357,7 +444,11 @@ mod tests {
 
     #[test]
     fn rotations_per_target_independent() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "Multi.Independent", "tenant-kr-mi");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/keyrotation.go",
+            "Multi.Independent",
+            "tenant-kr-mi"
+        );
         let mut c = ctrl(tenant);
         c.install_initial("a", vec![1], 100);
         c.install_initial("b", vec![1], 100);
@@ -371,8 +462,16 @@ mod tests {
 
     #[test]
     fn rotation_phase_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "Phase.Serde", "tenant-kr-pserde");
-        for p in [RotationPhase::Stable, RotationPhase::Drain, RotationPhase::Switched] {
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ipsec/keyrotation.go",
+            "Phase.Serde",
+            "tenant-kr-pserde"
+        );
+        for p in [
+            RotationPhase::Stable,
+            RotationPhase::Drain,
+            RotationPhase::Switched,
+        ] {
             let s = serde_json::to_string(&p).unwrap();
             let back: RotationPhase = serde_json::from_str(&s).unwrap();
             assert_eq!(back, p);
@@ -381,8 +480,16 @@ mod tests {
 
     #[test]
     fn key_version_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ipsec/keyrotation.go", "KeyVersion.Serde", "tenant-kr-kvserde");
-        let k = KeyVersion { spi: 100, key: vec![1, 2, 3], installed_ns: 200 };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ipsec/keyrotation.go",
+            "KeyVersion.Serde",
+            "tenant-kr-kvserde"
+        );
+        let k = KeyVersion {
+            spi: 100,
+            key: vec![1, 2, 3],
+            installed_ns: 200,
+        };
         let s = serde_json::to_string(&k).unwrap();
         let back: KeyVersion = serde_json::from_str(&s).unwrap();
         assert_eq!(back, k);

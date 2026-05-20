@@ -107,7 +107,9 @@ impl LengthSpec {
 
 fn read_length(bytes: &[u8], spec: &LengthSpec) -> Result<usize, FrameError> {
     if bytes.len() < spec.length_size {
-        return Err(FrameError::Incomplete { needed: spec.length_size - bytes.len() });
+        return Err(FrameError::Incomplete {
+            needed: spec.length_size - bytes.len(),
+        });
     }
     let value = match (spec.length_size, spec.endian) {
         (4, Endian::Big) => u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize,
@@ -158,7 +160,10 @@ pub fn try_read_length_prefixed(
         )));
     }
     if frame_len > spec.max_frame_size {
-        return Err(FrameError::Limit { actual: frame_len, max: spec.max_frame_size });
+        return Err(FrameError::Limit {
+            actual: frame_len,
+            max: spec.max_frame_size,
+        });
     }
     if src.len() < frame_len {
         return Ok(None);

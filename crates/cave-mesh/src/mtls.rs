@@ -92,8 +92,11 @@ impl MtlsManager {
             if policy.namespace != namespace {
                 continue;
             }
-            let is_namespace_wide =
-                policy.selector.as_ref().map(|s| s.is_empty()).unwrap_or(true);
+            let is_namespace_wide = policy
+                .selector
+                .as_ref()
+                .map(|s| s.is_empty())
+                .unwrap_or(true);
 
             if is_namespace_wide {
                 // Check port-level override first
@@ -108,9 +111,9 @@ impl MtlsManager {
                 };
                 namespace_mode = Some(effective);
             } else if let Some(selector) = &policy.selector {
-                let matches = selector.iter().all(|(k, v)| {
-                    workload_labels.get(k).map(|vv| vv == v).unwrap_or(false)
-                });
+                let matches = selector
+                    .iter()
+                    .all(|(k, v)| workload_labels.get(k).map(|vv| vv == v).unwrap_or(false));
                 if matches {
                     let effective = if let Some(p) = port {
                         policy
@@ -181,7 +184,10 @@ impl MtlsManager {
     /// Extract SPIFFE principal from the peer TLS context.
     pub fn peer_principal(ctx: &TlsContext) -> Option<&str> {
         ctx.peer_principal.as_deref().or_else(|| {
-            ctx.peer_cert_san.iter().find(|s| s.starts_with("spiffe://")).map(|s| s.as_str())
+            ctx.peer_cert_san
+                .iter()
+                .find(|s| s.starts_with("spiffe://"))
+                .map(|s| s.as_str())
         })
     }
 }

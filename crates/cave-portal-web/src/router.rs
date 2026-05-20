@@ -43,7 +43,11 @@ impl Router {
 
     pub fn register(&mut self, page: Page) -> &mut Self {
         let segments = parse_pattern(&page.path);
-        self.routes.push(Route { pattern: page.path.clone(), segments, page });
+        self.routes.push(Route {
+            pattern: page.path.clone(),
+            segments,
+            page,
+        });
         self
     }
 
@@ -63,7 +67,10 @@ impl Router {
         let request_segments: Vec<&str> = split_path(path);
         for route in &self.routes {
             if let Some(params) = match_segments(&route.segments, &request_segments) {
-                return Some(RouteMatch { page: &route.page, params });
+                return Some(RouteMatch {
+                    page: &route.page,
+                    params,
+                });
             }
         }
         None
@@ -71,7 +78,10 @@ impl Router {
 }
 
 fn split_path(path: &str) -> Vec<&str> {
-    path.trim_matches('/').split('/').filter(|s| !s.is_empty()).collect()
+    path.trim_matches('/')
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .collect()
 }
 
 pub(crate) fn parse_pattern(path: &str) -> Vec<Segment> {
@@ -204,8 +214,18 @@ mod tests {
     #[test]
     fn router_match_first_registered_wins() {
         let mut r = Router::new();
-        r.register(Page::builder("a", "/x").title("first").scope(Scope::Public).build());
-        r.register(Page::builder("b", "/x").title("second").scope(Scope::Public).build());
+        r.register(
+            Page::builder("a", "/x")
+                .title("first")
+                .scope(Scope::Public)
+                .build(),
+        );
+        r.register(
+            Page::builder("b", "/x")
+                .title("second")
+                .scope(Scope::Public)
+                .build(),
+        );
         let m = r.r#match("/x").unwrap();
         assert_eq!(m.page.title, "first");
     }
@@ -238,8 +258,16 @@ mod tests {
     fn router_match_literal_takes_priority_over_param_when_registered_first() {
         // Real Backstage-like behaviour: order matters.
         let mut r = Router::new();
-        r.register(Page::builder("specific", "/users/me").scope(Scope::Public).build());
-        r.register(Page::builder("generic", "/users/:id").scope(Scope::Public).build());
+        r.register(
+            Page::builder("specific", "/users/me")
+                .scope(Scope::Public)
+                .build(),
+        );
+        r.register(
+            Page::builder("generic", "/users/:id")
+                .scope(Scope::Public)
+                .build(),
+        );
         let m = r.r#match("/users/me").unwrap();
         assert_eq!(m.page.id, "specific");
     }
@@ -247,8 +275,16 @@ mod tests {
     #[test]
     fn router_match_falls_through_to_param_when_no_literal() {
         let mut r = Router::new();
-        r.register(Page::builder("specific", "/users/me").scope(Scope::Public).build());
-        r.register(Page::builder("generic", "/users/:id").scope(Scope::Public).build());
+        r.register(
+            Page::builder("specific", "/users/me")
+                .scope(Scope::Public)
+                .build(),
+        );
+        r.register(
+            Page::builder("generic", "/users/:id")
+                .scope(Scope::Public)
+                .build(),
+        );
         let m = r.r#match("/users/42").unwrap();
         assert_eq!(m.page.id, "generic");
     }

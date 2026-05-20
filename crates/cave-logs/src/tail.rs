@@ -5,40 +5,39 @@
 //! Subscribers connect via WebSocket and receive a stream of `TailResponse`
 //! JSON messages matching their LogQL filter query.
 
+use axum::extract::ws::{Message, WebSocket};
+use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use futures_util::{SinkExt, StreamExt};
-use axum::extract::ws::{Message, WebSocket};
 use tracing::warn;
 
-use crate::logql::ast::{Query, PipelineStage};
+use crate::logql::ast::{PipelineStage, Query};
 use crate::logql::eval::{apply_pipeline, labels_match};
 use crate::logql::parser::Parser;
 use crate::models::{TailEntry, TailEvent, TailResponse, TailStream};
 use crate::store::LogStore;
 
 /// Handle one WebSocket tail connection.
-pub async fn handle_tail(
-    ws: WebSocket,
-    logql_query: String,
-    tenant: String,
-    store: Arc<LogStore>,
-) {
+pub async fn handle_tail(ws: WebSocket, logql_query: String, tenant: String, store: Arc<LogStore>) {
     let (mut sender, mut receiver) = ws.split();
 
     // Parse the LogQL query — we only use it for filtering.
     let (selector, pipeline) = match Parser::parse_query(&logql_query) {
         Ok(Query::Log(lq)) => (lq.selector, lq.pipeline),
         Ok(_) => {
-            let _ = sender.send(Message::Text(
-                r#"{"error":"tail requires a log query, not a metric query"}"#.into()
-            )).await;
+            let _ = sender
+                .send(Message::Text(
+                    r#"{"error":"tail requires a log query, not a metric query"}"#.into(),
+                ))
+                .await;
             return;
         }
         Err(e) => {
-            let _ = sender.send(Message::Text(
-                format!(r#"{{"error":"parse error: {}"}}"#, e).into()
-            )).await;
+            let _ = sender
+                .send(Message::Text(
+                    format!(r#"{{"error":"parse error: {}"}}"#, e).into(),
+                ))
+                .await;
             return;
         }
     };
@@ -108,7 +107,7 @@ pub async fn handle_tail(
 #[cfg(test)]
 mod tests {
     // WebSocket tests require a running server; we test the filter logic only.
-    use crate::logql::ast::{LineFilter, PipelineStage, StreamSelector, LabelMatcher, MatchOp};
+    use crate::logql::ast::{LabelMatcher, LineFilter, MatchOp, PipelineStage, StreamSelector};
     use crate::logql::eval::{apply_pipeline, labels_match};
     use crate::models::{Labels, LogEntry};
     use std::collections::HashMap;
@@ -117,12 +116,18 @@ mod tests {
     fn tail_filter_matches() {
         let labels = Labels::new(HashMap::from([("app".into(), "nginx".into())]));
         let selector = StreamSelector {
-            matchers: vec![LabelMatcher { name: "app".into(), op: MatchOp::Eq, value: "nginx".into() }],
+            matchers: vec![LabelMatcher {
+                name: "app".into(),
+                op: MatchOp::Eq,
+                value: "nginx".into(),
+            }],
         };
         assert!(labels_match(&labels, &selector));
 
         let entry = LogEntry::new(0, "error: 500");
-        let pipeline = vec![PipelineStage::LineFilter(LineFilter::Contains("error".into()))];
+        let pipeline = vec![PipelineStage::LineFilter(LineFilter::Contains(
+            "error".into(),
+        ))];
         assert!(apply_pipeline(&entry, &labels, &pipeline).is_some());
     }
 
@@ -130,7 +135,11 @@ mod tests {
     fn tail_filter_no_match() {
         let labels = Labels::new(HashMap::from([("app".into(), "postgres".into())]));
         let selector = StreamSelector {
-            matchers: vec![LabelMatcher { name: "app".into(), op: MatchOp::Eq, value: "nginx".into() }],
+            matchers: vec![LabelMatcher {
+                name: "app".into(),
+                op: MatchOp::Eq,
+                value: "nginx".into(),
+            }],
         };
         assert!(!labels_match(&labels, &selector));
     }

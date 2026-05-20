@@ -7,7 +7,7 @@
 //! `Deployment`; the runtime dispatches to the right strategy
 //! (rolling, blue/green, canary) based on the module's manifest.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Args;
 use serde_json::json;
 

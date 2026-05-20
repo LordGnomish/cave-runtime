@@ -98,7 +98,10 @@ mod tests {
 
     #[test]
     fn test_workflow_edge_serde_roundtrip() {
-        let edge = WorkflowEdge { from_node: "a".to_string(), to_node: "b".to_string() };
+        let edge = WorkflowEdge {
+            from_node: "a".to_string(),
+            to_node: "b".to_string(),
+        };
         let json = serde_json::to_string(&edge).unwrap();
         let back: WorkflowEdge = serde_json::from_str(&json).unwrap();
         assert_eq!(edge, back);
@@ -107,8 +110,14 @@ mod tests {
     #[test]
     fn test_workflow_serde_roundtrip() {
         let wf = make_workflow(
-            vec![make_node("t", NodeType::Trigger), make_node("a", NodeType::Action)],
-            vec![WorkflowEdge { from_node: "t".to_string(), to_node: "a".to_string() }],
+            vec![
+                make_node("t", NodeType::Trigger),
+                make_node("a", NodeType::Action),
+            ],
+            vec![WorkflowEdge {
+                from_node: "t".to_string(),
+                to_node: "a".to_string(),
+            }],
         );
         let json = serde_json::to_string(&wf).unwrap();
         let back: Workflow = serde_json::from_str(&json).unwrap();
@@ -117,16 +126,34 @@ mod tests {
 
     #[test]
     fn test_node_type_serialization() {
-        assert_eq!(serde_json::to_string(&NodeType::Trigger).unwrap(), "\"trigger\"");
-        assert_eq!(serde_json::to_string(&NodeType::Action).unwrap(), "\"action\"");
-        assert_eq!(serde_json::to_string(&NodeType::Condition).unwrap(), "\"condition\"");
+        assert_eq!(
+            serde_json::to_string(&NodeType::Trigger).unwrap(),
+            "\"trigger\""
+        );
+        assert_eq!(
+            serde_json::to_string(&NodeType::Action).unwrap(),
+            "\"action\""
+        );
+        assert_eq!(
+            serde_json::to_string(&NodeType::Condition).unwrap(),
+            "\"condition\""
+        );
     }
 
     #[test]
     fn test_workflow_status_serialization() {
-        assert_eq!(serde_json::to_string(&WorkflowStatus::Draft).unwrap(), "\"draft\"");
-        assert_eq!(serde_json::to_string(&WorkflowStatus::Active).unwrap(), "\"active\"");
-        assert_eq!(serde_json::to_string(&WorkflowStatus::Archived).unwrap(), "\"archived\"");
+        assert_eq!(
+            serde_json::to_string(&WorkflowStatus::Draft).unwrap(),
+            "\"draft\""
+        );
+        assert_eq!(
+            serde_json::to_string(&WorkflowStatus::Active).unwrap(),
+            "\"active\""
+        );
+        assert_eq!(
+            serde_json::to_string(&WorkflowStatus::Archived).unwrap(),
+            "\"archived\""
+        );
     }
 
     #[test]
@@ -160,9 +187,18 @@ mod tests {
 
     #[test]
     fn test_workflow_error_display() {
-        assert_eq!(WorkflowError::CycleDetected.to_string(), "Cycle detected in workflow DAG");
-        assert_eq!(WorkflowError::EmptyWorkflow.to_string(), "Workflow has no nodes");
-        assert_eq!(WorkflowError::MultipleTriggers.to_string(), "Multiple trigger nodes found");
+        assert_eq!(
+            WorkflowError::CycleDetected.to_string(),
+            "Cycle detected in workflow DAG"
+        );
+        assert_eq!(
+            WorkflowError::EmptyWorkflow.to_string(),
+            "Workflow has no nodes"
+        );
+        assert_eq!(
+            WorkflowError::MultipleTriggers.to_string(),
+            "Multiple trigger nodes found"
+        );
         assert_eq!(
             WorkflowError::UndefinedNode("xyz".to_string()).to_string(),
             "Node 'xyz' referenced in edge but not defined"

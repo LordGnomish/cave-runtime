@@ -101,7 +101,11 @@ pub fn plan_gc(pods: &[ManagedPod], cfg: &PodGcConfig, now: DateTime<Utc>) -> Gc
 
     // Group by namespace if per_namespace; otherwise one global bucket.
     let bucket_key = |p: &&ManagedPod| -> String {
-        if cfg.per_namespace { p.namespace.clone() } else { String::new() }
+        if cfg.per_namespace {
+            p.namespace.clone()
+        } else {
+            String::new()
+        }
     };
     let mut buckets: HashMap<String, Vec<&ManagedPod>> = HashMap::new();
     for p in &terminated {
@@ -208,7 +212,11 @@ mod tests {
     fn terminated_younger_than_min_age_is_kept() {
         let now = Utc::now();
         let pods = vec![pod("a", "ns", PodPhase::Succeeded, 5, now)];
-        let cfg = PodGcConfig { max_terminated: 0, min_age: Duration::seconds(60), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 0,
+            min_age: Duration::seconds(60),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert!(r.collected.is_empty());
         assert_eq!(r.kept.values().next(), Some(&KeepReason::YoungerThanMinAge));
@@ -218,7 +226,11 @@ mod tests {
     fn terminated_at_or_above_min_age_is_eligible() {
         let now = Utc::now();
         let pods = vec![pod("a", "ns", PodPhase::Succeeded, 60, now)];
-        let cfg = PodGcConfig { max_terminated: 0, min_age: Duration::seconds(60), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 0,
+            min_age: Duration::seconds(60),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert_eq!(r.collected.len(), 1);
     }
@@ -228,9 +240,13 @@ mod tests {
         let now = Utc::now();
         let pods = vec![
             pod("a", "ns", PodPhase::Succeeded, 100, now),
-            pod("b", "ns", PodPhase::Failed,    200, now),
+            pod("b", "ns", PodPhase::Failed, 200, now),
         ];
-        let cfg = PodGcConfig { max_terminated: 5, min_age: Duration::seconds(10), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 5,
+            min_age: Duration::seconds(10),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert!(r.collected.is_empty());
         assert_eq!(r.kept.len(), 2);
@@ -246,7 +262,11 @@ mod tests {
         let p_mid = pod("mid", "ns", PodPhase::Succeeded, 500, now);
         let p_new = pod("new", "ns", PodPhase::Succeeded, 100, now);
         let pods = vec![p_old.clone(), p_mid.clone(), p_new.clone()];
-        let cfg = PodGcConfig { max_terminated: 1, min_age: Duration::seconds(10), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 1,
+            min_age: Duration::seconds(10),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         // Oldest two must be collected, newest kept.
         assert_eq!(r.collected.len(), 2);
@@ -261,7 +281,11 @@ mod tests {
         let p1 = pod("a", "ns", PodPhase::Failed, 600, now);
         let p2 = pod("b", "ns", PodPhase::Succeeded, 700, now);
         let pods = vec![p1.clone(), p2.clone()];
-        let cfg = PodGcConfig { max_terminated: 0, min_age: Duration::seconds(60), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 0,
+            min_age: Duration::seconds(60),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert_eq!(r.collected.len(), 2);
     }
@@ -274,7 +298,11 @@ mod tests {
         let b1 = pod("b1", "ns-b", PodPhase::Succeeded, 1000, now);
         let b2 = pod("b2", "ns-b", PodPhase::Succeeded, 500, now);
         let pods = vec![a1.clone(), a2.clone(), b1.clone(), b2.clone()];
-        let cfg = PodGcConfig { max_terminated: 1, min_age: Duration::seconds(10), per_namespace: true };
+        let cfg = PodGcConfig {
+            max_terminated: 1,
+            min_age: Duration::seconds(10),
+            per_namespace: true,
+        };
         let r = plan_gc(&pods, &cfg, now);
         // each namespace should evict its single oldest (a1, b1)
         assert_eq!(r.collected.len(), 2);
@@ -290,7 +318,11 @@ mod tests {
         let a = pod("a", "ns-a", PodPhase::Succeeded, 1000, now);
         let b = pod("b", "ns-b", PodPhase::Succeeded, 100, now);
         let pods = vec![a.clone(), b.clone()];
-        let cfg = PodGcConfig { max_terminated: 1, min_age: Duration::seconds(10), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 1,
+            min_age: Duration::seconds(10),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         // Single global cap of 1 → oldest "a" evicted regardless of namespace
         assert_eq!(r.collected, vec![a.uid]);
@@ -303,7 +335,11 @@ mod tests {
         let active = pod("active", "ns", PodPhase::Running, 0, now);
         let term = pod("term", "ns", PodPhase::Succeeded, 1000, now);
         let pods = vec![active.clone(), term.clone()];
-        let cfg = PodGcConfig { max_terminated: 0, min_age: Duration::seconds(10), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 0,
+            min_age: Duration::seconds(10),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert_eq!(r.collected, vec![term.uid]);
         assert_eq!(r.kept.get(&active.uid), Some(&KeepReason::Active));
@@ -318,7 +354,11 @@ mod tests {
         a.uid = Uuid::from_bytes([1u8; 16]);
         b.uid = Uuid::from_bytes([2u8; 16]);
         let pods = vec![a.clone(), b.clone()];
-        let cfg = PodGcConfig { max_terminated: 1, min_age: Duration::seconds(10), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 1,
+            min_age: Duration::seconds(10),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         // Same age — by uid, lower uid is "older", so it should be evicted first.
         assert_eq!(r.collected.len(), 1);
@@ -330,9 +370,19 @@ mod tests {
         let now = Utc::now();
         let mut pods = Vec::new();
         for i in 0..50 {
-            pods.push(pod(&format!("p{}", i), "ns", PodPhase::Succeeded, 100 + i, now));
+            pods.push(pod(
+                &format!("p{}", i),
+                "ns",
+                PodPhase::Succeeded,
+                100 + i,
+                now,
+            ));
         }
-        let cfg = PodGcConfig { max_terminated: 10, min_age: Duration::seconds(50), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 10,
+            min_age: Duration::seconds(50),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert_eq!(r.collected.len(), 40);
         assert_eq!(r.kept.len(), 10);
@@ -345,7 +395,11 @@ mod tests {
         for i in 0..20 {
             pods.push(pod(&format!("p{}", i), "ns", PodPhase::Succeeded, i, now));
         }
-        let cfg = PodGcConfig { max_terminated: 0, min_age: Duration::seconds(120), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 0,
+            min_age: Duration::seconds(120),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert!(r.collected.is_empty());
         assert_eq!(r.kept.len(), 20);
@@ -362,7 +416,11 @@ mod tests {
         p1.uid = Uuid::from_bytes([5u8; 16]);
         p2.uid = Uuid::from_bytes([3u8; 16]);
         let pods = vec![p1.clone(), p2.clone()];
-        let cfg = PodGcConfig { max_terminated: 0, min_age: Duration::seconds(10), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 0,
+            min_age: Duration::seconds(10),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         let mut sorted = r.collected.clone();
         sorted.sort();
@@ -375,7 +433,11 @@ mod tests {
         let f = pod("f", "ns", PodPhase::Failed, 1000, now);
         let s = pod("s", "ns", PodPhase::Succeeded, 1100, now);
         let pods = vec![f.clone(), s.clone()];
-        let cfg = PodGcConfig { max_terminated: 0, min_age: Duration::seconds(10), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 0,
+            min_age: Duration::seconds(10),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert_eq!(r.collected.len(), 2);
     }
@@ -385,7 +447,11 @@ mod tests {
         let now = Utc::now();
         let p = pod("p", "ns", PodPhase::Unknown, 5000, now);
         let pods = vec![p.clone()];
-        let cfg = PodGcConfig { max_terminated: 0, min_age: Duration::seconds(10), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 0,
+            min_age: Duration::seconds(10),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert!(r.collected.is_empty());
         assert_eq!(r.kept.get(&p.uid), Some(&KeepReason::Active));
@@ -396,7 +462,11 @@ mod tests {
         let now = Utc::now();
         let p = pod("p", "ns", PodPhase::Pending, 5000, now);
         let pods = vec![p.clone()];
-        let cfg = PodGcConfig { max_terminated: 0, min_age: Duration::seconds(10), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 0,
+            min_age: Duration::seconds(10),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert!(r.collected.is_empty());
     }
@@ -407,7 +477,11 @@ mod tests {
         let active = pod("a", "ns", PodPhase::Running, 0, now);
         let evict = pod("b", "ns", PodPhase::Succeeded, 1000, now);
         let pods = vec![active.clone(), evict.clone()];
-        let cfg = PodGcConfig { max_terminated: 0, min_age: Duration::seconds(10), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 0,
+            min_age: Duration::seconds(10),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert_eq!(r.collected_count(), r.collected.len());
         assert_eq!(r.kept_count(), r.kept.len());
@@ -417,7 +491,11 @@ mod tests {
     fn min_age_boundary_inclusive_at_threshold() {
         let now = Utc::now();
         let p = pod("p", "ns", PodPhase::Succeeded, 60, now);
-        let cfg = PodGcConfig { max_terminated: 0, min_age: Duration::seconds(60), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 0,
+            min_age: Duration::seconds(60),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods_vec(&[p.clone()]), &cfg, now);
         // exactly at threshold → eligible (>=)
         assert_eq!(r.collected.len(), 1);
@@ -427,18 +505,30 @@ mod tests {
     fn min_age_just_below_threshold_kept() {
         let now = Utc::now();
         let p = pod("p", "ns", PodPhase::Succeeded, 59, now);
-        let cfg = PodGcConfig { max_terminated: 0, min_age: Duration::seconds(60), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 0,
+            min_age: Duration::seconds(60),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods_vec(&[p.clone()]), &cfg, now);
         assert!(r.collected.is_empty());
     }
 
-    fn pods_vec(slice: &[ManagedPod]) -> Vec<ManagedPod> { slice.to_vec() }
+    fn pods_vec(slice: &[ManagedPod]) -> Vec<ManagedPod> {
+        slice.to_vec()
+    }
 
     #[test]
     fn cap_equals_count_keeps_all() {
         let now = Utc::now();
-        let pods: Vec<_> = (0..3).map(|i| pod(&format!("p{}", i), "ns", PodPhase::Succeeded, 100 + i, now)).collect();
-        let cfg = PodGcConfig { max_terminated: 3, min_age: Duration::seconds(10), per_namespace: false };
+        let pods: Vec<_> = (0..3)
+            .map(|i| pod(&format!("p{}", i), "ns", PodPhase::Succeeded, 100 + i, now))
+            .collect();
+        let cfg = PodGcConfig {
+            max_terminated: 3,
+            min_age: Duration::seconds(10),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert!(r.collected.is_empty());
         assert_eq!(r.kept.len(), 3);
@@ -448,8 +538,14 @@ mod tests {
     fn fresh_terminated_with_low_cap_keeps_via_min_age() {
         let now = Utc::now();
         // 5 fresh pods + cap 1 → all kept under YoungerThanMinAge, not collected.
-        let pods: Vec<_> = (0..5).map(|i| pod(&format!("p{}", i), "ns", PodPhase::Succeeded, i as i64, now)).collect();
-        let cfg = PodGcConfig { max_terminated: 1, min_age: Duration::seconds(60), per_namespace: false };
+        let pods: Vec<_> = (0..5)
+            .map(|i| pod(&format!("p{}", i), "ns", PodPhase::Succeeded, i as i64, now))
+            .collect();
+        let cfg = PodGcConfig {
+            max_terminated: 1,
+            min_age: Duration::seconds(60),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert!(r.collected.is_empty());
         for (_, v) in r.kept.iter() {
@@ -462,9 +558,13 @@ mod tests {
         let now = Utc::now();
         let aged_a = pod("aged_a", "ns", PodPhase::Succeeded, 1000, now);
         let aged_b = pod("aged_b", "ns", PodPhase::Succeeded, 800, now);
-        let young = pod("young",  "ns", PodPhase::Succeeded, 5,    now);
+        let young = pod("young", "ns", PodPhase::Succeeded, 5, now);
         let pods = vec![aged_a.clone(), aged_b.clone(), young.clone()];
-        let cfg = PodGcConfig { max_terminated: 1, min_age: Duration::seconds(60), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 1,
+            min_age: Duration::seconds(60),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         // Only aged_a should be evicted (oldest aged, cap 1 across aged set)
         assert_eq!(r.collected, vec![aged_a.uid]);
@@ -476,8 +576,14 @@ mod tests {
     fn non_terminated_pods_are_not_counted_against_cap() {
         let now = Utc::now();
         // 5 active pods, cap=0 — none collected, none aged.
-        let pods: Vec<_> = (0..5).map(|i| pod(&format!("a{}", i), "ns", PodPhase::Running, 1000, now)).collect();
-        let cfg = PodGcConfig { max_terminated: 0, min_age: Duration::seconds(10), per_namespace: false };
+        let pods: Vec<_> = (0..5)
+            .map(|i| pod(&format!("a{}", i), "ns", PodPhase::Running, 1000, now))
+            .collect();
+        let cfg = PodGcConfig {
+            max_terminated: 0,
+            min_age: Duration::seconds(10),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert!(r.collected.is_empty());
         assert_eq!(r.kept.len(), 5);
@@ -486,8 +592,14 @@ mod tests {
     #[test]
     fn duration_zero_min_age_collects_all_terminated() {
         let now = Utc::now();
-        let pods: Vec<_> = (0..3).map(|i| pod(&format!("p{}", i), "ns", PodPhase::Succeeded, i as i64, now)).collect();
-        let cfg = PodGcConfig { max_terminated: 0, min_age: Duration::zero(), per_namespace: false };
+        let pods: Vec<_> = (0..3)
+            .map(|i| pod(&format!("p{}", i), "ns", PodPhase::Succeeded, i as i64, now))
+            .collect();
+        let cfg = PodGcConfig {
+            max_terminated: 0,
+            min_age: Duration::zero(),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert_eq!(r.collected.len(), 3);
     }
@@ -517,12 +629,22 @@ mod tests {
     fn many_namespaces_per_namespace_mode() {
         let now = Utc::now();
         let mut pods = Vec::new();
-        for ns in &["a","b","c","d","e"] {
+        for ns in &["a", "b", "c", "d", "e"] {
             for i in 0..3 {
-                pods.push(pod(&format!("{}_{}", ns, i), ns, PodPhase::Succeeded, (1000 - i) as i64, now));
+                pods.push(pod(
+                    &format!("{}_{}", ns, i),
+                    ns,
+                    PodPhase::Succeeded,
+                    (1000 - i) as i64,
+                    now,
+                ));
             }
         }
-        let cfg = PodGcConfig { max_terminated: 1, min_age: Duration::seconds(60), per_namespace: true };
+        let cfg = PodGcConfig {
+            max_terminated: 1,
+            min_age: Duration::seconds(60),
+            per_namespace: true,
+        };
         let r = plan_gc(&pods, &cfg, now);
         // Each of 5 namespaces evicts 2 pods (3 - 1 cap each) → 10 collected total.
         assert_eq!(r.collected.len(), 10);
@@ -537,7 +659,11 @@ mod tests {
         let mut p = pod("clock_skew", "ns", PodPhase::Succeeded, -100, now);
         // future startup time
         p.started_at = Some(now + Duration::seconds(100));
-        let cfg = PodGcConfig { max_terminated: 0, min_age: Duration::seconds(1), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 0,
+            min_age: Duration::seconds(1),
+            per_namespace: false,
+        };
         let r = plan_gc(&[p.clone()], &cfg, now);
         assert!(r.collected.is_empty());
         assert_eq!(r.kept.get(&p.uid), Some(&KeepReason::YoungerThanMinAge));
@@ -547,8 +673,22 @@ mod tests {
     fn isolation_across_calls_is_pure() {
         // plan_gc is pure: identical inputs yield identical outputs.
         let now = Utc::now();
-        let pods: Vec<_> = (0..5).map(|i| pod(&format!("p{}", i), "ns", PodPhase::Succeeded, 100 * (i+1) as i64, now)).collect();
-        let cfg = PodGcConfig { max_terminated: 2, min_age: Duration::seconds(10), per_namespace: false };
+        let pods: Vec<_> = (0..5)
+            .map(|i| {
+                pod(
+                    &format!("p{}", i),
+                    "ns",
+                    PodPhase::Succeeded,
+                    100 * (i + 1) as i64,
+                    now,
+                )
+            })
+            .collect();
+        let cfg = PodGcConfig {
+            max_terminated: 2,
+            min_age: Duration::seconds(10),
+            per_namespace: false,
+        };
         let r1 = plan_gc(&pods, &cfg, now);
         let r2 = plan_gc(&pods, &cfg, now);
         assert_eq!(r1.collected, r2.collected);
@@ -571,7 +711,11 @@ mod tests {
         let old = pod("old", "ns", PodPhase::Failed, 2000, now);
         let new = pod("new", "ns", PodPhase::Succeeded, 1000, now);
         let pods = vec![old.clone(), new.clone()];
-        let cfg = PodGcConfig { max_terminated: 1, min_age: Duration::seconds(10), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 1,
+            min_age: Duration::seconds(10),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert_eq!(r.collected, vec![old.uid]);
         assert_eq!(r.kept.get(&new.uid), Some(&KeepReason::UnderCap));
@@ -582,7 +726,11 @@ mod tests {
         let now = Utc::now();
         let p = pod("p", "", PodPhase::Succeeded, 1000, now);
         let pods = vec![p.clone()];
-        let cfg = PodGcConfig { max_terminated: 0, min_age: Duration::seconds(10), per_namespace: true };
+        let cfg = PodGcConfig {
+            max_terminated: 0,
+            min_age: Duration::seconds(10),
+            per_namespace: true,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert_eq!(r.collected, vec![p.uid]);
     }
@@ -590,8 +738,14 @@ mod tests {
     #[test]
     fn high_cap_keeps_all_aged() {
         let now = Utc::now();
-        let pods: Vec<_> = (0..5).map(|i| pod(&format!("p{}", i), "ns", PodPhase::Succeeded, 100 + i, now)).collect();
-        let cfg = PodGcConfig { max_terminated: 1000, min_age: Duration::seconds(10), per_namespace: false };
+        let pods: Vec<_> = (0..5)
+            .map(|i| pod(&format!("p{}", i), "ns", PodPhase::Succeeded, 100 + i, now))
+            .collect();
+        let cfg = PodGcConfig {
+            max_terminated: 1000,
+            min_age: Duration::seconds(10),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         assert!(r.collected.is_empty());
     }
@@ -602,11 +756,18 @@ mod tests {
         let p1 = pod("p1", "ns", PodPhase::Succeeded, 1000, now);
         let p2 = pod("p2", "ns", PodPhase::Succeeded, 900, now);
         let pods = vec![p1.clone(), p2.clone()];
-        let cfg = PodGcConfig { max_terminated: 0, min_age: Duration::seconds(10), per_namespace: false };
+        let cfg = PodGcConfig {
+            max_terminated: 0,
+            min_age: Duration::seconds(10),
+            per_namespace: false,
+        };
         let r = plan_gc(&pods, &cfg, now);
         for uid in &r.collected {
-            assert!(!r.kept.contains_key(uid),
-                "uid {} both collected AND kept", uid);
+            assert!(
+                !r.kept.contains_key(uid),
+                "uid {} both collected AND kept",
+                uid
+            );
         }
     }
 }

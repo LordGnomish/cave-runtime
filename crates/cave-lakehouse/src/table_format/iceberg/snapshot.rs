@@ -122,7 +122,9 @@ impl Snapshot {
     pub fn validate(&self) -> IcebergResult<()> {
         validate_tenant_id(&self.tenant_id)?;
         if self.snapshot_id == 0 {
-            return Err(IcebergError::Snapshot("snapshot_id must be non-zero".into()));
+            return Err(IcebergError::Snapshot(
+                "snapshot_id must be non-zero".into(),
+            ));
         }
         if self.sequence_number < 0 {
             return Err(IcebergError::Snapshot("sequence_number must be ≥ 0".into()));
@@ -131,7 +133,9 @@ impl Snapshot {
             return Err(IcebergError::Snapshot("timestamp_ms must be ≥ 0".into()));
         }
         if self.manifest_list.is_empty() {
-            return Err(IcebergError::Snapshot("manifest_list path must not be empty".into()));
+            return Err(IcebergError::Snapshot(
+                "manifest_list path must not be empty".into(),
+            ));
         }
         if let Some(p) = self.parent_snapshot_id {
             if p == self.snapshot_id {
@@ -194,7 +198,10 @@ mod tests {
     #[test]
     fn summary_with_appends_property() {
         let s = SnapshotSummary::new(SnapshotOperation::Append).with("added-records", "1000");
-        assert_eq!(s.additional_properties.get("added-records").unwrap(), "1000");
+        assert_eq!(
+            s.additional_properties.get("added-records").unwrap(),
+            "1000"
+        );
     }
 
     #[test]
@@ -304,10 +311,7 @@ mod tests {
 
     #[test]
     fn snapshot_serde_round_trip() {
-        let s = snap()
-            .with_parent(1)
-            .with_tenant("acme")
-            .with_schema(0);
+        let s = snap().with_parent(1).with_tenant("acme").with_schema(0);
         let j = serde_json::to_string(&s).unwrap();
         let back: Snapshot = serde_json::from_str(&j).unwrap();
         assert_eq!(back, s);

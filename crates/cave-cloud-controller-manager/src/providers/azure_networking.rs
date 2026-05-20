@@ -88,7 +88,10 @@ impl NetworkProfile {
             _ => {}
         }
         if self.policy == NetworkPolicy::Azure
-            && !matches!(self.plugin, NetworkPlugin::Azure | NetworkPlugin::AzureOverlay)
+            && !matches!(
+                self.plugin,
+                NetworkPlugin::Azure | NetworkPlugin::AzureOverlay
+            )
         {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Azure,
@@ -141,8 +144,7 @@ impl AutoscalerProfile {
     }
 
     pub fn validate(&self) -> Result<(), CloudError> {
-        let allowed_expanders =
-            ["least-waste", "most-pods", "priority", "random", "price"];
+        let allowed_expanders = ["least-waste", "most-pods", "priority", "random", "price"];
         if !allowed_expanders.iter().any(|e| *e == self.expander) {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Azure,
@@ -318,10 +320,18 @@ impl DiskCsiDriver {
     pub const FILE_NAME: &'static str = "file.csi.azure.com";
 
     pub fn azure_disk() -> Self {
-        Self { name: Self::NAME.into(), state: CsiDriverState::Available, volume_count: 0 }
+        Self {
+            name: Self::NAME.into(),
+            state: CsiDriverState::Available,
+            volume_count: 0,
+        }
     }
     pub fn azure_file() -> Self {
-        Self { name: Self::FILE_NAME.into(), state: CsiDriverState::Available, volume_count: 0 }
+        Self {
+            name: Self::FILE_NAME.into(),
+            state: CsiDriverState::Available,
+            volume_count: 0,
+        }
     }
 
     pub fn validate(&self) -> Result<(), CloudError> {
@@ -357,7 +367,11 @@ mod tests {
 
     #[test]
     fn network_plugin_keys_match_aks_cli_strings() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "NetworkPlugin");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "NetworkPlugin",
+        );
         assert_eq!(NetworkPlugin::Azure.key(), "azure");
         assert_eq!(NetworkPlugin::Kubenet.key(), "kubenet");
         assert_eq!(NetworkPlugin::AzureOverlay.key(), "azure-overlay");
@@ -366,7 +380,11 @@ mod tests {
 
     #[test]
     fn network_policy_keys_match_aks_cli_strings() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "NetworkPolicy");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "NetworkPolicy",
+        );
         assert_eq!(NetworkPolicy::Calico.key(), "calico");
         assert_eq!(NetworkPolicy::Azure.key(), "azure");
         assert_eq!(NetworkPolicy::Cilium.key(), "cilium");
@@ -385,33 +403,74 @@ mod tests {
 
     #[test]
     fn kubenet_profile_requires_pod_cidr() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "NetworkProfile");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "NetworkProfile",
+        );
         let bad = np(NetworkPlugin::Kubenet, NetworkPolicy::None, None);
-        assert!(matches!(bad.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
-        let good = np(NetworkPlugin::Kubenet, NetworkPolicy::None, Some("10.244.0.0/16"));
+        assert!(matches!(
+            bad.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
+        let good = np(
+            NetworkPlugin::Kubenet,
+            NetworkPolicy::None,
+            Some("10.244.0.0/16"),
+        );
         assert!(good.validate().is_ok());
     }
 
     #[test]
     fn azure_cni_rejects_pod_cidr() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "NetworkProfile");
-        let bad = np(NetworkPlugin::Azure, NetworkPolicy::None, Some("10.244.0.0/16"));
-        assert!(matches!(bad.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "NetworkProfile",
+        );
+        let bad = np(
+            NetworkPlugin::Azure,
+            NetworkPolicy::None,
+            Some("10.244.0.0/16"),
+        );
+        assert!(matches!(
+            bad.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn azure_network_policy_requires_azure_cni() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "NetworkProfile");
-        let bad = np(NetworkPlugin::Kubenet, NetworkPolicy::Azure, Some("10.244.0.0/16"));
-        assert!(matches!(bad.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "NetworkProfile",
+        );
+        let bad = np(
+            NetworkPlugin::Kubenet,
+            NetworkPolicy::Azure,
+            Some("10.244.0.0/16"),
+        );
+        assert!(matches!(
+            bad.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         let good = np(NetworkPlugin::Azure, NetworkPolicy::Azure, None);
         assert!(good.validate().is_ok());
     }
 
     #[test]
     fn calico_policy_works_with_kubenet_or_cni() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "NetworkProfile");
-        let p1 = np(NetworkPlugin::Kubenet, NetworkPolicy::Calico, Some("10.244.0.0/16"));
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "NetworkProfile",
+        );
+        let p1 = np(
+            NetworkPlugin::Kubenet,
+            NetworkPolicy::Calico,
+            Some("10.244.0.0/16"),
+        );
         let p2 = np(NetworkPlugin::Azure, NetworkPolicy::Calico, None);
         assert!(p1.validate().is_ok());
         assert!(p2.validate().is_ok());
@@ -419,34 +478,59 @@ mod tests {
 
     #[test]
     fn network_profile_service_cidr_must_be_cidr() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "NetworkProfile");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "NetworkProfile",
+        );
         let mut p = np(NetworkPlugin::Azure, NetworkPolicy::None, None);
         p.service_cidr = "garbage".into();
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn network_profile_dns_service_ip_must_be_ipv4() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "NetworkProfile");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "NetworkProfile",
+        );
         let mut p = np(NetworkPlugin::Azure, NetworkPolicy::None, None);
         p.dns_service_ip = "no-dots".into();
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     // ─── Autoscaler profile ──────────────────────────────────────────────────
 
     #[test]
     fn autoscaler_defaults_validate() {
-        let _ = ctx("acme", "cluster-autoscaler/cloudprovider/azure/azure.go", "AutoscalerProfile");
+        let _ = ctx(
+            "acme",
+            "cluster-autoscaler/cloudprovider/azure/azure.go",
+            "AutoscalerProfile",
+        );
         assert!(AutoscalerProfile::defaults().validate().is_ok());
     }
 
     #[test]
     fn autoscaler_expander_must_be_known() {
-        let _ = ctx("acme", "cluster-autoscaler/cloudprovider/azure/azure.go", "AutoscalerProfile");
+        let _ = ctx(
+            "acme",
+            "cluster-autoscaler/cloudprovider/azure/azure.go",
+            "AutoscalerProfile",
+        );
         let mut p = AutoscalerProfile::defaults();
         p.expander = "weighted".into();
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         for e in ["least-waste", "most-pods", "priority", "random", "price"] {
             p.expander = e.into();
             assert!(p.validate().is_ok(), "expander {e}");
@@ -455,30 +539,57 @@ mod tests {
 
     #[test]
     fn autoscaler_max_empty_bulk_delete_is_capped() {
-        let _ = ctx("acme", "cluster-autoscaler/cloudprovider/azure/azure.go", "AutoscalerProfile");
+        let _ = ctx(
+            "acme",
+            "cluster-autoscaler/cloudprovider/azure/azure.go",
+            "AutoscalerProfile",
+        );
         let mut p = AutoscalerProfile::defaults();
         p.max_empty_bulk_delete = 0;
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         p.max_empty_bulk_delete = 200;
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn autoscaler_max_graceful_termination_outside_60_3600_is_rejected() {
-        let _ = ctx("acme", "cluster-autoscaler/cloudprovider/azure/azure.go", "AutoscalerProfile");
+        let _ = ctx(
+            "acme",
+            "cluster-autoscaler/cloudprovider/azure/azure.go",
+            "AutoscalerProfile",
+        );
         let mut p = AutoscalerProfile::defaults();
         p.max_graceful_termination_seconds = 30;
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn autoscaler_scan_interval_outside_1_120_is_rejected() {
-        let _ = ctx("acme", "cluster-autoscaler/cloudprovider/azure/azure.go", "AutoscalerProfile");
+        let _ = ctx(
+            "acme",
+            "cluster-autoscaler/cloudprovider/azure/azure.go",
+            "AutoscalerProfile",
+        );
         let mut p = AutoscalerProfile::defaults();
         p.scan_interval_seconds = 0;
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         p.scan_interval_seconds = 200;
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     // ─── BYO VNet ────────────────────────────────────────────────────────────
@@ -503,7 +614,10 @@ mod tests {
         let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "ByoVnet");
         let mut c = byo();
         c.vnet_subnet_id = "vnet-1/subnets/s".into();
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -511,7 +625,10 @@ mod tests {
         let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "ByoVnet");
         let mut c = byo();
         c.pod_subnet_id = Some("not-a-subnet".into());
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         c.pod_subnet_id = Some(
             "/subscriptions/aaa/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/v/subnets/pods".into(),
         );
@@ -523,7 +640,10 @@ mod tests {
         let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "ByoVnet");
         let mut c = byo();
         c.service_cidr = "no-mask".into();
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     // ─── AGIC backend match ──────────────────────────────────────────────────
@@ -531,8 +651,15 @@ mod tests {
     #[test]
     fn agic_backend_match_requires_host_or_path() {
         let _ = ctx("acme", "pkg/provider/azure_app_gateway.go", "BackendMatch");
-        let m = AgicBackendMatch { host: None, path_prefix: None, backend_pool: "bp".into() };
-        assert!(matches!(m.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        let m = AgicBackendMatch {
+            host: None,
+            path_prefix: None,
+            backend_pool: "bp".into(),
+        };
+        assert!(matches!(
+            m.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -543,7 +670,10 @@ mod tests {
             path_prefix: Some("api".into()),
             backend_pool: "bp".into(),
         };
-        assert!(matches!(m.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            m.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -554,7 +684,10 @@ mod tests {
             path_prefix: None,
             backend_pool: "bp".into(),
         };
-        assert!(matches!(m.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            m.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -565,7 +698,10 @@ mod tests {
             path_prefix: None,
             backend_pool: String::new(),
         };
-        assert!(matches!(m.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            m.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -583,23 +719,50 @@ mod tests {
 
     #[test]
     fn api_server_vnet_integration_disabled_skips_validation() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "ApiServerVnetIntegration");
-        let v = ApiServerVnetIntegration { enabled: false, subnet_id: None };
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "ApiServerVnetIntegration",
+        );
+        let v = ApiServerVnetIntegration {
+            enabled: false,
+            subnet_id: None,
+        };
         assert!(v.validate().is_ok());
     }
 
     #[test]
     fn api_server_vnet_integration_requires_subnet_id_when_enabled() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "ApiServerVnetIntegration");
-        let v = ApiServerVnetIntegration { enabled: true, subnet_id: None };
-        assert!(matches!(v.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "ApiServerVnetIntegration",
+        );
+        let v = ApiServerVnetIntegration {
+            enabled: true,
+            subnet_id: None,
+        };
+        assert!(matches!(
+            v.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn api_server_vnet_integration_subnet_id_must_be_arm_id() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "ApiServerVnetIntegration");
-        let v = ApiServerVnetIntegration { enabled: true, subnet_id: Some("subnet-1".into()) };
-        assert!(matches!(v.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "ApiServerVnetIntegration",
+        );
+        let v = ApiServerVnetIntegration {
+            enabled: true,
+            subnet_id: Some("subnet-1".into()),
+        };
+        assert!(matches!(
+            v.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         let v = ApiServerVnetIntegration {
             enabled: true,
             subnet_id: Some("/subscriptions/aaa/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/v/subnets/api".into()),
@@ -631,7 +794,10 @@ mod tests {
             state: CsiDriverState::Available,
             volume_count: 0,
         };
-        assert!(matches!(d.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            d.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]

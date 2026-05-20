@@ -151,7 +151,10 @@ mod tests {
     fn test_any_match() {
         let l = lbl([("env", "prod")]);
         assert!(any_match(
-            &[Matcher::equal("env", "stage"), Matcher::equal("env", "prod")],
+            &[
+                Matcher::equal("env", "stage"),
+                Matcher::equal("env", "prod")
+            ],
             &l
         ));
         assert!(!any_match(

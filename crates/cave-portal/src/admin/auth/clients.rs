@@ -11,10 +11,10 @@
 
 use std::collections::BTreeMap;
 
+use super::AuthViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
-use super::AuthViewError;
+use crate::admin::state::{AdminState, scope};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientRow {
@@ -28,7 +28,9 @@ pub struct ClientRow {
 pub fn list_clients(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<ClientRow>, AuthViewError> {
     ctx.authorise(Permission::AuthSessionsRead)?;
     let mut grouped: BTreeMap<(String, String), usize> = BTreeMap::new();
-    for s in scope(&state.auth_sessions.read().unwrap(), &ctx.tenant, |r| &r.tenant) {
+    for s in scope(&state.auth_sessions.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    }) {
         let client = s
             .principal
             .split_once('@')
@@ -87,19 +89,22 @@ mod tests {
 
     #[test]
     fn list_derives_clients_from_principal_host() {
-        let rows = list_clients(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
+        let rows =
+            list_clients(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
         assert!(rows.iter().any(|r| r.client_id == "acme"));
     }
 
     #[test]
     fn list_excludes_other_tenants() {
-        let rows = list_clients(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
+        let rows =
+            list_clients(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
         assert!(rows.iter().all(|r| r.client_id != "evil"));
     }
 
     #[test]
     fn list_groups_by_realm_and_client() {
-        let rows = list_clients(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
+        let rows =
+            list_clients(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
         // Two acme@acme sessions in acme-realm → one client row, count = 2.
         let r = rows.iter().find(|r| r.client_id == "acme").unwrap();
         assert_eq!(r.session_count, 2);

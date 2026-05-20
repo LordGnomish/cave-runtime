@@ -76,9 +76,12 @@ impl Default for ExtenderConfig {
         Self {
             name: "extender".into(),
             url_prefix: String::new(),
-            filter_verb: None, prioritize_verb: None,
-            preempt_verb: None, bind_verb: None,
-            weight: 1, ignorable: false,
+            filter_verb: None,
+            prioritize_verb: None,
+            preempt_verb: None,
+            bind_verb: None,
+            weight: 1,
+            ignorable: false,
             managed_resources: Vec::new(),
             http_timeout_ms: 5_000,
             enable_https: false,
@@ -90,7 +93,8 @@ impl ExtenderConfig {
     /// True when this extender owns the named resource and asks the
     /// scheduler to skip the in-tree fit check for it.
     pub fn owns_resource_for_scheduler_skip(&self, name: &str) -> bool {
-        self.managed_resources.iter()
+        self.managed_resources
+            .iter()
             .any(|r| r.name == name && r.ignored_by_scheduler)
     }
 }
@@ -115,11 +119,7 @@ pub struct ExtenderPrioritizeResponse {
 pub trait ExtenderClient: Send + Sync {
     fn filter(&self, pod: &Pod, nodes: &[Node]) -> Result<ExtenderFilterResponse, String>;
     fn prioritize(&self, pod: &Pod, nodes: &[Node]) -> Result<ExtenderPrioritizeResponse, String>;
-    fn preempt(
-        &self,
-        pod: &Pod,
-        plan: &PreemptionResult,
-    ) -> Result<PreemptionResult, String>;
+    fn preempt(&self, pod: &Pod, plan: &PreemptionResult) -> Result<PreemptionResult, String>;
     fn bind(&self, pod: &Pod, node: &str) -> Result<Status, String>;
 }
 
@@ -144,7 +144,9 @@ impl Extender {
 }
 
 impl FilterPlugin for Extender {
-    fn name(&self) -> &str { &self.config.name }
+    fn name(&self) -> &str {
+        &self.config.name
+    }
     fn filter(&self, pod: &Pod, node: &Node, snap: &ClusterSnapshot) -> Status {
         if self.config.filter_verb.is_none() {
             return Status::skip(&self.config.name);
@@ -168,7 +170,9 @@ impl FilterPlugin for Extender {
 }
 
 impl ScorePlugin for Extender {
-    fn name(&self) -> &str { &self.config.name }
+    fn name(&self) -> &str {
+        &self.config.name
+    }
     fn score(&self, pod: &Pod, node: &Node, snap: &ClusterSnapshot) -> i64 {
         if self.config.prioritize_verb.is_none() {
             return 0;
@@ -184,7 +188,9 @@ impl ScorePlugin for Extender {
 }
 
 impl PostFilterPlugin for Extender {
-    fn name(&self) -> &str { &self.config.name }
+    fn name(&self) -> &str {
+        &self.config.name
+    }
     fn post_filter(
         &self,
         pod: &Pod,
@@ -193,19 +199,29 @@ impl PostFilterPlugin for Extender {
         _state: &CycleState,
     ) -> (PostFilterResult, Status) {
         if self.config.preempt_verb.is_none() {
-            return (PostFilterResult::default(), Status::unschedulable(&self.config.name, "extender has no preempt verb"));
+            return (
+                PostFilterResult::default(),
+                Status::unschedulable(&self.config.name, "extender has no preempt verb"),
+            );
         }
         // Build a no-op base plan and let the extender curate it. Real impl
         // would compute victims first via in-tree preempt; mocks pass through.
         let base = PreemptionResult {
-            nominated_node_name: snapshot.nodes.first().map(|n| n.name.clone()).unwrap_or_default(),
+            nominated_node_name: snapshot
+                .nodes
+                .first()
+                .map(|n| n.name.clone())
+                .unwrap_or_default(),
             victims: vec![],
             pdb_violations: 0,
         };
         match self.client.preempt(pod, &base) {
             Ok(curated) => {
                 if curated.nominated_node_name.is_empty() {
-                    (PostFilterResult::default(), Status::unschedulable(&self.config.name, "extender vetoed preemption"))
+                    (
+                        PostFilterResult::default(),
+                        Status::unschedulable(&self.config.name, "extender vetoed preemption"),
+                    )
                 } else {
                     (
                         PostFilterResult::nominate(curated.nominated_node_name.clone()),
@@ -219,7 +235,9 @@ impl PostFilterPlugin for Extender {
 }
 
 impl BindPlugin for Extender {
-    fn name(&self) -> &str { &self.config.name }
+    fn name(&self) -> &str {
+        &self.config.name
+    }
     fn bind(&self, pod: &Pod, node: &str, _: &CycleState) -> Status {
         if self.config.bind_verb.is_none() {
             return Status::skip(&self.config.name);
@@ -242,17 +260,25 @@ mod tests {
 
     fn ready_node(name: &str) -> Node {
         Node {
-            name: name.into(), uid: Uuid::new_v4(), status: NodeStatus::Ready,
+            name: name.into(),
+            uid: Uuid::new_v4(),
+            status: NodeStatus::Ready,
             capacity: ResourceCapacity::default(),
             allocatable: ResourceCapacity::default(),
             allocated: ResourceCapacity::default(),
-            labels: HashMap::new(), taints: vec![], conditions: vec![],
-            registered_at: Utc::now(), last_heartbeat: Utc::now(),
+            labels: HashMap::new(),
+            taints: vec![],
+            conditions: vec![],
+            registered_at: Utc::now(),
+            last_heartbeat: Utc::now(),
         }
     }
 
     fn snap(nodes: Vec<Node>) -> ClusterSnapshot {
-        ClusterSnapshot { nodes, pods_by_node: HashMap::new() }
+        ClusterSnapshot {
+            nodes,
+            pods_by_node: HashMap::new(),
+        }
     }
 
     /// Programmable mock — every method returns whatever was last `set_*`'d.
@@ -268,11 +294,16 @@ mod tests {
         fn new() -> Self {
             Self {
                 filter_resp: Mutex::new(Ok(ExtenderFilterResponse {
-                    passing_nodes: vec![], failed_nodes: HashMap::new(),
+                    passing_nodes: vec![],
+                    failed_nodes: HashMap::new(),
                 })),
-                prio_resp: Mutex::new(Ok(ExtenderPrioritizeResponse { scores: HashMap::new() })),
+                prio_resp: Mutex::new(Ok(ExtenderPrioritizeResponse {
+                    scores: HashMap::new(),
+                })),
                 preempt_resp: Mutex::new(Ok(PreemptionResult {
-                    nominated_node_name: String::new(), victims: vec![], pdb_violations: 0,
+                    nominated_node_name: String::new(),
+                    victims: vec![],
+                    pdb_violations: 0,
                 })),
                 bind_resp: Mutex::new(Ok(Status::success("mock"))),
                 bind_calls: Mutex::new(0),
@@ -297,9 +328,14 @@ mod tests {
     }
 
     fn cfg(name: &str) -> ExtenderConfig {
-        ExtenderConfig { name: name.into(), filter_verb: Some("filter".into()),
-            prioritize_verb: Some("prioritize".into()), preempt_verb: Some("preempt".into()),
-            bind_verb: Some("bind".into()), ..Default::default() }
+        ExtenderConfig {
+            name: name.into(),
+            filter_verb: Some("filter".into()),
+            prioritize_verb: Some("prioritize".into()),
+            preempt_verb: Some("preempt".into()),
+            bind_verb: Some("bind".into()),
+            ..Default::default()
+        }
     }
 
     // ── ExtenderConfig ────────────────────────────────────────────────────
@@ -308,8 +344,14 @@ mod tests {
     fn managed_resource_skip_flag() {
         let mut c = ExtenderConfig::default();
         c.managed_resources = vec![
-            ManagedResource { name: "nvidia.com/gpu".into(), ignored_by_scheduler: true },
-            ManagedResource { name: "smarter-devices/fuse".into(), ignored_by_scheduler: false },
+            ManagedResource {
+                name: "nvidia.com/gpu".into(),
+                ignored_by_scheduler: true,
+            },
+            ManagedResource {
+                name: "smarter-devices/fuse".into(),
+                ignored_by_scheduler: false,
+            },
         ];
         assert!(c.owns_resource_for_scheduler_skip("nvidia.com/gpu"));
         assert!(!c.owns_resource_for_scheduler_skip("smarter-devices/fuse"));
@@ -332,7 +374,8 @@ mod tests {
     fn filter_passes_when_extender_passes() {
         let mock = Arc::new(MockClient::new());
         *mock.filter_resp.lock().unwrap() = Ok(ExtenderFilterResponse {
-            passing_nodes: vec!["a".into(), "b".into()], failed_nodes: HashMap::new(),
+            passing_nodes: vec!["a".into(), "b".into()],
+            failed_nodes: HashMap::new(),
         });
         let ext = Extender::new(cfg("ext"), mock);
         let p = Pod::new("t", "ns", "p");
@@ -346,7 +389,8 @@ mod tests {
         let mut failed = HashMap::new();
         failed.insert("a".into(), "wrong-zone".into());
         *mock.filter_resp.lock().unwrap() = Ok(ExtenderFilterResponse {
-            passing_nodes: vec![], failed_nodes: failed,
+            passing_nodes: vec![],
+            failed_nodes: failed,
         });
         let ext = Extender::new(cfg("ext"), mock);
         let p = Pod::new("t", "ns", "p");
@@ -418,7 +462,9 @@ mod tests {
     #[test]
     fn prioritize_unknown_node_returns_zero() {
         let mock = Arc::new(MockClient::new());
-        *mock.prio_resp.lock().unwrap() = Ok(ExtenderPrioritizeResponse { scores: HashMap::new() });
+        *mock.prio_resp.lock().unwrap() = Ok(ExtenderPrioritizeResponse {
+            scores: HashMap::new(),
+        });
         let ext = Extender::new(cfg("ext"), mock);
         let p = Pod::new("t", "ns", "p");
         assert_eq!(ext.score(&p, &ready_node("a"), &snap(vec![])), 0);
@@ -441,12 +487,18 @@ mod tests {
         let mock = Arc::new(MockClient::new());
         *mock.preempt_resp.lock().unwrap() = Ok(PreemptionResult {
             nominated_node_name: "node-x".into(),
-            victims: vec![], pdb_violations: 0,
+            victims: vec![],
+            pdb_violations: 0,
         });
         let ext = Extender::new(cfg("ext"), mock);
         let p = Pod::new("t", "ns", "p");
         let cs = CycleState::new();
-        let (res, st) = ext.post_filter(&p, &snap(vec![ready_node("a")]), &NodeToStatusMap::new(), &cs);
+        let (res, st) = ext.post_filter(
+            &p,
+            &snap(vec![ready_node("a")]),
+            &NodeToStatusMap::new(),
+            &cs,
+        );
         assert!(st.is_success());
         assert_eq!(res.nominating_info.unwrap().nominated_node_name, "node-x");
     }
@@ -456,12 +508,18 @@ mod tests {
         let mock = Arc::new(MockClient::new());
         *mock.preempt_resp.lock().unwrap() = Ok(PreemptionResult {
             nominated_node_name: String::new(),
-            victims: vec![], pdb_violations: 0,
+            victims: vec![],
+            pdb_violations: 0,
         });
         let ext = Extender::new(cfg("ext"), mock);
         let p = Pod::new("t", "ns", "p");
         let cs = CycleState::new();
-        let (res, st) = ext.post_filter(&p, &snap(vec![ready_node("a")]), &NodeToStatusMap::new(), &cs);
+        let (res, st) = ext.post_filter(
+            &p,
+            &snap(vec![ready_node("a")]),
+            &NodeToStatusMap::new(),
+            &cs,
+        );
         assert!(res.nominating_info.is_none());
         assert!(st.is_rejected());
     }
@@ -482,7 +540,8 @@ mod tests {
     fn preempt_error_with_ignorable_returns_skip() {
         let mock = Arc::new(MockClient::new());
         *mock.preempt_resp.lock().unwrap() = Err("net".into());
-        let mut c = cfg("ext"); c.ignorable = true;
+        let mut c = cfg("ext");
+        c.ignorable = true;
         let ext = Extender::new(c, mock);
         let p = Pod::new("t", "ns", "p");
         let cs = CycleState::new();
@@ -506,7 +565,8 @@ mod tests {
     #[test]
     fn bind_no_verb_is_skip() {
         let mock = Arc::new(MockClient::new());
-        let mut c = cfg("ext"); c.bind_verb = None;
+        let mut c = cfg("ext");
+        c.bind_verb = None;
         let ext = Extender::new(c, mock);
         let p = Pod::new("t", "ns", "p");
         let cs = CycleState::new();
@@ -517,7 +577,8 @@ mod tests {
     fn bind_error_ignorable_skip() {
         let mock = Arc::new(MockClient::new());
         *mock.bind_resp.lock().unwrap() = Err("transport".into());
-        let mut c = cfg("ext"); c.ignorable = true;
+        let mut c = cfg("ext");
+        c.ignorable = true;
         let ext = Extender::new(c, mock);
         let p = Pod::new("t", "ns", "p");
         let cs = CycleState::new();
@@ -545,7 +606,8 @@ mod tests {
         let mut failed = HashMap::new();
         failed.insert("a".into(), "ext-reject".into());
         *mock.filter_resp.lock().unwrap() = Ok(ExtenderFilterResponse {
-            passing_nodes: vec![], failed_nodes: failed,
+            passing_nodes: vec![],
+            failed_nodes: failed,
         });
         let ext = Extender::new(cfg("ext"), mock);
         let fw = Framework::new().with_filter(Box::new(ext));
@@ -560,12 +622,16 @@ mod tests {
         use crate::framework::Framework;
         let mock = Arc::new(MockClient::new());
         *mock.filter_resp.lock().unwrap() = Err("net".into());
-        let mut c = cfg("ext"); c.ignorable = true;
+        let mut c = cfg("ext");
+        c.ignorable = true;
         let ext = Extender::new(c, mock);
         let fw = Framework::new().with_filter(Box::new(ext));
         // Skip-result is treated as success in run_filters → node passes.
         let s = fw.run_filters(&Pod::new("t", "ns", "p"), &snap(vec![ready_node("a")]));
-        assert!(s.get("a").unwrap().is_none(), "fallback: ignorable extender error → node still passes");
+        assert!(
+            s.get("a").unwrap().is_none(),
+            "fallback: ignorable extender error → node still passes"
+        );
     }
 
     #[test]
@@ -575,15 +641,23 @@ mod tests {
         let mut scores = HashMap::new();
         scores.insert("a".into(), 50);
         *mock.prio_resp.lock().unwrap() = Ok(ExtenderPrioritizeResponse { scores });
-        let mut c = cfg("ext"); c.weight = 4;
+        let mut c = cfg("ext");
+        c.weight = 4;
         let ext = Extender::new(c, mock);
         // Wrap inside a struct so we don't move out of the unique-ownership ext.
         let fw = Framework::new().with_score(Box::new(ext));
-        let scores = fw.run_scores(&Pod::new("t", "ns", "p"), &["a".into()], &snap(vec![ready_node("a")]));
+        let scores = fw.run_scores(
+            &Pod::new("t", "ns", "p"),
+            &["a".into()],
+            &snap(vec![ready_node("a")]),
+        );
         // Note: framework.run_scores clamps each per-plugin score to MAX_NODE_SCORE
         // before applying ScoringWeights; here weight is in the extender, so
         // raw is 200 → clamped to 100.
         let s = *scores.get("a").unwrap();
-        assert_eq!(s, 100, "extender weight folded into raw, then framework clamps");
+        assert_eq!(
+            s, 100,
+            "extender weight folded into raw, then framework clamps"
+        );
     }
 }

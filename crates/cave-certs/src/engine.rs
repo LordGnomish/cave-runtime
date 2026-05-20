@@ -95,21 +95,13 @@ mod tests {
 
     #[test]
     fn test_covers_domain_san() {
-        let cert = make_cert(
-            "example.com",
-            vec!["api.example.com".to_string()],
-            90,
-        );
+        let cert = make_cert("example.com", vec!["api.example.com".to_string()], 90);
         assert!(covers_domain(&cert, "api.example.com"));
     }
 
     #[test]
     fn test_covers_domain_wildcard() {
-        let cert = make_cert(
-            "example.com",
-            vec!["*.example.com".to_string()],
-            90,
-        );
+        let cert = make_cert("example.com", vec!["*.example.com".to_string()], 90);
         assert!(covers_domain(&cert, "sub.example.com"));
         assert!(covers_domain(&cert, "api.example.com"));
     }

@@ -4,7 +4,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, DevlakeMetric};
+use crate::admin::state::{AdminState, DevlakeMetric, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -13,35 +13,67 @@ pub enum DevlakeViewError {
     Auth(#[from] crate::admin::permission::AuthError),
 }
 
-pub fn list_records(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<DevlakeMetric>, DevlakeViewError> {
+pub fn list_records(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<DevlakeMetric>, DevlakeViewError> {
     ctx.authorise(Permission::DevlakeRead)?;
-    Ok(scope(&state.devlake_metrics.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter().cloned().collect())
+    Ok(
+        scope(&state.devlake_metrics.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect(),
+    )
 }
 
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, DevlakeViewError> {
     let rows = list_records(state, ctx)?;
-    let table_rows: Vec<Vec<String>> = rows.iter().map(|r| vec![r.project.clone(), r.metric.clone(), r.value_thousandths.to_string()]).collect();
+    let table_rows: Vec<Vec<String>> = rows
+        .iter()
+        .map(|r| {
+            vec![
+                r.project.clone(),
+                r.metric.clone(),
+                r.value_thousandths.to_string(),
+            ]
+        })
+        .collect();
     let body = format!(
         r#"<section><h2 class="text-lg font-semibold mb-2">Devlake ({n})</h2>{tbl}</section>"#,
         n = rows.len(),
         tbl = table(&["project", "metric", "value_thousandths"], &table_rows),
     );
-    Ok(page_shell_full(ctx, "/admin/devlake", &format!("devlake · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/devlake",
+        &format!("devlake · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::backstage("plugins/devlake/src/components/MetricsList.tsx", "MetricsList");
+const FILE_CITE: Cite = Cite::backstage(
+    "plugins/devlake/src/components/MetricsList.tsx",
+    "MetricsList",
+);
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::portal_test_ctx;
-    fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
+    fn ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer("acme", perms)
+    }
 
     #[test]
     fn list_filters_to_owner() {
-        let (_c, _t) = portal_test_ctx!("plugins/devlake/src/components/MetricsList.tsx", "MetricsList", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/devlake/src/components/MetricsList.tsx",
+            "MetricsList",
+            "acme"
+        );
         let s = AdminState::seeded();
         let r = list_records(&s, &ctx(&[Permission::DevlakeRead])).unwrap();
         assert_eq!(r.len(), 2);
@@ -50,27 +82,43 @@ mod tests {
 
     #[test]
     fn list_refuses_without_perm() {
-        let (_c, _t) = portal_test_ctx!("plugins/permission-react/src/PermissionApi.ts", "authorize", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/permission-react/src/PermissionApi.ts",
+            "authorize",
+            "acme"
+        );
         assert!(list_records(&AdminState::seeded(), &ctx(&[])).is_err());
     }
 
     #[test]
     fn render_contains_owner_row() {
-        let (_c, _t) = portal_test_ctx!("plugins/devlake/src/components/MetricsList.tsx", "RenderOwner", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/devlake/src/components/MetricsList.tsx",
+            "RenderOwner",
+            "acme"
+        );
         let html = render(&AdminState::seeded(), &ctx(&[Permission::DevlakeRead])).unwrap();
         assert!(html.contains("acme-web"));
     }
 
     #[test]
     fn render_excludes_evil_row() {
-        let (_c, _t) = portal_test_ctx!("plugins/devlake/src/components/MetricsList.tsx", "RenderEvil", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/devlake/src/components/MetricsList.tsx",
+            "RenderEvil",
+            "acme"
+        );
         let html = render(&AdminState::seeded(), &ctx(&[Permission::DevlakeRead])).unwrap();
         assert!(!html.contains("evil"));
     }
 
     #[test]
     fn render_shows_acme_count() {
-        let (_c, _t) = portal_test_ctx!("plugins/devlake/src/components/MetricsList.tsx", "Count", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/devlake/src/components/MetricsList.tsx",
+            "Count",
+            "acme"
+        );
         let html = render(&AdminState::seeded(), &ctx(&[Permission::DevlakeRead])).unwrap();
         assert!(html.contains("(2)"));
     }

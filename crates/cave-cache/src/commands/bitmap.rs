@@ -5,12 +5,14 @@
 use crate::db::Db;
 use crate::error::{CacheError, CacheResult};
 use crate::resp::Resp;
-use crate::types::{bytes_to_i64, Entry, Value};
+use crate::types::{Entry, Value, bytes_to_i64};
 
 // ── SETBIT ───────────────────────────────────────────────────────────────────
 
 pub fn cmd_setbit(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 4 { return Err(CacheError::wrong_arity("setbit")); }
+    if args.len() != 4 {
+        return Err(CacheError::wrong_arity("setbit"));
+    }
     let key = args[1].clone();
     let offset = bytes_to_i64(&args[2]).ok_or(CacheError::BitOffset)? as usize;
     let bit_val = bytes_to_i64(&args[3]).ok_or(CacheError::BitValue)?;
@@ -57,7 +59,9 @@ pub fn cmd_setbit(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 // ── GETBIT ───────────────────────────────────────────────────────────────────
 
 pub fn cmd_getbit(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 3 { return Err(CacheError::wrong_arity("getbit")); }
+    if args.len() != 3 {
+        return Err(CacheError::wrong_arity("getbit"));
+    }
     let offset = bytes_to_i64(&args[2]).ok_or(CacheError::BitOffset)? as usize;
 
     match db.get_typed(&args[1], "string")? {
@@ -79,7 +83,9 @@ pub fn cmd_getbit(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 // ── BITCOUNT ─────────────────────────────────────────────────────────────────
 
 pub fn cmd_bitcount(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 2 || args.len() > 5 { return Err(CacheError::wrong_arity("bitcount")); }
+    if args.len() < 2 || args.len() > 5 {
+        return Err(CacheError::wrong_arity("bitcount"));
+    }
 
     match db.get_typed(&args[1], "string")? {
         Some(e) => match &e.value {
@@ -88,7 +94,10 @@ pub fn cmd_bitcount(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
                     let s = bytes_to_i64(&args[2]).ok_or(CacheError::NotInteger)?;
                     let e = bytes_to_i64(&args[3]).ok_or(CacheError::NotInteger)?;
                     // Optional BYTE/BIT unit
-                    let is_bit = args.get(4).map(|u| u.to_ascii_uppercase() == b"BIT").unwrap_or(false);
+                    let is_bit = args
+                        .get(4)
+                        .map(|u| u.to_ascii_uppercase() == b"BIT")
+                        .unwrap_or(false);
                     if is_bit {
                         bit_range_to_bytes(s, e, v.len())
                     } else {
@@ -116,15 +125,31 @@ pub fn cmd_bitcount(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 
 fn byte_range(start: i64, end: i64, len: usize) -> (usize, usize) {
     let len = len as i64;
-    let s = if start < 0 { (len + start).max(0) } else { start.min(len - 1) } as usize;
-    let e = if end < 0 { (len + end).max(0) } else { end.min(len - 1) } as usize;
+    let s = if start < 0 {
+        (len + start).max(0)
+    } else {
+        start.min(len - 1)
+    } as usize;
+    let e = if end < 0 {
+        (len + end).max(0)
+    } else {
+        end.min(len - 1)
+    } as usize;
     (s, e)
 }
 
 fn bit_range_to_bytes(start: i64, end: i64, len: usize) -> (usize, usize) {
     let bits = (len * 8) as i64;
-    let s = if start < 0 { (bits + start).max(0) } else { start.min(bits - 1) };
-    let e = if end < 0 { (bits + end).max(0) } else { end.min(bits - 1) };
+    let s = if start < 0 {
+        (bits + start).max(0)
+    } else {
+        start.min(bits - 1)
+    };
+    let e = if end < 0 {
+        (bits + end).max(0)
+    } else {
+        end.min(bits - 1)
+    };
     (s as usize / 8, e as usize / 8)
 }
 
@@ -132,13 +157,17 @@ fn bit_range_to_bytes(start: i64, end: i64, len: usize) -> (usize, usize) {
 
 pub fn cmd_bitop(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
     // args: [BITOP, operation, destkey, srckey ...]
-    if args.len() < 4 { return Err(CacheError::wrong_arity("bitop")); }
+    if args.len() < 4 {
+        return Err(CacheError::wrong_arity("bitop"));
+    }
     let op = &args[1].to_ascii_uppercase();
     let dst = args[2].clone();
 
     match op.as_slice() {
         b"NOT" => {
-            if args.len() != 4 { return Err(CacheError::wrong_arity("bitop not")); }
+            if args.len() != 4 {
+                return Err(CacheError::wrong_arity("bitop not"));
+            }
             let src = get_bytes(db, &args[3])?;
             let result: Vec<u8> = src.iter().map(|b| !b).collect();
             let len = result.len() as i64;
@@ -146,7 +175,8 @@ pub fn cmd_bitop(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
             Ok(Resp::Integer(len))
         }
         b"AND" | b"OR" | b"XOR" => {
-            let srcs: Vec<Vec<u8>> = args[3..].iter()
+            let srcs: Vec<Vec<u8>> = args[3..]
+                .iter()
                 .map(|k| get_bytes(db, k))
                 .collect::<CacheResult<_>>()?;
 
@@ -156,21 +186,24 @@ pub fn cmd_bitop(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
             match op.as_slice() {
                 b"AND" => {
                     for (i, b) in result.iter_mut().enumerate() {
-                        *b = srcs.iter()
+                        *b = srcs
+                            .iter()
                             .map(|s| s.get(i).copied().unwrap_or(0))
                             .fold(0xFF, |acc, x| acc & x);
                     }
                 }
                 b"OR" => {
                     for (i, b) in result.iter_mut().enumerate() {
-                        *b = srcs.iter()
+                        *b = srcs
+                            .iter()
                             .map(|s| s.get(i).copied().unwrap_or(0))
                             .fold(0, |acc, x| acc | x);
                     }
                 }
                 b"XOR" => {
                     for (i, b) in result.iter_mut().enumerate() {
-                        *b = srcs.iter()
+                        *b = srcs
+                            .iter()
                             .map(|s| s.get(i).copied().unwrap_or(0))
                             .fold(0, |acc, x| acc ^ x);
                     }
@@ -182,8 +215,10 @@ pub fn cmd_bitop(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
             db.insert(dst, Entry::new(Value::String(result)));
             Ok(Resp::Integer(len))
         }
-        _ => Err(CacheError::generic(format!("ERR Unknown operation '{}'. Please specify AND, OR, XOR, or NOT",
-            std::str::from_utf8(op).unwrap_or("?")))),
+        _ => Err(CacheError::generic(format!(
+            "ERR Unknown operation '{}'. Please specify AND, OR, XOR, or NOT",
+            std::str::from_utf8(op).unwrap_or("?")
+        ))),
     }
 }
 
@@ -200,9 +235,13 @@ fn get_bytes(db: &mut Db, key: &[u8]) -> CacheResult<Vec<u8>> {
 // ── BITPOS ───────────────────────────────────────────────────────────────────
 
 pub fn cmd_bitpos(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 3 { return Err(CacheError::wrong_arity("bitpos")); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity("bitpos"));
+    }
     let target = bytes_to_i64(&args[2]).ok_or(CacheError::BitValue)?;
-    if target != 0 && target != 1 { return Err(CacheError::BitValue); }
+    if target != 0 && target != 1 {
+        return Err(CacheError::BitValue);
+    }
 
     let bytes = match db.get_typed(&args[1], "string")? {
         Some(e) => match &e.value {
@@ -218,7 +257,11 @@ pub fn cmd_bitpos(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
         byte_range(s, e, bytes.len())
     } else if args.len() >= 4 {
         let s = bytes_to_i64(&args[3]).ok_or(CacheError::NotInteger)?;
-        let e = if s < 0 { bytes.len() as i64 - 1 } else { bytes.len() as i64 - 1 };
+        let e = if s < 0 {
+            bytes.len() as i64 - 1
+        } else {
+            bytes.len() as i64 - 1
+        };
         byte_range(s, e, bytes.len())
     } else {
         (0, bytes.len().saturating_sub(1))
@@ -252,7 +295,9 @@ pub fn cmd_bitpos(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 // ── BITFIELD ─────────────────────────────────────────────────────────────────
 
 pub fn cmd_bitfield(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 2 { return Err(CacheError::wrong_arity("bitfield")); }
+    if args.len() < 2 {
+        return Err(CacheError::wrong_arity("bitfield"));
+    }
     let key = args[1].clone();
 
     let mut results = Vec::new();
@@ -296,7 +341,9 @@ pub fn cmd_bitfield(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
                 };
                 i += 2;
             }
-            _ => { i += 1; }
+            _ => {
+                i += 1;
+            }
         }
     }
 
@@ -304,7 +351,11 @@ pub fn cmd_bitfield(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 }
 
 #[derive(Clone, Copy)]
-enum OverflowPolicy { Wrap, Sat, Fail }
+enum OverflowPolicy {
+    Wrap,
+    Sat,
+    Fail,
+}
 
 fn parse_bitfield_type(t: &[u8]) -> CacheResult<(bool, u8)> {
     let s = std::str::from_utf8(t).map_err(|_| CacheError::Syntax)?;
@@ -344,7 +395,9 @@ fn get_bits(bytes: &[u8], offset: usize, bits: u8) -> u64 {
 
 fn set_bits(bytes: &mut Vec<u8>, offset: usize, bits: u8, val: u64) {
     let needed = (offset + bits as usize + 7) / 8;
-    if bytes.len() < needed { bytes.resize(needed, 0); }
+    if bytes.len() < needed {
+        bytes.resize(needed, 0);
+    }
     for i in 0..bits as usize {
         let bit_pos = offset + i;
         let byte_idx = bit_pos / 8;
@@ -358,9 +411,18 @@ fn set_bits(bytes: &mut Vec<u8>, offset: usize, bits: u8, val: u64) {
     }
 }
 
-fn bitfield_get(db: &mut Db, key: &[u8], is_signed: bool, bits: u8, offset: usize) -> CacheResult<i64> {
+fn bitfield_get(
+    db: &mut Db,
+    key: &[u8],
+    is_signed: bool,
+    bits: u8,
+    offset: usize,
+) -> CacheResult<i64> {
     let bytes = match db.get_typed(key, "string")? {
-        Some(e) => match &e.value { Value::String(v) => v.clone(), _ => unreachable!() },
+        Some(e) => match &e.value {
+            Value::String(v) => v.clone(),
+            _ => unreachable!(),
+        },
         None => vec![],
     };
     let raw = get_bits(&bytes, offset, bits);
@@ -372,32 +434,63 @@ fn bitfield_get(db: &mut Db, key: &[u8], is_signed: bool, bits: u8, offset: usiz
     }
 }
 
-fn bitfield_set(db: &mut Db, key: &[u8], is_signed: bool, bits: u8, offset: usize, value: i64) -> CacheResult<i64> {
+fn bitfield_set(
+    db: &mut Db,
+    key: &[u8],
+    is_signed: bool,
+    bits: u8,
+    offset: usize,
+    value: i64,
+) -> CacheResult<i64> {
     let old = bitfield_get(db, key, is_signed, bits, offset)?;
     let bytes = match db.get_typed_mut(key, "string")? {
-        Some(e) => match &mut e.value { Value::String(v) => v, _ => unreachable!() },
+        Some(e) => match &mut e.value {
+            Value::String(v) => v,
+            _ => unreachable!(),
+        },
         None => {
             db.insert(key.to_vec(), Entry::new(Value::String(vec![])));
             match db.get_typed_mut(key, "string")? {
-                Some(e) => match &mut e.value { Value::String(v) => v, _ => unreachable!() },
+                Some(e) => match &mut e.value {
+                    Value::String(v) => v,
+                    _ => unreachable!(),
+                },
                 None => unreachable!(),
             }
         }
     };
-    let mask = if bits == 64 { u64::MAX } else { (1u64 << bits) - 1 };
+    let mask = if bits == 64 {
+        u64::MAX
+    } else {
+        (1u64 << bits) - 1
+    };
     set_bits(bytes, offset, bits, (value as u64) & mask);
     Ok(old)
 }
 
 fn bitfield_incrby(
-    db: &mut Db, key: &[u8], is_signed: bool, bits: u8, offset: usize, delta: i64, overflow: OverflowPolicy
+    db: &mut Db,
+    key: &[u8],
+    is_signed: bool,
+    bits: u8,
+    offset: usize,
+    delta: i64,
+    overflow: OverflowPolicy,
 ) -> CacheResult<Option<i64>> {
     let old = bitfield_get(db, key, is_signed, bits, offset)?;
     let new_val = old.wrapping_add(delta);
 
     let (result, overflowed) = if is_signed {
-        let min = if bits == 64 { i64::MIN } else { -(1i64 << (bits - 1)) };
-        let max = if bits == 64 { i64::MAX } else { (1i64 << (bits - 1)) - 1 };
+        let min = if bits == 64 {
+            i64::MIN
+        } else {
+            -(1i64 << (bits - 1))
+        };
+        let max = if bits == 64 {
+            i64::MAX
+        } else {
+            (1i64 << (bits - 1)) - 1
+        };
         if new_val < min || new_val > max {
             match overflow {
                 OverflowPolicy::Wrap => (new_val, false), // wrapping already done
@@ -408,7 +501,11 @@ fn bitfield_incrby(
             (new_val, false)
         }
     } else {
-        let max = if bits == 64 { u64::MAX as i64 } else { ((1u64 << bits) - 1) as i64 };
+        let max = if bits == 64 {
+            u64::MAX as i64
+        } else {
+            ((1u64 << bits) - 1) as i64
+        };
         if new_val < 0 || new_val > max {
             match overflow {
                 OverflowPolicy::Wrap => (new_val & max, false),

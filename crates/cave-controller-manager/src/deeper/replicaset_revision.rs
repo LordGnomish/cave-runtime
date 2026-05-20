@@ -30,10 +30,7 @@ pub fn next_revision(existing: &[RsSnapshot]) -> u64 {
 
 /// Identify which RS is the active one (matching the desired
 /// `pod_template_hash`).
-pub fn active_rs<'a>(
-    rs_list: &'a [RsSnapshot],
-    desired_hash: &str,
-) -> Option<&'a RsSnapshot> {
+pub fn active_rs<'a>(rs_list: &'a [RsSnapshot], desired_hash: &str) -> Option<&'a RsSnapshot> {
     rs_list.iter().find(|r| r.pod_template_hash == desired_hash)
 }
 
@@ -41,11 +38,7 @@ pub fn active_rs<'a>(
 /// has 0 replicas. These are eligible for pruning under
 /// `revisionHistoryLimit`. Returns the names of RSes to delete (oldest
 /// revision first), keeping at most `keep` history entries.
-pub fn rs_to_prune(
-    rs_list: &[RsSnapshot],
-    desired_hash: &str,
-    keep: u32,
-) -> Vec<String> {
+pub fn rs_to_prune(rs_list: &[RsSnapshot], desired_hash: &str, keep: u32) -> Vec<String> {
     let mut old: Vec<&RsSnapshot> = rs_list
         .iter()
         .filter(|r| r.pod_template_hash != desired_hash && r.current_replicas == 0)
@@ -56,10 +49,7 @@ pub fn rs_to_prune(
         return vec![];
     }
     let to_drop = old.len() - limit;
-    old.iter()
-        .take(to_drop)
-        .map(|r| r.name.clone())
-        .collect()
+    old.iter().take(to_drop).map(|r| r.name.clone()).collect()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -72,10 +62,7 @@ pub enum RolloutAction {
     CreateActiveRs,
 }
 
-pub fn evaluate(
-    rs_list: &[RsSnapshot],
-    desired_hash: &str,
-) -> RolloutAction {
+pub fn evaluate(rs_list: &[RsSnapshot], desired_hash: &str) -> RolloutAction {
     match active_rs(rs_list, desired_hash) {
         None => RolloutAction::CreateActiveRs,
         Some(active) => {
@@ -130,7 +117,11 @@ mod tests {
             "MaxRevision",
             "tenant-rs-rev-max"
         );
-        let r = vec![rs("a", 3, "h1", 0), rs("b", 1, "h2", 0), rs("c", 7, "h3", 4)];
+        let r = vec![
+            rs("a", 3, "h1", 0),
+            rs("b", 1, "h2", 0),
+            rs("c", 7, "h3", 4),
+        ];
         assert_eq!(next_revision(&r), 8);
     }
 
@@ -222,10 +213,7 @@ mod tests {
             "syncRolloutStatus",
             "tenant-rs-rev-eval-stamp"
         );
-        let r = vec![
-            rs("active", 1, "new", 4),
-            rs("old", 5, "old", 0),
-        ];
+        let r = vec![rs("active", 1, "new", 4), rs("old", 5, "old", 0)];
         match evaluate(&r, "new") {
             RolloutAction::StampRevision { rs_name, revision } => {
                 assert_eq!(rs_name, "active");
@@ -256,7 +244,10 @@ mod tests {
         for a in [
             RolloutAction::NoOp,
             RolloutAction::CreateActiveRs,
-            RolloutAction::StampRevision { rs_name: "x".into(), revision: 3 },
+            RolloutAction::StampRevision {
+                rs_name: "x".into(),
+                revision: 3,
+            },
         ] {
             let s = serde_json::to_string(&a).unwrap();
             let back: RolloutAction = serde_json::from_str(&s).unwrap();

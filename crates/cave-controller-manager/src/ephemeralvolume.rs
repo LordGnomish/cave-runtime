@@ -170,7 +170,11 @@ mod tests {
         let d = decl("pod", "scratch", "uid-1");
         let a = evaluate(&d, None);
         match a {
-            Action::Create { name, owner_pod_uid, .. } => {
+            Action::Create {
+                name,
+                owner_pod_uid,
+                ..
+            } => {
                 assert_eq!(name, "pod-scratch");
                 assert_eq!(owner_pod_uid, "uid-1");
             }

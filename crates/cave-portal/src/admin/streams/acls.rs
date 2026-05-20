@@ -9,10 +9,10 @@
 //!
 //! Upstream: <https://kafka.apache.org/documentation/#security_authz>
 
+use super::StreamsViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
-use super::StreamsViewError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AclRow {
@@ -116,20 +116,27 @@ mod tests {
 
     #[test]
     fn synthesize_produces_two_acls_per_topic() {
-        let topics = super::super::topics::list_topics_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
-        let rows = synthesize_acls(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let topics = super::super::topics::list_topics_sorted(
+            &AdminState::seeded(),
+            &ctx(&[Permission::StreamsRead]),
+        )
+        .unwrap();
+        let rows =
+            synthesize_acls(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
         assert_eq!(rows.len(), topics.len() * 2);
     }
 
     #[test]
     fn synthesize_uses_tenant_principal() {
-        let rows = synthesize_acls(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let rows =
+            synthesize_acls(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
         assert!(rows.iter().all(|r| r.principal == "User:acme"));
     }
 
     #[test]
     fn count_by_operation_splits_read_write_evenly() {
-        let rows = synthesize_acls(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let rows =
+            synthesize_acls(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
         let by_op = count_by_operation(&rows);
         assert_eq!(by_op.get("READ"), by_op.get("WRITE"));
     }

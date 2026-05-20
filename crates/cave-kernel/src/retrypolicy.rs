@@ -200,8 +200,8 @@ mod tests {
     use super::*;
     use rand::SeedableRng;
     use rand::rngs::StdRng;
-    use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicU32, Ordering};
 
     fn rng() -> StdRng {
         StdRng::seed_from_u64(42)
@@ -214,7 +214,10 @@ mod tests {
         let s = BackoffStrategy::Constant(Duration::from_millis(50));
         let mut r = rng();
         for i in 0..5 {
-            assert_eq!(s.delay_for(i, Duration::ZERO, &mut r), Duration::from_millis(50));
+            assert_eq!(
+                s.delay_for(i, Duration::ZERO, &mut r),
+                Duration::from_millis(50)
+            );
         }
         let _ = tenant_id;
     }
@@ -228,10 +231,22 @@ mod tests {
             cap: Duration::from_secs(60),
         };
         let mut r = rng();
-        assert_eq!(s.delay_for(0, Duration::ZERO, &mut r), Duration::from_millis(10));
-        assert_eq!(s.delay_for(1, Duration::ZERO, &mut r), Duration::from_millis(20));
-        assert_eq!(s.delay_for(2, Duration::ZERO, &mut r), Duration::from_millis(40));
-        assert_eq!(s.delay_for(3, Duration::ZERO, &mut r), Duration::from_millis(80));
+        assert_eq!(
+            s.delay_for(0, Duration::ZERO, &mut r),
+            Duration::from_millis(10)
+        );
+        assert_eq!(
+            s.delay_for(1, Duration::ZERO, &mut r),
+            Duration::from_millis(20)
+        );
+        assert_eq!(
+            s.delay_for(2, Duration::ZERO, &mut r),
+            Duration::from_millis(40)
+        );
+        assert_eq!(
+            s.delay_for(3, Duration::ZERO, &mut r),
+            Duration::from_millis(80)
+        );
         let _ = tenant_id;
     }
 
@@ -245,7 +260,10 @@ mod tests {
         };
         let mut r = rng();
         // 10 * 2^10 = 10240, capped at 100
-        assert_eq!(s.delay_for(10, Duration::ZERO, &mut r), Duration::from_millis(100));
+        assert_eq!(
+            s.delay_for(10, Duration::ZERO, &mut r),
+            Duration::from_millis(100)
+        );
         let _ = tenant_id;
     }
 

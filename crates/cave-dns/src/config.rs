@@ -505,7 +505,12 @@ impl Default for ChaosConfig {
 mod hostname {
     pub fn get() -> std::io::Result<std::ffi::OsString> {
         std::env::var_os("HOSTNAME").map_or_else(
-            || Err(std::io::Error::new(std::io::ErrorKind::NotFound, "no HOSTNAME")),
+            || {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "no HOSTNAME",
+                ))
+            },
             Ok,
         )
     }

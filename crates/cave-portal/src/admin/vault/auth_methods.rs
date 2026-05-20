@@ -7,7 +7,7 @@
 use super::VaultViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, table};
-use crate::admin::state::{scope, AdminState, VaultAuthMethod};
+use crate::admin::state::{AdminState, VaultAuthMethod, scope};
 
 pub fn list_auth_methods(
     state: &AdminState,
@@ -29,9 +29,7 @@ pub fn list_auth_methods(
 /// Group methods by their `method_type` so the UI can show "you have
 /// 3 OIDC mounts" at a glance. Returns `(method_type → count)` pairs
 /// sorted by count desc.
-pub fn group_by_type(
-    methods: &[VaultAuthMethod],
-) -> Vec<(String, usize)> {
+pub fn group_by_type(methods: &[VaultAuthMethod]) -> Vec<(String, usize)> {
     use std::collections::BTreeMap;
     let mut acc: BTreeMap<String, usize> = BTreeMap::new();
     for m in methods {
@@ -67,7 +65,11 @@ pub(super) fn render_section(
                 escape(&m.method_type),
                 escape(&m.accessor),
                 ttl_human(m.default_lease_ttl_s),
-                if m.enabled { "enabled".into() } else { "disabled".into() },
+                if m.enabled {
+                    "enabled".into()
+                } else {
+                    "disabled".into()
+                },
             ]
         })
         .collect();
@@ -99,8 +101,8 @@ fn ttl_human(s: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cave_kernel::ns::TenantId;
     use crate::portal_test_ctx;
+    use cave_kernel::ns::TenantId;
 
     fn ctx(perms: &[Permission]) -> RequestCtx {
         RequestCtx::developer("acme", perms)
@@ -113,7 +115,8 @@ mod tests {
             "AuthMethods",
             "acme"
         );
-        let methods = list_auth_methods(&AdminState::seeded(), &ctx(&[Permission::VaultRead])).unwrap();
+        let methods =
+            list_auth_methods(&AdminState::seeded(), &ctx(&[Permission::VaultRead])).unwrap();
         assert_eq!(methods.len(), 5);
         let paths: Vec<&str> = methods.iter().map(|m| m.path.as_str()).collect();
         assert!(paths.windows(2).all(|w| w[0] <= w[1]));

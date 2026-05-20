@@ -21,10 +21,12 @@ impl GatewayPlugin for GrpcGatewayPlugin {
 
     async fn access(&self, ctx: &mut PluginCtx, config: &Value) -> PluginResult {
         // Signal to proxy handler to use gRPC encoding
-        ctx.ctx.insert("grpc_gateway_enabled".to_string(), Value::Bool(true));
+        ctx.ctx
+            .insert("grpc_gateway_enabled".to_string(), Value::Bool(true));
 
         // Rewrite content-type for upstream
-        ctx.headers.insert("content-type".to_string(), "application/grpc".to_string());
+        ctx.headers
+            .insert("content-type".to_string(), "application/grpc".to_string());
         ctx.headers.insert("te".to_string(), "trailers".to_string());
 
         // Map HTTP method+path to gRPC method
@@ -32,7 +34,10 @@ impl GatewayPlugin for GrpcGatewayPlugin {
         if let Some(path_map) = config["path_map"].as_object() {
             let key = format!("{}:{}", ctx.method, ctx.path);
             if let Some(grpc_method) = path_map.get(&key).and_then(|v| v.as_str()) {
-                ctx.ctx.insert("grpc_method".to_string(), Value::String(grpc_method.to_string()));
+                ctx.ctx.insert(
+                    "grpc_method".to_string(),
+                    Value::String(grpc_method.to_string()),
+                );
             }
         }
 

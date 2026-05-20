@@ -31,7 +31,10 @@ pub mod types;
 pub mod user;
 
 use axum::Router;
-use models::{BackupJob, ConnectionPool, DatabaseInstance, DbSizeRecord, DbUser, MigrationRecord, QueryStat, ReplicationStatus, TableStat};
+use models::{
+    BackupJob, ConnectionPool, DatabaseInstance, DbSizeRecord, DbUser, MigrationRecord, QueryStat,
+    ReplicationStatus, TableStat,
+};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;

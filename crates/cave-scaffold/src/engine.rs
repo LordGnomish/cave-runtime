@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-use crate::models::{ScaffoldTemplate, JobStatus};
+use crate::models::{JobStatus, ScaffoldTemplate};
 use std::collections::HashMap;
 
 /// Validate that all required variables are provided
-pub fn validate_parameters(template: &ScaffoldTemplate, params: &HashMap<String, String>) -> Vec<String> {
-    template.variables.iter()
+pub fn validate_parameters(
+    template: &ScaffoldTemplate,
+    params: &HashMap<String, String>,
+) -> Vec<String> {
+    template
+        .variables
+        .iter()
         .filter(|v| v.required && !params.contains_key(&v.name))
         .map(|v| format!("Missing required variable: {}", v.name))
         .collect()
@@ -37,16 +42,22 @@ pub fn required_variable_count(template: &ScaffoldTemplate) -> usize {
 }
 
 /// Filter templates by category tag
-pub fn filter_by_tag<'a>(templates: &'a [ScaffoldTemplate], tag: &str) -> Vec<&'a ScaffoldTemplate> {
-    templates.iter().filter(|t| t.tags.iter().any(|tg| tg == tag)).collect()
+pub fn filter_by_tag<'a>(
+    templates: &'a [ScaffoldTemplate],
+    tag: &str,
+) -> Vec<&'a ScaffoldTemplate> {
+    templates
+        .iter()
+        .filter(|t| t.tags.iter().any(|tg| tg == tag))
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::models::{ScaffoldTemplate, TemplateCategory, TemplateVariable, VariableType};
-    use uuid::Uuid;
     use chrono::Utc;
+    use uuid::Uuid;
 
     fn make_template(vars: Vec<TemplateVariable>, tags: Vec<String>) -> ScaffoldTemplate {
         ScaffoldTemplate {

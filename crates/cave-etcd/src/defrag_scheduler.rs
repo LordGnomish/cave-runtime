@@ -15,7 +15,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use crate::cluster_status::{DefragDecision, DefragQuota, DefragTrigger, MemberStatus, defrag_decision};
+use crate::cluster_status::{
+    defrag_decision, DefragDecision, DefragQuota, DefragTrigger, MemberStatus,
+};
 
 // ── Errors ────────────────────────────────────────────────────────────────
 
@@ -38,7 +40,9 @@ impl std::fmt::Display for SchedulerError {
         match self {
             Self::AlreadyInFlight(id) => write!(f, "defrag already in flight for member {id}"),
             Self::NotInFlight => write!(f, "no defrag in flight"),
-            Self::RateLimited { retry_after } => write!(f, "rate limited; retry after {retry_after:?}"),
+            Self::RateLimited { retry_after } => {
+                write!(f, "rate limited; retry after {retry_after:?}")
+            }
             Self::UnknownMember(id) => write!(f, "unknown member: {id}"),
             Self::QuorumWouldBreak => write!(f, "defrag would break quorum"),
         }
@@ -95,16 +99,34 @@ impl DefragScheduler {
         }
     }
 
-    pub fn with_cooldown(mut self, d: Duration) -> Self { self.per_member_cooldown = d; self }
-    pub fn with_history_cap(mut self, cap: usize) -> Self { self.history_cap = cap; self }
-    pub fn set_quota(&self, q: DefragQuota) { *self.quota.lock().unwrap() = q; }
-    pub fn quota(&self) -> DefragQuota { self.quota.lock().unwrap().clone() }
+    pub fn with_cooldown(mut self, d: Duration) -> Self {
+        self.per_member_cooldown = d;
+        self
+    }
+    pub fn with_history_cap(mut self, cap: usize) -> Self {
+        self.history_cap = cap;
+        self
+    }
+    pub fn set_quota(&self, q: DefragQuota) {
+        *self.quota.lock().unwrap() = q;
+    }
+    pub fn quota(&self) -> DefragQuota {
+        self.quota.lock().unwrap().clone()
+    }
 
-    pub fn queued(&self) -> u64 { self.queued.load(Ordering::SeqCst) }
-    pub fn completed(&self) -> u64 { self.completed.load(Ordering::SeqCst) }
-    pub fn skipped(&self) -> u64 { self.skipped.load(Ordering::SeqCst) }
+    pub fn queued(&self) -> u64 {
+        self.queued.load(Ordering::SeqCst)
+    }
+    pub fn completed(&self) -> u64 {
+        self.completed.load(Ordering::SeqCst)
+    }
+    pub fn skipped(&self) -> u64 {
+        self.skipped.load(Ordering::SeqCst)
+    }
 
-    pub fn in_flight(&self) -> Option<InFlight> { self.in_flight.lock().unwrap().clone() }
+    pub fn in_flight(&self) -> Option<InFlight> {
+        self.in_flight.lock().unwrap().clone()
+    }
 
     pub fn history(&self) -> Vec<DefragHistoryEntry> {
         self.history.lock().unwrap().iter().cloned().collect()
@@ -112,7 +134,12 @@ impl DefragScheduler {
 
     /// Decide whether `member` should defrag right now, honouring quota,
     /// in-flight, cooldown, and quorum constraints.
-    pub fn evaluate(&self, member: &MemberStatus, voter_count: usize, alive_count: usize) -> Result<DefragTrigger, SchedulerError> {
+    pub fn evaluate(
+        &self,
+        member: &MemberStatus,
+        voter_count: usize,
+        alive_count: usize,
+    ) -> Result<DefragTrigger, SchedulerError> {
         // Quorum check: defragging this member would temporarily reduce
         // the alive set by one; refuse if that breaks quorum.
         let alive_after = alive_count.saturating_sub(1);
@@ -128,7 +155,13 @@ impl DefragScheduler {
         }
 
         // Cooldown gate.
-        if let Some(last) = self.last_run.lock().unwrap().get(&member.member_id).copied() {
+        if let Some(last) = self
+            .last_run
+            .lock()
+            .unwrap()
+            .get(&member.member_id)
+            .copied()
+        {
             let elapsed = last.elapsed();
             if elapsed < self.per_member_cooldown {
                 self.skipped.fetch_add(1, Ordering::SeqCst);
@@ -139,7 +172,9 @@ impl DefragScheduler {
         }
 
         match defrag_decision(&self.quota.lock().unwrap(), member) {
-            DefragDecision::Skip => Err(SchedulerError::RateLimited { retry_after: Duration::from_secs(0) }),
+            DefragDecision::Skip => Err(SchedulerError::RateLimited {
+                retry_after: Duration::from_secs(0),
+            }),
             DefragDecision::Trigger(t) => Ok(t),
         }
     }
@@ -150,13 +185,21 @@ impl DefragScheduler {
         if let Some(f) = g.as_ref() {
             return Err(SchedulerError::AlreadyInFlight(f.member_id));
         }
-        *g = Some(InFlight { member_id, trigger, started_at: Instant::now() });
+        *g = Some(InFlight {
+            member_id,
+            trigger,
+            started_at: Instant::now(),
+        });
         self.queued.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
     /// Mark the current defrag as finished, recording its outcome.
-    pub fn finish(&self, member_id: u64, bytes_freed: u64) -> Result<DefragHistoryEntry, SchedulerError> {
+    pub fn finish(
+        &self,
+        member_id: u64,
+        bytes_freed: u64,
+    ) -> Result<DefragHistoryEntry, SchedulerError> {
         let mut g = self.in_flight.lock().unwrap();
         let f = g.take().ok_or(SchedulerError::NotInFlight)?;
         if f.member_id != member_id {
@@ -172,9 +215,14 @@ impl DefragScheduler {
             bytes_freed,
         };
         let mut h = self.history.lock().unwrap();
-        if h.len() >= self.history_cap { h.pop_front(); }
+        if h.len() >= self.history_cap {
+            h.pop_front();
+        }
         h.push_back(entry.clone());
-        self.last_run.lock().unwrap().insert(member_id, Instant::now());
+        self.last_run
+            .lock()
+            .unwrap()
+            .insert(member_id, Instant::now());
         self.completed.fetch_add(1, Ordering::SeqCst);
         Ok(entry)
     }
@@ -183,7 +231,10 @@ impl DefragScheduler {
     pub fn cancel(&self, member_id: u64) -> Result<(), SchedulerError> {
         let mut g = self.in_flight.lock().unwrap();
         match g.as_ref() {
-            Some(f) if f.member_id == member_id => { *g = None; Ok(()) }
+            Some(f) if f.member_id == member_id => {
+                *g = None;
+                Ok(())
+            }
             Some(f) => Err(SchedulerError::AlreadyInFlight(f.member_id)),
             None => Err(SchedulerError::NotInFlight),
         }
@@ -192,7 +243,8 @@ impl DefragScheduler {
     /// Build a follower-first defrag order: leader is always last so we
     /// don't disrupt the leader-elected node mid-batch.
     pub fn order_followers_first(members: &[MemberStatus], leader_id: u64) -> Vec<u64> {
-        let mut followers: Vec<u64> = members.iter()
+        let mut followers: Vec<u64> = members
+            .iter()
             .filter(|m| m.member_id != leader_id && !m.is_learner)
             .map(|m| m.member_id)
             .collect();
@@ -205,7 +257,12 @@ impl DefragScheduler {
 
     /// Total bytes freed across history.
     pub fn total_bytes_freed(&self) -> u64 {
-        self.history.lock().unwrap().iter().map(|e| e.bytes_freed).sum()
+        self.history
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|e| e.bytes_freed)
+            .sum()
     }
 }
 
@@ -220,15 +277,26 @@ mod tests {
 
     fn member(id: u64, db: u64, in_use: u64) -> MemberStatus {
         MemberStatus {
-            member_id: id, name: format!("m{id}"), revision: 0,
-            db_size: db, db_size_in_use: in_use, leader: 0, raft_term: 1,
-            is_learner: false, health: MemberHealth::Healthy,
-            last_heartbeat_age_secs: Some(0), version: "3.6".into(),
+            member_id: id,
+            name: format!("m{id}"),
+            revision: 0,
+            db_size: db,
+            db_size_in_use: in_use,
+            leader: 0,
+            raft_term: 1,
+            is_learner: false,
+            health: MemberHealth::Healthy,
+            last_heartbeat_age_secs: Some(0),
+            version: "3.6".into(),
         }
     }
 
     fn quota_strict() -> DefragQuota {
-        DefragQuota { quota_bytes: 100, threshold: 0.8, fragmentation_threshold: 0.5 }
+        DefragQuota {
+            quota_bytes: 100,
+            threshold: 0.8,
+            fragmentation_threshold: 0.5,
+        }
     }
 
     // ── evaluate / start / finish ──────────────────────────────────────
@@ -244,14 +312,22 @@ mod tests {
     #[test]
     fn test_evaluate_triggers_on_fragmentation() {
         // cite: bbolt fragmentation
-        let s = DefragScheduler::new(DefragQuota { quota_bytes: 10_000, threshold: 0.99, fragmentation_threshold: 0.5 });
+        let s = DefragScheduler::new(DefragQuota {
+            quota_bytes: 10_000,
+            threshold: 0.99,
+            fragmentation_threshold: 0.5,
+        });
         let m = member(1, 1000, 200);
         assert_eq!(s.evaluate(&m, 3, 3).unwrap(), DefragTrigger::Fragmented);
     }
 
     #[test]
     fn test_evaluate_skips_under_threshold() {
-        let s = DefragScheduler::new(DefragQuota { quota_bytes: 1000, threshold: 0.99, fragmentation_threshold: 0.0 });
+        let s = DefragScheduler::new(DefragQuota {
+            quota_bytes: 1000,
+            threshold: 0.99,
+            fragmentation_threshold: 0.0,
+        });
         let m = member(1, 100, 90);
         assert!(s.evaluate(&m, 3, 3).is_err());
     }
@@ -352,7 +428,10 @@ mod tests {
         let s = DefragScheduler::new(quota_strict());
         let m = member(1, 90, 80);
         // 3 voters, 2 alive ⇒ defrag-of-one would leave 1 alive ⇒ no quorum
-        assert_eq!(s.evaluate(&m, 3, 2).unwrap_err(), SchedulerError::QuorumWouldBreak);
+        assert_eq!(
+            s.evaluate(&m, 3, 2).unwrap_err(),
+            SchedulerError::QuorumWouldBreak
+        );
     }
 
     #[test]
@@ -368,7 +447,9 @@ mod tests {
     #[test]
     fn test_history_capped_at_history_cap() {
         // cite: bounded history (no unbounded growth)
-        let s = DefragScheduler::new(quota_strict()).with_history_cap(2).with_cooldown(Duration::from_secs(0));
+        let s = DefragScheduler::new(quota_strict())
+            .with_history_cap(2)
+            .with_cooldown(Duration::from_secs(0));
         for i in 1..=5u64 {
             s.start(i, DefragTrigger::ManualOverride).unwrap();
             s.finish(i, 1).unwrap();
@@ -437,7 +518,11 @@ mod tests {
         let s = DefragScheduler::new(quota_strict());
         let m = member(1, 50, 50);
         assert!(s.evaluate(&m, 3, 3).is_err());
-        s.set_quota(DefragQuota { quota_bytes: 10, threshold: 0.5, fragmentation_threshold: 0.0 });
+        s.set_quota(DefragQuota {
+            quota_bytes: 10,
+            threshold: 0.5,
+            fragmentation_threshold: 0.0,
+        });
         assert!(s.evaluate(&m, 3, 3).is_ok());
     }
 }

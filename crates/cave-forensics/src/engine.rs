@@ -35,7 +35,7 @@ pub fn has_valid_evidence(item: &EvidenceItem) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{EvidenceType, ForensicCase, ForensicSeverity, CaseStatus, EvidenceItem};
+    use crate::models::{CaseStatus, EvidenceItem, EvidenceType, ForensicCase, ForensicSeverity};
     use chrono::Utc;
     use uuid::Uuid;
 
@@ -64,7 +64,9 @@ mod tests {
 
     #[test]
     fn test_severity_rank_ordering() {
-        assert!(severity_rank(&ForensicSeverity::Critical) > severity_rank(&ForensicSeverity::High));
+        assert!(
+            severity_rank(&ForensicSeverity::Critical) > severity_rank(&ForensicSeverity::High)
+        );
         assert!(severity_rank(&ForensicSeverity::High) > severity_rank(&ForensicSeverity::Medium));
         assert!(severity_rank(&ForensicSeverity::Medium) > severity_rank(&ForensicSeverity::Low));
     }

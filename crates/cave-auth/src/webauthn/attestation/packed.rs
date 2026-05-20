@@ -21,10 +21,10 @@
 
 use ciborium::value::Value;
 
+use crate::webauthn::CoseAlg;
+use crate::webauthn::WebAuthnError;
 use crate::webauthn::cbor;
 use crate::webauthn::cose;
-use crate::webauthn::WebAuthnError;
-use crate::webauthn::CoseAlg;
 
 #[derive(Debug, Clone)]
 pub struct PackedAttStmt {
@@ -86,7 +86,7 @@ pub fn verify_self(
 mod tests {
     use super::*;
     use crate::webauthn::cbor;
-    use p256::ecdsa::{signature::Signer as _, SigningKey};
+    use p256::ecdsa::{SigningKey, signature::Signer as _};
     use rand::rngs::OsRng;
 
     fn cbor_stmt(alg: i64, sig: &[u8], x5c: Option<Vec<Vec<u8>>>) -> Value {

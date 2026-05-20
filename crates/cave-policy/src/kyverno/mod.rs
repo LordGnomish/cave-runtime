@@ -16,8 +16,8 @@ use models::*;
 use std::collections::HashMap;
 
 pub use models::{
-    ClusterPolicy, CleanupPolicy, Policy, PolicyException,
-    PolicyEvalResult, PolicyReport, ClusterPolicyReport,
+    CleanupPolicy, ClusterPolicy, ClusterPolicyReport, Policy, PolicyEvalResult, PolicyException,
+    PolicyReport,
 };
 
 /// Kyverno policy engine — holds loaded policies and exceptions.
@@ -37,7 +37,8 @@ impl KyvernoEngine {
     }
 
     pub fn add_cluster_policy(&mut self, policy: ClusterPolicy) {
-        self.cluster_policies.insert(policy.metadata.name.clone(), policy);
+        self.cluster_policies
+            .insert(policy.metadata.name.clone(), policy);
     }
 
     pub fn remove_cluster_policy(&mut self, name: &str) {
@@ -53,7 +54,11 @@ impl KyvernoEngine {
     }
 
     pub fn add_policy(&mut self, policy: Policy) {
-        let key = format!("{}/{}", policy.metadata.namespace.as_deref().unwrap_or("default"), policy.metadata.name);
+        let key = format!(
+            "{}/{}",
+            policy.metadata.namespace.as_deref().unwrap_or("default"),
+            policy.metadata.name
+        );
         self.policies.insert(key, policy);
     }
 
@@ -80,10 +85,7 @@ impl KyvernoEngine {
             .chain(
                 self.policies
                     .values()
-                    .filter(|p| {
-                        p.metadata.namespace.as_deref() == namespace
-                            || namespace.is_none()
-                    })
+                    .filter(|p| p.metadata.namespace.as_deref() == namespace || namespace.is_none())
                     .map(|p| (p.metadata.name.as_str(), &p.spec)),
             )
             .collect();
@@ -106,77 +108,75 @@ impl KyvernoEngine {
                 }
 
                 match rule.rule_type() {
-                    "validate" => {
-                        match validate::validate_rule(rule, resource, &context) {
-                            Ok(Some(mut violation)) => {
-                                violation.policy = policy_name.to_string();
-                                match spec.validation_failure_action {
-                                    ValidationFailureAction::Enforce => {
-                                        result.allowed = false;
-                                    }
-                                    ValidationFailureAction::Audit => {
-                                        result.warnings.push(format!(
-                                            "audit: policy {} rule {} failed: {}",
-                                            policy_name, rule.name, violation.message
-                                        ));
-                                    }
-                                }
-                                result.violations.push(violation);
-                            }
-                            Ok(None) => {}
-                            Err(e) => {
-                                result.warnings.push(format!(
-                                    "error evaluating policy {} rule {}: {e}",
-                                    policy_name, rule.name
-                                ));
-                                if spec.failure_policy == FailurePolicy::Fail {
+                    "validate" => match validate::validate_rule(rule, resource, &context) {
+                        Ok(Some(mut violation)) => {
+                            violation.policy = policy_name.to_string();
+                            match spec.validation_failure_action {
+                                ValidationFailureAction::Enforce => {
                                     result.allowed = false;
                                 }
-                            }
-                        }
-                    }
-                    "mutate" => {
-                        match mutate::mutate_rule(rule, resource, &context) {
-                            Ok(Some((_new_resource, patches))) => {
-                                result.mutations.extend(patches);
-                            }
-                            Ok(None) => {}
-                            Err(e) => {
-                                result.warnings.push(format!(
-                                    "error mutating policy {} rule {}: {e}",
-                                    policy_name, rule.name
-                                ));
-                            }
-                        }
-                    }
-                    "generate" => {
-                        match generate::generate_rule(rule, resource, &context) {
-                            Ok(mut generated) => {
-                                for g in &mut generated {
-                                    g.policy = policy_name.to_string();
+                                ValidationFailureAction::Audit => {
+                                    result.warnings.push(format!(
+                                        "audit: policy {} rule {} failed: {}",
+                                        policy_name, rule.name, violation.message
+                                    ));
                                 }
-                                result.generated.extend(generated);
                             }
-                            Err(e) => {
-                                result.warnings.push(format!(
-                                    "error generating policy {} rule {}: {e}",
-                                    policy_name, rule.name
-                                ));
+                            result.violations.push(violation);
+                        }
+                        Ok(None) => {}
+                        Err(e) => {
+                            result.warnings.push(format!(
+                                "error evaluating policy {} rule {}: {e}",
+                                policy_name, rule.name
+                            ));
+                            if spec.failure_policy == FailurePolicy::Fail {
+                                result.allowed = false;
                             }
                         }
-                    }
+                    },
+                    "mutate" => match mutate::mutate_rule(rule, resource, &context) {
+                        Ok(Some((_new_resource, patches))) => {
+                            result.mutations.extend(patches);
+                        }
+                        Ok(None) => {}
+                        Err(e) => {
+                            result.warnings.push(format!(
+                                "error mutating policy {} rule {}: {e}",
+                                policy_name, rule.name
+                            ));
+                        }
+                    },
+                    "generate" => match generate::generate_rule(rule, resource, &context) {
+                        Ok(mut generated) => {
+                            for g in &mut generated {
+                                g.policy = policy_name.to_string();
+                            }
+                            result.generated.extend(generated);
+                        }
+                        Err(e) => {
+                            result.warnings.push(format!(
+                                "error generating policy {} rule {}: {e}",
+                                policy_name, rule.name
+                            ));
+                        }
+                    },
                     "verifyImages" => {
                         match image_verify::verify_images_rule(rule, resource, &context) {
                             Ok(image_results) => {
                                 for ir in &image_results {
                                     if !ir.verified {
-                                        if spec.validation_failure_action == ValidationFailureAction::Enforce {
+                                        if spec.validation_failure_action
+                                            == ValidationFailureAction::Enforce
+                                        {
                                             result.allowed = false;
                                         }
                                         result.violations.push(PolicyViolation {
                                             policy: policy_name.to_string(),
                                             rule: rule.name.clone(),
-                                            message: ir.error.clone().unwrap_or_else(|| format!("image {} not verified", ir.image)),
+                                            message: ir.error.clone().unwrap_or_else(|| {
+                                                format!("image {} not verified", ir.image)
+                                            }),
                                             severity: None,
                                             resource: None,
                                         });
@@ -221,10 +221,17 @@ impl KyvernoEngine {
         true
     }
 
-    fn has_exception(&self, policy_name: &str, rule_name: &str, _resource: &serde_json::Value) -> bool {
+    fn has_exception(
+        &self,
+        policy_name: &str,
+        rule_name: &str,
+        _resource: &serde_json::Value,
+    ) -> bool {
         for exc in self.exceptions.values() {
             for entry in &exc.spec.exceptions {
-                if entry.policy_name == policy_name && entry.rule_names.contains(&rule_name.to_string()) {
+                if entry.policy_name == policy_name
+                    && entry.rule_names.contains(&rule_name.to_string())
+                {
                     return true;
                 }
             }
@@ -249,7 +256,9 @@ impl KyvernoEngine {
 }
 
 impl Default for KyvernoEngine {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn matches_resources(
@@ -270,13 +279,19 @@ fn matches_resources(
     let any_match = if match_res.any.is_empty() {
         true
     } else {
-        match_res.any.iter().any(|f| filter_matches(f, resource, namespace, operation))
+        match_res
+            .any
+            .iter()
+            .any(|f| filter_matches(f, resource, namespace, operation))
     };
 
     let all_match = if match_res.all.is_empty() {
         true
     } else {
-        match_res.all.iter().all(|f| filter_matches(f, resource, namespace, operation))
+        match_res
+            .all
+            .iter()
+            .all(|f| filter_matches(f, resource, namespace, operation))
     };
 
     any_match && all_match
@@ -289,12 +304,20 @@ fn matches_exclude(
     operation: &str,
 ) -> bool {
     if !exclude.any.is_empty() {
-        if exclude.any.iter().any(|f| filter_matches(f, resource, namespace, operation)) {
+        if exclude
+            .any
+            .iter()
+            .any(|f| filter_matches(f, resource, namespace, operation))
+        {
             return true;
         }
     }
     if !exclude.all.is_empty() {
-        if exclude.all.iter().all(|f| filter_matches(f, resource, namespace, operation)) {
+        if exclude
+            .all
+            .iter()
+            .all(|f| filter_matches(f, resource, namespace, operation))
+        {
             return true;
         }
     }
@@ -326,8 +349,14 @@ fn matches_resource_description(
     operation: &str,
 ) -> bool {
     let kind = resource.get("kind").and_then(|v| v.as_str()).unwrap_or("");
-    let api_version = resource.get("apiVersion").and_then(|v| v.as_str()).unwrap_or("");
-    let name = resource.pointer("/metadata/name").and_then(|v| v.as_str()).unwrap_or("");
+    let api_version = resource
+        .get("apiVersion")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let name = resource
+        .pointer("/metadata/name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
 
     // Check kinds
     if !desc.kinds.is_empty() {
@@ -335,36 +364,55 @@ fn matches_resource_description(
             if k.contains('/') {
                 // apiVersion/Kind format
                 let parts: Vec<&str> = k.splitn(2, '/').collect();
-                parts.get(0).map(|&av| av == api_version || av == "*").unwrap_or(false)
-                    && parts.get(1).map(|&ki| ki == kind || ki == "*").unwrap_or(false)
+                parts
+                    .get(0)
+                    .map(|&av| av == api_version || av == "*")
+                    .unwrap_or(false)
+                    && parts
+                        .get(1)
+                        .map(|&ki| ki == kind || ki == "*")
+                        .unwrap_or(false)
             } else {
                 k == kind || k == "*"
             }
         });
-        if !matches { return false; }
+        if !matches {
+            return false;
+        }
     }
 
     // Check namespaces
     if !desc.namespaces.is_empty() {
         let ns = namespace.unwrap_or("");
-        let matches = desc.namespaces.iter().any(|n| {
-            n == ns || jmespath::kyverno_pattern_match(n, ns)
-        });
-        if !matches { return false; }
+        let matches = desc
+            .namespaces
+            .iter()
+            .any(|n| n == ns || jmespath::kyverno_pattern_match(n, ns));
+        if !matches {
+            return false;
+        }
     }
 
     // Check names
     if !desc.names.is_empty() {
-        let matches = desc.names.iter().any(|n| {
-            n == name || jmespath::kyverno_pattern_match(n, name)
-        });
-        if !matches { return false; }
+        let matches = desc
+            .names
+            .iter()
+            .any(|n| n == name || jmespath::kyverno_pattern_match(n, name));
+        if !matches {
+            return false;
+        }
     }
 
     // Check operations
     if !desc.operations.is_empty() {
-        let matches = desc.operations.iter().any(|op| op.eq_ignore_ascii_case(operation));
-        if !matches { return false; }
+        let matches = desc
+            .operations
+            .iter()
+            .any(|op| op.eq_ignore_ascii_case(operation));
+        if !matches {
+            return false;
+        }
     }
 
     // Check selector (label matching)
@@ -378,7 +426,8 @@ fn matches_resource_description(
 }
 
 fn label_selector_matches(selector: &LabelSelector, resource: &serde_json::Value) -> bool {
-    let labels = resource.pointer("/metadata/labels")
+    let labels = resource
+        .pointer("/metadata/labels")
         .and_then(|v| v.as_object())
         .cloned()
         .unwrap_or_default();
@@ -401,7 +450,9 @@ fn label_selector_matches(selector: &LabelSelector, resource: &serde_json::Value
             "NotIn" => !has_key || !expr.values.iter().any(|v| v == label_val),
             _ => true,
         };
-        if !ok { return false; }
+        if !ok {
+            return false;
+        }
     }
 
     true

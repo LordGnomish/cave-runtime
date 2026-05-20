@@ -16,8 +16,8 @@
 //! exports. `pkg_index` is maintained on `put_advisory` for O(1) lookups.
 
 use crate::{
-    Advisory, DbError, IacRule, IacRuleDb, LangAdvisoryDb, OsAdvisoryDb, Result, Vulnerability,
-    VulnDb,
+    Advisory, DbError, IacRule, IacRuleDb, LangAdvisoryDb, OsAdvisoryDb, Result, VulnDb,
+    Vulnerability,
 };
 use sled::Db;
 use std::path::Path;
@@ -166,8 +166,8 @@ impl IacRuleDb for SledStore {
         let mut out = Vec::new();
         for kv in providers.scan_prefix(prefix.as_bytes()) {
             let (k, _) = kv?;
-            let k_str = std::str::from_utf8(&k)
-                .map_err(|_| DbError::InvalidFeed("non-utf8 key".into()))?;
+            let k_str =
+                std::str::from_utf8(&k).map_err(|_| DbError::InvalidFeed("non-utf8 key".into()))?;
             let id = k_str.trim_start_matches(&prefix);
             if let Some(b) = rules.get(id.as_bytes())? {
                 out.push(serde_json::from_slice(&b)?);

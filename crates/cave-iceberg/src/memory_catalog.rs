@@ -38,7 +38,10 @@ impl Catalog for MemoryCatalog {
     async fn create_namespace(&self, ns: &Namespace) -> Result<()> {
         let mut g = self.namespaces.write().await;
         if g.contains_key(&ns.ident) {
-            return Err(Error::AlreadyExists(format!("namespace {}", ns.ident.as_dot())));
+            return Err(Error::AlreadyExists(format!(
+                "namespace {}",
+                ns.ident.as_dot()
+            )));
         }
         g.insert(ns.ident.clone(), ns.clone());
         Ok(())
@@ -54,7 +57,10 @@ impl Catalog for MemoryCatalog {
         Ok(())
     }
 
-    async fn list_namespaces(&self, parent: Option<&NamespaceIdent>) -> Result<Vec<NamespaceIdent>> {
+    async fn list_namespaces(
+        &self,
+        parent: Option<&NamespaceIdent>,
+    ) -> Result<Vec<NamespaceIdent>> {
         let g = self.namespaces.read().await;
         let mut out: Vec<NamespaceIdent> = match parent {
             None => g.keys().cloned().collect(),
@@ -110,11 +116,7 @@ impl Catalog for MemoryCatalog {
 
     async fn list_tables(&self, ns: &NamespaceIdent) -> Result<Vec<TableIdent>> {
         let g = self.tables.read().await;
-        let mut out: Vec<TableIdent> = g
-            .keys()
-            .filter(|k| &k.namespace == ns)
-            .cloned()
-            .collect();
+        let mut out: Vec<TableIdent> = g.keys().filter(|k| &k.namespace == ns).cloned().collect();
         out.sort_by(|a, b| a.name.cmp(&b.name));
         Ok(out)
     }
@@ -209,10 +211,11 @@ mod tests {
         cat.drop_namespace(&NamespaceIdent::from_dot("analytics"))
             .await
             .unwrap();
-        assert!(!cat
-            .table_exists(&TableIdent::from_dot("analytics.t1"))
-            .await
-            .unwrap());
+        assert!(
+            !cat.table_exists(&TableIdent::from_dot("analytics.t1"))
+                .await
+                .unwrap()
+        );
     }
 
     #[tokio::test]
@@ -227,14 +230,16 @@ mod tests {
         )
         .await
         .unwrap();
-        assert!(cat
-            .table_exists(&TableIdent::from_dot("analytics.t2"))
-            .await
-            .unwrap());
-        assert!(!cat
-            .table_exists(&TableIdent::from_dot("analytics.t1"))
-            .await
-            .unwrap());
+        assert!(
+            cat.table_exists(&TableIdent::from_dot("analytics.t2"))
+                .await
+                .unwrap()
+        );
+        assert!(
+            !cat.table_exists(&TableIdent::from_dot("analytics.t1"))
+                .await
+                .unwrap()
+        );
     }
 
     #[tokio::test]
@@ -253,10 +258,11 @@ mod tests {
             )
             .await;
         assert!(matches!(r, Err(Error::AlreadyExists(_))));
-        assert!(cat
-            .table_exists(&TableIdent::from_dot("analytics.t1"))
-            .await
-            .unwrap());
+        assert!(
+            cat.table_exists(&TableIdent::from_dot("analytics.t1"))
+                .await
+                .unwrap()
+        );
     }
 
     #[tokio::test]

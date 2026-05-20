@@ -98,9 +98,7 @@ fn extract_cwe(rule_props: &Value) -> Option<u32> {
             if let Some(s) = t.as_str() {
                 let lower = s.to_ascii_lowercase();
                 if let Some(idx) = lower.rfind("cwe-") {
-                    if let Some(num) = lower[idx + 4..]
-                        .split(|c: char| !c.is_ascii_digit())
-                        .next()
+                    if let Some(num) = lower[idx + 4..].split(|c: char| !c.is_ascii_digit()).next()
                     {
                         if let Ok(n) = num.parse::<u32>() {
                             return Some(n);
@@ -114,7 +112,9 @@ fn extract_cwe(rule_props: &Value) -> Option<u32> {
 }
 
 impl ScanParser for SarifParser {
-    fn scan_type(&self) -> &'static str { "SARIF" }
+    fn scan_type(&self) -> &'static str {
+        "SARIF"
+    }
     fn dedupe_fields(&self) -> &'static [&'static str] {
         &["title", "cwe", "line", "file_path", "description"]
     }
@@ -128,12 +128,17 @@ impl ScanParser for SarifParser {
                 // Look up the rule by id to harvest CWE + descriptions.
                 let rule = run.tool.driver.rules.iter().find(|x| x.id == rule_id);
                 let cwe = rule.and_then(|x| extract_cwe(&x.properties));
-                let sec_severity = r.properties.get("security-severity")
-                    .and_then(|v| v.as_str().and_then(|s| s.parse::<f32>().ok())
-                        .or_else(|| v.as_f64().map(|x| x as f32)));
+                let sec_severity = r.properties.get("security-severity").and_then(|v| {
+                    v.as_str()
+                        .and_then(|s| s.parse::<f32>().ok())
+                        .or_else(|| v.as_f64().map(|x| x as f32))
+                });
                 let sev = level_to_severity(&r.level, sec_severity);
                 let title = if let Some(rl) = rule {
-                    rl.short_description.get("text").and_then(|v| v.as_str()).map(String::from)
+                    rl.short_description
+                        .get("text")
+                        .and_then(|v| v.as_str())
+                        .map(String::from)
                         .unwrap_or_else(|| rule_id.clone())
                 } else {
                     rule_id.clone()
@@ -146,12 +151,22 @@ impl ScanParser for SarifParser {
                 if !driver_name.is_empty() {
                     f.service = Some(driver_name.clone());
                 }
-                let msg = r.message.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let msg = r
+                    .message
+                    .get("text")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
                 if !msg.is_empty() {
                     f.description = msg;
                 }
                 if let Some(loc) = r.locations.first() {
-                    if let Some(art) = loc.physical.get("artifactLocation").and_then(|a| a.get("uri")).and_then(|v| v.as_str()) {
+                    if let Some(art) = loc
+                        .physical
+                        .get("artifactLocation")
+                        .and_then(|a| a.get("uri"))
+                        .and_then(|v| v.as_str())
+                    {
                         f.file_path = Some(art.into());
                     }
                     if let Some(region) = loc.physical.get("region") {
@@ -160,7 +175,12 @@ impl ScanParser for SarifParser {
                         }
                     }
                 }
-                if let Some(fp) = r.partial_fingerprints.as_object().and_then(|o| o.values().next()).and_then(|v| v.as_str()) {
+                if let Some(fp) = r
+                    .partial_fingerprints
+                    .as_object()
+                    .and_then(|o| o.values().next())
+                    .and_then(|v| v.as_str())
+                {
                     f.unique_id_from_tool = Some(fp.into());
                 }
                 if !r.suppressions.is_empty() {
@@ -262,7 +282,9 @@ mod tests {
 
     #[test]
     fn empty_runs_returns_empty() {
-        let out = SarifParser.parse(br#"{"version":"2.1.0","runs":[]}"#).unwrap();
+        let out = SarifParser
+            .parse(br#"{"version":"2.1.0","runs":[]}"#)
+            .unwrap();
         assert!(out.is_empty());
     }
 }

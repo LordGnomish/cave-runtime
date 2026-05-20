@@ -34,11 +34,7 @@ impl MerkleChain {
         metadata: serde_json::Value,
     ) -> &LedgerEntry {
         let sequence = self.entries.len() as u64;
-        let previous_hash = self
-            .entries
-            .last()
-            .map(|e| e.hash.as_str())
-            .unwrap_or("");
+        let previous_hash = self.entries.last().map(|e| e.hash.as_str()).unwrap_or("");
 
         let entry = LedgerEntry::new(sequence, previous_hash, kind, actor, action, metadata);
         self.entries.push(entry);
@@ -116,8 +112,7 @@ impl MerkleChain {
                         entries_checked: i as u64,
                         error: Some(format!(
                             "Chain broken at sequence {}: previous_hash doesn't match entry {}",
-                            entry.sequence,
-                            prev.sequence
+                            entry.sequence, prev.sequence
                         )),
                     };
                 }
@@ -171,10 +166,7 @@ impl MerkleChain {
 
     /// Find entries by actor.
     pub fn find_by_actor(&self, actor: &str) -> Vec<&LedgerEntry> {
-        self.entries
-            .iter()
-            .filter(|e| e.actor == actor)
-            .collect()
+        self.entries.iter().filter(|e| e.actor == actor).collect()
     }
 
     /// Find entries by tenant.
@@ -265,9 +257,24 @@ mod tests {
     #[test]
     fn test_find_by_kind() {
         let mut chain = MerkleChain::new();
-        chain.append(LedgerEntryKind::Deployment, "a", "deploy 1", serde_json::json!({}));
-        chain.append(LedgerEntryKind::Security, "b", "block 1", serde_json::json!({}));
-        chain.append(LedgerEntryKind::Deployment, "a", "deploy 2", serde_json::json!({}));
+        chain.append(
+            LedgerEntryKind::Deployment,
+            "a",
+            "deploy 1",
+            serde_json::json!({}),
+        );
+        chain.append(
+            LedgerEntryKind::Security,
+            "b",
+            "block 1",
+            serde_json::json!({}),
+        );
+        chain.append(
+            LedgerEntryKind::Deployment,
+            "a",
+            "deploy 2",
+            serde_json::json!({}),
+        );
 
         let deployments = chain.find_by_kind(&LedgerEntryKind::Deployment);
         assert_eq!(deployments.len(), 2);
@@ -276,9 +283,24 @@ mod tests {
     #[test]
     fn test_find_by_actor() {
         let mut chain = MerkleChain::new();
-        chain.append(LedgerEntryKind::Deployment, "alice", "deploy", serde_json::json!({}));
-        chain.append(LedgerEntryKind::Deployment, "bob", "deploy", serde_json::json!({}));
-        chain.append(LedgerEntryKind::Security, "alice", "block", serde_json::json!({}));
+        chain.append(
+            LedgerEntryKind::Deployment,
+            "alice",
+            "deploy",
+            serde_json::json!({}),
+        );
+        chain.append(
+            LedgerEntryKind::Deployment,
+            "bob",
+            "deploy",
+            serde_json::json!({}),
+        );
+        chain.append(
+            LedgerEntryKind::Security,
+            "alice",
+            "block",
+            serde_json::json!({}),
+        );
 
         let alice_entries = chain.find_by_actor("alice");
         assert_eq!(alice_entries.len(), 2);

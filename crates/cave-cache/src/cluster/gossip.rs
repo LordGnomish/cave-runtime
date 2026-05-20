@@ -175,9 +175,7 @@ fn compute_effect(msg: &GossipMessage, state: &ClusterState) -> GossipEffect {
             }
         }
         GossipMessageKind::Fail => {
-            return GossipEffect::MarkFail(
-                String::from_utf8_lossy(&msg.payload).into_owned(),
-            );
+            return GossipEffect::MarkFail(String::from_utf8_lossy(&msg.payload).into_owned());
         }
         _ => {}
     }

@@ -56,11 +56,25 @@ impl Parser {
     fn expect_ident(&mut self) -> Result<String, PolicyError> {
         self.skip_newlines();
         match self.peek().clone() {
-            Token::Ident(s) => { self.advance(); Ok(s) }
-            Token::Data => { self.advance(); Ok("data".into()) }
-            Token::Input => { self.advance(); Ok("input".into()) }
-            Token::Future => { self.advance(); Ok("future".into()) }
-            other => Err(PolicyError::Parse(format!("expected identifier, got {other:?}"))),
+            Token::Ident(s) => {
+                self.advance();
+                Ok(s)
+            }
+            Token::Data => {
+                self.advance();
+                Ok("data".into())
+            }
+            Token::Input => {
+                self.advance();
+                Ok("input".into())
+            }
+            Token::Future => {
+                self.advance();
+                Ok("future".into())
+            }
+            other => Err(PolicyError::Parse(format!(
+                "expected identifier, got {other:?}"
+            ))),
         }
     }
 
@@ -85,7 +99,12 @@ impl Parser {
             }
         }
 
-        Ok(Module { package, imports, rules, comments: vec![] })
+        Ok(Module {
+            package,
+            imports,
+            rules,
+            comments: vec![],
+        })
     }
 
     fn parse_package(&mut self) -> Result<Package, PolicyError> {
@@ -154,9 +173,7 @@ impl Parser {
         //   head := value (no body)
         //   head contains term { body }
 
-        while matches!(self.peek(), Token::LBrace)
-            || matches!(self.peek(), Token::If)
-        {
+        while matches!(self.peek(), Token::LBrace) || matches!(self.peek(), Token::If) {
             if matches!(self.peek(), Token::If) {
                 self.advance(); // consume `if`
             }
@@ -185,7 +202,10 @@ impl Parser {
             } else {
                 vec![]
             };
-            else_rules.push(ElseRule { value: else_value, body: else_body });
+            else_rules.push(ElseRule {
+                value: else_value,
+                body: else_body,
+            });
         }
 
         Ok(Rule {
@@ -246,7 +266,13 @@ impl Parser {
             None
         };
 
-        Ok(RuleHead { name, args, key, value, contains })
+        Ok(RuleHead {
+            name,
+            args,
+            key,
+            value,
+            contains,
+        })
     }
 
     // ─── Body ─────────────────────────────────────────────────────────────────
@@ -396,7 +422,12 @@ impl Parser {
         self.expect(&Token::LBrace)?;
         let body = self.parse_body()?;
         self.expect(&Token::RBrace)?;
-        Ok(Expr::Every { key, value, domain, body })
+        Ok(Expr::Every {
+            key,
+            value,
+            domain,
+            body,
+        })
     }
 
     // ─── Terms ────────────────────────────────────────────────────────────────
@@ -420,12 +451,30 @@ impl Parser {
 
     fn parse_primary_term(&mut self) -> Result<Term, PolicyError> {
         match self.peek().clone() {
-            Token::Null => { self.advance(); Ok(Term::Null) }
-            Token::True => { self.advance(); Ok(Term::Bool(true)) }
-            Token::False => { self.advance(); Ok(Term::Bool(false)) }
-            Token::Number(n) => { self.advance(); Ok(Term::Number(n)) }
-            Token::String(s) => { self.advance(); Ok(Term::String(s)) }
-            Token::Underscore => { self.advance(); Ok(Term::Wildcard) }
+            Token::Null => {
+                self.advance();
+                Ok(Term::Null)
+            }
+            Token::True => {
+                self.advance();
+                Ok(Term::Bool(true))
+            }
+            Token::False => {
+                self.advance();
+                Ok(Term::Bool(false))
+            }
+            Token::Number(n) => {
+                self.advance();
+                Ok(Term::Number(n))
+            }
+            Token::String(s) => {
+                self.advance();
+                Ok(Term::String(s))
+            }
+            Token::Underscore => {
+                self.advance();
+                Ok(Term::Wildcard)
+            }
             Token::LBracket => self.parse_array_or_compr(),
             Token::LBrace => self.parse_object_or_set_or_compr(),
             Token::LParen => {
@@ -434,9 +483,18 @@ impl Parser {
                 self.expect(&Token::RParen)?;
                 Ok(t)
             }
-            Token::Data => { self.advance(); Ok(Term::Var("data".into())) }
-            Token::Input => { self.advance(); Ok(Term::Var("input".into())) }
-            Token::Future => { self.advance(); Ok(Term::Var("future".into())) }
+            Token::Data => {
+                self.advance();
+                Ok(Term::Var("data".into()))
+            }
+            Token::Input => {
+                self.advance();
+                Ok(Term::Var("input".into()))
+            }
+            Token::Future => {
+                self.advance();
+                Ok(Term::Var("future".into()))
+            }
             Token::Ident(name) => {
                 self.advance();
                 Ok(Term::Var(name))
@@ -446,7 +504,9 @@ impl Parser {
                 let name = format!("{:?}", self.advance()).to_lowercase();
                 Ok(Term::Var(name))
             }
-            other => Err(PolicyError::Parse(format!("unexpected token in term: {other:?}"))),
+            other => Err(PolicyError::Parse(format!(
+                "unexpected token in term: {other:?}"
+            ))),
         }
     }
 
@@ -489,7 +549,10 @@ impl Parser {
                     } else {
                         Box::new(Term::Ref(Box::new(base), args.clone()))
                     };
-                    return Ok(Term::Call { func, args: call_args });
+                    return Ok(Term::Call {
+                        func,
+                        args: call_args,
+                    });
                 }
                 _ => break,
             }
@@ -521,7 +584,10 @@ impl Parser {
             self.advance();
             let body = self.parse_body()?;
             self.expect(&Token::RBracket)?;
-            return Ok(Term::ArrayCompr { term: Box::new(first), body });
+            return Ok(Term::ArrayCompr {
+                term: Box::new(first),
+                body,
+            });
         }
 
         // Regular array
@@ -591,7 +657,10 @@ impl Parser {
                 self.advance();
                 let body = self.parse_body()?;
                 self.expect(&Token::RBrace)?;
-                Ok(Term::SetCompr { term: Box::new(first), body })
+                Ok(Term::SetCompr {
+                    term: Box::new(first),
+                    body,
+                })
             }
             // Set: { a, b, c }
             Token::Comma => {
@@ -624,32 +693,30 @@ impl Parser {
 fn term_to_var(t: &Term) -> Result<String, PolicyError> {
     match t {
         Term::Var(v) => Ok(v.clone()),
-        other => Err(PolicyError::Parse(format!("expected variable, got: {other}"))),
+        other => Err(PolicyError::Parse(format!(
+            "expected variable, got: {other}"
+        ))),
     }
 }
 
 /// Parse a Rego module from source text.
 pub fn parse_module(src: &str) -> Result<Module, PolicyError> {
-    let tokens: Vec<Token> = tokenize(src)?
-        .into_iter()
-        .map(|(t, _)| t)
-        .collect();
+    let tokens: Vec<Token> = tokenize(src)?.into_iter().map(|(t, _)| t).collect();
     Parser::new(tokens).parse_module()
 }
 
 /// Parse a Rego query (list of exprs) from source text.
 pub fn parse_query(src: &str) -> Result<Body, PolicyError> {
-    let tokens: Vec<Token> = tokenize(src)?
-        .into_iter()
-        .map(|(t, _)| t)
-        .collect();
+    let tokens: Vec<Token> = tokenize(src)?.into_iter().map(|(t, _)| t).collect();
     let mut p = Parser::new(tokens);
     let mut body = Vec::new();
     loop {
         p.skip_newlines();
         match p.peek() {
             Token::Eof => break,
-            Token::Semicolon => { p.advance(); }
+            Token::Semicolon => {
+                p.advance();
+            }
             _ => body.push(p.parse_expr()?),
         }
     }

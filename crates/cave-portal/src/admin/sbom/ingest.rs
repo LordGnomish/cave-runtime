@@ -4,10 +4,10 @@
 //!
 //! Upstream: <https://dependencytrack.org/docs/usage/bom-uploads/>
 
+use super::SbomViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full};
 use crate::admin::state::AdminState;
-use super::SbomViewError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IngestStats {
@@ -17,7 +17,12 @@ pub struct IngestStats {
 
 pub fn current_stats() -> IngestStats {
     IngestStats {
-        supported_formats: vec!["CycloneDX 1.4/1.5/1.6 JSON", "CycloneDX 1.4/1.5/1.6 XML", "SPDX 2.3 JSON", "SPDX 2.3 tag-value"],
+        supported_formats: vec![
+            "CycloneDX 1.4/1.5/1.6 JSON",
+            "CycloneDX 1.4/1.5/1.6 XML",
+            "SPDX 2.3 JSON",
+            "SPDX 2.3 tag-value",
+        ],
         max_size_mb: 50,
     }
 }
@@ -61,7 +66,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SbomViewEr
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
+    fn ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer("acme", perms)
+    }
 
     #[test]
     fn stats_include_all_four_formats() {

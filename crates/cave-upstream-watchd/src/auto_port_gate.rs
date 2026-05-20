@@ -20,8 +20,8 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use thiserror::Error;
 use std::process::Command;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum GateError {
@@ -108,7 +108,11 @@ impl CharterV2Gate {
     /// when the manifest exists but no ratio is set (honest 0.0 is
     /// returned as `Ok(Some(0.0))`).
     pub fn read_fill_ratio(&self, crate_name: &str) -> Result<Option<f64>, GateError> {
-        let path = self.workspace_root.join("crates").join(crate_name).join("parity.manifest.toml");
+        let path = self
+            .workspace_root
+            .join("crates")
+            .join(crate_name)
+            .join("parity.manifest.toml");
         if !path.is_file() {
             return Err(GateError::NoManifest(path.display().to_string()));
         }
@@ -121,7 +125,10 @@ impl CharterV2Gate {
                 continue;
             }
             if in_section {
-                if trimmed.starts_with('[') && !trimmed.starts_with("[parity]") && !trimmed.starts_with('#') {
+                if trimmed.starts_with('[')
+                    && !trimmed.starts_with("[parity]")
+                    && !trimmed.starts_with('#')
+                {
                     break;
                 }
                 let value_part = trimmed.split('#').next().unwrap_or(trimmed);
@@ -223,7 +230,9 @@ pub fn count_stubs_in_source(text: &str) -> u64 {
 
 fn walk_rs_files(root: &std::path::Path) -> Vec<PathBuf> {
     fn inner(p: &std::path::Path, out: &mut Vec<PathBuf>) {
-        let Ok(read) = std::fs::read_dir(p) else { return; };
+        let Ok(read) = std::fs::read_dir(p) else {
+            return;
+        };
         for ent in read.flatten() {
             let path = ent.path();
             let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
@@ -238,7 +247,10 @@ fn walk_rs_files(root: &std::path::Path) -> Vec<PathBuf> {
                     .components()
                     .filter_map(|c| c.as_os_str().to_str())
                     .collect();
-                if parents.iter().any(|c| matches!(*c, "benches" | "tests" | "examples")) {
+                if parents
+                    .iter()
+                    .any(|c| matches!(*c, "benches" | "tests" | "examples"))
+                {
                     continue;
                 }
                 out.push(path);
@@ -274,7 +286,8 @@ impl CharterGate for CharterV2Gate {
             notes.push("cargo test skipped (skip_cargo=true)".into());
             true
         } else {
-            let pass = self.run_cargo(&["test", "-p", &baseline.crate_name, "--include-ignored"])?;
+            let pass =
+                self.run_cargo(&["test", "-p", &baseline.crate_name, "--include-ignored"])?;
             if !pass {
                 notes.push(format!(
                     "cargo test -p {} --include-ignored FAILED",
@@ -284,9 +297,7 @@ impl CharterGate for CharterV2Gate {
             pass
         };
 
-        let fill_ratio_after = self
-            .read_fill_ratio(&baseline.crate_name)?
-            .unwrap_or(0.0);
+        let fill_ratio_after = self.read_fill_ratio(&baseline.crate_name)?.unwrap_or(0.0);
         let parity_ratio_delta = fill_ratio_after - baseline.fill_ratio_before;
         if parity_ratio_delta <= 0.0 {
             notes.push(format!(
@@ -370,12 +381,8 @@ impl CharterV2Gate {
     {
         let mut result = <Self as CharterGate>::verify(self, baseline, commit_sha_after).await?;
 
-        match crate::tdd::analyze_tdd_compliance(
-            inspector,
-            base_ref,
-            branch_ref,
-            result.tests_pass,
-        ) {
+        match crate::tdd::analyze_tdd_compliance(inspector, base_ref, branch_ref, result.tests_pass)
+        {
             Ok(tdd) => {
                 if !tdd.is_pass() {
                     result.overall_pass = false;
@@ -456,7 +463,10 @@ last_audit = "2026-05-13"
             cargo_path: PathBuf::from("cargo"),
             skip_cargo: true,
         };
-        assert!(matches!(g.read_fill_ratio("cave-x"), Err(GateError::NoManifest(_))));
+        assert!(matches!(
+            g.read_fill_ratio("cave-x"),
+            Err(GateError::NoManifest(_))
+        ));
     }
 
     #[test]
@@ -530,7 +540,11 @@ mod tests {
         let b = baseline("cave-x", 0.7, 0);
         let r = g.verify(&b, "sha").await.unwrap();
         assert!(!r.overall_pass);
-        assert!(r.notes.iter().any(|n| n.contains("fill_ratio did not increase")));
+        assert!(
+            r.notes
+                .iter()
+                .any(|n| n.contains("fill_ratio did not increase"))
+        );
     }
 
     #[tokio::test]

@@ -31,7 +31,9 @@ struct SgResult {
     extra: SgExtra,
 }
 #[derive(Deserialize)]
-struct SgStart { line: u32 }
+struct SgStart {
+    line: u32,
+}
 #[derive(Deserialize)]
 struct SgExtra {
     severity: String,
@@ -63,7 +65,11 @@ struct SgAdvisory {
     references: Value,
 }
 #[derive(Deserialize)]
-struct SgLocation { path: String, #[serde(rename = "startLine")] start_line: u32 }
+struct SgLocation {
+    path: String,
+    #[serde(rename = "startLine")]
+    start_line: u32,
+}
 
 impl SemgrepParser {
     fn convert_severity(s: &str) -> FindingSeverity {
@@ -78,7 +84,9 @@ impl SemgrepParser {
 }
 
 impl ScanParser for SemgrepParser {
-    fn scan_type(&self) -> &'static str { "Semgrep JSON Report" }
+    fn scan_type(&self) -> &'static str {
+        "Semgrep JSON Report"
+    }
     fn dedupe_fields(&self) -> &'static [&'static str] {
         &["title", "cwe", "line", "file_path", "description"]
     }
@@ -106,14 +114,27 @@ impl ScanParser for SemgrepParser {
                 if let Some(s) = cwe_str {
                     // "CWE-79: …" → 79
                     let trimmed = s.split(':').next().unwrap_or("").to_ascii_uppercase();
-                    if let Some(n) = trimmed.strip_prefix("CWE-").and_then(|x| x.trim().parse().ok()) {
+                    if let Some(n) = trimmed
+                        .strip_prefix("CWE-")
+                        .and_then(|x| x.trim().parse().ok())
+                    {
                         f.cwe = Some(n);
                     }
                 }
             }
-            if let Some(refs) = r.extra.metadata.get("references").and_then(|v| v.as_array()) {
-                let lines: Vec<String> = refs.iter().filter_map(|v| v.as_str().map(String::from)).collect();
-                if !lines.is_empty() { f.references = Some(lines.join("\n")); }
+            if let Some(refs) = r
+                .extra
+                .metadata
+                .get("references")
+                .and_then(|v| v.as_array())
+            {
+                let lines: Vec<String> = refs
+                    .iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect();
+                if !lines.is_empty() {
+                    f.references = Some(lines.join("\n"));
+                }
             }
             if let Some(fix) = r.extra.fix {
                 f.mitigation = Some(fix);
@@ -133,7 +154,9 @@ impl ScanParser for SemgrepParser {
             f.vuln_id_from_tool = Some(v.repo_id);
             f.static_finding = true;
             f.found_by_scanner = Some("Semgrep JSON Report".into());
-            if let Some(d) = v.advisory.description { f.description = d; }
+            if let Some(d) = v.advisory.description {
+                f.description = d;
+            }
             if let Some(cwe_ids) = v.advisory.references.get("cweIds") {
                 let cwe_str = match cwe_ids {
                     Value::Array(a) => a.first().and_then(|v| v.as_str()).map(String::from),
@@ -142,7 +165,10 @@ impl ScanParser for SemgrepParser {
                 };
                 if let Some(s) = cwe_str {
                     let trimmed = s.split(':').next().unwrap_or("").to_ascii_uppercase();
-                    if let Some(n) = trimmed.strip_prefix("CWE-").and_then(|x| x.trim().parse().ok()) {
+                    if let Some(n) = trimmed
+                        .strip_prefix("CWE-")
+                        .and_then(|x| x.trim().parse().ok())
+                    {
                         f.cwe = Some(n);
                     }
                 }

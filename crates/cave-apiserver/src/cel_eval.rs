@@ -69,9 +69,8 @@ impl CelInterpreterEvaluator {
                 return Ok(p.clone());
             }
         }
-        let program = Program::compile(expr).map_err(|e| {
-            CelError::Compile(format!("{expr}: {e}"))
-        })?;
+        let program =
+            Program::compile(expr).map_err(|e| CelError::Compile(format!("{expr}: {e}")))?;
         let arc = Arc::new(program);
         let mut guard = self.cache.lock().expect("cel cache poisoned");
         // Tolerate races — another caller may have populated the entry
@@ -212,7 +211,8 @@ mod tests {
             CelValue::Int(5),
         );
         assert_eq!(
-            ev.evaluate("10 - 4 * 2", &CelActivation::default()).unwrap(),
+            ev.evaluate("10 - 4 * 2", &CelActivation::default())
+                .unwrap(),
             CelValue::Int(2),
         );
     }
@@ -242,7 +242,8 @@ mod tests {
             "spec": {"image": "nginx:1.27"}
         }));
         assert_eq!(
-            ev.evaluate("object.spec.image == 'nginx:1.27'", &act).unwrap(),
+            ev.evaluate("object.spec.image == 'nginx:1.27'", &act)
+                .unwrap(),
             CelValue::Bool(true),
         );
         assert_eq!(
@@ -261,14 +262,16 @@ mod tests {
             ev.evaluate(
                 "object.spec.replicas > 0 && object.spec.image != 'latest'",
                 &act
-            ).unwrap(),
+            )
+            .unwrap(),
             CelValue::Bool(true),
         );
         assert_eq!(
             ev.evaluate(
                 "object.spec.replicas == 0 || object.spec.image == 'nginx:1.27'",
                 &act
-            ).unwrap(),
+            )
+            .unwrap(),
             CelValue::Bool(true),
         );
     }
@@ -280,7 +283,8 @@ mod tests {
             "metadata": {"labels": {"team": "platform"}}
         }));
         assert_eq!(
-            ev.evaluate("has(object.metadata.labels.team)", &act).unwrap(),
+            ev.evaluate("has(object.metadata.labels.team)", &act)
+                .unwrap(),
             CelValue::Bool(true),
         );
     }
@@ -292,7 +296,8 @@ mod tests {
             "metadata": {"labels": {}}
         }));
         assert_eq!(
-            ev.evaluate("has(object.metadata.labels.team)", &act).unwrap(),
+            ev.evaluate("has(object.metadata.labels.team)", &act)
+                .unwrap(),
             CelValue::Bool(false),
         );
     }
@@ -304,11 +309,13 @@ mod tests {
             "spec": {"image": "registry.cave.local/app:v1"}
         }));
         assert_eq!(
-            ev.evaluate("object.spec.image.startsWith('registry.cave.local/')", &act).unwrap(),
+            ev.evaluate("object.spec.image.startsWith('registry.cave.local/')", &act)
+                .unwrap(),
             CelValue::Bool(true),
         );
         assert_eq!(
-            ev.evaluate("object.spec.image.startsWith('docker.io/')", &act).unwrap(),
+            ev.evaluate("object.spec.image.startsWith('docker.io/')", &act)
+                .unwrap(),
             CelValue::Bool(false),
         );
     }
@@ -327,7 +334,8 @@ mod tests {
             ev.evaluate(
                 "object.metadata.labels.team != oldObject.metadata.labels.team",
                 &act
-            ).unwrap(),
+            )
+            .unwrap(),
             CelValue::Bool(true),
         );
     }
@@ -343,7 +351,8 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            ev.evaluate("object.spec.replicas <= params[0].maxReplicas", &act).unwrap(),
+            ev.evaluate("object.spec.replicas <= params[0].maxReplicas", &act)
+                .unwrap(),
             CelValue::Bool(true),
         );
         let act2 = CelActivation {
@@ -352,7 +361,8 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            ev.evaluate("object.spec.replicas <= params[0].maxReplicas", &act2).unwrap(),
+            ev.evaluate("object.spec.replicas <= params[0].maxReplicas", &act2)
+                .unwrap(),
             CelValue::Bool(false),
         );
     }
@@ -369,7 +379,8 @@ mod tests {
             CelValue::Bool(true),
         );
         assert_eq!(
-            ev.evaluate("request.userInfo.username == 'alice'", &act).unwrap(),
+            ev.evaluate("request.userInfo.username == 'alice'", &act)
+                .unwrap(),
             CelValue::Bool(true),
         );
     }
@@ -378,10 +389,12 @@ mod tests {
     fn evaluates_user_variables() {
         let ev = CelInterpreterEvaluator::new();
         let mut act = CelActivation::default();
-        act.variables.insert("maxPods".to_string(), CelValue::Int(100));
+        act.variables
+            .insert("maxPods".to_string(), CelValue::Int(100));
         act.object = Some(json!({"spec": {"replicas": 50}}));
         assert_eq!(
-            ev.evaluate("object.spec.replicas <= maxPods", &act).unwrap(),
+            ev.evaluate("object.spec.replicas <= maxPods", &act)
+                .unwrap(),
             CelValue::Bool(true),
         );
     }
@@ -391,7 +404,9 @@ mod tests {
     #[test]
     fn invalid_syntax_returns_compile_error() {
         let ev = CelInterpreterEvaluator::new();
-        let err = ev.evaluate("object.spec.replicas >>", &CelActivation::default()).unwrap_err();
+        let err = ev
+            .evaluate("object.spec.replicas >>", &CelActivation::default())
+            .unwrap_err();
         assert!(
             matches!(err, CelError::Compile(_)),
             "expected Compile error, got {err:?}"
@@ -402,7 +417,9 @@ mod tests {
     fn undeclared_reference_returns_runtime_error() {
         let ev = CelInterpreterEvaluator::new();
         // No `object` in the activation, but the expression references it.
-        let err = ev.evaluate("object.foo == 'bar'", &CelActivation::default()).unwrap_err();
+        let err = ev
+            .evaluate("object.foo == 'bar'", &CelActivation::default())
+            .unwrap_err();
         assert!(
             matches!(err, CelError::Runtime(_)),
             "expected Runtime error for missing var, got {err:?}"
@@ -435,7 +452,11 @@ mod tests {
         }
         assert_eq!(ev.cache_len(), 1, "same expression caches once");
         ev.evaluate("object.spec.replicas < 100", &act).unwrap();
-        assert_eq!(ev.cache_len(), 2, "different expression adds a second entry");
+        assert_eq!(
+            ev.cache_len(),
+            2,
+            "different expression adds a second entry"
+        );
     }
 
     // ── integration: drop-in for the Dispatcher trait ─────────────────────
@@ -446,7 +467,10 @@ mod tests {
         // evaluator survives that erasure.
         let ev: Arc<dyn CelEvaluator> = Arc::new(CelInterpreterEvaluator::new());
         let act = act_with_object(json!({"x": 1}));
-        assert_eq!(ev.evaluate("object.x == 1", &act).unwrap(), CelValue::Bool(true));
+        assert_eq!(
+            ev.evaluate("object.x == 1", &act).unwrap(),
+            CelValue::Bool(true)
+        );
     }
 
     #[test]
@@ -455,7 +479,9 @@ mod tests {
         // an error. The dispatcher then turns this into a fail-policy
         // outcome — exactly the right behaviour for a malformed policy.
         let ev = CelInterpreterEvaluator::new();
-        let err = ev.evaluate("[1, 2, 3]", &CelActivation::default()).unwrap_err();
+        let err = ev
+            .evaluate("[1, 2, 3]", &CelActivation::default())
+            .unwrap_err();
         assert!(
             matches!(err, CelError::Type { .. }),
             "expected Type error for List result, got {err:?}"
@@ -492,7 +518,8 @@ mod tests {
         };
         let act = act_with_authorizer(view);
         assert_eq!(
-            ev.evaluate("authorizer.user == 'kube-admin'", &act).unwrap(),
+            ev.evaluate("authorizer.user == 'kube-admin'", &act)
+                .unwrap(),
             CelValue::Bool(true),
         );
         assert_eq!(
@@ -519,8 +546,7 @@ mod tests {
         // The dispatcher's allow-list keys are stable strings; the
         // simplest CEL spelling is membership against the list.
         let ev = CelInterpreterEvaluator::new();
-        let view = AuthorizerView::default()
-            .allow("update", "apps", "deployments", Some("team-a"));
+        let view = AuthorizerView::default().allow("update", "apps", "deployments", Some("team-a"));
         let act = act_with_authorizer(view);
         assert_eq!(
             ev.evaluate(
@@ -588,7 +614,8 @@ mod tests {
         // CEL side still reads .grants verbatim.
         let act = act_with_authorizer(view);
         assert_eq!(
-            ev.evaluate("'*:apps/*/team-a' in authorizer.grants", &act).unwrap(),
+            ev.evaluate("'*:apps/*/team-a' in authorizer.grants", &act)
+                .unwrap(),
             CelValue::Bool(true),
         );
     }
@@ -600,9 +627,7 @@ mod tests {
         // truly be undeclared so a typoed expression fails loudly.
         let ev = CelInterpreterEvaluator::new();
         let act = act_with_object(json!({"x": 1}));
-        let err = ev
-            .evaluate("authorizer.user == 'x'", &act)
-            .unwrap_err();
+        let err = ev.evaluate("authorizer.user == 'x'", &act).unwrap_err();
         assert!(matches!(err, CelError::Runtime(_)));
     }
 
@@ -623,11 +648,8 @@ mod tests {
             CelValue::Bool(true),
         );
         assert_eq!(
-            ev.evaluate(
-                "authorizer.groups.exists(g, g == 'unknown:group')",
-                &act
-            )
-            .unwrap(),
+            ev.evaluate("authorizer.groups.exists(g, g == 'unknown:group')", &act)
+                .unwrap(),
             CelValue::Bool(false),
         );
     }
@@ -642,14 +664,23 @@ mod tests {
     use crate::resources::{ConfigMap, ObjectMeta, Resource};
     use crate::vap_advanced::{
         match_resources_matches as _, // unused but keeps the surface visible
-        Dispatcher, DispatchOutcome, FailurePolicyType, InMemoryParamResolver, MatchCondition,
-        MatchInput, ValidatingAdmissionPolicy, ValidatingAdmissionPolicyBinding,
-        ValidatingAdmissionPolicyBindingSpec, ValidatingAdmissionPolicySpec, Validation,
+        DispatchOutcome,
+        Dispatcher,
+        FailurePolicyType,
+        InMemoryParamResolver,
+        MatchCondition,
+        MatchInput,
+        ValidatingAdmissionPolicy,
+        ValidatingAdmissionPolicyBinding,
+        ValidatingAdmissionPolicyBindingSpec,
+        ValidatingAdmissionPolicySpec,
+        Validation,
     };
 
     fn mk_cm(name: &str, tenant: &str, env: &str) -> Resource {
         let mut meta = ObjectMeta::new(name, "default");
-        meta.annotations.insert("cave.runtime/tenant-id".into(), tenant.into());
+        meta.annotations
+            .insert("cave.runtime/tenant-id".into(), tenant.into());
         meta.labels.insert("env".into(), env.into());
         Resource::ConfigMap(ConfigMap {
             api_version: "v1".into(),
@@ -675,9 +706,14 @@ mod tests {
         }
     }
 
-    fn mk_policy(name: &str, tenant: &str, validations: Vec<Validation>) -> ValidatingAdmissionPolicy {
+    fn mk_policy(
+        name: &str,
+        tenant: &str,
+        validations: Vec<Validation>,
+    ) -> ValidatingAdmissionPolicy {
         let mut meta = ObjectMeta::new(name, "");
-        meta.annotations.insert("cave.runtime/tenant-id".into(), tenant.into());
+        meta.annotations
+            .insert("cave.runtime/tenant-id".into(), tenant.into());
         ValidatingAdmissionPolicy {
             api_version: "admissionregistration.k8s.io/v1".into(),
             kind: "ValidatingAdmissionPolicy".into(),
@@ -692,7 +728,8 @@ mod tests {
 
     fn mk_binding(name: &str, tenant: &str, policy: &str) -> ValidatingAdmissionPolicyBinding {
         let mut meta = ObjectMeta::new(name, "");
-        meta.annotations.insert("cave.runtime/tenant-id".into(), tenant.into());
+        meta.annotations
+            .insert("cave.runtime/tenant-id".into(), tenant.into());
         ValidatingAdmissionPolicyBinding {
             api_version: "admissionregistration.k8s.io/v1".into(),
             kind: "ValidatingAdmissionPolicyBinding".into(),
@@ -771,7 +808,8 @@ mod tests {
         let input = match_input(&req, &labels, &ns);
         let out = d.dispatch_one("acme", &policy, &binding, &req, &input);
         assert!(
-            out.iter().any(|o| matches!(o, DispatchOutcome::Deny { .. })),
+            out.iter()
+                .any(|o| matches!(o, DispatchOutcome::Deny { .. })),
             "at least one Deny expected, got {out:?}"
         );
     }
@@ -803,7 +841,10 @@ mod tests {
         let ns = std::collections::HashMap::new();
         let input = match_input(&req, &labels, &ns);
         let out = d.dispatch_one("acme", &policy, &binding, &req, &input);
-        assert!(out.is_empty(), "matchCondition=false skips policy, got {out:?}");
+        assert!(
+            out.is_empty(),
+            "matchCondition=false skips policy, got {out:?}"
+        );
     }
 
     #[test]
@@ -855,7 +896,8 @@ mod tests {
         let input = match_input(&req, &labels, &ns);
         let out = d.dispatch_one("acme", &policy, &binding, &req, &input);
         assert!(
-            out.iter().all(|o| matches!(o, DispatchOutcome::SilencedError)),
+            out.iter()
+                .all(|o| matches!(o, DispatchOutcome::SilencedError)),
             "FailurePolicy::Ignore should silence the error, got {out:?}"
         );
     }

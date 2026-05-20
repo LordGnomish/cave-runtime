@@ -7,19 +7,21 @@
 use super::NetViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::table;
-use crate::admin::state::{scope, AdminState, NetEndpoint};
+use crate::admin::state::{AdminState, NetEndpoint, scope};
 
 pub fn list_endpoints(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<Vec<NetEndpoint>, NetViewError> {
     ctx.authorise(Permission::NetRead)?;
-    Ok(scope(&state.net_endpoints.read().unwrap(), &ctx.tenant, |r| {
-        &r.tenant
-    })
-    .into_iter()
-    .cloned()
-    .collect())
+    Ok(
+        scope(&state.net_endpoints.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect(),
+    )
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,16 +32,16 @@ pub struct AgentRow {
     pub identities: u32,
 }
 
-pub fn list_agents(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<Vec<AgentRow>, NetViewError> {
+pub fn list_agents(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<AgentRow>, NetViewError> {
     let endpoints = list_endpoints(state, ctx)?;
     // Group endpoints by IP /24 to derive node identity.
     use std::collections::BTreeMap;
     let mut by_node: BTreeMap<String, u32> = BTreeMap::new();
     for e in &endpoints {
-        let node = e.ip.rsplit_once('.').map(|(p, _)| p.to_string()).unwrap_or_default();
+        let node =
+            e.ip.rsplit_once('.')
+                .map(|(p, _)| p.to_string())
+                .unwrap_or_default();
         *by_node.entry(node).or_insert(0) += 1;
     }
     Ok(by_node
@@ -53,10 +55,7 @@ pub fn list_agents(
         .collect())
 }
 
-pub(crate) fn render_section(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, NetViewError> {
+pub(crate) fn render_section(state: &AdminState, ctx: &RequestCtx) -> Result<String, NetViewError> {
     let endpoints = list_endpoints(state, ctx)?;
     let agents = list_agents(state, ctx)?;
     let endpoint_rows: Vec<Vec<String>> = endpoints

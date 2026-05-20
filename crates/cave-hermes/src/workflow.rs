@@ -89,7 +89,10 @@ impl Workflow {
 
     pub fn is_complete(&self) -> bool {
         self.next_pending().is_none()
-            && self.steps.iter().all(|s| matches!(s.status, WorkflowStatus::Done))
+            && self
+                .steps
+                .iter()
+                .all(|s| matches!(s.status, WorkflowStatus::Done))
     }
 
     /// Mark the current step as running. Returns the step name advanced to.

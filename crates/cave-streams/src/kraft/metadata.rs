@@ -294,10 +294,7 @@ mod tests {
         m.apply(&partition("orders", 1, 2));
         m.apply(&partition("payments", 0, 1));
         assert_eq!(m.partitions.len(), 3);
-        assert_eq!(
-            m.partitions[&("orders".into(), 1)].leader,
-            2
-        );
+        assert_eq!(m.partitions[&("orders".into(), 1)].leader, 2);
     }
 
     #[test]

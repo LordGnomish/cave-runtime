@@ -25,8 +25,8 @@
 //! cross-tenant Service.
 
 use crate::conversion::{
-    ConversionRequest, ConversionResponse, ConvertibleObject,
-    ConversionWebhookClient, WebhookConverter,
+    ConversionRequest, ConversionResponse, ConversionWebhookClient, ConvertibleObject,
+    WebhookConverter,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -39,7 +39,9 @@ pub enum ConversionStrategyType {
 }
 
 impl Default for ConversionStrategyType {
-    fn default() -> Self { ConversionStrategyType::None }
+    fn default() -> Self {
+        ConversionStrategyType::None
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -105,7 +107,8 @@ pub enum ConversionValidationError {
 }
 
 pub fn validate_conversion(
-    cv: &CustomResourceConversion, tenant_id: &str,
+    cv: &CustomResourceConversion,
+    tenant_id: &str,
 ) -> Result<(), ConversionValidationError> {
     match cv.strategy {
         ConversionStrategyType::None => {
@@ -118,7 +121,11 @@ pub fn validate_conversion(
             let Some(w) = &cv.webhook else {
                 return Err(ConversionValidationError::WebhookMissing);
             };
-            if !w.conversion_review_versions.iter().any(|v| v == "v1" || v == "v1beta1") {
+            if !w
+                .conversion_review_versions
+                .iter()
+                .any(|v| v == "v1" || v == "v1beta1")
+            {
                 return Err(ConversionValidationError::NoSupportedReviewVersion);
             }
             match (&w.client_config.url, &w.client_config.service) {
@@ -133,7 +140,8 @@ pub fn validate_conversion(
                 (None, Some(s)) => {
                     if !s.tenant_id.is_empty() && s.tenant_id != tenant_id {
                         return Err(ConversionValidationError::CrossTenantService(
-                            s.tenant_id.clone(), tenant_id.into(),
+                            s.tenant_id.clone(),
+                            tenant_id.into(),
                         ));
                     }
                     Ok(())
@@ -186,9 +194,15 @@ pub enum CRDVersionError {
 
 pub fn validate_version_set(set: &CRDVersionSet) -> Result<(), CRDVersionError> {
     let storage_count = set.versions.iter().filter(|v| v.storage).count();
-    if storage_count > 1 { return Err(CRDVersionError::MultipleStorage(storage_count)); }
-    if storage_count == 0 { return Err(CRDVersionError::NoStorage); }
-    if !set.versions.iter().any(|v| v.served) { return Err(CRDVersionError::NoServed); }
+    if storage_count > 1 {
+        return Err(CRDVersionError::MultipleStorage(storage_count));
+    }
+    if storage_count == 0 {
+        return Err(CRDVersionError::NoStorage);
+    }
+    if !set.versions.iter().any(|v| v.served) {
+        return Err(CRDVersionError::NoServed);
+    }
     Ok(())
 }
 
@@ -217,10 +231,15 @@ impl ConversionWebhookClient for NopConverter {
                 };
             }
         }
-        let converted = req.objects.iter().cloned().map(|mut o| {
-            o.api_version = target.clone();
-            o
-        }).collect();
+        let converted = req
+            .objects
+            .iter()
+            .cloned()
+            .map(|mut o| {
+                o.api_version = target.clone();
+                o
+            })
+            .collect();
         ConversionResponse {
             uid: req.uid,
             converted_objects: converted,
@@ -231,8 +250,10 @@ impl ConversionWebhookClient for NopConverter {
 }
 
 pub fn dispatch_conversion<C: ConversionWebhookClient>(
-    cv: &CustomResourceConversion, webhook_name: &str,
-    nop: &NopConverter, webhook_client: Option<C>,
+    cv: &CustomResourceConversion,
+    webhook_name: &str,
+    nop: &NopConverter,
+    webhook_client: Option<C>,
     req: ConversionRequest,
 ) -> ConversionResponse {
     match cv.strategy {
@@ -267,13 +288,18 @@ impl ConversionWebhookClient for FakeConversionClient {
 }
 
 #[allow(dead_code)]
-fn unused_obj_fields() -> HashMap<String, serde_json::Value> { HashMap::new() }
+fn unused_obj_fields() -> HashMap<String, serde_json::Value> {
+    HashMap::new()
+}
 
 #[allow(dead_code)]
 fn unused_obj() -> ConvertibleObject {
     ConvertibleObject {
-        api_version: "".into(), kind: "".into(),
-        name: "".into(), namespace: "".into(), tenant_id: "".into(),
+        api_version: "".into(),
+        kind: "".into(),
+        name: "".into(),
+        namespace: "".into(),
+        tenant_id: "".into(),
         fields: serde_json::Map::new(),
     }
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-use serde::{Deserialize, Serialize};
 use crate::raft::types::{LogIndex, MembershipConfig, NodeId, SnapshotMeta, Term};
+use serde::{Deserialize, Serialize};
 
 /// A complete snapshot ready for installation or transfer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -12,7 +12,14 @@ pub struct Snapshot {
 
 impl Snapshot {
     pub fn new(index: LogIndex, term: Term, membership: MembershipConfig, data: Vec<u8>) -> Self {
-        Self { meta: SnapshotMeta { index, term, membership }, data }
+        Self {
+            meta: SnapshotMeta {
+                index,
+                term,
+                membership,
+            },
+            data,
+        }
     }
 
     /// Split data into chunks of `chunk_size` bytes for streaming transfer.
@@ -107,7 +114,12 @@ pub struct SnapshotTransfer {
 
 impl SnapshotTransfer {
     pub fn new(to: NodeId, snapshot: Snapshot, chunk_size: usize) -> Self {
-        Self { to, snapshot, next_chunk: 0, chunk_size }
+        Self {
+            to,
+            snapshot,
+            next_chunk: 0,
+            chunk_size,
+        }
     }
 
     /// Get the next chunk to send, or None if complete.

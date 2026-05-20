@@ -132,11 +132,7 @@ pub enum CtAction {
 
 /// Look up `key` in the CT map, advancing `last_seen` on hit.
 /// `now_ns` is the helper-provided clock so tests can fix it.
-pub fn ct_lookup(
-    map: &mut ConntrackMap,
-    key: &ConntrackKey,
-    now_ns: u64,
-) -> CtAction {
+pub fn ct_lookup(map: &mut ConntrackMap, key: &ConntrackKey, now_ns: u64) -> CtAction {
     match map.lookup(key) {
         Some(entry) => {
             if entry.is_expired(now_ns) {
@@ -166,7 +162,11 @@ pub fn ct_create(
     now_ns: u64,
     lifetime_ns: u64,
 ) -> Result<(), MapError> {
-    map.update(key, ConntrackEntry::new(now_ns, lifetime_ns), UpdateFlag::Any)
+    map.update(
+        key,
+        ConntrackEntry::new(now_ns, lifetime_ns),
+        UpdateFlag::Any,
+    )
 }
 
 #[cfg(test)]
@@ -225,7 +225,10 @@ mod tests {
         let k_in = key_tcp(CtDirection::Ingress);
         ct_create(&mut m, k_eg, helpers.ktime_get_ns(), CT_TCP_LIFETIME_NS).unwrap();
         // Ingress lookup misses — they are different keys.
-        assert_eq!(ct_lookup(&mut m, &k_in, helpers.ktime_get_ns()), CtAction::New);
+        assert_eq!(
+            ct_lookup(&mut m, &k_in, helpers.ktime_get_ns()),
+            CtAction::New
+        );
     }
 
     #[test]
@@ -301,7 +304,14 @@ mod tests {
         }
         assert_eq!(m.len(), 3);
         // Key 0 (oldest) should be gone.
-        let k0 = ConntrackKey { saddr: 0, daddr: 0, sport: 0, dport: 0, nexthdr: 6, direction: CtDirection::Egress };
+        let k0 = ConntrackKey {
+            saddr: 0,
+            daddr: 0,
+            sport: 0,
+            dport: 0,
+            nexthdr: 6,
+            direction: CtDirection::Egress,
+        };
         assert!(m.peek(&k0).is_none());
     }
 
@@ -309,9 +319,30 @@ mod tests {
     fn create_overflow_on_static_map_returns_at_capacity_when_no_lru() {
         // Build a plain hash map (not LRU) of capacity-via-array.
         let mut m: ConntrackMap = Map::new_array(2);
-        let k1 = ConntrackKey { saddr: 1, daddr: 0, sport: 0, dport: 0, nexthdr: 6, direction: CtDirection::Egress };
-        let k2 = ConntrackKey { saddr: 2, daddr: 0, sport: 0, dport: 0, nexthdr: 6, direction: CtDirection::Egress };
-        let k3 = ConntrackKey { saddr: 3, daddr: 0, sport: 0, dport: 0, nexthdr: 6, direction: CtDirection::Egress };
+        let k1 = ConntrackKey {
+            saddr: 1,
+            daddr: 0,
+            sport: 0,
+            dport: 0,
+            nexthdr: 6,
+            direction: CtDirection::Egress,
+        };
+        let k2 = ConntrackKey {
+            saddr: 2,
+            daddr: 0,
+            sport: 0,
+            dport: 0,
+            nexthdr: 6,
+            direction: CtDirection::Egress,
+        };
+        let k3 = ConntrackKey {
+            saddr: 3,
+            daddr: 0,
+            sport: 0,
+            dport: 0,
+            nexthdr: 6,
+            direction: CtDirection::Egress,
+        };
         ct_create(&mut m, k1, 0, CT_TCP_LIFETIME_NS).unwrap();
         ct_create(&mut m, k2, 0, CT_TCP_LIFETIME_NS).unwrap();
         let err = ct_create(&mut m, k3, 0, CT_TCP_LIFETIME_NS).unwrap_err();

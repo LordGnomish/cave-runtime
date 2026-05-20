@@ -12,7 +12,7 @@
 //! Used by `authorize.rs` (to store the challenge) and `token_endpoint`
 //! (to verify the verifier on `code` exchange).
 
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use sha2::{Digest, Sha256};
 
 /// The set of code-challenge methods accepted by the authorization endpoint.
@@ -45,10 +45,12 @@ pub fn is_valid_verifier(verifier: &str) -> bool {
     if !(43..=128).contains(&len) {
         return false;
     }
-    verifier.bytes().all(|b| matches!(
-        b,
-        b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~'
-    ))
+    verifier.bytes().all(|b| {
+        matches!(
+            b,
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~'
+        )
+    })
 }
 
 /// Compute the code_challenge expected for the given verifier + method.
@@ -66,11 +68,7 @@ pub fn compute_challenge(verifier: &str, method: PkceMethod) -> String {
 ///
 /// Returns `Ok(())` on success; on failure returns an OAuth error
 /// code suitable for the `error` field of a token-error response.
-pub fn verify(
-    verifier: &str,
-    challenge: &str,
-    method: PkceMethod,
-) -> Result<(), &'static str> {
+pub fn verify(verifier: &str, challenge: &str, method: PkceMethod) -> Result<(), &'static str> {
     if !is_valid_verifier(verifier) {
         return Err("invalid_grant");
     }

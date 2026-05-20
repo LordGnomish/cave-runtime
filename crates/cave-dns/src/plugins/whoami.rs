@@ -42,10 +42,7 @@ impl Plugin for WhoamiPlugin {
         debug!(client = %client_ip, "whoami");
 
         let (rdata, rtype) = match client_ip {
-            IpAddr::V4(v4) => (
-                RData::A(hickory_proto::rr::rdata::A(v4)),
-                RecordType::A,
-            ),
+            IpAddr::V4(v4) => (RData::A(hickory_proto::rr::rdata::A(v4)), RecordType::A),
             IpAddr::V6(v6) => (
                 RData::AAAA(hickory_proto::rr::rdata::AAAA(v6)),
                 RecordType::AAAA,

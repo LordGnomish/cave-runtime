@@ -22,11 +22,26 @@ pub struct AccountNavItem {
 /// (password / 2-factor) + Personal info (profile).
 pub fn account_nav_items() -> Vec<AccountNavItem> {
     vec![
-        AccountNavItem { label: "Personal info", href: "/account/profile" },
-        AccountNavItem { label: "Account security · Signing in", href: "/account/password" },
-        AccountNavItem { label: "Account security · 2FA", href: "/account/two-factor" },
-        AccountNavItem { label: "Applications", href: "/account/applications" },
-        AccountNavItem { label: "Sessions", href: "/account/sessions" },
+        AccountNavItem {
+            label: "Personal info",
+            href: "/account/profile",
+        },
+        AccountNavItem {
+            label: "Account security · Signing in",
+            href: "/account/password",
+        },
+        AccountNavItem {
+            label: "Account security · 2FA",
+            href: "/account/two-factor",
+        },
+        AccountNavItem {
+            label: "Applications",
+            href: "/account/applications",
+        },
+        AccountNavItem {
+            label: "Sessions",
+            href: "/account/sessions",
+        },
     ]
 }
 

@@ -15,4 +15,4 @@ pub use codec::{
 };
 pub use error::ErrorResponse;
 pub use messages::{BackendMessage, FrontendMessage};
-pub use startup::{StartupMessage, SSLRequest};
+pub use startup::{SSLRequest, StartupMessage};

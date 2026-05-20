@@ -78,7 +78,8 @@ pub struct LabelResolver {
 impl LabelResolver {
     pub fn new(tenant: TenantId, filter: LabelFilter) -> Self {
         Self {
-            tenant, filter,
+            tenant,
+            filter,
             always_include_prefixes: vec![
                 "io.kubernetes.pod.namespace".into(),
                 "io.cilium".into(),
@@ -113,7 +114,11 @@ impl LabelResolver {
     }
 
     fn is_kept(&self, key: &str) -> bool {
-        if self.always_include_prefixes.iter().any(|p| key.starts_with(p)) {
+        if self
+            .always_include_prefixes
+            .iter()
+            .any(|p| key.starts_with(p))
+        {
             return true;
         }
         self.filter.keep(key)
@@ -144,8 +149,12 @@ mod tests {
 
     fn pod(name: &str, ns: &str, labels: &[(&str, &str)], sa: Option<&str>) -> PodMeta {
         PodMeta {
-            name: name.into(), namespace: ns.into(),
-            labels: labels.iter().map(|(k, v)| ((*k).into(), (*v).into())).collect(),
+            name: name.into(),
+            namespace: ns.into(),
+            labels: labels
+                .iter()
+                .map(|(k, v)| ((*k).into(), (*v).into()))
+                .collect(),
             service_account: sa.map(String::from),
         }
     }
@@ -153,7 +162,10 @@ mod tests {
     fn namespace(name: &str, labels: &[(&str, &str)]) -> NamespaceMeta {
         NamespaceMeta {
             name: name.into(),
-            labels: labels.iter().map(|(k, v)| ((*k).into(), (*v).into())).collect(),
+            labels: labels
+                .iter()
+                .map(|(k, v)| ((*k).into(), (*v).into()))
+                .collect(),
         }
     }
 
@@ -189,7 +201,10 @@ mod tests {
     #[test]
     fn pattern_matches_prefix_dot_star() {
         let (_c, _t) = cilium_test_ctx!("pkg/labels/filter.go", "Pattern.Prefix", "tenant-lr-pp");
-        assert!(pattern_match("io.cilium.*", "io.cilium.k8s.policy.serviceaccount"));
+        assert!(pattern_match(
+            "io.cilium.*",
+            "io.cilium.k8s.policy.serviceaccount"
+        ));
         assert!(!pattern_match("io.cilium.*", "io.other.label"));
     }
 
@@ -224,12 +239,16 @@ mod tests {
 
     #[test]
     fn resolve_includes_namespace_label() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/labels.go", "Resolve.Namespace", "tenant-lr-n");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/k8s/labels.go", "Resolve.Namespace", "tenant-lr-n");
         let r = LabelResolver::new(tenant, whitelist(&["app"]));
         let pod = pod("p", "default", &[("app", "web")], None);
         let ns = namespace("default", &[]);
         let labels = r.resolve(&pod, &ns);
-        assert!(labels.pairs.iter().any(|(k, v)| k == "io.kubernetes.pod.namespace" && v == "default"));
+        assert!(labels
+            .pairs
+            .iter()
+            .any(|(k, v)| k == "io.kubernetes.pod.namespace" && v == "default"));
     }
 
     #[test]
@@ -239,17 +258,23 @@ mod tests {
         let pod = pod("p", "default", &[], Some("api-sa"));
         let ns = namespace("default", &[]);
         let labels = r.resolve(&pod, &ns);
-        assert!(labels.pairs.iter().any(|(k, v)| k == "io.cilium.k8s.policy.serviceaccount" && v == "api-sa"));
+        assert!(labels
+            .pairs
+            .iter()
+            .any(|(k, v)| k == "io.cilium.k8s.policy.serviceaccount" && v == "api-sa"));
     }
 
     #[test]
     fn resolve_filters_out_unwanted_labels_in_whitelist_mode() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/labels.go", "Resolve.Whitelist", "tenant-lr-wl2");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/k8s/labels.go", "Resolve.Whitelist", "tenant-lr-wl2");
         let r = LabelResolver::new(tenant, whitelist(&["app"]));
-        let pod = pod("p", "default", &[
-            ("app", "web"),
-            ("pod-template-hash", "abc123"),
-        ], None);
+        let pod = pod(
+            "p",
+            "default",
+            &[("app", "web"), ("pod-template-hash", "abc123")],
+            None,
+        );
         let ns = namespace("default", &[]);
         let labels = r.resolve(&pod, &ns);
         assert!(labels.pairs.iter().any(|(k, _)| k == "app"));
@@ -258,22 +283,34 @@ mod tests {
 
     #[test]
     fn resolve_keeps_always_include_prefix_even_outside_filter() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/labels.go", "Resolve.AlwaysInclude", "tenant-lr-ai");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/k8s/labels.go", "Resolve.AlwaysInclude", "tenant-lr-ai");
         let r = LabelResolver::new(tenant, whitelist(&["env"]));
-        let pod = pod("p", "default", &[("io.cilium.policy.scope", "cluster")], None);
+        let pod = pod(
+            "p",
+            "default",
+            &[("io.cilium.policy.scope", "cluster")],
+            None,
+        );
         let ns = namespace("default", &[]);
         let labels = r.resolve(&pod, &ns);
-        assert!(labels.pairs.iter().any(|(k, _)| k == "io.cilium.policy.scope"));
+        assert!(labels
+            .pairs
+            .iter()
+            .any(|(k, _)| k == "io.cilium.policy.scope"));
     }
 
     #[test]
     fn resolve_blacklist_drops_specified_labels() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/labels.go", "Resolve.Blacklist", "tenant-lr-bl2");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/k8s/labels.go", "Resolve.Blacklist", "tenant-lr-bl2");
         let r = LabelResolver::new(tenant, blacklist(&["pod-template-hash"]));
-        let pod = pod("p", "default", &[
-            ("env", "prod"),
-            ("pod-template-hash", "abc123"),
-        ], None);
+        let pod = pod(
+            "p",
+            "default",
+            &[("env", "prod"), ("pod-template-hash", "abc123")],
+            None,
+        );
         let ns = namespace("default", &[]);
         let labels = r.resolve(&pod, &ns);
         assert!(labels.pairs.iter().any(|(k, _)| k == "env"));
@@ -282,12 +319,22 @@ mod tests {
 
     #[test]
     fn resolve_namespace_labels_promoted_to_pod_namespace_labels_prefix() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/labels.go", "Resolve.NamespaceLabels", "tenant-lr-nl");
-        let r = LabelResolver::new(tenant, whitelist(&["env", "io.kubernetes.pod.namespace.labels.env"]));
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/labels.go",
+            "Resolve.NamespaceLabels",
+            "tenant-lr-nl"
+        );
+        let r = LabelResolver::new(
+            tenant,
+            whitelist(&["env", "io.kubernetes.pod.namespace.labels.env"]),
+        );
         let pod = pod("p", "default", &[("env", "prod")], None);
         let ns = namespace("default", &[("env", "prod")]);
         let labels = r.resolve(&pod, &ns);
-        assert!(labels.pairs.iter().any(|(k, _)| k == "io.kubernetes.pod.namespace.labels.env"));
+        assert!(labels
+            .pairs
+            .iter()
+            .any(|(k, _)| k == "io.kubernetes.pod.namespace.labels.env"));
     }
 
     #[test]
@@ -297,12 +344,16 @@ mod tests {
         let pod = pod("p", "default", &[], None);
         let ns = namespace("default", &[]);
         let labels = r.resolve(&pod, &ns);
-        assert!(!labels.pairs.iter().any(|(k, _)| k == "io.cilium.k8s.policy.serviceaccount"));
+        assert!(!labels
+            .pairs
+            .iter()
+            .any(|(k, _)| k == "io.cilium.k8s.policy.serviceaccount"));
     }
 
     #[test]
     fn resolve_app_label_always_included() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/labels.go", "Resolve.AppDefault", "tenant-lr-ad");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/k8s/labels.go", "Resolve.AppDefault", "tenant-lr-ad");
         // Filter only allows "env" — but "app" is in always_include_prefixes.
         let r = LabelResolver::new(tenant, whitelist(&["env"]));
         let pod = pod("p", "default", &[("app", "web")], None);
@@ -313,7 +364,8 @@ mod tests {
 
     #[test]
     fn resolve_empty_pod_and_namespace_returns_minimal_set() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/labels.go", "Resolve.Minimal", "tenant-lr-min");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/k8s/labels.go", "Resolve.Minimal", "tenant-lr-min");
         let r = LabelResolver::new(tenant, whitelist(&[]));
         let pod = pod("p", "ns", &[], None);
         let ns = namespace("ns", &[]);
@@ -326,11 +378,16 @@ mod tests {
     fn resolve_with_glob_filter_keeps_matching_labels() {
         let (_c, tenant) = cilium_test_ctx!("pkg/k8s/labels.go", "Resolve.Glob", "tenant-lr-glob");
         let r = LabelResolver::new(tenant, whitelist(&["acme.*"]));
-        let pod = pod("p", "default", &[
-            ("acme.io/team", "platform"),
-            ("acme.io/env", "prod"),
-            ("k8s.io/version", "v1"),
-        ], None);
+        let pod = pod(
+            "p",
+            "default",
+            &[
+                ("acme.io/team", "platform"),
+                ("acme.io/env", "prod"),
+                ("k8s.io/version", "v1"),
+            ],
+            None,
+        );
         let ns = namespace("default", &[]);
         let labels = r.resolve(&pod, &ns);
         assert!(labels.pairs.iter().any(|(k, _)| k == "acme.io/team"));
@@ -341,7 +398,8 @@ mod tests {
 
     #[test]
     fn resolve_same_input_produces_same_output() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/labels.go", "Resolve.Idempotent", "tenant-lr-idem");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/k8s/labels.go", "Resolve.Idempotent", "tenant-lr-idem");
         let r = LabelResolver::new(tenant, whitelist(&["app"]));
         let pod = pod("p", "default", &[("app", "web")], Some("api-sa"));
         let ns = namespace("default", &[]);
@@ -352,7 +410,11 @@ mod tests {
 
     #[test]
     fn resolve_label_order_does_not_affect_output() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/labels.go", "Resolve.OrderInsensitive", "tenant-lr-oi");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/labels.go",
+            "Resolve.OrderInsensitive",
+            "tenant-lr-oi"
+        );
         let r = LabelResolver::new(tenant, whitelist(&["app", "env"]));
         let mut a_labels = BTreeMap::new();
         a_labels.insert("app".into(), "web".into());
@@ -360,8 +422,18 @@ mod tests {
         let mut b_labels = BTreeMap::new();
         b_labels.insert("env".into(), "prod".into());
         b_labels.insert("app".into(), "web".into());
-        let pod_a = PodMeta { name: "p".into(), namespace: "ns".into(), labels: a_labels, service_account: None };
-        let pod_b = PodMeta { name: "p".into(), namespace: "ns".into(), labels: b_labels, service_account: None };
+        let pod_a = PodMeta {
+            name: "p".into(),
+            namespace: "ns".into(),
+            labels: a_labels,
+            service_account: None,
+        };
+        let pod_b = PodMeta {
+            name: "p".into(),
+            namespace: "ns".into(),
+            labels: b_labels,
+            service_account: None,
+        };
         let ns = namespace("ns", &[]);
         assert_eq!(r.resolve(&pod_a, &ns), r.resolve(&pod_b, &ns));
     }
@@ -388,7 +460,11 @@ mod tests {
 
     #[test]
     fn namespace_meta_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/labels.go", "NamespaceMeta.Serde", "tenant-lr-nserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/labels.go",
+            "NamespaceMeta.Serde",
+            "tenant-lr-nserde"
+        );
         let n = namespace("ns", &[("env", "prod")]);
         let s = serde_json::to_string(&n).unwrap();
         let back: NamespaceMeta = serde_json::from_str(&s).unwrap();
@@ -399,7 +475,8 @@ mod tests {
 
     #[test]
     fn empty_blacklist_keeps_all_labels() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/labels/filter.go", "Blacklist.Empty", "tenant-lr-be");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/labels/filter.go", "Blacklist.Empty", "tenant-lr-be");
         let r = LabelResolver::new(tenant, blacklist(&[]));
         let pod = pod("p", "default", &[("app", "web"), ("custom", "v")], None);
         let ns = namespace("default", &[]);
@@ -409,7 +486,8 @@ mod tests {
 
     #[test]
     fn empty_whitelist_drops_non_always_include_labels() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/labels/filter.go", "Whitelist.Empty", "tenant-lr-we");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/labels/filter.go", "Whitelist.Empty", "tenant-lr-we");
         let r = LabelResolver::new(tenant, whitelist(&[]));
         let pod = pod("p", "default", &[("custom", "v")], None);
         let ns = namespace("default", &[]);

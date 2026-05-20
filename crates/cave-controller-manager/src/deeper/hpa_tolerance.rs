@@ -167,7 +167,10 @@ mod tests {
             "tenant-hpa-tol-asymmetric-up"
         );
         // Asymmetric: tight scale-up band, loose scale-down band.
-        let band = ToleranceBand { scale_up: 0.05, scale_down: 0.30 };
+        let band = ToleranceBand {
+            scale_up: 0.05,
+            scale_down: 0.30,
+        };
         // ratio=1.10, scale-up dir, band 0.05 → outside → take proposal.
         let got = apply_tolerance(&band, 4, 110, 100, 6).unwrap();
         assert_eq!(got, 6);
@@ -180,7 +183,10 @@ mod tests {
             "GetResourceReplicas",
             "tenant-hpa-tol-asymmetric-down"
         );
-        let band = ToleranceBand { scale_up: 0.30, scale_down: 0.05 };
+        let band = ToleranceBand {
+            scale_up: 0.30,
+            scale_down: 0.05,
+        };
         // ratio=0.90, scale-down dir, band 0.05 → outside → take proposal.
         let got = apply_tolerance(&band, 8, 90, 100, 4).unwrap();
         assert_eq!(got, 4);
@@ -193,7 +199,10 @@ mod tests {
             "GetResourceReplicas",
             "tenant-hpa-tol-zero-band"
         );
-        let band = ToleranceBand { scale_up: 0.0, scale_down: 0.0 };
+        let band = ToleranceBand {
+            scale_up: 0.0,
+            scale_down: 0.0,
+        };
         assert_eq!(apply_tolerance(&band, 5, 100, 100, 7).unwrap(), 5);
         assert_eq!(apply_tolerance(&band, 5, 101, 100, 7).unwrap(), 7);
     }

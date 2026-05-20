@@ -76,12 +76,12 @@ impl AclPlugin {
                 || rule.networks.iter().any(|net| net.contains(&client_ip));
 
             // Zone match (empty = match all)
-            let zone_match = rule.zones.is_empty()
-                || rule.zones.iter().any(|z| qname.ends_with(z.as_str()));
+            let zone_match =
+                rule.zones.is_empty() || rule.zones.iter().any(|z| qname.ends_with(z.as_str()));
 
             // Type match (empty = match all)
-            let type_match = rule.types.is_empty()
-                || rule.types.iter().any(|t| t.eq_ignore_ascii_case(&qtype));
+            let type_match =
+                rule.types.is_empty() || rule.types.iter().any(|t| t.eq_ignore_ascii_case(&qtype));
 
             if ip_match && zone_match && type_match {
                 debug!(

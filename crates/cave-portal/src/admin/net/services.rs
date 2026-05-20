@@ -52,10 +52,7 @@ pub fn count_by_kind(rows: &[ServiceRow], kind: &str) -> usize {
     rows.iter().filter(|r| r.kind == kind).count()
 }
 
-pub(super) fn render_section(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, NetViewError> {
+pub(super) fn render_section(state: &AdminState, ctx: &RequestCtx) -> Result<String, NetViewError> {
     let rows = list_services(state, ctx)?;
     let table_rows: Vec<Vec<String>> = rows
         .iter()

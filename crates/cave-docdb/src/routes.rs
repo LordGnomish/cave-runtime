@@ -3,14 +3,14 @@
 //! HTTP admin API routes for cave-docdb.
 
 use crate::bson::Document;
+use crate::cursor::CursorStore;
 use crate::engine::Engine;
 use crate::models::*;
-use crate::cursor::CursorStore;
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     routing::{get, post},
-    Json, Router,
 };
 use serde_json::Value;
 use std::sync::Arc;
@@ -164,24 +164,18 @@ async fn find(
         }
     });
 
-    let database = state
-        .engine
-        .get_or_create_database(&db)
-        .await;
+    let database = state.engine.get_or_create_database(&db).await;
     let collection = database.get_or_create_collection(&col).await;
 
-    let docs = collection.find(filter.as_ref()).await.map_err(|e| err_internal(&e))?;
+    let docs = collection
+        .find(filter.as_ref())
+        .await
+        .map_err(|e| err_internal(&e))?;
 
     let count = docs.len();
     let documents = docs
         .into_iter()
-        .map(|doc| {
-            Value::Object(
-                doc.iter()
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect(),
-            )
-        })
+        .map(|doc| Value::Object(doc.iter().map(|(k, v)| (k.clone(), v.clone())).collect()))
         .collect();
 
     Ok(Json(FindResponse { documents, count }))
@@ -192,10 +186,7 @@ async fn insert(
     Path((db, col)): Path<(String, String)>,
     Json(req): Json<InsertRequest>,
 ) -> ApiResult<InsertResponse> {
-    let database = state
-        .engine
-        .get_or_create_database(&db)
-        .await;
+    let database = state.engine.get_or_create_database(&db).await;
     let collection = database.get_or_create_collection(&col).await;
 
     let mut docs = Vec::new();
@@ -248,10 +239,7 @@ async fn update(
         return Err(err_bad_request("invalid update spec"));
     }
 
-    let database = state
-        .engine
-        .get_or_create_database(&db)
-        .await;
+    let database = state.engine.get_or_create_database(&db).await;
     let collection = database.get_or_create_collection(&col).await;
 
     let modified_count = collection
@@ -279,10 +267,7 @@ async fn delete(
         }
     });
 
-    let database = state
-        .engine
-        .get_or_create_database(&db)
-        .await;
+    let database = state.engine.get_or_create_database(&db).await;
     let collection = database.get_or_create_collection(&col).await;
 
     let deleted_count = collection
@@ -298,23 +283,14 @@ async fn aggregate(
     Path((db, col)): Path<(String, String)>,
     Json(_req): Json<AggregateRequest>,
 ) -> ApiResult<Vec<Value>> {
-    let database = state
-        .engine
-        .get_or_create_database(&db)
-        .await;
+    let database = state.engine.get_or_create_database(&db).await;
     let collection = database.get_or_create_collection(&col).await;
 
     let docs = collection.find(None).await.map_err(|e| err_internal(&e))?;
 
     let results = docs
         .into_iter()
-        .map(|doc| {
-            Value::Object(
-                doc.iter()
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect(),
-            )
-        })
+        .map(|doc| Value::Object(doc.iter().map(|(k, v)| (k.clone(), v.clone())).collect()))
         .collect();
 
     Ok(Json(results))
@@ -345,10 +321,7 @@ async fn create_indexes(
     Path((db, col)): Path<(String, String)>,
     Json(req): Json<IndexCreateRequest>,
 ) -> ApiResult<Value> {
-    let database = state
-        .engine
-        .get_or_create_database(&db)
-        .await;
+    let database = state.engine.get_or_create_database(&db).await;
     let collection = database.get_or_create_collection(&col).await;
 
     let mut keys = std::collections::BTreeMap::new();
@@ -362,17 +335,16 @@ async fn create_indexes(
     let unique = req.unique.unwrap_or(false);
 
     let index = crate::index::Index::new(name.clone(), keys, unique);
-    collection.add_index(index).await.map_err(|e| err_internal(&e))?;
+    collection
+        .add_index(index)
+        .await
+        .map_err(|e| err_internal(&e))?;
 
     Ok(Json(serde_json::json!({ "index_name": name })))
 }
 
 async fn engine_stats(State(state): State<Arc<DocDbState>>) -> ApiResult<Value> {
-    let stats = state
-        .engine
-        .stats()
-        .await
-        .map_err(|e| err_internal(&e))?;
+    let stats = state.engine.stats().await.map_err(|e| err_internal(&e))?;
     Ok(Json(serde_json::json!({
         "database_count": stats.database_count,
         "collection_count": stats.collection_count,

@@ -77,8 +77,8 @@ impl AdmissionResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonPatch {
-    pub op: String,         // "add" | "replace" | "remove"
-    pub path: String,       // e.g., "/metadata/labels/cave.runtime~1tenant-id"
+    pub op: String,   // "add" | "replace" | "remove"
+    pub path: String, // e.g., "/metadata/labels/cave.runtime~1tenant-id"
     pub value: Option<serde_json::Value>,
 }
 
@@ -101,7 +101,10 @@ pub struct AdmissionChain {
 
 impl AdmissionChain {
     pub fn new() -> Self {
-        Self { mutating: vec![], validating: vec![] }
+        Self {
+            mutating: vec![],
+            validating: vec![],
+        }
     }
 
     pub fn with_mutating(mut self, w: Arc<dyn MutatingWebhook>) -> Self {
@@ -127,7 +130,8 @@ impl AdmissionChain {
             if r.tenant_id != original_tenant_id || req.tenant_id != original_tenant_id {
                 req.tenant_id = original_tenant_id.clone();
                 let mut deny = AdmissionResponse::deny(
-                    &req, 422,
+                    &req,
+                    422,
                     format!("mutating webhook {} altered tenant_id", hook.name()),
                 );
                 deny.tenant_id = original_tenant_id.clone();
@@ -144,19 +148,27 @@ impl AdmissionChain {
         (req, final_resp)
     }
 
-    pub fn mutating_count(&self) -> usize { self.mutating.len() }
-    pub fn validating_count(&self) -> usize { self.validating.len() }
+    pub fn mutating_count(&self) -> usize {
+        self.mutating.len()
+    }
+    pub fn validating_count(&self) -> usize {
+        self.validating.len()
+    }
 }
 
 impl Default for AdmissionChain {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Built-in mutator — injects `cave.runtime/tenant-id` annotation if absent.
 pub struct TenantIdInjector;
 
 impl MutatingWebhook for TenantIdInjector {
-    fn name(&self) -> &str { "tenant-id-injector" }
+    fn name(&self) -> &str {
+        "tenant-id-injector"
+    }
     fn admit(&self, req: &mut AdmissionRequest) -> AdmissionResponse {
         let mut resp = AdmissionResponse::allow(req);
         resp.patches.push(JsonPatch {
@@ -172,7 +184,9 @@ impl MutatingWebhook for TenantIdInjector {
 pub struct TenantIdRequired;
 
 impl ValidatingWebhook for TenantIdRequired {
-    fn name(&self) -> &str { "tenant-id-required" }
+    fn name(&self) -> &str {
+        "tenant-id-required"
+    }
     fn validate(&self, req: &AdmissionRequest) -> AdmissionResponse {
         if req.tenant_id.trim().is_empty() {
             return AdmissionResponse::deny(req, 403, "tenant_id is required");
@@ -186,14 +200,22 @@ impl ValidatingWebhook for TenantIdRequired {
 pub struct NamespaceLifecycle;
 
 impl ValidatingWebhook for NamespaceLifecycle {
-    fn name(&self) -> &str { "namespace-lifecycle" }
+    fn name(&self) -> &str {
+        "namespace-lifecycle"
+    }
     fn validate(&self, req: &AdmissionRequest) -> AdmissionResponse {
         if req.namespace == "kube-system"
             && !req.user.starts_with("system:")
-            && matches!(req.operation, Operation::Create | Operation::Update | Operation::Delete)
+            && matches!(
+                req.operation,
+                Operation::Create | Operation::Update | Operation::Delete
+            )
         {
-            return AdmissionResponse::deny(req, 403,
-                "kube-system writes are restricted to system: users");
+            return AdmissionResponse::deny(
+                req,
+                403,
+                "kube-system writes are restricted to system: users",
+            );
         }
         AdmissionResponse::allow(req)
     }
@@ -207,8 +229,10 @@ mod tests {
 
     fn req(op: Operation, ns: &str, tenant: &str, user: &str) -> AdmissionRequest {
         let cm = Resource::ConfigMap(ConfigMap {
-            api_version: "v1".into(), kind: "ConfigMap".into(),
-            metadata: ObjectMeta::new("cm1", ns), data: HashMap::new(),
+            api_version: "v1".into(),
+            kind: "ConfigMap".into(),
+            metadata: ObjectMeta::new("cm1", ns),
+            data: HashMap::new(),
         });
         AdmissionRequest {
             uid: "uid-1".into(),
@@ -243,7 +267,10 @@ mod tests {
         let (_, resp) = chain.dispatch(r);
         assert!(!resp.allowed);
         assert_eq!(resp.status_code, 403);
-        assert_eq!(resp.tenant_id, "", "tenant_id invariant: response carries request tenant_id even on deny");
+        assert_eq!(
+            resp.tenant_id, "",
+            "tenant_id invariant: response carries request tenant_id even on deny"
+        );
     }
 
     /// Upstream parity: `TestChain_MutatingThenValidating`.
@@ -255,7 +282,10 @@ mod tests {
         let r = req(Operation::Create, "default", "acme", "alice");
         let (_, resp) = chain.dispatch(r);
         assert!(resp.allowed);
-        assert_eq!(resp.tenant_id, "acme", "tenant_id invariant preserved through chain");
+        assert_eq!(
+            resp.tenant_id, "acme",
+            "tenant_id invariant preserved through chain"
+        );
     }
 
     /// Upstream parity: `TestChain_ShortCircuitOnDeny`.
@@ -263,14 +293,18 @@ mod tests {
     fn test_chain_short_circuits_on_validating_deny() {
         struct AlwaysDeny;
         impl ValidatingWebhook for AlwaysDeny {
-            fn name(&self) -> &str { "always-deny" }
+            fn name(&self) -> &str {
+                "always-deny"
+            }
             fn validate(&self, req: &AdmissionRequest) -> AdmissionResponse {
                 AdmissionResponse::deny(req, 422, "no")
             }
         }
         struct CountingValidator(std::sync::atomic::AtomicUsize);
         impl ValidatingWebhook for CountingValidator {
-            fn name(&self) -> &str { "counter" }
+            fn name(&self) -> &str {
+                "counter"
+            }
             fn validate(&self, req: &AdmissionRequest) -> AdmissionResponse {
                 self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 AdmissionResponse::allow(req)
@@ -283,9 +317,15 @@ mod tests {
         let r = req(Operation::Create, "default", "acme", "alice");
         let (_, resp) = chain.dispatch(r);
         assert!(!resp.allowed);
-        assert_eq!(counter.0.load(std::sync::atomic::Ordering::SeqCst), 0,
-            "subsequent validators are not invoked after deny");
-        assert_eq!(resp.tenant_id, "acme", "tenant_id invariant preserved on early deny");
+        assert_eq!(
+            counter.0.load(std::sync::atomic::Ordering::SeqCst),
+            0,
+            "subsequent validators are not invoked after deny"
+        );
+        assert_eq!(
+            resp.tenant_id, "acme",
+            "tenant_id invariant preserved on early deny"
+        );
     }
 
     /// Upstream parity: `TestNamespaceLifecycle_DenyKubeSystemForNonSystemUser`.
@@ -296,14 +336,22 @@ mod tests {
         let (_, resp) = chain.dispatch(r);
         assert!(!resp.allowed);
         assert_eq!(resp.status_code, 403);
-        assert_eq!(resp.tenant_id, "acme", "tenant_id invariant preserved on namespace lifecycle deny");
+        assert_eq!(
+            resp.tenant_id, "acme",
+            "tenant_id invariant preserved on namespace lifecycle deny"
+        );
     }
 
     /// Upstream parity: `TestNamespaceLifecycle_AllowKubeSystemForSystemUser`.
     #[test]
     fn test_namespace_lifecycle_allows_system_user() {
         let chain = AdmissionChain::new().with_validating(Arc::new(NamespaceLifecycle));
-        let r = req(Operation::Create, "kube-system", "acme", "system:serviceaccount:kube-system:scheduler");
+        let r = req(
+            Operation::Create,
+            "kube-system",
+            "acme",
+            "system:serviceaccount:kube-system:scheduler",
+        );
         let (_, resp) = chain.dispatch(r);
         assert!(resp.allowed);
         assert_eq!(resp.tenant_id, "acme");
@@ -333,7 +381,9 @@ mod tests {
     fn test_chain_rejects_tenant_id_mutation_by_webhook() {
         struct EvilMutator;
         impl MutatingWebhook for EvilMutator {
-            fn name(&self) -> &str { "evil" }
+            fn name(&self) -> &str {
+                "evil"
+            }
             fn admit(&self, req: &mut AdmissionRequest) -> AdmissionResponse {
                 req.tenant_id = "attacker".into();
                 let mut r = AdmissionResponse::allow(req);
@@ -344,8 +394,10 @@ mod tests {
         let chain = AdmissionChain::new().with_mutating(Arc::new(EvilMutator));
         let r = req(Operation::Create, "default", "acme", "alice");
         let (_, resp) = chain.dispatch(r);
-        assert!(!resp.allowed,
-            "tenant_id invariant: mutating webhook MUST NOT alter tenant_id");
+        assert!(
+            !resp.allowed,
+            "tenant_id invariant: mutating webhook MUST NOT alter tenant_id"
+        );
         assert_eq!(resp.status_code, 422);
     }
 
@@ -361,7 +413,10 @@ mod tests {
         let (out_req, resp) = chain.dispatch(r);
         assert!(resp.allowed);
         assert_eq!(out_req.operation, Operation::Delete);
-        assert_eq!(resp.tenant_id, "acme", "tenant_id invariant preserved across delete");
+        assert_eq!(
+            resp.tenant_id, "acme",
+            "tenant_id invariant preserved across delete"
+        );
     }
 
     /// Upstream parity: `TestChain_DryRunDoesNotMutate`.
@@ -408,7 +463,9 @@ mod tests {
         }
         use std::sync::Mutex;
         impl MutatingWebhook for OrderRecorder {
-            fn name(&self) -> &str { "order-recorder" }
+            fn name(&self) -> &str {
+                "order-recorder"
+            }
             fn admit(&self, req: &mut AdmissionRequest) -> AdmissionResponse {
                 let n = SEQ.fetch_add(1, AOrd::SeqCst);
                 self.captured.lock().unwrap().push(self.slot);
@@ -419,16 +476,30 @@ mod tests {
         SEQ.store(0, AOrd::SeqCst);
         let captured = Arc::new(Mutex::new(Vec::<usize>::new()));
         let chain = AdmissionChain::new()
-            .with_mutating(Arc::new(OrderRecorder { slot: 1, captured: captured.clone() }))
-            .with_mutating(Arc::new(OrderRecorder { slot: 2, captured: captured.clone() }))
-            .with_mutating(Arc::new(OrderRecorder { slot: 3, captured: captured.clone() }));
+            .with_mutating(Arc::new(OrderRecorder {
+                slot: 1,
+                captured: captured.clone(),
+            }))
+            .with_mutating(Arc::new(OrderRecorder {
+                slot: 2,
+                captured: captured.clone(),
+            }))
+            .with_mutating(Arc::new(OrderRecorder {
+                slot: 3,
+                captured: captured.clone(),
+            }));
         let r = req(Operation::Create, "default", "acme", "alice");
         let (_, resp) = chain.dispatch(r);
         assert!(resp.allowed);
-        assert_eq!(*captured.lock().unwrap(), vec![1, 2, 3],
-            "mutating webhooks execute in insertion order");
-        assert_eq!(resp.tenant_id, "acme",
-            "tenant_id invariant preserved through ordered chain");
+        assert_eq!(
+            *captured.lock().unwrap(),
+            vec![1, 2, 3],
+            "mutating webhooks execute in insertion order"
+        );
+        assert_eq!(
+            resp.tenant_id, "acme",
+            "tenant_id invariant preserved through ordered chain"
+        );
     }
 
     /// Upstream parity: `TestChain_MutatingDenyShortCircuitsValidating`.
@@ -437,14 +508,18 @@ mod tests {
     fn test_mutating_deny_short_circuits_validating_phase() {
         struct MutatingDeny;
         impl MutatingWebhook for MutatingDeny {
-            fn name(&self) -> &str { "mutating-deny" }
+            fn name(&self) -> &str {
+                "mutating-deny"
+            }
             fn admit(&self, req: &mut AdmissionRequest) -> AdmissionResponse {
                 AdmissionResponse::deny(req, 400, "rejected at mutation")
             }
         }
         struct CountingValidator(std::sync::atomic::AtomicUsize);
         impl ValidatingWebhook for CountingValidator {
-            fn name(&self) -> &str { "counter" }
+            fn name(&self) -> &str {
+                "counter"
+            }
             fn validate(&self, req: &AdmissionRequest) -> AdmissionResponse {
                 self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 AdmissionResponse::allow(req)
@@ -458,24 +533,30 @@ mod tests {
         let (_, resp) = chain.dispatch(r);
         assert!(!resp.allowed);
         assert_eq!(resp.status_code, 400);
-        assert_eq!(counter.0.load(std::sync::atomic::Ordering::SeqCst), 0,
-            "validating phase MUST NOT run after mutating deny");
-        assert_eq!(resp.tenant_id, "acme",
-            "tenant_id invariant preserved on mutating-deny short-circuit");
+        assert_eq!(
+            counter.0.load(std::sync::atomic::Ordering::SeqCst),
+            0,
+            "validating phase MUST NOT run after mutating deny"
+        );
+        assert_eq!(
+            resp.tenant_id, "acme",
+            "tenant_id invariant preserved on mutating-deny short-circuit"
+        );
     }
 
     /// Upstream parity: `TestChain_ConnectOperation`
     /// (mirrors `admission.Operation == admission.Connect` for exec/portforward).
     #[test]
     fn test_chain_handles_connect_operation_for_exec() {
-        let chain = AdmissionChain::new()
-            .with_validating(Arc::new(TenantIdRequired));
+        let chain = AdmissionChain::new().with_validating(Arc::new(TenantIdRequired));
         let r = req(Operation::Connect, "default", "acme", "alice");
         let (out_req, resp) = chain.dispatch(r);
         assert!(resp.allowed);
         assert_eq!(out_req.operation, Operation::Connect);
-        assert_eq!(resp.tenant_id, "acme",
-            "tenant_id invariant preserved across Connect verbs");
+        assert_eq!(
+            resp.tenant_id, "acme",
+            "tenant_id invariant preserved across Connect verbs"
+        );
     }
 
     /// Upstream parity: `TestChain_WarningsAreReturnedFromMutating`
@@ -484,7 +565,9 @@ mod tests {
     fn test_mutating_webhook_can_emit_warnings_without_denying() {
         struct WarningEmitter;
         impl MutatingWebhook for WarningEmitter {
-            fn name(&self) -> &str { "warner" }
+            fn name(&self) -> &str {
+                "warner"
+            }
             fn admit(&self, req: &mut AdmissionRequest) -> AdmissionResponse {
                 let mut r = AdmissionResponse::allow(req);
                 r.warnings.push("deprecated field".into());
@@ -494,8 +577,10 @@ mod tests {
         let chain = AdmissionChain::new().with_mutating(Arc::new(WarningEmitter));
         let r = req(Operation::Create, "default", "acme", "alice");
         let (_, resp) = chain.dispatch(r);
-        assert!(resp.allowed,
-            "warnings do not deny — only deny field denies");
+        assert!(
+            resp.allowed,
+            "warnings do not deny — only deny field denies"
+        );
         assert_eq!(resp.tenant_id, "acme", "tenant_id invariant preserved");
         // Verify warning emission via direct invocation (chain returns a fresh allow).
         let mut r2 = req(Operation::Create, "default", "acme", "alice");
@@ -512,8 +597,10 @@ mod tests {
         let r = req(Operation::Update, "default", "acme", "alice");
         let (_, resp) = chain.dispatch(r);
         assert!(resp.allowed);
-        assert_eq!(resp.tenant_id, "acme",
-            "tenant_id invariant preserved on allow path");
+        assert_eq!(
+            resp.tenant_id, "acme",
+            "tenant_id invariant preserved on allow path"
+        );
     }
 
     /// Upstream parity: `TestChain_UidIsCarriedThroughResponse`
@@ -528,8 +615,10 @@ mod tests {
         r.uid = "uid-deeper-001".into();
         let (_, resp) = chain.dispatch(r);
         assert!(resp.allowed);
-        assert_eq!(resp.uid, "uid-deeper-001",
-            "AdmissionResponse.UID MUST equal AdmissionRequest.UID");
+        assert_eq!(
+            resp.uid, "uid-deeper-001",
+            "AdmissionResponse.UID MUST equal AdmissionRequest.UID"
+        );
         assert_eq!(resp.tenant_id, "acme", "tenant_id invariant");
     }
 }

@@ -39,22 +39,22 @@ impl BinlogEventType {
     /// Cite: MySQL `log_event.h::Log_event_type` numeric codes.
     pub fn type_code(&self) -> u8 {
         match self {
-            Self::Query             => 2,
-            Self::Rotate            => 4,
+            Self::Query => 2,
+            Self::Rotate => 4,
             Self::FormatDescription => 15,
-            Self::Xid               => 16,
-            Self::TableMap          => 19,
-            Self::WriteRows         => 30,
-            Self::UpdateRows        => 31,
-            Self::DeleteRows        => 32,
-            Self::Gtid              => 33,
+            Self::Xid => 16,
+            Self::TableMap => 19,
+            Self::WriteRows => 30,
+            Self::UpdateRows => 31,
+            Self::DeleteRows => 32,
+            Self::Gtid => 33,
         }
     }
 
     pub fn from_code(code: u8) -> Option<Self> {
         match code {
-            2  => Some(Self::Query),
-            4  => Some(Self::Rotate),
+            2 => Some(Self::Query),
+            4 => Some(Self::Rotate),
             15 => Some(Self::FormatDescription),
             16 => Some(Self::Xid),
             19 => Some(Self::TableMap),
@@ -62,7 +62,7 @@ impl BinlogEventType {
             31 => Some(Self::UpdateRows),
             32 => Some(Self::DeleteRows),
             33 => Some(Self::Gtid),
-            _  => None,
+            _ => None,
         }
     }
 
@@ -88,18 +88,21 @@ impl BinlogPosition {
     pub fn validate(&self) -> CdcResult<()> {
         if self.file.is_empty() {
             return Err(CdcError::InvalidBinlogPosition {
-                file: self.file.clone(), pos: self.pos,
+                file: self.file.clone(),
+                pos: self.pos,
             });
         }
         let Some(dot_idx) = self.file.rfind('.') else {
             return Err(CdcError::InvalidBinlogPosition {
-                file: self.file.clone(), pos: self.pos,
+                file: self.file.clone(),
+                pos: self.pos,
             });
         };
         let suffix = &self.file[dot_idx + 1..];
         if !suffix.chars().all(|c| c.is_ascii_digit()) || suffix.is_empty() {
             return Err(CdcError::InvalidBinlogPosition {
-                file: self.file.clone(), pos: self.pos,
+                file: self.file.clone(),
+                pos: self.pos,
             });
         }
         Ok(())
@@ -150,7 +153,10 @@ impl MySqlConnector {
             include_schemas: Vec::new(),
             server_id,
             state: ConnectorState::Initial,
-            last_committed_position: BinlogPosition { file: String::new(), pos: 0 },
+            last_committed_position: BinlogPosition {
+                file: String::new(),
+                pos: 0,
+            },
             last_gtid: None,
         }
     }
@@ -159,33 +165,47 @@ impl MySqlConnector {
     /// — the connector emits a downstream record only for events whose
     /// schema is in `include_schemas` (when non-empty).
     pub fn should_emit(&self, schema: &str) -> bool {
-        self.include_schemas.is_empty()
-            || self.include_schemas.iter().any(|s| s == schema)
+        self.include_schemas.is_empty() || self.include_schemas.iter().any(|s| s == schema)
     }
 
     pub fn record_position(&mut self, pos: BinlogPosition, gtid: Option<String>) -> CdcResult<()> {
         pos.validate()?;
         self.last_committed_position = pos;
-        if let Some(g) = gtid { self.last_gtid = Some(g); }
+        if let Some(g) = gtid {
+            self.last_gtid = Some(g);
+        }
         Ok(())
     }
 
-    pub fn last_committed_position(&self) -> &BinlogPosition { &self.last_committed_position }
-    pub fn last_gtid(&self) -> Option<&str> { self.last_gtid.as_deref() }
+    pub fn last_committed_position(&self) -> &BinlogPosition {
+        &self.last_committed_position
+    }
+    pub fn last_gtid(&self) -> Option<&str> {
+        self.last_gtid.as_deref()
+    }
 }
 
 impl SourceConnector for MySqlConnector {
-    fn name(&self) -> &str { &self.name }
-    fn tenant_id(&self) -> &str { &self.tenant_id }
-    fn state(&self) -> ConnectorState { self.state }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn tenant_id(&self) -> &str {
+        &self.tenant_id
+    }
+    fn state(&self) -> ConnectorState {
+        self.state
+    }
 
     fn validate(&self) -> CdcResult<()> {
         if self.tenant_id.trim().is_empty() {
-            return Err(CdcError::InvalidConfig("tenant_id must be non-empty".into()));
+            return Err(CdcError::InvalidConfig(
+                "tenant_id must be non-empty".into(),
+            ));
         }
         if self.server_id == 0 {
             return Err(CdcError::InvalidConfig(
-                "MySQL server_id must be != 0 (replication identity)".into()));
+                "MySQL server_id must be != 0 (replication identity)".into(),
+            ));
         }
         Ok(())
     }

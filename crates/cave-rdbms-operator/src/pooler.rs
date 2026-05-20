@@ -194,11 +194,7 @@ impl PoolerManager {
 
     /// One reconcile pass: move status toward spec. `ready_replicas`
     /// is provided by the caller (typically the pod-status feed).
-    pub fn reconcile(
-        &self,
-        name: &str,
-        observed_ready: u32,
-    ) -> Result<Pooler, PoolerError> {
+    pub fn reconcile(&self, name: &str, observed_ready: u32) -> Result<Pooler, PoolerError> {
         let mut poolers = self.poolers.write().unwrap();
         let pooler = poolers
             .get_mut(name)
@@ -218,7 +214,11 @@ impl PoolerManager {
             &mut pooler.status.conditions,
             "Available",
             observed_ready == desired,
-            if observed_ready == desired { "AsExpected" } else { "BelowDesired" },
+            if observed_ready == desired {
+                "AsExpected"
+            } else {
+                "BelowDesired"
+            },
             &format!("{}/{} replicas ready", observed_ready, desired),
         );
         Ok(pooler.clone())
@@ -427,7 +427,10 @@ mod tests {
             .find(|c| c.kind == "Available")
             .map(|c| c.last_transition)
             .unwrap();
-        assert!(t2 > t1, "transition timestamp must advance on status change");
+        assert!(
+            t2 > t1,
+            "transition timestamp must advance on status change"
+        );
     }
 
     #[test]

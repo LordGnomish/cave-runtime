@@ -2,9 +2,9 @@
 // Copyright 2026 Cave Runtime contributors
 //! Core domain types for cave-logs — mirrors Loki's data model.
 
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Tenant identifier extracted from X-Scope-OrgID header.
 /// Empty string or "fake" is treated as the anonymous tenant.
@@ -25,16 +25,23 @@ impl Labels {
 
     /// Canonical string representation: `{a="v1",b="v2"}` (keys sorted).
     pub fn to_selector(&self) -> String {
-        let mut pairs: Vec<(&str, &str)> = self.0.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+        let mut pairs: Vec<(&str, &str)> = self
+            .0
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect();
         pairs.sort_by_key(|(k, _)| *k);
-        let inner: Vec<String> = pairs.iter().map(|(k, v)| format!("{}=\"{}\"", k, v)).collect();
+        let inner: Vec<String> = pairs
+            .iter()
+            .map(|(k, v)| format!("{}=\"{}\"", k, v))
+            .collect();
         format!("{{{}}}", inner.join(","))
     }
 
     /// Stable 64-bit fingerprint of the label set.
     pub fn fingerprint(&self) -> u64 {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
         let mut sorted: Vec<(&String, &String)> = self.0.iter().collect();
         sorted.sort_by_key(|(k, _)| k.as_str());
         let mut hasher = DefaultHasher::new();
@@ -90,7 +97,11 @@ pub struct LogEntry {
 
 impl LogEntry {
     pub fn new(ts: TimestampNs, line: impl Into<String>) -> Self {
-        Self { ts, line: line.into(), metadata: HashMap::new() }
+        Self {
+            ts,
+            line: line.into(),
+            metadata: HashMap::new(),
+        }
     }
 
     pub fn with_metadata(mut self, metadata: HashMap<String, String>) -> Self {
@@ -120,7 +131,11 @@ pub struct LogStream {
 
 impl LogStream {
     pub fn new(labels: Labels, tenant: impl Into<TenantId>) -> Self {
-        Self { labels, tenant: tenant.into(), entries: Vec::new() }
+        Self {
+            labels,
+            tenant: tenant.into(),
+            entries: Vec::new(),
+        }
     }
 
     pub fn fingerprint(&self) -> u64 {
@@ -201,19 +216,34 @@ impl<'de> Deserialize<'de> for EntryValue {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         use serde::de::Error;
         let v: serde_json::Value = Deserialize::deserialize(d)?;
-        let arr = v.as_array().ok_or_else(|| D::Error::custom("entry must be array"))?;
+        let arr = v
+            .as_array()
+            .ok_or_else(|| D::Error::custom("entry must be array"))?;
         if arr.len() < 2 {
-            return Err(D::Error::custom("entry array must have at least 2 elements"));
+            return Err(D::Error::custom(
+                "entry array must have at least 2 elements",
+            ));
         }
-        let ts_str = arr[0].as_str().ok_or_else(|| D::Error::custom("timestamp must be string"))?;
-        let ts_ns: TimestampNs = ts_str.parse().map_err(|_| D::Error::custom("invalid timestamp"))?;
-        let line = arr[1].as_str().ok_or_else(|| D::Error::custom("line must be string"))?.to_owned();
+        let ts_str = arr[0]
+            .as_str()
+            .ok_or_else(|| D::Error::custom("timestamp must be string"))?;
+        let ts_ns: TimestampNs = ts_str
+            .parse()
+            .map_err(|_| D::Error::custom("invalid timestamp"))?;
+        let line = arr[1]
+            .as_str()
+            .ok_or_else(|| D::Error::custom("line must be string"))?
+            .to_owned();
         let metadata = if arr.len() > 2 {
             serde_json::from_value(arr[2].clone()).ok()
         } else {
             None
         };
-        Ok(Self { ts_ns, line, metadata })
+        Ok(Self {
+            ts_ns,
+            line,
+            metadata,
+        })
     }
 }
 
@@ -268,7 +298,9 @@ pub struct QueryRangeParams {
     pub direction: Direction,
 }
 
-fn default_limit() -> usize { 100 }
+fn default_limit() -> usize {
+    100
+}
 
 /// Params for /loki/api/v1/query (instant)
 #[derive(Debug, Deserialize)]
@@ -348,7 +380,9 @@ pub struct TailParams {
     pub delay_for: u64,
 }
 
-fn default_delay_for() -> u64 { 0 }
+fn default_delay_for() -> u64 {
+    0
+}
 
 /// Single entry in a tail response.
 #[derive(Debug, Serialize, Clone)]

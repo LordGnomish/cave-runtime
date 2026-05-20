@@ -33,7 +33,10 @@ pub fn deduplicate(alerts: Vec<Alert>) -> Vec<Alert> {
 
 /// Bucket alerts by (group_key, decision). Caller must apply the same
 /// `RoutingDecision` to every alert that should land in the same bucket.
-pub fn group_by_key<'a>(decision: &RoutingDecision, alerts: &'a [Alert]) -> HashMap<String, Vec<&'a Alert>> {
+pub fn group_by_key<'a>(
+    decision: &RoutingDecision,
+    alerts: &'a [Alert],
+) -> HashMap<String, Vec<&'a Alert>> {
     let mut out: HashMap<String, Vec<&'a Alert>> = HashMap::new();
     for a in alerts {
         let k = crate::routing::group_key(decision, a);
@@ -101,7 +104,11 @@ pub fn should_notify(
 }
 
 /// Update the group state to reflect a notification just sent.
-pub fn record_notification(state: &mut GroupState, firing_fingerprints: &[String], now: DateTime<Utc>) {
+pub fn record_notification(
+    state: &mut GroupState,
+    firing_fingerprints: &[String],
+    now: DateTime<Utc>,
+) {
     state.last_notified_at = Some(now);
     let mut sorted: Vec<String> = firing_fingerprints.to_vec();
     sorted.sort();
@@ -206,7 +213,12 @@ mod tests {
         state.first_seen_at = Some(now - Duration::hours(1));
         state.last_firing_set = vec!["fp1".into()];
         // Now firing fp1 + fp2 (changed) at now+30s — < 5min
-        let res = should_notify(&d, &state, &vec!["fp1".into(), "fp2".into()], now + Duration::seconds(30));
+        let res = should_notify(
+            &d,
+            &state,
+            &vec!["fp1".into(), "fp2".into()],
+            now + Duration::seconds(30),
+        );
         assert_eq!(res, NotifyDecision::Hold);
     }
 
@@ -218,7 +230,12 @@ mod tests {
         state.last_notified_at = Some(now);
         state.first_seen_at = Some(now - Duration::hours(1));
         state.last_firing_set = vec!["fp1".into()];
-        let res = should_notify(&d, &state, &vec!["fp1".into(), "fp2".into()], now + Duration::minutes(6));
+        let res = should_notify(
+            &d,
+            &state,
+            &vec!["fp1".into(), "fp2".into()],
+            now + Duration::minutes(6),
+        );
         assert_eq!(res, NotifyDecision::Send);
     }
 
@@ -253,7 +270,10 @@ mod tests {
         record_notification(&mut state, &vec!["fp1".into(), "fp2".into()], now);
         assert_eq!(state.last_notified_at, Some(now));
         assert_eq!(state.first_seen_at, Some(now));
-        assert_eq!(state.last_firing_set, vec!["fp1".to_string(), "fp2".to_string()]);
+        assert_eq!(
+            state.last_firing_set,
+            vec!["fp1".to_string(), "fp2".to_string()]
+        );
     }
 
     #[test]
@@ -262,7 +282,10 @@ mod tests {
         let now = Utc::now();
         record_notification(&mut state, &vec!["fp2".into(), "fp1".into()], now);
         // Stored sorted so equality checks work order-independently.
-        assert_eq!(state.last_firing_set, vec!["fp1".to_string(), "fp2".to_string()]);
+        assert_eq!(
+            state.last_firing_set,
+            vec!["fp1".to_string(), "fp2".to_string()]
+        );
     }
 
     #[test]
@@ -274,15 +297,20 @@ mod tests {
         state.first_seen_at = Some(now - Duration::hours(1));
         state.last_firing_set = vec!["fp1".into(), "fp2".into()];
         // Same fingerprints in reverse order → unchanged
-        let res = should_notify(&d, &state, &vec!["fp2".into(), "fp1".into()], now + Duration::hours(5));
+        let res = should_notify(
+            &d,
+            &state,
+            &vec!["fp2".into(), "fp1".into()],
+            now + Duration::hours(5),
+        );
         assert_eq!(res, NotifyDecision::Send); // unchanged + repeat_interval elapsed
     }
 
     #[test]
     fn test_use_routing_decision_via_real_route() {
         // Smoke: matchers + routing + group key wires together.
-        use crate::routing::route_alert_tree;
         use crate::models::Route;
+        use crate::routing::route_alert_tree;
         let r = Route::root("default");
         let a = alert("HighCPU", "fp1");
         let d = route_alert_tree(&r, &a);

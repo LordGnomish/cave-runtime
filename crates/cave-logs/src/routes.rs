@@ -15,7 +15,6 @@
 //!   GET  /ready                                — readiness probe
 //!   GET  /metrics                              — Prometheus metrics
 
-use std::sync::Arc;
 use axum::{
     Router,
     extract::{Path, Query, State, WebSocketUpgrade},
@@ -25,17 +24,18 @@ use axum::{
 };
 use chrono::Utc;
 use serde_json::json;
+use std::sync::Arc;
 use tracing::{info, warn};
 
 use crate::ingest::loki_push::{ingest_json, ingest_protobuf};
 use crate::ingest::otlp::ingest_otlp_json;
 use crate::limits::{LimitError, LimitsRegistry};
-use crate::logql::ast::{Query as LogQuery};
+use crate::logql::ast::Query as LogQuery;
 use crate::logql::eval::Evaluator;
 use crate::logql::parser::Parser;
 use crate::models::{
-    Direction, IndexStats, LabelParams, QueryData, QueryParams, QueryRangeParams,
-    QueryResponse, SeriesParams, TailParams,
+    Direction, IndexStats, LabelParams, QueryData, QueryParams, QueryRangeParams, QueryResponse,
+    SeriesParams, TailParams,
 };
 use crate::store::LogStore;
 use crate::tail::handle_tail;
@@ -86,7 +86,8 @@ fn step_to_ns(step: &str) -> i64 {
         return (secs * 1e9) as i64;
     }
     // duration suffix
-    let (n_str, suffix) = step.split_at(step.find(|c: char| c.is_alphabetic()).unwrap_or(step.len()));
+    let (n_str, suffix) =
+        step.split_at(step.find(|c: char| c.is_alphabetic()).unwrap_or(step.len()));
     let base: f64 = n_str.parse().unwrap_or(1.0);
     let ns = match suffix {
         "ns" => base as i64,
@@ -104,7 +105,11 @@ fn step_to_ns(step: &str) -> i64 {
 // ── Error responses ───────────────────────────────────────────────────────────
 
 fn loki_error(status: StatusCode, msg: impl std::fmt::Display) -> Response {
-    (status, Json(json!({ "status": "error", "error": msg.to_string() }))).into_response()
+    (
+        status,
+        Json(json!({ "status": "error", "error": msg.to_string() })),
+    )
+        .into_response()
 }
 
 fn limit_error_response(e: LimitError) -> Response {
@@ -177,13 +182,20 @@ async fn query_handler(
 ) -> Response {
     let tenant = tenant_from_headers(&headers);
     let now_ns = Utc::now().timestamp_nanos_opt().unwrap_or(0);
-    let time_ns = params.time.as_deref().and_then(parse_time_param).unwrap_or(now_ns);
+    let time_ns = params
+        .time
+        .as_deref()
+        .and_then(parse_time_param)
+        .unwrap_or(now_ns);
 
     // Instant query: [time - 1h, time]
     let start_ns = time_ns - 3_600_000_000_000i64;
     let end_ns = time_ns;
 
-    let limit = match state.limits.check_query_limits(&tenant, params.limit, start_ns, end_ns) {
+    let limit = match state
+        .limits
+        .check_query_limits(&tenant, params.limit, start_ns, end_ns)
+    {
         Ok(l) => l,
         Err(e) => return limit_error_response(e),
     };
@@ -196,11 +208,19 @@ async fn query_handler(
 
     let eval = Evaluator::new(state.store.clone());
     let data = match parsed {
-        LogQuery::Log(lq) => eval.eval_log_query(&tenant, &lq, start_ns, end_ns, limit, params.direction),
-        LogQuery::Metric(mq) => eval.eval_metric_query(&tenant, &mq, start_ns, end_ns, 60_000_000_000),
+        LogQuery::Log(lq) => {
+            eval.eval_log_query(&tenant, &lq, start_ns, end_ns, limit, params.direction)
+        }
+        LogQuery::Metric(mq) => {
+            eval.eval_metric_query(&tenant, &mq, start_ns, end_ns, 60_000_000_000)
+        }
     };
 
-    Json(QueryResponse { status: "success", data }).into_response()
+    Json(QueryResponse {
+        status: "success",
+        data,
+    })
+    .into_response()
 }
 
 // ── Range query ───────────────────────────────────────────────────────────────
@@ -213,11 +233,26 @@ async fn query_range_handler(
     let tenant = tenant_from_headers(&headers);
     let now_ns = Utc::now().timestamp_nanos_opt().unwrap_or(0);
 
-    let start_ns = params.start.as_deref().and_then(parse_time_param).unwrap_or(now_ns - 3_600_000_000_000);
-    let end_ns = params.end.as_deref().and_then(parse_time_param).unwrap_or(now_ns);
-    let step_ns = params.step.as_deref().map(step_to_ns).unwrap_or(1_000_000_000);
+    let start_ns = params
+        .start
+        .as_deref()
+        .and_then(parse_time_param)
+        .unwrap_or(now_ns - 3_600_000_000_000);
+    let end_ns = params
+        .end
+        .as_deref()
+        .and_then(parse_time_param)
+        .unwrap_or(now_ns);
+    let step_ns = params
+        .step
+        .as_deref()
+        .map(step_to_ns)
+        .unwrap_or(1_000_000_000);
 
-    let limit = match state.limits.check_query_limits(&tenant, params.limit, start_ns, end_ns) {
+    let limit = match state
+        .limits
+        .check_query_limits(&tenant, params.limit, start_ns, end_ns)
+    {
         Ok(l) => l,
         Err(e) => return limit_error_response(e),
     };
@@ -229,11 +264,17 @@ async fn query_range_handler(
 
     let eval = Evaluator::new(state.store.clone());
     let data = match parsed {
-        LogQuery::Log(lq) => eval.eval_log_query(&tenant, &lq, start_ns, end_ns, limit, params.direction),
+        LogQuery::Log(lq) => {
+            eval.eval_log_query(&tenant, &lq, start_ns, end_ns, limit, params.direction)
+        }
         LogQuery::Metric(mq) => eval.eval_metric_query(&tenant, &mq, start_ns, end_ns, step_ns),
     };
 
-    Json(QueryResponse { status: "success", data }).into_response()
+    Json(QueryResponse {
+        status: "success",
+        data,
+    })
+    .into_response()
 }
 
 // ── Labels ────────────────────────────────────────────────────────────────────
@@ -276,12 +317,14 @@ async fn series_handler(
         fps = state.store.matching_fps(&tenant, |_| true);
     } else {
         for matcher_str in matchers {
-            use crate::logql::eval::labels_match;
             use crate::logql::ast::StreamSelector;
+            use crate::logql::eval::labels_match;
             use crate::logql::lexer::Lexer;
             use crate::logql::parser::Parser;
             if let Ok(LogQuery::Log(lq)) = Parser::parse_query(matcher_str) {
-                let mut matched = state.store.matching_fps(&tenant, |l| labels_match(l, &lq.selector));
+                let mut matched = state
+                    .store
+                    .matching_fps(&tenant, |l| labels_match(l, &lq.selector));
                 fps.append(&mut matched);
             }
         }
@@ -309,7 +352,8 @@ async fn index_stats_handler(State(state): State<AppState>) -> Response {
             "entries": stats.entries,
             "bytes": stats.bytes,
         }
-    })).into_response()
+    }))
+    .into_response()
 }
 
 // ── Tail (WebSocket) ──────────────────────────────────────────────────────────
@@ -324,9 +368,7 @@ async fn tail_handler(
     let query = params.query.clone();
     let store = state.store.clone();
 
-    ws.on_upgrade(move |socket| {
-        handle_tail(socket, query, tenant, store)
-    })
+    ws.on_upgrade(move |socket| handle_tail(socket, query, tenant, store))
 }
 
 // ── Ready / metrics ───────────────────────────────────────────────────────────
@@ -352,7 +394,12 @@ async fn metrics_handler(State(state): State<AppState>) -> Response {
          cave_logs_bytes_total {}\n",
         stats.streams, stats.entries, stats.chunks, stats.bytes
     );
-    (StatusCode::OK, [("content-type", "text/plain; version=0.0.4")], text).into_response()
+    (
+        StatusCode::OK,
+        [("content-type", "text/plain; version=0.0.4")],
+        text,
+    )
+        .into_response()
 }
 
 // ── Router ────────────────────────────────────────────────────────────────────
@@ -368,7 +415,10 @@ pub fn router(state: AppState) -> Router {
         .route("/loki/api/v1/query_range", get(query_range_handler))
         // Label discovery
         .route("/loki/api/v1/labels", get(labels_handler))
-        .route("/loki/api/v1/label/{name}/values", get(label_values_handler))
+        .route(
+            "/loki/api/v1/label/{name}/values",
+            get(label_values_handler),
+        )
         // Series
         .route("/loki/api/v1/series", get(series_handler))
         // Index stats

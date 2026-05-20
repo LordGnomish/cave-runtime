@@ -2,8 +2,8 @@
 // Copyright 2026 Cave Runtime contributors
 //! Shared application state for cave-metrics.
 
-use std::sync::Arc;
 use parking_lot::RwLock;
+use std::sync::Arc;
 
 use crate::promql::Engine;
 use crate::rules::RuleGroup;
@@ -12,10 +12,10 @@ use crate::tsdb::Tsdb;
 
 /// Shared state passed to all handlers.
 pub struct MetricsState {
-    pub tsdb:           Arc<Tsdb>,
-    pub engine:         Arc<Engine>,
+    pub tsdb: Arc<Tsdb>,
+    pub engine: Arc<Engine>,
     pub scrape_manager: Arc<ScrapeManager>,
-    pub rule_groups:    Arc<RwLock<Vec<RuleGroup>>>,
+    pub rule_groups: Arc<RwLock<Vec<RuleGroup>>>,
 }
 
 impl MetricsState {

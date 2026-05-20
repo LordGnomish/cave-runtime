@@ -25,7 +25,12 @@ pub struct RuleGroup {
 
 impl RuleGroup {
     /// Evaluate all rules in this group at the current time.
-    pub fn evaluate(&mut self, engine: &Engine, tsdb: &Arc<Tsdb>, ts_ms: i64) -> Result<Vec<FiringAlert>> {
+    pub fn evaluate(
+        &mut self,
+        engine: &Engine,
+        tsdb: &Arc<Tsdb>,
+        ts_ms: i64,
+    ) -> Result<Vec<FiringAlert>> {
         // Recording rules first
         for rule in &self.recording_rules {
             rule.evaluate(engine, tsdb, ts_ms)?;

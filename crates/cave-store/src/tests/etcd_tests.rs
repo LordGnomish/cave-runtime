@@ -39,9 +39,18 @@ async fn test_delete_range() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    engine.put(b"key1".to_vec(), b"v1".to_vec(), 0, false).await.unwrap();
-    engine.put(b"key2".to_vec(), b"v2".to_vec(), 0, false).await.unwrap();
-    engine.put(b"key3".to_vec(), b"v3".to_vec(), 0, false).await.unwrap();
+    engine
+        .put(b"key1".to_vec(), b"v1".to_vec(), 0, false)
+        .await
+        .unwrap();
+    engine
+        .put(b"key2".to_vec(), b"v2".to_vec(), 0, false)
+        .await
+        .unwrap();
+    engine
+        .put(b"key3".to_vec(), b"v3".to_vec(), 0, false)
+        .await
+        .unwrap();
 
     // Delete range [key1, key3)
     let del = engine
@@ -64,17 +73,32 @@ async fn test_mvcc_revision_tracking() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    engine.put(b"k".to_vec(), b"v1".to_vec(), 0, false).await.unwrap();
-    engine.put(b"k".to_vec(), b"v2".to_vec(), 0, false).await.unwrap();
-    engine.put(b"k".to_vec(), b"v3".to_vec(), 0, false).await.unwrap();
+    engine
+        .put(b"k".to_vec(), b"v1".to_vec(), 0, false)
+        .await
+        .unwrap();
+    engine
+        .put(b"k".to_vec(), b"v2".to_vec(), 0, false)
+        .await
+        .unwrap();
+    engine
+        .put(b"k".to_vec(), b"v3".to_vec(), 0, false)
+        .await
+        .unwrap();
 
     // Current value
-    let r = engine.range(b"k".to_vec(), vec![], 0, 0, false, false).await.unwrap();
+    let r = engine
+        .range(b"k".to_vec(), vec![], 0, 0, false, false)
+        .await
+        .unwrap();
     assert_eq!(r.kvs[0].value, b"v3");
     assert_eq!(r.kvs[0].version, 3);
 
     // Historical value at revision 1
-    let r_hist = engine.range(b"k".to_vec(), vec![], 1, 0, false, false).await.unwrap();
+    let r_hist = engine
+        .range(b"k".to_vec(), vec![], 1, 0, false, false)
+        .await
+        .unwrap();
     assert_eq!(r_hist.kvs[0].value, b"v1");
 }
 
@@ -83,10 +107,22 @@ async fn test_prefix_range() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    engine.put(b"foo/a".to_vec(), b"1".to_vec(), 0, false).await.unwrap();
-    engine.put(b"foo/b".to_vec(), b"2".to_vec(), 0, false).await.unwrap();
-    engine.put(b"foo/c".to_vec(), b"3".to_vec(), 0, false).await.unwrap();
-    engine.put(b"bar/a".to_vec(), b"4".to_vec(), 0, false).await.unwrap();
+    engine
+        .put(b"foo/a".to_vec(), b"1".to_vec(), 0, false)
+        .await
+        .unwrap();
+    engine
+        .put(b"foo/b".to_vec(), b"2".to_vec(), 0, false)
+        .await
+        .unwrap();
+    engine
+        .put(b"foo/c".to_vec(), b"3".to_vec(), 0, false)
+        .await
+        .unwrap();
+    engine
+        .put(b"bar/a".to_vec(), b"4".to_vec(), 0, false)
+        .await
+        .unwrap();
 
     // Range [foo/, foo0) captures all foo/* keys (0 = '/' + 1 in ASCII)
     let range_end = {
@@ -106,7 +142,10 @@ async fn test_transaction_success() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    engine.put(b"balance".to_vec(), b"100".to_vec(), 0, false).await.unwrap();
+    engine
+        .put(b"balance".to_vec(), b"100".to_vec(), 0, false)
+        .await
+        .unwrap();
 
     // CAS: if version == 1, set to 200
     let txn = TxnRequest {
@@ -126,7 +165,10 @@ async fn test_transaction_success() {
     let resp = engine.txn(txn).await.unwrap();
     assert!(resp.succeeded);
 
-    let r = engine.range(b"balance".to_vec(), vec![], 0, 0, false, false).await.unwrap();
+    let r = engine
+        .range(b"balance".to_vec(), vec![], 0, 0, false, false)
+        .await
+        .unwrap();
     assert_eq!(r.kvs[0].value, b"200");
 }
 
@@ -135,7 +177,10 @@ async fn test_transaction_failure() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    engine.put(b"balance".to_vec(), b"100".to_vec(), 0, false).await.unwrap();
+    engine
+        .put(b"balance".to_vec(), b"100".to_vec(), 0, false)
+        .await
+        .unwrap();
 
     // CAS: if version == 99 (wrong), run failure branch
     let txn = TxnRequest {
@@ -159,7 +204,10 @@ async fn test_transaction_failure() {
     let resp = engine.txn(txn).await.unwrap();
     assert!(!resp.succeeded);
 
-    let r = engine.range(b"balance".to_vec(), vec![], 0, 0, false, false).await.unwrap();
+    let r = engine
+        .range(b"balance".to_vec(), vec![], 0, 0, false, false)
+        .await
+        .unwrap();
     assert_eq!(r.kvs[0].value, b"FALLBACK");
 }
 
@@ -168,19 +216,33 @@ async fn test_compaction() {
     let dir = TempDir::new().unwrap();
     let engine = make_engine(&dir);
 
-    engine.put(b"k".to_vec(), b"v1".to_vec(), 0, false).await.unwrap();
-    engine.put(b"k".to_vec(), b"v2".to_vec(), 0, false).await.unwrap();
-    engine.put(b"k".to_vec(), b"v3".to_vec(), 0, false).await.unwrap();
+    engine
+        .put(b"k".to_vec(), b"v1".to_vec(), 0, false)
+        .await
+        .unwrap();
+    engine
+        .put(b"k".to_vec(), b"v2".to_vec(), 0, false)
+        .await
+        .unwrap();
+    engine
+        .put(b"k".to_vec(), b"v3".to_vec(), 0, false)
+        .await
+        .unwrap();
 
     // Compact at revision 2 — history before rev 2 is pruned
     engine.compact(2).await.unwrap();
 
     // Accessing revision 1 should fail
-    let err = engine.range(b"k".to_vec(), vec![], 1, 0, false, false).await;
+    let err = engine
+        .range(b"k".to_vec(), vec![], 1, 0, false, false)
+        .await;
     assert!(err.is_err());
 
     // Current value still accessible
-    let r = engine.range(b"k".to_vec(), vec![], 0, 0, false, false).await.unwrap();
+    let r = engine
+        .range(b"k".to_vec(), vec![], 0, 0, false, false)
+        .await
+        .unwrap();
     assert_eq!(r.kvs[0].value, b"v3");
 }
 
@@ -228,7 +290,10 @@ async fn test_lease_lifecycle() {
         .unwrap();
 
     // Key exists
-    let r = engine.range(b"leased-key".to_vec(), vec![], 0, 0, false, false).await.unwrap();
+    let r = engine
+        .range(b"leased-key".to_vec(), vec![], 0, 0, false, false)
+        .await
+        .unwrap();
     assert_eq!(r.kvs.len(), 1);
 
     // Keep alive
@@ -241,7 +306,10 @@ async fn test_lease_lifecycle() {
 
     // Revoke — key should disappear
     engine.lease_revoke(lease_id).await.unwrap();
-    let r2 = engine.range(b"leased-key".to_vec(), vec![], 0, 0, false, false).await.unwrap();
+    let r2 = engine
+        .range(b"leased-key".to_vec(), vec![], 0, 0, false, false)
+        .await
+        .unwrap();
     assert_eq!(r2.kvs.len(), 0);
 }
 
@@ -251,7 +319,9 @@ async fn test_auth_user_role() {
 
     let auth = AuthManager::default();
 
-    auth.user_add("alice".to_string(), "password123".to_string()).await.unwrap();
+    auth.user_add("alice".to_string(), "password123".to_string())
+        .await
+        .unwrap();
     auth.role_add("reader".to_string()).await.unwrap();
     auth.user_grant_role("alice", "reader").await.unwrap();
 

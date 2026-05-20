@@ -153,10 +153,7 @@ fn encode_element(key: &str, value: &Value, buf: &mut Vec<u8>) -> Result<(), Bso
     Ok(())
 }
 
-fn decode_element(
-    bytes: &[u8],
-    _remaining: usize,
-) -> Result<(String, Value, usize), BsonError> {
+fn decode_element(bytes: &[u8], _remaining: usize) -> Result<(String, Value, usize), BsonError> {
     if bytes.is_empty() {
         return Err(BsonError::DecodeError("unexpected eof".to_string()));
     }
@@ -176,7 +173,8 @@ fn decode_element(
             if pos + 4 > bytes.len() {
                 return Err(BsonError::DecodeError("truncated int32".to_string()));
             }
-            let val = i32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]);
+            let val =
+                i32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]);
             pos += 4;
             Value::Number(val.into())
         }
@@ -185,8 +183,14 @@ fn decode_element(
                 return Err(BsonError::DecodeError("truncated int64".to_string()));
             }
             let val = i64::from_le_bytes([
-                bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3],
-                bytes[pos + 4], bytes[pos + 5], bytes[pos + 6], bytes[pos + 7],
+                bytes[pos],
+                bytes[pos + 1],
+                bytes[pos + 2],
+                bytes[pos + 3],
+                bytes[pos + 4],
+                bytes[pos + 5],
+                bytes[pos + 6],
+                bytes[pos + 7],
             ]);
             pos += 8;
             Value::Number(val.into())
@@ -196,13 +200,18 @@ fn decode_element(
                 return Err(BsonError::DecodeError("truncated double".to_string()));
             }
             let val = f64::from_le_bytes([
-                bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3],
-                bytes[pos + 4], bytes[pos + 5], bytes[pos + 6], bytes[pos + 7],
+                bytes[pos],
+                bytes[pos + 1],
+                bytes[pos + 2],
+                bytes[pos + 3],
+                bytes[pos + 4],
+                bytes[pos + 5],
+                bytes[pos + 6],
+                bytes[pos + 7],
             ]);
             pos += 8;
             Value::Number(
-                serde_json::Number::from_f64(val)
-                    .unwrap_or_else(|| serde_json::Number::from(0))
+                serde_json::Number::from_f64(val).unwrap_or_else(|| serde_json::Number::from(0)),
             )
         }
         TYPE_STRING => {
@@ -214,9 +223,9 @@ fn decode_element(
             if pos + 4 > bytes.len() {
                 return Err(BsonError::DecodeError("truncated document".to_string()));
             }
-            let doc_len = u32::from_le_bytes([
-                bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3],
-            ]) as usize;
+            let doc_len =
+                u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]])
+                    as usize;
             if pos + doc_len > bytes.len() {
                 return Err(BsonError::DecodeError("incomplete document".to_string()));
             }
@@ -228,9 +237,9 @@ fn decode_element(
             if pos + 4 > bytes.len() {
                 return Err(BsonError::DecodeError("truncated array".to_string()));
             }
-            let arr_len = u32::from_le_bytes([
-                bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3],
-            ]) as usize;
+            let arr_len =
+                u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]])
+                    as usize;
             if pos + arr_len > bytes.len() {
                 return Err(BsonError::DecodeError("incomplete array".to_string()));
             }
@@ -258,8 +267,14 @@ fn decode_element(
                 return Err(BsonError::DecodeError("truncated datetime".to_string()));
             }
             let ms = i64::from_le_bytes([
-                bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3],
-                bytes[pos + 4], bytes[pos + 5], bytes[pos + 6], bytes[pos + 7],
+                bytes[pos],
+                bytes[pos + 1],
+                bytes[pos + 2],
+                bytes[pos + 3],
+                bytes[pos + 4],
+                bytes[pos + 5],
+                bytes[pos + 6],
+                bytes[pos + 7],
             ]);
             pos += 8;
             if let Some(dt) = DateTime::<Utc>::from_timestamp_millis(ms) {
@@ -272,12 +287,14 @@ fn decode_element(
             if pos + 4 > bytes.len() {
                 return Err(BsonError::DecodeError("truncated binary".to_string()));
             }
-            let len = u32::from_le_bytes([
-                bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3],
-            ]) as usize;
+            let len =
+                u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]])
+                    as usize;
             pos += 4;
             if pos + 1 > bytes.len() {
-                return Err(BsonError::DecodeError("truncated binary subtype".to_string()));
+                return Err(BsonError::DecodeError(
+                    "truncated binary subtype".to_string(),
+                ));
             }
             let _subtype = bytes[pos];
             pos += 1;
@@ -306,8 +323,14 @@ fn decode_element(
                 return Err(BsonError::DecodeError("truncated timestamp".to_string()));
             }
             let val = u64::from_le_bytes([
-                bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3],
-                bytes[pos + 4], bytes[pos + 5], bytes[pos + 6], bytes[pos + 7],
+                bytes[pos],
+                bytes[pos + 1],
+                bytes[pos + 2],
+                bytes[pos + 3],
+                bytes[pos + 4],
+                bytes[pos + 5],
+                bytes[pos + 6],
+                bytes[pos + 7],
             ]);
             pos += 8;
             Value::Number(val.into())
@@ -399,7 +422,10 @@ mod tests {
     #[test]
     fn test_bson_encode_array() {
         let mut doc = Document::new();
-        doc.insert("field".to_string(), Value::Array(vec![Value::Number(1.into())]));
+        doc.insert(
+            "field".to_string(),
+            Value::Array(vec![Value::Number(1.into())]),
+        );
         let encoded = encode_doc(&doc).unwrap();
         assert!(encoded.len() >= 5);
     }

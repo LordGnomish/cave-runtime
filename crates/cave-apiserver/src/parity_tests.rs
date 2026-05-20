@@ -22,7 +22,9 @@ fn make_namespace(name: &str) -> Resource {
         api_version: "v1".into(),
         kind: "Namespace".into(),
         metadata: ObjectMeta::new(name, ""),
-        status: NamespaceStatus { phase: "Active".into() },
+        status: NamespaceStatus {
+            phase: "Active".into(),
+        },
     })
 }
 

@@ -8,7 +8,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, IamRoleAssignment, IamUser};
+use crate::admin::state::{AdminState, IamRoleAssignment, IamUser, scope};
 use crate::admin::types::Cite;
 use std::collections::BTreeMap;
 
@@ -26,14 +26,19 @@ pub enum IamViewError {
 
 pub fn list_users(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<IamUser>, IamViewError> {
     ctx.authorise(Permission::IamRead)?;
-    Ok(scope(&state.iam_users.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter()
-        .cloned()
-        .collect())
+    Ok(
+        scope(&state.iam_users.read().unwrap(), &ctx.tenant, |r| &r.tenant)
+            .into_iter()
+            .cloned()
+            .collect(),
+    )
 }
 
 /// `username -> Vec<role>`, alphabetically sorted on both axes.
-pub fn rbac_matrix(state: &AdminState, ctx: &RequestCtx) -> Result<BTreeMap<String, Vec<String>>, IamViewError> {
+pub fn rbac_matrix(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<BTreeMap<String, Vec<String>>, IamViewError> {
     ctx.authorise(Permission::IamRead)?;
     let mut out: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let users = state.iam_users.read().unwrap();
@@ -42,7 +47,9 @@ pub fn rbac_matrix(state: &AdminState, ctx: &RequestCtx) -> Result<BTreeMap<Stri
     }
     let assigns = state.iam_assignments.read().unwrap();
     for a in scope(&assigns, &ctx.tenant, |r| &r.tenant) {
-        out.entry(a.username.clone()).or_default().push(a.role.clone());
+        out.entry(a.username.clone())
+            .or_default()
+            .push(a.role.clone());
     }
     for roles in out.values_mut() {
         roles.sort();
@@ -108,8 +115,10 @@ pub fn revoke_role(
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, IamViewError> {
     let users = list_users(state, ctx)?;
     let matrix = rbac_matrix(state, ctx)?;
-    let user_rows: Vec<Vec<String>> =
-        users.iter().map(|u| vec![u.username.clone(), u.email.clone()]).collect();
+    let user_rows: Vec<Vec<String>> = users
+        .iter()
+        .map(|u| vec![u.username.clone(), u.email.clone()])
+        .collect();
     let matrix_rows: Vec<Vec<String>> = matrix
         .iter()
         .map(|(u, roles)| vec![u.clone(), roles.join(", ")])
@@ -130,7 +139,10 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, IamViewErr
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::backstage("plugins/permission-backend/src/index.ts", "PermissionPolicy");
+const FILE_CITE: Cite = Cite::backstage(
+    "plugins/permission-backend/src/index.ts",
+    "PermissionPolicy",
+);
 
 #[cfg(test)]
 mod tests {

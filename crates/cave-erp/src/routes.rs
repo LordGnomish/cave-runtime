@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
 use crate::store::ErpStore;
-use axum::{response::IntoResponse, routing::get, Json, Router};
+use axum::{Json, Router, response::IntoResponse, routing::get};
 use serde_json::json;
 use std::sync::Arc;
 

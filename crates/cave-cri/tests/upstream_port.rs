@@ -135,9 +135,7 @@ fn upstream_local_store_delete_refused_when_lease_holds_blob() {
     let mut writer = store.writer("w".into(), expected.clone()).unwrap();
     writer.write_all(payload).unwrap();
     writer.commit().unwrap();
-    leases
-        .create("L1", None, HashMap::new())
-        .unwrap();
+    leases.create("L1", None, HashMap::new()).unwrap();
     leases
         .add_resource("L1", Resource::content(&expected))
         .unwrap();
@@ -275,9 +273,7 @@ fn upstream_lease_manager_create_then_get_returns_lease() {
 fn upstream_lease_manager_duplicate_create_errors() {
     let leases = LeaseManager::new();
     leases.create("dup", None, HashMap::new()).unwrap();
-    let err = leases
-        .create("dup", None, HashMap::new())
-        .unwrap_err();
+    let err = leases.create("dup", None, HashMap::new()).unwrap_err();
     assert!(matches!(err, LeaseError::AlreadyExists(ref id) if id == "dup"));
 }
 
@@ -287,13 +283,9 @@ fn upstream_lease_manager_duplicate_create_errors() {
 #[test]
 fn upstream_lease_manager_live_content_returns_held_content_digests() {
     let leases = LeaseManager::new();
-    leases
-        .create("L1", None, HashMap::new())
-        .unwrap();
+    leases.create("L1", None, HashMap::new()).unwrap();
     let d = Digest::compute(DigestAlgorithm::Sha256, b"abc");
-    leases
-        .add_resource("L1", Resource::content(&d))
-        .unwrap();
+    leases.add_resource("L1", Resource::content(&d)).unwrap();
     // Add a non-content resource — must NOT appear in live_content.
     leases
         .add_resource("L1", Resource::snapshot("snap-7"))

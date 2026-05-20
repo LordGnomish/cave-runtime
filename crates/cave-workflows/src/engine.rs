@@ -29,7 +29,11 @@ pub fn validate_dag(workflow: &Workflow) -> Result<(), WorkflowError> {
         return Err(WorkflowError::MultipleTriggers);
     }
     if has_cycle(
-        &workflow.nodes.iter().map(|n| n.id.as_str()).collect::<Vec<_>>(),
+        &workflow
+            .nodes
+            .iter()
+            .map(|n| n.id.as_str())
+            .collect::<Vec<_>>(),
         &workflow.edges,
     ) {
         return Err(WorkflowError::CycleDetected);
@@ -44,7 +48,9 @@ pub fn has_cycle(node_ids: &[&str], edges: &[WorkflowEdge]) -> bool {
         adj.insert(id, vec![]);
     }
     for e in edges {
-        adj.entry(e.from_node.as_str()).or_default().push(e.to_node.as_str());
+        adj.entry(e.from_node.as_str())
+            .or_default()
+            .push(e.to_node.as_str());
     }
     let mut visited: HashSet<&str> = HashSet::new();
     let mut rec_stack: HashSet<&str> = HashSet::new();
@@ -160,7 +166,10 @@ mod tests {
     #[test]
     fn test_validate_empty_workflow_fails() {
         let wf = workflow(vec![], vec![]);
-        assert!(matches!(validate_dag(&wf), Err(WorkflowError::EmptyWorkflow)));
+        assert!(matches!(
+            validate_dag(&wf),
+            Err(WorkflowError::EmptyWorkflow)
+        ));
     }
 
     #[test]
@@ -179,13 +188,13 @@ mod tests {
     #[test]
     fn test_validate_cycle_detected() {
         let wf = workflow(
-            vec![
-                node("a", NodeType::Action),
-                node("b", NodeType::Action),
-            ],
+            vec![node("a", NodeType::Action), node("b", NodeType::Action)],
             vec![edge("a", "b"), edge("b", "a")],
         );
-        assert!(matches!(validate_dag(&wf), Err(WorkflowError::CycleDetected)));
+        assert!(matches!(
+            validate_dag(&wf),
+            Err(WorkflowError::CycleDetected)
+        ));
     }
 
     #[test]
@@ -194,7 +203,10 @@ mod tests {
             vec![node("a", NodeType::Trigger)],
             vec![edge("a", "missing")],
         );
-        assert!(matches!(validate_dag(&wf), Err(WorkflowError::UndefinedNode(_))));
+        assert!(matches!(
+            validate_dag(&wf),
+            Err(WorkflowError::UndefinedNode(_))
+        ));
     }
 
     #[test]
@@ -207,7 +219,10 @@ mod tests {
             ],
             vec![edge("t1", "a"), edge("t2", "a")],
         );
-        assert!(matches!(validate_dag(&wf), Err(WorkflowError::MultipleTriggers)));
+        assert!(matches!(
+            validate_dag(&wf),
+            Err(WorkflowError::MultipleTriggers)
+        ));
     }
 
     #[test]
@@ -285,6 +300,9 @@ mod tests {
             vec![node("a", NodeType::Action), node("b", NodeType::Action)],
             vec![edge("a", "b"), edge("b", "a")],
         );
-        assert!(matches!(topological_sort(&wf), Err(WorkflowError::CycleDetected)));
+        assert!(matches!(
+            topological_sort(&wf),
+            Err(WorkflowError::CycleDetected)
+        ));
     }
 }

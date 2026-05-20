@@ -33,7 +33,10 @@ impl FindingState {
     /// Source: `Finding._meta.get_field('active').default = True`
     ///         (overridden to True in `Finding.__init__` for fresh imports).
     pub fn fresh() -> Self {
-        Self { active: true, ..Default::default() }
+        Self {
+            active: true,
+            ..Default::default()
+        }
     }
 }
 
@@ -147,7 +150,9 @@ mod tests {
 
     #[test]
     fn verify_sets_verified_flag() {
-        let s = FindingState::fresh().apply(StateTransition::Verify, "alice").unwrap();
+        let s = FindingState::fresh()
+            .apply(StateTransition::Verify, "alice")
+            .unwrap();
         assert!(s.verified);
         assert!(s.active);
         assert_eq!(s.last_actor.as_deref(), Some("alice"));
@@ -155,28 +160,36 @@ mod tests {
 
     #[test]
     fn mitigate_clears_active_and_sets_mitigated() {
-        let s = FindingState::fresh().apply(StateTransition::Mitigate, "bob").unwrap();
+        let s = FindingState::fresh()
+            .apply(StateTransition::Mitigate, "bob")
+            .unwrap();
         assert!(s.is_mitigated);
         assert!(!s.active);
     }
 
     #[test]
     fn cannot_verify_mitigated_finding() {
-        let s = FindingState::fresh().apply(StateTransition::Mitigate, "bob").unwrap();
+        let s = FindingState::fresh()
+            .apply(StateTransition::Mitigate, "bob")
+            .unwrap();
         let err = s.apply(StateTransition::Verify, "alice").unwrap_err();
         assert_eq!(err, StateError::AlreadyMitigated(StateTransition::Verify));
     }
 
     #[test]
     fn cannot_mitigate_duplicate() {
-        let s = FindingState::fresh().apply(StateTransition::MarkDuplicate, "x").unwrap();
+        let s = FindingState::fresh()
+            .apply(StateTransition::MarkDuplicate, "x")
+            .unwrap();
         let err = s.apply(StateTransition::Mitigate, "x").unwrap_err();
         assert_eq!(err, StateError::DuplicateLocked(StateTransition::Mitigate));
     }
 
     #[test]
     fn risk_accept_clears_active() {
-        let s = FindingState::fresh().apply(StateTransition::RiskAccept, "ciso").unwrap();
+        let s = FindingState::fresh()
+            .apply(StateTransition::RiskAccept, "ciso")
+            .unwrap();
         assert!(s.risk_accepted);
         assert!(!s.active);
     }
@@ -184,15 +197,19 @@ mod tests {
     #[test]
     fn risk_unaccept_reactivates() {
         let s = FindingState::fresh()
-            .apply(StateTransition::RiskAccept, "ciso").unwrap()
-            .apply(StateTransition::RiskUnaccept, "auto").unwrap();
+            .apply(StateTransition::RiskAccept, "ciso")
+            .unwrap()
+            .apply(StateTransition::RiskUnaccept, "auto")
+            .unwrap();
         assert!(!s.risk_accepted);
         assert!(s.active);
     }
 
     #[test]
     fn false_positive_sets_false_p_and_clears_active() {
-        let s = FindingState::fresh().apply(StateTransition::MarkFalsePositive, "u").unwrap();
+        let s = FindingState::fresh()
+            .apply(StateTransition::MarkFalsePositive, "u")
+            .unwrap();
         assert!(s.false_p);
         assert!(!s.active);
     }
@@ -200,15 +217,19 @@ mod tests {
     #[test]
     fn reactivate_after_mitigation_works() {
         let s = FindingState::fresh()
-            .apply(StateTransition::Mitigate, "x").unwrap()
-            .apply(StateTransition::Reactivate, "y").unwrap();
+            .apply(StateTransition::Mitigate, "x")
+            .unwrap()
+            .apply(StateTransition::Reactivate, "y")
+            .unwrap();
         assert!(s.active);
         assert!(!s.is_mitigated);
     }
 
     #[test]
     fn cannot_reactivate_already_active_finding() {
-        let err = FindingState::fresh().apply(StateTransition::Reactivate, "x").unwrap_err();
+        let err = FindingState::fresh()
+            .apply(StateTransition::Reactivate, "x")
+            .unwrap_err();
         assert_eq!(err, StateError::AlreadyActive);
     }
 }

@@ -75,16 +75,14 @@ pub fn compute_incremental_plan(
     let mut stable_count = 0usize;
 
     // For each member that exists in `target`, compute retain / new-grant.
-    let target_members: BTreeSet<&String> =
-        target.keys().chain(previous.keys()).collect();
+    let target_members: BTreeSet<&String> = target.keys().chain(previous.keys()).collect();
     for member in target_members {
         let prev_set = previous.get(member).cloned().unwrap_or_default();
         let target_set = target.get(member).cloned().unwrap_or_default();
         // What the member already had AND still owns in target → retain.
         let retain: BTreeSet<Tp> = prev_set.intersection(&target_set).cloned().collect();
         // What the member previously owned but no longer does → release.
-        let to_release: BTreeSet<Tp> =
-            prev_set.difference(&target_set).cloned().collect();
+        let to_release: BTreeSet<Tp> = prev_set.difference(&target_set).cloned().collect();
         released_count += to_release.len();
         stable_count += retain.len();
         phase1.insert(
@@ -157,12 +155,9 @@ mod tests {
         let mut prev: HashMap<String, BTreeSet<Tp>> = HashMap::new();
         prev.insert(
             "m1".into(),
-            [
-                tp(topic(tenant_id, "t"), 0),
-                tp(topic(tenant_id, "t"), 1),
-            ]
-            .into_iter()
-            .collect(),
+            [tp(topic(tenant_id, "t"), 0), tp(topic(tenant_id, "t"), 1)]
+                .into_iter()
+                .collect(),
         );
         let target = prev.clone();
         let plan = compute_incremental_plan(&prev, &target);
@@ -200,11 +195,7 @@ mod tests {
                 .collect(),
         );
         let plan = compute_incremental_plan(&prev, &target);
-        let m1 = plan
-            .phase1
-            .iter()
-            .find(|m| m.member_id == "m1")
-            .unwrap();
+        let m1 = plan.phase1.iter().find(|m| m.member_id == "m1").unwrap();
         assert_eq!(m1.retain.len(), 2);
         assert_eq!(m1.to_release.len(), 2);
         assert_eq!(plan.released_count, 2);
@@ -215,7 +206,10 @@ mod tests {
         // cite: kafka 4.2.0 (Phase 2 grants full assignment after release)
         let tenant_id = "ir-003";
         let mut prev: HashMap<String, BTreeSet<Tp>> = HashMap::new();
-        prev.insert("m1".into(), [tp(topic(tenant_id, "t"), 0)].into_iter().collect());
+        prev.insert(
+            "m1".into(),
+            [tp(topic(tenant_id, "t"), 0)].into_iter().collect(),
+        );
         let mut target: HashMap<String, BTreeSet<Tp>> = HashMap::new();
         target.insert(
             "m1".into(),
@@ -224,11 +218,7 @@ mod tests {
                 .collect(),
         );
         let plan = compute_incremental_plan(&prev, &target);
-        let p2_m1 = plan
-            .phase2
-            .iter()
-            .find(|m| m.member_id == "m1")
-            .unwrap();
+        let p2_m1 = plan.phase2.iter().find(|m| m.member_id == "m1").unwrap();
         assert_eq!(p2_m1.assigned.len(), 2);
     }
 
@@ -251,11 +241,7 @@ mod tests {
                 .collect(),
         );
         let plan = compute_incremental_plan(&prev, &target);
-        let old = plan
-            .phase1
-            .iter()
-            .find(|m| m.member_id == "old")
-            .unwrap();
+        let old = plan.phase1.iter().find(|m| m.member_id == "old").unwrap();
         assert!(old.retain.is_empty());
         assert_eq!(old.to_release.len(), 2);
     }
@@ -276,7 +262,10 @@ mod tests {
             .collect(),
         );
         let mut target = prev.clone();
-        target.get_mut("m1").unwrap().insert(tp(topic(tenant_id, "t"), 3));
+        target
+            .get_mut("m1")
+            .unwrap()
+            .insert(tp(topic(tenant_id, "t"), 3));
         let plan = compute_incremental_plan(&prev, &target);
         assert_eq!(plan.stable_count, 3);
         assert_eq!(plan.released_count, 0);

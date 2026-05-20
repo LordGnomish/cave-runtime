@@ -9,14 +9,16 @@ use crate::db::Db;
 use crate::error::{CacheError, CacheResult};
 use crate::resp::Resp;
 use crate::types::{
-    bytes_to_f64, bytes_to_i64, f64_to_bytes, normalize_index, Entry, LexBound, ScoreBound, Value,
-    ZSet,
+    Entry, LexBound, ScoreBound, Value, ZSet, bytes_to_f64, bytes_to_i64, f64_to_bytes,
+    normalize_index,
 };
 
 // ── ZADD ─────────────────────────────────────────────────────────────────────
 
 pub fn cmd_zadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 4 { return Err(CacheError::wrong_arity("zadd")); }
+    if args.len() < 4 {
+        return Err(CacheError::wrong_arity("zadd"));
+    }
     let key = args[1].clone();
 
     let mut i = 2;
@@ -29,14 +31,34 @@ pub fn cmd_zadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 
     // Parse flags
     loop {
-        if i >= args.len() { break; }
+        if i >= args.len() {
+            break;
+        }
         match args[i].to_ascii_uppercase().as_slice() {
-            b"NX" => { nx = true; i += 1; }
-            b"XX" => { xx = true; i += 1; }
-            b"GT" => { gt = true; i += 1; }
-            b"LT" => { lt = true; i += 1; }
-            b"CH" => { ch = true; i += 1; }
-            b"INCR" => { incr = true; i += 1; }
+            b"NX" => {
+                nx = true;
+                i += 1;
+            }
+            b"XX" => {
+                xx = true;
+                i += 1;
+            }
+            b"GT" => {
+                gt = true;
+                i += 1;
+            }
+            b"LT" => {
+                lt = true;
+                i += 1;
+            }
+            b"CH" => {
+                ch = true;
+                i += 1;
+            }
+            b"INCR" => {
+                incr = true;
+                i += 1;
+            }
             _ => break,
         }
     }
@@ -74,8 +96,12 @@ pub fn cmd_zadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 
         let old_score = zset.score(&member);
 
-        if nx && old_score.is_some() { continue; }
-        if xx && old_score.is_none() { continue; }
+        if nx && old_score.is_some() {
+            continue;
+        }
+        if xx && old_score.is_none() {
+            continue;
+        }
 
         let new_score = if incr {
             old_score.unwrap_or(0.0) + score
@@ -83,17 +109,26 @@ pub fn cmd_zadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
             score
         };
 
-        if gt && old_score.map(|s| new_score <= s).unwrap_or(false) { continue; }
-        if lt && old_score.map(|s| new_score >= s).unwrap_or(false) { continue; }
+        if gt && old_score.map(|s| new_score <= s).unwrap_or(false) {
+            continue;
+        }
+        if lt && old_score.map(|s| new_score >= s).unwrap_or(false) {
+            continue;
+        }
 
         let was_new = zset.add(member, new_score);
-        if was_new { added += 1; }
-        else { changed += 1; }
+        if was_new {
+            added += 1;
+        } else {
+            changed += 1;
+        }
         last_score = Some(new_score);
     }
 
     if incr {
-        return Ok(last_score.map(|s| Resp::BulkString(Some(f64_to_bytes(s)))).unwrap_or(Resp::nil()));
+        return Ok(last_score
+            .map(|s| Resp::BulkString(Some(f64_to_bytes(s))))
+            .unwrap_or(Resp::nil()));
     }
 
     Ok(Resp::Integer(if ch { added + changed } else { added }))
@@ -102,17 +137,23 @@ pub fn cmd_zadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 // ── ZREM ─────────────────────────────────────────────────────────────────────
 
 pub fn cmd_zrem(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 3 { return Err(CacheError::wrong_arity("zrem")); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity("zrem"));
+    }
     let key = &args[1];
     match db.get_typed_mut(key, "zset")? {
         Some(entry) => match &mut entry.value {
             Value::ZSet(zset) => {
                 let mut removed = 0i64;
                 for member in &args[2..] {
-                    if zset.remove(member) { removed += 1; }
+                    if zset.remove(member) {
+                        removed += 1;
+                    }
                 }
                 let is_empty = zset.is_empty();
-                if is_empty { db.remove(key); }
+                if is_empty {
+                    db.remove(key);
+                }
                 Ok(Resp::Integer(removed))
             }
             _ => unreachable!(),
@@ -124,12 +165,15 @@ pub fn cmd_zrem(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 // ── ZSCORE / ZMSCORE ─────────────────────────────────────────────────────────
 
 pub fn cmd_zscore(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 3 { return Err(CacheError::wrong_arity("zscore")); }
+    if args.len() != 3 {
+        return Err(CacheError::wrong_arity("zscore"));
+    }
     match db.get_typed(&args[1], "zset")? {
         Some(e) => match &e.value {
-            Value::ZSet(zset) => {
-                Ok(zset.score(&args[2]).map(|s| Resp::BulkString(Some(f64_to_bytes(s)))).unwrap_or(Resp::nil()))
-            }
+            Value::ZSet(zset) => Ok(zset
+                .score(&args[2])
+                .map(|s| Resp::BulkString(Some(f64_to_bytes(s))))
+                .unwrap_or(Resp::nil())),
             _ => unreachable!(),
         },
         None => Ok(Resp::nil()),
@@ -137,7 +181,9 @@ pub fn cmd_zscore(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 }
 
 pub fn cmd_zmscore(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 3 { return Err(CacheError::wrong_arity("zmscore")); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity("zmscore"));
+    }
     let scores_opt: Option<&ZSet> = match db.get_typed(&args[1], "zset")? {
         Some(e) => match &e.value {
             Value::ZSet(z) => Some(unsafe { &*(z as *const ZSet) }),
@@ -169,13 +215,19 @@ pub fn cmd_zrevrank(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 
 fn zrank_impl(args: &[Vec<u8>], db: &mut Db, rev: bool) -> CacheResult<Resp> {
     let cmd = if rev { "zrevrank" } else { "zrank" };
-    if args.len() < 3 { return Err(CacheError::wrong_arity(cmd)); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity(cmd));
+    }
     let withscore = args.len() == 4 && args[3].to_ascii_uppercase() == b"WITHSCORE";
 
     match db.get_typed(&args[1], "zset")? {
         Some(e) => match &e.value {
             Value::ZSet(zset) => {
-                let rank_opt = if rev { zset.rev_rank(&args[2]) } else { zset.rank(&args[2]) };
+                let rank_opt = if rev {
+                    zset.rev_rank(&args[2])
+                } else {
+                    zset.rank(&args[2])
+                };
                 match rank_opt {
                     None => Ok(Resp::nil()),
                     Some(rank) => {
@@ -200,7 +252,9 @@ fn zrank_impl(args: &[Vec<u8>], db: &mut Db, rev: bool) -> CacheResult<Resp> {
 // ── ZCARD ────────────────────────────────────────────────────────────────────
 
 pub fn cmd_zcard(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 2 { return Err(CacheError::wrong_arity("zcard")); }
+    if args.len() != 2 {
+        return Err(CacheError::wrong_arity("zcard"));
+    }
     match db.get_typed(&args[1], "zset")? {
         Some(e) => match &e.value {
             Value::ZSet(z) => Ok(Resp::Integer(z.len() as i64)),
@@ -213,14 +267,18 @@ pub fn cmd_zcard(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 // ── ZCOUNT ───────────────────────────────────────────────────────────────────
 
 pub fn cmd_zcount(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 4 { return Err(CacheError::wrong_arity("zcount")); }
+    if args.len() != 4 {
+        return Err(CacheError::wrong_arity("zcount"));
+    }
     let min = ScoreBound::parse(&args[2]).ok_or(CacheError::NotFloat)?;
     let max = ScoreBound::parse(&args[3]).ok_or(CacheError::NotFloat)?;
 
     match db.get_typed(&args[1], "zset")? {
         Some(e) => match &e.value {
             Value::ZSet(zset) => {
-                let count = zset.ordered.keys()
+                let count = zset
+                    .ordered
+                    .keys()
                     .filter(|k| min.contains_min(k.score) && max.contains_max(k.score))
                     .count();
                 Ok(Resp::Integer(count as i64))
@@ -234,7 +292,9 @@ pub fn cmd_zcount(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 // ── ZINCRBY ──────────────────────────────────────────────────────────────────
 
 pub fn cmd_zincrby(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 4 { return Err(CacheError::wrong_arity("zincrby")); }
+    if args.len() != 4 {
+        return Err(CacheError::wrong_arity("zincrby"));
+    }
     let key = args[1].clone();
     let delta = bytes_to_f64(&args[2]).ok_or(CacheError::NotFloat)?;
     let member = args[3].clone();
@@ -268,7 +328,9 @@ pub fn cmd_zpopmax(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 
 fn zpop_impl(args: &[Vec<u8>], db: &mut Db, max: bool) -> CacheResult<Resp> {
     let cmd = if max { "zpopmax" } else { "zpopmin" };
-    if args.len() < 2 || args.len() > 3 { return Err(CacheError::wrong_arity(cmd)); }
+    if args.len() < 2 || args.len() > 3 {
+        return Err(CacheError::wrong_arity(cmd));
+    }
     let count = if args.len() == 3 {
         bytes_to_i64(&args[2]).ok_or(CacheError::NotInteger)? as usize
     } else {
@@ -291,7 +353,9 @@ fn zpop_impl(args: &[Vec<u8>], db: &mut Db, max: bool) -> CacheResult<Resp> {
                     }
                 }
                 let is_empty = zset.is_empty();
-                if is_empty { db.remove(key); }
+                if is_empty {
+                    db.remove(key);
+                }
                 Ok(Resp::Array(Some(result)))
             }
             _ => unreachable!(),
@@ -312,7 +376,9 @@ pub fn cmd_bzpopmax(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 
 fn bzpop_impl(args: &[Vec<u8>], db: &mut Db, max: bool) -> CacheResult<Resp> {
     let cmd = if max { "bzpopmax" } else { "bzpopmin" };
-    if args.len() < 3 { return Err(CacheError::wrong_arity(cmd)); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity(cmd));
+    }
     let keys = &args[1..args.len() - 1];
 
     for key in keys {
@@ -322,7 +388,9 @@ fn bzpop_impl(args: &[Vec<u8>], db: &mut Db, max: bool) -> CacheResult<Resp> {
                     let popped = if max { zset.pop_max() } else { zset.pop_min() };
                     if let Some((member, score)) = popped {
                         let is_empty = zset.is_empty();
-                        if is_empty { db.remove(key); }
+                        if is_empty {
+                            db.remove(key);
+                        }
                         return Ok(Resp::Array(Some(vec![
                             Resp::BulkString(Some(key.clone())),
                             Resp::BulkString(Some(member)),
@@ -342,7 +410,9 @@ fn bzpop_impl(args: &[Vec<u8>], db: &mut Db, max: bool) -> CacheResult<Resp> {
 // ── ZRANGE (unified, Redis 6.2+) ─────────────────────────────────────────────
 
 pub fn cmd_zrange(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 4 { return Err(CacheError::wrong_arity("zrange")); }
+    if args.len() < 4 {
+        return Err(CacheError::wrong_arity("zrange"));
+    }
 
     let mut byscore = false;
     let mut bylex = false;
@@ -354,16 +424,30 @@ pub fn cmd_zrange(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
     let mut i = 4;
     while i < args.len() {
         match args[i].to_ascii_uppercase().as_slice() {
-            b"BYSCORE" => { byscore = true; i += 1; }
-            b"BYLEX" => { bylex = true; i += 1; }
-            b"REV" => { rev = true; i += 1; }
-            b"WITHSCORES" => { withscores = true; i += 1; }
+            b"BYSCORE" => {
+                byscore = true;
+                i += 1;
+            }
+            b"BYLEX" => {
+                bylex = true;
+                i += 1;
+            }
+            b"REV" => {
+                rev = true;
+                i += 1;
+            }
+            b"WITHSCORES" => {
+                withscores = true;
+                i += 1;
+            }
             b"LIMIT" => {
                 limit_offset = Some(bytes_to_i64(&args[i + 1]).ok_or(CacheError::NotInteger)?);
                 limit_count = Some(bytes_to_i64(&args[i + 2]).ok_or(CacheError::NotInteger)?);
                 i += 3;
             }
-            _ => { i += 1; }
+            _ => {
+                i += 1;
+            }
         }
     }
 
@@ -371,19 +455,29 @@ pub fn cmd_zrange(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
         Some(e) => match &e.value {
             Value::ZSet(zset) => {
                 let results = if byscore {
-                    let min = ScoreBound::parse(if rev { &args[3] } else { &args[2] }).ok_or(CacheError::NotFloat)?;
-                    let max = ScoreBound::parse(if rev { &args[2] } else { &args[3] }).ok_or(CacheError::NotFloat)?;
-                    let mut entries: Vec<(Vec<u8>, f64)> = zset.ordered.keys()
+                    let min = ScoreBound::parse(if rev { &args[3] } else { &args[2] })
+                        .ok_or(CacheError::NotFloat)?;
+                    let max = ScoreBound::parse(if rev { &args[2] } else { &args[3] })
+                        .ok_or(CacheError::NotFloat)?;
+                    let mut entries: Vec<(Vec<u8>, f64)> = zset
+                        .ordered
+                        .keys()
                         .filter(|k| min.contains_min(k.score) && max.contains_max(k.score))
                         .map(|k| (k.member.clone(), k.score))
                         .collect();
-                    if rev { entries.reverse(); }
+                    if rev {
+                        entries.reverse();
+                    }
                     apply_limit(entries, limit_offset, limit_count)
                 } else if bylex {
-                    let min = LexBound::parse(if rev { &args[3] } else { &args[2] }).ok_or(CacheError::Syntax)?;
-                    let max = LexBound::parse(if rev { &args[2] } else { &args[3] }).ok_or(CacheError::Syntax)?;
+                    let min = LexBound::parse(if rev { &args[3] } else { &args[2] })
+                        .ok_or(CacheError::Syntax)?;
+                    let max = LexBound::parse(if rev { &args[2] } else { &args[3] })
+                        .ok_or(CacheError::Syntax)?;
                     let mut entries = zset.range_by_lex(&min, &max);
-                    if rev { entries.reverse(); }
+                    if rev {
+                        entries.reverse();
+                    }
                     apply_limit(entries, limit_offset, limit_count)
                 } else {
                     let start = bytes_to_i64(&args[2]).ok_or(CacheError::NotInteger)?;
@@ -410,7 +504,11 @@ pub fn cmd_zrange(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
     }
 }
 
-fn apply_limit(mut v: Vec<(Vec<u8>, f64)>, offset: Option<i64>, count: Option<i64>) -> Vec<(Vec<u8>, f64)> {
+fn apply_limit(
+    mut v: Vec<(Vec<u8>, f64)>,
+    offset: Option<i64>,
+    count: Option<i64>,
+) -> Vec<(Vec<u8>, f64)> {
     if let Some(off) = offset {
         let off = (off as usize).min(v.len());
         v.drain(..off);
@@ -426,7 +524,9 @@ fn apply_limit(mut v: Vec<(Vec<u8>, f64)>, offset: Option<i64>, count: Option<i6
 // ── ZREVRANGE ────────────────────────────────────────────────────────────────
 
 pub fn cmd_zrevrange(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 4 { return Err(CacheError::wrong_arity("zrevrange")); }
+    if args.len() < 4 {
+        return Err(CacheError::wrong_arity("zrevrange"));
+    }
     let withscores = args.len() > 4 && args[4].to_ascii_uppercase() == b"WITHSCORES";
     let start = bytes_to_i64(&args[2]).ok_or(CacheError::NotInteger)?;
     let stop = bytes_to_i64(&args[3]).ok_or(CacheError::NotInteger)?;
@@ -438,7 +538,9 @@ pub fn cmd_zrevrange(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
                 let mut resp = Vec::new();
                 for (member, score) in entries {
                     resp.push(Resp::BulkString(Some(member)));
-                    if withscores { resp.push(Resp::BulkString(Some(f64_to_bytes(score)))); }
+                    if withscores {
+                        resp.push(Resp::BulkString(Some(f64_to_bytes(score))));
+                    }
                 }
                 Ok(Resp::Array(Some(resp)))
             }
@@ -459,8 +561,14 @@ pub fn cmd_zrevrangebyscore(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> 
 }
 
 fn zrangebyscore_impl(args: &[Vec<u8>], db: &mut Db, rev: bool) -> CacheResult<Resp> {
-    let cmd = if rev { "zrevrangebyscore" } else { "zrangebyscore" };
-    if args.len() < 4 { return Err(CacheError::wrong_arity(cmd)); }
+    let cmd = if rev {
+        "zrevrangebyscore"
+    } else {
+        "zrangebyscore"
+    };
+    if args.len() < 4 {
+        return Err(CacheError::wrong_arity(cmd));
+    }
 
     let min_arg = if rev { &args[3] } else { &args[2] };
     let max_arg = if rev { &args[2] } else { &args[3] };
@@ -473,30 +581,41 @@ fn zrangebyscore_impl(args: &[Vec<u8>], db: &mut Db, rev: bool) -> CacheResult<R
     let mut i = 4;
     while i < args.len() {
         match args[i].to_ascii_uppercase().as_slice() {
-            b"WITHSCORES" => { withscores = true; i += 1; }
+            b"WITHSCORES" => {
+                withscores = true;
+                i += 1;
+            }
             b"LIMIT" => {
-                offset = bytes_to_i64(&args[i+1]).ok_or(CacheError::NotInteger)? as usize;
-                let c = bytes_to_i64(&args[i+2]).ok_or(CacheError::NotInteger)?;
+                offset = bytes_to_i64(&args[i + 1]).ok_or(CacheError::NotInteger)? as usize;
+                let c = bytes_to_i64(&args[i + 2]).ok_or(CacheError::NotInteger)?;
                 count = if c < 0 { usize::MAX } else { c as usize };
                 i += 3;
             }
-            _ => { i += 1; }
+            _ => {
+                i += 1;
+            }
         }
     }
 
     match db.get_typed(&args[1], "zset")? {
         Some(e) => match &e.value {
             Value::ZSet(zset) => {
-                let mut entries: Vec<(Vec<u8>, f64)> = zset.ordered.keys()
+                let mut entries: Vec<(Vec<u8>, f64)> = zset
+                    .ordered
+                    .keys()
                     .filter(|k| min.contains_min(k.score) && max.contains_max(k.score))
                     .map(|k| (k.member.clone(), k.score))
                     .collect();
-                if rev { entries.reverse(); }
+                if rev {
+                    entries.reverse();
+                }
                 let entries: Vec<_> = entries.into_iter().skip(offset).take(count).collect();
                 let mut resp = Vec::new();
                 for (member, score) in entries {
                     resp.push(Resp::BulkString(Some(member)));
-                    if withscores { resp.push(Resp::BulkString(Some(f64_to_bytes(score)))); }
+                    if withscores {
+                        resp.push(Resp::BulkString(Some(f64_to_bytes(score))));
+                    }
                 }
                 Ok(Resp::Array(Some(resp)))
             }
@@ -517,7 +636,13 @@ pub fn cmd_zrevrangebylex(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 }
 
 fn zrangebylex_impl(args: &[Vec<u8>], db: &mut Db, rev: bool) -> CacheResult<Resp> {
-    if args.len() < 4 { return Err(CacheError::wrong_arity(if rev { "zrevrangebylex" } else { "zrangebylex" })); }
+    if args.len() < 4 {
+        return Err(CacheError::wrong_arity(if rev {
+            "zrevrangebylex"
+        } else {
+            "zrangebylex"
+        }));
+    }
     let min = LexBound::parse(if rev { &args[3] } else { &args[2] }).ok_or(CacheError::Syntax)?;
     let max = LexBound::parse(if rev { &args[2] } else { &args[3] }).ok_or(CacheError::Syntax)?;
 
@@ -527,12 +652,14 @@ fn zrangebylex_impl(args: &[Vec<u8>], db: &mut Db, rev: bool) -> CacheResult<Res
     while i < args.len() {
         match args[i].to_ascii_uppercase().as_slice() {
             b"LIMIT" => {
-                offset = bytes_to_i64(&args[i+1]).ok_or(CacheError::NotInteger)? as usize;
-                let c = bytes_to_i64(&args[i+2]).ok_or(CacheError::NotInteger)?;
+                offset = bytes_to_i64(&args[i + 1]).ok_or(CacheError::NotInteger)? as usize;
+                let c = bytes_to_i64(&args[i + 2]).ok_or(CacheError::NotInteger)?;
                 count = if c < 0 { usize::MAX } else { c as usize };
                 i += 3;
             }
-            _ => { i += 1; }
+            _ => {
+                i += 1;
+            }
         }
     }
 
@@ -540,9 +667,12 @@ fn zrangebylex_impl(args: &[Vec<u8>], db: &mut Db, rev: bool) -> CacheResult<Res
         Some(e) => match &e.value {
             Value::ZSet(zset) => {
                 let mut entries = zset.range_by_lex(&min, &max);
-                if rev { entries.reverse(); }
+                if rev {
+                    entries.reverse();
+                }
                 let entries: Vec<_> = entries.into_iter().skip(offset).take(count).collect();
-                let resp: Vec<Resp> = entries.into_iter()
+                let resp: Vec<Resp> = entries
+                    .into_iter()
                     .map(|(m, _)| Resp::BulkString(Some(m)))
                     .collect();
                 Ok(Resp::Array(Some(resp)))
@@ -556,7 +686,9 @@ fn zrangebylex_impl(args: &[Vec<u8>], db: &mut Db, rev: bool) -> CacheResult<Res
 // ── ZLEXCOUNT ────────────────────────────────────────────────────────────────
 
 pub fn cmd_zlexcount(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 4 { return Err(CacheError::wrong_arity("zlexcount")); }
+    if args.len() != 4 {
+        return Err(CacheError::wrong_arity("zlexcount"));
+    }
     let min = LexBound::parse(&args[2]).ok_or(CacheError::Syntax)?;
     let max = LexBound::parse(&args[3]).ok_or(CacheError::Syntax)?;
     match db.get_typed(&args[1], "zset")? {
@@ -571,7 +703,9 @@ pub fn cmd_zlexcount(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 // ── ZRANGESTORE ──────────────────────────────────────────────────────────────
 
 pub fn cmd_zrangestore(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 5 { return Err(CacheError::wrong_arity("zrangestore")); }
+    if args.len() < 5 {
+        return Err(CacheError::wrong_arity("zrangestore"));
+    }
     // Parse same as ZRANGE then store
     let src = &args[2];
     let dst = args[1].clone();
@@ -615,13 +749,21 @@ pub fn cmd_zdiffstore(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
     zagg_store(args, db, "zdiffstore", AggMode::Diff)
 }
 
-enum AggMode { Union, Inter, Diff }
+enum AggMode {
+    Union,
+    Inter,
+    Diff,
+}
 
 fn zagg_store(args: &[Vec<u8>], db: &mut Db, cmd: &str, mode: AggMode) -> CacheResult<Resp> {
-    if args.len() < 4 { return Err(CacheError::wrong_arity(cmd)); }
+    if args.len() < 4 {
+        return Err(CacheError::wrong_arity(cmd));
+    }
     let dst = args[1].clone();
     let numkeys = bytes_to_i64(&args[2]).ok_or(CacheError::NotInteger)? as usize;
-    if numkeys == 0 { return Err(CacheError::generic("ERR numkeys must be > 0")); }
+    if numkeys == 0 {
+        return Err(CacheError::generic("ERR numkeys must be > 0"));
+    }
 
     let keys = &args[3..3 + numkeys];
     let rest = &args[3 + numkeys..];
@@ -644,12 +786,16 @@ fn zagg_store(args: &[Vec<u8>], db: &mut Db, cmd: &str, mode: AggMode) -> CacheR
                 // We can't store a closure, so we use an enum
                 i += 2;
             }
-            _ => { i += 1; }
+            _ => {
+                i += 1;
+            }
         }
     }
 
     // Collect all sets
-    let sets: Vec<Vec<(Vec<u8>, f64)>> = keys.iter().enumerate()
+    let sets: Vec<Vec<(Vec<u8>, f64)>> = keys
+        .iter()
+        .enumerate()
         .map(|(ki, key)| {
             let w = weights.get(ki).copied().unwrap_or(1.0);
             match db.get_typed(key, "zset") {
@@ -674,7 +820,9 @@ fn zagg_store(args: &[Vec<u8>], db: &mut Db, cmd: &str, mode: AggMode) -> CacheR
             }
         }
         AggMode::Inter => {
-            if sets.is_empty() { return Ok(Resp::Integer(0)); }
+            if sets.is_empty() {
+                return Ok(Resp::Integer(0));
+            }
             let first: std::collections::HashMap<Vec<u8>, f64> = sets[0].iter().cloned().collect();
             for (member, score) in &first {
                 let mut total = *score;
@@ -689,11 +837,15 @@ fn zagg_store(args: &[Vec<u8>], db: &mut Db, cmd: &str, mode: AggMode) -> CacheR
                         break;
                     }
                 }
-                if in_all { result.add(member.clone(), total); }
+                if in_all {
+                    result.add(member.clone(), total);
+                }
             }
         }
         AggMode::Diff => {
-            if sets.is_empty() { return Ok(Resp::Integer(0)); }
+            if sets.is_empty() {
+                return Ok(Resp::Integer(0));
+            }
             let others: std::collections::HashSet<Vec<u8>> = sets[1..]
                 .iter()
                 .flat_map(|s| s.iter().map(|(m, _)| m.clone()))
@@ -718,7 +870,9 @@ fn zagg_store(args: &[Vec<u8>], db: &mut Db, cmd: &str, mode: AggMode) -> CacheR
 // ── ZRANDMEMBER ──────────────────────────────────────────────────────────────
 
 pub fn cmd_zrandmember(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 2 { return Err(CacheError::wrong_arity("zrandmember")); }
+    if args.len() < 2 {
+        return Err(CacheError::wrong_arity("zrandmember"));
+    }
     let count: Option<i64> = if args.len() >= 3 {
         Some(bytes_to_i64(&args[2]).ok_or(CacheError::NotInteger)?)
     } else {
@@ -731,24 +885,37 @@ pub fn cmd_zrandmember(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
             Value::ZSet(zset) => {
                 let all: Vec<(&Vec<u8>, f64)> = zset.iter_asc().collect();
                 if all.is_empty() {
-                    return Ok(if count.is_some() { Resp::Array(Some(vec![])) } else { Resp::nil() });
+                    return Ok(if count.is_some() {
+                        Resp::Array(Some(vec![]))
+                    } else {
+                        Resp::nil()
+                    });
                 }
                 if let Some(n) = count {
                     let members: Vec<Resp> = if n >= 0 {
-                        all.iter().take(n as usize).flat_map(|(m, s)| {
-                            let mut v = vec![Resp::BulkString(Some(m.to_vec()))];
-                            if withscores { v.push(Resp::BulkString(Some(f64_to_bytes(*s)))); }
-                            v
-                        }).collect()
+                        all.iter()
+                            .take(n as usize)
+                            .flat_map(|(m, s)| {
+                                let mut v = vec![Resp::BulkString(Some(m.to_vec()))];
+                                if withscores {
+                                    v.push(Resp::BulkString(Some(f64_to_bytes(*s))));
+                                }
+                                v
+                            })
+                            .collect()
                     } else {
                         let count = (-n) as usize;
-                        (0..count).flat_map(|_| {
-                            let idx = rand::random::<usize>() % all.len();
-                            let (m, s) = all[idx];
-                            let mut v = vec![Resp::BulkString(Some(m.to_vec()))];
-                            if withscores { v.push(Resp::BulkString(Some(f64_to_bytes(s)))); }
-                            v
-                        }).collect()
+                        (0..count)
+                            .flat_map(|_| {
+                                let idx = rand::random::<usize>() % all.len();
+                                let (m, s) = all[idx];
+                                let mut v = vec![Resp::BulkString(Some(m.to_vec()))];
+                                if withscores {
+                                    v.push(Resp::BulkString(Some(f64_to_bytes(s))));
+                                }
+                                v
+                            })
+                            .collect()
                     };
                     Ok(Resp::Array(Some(members)))
                 } else {
@@ -758,7 +925,11 @@ pub fn cmd_zrandmember(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
             }
             _ => unreachable!(),
         },
-        None => Ok(if count.is_some() { Resp::Array(Some(vec![])) } else { Resp::nil() }),
+        None => Ok(if count.is_some() {
+            Resp::Array(Some(vec![]))
+        } else {
+            Resp::nil()
+        }),
     }
 }
 
@@ -803,7 +974,8 @@ mod tests {
     #[test]
     fn zadd_returns_new_member_count_only() {
         let mut db = Db::new();
-        let added = unwrap_int(cmd_zadd(&args(&["ZADD", "k", "1", "a", "2", "b"]), &mut db).unwrap());
+        let added =
+            unwrap_int(cmd_zadd(&args(&["ZADD", "k", "1", "a", "2", "b"]), &mut db).unwrap());
         assert_eq!(added, 2, "two new members");
 
         // Updating an existing member's score returns 0 (no NEW members).
@@ -818,9 +990,8 @@ mod tests {
         let mut db = Db::new();
         cmd_zadd(&args(&["ZADD", "k", "1", "a", "2", "b"]), &mut db).unwrap();
         // CH: re-score "a" (changed) + add "c" new → CH=2
-        let n = unwrap_int(
-            cmd_zadd(&args(&["ZADD", "k", "CH", "5", "a", "3", "c"]), &mut db).unwrap(),
-        );
+        let n =
+            unwrap_int(cmd_zadd(&args(&["ZADD", "k", "CH", "5", "a", "3", "c"]), &mut db).unwrap());
         assert_eq!(n, 2, "CH counts both score-updates and new adds");
     }
 
@@ -885,7 +1056,10 @@ mod tests {
         cmd_zadd(&args(&["ZADD", "k", "10", "a"]), &mut db).unwrap();
         let new_score =
             unwrap_bulk(cmd_zincrby(&args(&["ZINCRBY", "k", "5", "a"]), &mut db).unwrap());
-        assert_eq!(&new_score, b"15", "ZINCRBY returns the post-increment score");
+        assert_eq!(
+            &new_score, b"15",
+            "ZINCRBY returns the post-increment score"
+        );
     }
 
     /// upstream: redis 8.0/src/t_zset.c — ZINCRBY on a missing member
@@ -919,8 +1093,11 @@ mod tests {
                 other => panic!("expected bulk, got {other:?}"),
             })
             .collect();
-        assert_eq!(names, vec![b"b".to_vec(), b"c".to_vec()],
-            "inclusive [5,10] keeps b(5) and c(10)");
+        assert_eq!(
+            names,
+            vec![b"b".to_vec(), b"c".to_vec()],
+            "inclusive [5,10] keeps b(5) and c(10)"
+        );
     }
 
     /// upstream: redis 8.0/src/t_zset.c — ZRANGEBYSCORE supports `(` for
@@ -945,7 +1122,11 @@ mod tests {
     #[test]
     fn zpopmin_returns_lowest_score_member() {
         let mut db = Db::new();
-        cmd_zadd(&args(&["ZADD", "k", "5", "b", "1", "a", "10", "c"]), &mut db).unwrap();
+        cmd_zadd(
+            &args(&["ZADD", "k", "5", "b", "1", "a", "10", "c"]),
+            &mut db,
+        )
+        .unwrap();
         let popped = unwrap_array(cmd_zpopmin(&args(&["ZPOPMIN", "k"]), &mut db).unwrap());
         // [member, score]
         assert_eq!(popped.len(), 2);
@@ -960,7 +1141,11 @@ mod tests {
     #[test]
     fn zpopmax_returns_highest_score_member() {
         let mut db = Db::new();
-        cmd_zadd(&args(&["ZADD", "k", "5", "b", "1", "a", "10", "c"]), &mut db).unwrap();
+        cmd_zadd(
+            &args(&["ZADD", "k", "5", "b", "1", "a", "10", "c"]),
+            &mut db,
+        )
+        .unwrap();
         let popped = unwrap_array(cmd_zpopmax(&args(&["ZPOPMAX", "k"]), &mut db).unwrap());
         assert_eq!(popped[0], Resp::BulkString(Some(b"c".to_vec())));
         assert_eq!(popped[1], Resp::BulkString(Some(b"10".to_vec())));
@@ -1015,13 +1200,17 @@ mod tests {
     fn zmscore_returns_per_member_with_nil_for_missing() {
         let mut db = Db::new();
         cmd_zadd(&args(&["ZADD", "k", "1", "a", "2", "b"]), &mut db).unwrap();
-        let arr =
-            unwrap_array(cmd_zmscore(&args(&["ZMSCORE", "k", "a", "ghost", "b"]), &mut db).unwrap());
+        let arr = unwrap_array(
+            cmd_zmscore(&args(&["ZMSCORE", "k", "a", "ghost", "b"]), &mut db).unwrap(),
+        );
         assert_eq!(arr.len(), 3);
         assert_eq!(arr[0], Resp::BulkString(Some(b"1".to_vec())));
         // ghost → nil bulk
-        assert!(matches!(arr[1], Resp::BulkString(None)),
-            "ghost member must surface as nil bulk, got {:?}", arr[1]);
+        assert!(
+            matches!(arr[1], Resp::BulkString(None)),
+            "ghost member must surface as nil bulk, got {:?}",
+            arr[1]
+        );
         assert_eq!(arr[2], Resp::BulkString(Some(b"2".to_vec())));
     }
 }

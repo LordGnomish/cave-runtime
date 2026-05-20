@@ -5,9 +5,9 @@
 //! consent grants. Visual port of
 //! `js/apps/account-ui/src/applications/Applications.tsx`.
 
+use super::{AccountError, account_chrome::render_account_nav, require_account_user};
 use crate::admin::permission::RequestCtx;
 use crate::admin::render::{escape, page_shell_full, table_html};
-use super::{account_chrome::render_account_nav, require_account_user, AccountError};
 
 /// One client-application row.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,7 +64,12 @@ pub fn render(ctx: &RequestCtx) -> Result<String, AccountError> {
             let consents_cell = r
                 .consents
                 .iter()
-                .map(|c| format!(r#"<code class="text-xs bg-gray-100 dark:bg-zinc-800 px-1">{}</code>"#, escape(c)))
+                .map(|c| {
+                    format!(
+                        r#"<code class="text-xs bg-gray-100 dark:bg-zinc-800 px-1">{}</code>"#,
+                        escape(c)
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join(" ");
             let offline_cell = if r.offline_access {
@@ -118,7 +123,11 @@ mod tests {
     use crate::admin::permission::{Permission, Persona, RequestCtx};
 
     fn user_ctx() -> RequestCtx {
-        RequestCtx::developer_as("acme", &[Permission::AuthSessionsRead], Persona::TenantAdmin)
+        RequestCtx::developer_as(
+            "acme",
+            &[Permission::AuthSessionsRead],
+            Persona::TenantAdmin,
+        )
     }
 
     #[test]

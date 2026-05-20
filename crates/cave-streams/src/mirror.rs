@@ -72,11 +72,7 @@ pub struct MirrorFlow {
 }
 
 impl MirrorFlow {
-    pub fn new(
-        source_cluster: String,
-        target_cluster: String,
-        topics: Vec<String>,
-    ) -> Self {
+    pub fn new(source_cluster: String, target_cluster: String, topics: Vec<String>) -> Self {
         Self {
             id: format!("{source_cluster}->{target_cluster}"),
             source_cluster,
@@ -158,10 +154,7 @@ impl MirrorFlow {
     }
 
     pub fn total_lag(&self) -> i64 {
-        self.replication_lag
-            .values()
-            .flat_map(|p| p.values())
-            .sum()
+        self.replication_lag.values().flat_map(|p| p.values()).sum()
     }
 }
 
@@ -303,7 +296,9 @@ mod tests {
     #[test]
     fn create_and_start_flow() {
         let m = mm();
-        let flow = m.create_flow("dc1".into(), "dc2".into(), vec!["orders.*".into()]).unwrap();
+        let flow = m
+            .create_flow("dc1".into(), "dc2".into(), vec!["orders.*".into()])
+            .unwrap();
         let id = flow.id.clone();
         m.start_flow(&id).unwrap();
         assert_eq!(m.get_flow(&id).unwrap().state, MirrorFlowState::Running);
@@ -330,7 +325,9 @@ mod tests {
     #[test]
     fn lag_tracking() {
         let m = mm();
-        let flow = m.create_flow("dc1".into(), "dc2".into(), vec![".*".into()]).unwrap();
+        let flow = m
+            .create_flow("dc1".into(), "dc2".into(), vec![".*".into()])
+            .unwrap();
         m.update_lag(&flow.id, "orders", 0, 100).unwrap();
         m.update_lag(&flow.id, "orders", 1, 200).unwrap();
         assert_eq!(m.get_flow(&flow.id).unwrap().total_lag(), 300);

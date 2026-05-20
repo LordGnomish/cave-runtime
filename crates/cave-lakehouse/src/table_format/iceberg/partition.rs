@@ -122,7 +122,10 @@ pub struct PartitionSpec {
 
 impl PartitionSpec {
     pub fn unpartitioned(spec_id: i32) -> Self {
-        Self { spec_id, fields: Vec::new() }
+        Self {
+            spec_id,
+            fields: Vec::new(),
+        }
     }
 
     pub fn is_unpartitioned(&self) -> bool {
@@ -199,7 +202,10 @@ mod tests {
 
     #[test]
     fn parse_identity_ok() {
-        assert_eq!(Transform::parse_spec("identity").unwrap(), Transform::Identity);
+        assert_eq!(
+            Transform::parse_spec("identity").unwrap(),
+            Transform::Identity
+        );
     }
 
     #[test]
@@ -213,7 +219,10 @@ mod tests {
 
     #[test]
     fn parse_bucket_ok() {
-        assert_eq!(Transform::parse_spec("bucket[32]").unwrap(), Transform::Bucket(32));
+        assert_eq!(
+            Transform::parse_spec("bucket[32]").unwrap(),
+            Transform::Bucket(32)
+        );
     }
 
     #[test]
@@ -377,7 +386,12 @@ mod tests {
                 },
             ],
         };
-        assert!(spec.validate(&schema).unwrap_err().to_string().contains("duplicate field_id"));
+        assert!(
+            spec.validate(&schema)
+                .unwrap_err()
+                .to_string()
+                .contains("duplicate field_id")
+        );
     }
 
     #[test]
@@ -400,7 +414,12 @@ mod tests {
                 },
             ],
         };
-        assert!(spec.validate(&schema).unwrap_err().to_string().contains("duplicate name"));
+        assert!(
+            spec.validate(&schema)
+                .unwrap_err()
+                .to_string()
+                .contains("duplicate name")
+        );
     }
 
     // ── PartitionSpec serde ────────────────────────────────────────────────────

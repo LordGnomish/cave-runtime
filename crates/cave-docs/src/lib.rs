@@ -5,9 +5,9 @@
 //! Upstream tracking: apicurio + openapi-diff
 //! Features: OpenAPI/AsyncAPI spec storage, breaking change detection, schema versioning
 
-pub mod routes;
-pub mod models;
 pub mod engine;
+pub mod models;
+pub mod routes;
 
 use axum::Router;
 

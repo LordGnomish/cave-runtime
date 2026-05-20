@@ -5,7 +5,7 @@
 use super::K8sDashboardViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::table;
-use crate::admin::state::{scope, AdminState};
+use crate::admin::state::{AdminState, scope};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClusterNodeRow {
@@ -21,20 +21,20 @@ pub fn list_nodes(
     ctx: &RequestCtx,
 ) -> Result<Vec<ClusterNodeRow>, K8sDashboardViewError> {
     ctx.authorise(Permission::K8sDashboardRead)?;
-    Ok(scope(
-        &state.scheduler_nodes.read().unwrap(),
-        &ctx.tenant,
-        |r| &r.tenant,
+    Ok(
+        scope(&state.scheduler_nodes.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .map(|n| ClusterNodeRow {
+            name: n.name.clone(),
+            ready: n.ready,
+            allocatable_cpu_milli: n.allocatable_cpu_milli,
+            allocatable_mem_mib: n.allocatable_mem_mib,
+            taints: n.taints.clone(),
+        })
+        .collect(),
     )
-    .into_iter()
-    .map(|n| ClusterNodeRow {
-        name: n.name.clone(),
-        ready: n.ready,
-        allocatable_cpu_milli: n.allocatable_cpu_milli,
-        allocatable_mem_mib: n.allocatable_mem_mib,
-        taints: n.taints.clone(),
-    })
-    .collect())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,19 +88,17 @@ pub(super) fn render_section(
                 if n.ready { "Ready" } else { "NotReady" }.into(),
                 format!("{}m", n.allocatable_cpu_milli),
                 format!("{}Mi", n.allocatable_mem_mib),
-                if n.taints.is_empty() { "—".into() } else { n.taints.join(", ") },
+                if n.taints.is_empty() {
+                    "—".into()
+                } else {
+                    n.taints.join(", ")
+                },
             ]
         })
         .collect();
     let ns_rows: Vec<Vec<String>> = namespaces
         .iter()
-        .map(|n| {
-            vec![
-                n.name.clone(),
-                n.status.into(),
-                n.pod_count.to_string(),
-            ]
-        })
+        .map(|n| vec![n.name.clone(), n.status.into(), n.pod_count.to_string()])
         .collect();
     Ok(format!(
         r#"<section id="k8s-dashboard-cluster" class="mt-6">

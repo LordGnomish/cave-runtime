@@ -201,7 +201,11 @@ mod tests {
     #[test]
     fn test_catalog_create_and_get() {
         let store = CatalogStore::new();
-        let mut entry = CatalogEntry::new("UserAPI".to_string(), "team-a".to_string(), "core".to_string());
+        let mut entry = CatalogEntry::new(
+            "UserAPI".to_string(),
+            "team-a".to_string(),
+            "core".to_string(),
+        );
         let id = entry.id;
 
         store.upsert(entry.clone());
@@ -213,7 +217,11 @@ mod tests {
     #[test]
     fn test_catalog_get_by_slug() {
         let store = CatalogStore::new();
-        let entry = CatalogEntry::new("User API".to_string(), "team-a".to_string(), "core".to_string());
+        let entry = CatalogEntry::new(
+            "User API".to_string(),
+            "team-a".to_string(),
+            "core".to_string(),
+        );
         store.upsert(entry.clone());
 
         let retrieved = store.get_by_slug(&entry.slug);
@@ -224,7 +232,11 @@ mod tests {
     #[test]
     fn test_catalog_publish_version() {
         let store = CatalogStore::new();
-        let mut entry = CatalogEntry::new("UserAPI".to_string(), "team-a".to_string(), "core".to_string());
+        let mut entry = CatalogEntry::new(
+            "UserAPI".to_string(),
+            "team-a".to_string(),
+            "core".to_string(),
+        );
         let id = entry.id;
         entry.add_version(ApiVersion {
             version: "1.0.0".to_string(),
@@ -241,7 +253,11 @@ mod tests {
         assert!(store.publish(id, "1.0.0"));
 
         let retrieved = store.get(id).unwrap();
-        let v = retrieved.versions.iter().find(|v| v.version == "1.0.0").unwrap();
+        let v = retrieved
+            .versions
+            .iter()
+            .find(|v| v.version == "1.0.0")
+            .unwrap();
         assert_eq!(v.state, VersionState::Published);
         assert!(v.published_at.is_some());
     }
@@ -249,9 +265,17 @@ mod tests {
     #[test]
     fn test_catalog_search() {
         let store = CatalogStore::new();
-        let mut e1 = CatalogEntry::new("UserAPI".to_string(), "team-a".to_string(), "core".to_string());
+        let mut e1 = CatalogEntry::new(
+            "UserAPI".to_string(),
+            "team-a".to_string(),
+            "core".to_string(),
+        );
         e1.description = "User management API".to_string();
-        let mut e2 = CatalogEntry::new("OrderAPI".to_string(), "team-b".to_string(), "sales".to_string());
+        let mut e2 = CatalogEntry::new(
+            "OrderAPI".to_string(),
+            "team-b".to_string(),
+            "sales".to_string(),
+        );
         e2.description = "Order processing system".to_string();
 
         store.upsert(e1);
@@ -265,9 +289,21 @@ mod tests {
     #[test]
     fn test_catalog_list_by_category() {
         let store = CatalogStore::new();
-        let e1 = CatalogEntry::new("UserAPI".to_string(), "team-a".to_string(), "core".to_string());
-        let e2 = CatalogEntry::new("OrderAPI".to_string(), "team-b".to_string(), "core".to_string());
-        let e3 = CatalogEntry::new("ReportAPI".to_string(), "team-c".to_string(), "analytics".to_string());
+        let e1 = CatalogEntry::new(
+            "UserAPI".to_string(),
+            "team-a".to_string(),
+            "core".to_string(),
+        );
+        let e2 = CatalogEntry::new(
+            "OrderAPI".to_string(),
+            "team-b".to_string(),
+            "core".to_string(),
+        );
+        let e3 = CatalogEntry::new(
+            "ReportAPI".to_string(),
+            "team-c".to_string(),
+            "analytics".to_string(),
+        );
 
         store.upsert(e1);
         store.upsert(e2);

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-use axum::{http::StatusCode, response::{IntoResponse, Response}, Json};
+use axum::{
+    Json,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use serde_json::json;
 use thiserror::Error;
 
@@ -59,12 +63,17 @@ impl VaultError {
         match self {
             VaultError::PermissionDenied => StatusCode::FORBIDDEN,
             VaultError::BadToken | VaultError::TokenNotFound => StatusCode::FORBIDDEN,
-            VaultError::NotFound(_) | VaultError::KeyNotFound(_)
-            | VaultError::MountNotFound(_) | VaultError::PolicyNotFound(_)
-            | VaultError::RoleNotFound(_) | VaultError::SecretNotFound
-            | VaultError::LeaseNotFound | VaultError::WrapNotFound => StatusCode::NOT_FOUND,
+            VaultError::NotFound(_)
+            | VaultError::KeyNotFound(_)
+            | VaultError::MountNotFound(_)
+            | VaultError::PolicyNotFound(_)
+            | VaultError::RoleNotFound(_)
+            | VaultError::SecretNotFound
+            | VaultError::LeaseNotFound
+            | VaultError::WrapNotFound => StatusCode::NOT_FOUND,
             VaultError::Sealed | VaultError::NotInitialized => StatusCode::SERVICE_UNAVAILABLE,
-            VaultError::AlreadyInitialized | VaultError::InvalidRequest(_)
+            VaultError::AlreadyInitialized
+            | VaultError::InvalidRequest(_)
             | VaultError::CasFailed => StatusCode::BAD_REQUEST,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }

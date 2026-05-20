@@ -190,8 +190,14 @@ mod tests {
             serde_json::to_string(&SbomFormat::CycloneDx).unwrap(),
             "\"cyclone_dx\""
         );
-        assert_eq!(serde_json::to_string(&SbomFormat::Spdx).unwrap(), "\"spdx\"");
-        assert_eq!(serde_json::to_string(&SbomFormat::Syft).unwrap(), "\"syft\"");
+        assert_eq!(
+            serde_json::to_string(&SbomFormat::Spdx).unwrap(),
+            "\"spdx\""
+        );
+        assert_eq!(
+            serde_json::to_string(&SbomFormat::Syft).unwrap(),
+            "\"syft\""
+        );
     }
 
     #[test]
@@ -209,7 +215,10 @@ mod tests {
     #[test]
     fn test_component_type_classifier_strings() {
         assert_eq!(ComponentType::Library.as_classifier(), "LIBRARY");
-        assert_eq!(ComponentType::OperatingSystem.as_classifier(), "OPERATING_SYSTEM");
+        assert_eq!(
+            ComponentType::OperatingSystem.as_classifier(),
+            "OPERATING_SYSTEM"
+        );
         assert_eq!(ComponentType::Framework.as_classifier(), "FRAMEWORK");
     }
 
@@ -312,7 +321,10 @@ mod tests {
     #[test]
     fn vuln_source_serde_uppercase() {
         assert_eq!(serde_json::to_string(&VulnSource::Nvd).unwrap(), "\"NVD\"");
-        assert_eq!(serde_json::to_string(&VulnSource::Ghsa).unwrap(), "\"GHSA\"");
+        assert_eq!(
+            serde_json::to_string(&VulnSource::Ghsa).unwrap(),
+            "\"GHSA\""
+        );
         assert_eq!(serde_json::to_string(&VulnSource::Osv).unwrap(), "\"OSV\"");
     }
 
@@ -350,11 +362,17 @@ mod tests {
 
     #[test]
     fn analysis_state_serde_uppercase() {
-        assert_eq!(serde_json::to_string(&AnalysisState::NotSet).unwrap(), "\"NOT_SET\"");
+        assert_eq!(
+            serde_json::to_string(&AnalysisState::NotSet).unwrap(),
+            "\"NOT_SET\""
+        );
         assert_eq!(
             serde_json::to_string(&AnalysisState::FalsePositive).unwrap(),
             "\"FALSE_POSITIVE\""
         );
-        assert_eq!(serde_json::to_string(&AnalysisState::InTriage).unwrap(), "\"IN_TRIAGE\"");
+        assert_eq!(
+            serde_json::to_string(&AnalysisState::InTriage).unwrap(),
+            "\"IN_TRIAGE\""
+        );
     }
 }

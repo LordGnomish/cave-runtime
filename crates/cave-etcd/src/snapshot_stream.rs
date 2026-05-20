@@ -41,8 +41,12 @@ impl SnapshotReceiver {
         }
     }
 
-    pub fn total_chunks(&self) -> u64 { self.total }
-    pub fn chunk_size(&self) -> usize { self.chunk_size }
+    pub fn total_chunks(&self) -> u64 {
+        self.total
+    }
+    pub fn chunk_size(&self) -> usize {
+        self.chunk_size
+    }
 
     pub fn received_count(&self) -> u64 {
         self.received.read().unwrap().len() as u64
@@ -61,12 +65,16 @@ impl SnapshotReceiver {
     pub fn add(&self, sequence: u64, payload: Vec<u8>) -> EtcdResult<bool> {
         if sequence >= self.total {
             return Err(EtcdError::SnapshotDecode(format!(
-                "sequence {sequence} >= total {}", self.total
+                "sequence {sequence} >= total {}",
+                self.total
             )));
         }
         let mut g = self.received.write().unwrap();
-        if g.contains_key(&sequence) { return Ok(false); }
-        self.bytes_received.fetch_add(payload.len(), Ordering::SeqCst);
+        if g.contains_key(&sequence) {
+            return Ok(false);
+        }
+        self.bytes_received
+            .fetch_add(payload.len(), Ordering::SeqCst);
         g.insert(sequence, payload);
         if g.len() as u64 == self.total {
             self.completed.fetch_add(1, Ordering::SeqCst);
@@ -87,12 +95,15 @@ impl SnapshotReceiver {
         let g = self.received.read().unwrap();
         if (g.len() as u64) != self.total {
             return Err(EtcdError::SnapshotDecode(format!(
-                "missing {} chunks", self.total - g.len() as u64
+                "missing {} chunks",
+                self.total - g.len() as u64
             )));
         }
         let mut out = Vec::with_capacity(self.bytes_received());
         for s in 0..self.total {
-            let chunk = g.get(&s).ok_or_else(|| EtcdError::SnapshotDecode(format!("missing seq {s}")))?;
+            let chunk = g
+                .get(&s)
+                .ok_or_else(|| EtcdError::SnapshotDecode(format!("missing seq {s}")))?;
             out.extend_from_slice(chunk);
         }
         Ok(out)
@@ -103,7 +114,9 @@ impl SnapshotReceiver {
 
 /// Chunk a payload into fixed-size pieces, ready for the wire.
 pub fn chunk(payload: &[u8], chunk_size: usize) -> Vec<(u64, Vec<u8>)> {
-    if chunk_size == 0 || payload.is_empty() { return Vec::new(); }
+    if chunk_size == 0 || payload.is_empty() {
+        return Vec::new();
+    }
     let mut out = Vec::new();
     let mut seq = 0u64;
     let mut p = 0usize;
@@ -138,7 +151,10 @@ pub enum LearnerError {
     /// Tried to promote before `Healthy`.
     NotReady(LearnerStage),
     /// Stage transitioned illegally (e.g. Promoted → Joining).
-    InvalidTransition { from: LearnerStage, to: LearnerStage },
+    InvalidTransition {
+        from: LearnerStage,
+        to: LearnerStage,
+    },
     /// Lag exceeded the configured ceiling.
     LagTooHigh { lag: u64, ceiling: u64 },
 }
@@ -147,7 +163,9 @@ impl std::fmt::Display for LearnerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NotReady(s) => write!(f, "not ready: stage={s:?}"),
-            Self::InvalidTransition { from, to } => write!(f, "invalid transition {from:?} → {to:?}"),
+            Self::InvalidTransition { from, to } => {
+                write!(f, "invalid transition {from:?} → {to:?}")
+            }
             Self::LagTooHigh { lag, ceiling } => write!(f, "lag {lag} > ceiling {ceiling}"),
         }
     }
@@ -177,12 +195,22 @@ impl LearnerBootstrap {
         let mut inner = LearnerInner::default();
         inner.stage = Some(LearnerStage::Joining);
         inner.transitions.push(LearnerStage::Joining);
-        Self { member_id, max_lag, inner: RwLock::new(inner) }
+        Self {
+            member_id,
+            max_lag,
+            inner: RwLock::new(inner),
+        }
     }
 
-    pub fn member_id(&self) -> u64 { self.member_id }
-    pub fn max_lag(&self) -> u64 { self.max_lag }
-    pub fn stage(&self) -> LearnerStage { self.inner.read().unwrap().stage.unwrap() }
+    pub fn member_id(&self) -> u64 {
+        self.member_id
+    }
+    pub fn max_lag(&self) -> u64 {
+        self.max_lag
+    }
+    pub fn stage(&self) -> LearnerStage {
+        self.inner.read().unwrap().stage.unwrap()
+    }
     pub fn transitions(&self) -> Vec<LearnerStage> {
         self.inner.read().unwrap().transitions.clone()
     }
@@ -205,7 +233,10 @@ impl LearnerBootstrap {
         inner.learner_revision = learner_rev;
         let lag = leader_rev.saturating_sub(learner_rev);
         if lag > self.max_lag {
-            return Err(LearnerError::LagTooHigh { lag, ceiling: self.max_lag });
+            return Err(LearnerError::LagTooHigh {
+                lag,
+                ceiling: self.max_lag,
+            });
         }
         if matches!(inner.stage, Some(LearnerStage::CatchingUp)) {
             inner.stage = Some(LearnerStage::Healthy);
@@ -377,7 +408,9 @@ mod tests {
         let payload: Vec<u8> = (0..1000u32).map(|i| i as u8).collect();
         let chunks = chunk(&payload, 64);
         let r = SnapshotReceiver::new(chunks.len() as u64, 64);
-        for (s, b) in chunks { r.add(s, b).unwrap(); }
+        for (s, b) in chunks {
+            r.add(s, b).unwrap();
+        }
         assert_eq!(r.assemble().unwrap(), payload);
     }
 

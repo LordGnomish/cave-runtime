@@ -40,10 +40,7 @@ pub fn list_identities(
         .collect())
 }
 
-pub(crate) fn render_section(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, NetViewError> {
+pub(crate) fn render_section(state: &AdminState, ctx: &RequestCtx) -> Result<String, NetViewError> {
     let rows = list_identities(state, ctx)?;
     let table_rows: Vec<Vec<String>> = rows
         .iter()
@@ -62,10 +59,7 @@ pub(crate) fn render_section(
   {tbl}
 </section>"#,
         n = rows.len(),
-        tbl = table(
-            &["id", "namespace", "labels", "endpoints"],
-            &table_rows
-        ),
+        tbl = table(&["id", "namespace", "labels", "endpoints"], &table_rows),
     ))
 }
 

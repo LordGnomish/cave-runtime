@@ -5,8 +5,8 @@
 //! Both formats are accepted on the same UDP/TCP listener. The parser
 //! auto-detects the format based on the leading `<PRI>` and version field.
 
-use std::collections::HashMap;
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use std::collections::HashMap;
 
 use crate::models::{Labels, LogEntry, TimestampNs};
 
@@ -30,20 +30,28 @@ impl SyslogMessage {
         let mut label_map: HashMap<String, String> = HashMap::new();
 
         if let Some(h) = &self.hostname {
-            if h != "-" { label_map.insert("hostname".into(), h.clone()); }
+            if h != "-" {
+                label_map.insert("hostname".into(), h.clone());
+            }
         }
         if let Some(a) = &self.app_name {
-            if a != "-" { label_map.insert("app".into(), a.clone()); }
+            if a != "-" {
+                label_map.insert("app".into(), a.clone());
+            }
         }
         if let Some(p) = &self.proc_id {
-            if p != "-" { label_map.insert("proc_id".into(), p.clone()); }
+            if p != "-" {
+                label_map.insert("proc_id".into(), p.clone());
+            }
         }
         label_map.insert("facility".into(), self.facility.to_string());
         label_map.insert("severity".into(), severity_name(self.severity).to_owned());
 
         let mut meta: HashMap<String, String> = HashMap::new();
         if let Some(mid) = &self.msg_id {
-            if mid != "-" { meta.insert("msg_id".into(), mid.clone()); }
+            if mid != "-" {
+                meta.insert("msg_id".into(), mid.clone());
+            }
         }
         for (sd_id, params) in &self.structured_data {
             for (k, v) in params {
@@ -51,7 +59,11 @@ impl SyslogMessage {
             }
         }
 
-        let entry = LogEntry { ts: self.timestamp, line: self.message.clone(), metadata: meta };
+        let entry = LogEntry {
+            ts: self.timestamp,
+            line: self.message.clone(),
+            metadata: meta,
+        };
         (entry, Labels::new(label_map))
     }
 }
@@ -82,10 +94,13 @@ pub fn parse_rfc5424(line: &str) -> Option<SyslogMessage> {
 
     // Version field (must be "1")
     let (ver, rest) = next_field(rest)?;
-    if ver != "1" { return None; }
+    if ver != "1" {
+        return None;
+    }
 
     let (ts_str, rest) = next_field(rest)?;
-    let timestamp = parse_5424_timestamp(ts_str).unwrap_or_else(|| Utc::now().timestamp_nanos_opt().unwrap_or(0));
+    let timestamp = parse_5424_timestamp(ts_str)
+        .unwrap_or_else(|| Utc::now().timestamp_nanos_opt().unwrap_or(0));
 
     let (hostname, rest) = next_field(rest)?;
     let (app_name, rest) = next_field(rest)?;
@@ -111,7 +126,9 @@ pub fn parse_rfc5424(line: &str) -> Option<SyslogMessage> {
 }
 
 fn parse_priority(s: &str) -> Option<(u16, &str)> {
-    if !s.starts_with('<') { return None; }
+    if !s.starts_with('<') {
+        return None;
+    }
     let end = s.find('>')?;
     let pri: u16 = s[1..end].parse().ok()?;
     Some((pri, &s[end + 1..]))
@@ -119,13 +136,17 @@ fn parse_priority(s: &str) -> Option<(u16, &str)> {
 
 fn next_field(s: &str) -> Option<(&str, &str)> {
     let s = s.trim_start_matches(' ');
-    if s.is_empty() { return None; }
+    if s.is_empty() {
+        return None;
+    }
     let end = s.find(' ').unwrap_or(s.len());
     Some((&s[..end], &s[end..]))
 }
 
 fn parse_5424_timestamp(s: &str) -> Option<TimestampNs> {
-    if s == "-" { return None; }
+    if s == "-" {
+        return None;
+    }
     // RFC 3339: 2023-10-05T12:34:56.123456789Z or +00:00
     let dt = DateTime::parse_from_rfc3339(s).ok()?;
     Some(dt.timestamp_nanos_opt()?)
@@ -136,32 +157,43 @@ fn parse_structured_data(s: &str) -> Option<(HashMap<String, HashMap<String, Str
     if s.starts_with('-') {
         return Some((HashMap::new(), &s[1..]));
     }
-    if !s.starts_with('[') { return None; }
+    if !s.starts_with('[') {
+        return None;
+    }
 
     let mut result: HashMap<String, HashMap<String, String>> = HashMap::new();
     let mut rest = s;
 
     while rest.starts_with('[') {
         rest = &rest[1..]; // consume '['
-        let id_end = rest.find(|c: char| c == ' ' || c == ']').unwrap_or(rest.len());
+        let id_end = rest
+            .find(|c: char| c == ' ' || c == ']')
+            .unwrap_or(rest.len());
         let sd_id = rest[..id_end].to_owned();
         rest = &rest[id_end..];
 
         let mut params: HashMap<String, String> = HashMap::new();
         while rest.starts_with(' ') {
             rest = &rest[1..];
-            if rest.starts_with(']') { break; }
+            if rest.starts_with(']') {
+                break;
+            }
             // Parse param: key="value"
             let eq = rest.find('=')?;
             let key = rest[..eq].to_owned();
             rest = &rest[eq + 1..];
-            if !rest.starts_with('"') { break; }
+            if !rest.starts_with('"') {
+                break;
+            }
             rest = &rest[1..]; // consume opening "
             let mut val = String::new();
             loop {
                 match rest.chars().next() {
                     None => break,
-                    Some('"') => { rest = &rest[1..]; break; }
+                    Some('"') => {
+                        rest = &rest[1..];
+                        break;
+                    }
                     Some('\\') => {
                         rest = &rest[1..];
                         if let Some(c) = rest.chars().next() {
@@ -177,7 +209,9 @@ fn parse_structured_data(s: &str) -> Option<(HashMap<String, HashMap<String, Str
             }
             params.insert(key, val);
         }
-        if rest.starts_with(']') { rest = &rest[1..]; }
+        if rest.starts_with(']') {
+            rest = &rest[1..];
+        }
         result.insert(sd_id, params);
     }
 
@@ -220,7 +254,15 @@ pub fn parse_rfc3164(line: &str) -> Option<SyslogMessage> {
         } else {
             (tag, "")
         };
-        (app.to_owned(), if pid.is_empty() { None } else { Some(pid.to_owned()) }, &rest[colon + 2..])
+        (
+            app.to_owned(),
+            if pid.is_empty() {
+                None
+            } else {
+                Some(pid.to_owned())
+            },
+            &rest[colon + 2..],
+        )
     } else {
         (String::new(), None, rest)
     };
@@ -230,7 +272,11 @@ pub fn parse_rfc3164(line: &str) -> Option<SyslogMessage> {
         severity,
         timestamp,
         hostname: Some(hostname.to_owned()),
-        app_name: if app_name.is_empty() { None } else { Some(app_name) },
+        app_name: if app_name.is_empty() {
+            None
+        } else {
+            Some(app_name)
+        },
         proc_id,
         msg_id: None,
         structured_data: HashMap::new(),

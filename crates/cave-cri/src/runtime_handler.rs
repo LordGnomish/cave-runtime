@@ -350,7 +350,10 @@ mod tests {
 
     #[test]
     fn runtime_handler_features_roundtrips_through_json() {
-        let f = RuntimeHandlerFeatures { recursive_read_only_mounts: true, user_namespaces: false };
+        let f = RuntimeHandlerFeatures {
+            recursive_read_only_mounts: true,
+            user_namespaces: false,
+        };
         let json = serde_json::to_string(&f).unwrap();
         let back: RuntimeHandlerFeatures = serde_json::from_str(&json).unwrap();
         assert_eq!(f, back);
@@ -370,7 +373,9 @@ mod tests {
                 });
             }));
         }
-        for h in handles { h.join().unwrap(); }
+        for h in handles {
+            h.join().unwrap();
+        }
         assert_eq!(r.len(), 10);
     }
 }

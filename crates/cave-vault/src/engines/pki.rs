@@ -1,25 +1,26 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+use crate::VaultState;
 use crate::error::{VaultError, VaultResult};
 use crate::response::VaultResponse;
-use crate::VaultState;
 use axum::{
+    Router,
     extract::{Json, Path, State},
     http::HeaderMap,
     response::IntoResponse,
     routing::{delete, get, post},
-    Router,
 };
 use chrono::{Duration, Utc};
 use rcgen::{BasicConstraints, CertificateParams, DnType, IsCa, KeyPair, SanType};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::Arc;
 use time::OffsetDateTime;
 
 fn extract_token(headers: &HeaderMap) -> VaultResult<String> {
-    headers.get("x-vault-token")
+    headers
+        .get("x-vault-token")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or(VaultError::BadToken)
@@ -126,24 +127,29 @@ pub async fn generate_root(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
 
-    let common_name = body.get("common_name")
+    let common_name = body
+        .get("common_name")
         .and_then(|v| v.as_str())
         .unwrap_or("Vault CA");
-    let ttl_secs = body.get("ttl")
+    let ttl_secs = body
+        .get("ttl")
         .and_then(|v| v.as_str())
         .map(crate::token::parse_duration)
         .unwrap_or(315_360_000);
 
-    let ca_key = KeyPair::generate()
-        .map_err(|e| VaultError::Pki(format!("key gen failed: {}", e)))?;
+    let ca_key =
+        KeyPair::generate().map_err(|e| VaultError::Pki(format!("key gen failed: {}", e)))?;
 
     let mut params = CertificateParams::default();
     params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
-    params.distinguished_name.push(DnType::CommonName, common_name);
+    params
+        .distinguished_name
+        .push(DnType::CommonName, common_name);
     params.not_before = OffsetDateTime::now_utc();
     params.not_after = chrono_to_time(Utc::now() + Duration::seconds(ttl_secs));
 
-    let ca_cert = params.self_signed(&ca_key)
+    let ca_cert = params
+        .self_signed(&ca_key)
         .map_err(|e| VaultError::Pki(format!("cert gen failed: {}", e)))?;
 
     let cert_pem = ca_cert.pem();
@@ -186,20 +192,24 @@ pub async fn generate_intermediate(
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    let common_name = body.get("common_name")
+    let common_name = body
+        .get("common_name")
         .and_then(|v| v.as_str())
         .unwrap_or("Vault Intermediate CA");
 
-    let key = KeyPair::generate()
-        .map_err(|e| VaultError::Pki(format!("key gen failed: {}", e)))?;
+    let key = KeyPair::generate().map_err(|e| VaultError::Pki(format!("key gen failed: {}", e)))?;
 
     let mut params = CertificateParams::default();
     params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
-    params.distinguished_name.push(DnType::CommonName, common_name);
+    params
+        .distinguished_name
+        .push(DnType::CommonName, common_name);
 
-    let csr = params.serialize_request(&key)
+    let csr = params
+        .serialize_request(&key)
         .map_err(|e| VaultError::Pki(format!("CSR gen failed: {}", e)))?;
-    let csr_pem = csr.pem()
+    let csr_pem = csr
+        .pem()
         .map_err(|e| VaultError::Pki(format!("CSR PEM failed: {}", e)))?;
 
     let key_pem = key.serialize_pem();
@@ -218,7 +228,10 @@ pub async fn sign_intermediate(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.pki_store.read().await;
-    let ca = store.ca.as_ref().ok_or_else(|| VaultError::Pki("no CA configured".into()))?;
+    let ca = store
+        .ca
+        .as_ref()
+        .ok_or_else(|| VaultError::Pki("no CA configured".into()))?;
     Ok(VaultResponse::new().with_data(json!({
         "certificate": "signed-intermediate-cert-placeholder",
         "issuing_ca": ca.cert_pem.clone(),
@@ -233,7 +246,8 @@ pub async fn set_signed(
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    let cert_pem = body.get("certificate")
+    let cert_pem = body
+        .get("certificate")
         .and_then(|v| v.as_str())
         .ok_or_else(|| VaultError::InvalidRequest("certificate required".into()))?
         .to_string();
@@ -256,7 +270,10 @@ pub async fn get_ca_pem(
     Path(_mount): Path<String>,
 ) -> Result<impl IntoResponse, VaultError> {
     let store = state.pki_store.read().await;
-    let ca = store.ca.as_ref().ok_or_else(|| VaultError::Pki("no CA configured".into()))?;
+    let ca = store
+        .ca
+        .as_ref()
+        .ok_or_else(|| VaultError::Pki("no CA configured".into()))?;
     Ok((
         axum::http::StatusCode::OK,
         [(axum::http::header::CONTENT_TYPE, "application/x-pem-file")],
@@ -269,7 +286,10 @@ pub async fn get_ca_der(
     Path(_mount): Path<String>,
 ) -> Result<VaultResponse, VaultError> {
     let store = state.pki_store.read().await;
-    let ca = store.ca.as_ref().ok_or_else(|| VaultError::Pki("no CA configured".into()))?;
+    let ca = store
+        .ca
+        .as_ref()
+        .ok_or_else(|| VaultError::Pki("no CA configured".into()))?;
     Ok(VaultResponse::new().with_data(json!({ "certificate": ca.cert_pem })))
 }
 
@@ -293,19 +313,37 @@ pub async fn create_role(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.pki_store.write().await;
-    let role = store.roles.entry(role_name.clone()).or_insert_with(|| PkiRole {
-        name: role_name.clone(),
-        ..Default::default()
-    });
+    let role = store
+        .roles
+        .entry(role_name.clone())
+        .or_insert_with(|| PkiRole {
+            name: role_name.clone(),
+            ..Default::default()
+        });
     if let Some(domains) = body.get("allowed_domains").and_then(|v| v.as_array()) {
-        role.allowed_domains = domains.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
+        role.allowed_domains = domains
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect();
     }
-    if let Some(v) = body.get("allow_subdomains").and_then(|v| v.as_bool()) { role.allow_subdomains = v; }
-    if let Some(v) = body.get("allow_any_name").and_then(|v| v.as_bool()) { role.allow_any_name = v; }
-    if let Some(v) = body.get("key_type").and_then(|v| v.as_str()) { role.key_type = v.to_string(); }
-    if let Some(v) = body.get("key_bits").and_then(|v| v.as_u64()) { role.key_bits = v as u32; }
-    if let Some(ttl) = body.get("ttl").and_then(|v| v.as_str()) { role.ttl = crate::token::parse_duration(ttl); }
-    if let Some(ttl) = body.get("max_ttl").and_then(|v| v.as_str()) { role.max_ttl = crate::token::parse_duration(ttl); }
+    if let Some(v) = body.get("allow_subdomains").and_then(|v| v.as_bool()) {
+        role.allow_subdomains = v;
+    }
+    if let Some(v) = body.get("allow_any_name").and_then(|v| v.as_bool()) {
+        role.allow_any_name = v;
+    }
+    if let Some(v) = body.get("key_type").and_then(|v| v.as_str()) {
+        role.key_type = v.to_string();
+    }
+    if let Some(v) = body.get("key_bits").and_then(|v| v.as_u64()) {
+        role.key_bits = v as u32;
+    }
+    if let Some(ttl) = body.get("ttl").and_then(|v| v.as_str()) {
+        role.ttl = crate::token::parse_duration(ttl);
+    }
+    if let Some(ttl) = body.get("max_ttl").and_then(|v| v.as_str()) {
+        role.max_ttl = crate::token::parse_duration(ttl);
+    }
     Ok(VaultResponse::new())
 }
 
@@ -316,7 +354,9 @@ pub async fn read_role(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.pki_store.read().await;
-    let role = store.roles.get(&role_name)
+    let role = store
+        .roles
+        .get(&role_name)
         .ok_or_else(|| VaultError::RoleNotFound(role_name))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(role).unwrap_or_default()))
 }
@@ -351,15 +391,27 @@ pub async fn issue_cert(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
 
-    let common_name = body.get("common_name")
+    let common_name = body
+        .get("common_name")
         .and_then(|v| v.as_str())
         .ok_or_else(|| VaultError::InvalidRequest("common_name required".into()))?;
 
     let store = state.pki_store.read().await;
-    let ca = store.ca.as_ref().ok_or_else(|| VaultError::Pki("no CA configured".into()))?.clone();
-    let ca_key_pem = store.ca_key_pem.as_ref().ok_or_else(|| VaultError::Pki("no CA key available".into()))?.clone();
-    let role = store.roles.get(&role_name)
-        .ok_or_else(|| VaultError::RoleNotFound(role_name.clone()))?.clone();
+    let ca = store
+        .ca
+        .as_ref()
+        .ok_or_else(|| VaultError::Pki("no CA configured".into()))?
+        .clone();
+    let ca_key_pem = store
+        .ca_key_pem
+        .as_ref()
+        .ok_or_else(|| VaultError::Pki("no CA key available".into()))?
+        .clone();
+    let role = store
+        .roles
+        .get(&role_name)
+        .ok_or_else(|| VaultError::RoleNotFound(role_name.clone()))?
+        .clone();
     drop(store);
 
     if !role.allow_any_name {
@@ -370,19 +422,23 @@ pub async fn issue_cert(
             common_name == d.as_str()
         });
         if !domain_ok {
-            return Err(VaultError::Pki(format!("common_name {} not allowed by role", common_name)));
+            return Err(VaultError::Pki(format!(
+                "common_name {} not allowed by role",
+                common_name
+            )));
         }
     }
 
-    let ttl_secs = body.get("ttl")
+    let ttl_secs = body
+        .get("ttl")
         .and_then(|v| v.as_str())
         .map(crate::token::parse_duration)
         .filter(|&t| t > 0)
         .unwrap_or_else(|| if role.ttl > 0 { role.ttl } else { 86400 });
 
     // Generate end-entity cert using rcgen
-    let ee_key = KeyPair::generate()
-        .map_err(|e| VaultError::Pki(format!("key gen failed: {}", e)))?;
+    let ee_key =
+        KeyPair::generate().map_err(|e| VaultError::Pki(format!("key gen failed: {}", e)))?;
 
     let mut san_names = vec![common_name.to_string()];
     if let Some(alt_names) = body.get("alt_names").and_then(|v| v.as_str()) {
@@ -391,7 +447,9 @@ pub async fn issue_cert(
 
     let mut ee_params = CertificateParams::new(san_names)
         .map_err(|e| VaultError::Pki(format!("cert params failed: {}", e)))?;
-    ee_params.distinguished_name.push(DnType::CommonName, common_name);
+    ee_params
+        .distinguished_name
+        .push(DnType::CommonName, common_name);
     ee_params.not_before = OffsetDateTime::now_utc();
     ee_params.not_after = chrono_to_time(Utc::now() + Duration::seconds(ttl_secs));
 
@@ -404,11 +462,15 @@ pub async fn issue_cert(
     // Reconstruct CA cert params for signing
     let mut ca_params = CertificateParams::default();
     ca_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
-    ca_params.distinguished_name.push(DnType::CommonName, "Vault CA");
-    let ca_cert_for_signing = ca_params.self_signed(&ca_key)
+    ca_params
+        .distinguished_name
+        .push(DnType::CommonName, "Vault CA");
+    let ca_cert_for_signing = ca_params
+        .self_signed(&ca_key)
         .map_err(|e| VaultError::Pki(format!("CA cert reconstitution failed: {}", e)))?;
 
-    let ee_cert = ee_params.signed_by(&ee_key, &ca_cert_for_signing, &ca_key)
+    let ee_cert = ee_params
+        .signed_by(&ee_key, &ca_cert_for_signing, &ca_key)
         .map_err(|e| VaultError::Pki(format!("cert signing failed: {}", e)))?;
 
     let cert_pem = ee_cert.pem();
@@ -457,7 +519,8 @@ pub async fn revoke_cert(
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    let serial = body.get("serial_number")
+    let serial = body
+        .get("serial_number")
         .and_then(|v| v.as_str())
         .ok_or_else(|| VaultError::InvalidRequest("serial_number required".into()))?
         .to_string();
@@ -481,7 +544,9 @@ pub async fn read_cert(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.pki_store.read().await;
-    let cert = store.certs.get(&serial)
+    let cert = store
+        .certs
+        .get(&serial)
         .ok_or_else(|| VaultError::NotFound(format!("cert {} not found", serial)))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(cert).unwrap_or_default()))
 }

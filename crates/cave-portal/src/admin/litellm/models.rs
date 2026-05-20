@@ -5,24 +5,36 @@
 use super::types::{LiteLlmModel, LiteLlmViewError};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
+use crate::admin::state::{AdminState, scope};
 
 pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<LiteLlmModel>, LiteLlmViewError> {
     ctx.authorise(Permission::LiteLlmRead)?;
     let mut rows: Vec<LiteLlmModel> =
-        scope(&state.litellm_models.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-            .into_iter()
-            .cloned()
-            .collect();
+        scope(&state.litellm_models.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| a.provider.cmp(&b.provider).then(a.name.cmp(&b.name)));
     Ok(rows)
 }
 
-pub fn list_active(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<LiteLlmModel>, LiteLlmViewError> {
-    Ok(list(state, ctx)?.into_iter().filter(|m| m.status == "active").collect())
+pub fn list_active(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<LiteLlmModel>, LiteLlmViewError> {
+    Ok(list(state, ctx)?
+        .into_iter()
+        .filter(|m| m.status == "active")
+        .collect())
 }
 
-pub fn get(state: &AdminState, ctx: &RequestCtx, name: &str) -> Result<LiteLlmModel, LiteLlmViewError> {
+pub fn get(
+    state: &AdminState,
+    ctx: &RequestCtx,
+    name: &str,
+) -> Result<LiteLlmModel, LiteLlmViewError> {
     list(state, ctx)?
         .into_iter()
         .find(|m| m.name == name)
@@ -39,7 +51,9 @@ pub fn provider_histogram(rows: &[LiteLlmModel]) -> Vec<(String, usize)> {
 }
 
 pub fn with_fallback<'a>(rows: &'a [LiteLlmModel]) -> Vec<&'a LiteLlmModel> {
-    rows.iter().filter(|m| !m.fallback_chain.is_empty()).collect()
+    rows.iter()
+        .filter(|m| !m.fallback_chain.is_empty())
+        .collect()
 }
 
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LiteLlmViewError> {
@@ -73,7 +87,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LiteLlmVie
         r#"<section><div class="mb-3">{chips}</div>{tbl}</section>"#,
         chips = chips,
         tbl = table(
-            &["name", "provider", "model_id", "status", "rpm", "tpm", "fallback"],
+            &[
+                "name", "provider", "model_id", "status", "rpm", "tpm", "fallback"
+            ],
             &rows_html,
         ),
     );
@@ -94,7 +110,13 @@ mod tests {
         RequestCtx::developer("acme", perms)
     }
 
-    fn m(tenant: &str, name: &str, provider: &str, status: &str, fallback: Vec<&str>) -> LiteLlmModel {
+    fn m(
+        tenant: &str,
+        name: &str,
+        provider: &str,
+        status: &str,
+        fallback: Vec<&str>,
+    ) -> LiteLlmModel {
         LiteLlmModel {
             tenant: TenantId::new(tenant).expect("t"),
             name: name.into(),
@@ -111,8 +133,20 @@ mod tests {
     fn seeded() -> AdminState {
         let s = AdminState::seeded();
         let mut g = s.litellm_models.write().unwrap();
-        g.push(m("acme", "gpt-4o", "openai", "active", vec!["claude-3-5-sonnet"]));
-        g.push(m("acme", "claude-3-5-sonnet", "anthropic", "active", vec![]));
+        g.push(m(
+            "acme",
+            "gpt-4o",
+            "openai",
+            "active",
+            vec!["claude-3-5-sonnet"],
+        ));
+        g.push(m(
+            "acme",
+            "claude-3-5-sonnet",
+            "anthropic",
+            "active",
+            vec![],
+        ));
         g.push(m("acme", "old-model", "openai", "disabled", vec![]));
         g.push(m("evil", "secret", "openai", "active", vec![]));
         drop(g);
@@ -145,7 +179,10 @@ mod tests {
         let s = seeded();
         let c = ctx(&[Permission::LiteLlmRead]);
         assert_eq!(get(&s, &c, "gpt-4o").unwrap().provider, "openai");
-        assert!(matches!(get(&s, &c, "nope").unwrap_err(), LiteLlmViewError::ModelNotFound(_)));
+        assert!(matches!(
+            get(&s, &c, "nope").unwrap_err(),
+            LiteLlmViewError::ModelNotFound(_)
+        ));
     }
 
     #[test]
@@ -153,7 +190,11 @@ mod tests {
         let s = seeded();
         let rows = list(&s, &ctx(&[Permission::LiteLlmRead])).unwrap();
         let h = provider_histogram(&rows);
-        let openai = h.iter().find(|(p, _)| p == "openai").map(|(_, n)| *n).unwrap();
+        let openai = h
+            .iter()
+            .find(|(p, _)| p == "openai")
+            .map(|(_, n)| *n)
+            .unwrap();
         assert_eq!(openai, 2);
     }
 

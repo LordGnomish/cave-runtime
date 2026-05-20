@@ -50,9 +50,9 @@ pub mod routes;
 pub mod store;
 pub mod tail;
 
-pub use routes::{router, AppState};
-pub use store::LogStore;
 pub use limits::LimitsRegistry;
+pub use routes::{AppState, router};
+pub use store::LogStore;
 
 /// Create a fully initialised `AppState` with default configuration.
 pub fn default_state() -> AppState {
@@ -65,18 +65,26 @@ pub fn default_state() -> AppState {
 #[cfg(test)]
 mod parity_tests {
     use super::*;
-    use crate::chunk::{compress, decompress, encode_chunk, decode_chunk, snappy_raw_compress, snappy_raw_decompress};
+    use crate::chunk::{
+        compress, decode_chunk, decompress, encode_chunk, snappy_raw_compress,
+        snappy_raw_decompress,
+    };
     use crate::index::{ChunkMeta, LabelIndex, StreamKey};
     use crate::models::{Codec, Direction, Labels, LogEntry, TenantLimits};
     use crate::multitenant::{
-        dry_run_retention, inject_tenant_stream_label, normalize_tenant_label, plan_compaction,
-        tenant_from_headers, CompactionPolicy, RetentionPolicy, DEFAULT_TENANT, TENANT_LABEL,
+        CompactionPolicy, DEFAULT_TENANT, RetentionPolicy, TENANT_LABEL, dry_run_retention,
+        inject_tenant_stream_label, normalize_tenant_label, plan_compaction, tenant_from_headers,
     };
     use std::collections::HashMap;
     use std::time::Duration;
 
     fn lbl(pairs: &[(&str, &str)]) -> Labels {
-        Labels::new(pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect())
+        Labels::new(
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        )
     }
 
     // ─── Chunk codec roundtrip + helpers ─────────────────────
@@ -90,10 +98,14 @@ mod parity_tests {
         ];
         let bytes = encode_chunk(&entries, Codec::Gzip).unwrap();
         let chunk = crate::models::Chunk {
-            stream_fp: 1, tenant: "t".to_string(),
-            min_ts: 100, max_ts: 300,
-            num_entries: 3, codec: Codec::Gzip,
-            data: bytes, uncompressed_size: 100,
+            stream_fp: 1,
+            tenant: "t".to_string(),
+            min_ts: 100,
+            max_ts: 300,
+            num_entries: 3,
+            codec: Codec::Gzip,
+            data: bytes,
+            uncompressed_size: 100,
         };
         let decoded = decode_chunk(&chunk).unwrap();
         assert_eq!(decoded.len(), 3);
@@ -138,7 +150,9 @@ mod parity_tests {
     fn store_query_backward_returns_newest_first() {
         let store = LogStore::new();
         let labels = lbl(&[("svc", "app")]);
-        let entries: Vec<LogEntry> = (0..5).map(|i| LogEntry::new(1000 + i, format!("line-{i}"))).collect();
+        let entries: Vec<LogEntry> = (0..5)
+            .map(|i| LogEntry::new(1000 + i, format!("line-{i}")))
+            .collect();
         store.push("t", labels, entries).unwrap();
         let fps = store.matching_fps("t", |_| true);
         let res = store.query_entries("t", &fps, 0, i64::MAX, 100, Direction::Backward);
@@ -147,7 +161,10 @@ mod parity_tests {
         // First entry must be the latest one (line-4)
         assert_eq!(lines[0], "line-4");
         // Sequence is strictly decreasing
-        assert_eq!(lines, vec!["line-4", "line-3", "line-2", "line-1", "line-0"]);
+        assert_eq!(
+            lines,
+            vec!["line-4", "line-3", "line-2", "line-1", "line-0"]
+        );
     }
 
     #[test]
@@ -163,8 +180,12 @@ mod parity_tests {
     #[test]
     fn store_flush_all_seals_head_chunks() {
         let store = LogStore::new();
-        store.push("t", lbl(&[("a", "1")]), vec![LogEntry::new(1, "l")]).unwrap();
-        store.push("t", lbl(&[("a", "2")]), vec![LogEntry::new(1, "l")]).unwrap();
+        store
+            .push("t", lbl(&[("a", "1")]), vec![LogEntry::new(1, "l")])
+            .unwrap();
+        store
+            .push("t", lbl(&[("a", "2")]), vec![LogEntry::new(1, "l")])
+            .unwrap();
         let pre_chunks = store.stats().streams; // chunks not necessarily sealed yet
         let _ = pre_chunks;
         store.flush_all().unwrap();
@@ -176,7 +197,9 @@ mod parity_tests {
     #[test]
     fn store_series_returns_labels_for_fps() {
         let store = LogStore::new();
-        store.push("t", lbl(&[("env", "prod")]), vec![LogEntry::new(0, "l")]).unwrap();
+        store
+            .push("t", lbl(&[("env", "prod")]), vec![LogEntry::new(0, "l")])
+            .unwrap();
         let fps = store.matching_fps("t", |_| true);
         let series = store.series("t", &fps);
         assert_eq!(series.len(), 1);
@@ -261,11 +284,14 @@ mod parity_tests {
         let mut reg = LimitsRegistry::new(tl);
         // Need mutability — get the inner Arc out
         let mr = std::sync::Arc::get_mut(&mut reg).unwrap();
-        mr.set_tenant_limits("burst-tenant", TenantLimits {
-            ingestion_rate_bytes: 1000,
-            ingestion_burst_bytes: 1000,
-            ..TenantLimits::default()
-        });
+        mr.set_tenant_limits(
+            "burst-tenant",
+            TenantLimits {
+                ingestion_rate_bytes: 1000,
+                ingestion_burst_bytes: 1000,
+                ..TenantLimits::default()
+            },
+        );
         // First request consumes the burst
         assert!(reg.check_ingestion_rate("burst-tenant", 800).is_ok());
         // Second request would exceed the remaining tokens
@@ -325,9 +351,9 @@ mod parity_tests {
 
     #[test]
     fn tenant_from_headers_case_insensitive_and_trim() {
-        let h: HashMap<String, String> = [
-            ("x-scope-orgid".to_string(), "  acme  ".to_string()),
-        ].into_iter().collect();
+        let h: HashMap<String, String> = [("x-scope-orgid".to_string(), "  acme  ".to_string())]
+            .into_iter()
+            .collect();
         assert_eq!(tenant_from_headers(&h), "acme");
     }
 
@@ -339,9 +365,9 @@ mod parity_tests {
 
     #[test]
     fn tenant_from_headers_empty_value_returns_default() {
-        let h: HashMap<String, String> = [
-            ("X-Scope-OrgID".to_string(), "   ".to_string()),
-        ].into_iter().collect();
+        let h: HashMap<String, String> = [("X-Scope-OrgID".to_string(), "   ".to_string())]
+            .into_iter()
+            .collect();
         assert_eq!(tenant_from_headers(&h), DEFAULT_TENANT);
     }
 
@@ -428,8 +454,12 @@ mod parity_tests {
     #[test]
     fn store_handles_separate_streams_independently() {
         let store = LogStore::new();
-        store.push("t", lbl(&[("svc", "a")]), vec![LogEntry::new(1, "x")]).unwrap();
-        store.push("t", lbl(&[("svc", "b")]), vec![LogEntry::new(1, "y")]).unwrap();
+        store
+            .push("t", lbl(&[("svc", "a")]), vec![LogEntry::new(1, "x")])
+            .unwrap();
+        store
+            .push("t", lbl(&[("svc", "b")]), vec![LogEntry::new(1, "y")])
+            .unwrap();
         let fps_a = store.matching_fps("t", |l| l.get("svc") == Some("a"));
         let fps_b = store.matching_fps("t", |l| l.get("svc") == Some("b"));
         assert_eq!(fps_a.len(), 1);
@@ -440,8 +470,12 @@ mod parity_tests {
     #[test]
     fn store_label_values_filtered_by_tenant() {
         let store = LogStore::new();
-        store.push("t1", lbl(&[("env", "prod")]), vec![LogEntry::new(0, "l")]).unwrap();
-        store.push("t2", lbl(&[("env", "dev")]), vec![LogEntry::new(0, "l")]).unwrap();
+        store
+            .push("t1", lbl(&[("env", "prod")]), vec![LogEntry::new(0, "l")])
+            .unwrap();
+        store
+            .push("t2", lbl(&[("env", "dev")]), vec![LogEntry::new(0, "l")])
+            .unwrap();
         let v_t1 = store.label_values("env", "t1");
         let v_t2 = store.label_values("env", "t2");
         assert_eq!(v_t1, vec!["prod"]);

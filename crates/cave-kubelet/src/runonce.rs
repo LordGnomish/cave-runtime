@@ -70,7 +70,10 @@ impl RunOnce {
             return Err("static pod name must not be empty".into());
         }
         if m.name.chars().any(|c| c.is_whitespace()) {
-            return Err(format!("static pod name must not contain whitespace: '{}'", m.name));
+            return Err(format!(
+                "static pod name must not contain whitespace: '{}'",
+                m.name
+            ));
         }
         if m.images.is_empty() {
             return Err("static pod must declare at least one container image".into());
@@ -87,7 +90,8 @@ impl RunOnce {
             }
             Err(reason) => {
                 let name = manifest.name.clone();
-                self.outcomes.insert(name, RunOnceResult::Rejected { reason });
+                self.outcomes
+                    .insert(name, RunOnceResult::Rejected { reason });
             }
         }
     }
@@ -225,7 +229,11 @@ mod tests {
 
     #[test]
     fn restart_policy_round_trips() {
-        for p in [RestartPolicy::Always, RestartPolicy::OnFailure, RestartPolicy::Never] {
+        for p in [
+            RestartPolicy::Always,
+            RestartPolicy::OnFailure,
+            RestartPolicy::Never,
+        ] {
             let mut m = manifest("a");
             m.restart_policy = p;
             assert_eq!(m.restart_policy, p);

@@ -57,18 +57,41 @@ impl BinaryOp {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum LogicalExpr {
-    Column { name: String },
-    Literal { value: Value },
-    BinaryOp { op: BinaryOp, left: Box<LogicalExpr>, right: Box<LogicalExpr> },
-    Not { expr: Box<LogicalExpr> },
-    IsNull { expr: Box<LogicalExpr> },
-    IsNotNull { expr: Box<LogicalExpr> },
-    Cast { expr: Box<LogicalExpr>, to: crate::schema::DataType },
+    Column {
+        name: String,
+    },
+    Literal {
+        value: Value,
+    },
+    BinaryOp {
+        op: BinaryOp,
+        left: Box<LogicalExpr>,
+        right: Box<LogicalExpr>,
+    },
+    Not {
+        expr: Box<LogicalExpr>,
+    },
+    IsNull {
+        expr: Box<LogicalExpr>,
+    },
+    IsNotNull {
+        expr: Box<LogicalExpr>,
+    },
+    Cast {
+        expr: Box<LogicalExpr>,
+        to: crate::schema::DataType,
+    },
     /// `name(arg, arg, …)` — scalar or aggregate; the planner decides
     /// from the FunctionRegistry which one it is.
-    Function { name: String, args: Vec<LogicalExpr> },
+    Function {
+        name: String,
+        args: Vec<LogicalExpr>,
+    },
     /// SQL `AS` alias — rewrites the output column name.
-    Alias { expr: Box<LogicalExpr>, alias: String },
+    Alias {
+        expr: Box<LogicalExpr>,
+        alias: String,
+    },
 }
 
 impl LogicalExpr {
@@ -81,7 +104,11 @@ impl LogicalExpr {
     }
 
     pub fn binary(left: Self, op: BinaryOp, right: Self) -> Self {
-        Self::BinaryOp { op, left: Box::new(left), right: Box::new(right) }
+        Self::BinaryOp {
+            op,
+            left: Box::new(left),
+            right: Box::new(right),
+        }
     }
 
     pub fn eq(self, other: Self) -> Self {
@@ -101,15 +128,23 @@ impl LogicalExpr {
     }
 
     pub fn alias(self, alias: impl Into<String>) -> Self {
-        Self::Alias { expr: Box::new(self), alias: alias.into() }
+        Self::Alias {
+            expr: Box::new(self),
+            alias: alias.into(),
+        }
     }
 
     pub fn is_null(self) -> Self {
-        Self::IsNull { expr: Box::new(self) }
+        Self::IsNull {
+            expr: Box::new(self),
+        }
     }
 
     pub fn cast_to(self, to: crate::schema::DataType) -> Self {
-        Self::Cast { expr: Box::new(self), to }
+        Self::Cast {
+            expr: Box::new(self),
+            to,
+        }
     }
 
     /// The output column name when this expression appears in a SELECT
@@ -206,7 +241,9 @@ mod tests {
     fn col_eq_chain_builds_tree() {
         let e = LogicalExpr::col("a").eq(LogicalExpr::lit(7));
         match e {
-            LogicalExpr::BinaryOp { op: BinaryOp::Eq, .. } => {}
+            LogicalExpr::BinaryOp {
+                op: BinaryOp::Eq, ..
+            } => {}
             _ => panic!("expected Eq"),
         }
     }
@@ -236,7 +273,9 @@ mod tests {
 
     #[test]
     fn cast_alias_round_trip() {
-        let e = LogicalExpr::col("a").cast_to(crate::schema::DataType::Float64).alias("af");
+        let e = LogicalExpr::col("a")
+            .cast_to(crate::schema::DataType::Float64)
+            .alias("af");
         assert_eq!(e.output_name(), "af");
     }
 }

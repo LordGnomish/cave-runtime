@@ -16,7 +16,7 @@ use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 use uuid::Uuid;
 
-use super::{ns, NameIdFormat, SamlError};
+use super::{NameIdFormat, SamlError, ns};
 
 /// A SAML 2.0 `AuthnRequest`. Field naming follows the spec
 /// (`Issuer`, `Destination`, `NameIDPolicy`...) rather than
@@ -117,7 +117,8 @@ impl AuthnRequest {
         w.write_event(Event::Start(req)).map_err(io_err)?;
 
         let issuer = BytesStart::new("saml:Issuer");
-        w.write_event(Event::Start(issuer.clone())).map_err(io_err)?;
+        w.write_event(Event::Start(issuer.clone()))
+            .map_err(io_err)?;
         w.write_event(Event::Text(BytesText::new(&self.issuer)))
             .map_err(io_err)?;
         w.write_event(Event::End(BytesEnd::new("saml:Issuer")))
@@ -191,8 +192,8 @@ impl AuthnRequest {
                                         .unescape_value()
                                         .map_err(|err| SamlError::Parse(err.to_string()))?
                                         .into_owned();
-                                    nameid_policy_format =
-                                        NameIdFormat::from_urn(&val).or(Some(NameIdFormat::Unspecified));
+                                    nameid_policy_format = NameIdFormat::from_urn(&val)
+                                        .or(Some(NameIdFormat::Unspecified));
                                 }
                             }
                         }
@@ -217,10 +218,10 @@ impl AuthnRequest {
         }
 
         let id = id.ok_or_else(|| SamlError::MissingField("ID".into()))?;
-        let issue_instant = issue_instant
-            .ok_or_else(|| SamlError::MissingField("IssueInstant".into()))?;
-        let destination = destination
-            .ok_or_else(|| SamlError::MissingField("Destination".into()))?;
+        let issue_instant =
+            issue_instant.ok_or_else(|| SamlError::MissingField("IssueInstant".into()))?;
+        let destination =
+            destination.ok_or_else(|| SamlError::MissingField("Destination".into()))?;
         let issuer = issuer.ok_or_else(|| SamlError::MissingField("Issuer".into()))?;
         let issue_instant: DateTime<Utc> = DateTime::parse_from_rfc3339(&issue_instant)
             .map_err(|e| SamlError::Parse(format!("IssueInstant: {e}")))?

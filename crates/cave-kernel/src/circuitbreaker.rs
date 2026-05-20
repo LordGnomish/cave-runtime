@@ -117,7 +117,10 @@ impl BreakerConfig {
     /// path; callers should consult `self.trip` for the real semantics).
     pub fn failure_rate_threshold(&self) -> f64 {
         match self.trip {
-            TripCondition::WindowedRate { failure_rate_threshold, .. } => failure_rate_threshold,
+            TripCondition::WindowedRate {
+                failure_rate_threshold,
+                ..
+            } => failure_rate_threshold,
             TripCondition::Consecutive { .. } => 1.0,
         }
     }
@@ -619,15 +622,15 @@ mod tests {
     /// cite: Envoy outlier-detection — N consecutive failures opens the breaker
     #[test]
     fn breaker_consecutive_opens_after_n_failures() {
-        let b = CircuitBreaker::new(BreakerConfig::consecutive(
-            3,
-            2,
-            Duration::from_millis(100),
-        ));
+        let b = CircuitBreaker::new(BreakerConfig::consecutive(3, 2, Duration::from_millis(100)));
         assert_eq!(b.state(), BreakerState::Closed);
         b.record_failure();
         b.record_failure();
-        assert_eq!(b.state(), BreakerState::Closed, "2 failures < 3 stays closed");
+        assert_eq!(
+            b.state(),
+            BreakerState::Closed,
+            "2 failures < 3 stays closed"
+        );
         b.record_failure();
         assert_eq!(b.state(), BreakerState::Open, "3 consecutive failures trip");
     }
@@ -635,11 +638,7 @@ mod tests {
     /// cite: Envoy outlier-detection — a single success resets the streak
     #[test]
     fn breaker_consecutive_success_resets_streak() {
-        let b = CircuitBreaker::new(BreakerConfig::consecutive(
-            3,
-            2,
-            Duration::from_millis(100),
-        ));
+        let b = CircuitBreaker::new(BreakerConfig::consecutive(3, 2, Duration::from_millis(100)));
         b.record_failure();
         b.record_failure();
         b.record_success(); // resets streak
@@ -658,11 +657,7 @@ mod tests {
     /// `success_count` trial successes
     #[test]
     fn breaker_consecutive_halfopen_closes_after_n_successes() {
-        let b = CircuitBreaker::new(BreakerConfig::consecutive(
-            2,
-            2,
-            Duration::from_millis(10),
-        ));
+        let b = CircuitBreaker::new(BreakerConfig::consecutive(2, 2, Duration::from_millis(10)));
         b.record_failure();
         b.record_failure();
         assert_eq!(b.state(), BreakerState::Open);

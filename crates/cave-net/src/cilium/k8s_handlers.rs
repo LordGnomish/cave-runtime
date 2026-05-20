@@ -95,7 +95,10 @@ impl EndpointSliceHandler {
     }
 
     pub fn remove(&mut self, key: &str) -> Result<(), HandlerError> {
-        let removed = self.slices.remove(key).ok_or_else(|| HandlerError::SliceNotFound(key.to_string()))?;
+        let removed = self
+            .slices
+            .remove(key)
+            .ok_or_else(|| HandlerError::SliceNotFound(key.to_string()))?;
         let svc_key = format!("{}/{}", removed.namespace, removed.service_name);
         if let Some(entries) = self.by_service.get_mut(&svc_key) {
             entries.retain(|k| k != key);
@@ -174,7 +177,9 @@ impl ServiceCidrRegistry {
     }
 
     pub fn remove(&mut self, name: &str) -> Result<(), HandlerError> {
-        self.cidrs.remove(name).ok_or_else(|| HandlerError::CidrNotFound(name.to_string()))?;
+        self.cidrs
+            .remove(name)
+            .ok_or_else(|| HandlerError::CidrNotFound(name.to_string()))?;
         Ok(())
     }
 
@@ -215,16 +220,26 @@ mod tests {
 
     fn slice(ns: &str, name: &str, svc: &str, ips: &[IpAddr], ready: bool) -> EndpointSlice {
         EndpointSlice {
-            name: name.into(), namespace: ns.into(), service_name: svc.into(),
+            name: name.into(),
+            namespace: ns.into(),
+            service_name: svc.into(),
             address_type: "IPv4".into(),
             endpoints: vec![SliceEndpoint {
                 addresses: ips.to_vec(),
-                condition: if ready { EndpointCondition::Ready } else { EndpointCondition::NotReady },
+                condition: if ready {
+                    EndpointCondition::Ready
+                } else {
+                    EndpointCondition::NotReady
+                },
                 node_name: Some("node-a".into()),
                 target_ref: Some(format!("{ns}/pod-1")),
                 zone: Some("zone-a".into()),
             }],
-            ports: vec![SlicePort { name: "http".into(), port: 80, protocol: "TCP".into() }],
+            ports: vec![SlicePort {
+                name: "http".into(),
+                port: 80,
+                protocol: "TCP".into(),
+            }],
         }
     }
 
@@ -241,7 +256,11 @@ mod tests {
 
     #[test]
     fn slice_upsert_replaces_existing() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/watchers/endpoints.go", "Upsert.Replace", "tenant-k8s-uprep");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/watchers/endpoints.go",
+            "Upsert.Replace",
+            "tenant-k8s-uprep"
+        );
         let mut h = EndpointSliceHandler::new();
         h.upsert(slice("ns", "svc-1", "svc", &[ip(10, 0, 1, 1)], true));
         h.upsert(slice("ns", "svc-1", "svc", &[ip(10, 0, 1, 99)], true));
@@ -262,7 +281,11 @@ mod tests {
 
     #[test]
     fn slice_remove_unknown_returns_not_found() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/watchers/endpoints.go", "Remove.NotFound", "tenant-k8s-rmnf");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/watchers/endpoints.go",
+            "Remove.NotFound",
+            "tenant-k8s-rmnf"
+        );
         let mut h = EndpointSliceHandler::new();
         let err = h.remove("ns/missing").unwrap_err();
         assert!(matches!(err, HandlerError::SliceNotFound(_)));
@@ -272,7 +295,11 @@ mod tests {
 
     #[test]
     fn slices_for_service_aggregates_all_owned() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/service_cache.go", "SlicesForService", "tenant-k8s-sfs");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/service_cache.go",
+            "SlicesForService",
+            "tenant-k8s-sfs"
+        );
         let mut h = EndpointSliceHandler::new();
         h.upsert(slice("ns", "svc-abc", "svc", &[ip(10, 0, 1, 1)], true));
         h.upsert(slice("ns", "svc-def", "svc", &[ip(10, 0, 1, 2)], true));
@@ -283,7 +310,11 @@ mod tests {
 
     #[test]
     fn slices_for_service_empty_when_no_match() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/service_cache.go", "SlicesForService.None", "tenant-k8s-sfsn");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/service_cache.go",
+            "SlicesForService.None",
+            "tenant-k8s-sfsn"
+        );
         let h = EndpointSliceHandler::new();
         assert!(h.slices_for_service("ns", "svc").is_empty());
     }
@@ -292,9 +323,16 @@ mod tests {
 
     #[test]
     fn ready_backends_returns_addr_port_pairs() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/service_cache.go", "ReadyBackends", "tenant-k8s-rb");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/k8s/service_cache.go", "ReadyBackends", "tenant-k8s-rb");
         let mut h = EndpointSliceHandler::new();
-        h.upsert(slice("ns", "svc-1", "svc", &[ip(10, 0, 1, 1), ip(10, 0, 1, 2)], true));
+        h.upsert(slice(
+            "ns",
+            "svc-1",
+            "svc",
+            &[ip(10, 0, 1, 1), ip(10, 0, 1, 2)],
+            true,
+        ));
         let backends = h.ready_backends("ns", "svc");
         assert_eq!(backends.len(), 2);
         assert!(backends.contains(&(ip(10, 0, 1, 1), 80)));
@@ -303,7 +341,11 @@ mod tests {
 
     #[test]
     fn ready_backends_excludes_not_ready_endpoints() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/service_cache.go", "ReadyBackends.SkipNotReady", "tenant-k8s-rbs");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/service_cache.go",
+            "ReadyBackends.SkipNotReady",
+            "tenant-k8s-rbs"
+        );
         let mut h = EndpointSliceHandler::new();
         h.upsert(slice("ns", "svc-1", "svc", &[ip(10, 0, 1, 1)], false));
         let backends = h.ready_backends("ns", "svc");
@@ -312,7 +354,11 @@ mod tests {
 
     #[test]
     fn ready_backends_excludes_terminating_endpoints() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/service_cache.go", "ReadyBackends.SkipTerminating", "tenant-k8s-rbt");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/service_cache.go",
+            "ReadyBackends.SkipTerminating",
+            "tenant-k8s-rbt"
+        );
         let mut h = EndpointSliceHandler::new();
         let mut s = slice("ns", "svc-1", "svc", &[ip(10, 0, 1, 1)], true);
         s.endpoints[0].condition = EndpointCondition::Terminating;
@@ -323,10 +369,18 @@ mod tests {
 
     #[test]
     fn ready_backends_combines_addresses_x_ports() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/service_cache.go", "ReadyBackends.AddressXPort", "tenant-k8s-rbxp");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/service_cache.go",
+            "ReadyBackends.AddressXPort",
+            "tenant-k8s-rbxp"
+        );
         let mut h = EndpointSliceHandler::new();
         let mut s = slice("ns", "svc-1", "svc", &[ip(10, 0, 1, 1)], true);
-        s.ports.push(SlicePort { name: "https".into(), port: 443, protocol: "TCP".into() });
+        s.ports.push(SlicePort {
+            name: "https".into(),
+            port: 443,
+            protocol: "TCP".into(),
+        });
         h.upsert(s);
         let backends = h.ready_backends("ns", "svc");
         assert_eq!(backends.len(), 2);
@@ -338,7 +392,11 @@ mod tests {
 
     #[test]
     fn slice_key_format() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/watchers/endpoints.go", "Slice.Key", "tenant-k8s-key");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/watchers/endpoints.go",
+            "Slice.Key",
+            "tenant-k8s-key"
+        );
         let s = slice("ns", "svc-abc", "svc", &[ip(10, 0, 1, 1)], true);
         assert_eq!(s.key(), "ns/svc-abc");
     }
@@ -347,38 +405,61 @@ mod tests {
 
     #[test]
     fn cidr_upsert_registers() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/watchers/service.go", "ServiceCIDR.Upsert", "tenant-k8s-cup");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/watchers/service.go",
+            "ServiceCIDR.Upsert",
+            "tenant-k8s-cup"
+        );
         let mut r = ServiceCidrRegistry::new();
         r.upsert(ServiceCidrSpec {
             name: "default".into(),
             cidrs: vec!["10.96.0.0/12".into()],
-        }).unwrap();
+        })
+        .unwrap();
         assert_eq!(r.count(), 1);
     }
 
     #[test]
     fn cidr_upsert_with_invalid_cidr_rejected() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/watchers/service.go", "ServiceCIDR.BadCidr", "tenant-k8s-cbad");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/watchers/service.go",
+            "ServiceCIDR.BadCidr",
+            "tenant-k8s-cbad"
+        );
         let mut r = ServiceCidrRegistry::new();
-        let err = r.upsert(ServiceCidrSpec {
-            name: "default".into(),
-            cidrs: vec!["nope".into()],
-        }).unwrap_err();
+        let err = r
+            .upsert(ServiceCidrSpec {
+                name: "default".into(),
+                cidrs: vec!["nope".into()],
+            })
+            .unwrap_err();
         assert!(matches!(err, HandlerError::BadCidr(_)));
     }
 
     #[test]
     fn cidr_remove_drops_entry() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/watchers/service.go", "ServiceCIDR.Remove", "tenant-k8s-crm");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/watchers/service.go",
+            "ServiceCIDR.Remove",
+            "tenant-k8s-crm"
+        );
         let mut r = ServiceCidrRegistry::new();
-        r.upsert(ServiceCidrSpec { name: "default".into(), cidrs: vec!["10.96.0.0/12".into()] }).unwrap();
+        r.upsert(ServiceCidrSpec {
+            name: "default".into(),
+            cidrs: vec!["10.96.0.0/12".into()],
+        })
+        .unwrap();
         r.remove("default").unwrap();
         assert_eq!(r.count(), 0);
     }
 
     #[test]
     fn cidr_remove_unknown_returns_not_found() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/watchers/service.go", "ServiceCIDR.Remove.NotFound", "tenant-k8s-crmnf");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/watchers/service.go",
+            "ServiceCIDR.Remove.NotFound",
+            "tenant-k8s-crmnf"
+        );
         let mut r = ServiceCidrRegistry::new();
         let err = r.remove("ghost").unwrap_err();
         assert!(matches!(err, HandlerError::CidrNotFound(_)));
@@ -386,35 +467,71 @@ mod tests {
 
     #[test]
     fn cidr_contains_true_for_in_range() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/watchers/service.go", "ServiceCIDR.Contains.In", "tenant-k8s-cin");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/watchers/service.go",
+            "ServiceCIDR.Contains.In",
+            "tenant-k8s-cin"
+        );
         let mut r = ServiceCidrRegistry::new();
-        r.upsert(ServiceCidrSpec { name: "default".into(), cidrs: vec!["10.96.0.0/12".into()] }).unwrap();
+        r.upsert(ServiceCidrSpec {
+            name: "default".into(),
+            cidrs: vec!["10.96.0.0/12".into()],
+        })
+        .unwrap();
         assert!(r.contains(ip(10, 96, 0, 100)).unwrap());
     }
 
     #[test]
     fn cidr_contains_false_for_out_of_range() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/watchers/service.go", "ServiceCIDR.Contains.Out", "tenant-k8s-cout");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/watchers/service.go",
+            "ServiceCIDR.Contains.Out",
+            "tenant-k8s-cout"
+        );
         let mut r = ServiceCidrRegistry::new();
-        r.upsert(ServiceCidrSpec { name: "default".into(), cidrs: vec!["10.96.0.0/12".into()] }).unwrap();
+        r.upsert(ServiceCidrSpec {
+            name: "default".into(),
+            cidrs: vec!["10.96.0.0/12".into()],
+        })
+        .unwrap();
         assert!(!r.contains(ip(192, 168, 1, 1)).unwrap());
     }
 
     #[test]
     fn cidr_contains_v6() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/watchers/service.go", "ServiceCIDR.Contains.V6", "tenant-k8s-cv6");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/watchers/service.go",
+            "ServiceCIDR.Contains.V6",
+            "tenant-k8s-cv6"
+        );
         let mut r = ServiceCidrRegistry::new();
-        r.upsert(ServiceCidrSpec { name: "v6".into(), cidrs: vec!["fd00:96::/108".into()] }).unwrap();
+        r.upsert(ServiceCidrSpec {
+            name: "v6".into(),
+            cidrs: vec!["fd00:96::/108".into()],
+        })
+        .unwrap();
         let ip6: IpAddr = "fd00:96::1".parse().unwrap();
         assert!(r.contains(ip6).unwrap());
     }
 
     #[test]
     fn cidr_multiple_registries_combine() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/watchers/service.go", "ServiceCIDR.Multi", "tenant-k8s-cmulti");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/watchers/service.go",
+            "ServiceCIDR.Multi",
+            "tenant-k8s-cmulti"
+        );
         let mut r = ServiceCidrRegistry::new();
-        r.upsert(ServiceCidrSpec { name: "v4".into(), cidrs: vec!["10.96.0.0/12".into()] }).unwrap();
-        r.upsert(ServiceCidrSpec { name: "extra".into(), cidrs: vec!["172.16.0.0/12".into()] }).unwrap();
+        r.upsert(ServiceCidrSpec {
+            name: "v4".into(),
+            cidrs: vec!["10.96.0.0/12".into()],
+        })
+        .unwrap();
+        r.upsert(ServiceCidrSpec {
+            name: "extra".into(),
+            cidrs: vec!["172.16.0.0/12".into()],
+        })
+        .unwrap();
         assert!(r.contains(ip(10, 96, 0, 1)).unwrap());
         assert!(r.contains(ip(172, 16, 0, 1)).unwrap());
         assert!(!r.contains(ip(192, 168, 1, 1)).unwrap());
@@ -424,10 +541,20 @@ mod tests {
 
     #[test]
     fn slice_count_tracks_inserts() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/watchers/endpoints.go", "SliceCount", "tenant-k8s-sc");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/watchers/endpoints.go",
+            "SliceCount",
+            "tenant-k8s-sc"
+        );
         let mut h = EndpointSliceHandler::new();
         for i in 0..5u8 {
-            h.upsert(slice("ns", &format!("s-{i}"), "svc", &[ip(10, 0, 1, i)], true));
+            h.upsert(slice(
+                "ns",
+                &format!("s-{i}"),
+                "svc",
+                &[ip(10, 0, 1, i)],
+                true,
+            ));
         }
         assert_eq!(h.slice_count(), 5);
     }
@@ -436,7 +563,11 @@ mod tests {
 
     #[test]
     fn endpoint_condition_ready_returns_true_for_ready_state() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/watchers/endpoints.go", "Condition.Ready", "tenant-k8s-cr");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/watchers/endpoints.go",
+            "Condition.Ready",
+            "tenant-k8s-cr"
+        );
         assert!(matches!(EndpointCondition::Ready, EndpointCondition::Ready));
     }
 
@@ -444,7 +575,11 @@ mod tests {
 
     #[test]
     fn endpoint_slice_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/watchers/endpoints.go", "Slice.Serde", "tenant-k8s-sserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/watchers/endpoints.go",
+            "Slice.Serde",
+            "tenant-k8s-sserde"
+        );
         let s = slice("ns", "svc-1", "svc", &[ip(10, 0, 1, 1)], true);
         let json = serde_json::to_string(&s).unwrap();
         let back: EndpointSlice = serde_json::from_str(&json).unwrap();
@@ -453,8 +588,15 @@ mod tests {
 
     #[test]
     fn service_cidr_spec_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/watchers/service.go", "ServiceCIDR.Serde", "tenant-k8s-cserde");
-        let s = ServiceCidrSpec { name: "default".into(), cidrs: vec!["10.96.0.0/12".into()] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/watchers/service.go",
+            "ServiceCIDR.Serde",
+            "tenant-k8s-cserde"
+        );
+        let s = ServiceCidrSpec {
+            name: "default".into(),
+            cidrs: vec!["10.96.0.0/12".into()],
+        };
         let json = serde_json::to_string(&s).unwrap();
         let back: ServiceCidrSpec = serde_json::from_str(&json).unwrap();
         assert_eq!(back, s);
@@ -462,8 +604,16 @@ mod tests {
 
     #[test]
     fn endpoint_condition_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/watchers/endpoints.go", "Condition.Serde", "tenant-k8s-condserde");
-        for c in [EndpointCondition::Ready, EndpointCondition::NotReady, EndpointCondition::Terminating] {
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/watchers/endpoints.go",
+            "Condition.Serde",
+            "tenant-k8s-condserde"
+        );
+        for c in [
+            EndpointCondition::Ready,
+            EndpointCondition::NotReady,
+            EndpointCondition::Terminating,
+        ] {
             let s = serde_json::to_string(&c).unwrap();
             let back: EndpointCondition = serde_json::from_str(&s).unwrap();
             assert_eq!(back, c);

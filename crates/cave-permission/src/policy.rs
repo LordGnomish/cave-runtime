@@ -51,9 +51,7 @@ impl PermissionPolicy for AllowAllPermissionPolicy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::catalog::{
-        catalog_entity_delete_permission, catalog_entity_read_permission,
-    };
+    use crate::catalog::{catalog_entity_delete_permission, catalog_entity_read_permission};
 
     #[tokio::test]
     async fn allow_all_policy_allows_any_permission() {

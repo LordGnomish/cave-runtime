@@ -18,20 +18,20 @@
 //!
 //! Both halves share `projects::TRACKED_PROJECTS` as the single source of truth.
 
-pub mod tracker;
-pub mod projects;
+pub mod adr_links;
 pub mod engine;
 pub mod models;
-pub mod store;
+pub mod projects;
 pub mod routes;
-pub mod adr_links;
+pub mod store;
+pub mod tracker;
 
 // ── Watch daemon ────────────────────────────────────────────────────────────
 
-pub mod state;
+pub mod daemon;
 pub mod delta;
 pub mod pump;
-pub mod daemon;
+pub mod state;
 
 /// All upstream projects we track.
 pub use projects::TRACKED_PROJECTS;

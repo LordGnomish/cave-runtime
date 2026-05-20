@@ -63,7 +63,9 @@ impl FileResolver for FsResolver {
 }
 
 fn walk_contains(dir: &std::path::Path, pattern: &str) -> bool {
-    let Ok(entries) = std::fs::read_dir(dir) else { return false };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return false;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
@@ -82,7 +84,9 @@ fn walk_contains(dir: &std::path::Path, pattern: &str) -> bool {
 }
 
 fn walk_stub_count(dir: &std::path::Path) -> u32 {
-    let Ok(entries) = std::fs::read_dir(dir) else { return 0 };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return 0;
+    };
     let mut count = 0u32;
     for entry in entries.flatten() {
         let path = entry.path();
@@ -136,11 +140,9 @@ impl<R: FileResolver> ParityCalculator<R> {
         //
         // Falls back to the heuristic average when no `[parity]` block
         // exists (legacy manifests) or when fill_ratio is unset.
-        let heuristic_overall = (file_parity.score
-            + function_parity.score
-            + test_parity.score
-            + surface_parity.score)
-            / 4.0;
+        let heuristic_overall =
+            (file_parity.score + function_parity.score + test_parity.score + surface_parity.score)
+                / 4.0;
         let overall = manifest
             .parity
             .as_ref()
@@ -170,20 +172,32 @@ impl<R: FileResolver> ParityCalculator<R> {
     fn calc_file_parity(&self, manifest: &ParityManifest) -> ParityMetric {
         let total = manifest.files.len() as u32;
         if total == 0 {
-            return ParityMetric { score: 0.0, matched: 0, total: 0 };
+            return ParityMetric {
+                score: 0.0,
+                matched: 0,
+                total: 0,
+            };
         }
         let matched = manifest
             .files
             .iter()
             .filter(|f| self.resolver.file_exists(&f.local))
             .count() as u32;
-        ParityMetric { score: matched as f32 / total as f32, matched, total }
+        ParityMetric {
+            score: matched as f32 / total as f32,
+            matched,
+            total,
+        }
     }
 
     fn calc_function_parity(&self, manifest: &ParityManifest) -> ParityMetric {
         let total = manifest.functions.len() as u32;
         if total == 0 {
-            return ParityMetric { score: 0.0, matched: 0, total: 0 };
+            return ParityMetric {
+                score: 0.0,
+                matched: 0,
+                total: 0,
+            };
         }
         let matched = manifest
             .functions
@@ -193,13 +207,21 @@ impl<R: FileResolver> ParityCalculator<R> {
                     .file_contains(&f.file, &format!("fn {}", f.local_name))
             })
             .count() as u32;
-        ParityMetric { score: matched as f32 / total as f32, matched, total }
+        ParityMetric {
+            score: matched as f32 / total as f32,
+            matched,
+            total,
+        }
     }
 
     fn calc_test_parity(&self, manifest: &ParityManifest, source_root: &str) -> ParityMetric {
         let total = manifest.tests.len() as u32;
         if total == 0 {
-            return ParityMetric { score: 0.0, matched: 0, total: 0 };
+            return ParityMetric {
+                score: 0.0,
+                matched: 0,
+                total: 0,
+            };
         }
         let matched = manifest
             .tests
@@ -209,20 +231,32 @@ impl<R: FileResolver> ParityCalculator<R> {
                     .source_or_tests_contains(source_root, &format!("fn {}", t.local_test))
             })
             .count() as u32;
-        ParityMetric { score: matched as f32 / total as f32, matched, total }
+        ParityMetric {
+            score: matched as f32 / total as f32,
+            matched,
+            total,
+        }
     }
 
     fn calc_surface_parity(&self, manifest: &ParityManifest, source_root: &str) -> ParityMetric {
         let total = manifest.surfaces.len() as u32;
         if total == 0 {
-            return ParityMetric { score: 0.0, matched: 0, total: 0 };
+            return ParityMetric {
+                score: 0.0,
+                matched: 0,
+                total: 0,
+            };
         }
         let matched = manifest
             .surfaces
             .iter()
             .filter(|s| self.resolver.source_contains(source_root, &s.local_path))
             .count() as u32;
-        ParityMetric { score: matched as f32 / total as f32, matched, total }
+        ParityMetric {
+            score: matched as f32 / total as f32,
+            matched,
+            total,
+        }
     }
 
     fn collect_gaps(&self, manifest: &ParityManifest, source_root: &str) -> Vec<GapItem> {
@@ -239,7 +273,8 @@ impl<R: FileResolver> ParityCalculator<R> {
         }
 
         for f in &manifest.functions {
-            if !self.resolver
+            if !self
+                .resolver
                 .file_contains(&f.file, &format!("fn {}", f.local_name))
             {
                 gaps.push(GapItem {
@@ -251,7 +286,8 @@ impl<R: FileResolver> ParityCalculator<R> {
         }
 
         for t in &manifest.tests {
-            if !self.resolver
+            if !self
+                .resolver
                 .source_contains(source_root, &format!("fn {}", t.local_test))
             {
                 gaps.push(GapItem {
@@ -376,8 +412,14 @@ mod tests {
                 source_root: Some("src".into()),
             },
             files: vec![
-                FileMapping { upstream: "foo.go".into(), local: "src/foo.rs".into() },
-                FileMapping { upstream: "bar.go".into(), local: "src/bar.rs".into() },
+                FileMapping {
+                    upstream: "foo.go".into(),
+                    local: "src/foo.rs".into(),
+                },
+                FileMapping {
+                    upstream: "bar.go".into(),
+                    local: "src/bar.rs".into(),
+                },
             ],
             functions: vec![
                 FunctionMapping {
@@ -421,7 +463,9 @@ mod tests {
 
     #[test]
     fn file_parity_all_present() {
-        let r = MockResolver::new().with_file("src/foo.rs").with_file("src/bar.rs");
+        let r = MockResolver::new()
+            .with_file("src/foo.rs")
+            .with_file("src/bar.rs");
         let report = ParityCalculator::new(r).calculate(&sample_manifest());
         assert_eq!(report.file_parity.matched, 2);
         assert_eq!(report.file_parity.total, 2);
@@ -603,8 +647,11 @@ mod tests {
             .with_source_pattern("src", "fn test_foo")
             .with_source_pattern("src", "/api/foo");
         let report = ParityCalculator::new(r).calculate(&sample_manifest());
-        assert!((report.overall - 0.5).abs() < 1e-5,
-            "expected 0.5, got {}", report.overall);
+        assert!(
+            (report.overall - 0.5).abs() < 1e-5,
+            "expected 0.5, got {}",
+            report.overall
+        );
     }
 
     #[test]
@@ -728,7 +775,11 @@ mod tests {
     fn gaps_report_missing_file() {
         let r = MockResolver::new().with_file("src/foo.rs"); // bar.rs missing
         let report = ParityCalculator::new(r).calculate(&sample_manifest());
-        let file_gaps: Vec<_> = report.gaps.iter().filter(|g| g.kind == GapKind::File).collect();
+        let file_gaps: Vec<_> = report
+            .gaps
+            .iter()
+            .filter(|g| g.kind == GapKind::File)
+            .collect();
         assert_eq!(file_gaps.len(), 1);
         assert_eq!(file_gaps[0].upstream, "bar.go");
         assert_eq!(file_gaps[0].local.as_deref(), Some("src/bar.rs"));
@@ -738,8 +789,11 @@ mod tests {
     fn gaps_report_missing_function() {
         let r = MockResolver::new().with_file_pattern("src/foo.rs", "fn foo");
         let report = ParityCalculator::new(r).calculate(&sample_manifest());
-        let fn_gaps: Vec<_> =
-            report.gaps.iter().filter(|g| g.kind == GapKind::Function).collect();
+        let fn_gaps: Vec<_> = report
+            .gaps
+            .iter()
+            .filter(|g| g.kind == GapKind::Function)
+            .collect();
         assert_eq!(fn_gaps.len(), 1);
         assert_eq!(fn_gaps[0].upstream, "Bar");
         assert_eq!(fn_gaps[0].local.as_deref(), Some("bar"));
@@ -749,8 +803,11 @@ mod tests {
     fn gaps_report_missing_test() {
         let r = MockResolver::new().with_source_pattern("src", "fn test_foo");
         let report = ParityCalculator::new(r).calculate(&sample_manifest());
-        let test_gaps: Vec<_> =
-            report.gaps.iter().filter(|g| g.kind == GapKind::Test).collect();
+        let test_gaps: Vec<_> = report
+            .gaps
+            .iter()
+            .filter(|g| g.kind == GapKind::Test)
+            .collect();
         assert_eq!(test_gaps.len(), 1);
         assert_eq!(test_gaps[0].upstream, "TestBar");
     }
@@ -759,8 +816,11 @@ mod tests {
     fn gaps_report_missing_surface() {
         let r = MockResolver::new().with_source_pattern("src", "/api/foo");
         let report = ParityCalculator::new(r).calculate(&sample_manifest());
-        let surf_gaps: Vec<_> =
-            report.gaps.iter().filter(|g| g.kind == GapKind::Surface).collect();
+        let surf_gaps: Vec<_> = report
+            .gaps
+            .iter()
+            .filter(|g| g.kind == GapKind::Surface)
+            .collect();
         assert_eq!(surf_gaps.len(), 1);
         assert_eq!(surf_gaps[0].upstream, "/api/bar");
     }
@@ -820,8 +880,7 @@ kind = "http"
 upstream_path = "/api/foo"
 local_path = "/api/foo"
 "#;
-        let manifest: crate::parity::manifest::ParityManifest =
-            toml::from_str(toml).unwrap();
+        let manifest: crate::parity::manifest::ParityManifest = toml::from_str(toml).unwrap();
         let primary = manifest.primary_upstream().unwrap();
         assert_eq!(primary.org, "test-org");
         assert_eq!(primary.repo, "test-repo");
@@ -844,8 +903,7 @@ version = "v0"
 [module]
 name = "m"
 "#;
-        let manifest: crate::parity::manifest::ParityManifest =
-            toml::from_str(toml).unwrap();
+        let manifest: crate::parity::manifest::ParityManifest = toml::from_str(toml).unwrap();
         assert!(manifest.files.is_empty());
         assert!(manifest.functions.is_empty());
         assert!(manifest.tests.is_empty());

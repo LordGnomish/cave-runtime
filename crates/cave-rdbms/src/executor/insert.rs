@@ -7,10 +7,7 @@ use crate::storage::schema::Database;
 use crate::types::SqlValue;
 
 pub fn execute_insert(insert: &InsertStmt, db: &mut Database) -> Result<u64, String> {
-    let schema = db
-        .schemas
-        .get_mut("public")
-        .ok_or("no public schema")?;
+    let schema = db.schemas.get_mut("public").ok_or("no public schema")?;
     let table = schema
         .tables
         .get_mut(&insert.table)

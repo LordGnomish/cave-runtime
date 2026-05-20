@@ -406,7 +406,12 @@ impl HetznerInventory {
         &self.tenant
     }
 
-    fn check_tenant(&self, caller: &TenantId, kind: &'static str, name: &str) -> Result<(), CloudError> {
+    fn check_tenant(
+        &self,
+        caller: &TenantId,
+        kind: &'static str,
+        name: &str,
+    ) -> Result<(), CloudError> {
         if caller != &self.tenant {
             return Err(CloudError::TenantDenied {
                 tenant: caller.clone(),
@@ -448,7 +453,12 @@ impl HetznerInventory {
         let fingerprint = SshKey::compute_fingerprint(public_key);
         self.ssh_keys.insert(
             id,
-            SshKey { id, name: name.into(), public_key: public_key.into(), fingerprint },
+            SshKey {
+                id,
+                name: name.into(),
+                public_key: public_key.into(),
+                fingerprint,
+            },
         );
         Ok(id)
     }
@@ -508,7 +518,12 @@ impl HetznerInventory {
         let id = self.alloc_id();
         self.networks.insert(
             id,
-            PrivateNetwork { id, name: name.into(), cidr: cidr.into(), subnets: Vec::new() },
+            PrivateNetwork {
+                id,
+                name: name.into(),
+                cidr: cidr.into(),
+                subnets: Vec::new(),
+            },
         );
         Ok(id)
     }
@@ -519,10 +534,13 @@ impl HetznerInventory {
         network_id: u64,
         sub: Subnet,
     ) -> Result<(), CloudError> {
-        let net = self.networks.get(&network_id).ok_or_else(|| CloudError::Upstream {
-            provider: ProviderName::Hetzner,
-            reason: format!("network {network_id} not found"),
-        })?;
+        let net = self
+            .networks
+            .get(&network_id)
+            .ok_or_else(|| CloudError::Upstream {
+                provider: ProviderName::Hetzner,
+                reason: format!("network {network_id} not found"),
+            })?;
         self.check_tenant(caller, "Subnet", &net.name)?;
         let net = self.networks.get_mut(&network_id).unwrap();
         net.allocate_subnet(sub)
@@ -548,7 +566,13 @@ impl HetznerInventory {
         };
         self.floating_ips.insert(
             id,
-            FloatingIp { id, kind, ip, server_id: None, home_location: home },
+            FloatingIp {
+                id,
+                kind,
+                ip,
+                server_id: None,
+                home_location: home,
+            },
         );
         Ok(id)
     }
@@ -559,10 +583,13 @@ impl HetznerInventory {
         floating_ip_id: u64,
         server_id: u64,
     ) -> Result<(), CloudError> {
-        let fip = self.floating_ips.get_mut(&floating_ip_id).ok_or_else(|| CloudError::Upstream {
-            provider: ProviderName::Hetzner,
-            reason: format!("floating ip {floating_ip_id} not found"),
-        })?;
+        let fip =
+            self.floating_ips
+                .get_mut(&floating_ip_id)
+                .ok_or_else(|| CloudError::Upstream {
+                    provider: ProviderName::Hetzner,
+                    reason: format!("floating ip {floating_ip_id} not found"),
+                })?;
         if caller != &self.tenant {
             return Err(CloudError::TenantDenied {
                 tenant: caller.clone(),
@@ -588,10 +615,13 @@ impl HetznerInventory {
         floating_ip_id: u64,
     ) -> Result<(), CloudError> {
         self.check_tenant(caller, "FloatingIP", "")?;
-        let fip = self.floating_ips.get_mut(&floating_ip_id).ok_or_else(|| CloudError::Upstream {
-            provider: ProviderName::Hetzner,
-            reason: format!("floating ip {floating_ip_id} not found"),
-        })?;
+        let fip =
+            self.floating_ips
+                .get_mut(&floating_ip_id)
+                .ok_or_else(|| CloudError::Upstream {
+                    provider: ProviderName::Hetzner,
+                    reason: format!("floating ip {floating_ip_id} not found"),
+                })?;
         fip.server_id = None;
         Ok(())
     }
@@ -619,7 +649,13 @@ impl HetznerInventory {
         let id = self.alloc_id();
         self.volumes.insert(
             id,
-            Volume { id, name: name.into(), size_gb, location, server_id: None },
+            Volume {
+                id,
+                name: name.into(),
+                size_gb,
+                location,
+                server_id: None,
+            },
         );
         Ok(id)
     }
@@ -631,10 +667,13 @@ impl HetznerInventory {
         server_id: u64,
     ) -> Result<(), CloudError> {
         self.check_tenant(caller, "Volume", "")?;
-        let v = self.volumes.get_mut(&volume_id).ok_or_else(|| CloudError::Upstream {
-            provider: ProviderName::Hetzner,
-            reason: format!("volume {volume_id} not found"),
-        })?;
+        let v = self
+            .volumes
+            .get_mut(&volume_id)
+            .ok_or_else(|| CloudError::Upstream {
+                provider: ProviderName::Hetzner,
+                reason: format!("volume {volume_id} not found"),
+            })?;
         if let Some(existing) = v.server_id {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Hetzner,
@@ -715,10 +754,13 @@ impl HetznerInventory {
     }
 
     pub fn finish_snapshot(&mut self, id: u64, size_gb: u32) -> Result<(), CloudError> {
-        let img = self.images.get_mut(&id).ok_or_else(|| CloudError::Upstream {
-            provider: ProviderName::Hetzner,
-            reason: format!("image {id} not found"),
-        })?;
+        let img = self
+            .images
+            .get_mut(&id)
+            .ok_or_else(|| CloudError::Upstream {
+                provider: ProviderName::Hetzner,
+                reason: format!("image {id} not found"),
+            })?;
         if img.kind != ImageKind::Snapshot {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Hetzner,
@@ -730,11 +772,7 @@ impl HetznerInventory {
         Ok(())
     }
 
-    pub fn enable_backups(
-        &mut self,
-        caller: &TenantId,
-        server_id: u64,
-    ) -> Result<(), CloudError> {
+    pub fn enable_backups(&mut self, caller: &TenantId, server_id: u64) -> Result<(), CloudError> {
         self.check_tenant(caller, "Backup", "")?;
         self.backups_by_server.entry(server_id).or_default();
         Ok(())
@@ -770,7 +808,10 @@ impl HetznerInventory {
     }
 
     pub fn backups_for(&self, server_id: u64) -> &[u64] {
-        self.backups_by_server.get(&server_id).map(|v| v.as_slice()).unwrap_or(&[])
+        self.backups_by_server
+            .get(&server_id)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
     }
 }
 
@@ -796,10 +837,15 @@ impl HetznerInventory {
 /// Sorted location codes — handy for tests asserting full enumeration
 /// without depending on enum iteration order.
 pub fn all_locations_sorted() -> Vec<&'static str> {
-    let mut v = [Location::Fsn1, Location::Nbg1, Location::Hel1, Location::Ash]
-        .iter()
-        .map(|l| l.code())
-        .collect::<Vec<_>>();
+    let mut v = [
+        Location::Fsn1,
+        Location::Nbg1,
+        Location::Hel1,
+        Location::Ash,
+    ]
+    .iter()
+    .map(|l| l.code())
+    .collect::<Vec<_>>();
     v.sort();
     v
 }
@@ -823,7 +869,7 @@ mod tests {
 
     #[test]
     fn cx_intel_line_round_trips_through_name() {
-        let _ = tenant_ctx("acme", "hcloud/server_type.go", "ServerType", );
+        let _ = tenant_ctx("acme", "hcloud/server_type.go", "ServerType");
         for st in [ServerType::Cx21, ServerType::Cx31, ServerType::Cx41] {
             assert_eq!(ServerType::from_name(st.name()), Some(st));
             assert_eq!(st.architecture(), CpuArch::X86_64);
@@ -902,15 +948,10 @@ mod tests {
     #[test]
     fn lb11_through_lb31_are_monotonic_in_capacity() {
         let _ = tenant_ctx("acme", "hcloud/load_balancer_type.go", "LoadBalancerType");
+        assert!(LoadBalancerType::Lb11.max_services() < LoadBalancerType::Lb21.max_services());
+        assert!(LoadBalancerType::Lb21.max_services() < LoadBalancerType::Lb31.max_services());
         assert!(
-            LoadBalancerType::Lb11.max_services() < LoadBalancerType::Lb21.max_services()
-        );
-        assert!(
-            LoadBalancerType::Lb21.max_services() < LoadBalancerType::Lb31.max_services()
-        );
-        assert!(
-            LoadBalancerType::Lb11.throughput_gbps()
-                < LoadBalancerType::Lb21.throughput_gbps()
+            LoadBalancerType::Lb11.throughput_gbps() < LoadBalancerType::Lb21.throughput_gbps()
         );
         assert_eq!(LoadBalancerType::Lb11.name(), "lb11");
     }
@@ -942,7 +983,9 @@ mod tests {
     fn ssh_key_rejects_missing_ssh_prefix() {
         let tenant = tenant_ctx("acme", "hcloud/ssh_key.go", "Create");
         let mut inv = HetznerInventory::for_tenant(tenant.clone());
-        let err = inv.register_ssh_key(&tenant, "deploy", "AAAA no-prefix").unwrap_err();
+        let err = inv
+            .register_ssh_key(&tenant, "deploy", "AAAA no-prefix")
+            .unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
     }
 
@@ -950,7 +993,8 @@ mod tests {
     fn ssh_key_name_collision_is_refused() {
         let tenant = tenant_ctx("acme", "hcloud/ssh_key.go", "Create");
         let mut inv = HetznerInventory::for_tenant(tenant.clone());
-        inv.register_ssh_key(&tenant, "deploy", "ssh-ed25519 AAAA").unwrap();
+        inv.register_ssh_key(&tenant, "deploy", "ssh-ed25519 AAAA")
+            .unwrap();
         let err = inv
             .register_ssh_key(&tenant, "deploy", "ssh-ed25519 BBBB")
             .unwrap_err();
@@ -974,7 +1018,9 @@ mod tests {
     fn image_lookup_by_name_returns_expected_record() {
         let tenant = tenant_ctx("acme", "hcloud/image.go", "Image");
         let mut inv = HetznerInventory::for_tenant(tenant.clone());
-        let id = inv.register_image(&tenant, "ubuntu-24.04", ImageKind::System, 8).unwrap();
+        let id = inv
+            .register_image(&tenant, "ubuntu-24.04", ImageKind::System, 8)
+            .unwrap();
         assert_eq!(inv.image(id).unwrap().kind, ImageKind::System);
         assert_eq!(inv.image_by_name("ubuntu-24.04").unwrap().id, id);
     }
@@ -1017,7 +1063,9 @@ mod tests {
     fn finish_snapshot_refuses_non_snapshot_image() {
         let tenant = tenant_ctx("acme", "hcloud/server.go", "CreateImage");
         let mut inv = HetznerInventory::for_tenant(tenant.clone());
-        let id = inv.register_image(&tenant, "ubuntu", ImageKind::System, 8).unwrap();
+        let id = inv
+            .register_image(&tenant, "ubuntu", ImageKind::System, 8)
+            .unwrap();
         let err = inv.finish_snapshot(id, 4).unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
     }
@@ -1074,7 +1122,9 @@ mod tests {
         let tenant = tenant_ctx("acme", "hcloud/network.go", "Create");
         let attacker = TenantId::new("attacker").expect("test fixture");
         let mut inv = HetznerInventory::for_tenant(tenant);
-        let err = inv.create_network(&attacker, "k8s", "10.0.0.0/16").unwrap_err();
+        let err = inv
+            .create_network(&attacker, "k8s", "10.0.0.0/16")
+            .unwrap_err();
         assert!(matches!(err, CloudError::TenantDenied { .. }));
     }
 
@@ -1084,7 +1134,9 @@ mod tests {
     fn floating_ipv4_allocates_a_198_51_100_address() {
         let tenant = tenant_ctx("acme", "hcloud/floating_ip.go", "Create");
         let mut inv = HetznerInventory::for_tenant(tenant.clone());
-        let id = inv.allocate_floating_ip(&tenant, FloatingIpType::V4, Location::Fsn1).unwrap();
+        let id = inv
+            .allocate_floating_ip(&tenant, FloatingIpType::V4, Location::Fsn1)
+            .unwrap();
         let fip = inv.floating_ip(id).unwrap();
         assert!(fip.ip.starts_with("198.51.100."));
         assert_eq!(fip.kind, FloatingIpType::V4);
@@ -1095,7 +1147,9 @@ mod tests {
     fn floating_ipv6_uses_documentation_prefix() {
         let tenant = tenant_ctx("acme", "hcloud/floating_ip.go", "Create");
         let mut inv = HetznerInventory::for_tenant(tenant.clone());
-        let id = inv.allocate_floating_ip(&tenant, FloatingIpType::V6, Location::Hel1).unwrap();
+        let id = inv
+            .allocate_floating_ip(&tenant, FloatingIpType::V6, Location::Hel1)
+            .unwrap();
         assert!(inv.floating_ip(id).unwrap().ip.starts_with("2001:db8:"));
     }
 
@@ -1103,7 +1157,9 @@ mod tests {
     fn floating_ip_assign_then_unassign_clears_server() {
         let tenant = tenant_ctx("acme", "hcloud/floating_ip.go", "Assign");
         let mut inv = HetznerInventory::for_tenant(tenant.clone());
-        let id = inv.allocate_floating_ip(&tenant, FloatingIpType::V4, Location::Fsn1).unwrap();
+        let id = inv
+            .allocate_floating_ip(&tenant, FloatingIpType::V4, Location::Fsn1)
+            .unwrap();
         inv.assign_floating_ip(&tenant, id, 7).unwrap();
         assert_eq!(inv.floating_ip(id).unwrap().server_id, Some(7));
         inv.unassign_floating_ip(&tenant, id).unwrap();
@@ -1114,7 +1170,9 @@ mod tests {
     fn floating_ip_cannot_be_reassigned_while_held() {
         let tenant = tenant_ctx("acme", "hcloud/floating_ip.go", "Assign");
         let mut inv = HetznerInventory::for_tenant(tenant.clone());
-        let id = inv.allocate_floating_ip(&tenant, FloatingIpType::V4, Location::Fsn1).unwrap();
+        let id = inv
+            .allocate_floating_ip(&tenant, FloatingIpType::V4, Location::Fsn1)
+            .unwrap();
         inv.assign_floating_ip(&tenant, id, 7).unwrap();
         let err = inv.assign_floating_ip(&tenant, id, 8).unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
@@ -1125,7 +1183,9 @@ mod tests {
         let tenant = tenant_ctx("acme", "hcloud/floating_ip.go", "Assign");
         let attacker = TenantId::new("attacker").expect("test fixture");
         let mut inv = HetznerInventory::for_tenant(tenant.clone());
-        let id = inv.allocate_floating_ip(&tenant, FloatingIpType::V4, Location::Fsn1).unwrap();
+        let id = inv
+            .allocate_floating_ip(&tenant, FloatingIpType::V4, Location::Fsn1)
+            .unwrap();
         let err = inv.assign_floating_ip(&attacker, id, 7).unwrap_err();
         assert!(matches!(err, CloudError::TenantDenied { .. }));
     }
@@ -1137,11 +1197,13 @@ mod tests {
         let tenant = tenant_ctx("acme", "hcloud/volume.go", "Create");
         let mut inv = HetznerInventory::for_tenant(tenant.clone());
         assert!(matches!(
-            inv.create_volume(&tenant, "small", 5, Location::Fsn1).unwrap_err(),
+            inv.create_volume(&tenant, "small", 5, Location::Fsn1)
+                .unwrap_err(),
             CloudError::InvalidConfig { .. }
         ));
         assert!(matches!(
-            inv.create_volume(&tenant, "huge", 99_999, Location::Fsn1).unwrap_err(),
+            inv.create_volume(&tenant, "huge", 99_999, Location::Fsn1)
+                .unwrap_err(),
             CloudError::InvalidConfig { .. }
         ));
     }
@@ -1150,7 +1212,9 @@ mod tests {
     fn volume_attach_is_idempotent_only_for_same_server() {
         let tenant = tenant_ctx("acme", "hcloud/volume.go", "Attach");
         let mut inv = HetznerInventory::for_tenant(tenant.clone());
-        let v = inv.create_volume(&tenant, "data", 100, Location::Fsn1).unwrap();
+        let v = inv
+            .create_volume(&tenant, "data", 100, Location::Fsn1)
+            .unwrap();
         inv.attach_volume(&tenant, v, 7).unwrap();
         let err = inv.attach_volume(&tenant, v, 8).unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
@@ -1184,8 +1248,12 @@ mod tests {
     fn server_create_validates_ssh_keys_and_network() {
         let tenant = tenant_ctx("acme", "hcloud/server.go", "Create");
         let mut inv = HetznerInventory::for_tenant(tenant.clone());
-        let img = inv.register_image(&tenant, "u24", ImageKind::System, 8).unwrap();
-        let key = inv.register_ssh_key(&tenant, "deploy", "ssh-ed25519 AAAA").unwrap();
+        let img = inv
+            .register_image(&tenant, "u24", ImageKind::System, 8)
+            .unwrap();
+        let key = inv
+            .register_ssh_key(&tenant, "deploy", "ssh-ed25519 AAAA")
+            .unwrap();
         let net = inv.create_network(&tenant, "k8s", "10.0.0.0/16").unwrap();
         let s = inv
             .create_server(
@@ -1210,7 +1278,9 @@ mod tests {
     fn server_create_with_unknown_ssh_key_is_refused() {
         let tenant = tenant_ctx("acme", "hcloud/server.go", "Create");
         let mut inv = HetznerInventory::for_tenant(tenant.clone());
-        let img = inv.register_image(&tenant, "u24", ImageKind::System, 8).unwrap();
+        let img = inv
+            .register_image(&tenant, "u24", ImageKind::System, 8)
+            .unwrap();
         let err = inv
             .create_server(
                 &tenant,
@@ -1233,9 +1303,12 @@ mod tests {
         let tenant = tenant_ctx("acme", "hcloud/cloud.go", "Inventory");
         let mut inv = HetznerInventory::for_tenant(tenant.clone());
         assert_eq!(inv.ssh_key_count(), 0);
-        inv.register_ssh_key(&tenant, "k", "ssh-ed25519 AAAA").unwrap();
-        inv.register_image(&tenant, "u24", ImageKind::System, 8).unwrap();
-        inv.allocate_floating_ip(&tenant, FloatingIpType::V4, Location::Fsn1).unwrap();
+        inv.register_ssh_key(&tenant, "k", "ssh-ed25519 AAAA")
+            .unwrap();
+        inv.register_image(&tenant, "u24", ImageKind::System, 8)
+            .unwrap();
+        inv.allocate_floating_ip(&tenant, FloatingIpType::V4, Location::Fsn1)
+            .unwrap();
         inv.create_volume(&tenant, "d", 50, Location::Fsn1).unwrap();
         assert_eq!(inv.ssh_key_count(), 1);
         assert_eq!(inv.image_count(), 1);

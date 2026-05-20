@@ -78,8 +78,12 @@ pub fn is_gzip_envelope(b: &[u8]) -> bool {
 
 /// Test-only round-trip — extracts payload from a `gzip_envelope`-shaped buffer.
 pub fn unwrap_gzip_envelope(b: &[u8]) -> Option<&[u8]> {
-    if !is_gzip_envelope(b) { return None; }
-    if b.len() < 18 { return None; }
+    if !is_gzip_envelope(b) {
+        return None;
+    }
+    if b.len() < 18 {
+        return None;
+    }
     Some(&b[10..b.len() - 8])
 }
 
@@ -135,19 +139,23 @@ pub struct PagedDiscovery {
 /// Page over a flat list of (group, list-of-resources) pairs.
 /// Upstream uses (group, index_within_group) but we accept a single index per
 /// item since each input is one group.
-pub fn page_groups(
-    groups: &[APIGroupDiscovery], req: &PageRequest,
-) -> PagedDiscovery {
+pub fn page_groups(groups: &[APIGroupDiscovery], req: &PageRequest) -> PagedDiscovery {
     let start = if let Some(tok) = &req.continue_token {
         decode_continue(tok).unwrap_or(0)
-    } else { 0 };
+    } else {
+        0
+    };
     let end = (start + req.limit).min(groups.len());
     let slice = if start >= groups.len() {
         vec![]
     } else {
         groups[start..end].to_vec()
     };
-    let next = if end < groups.len() { encode_continue(end) } else { String::new() };
+    let next = if end < groups.len() {
+        encode_continue(end)
+    } else {
+        String::new()
+    };
     PagedDiscovery {
         doc: AggregatedDiscoveryV2 {
             api_version: "apidiscovery.k8s.io/v2".into(),
@@ -177,12 +185,24 @@ fn base64_encode(bytes: &[u8]) -> String {
     const A: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = Vec::with_capacity((bytes.len() + 2) / 3 * 4);
     for chunk in bytes.chunks(3) {
-        let (b0, b1, b2) = (chunk[0], chunk.get(1).copied().unwrap_or(0), chunk.get(2).copied().unwrap_or(0));
+        let (b0, b1, b2) = (
+            chunk[0],
+            chunk.get(1).copied().unwrap_or(0),
+            chunk.get(2).copied().unwrap_or(0),
+        );
         let n = ((b0 as u32) << 16) | ((b1 as u32) << 8) | (b2 as u32);
         out.push(A[((n >> 18) & 0x3f) as usize]);
         out.push(A[((n >> 12) & 0x3f) as usize]);
-        out.push(if chunk.len() > 1 { A[((n >> 6) & 0x3f) as usize] } else { b'=' });
-        out.push(if chunk.len() > 2 { A[(n & 0x3f) as usize] } else { b'=' });
+        out.push(if chunk.len() > 1 {
+            A[((n >> 6) & 0x3f) as usize]
+        } else {
+            b'='
+        });
+        out.push(if chunk.len() > 2 {
+            A[(n & 0x3f) as usize]
+        } else {
+            b'='
+        });
     }
     String::from_utf8(out).unwrap()
 }
@@ -199,7 +219,9 @@ fn base64_decode(s: &str) -> Option<Vec<u8>> {
         }
     }
     let bytes = s.as_bytes();
-    if bytes.len() % 4 != 0 { return None; }
+    if bytes.len() % 4 != 0 {
+        return None;
+    }
     let mut out = Vec::with_capacity(bytes.len() / 4 * 3);
     for chunk in bytes.chunks(4) {
         let pad = chunk.iter().filter(|&&c| c == b'=').count();
@@ -209,8 +231,12 @@ fn base64_decode(s: &str) -> Option<Vec<u8>> {
         let v3 = if pad == 0 { val(chunk[3])? as u32 } else { 0 };
         let n = (v0 << 18) | (v1 << 12) | (v2 << 6) | v3;
         out.push((n >> 16) as u8);
-        if pad < 2 { out.push((n >> 8) as u8); }
-        if pad == 0 { out.push(n as u8); }
+        if pad < 2 {
+            out.push((n >> 8) as u8);
+        }
+        if pad == 0 {
+            out.push(n as u8);
+        }
     }
     Some(out)
 }
@@ -239,9 +265,12 @@ pub fn build_index(specs: &BTreeMap<String, Vec<u8>>) -> OpenAPIV3Index {
     for (gv, bytes) in specs {
         let etag = etag_for_bytes(bytes);
         let cleaned = etag.trim_matches('"');
-        idx.paths.insert(gv.clone(), OpenAPIV3IndexEntry {
-            server_relative_url: format!("/openapi/v3/{gv}?hash={cleaned}"),
-        });
+        idx.paths.insert(
+            gv.clone(),
+            OpenAPIV3IndexEntry {
+                server_relative_url: format!("/openapi/v3/{gv}?hash={cleaned}"),
+            },
+        );
     }
     idx
 }
@@ -258,12 +287,18 @@ pub fn from_resource_list(version: &str, list: &APIResourceList) -> APIVersionDi
 }
 
 pub fn group_from_versions(name: &str, versions: Vec<APIVersionDiscovery>) -> APIGroupDiscovery {
-    APIGroupDiscovery { name: name.into(), versions }
+    APIGroupDiscovery {
+        name: name.into(),
+        versions,
+    }
 }
 
 #[allow(dead_code)]
 fn unused_gv() -> GroupVersion {
-    GroupVersion { group: "".into(), version: "".into() }
+    GroupVersion {
+        group: "".into(),
+        version: "".into(),
+    }
 }
 
 #[cfg(test)]

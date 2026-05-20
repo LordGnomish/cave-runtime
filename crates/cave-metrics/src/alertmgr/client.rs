@@ -2,9 +2,9 @@
 // Copyright 2026 Cave Runtime contributors
 //! AlertManager HTTP client for pushing alerts and creating silences.
 
+use super::model::{Alert, Silence};
 use crate::error::{MetricsError, Result};
 use crate::rules::FiringAlert;
-use super::model::{Alert, Silence};
 
 pub struct AlertmanagerClient {
     base_url: String,
@@ -22,7 +22,8 @@ impl AlertmanagerClient {
     /// Push a batch of alerts to AlertManager.
     pub async fn send_alerts(&self, alerts: &[Alert]) -> Result<()> {
         let url = format!("{}/api/v2/alerts", self.base_url);
-        self.client.post(&url)
+        self.client
+            .post(&url)
             .json(alerts)
             .send()
             .await
@@ -35,7 +36,9 @@ impl AlertmanagerClient {
     /// Create a silence on AlertManager.
     pub async fn create_silence(&self, silence: &Silence) -> Result<String> {
         let url = format!("{}/api/v2/silences", self.base_url);
-        let resp: serde_json::Value = self.client.post(&url)
+        let resp: serde_json::Value = self
+            .client
+            .post(&url)
             .json(silence)
             .send()
             .await
@@ -49,7 +52,8 @@ impl AlertmanagerClient {
     /// Delete (expire) a silence.
     pub async fn delete_silence(&self, id: &str) -> Result<()> {
         let url = format!("{}/api/v2/silence/{}", self.base_url, id);
-        self.client.delete(&url)
+        self.client
+            .delete(&url)
             .send()
             .await
             .map_err(|e| MetricsError::Http(e.to_string()))?
@@ -61,7 +65,9 @@ impl AlertmanagerClient {
     /// List all silences.
     pub async fn list_silences(&self) -> Result<Vec<Silence>> {
         let url = format!("{}/api/v2/silences", self.base_url);
-        let resp: Vec<Silence> = self.client.get(&url)
+        let resp: Vec<Silence> = self
+            .client
+            .get(&url)
             .send()
             .await
             .map_err(|e| MetricsError::Http(e.to_string()))?

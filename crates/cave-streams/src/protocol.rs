@@ -253,7 +253,9 @@ impl RequestHeader {
 /// Decode a nullable string: INT16 length (–1 = null) + UTF-8 bytes.
 pub fn decode_nullable_string(buf: &mut dyn Buf) -> StreamsResult<Option<String>> {
     if buf.remaining() < 2 {
-        return Err(StreamsError::ProtocolDecode("expected string length".into()));
+        return Err(StreamsError::ProtocolDecode(
+            "expected string length".into(),
+        ));
     }
     let len = buf.get_i16();
     if len == -1 {
@@ -267,15 +269,15 @@ pub fn decode_nullable_string(buf: &mut dyn Buf) -> StreamsResult<Option<String>
         )));
     }
     let bytes = buf.copy_to_bytes(len);
-    Ok(Some(
-        String::from_utf8(bytes.to_vec())
-            .map_err(|e| StreamsError::ProtocolDecode(e.to_string()))?,
-    ))
+    Ok(Some(String::from_utf8(bytes.to_vec()).map_err(|e| {
+        StreamsError::ProtocolDecode(e.to_string())
+    })?))
 }
 
 /// Decode a mandatory string (length must be ≥ 0).
 pub fn decode_string(buf: &mut dyn Buf) -> StreamsResult<String> {
-    decode_nullable_string(buf)?.ok_or_else(|| StreamsError::ProtocolDecode("unexpected null string".into()))
+    decode_nullable_string(buf)?
+        .ok_or_else(|| StreamsError::ProtocolDecode("unexpected null string".into()))
 }
 
 /// Decode an INT32-prefixed array, calling `item_fn` for each element.
@@ -376,7 +378,10 @@ impl ProduceRequest {
                 };
                 Ok(ProducePartitionData { index, records })
             })?;
-            Ok(ProduceTopicData { name, partition_data })
+            Ok(ProduceTopicData {
+                name,
+                partition_data,
+            })
         })?;
         Ok(Self {
             transactional_id,
@@ -455,7 +460,11 @@ impl FetchRequest {
         let replica_id = buf.get_i32();
         let max_wait_ms = buf.get_i32();
         let min_bytes = buf.get_i32();
-        let max_bytes = if version >= 3 { buf.get_i32() } else { i32::MAX };
+        let max_bytes = if version >= 3 {
+            buf.get_i32()
+        } else {
+            i32::MAX
+        };
         let isolation_level = if version >= 4 { buf.get_i8() } else { 0 };
         let topics = decode_array(buf, |b| {
             let name = decode_string(b)?;
@@ -464,11 +473,23 @@ impl FetchRequest {
                 let current_leader_epoch = if version >= 9 { pb.get_i32() } else { -1 };
                 let fetch_offset = pb.get_i64();
                 let partition_max_bytes = pb.get_i32();
-                Ok(FetchPartition { partition, current_leader_epoch, fetch_offset, partition_max_bytes })
+                Ok(FetchPartition {
+                    partition,
+                    current_leader_epoch,
+                    fetch_offset,
+                    partition_max_bytes,
+                })
             })?;
             Ok(FetchTopic { name, partitions })
         })?;
-        Ok(Self { replica_id, max_wait_ms, min_bytes, max_bytes, isolation_level, topics })
+        Ok(Self {
+            replica_id,
+            max_wait_ms,
+            min_bytes,
+            max_bytes,
+            isolation_level,
+            topics,
+        })
     }
 }
 
@@ -483,9 +504,20 @@ pub struct MetadataRequest {
 impl MetadataRequest {
     pub fn decode(buf: &mut impl Buf, version: i16) -> StreamsResult<Self> {
         let topics_raw = decode_array(buf, |b| decode_string(b))?;
-        let topics = if topics_raw.is_empty() { None } else { Some(topics_raw) };
-        let allow_auto_topic_creation = if version >= 4 { buf.get_u8() != 0 } else { true };
-        Ok(Self { topics, allow_auto_topic_creation })
+        let topics = if topics_raw.is_empty() {
+            None
+        } else {
+            Some(topics_raw)
+        };
+        let allow_auto_topic_creation = if version >= 4 {
+            buf.get_u8() != 0
+        } else {
+            true
+        };
+        Ok(Self {
+            topics,
+            allow_auto_topic_creation,
+        })
     }
 }
 
@@ -523,11 +555,24 @@ impl CreateTopicsRequest {
                 let v = decode_nullable_string(cb)?;
                 Ok((k, v))
             })?;
-            Ok(CreateTopicConfig { name, num_partitions, replication_factor, configs })
+            Ok(CreateTopicConfig {
+                name,
+                num_partitions,
+                replication_factor,
+                configs,
+            })
         })?;
         let timeout_ms = buf.get_i32();
-        let validate_only = if version >= 1 { buf.get_u8() != 0 } else { false };
-        Ok(Self { topics, timeout_ms, validate_only })
+        let validate_only = if version >= 1 {
+            buf.get_u8() != 0
+        } else {
+            false
+        };
+        Ok(Self {
+            topics,
+            timeout_ms,
+            validate_only,
+        })
     }
 }
 

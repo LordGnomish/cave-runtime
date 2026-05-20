@@ -3,13 +3,13 @@
 //! JWT authentication middleware with RBAC support for CAVE runtime.
 
 use axum::{
+    Json,
     extract::{FromRequestParts, Request},
-    http::{header, StatusCode},
+    http::{StatusCode, header},
     middleware::Next,
     response::{IntoResponse, Response},
-    Json,
 };
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
@@ -77,7 +77,9 @@ fn extract_session_cookie(req: &Request) -> Option<String> {
 /// Use with `axum::middleware::from_fn(make_auth_middleware(state))`.
 pub fn make_auth_middleware(
     state: Arc<AuthState>,
-) -> impl Fn(Request, Next) -> std::pin::Pin<Box<dyn std::future::Future<Output = Response> + Send>> + Clone + Send {
+) -> impl Fn(Request, Next) -> std::pin::Pin<Box<dyn std::future::Future<Output = Response> + Send>>
++ Clone
++ Send {
     move |req, next| {
         let state = state.clone();
         Box::pin(auth_middleware_inner(state, req, next))
@@ -102,9 +104,7 @@ pub async fn auth_middleware_inner(
         // No enforcement here — a missing or expired token just
         // means no claims, which is the dev `?tenant_id=...`
         // shortcut path.
-        if let Some(token) =
-            extract_bearer_token(&req).or_else(|| extract_session_cookie(&req))
-        {
+        if let Some(token) = extract_bearer_token(&req).or_else(|| extract_session_cookie(&req)) {
             let key = DecodingKey::from_secret(state.jwt_secret.as_bytes());
             let mut v = Validation::new(Algorithm::HS256);
             v.validate_exp = true;
@@ -132,7 +132,9 @@ pub async fn auth_middleware_inner(
             }
             return (
                 StatusCode::UNAUTHORIZED,
-                Json(json!({ "error": "Missing or invalid Authorization header / session cookie" })),
+                Json(
+                    json!({ "error": "Missing or invalid Authorization header / session cookie" }),
+                ),
             )
                 .into_response();
         }
@@ -167,17 +169,13 @@ impl<S: Send + Sync> FromRequestParts<S> for JwtClaims {
         parts: &mut axum::http::request::Parts,
         _state: &S,
     ) -> Result<Self, Self::Rejection> {
-        parts
-            .extensions
-            .get::<JwtClaims>()
-            .cloned()
-            .ok_or_else(|| {
-                (
-                    StatusCode::UNAUTHORIZED,
-                    Json(json!({ "error": "Not authenticated" })),
-                )
-                    .into_response()
-            })
+        parts.extensions.get::<JwtClaims>().cloned().ok_or_else(|| {
+            (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({ "error": "Not authenticated" })),
+            )
+                .into_response()
+        })
     }
 }
 
@@ -238,7 +236,7 @@ mod tests {
 
     #[test]
     fn valid_token_decodes() {
-        use jsonwebtoken::{encode, EncodingKey, Header};
+        use jsonwebtoken::{EncodingKey, Header, encode};
         let secret = "test-secret";
         let claims = JwtClaims {
             sub: "user1".into(),
@@ -263,7 +261,7 @@ mod tests {
 
     #[test]
     fn expired_token_rejected() {
-        use jsonwebtoken::{encode, EncodingKey, Header};
+        use jsonwebtoken::{EncodingKey, Header, encode};
         let secret = "test-secret";
         let claims = JwtClaims {
             sub: "user1".into(),
@@ -287,7 +285,7 @@ mod tests {
 
     #[test]
     fn wrong_secret_rejected() {
-        use jsonwebtoken::{encode, EncodingKey, Header};
+        use jsonwebtoken::{EncodingKey, Header, encode};
         let claims = JwtClaims {
             sub: "u".into(),
             email: "e".into(),
@@ -311,13 +309,13 @@ mod tests {
     fn cookie_extracted() {
         let req = Request::builder()
             .uri("/x")
-            .header(header::COOKIE, "other=foo; cave_session=abc.def.ghi; tail=zz")
+            .header(
+                header::COOKIE,
+                "other=foo; cave_session=abc.def.ghi; tail=zz",
+            )
             .body(axum::body::Body::empty())
             .unwrap();
-        assert_eq!(
-            extract_session_cookie(&req).as_deref(),
-            Some("abc.def.ghi")
-        );
+        assert_eq!(extract_session_cookie(&req).as_deref(), Some("abc.def.ghi"));
     }
 
     #[test]

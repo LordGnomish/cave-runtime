@@ -5,7 +5,7 @@
 //! SPDX 2.3 SBOM serializer (JSON form).
 
 use super::Report;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub fn to_spdx(report: &Report) -> Value {
     let packages: Vec<Value> = report

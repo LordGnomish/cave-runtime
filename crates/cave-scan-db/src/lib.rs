@@ -165,5 +165,5 @@ pub trait IacRuleDb {
     fn rules_for_provider(&self, provider: &str) -> Result<Vec<IacRule>>;
 }
 
-pub use matcher::{match_purl, PackageRef};
+pub use matcher::{PackageRef, match_purl};
 pub use storage::SledStore;

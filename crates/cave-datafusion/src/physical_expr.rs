@@ -37,13 +37,30 @@ pub enum BinaryPhysicalOp {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PhysicalExpr {
-    Column { index: usize },
-    Literal { value: Value },
-    Binary { op: BinaryPhysicalOp, left: Box<PhysicalExpr>, right: Box<PhysicalExpr> },
-    Not { expr: Box<PhysicalExpr> },
-    IsNull { expr: Box<PhysicalExpr> },
-    IsNotNull { expr: Box<PhysicalExpr> },
-    Cast { expr: Box<PhysicalExpr>, to: DataType },
+    Column {
+        index: usize,
+    },
+    Literal {
+        value: Value,
+    },
+    Binary {
+        op: BinaryPhysicalOp,
+        left: Box<PhysicalExpr>,
+        right: Box<PhysicalExpr>,
+    },
+    Not {
+        expr: Box<PhysicalExpr>,
+    },
+    IsNull {
+        expr: Box<PhysicalExpr>,
+    },
+    IsNotNull {
+        expr: Box<PhysicalExpr>,
+    },
+    Cast {
+        expr: Box<PhysicalExpr>,
+        to: DataType,
+    },
 }
 
 impl PhysicalExpr {
@@ -111,7 +128,9 @@ fn eval_binary(op: BinaryPhysicalOp, l: &Value, r: &Value) -> Result<Value> {
                 _ => unreachable!(),
             };
             // Promote to f64 unless both sides are integer.
-            if matches!(l, Value::Int32(_) | Value::Int64(_)) && matches!(r, Value::Int32(_) | Value::Int64(_)) && matches!(op, Plus | Minus | Multiply | Modulo)
+            if matches!(l, Value::Int32(_) | Value::Int64(_))
+                && matches!(r, Value::Int32(_) | Value::Int64(_))
+                && matches!(op, Plus | Minus | Multiply | Modulo)
             {
                 Ok(Value::Int64(out as i64))
             } else {
@@ -228,7 +247,9 @@ mod tests {
         let e = PhysicalExpr::Binary {
             op: BinaryPhysicalOp::Gt,
             left: Box::new(PhysicalExpr::Column { index: 0 }),
-            right: Box::new(PhysicalExpr::Literal { value: Value::Int64(2) }),
+            right: Box::new(PhysicalExpr::Literal {
+                value: Value::Int64(2),
+            }),
         };
         assert_eq!(e.evaluate(&r).unwrap(), Value::Bool(true));
     }
@@ -239,7 +260,9 @@ mod tests {
         let e = PhysicalExpr::Binary {
             op: BinaryPhysicalOp::Plus,
             left: Box::new(PhysicalExpr::Column { index: 0 }),
-            right: Box::new(PhysicalExpr::Literal { value: Value::Int64(1) }),
+            right: Box::new(PhysicalExpr::Literal {
+                value: Value::Int64(1),
+            }),
         };
         assert_eq!(e.evaluate(&r).unwrap(), Value::Null);
     }

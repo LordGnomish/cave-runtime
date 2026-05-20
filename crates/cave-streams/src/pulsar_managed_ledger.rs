@@ -24,9 +24,15 @@ use std::collections::HashMap;
 pub struct EntryId(pub u64, pub u64); // (ledger_id, entry_id)
 
 impl EntryId {
-    pub fn new(ledger: u64, entry: u64) -> Self { EntryId(ledger, entry) }
-    pub fn ledger(&self) -> u64 { self.0 }
-    pub fn entry(&self) -> u64 { self.1 }
+    pub fn new(ledger: u64, entry: u64) -> Self {
+        EntryId(ledger, entry)
+    }
+    pub fn ledger(&self) -> u64 {
+        self.0
+    }
+    pub fn entry(&self) -> u64 {
+        self.1
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -40,9 +46,17 @@ pub struct LedgerSegment {
 
 impl LedgerSegment {
     pub fn new(id: u64, created_at_ms: i64) -> Self {
-        Self { id, entries: Vec::new(), size_bytes: 0, sealed: false, created_at_ms }
+        Self {
+            id,
+            entries: Vec::new(),
+            size_bytes: 0,
+            sealed: false,
+            created_at_ms,
+        }
     }
-    pub fn seal(&mut self) { self.sealed = true; }
+    pub fn seal(&mut self) {
+        self.sealed = true;
+    }
     pub fn append(&mut self, data: Vec<u8>) -> u64 {
         let entry_id = self.entries.len() as u64;
         self.size_bytes += data.len() as u64;
@@ -59,7 +73,10 @@ pub struct RetentionPolicy {
 
 impl Default for RetentionPolicy {
     fn default() -> Self {
-        Self { retention_size_bytes: 100 * 1024 * 1024, retention_time_ms: 24 * 60 * 60 * 1000 }
+        Self {
+            retention_size_bytes: 100 * 1024 * 1024,
+            retention_time_ms: 24 * 60 * 60 * 1000,
+        }
     }
 }
 
@@ -97,9 +114,8 @@ impl ManagedCursor {
         if !self.pending_acks.iter().any(|e| *e == target) {
             self.pending_acks.push(target);
         }
-        self.pending_acks.sort_by(|a, b| {
-            a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1))
-        });
+        self.pending_acks
+            .sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
         // Collapse run starting from the mark+1.
         loop {
             let next_id = next_after(&self.mark_delete_position);
@@ -146,10 +162,14 @@ impl ManagedLedger {
         }
     }
 
-    pub fn set_clock(&mut self, ms: i64) { self.clock_ms = ms; }
+    pub fn set_clock(&mut self, ms: i64) {
+        self.clock_ms = ms;
+    }
 
     pub fn open_cursor(&mut self, name: &str) -> &ManagedCursor {
-        self.cursors.entry(name.to_string()).or_insert_with(|| ManagedCursor::new(name))
+        self.cursors
+            .entry(name.to_string())
+            .or_insert_with(|| ManagedCursor::new(name))
     }
 
     pub fn append(&mut self, data: Vec<u8>) -> EntryId {
@@ -161,7 +181,8 @@ impl ManagedLedger {
         };
         if need_roll {
             self.segments.last_mut().unwrap().seal();
-            self.segments.push(LedgerSegment::new(self.next_ledger_id, self.clock_ms));
+            self.segments
+                .push(LedgerSegment::new(self.next_ledger_id, self.clock_ms));
             self.next_ledger_id += 1;
         }
         let seg = self.segments.last_mut().unwrap();
@@ -210,7 +231,9 @@ impl ManagedLedger {
         before - self.segments.len()
     }
 
-    pub fn segment_count(&self) -> usize { self.segments.len() }
+    pub fn segment_count(&self) -> usize {
+        self.segments.len()
+    }
 
     pub fn total_entries(&self) -> usize {
         self.segments.iter().map(|s| s.entries.len()).sum()
@@ -266,7 +289,10 @@ mod tests {
         ml.append(vec![2]);
         let cursor = ml.open_cursor("sub-1").clone();
         assert_eq!(cursor.mark_delete_position, EntryId::new(0, 0));
-        ml.cursors.get_mut("sub-1").unwrap().mark_delete(EntryId::new(1, 0));
+        ml.cursors
+            .get_mut("sub-1")
+            .unwrap()
+            .mark_delete(EntryId::new(1, 0));
         assert_eq!(ml.cursors["sub-1"].mark_delete_position, EntryId::new(1, 0));
     }
 

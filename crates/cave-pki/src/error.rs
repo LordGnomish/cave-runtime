@@ -20,7 +20,11 @@ pub enum PkiError {
     ChainInvalid(String),
     /// Cite: RFC 5280 §5 — revoked cert returned by CRL/OCSP responder.
     #[error("certificate {serial} revoked at {revoked_at}: {reason:?}")]
-    Revoked { serial: String, revoked_at: String, reason: super::crl::RevocationReason },
+    Revoked {
+        serial: String,
+        revoked_at: String,
+        reason: super::crl::RevocationReason,
+    },
     /// cave multi-tenant invariant.
     #[error("cross-tenant access denied: store='{store}' request='{req}'")]
     CrossTenantDenied { store: String, req: String },

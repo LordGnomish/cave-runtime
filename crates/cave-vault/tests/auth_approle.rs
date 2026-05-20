@@ -24,7 +24,11 @@ fn secret_id(role_name: &str, ttl_secs: i64, num_uses: i64) -> (String, SecretId
         secret_id: sid.clone(),
         accessor: acc.clone(),
         created_at: Utc::now(),
-        expires_at: if ttl_secs > 0 { Some(Utc::now() + Duration::seconds(ttl_secs)) } else { None },
+        expires_at: if ttl_secs > 0 {
+            Some(Utc::now() + Duration::seconds(ttl_secs))
+        } else {
+            None
+        },
         num_uses,
         uses_remaining: num_uses,
         metadata: HashMap::new(),
@@ -62,11 +66,18 @@ fn read_back_role_after_insert() {
 #[test]
 fn delete_role_clears_secret_ids() {
     let mut store = ApproleStore::default();
-    store.roles.insert("ephemeral".into(), role("ephemeral", true));
+    store
+        .roles
+        .insert("ephemeral".into(), role("ephemeral", true));
     let (sid, entry) = secret_id("ephemeral", 600, 0);
-    store.secret_ids.entry("ephemeral".into()).or_default()
+    store
+        .secret_ids
+        .entry("ephemeral".into())
+        .or_default()
         .insert(entry.accessor.clone(), entry.clone());
-    store.secret_id_by_id.insert(sid.clone(), ("ephemeral".into(), entry.accessor));
+    store
+        .secret_id_by_id
+        .insert(sid.clone(), ("ephemeral".into(), entry.accessor));
 
     store.roles.remove("ephemeral");
     store.secret_ids.remove("ephemeral");
@@ -86,11 +97,22 @@ fn login_rejects_expired_secret_id() {
     // backdate expiry into the past
     entry.expires_at = Some(Utc::now() - Duration::seconds(10));
     let acc = entry.accessor.clone();
-    store.secret_id_by_id.insert(sid.clone(), ("svc".into(), acc.clone()));
-    store.secret_ids.entry("svc".into()).or_default().insert(acc, entry);
+    store
+        .secret_id_by_id
+        .insert(sid.clone(), ("svc".into(), acc.clone()));
+    store
+        .secret_ids
+        .entry("svc".into())
+        .or_default()
+        .insert(acc, entry);
 
     let lookup = store.secret_id_by_id.get(&sid).cloned().unwrap();
-    let entry = store.secret_ids.get(&lookup.0).unwrap().get(&lookup.1).unwrap();
+    let entry = store
+        .secret_ids
+        .get(&lookup.0)
+        .unwrap()
+        .get(&lookup.1)
+        .unwrap();
     let exp = entry.expires_at.unwrap();
     assert!(Utc::now() > exp, "secret_id is expired → login must fail");
 }
@@ -105,17 +127,36 @@ fn login_decrements_uses_remaining_and_rejects_when_zero() {
 
     let (sid, entry) = secret_id("svc", 0, 2);
     let acc = entry.accessor.clone();
-    store.secret_id_by_id.insert(sid.clone(), ("svc".into(), acc.clone()));
-    store.secret_ids.entry("svc".into()).or_default().insert(acc.clone(), entry);
+    store
+        .secret_id_by_id
+        .insert(sid.clone(), ("svc".into(), acc.clone()));
+    store
+        .secret_ids
+        .entry("svc".into())
+        .or_default()
+        .insert(acc.clone(), entry);
 
     // simulate two successful logins then one rejected
     for _ in 0..2 {
         let lookup = store.secret_id_by_id.get(&sid).cloned().unwrap();
-        let e = store.secret_ids.get_mut(&lookup.0).unwrap().get_mut(&lookup.1).unwrap();
+        let e = store
+            .secret_ids
+            .get_mut(&lookup.0)
+            .unwrap()
+            .get_mut(&lookup.1)
+            .unwrap();
         assert!(e.uses_remaining > 0);
         e.uses_remaining -= 1;
     }
     let lookup = store.secret_id_by_id.get(&sid).cloned().unwrap();
-    let e = store.secret_ids.get(&lookup.0).unwrap().get(&lookup.1).unwrap();
-    assert_eq!(e.uses_remaining, 0, "exhausted secret_id must be rejected on the next login");
+    let e = store
+        .secret_ids
+        .get(&lookup.0)
+        .unwrap()
+        .get(&lookup.1)
+        .unwrap();
+    assert_eq!(
+        e.uses_remaining, 0,
+        "exhausted secret_id must be rejected on the next login"
+    );
 }

@@ -58,10 +58,18 @@ pub enum ConfigError {
 
 impl ConnectorConfig {
     pub fn validate(&self) -> Result<(), ConfigError> {
-        if self.name.is_empty() { return Err(ConfigError::EmptyName); }
-        if self.class_name.is_empty() { return Err(ConfigError::EmptyClass); }
-        if self.topic_name.is_empty() { return Err(ConfigError::EmptyTopic); }
-        if self.parallelism == 0 { return Err(ConfigError::ZeroParallelism); }
+        if self.name.is_empty() {
+            return Err(ConfigError::EmptyName);
+        }
+        if self.class_name.is_empty() {
+            return Err(ConfigError::EmptyClass);
+        }
+        if self.topic_name.is_empty() {
+            return Err(ConfigError::EmptyTopic);
+        }
+        if self.parallelism == 0 {
+            return Err(ConfigError::ZeroParallelism);
+        }
         Ok(())
     }
 }
@@ -85,7 +93,9 @@ pub enum InstanceState {
 }
 
 impl Default for InstanceState {
-    fn default() -> Self { InstanceState::Initializing }
+    fn default() -> Self {
+        InstanceState::Initializing
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -104,7 +114,9 @@ pub struct ConnectorRuntime {
 }
 
 impl ConnectorRuntime {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Install a connector config. Returns a per-instance plan (one
     /// `InstanceStatus` per parallelism slot, all `Initializing`).
@@ -113,14 +125,20 @@ impl ConnectorRuntime {
         let parallelism = cfg.parallelism;
         self.config = Some(cfg);
         self.instances = (0..parallelism)
-            .map(|i| InstanceStatus { id: i, ..Default::default() })
+            .map(|i| InstanceStatus {
+                id: i,
+                ..Default::default()
+            })
             .collect();
         Ok(self.instances.iter().map(|s| s.id).collect())
     }
 
     pub fn start(&mut self) {
         for i in self.instances.iter_mut() {
-            if matches!(i.state, InstanceState::Initializing | InstanceState::Stopped | InstanceState::Paused) {
+            if matches!(
+                i.state,
+                InstanceState::Initializing | InstanceState::Stopped | InstanceState::Paused
+            ) {
                 i.state = InstanceState::Running;
             }
         }
@@ -191,7 +209,9 @@ pub struct SourceRecord {
 pub trait PulsarSink: Send + Sync {
     fn open(&mut self, ctx: &SinkContext) -> Result<(), String>;
     fn write(&mut self, record: &SinkRecord) -> Result<(), String>;
-    fn flush(&mut self) -> Result<(), String> { Ok(()) }
+    fn flush(&mut self) -> Result<(), String> {
+        Ok(())
+    }
     fn close(&mut self);
 }
 
@@ -235,7 +255,10 @@ mod tests {
 
     #[test]
     fn validate_rejects_zero_parallelism() {
-        assert_eq!(cfg("c", ConnectorKind::Source, 0).validate(), Err(ConfigError::ZeroParallelism));
+        assert_eq!(
+            cfg("c", ConnectorKind::Source, 0).validate(),
+            Err(ConfigError::ZeroParallelism)
+        );
     }
 
     #[test]
@@ -251,7 +274,11 @@ mod tests {
         let mut rt = ConnectorRuntime::new();
         rt.install(cfg("c", ConnectorKind::Source, 2)).unwrap();
         rt.start();
-        assert!(rt.instances.iter().all(|i| i.state == InstanceState::Running));
+        assert!(
+            rt.instances
+                .iter()
+                .all(|i| i.state == InstanceState::Running)
+        );
     }
 
     #[test]
@@ -286,8 +313,14 @@ mod tests {
 
     #[test]
     fn parse_processing_guarantee_matches_known_strings() {
-        assert_eq!(parse_processing_guarantee("ATLEAST_ONCE").unwrap(), ProcessingGuarantees::AtLeastOnce);
-        assert_eq!(parse_processing_guarantee("effectivelyonce").unwrap(), ProcessingGuarantees::EffectivelyOnce);
+        assert_eq!(
+            parse_processing_guarantee("ATLEAST_ONCE").unwrap(),
+            ProcessingGuarantees::AtLeastOnce
+        );
+        assert_eq!(
+            parse_processing_guarantee("effectivelyonce").unwrap(),
+            ProcessingGuarantees::EffectivelyOnce
+        );
     }
 
     #[test]
@@ -319,14 +352,26 @@ mod tests {
                 sequence_id: Some(self.emitted as u64),
             }]
         }
-        fn ack(&mut self, _record: &SourceRecord) -> Result<(), String> { Ok(()) }
-        fn close(&mut self) { self.close_called = true; }
+        fn ack(&mut self, _record: &SourceRecord) -> Result<(), String> {
+            Ok(())
+        }
+        fn close(&mut self) {
+            self.close_called = true;
+        }
     }
 
     #[test]
     fn pulsar_source_lifecycle_open_poll_ack_close() {
-        let mut src = CountingSource { emitted: 0, open_called: false, close_called: false };
-        let ctx = SourceContext { instance_id: 0, topic_name: "t".into(), configs: HashMap::new() };
+        let mut src = CountingSource {
+            emitted: 0,
+            open_called: false,
+            close_called: false,
+        };
+        let ctx = SourceContext {
+            instance_id: 0,
+            topic_name: "t".into(),
+            configs: HashMap::new(),
+        };
         src.open(&ctx).unwrap();
         let recs = src.poll();
         assert_eq!(recs.len(), 1);

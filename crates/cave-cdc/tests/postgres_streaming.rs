@@ -78,7 +78,9 @@ fn flush_lsn_must_advance_monotonically() {
 #[test]
 fn wal_event_kinds_serde_round_trip() {
     use WalEventKind::*;
-    for k in [Begin, Commit, Insert, Update, Delete, Truncate, Relation, Type, Origin, Message] {
+    for k in [
+        Begin, Commit, Insert, Update, Delete, Truncate, Relation, Type, Origin, Message,
+    ] {
         let json = serde_json::to_string(&k).unwrap();
         let back: WalEventKind = serde_json::from_str(&json).unwrap();
         assert_eq!(k, back);

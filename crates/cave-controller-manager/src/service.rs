@@ -95,7 +95,10 @@ mod tests {
         );
         let s = svc(ServiceType::ClusterIP, false);
         assert!(!wants_load_balancer(&s));
-        assert_eq!(reconcile(&s, &ServiceStatus::default(), &tenant).unwrap(), Reconcile::NoOp);
+        assert_eq!(
+            reconcile(&s, &ServiceStatus::default(), &tenant).unwrap(),
+            Reconcile::NoOp
+        );
     }
 
     #[test]
@@ -106,7 +109,10 @@ mod tests {
             "tenant-svc-create-lb"
         );
         let s = svc(ServiceType::LoadBalancer, false);
-        assert_eq!(reconcile(&s, &ServiceStatus::default(), &tenant).unwrap(), Reconcile::Create(1));
+        assert_eq!(
+            reconcile(&s, &ServiceStatus::default(), &tenant).unwrap(),
+            Reconcile::Create(1)
+        );
     }
 
     #[test]
@@ -117,7 +123,10 @@ mod tests {
             "tenant-svc-delete-lb"
         );
         let s = svc(ServiceType::LoadBalancer, true);
-        let st = ServiceStatus { lb_provisioned: true, finalizer_present: true };
+        let st = ServiceStatus {
+            lb_provisioned: true,
+            finalizer_present: true,
+        };
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::Delete(1));
     }
 
@@ -129,7 +138,10 @@ mod tests {
             "tenant-svc-finalizer"
         );
         let s = svc(ServiceType::LoadBalancer, true);
-        let st = ServiceStatus { lb_provisioned: false, finalizer_present: true };
+        let st = ServiceStatus {
+            lb_provisioned: false,
+            finalizer_present: true,
+        };
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::Update(0));
     }
 }

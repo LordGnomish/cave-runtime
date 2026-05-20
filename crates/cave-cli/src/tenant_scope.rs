@@ -14,7 +14,7 @@
 //! This module is the pure resolver. The CLI layer feeds it the
 //! current flag/env/config snapshot.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TenantSource {
@@ -157,12 +157,12 @@ pub fn parse_config_tenant(toml: &str) -> Option<String> {
 mod tests {
     use super::*;
 
-    fn inputs<'a>(flag: Option<&'a str>, env: Option<&'a str>, config: Option<&'a str>) -> TenantInputs<'a> {
-        TenantInputs {
-            flag,
-            env,
-            config,
-        }
+    fn inputs<'a>(
+        flag: Option<&'a str>,
+        env: Option<&'a str>,
+        config: Option<&'a str>,
+    ) -> TenantInputs<'a> {
+        TenantInputs { flag, env, config }
     }
 
     #[test]

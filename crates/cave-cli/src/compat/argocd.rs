@@ -2,9 +2,9 @@
 // Copyright 2026 Cave Runtime contributors
 //! `cavectl argocd …` — Argo CD compat shim.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Subcommand;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::native::{HttpVerb, PreparedRequest};
 
@@ -119,12 +119,8 @@ pub enum ClusterCmd {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum ProjectCmd {
-    Create {
-        name: String,
-    },
-    Delete {
-        name: String,
-    },
+    Create { name: String },
+    Delete { name: String },
     List,
 }
 
@@ -288,17 +284,11 @@ fn prepare_repo(cmd: &RepoCmd) -> Result<PreparedRequest> {
             if let Some(u) = username {
                 body["username"] = json!(u);
             }
-            Ok(
-                PreparedRequest::new(HttpVerb::Post, "/api/compat/argocd/v1/repos")
-                    .with_body(body),
-            )
+            Ok(PreparedRequest::new(HttpVerb::Post, "/api/compat/argocd/v1/repos").with_body(body))
         }
         RepoCmd::Remove { url } => Ok(PreparedRequest::new(
             HttpVerb::Delete,
-            format!(
-                "/api/compat/argocd/v1/repos/{}",
-                url_segment_safe(url)
-            ),
+            format!("/api/compat/argocd/v1/repos/{}", url_segment_safe(url)),
         )),
         RepoCmd::List => Ok(PreparedRequest::new(
             HttpVerb::Get,
@@ -535,9 +525,7 @@ mod tests {
     #[test]
     fn app_diff() {
         let c = ArgoCdCmd::App {
-            cmd: AppCmd::Diff {
-                name: "g".into(),
-            },
+            cmd: AppCmd::Diff { name: "g".into() },
         };
         let r = prepare(&c).unwrap();
         assert_eq!(r.verb, HttpVerb::Get);
@@ -573,9 +561,7 @@ mod tests {
     #[test]
     fn app_history() {
         let c = ArgoCdCmd::App {
-            cmd: AppCmd::History {
-                name: "g".into(),
-            },
+            cmd: AppCmd::History { name: "g".into() },
         };
         let r = prepare(&c).unwrap();
         assert!(r.path.ends_with("/history"));
@@ -683,9 +669,7 @@ mod tests {
     #[test]
     fn project_create() {
         let c = ArgoCdCmd::Project {
-            cmd: ProjectCmd::Create {
-                name: "p".into(),
-            },
+            cmd: ProjectCmd::Create { name: "p".into() },
         };
         let r = prepare(&c).unwrap();
         assert_eq!(r.verb, HttpVerb::Post);
@@ -694,9 +678,7 @@ mod tests {
     #[test]
     fn project_delete() {
         let c = ArgoCdCmd::Project {
-            cmd: ProjectCmd::Delete {
-                name: "p".into(),
-            },
+            cmd: ProjectCmd::Delete { name: "p".into() },
         };
         let r = prepare(&c).unwrap();
         assert_eq!(r.verb, HttpVerb::Delete);

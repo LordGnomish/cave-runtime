@@ -14,9 +14,9 @@ use crate::executor::delete::execute_delete;
 use crate::executor::insert::execute_insert;
 use crate::executor::select::execute_select;
 use crate::executor::update::execute_update;
+use crate::protocol::StartupMessage;
 use crate::protocol::codec::{PgFrame, PgWireCodec, StartupKind, classify_startup};
 use crate::protocol::messages::{BackendMessage, FieldDescription};
-use crate::protocol::StartupMessage;
 use crate::sql::ast::Statement;
 use crate::sql::parser::Parser;
 use crate::types::{SqlValue, oid};
@@ -157,16 +157,16 @@ async fn handle_client(
             }
             b'D' => {
                 socket
-                    .write_all(
-                        &BackendMessage::RowDescription { fields: vec![] }.serialize()?,
-                    )
+                    .write_all(&BackendMessage::RowDescription { fields: vec![] }.serialize()?)
                     .await?;
             }
             b'E' => {
                 socket
                     .write_all(
-                        &BackendMessage::CommandComplete { tag: "SELECT 0".to_string() }
-                            .serialize()?,
+                        &BackendMessage::CommandComplete {
+                            tag: "SELECT 0".to_string(),
+                        }
+                        .serialize()?,
                     )
                     .await?;
             }
@@ -276,8 +276,10 @@ async fn execute_and_respond(
                     Ok(n) => {
                         socket
                             .write_all(
-                                &BackendMessage::CommandComplete { tag: format!("UPDATE {}", n) }
-                                    .serialize()?,
+                                &BackendMessage::CommandComplete {
+                                    tag: format!("UPDATE {}", n),
+                                }
+                                .serialize()?,
                             )
                             .await?
                     }
@@ -290,8 +292,10 @@ async fn execute_and_respond(
                     Ok(n) => {
                         socket
                             .write_all(
-                                &BackendMessage::CommandComplete { tag: format!("DELETE {}", n) }
-                                    .serialize()?,
+                                &BackendMessage::CommandComplete {
+                                    tag: format!("DELETE {}", n),
+                                }
+                                .serialize()?,
                             )
                             .await?
                     }
@@ -300,29 +304,40 @@ async fn execute_and_respond(
             Statement::Begin => {
                 socket
                     .write_all(
-                        &BackendMessage::CommandComplete { tag: "BEGIN".to_string() }.serialize()?,
+                        &BackendMessage::CommandComplete {
+                            tag: "BEGIN".to_string(),
+                        }
+                        .serialize()?,
                     )
                     .await?
             }
             Statement::Commit => {
                 socket
                     .write_all(
-                        &BackendMessage::CommandComplete { tag: "COMMIT".to_string() }.serialize()?,
+                        &BackendMessage::CommandComplete {
+                            tag: "COMMIT".to_string(),
+                        }
+                        .serialize()?,
                     )
                     .await?
             }
             Statement::Rollback => {
                 socket
                     .write_all(
-                        &BackendMessage::CommandComplete { tag: "ROLLBACK".to_string() }
-                            .serialize()?,
+                        &BackendMessage::CommandComplete {
+                            tag: "ROLLBACK".to_string(),
+                        }
+                        .serialize()?,
                     )
                     .await?
             }
             _ => {
                 socket
                     .write_all(
-                        &BackendMessage::CommandComplete { tag: "OK".to_string() }.serialize()?,
+                        &BackendMessage::CommandComplete {
+                            tag: "OK".to_string(),
+                        }
+                        .serialize()?,
                     )
                     .await?
             }

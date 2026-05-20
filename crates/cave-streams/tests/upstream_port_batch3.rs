@@ -12,9 +12,7 @@
 //!   * core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala
 //!   * connect/runtime/src/test/java/org/apache/kafka/connect/runtime/{ConnectorConfig,Worker,distributed/DistributedHerder}_test.java
 
-use cave_streams::connect::{
-    ConnectCluster, Connector, ConnectorState, ConnectorType, TaskState,
-};
+use cave_streams::connect::{ConnectCluster, Connector, ConnectorState, ConnectorType, TaskState};
 use cave_streams::consumer_group::{GroupCoordinator, GroupState};
 use cave_streams::error::StreamsError;
 use std::collections::HashMap;

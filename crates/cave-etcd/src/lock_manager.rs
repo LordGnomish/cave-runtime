@@ -74,7 +74,9 @@ pub struct LockHeader {
 }
 
 impl LockHeader {
-    pub fn age(&self) -> Duration { self.acquired_at.elapsed() }
+    pub fn age(&self) -> Duration {
+        self.acquired_at.elapsed()
+    }
 }
 
 // ── HeaderedMutex ────────────────────────────────────────────────────────
@@ -104,9 +106,13 @@ impl HeaderedMutex {
         }
     }
 
-    pub fn key(&self) -> &str { &self.key }
+    pub fn key(&self) -> &str {
+        &self.key
+    }
 
-    fn next_rev(&self) -> u64 { self.revision.fetch_add(1, Ordering::SeqCst) + 1 }
+    fn next_rev(&self) -> u64 {
+        self.revision.fetch_add(1, Ordering::SeqCst) + 1
+    }
 
     /// Acquire — blocks (in the abstract sense) until first in queue.
     /// Returns the header if granted, or `WouldBlock` if queued.
@@ -115,14 +121,17 @@ impl HeaderedMutex {
         let mut s = self.state.lock().unwrap();
         // Re-entrant under same lease.
         if let Some(h) = &s.holder_header {
-            if h.lease_id == lease_id { return Ok(h.clone()); }
+            if h.lease_id == lease_id {
+                return Ok(h.clone());
+            }
         }
         s.queue.insert(rev, lease_id);
         let head = *s.queue.keys().next().unwrap();
         if head == rev {
             let header = LockHeader {
                 acquired_revision: rev,
-                lease_id, key: self.key.clone(),
+                lease_id,
+                key: self.key.clone(),
                 acquired_at: Instant::now(),
             };
             s.holder_header = Some(header.clone());
@@ -134,15 +143,23 @@ impl HeaderedMutex {
 
     /// Try to acquire by `deadline`.  Loops the queue once; succeeds only
     /// if we end up at the head before the deadline.
-    pub fn try_lock_until(&self, lease_id: i64, deadline: Instant) -> Result<LockHeader, LockManagerError> {
+    pub fn try_lock_until(
+        &self,
+        lease_id: i64,
+        deadline: Instant,
+    ) -> Result<LockHeader, LockManagerError> {
         // Single-process model: register, then check head.  If not head,
         // poll until deadline.
         let _ = self.lock(lease_id);
         loop {
-            if Instant::now() >= deadline { return Err(LockManagerError::DeadlineExceeded); }
+            if Instant::now() >= deadline {
+                return Err(LockManagerError::DeadlineExceeded);
+            }
             let s = self.state.lock().unwrap();
             if let Some(h) = &s.holder_header {
-                if h.lease_id == lease_id { return Ok(h.clone()); }
+                if h.lease_id == lease_id {
+                    return Ok(h.clone());
+                }
             }
             drop(s);
             std::thread::sleep(Duration::from_millis(1));
@@ -154,13 +171,18 @@ impl HeaderedMutex {
         let mut s = self.state.lock().unwrap();
         let holder_rev = s.queue.iter().next().map(|(r, _)| *r);
         let holder_lease = s.queue.iter().next().map(|(_, l)| *l);
-        if holder_lease != Some(lease_id) { return Err(LockManagerError::NotOwner); }
-        if let Some(rev) = holder_rev { s.queue.remove(&rev); }
+        if holder_lease != Some(lease_id) {
+            return Err(LockManagerError::NotOwner);
+        }
+        if let Some(rev) = holder_rev {
+            s.queue.remove(&rev);
+        }
         s.holder_header = None;
         // Promote next.
         if let Some((&rev, &next_lease)) = s.queue.iter().next() {
             s.holder_header = Some(LockHeader {
-                acquired_revision: rev, lease_id: next_lease,
+                acquired_revision: rev,
+                lease_id: next_lease,
                 key: self.key.clone(),
                 acquired_at: Instant::now(),
             });
@@ -172,7 +194,9 @@ impl HeaderedMutex {
         self.state.lock().unwrap().holder_header.clone()
     }
 
-    pub fn queue_len(&self) -> usize { self.state.lock().unwrap().queue.len() }
+    pub fn queue_len(&self) -> usize {
+        self.state.lock().unwrap().queue.len()
+    }
 }
 
 // ── Multi-lock acquire ───────────────────────────────────────────────────
@@ -196,7 +220,9 @@ pub fn acquire_all(
     sorted.sort();
     let mut acquired: Vec<(String, LockHeader)> = Vec::new();
     for k in &sorted {
-        let lock = locks.get(k.as_str()).ok_or_else(|| LockManagerError::UnknownLock(k.to_string()))?;
+        let lock = locks
+            .get(k.as_str())
+            .ok_or_else(|| LockManagerError::UnknownLock(k.to_string()))?;
         match lock.lock(lease_id) {
             Ok(h) => acquired.push((k.to_string(), h)),
             Err(_) => {
@@ -220,7 +246,9 @@ pub fn release_all(
     lease_id: i64,
 ) -> Result<(), LockManagerError> {
     for k in keys {
-        let lock = locks.get(k.as_str()).ok_or_else(|| LockManagerError::UnknownLock(k.to_string()))?;
+        let lock = locks
+            .get(k.as_str())
+            .ok_or_else(|| LockManagerError::UnknownLock(k.to_string()))?;
         lock.unlock(lease_id)?;
     }
     Ok(())
@@ -235,7 +263,11 @@ pub struct LockManager {
 }
 
 impl LockManager {
-    pub fn new() -> Self { Self { inner: RwLock::new(HashMap::new()) } }
+    pub fn new() -> Self {
+        Self {
+            inner: RwLock::new(HashMap::new()),
+        }
+    }
 
     pub fn get_or_create(&self, name: impl Into<String>) -> String {
         let name = name.into();
@@ -248,18 +280,26 @@ impl LockManager {
 
     pub fn lock(&self, name: &str, lease_id: i64) -> Result<LockHeader, LockManagerError> {
         let g = self.inner.read().unwrap();
-        let lock = g.get(name).ok_or_else(|| LockManagerError::UnknownLock(name.to_string()))?;
+        let lock = g
+            .get(name)
+            .ok_or_else(|| LockManagerError::UnknownLock(name.to_string()))?;
         lock.lock(lease_id).map_err(|_| LockManagerError::NotOwner)
     }
 
     pub fn unlock(&self, name: &str, lease_id: i64) -> Result<(), LockManagerError> {
         let g = self.inner.read().unwrap();
-        let lock = g.get(name).ok_or_else(|| LockManagerError::UnknownLock(name.to_string()))?;
+        let lock = g
+            .get(name)
+            .ok_or_else(|| LockManagerError::UnknownLock(name.to_string()))?;
         lock.unlock(lease_id)
     }
 
     pub fn header(&self, name: &str) -> Option<LockHeader> {
-        self.inner.read().unwrap().get(name).and_then(|l| l.header())
+        self.inner
+            .read()
+            .unwrap()
+            .get(name)
+            .and_then(|l| l.header())
     }
 
     pub fn names(&self) -> Vec<String> {
@@ -272,12 +312,18 @@ impl LockManager {
         self.inner.write().unwrap().remove(name).is_some()
     }
 
-    pub fn len(&self) -> usize { self.inner.read().unwrap().len() }
-    pub fn is_empty(&self) -> bool { self.len() == 0 }
+    pub fn len(&self) -> usize {
+        self.inner.read().unwrap().len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl Default for LockManager {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── Election with epoch + observer ───────────────────────────────────────
@@ -336,12 +382,19 @@ impl EpochElection {
     }
 
     pub fn observer_history(&self) -> Vec<LeaderEpoch> {
-        self.observer_buffer.lock().unwrap().iter().cloned().collect()
+        self.observer_buffer
+            .lock()
+            .unwrap()
+            .iter()
+            .cloned()
+            .collect()
     }
 
     fn record_epoch(&self, ep: LeaderEpoch) {
         let mut buf = self.observer_buffer.lock().unwrap();
-        if buf.len() >= self.observer_buffer_cap { buf.pop_front(); }
+        if buf.len() >= self.observer_buffer_cap {
+            buf.pop_front();
+        }
         buf.push_back(ep);
     }
 
@@ -356,7 +409,9 @@ impl EpochElection {
         if was_empty {
             let ep = LeaderEpoch {
                 epoch: self.epoch_counter.fetch_add(1, Ordering::SeqCst) + 1,
-                lease_id, value, elected_at: Instant::now(),
+                lease_id,
+                value,
+                elected_at: Instant::now(),
             };
             s.current = Some(ep.clone());
             drop(s);
@@ -370,16 +425,21 @@ impl EpochElection {
     pub fn resign(&self, lease_id: i64) -> Result<Option<(u64, i64)>, LockManagerError> {
         let mut s = self.state.write().unwrap();
         let cur = s.current.as_ref().ok_or(LockManagerError::NoLeader)?;
-        if cur.lease_id != lease_id { return Err(LockManagerError::NotLeader); }
+        if cur.lease_id != lease_id {
+            return Err(LockManagerError::NotLeader);
+        }
         // Remove leader from queue.
         let leader_rev = *s.queue.iter().next().map(|(r, _)| r).unwrap();
         s.queue.remove(&leader_rev);
         s.current = None;
         // Promote next.
-        if let Some((&rev, (next_lease, value))) = s.queue.iter().next().map(|(r, v)| (r, (v.0, v.1.clone()))) {
+        if let Some((&rev, (next_lease, value))) =
+            s.queue.iter().next().map(|(r, v)| (r, (v.0, v.1.clone())))
+        {
             let ep = LeaderEpoch {
                 epoch: self.epoch_counter.fetch_add(1, Ordering::SeqCst) + 1,
-                lease_id: next_lease, value,
+                lease_id: next_lease,
+                value,
                 elected_at: Instant::now(),
             };
             s.current = Some(ep.clone());
@@ -393,10 +453,16 @@ impl EpochElection {
     }
 
     /// Update the leader's published value without re-electing.
-    pub fn proclaim(&self, lease_id: i64, value: impl Into<Vec<u8>>) -> Result<(), LockManagerError> {
+    pub fn proclaim(
+        &self,
+        lease_id: i64,
+        value: impl Into<Vec<u8>>,
+    ) -> Result<(), LockManagerError> {
         let mut s = self.state.write().unwrap();
         let cur = s.current.as_mut().ok_or(LockManagerError::NoLeader)?;
-        if cur.lease_id != lease_id { return Err(LockManagerError::NotLeader); }
+        if cur.lease_id != lease_id {
+            return Err(LockManagerError::NotLeader);
+        }
         cur.value = value.into();
         Ok(())
     }
@@ -406,18 +472,25 @@ impl EpochElection {
     pub fn expire_lease(&self, lease_id: i64) -> Option<(u64, i64)> {
         let mut s = self.state.write().unwrap();
         let prev_lease = s.current.as_ref().map(|c| c.lease_id);
-        let revs: Vec<u64> = s.queue.iter()
+        let revs: Vec<u64> = s
+            .queue
+            .iter()
             .filter(|(_, (l, _))| *l == lease_id)
             .map(|(r, _)| *r)
             .collect();
-        for r in revs { s.queue.remove(&r); }
+        for r in revs {
+            s.queue.remove(&r);
+        }
         // If the expired lease was the leader, promote the next.
         if prev_lease == Some(lease_id) {
             s.current = None;
-            if let Some((&rev, (next_lease, value))) = s.queue.iter().next().map(|(r, v)| (r, (v.0, v.1.clone()))) {
+            if let Some((&rev, (next_lease, value))) =
+                s.queue.iter().next().map(|(r, v)| (r, (v.0, v.1.clone())))
+            {
                 let ep = LeaderEpoch {
                     epoch: self.epoch_counter.fetch_add(1, Ordering::SeqCst) + 1,
-                    lease_id: next_lease, value,
+                    lease_id: next_lease,
+                    value,
                     elected_at: Instant::now(),
                 };
                 s.current = Some(ep.clone());
@@ -430,11 +503,15 @@ impl EpochElection {
         None
     }
 
-    pub fn queue_len(&self) -> usize { self.state.read().unwrap().queue.len() }
+    pub fn queue_len(&self) -> usize {
+        self.state.read().unwrap().queue.len()
+    }
 }
 
 impl Default for EpochElection {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -447,7 +524,9 @@ mod tests {
 
     fn three_locks() -> HashMap<String, HeaderedMutex> {
         let mut m = HashMap::new();
-        for k in ["/a", "/b", "/c"] { m.insert(k.into(), HeaderedMutex::new(k)); }
+        for k in ["/a", "/b", "/c"] {
+            m.insert(k.into(), HeaderedMutex::new(k));
+        }
         m
     }
 
@@ -536,7 +615,9 @@ mod tests {
     fn test_try_lock_until_succeeds_when_free() {
         // cite: recipes/double_barrier.go (deadline acquire)
         let m = HeaderedMutex::new("/k");
-        let h = m.try_lock_until(7, Instant::now() + Duration::from_secs(1)).unwrap();
+        let h = m
+            .try_lock_until(7, Instant::now() + Duration::from_secs(1))
+            .unwrap();
         assert_eq!(h.lease_id, 7);
     }
 
@@ -545,7 +626,9 @@ mod tests {
         // cite: recipes (deadline path)
         let m = HeaderedMutex::new("/k");
         m.lock(1).unwrap();
-        let err = m.try_lock_until(2, Instant::now() + Duration::from_millis(20)).unwrap_err();
+        let err = m
+            .try_lock_until(2, Instant::now() + Duration::from_millis(20))
+            .unwrap_err();
         assert_eq!(err, LockManagerError::DeadlineExceeded);
     }
 
@@ -560,7 +643,9 @@ mod tests {
             std::thread::sleep(Duration::from_millis(5));
             m2.unlock(1).unwrap();
         });
-        let h = m.try_lock_until(2, Instant::now() + Duration::from_millis(200)).unwrap();
+        let h = m
+            .try_lock_until(2, Instant::now() + Duration::from_millis(200))
+            .unwrap();
         t.join().unwrap();
         assert_eq!(h.lease_id, 2);
     }
@@ -640,7 +725,10 @@ mod tests {
     #[test]
     fn test_lock_manager_unknown_lock_errors() {
         let m = LockManager::new();
-        assert!(matches!(m.lock("/x", 1).unwrap_err(), LockManagerError::UnknownLock(_)));
+        assert!(matches!(
+            m.lock("/x", 1).unwrap_err(),
+            LockManagerError::UnknownLock(_)
+        ));
     }
 
     #[test]
@@ -710,13 +798,19 @@ mod tests {
         let e = EpochElection::new();
         e.campaign(1, b"v".to_vec());
         e.campaign(2, b"v".to_vec());
-        assert_eq!(e.proclaim(2, b"x".to_vec()).unwrap_err(), LockManagerError::NotLeader);
+        assert_eq!(
+            e.proclaim(2, b"x".to_vec()).unwrap_err(),
+            LockManagerError::NotLeader
+        );
     }
 
     #[test]
     fn test_epoch_election_proclaim_no_leader_errors() {
         let e = EpochElection::new();
-        assert_eq!(e.proclaim(1, b"x".to_vec()).unwrap_err(), LockManagerError::NoLeader);
+        assert_eq!(
+            e.proclaim(1, b"x".to_vec()).unwrap_err(),
+            LockManagerError::NoLeader
+        );
     }
 
     #[test]
@@ -773,7 +867,9 @@ mod tests {
         let e = EpochElection::new().with_observer_cap(2);
         for n in 1..=4i64 {
             e.campaign(n, b"x".to_vec());
-            if n > 1 { e.resign(n - 1).unwrap(); }
+            if n > 1 {
+                e.resign(n - 1).unwrap();
+            }
         }
         assert_eq!(e.observer_history().len(), 2);
     }
@@ -814,7 +910,9 @@ mod tests {
     #[test]
     fn test_epoch_election_queue_len_tracks_candidates() {
         let e = EpochElection::new();
-        for n in 1..=5i64 { e.campaign(n, b"x".to_vec()); }
+        for n in 1..=5i64 {
+            e.campaign(n, b"x".to_vec());
+        }
         assert_eq!(e.queue_len(), 5);
     }
 
@@ -886,8 +984,12 @@ mod tests {
     fn test_epoch_election_resign_chain() {
         // cite: election.go (chain of resigns)
         let e = EpochElection::new();
-        for n in 1..=4i64 { e.campaign(n, b"x".to_vec()); }
-        for n in 1..=3i64 { e.resign(n).unwrap(); }
+        for n in 1..=4i64 {
+            e.campaign(n, b"x".to_vec());
+        }
+        for n in 1..=3i64 {
+            e.resign(n).unwrap();
+        }
         assert_eq!(e.current_leader().unwrap().lease_id, 4);
     }
 

@@ -9,8 +9,8 @@
 //! This is used by the Jaeger/Tempo UIs to show contextual logs/metrics
 //! alongside a selected trace.
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use crate::types::{Span, TagValue, Trace, TraceId};
 
@@ -30,7 +30,7 @@ pub struct LogCorrelation {
 /// Build a Loki log correlation for a span.
 pub fn log_correlation(span: &Span) -> LogCorrelation {
     let trace_id_hex = crate::types::format_trace_id(span.trace_id);
-    let span_id_hex  = crate::types::format_span_id(span.span_id);
+    let span_id_hex = crate::types::format_span_id(span.span_id);
 
     // Build selector from resource / log labels
     let selector_parts: Vec<String> = build_loki_labels(span)
@@ -62,16 +62,20 @@ fn build_loki_labels(span: &Span) -> Vec<(String, String)> {
 
     // Prefer explicit log_labels (set at ingestion time)
     if !span.log_labels.is_empty() {
-        return span.log_labels.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+        return span
+            .log_labels
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
     }
 
     // Derive from well-known resource attributes
     let well_known = [
-        ("service.name",      "app"),
-        ("k8s.namespace.name","namespace"),
-        ("k8s.pod.name",      "pod"),
-        ("k8s.container.name","container"),
-        ("host.name",         "host"),
+        ("service.name", "app"),
+        ("k8s.namespace.name", "namespace"),
+        ("k8s.pod.name", "pod"),
+        ("k8s.container.name", "container"),
+        ("host.name", "host"),
         ("deployment.environment", "env"),
     ];
     for (attr, label) in well_known {
@@ -116,16 +120,15 @@ pub fn metrics_correlation(trace: &Trace) -> MetricsCorrelation {
     // Pad the time range by 5 minutes on each side for context
     let pad_ns = 5 * 60 * 1_000_000_000u64;
     let start_s = (trace.start_time_unix_nano.saturating_sub(pad_ns) / 1_000_000_000) as i64;
-    let end_s   = ((trace.end_time_unix_nano + pad_ns) / 1_000_000_000) as i64;
+    let end_s = ((trace.end_time_unix_nano + pad_ns) / 1_000_000_000) as i64;
 
     MetricsCorrelation {
         trace_id: trace_id_hex,
         prometheus_selector: selector.clone(),
-        request_rate_promql: format!(
-            "rate(http_server_requests_total{{{}}}[1m])", selector
-        ),
+        request_rate_promql: format!("rate(http_server_requests_total{{{}}}[1m])", selector),
         error_rate_promql: format!(
-            "rate(http_server_requests_total{{{},status=~\"5..\"}}[1m])", selector
+            "rate(http_server_requests_total{{{},status=~\"5..\"}}[1m])",
+            selector
         ),
         p99_latency_promql: format!(
             "histogram_quantile(0.99, rate(http_server_request_duration_seconds_bucket{{{}}}[1m]))",
@@ -166,7 +169,10 @@ mod tests {
         let mut resource = HashMap::new();
         resource.insert("service.name".into(), TagValue::String("checkout".into()));
         resource.insert("k8s.namespace.name".into(), TagValue::String("prod".into()));
-        resource.insert("k8s.pod.name".into(), TagValue::String("checkout-abc123".into()));
+        resource.insert(
+            "k8s.pod.name".into(),
+            TagValue::String("checkout-abc123".into()),
+        );
 
         Span {
             trace_id: 0xdeadbeef,
@@ -175,7 +181,7 @@ mod tests {
             operation_name: "POST /order".into(),
             service_name: "checkout".into(),
             start_time_unix_nano: 1_640_000_000_000_000_000,
-            end_time_unix_nano:   1_640_000_000_005_000_000,
+            end_time_unix_nano: 1_640_000_000_005_000_000,
             duration_ns: 5_000_000,
             status: SpanStatus::Ok,
             kind: SpanKind::Server,
@@ -201,7 +207,9 @@ mod tests {
     fn log_correlation_uses_k8s_labels() {
         let span = make_span();
         let corr = log_correlation(&span);
-        assert!(corr.loki_selector.contains("namespace") || corr.loki_selector.contains("checkout"));
+        assert!(
+            corr.loki_selector.contains("namespace") || corr.loki_selector.contains("checkout")
+        );
     }
 
     #[test]
@@ -215,7 +223,10 @@ mod tests {
     #[test]
     fn baggage_extraction_from_tag() {
         let mut span = make_span();
-        span.tags.insert("baggage".into(), TagValue::String("user_id=42, tenant=acme".into()));
+        span.tags.insert(
+            "baggage".into(),
+            TagValue::String("user_id=42, tenant=acme".into()),
+        );
         let baggage = extract_baggage(&span);
         assert_eq!(baggage.get("user_id"), Some(&"42".to_owned()));
         assert_eq!(baggage.get("tenant"), Some(&"acme".to_owned()));

@@ -37,7 +37,12 @@ fn gate_1_spdx_full_coverage() {
         }
     });
     assert!(total > 0, "no .rs files found under src/");
-    assert_eq!(spdx, total, "SPDX-License-Identifier missing on {} files", total - spdx);
+    assert_eq!(
+        spdx,
+        total,
+        "SPDX-License-Identifier missing on {} files",
+        total - spdx
+    );
 }
 
 #[test]
@@ -90,8 +95,8 @@ fn has_kv(s: &str, key: &str, expected_value: &str) -> bool {
 #[test]
 fn gate_5_fill_ratio_floor() {
     let m = read_manifest();
-    let ratio = extract_float(&m, "fill_ratio")
-        .expect("manifest must declare fill_ratio = <0.0..1.0>");
+    let ratio =
+        extract_float(&m, "fill_ratio").expect("manifest must declare fill_ratio = <0.0..1.0>");
     assert!(
         ratio >= 0.90,
         "fill_ratio = {} (need >= 0.90 — PostgreSQL in-scope mapped+partial+skipped coverage)",
@@ -145,9 +150,14 @@ fn gate_8_parity_report_exists() {
     let report = crate_root().join("PARITY_REPORT.md");
     assert!(report.exists(), "PARITY_REPORT.md must exist at crate root");
     let body = fs::read_to_string(&report).unwrap();
-    assert!(body.contains("Charter v2"), "PARITY_REPORT must reference Charter v2");
-    assert!(body.contains("8/8 PASS") || body.contains("8-gate"),
-        "PARITY_REPORT must summarise 8-gate result");
+    assert!(
+        body.contains("Charter v2"),
+        "PARITY_REPORT must reference Charter v2"
+    );
+    assert!(
+        body.contains("8/8 PASS") || body.contains("8-gate"),
+        "PARITY_REPORT must summarise 8-gate result"
+    );
 }
 
 #[test]

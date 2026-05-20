@@ -2,28 +2,38 @@
 // Copyright 2026 Cave Runtime contributors
 //! Service discovery backends: static, file-based, and Kubernetes.
 
-use serde::{Deserialize, Serialize};
-use std::path::Path;
+use super::target::{FileSdConfig, KubernetesSdConfig, ScrapeConfig, ScrapeTarget, StaticConfig};
 use crate::error::Result;
 use crate::model::Labels;
-use super::target::{FileSdConfig, KubernetesSdConfig, ScrapeConfig, ScrapeTarget, StaticConfig};
+use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 /// Resolve static configs into targets.
-pub fn resolve_static(job_name: &str, config: &ScrapeConfig, sc: &StaticConfig) -> Vec<ScrapeTarget> {
-    sc.targets.iter().map(|host| {
-        let url = format!("{}://{}{}",
-            config.scheme, host, config.metrics_path);
+pub fn resolve_static(
+    job_name: &str,
+    config: &ScrapeConfig,
+    sc: &StaticConfig,
+) -> Vec<ScrapeTarget> {
+    sc.targets
+        .iter()
+        .map(|host| {
+            let url = format!("{}://{}{}", config.scheme, host, config.metrics_path);
 
-        let mut labels = sc.labels.clone();
-        labels.insert("job", job_name);
-        labels.insert("instance", host.as_str());
+            let mut labels = sc.labels.clone();
+            labels.insert("job", job_name);
+            labels.insert("instance", host.as_str());
 
-        ScrapeTarget::new(url, labels, config.clone())
-    }).collect()
+            ScrapeTarget::new(url, labels, config.clone())
+        })
+        .collect()
 }
 
 /// Resolve file-based SD (reads a JSON/YAML file with target groups).
-pub fn resolve_file_sd(job_name: &str, config: &ScrapeConfig, fsc: &FileSdConfig) -> Vec<ScrapeTarget> {
+pub fn resolve_file_sd(
+    job_name: &str,
+    config: &ScrapeConfig,
+    fsc: &FileSdConfig,
+) -> Vec<ScrapeTarget> {
     let mut targets = Vec::new();
     for file_pattern in &fsc.files {
         // Simple glob expansion: for now treat as literal paths.
@@ -65,7 +75,11 @@ pub fn resolve_all(config: &ScrapeConfig) -> Vec<ScrapeTarget> {
     // Here we register the target structure but don't make live K8s calls.
     for ksc in &config.kubernetes_sd_configs {
         // Emit a placeholder to keep the structure.
-        tracing::info!("Kubernetes SD configured for role {:?} (namespaces: {:?})", ksc.role, ksc.namespaces);
+        tracing::info!(
+            "Kubernetes SD configured for role {:?} (namespaces: {:?})",
+            ksc.role,
+            ksc.namespaces
+        );
     }
 
     targets

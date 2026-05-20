@@ -50,13 +50,21 @@ fn service_ips_map_one_entry_per_clusterip_service() {
     let p = NftablesProxier::new(TENANT);
     let services = vec![
         svc("api", "10.0.0.1", 80, None),
-        svc("db",  "10.0.0.2", 5432, None),
-        svc("headless", "0.0.0.0", 80, None),  // skipped
+        svc("db", "10.0.0.2", 5432, None),
+        svc("headless", "0.0.0.0", 80, None), // skipped
     ];
     let entries = p.build_service_ips_map_entries(&services).unwrap();
     assert_eq!(entries.len(), 2, "headless service skipped");
-    assert!(entries.iter().any(|e| e.contains("10.0.0.1 . tcp . 80 : goto svc-")));
-    assert!(entries.iter().any(|e| e.contains("10.0.0.2 . tcp . 5432 : goto svc-")));
+    assert!(
+        entries
+            .iter()
+            .any(|e| e.contains("10.0.0.1 . tcp . 80 : goto svc-"))
+    );
+    assert!(
+        entries
+            .iter()
+            .any(|e| e.contains("10.0.0.2 . tcp . 5432 : goto svc-"))
+    );
 }
 
 /// Cite: `pkg/proxy/nftables/proxier.go` `service-nodeports` map
@@ -68,8 +76,8 @@ fn service_nodeports_map_only_for_nodeport_services() {
     let p = NftablesProxier::new(TENANT);
     let services = vec![
         svc("api", "10.0.0.1", 80, Some(31080)),
-        svc("db",  "10.0.0.2", 5432, None),
-        svc("ui",  "10.0.0.3", 8080, Some(31443)),
+        svc("db", "10.0.0.2", 5432, None),
+        svc("ui", "10.0.0.3", 8080, Some(31443)),
     ];
     let entries = p.build_service_nodeports_map_entries(&services).unwrap();
     assert_eq!(entries.len(), 2);
@@ -105,17 +113,27 @@ fn svc_chain_emits_numgen_random_lb_and_rejects_when_no_endpoints() {
 
     // 3 endpoints → 2 numgen rules + 1 trailing DNAT
     let mut eps = EndpointSliceMap::new(TENANT);
-    eps.upsert_slice(s.name.clone(), "slice-1", vec![
-        EndpointInfo::ready("10.1.0.1".parse().unwrap(), 8080),
-        EndpointInfo::ready("10.1.0.2".parse().unwrap(), 8080),
-        EndpointInfo::ready("10.1.0.3".parse().unwrap(), 8080),
-    ]);
+    eps.upsert_slice(
+        s.name.clone(),
+        "slice-1",
+        vec![
+            EndpointInfo::ready("10.1.0.1".parse().unwrap(), 8080),
+            EndpointInfo::ready("10.1.0.2".parse().unwrap(), 8080),
+            EndpointInfo::ready("10.1.0.3".parse().unwrap(), 8080),
+        ],
+    );
     let rules = p.build_svc_chain_rules(&s, &eps).unwrap();
-    let body: Vec<&String> = rules.iter().filter(|r| r.contains("dnat to") || r.contains("numgen")).collect();
+    let body: Vec<&String> = rules
+        .iter()
+        .filter(|r| r.contains("dnat to") || r.contains("numgen"))
+        .collect();
     assert_eq!(body.len(), 3);
     assert!(body[0].contains("numgen random mod 3 == 0"));
     assert!(body[1].contains("numgen random mod 3 == 1"));
-    assert!(!body[2].contains("numgen"), "last endpoint is unconditional");
+    assert!(
+        !body[2].contains("numgen"),
+        "last endpoint is unconditional"
+    );
 
     // Cross-tenant safety
     let foreign_eps = EndpointSliceMap::new("tenant-other");

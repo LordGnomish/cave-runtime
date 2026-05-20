@@ -55,10 +55,7 @@ pub enum TokenAction {
 }
 
 /// Decide what the controller should do with the (SA, observed secrets) pair.
-pub fn evaluate(
-    sa: &ServiceAccountSnapshot,
-    observed: &[TokenSecret],
-) -> TokenAction {
+pub fn evaluate(sa: &ServiceAccountSnapshot, observed: &[TokenSecret]) -> TokenAction {
     // First, look for any secret for the SA's namespace whose annotated UID
     // does NOT match the current SA UID → stale.
     for s in observed {
@@ -73,8 +70,7 @@ pub fn evaluate(
     }
     // Look for a fresh secret for this SA.
     let fresh = observed.iter().find(|s| {
-        s.namespace == sa.namespace
-            && s.annotated_uid.as_deref() == Some(sa.uid.as_str())
+        s.namespace == sa.namespace && s.annotated_uid.as_deref() == Some(sa.uid.as_str())
     });
     match fresh {
         Some(s) if !s.has_token => TokenAction::PopulateToken,
@@ -101,8 +97,10 @@ pub const DEFAULT_BOUND_TOKEN_EXPIRATION_SEC: u32 = 60 * 60;
 /// Validate + clamp the requested token expiration to the supported window.
 /// Mirrors `pkg/serviceaccount/jwt.go::Generator.GenerateToken`.
 pub fn clamp_bound_token_expiration(req: &BoundTokenRequest) -> u32 {
-    req.expiration_sec
-        .clamp(MIN_BOUND_TOKEN_EXPIRATION_SEC, MAX_BOUND_TOKEN_EXPIRATION_SEC)
+    req.expiration_sec.clamp(
+        MIN_BOUND_TOKEN_EXPIRATION_SEC,
+        MAX_BOUND_TOKEN_EXPIRATION_SEC,
+    )
 }
 
 #[allow(dead_code)]

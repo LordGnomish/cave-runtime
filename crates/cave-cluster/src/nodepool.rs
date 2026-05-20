@@ -113,7 +113,9 @@ impl NodePool {
             if node_count < min || node_count > max {
                 return Err(ClusterError::InvalidName {
                     name: self.name.clone(),
-                    reason: format!("node_count {node_count} out of autoscaling range [{min}, {max}]"),
+                    reason: format!(
+                        "node_count {node_count} out of autoscaling range [{min}, {max}]"
+                    ),
                 });
             }
         }

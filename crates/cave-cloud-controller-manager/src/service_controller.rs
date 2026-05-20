@@ -135,9 +135,7 @@ impl ServiceSpec {
                 ),
             });
         }
-        if self.ip_family_policy == IpFamilyPolicy::RequireDualStack
-            && self.ip_families.len() < 2
-        {
+        if self.ip_family_policy == IpFamilyPolicy::RequireDualStack && self.ip_families.len() < 2 {
             return Err(CloudError::InvalidConfig {
                 provider: crate::types::ProviderName::Hetzner,
                 reason: format!(
@@ -160,15 +158,24 @@ pub struct LoadBalancerStatus {
 
 impl LoadBalancerStatus {
     pub fn empty() -> Self {
-        Self { ingress_ip: None, ingress_hostname: None }
+        Self {
+            ingress_ip: None,
+            ingress_hostname: None,
+        }
     }
 
     pub fn ip(addr: impl Into<String>) -> Self {
-        Self { ingress_ip: Some(addr.into()), ingress_hostname: None }
+        Self {
+            ingress_ip: Some(addr.into()),
+            ingress_hostname: None,
+        }
     }
 
     pub fn hostname(host: impl Into<String>) -> Self {
-        Self { ingress_ip: None, ingress_hostname: Some(host.into()) }
+        Self {
+            ingress_ip: None,
+            ingress_hostname: Some(host.into()),
+        }
     }
 
     pub fn is_published(&self) -> bool {
@@ -227,7 +234,10 @@ impl ServiceObservation {
 
     /// Convenience for the legacy field used by the original v1 reconcile.
     pub fn external_ip(&self) -> Option<&str> {
-        self.status.ingress_ip.as_deref().or(self.legacy_external_ip.as_deref())
+        self.status
+            .ingress_ip
+            .as_deref()
+            .or(self.legacy_external_ip.as_deref())
     }
 
     /// Convenience for the legacy field used by the original v1 reconcile.
@@ -359,10 +369,7 @@ pub fn reconcile_phase<P: LoadBalancerIface>(
             provider.authorise(tenant, "Service", &obs.spec.name)?;
             provider.delete_lb(tenant, &obs.spec.name)?;
         }
-        LbPhase::AddFinalizer
-        | LbPhase::RemoveFinalizer
-        | LbPhase::NoOp
-        | LbPhase::Skip => {}
+        LbPhase::AddFinalizer | LbPhase::RemoveFinalizer | LbPhase::NoOp | LbPhase::Skip => {}
     }
     Ok(phase)
 }
@@ -425,10 +432,17 @@ mod tests {
         ServiceObservation::from_v1(name, "default", ip, deletion)
     }
 
-    fn full_obs(spec: ServiceSpec, ip: Option<&str>, deletion: bool, finalizer: bool) -> ServiceObservation {
+    fn full_obs(
+        spec: ServiceSpec,
+        ip: Option<&str>,
+        deletion: bool,
+        finalizer: bool,
+    ) -> ServiceObservation {
         ServiceObservation {
             spec,
-            status: ip.map(LoadBalancerStatus::ip).unwrap_or_else(LoadBalancerStatus::empty),
+            status: ip
+                .map(LoadBalancerStatus::ip)
+                .unwrap_or_else(LoadBalancerStatus::empty),
             deletion_pending: deletion,
             last_applied_spec: None,
             finalizer_present: finalizer,
@@ -524,7 +538,10 @@ mod tests {
         );
         let mut s = ServiceSpec::http("web", "default");
         s.ports.clear();
-        assert!(matches!(s.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            s.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -536,7 +553,10 @@ mod tests {
         );
         let mut s = ServiceSpec::http("web", "default");
         s.external_traffic_policy = ExternalTrafficPolicy::Local;
-        assert!(matches!(s.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            s.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         s.health_check_node_port = Some(31000);
         assert!(s.validate().is_ok());
     }
@@ -550,7 +570,10 @@ mod tests {
         );
         let mut s = ServiceSpec::http("web", "default");
         s.ip_family_policy = IpFamilyPolicy::RequireDualStack;
-        assert!(matches!(s.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            s.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         s.ip_families = vec![IpFamily::V4, IpFamily::V6];
         assert!(s.validate().is_ok());
     }
@@ -968,7 +991,10 @@ mod tests {
             "ServiceLoadBalancerFinalizer",
             "tenant-finalizer-key"
         );
-        assert_eq!(LB_CLEANUP_FINALIZER, "service.kubernetes.io/load-balancer-cleanup");
+        assert_eq!(
+            LB_CLEANUP_FINALIZER,
+            "service.kubernetes.io/load-balancer-cleanup"
+        );
     }
 
     // ─── ServicePort helpers ─────────────────────────────────────────────────

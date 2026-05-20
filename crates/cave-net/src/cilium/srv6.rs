@@ -31,11 +31,21 @@ use std::net::{IpAddr, Ipv6Addr};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Srv6Behavior {
     End,
-    EndDx4 { nexthop: std::net::Ipv4Addr },
-    EndDx6 { nexthop: Ipv6Addr },
-    EndDt4 { vrf_id: u32 },
-    EndDt6 { vrf_id: u32 },
-    EndB6Encaps { sid_list: u8 /* number of SIDs to follow, kept abstract */ },
+    EndDx4 {
+        nexthop: std::net::Ipv4Addr,
+    },
+    EndDx6 {
+        nexthop: Ipv6Addr,
+    },
+    EndDt4 {
+        vrf_id: u32,
+    },
+    EndDt6 {
+        vrf_id: u32,
+    },
+    EndB6Encaps {
+        sid_list: u8, /* number of SIDs to follow, kept abstract */
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -67,7 +77,10 @@ pub struct SidList {
 impl SidList {
     pub fn new(sids: Vec<Sid>) -> Self {
         let n = sids.len() as u8;
-        Self { sids, segments_left: n.saturating_sub(1) }
+        Self {
+            sids,
+            segments_left: n.saturating_sub(1),
+        }
     }
     pub fn current(&self) -> Option<Sid> {
         if self.sids.is_empty() {
@@ -188,7 +201,9 @@ impl Srv6Manager {
     }
 
     pub fn remove_policy(&mut self, name: &str) -> Result<(), Srv6Error> {
-        self.egress_policies.remove(name).ok_or_else(|| Srv6Error::PolicyNotFound(name.to_string()))?;
+        self.egress_policies
+            .remove(name)
+            .ok_or_else(|| Srv6Error::PolicyNotFound(name.to_string()))?;
         Ok(())
     }
 
@@ -264,7 +279,11 @@ mod tests {
     #[test]
     fn sidlist_new_initialises_segments_left_to_n_minus_1() {
         let (_c, _t) = cilium_test_ctx!("bpf/lib/srv6.h", "SidList.New", "tenant-srv6-sln");
-        let sl = SidList::new(vec![Sid(v6("fd00::1")), Sid(v6("fd00::2")), Sid(v6("fd00::3"))]);
+        let sl = SidList::new(vec![
+            Sid(v6("fd00::1")),
+            Sid(v6("fd00::2")),
+            Sid(v6("fd00::3")),
+        ]);
         assert_eq!(sl.segments_left, 2);
     }
 
@@ -311,14 +330,17 @@ mod tests {
 
     #[test]
     fn locator_match_uses_longest_prefix() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/srv6/manager.go", "LookupLocator", "tenant-srv6-lp");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/srv6/manager.go", "LookupLocator", "tenant-srv6-lp");
         let mut m = mgr(tenant);
         m.upsert_locator(Locator {
-            prefix: v6("fd00::"), prefix_len: 16,
+            prefix: v6("fd00::"),
+            prefix_len: 16,
             behavior: Srv6Behavior::End,
         });
         m.upsert_locator(Locator {
-            prefix: v6("fd00:db8::"), prefix_len: 32,
+            prefix: v6("fd00:db8::"),
+            prefix_len: 32,
             behavior: Srv6Behavior::EndDt4 { vrf_id: 7 },
         });
         let l = m.lookup_locator(Sid(v6("fd00:db8::1234"))).unwrap();
@@ -327,10 +349,15 @@ mod tests {
 
     #[test]
     fn locator_match_falls_through_to_shorter_prefix() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/srv6/manager.go", "LookupLocator.Fallthrough", "tenant-srv6-lpf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/srv6/manager.go",
+            "LookupLocator.Fallthrough",
+            "tenant-srv6-lpf"
+        );
         let mut m = mgr(tenant);
         m.upsert_locator(Locator {
-            prefix: v6("fd00::"), prefix_len: 16,
+            prefix: v6("fd00::"),
+            prefix_len: 16,
             behavior: Srv6Behavior::End,
         });
         let l = m.lookup_locator(Sid(v6("fd00:99::1234"))).unwrap();
@@ -339,14 +366,19 @@ mod tests {
 
     #[test]
     fn locator_no_match_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/srv6/manager.go", "LookupLocator.NotFound", "tenant-srv6-lpnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/srv6/manager.go",
+            "LookupLocator.NotFound",
+            "tenant-srv6-lpnf"
+        );
         let m = mgr(tenant);
         assert!(m.lookup_locator(Sid(v6("fd00::1"))).is_none());
     }
 
     #[test]
     fn locator_count_tracks_upserts() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/srv6/manager.go", "LocatorCount", "tenant-srv6-lcnt");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/srv6/manager.go", "LocatorCount", "tenant-srv6-lcnt");
         let mut m = mgr(tenant);
         for i in 0..3u8 {
             m.upsert_locator(Locator {
@@ -368,25 +400,36 @@ mod tests {
             vrf_id: 7,
             pod_cidr_v4: Some("10.244.7.0/24".into()),
             pod_cidr_v6: Some("fd00:7::/64".into()),
-        }).unwrap();
+        })
+        .unwrap();
         assert_eq!(m.lookup_vrf(7).unwrap().vrf_id, 7);
     }
 
     #[test]
     fn vrf_upsert_with_bad_cidr_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/srv6/manager.go", "UpsertVRF.BadCidr", "tenant-srv6-vrfbad");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/srv6/manager.go",
+            "UpsertVRF.BadCidr",
+            "tenant-srv6-vrfbad"
+        );
         let mut m = mgr(tenant);
-        let err = m.upsert_vrf(VrfBinding {
-            vrf_id: 7,
-            pod_cidr_v4: Some("not-a-cidr".into()),
-            pod_cidr_v6: None,
-        }).unwrap_err();
+        let err = m
+            .upsert_vrf(VrfBinding {
+                vrf_id: 7,
+                pod_cidr_v4: Some("not-a-cidr".into()),
+                pod_cidr_v6: None,
+            })
+            .unwrap_err();
         assert_eq!(err, Srv6Error::BadCidr("not-a-cidr".into()));
     }
 
     #[test]
     fn vrf_lookup_unknown_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/srv6/manager.go", "LookupVRF.NotFound", "tenant-srv6-vrfnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/srv6/manager.go",
+            "LookupVRF.NotFound",
+            "tenant-srv6-vrfnf"
+        );
         let m = mgr(tenant);
         assert!(m.lookup_vrf(99).is_none());
     }
@@ -395,58 +438,82 @@ mod tests {
 
     #[test]
     fn egress_policy_match_pushes_sid_list() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/srv6/manager.go", "LookupEgressPolicy", "tenant-srv6-eg");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/srv6/manager.go",
+            "LookupEgressPolicy",
+            "tenant-srv6-eg"
+        );
         let mut m = mgr(tenant);
         m.upsert_policy(EgressPolicy {
             name: "to-vpn".into(),
             destination_cidr: "10.10.0.0/16".into(),
             sid_list: vec![Sid(v6("fd00:db8::1")), Sid(v6("fd00:db8::2"))],
-        }).unwrap();
-        let p = m.lookup_egress_policy(IpAddr::V4(std::net::Ipv4Addr::new(10, 10, 5, 1))).unwrap();
+        })
+        .unwrap();
+        let p = m
+            .lookup_egress_policy(IpAddr::V4(std::net::Ipv4Addr::new(10, 10, 5, 1)))
+            .unwrap();
         assert_eq!(p.sid_list.len(), 2);
     }
 
     #[test]
     fn egress_policy_no_match_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/srv6/manager.go", "LookupEgressPolicy.NoMatch", "tenant-srv6-egnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/srv6/manager.go",
+            "LookupEgressPolicy.NoMatch",
+            "tenant-srv6-egnf"
+        );
         let mut m = mgr(tenant);
         m.upsert_policy(EgressPolicy {
             name: "p".into(),
             destination_cidr: "10.0.0.0/8".into(),
             sid_list: vec![Sid(v6("fd00::1"))],
-        }).unwrap();
+        })
+        .unwrap();
         let p = m.lookup_egress_policy(IpAddr::V4(std::net::Ipv4Addr::new(8, 8, 8, 8)));
         assert!(p.is_none());
     }
 
     #[test]
     fn egress_policy_with_bad_cidr_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/srv6/manager.go", "UpsertPolicy.BadCidr", "tenant-srv6-egbc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/srv6/manager.go",
+            "UpsertPolicy.BadCidr",
+            "tenant-srv6-egbc"
+        );
         let mut m = mgr(tenant);
-        let err = m.upsert_policy(EgressPolicy {
-            name: "p".into(),
-            destination_cidr: "nope".into(),
-            sid_list: vec![],
-        }).unwrap_err();
+        let err = m
+            .upsert_policy(EgressPolicy {
+                name: "p".into(),
+                destination_cidr: "nope".into(),
+                sid_list: vec![],
+            })
+            .unwrap_err();
         assert!(matches!(err, Srv6Error::BadCidr(_)));
     }
 
     #[test]
     fn egress_policy_remove_drops_entry() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/srv6/manager.go", "RemovePolicy", "tenant-srv6-rmp");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/srv6/manager.go", "RemovePolicy", "tenant-srv6-rmp");
         let mut m = mgr(tenant);
         m.upsert_policy(EgressPolicy {
             name: "p".into(),
             destination_cidr: "10.0.0.0/8".into(),
             sid_list: vec![],
-        }).unwrap();
+        })
+        .unwrap();
         m.remove_policy("p").unwrap();
         assert_eq!(m.policy_count(), 0);
     }
 
     #[test]
     fn egress_policy_remove_unknown_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/srv6/manager.go", "RemovePolicy.NotFound", "tenant-srv6-rmpnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/srv6/manager.go",
+            "RemovePolicy.NotFound",
+            "tenant-srv6-rmpnf"
+        );
         let mut m = mgr(tenant);
         let err = m.remove_policy("ghost").unwrap_err();
         assert!(matches!(err, Srv6Error::PolicyNotFound(_)));
@@ -456,17 +523,23 @@ mod tests {
 
     #[test]
     fn behavior_end_dx4_carries_nexthop() {
-        let (_c, _t) = cilium_test_ctx!("pkg/srv6/manager.go", "Behavior.EndDX4", "tenant-srv6-dx4");
-        let b = Srv6Behavior::EndDx4 { nexthop: std::net::Ipv4Addr::new(10, 0, 0, 1) };
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/srv6/manager.go", "Behavior.EndDX4", "tenant-srv6-dx4");
+        let b = Srv6Behavior::EndDx4 {
+            nexthop: std::net::Ipv4Addr::new(10, 0, 0, 1),
+        };
         match b {
-            Srv6Behavior::EndDx4 { nexthop } => assert_eq!(nexthop, std::net::Ipv4Addr::new(10, 0, 0, 1)),
+            Srv6Behavior::EndDx4 { nexthop } => {
+                assert_eq!(nexthop, std::net::Ipv4Addr::new(10, 0, 0, 1))
+            }
             _ => panic!(),
         }
     }
 
     #[test]
     fn behavior_end_dt6_carries_vrf() {
-        let (_c, _t) = cilium_test_ctx!("pkg/srv6/manager.go", "Behavior.EndDT6", "tenant-srv6-dt6");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/srv6/manager.go", "Behavior.EndDT6", "tenant-srv6-dt6");
         let b = Srv6Behavior::EndDt6 { vrf_id: 42 };
         match b {
             Srv6Behavior::EndDt6 { vrf_id } => assert_eq!(vrf_id, 42),
@@ -476,7 +549,11 @@ mod tests {
 
     #[test]
     fn behavior_end_b6_encaps_records_sid_count() {
-        let (_c, _t) = cilium_test_ctx!("pkg/srv6/manager.go", "Behavior.EndB6Encaps", "tenant-srv6-b6");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/srv6/manager.go",
+            "Behavior.EndB6Encaps",
+            "tenant-srv6-b6"
+        );
         let b = Srv6Behavior::EndB6Encaps { sid_list: 3 };
         match b {
             Srv6Behavior::EndB6Encaps { sid_list } => assert_eq!(sid_list, 3),
@@ -486,8 +563,11 @@ mod tests {
 
     #[test]
     fn behavior_end_dx6_carries_v6_nexthop() {
-        let (_c, _t) = cilium_test_ctx!("pkg/srv6/manager.go", "Behavior.EndDX6", "tenant-srv6-dx6");
-        let b = Srv6Behavior::EndDx6 { nexthop: v6("fd00::99") };
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/srv6/manager.go", "Behavior.EndDX6", "tenant-srv6-dx6");
+        let b = Srv6Behavior::EndDx6 {
+            nexthop: v6("fd00::99"),
+        };
         match b {
             Srv6Behavior::EndDx6 { nexthop } => assert_eq!(nexthop, v6("fd00::99")),
             _ => panic!(),
@@ -498,10 +578,16 @@ mod tests {
 
     #[test]
     fn srv6_behavior_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/srv6/manager.go", "Behavior.Serde", "tenant-srv6-bserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/srv6/manager.go",
+            "Behavior.Serde",
+            "tenant-srv6-bserde"
+        );
         for b in [
             Srv6Behavior::End,
-            Srv6Behavior::EndDx4 { nexthop: std::net::Ipv4Addr::new(10, 0, 0, 1) },
+            Srv6Behavior::EndDx4 {
+                nexthop: std::net::Ipv4Addr::new(10, 0, 0, 1),
+            },
             Srv6Behavior::EndDt4 { vrf_id: 7 },
             Srv6Behavior::EndDt6 { vrf_id: 7 },
             Srv6Behavior::EndB6Encaps { sid_list: 3 },
@@ -514,7 +600,11 @@ mod tests {
 
     #[test]
     fn sidlist_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/srv6/manager.go", "SidList.Serde", "tenant-srv6-slserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/srv6/manager.go",
+            "SidList.Serde",
+            "tenant-srv6-slserde"
+        );
         let sl = SidList::new(vec![Sid(v6("fd00::1")), Sid(v6("fd00::2"))]);
         let s = serde_json::to_string(&sl).unwrap();
         let back: SidList = serde_json::from_str(&s).unwrap();
@@ -523,7 +613,11 @@ mod tests {
 
     #[test]
     fn egress_policy_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/srv6/manager.go", "EgressPolicy.Serde", "tenant-srv6-eserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/srv6/manager.go",
+            "EgressPolicy.Serde",
+            "tenant-srv6-eserde"
+        );
         let p = EgressPolicy {
             name: "to-vpn".into(),
             destination_cidr: "10.10.0.0/16".into(),
@@ -536,7 +630,11 @@ mod tests {
 
     #[test]
     fn vrf_binding_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/srv6/manager.go", "VrfBinding.Serde", "tenant-srv6-vserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/srv6/manager.go",
+            "VrfBinding.Serde",
+            "tenant-srv6-vserde"
+        );
         let v = VrfBinding {
             vrf_id: 7,
             pod_cidr_v4: Some("10.244.7.0/24".into()),

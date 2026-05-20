@@ -11,8 +11,8 @@ use cave_rdbms_operator::backup::BackupManager;
 use cave_rdbms_operator::ha::HaController;
 use cave_rdbms_operator::lifecycle::InstanceManager;
 use cave_rdbms_operator::manager::{
-    bloated_tables, needs_vacuum, pool_utilisation_pct, replication_healthy,
-    size_alert_records, slow_queries,
+    bloated_tables, needs_vacuum, pool_utilisation_pct, replication_healthy, size_alert_records,
+    slow_queries,
 };
 use cave_rdbms_operator::models::{
     DbSizeRecord, QueryStat, ReplicationSlot, ReplicationStatus, TableStat,
@@ -117,7 +117,8 @@ fn instance_manager_creates_unique_instance() {
 #[test]
 fn instance_manager_rejects_duplicate_name() {
     let mgr = InstanceManager::new();
-    mgr.create_instance("dup", "16", "h", 5432, "d", "u").unwrap();
+    mgr.create_instance("dup", "16", "h", 5432, "d", "u")
+        .unwrap();
     let err = mgr.create_instance("dup", "16", "h", 5432, "d", "u");
     assert!(err.is_err(), "duplicate must fail");
 }
@@ -141,15 +142,29 @@ fn instance_manager_lists_all() {
 #[test]
 fn instance_manager_lifecycle_transitions() {
     let mgr = InstanceManager::new();
-    let inst = mgr.create_instance("life", "16", "h", 5432, "d", "u").unwrap();
+    let inst = mgr
+        .create_instance("life", "16", "h", 5432, "d", "u")
+        .unwrap();
     mgr.start_instance(&inst.id).unwrap();
-    assert_eq!(mgr.get_instance(&inst.id).unwrap().state, InstanceState::Running);
+    assert_eq!(
+        mgr.get_instance(&inst.id).unwrap().state,
+        InstanceState::Running
+    );
     mgr.stop_instance(&inst.id).unwrap();
-    assert_eq!(mgr.get_instance(&inst.id).unwrap().state, InstanceState::Stopped);
+    assert_eq!(
+        mgr.get_instance(&inst.id).unwrap().state,
+        InstanceState::Stopped
+    );
     mgr.restart_instance(&inst.id).unwrap();
-    assert_eq!(mgr.get_instance(&inst.id).unwrap().state, InstanceState::Running);
+    assert_eq!(
+        mgr.get_instance(&inst.id).unwrap().state,
+        InstanceState::Running
+    );
     mgr.mark_failed(&inst.id, "oom").unwrap();
-    assert_eq!(mgr.get_instance(&inst.id).unwrap().state, InstanceState::Failed);
+    assert_eq!(
+        mgr.get_instance(&inst.id).unwrap().state,
+        InstanceState::Failed
+    );
 }
 
 #[test]
@@ -170,7 +185,10 @@ fn instance_manager_labels_replace() {
     let mut labels = HashMap::new();
     labels.insert("env".into(), "prod".into());
     mgr.update_labels(&inst.id, labels).unwrap();
-    assert_eq!(mgr.get_instance(&inst.id).unwrap().labels.get("env"), Some(&"prod".into()));
+    assert_eq!(
+        mgr.get_instance(&inst.id).unwrap().labels.get("env"),
+        Some(&"prod".into())
+    );
 }
 
 #[test]
@@ -184,7 +202,9 @@ fn instance_manager_delete_removes() {
 #[test]
 fn instance_manager_connection_string_format() {
     let mgr = InstanceManager::new();
-    let inst = mgr.create_instance("cs", "16", "db.local", 5433, "shop", "shopper").unwrap();
+    let inst = mgr
+        .create_instance("cs", "16", "db.local", 5433, "shop", "shopper")
+        .unwrap();
     let url = mgr.connection_string(&inst.id).unwrap();
     assert_eq!(url, "postgres://shopper@db.local:5433/shop");
 }
@@ -289,7 +309,8 @@ fn ha_controller_registers_and_lists_replicas() {
     let ha = HaController::new();
     ha.register_replica(sample_replica("r1", "p", 0)).unwrap();
     ha.register_replica(sample_replica("r2", "p", 100)).unwrap();
-    ha.register_replica(sample_replica("r3", "other", 0)).unwrap();
+    ha.register_replica(sample_replica("r3", "other", 0))
+        .unwrap();
     assert_eq!(ha.list_replicas("p").len(), 2);
     assert_eq!(ha.list_replicas("other").len(), 1);
 }
@@ -307,8 +328,10 @@ fn ha_controller_updates_lag() {
 #[test]
 fn ha_controller_failover_picks_lowest_lag() {
     let ha = HaController::new();
-    ha.register_replica(sample_replica("r-far", "p", 5_000_000)).unwrap();
-    ha.register_replica(sample_replica("r-near", "p", 100)).unwrap();
+    ha.register_replica(sample_replica("r-far", "p", 5_000_000))
+        .unwrap();
+    ha.register_replica(sample_replica("r-near", "p", 100))
+        .unwrap();
     let event = ha.trigger_failover("p", "primary down").unwrap();
     assert_eq!(event.new_primary_id, "r-near");
     assert_eq!(event.reason, "primary down");
@@ -493,8 +516,14 @@ fn user_manager_alter_role_combines_options() {
 #[test]
 fn user_manager_grant_revoke() {
     let um = UserManager::new();
-    assert_eq!(um.grant_role("admin", "alice"), "GRANT \"admin\" TO \"alice\";");
-    assert_eq!(um.revoke_role("admin", "alice"), "REVOKE \"admin\" FROM \"alice\";");
+    assert_eq!(
+        um.grant_role("admin", "alice"),
+        "GRANT \"admin\" TO \"alice\";"
+    );
+    assert_eq!(
+        um.revoke_role("admin", "alice"),
+        "REVOKE \"admin\" FROM \"alice\";"
+    );
 }
 
 #[test]
@@ -555,7 +584,10 @@ fn monitor_parses_stat_tables() {
 #[test]
 fn monitor_lag_summary_aggregates() {
     let r1 = sample_replica("a", "p", 100);
-    let r2 = ReplicaInfo { lag_seconds: 2.0, ..sample_replica("b", "p", 200) };
+    let r2 = ReplicaInfo {
+        lag_seconds: 2.0,
+        ..sample_replica("b", "p", 200)
+    };
     let s = Monitor::compute_lag_summary(&[r1, r2]);
     assert_eq!(s.replica_count, 2);
     assert_eq!(s.max_lag_bytes, 200);
@@ -664,7 +696,11 @@ fn monitor_metrics_text_emits_prometheus_format() {
 
 #[test]
 fn manager_slow_queries_filters_by_threshold() {
-    let stats = vec![sample_query_stat(50.0), sample_query_stat(500.0), sample_query_stat(1500.0)];
+    let stats = vec![
+        sample_query_stat(50.0),
+        sample_query_stat(500.0),
+        sample_query_stat(1500.0),
+    ];
     assert_eq!(slow_queries(&stats, 100.0).len(), 2);
     assert_eq!(slow_queries(&stats, 1000.0).len(), 1);
     assert_eq!(slow_queries(&stats, 2000.0).len(), 0);
@@ -672,7 +708,11 @@ fn manager_slow_queries_filters_by_threshold() {
 
 #[test]
 fn manager_bloated_tables_filters() {
-    let stats = vec![sample_table_stat(0.1), sample_table_stat(0.3), sample_table_stat(0.9)];
+    let stats = vec![
+        sample_table_stat(0.1),
+        sample_table_stat(0.3),
+        sample_table_stat(0.9),
+    ];
     assert_eq!(bloated_tables(&stats, 0.2).len(), 2);
     assert_eq!(bloated_tables(&stats, 0.5).len(), 1);
 }
@@ -704,7 +744,10 @@ fn manager_replication_healthy_thresholds() {
     };
     assert!(!replication_healthy(&unhealthy));
 
-    let slow = ReplicationStatus { replication_lag_seconds: 60.0, ..healthy };
+    let slow = ReplicationStatus {
+        replication_lag_seconds: 60.0,
+        ..healthy
+    };
     assert!(!replication_healthy(&slow));
 }
 

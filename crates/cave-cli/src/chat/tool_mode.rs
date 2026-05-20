@@ -8,7 +8,7 @@
 //!   - tool dispatch (LLM-issued `ToolCall`),
 //!   - result feedback to the conversation.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -58,11 +58,7 @@ impl ToolMode {
     pub fn grant(&self, tenant_id: impl Into<String>, tool_name: impl Into<String>) {
         let tid = tenant_id.into();
         let name = tool_name.into();
-        self.grants
-            .write()
-            .entry(tid)
-            .or_default()
-            .insert(name);
+        self.grants.write().entry(tid).or_default().insert(name);
     }
 
     pub fn revoke(&self, tenant_id: &str, tool_name: &str) {
@@ -115,7 +111,7 @@ impl ToolMode {
                     output: serde_json::json!({
                         "error": format!("unknown tool '{}'", call.tool_name),
                     }),
-                }
+                };
             }
         };
         match handler(&call.arguments) {
@@ -217,10 +213,12 @@ mod tests {
         let call = make_call(tenant_id, "echo", serde_json::json!({}));
         let res = m.dispatch(&call);
         assert!(!res.ok);
-        assert!(res.output["error"]
-            .as_str()
-            .unwrap()
-            .contains("not granted"));
+        assert!(
+            res.output["error"]
+                .as_str()
+                .unwrap()
+                .contains("not granted")
+        );
     }
 
     /// cite: tool dispatch — unknown tool reported as such
@@ -232,10 +230,12 @@ mod tests {
         let call = make_call(tenant_id, "ghost", serde_json::json!({}));
         let res = m.dispatch(&call);
         assert!(!res.ok);
-        assert!(res.output["error"]
-            .as_str()
-            .unwrap()
-            .contains("unknown tool"));
+        assert!(
+            res.output["error"]
+                .as_str()
+                .unwrap()
+                .contains("unknown tool")
+        );
     }
 
     /// cite: tool dispatch — handler error wrapped in ok=false output
@@ -272,7 +272,10 @@ mod tests {
         m.grant(tenant_id, "echo");
         m.grant(tenant_id, "add");
         m.grant("globex", "danger");
-        assert_eq!(m.granted_for(tenant_id), vec!["add".to_string(), "echo".to_string()]);
+        assert_eq!(
+            m.granted_for(tenant_id),
+            vec!["add".to_string(), "echo".to_string()]
+        );
     }
 
     /// cite: tool dispatch — call_id propagated to result for correlation

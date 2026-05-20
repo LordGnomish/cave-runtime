@@ -21,9 +21,7 @@
 //! unchanged — this module owns framing only.
 
 use bytes::{Bytes, BytesMut};
-use cave_kernel::codec::{
-    FrameCodec, FrameError, LengthSpec, try_read_length_prefixed,
-};
+use cave_kernel::codec::{FrameCodec, FrameError, LengthSpec, try_read_length_prefixed};
 
 /// One PostgreSQL frame as carried on the wire.
 #[derive(Debug, Clone)]
@@ -61,7 +59,10 @@ impl PgWireCodec {
     }
 
     pub fn with_limit(max_frame_size: usize) -> Self {
-        Self { phase: PgPhase::Startup, max_frame_size }
+        Self {
+            phase: PgPhase::Startup,
+            max_frame_size,
+        }
     }
 
     pub fn phase(&self) -> PgPhase {
@@ -89,7 +90,10 @@ impl FrameCodec<PgFrame> for PgWireCodec {
         }
         let length_value = 4 + frame.body.len();
         if length_value > u32::MAX as usize {
-            return Err(FrameError::Limit { actual: length_value, max: u32::MAX as usize });
+            return Err(FrameError::Limit {
+                actual: length_value,
+                max: u32::MAX as usize,
+            });
         }
         buf.extend_from_slice(&(length_value as u32).to_be_bytes());
         buf.extend_from_slice(&frame.body);
@@ -108,11 +112,17 @@ impl FrameCodec<PgFrame> for PgWireCodec {
         let frame = match self.phase {
             PgPhase::Startup => {
                 // raw = [4B length][payload]
-                PgFrame { type_byte: None, body: raw.slice(4..) }
+                PgFrame {
+                    type_byte: None,
+                    body: raw.slice(4..),
+                }
             }
             PgPhase::Regular => {
                 // raw = [1B type][4B length][payload]
-                PgFrame { type_byte: Some(raw[0]), body: raw.slice(5..) }
+                PgFrame {
+                    type_byte: Some(raw[0]),
+                    body: raw.slice(5..),
+                }
             }
         };
         Ok(Some(frame))
@@ -209,7 +219,10 @@ mod tests {
         let mut codec = PgWireCodec::new();
         codec.advance_to_regular();
         let mut buf = BytesMut::new();
-        let frame = PgFrame { type_byte: Some(b'C'), body: Bytes::from_static(b"SELECT 3\0") };
+        let frame = PgFrame {
+            type_byte: Some(b'C'),
+            body: Bytes::from_static(b"SELECT 3\0"),
+        };
         codec.encode(frame, &mut buf).unwrap();
 
         let decoded = codec.decode(&mut buf).unwrap().unwrap();
@@ -222,7 +235,10 @@ mod tests {
     fn encode_then_decode_startup_roundtrip() {
         let mut codec = PgWireCodec::new();
         let mut buf = BytesMut::new();
-        let frame = PgFrame { type_byte: None, body: Bytes::from_static(b"\x00\x03\x00\x00user\x00x\x00\x00") };
+        let frame = PgFrame {
+            type_byte: None,
+            body: Bytes::from_static(b"\x00\x03\x00\x00user\x00x\x00\x00"),
+        };
         codec.encode(frame, &mut buf).unwrap();
         let decoded = codec.decode(&mut buf).unwrap().unwrap();
         assert_eq!(decoded.type_byte, None);
@@ -236,7 +252,10 @@ mod tests {
 
         let mut cancel_body = Vec::from([0u8; 4]);
         cancel_body[..4].copy_from_slice(&CANCEL_REQUEST_CODE.to_be_bytes());
-        assert_eq!(classify_startup(&cancel_body), Some(StartupKind::CancelRequest));
+        assert_eq!(
+            classify_startup(&cancel_body),
+            Some(StartupKind::CancelRequest)
+        );
 
         let mut startup_body = vec![0u8; 8];
         startup_body[..4].copy_from_slice(&0x0003_0000u32.to_be_bytes());

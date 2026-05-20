@@ -97,7 +97,11 @@ pub fn parse_advisory(input: &[u8]) -> Result<VulnIntel, OsvError> {
 pub fn parse_jsonl(input: &[u8]) -> Result<Vec<VulnIntel>, OsvError> {
     let mut out = Vec::new();
     for line in input.split(|b| *b == b'\n') {
-        let trimmed = line.iter().copied().skip_while(|b| b.is_ascii_whitespace()).collect::<Vec<_>>();
+        let trimmed = line
+            .iter()
+            .copied()
+            .skip_while(|b| b.is_ascii_whitespace())
+            .collect::<Vec<_>>();
         if trimmed.is_empty() {
             continue;
         }
@@ -121,7 +125,9 @@ fn to_intel(a: OsvAdvisory) -> VulnIntel {
         .find(|s| s.sev_type == "CVSS_V3")
         .map(|s| s.score.clone());
     let cvss_v3_base = cvss_vector.as_deref().and_then(parse_cvss_v3_base);
-    let severity = cvss_v3_base.map(Severity::from_cvss_v3).unwrap_or(Severity::Unassigned);
+    let severity = cvss_v3_base
+        .map(Severity::from_cvss_v3)
+        .unwrap_or(Severity::Unassigned);
     let cwes = a
         .database_specific
         .as_ref()
@@ -136,11 +142,7 @@ fn to_intel(a: OsvAdvisory) -> VulnIntel {
     let mut affected = Vec::new();
     for af in &a.affected {
         let (purl_type, namespace, name) = match (&af.package, ()) {
-            (Some(p), _) => (
-                purl_type_from_ecosystem(&p.ecosystem),
-                None,
-                p.name.clone(),
-            ),
+            (Some(p), _) => (purl_type_from_ecosystem(&p.ecosystem), None, p.name.clone()),
             (None, _) => ("unknown".to_string(), None, String::new()),
         };
         for r in &af.ranges {
@@ -203,7 +205,10 @@ fn events_to_vers(events: &[OsvEvent]) -> (String, Option<String>) {
     } else {
         last_affected.as_ref().map(|la| format!("<={}", la))
     };
-    let vers = match (lower.as_deref().unwrap_or(""), upper.as_deref().unwrap_or("")) {
+    let vers = match (
+        lower.as_deref().unwrap_or(""),
+        upper.as_deref().unwrap_or(""),
+    ) {
         ("", "") => "*".to_string(),
         ("", up) => up.to_string(),
         (lo, "") => lo.to_string(),

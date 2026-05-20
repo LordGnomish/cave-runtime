@@ -7,10 +7,10 @@
 //!
 //! Upstream: <https://kafka.apache.org/documentation/#basic_ops_topics>
 
+use super::StreamsViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, StreamsTopic};
-use super::StreamsViewError;
+use crate::admin::state::{AdminState, StreamsTopic, scope};
 
 pub fn list_topics_sorted(
     state: &AdminState,
@@ -18,10 +18,12 @@ pub fn list_topics_sorted(
 ) -> Result<Vec<StreamsTopic>, StreamsViewError> {
     ctx.authorise(Permission::StreamsRead)?;
     let mut rows: Vec<StreamsTopic> =
-        scope(&state.streams_topics.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-            .into_iter()
-            .cloned()
-            .collect();
+        scope(&state.streams_topics.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(rows)
 }
@@ -101,13 +103,15 @@ mod tests {
 
     #[test]
     fn list_returns_seeded_topics_for_tenant() {
-        let rows = list_topics_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let rows =
+            list_topics_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
         assert!(rows.iter().all(|t| t.tenant.as_str() == "acme"));
     }
 
     #[test]
     fn list_sorted_alphabetically() {
-        let rows = list_topics_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let rows =
+            list_topics_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
         for w in rows.windows(2) {
             assert!(w[0].name <= w[1].name);
         }
@@ -115,7 +119,8 @@ mod tests {
 
     #[test]
     fn total_partitions_sums_correctly() {
-        let rows = list_topics_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let rows =
+            list_topics_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
         let total = total_partitions(&rows);
         let expected: u64 = rows.iter().map(|t| t.partitions as u64).sum();
         assert_eq!(total, expected);
@@ -123,7 +128,8 @@ mod tests {
 
     #[test]
     fn topics_by_compaction_groups_policy() {
-        let rows = list_topics_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let rows =
+            list_topics_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
         let by_c = topics_by_compaction(&rows);
         let total_in_map: usize = by_c.values().sum();
         assert_eq!(total_in_map, rows.len());

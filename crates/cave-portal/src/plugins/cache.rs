@@ -341,15 +341,16 @@ mod tests {
     #[test]
     fn register_key_validates_input() {
         let mut p = CachePlugin::new();
-        assert!(p
-            .register_key(KeyEntry {
+        assert!(
+            p.register_key(KeyEntry {
                 key: "session:acme:abc".into(),
                 tenant: "acme".into(),
                 kind: KeyKind::String,
                 size_bytes: 64,
                 ttl_seconds: Some(300),
             })
-            .is_ok());
+            .is_ok()
+        );
         let err = p
             .register_key(KeyEntry {
                 key: String::new(),
@@ -375,8 +376,16 @@ mod tests {
             })
             .unwrap();
         }
-        assert_eq!(p.list_keys(Some("user:*"), ViewPersona::Admin, "acme", 100).len(), 2);
-        assert_eq!(p.list_keys(Some("post:?"), ViewPersona::Admin, "acme", 100).len(), 1);
+        assert_eq!(
+            p.list_keys(Some("user:*"), ViewPersona::Admin, "acme", 100)
+                .len(),
+            2
+        );
+        assert_eq!(
+            p.list_keys(Some("post:?"), ViewPersona::Admin, "acme", 100)
+                .len(),
+            1
+        );
         assert_eq!(p.list_keys(None, ViewPersona::Admin, "acme", 100).len(), 3);
         assert_eq!(p.list_keys(None, ViewPersona::Admin, "acme", 1).len(), 1);
     }
@@ -401,7 +410,10 @@ mod tests {
         })
         .unwrap();
         assert_eq!(p.list_keys(None, ViewPersona::Tenant, "acme", 100).len(), 1);
-        assert_eq!(p.list_keys(None, ViewPersona::Admin, "anything", 100).len(), 2);
+        assert_eq!(
+            p.list_keys(None, ViewPersona::Admin, "anything", 100).len(),
+            2
+        );
     }
 
     #[test]

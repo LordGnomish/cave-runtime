@@ -186,6 +186,8 @@ impl AuditLogger {
         allowed: bool,
         reason: Option<&str>,
     ) {
-        self.log(AuditEvent::authz(cave_uid, action, resource, allowed, reason));
+        self.log(AuditEvent::authz(
+            cave_uid, action, resource, allowed, reason,
+        ));
     }
 }

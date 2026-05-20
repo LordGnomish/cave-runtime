@@ -124,7 +124,10 @@ struct NvdCpeMatch {
 /// Parse an NVD `/rest/json/cves/2.0` response into normalized advisories.
 pub fn parse_cves_response(input: &[u8]) -> Result<Vec<VulnIntel>, NvdError> {
     let r: NvdResponse = serde_json::from_slice(input)?;
-    Ok(r.vulnerabilities.into_iter().map(envelope_to_intel).collect())
+    Ok(r.vulnerabilities
+        .into_iter()
+        .map(envelope_to_intel)
+        .collect())
 }
 
 fn envelope_to_intel(env: NvdVulnEnvelope) -> VulnIntel {
@@ -140,14 +143,22 @@ fn envelope_to_intel(env: NvdVulnEnvelope) -> VulnIntel {
     let v3 = v31.or(v30);
     let cvss_v3_base = v3.map(|m| m.cvss_data.base_score);
     let cvss_v3_vector = v3.and_then(|m| m.cvss_data.vector_string.clone());
-    let cvss_v2_base = cve.metrics.cvss_metric_v2.first().map(|m| m.cvss_data.base_score);
-    let severity = cvss_v3_base.map(Severity::from_cvss_v3).unwrap_or(Severity::Unassigned);
+    let cvss_v2_base = cve
+        .metrics
+        .cvss_metric_v2
+        .first()
+        .map(|m| m.cvss_data.base_score);
+    let severity = cvss_v3_base
+        .map(Severity::from_cvss_v3)
+        .unwrap_or(Severity::Unassigned);
     let cwes = cve
         .weaknesses
         .iter()
         .flat_map(|w| w.description.iter())
         .filter_map(|d| {
-            d.value.strip_prefix("CWE-").and_then(|n| n.parse::<u32>().ok())
+            d.value
+                .strip_prefix("CWE-")
+                .and_then(|n| n.parse::<u32>().ok())
         })
         .collect();
     let references: Vec<String> = cve.references.iter().map(|r| r.url.clone()).collect();
@@ -223,7 +234,10 @@ pub fn parse_cpe_vendor_product(cpe: &str) -> (Option<String>, String) {
     let parts: Vec<&str> = cpe.split(':').collect();
     // cpe:2.3:a:vendor:product:version:...
     if parts.len() >= 5 && parts[0] == "cpe" {
-        let vendor = parts.get(3).map(|s| s.to_string()).filter(|s| !s.is_empty());
+        let vendor = parts
+            .get(3)
+            .map(|s| s.to_string())
+            .filter(|s| !s.is_empty());
         let product = parts.get(4).map(|s| s.to_string()).unwrap_or_default();
         (vendor, product)
     } else {

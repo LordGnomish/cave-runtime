@@ -2,10 +2,10 @@
 // Copyright 2026 Cave Runtime contributors
 //! In-memory storage backend.
 
-pub mod schema;
 pub mod catalog;
+pub mod schema;
 pub mod transaction;
 
-pub use schema::{Database, Schema, Table};
 pub use catalog::SystemCatalog;
+pub use schema::{Database, Schema, Table};
 pub use transaction::Transaction;

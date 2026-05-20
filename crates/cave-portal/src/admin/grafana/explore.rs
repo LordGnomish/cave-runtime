@@ -15,14 +15,29 @@ use crate::admin::state::AdminState;
 /// Pre-canned starter queries the Explore view exposes as quick
 /// links. Mirrors Grafana's "Query history → Starred" feature.
 pub const STARTER_PROMQL: &[(&str, &str)] = &[
-    ("CPU per node (5m avg)", "avg by (instance) (rate(node_cpu_seconds_total{mode!='idle'}[5m]))"),
-    ("Pod restarts (1h)", "increase(kube_pod_container_status_restarts_total[1h])"),
-    ("HTTP 5xx rate", "sum(rate(http_requests_total{status=~'5..'}[5m]))"),
-    ("Disk free %", "100 * (node_filesystem_avail_bytes / node_filesystem_size_bytes)"),
+    (
+        "CPU per node (5m avg)",
+        "avg by (instance) (rate(node_cpu_seconds_total{mode!='idle'}[5m]))",
+    ),
+    (
+        "Pod restarts (1h)",
+        "increase(kube_pod_container_status_restarts_total[1h])",
+    ),
+    (
+        "HTTP 5xx rate",
+        "sum(rate(http_requests_total{status=~'5..'}[5m]))",
+    ),
+    (
+        "Disk free %",
+        "100 * (node_filesystem_avail_bytes / node_filesystem_size_bytes)",
+    ),
 ];
 
 pub const STARTER_LOGQL: &[(&str, &str)] = &[
-    ("Error log rate per service", "sum by (app) (rate({namespace='prod'} |= 'error' [5m]))"),
+    (
+        "Error log rate per service",
+        "sum by (app) (rate({namespace='prod'} |= 'error' [5m]))",
+    ),
     ("Per-pod stderr tail", "{app='ingest'} != 'INFO'"),
 ];
 

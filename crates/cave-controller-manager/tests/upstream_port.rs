@@ -182,7 +182,13 @@ fn upstream_replicaset_empty_selector_rejected() {
     let spec = rs_spec(3, &[]);
     let status = ReplicaSetStatus::default();
     let err = rs_reconcile(&spec, &status, &tenant("acme")).unwrap_err();
-    assert!(matches!(err, ControllerError::InvalidSpec { kind: "ReplicaSet", .. }));
+    assert!(matches!(
+        err,
+        ControllerError::InvalidSpec {
+            kind: "ReplicaSet",
+            ..
+        }
+    ));
 }
 
 /// Upstream: TestManageReplicas / `under_replicated_yields_create`.
@@ -207,7 +213,10 @@ fn upstream_replicaset_burst_replicas_caps_per_pass_creates() {
     let capped = clamp_burst(big_diff, 50);
     assert_eq!(capped, Reconcile::Create(50));
     // Deletes are also bursted.
-    assert_eq!(clamp_burst(Reconcile::Delete(80), 25), Reconcile::Delete(25));
+    assert_eq!(
+        clamp_burst(Reconcile::Delete(80), 25),
+        Reconcile::Delete(25)
+    );
     // NoOp/Update pass through.
     assert_eq!(clamp_burst(Reconcile::NoOp, 10), Reconcile::NoOp);
 }

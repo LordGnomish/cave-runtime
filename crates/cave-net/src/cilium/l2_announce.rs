@@ -34,9 +34,9 @@ pub struct ServiceSelector {
 
 impl ServiceSelector {
     pub fn matches(&self, labels: &[(String, String)]) -> bool {
-        self.match_labels.iter().all(|(k, v)| {
-            labels.iter().any(|(lk, lv)| lk == k && lv == v)
-        })
+        self.match_labels
+            .iter()
+            .all(|(k, v)| labels.iter().any(|(lk, lv)| lk == k && lv == v))
     }
 }
 
@@ -115,7 +115,9 @@ pub struct L2Announcer {
 impl L2Announcer {
     pub fn new(tenant: TenantId, local_node: impl Into<String>, renewal_seconds: u64) -> Self {
         Self {
-            tenant, local_node: local_node.into(), renewal_seconds,
+            tenant,
+            local_node: local_node.into(),
+            renewal_seconds,
             policies: HashMap::new(),
             services: HashMap::new(),
             leases: HashMap::new(),
@@ -127,7 +129,9 @@ impl L2Announcer {
     }
 
     pub fn remove_policy(&mut self, name: &str) -> Result<(), L2Error> {
-        self.policies.remove(name).ok_or_else(|| L2Error::PolicyNotFound(name.to_string()))?;
+        self.policies
+            .remove(name)
+            .ok_or_else(|| L2Error::PolicyNotFound(name.to_string()))?;
         Ok(())
     }
 
@@ -136,7 +140,9 @@ impl L2Announcer {
     }
 
     pub fn remove_service(&mut self, key: &str) -> Result<(), L2Error> {
-        self.services.remove(key).ok_or_else(|| L2Error::ServiceNotFound(key.to_string()))?;
+        self.services
+            .remove(key)
+            .ok_or_else(|| L2Error::ServiceNotFound(key.to_string()))?;
         // Drop any leases whose VIP belongs to that service.
         self.leases.retain(|_, _| true);
         Ok(())
@@ -197,11 +203,14 @@ impl L2Announcer {
         if !can_take {
             return false;
         }
-        self.leases.insert(key, LeaseHolder {
-            node: self.local_node.clone(),
-            acquired_ns: now_ns,
-            renewal_deadline_ns: now_ns + renewal_ns,
-        });
+        self.leases.insert(
+            key,
+            LeaseHolder {
+                node: self.local_node.clone(),
+                acquired_ns: now_ns,
+                renewal_deadline_ns: now_ns + renewal_ns,
+            },
+        );
         true
     }
 
@@ -254,9 +263,14 @@ mod tests {
 
     fn lb_policy(tenant: TenantId) -> L2AnnouncementPolicy {
         L2AnnouncementPolicy {
-            name: "lb".into(), tenant,
-            service_selector: ServiceSelector { match_labels: vec![("type".into(), "public".into())] },
-            interfaces: InterfaceMatcher { patterns: vec!["eth*".into()] },
+            name: "lb".into(),
+            tenant,
+            service_selector: ServiceSelector {
+                match_labels: vec![("type".into(), "public".into())],
+            },
+            interfaces: InterfaceMatcher {
+                patterns: vec!["eth*".into()],
+            },
             load_balancer_ips: true,
             external_ips: false,
         }
@@ -276,22 +290,40 @@ mod tests {
 
     #[test]
     fn selector_match_labels_subset() {
-        let (_c, _t) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Selector.Match", "tenant-l2-sm");
-        let s = ServiceSelector { match_labels: vec![("a".into(), "1".into())] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Selector.Match",
+            "tenant-l2-sm"
+        );
+        let s = ServiceSelector {
+            match_labels: vec![("a".into(), "1".into())],
+        };
         assert!(s.matches(&[("a".into(), "1".into()), ("b".into(), "2".into())]));
     }
 
     #[test]
     fn selector_match_labels_mismatch() {
-        let (_c, _t) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Selector.Mismatch", "tenant-l2-smm");
-        let s = ServiceSelector { match_labels: vec![("a".into(), "1".into())] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Selector.Mismatch",
+            "tenant-l2-smm"
+        );
+        let s = ServiceSelector {
+            match_labels: vec![("a".into(), "1".into())],
+        };
         assert!(!s.matches(&[("a".into(), "2".into())]));
     }
 
     #[test]
     fn selector_empty_matches_anything() {
-        let (_c, _t) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Selector.Empty", "tenant-l2-se");
-        let s = ServiceSelector { match_labels: vec![] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Selector.Empty",
+            "tenant-l2-se"
+        );
+        let s = ServiceSelector {
+            match_labels: vec![],
+        };
         assert!(s.matches(&[("a".into(), "1".into())]));
     }
 
@@ -299,16 +331,28 @@ mod tests {
 
     #[test]
     fn iface_matcher_exact() {
-        let (_c, _t) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Iface.Exact", "tenant-l2-ie");
-        let m = InterfaceMatcher { patterns: vec!["eth0".into()] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Iface.Exact",
+            "tenant-l2-ie"
+        );
+        let m = InterfaceMatcher {
+            patterns: vec!["eth0".into()],
+        };
         assert!(m.matches("eth0"));
         assert!(!m.matches("eth1"));
     }
 
     #[test]
     fn iface_matcher_prefix_wildcard() {
-        let (_c, _t) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Iface.Prefix", "tenant-l2-ip");
-        let m = InterfaceMatcher { patterns: vec!["eth*".into()] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Iface.Prefix",
+            "tenant-l2-ip"
+        );
+        let m = InterfaceMatcher {
+            patterns: vec!["eth*".into()],
+        };
         assert!(m.matches("eth0"));
         assert!(m.matches("eth1"));
         assert!(!m.matches("bond0"));
@@ -316,15 +360,27 @@ mod tests {
 
     #[test]
     fn iface_matcher_star_matches_anything() {
-        let (_c, _t) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Iface.Star", "tenant-l2-istar");
-        let m = InterfaceMatcher { patterns: vec!["*".into()] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Iface.Star",
+            "tenant-l2-istar"
+        );
+        let m = InterfaceMatcher {
+            patterns: vec!["*".into()],
+        };
         assert!(m.matches("anything"));
     }
 
     #[test]
     fn iface_matcher_multiple_patterns() {
-        let (_c, _t) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Iface.Multi", "tenant-l2-imult");
-        let m = InterfaceMatcher { patterns: vec!["eth0".into(), "bond*".into()] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Iface.Multi",
+            "tenant-l2-imult"
+        );
+        let m = InterfaceMatcher {
+            patterns: vec!["eth0".into(), "bond*".into()],
+        };
         assert!(m.matches("eth0"));
         assert!(m.matches("bond1"));
         assert!(!m.matches("vlan10"));
@@ -334,7 +390,11 @@ mod tests {
 
     #[test]
     fn announceable_includes_lb_ip_for_matching_service() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Announceable.LB", "tenant-l2-anlb");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Announceable.LB",
+            "tenant-l2-anlb"
+        );
         let mut a = ann(tenant.clone(), "node-a");
         a.upsert_policy(lb_policy(tenant));
         a.upsert_service(service(true));
@@ -344,7 +404,11 @@ mod tests {
 
     #[test]
     fn announceable_skips_service_without_active_backends() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Announceable.NoBackends", "tenant-l2-anb");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Announceable.NoBackends",
+            "tenant-l2-anb"
+        );
         let mut a = ann(tenant.clone(), "node-a");
         a.upsert_policy(lb_policy(tenant));
         a.upsert_service(service(false));
@@ -354,7 +418,11 @@ mod tests {
 
     #[test]
     fn announceable_external_ip_only_when_policy_enables_it() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Announceable.ExternalIPs", "tenant-l2-anex");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Announceable.ExternalIPs",
+            "tenant-l2-anex"
+        );
         let mut a = ann(tenant.clone(), "node-a");
         let mut p = lb_policy(tenant);
         p.load_balancer_ips = false;
@@ -370,7 +438,11 @@ mod tests {
 
     #[test]
     fn announceable_skips_interfaces_not_matching() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Announceable.Iface", "tenant-l2-anif");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Announceable.Iface",
+            "tenant-l2-anif"
+        );
         let mut a = ann(tenant.clone(), "node-a");
         a.upsert_policy(lb_policy(tenant));
         a.upsert_service(service(true));
@@ -382,15 +454,26 @@ mod tests {
 
     #[test]
     fn lease_acquire_no_existing_holder_succeeds() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Lease.AcquireFresh", "tenant-l2-laq");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Lease.AcquireFresh",
+            "tenant-l2-laq"
+        );
         let mut a = ann(tenant, "node-a");
         assert!(a.try_acquire(ip(203, 0, 113, 5), "eth0", 0));
-        assert_eq!(a.lease_holder(ip(203, 0, 113, 5), "eth0").unwrap().node, "node-a");
+        assert_eq!(
+            a.lease_holder(ip(203, 0, 113, 5), "eth0").unwrap().node,
+            "node-a"
+        );
     }
 
     #[test]
     fn lease_acquire_held_by_other_node_within_window_fails() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Lease.HeldByOther", "tenant-l2-loth");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Lease.HeldByOther",
+            "tenant-l2-loth"
+        );
         let mut a = ann(tenant.clone(), "node-a");
         let mut b = ann(tenant, "node-b");
         // node-a takes the lease.
@@ -403,7 +486,11 @@ mod tests {
 
     #[test]
     fn lease_acquire_after_window_lapsed_succeeds_for_other_node() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Lease.WindowLapsed", "tenant-l2-llap");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Lease.WindowLapsed",
+            "tenant-l2-llap"
+        );
         let mut a = ann(tenant.clone(), "node-a");
         let mut b = ann(tenant, "node-b");
         a.try_acquire(ip(203, 0, 113, 5), "eth0", 0);
@@ -414,7 +501,11 @@ mod tests {
 
     #[test]
     fn lease_renewal_by_same_node_always_succeeds() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Lease.RenewSelf", "tenant-l2-lren");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Lease.RenewSelf",
+            "tenant-l2-lren"
+        );
         let mut a = ann(tenant, "node-a");
         a.try_acquire(ip(203, 0, 113, 5), "eth0", 0);
         // Renew at t=10s.
@@ -425,7 +516,11 @@ mod tests {
 
     #[test]
     fn lease_release_drops_when_held_by_self() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Lease.Release", "tenant-l2-lrel");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Lease.Release",
+            "tenant-l2-lrel"
+        );
         let mut a = ann(tenant, "node-a");
         a.try_acquire(ip(203, 0, 113, 5), "eth0", 0);
         assert!(a.release(ip(203, 0, 113, 5), "eth0"));
@@ -434,7 +529,11 @@ mod tests {
 
     #[test]
     fn lease_release_does_nothing_when_held_by_other() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Lease.Release.Foreign", "tenant-l2-lrelf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Lease.Release.Foreign",
+            "tenant-l2-lrelf"
+        );
         let mut a = ann(tenant.clone(), "node-a");
         let mut b = ann(tenant, "node-b");
         a.try_acquire(ip(203, 0, 113, 5), "eth0", 0);
@@ -445,7 +544,11 @@ mod tests {
 
     #[test]
     fn lease_release_unknown_returns_false() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Lease.Release.Unknown", "tenant-l2-lrelnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Lease.Release.Unknown",
+            "tenant-l2-lrelnf"
+        );
         let mut a = ann(tenant, "node-a");
         assert!(!a.release(ip(1, 1, 1, 1), "eth0"));
     }
@@ -454,24 +557,41 @@ mod tests {
 
     #[test]
     fn answer_arp_returns_local_mac_when_holder() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "ARP.Answer", "tenant-l2-arp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "ARP.Answer",
+            "tenant-l2-arp"
+        );
         let mut a = ann(tenant, "node-a");
         a.try_acquire(ip(203, 0, 113, 5), "eth0", 0);
-        assert_eq!(a.answer_arp(ip(203, 0, 113, 5), "eth0", [1, 2, 3, 4, 5, 6]), Some([1, 2, 3, 4, 5, 6]));
+        assert_eq!(
+            a.answer_arp(ip(203, 0, 113, 5), "eth0", [1, 2, 3, 4, 5, 6]),
+            Some([1, 2, 3, 4, 5, 6])
+        );
     }
 
     #[test]
     fn answer_arp_silent_when_not_holder() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "ARP.Silent", "tenant-l2-arpsil");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "ARP.Silent",
+            "tenant-l2-arpsil"
+        );
         let a = ann(tenant, "node-a");
-        assert!(a.answer_arp(ip(203, 0, 113, 5), "eth0", [1, 2, 3, 4, 5, 6]).is_none());
+        assert!(a
+            .answer_arp(ip(203, 0, 113, 5), "eth0", [1, 2, 3, 4, 5, 6])
+            .is_none());
     }
 
     // ── Lifecycle ───────────────────────────────────────────────────────────
 
     #[test]
     fn announcer_remove_policy_drops_it() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "RemovePolicy", "tenant-l2-rmp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "RemovePolicy",
+            "tenant-l2-rmp"
+        );
         let mut a = ann(tenant.clone(), "node-a");
         a.upsert_policy(lb_policy(tenant));
         a.remove_policy("lb").unwrap();
@@ -480,7 +600,11 @@ mod tests {
 
     #[test]
     fn announcer_remove_unknown_policy_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "RemovePolicy.NotFound", "tenant-l2-rmpnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "RemovePolicy.NotFound",
+            "tenant-l2-rmpnf"
+        );
         let mut a = ann(tenant, "node-a");
         let err = a.remove_policy("ghost").unwrap_err();
         assert!(matches!(err, L2Error::PolicyNotFound(_)));
@@ -488,7 +612,11 @@ mod tests {
 
     #[test]
     fn announcer_remove_service_drops_it() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "RemoveService", "tenant-l2-rms");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "RemoveService",
+            "tenant-l2-rms"
+        );
         let mut a = ann(tenant, "node-a");
         a.upsert_service(service(true));
         a.remove_service("ns/svc").unwrap();
@@ -497,7 +625,11 @@ mod tests {
 
     #[test]
     fn announcer_announced_vips_lists_all_held() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "AnnouncedVIPs", "tenant-l2-anv");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "AnnouncedVIPs",
+            "tenant-l2-anv"
+        );
         let mut a = ann(tenant, "node-a");
         a.try_acquire(ip(203, 0, 113, 5), "eth0", 0);
         a.try_acquire(ip(203, 0, 113, 6), "eth0", 0);
@@ -508,7 +640,11 @@ mod tests {
 
     #[test]
     fn announceable_combines_multiple_policies() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Announceable.MultiPolicy", "tenant-l2-mp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Announceable.MultiPolicy",
+            "tenant-l2-mp"
+        );
         let mut a = ann(tenant.clone(), "node-a");
         let mut p1 = lb_policy(tenant.clone());
         p1.name = "p1".into();
@@ -526,7 +662,11 @@ mod tests {
 
     #[test]
     fn l2_policy_serde_round_trip() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2alpha1/types.go", "L2Policy.Serde", "tenant-l2-pserde");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2alpha1/types.go",
+            "L2Policy.Serde",
+            "tenant-l2-pserde"
+        );
         let p = lb_policy(tenant);
         let s = serde_json::to_string(&p).unwrap();
         let back: L2AnnouncementPolicy = serde_json::from_str(&s).unwrap();
@@ -535,8 +675,16 @@ mod tests {
 
     #[test]
     fn lease_holder_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "LeaseHolder.Serde", "tenant-l2-lserde");
-        let l = LeaseHolder { node: "a".into(), acquired_ns: 100, renewal_deadline_ns: 200 };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "LeaseHolder.Serde",
+            "tenant-l2-lserde"
+        );
+        let l = LeaseHolder {
+            node: "a".into(),
+            acquired_ns: 100,
+            renewal_deadline_ns: 200,
+        };
         let s = serde_json::to_string(&l).unwrap();
         let back: LeaseHolder = serde_json::from_str(&s).unwrap();
         assert_eq!(back, l);
@@ -544,7 +692,11 @@ mod tests {
 
     #[test]
     fn service_frontends_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "ServiceFrontends.Serde", "tenant-l2-sserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "ServiceFrontends.Serde",
+            "tenant-l2-sserde"
+        );
         let s = service(true);
         let json = serde_json::to_string(&s).unwrap();
         let back: ServiceFrontends = serde_json::from_str(&json).unwrap();
@@ -555,7 +707,11 @@ mod tests {
 
     #[test]
     fn announceable_empty_interfaces_returns_empty() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Announceable.NoIfaces", "tenant-l2-nif");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Announceable.NoIfaces",
+            "tenant-l2-nif"
+        );
         let mut a = ann(tenant.clone(), "node-a");
         a.upsert_policy(lb_policy(tenant));
         a.upsert_service(service(true));
@@ -565,7 +721,11 @@ mod tests {
 
     #[test]
     fn announceable_no_policies_returns_empty() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/l2announcer.go", "Announceable.NoPolicies", "tenant-l2-np");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/l2announcer.go",
+            "Announceable.NoPolicies",
+            "tenant-l2-np"
+        );
         let mut a = ann(tenant, "node-a");
         a.upsert_service(service(true));
         let r = a.announceable(&["eth0".into()]);

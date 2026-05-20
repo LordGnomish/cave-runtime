@@ -33,7 +33,8 @@ impl BootstrapConfig {
     /// upstream `envoy.yaml` / `envoy_bootstrap.yaml` template.
     pub fn to_json(&self) -> String {
         let access_log = self.accesslog_socket_path.as_deref().unwrap_or("");
-        format!(r#"{{
+        format!(
+            r#"{{
   "node": {{ "id": "{node}", "cluster": "{cluster}" }},
   "admin": {{ "address": {{ "pipe": {{ "path": "{admin}" }} }} }},
   "static_resources": {{
@@ -132,28 +133,44 @@ mod tests {
 
     #[test]
     fn json_static_cluster_is_xds_grpc_cilium() {
-        let (_c, _t) = cilium_test_ctx!("pkg/envoy/embedded_envoy.go", "JSON.ClusterName", "tenant-eb-cn");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/envoy/embedded_envoy.go",
+            "JSON.ClusterName",
+            "tenant-eb-cn"
+        );
         let s = cfg().to_json();
         assert!(s.contains("\"name\": \"xds-grpc-cilium\""));
     }
 
     #[test]
     fn json_concurrency_field_present() {
-        let (_c, _t) = cilium_test_ctx!("pkg/envoy/embedded_envoy.go", "JSON.Concurrency", "tenant-eb-cc");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/envoy/embedded_envoy.go",
+            "JSON.Concurrency",
+            "tenant-eb-cc"
+        );
         let s = cfg().to_json();
         assert!(s.contains("\"concurrency\": 2"));
     }
 
     #[test]
     fn json_optional_accesslog_path_when_set() {
-        let (_c, _t) = cilium_test_ctx!("pkg/envoy/embedded_envoy.go", "JSON.AccessLog", "tenant-eb-al");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/envoy/embedded_envoy.go",
+            "JSON.AccessLog",
+            "tenant-eb-al"
+        );
         let s = cfg().to_json();
         assert!(s.contains("/var/run/cilium/access_log.sock"));
     }
 
     #[test]
     fn json_accesslog_empty_when_none() {
-        let (_c, _t) = cilium_test_ctx!("pkg/envoy/embedded_envoy.go", "JSON.AccessLog.None", "tenant-eb-ale");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/envoy/embedded_envoy.go",
+            "JSON.AccessLog.None",
+            "tenant-eb-ale"
+        );
         let mut c = cfg();
         c.accesslog_socket_path = None;
         let s = c.to_json();
@@ -162,7 +179,8 @@ mod tests {
 
     #[test]
     fn json_uses_grpc_api_type() {
-        let (_c, _t) = cilium_test_ctx!("pkg/envoy/embedded_envoy.go", "JSON.GRPC", "tenant-eb-grpc");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/envoy/embedded_envoy.go", "JSON.GRPC", "tenant-eb-grpc");
         let s = cfg().to_json();
         assert!(s.contains("\"api_type\": \"GRPC\""));
     }

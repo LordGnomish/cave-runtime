@@ -12,5 +12,7 @@ pub mod store;
 
 // Convenience re-exports.
 pub use migrations::CATALOG_SCHEMA_SQL;
-pub use models::{Entity, EntityFilter, EntityMetadata, EntityRelation, Location, RefreshStateRecord};
+pub use models::{
+    Entity, EntityFilter, EntityMetadata, EntityRelation, Location, RefreshStateRecord,
+};
 pub use store::{CatalogStore, CatalogStoreError, MemoryCatalogStore, PostgresCatalogStore};

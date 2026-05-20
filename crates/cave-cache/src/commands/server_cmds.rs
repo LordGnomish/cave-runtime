@@ -29,14 +29,18 @@ pub fn cmd_ping(args: &[Vec<u8>]) -> CacheResult<Resp> {
 // ── ECHO ─────────────────────────────────────────────────────────────────────
 
 pub fn cmd_echo(args: &[Vec<u8>]) -> CacheResult<Resp> {
-    if args.len() != 2 { return Err(CacheError::wrong_arity("echo")); }
+    if args.len() != 2 {
+        return Err(CacheError::wrong_arity("echo"));
+    }
     Ok(Resp::BulkString(Some(args[1].clone())))
 }
 
 // ── SELECT ───────────────────────────────────────────────────────────────────
 
 pub fn cmd_select(args: &[Vec<u8>], num_dbs: usize) -> CacheResult<usize> {
-    if args.len() != 2 { return Err(CacheError::wrong_arity("select")); }
+    if args.len() != 2 {
+        return Err(CacheError::wrong_arity("select"));
+    }
     let idx = bytes_to_i64(&args[1]).ok_or(CacheError::NotInteger)?;
     if idx < 0 || idx as usize >= num_dbs {
         return Err(CacheError::InvalidDb);
@@ -76,13 +80,34 @@ pub fn cmd_hello(args: &[Vec<u8>], resp_version: u8, client_id: u64) -> CacheRes
 
 fn hello_response(version: u8, client_id: u64) -> Resp {
     let pairs = vec![
-        (Resp::BulkString(Some(b"server".to_vec())), Resp::BulkString(Some(b"cave-cache".to_vec()))),
-        (Resp::BulkString(Some(b"version".to_vec())), Resp::BulkString(Some(b"7.2.0".to_vec()))),
-        (Resp::BulkString(Some(b"proto".to_vec())), Resp::Integer(version as i64)),
-        (Resp::BulkString(Some(b"id".to_vec())), Resp::Integer(client_id as i64)),
-        (Resp::BulkString(Some(b"mode".to_vec())), Resp::BulkString(Some(b"standalone".to_vec()))),
-        (Resp::BulkString(Some(b"role".to_vec())), Resp::BulkString(Some(b"master".to_vec()))),
-        (Resp::BulkString(Some(b"modules".to_vec())), Resp::Array(Some(vec![]))),
+        (
+            Resp::BulkString(Some(b"server".to_vec())),
+            Resp::BulkString(Some(b"cave-cache".to_vec())),
+        ),
+        (
+            Resp::BulkString(Some(b"version".to_vec())),
+            Resp::BulkString(Some(b"7.2.0".to_vec())),
+        ),
+        (
+            Resp::BulkString(Some(b"proto".to_vec())),
+            Resp::Integer(version as i64),
+        ),
+        (
+            Resp::BulkString(Some(b"id".to_vec())),
+            Resp::Integer(client_id as i64),
+        ),
+        (
+            Resp::BulkString(Some(b"mode".to_vec())),
+            Resp::BulkString(Some(b"standalone".to_vec())),
+        ),
+        (
+            Resp::BulkString(Some(b"role".to_vec())),
+            Resp::BulkString(Some(b"master".to_vec())),
+        ),
+        (
+            Resp::BulkString(Some(b"modules".to_vec())),
+            Resp::Array(Some(vec![])),
+        ),
     ];
 
     if version == 3 {
@@ -114,8 +139,12 @@ pub fn cmd_flushall_response() -> CacheResult<Resp> {
 
 pub fn cmd_info_response(state: &ServerState, section: Option<&str>, config: &Config) -> Resp {
     let uptime = state.uptime_secs();
-    let connected = state.connected_clients.load(std::sync::atomic::Ordering::Relaxed);
-    let total_cmds = state.total_commands.load(std::sync::atomic::Ordering::Relaxed);
+    let connected = state
+        .connected_clients
+        .load(std::sync::atomic::Ordering::Relaxed);
+    let total_cmds = state
+        .total_commands
+        .load(std::sync::atomic::Ordering::Relaxed);
 
     let sections: &[&str] = match section {
         Some("server") => &["server"],
@@ -125,7 +154,15 @@ pub fn cmd_info_response(state: &ServerState, section: Option<&str>, config: &Co
         Some("replication") => &["replication"],
         Some("cpu") => &["cpu"],
         Some("keyspace") => &["keyspace"],
-        Some("all") | None => &["server", "clients", "memory", "stats", "replication", "cpu", "keyspace"],
+        Some("all") | None => &[
+            "server",
+            "clients",
+            "memory",
+            "stats",
+            "replication",
+            "cpu",
+            "keyspace",
+        ],
         _ => &["server"],
     };
 
@@ -149,8 +186,13 @@ pub fn cmd_info_response(state: &ServerState, section: Option<&str>, config: &Co
                 info.push_str("process_id:1\r\n");
                 info.push_str(&format!("run_id:{}\r\n", "0".repeat(40)));
                 info.push_str(&format!("tcp_port:{}\r\n", config.port));
-                info.push_str(&format!("server_time_usec:{}\r\n",
-                    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_micros()));
+                info.push_str(&format!(
+                    "server_time_usec:{}\r\n",
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_micros()
+                ));
                 info.push_str(&format!("uptime_in_seconds:{}\r\n", uptime));
                 info.push_str(&format!("uptime_in_days:{}\r\n", uptime / 86400));
                 info.push_str(&format!("hz:{}\r\n", config.hz));
@@ -217,9 +259,21 @@ pub fn cmd_info_response(state: &ServerState, section: Option<&str>, config: &Co
                 info.push_str("used_memory_functions:216\r\n");
                 info.push_str("used_memory_scripts:216\r\n");
                 info.push_str("used_memory_scripts_human:216B\r\n");
-                info.push_str(&format!("maxmemory:{}\r\n", config.max_memory_bytes.unwrap_or(0)));
-                info.push_str(&format!("maxmemory_human:{}\r\n", config.max_memory_bytes.map(|m| format!("{}B", m)).unwrap_or("0B".into())));
-                info.push_str(&format!("maxmemory_policy:{}\r\n", config.eviction_policy.as_str()));
+                info.push_str(&format!(
+                    "maxmemory:{}\r\n",
+                    config.max_memory_bytes.unwrap_or(0)
+                ));
+                info.push_str(&format!(
+                    "maxmemory_human:{}\r\n",
+                    config
+                        .max_memory_bytes
+                        .map(|m| format!("{}B", m))
+                        .unwrap_or("0B".into())
+                ));
+                info.push_str(&format!(
+                    "maxmemory_policy:{}\r\n",
+                    config.eviction_policy.as_str()
+                ));
                 info.push_str("allocator_frag_ratio:2.00\r\n");
                 info.push_str("allocator_frag_bytes:1024000\r\n");
                 info.push_str("allocator_rss_ratio:1.00\r\n");
@@ -241,7 +295,12 @@ pub fn cmd_info_response(state: &ServerState, section: Option<&str>, config: &Co
             }
             "stats" => {
                 info.push_str("# Stats\r\n");
-                info.push_str(&format!("total_connections_received:{}\r\n", state.total_connections.load(std::sync::atomic::Ordering::Relaxed)));
+                info.push_str(&format!(
+                    "total_connections_received:{}\r\n",
+                    state
+                        .total_connections
+                        .load(std::sync::atomic::Ordering::Relaxed)
+                ));
                 info.push_str(&format!("total_commands_processed:{}\r\n", total_cmds));
                 info.push_str("instantaneous_ops_per_sec:0\r\n");
                 info.push_str("total_net_input_bytes:0\r\n");
@@ -329,7 +388,9 @@ pub fn cmd_info_response(state: &ServerState, section: Option<&str>, config: &Co
 // ── CONFIG ───────────────────────────────────────────────────────────────────
 
 pub fn cmd_config_get(args: &[Vec<u8>], config: &Config) -> CacheResult<Resp> {
-    if args.len() < 3 { return Err(CacheError::wrong_arity("config get")); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity("config get"));
+    }
     let patterns = &args[2..];
 
     let all_config = config_to_pairs(config);
@@ -349,36 +410,109 @@ pub fn cmd_config_get(args: &[Vec<u8>], config: &Config) -> CacheResult<Resp> {
 
 fn config_to_pairs(config: &Config) -> Vec<(String, String)> {
     vec![
-        ("maxmemory".into(), config.max_memory_bytes.unwrap_or(0).to_string()),
-        ("maxmemory-policy".into(), config.eviction_policy.as_str().into()),
+        (
+            "maxmemory".into(),
+            config.max_memory_bytes.unwrap_or(0).to_string(),
+        ),
+        (
+            "maxmemory-policy".into(),
+            config.eviction_policy.as_str().into(),
+        ),
         ("databases".into(), config.databases.to_string()),
         ("hz".into(), config.hz.to_string()),
         ("bind".into(), config.bind.clone()),
         ("port".into(), config.port.to_string()),
-        ("requirepass".into(), config.requirepass.clone().unwrap_or_default()),
-        ("appendonly".into(), if config.aof_enabled { "yes".into() } else { "no".into() }),
+        (
+            "requirepass".into(),
+            config.requirepass.clone().unwrap_or_default(),
+        ),
+        (
+            "appendonly".into(),
+            if config.aof_enabled {
+                "yes".into()
+            } else {
+                "no".into()
+            },
+        ),
         ("appendfilename".into(), config.aof_path.clone()),
         ("dbfilename".into(), config.rdb_path.clone()),
-        ("slowlog-log-slower-than".into(), config.slowlog_log_slower_than.to_string()),
+        (
+            "slowlog-log-slower-than".into(),
+            config.slowlog_log_slower_than.to_string(),
+        ),
         ("slowlog-max-len".into(), config.slowlog_max_len.to_string()),
         ("maxclients".into(), config.maxclients.to_string()),
         ("timeout".into(), config.timeout.to_string()),
         ("loglevel".into(), config.loglevel.as_str().into()),
-        ("notify-keyspace-events".into(), config.notify_keyspace_events.clone()),
-        ("cluster-enabled".into(), if config.cluster_enabled { "yes".into() } else { "no".into() }),
-        ("save".into(), config.rdb_save_intervals.iter()
-            .map(|(s, c)| format!("{} {}", s, c))
-            .collect::<Vec<_>>()
-            .join(" ")),
-        ("lazyfree-lazy-eviction".into(), if config.lazyfree_lazy_eviction { "yes".into() } else { "no".into() }),
-        ("lazyfree-lazy-expire".into(), if config.lazyfree_lazy_expire { "yes".into() } else { "no".into() }),
-        ("active-expire-enabled".into(), if config.active_expire_enabled { "1".into() } else { "0".into() }),
-        ("hash-max-listpack-entries".into(), config.hash_max_listpack_entries.to_string()),
-        ("hash-max-listpack-value".into(), config.hash_max_listpack_value.to_string()),
-        ("zset-max-listpack-entries".into(), config.zset_max_listpack_entries.to_string()),
-        ("zset-max-listpack-value".into(), config.zset_max_listpack_value.to_string()),
-        ("set-max-intset-entries".into(), config.set_max_intset_entries.to_string()),
-        ("list-max-listpack-size".into(), config.list_max_listpack_size.to_string()),
+        (
+            "notify-keyspace-events".into(),
+            config.notify_keyspace_events.clone(),
+        ),
+        (
+            "cluster-enabled".into(),
+            if config.cluster_enabled {
+                "yes".into()
+            } else {
+                "no".into()
+            },
+        ),
+        (
+            "save".into(),
+            config
+                .rdb_save_intervals
+                .iter()
+                .map(|(s, c)| format!("{} {}", s, c))
+                .collect::<Vec<_>>()
+                .join(" "),
+        ),
+        (
+            "lazyfree-lazy-eviction".into(),
+            if config.lazyfree_lazy_eviction {
+                "yes".into()
+            } else {
+                "no".into()
+            },
+        ),
+        (
+            "lazyfree-lazy-expire".into(),
+            if config.lazyfree_lazy_expire {
+                "yes".into()
+            } else {
+                "no".into()
+            },
+        ),
+        (
+            "active-expire-enabled".into(),
+            if config.active_expire_enabled {
+                "1".into()
+            } else {
+                "0".into()
+            },
+        ),
+        (
+            "hash-max-listpack-entries".into(),
+            config.hash_max_listpack_entries.to_string(),
+        ),
+        (
+            "hash-max-listpack-value".into(),
+            config.hash_max_listpack_value.to_string(),
+        ),
+        (
+            "zset-max-listpack-entries".into(),
+            config.zset_max_listpack_entries.to_string(),
+        ),
+        (
+            "zset-max-listpack-value".into(),
+            config.zset_max_listpack_value.to_string(),
+        ),
+        (
+            "set-max-intset-entries".into(),
+            config.set_max_intset_entries.to_string(),
+        ),
+        (
+            "list-max-listpack-size".into(),
+            config.list_max_listpack_size.to_string(),
+        ),
     ]
 }
 
@@ -388,12 +522,19 @@ pub fn cmd_config_set(args: &[Vec<u8>], config: &mut Config) -> CacheResult<Resp
     }
     let mut i = 2;
     while i < args.len() {
-        let key = std::str::from_utf8(&args[i]).unwrap_or("").to_ascii_lowercase();
+        let key = std::str::from_utf8(&args[i])
+            .unwrap_or("")
+            .to_ascii_lowercase();
         let val = std::str::from_utf8(&args[i + 1]).unwrap_or("");
         match key.as_str() {
             "maxmemory" => {
-                config.max_memory_bytes = if val == "0" { None } else {
-                    Some(val.parse().map_err(|_| CacheError::generic("ERR Invalid value for maxmemory"))?)
+                config.max_memory_bytes = if val == "0" {
+                    None
+                } else {
+                    Some(
+                        val.parse()
+                            .map_err(|_| CacheError::generic("ERR Invalid value for maxmemory"))?,
+                    )
                 };
             }
             "maxmemory-policy" => {
@@ -401,10 +542,13 @@ pub fn cmd_config_set(args: &[Vec<u8>], config: &mut Config) -> CacheResult<Resp
                     .ok_or_else(|| CacheError::generic("ERR Invalid maxmemory-policy"))?;
             }
             "hz" => {
-                config.hz = val.parse().map_err(|_| CacheError::generic("ERR Invalid hz value"))?;
+                config.hz = val
+                    .parse()
+                    .map_err(|_| CacheError::generic("ERR Invalid hz value"))?;
             }
             "slowlog-log-slower-than" => {
-                config.slowlog_log_slower_than = val.parse().map_err(|_| CacheError::generic("ERR"))?;
+                config.slowlog_log_slower_than =
+                    val.parse().map_err(|_| CacheError::generic("ERR"))?;
             }
             "slowlog-max-len" => {
                 config.slowlog_max_len = val.parse().map_err(|_| CacheError::generic("ERR"))?;
@@ -413,7 +557,11 @@ pub fn cmd_config_set(args: &[Vec<u8>], config: &mut Config) -> CacheResult<Resp
                 config.notify_keyspace_events = val.to_string();
             }
             "requirepass" => {
-                config.requirepass = if val.is_empty() { None } else { Some(val.to_string()) };
+                config.requirepass = if val.is_empty() {
+                    None
+                } else {
+                    Some(val.to_string())
+                };
             }
             "loglevel" => {
                 // Just accept it
@@ -436,20 +584,28 @@ pub fn cmd_config_resetstat() -> CacheResult<Resp> {
 }
 
 pub fn cmd_config_rewrite() -> CacheResult<Resp> {
-    Err(CacheError::generic("ERR The server is running without a config file"))
+    Err(CacheError::generic(
+        "ERR The server is running without a config file",
+    ))
 }
 
 // ── SLOWLOG ──────────────────────────────────────────────────────────────────
 
 pub fn slowlog_get(log: &VecDeque<SlowlogEntry>, count: Option<usize>) -> Resp {
-    let entries: Vec<Resp> = log.iter()
+    let entries: Vec<Resp> = log
+        .iter()
         .take(count.unwrap_or(log.len()))
         .map(|e| {
             Resp::Array(Some(vec![
                 Resp::Integer(e.id as i64),
                 Resp::Integer(e.timestamp as i64),
                 Resp::Integer(e.duration_us as i64),
-                Resp::Array(Some(e.args.iter().map(|a| Resp::BulkString(Some(a.clone()))).collect())),
+                Resp::Array(Some(
+                    e.args
+                        .iter()
+                        .map(|a| Resp::BulkString(Some(a.clone())))
+                        .collect(),
+                )),
                 Resp::BulkString(Some(e.client_addr.as_bytes().to_vec())),
                 Resp::BulkString(Some(e.client_name.as_bytes().to_vec())),
             ]))
@@ -500,55 +656,66 @@ pub fn cmd_command_docs(args: &[Vec<u8>]) -> Resp {
 
 pub fn cmd_command_info(args: &[Vec<u8>]) -> Resp {
     // Return minimal command info
-    Resp::Array(Some(args[2..].iter().map(|cmd| {
-        let name = std::str::from_utf8(cmd).unwrap_or("").to_ascii_lowercase();
-        Resp::Array(Some(vec![
-            Resp::BulkString(Some(name.into_bytes())),
-            Resp::Integer(-1), // arity
-            Resp::Array(Some(vec![])), // flags
-            Resp::Integer(0), // first key
-            Resp::Integer(0), // last key
-            Resp::Integer(0), // step
-        ]))
-    }).collect()))
+    Resp::Array(Some(
+        args[2..]
+            .iter()
+            .map(|cmd| {
+                let name = std::str::from_utf8(cmd).unwrap_or("").to_ascii_lowercase();
+                Resp::Array(Some(vec![
+                    Resp::BulkString(Some(name.into_bytes())),
+                    Resp::Integer(-1),         // arity
+                    Resp::Array(Some(vec![])), // flags
+                    Resp::Integer(0),          // first key
+                    Resp::Integer(0),          // last key
+                    Resp::Integer(0),          // step
+                ]))
+            })
+            .collect(),
+    ))
 }
 
 // ── DEBUG ─────────────────────────────────────────────────────────────────────
 
 pub fn cmd_debug(args: &[Vec<u8>]) -> CacheResult<Resp> {
-    if args.len() < 2 { return Err(CacheError::wrong_arity("debug")); }
+    if args.len() < 2 {
+        return Err(CacheError::wrong_arity("debug"));
+    }
     match args[1].to_ascii_uppercase().as_slice() {
         b"SLEEP" => {
             // Non-blocking sleep (just return OK)
             Ok(Resp::ok())
         }
-        b"SET-ACTIVE-EXPIRE" | b"SETOBJ" | b"RELOAD" | b"LOADAOF" | b"FLUSHALL" |
-        b"CHANGE-REPL-ID" | b"AOFSTATS" | b"DISABLE-REPLICATION-CACHING" |
-        b"QUICKLIST-PACKED-THRESHOLD" | b"SFLAGS" | b"CLOSE-LISTENERS-ASA" => {
-            Ok(Resp::ok())
-        }
-        b"JMAP" | b"MALLOPT-ARENA-MAX" | b"MALLOPT-ARENA-TEST" => {
-            Ok(Resp::ok())
-        }
-        b"GETANDPROPAGET" | b"GETANDPROPAVOIDJUMP" => {
-            Ok(Resp::nil())
-        }
-        b"OBJECT" => {
-            Err(CacheError::generic("ERR DEBUG OBJECT not supported for all key types"))
-        }
-        _ => {
-            Ok(Resp::ok())
-        }
+        b"SET-ACTIVE-EXPIRE"
+        | b"SETOBJ"
+        | b"RELOAD"
+        | b"LOADAOF"
+        | b"FLUSHALL"
+        | b"CHANGE-REPL-ID"
+        | b"AOFSTATS"
+        | b"DISABLE-REPLICATION-CACHING"
+        | b"QUICKLIST-PACKED-THRESHOLD"
+        | b"SFLAGS"
+        | b"CLOSE-LISTENERS-ASA" => Ok(Resp::ok()),
+        b"JMAP" | b"MALLOPT-ARENA-MAX" | b"MALLOPT-ARENA-TEST" => Ok(Resp::ok()),
+        b"GETANDPROPAGET" | b"GETANDPROPAVOIDJUMP" => Ok(Resp::nil()),
+        b"OBJECT" => Err(CacheError::generic(
+            "ERR DEBUG OBJECT not supported for all key types",
+        )),
+        _ => Ok(Resp::ok()),
     }
 }
 
 // ── MEMORY ───────────────────────────────────────────────────────────────────
 
 pub fn cmd_memory(args: &[Vec<u8>], db: &Db) -> CacheResult<Resp> {
-    if args.len() < 2 { return Err(CacheError::wrong_arity("memory")); }
+    if args.len() < 2 {
+        return Err(CacheError::wrong_arity("memory"));
+    }
     match args[1].to_ascii_uppercase().as_slice() {
         b"USAGE" => {
-            if args.len() < 3 { return Err(CacheError::wrong_arity("memory usage")); }
+            if args.len() < 3 {
+                return Err(CacheError::wrong_arity("memory usage"));
+            }
             // Return rough estimate
             let key = &args[2];
             match db.keys.get(key.as_slice()) {
@@ -559,14 +726,26 @@ pub fn cmd_memory(args: &[Vec<u8>], db: &Db) -> CacheResult<Resp> {
                 None => Ok(Resp::nil()),
             }
         }
-        b"DOCTOR" => Ok(Resp::BulkString(Some(b"Cave-cache memory: all good!".to_vec()))),
-        b"MALLOC-STATS" => Ok(Resp::BulkString(Some(b"Peak allocator stats: N/A".to_vec()))),
-        b"STATS" => Ok(Resp::BulkString(Some(b"Peak allocator stats: N/A".to_vec()))),
+        b"DOCTOR" => Ok(Resp::BulkString(Some(
+            b"Cave-cache memory: all good!".to_vec(),
+        ))),
+        b"MALLOC-STATS" => Ok(Resp::BulkString(Some(
+            b"Peak allocator stats: N/A".to_vec(),
+        ))),
+        b"STATS" => Ok(Resp::BulkString(Some(
+            b"Peak allocator stats: N/A".to_vec(),
+        ))),
         b"HELP" => Ok(Resp::Array(Some(vec![
-            Resp::BulkString(Some(b"MEMORY DOCTOR - Return memory problems report".to_vec())),
-            Resp::BulkString(Some(b"MEMORY MALLOC-STATS - Return allocator stats".to_vec())),
+            Resp::BulkString(Some(
+                b"MEMORY DOCTOR - Return memory problems report".to_vec(),
+            )),
+            Resp::BulkString(Some(
+                b"MEMORY MALLOC-STATS - Return allocator stats".to_vec(),
+            )),
             Resp::BulkString(Some(b"MEMORY STATS - Return memory overview".to_vec())),
-            Resp::BulkString(Some(b"MEMORY USAGE <key> [SAMPLES <n>] - Return size in bytes".to_vec())),
+            Resp::BulkString(Some(
+                b"MEMORY USAGE <key> [SAMPLES <n>] - Return size in bytes".to_vec(),
+            )),
         ]))),
         b"PURGE" => Ok(Resp::ok()),
         _ => Err(CacheError::generic(format!(
@@ -598,14 +777,19 @@ pub fn cmd_bgrewriteaof() -> Resp {
 }
 
 pub fn cmd_lastsave() -> Resp {
-    let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
     Resp::Integer(ts as i64)
 }
 
 // ── MOVE ─────────────────────────────────────────────────────────────────────
 
 pub fn cmd_move_key(args: &[Vec<u8>], src_db: &mut Db, dst_db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 3 { return Err(CacheError::wrong_arity("move")); }
+    if args.len() != 3 {
+        return Err(CacheError::wrong_arity("move"));
+    }
     let key = &args[1];
 
     if dst_db.exists(key) {
@@ -627,7 +811,9 @@ pub fn cmd_move_key(args: &[Vec<u8>], src_db: &mut Db, dst_db: &mut Db) -> Cache
 // ── SWAPDB ───────────────────────────────────────────────────────────────────
 
 pub fn cmd_swapdb(args: &[Vec<u8>]) -> CacheResult<(usize, usize)> {
-    if args.len() != 3 { return Err(CacheError::wrong_arity("swapdb")); }
+    if args.len() != 3 {
+        return Err(CacheError::wrong_arity("swapdb"));
+    }
     let a = bytes_to_i64(&args[1]).ok_or(CacheError::NotInteger)? as usize;
     let b = bytes_to_i64(&args[2]).ok_or(CacheError::NotInteger)? as usize;
     Ok((a, b))
@@ -636,10 +822,14 @@ pub fn cmd_swapdb(args: &[Vec<u8>]) -> CacheResult<(usize, usize)> {
 // ── LATENCY ──────────────────────────────────────────────────────────────────
 
 pub fn cmd_latency(args: &[Vec<u8>]) -> CacheResult<Resp> {
-    if args.len() < 2 { return Err(CacheError::wrong_arity("latency")); }
+    if args.len() < 2 {
+        return Err(CacheError::wrong_arity("latency"));
+    }
     match args[1].to_ascii_uppercase().as_slice() {
         b"HISTORY" | b"LATEST" | b"RESET" => Ok(Resp::Array(Some(vec![]))),
-        b"GRAPH" => Ok(Resp::BulkString(Some(b"No latency data collected yet".to_vec()))),
+        b"GRAPH" => Ok(Resp::BulkString(Some(
+            b"No latency data collected yet".to_vec(),
+        ))),
         _ => Ok(Resp::Array(Some(vec![]))),
     }
 }
@@ -647,13 +837,18 @@ pub fn cmd_latency(args: &[Vec<u8>]) -> CacheResult<Resp> {
 // ── LOLWUT ───────────────────────────────────────────────────────────────────
 
 pub fn cmd_lolwut() -> Resp {
-    Resp::BulkString(Some(b"\nCave Cache - Full Redis Parity\n\nDragon: [redacted for performance]\n\nDragon\n".to_vec()))
+    Resp::BulkString(Some(
+        b"\nCave Cache - Full Redis Parity\n\nDragon: [redacted for performance]\n\nDragon\n"
+            .to_vec(),
+    ))
 }
 
 // ── REPLICAOF / SLAVEOF ───────────────────────────────────────────────────────
 
 pub fn cmd_replicaof(args: &[Vec<u8>]) -> CacheResult<Resp> {
-    if args.len() != 3 { return Err(CacheError::wrong_arity("replicaof")); }
+    if args.len() != 3 {
+        return Err(CacheError::wrong_arity("replicaof"));
+    }
     Ok(Resp::ok())
 }
 
@@ -662,12 +857,19 @@ pub fn cmd_replicaof(args: &[Vec<u8>]) -> CacheResult<Resp> {
 // ── ACL ──────────────────────────────────────────────────────────────────────
 
 pub fn cmd_acl(args: &[Vec<u8>], acl: &crate::acl::AclState) -> CacheResult<Resp> {
-    if args.len() < 2 { return Err(CacheError::wrong_arity("acl")); }
+    if args.len() < 2 {
+        return Err(CacheError::wrong_arity("acl"));
+    }
     match args[1].to_ascii_uppercase().as_slice() {
         b"LIST" => {
-            let users: Vec<Resp> = acl.list_users()
+            let users: Vec<Resp> = acl
+                .list_users()
                 .into_iter()
-                .map(|u| Resp::BulkString(Some(format!("user {} on nopass ~* &* +@all", u).into_bytes())))
+                .map(|u| {
+                    Resp::BulkString(Some(
+                        format!("user {} on nopass ~* &* +@all", u).into_bytes(),
+                    ))
+                })
                 .collect();
             Ok(Resp::Array(Some(users)))
         }
@@ -695,15 +897,25 @@ pub fn cmd_acl(args: &[Vec<u8>], acl: &crate::acl::AclState) -> CacheResult<Resp
             Resp::BulkString(Some(b"transaction".to_vec())),
         ]))),
         b"LOG" => Ok(Resp::Array(Some(vec![]))),
-        b"USERS" => Ok(Resp::Array(Some(acl.list_users().into_iter()
-            .map(|u| Resp::BulkString(Some(u.into_bytes()))).collect()))),
+        b"USERS" => Ok(Resp::Array(Some(
+            acl.list_users()
+                .into_iter()
+                .map(|u| Resp::BulkString(Some(u.into_bytes())))
+                .collect(),
+        ))),
         b"GETUSER" => {
-            if args.len() < 3 { return Err(CacheError::wrong_arity("acl getuser")); }
+            if args.len() < 3 {
+                return Err(CacheError::wrong_arity("acl getuser"));
+            }
             let username = std::str::from_utf8(&args[2]).unwrap_or("");
             match acl.get_user(username) {
                 Some(user) => Ok(Resp::Array(Some(vec![
                     Resp::BulkString(Some(b"flags".to_vec())),
-                    Resp::Array(Some(if user.enabled { vec![Resp::BulkString(Some(b"on".to_vec()))] } else { vec![Resp::BulkString(Some(b"off".to_vec()))] })),
+                    Resp::Array(Some(if user.enabled {
+                        vec![Resp::BulkString(Some(b"on".to_vec()))]
+                    } else {
+                        vec![Resp::BulkString(Some(b"off".to_vec()))]
+                    })),
                     Resp::BulkString(Some(b"passwords".to_vec())),
                     Resp::Array(Some(vec![])),
                     Resp::BulkString(Some(b"commands".to_vec())),
@@ -729,7 +941,9 @@ pub fn cmd_acl(args: &[Vec<u8>], acl: &crate::acl::AclState) -> CacheResult<Resp
                 256
             };
             let bytes = bits / 8;
-            let hex: String = (0..bytes).map(|_| format!("{:02x}", rand::random::<u8>())).collect();
+            let hex: String = (0..bytes)
+                .map(|_| format!("{:02x}", rand::random::<u8>()))
+                .collect();
             Ok(Resp::BulkString(Some(hex.into_bytes())))
         }
         b"HELP" => Ok(Resp::Array(Some(vec![

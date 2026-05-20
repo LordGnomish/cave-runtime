@@ -41,7 +41,10 @@ pub struct KubeconfigUser {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KubeconfigUserData {
     pub token: Option<String>,
-    #[serde(rename = "client-certificate-data", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "client-certificate-data",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub client_cert: Option<String>,
     #[serde(rename = "client-key-data", skip_serializing_if = "Option::is_none")]
     pub client_key: Option<String>,
@@ -125,10 +128,7 @@ pub fn to_yaml(kc: &Kubeconfig) -> ClusterResult<String> {
 pub fn generate_token(cluster: &Cluster, service_account: &str, namespace: &str) -> String {
     format!(
         "cave-token.{}.{}.{}.{}",
-        cluster.spec.name,
-        service_account,
-        namespace,
-        cluster.id
+        cluster.spec.name, service_account, namespace, cluster.id
     )
 }
 

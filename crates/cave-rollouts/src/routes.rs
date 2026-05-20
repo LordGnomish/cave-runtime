@@ -6,20 +6,20 @@
 //! querying, and controlling progressive delivery rollouts.
 
 use axum::{
+    Router,
     extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Json},
     routing::{delete, get, post, put},
-    Router,
 };
 use chrono::Utc;
 use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
+    RolloutsState,
     engine::{advance_canary, apply_canary_action, initial_status},
     models::*,
-    RolloutsState,
 };
 
 // ── Router ────────────────────────────────────────────────────────────────────

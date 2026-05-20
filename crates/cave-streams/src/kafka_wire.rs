@@ -14,7 +14,10 @@
 use bytes::{Buf, BufMut, BytesMut};
 
 use crate::error::{StreamsError, StreamsResult};
-use crate::protocol::{decode_array, decode_nullable_string, decode_string, encode_array, encode_nullable_string, encode_string};
+use crate::protocol::{
+    decode_array, decode_nullable_string, decode_string, encode_array, encode_nullable_string,
+    encode_string,
+};
 
 // ── ApiVersions: dedicated decode helper ───────────────────────────────────
 
@@ -1012,4 +1015,3 @@ mod tests {
         assert_eq!(unsupported_version_error_code(), 35);
     }
 }
-

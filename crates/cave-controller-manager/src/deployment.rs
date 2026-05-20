@@ -16,7 +16,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Strategy {
     Recreate,
-    RollingUpdate { max_surge: u32, max_unavailable: u32 },
+    RollingUpdate {
+        max_surge: u32,
+        max_unavailable: u32,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -92,7 +95,10 @@ pub struct RevisionEntry {
 impl RevisionHistory {
     pub fn new(limit: u32) -> Self {
         assert!(limit > 0, "revision history limit must be > 0");
-        Self { limit, revisions: vec![] }
+        Self {
+            limit,
+            revisions: vec![],
+        }
     }
 
     /// Append a new revision; evict the oldest if the buffer is over capacity.
@@ -161,12 +167,14 @@ pub fn plan_rolling_step(
                 old_rs_target: 0,
             });
         }
-        Strategy::RollingUpdate { max_surge, max_unavailable } => {
-            (max_surge, max_unavailable)
-        }
+        Strategy::RollingUpdate {
+            max_surge,
+            max_unavailable,
+        } => (max_surge, max_unavailable),
     };
     let total = new_rs_size.saturating_add(old_rs_size);
-    let surge_room = spec.replicas
+    let surge_room = spec
+        .replicas
         .saturating_add(max_surge)
         .saturating_sub(total);
     let new_rs_target = new_rs_size.saturating_add(surge_room).min(spec.replicas);
@@ -178,7 +186,10 @@ pub fn plan_rolling_step(
     let removable = alive.saturating_sub(min_available);
     let scale_down = removable.min(old_rs_size);
     let old_rs_target = old_rs_size.saturating_sub(scale_down);
-    Ok(RollingStep { new_rs_target, old_rs_target })
+    Ok(RollingStep {
+        new_rs_target,
+        old_rs_target,
+    })
 }
 
 // ── Rollout progress conditions ─────────────────────────────────────────────
@@ -369,7 +380,10 @@ mod tests {
             name: "web".into(),
             namespace: "default".into(),
             replicas,
-            strategy: Strategy::RollingUpdate { max_surge: 1, max_unavailable: 0 },
+            strategy: Strategy::RollingUpdate {
+                max_surge: 1,
+                max_unavailable: 0,
+            },
             paused,
             progress_deadline_seconds: None,
         }
@@ -383,7 +397,10 @@ mod tests {
             "tenant-deploy-scale-up"
         );
         let s = spec(5, false);
-        let st = DeploymentStatus { observed_replicas: 2, ..Default::default() };
+        let st = DeploymentStatus {
+            observed_replicas: 2,
+            ..Default::default()
+        };
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::Create(3));
         assert_eq!(cite.symbol, "scale");
     }
@@ -396,7 +413,10 @@ mod tests {
             "tenant-deploy-scale-down"
         );
         let s = spec(2, false);
-        let st = DeploymentStatus { observed_replicas: 5, ..Default::default() };
+        let st = DeploymentStatus {
+            observed_replicas: 5,
+            ..Default::default()
+        };
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::Delete(3));
     }
 
@@ -422,7 +442,10 @@ mod tests {
         let _ = tenant;
         let s = spec(4, false);
         assert_eq!(max_pods_during_surge(&s), 5);
-        let recreate = DeploymentSpec { strategy: Strategy::Recreate, ..s };
+        let recreate = DeploymentSpec {
+            strategy: Strategy::Recreate,
+            ..s
+        };
         assert_eq!(max_pods_during_surge(&recreate), 4);
     }
 
@@ -441,7 +464,10 @@ mod tests {
         let _ = tenant;
         let s = DeploymentSpec {
             replicas: 10,
-            strategy: Strategy::RollingUpdate { max_surge: 2, max_unavailable: 0 },
+            strategy: Strategy::RollingUpdate {
+                max_surge: 2,
+                max_unavailable: 0,
+            },
             ..spec(10, false)
         };
         let step = plan_rolling_step(&s, 0, 10).unwrap();
@@ -465,7 +491,10 @@ mod tests {
         let _ = tenant;
         let s = DeploymentSpec {
             replicas: 10,
-            strategy: Strategy::RollingUpdate { max_surge: 2, max_unavailable: 2 },
+            strategy: Strategy::RollingUpdate {
+                max_surge: 2,
+                max_unavailable: 2,
+            },
             ..spec(10, false)
         };
         // Mid-rollout: 4 new pods up, 8 old still up — total 12 = 10 + maxSurge.
@@ -494,11 +523,15 @@ mod tests {
             ..spec(5, false)
         };
         let mid = plan_rolling_step(&s, 0, 3).unwrap();
-        assert_eq!(mid.new_rs_target, 0,
-            "Recreate must NOT bring up new pods while old pods still alive");
+        assert_eq!(
+            mid.new_rs_target, 0,
+            "Recreate must NOT bring up new pods while old pods still alive"
+        );
         let drained = plan_rolling_step(&s, 0, 0).unwrap();
-        assert_eq!(drained.new_rs_target, 5,
-            "Once drained, Recreate brings the full replica count online");
+        assert_eq!(
+            drained.new_rs_target, 5,
+            "Once drained, Recreate brings the full replica count online"
+        );
     }
 
     /// Upstream parity: `TestRevisionHistory_RingBufferLimit`
@@ -561,7 +594,10 @@ mod tests {
             "tenant-deploy-pause-resume"
         );
         let mut s = spec(5, true);
-        let st = DeploymentStatus { observed_replicas: 0, ..Default::default() };
+        let st = DeploymentStatus {
+            observed_replicas: 0,
+            ..Default::default()
+        };
         // Paused: no-op even though spec wants 5 and status has 0.
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::NoOp);
         // Resume: now the diff is acted on.

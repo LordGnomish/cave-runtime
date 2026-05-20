@@ -45,19 +45,37 @@ struct AssignPodReq {
     containers: Vec<(String, String)>,
 }
 
-async fn assign_pod(State(s): State<Arc<KubeletState>>, Json(req): Json<AssignPodReq>) -> (StatusCode, Json<ManagedPod>) {
+async fn assign_pod(
+    State(s): State<Arc<KubeletState>>,
+    Json(req): Json<AssignPodReq>,
+) -> (StatusCode, Json<ManagedPod>) {
     let pod = agent::assign_pod(&s, &req.name, &req.namespace, req.containers);
     (StatusCode::CREATED, Json(pod))
 }
 
-async fn start_pod(State(s): State<Arc<KubeletState>>, Path(uid): Path<Uuid>) -> Result<Json<ManagedPod>, (StatusCode, String)> {
-    agent::start_pod(&s, &uid).map(Json).ok_or((StatusCode::NOT_FOUND, "pod not found".into()))
+async fn start_pod(
+    State(s): State<Arc<KubeletState>>,
+    Path(uid): Path<Uuid>,
+) -> Result<Json<ManagedPod>, (StatusCode, String)> {
+    agent::start_pod(&s, &uid)
+        .map(Json)
+        .ok_or((StatusCode::NOT_FOUND, "pod not found".into()))
 }
 
-async fn stop_pod(State(s): State<Arc<KubeletState>>, Path(uid): Path<Uuid>) -> Result<Json<ManagedPod>, (StatusCode, String)> {
-    agent::stop_pod(&s, &uid).map(Json).ok_or((StatusCode::NOT_FOUND, "pod not found".into()))
+async fn stop_pod(
+    State(s): State<Arc<KubeletState>>,
+    Path(uid): Path<Uuid>,
+) -> Result<Json<ManagedPod>, (StatusCode, String)> {
+    agent::stop_pod(&s, &uid)
+        .map(Json)
+        .ok_or((StatusCode::NOT_FOUND, "pod not found".into()))
 }
 
-async fn remove_pod(State(s): State<Arc<KubeletState>>, Path(uid): Path<Uuid>) -> Result<StatusCode, (StatusCode, String)> {
-    agent::remove_pod(&s, &uid).map(|_| StatusCode::OK).ok_or((StatusCode::NOT_FOUND, "pod not found".into()))
+async fn remove_pod(
+    State(s): State<Arc<KubeletState>>,
+    Path(uid): Path<Uuid>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    agent::remove_pod(&s, &uid)
+        .map(|_| StatusCode::OK)
+        .ok_or((StatusCode::NOT_FOUND, "pod not found".into()))
 }

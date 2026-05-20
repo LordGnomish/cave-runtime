@@ -36,7 +36,9 @@ pub enum ClusterError {
     #[error("Cannot delete last node pool in cluster {0}")]
     LastNodePool(String),
 
-    #[error("Cluster not in expected state: cluster={cluster}, expected={expected}, actual={actual}")]
+    #[error(
+        "Cluster not in expected state: cluster={cluster}, expected={expected}, actual={actual}"
+    )]
     InvalidState {
         cluster: String,
         expected: String,

@@ -401,7 +401,10 @@ mod tests {
             WebSocketChannelVersion::V4,
             WebSocketChannelVersion::V5,
         ] {
-            assert_eq!(WebSocketChannelVersion::from_subprotocol(v.subprotocol()), Some(v));
+            assert_eq!(
+                WebSocketChannelVersion::from_subprotocol(v.subprotocol()),
+                Some(v)
+            );
         }
     }
 
@@ -564,31 +567,46 @@ mod tests {
 
     #[test]
     fn portforward_validate_requires_ports() {
-        let r = PortForwardRequest { pod_uid: "p".into(), ports: vec![] };
+        let r = PortForwardRequest {
+            pod_uid: "p".into(),
+            ports: vec![],
+        };
         assert!(r.validate().is_err());
     }
 
     #[test]
     fn portforward_validate_rejects_zero_port() {
-        let r = PortForwardRequest { pod_uid: "p".into(), ports: vec![0, 80] };
+        let r = PortForwardRequest {
+            pod_uid: "p".into(),
+            ports: vec![0, 80],
+        };
         assert!(r.validate().is_err());
     }
 
     #[test]
     fn portforward_validate_rejects_duplicates() {
-        let r = PortForwardRequest { pod_uid: "p".into(), ports: vec![80, 80] };
+        let r = PortForwardRequest {
+            pod_uid: "p".into(),
+            ports: vec![80, 80],
+        };
         assert!(r.validate().is_err());
     }
 
     #[test]
     fn portforward_validate_accepts_unique_ports() {
-        let r = PortForwardRequest { pod_uid: "p".into(), ports: vec![80, 443, 8080] };
+        let r = PortForwardRequest {
+            pod_uid: "p".into(),
+            ports: vec![80, 443, 8080],
+        };
         assert!(r.validate().is_ok());
     }
 
     #[test]
     fn terminal_size_round_trip() {
-        let s = TerminalSize { width: 120, height: 40 };
+        let s = TerminalSize {
+            width: 120,
+            height: 40,
+        };
         let json = s.encode();
         assert!(json.contains("\"Width\":120"));
         let s2 = TerminalSize::parse(&json).unwrap();
@@ -653,8 +671,14 @@ mod tests {
 
     #[test]
     fn portforward_stream_kind_header_round_trip() {
-        assert_eq!(PortForwardStreamKind::from_header("data"), Some(PortForwardStreamKind::Data));
-        assert_eq!(PortForwardStreamKind::from_header("error"), Some(PortForwardStreamKind::Error));
+        assert_eq!(
+            PortForwardStreamKind::from_header("data"),
+            Some(PortForwardStreamKind::Data)
+        );
+        assert_eq!(
+            PortForwardStreamKind::from_header("error"),
+            Some(PortForwardStreamKind::Error)
+        );
         assert_eq!(PortForwardStreamKind::from_header("nope"), None);
         assert_eq!(PortForwardStreamKind::Data.as_header(), "data");
         assert_eq!(PortForwardStreamKind::Error.as_header(), "error");

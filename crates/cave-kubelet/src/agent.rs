@@ -32,19 +32,29 @@ impl Default for KubeletState {
 }
 
 /// Assign a pod to this kubelet.
-pub fn assign_pod(state: &KubeletState, name: &str, namespace: &str, containers: Vec<(String, String)>) -> ManagedPod {
+pub fn assign_pod(
+    state: &KubeletState,
+    name: &str,
+    namespace: &str,
+    containers: Vec<(String, String)>,
+) -> ManagedPod {
     let pod = ManagedPod {
         uid: Uuid::new_v4(),
         name: name.to_string(),
         namespace: namespace.to_string(),
-        containers: containers.into_iter().map(|(n, img)| ManagedContainer {
-            name: n,
-            image: img,
-            container_id: None,
-            state: ContainerState::Waiting { reason: "ContainerCreating".into() },
-            restart_count: 0,
-            ready: false,
-        }).collect(),
+        containers: containers
+            .into_iter()
+            .map(|(n, img)| ManagedContainer {
+                name: n,
+                image: img,
+                container_id: None,
+                state: ContainerState::Waiting {
+                    reason: "ContainerCreating".into(),
+                },
+                restart_count: 0,
+                ready: false,
+            })
+            .collect(),
         status: PodPhase::Pending,
         assigned_at: Utc::now(),
         started_at: None,
@@ -60,7 +70,9 @@ pub fn start_pod(state: &KubeletState, pod_uid: &Uuid) -> Option<ManagedPod> {
     state.pods.get_mut(pod_uid).map(|mut pod| {
         for container in &mut pod.containers {
             container.container_id = Some(Uuid::new_v4());
-            container.state = ContainerState::Running { started_at: Utc::now() };
+            container.state = ContainerState::Running {
+                started_at: Utc::now(),
+            };
             container.ready = true;
         }
         pod.status = PodPhase::Running;
@@ -106,7 +118,12 @@ mod tests {
     #[test]
     fn test_assign_and_start_pod() {
         let state = KubeletState::new("test-node");
-        let pod = assign_pod(&state, "nginx", "default", vec![("nginx".into(), "nginx:latest".into())]);
+        let pod = assign_pod(
+            &state,
+            "nginx",
+            "default",
+            vec![("nginx".into(), "nginx:latest".into())],
+        );
         assert_eq!(pod.status, PodPhase::Pending);
 
         let started = start_pod(&state, &pod.uid).unwrap();
@@ -170,7 +187,9 @@ mod tests {
         // this is what cave-cri later uses to address each container.
         let state = KubeletState::new("test-node");
         let pod = assign_pod(
-            &state, "multi", "ns",
+            &state,
+            "multi",
+            "ns",
             vec![("c1".into(), "img1".into()), ("c2".into(), "img2".into())],
         );
         let started = start_pod(&state, &pod.uid).unwrap();
@@ -202,7 +221,9 @@ mod tests {
         let stopped = stop_pod(&state, &pod.uid).unwrap();
         for c in &stopped.containers {
             match &c.state {
-                ContainerState::Terminated { exit_code, reason, .. } => {
+                ContainerState::Terminated {
+                    exit_code, reason, ..
+                } => {
                     assert_eq!(*exit_code, 0);
                     assert_eq!(reason, "Stopped");
                 }

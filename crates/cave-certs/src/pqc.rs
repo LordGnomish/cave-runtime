@@ -57,7 +57,11 @@ impl HybridKeyPair {
         let classical = SigningKey::from_bytes(&secret);
         let mut pqc_seed = [0u8; 32];
         rng.fill_bytes(&mut pqc_seed);
-        Self { key_id: key_id.into(), classical, pqc_key_seed: pqc_seed }
+        Self {
+            key_id: key_id.into(),
+            classical,
+            pqc_key_seed: pqc_seed,
+        }
     }
 
     pub fn classical_public_key(&self) -> VerifyingKey {
@@ -87,30 +91,40 @@ impl HybridKeyPair {
 /// container back into its components.
 pub fn split_composite(blob: &[u8]) -> Result<(Vec<u8>, Vec<u8>), PqcError> {
     if blob.is_empty() {
-        return Err(PqcError::Truncated { expected: 5, actual: 0 });
+        return Err(PqcError::Truncated {
+            expected: 5,
+            actual: 0,
+        });
     }
     if blob[0] != CONTAINER_VERSION {
         return Err(PqcError::VersionMismatch {
-            expected: CONTAINER_VERSION, actual: blob[0],
+            expected: CONTAINER_VERSION,
+            actual: blob[0],
         });
     }
     if blob.len() < 1 + 4 {
-        return Err(PqcError::Truncated { expected: 5, actual: blob.len() });
+        return Err(PqcError::Truncated {
+            expected: 5,
+            actual: blob.len(),
+        });
     }
     let classical_len = u32::from_be_bytes(blob[1..5].try_into().unwrap()) as usize;
     let classical_end = 5 + classical_len;
     if blob.len() < classical_end + 4 {
         return Err(PqcError::Truncated {
-            expected: classical_end + 4, actual: blob.len(),
+            expected: classical_end + 4,
+            actual: blob.len(),
         });
     }
     let classical = blob[5..classical_end].to_vec();
-    let pqc_len = u32::from_be_bytes(
-        blob[classical_end..classical_end + 4].try_into().unwrap()
-    ) as usize;
+    let pqc_len =
+        u32::from_be_bytes(blob[classical_end..classical_end + 4].try_into().unwrap()) as usize;
     let pqc_end = classical_end + 4 + pqc_len;
     if blob.len() < pqc_end {
-        return Err(PqcError::Truncated { expected: pqc_end, actual: blob.len() });
+        return Err(PqcError::Truncated {
+            expected: pqc_end,
+            actual: blob.len(),
+        });
     }
     let pqc = blob[classical_end + 4..pqc_end].to_vec();
     Ok((classical, pqc))
@@ -126,9 +140,10 @@ pub fn verify_dual(
     key_id: &str,
 ) -> Result<(), PqcError> {
     let (classical_bytes, pqc_bytes) = split_composite(composite)?;
-    let classical_sig = Signature::from_slice(&classical_bytes)
-        .map_err(|_| PqcError::ClassicalInvalid)?;
-    classical_pub.verify(message, &classical_sig)
+    let classical_sig =
+        Signature::from_slice(&classical_bytes).map_err(|_| PqcError::ClassicalInvalid)?;
+    classical_pub
+        .verify(message, &classical_sig)
         .map_err(|_| PqcError::ClassicalInvalid)?;
 
     let expected = pqc_fixture(pqc_seed, key_id, message);

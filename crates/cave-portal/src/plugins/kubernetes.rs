@@ -190,10 +190,12 @@ impl CriPanel {
 
     pub fn is_unhealthy(&self) -> bool {
         self.oom_kills > 0
-            || self
-                .containers
-                .iter()
-                .any(|c| matches!(c.state, ContainerState::Waiting | ContainerState::Terminated))
+            || self.containers.iter().any(|c| {
+                matches!(
+                    c.state,
+                    ContainerState::Waiting | ContainerState::Terminated
+                )
+            })
     }
 
     /// Pod-level CRI detail is visible to the tenant (it's their pod) plus
@@ -271,7 +273,11 @@ impl KubernetesPlugin {
     }
 
     pub fn upsert_cri_pod(&mut self, panel: CriPanel) {
-        if let Some(idx) = self.cri_pods.iter().position(|p| p.pod_uid == panel.pod_uid) {
+        if let Some(idx) = self
+            .cri_pods
+            .iter()
+            .position(|p| p.pod_uid == panel.pod_uid)
+        {
             self.cri_pods[idx] = panel;
         } else {
             self.cri_pods.push(panel);

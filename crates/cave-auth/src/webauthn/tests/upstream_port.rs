@@ -11,17 +11,15 @@ use ciborium::value::Value;
 use sha2::{Digest, Sha256};
 
 use crate::webauthn::attestation;
-use crate::webauthn::authentication::{
-    AssertionOptions, AssertionResponse, AuthenticationManager,
-};
+use crate::webauthn::authentication::{AssertionOptions, AssertionResponse, AuthenticationManager};
 use crate::webauthn::authenticator_data::{self, AuthFlags};
 use crate::webauthn::cbor;
 use crate::webauthn::client_data;
 use crate::webauthn::cose::{self, CoseKey};
 use crate::webauthn::credential_store::InMemoryCredentialStore;
 use crate::webauthn::registration::{
-    self, AttestationResponse, RegistrationManager, RegistrationOptions,
-    ResidentKeyRequirement, UserVerification,
+    self, AttestationResponse, RegistrationManager, RegistrationOptions, ResidentKeyRequirement,
+    UserVerification,
 };
 
 fn b64u(s: &[u8]) -> String {
@@ -151,11 +149,8 @@ fn ceremony_1_eddsa_register_then_authenticate() {
     let sig = sk.sign(&signed);
 
     // Note: we re-use the same store from reg_mgr by re-borrowing.
-    let auth_mgr = AuthenticationManager::new(
-        reg_mgr.store,
-        "login.cave.dev",
-        "https://login.cave.dev",
-    );
+    let auth_mgr =
+        AuthenticationManager::new(reg_mgr.store, "login.cave.dev", "https://login.cave.dev");
     let stored = auth_mgr
         .verify(
             &AssertionOptions {
@@ -180,7 +175,7 @@ fn ceremony_1_eddsa_register_then_authenticate() {
 /// Integration ceremony #2 — ES256 registration + ES256 assertion roundtrip.
 #[test]
 fn ceremony_2_es256_register_then_authenticate() {
-    use p256::ecdsa::{signature::Signer as _, SigningKey};
+    use p256::ecdsa::{SigningKey, signature::Signer as _};
     use rand::rngs::OsRng;
 
     let sk = SigningKey::random(&mut OsRng);
@@ -240,11 +235,8 @@ fn ceremony_2_es256_register_then_authenticate() {
     signed.extend_from_slice(&cdh);
     let sig: p256::ecdsa::Signature = sk.sign(&signed);
     let der = sig.to_der();
-    let auth_mgr = AuthenticationManager::new(
-        reg_mgr.store,
-        "login.cave.dev",
-        "https://login.cave.dev",
-    );
+    let auth_mgr =
+        AuthenticationManager::new(reg_mgr.store, "login.cave.dev", "https://login.cave.dev");
     let stored = auth_mgr
         .verify(
             &AssertionOptions {
@@ -310,11 +302,8 @@ fn ceremony_3_replay_rejected_by_sign_count() {
             },
         )
         .unwrap();
-    let auth_mgr = AuthenticationManager::new(
-        reg_mgr.store,
-        "login.cave.dev",
-        "https://login.cave.dev",
-    );
+    let auth_mgr =
+        AuthenticationManager::new(reg_mgr.store, "login.cave.dev", "https://login.cave.dev");
     // First assertion succeeds at sign_count=5.
     let mut do_assert = |sign_count: u32| -> Result<_, _> {
         let auth_data = auth_data_assertion("login.cave.dev", AuthFlags::UP, sign_count);
@@ -395,11 +384,8 @@ fn ceremony_4_passkey_discoverable() {
             },
         )
         .unwrap();
-    let auth_mgr = AuthenticationManager::new(
-        reg_mgr.store,
-        "login.cave.dev",
-        "https://login.cave.dev",
-    );
+    let auth_mgr =
+        AuthenticationManager::new(reg_mgr.store, "login.cave.dev", "https://login.cave.dev");
     let challenge = b"passkey-chal".to_vec();
     let auth_data_a = auth_data_assertion(
         "login.cave.dev",

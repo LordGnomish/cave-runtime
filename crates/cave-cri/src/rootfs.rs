@@ -19,18 +19,16 @@ pub fn assemble_rootfs(image: &OciImage, container_id: &str) -> CriResult<PathBu
 
     // Create directories
     for dir in [&rootfs, &upper, &work, &merged] {
-        std::fs::create_dir_all(dir).map_err(|e| {
-            CriError::Rootfs(format!("failed to create {}: {}", dir.display(), e))
-        })?;
+        std::fs::create_dir_all(dir)
+            .map_err(|e| CriError::Rootfs(format!("failed to create {}: {}", dir.display(), e)))?;
     }
 
     // Extract layers into rootfs
     for (i, layer) in image.layers.iter().enumerate() {
         if let Some(ref local_path) = layer.local_path {
             let layer_dir = container_dir.join(format!("layer_{}", i));
-            std::fs::create_dir_all(&layer_dir).map_err(|e| {
-                CriError::Rootfs(format!("failed to create layer dir: {}", e))
-            })?;
+            std::fs::create_dir_all(&layer_dir)
+                .map_err(|e| CriError::Rootfs(format!("failed to create layer dir: {}", e)))?;
             extract_layer(local_path, &layer_dir)?;
         }
     }
@@ -40,7 +38,12 @@ pub fn assemble_rootfs(image: &OciImage, container_id: &str) -> CriResult<PathBu
     {
         let lower_dirs: Vec<String> = (0..image.layers.len())
             .rev()
-            .map(|i| container_dir.join(format!("layer_{}", i)).display().to_string())
+            .map(|i| {
+                container_dir
+                    .join(format!("layer_{}", i))
+                    .display()
+                    .to_string()
+            })
             .collect();
 
         let lower = lower_dirs.join(":");
@@ -82,13 +85,14 @@ pub(crate) fn extract_layer(archive_path: &Path, target_dir: &Path) -> CriResult
     let decoder = flate2::read::GzDecoder::new(file);
     let mut archive = tar::Archive::new(decoder);
 
-    for entry in archive.entries()
+    for entry in archive
+        .entries()
         .map_err(|e| CriError::Rootfs(format!("layer read failed: {}", e)))?
     {
-        let mut entry = entry
-            .map_err(|e| CriError::Rootfs(format!("layer entry error: {}", e)))?;
+        let mut entry = entry.map_err(|e| CriError::Rootfs(format!("layer entry error: {}", e)))?;
 
-        let entry_path = entry.path()
+        let entry_path = entry
+            .path()
             .map_err(|e| CriError::Rootfs(format!("entry path error: {}", e)))?
             .to_path_buf();
 
@@ -124,8 +128,12 @@ pub(crate) fn extract_layer(archive_path: &Path, target_dir: &Path) -> CriResult
         if let Some(parent) = dest.parent() {
             std::fs::create_dir_all(parent).ok();
         }
-        entry.unpack(&dest)
-            .map_err(|e| CriError::Rootfs(format!("layer extraction failed for {:?}: {}", entry_path, e)))?;
+        entry.unpack(&dest).map_err(|e| {
+            CriError::Rootfs(format!(
+                "layer extraction failed for {:?}: {}",
+                entry_path, e
+            ))
+        })?;
     }
 
     Ok(())
@@ -182,7 +190,9 @@ mod tests {
         std::env::remove_var("CAVE_ROOT_DIR");
         let path = paths::container_dir("abc");
         assert!(path.starts_with("/var/lib/cave/containers"));
-        if let Some(v) = prev { std::env::set_var("CAVE_ROOT_DIR", v); }
+        if let Some(v) = prev {
+            std::env::set_var("CAVE_ROOT_DIR", v);
+        }
     }
 
     #[test]
@@ -287,7 +297,10 @@ mod tests {
         std::fs::create_dir_all(&target).unwrap();
         extract_layer(&archive, &target).unwrap();
         assert!(target.join("hello.txt").exists());
-        assert_eq!(std::fs::read_to_string(target.join("hello.txt")).unwrap(), "hello world");
+        assert_eq!(
+            std::fs::read_to_string(target.join("hello.txt")).unwrap(),
+            "hello world"
+        );
     }
 
     #[test]
@@ -300,7 +313,10 @@ mod tests {
         // Layer with whiteout
         let archive = make_tar_gz(&dir, &[(".wh.todelete.txt", b"")]);
         extract_layer(&archive, &target).unwrap();
-        assert!(!target.join("todelete.txt").exists(), "whiteout should have deleted file");
+        assert!(
+            !target.join("todelete.txt").exists(),
+            "whiteout should have deleted file"
+        );
     }
 
     #[test]
@@ -320,7 +336,10 @@ mod tests {
         std::fs::create_dir_all(&target).unwrap();
         let archive = make_tar_gz(&dir, &[(".wh..wh..opq", b"")]);
         extract_layer(&archive, &target).unwrap();
-        assert!(target.join(".wh..wh..opq").exists(), "opaque whiteout sentinel should exist");
+        assert!(
+            target.join(".wh..wh..opq").exists(),
+            "opaque whiteout sentinel should exist"
+        );
     }
 
     #[test]

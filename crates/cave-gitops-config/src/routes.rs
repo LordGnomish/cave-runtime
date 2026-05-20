@@ -4,16 +4,16 @@
 
 use crate::engine::PipelineEngine;
 use crate::models::{
-    ClusterDestination, ClusterStatus, CreatePromiseRequest, CreateResourceRequestRequest,
-    Promise, PromiseStatus, RegisterClusterRequest, ResourceRequest, ResourceRequestStatus,
-    StateStoreEntry, SyncStatus,
+    ClusterDestination, ClusterStatus, CreatePromiseRequest, CreateResourceRequestRequest, Promise,
+    PromiseStatus, RegisterClusterRequest, ResourceRequest, ResourceRequestStatus, StateStoreEntry,
+    SyncStatus,
 };
 use crate::store::GitOpsStore;
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     routing::get,
-    Json, Router,
 };
 use chrono::Utc;
 use serde::Deserialize;
@@ -35,19 +35,28 @@ impl Default for GitOpsAppState {
 pub fn create_router(state: Arc<GitOpsAppState>) -> Router {
     Router::new()
         .route("/api/gitops/health", get(health))
-        .route("/api/gitops/promises", get(list_promises).post(create_promise))
+        .route(
+            "/api/gitops/promises",
+            get(list_promises).post(create_promise),
+        )
         .route(
             "/api/gitops/promises/{name}",
             get(get_promise).put(update_promise).delete(delete_promise),
         )
-        .route("/api/gitops/requests", get(list_requests).post(create_request))
+        .route(
+            "/api/gitops/requests",
+            get(list_requests).post(create_request),
+        )
         .route(
             "/api/gitops/requests/{id}",
             get(get_request).delete(delete_request),
         )
         .route("/api/gitops/state", get(list_state))
         .route("/api/gitops/state/{*path}", get(get_state_entry))
-        .route("/api/gitops/clusters", get(list_clusters).post(register_cluster))
+        .route(
+            "/api/gitops/clusters",
+            get(list_clusters).post(register_cluster),
+        )
         .route("/api/gitops/pipelines/{request_id}", get(get_pipeline))
         .with_state(state)
 }
@@ -106,7 +115,10 @@ async fn update_promise(
     Path(name): Path<String>,
     Json(req): Json<CreatePromiseRequest>,
 ) -> Result<Json<Promise>, StatusCode> {
-    let existing = state.store.get_promise(&name).ok_or(StatusCode::NOT_FOUND)?;
+    let existing = state
+        .store
+        .get_promise(&name)
+        .ok_or(StatusCode::NOT_FOUND)?;
     let updated = Promise {
         name: req.name,
         version: req.version,
@@ -170,15 +182,12 @@ async fn create_request(
     Json(req): Json<CreateResourceRequestRequest>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<serde_json::Value>)> {
     // Look up the promise
-    let promise = state
-        .store
-        .get_promise(&req.promise_name)
-        .ok_or_else(|| {
-            (
-                StatusCode::NOT_FOUND,
-                Json(serde_json::json!({"error": "promise not found"})),
-            )
-        })?;
+    let promise = state.store.get_promise(&req.promise_name).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "promise not found"})),
+        )
+    })?;
 
     // Validate spec against schema
     if let Err(errors) = PipelineEngine::validate_spec(&promise, &req.spec) {
@@ -204,7 +213,9 @@ async fn create_request(
         updated_at: now,
     };
 
-    let stored = state.store.create_resource_request(resource_request.clone());
+    let stored = state
+        .store
+        .create_resource_request(resource_request.clone());
 
     // Run the pipeline
     let clusters = state.store.list_clusters();
@@ -298,9 +309,7 @@ async fn get_state_entry(
 
 // ─── Clusters ─────────────────────────────────────────────────────────────────
 
-async fn list_clusters(
-    State(state): State<Arc<GitOpsAppState>>,
-) -> Json<Vec<ClusterDestination>> {
+async fn list_clusters(State(state): State<Arc<GitOpsAppState>>) -> Json<Vec<ClusterDestination>> {
     Json(state.store.list_clusters())
 }
 

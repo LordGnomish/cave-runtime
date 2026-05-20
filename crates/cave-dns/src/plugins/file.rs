@@ -46,9 +46,9 @@ impl FilePlugin {
 
 async fn load_zone_into_manager(mgr: &mut ZoneManager, path: &Path) -> DnsResult<()> {
     // Infer zone origin from SOA in the file (or file name)
-    let content = tokio::fs::read_to_string(path).await.map_err(|e| {
-        DnsError::Zone(format!("read {}: {e}", path.display()))
-    })?;
+    let content = tokio::fs::read_to_string(path)
+        .await
+        .map_err(|e| DnsError::Zone(format!("read {}: {e}", path.display())))?;
 
     // Extract $ORIGIN directive or fall back to filename stem
     let origin_str = content

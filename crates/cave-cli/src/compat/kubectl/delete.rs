@@ -2,7 +2,7 @@
 // Copyright 2026 Cave Runtime contributors
 //! `cavectl kubectl delete …`
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Args;
 
 use crate::compat::kubectl::resource::ns_path;
@@ -109,10 +109,7 @@ mod tests {
         let mut a = args("pods");
         a.all = true;
         let r = prepare(&a).unwrap();
-        assert_eq!(
-            r.path,
-            "/api/compat/kubectl/v1/namespaces/default/pods"
-        );
+        assert_eq!(r.path, "/api/compat/kubectl/v1/namespaces/default/pods");
     }
 
     #[test]

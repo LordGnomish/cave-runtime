@@ -3,7 +3,11 @@
 //! HTTP routes for cave-secrets.
 
 use crate::SecretsState;
-use axum::{extract::State, routing::{get, post}, Json, Router};
+use axum::{
+    Json, Router,
+    extract::State,
+    routing::{get, post},
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -42,12 +46,15 @@ async fn scan_content(
     let findings = crate::detector::scan(&req.content, &req.filename, &state.detectors);
     let lines = req.content.lines().count();
     Json(ScanResponse {
-        findings: findings.iter().map(|f| FindingDto {
-            detector: f.detector.clone(),
-            file: f.file.clone(),
-            line: f.line,
-            severity: format!("{:?}", f.severity),
-        }).collect(),
+        findings: findings
+            .iter()
+            .map(|f| FindingDto {
+                detector: f.detector.clone(),
+                file: f.file.clone(),
+                line: f.line,
+                severity: format!("{:?}", f.severity),
+            })
+            .collect(),
         scanned_lines: lines,
     })
 }

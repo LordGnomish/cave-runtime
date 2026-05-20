@@ -146,13 +146,22 @@ impl HarborAuthBridge {
     /// Effective role for `uid` on `project`. Scope precedence:
     /// **Project > Tenant > Platform**. Returns `None` when no binding
     /// applies — caller may fall through to Harbor's per-project ACL.
-    pub fn resolve_project_role(&self, uid: Uuid, tenant_id: &str, project: &str) -> Option<HarborRole> {
+    pub fn resolve_project_role(
+        &self,
+        uid: Uuid,
+        tenant_id: &str,
+        project: &str,
+    ) -> Option<HarborRole> {
         let bindings = self.bindings.read().unwrap();
         let user_bindings: Vec<&RoleBinding> =
             bindings.iter().filter(|b| b.cave_uid == uid).collect();
         // 1) project-scope exact match
         for b in &user_bindings {
-            if let BindingScope::Project { tenant_id: t, project_id: p } = &b.scope {
+            if let BindingScope::Project {
+                tenant_id: t,
+                project_id: p,
+            } = &b.scope
+            {
                 if t == tenant_id && p == project {
                     if let Some(r) = HarborRole::from_cave_role(&b.role) {
                         return Some(r);
@@ -285,7 +294,11 @@ mod tests {
     fn bridge_returns_none_when_no_binding_exists() {
         let bridge = HarborAuthBridge::new();
         let uid = Uuid::new_v4();
-        assert!(bridge.resolve_project_role(uid, "acme", "library").is_none());
+        assert!(
+            bridge
+                .resolve_project_role(uid, "acme", "library")
+                .is_none()
+        );
         assert!(!bridge.may(uid, "acme", "library", "pull"));
     }
 

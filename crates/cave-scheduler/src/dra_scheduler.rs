@@ -96,16 +96,27 @@ pub struct DraStore {
 }
 
 impl DraStore {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn add_slice(&self, slice: ResourceSlice) {
-        self.slices.lock().unwrap().insert(slice.node_name.clone(), slice);
+        self.slices
+            .lock()
+            .unwrap()
+            .insert(slice.node_name.clone(), slice);
     }
     pub fn add_claim(&self, claim: ResourceClaim) {
-        self.claims.lock().unwrap().insert(claim.name.clone(), claim);
+        self.claims
+            .lock()
+            .unwrap()
+            .insert(claim.name.clone(), claim);
     }
     pub fn add_class(&self, class: DeviceClass) {
-        self.classes.lock().unwrap().insert(class.name.clone(), class);
+        self.classes
+            .lock()
+            .unwrap()
+            .insert(class.name.clone(), class);
     }
     pub fn get_claim(&self, name: &str) -> Option<ResourceClaim> {
         self.claims.lock().unwrap().get(name).cloned()
@@ -177,7 +188,9 @@ pub fn try_allocate_on(
     // Class-level node restriction (suitable_nodes labels).
     if let Some(class) = store.get_class(&claim.device_class) {
         for (k, v) in &class.suitable_nodes {
-            if node.labels.get(k) != Some(v) { return None; }
+            if node.labels.get(k) != Some(v) {
+                return None;
+            }
         }
     }
     let slice = store.slice_for(&node.name)?;
@@ -185,12 +198,23 @@ pub fn try_allocate_on(
     let mut sorted: Vec<&Device> = slice.devices.iter().collect();
     sorted.sort_by(|a, b| a.name.cmp(&b.name));
     for dev in sorted {
-        if dev.class != claim.device_class { continue; }
-        if dev.allocated_by.is_some() { continue; }
-        let attrs_ok = claim.selector.iter().all(|(k, v)| dev.attributes.get(k) == Some(v));
-        if !attrs_ok { continue; }
+        if dev.class != claim.device_class {
+            continue;
+        }
+        if dev.allocated_by.is_some() {
+            continue;
+        }
+        let attrs_ok = claim
+            .selector
+            .iter()
+            .all(|(k, v)| dev.attributes.get(k) == Some(v));
+        if !attrs_ok {
+            continue;
+        }
         chosen.push(dev.name.clone());
-        if chosen.len() == claim.count { return Some(chosen); }
+        if chosen.len() == claim.count {
+            return Some(chosen);
+        }
     }
     None
 }
@@ -218,11 +242,15 @@ pub struct DraScheduler {
 }
 
 impl DraScheduler {
-    pub fn new(store: Arc<DraStore>) -> Self { Self { store } }
+    pub fn new(store: Arc<DraStore>) -> Self {
+        Self { store }
+    }
 }
 
 impl FilterPlugin for DraScheduler {
-    fn name(&self) -> &str { "DraScheduler" }
+    fn name(&self) -> &str {
+        "DraScheduler"
+    }
 
     fn filter(&self, pod: &Pod, node: &Node, _: &ClusterSnapshot) -> Status {
         if pod.spec.resource_claims.is_empty() {
@@ -230,7 +258,10 @@ impl FilterPlugin for DraScheduler {
         }
         for r in &pod.spec.resource_claims {
             let Some(claim) = self.store.get_claim(&r.claim_name) else {
-                return Status::unresolvable("DraScheduler", format!("claim {} not found", r.claim_name));
+                return Status::unresolvable(
+                    "DraScheduler",
+                    format!("claim {} not found", r.claim_name),
+                );
             };
             if !claim.tenant_id.is_empty() && claim.tenant_id != pod.tenant_id {
                 return Status::unresolvable("DraScheduler", "cross-tenant claim reference");
@@ -238,15 +269,21 @@ impl FilterPlugin for DraScheduler {
             // Already-allocated claim: must run on its bound node.
             if let Some(alloc) = &claim.allocation {
                 if alloc.node_name != node.name {
-                    return Status::unschedulable("DraScheduler",
-                        format!("claim {} bound to node {}", r.claim_name, alloc.node_name));
+                    return Status::unschedulable(
+                        "DraScheduler",
+                        format!("claim {} bound to node {}", r.claim_name, alloc.node_name),
+                    );
                 }
                 continue;
             }
             if try_allocate_on(&self.store, &claim, node).is_none() {
-                return Status::unschedulable("DraScheduler",
-                    format!("node {} cannot satisfy claim {} ({}× {})",
-                        node.name, r.claim_name, claim.count, claim.device_class));
+                return Status::unschedulable(
+                    "DraScheduler",
+                    format!(
+                        "node {} cannot satisfy claim {} ({}× {})",
+                        node.name, r.claim_name, claim.count, claim.device_class
+                    ),
+                );
             }
         }
         Status::success("DraScheduler")
@@ -254,7 +291,9 @@ impl FilterPlugin for DraScheduler {
 }
 
 impl ReservePlugin for DraScheduler {
-    fn name(&self) -> &str { "DraScheduler" }
+    fn name(&self) -> &str {
+        "DraScheduler"
+    }
 
     fn reserve(&self, pod: &Pod, node: &str, state: &CycleState) -> Status {
         if pod.spec.resource_claims.is_empty() {
@@ -278,19 +317,28 @@ impl ReservePlugin for DraScheduler {
         let mut decisions: Vec<DraDecision> = Vec::new();
         for r in &pod.spec.resource_claims {
             let Some(claim) = self.store.get_claim(&r.claim_name) else {
-                return Status::error("DraScheduler", format!("claim {} disappeared", r.claim_name));
+                return Status::error(
+                    "DraScheduler",
+                    format!("claim {} disappeared", r.claim_name),
+                );
             };
-            if claim.allocation.is_some() { continue; }
+            if claim.allocation.is_some() {
+                continue;
+            }
             let Some(devices) = try_allocate_on(&self.store, &claim, &node_info) else {
-                return Status::unschedulable("DraScheduler",
-                    format!("reserve: claim {} no longer satisfiable", r.claim_name));
+                return Status::unschedulable(
+                    "DraScheduler",
+                    format!("reserve: claim {} no longer satisfiable", r.claim_name),
+                );
             };
             // Mark devices reserved immediately so concurrent claim allocations
             // in this cycle don't double-pick. Bind-log entry waits for PreBind.
             for d in &devices {
                 if let Some(s) = self.store.slices.lock().unwrap().get_mut(node) {
                     for dev in &mut s.devices {
-                        if &dev.name == d { dev.allocated_by = Some(r.claim_name.clone()); }
+                        if &dev.name == d {
+                            dev.allocated_by = Some(r.claim_name.clone());
+                        }
                     }
                 }
             }
@@ -305,7 +353,9 @@ impl ReservePlugin for DraScheduler {
     }
 
     fn unreserve(&self, _pod: &Pod, _node: &str, state: &CycleState) {
-        let Some(cycle): Option<DraCycleState> = state.read(DRA_STATE_KEY) else { return };
+        let Some(cycle): Option<DraCycleState> = state.read(DRA_STATE_KEY) else {
+            return;
+        };
         for d in &cycle.decisions {
             self.store.rollback(&d.claim_name, &d.node_name, &d.devices);
         }
@@ -314,7 +364,9 @@ impl ReservePlugin for DraScheduler {
 }
 
 impl PreBindPlugin for DraScheduler {
-    fn name(&self) -> &str { "DraScheduler" }
+    fn name(&self) -> &str {
+        "DraScheduler"
+    }
 
     fn pre_bind(&self, _pod: &Pod, _node: &str, state: &CycleState) -> Status {
         let Some(cycle): Option<DraCycleState> = state.read(DRA_STATE_KEY) else {
@@ -338,22 +390,39 @@ mod tests {
 
     fn ready(name: &str) -> Node {
         Node {
-            name: name.into(), uid: Uuid::new_v4(), status: NodeStatus::Ready,
+            name: name.into(),
+            uid: Uuid::new_v4(),
+            status: NodeStatus::Ready,
             capacity: ResourceCapacity::default(),
-            allocatable: ResourceCapacity { cpu_millicores: 1000, memory_bytes: 1, pods: 10, ephemeral_storage_bytes: 0 },
+            allocatable: ResourceCapacity {
+                cpu_millicores: 1000,
+                memory_bytes: 1,
+                pods: 10,
+                ephemeral_storage_bytes: 0,
+            },
             allocated: ResourceCapacity::default(),
-            labels: HashMap::new(), taints: vec![], conditions: vec![],
-            registered_at: Utc::now(), last_heartbeat: Utc::now(),
+            labels: HashMap::new(),
+            taints: vec![],
+            conditions: vec![],
+            registered_at: Utc::now(),
+            last_heartbeat: Utc::now(),
         }
     }
 
     fn dev(name: &str, class: &str, vendor: &str) -> Device {
         let mut a = HashMap::new();
         a.insert("vendor".into(), vendor.into());
-        Device { name: name.into(), class: class.into(), attributes: a, allocated_by: None }
+        Device {
+            name: name.into(),
+            class: class.into(),
+            attributes: a,
+            allocated_by: None,
+        }
     }
 
-    fn snap() -> ClusterSnapshot { ClusterSnapshot::default() }
+    fn snap() -> ClusterSnapshot {
+        ClusterSnapshot::default()
+    }
 
     fn pod_with_claim(name: &str, ref_name: &str, claim_name: &str) -> Pod {
         let mut p = Pod::new("t", "ns", name);
@@ -391,7 +460,10 @@ mod tests {
         let store = Arc::new(DraStore::new());
         store.add_slice(ResourceSlice {
             node_name: "a".into(),
-            devices: vec![dev("gpu0", "nvidia.com/gpu", "nvidia"), dev("gpu1", "nvidia.com/gpu", "nvidia")],
+            devices: vec![
+                dev("gpu0", "nvidia.com/gpu", "nvidia"),
+                dev("gpu1", "nvidia.com/gpu", "nvidia"),
+            ],
         });
         store.add_claim(gpu_claim("c1", 1));
         let plug = DraScheduler::new(store);
@@ -424,7 +496,10 @@ mod tests {
         store.add_claim(c);
         let plug = DraScheduler::new(store);
         let p = pod_with_claim("p", "claim0", "c1");
-        assert_eq!(plug.filter(&p, &ready("a"), &snap()).code, crate::framework::Code::UnschedulableAndUnresolvable);
+        assert_eq!(
+            plug.filter(&p, &ready("a"), &snap()).code,
+            crate::framework::Code::UnschedulableAndUnresolvable
+        );
     }
 
     #[test]
@@ -432,16 +507,28 @@ mod tests {
         let store = Arc::new(DraStore::new());
         let plug = DraScheduler::new(store);
         let p = pod_with_claim("p", "claim0", "ghost");
-        assert_eq!(plug.filter(&p, &ready("a"), &snap()).code, crate::framework::Code::UnschedulableAndUnresolvable);
+        assert_eq!(
+            plug.filter(&p, &ready("a"), &snap()).code,
+            crate::framework::Code::UnschedulableAndUnresolvable
+        );
     }
 
     #[test]
     fn already_bound_pinned_to_node() {
         let store = Arc::new(DraStore::new());
-        store.add_slice(ResourceSlice { node_name: "a".into(), devices: vec![dev("g", "nvidia.com/gpu", "nvidia")] });
-        store.add_slice(ResourceSlice { node_name: "b".into(), devices: vec![dev("g", "nvidia.com/gpu", "nvidia")] });
+        store.add_slice(ResourceSlice {
+            node_name: "a".into(),
+            devices: vec![dev("g", "nvidia.com/gpu", "nvidia")],
+        });
+        store.add_slice(ResourceSlice {
+            node_name: "b".into(),
+            devices: vec![dev("g", "nvidia.com/gpu", "nvidia")],
+        });
         let mut c = gpu_claim("c1", 1);
-        c.allocation = Some(AllocationResult { node_name: "a".into(), devices: vec!["g".into()] });
+        c.allocation = Some(AllocationResult {
+            node_name: "a".into(),
+            devices: vec!["g".into()],
+        });
         store.add_claim(c);
         let plug = DraScheduler::new(store);
         let p = pod_with_claim("p", "claim0", "c1");
@@ -457,7 +544,10 @@ mod tests {
             provisioner: "test".into(),
             suitable_nodes: HashMap::from([("gpu".into(), "true".into())]),
         });
-        store.add_slice(ResourceSlice { node_name: "a".into(), devices: vec![dev("g", "nvidia.com/gpu", "nvidia")] });
+        store.add_slice(ResourceSlice {
+            node_name: "a".into(),
+            devices: vec![dev("g", "nvidia.com/gpu", "nvidia")],
+        });
         store.add_claim(gpu_claim("c1", 1));
         let plug = DraScheduler::new(store);
         let p = pod_with_claim("p", "claim0", "c1");
@@ -471,9 +561,13 @@ mod tests {
     #[test]
     fn allocator_skips_already_allocated_devices() {
         let store = Arc::new(DraStore::new());
-        let mut d1 = dev("g0", "nvidia.com/gpu", "nvidia"); d1.allocated_by = Some("other".into());
+        let mut d1 = dev("g0", "nvidia.com/gpu", "nvidia");
+        d1.allocated_by = Some("other".into());
         let d2 = dev("g1", "nvidia.com/gpu", "nvidia");
-        store.add_slice(ResourceSlice { node_name: "a".into(), devices: vec![d1, d2] });
+        store.add_slice(ResourceSlice {
+            node_name: "a".into(),
+            devices: vec![d1, d2],
+        });
         store.add_claim(gpu_claim("c1", 1));
         let plug = DraScheduler::new(store.clone());
         let p = pod_with_claim("p", "c", "c1");
@@ -487,10 +581,13 @@ mod tests {
     #[test]
     fn allocator_attribute_selector_filters() {
         let store = Arc::new(DraStore::new());
-        store.add_slice(ResourceSlice { node_name: "a".into(), devices: vec![
-            dev("g0", "nvidia.com/gpu", "nvidia"),
-            dev("g1", "nvidia.com/gpu", "amd"),
-        ]});
+        store.add_slice(ResourceSlice {
+            node_name: "a".into(),
+            devices: vec![
+                dev("g0", "nvidia.com/gpu", "nvidia"),
+                dev("g1", "nvidia.com/gpu", "amd"),
+            ],
+        });
         let mut c = gpu_claim("c1", 1);
         c.selector = HashMap::from([("vendor".into(), "nvidia".into())]);
         store.add_claim(c);
@@ -498,7 +595,8 @@ mod tests {
         let p = pod_with_claim("p", "c", "c1");
         assert!(plug.filter(&p, &ready("a"), &snap()).is_success());
         // Now make only AMD remaining.
-        store.slices.lock().unwrap().get_mut("a").unwrap().devices[0].allocated_by = Some("x".into());
+        store.slices.lock().unwrap().get_mut("a").unwrap().devices[0].allocated_by =
+            Some("x".into());
         assert!(plug.filter(&p, &ready("a"), &snap()).is_rejected());
     }
 
@@ -507,7 +605,10 @@ mod tests {
     #[test]
     fn reserve_marks_devices_and_pre_bind_commits() {
         let store = Arc::new(DraStore::new());
-        store.add_slice(ResourceSlice { node_name: "a".into(), devices: vec![dev("g0", "nvidia.com/gpu", "nvidia")] });
+        store.add_slice(ResourceSlice {
+            node_name: "a".into(),
+            devices: vec![dev("g0", "nvidia.com/gpu", "nvidia")],
+        });
         store.add_claim(gpu_claim("c1", 1));
         let plug = DraScheduler::new(store.clone());
         let cs = CycleState::new();
@@ -534,7 +635,10 @@ mod tests {
     #[test]
     fn unreserve_releases_devices() {
         let store = Arc::new(DraStore::new());
-        store.add_slice(ResourceSlice { node_name: "a".into(), devices: vec![dev("g0", "nvidia.com/gpu", "nvidia")] });
+        store.add_slice(ResourceSlice {
+            node_name: "a".into(),
+            devices: vec![dev("g0", "nvidia.com/gpu", "nvidia")],
+        });
         store.add_claim(gpu_claim("c1", 1));
         let plug = DraScheduler::new(store.clone());
         let cs = CycleState::new();
@@ -552,9 +656,15 @@ mod tests {
     #[test]
     fn reserve_skips_already_allocated_claim() {
         let store = Arc::new(DraStore::new());
-        store.add_slice(ResourceSlice { node_name: "a".into(), devices: vec![dev("g0", "nvidia.com/gpu", "nvidia")] });
+        store.add_slice(ResourceSlice {
+            node_name: "a".into(),
+            devices: vec![dev("g0", "nvidia.com/gpu", "nvidia")],
+        });
         let mut c = gpu_claim("c1", 1);
-        c.allocation = Some(AllocationResult { node_name: "a".into(), devices: vec!["pre".into()] });
+        c.allocation = Some(AllocationResult {
+            node_name: "a".into(),
+            devices: vec!["pre".into()],
+        });
         store.add_claim(c);
         let plug = DraScheduler::new(store.clone());
         let cs = CycleState::new();
@@ -578,7 +688,10 @@ mod tests {
     #[test]
     fn reserve_fails_when_no_devices_remain() {
         let store = Arc::new(DraStore::new());
-        store.add_slice(ResourceSlice { node_name: "a".into(), devices: vec![] });
+        store.add_slice(ResourceSlice {
+            node_name: "a".into(),
+            devices: vec![],
+        });
         store.add_claim(gpu_claim("c1", 1));
         let plug = DraScheduler::new(store);
         let cs = CycleState::new();
@@ -593,15 +706,24 @@ mod tests {
         let store = Arc::new(DraStore::new());
         store.add_slice(ResourceSlice {
             node_name: "a".into(),
-            devices: vec![dev("g0", "nvidia.com/gpu", "nvidia"), dev("g1", "nvidia.com/gpu", "nvidia")],
+            devices: vec![
+                dev("g0", "nvidia.com/gpu", "nvidia"),
+                dev("g1", "nvidia.com/gpu", "nvidia"),
+            ],
         });
         store.add_claim(gpu_claim("c1", 1));
         store.add_claim(gpu_claim("c2", 1));
         let plug = DraScheduler::new(store.clone());
         let cs = CycleState::new();
         let mut p = Pod::new("t", "ns", "p");
-        p.spec.resource_claims.push(ResourceClaimRef { name: "r1".into(), claim_name: "c1".into() });
-        p.spec.resource_claims.push(ResourceClaimRef { name: "r2".into(), claim_name: "c2".into() });
+        p.spec.resource_claims.push(ResourceClaimRef {
+            name: "r1".into(),
+            claim_name: "c1".into(),
+        });
+        p.spec.resource_claims.push(ResourceClaimRef {
+            name: "r2".into(),
+            claim_name: "c2".into(),
+        });
         ReservePlugin::reserve(&plug, &p, "a", &cs);
         PreBindPlugin::pre_bind(&plug, &p, "a", &cs);
         let log = store.bind_records();
@@ -642,7 +764,10 @@ mod tests {
 
     #[test]
     fn allocation_result_carries_devices() {
-        let r = AllocationResult { node_name: "n".into(), devices: vec!["d1".into(), "d2".into()] };
+        let r = AllocationResult {
+            node_name: "n".into(),
+            devices: vec!["d1".into(), "d2".into()],
+        };
         assert_eq!(r.devices.len(), 2);
         assert_eq!(r.node_name, "n");
     }
@@ -651,7 +776,8 @@ mod tests {
     fn device_class_round_trip() {
         let store = DraStore::new();
         store.add_class(DeviceClass {
-            name: "x".into(), provisioner: "p".into(),
+            name: "x".into(),
+            provisioner: "p".into(),
             suitable_nodes: HashMap::from([("zone".into(), "us-east-1a".into())]),
         });
         let c = store.get_class("x").unwrap();
@@ -662,7 +788,11 @@ mod tests {
 
     #[test]
     fn dra_decision_equality_for_audit() {
-        let a = DraDecision { claim_name: "c1".into(), node_name: "n".into(), devices: vec!["d".into()] };
+        let a = DraDecision {
+            claim_name: "c1".into(),
+            node_name: "n".into(),
+            devices: vec!["d".into()],
+        };
         let b = a.clone();
         let mut s = HashSet::new();
         s.insert(format!("{:?}", a));
@@ -675,11 +805,16 @@ mod tests {
         let store = DraStore::new();
         let mut d = dev("g", "nvidia.com/gpu", "nvidia");
         d.allocated_by = Some("other".into());
-        store.add_slice(ResourceSlice { node_name: "a".into(), devices: vec![d] });
+        store.add_slice(ResourceSlice {
+            node_name: "a".into(),
+            devices: vec![d],
+        });
         store.rollback("self", "a", &["g".into()]);
         // Other-owner should not be cleared.
         assert_eq!(
-            store.slice_for("a").unwrap().devices[0].allocated_by.as_deref(),
+            store.slice_for("a").unwrap().devices[0]
+                .allocated_by
+                .as_deref(),
             Some("other"),
         );
     }

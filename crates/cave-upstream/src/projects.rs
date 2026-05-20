@@ -89,7 +89,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "Kubernetes Core",
         phase: 1,
     },
-
     // ============================================================
     // PROVIDER-ABSTRACTED: Kubernetes
     // ============================================================
@@ -106,7 +105,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "database",
         phase: 2,
     },
-
     // ============================================================
     // PROVIDER-ABSTRACTED: Object Storage
     // ============================================================
@@ -119,7 +117,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "storage",
         phase: 2,
     },
-
     // ============================================================
     // PROVIDER-ABSTRACTED: Event Streaming
     // ============================================================
@@ -141,7 +138,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "messaging",
         phase: 2,
     },
-
     // ============================================================
     // PROVIDER-ABSTRACTED: Cache
     // ============================================================
@@ -154,7 +150,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "cache",
         phase: 2,
     },
-
     // ============================================================
     // PROVIDER-ABSTRACTED: Search
     // ============================================================
@@ -202,7 +197,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "secrets",
         phase: 1,
     },
-
     // ============================================================
     // NETWORKING & GATEWAY
     // ============================================================
@@ -259,7 +253,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "networking",
         phase: 1,
     },
-
     // ============================================================
     // OBSERVABILITY
     // ============================================================
@@ -326,7 +319,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "observability",
         phase: 3,
     },
-
     // ============================================================
     // GITOPS & CI/CD
     // ============================================================
@@ -375,7 +367,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "gitops",
         phase: 2,
     },
-
     // ============================================================
     // SECURITY
     // ============================================================
@@ -478,7 +469,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "security",
         phase: 3,
     },
-
     // ============================================================
     // AI / LLM
     // ============================================================
@@ -527,7 +517,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "ai",
         phase: 2,
     },
-
     // ============================================================
     // DATA PLATFORM
     // ============================================================
@@ -540,7 +529,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "data-platform",
         phase: 4,
     },
-
     // ============================================================
     // DEVELOPER EXPERIENCE
     // ============================================================
@@ -580,7 +568,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "devex",
         phase: 2,
     },
-
     // ============================================================
     // PLATFORM OPERATIONS
     // ============================================================
@@ -660,7 +647,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "operations",
         phase: 1,
     },
-
     // ============================================================
     // CROSSPLANE & INFRASTRUCTURE
     // ============================================================
@@ -673,7 +659,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "infrastructure",
         phase: 1,
     },
-
     // ============================================================
     // PHASE 4: EXTENSIONS (opt-in)
     // ============================================================
@@ -734,7 +719,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "lakehouse",
         phase: 2,
     },
-
     // ============================================================
     // BUSINESS APPLICATIONS (CRM, ERP — standalone modules)
     // ============================================================
@@ -770,7 +754,11 @@ mod tests {
     #[test]
     fn test_all_projects_have_names() {
         for project in TRACKED_PROJECTS {
-            assert!(!project.name.is_empty(), "Project has empty name: {:?}", project);
+            assert!(
+                !project.name.is_empty(),
+                "Project has empty name: {:?}",
+                project
+            );
         }
     }
 
@@ -864,9 +852,21 @@ mod tests {
     fn test_core_projects_present() {
         let names: HashSet<&str> = TRACKED_PROJECTS.iter().map(|p| p.name).collect();
         let core = [
-            "Prometheus", "Grafana", "Loki", "Tempo", "Kong", "Istio",
-            "Cilium", "ArgoCD", "Keycloak", "OpenBao", "OPA Gatekeeper",
-            "Crossplane", "Backstage", "Valkey", "MinIO",
+            "Prometheus",
+            "Grafana",
+            "Loki",
+            "Tempo",
+            "Kong",
+            "Istio",
+            "Cilium",
+            "ArgoCD",
+            "Keycloak",
+            "OpenBao",
+            "OPA Gatekeeper",
+            "Crossplane",
+            "Backstage",
+            "Valkey",
+            "MinIO",
         ];
         for name in &core {
             assert!(names.contains(name), "Core project '{}' not tracked", name);

@@ -2,14 +2,13 @@
 // Copyright 2026 Cave Runtime contributors
 //! LogQL evaluator — takes a parsed `Query` and executes it against the store.
 
+use regex::Regex;
 use std::collections::HashMap;
 use std::sync::Arc;
-use regex::Regex;
 
 use super::ast::*;
 use crate::models::{
-    Direction, Labels, LogEntry, MatrixResult, QueryData, StreamResult,
-    TimestampNs, VectorResult,
+    Direction, Labels, LogEntry, MatrixResult, QueryData, StreamResult, TimestampNs, VectorResult,
 };
 use crate::store::LogStore;
 
@@ -29,22 +28,36 @@ pub fn labels_match(labels: &Labels, selector: &StreamSelector) -> bool {
         let actual = labels.get(&m.name);
         match (&m.op, actual) {
             (MatchOp::Eq, Some(v)) => {
-                if v != m.value.as_str() { return false; }
+                if v != m.value.as_str() {
+                    return false;
+                }
             }
             (MatchOp::Eq, None) => return false,
             (MatchOp::Neq, Some(v)) => {
-                if v == m.value.as_str() { return false; }
+                if v == m.value.as_str() {
+                    return false;
+                }
             }
             (MatchOp::Neq, None) => {} // absence satisfies !=
             (MatchOp::Re, actual_opt) => {
                 let v = actual_opt.unwrap_or("");
-                let re = match Regex::new(&m.value) { Ok(r) => r, Err(_) => return false };
-                if !re.is_match(v) { return false; }
+                let re = match Regex::new(&m.value) {
+                    Ok(r) => r,
+                    Err(_) => return false,
+                };
+                if !re.is_match(v) {
+                    return false;
+                }
             }
             (MatchOp::NotRe, actual_opt) => {
                 let v = actual_opt.unwrap_or("");
-                let re = match Regex::new(&m.value) { Ok(r) => r, Err(_) => return false };
-                if re.is_match(v) { return false; }
+                let re = match Regex::new(&m.value) {
+                    Ok(r) => r,
+                    Err(_) => return false,
+                };
+                if re.is_match(v) {
+                    return false;
+                }
             }
         }
     }
@@ -93,7 +106,11 @@ pub fn apply_pipeline(
         }
     }
 
-    Some(ProcessedEntry { ts: entry.ts, line, labels: extra })
+    Some(ProcessedEntry {
+        ts: entry.ts,
+        line,
+        labels: extra,
+    })
 }
 
 fn apply_line_filter(line: &str, lf: &LineFilter) -> bool {
@@ -134,7 +151,9 @@ fn parse_logfmt(line: &str, extra: &mut HashMap<String, String>) {
     let mut rest = line;
     while !rest.is_empty() {
         rest = rest.trim_start();
-        if rest.is_empty() { break; }
+        if rest.is_empty() {
+            break;
+        }
         let eq = match rest.find('=') {
             Some(i) => i,
             None => break,
@@ -197,7 +216,9 @@ fn parse_unpack(line: &str, extra: &mut HashMap<String, String>) {
     if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
         if let Some(obj) = val.as_object() {
             for (k, v) in obj {
-                if k == "_entry" { continue; }
+                if k == "_entry" {
+                    continue;
+                }
                 let s = match v {
                     serde_json::Value::String(s) => s.clone(),
                     other => other.to_string(),
@@ -266,11 +287,17 @@ fn parse_duration_str(s: &str) -> Option<u64> {
     if let Some(rest) = s.strip_suffix("ms") {
         rest.parse::<f64>().ok().map(|n| (n * 1_000_000.0) as u64)
     } else if let Some(rest) = s.strip_suffix('s') {
-        rest.parse::<f64>().ok().map(|n| (n * 1_000_000_000.0) as u64)
+        rest.parse::<f64>()
+            .ok()
+            .map(|n| (n * 1_000_000_000.0) as u64)
     } else if let Some(rest) = s.strip_suffix('m') {
-        rest.parse::<f64>().ok().map(|n| (n * 60_000_000_000.0) as u64)
+        rest.parse::<f64>()
+            .ok()
+            .map(|n| (n * 60_000_000_000.0) as u64)
     } else if let Some(rest) = s.strip_suffix('h') {
-        rest.parse::<f64>().ok().map(|n| (n * 3_600_000_000_000.0) as u64)
+        rest.parse::<f64>()
+            .ok()
+            .map(|n| (n * 3_600_000_000_000.0) as u64)
     } else {
         s.parse::<u64>().ok() // raw nanoseconds
     }
@@ -321,9 +348,13 @@ impl Evaluator {
         limit: usize,
         direction: Direction,
     ) -> QueryData {
-        let fps = self.store.matching_fps(tenant, |labels| labels_match(labels, &query.selector));
+        let fps = self
+            .store
+            .matching_fps(tenant, |labels| labels_match(labels, &query.selector));
 
-        let raw = self.store.query_entries(tenant, &fps, start_ns, end_ns, limit, direction);
+        let raw = self
+            .store
+            .query_entries(tenant, &fps, start_ns, end_ns, limit, direction);
 
         let mut streams: Vec<StreamResult> = Vec::new();
         let mut total = 0usize;
@@ -331,7 +362,9 @@ impl Evaluator {
         'outer: for (_, labels, entries) in raw {
             let mut values = Vec::new();
             for entry in &entries {
-                if total >= limit { break 'outer; }
+                if total >= limit {
+                    break 'outer;
+                }
                 if let Some(processed) = apply_pipeline(entry, &labels, &query.pipeline) {
                     values.push((processed.ts.to_string(), processed.line));
                     total += 1;
@@ -359,7 +392,9 @@ impl Evaluator {
     ) -> QueryData {
         match query {
             MetricQuery::RangeAgg(ra) => self.eval_range_agg(tenant, ra, start_ns, end_ns, step_ns),
-            MetricQuery::VectorAgg(va) => self.eval_vector_agg(tenant, va, start_ns, end_ns, step_ns),
+            MetricQuery::VectorAgg(va) => {
+                self.eval_vector_agg(tenant, va, start_ns, end_ns, step_ns)
+            }
             MetricQuery::BinaryExpr(be) => self.eval_binary(tenant, be, start_ns, end_ns, step_ns),
             MetricQuery::Literal(n) => QueryData::Vector(vec![VectorResult {
                 metric: HashMap::new(),
@@ -376,36 +411,51 @@ impl Evaluator {
         end_ns: TimestampNs,
         step_ns: i64,
     ) -> QueryData {
-        let fps = self.store.matching_fps(tenant, |labels| labels_match(labels, &ra.query.selector));
+        let fps = self
+            .store
+            .matching_fps(tenant, |labels| labels_match(labels, &ra.query.selector));
 
         // Compute buckets across all matching streams.
         let buckets = match ra.agg {
             RangeAgg::Rate => {
                 let range_ns = ra.range.as_nanos() as i64;
-                let counts = self.store.count_over_buckets(tenant, &fps, start_ns, end_ns, step_ns);
-                counts.into_iter().map(|(ts, c)| (ts, c / (range_ns as f64 / 1e9))).collect::<Vec<_>>()
+                let counts = self
+                    .store
+                    .count_over_buckets(tenant, &fps, start_ns, end_ns, step_ns);
+                counts
+                    .into_iter()
+                    .map(|(ts, c)| (ts, c / (range_ns as f64 / 1e9)))
+                    .collect::<Vec<_>>()
             }
-            RangeAgg::CountOverTime => {
-                self.store.count_over_buckets(tenant, &fps, start_ns, end_ns, step_ns)
-            }
-            RangeAgg::BytesOverTime => {
-                self.store.bytes_over_buckets(tenant, &fps, start_ns, end_ns, step_ns)
-            }
+            RangeAgg::CountOverTime => self
+                .store
+                .count_over_buckets(tenant, &fps, start_ns, end_ns, step_ns),
+            RangeAgg::BytesOverTime => self
+                .store
+                .bytes_over_buckets(tenant, &fps, start_ns, end_ns, step_ns),
             RangeAgg::BytesRate => {
                 let range_ns = ra.range.as_nanos() as i64;
-                self.store.bytes_over_buckets(tenant, &fps, start_ns, end_ns, step_ns)
+                self.store
+                    .bytes_over_buckets(tenant, &fps, start_ns, end_ns, step_ns)
                     .into_iter()
                     .map(|(ts, b)| (ts, b / (range_ns as f64 / 1e9)))
                     .collect()
             }
             RangeAgg::AbsentOverTime => {
                 // Returns 1 if there are NO entries in the range, else no result.
-                let counts = self.store.count_over_buckets(tenant, &fps, start_ns, end_ns, step_ns);
-                counts.into_iter().map(|(ts, c)| (ts, if c == 0.0 { 1.0 } else { 0.0 })).collect()
+                let counts = self
+                    .store
+                    .count_over_buckets(tenant, &fps, start_ns, end_ns, step_ns);
+                counts
+                    .into_iter()
+                    .map(|(ts, c)| (ts, if c == 0.0 { 1.0 } else { 0.0 }))
+                    .collect()
             }
             // For unwrap-based range aggs we default to count_over_time as a stub;
             // full implementation requires extracting numeric values from log lines.
-            _ => self.store.count_over_buckets(tenant, &fps, start_ns, end_ns, step_ns),
+            _ => self
+                .store
+                .count_over_buckets(tenant, &fps, start_ns, end_ns, step_ns),
         };
 
         // Aggregate per stream into a matrix result.
@@ -443,7 +493,8 @@ impl Evaluator {
                 None => vec![],
                 Some(g) if g.without => {
                     let mut pairs: Vec<(String, String)> = series
-                        .metric.iter()
+                        .metric
+                        .iter()
                         .filter(|(k, _)| !g.labels.contains(k))
                         .map(|(k, v)| (k.clone(), v.clone()))
                         .collect();
@@ -451,7 +502,9 @@ impl Evaluator {
                     pairs
                 }
                 Some(g) => {
-                    let mut pairs: Vec<(String, String)> = g.labels.iter()
+                    let mut pairs: Vec<(String, String)> = g
+                        .labels
+                        .iter()
                         .filter_map(|l| series.metric.get(l).map(|v| (l.clone(), v.clone())))
                         .collect();
                     pairs.sort();
@@ -459,7 +512,9 @@ impl Evaluator {
                 }
             };
 
-            let vals: Vec<f64> = series.values.iter()
+            let vals: Vec<f64> = series
+                .values
+                .iter()
                 .map(|(_, v)| v.parse::<f64>().unwrap_or(0.0))
                 .collect();
 
@@ -467,31 +522,35 @@ impl Evaluator {
         }
 
         // Apply aggregation function.
-        let results: Vec<MatrixResult> = groups.into_iter().map(|(key, vals)| {
-            let metric: HashMap<String, String> = key.into_iter().collect();
-            let agg_val = match &va.agg {
-                VectorAgg::Sum => vals.iter().sum(),
-                VectorAgg::Avg => vals.iter().sum::<f64>() / vals.len() as f64,
-                VectorAgg::Max => vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
-                VectorAgg::Min => vals.iter().cloned().fold(f64::INFINITY, f64::min),
-                VectorAgg::Count => vals.len() as f64,
-                VectorAgg::Stddev => {
-                    let mean = vals.iter().sum::<f64>() / vals.len() as f64;
-                    (vals.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / vals.len() as f64).sqrt()
+        let results: Vec<MatrixResult> = groups
+            .into_iter()
+            .map(|(key, vals)| {
+                let metric: HashMap<String, String> = key.into_iter().collect();
+                let agg_val = match &va.agg {
+                    VectorAgg::Sum => vals.iter().sum(),
+                    VectorAgg::Avg => vals.iter().sum::<f64>() / vals.len() as f64,
+                    VectorAgg::Max => vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+                    VectorAgg::Min => vals.iter().cloned().fold(f64::INFINITY, f64::min),
+                    VectorAgg::Count => vals.len() as f64,
+                    VectorAgg::Stddev => {
+                        let mean = vals.iter().sum::<f64>() / vals.len() as f64;
+                        (vals.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / vals.len() as f64)
+                            .sqrt()
+                    }
+                    VectorAgg::Stdvar => {
+                        let mean = vals.iter().sum::<f64>() / vals.len() as f64;
+                        vals.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / vals.len() as f64
+                    }
+                    VectorAgg::Topk(_) | VectorAgg::Bottomk(_) | VectorAgg::Quantile(_) => {
+                        vals.iter().sum::<f64>() // simplified; real impl needs per-series tracking
+                    }
+                };
+                MatrixResult {
+                    metric,
+                    values: vec![(start_ns as f64 / 1e9, format!("{:.6}", agg_val))],
                 }
-                VectorAgg::Stdvar => {
-                    let mean = vals.iter().sum::<f64>() / vals.len() as f64;
-                    vals.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / vals.len() as f64
-                }
-                VectorAgg::Topk(_) | VectorAgg::Bottomk(_) | VectorAgg::Quantile(_) => {
-                    vals.iter().sum::<f64>() // simplified; real impl needs per-series tracking
-                }
-            };
-            MatrixResult {
-                metric,
-                values: vec![(start_ns as f64 / 1e9, format!("{:.6}", agg_val))],
-            }
-        }).collect();
+            })
+            .collect();
 
         QueryData::Matrix(results)
     }
@@ -510,39 +569,100 @@ impl Evaluator {
         let lhs_vals: Vec<f64> = extract_values(&lhs);
         let rhs_vals: Vec<f64> = extract_values(&rhs);
 
-        let result_vals: Vec<f64> = lhs_vals.iter().zip(rhs_vals.iter()).map(|(l, r)| {
-            match &be.op {
+        let result_vals: Vec<f64> = lhs_vals
+            .iter()
+            .zip(rhs_vals.iter())
+            .map(|(l, r)| match &be.op {
                 BinOp::Add => l + r,
                 BinOp::Sub => l - r,
                 BinOp::Mul => l * r,
-                BinOp::Div => if *r == 0.0 { f64::NAN } else { l / r },
+                BinOp::Div => {
+                    if *r == 0.0 {
+                        f64::NAN
+                    } else {
+                        l / r
+                    }
+                }
                 BinOp::Mod => l % r,
                 BinOp::Pow => l.powf(*r),
-                BinOp::CmpEq(b) => if (l - r).abs() < f64::EPSILON { if *b { 1.0 } else { *l } } else { if *b { 0.0 } else { f64::NAN } },
-                BinOp::CmpNeq(b) => if (l - r).abs() >= f64::EPSILON { if *b { 1.0 } else { *l } } else { if *b { 0.0 } else { f64::NAN } },
-                BinOp::CmpGt(b) => if l > r { if *b { 1.0 } else { *l } } else { if *b { 0.0 } else { f64::NAN } },
-                BinOp::CmpGte(b) => if l >= r { if *b { 1.0 } else { *l } } else { if *b { 0.0 } else { f64::NAN } },
-                BinOp::CmpLt(b) => if l < r { if *b { 1.0 } else { *l } } else { if *b { 0.0 } else { f64::NAN } },
-                BinOp::CmpLte(b) => if l <= r { if *b { 1.0 } else { *l } } else { if *b { 0.0 } else { f64::NAN } },
+                BinOp::CmpEq(b) => {
+                    if (l - r).abs() < f64::EPSILON {
+                        if *b { 1.0 } else { *l }
+                    } else {
+                        if *b { 0.0 } else { f64::NAN }
+                    }
+                }
+                BinOp::CmpNeq(b) => {
+                    if (l - r).abs() >= f64::EPSILON {
+                        if *b { 1.0 } else { *l }
+                    } else {
+                        if *b { 0.0 } else { f64::NAN }
+                    }
+                }
+                BinOp::CmpGt(b) => {
+                    if l > r {
+                        if *b { 1.0 } else { *l }
+                    } else {
+                        if *b { 0.0 } else { f64::NAN }
+                    }
+                }
+                BinOp::CmpGte(b) => {
+                    if l >= r {
+                        if *b { 1.0 } else { *l }
+                    } else {
+                        if *b { 0.0 } else { f64::NAN }
+                    }
+                }
+                BinOp::CmpLt(b) => {
+                    if l < r {
+                        if *b { 1.0 } else { *l }
+                    } else {
+                        if *b { 0.0 } else { f64::NAN }
+                    }
+                }
+                BinOp::CmpLte(b) => {
+                    if l <= r {
+                        if *b { 1.0 } else { *l }
+                    } else {
+                        if *b { 0.0 } else { f64::NAN }
+                    }
+                }
                 _ => l + r,
-            }
-        }).collect();
-
-        let values: Vec<(f64, String)> = result_vals.into_iter()
-            .enumerate()
-            .map(|(i, v)| ((start_ns + i as i64 * step_ns) as f64 / 1e9, format!("{:.6}", v)))
+            })
             .collect();
 
-        QueryData::Matrix(vec![MatrixResult { metric: HashMap::new(), values }])
+        let values: Vec<(f64, String)> = result_vals
+            .into_iter()
+            .enumerate()
+            .map(|(i, v)| {
+                (
+                    (start_ns + i as i64 * step_ns) as f64 / 1e9,
+                    format!("{:.6}", v),
+                )
+            })
+            .collect();
+
+        QueryData::Matrix(vec![MatrixResult {
+            metric: HashMap::new(),
+            values,
+        }])
     }
 }
 
 fn extract_values(data: &QueryData) -> Vec<f64> {
     match data {
-        QueryData::Matrix(m) => m.iter()
-            .flat_map(|r| r.values.iter().map(|(_, v)| v.parse::<f64>().unwrap_or(0.0)))
+        QueryData::Matrix(m) => m
+            .iter()
+            .flat_map(|r| {
+                r.values
+                    .iter()
+                    .map(|(_, v)| v.parse::<f64>().unwrap_or(0.0))
+            })
             .collect(),
-        QueryData::Vector(v) => v.iter().map(|r| r.value.1.parse::<f64>().unwrap_or(0.0)).collect(),
+        QueryData::Vector(v) => v
+            .iter()
+            .map(|r| r.value.1.parse::<f64>().unwrap_or(0.0))
+            .collect(),
         _ => vec![],
     }
 }
@@ -554,7 +674,12 @@ mod tests {
     use std::collections::HashMap;
 
     fn make_labels(pairs: &[(&str, &str)]) -> Labels {
-        Labels::new(pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect())
+        Labels::new(
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        )
     }
 
     #[test]
@@ -562,8 +687,16 @@ mod tests {
         let labels = make_labels(&[("app", "nginx"), ("env", "prod")]);
         let sel = StreamSelector {
             matchers: vec![
-                LabelMatcher { name: "app".into(), op: MatchOp::Eq, value: "nginx".into() },
-                LabelMatcher { name: "env".into(), op: MatchOp::Eq, value: "prod".into() },
+                LabelMatcher {
+                    name: "app".into(),
+                    op: MatchOp::Eq,
+                    value: "nginx".into(),
+                },
+                LabelMatcher {
+                    name: "env".into(),
+                    op: MatchOp::Eq,
+                    value: "prod".into(),
+                },
             ],
         };
         assert!(labels_match(&labels, &sel));
@@ -573,9 +706,11 @@ mod tests {
     fn labels_match_neq() {
         let labels = make_labels(&[("app", "nginx")]);
         let sel = StreamSelector {
-            matchers: vec![
-                LabelMatcher { name: "app".into(), op: MatchOp::Neq, value: "apache".into() },
-            ],
+            matchers: vec![LabelMatcher {
+                name: "app".into(),
+                op: MatchOp::Neq,
+                value: "apache".into(),
+            }],
         };
         assert!(labels_match(&labels, &sel));
     }
@@ -584,9 +719,11 @@ mod tests {
     fn labels_match_regex() {
         let labels = make_labels(&[("env", "production")]);
         let sel = StreamSelector {
-            matchers: vec![
-                LabelMatcher { name: "env".into(), op: MatchOp::Re, value: "prod.*".into() },
-            ],
+            matchers: vec![LabelMatcher {
+                name: "env".into(),
+                op: MatchOp::Re,
+                value: "prod.*".into(),
+            }],
         };
         assert!(labels_match(&labels, &sel));
     }
@@ -595,10 +732,14 @@ mod tests {
     fn pipeline_line_filter_contains() {
         let entry = LogEntry::new(0, "error: something went wrong");
         let labels = make_labels(&[]);
-        let pipeline = vec![PipelineStage::LineFilter(LineFilter::Contains("error".into()))];
+        let pipeline = vec![PipelineStage::LineFilter(LineFilter::Contains(
+            "error".into(),
+        ))];
         assert!(apply_pipeline(&entry, &labels, &pipeline).is_some());
 
-        let pipeline_neg = vec![PipelineStage::LineFilter(LineFilter::Contains("debug".into()))];
+        let pipeline_neg = vec![PipelineStage::LineFilter(LineFilter::Contains(
+            "debug".into(),
+        ))];
         assert!(apply_pipeline(&entry, &labels, &pipeline_neg).is_none());
     }
 
@@ -654,20 +795,28 @@ mod tests {
     fn evaluator_log_query() {
         let store = LogStore::new();
         let t = 1_000_000_000i64;
-        store.push(
-            "tenant",
-            make_labels(&[("app", "test")]),
-            vec![
-                LogEntry::new(t, "error: disk full"),
-                LogEntry::new(t + 1_000_000, "info: started"),
-            ],
-        ).unwrap();
+        store
+            .push(
+                "tenant",
+                make_labels(&[("app", "test")]),
+                vec![
+                    LogEntry::new(t, "error: disk full"),
+                    LogEntry::new(t + 1_000_000, "info: started"),
+                ],
+            )
+            .unwrap();
 
         let eval = Evaluator::new(store);
         let selector = StreamSelector {
-            matchers: vec![LabelMatcher { name: "app".into(), op: MatchOp::Eq, value: "test".into() }],
+            matchers: vec![LabelMatcher {
+                name: "app".into(),
+                op: MatchOp::Eq,
+                value: "test".into(),
+            }],
         };
-        let pipeline = vec![PipelineStage::LineFilter(LineFilter::Contains("error".into()))];
+        let pipeline = vec![PipelineStage::LineFilter(LineFilter::Contains(
+            "error".into(),
+        ))];
         let query = LogQuery { selector, pipeline };
 
         let data = eval.eval_log_query("tenant", &query, 0, t + 2_000_000, 100, Direction::Forward);
@@ -675,6 +824,8 @@ mod tests {
             assert_eq!(streams.len(), 1);
             assert_eq!(streams[0].values.len(), 1);
             assert!(streams[0].values[0].1.contains("error"));
-        } else { panic!("expected streams"); }
+        } else {
+            panic!("expected streams");
+        }
     }
 }

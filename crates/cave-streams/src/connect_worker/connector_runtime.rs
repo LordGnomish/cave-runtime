@@ -96,7 +96,10 @@ impl ConnectorRuntime {
     /// Transition to Running once the Worker has picked up its
     /// tasks. Idempotent.
     pub fn mark_running(&mut self) {
-        if matches!(self.lifecycle, ConnectorLifecycle::Generated | ConnectorLifecycle::Paused) {
+        if matches!(
+            self.lifecycle,
+            ConnectorLifecycle::Generated | ConnectorLifecycle::Paused
+        ) {
             self.lifecycle = ConnectorLifecycle::Running;
         }
     }
@@ -127,7 +130,9 @@ impl ConnectorRuntime {
     /// connector name non-empty, no whitespace in name.
     pub fn validate(&self) -> Result<(), StreamsError> {
         if self.spec.name.is_empty() {
-            return Err(StreamsError::Internal("connector name must not be empty".into()));
+            return Err(StreamsError::Internal(
+                "connector name must not be empty".into(),
+            ));
         }
         if self.spec.name.chars().any(|c| c.is_whitespace()) {
             return Err(StreamsError::Internal(format!(

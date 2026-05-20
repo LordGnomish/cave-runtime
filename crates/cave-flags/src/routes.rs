@@ -7,14 +7,14 @@
 //!  - Frontend API    (/api/frontend/*)
 //!  - Admin API       (/api/admin/*)
 
+use crate::FlagsState;
 use crate::engine::{evaluate_all, evaluate_flag};
 use crate::models::*;
-use crate::FlagsState;
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     routing::{delete, get, post, put},
-    Json, Router,
 };
 use chrono::Utc;
 use serde::Deserialize;
@@ -30,9 +30,15 @@ pub fn create_router(state: Arc<FlagsState>) -> Router {
         .route("/api/client/metrics", post(client_metrics))
         .route("/api/client/register", post(client_register))
         // ── Frontend ─────────────────────────────────────────────────────────
-        .route("/api/frontend", get(frontend_toggles_get).post(frontend_toggles_post))
+        .route(
+            "/api/frontend",
+            get(frontend_toggles_get).post(frontend_toggles_post),
+        )
         .route("/api/frontend/features", get(frontend_features_list))
-        .route("/api/frontend/features/{name}", get(frontend_feature_single))
+        .route(
+            "/api/frontend/features/{name}",
+            get(frontend_feature_single),
+        )
         // ── Admin: features ──────────────────────────────────────────────────
         .route(
             "/api/admin/features",
@@ -75,13 +81,18 @@ pub fn create_router(state: Arc<FlagsState>) -> Router {
         )
         .route(
             "/api/admin/projects/{id}",
-            get(admin_get_project).put(admin_update_project).delete(admin_delete_project),
+            get(admin_get_project)
+                .put(admin_update_project)
+                .delete(admin_delete_project),
         )
         // ── Admin: environments ──────────────────────────────────────────────
         .route("/api/admin/environments", get(admin_list_environments))
         .route("/api/admin/environments/{name}", get(admin_get_environment))
         // ── Admin: strategies ────────────────────────────────────────────────
-        .route("/api/admin/strategies", get(admin_list_strategy_definitions))
+        .route(
+            "/api/admin/strategies",
+            get(admin_list_strategy_definitions),
+        )
         // ── Admin: segments ──────────────────────────────────────────────────
         .route(
             "/api/admin/segments",
@@ -89,7 +100,9 @@ pub fn create_router(state: Arc<FlagsState>) -> Router {
         )
         .route(
             "/api/admin/segments/{id}",
-            get(admin_get_segment).put(admin_update_segment).delete(admin_delete_segment),
+            get(admin_get_segment)
+                .put(admin_update_segment)
+                .delete(admin_delete_segment),
         )
         // ── Admin: context fields ────────────────────────────────────────────
         .route("/api/admin/context", get(admin_list_context_fields))
@@ -519,7 +532,11 @@ async fn admin_delete_strategy(
     for fe in flag.environments.iter_mut() {
         fe.strategies.retain(|s| s.id != sid);
     }
-    if flag.strategies.len() < before { StatusCode::OK } else { StatusCode::NOT_FOUND }
+    if flag.strategies.len() < before {
+        StatusCode::OK
+    } else {
+        StatusCode::NOT_FOUND
+    }
 }
 
 async fn admin_get_variants(
@@ -813,7 +830,11 @@ async fn admin_delete_segment(
     let mut cache = state.cache.write().await;
     let before = cache.segments.len();
     cache.segments.retain(|s| s.id != id);
-    if cache.segments.len() < before { StatusCode::OK } else { StatusCode::NOT_FOUND }
+    if cache.segments.len() < before {
+        StatusCode::OK
+    } else {
+        StatusCode::NOT_FOUND
+    }
 }
 
 // ── Admin: context fields ──────────────────────────────────────────────────────
@@ -855,11 +876,7 @@ async fn admin_create_token(
         username: req.username,
         token_type: req.token_type,
         environment: req.environment,
-        project: req
-            .projects
-            .as_ref()
-            .and_then(|p| p.first())
-            .cloned(),
+        project: req.projects.as_ref().and_then(|p| p.first()).cloned(),
         projects: req.projects.unwrap_or_default(),
         created_at: Utc::now(),
         expires_at: req.expires_at,
@@ -878,9 +895,7 @@ async fn admin_list_banners() -> Json<serde_json::Value> {
     Json(serde_json::json!({ "banners": [] }))
 }
 
-async fn admin_create_banner(
-    Json(req): Json<CreateBannerRequest>,
-) -> (StatusCode, Json<Banner>) {
+async fn admin_create_banner(Json(req): Json<CreateBannerRequest>) -> (StatusCode, Json<Banner>) {
     let banner = Banner {
         id: 1,
         message: req.message,
@@ -914,9 +929,7 @@ async fn admin_delete_banner(Path(_id): Path<i64>) -> StatusCode {
 
 // ── Admin: change requests ─────────────────────────────────────────────────────
 
-async fn admin_list_change_requests(
-    Path(project): Path<String>,
-) -> Json<serde_json::Value> {
+async fn admin_list_change_requests(Path(project): Path<String>) -> Json<serde_json::Value> {
     Json(serde_json::json!({ "changeRequests": [], "project": project }))
 }
 
@@ -941,14 +954,10 @@ async fn admin_create_change_request(
     (StatusCode::CREATED, Json(cr))
 }
 
-async fn admin_approve_change_request(
-    Path((_project, _id)): Path<(String, i64)>,
-) -> StatusCode {
+async fn admin_approve_change_request(Path((_project, _id)): Path<(String, i64)>) -> StatusCode {
     StatusCode::OK
 }
 
-async fn admin_apply_change_request(
-    Path((_project, _id)): Path<(String, i64)>,
-) -> StatusCode {
+async fn admin_apply_change_request(Path((_project, _id)): Path<(String, i64)>) -> StatusCode {
     StatusCode::OK
 }

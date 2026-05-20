@@ -72,7 +72,11 @@ mod tests {
     fn empty_provider() -> Arc<dyn TableProvider> {
         Arc::new(
             MemTable::new(
-                Arc::new(TableSchema::new(vec![Field::new("x", DataType::Int64, false)])),
+                Arc::new(TableSchema::new(vec![Field::new(
+                    "x",
+                    DataType::Int64,
+                    false,
+                )])),
                 vec![],
             )
             .unwrap(),

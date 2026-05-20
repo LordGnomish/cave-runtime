@@ -7,19 +7,21 @@
 use super::SchedulerViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::table;
-use crate::admin::state::{scope, AdminState, SchedulerNode, SchedulerPolicy};
+use crate::admin::state::{AdminState, SchedulerNode, SchedulerPolicy, scope};
 
 pub fn list_nodes(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<Vec<SchedulerNode>, SchedulerViewError> {
     ctx.authorise(Permission::SchedulerRead)?;
-    Ok(scope(&state.scheduler_nodes.read().unwrap(), &ctx.tenant, |r| {
-        &r.tenant
-    })
-    .into_iter()
-    .cloned()
-    .collect())
+    Ok(
+        scope(&state.scheduler_nodes.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect(),
+    )
 }
 
 pub fn list_policies(
@@ -27,9 +29,11 @@ pub fn list_policies(
     ctx: &RequestCtx,
 ) -> Result<Vec<SchedulerPolicy>, SchedulerViewError> {
     ctx.authorise(Permission::SchedulerRead)?;
-    Ok(scope(&state.scheduler_policies.read().unwrap(), &ctx.tenant, |r| {
-        &r.tenant
-    })
+    Ok(scope(
+        &state.scheduler_policies.read().unwrap(),
+        &ctx.tenant,
+        |r| &r.tenant,
+    )
     .into_iter()
     .cloned()
     .collect())
@@ -50,7 +54,10 @@ pub fn create_policy(
         return Err(SchedulerViewError::InvalidWeight);
     }
     let mut policies = state.scheduler_policies.write().unwrap();
-    if policies.iter().any(|p| p.tenant == ctx.tenant && p.name == name) {
+    if policies
+        .iter()
+        .any(|p| p.tenant == ctx.tenant && p.name == name)
+    {
         return Err(SchedulerViewError::DuplicatePolicy(name.into()));
     }
     policies.push(SchedulerPolicy {
@@ -92,28 +99,104 @@ pub fn list_plugins(
     ctx.authorise(Permission::SchedulerRead)?;
     Ok(vec![
         // PreFilter
-        PluginRow { phase: "PreFilter", name: "NodeResourcesFit",      enabled: true },
-        PluginRow { phase: "PreFilter", name: "InterPodAffinity",      enabled: true },
-        PluginRow { phase: "PreFilter", name: "VolumeBinding",         enabled: true },
+        PluginRow {
+            phase: "PreFilter",
+            name: "NodeResourcesFit",
+            enabled: true,
+        },
+        PluginRow {
+            phase: "PreFilter",
+            name: "InterPodAffinity",
+            enabled: true,
+        },
+        PluginRow {
+            phase: "PreFilter",
+            name: "VolumeBinding",
+            enabled: true,
+        },
         // Filter
-        PluginRow { phase: "Filter", name: "NodeUnschedulable",        enabled: true },
-        PluginRow { phase: "Filter", name: "NodeName",                 enabled: true },
-        PluginRow { phase: "Filter", name: "NodePorts",                enabled: true },
-        PluginRow { phase: "Filter", name: "NodeAffinity",             enabled: true },
-        PluginRow { phase: "Filter", name: "TaintToleration",          enabled: true },
-        PluginRow { phase: "Filter", name: "VolumeRestrictions",       enabled: true },
-        PluginRow { phase: "Filter", name: "VolumeBinding",            enabled: true },
+        PluginRow {
+            phase: "Filter",
+            name: "NodeUnschedulable",
+            enabled: true,
+        },
+        PluginRow {
+            phase: "Filter",
+            name: "NodeName",
+            enabled: true,
+        },
+        PluginRow {
+            phase: "Filter",
+            name: "NodePorts",
+            enabled: true,
+        },
+        PluginRow {
+            phase: "Filter",
+            name: "NodeAffinity",
+            enabled: true,
+        },
+        PluginRow {
+            phase: "Filter",
+            name: "TaintToleration",
+            enabled: true,
+        },
+        PluginRow {
+            phase: "Filter",
+            name: "VolumeRestrictions",
+            enabled: true,
+        },
+        PluginRow {
+            phase: "Filter",
+            name: "VolumeBinding",
+            enabled: true,
+        },
         // Score
-        PluginRow { phase: "Score", name: "NodeResourcesBalancedAllocation", enabled: true },
-        PluginRow { phase: "Score", name: "NodeResourcesFit",          enabled: true },
-        PluginRow { phase: "Score", name: "ImageLocality",             enabled: true },
-        PluginRow { phase: "Score", name: "InterPodAffinity",          enabled: true },
-        PluginRow { phase: "Score", name: "NodeAffinity",              enabled: true },
-        PluginRow { phase: "Score", name: "PodTopologySpread",         enabled: true },
-        PluginRow { phase: "Score", name: "TaintToleration",           enabled: true },
+        PluginRow {
+            phase: "Score",
+            name: "NodeResourcesBalancedAllocation",
+            enabled: true,
+        },
+        PluginRow {
+            phase: "Score",
+            name: "NodeResourcesFit",
+            enabled: true,
+        },
+        PluginRow {
+            phase: "Score",
+            name: "ImageLocality",
+            enabled: true,
+        },
+        PluginRow {
+            phase: "Score",
+            name: "InterPodAffinity",
+            enabled: true,
+        },
+        PluginRow {
+            phase: "Score",
+            name: "NodeAffinity",
+            enabled: true,
+        },
+        PluginRow {
+            phase: "Score",
+            name: "PodTopologySpread",
+            enabled: true,
+        },
+        PluginRow {
+            phase: "Score",
+            name: "TaintToleration",
+            enabled: true,
+        },
         // Reserve / Permit
-        PluginRow { phase: "Reserve", name: "VolumeBinding",           enabled: true },
-        PluginRow { phase: "Permit", name: "DefaultBinder",            enabled: true },
+        PluginRow {
+            phase: "Reserve",
+            name: "VolumeBinding",
+            enabled: true,
+        },
+        PluginRow {
+            phase: "Permit",
+            name: "DefaultBinder",
+            enabled: true,
+        },
     ])
 }
 
@@ -121,15 +204,18 @@ pub fn count_enabled(rows: &[PluginRow]) -> usize {
     rows.iter().filter(|r| r.enabled).count()
 }
 
-pub fn render_section(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, SchedulerViewError> {
+pub fn render_section(state: &AdminState, ctx: &RequestCtx) -> Result<String, SchedulerViewError> {
     let plugins = list_plugins(state, ctx)?;
     let policies = list_policies(state, ctx)?;
     let plugin_rows: Vec<Vec<String>> = plugins
         .iter()
-        .map(|p| vec![p.phase.into(), p.name.into(), if p.enabled { "Enabled" } else { "Disabled" }.into()])
+        .map(|p| {
+            vec![
+                p.phase.into(),
+                p.name.into(),
+                if p.enabled { "Enabled" } else { "Disabled" }.into(),
+            ]
+        })
         .collect();
     let policy_rows: Vec<Vec<String>> = policies
         .iter()

@@ -37,7 +37,12 @@ impl ObjectKey {
         namespace: impl Into<String>,
         name: impl Into<String>,
     ) -> Self {
-        Self { tenant, kind, namespace: namespace.into(), name: name.into() }
+        Self {
+            tenant,
+            kind,
+            namespace: namespace.into(),
+            name: name.into(),
+        }
     }
 }
 
@@ -186,7 +191,13 @@ pub struct SyncController<R: Reconciler> {
 
 impl<R: Reconciler> SyncController<R> {
     pub fn new(owner: TenantId, reconciler: R) -> Self {
-        Self { owner, reconciler, processed: 0, denied_cross_tenant: 0, errored: 0 }
+        Self {
+            owner,
+            reconciler,
+            processed: 0,
+            denied_cross_tenant: 0,
+            errored: 0,
+        }
     }
 
     /// Drain everything currently in the queue. Returns the number of keys
@@ -228,7 +239,12 @@ mod tests {
     use crate::test_ctx;
 
     fn key(tenant: &str, name: &str) -> ObjectKey {
-        ObjectKey::new(TenantId::new(tenant).expect("test fixture"), "Deployment", "default", name)
+        ObjectKey::new(
+            TenantId::new(tenant).expect("test fixture"),
+            "Deployment",
+            "default",
+            name,
+        )
     }
 
     #[test]
@@ -307,7 +323,10 @@ mod tests {
         q.add(key("acme", "a"));
         q.add(key("evil", "b"));
         q.add(key("acme", "c"));
-        let mut ctrl = SyncController::new(TenantId::new("acme").expect("test fixture"), ConstReconciler::new(Reconcile::NoOp));
+        let mut ctrl = SyncController::new(
+            TenantId::new("acme").expect("test fixture"),
+            ConstReconciler::new(Reconcile::NoOp),
+        );
         let dispatched = ctrl.run_until_idle(&mut q);
         assert_eq!(dispatched, 2);
         assert_eq!(ctrl.processed, 2);
@@ -331,7 +350,10 @@ mod tests {
         }
         let mut q = Workqueue::new();
         q.add(key("acme", "a"));
-        let mut ctrl = SyncController::new(TenantId::new("acme").expect("test fixture"), ErrorReconciler);
+        let mut ctrl = SyncController::new(
+            TenantId::new("acme").expect("test fixture"),
+            ErrorReconciler,
+        );
         ctrl.run_until_idle(&mut q);
         assert_eq!(ctrl.processed, 0);
         assert_eq!(ctrl.errored, 1);

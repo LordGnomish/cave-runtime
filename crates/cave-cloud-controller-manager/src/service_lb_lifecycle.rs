@@ -117,7 +117,10 @@ impl LifecycleParams {
         if !(1..=10).contains(&self.healthy_threshold) {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Hetzner,
-                reason: format!("healthy_threshold {} outside [1, 10]", self.healthy_threshold),
+                reason: format!(
+                    "healthy_threshold {} outside [1, 10]",
+                    self.healthy_threshold
+                ),
             });
         }
         if !(1..=10).contains(&self.unhealthy_threshold) {
@@ -168,13 +171,18 @@ pub fn step_on_probe(
     match outcome {
         ProbeOutcome::Success => {
             entry.consecutive_failed_probes = 0;
-            entry.consecutive_healthy_probes =
-                entry.consecutive_healthy_probes.saturating_add(1);
-            if matches!(entry.state, TargetSyncState::Pending | TargetSyncState::Initializing)
-                && entry.consecutive_healthy_probes >= params.healthy_threshold
+            entry.consecutive_healthy_probes = entry.consecutive_healthy_probes.saturating_add(1);
+            if matches!(
+                entry.state,
+                TargetSyncState::Pending | TargetSyncState::Initializing
+            ) && entry.consecutive_healthy_probes >= params.healthy_threshold
             {
                 entry.state = TargetSyncState::Healthy;
-                entry.traffic_weight_percent = if params.slow_start_seconds == 0 { 100 } else { 0 };
+                entry.traffic_weight_percent = if params.slow_start_seconds == 0 {
+                    100
+                } else {
+                    0
+                };
             }
             if matches!(entry.state, TargetSyncState::Pending) {
                 entry.state = TargetSyncState::Initializing;
@@ -182,8 +190,7 @@ pub fn step_on_probe(
         }
         ProbeOutcome::Failure => {
             entry.consecutive_healthy_probes = 0;
-            entry.consecutive_failed_probes =
-                entry.consecutive_failed_probes.saturating_add(1);
+            entry.consecutive_failed_probes = entry.consecutive_failed_probes.saturating_add(1);
             if matches!(entry.state, TargetSyncState::Healthy)
                 && entry.consecutive_failed_probes >= params.unhealthy_threshold
             {
@@ -210,10 +217,8 @@ pub fn advance_slow_start(
         entry.traffic_weight_percent = 100;
         return 100;
     }
-    let step =
-        ((elapsed_seconds as u64 * 100) / params.slow_start_seconds as u64).min(100) as u32;
-    entry.traffic_weight_percent =
-        (entry.traffic_weight_percent as u32 + step).min(100) as u8;
+    let step = ((elapsed_seconds as u64 * 100) / params.slow_start_seconds as u64).min(100) as u32;
+    entry.traffic_weight_percent = (entry.traffic_weight_percent as u32 + step).min(100) as u8;
     entry.traffic_weight_percent
 }
 
@@ -222,8 +227,9 @@ pub fn tick_drain(entry: &mut TargetSyncEntry, elapsed_seconds: u32) -> TargetSy
     if entry.state != TargetSyncState::Draining {
         return entry.state;
     }
-    entry.draining_remaining_seconds =
-        entry.draining_remaining_seconds.saturating_sub(elapsed_seconds);
+    entry.draining_remaining_seconds = entry
+        .draining_remaining_seconds
+        .saturating_sub(elapsed_seconds);
     if entry.draining_remaining_seconds == 0 {
         entry.state = TargetSyncState::Removed;
     }
@@ -298,10 +304,7 @@ impl ListenerDiff {
     }
 }
 
-pub fn diff_listeners(
-    current: &[ListenerSpec],
-    desired: &[ListenerSpec],
-) -> ListenerDiff {
+pub fn diff_listeners(current: &[ListenerSpec], desired: &[ListenerSpec]) -> ListenerDiff {
     let mut add = Vec::new();
     let mut update = Vec::new();
     for d in desired {
@@ -316,7 +319,11 @@ pub fn diff_listeners(
         .filter(|c| !desired.iter().any(|d| d.name == c.name))
         .map(|c| c.name.clone())
         .collect();
-    ListenerDiff { add, remove, update }
+    ListenerDiff {
+        add,
+        remove,
+        update,
+    }
 }
 
 #[cfg(test)]
@@ -337,7 +344,11 @@ mod tests {
 
     #[test]
     fn state_keys_match_lower_case_camel() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "TargetState");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "TargetState",
+        );
         assert_eq!(TargetSyncState::Pending.key(), "Pending");
         assert_eq!(TargetSyncState::Initializing.key(), "Initializing");
         assert_eq!(TargetSyncState::Healthy.key(), "Healthy");
@@ -347,7 +358,11 @@ mod tests {
 
     #[test]
     fn carries_traffic_returns_true_only_for_healthy_and_draining() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "TargetState");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "TargetState",
+        );
         assert!(TargetSyncState::Healthy.carries_traffic());
         assert!(TargetSyncState::Draining.carries_traffic());
         assert!(!TargetSyncState::Pending.carries_traffic());
@@ -357,7 +372,11 @@ mod tests {
 
     #[test]
     fn is_terminal_only_for_removed() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "TargetState");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "TargetState",
+        );
         assert!(TargetSyncState::Removed.is_terminal());
         for s in [
             TargetSyncState::Pending,
@@ -373,49 +392,88 @@ mod tests {
 
     #[test]
     fn lifecycle_defaults_validate() {
-        ctx("acme", "cmd/cloud-controller-manager/app/options/options.go", "DefaultLifecycle");
+        ctx(
+            "acme",
+            "cmd/cloud-controller-manager/app/options/options.go",
+            "DefaultLifecycle",
+        );
         assert!(defaults().validate().is_ok());
     }
 
     #[test]
     fn lifecycle_healthy_threshold_outside_1_10_is_rejected() {
-        ctx("acme", "cmd/cloud-controller-manager/app/options/options.go", "DefaultLifecycle");
+        ctx(
+            "acme",
+            "cmd/cloud-controller-manager/app/options/options.go",
+            "DefaultLifecycle",
+        );
         let mut p = defaults();
         p.healthy_threshold = 0;
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         p.healthy_threshold = 99;
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn lifecycle_unhealthy_threshold_outside_1_10_is_rejected() {
-        ctx("acme", "cmd/cloud-controller-manager/app/options/options.go", "DefaultLifecycle");
+        ctx(
+            "acme",
+            "cmd/cloud-controller-manager/app/options/options.go",
+            "DefaultLifecycle",
+        );
         let mut p = defaults();
         p.unhealthy_threshold = 0;
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn lifecycle_drain_timeout_outside_0_600_is_rejected() {
-        ctx("acme", "cmd/cloud-controller-manager/app/options/options.go", "DefaultLifecycle");
+        ctx(
+            "acme",
+            "cmd/cloud-controller-manager/app/options/options.go",
+            "DefaultLifecycle",
+        );
         let mut p = defaults();
         p.drain_timeout_seconds = 700;
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn lifecycle_slow_start_outside_0_300_is_rejected() {
-        ctx("acme", "cmd/cloud-controller-manager/app/options/options.go", "DefaultLifecycle");
+        ctx(
+            "acme",
+            "cmd/cloud-controller-manager/app/options/options.go",
+            "DefaultLifecycle",
+        );
         let mut p = defaults();
         p.slow_start_seconds = 999;
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     // ─── Probe transitions ───────────────────────────────────────────────────
 
     #[test]
     fn pending_target_first_success_moves_to_initializing() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "syncTargets");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "syncTargets",
+        );
         let mut e = TargetSyncEntry::pending("t1");
         let s = step_on_probe(&mut e, ProbeOutcome::Success, &defaults());
         assert_eq!(s, TargetSyncState::Initializing);
@@ -423,7 +481,11 @@ mod tests {
 
     #[test]
     fn initializing_target_promotes_to_healthy_after_threshold() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "syncTargets");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "syncTargets",
+        );
         let p = defaults();
         let mut e = TargetSyncEntry::pending("t1");
         for _ in 0..p.healthy_threshold {
@@ -434,7 +496,11 @@ mod tests {
 
     #[test]
     fn healthy_target_drains_after_unhealthy_threshold_failures() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "syncTargets");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "syncTargets",
+        );
         let p = defaults();
         let mut e = TargetSyncEntry::pending("t1");
         for _ in 0..p.healthy_threshold {
@@ -451,7 +517,11 @@ mod tests {
 
     #[test]
     fn probe_success_resets_failure_counter() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "syncTargets");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "syncTargets",
+        );
         let p = defaults();
         let mut e = TargetSyncEntry::pending("t1");
         for _ in 0..p.healthy_threshold {
@@ -466,7 +536,11 @@ mod tests {
 
     #[test]
     fn intermittent_failures_below_threshold_keep_healthy_state() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "syncTargets");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "syncTargets",
+        );
         let p = defaults();
         let mut e = TargetSyncEntry::pending("t1");
         for _ in 0..p.healthy_threshold {
@@ -482,7 +556,11 @@ mod tests {
 
     #[test]
     fn slow_start_ramps_up_proportional_to_elapsed() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "slowStart");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "slowStart",
+        );
         let p = defaults();
         let mut e = TargetSyncEntry::pending("t1");
         for _ in 0..p.healthy_threshold {
@@ -495,7 +573,11 @@ mod tests {
 
     #[test]
     fn slow_start_caps_at_one_hundred() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "slowStart");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "slowStart",
+        );
         let p = defaults();
         let mut e = TargetSyncEntry::pending("t1");
         for _ in 0..p.healthy_threshold {
@@ -507,7 +589,11 @@ mod tests {
 
     #[test]
     fn slow_start_is_a_noop_for_non_healthy_targets() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "slowStart");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "slowStart",
+        );
         let mut e = TargetSyncEntry::pending("t1");
         let w = advance_slow_start(&mut e, 30, &defaults());
         assert_eq!(w, 0);
@@ -515,7 +601,11 @@ mod tests {
 
     #[test]
     fn slow_start_zero_seconds_jumps_to_full_weight_on_promotion() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "slowStart");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "slowStart",
+        );
         let mut p = defaults();
         p.slow_start_seconds = 0;
         let mut e = TargetSyncEntry::pending("t1");
@@ -529,7 +619,11 @@ mod tests {
 
     #[test]
     fn tick_drain_decrements_remaining_then_removes() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "ConnectionDraining");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "ConnectionDraining",
+        );
         let p = defaults();
         let mut e = TargetSyncEntry::pending("t1");
         for _ in 0..p.healthy_threshold {
@@ -547,7 +641,11 @@ mod tests {
 
     #[test]
     fn tick_drain_is_a_noop_for_non_draining_states() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "ConnectionDraining");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "ConnectionDraining",
+        );
         let mut e = TargetSyncEntry::pending("t1");
         let s = tick_drain(&mut e, 60);
         assert_eq!(s, TargetSyncState::Pending);
@@ -555,7 +653,11 @@ mod tests {
 
     #[test]
     fn begin_drain_sets_state_and_starts_timer() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "removeTarget");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "removeTarget",
+        );
         let p = defaults();
         let mut e = TargetSyncEntry::pending("t1");
         for _ in 0..p.healthy_threshold {
@@ -569,7 +671,11 @@ mod tests {
 
     #[test]
     fn begin_drain_is_idempotent_for_already_draining_target() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "removeTarget");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "removeTarget",
+        );
         let p = defaults();
         let mut e = TargetSyncEntry::pending("t1");
         for _ in 0..p.healthy_threshold {
@@ -587,7 +693,11 @@ mod tests {
 
     #[test]
     fn begin_drain_does_not_resurrect_removed_targets() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "removeTarget");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "removeTarget",
+        );
         let p = defaults();
         let mut e = TargetSyncEntry::pending("t1");
         e.state = TargetSyncState::Removed;
@@ -599,7 +709,11 @@ mod tests {
 
     #[test]
     fn backend_pool_diff_returns_empty_for_identical_sets() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "servicePortMembers");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "servicePortMembers",
+        );
         let cur = vec!["n1".to_string(), "n2".to_string()];
         let want = cur.clone();
         let d = diff_backend_pool(&cur, &want);
@@ -609,7 +723,11 @@ mod tests {
 
     #[test]
     fn backend_pool_diff_emits_add_for_new_members() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "servicePortMembers");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "servicePortMembers",
+        );
         let cur = vec!["n1".to_string()];
         let want = vec!["n1".to_string(), "n2".to_string()];
         let d = diff_backend_pool(&cur, &want);
@@ -619,7 +737,11 @@ mod tests {
 
     #[test]
     fn backend_pool_diff_emits_remove_for_stale_members() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "servicePortMembers");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "servicePortMembers",
+        );
         let cur = vec!["n1".to_string(), "n2".to_string()];
         let want = vec!["n1".to_string()];
         let d = diff_backend_pool(&cur, &want);
@@ -629,7 +751,11 @@ mod tests {
 
     #[test]
     fn backend_pool_diff_handles_full_swap() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "servicePortMembers");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "servicePortMembers",
+        );
         let cur = vec!["n1".to_string(), "n2".to_string()];
         let want = vec!["n3".to_string(), "n4".to_string()];
         let d = diff_backend_pool(&cur, &want);
@@ -649,7 +775,11 @@ mod tests {
 
     #[test]
     fn listener_diff_returns_empty_for_identical_lists() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "syncListeners");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "syncListeners",
+        );
         let l = vec![lst("http", 80, 8080, "TCP")];
         let d = diff_listeners(&l, &l);
         assert!(d.add.is_empty() && d.remove.is_empty() && d.update.is_empty());
@@ -657,7 +787,11 @@ mod tests {
 
     #[test]
     fn listener_diff_emits_add_for_new_listener() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "syncListeners");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "syncListeners",
+        );
         let cur = vec![lst("http", 80, 8080, "TCP")];
         let want = vec![lst("http", 80, 8080, "TCP"), lst("https", 443, 8443, "TCP")];
         let d = diff_listeners(&cur, &want);
@@ -667,7 +801,11 @@ mod tests {
 
     #[test]
     fn listener_diff_emits_remove_for_stale_listener() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "syncListeners");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "syncListeners",
+        );
         let cur = vec![lst("http", 80, 8080, "TCP"), lst("legacy", 81, 8081, "TCP")];
         let want = vec![lst("http", 80, 8080, "TCP")];
         let d = diff_listeners(&cur, &want);
@@ -676,7 +814,11 @@ mod tests {
 
     #[test]
     fn listener_diff_emits_update_for_port_change() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "syncListeners");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "syncListeners",
+        );
         let cur = vec![lst("http", 80, 8080, "TCP")];
         let want = vec![lst("http", 80, 8081, "TCP")];
         let d = diff_listeners(&cur, &want);
@@ -686,7 +828,11 @@ mod tests {
 
     #[test]
     fn listener_diff_write_count_sums_three_categories() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "syncListeners");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "syncListeners",
+        );
         let cur = vec![lst("a", 80, 8080, "TCP"), lst("b", 81, 8081, "TCP")];
         let want = vec![lst("a", 80, 8090, "TCP"), lst("c", 82, 8082, "TCP")];
         let d = diff_listeners(&cur, &want);
@@ -697,7 +843,11 @@ mod tests {
 
     #[test]
     fn target_sync_entry_pending_constructor_zeroes_counters() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/service/controller.go", "syncTargets");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/service/controller.go",
+            "syncTargets",
+        );
         let e = TargetSyncEntry::pending("t1");
         assert_eq!(e.state, TargetSyncState::Pending);
         assert_eq!(e.consecutive_healthy_probes, 0);

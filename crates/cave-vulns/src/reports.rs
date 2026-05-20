@@ -7,7 +7,7 @@
 
 use crate::finding::{Finding, FindingSeverity};
 use crate::hierarchy::{Engagement, Product};
-use crate::sla::{rollup, SlaConfiguration};
+use crate::sla::{SlaConfiguration, rollup};
 use chrono::Utc;
 use serde::Serialize;
 
@@ -45,7 +45,9 @@ pub fn executive_summary(
     let mut active = 0usize;
     let mut components: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     for f in findings {
-        if f.state.active { active += 1; }
+        if f.state.active {
+            active += 1;
+        }
         match f.severity {
             FindingSeverity::Critical => by_sev.critical += 1,
             FindingSeverity::High => by_sev.high += 1,
@@ -110,10 +112,16 @@ pub fn to_html(summary: &ExecutiveSummary) -> String {
         prod = s.product.clone().unwrap_or_else(|| "(all)".into()),
         ts = s.generated_at,
         eng = s.engagement.clone().unwrap_or_else(|| "(all)".into()),
-        c = s.by_severity.critical, h = s.by_severity.high,
-        m = s.by_severity.medium, l = s.by_severity.low, i = s.by_severity.info,
-        br = s.sla_breached, soon = s.sla_breaching_soon,
-        top = s.top_components.iter()
+        c = s.by_severity.critical,
+        h = s.by_severity.high,
+        m = s.by_severity.medium,
+        l = s.by_severity.low,
+        i = s.by_severity.info,
+        br = s.sla_breached,
+        soon = s.sla_breaching_soon,
+        top = s
+            .top_components
+            .iter()
             .map(|(n, c)| format!("<li>{n} (×{c})</li>"))
             .collect::<String>(),
     )
@@ -177,7 +185,12 @@ mod tests {
     #[test]
     fn to_html_includes_severity_labels() {
         let p = Product::new(Uuid::new_v4(), "MyApp");
-        let s = executive_summary(Some(&p), None, &[fin(FindingSeverity::High, "x", 1)], &SlaConfiguration::default());
+        let s = executive_summary(
+            Some(&p),
+            None,
+            &[fin(FindingSeverity::High, "x", 1)],
+            &SlaConfiguration::default(),
+        );
         let html = to_html(&s);
         assert!(html.contains("<h1>"));
         assert!(html.contains("Critical:"));

@@ -34,7 +34,12 @@ pub struct Cite {
 
 impl Cite {
     pub const fn istio(path: &'static str, symbol: &'static str) -> Self {
-        Self { repo: UPSTREAM_REPO, path, symbol, version: UPSTREAM_VERSION }
+        Self {
+            repo: UPSTREAM_REPO,
+            path,
+            symbol,
+            version: UPSTREAM_VERSION,
+        }
     }
     pub const fn ext(
         repo: &'static str,
@@ -42,16 +47,28 @@ impl Cite {
         symbol: &'static str,
         version: &'static str,
     ) -> Self {
-        Self { repo, path, symbol, version }
+        Self {
+            repo,
+            path,
+            symbol,
+            version,
+        }
     }
     pub fn url(&self) -> String {
-        format!("https://github.com/{}/blob/{}/{}", self.repo, self.version, self.path)
+        format!(
+            "https://github.com/{}/blob/{}/{}",
+            self.repo, self.version, self.path
+        )
     }
 }
 
 impl fmt::Display for Cite {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}::{}::{} @ {}", self.repo, self.path, self.symbol, self.version)
+        write!(
+            f,
+            "{}::{}::{} @ {}",
+            self.repo, self.path, self.symbol, self.version
+        )
     }
 }
 
@@ -86,11 +103,8 @@ mod tests {
 
     #[test]
     fn istio_cite_url_uses_pinned_version() {
-        let (cite, tenant) = ambient_test_ctx!(
-            "pkg/hbone/server.go",
-            "HBONEServer",
-            "tenant-types-istio"
-        );
+        let (cite, tenant) =
+            ambient_test_ctx!("pkg/hbone/server.go", "HBONEServer", "tenant-types-istio");
         assert!(cite.url().contains(UPSTREAM_VERSION));
         assert_eq!(cite.repo, UPSTREAM_REPO);
         assert_eq!(tenant.as_str(), "tenant-types-istio");
@@ -111,11 +125,8 @@ mod tests {
 
     #[test]
     fn tenant_id_round_trips_through_serde() {
-        let (_cite, tenant) = ambient_test_ctx!(
-            "pkg/hbone/server.go",
-            "HBONEServer",
-            "tenant-types-serde"
-        );
+        let (_cite, tenant) =
+            ambient_test_ctx!("pkg/hbone/server.go", "HBONEServer", "tenant-types-serde");
         let json = serde_json::to_string(&tenant).unwrap();
         let back: TenantId = serde_json::from_str(&json).unwrap();
         assert_eq!(tenant, back);

@@ -8,8 +8,8 @@
 use anyhow::{Context, Result};
 use cave_local_llm::{
     draft::{
-        build_ollama_prompt, draft_filename, parse_ollama_response, Draft, DraftFrontmatter,
-        DraftStatus,
+        Draft, DraftFrontmatter, DraftStatus, build_ollama_prompt, draft_filename,
+        parse_ollama_response,
     },
     manifest::{find_missing_functions, read_crate_manifest},
     metrics::DraftMetrics,
@@ -78,10 +78,15 @@ async fn run(cli: Cli) -> Result<()> {
     let metrics = DraftMetrics::new(&mut registry);
 
     match cli.command {
-        Commands::Run { crate_name, workspace_root, model, dry_run } => {
-            let workspace_root = workspace_root
-                .canonicalize()
-                .with_context(|| format!("workspace root '{}' not found", workspace_root.display()))?;
+        Commands::Run {
+            crate_name,
+            workspace_root,
+            model,
+            dry_run,
+        } => {
+            let workspace_root = workspace_root.canonicalize().with_context(|| {
+                format!("workspace root '{}' not found", workspace_root.display())
+            })?;
 
             let start = std::time::Instant::now();
 
@@ -130,7 +135,7 @@ async fn run(cli: Cli) -> Result<()> {
                 stream: Some(false),
                 options: None,
                 keep_alive: None,
-};
+            };
 
             let response = ollama.generate(req).await.map_err(|e| {
                 metrics.drafts_failed_total.inc();
@@ -151,7 +156,11 @@ async fn run(cli: Cli) -> Result<()> {
                 tier: 1,
                 created_at: chrono::Utc::now(),
             };
-            let draft = Draft { frontmatter: fm, failing_test: test_code, skeleton: skel_code };
+            let draft = Draft {
+                frontmatter: fm,
+                failing_test: test_code,
+                skeleton: skel_code,
+            };
             let rendered = draft.render();
 
             if dry_run {
@@ -172,7 +181,10 @@ async fn run(cli: Cli) -> Result<()> {
 
             println!("Draft written → {}", out_path.display());
             println!("  crate:    {crate_name}");
-            println!("  function: {} → {}", target.upstream_name, target.local_name);
+            println!(
+                "  function: {} → {}",
+                target.upstream_name, target.local_name
+            );
             println!("  model:    {model}");
             println!("  elapsed:  {elapsed:.2}s");
 

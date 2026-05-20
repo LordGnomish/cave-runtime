@@ -150,8 +150,8 @@ impl ProviderPrompt for AnthropicPrompt {
         if !cx.tools.is_empty() {
             out.push_str("<tools>\n");
             for t in &cx.tools {
-                let schema_pretty = serde_json::to_string_pretty(&t.schema)
-                    .map_err(HermesError::Json)?;
+                let schema_pretty =
+                    serde_json::to_string_pretty(&t.schema).map_err(HermesError::Json)?;
                 out.push_str(&format!(
                     "  <tool name=\"{}\">\n    <description>{}</description>\n    <schema>{}</schema>\n  </tool>\n",
                     t.name,
@@ -164,11 +164,18 @@ impl ProviderPrompt for AnthropicPrompt {
         if !cx.memory.is_empty() {
             out.push_str("<memory-context>\n");
             for r in &cx.memory {
-                out.push_str(&format!("  <fact id=\"{}\">{}</fact>\n", r.id, xml_escape(&r.body)));
+                out.push_str(&format!(
+                    "  <fact id=\"{}\">{}</fact>\n",
+                    r.id,
+                    xml_escape(&r.body)
+                ));
             }
             out.push_str("</memory-context>\n");
         }
-        out.push_str(&format!("<task>\n{}\n</task>\n", xml_escape(cx.task.trim())));
+        out.push_str(&format!(
+            "<task>\n{}\n</task>\n",
+            xml_escape(cx.task.trim())
+        ));
         Ok(out)
     }
 }
@@ -222,8 +229,8 @@ impl ProviderPrompt for OpenAiPrompt {
                     })
                 })
                 .collect();
-            let rendered = serde_json::to_string_pretty(&tools_payload)
-                .map_err(HermesError::Json)?;
+            let rendered =
+                serde_json::to_string_pretty(&tools_payload).map_err(HermesError::Json)?;
             out.push_str(&format!("Available tools (JSON):\n{}\n\n", rendered));
         }
         if !cx.memory.is_empty() {
@@ -270,12 +277,7 @@ impl ProviderPrompt for OllamaPrompt {
         if !cx.tools.is_empty() {
             out.push_str("TOOLS:\n");
             for (i, t) in cx.tools.iter().enumerate() {
-                out.push_str(&format!(
-                    "  {}. {} — {}\n",
-                    i + 1,
-                    t.name,
-                    t.description,
-                ));
+                out.push_str(&format!("  {}. {} — {}\n", i + 1, t.name, t.description,));
             }
             out.push('\n');
         }

@@ -17,8 +17,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::types::{
-    build_histogram, LatencyHistogram, Span, SpanId, SpanStatus, TagValue, Trace, TraceId,
-    TraceSearchQuery,
+    LatencyHistogram, Span, SpanId, SpanStatus, TagValue, Trace, TraceId, TraceSearchQuery,
+    build_histogram,
 };
 use crate::{Result, TraceError};
 
@@ -152,7 +152,12 @@ impl TraceRecord {
     }
 
     pub fn trace_start_ns(&self) -> u64 {
-        self.columnar.start_times_ns.iter().copied().min().unwrap_or(0)
+        self.columnar
+            .start_times_ns
+            .iter()
+            .copied()
+            .min()
+            .unwrap_or(0)
     }
 
     pub fn trace_end_ns(&self) -> u64 {
@@ -328,8 +333,12 @@ impl TraceStore {
             .filter(|((svc, _), ids)| {
                 svc == service
                     && tenant_id.map_or(true, |t| {
-                        ids.iter()
-                            .any(|id| self.traces.get(id).map(|r| r.tenant_id == t).unwrap_or(false))
+                        ids.iter().any(|id| {
+                            self.traces
+                                .get(id)
+                                .map(|r| r.tenant_id == t)
+                                .unwrap_or(false)
+                        })
                     })
             })
             .map(|((_, op), _)| op.clone())
@@ -348,8 +357,12 @@ impl TraceStore {
                     self.tag_index
                         .get(&(key.clone(), "".to_string()))
                         .map_or(true, |ids| {
-                            ids.iter()
-                                .any(|id| self.traces.get(id).map(|r| r.tenant_id == t).unwrap_or(false))
+                            ids.iter().any(|id| {
+                                self.traces
+                                    .get(id)
+                                    .map(|r| r.tenant_id == t)
+                                    .unwrap_or(false)
+                            })
                         })
                 })
             })
@@ -377,7 +390,8 @@ impl TraceStore {
 
     pub fn search(&self, query: &TraceSearchQuery) -> Vec<&TraceRecord> {
         // Start with a candidate set
-        let candidates: Box<dyn Iterator<Item = TraceId>> = match (&query.service, &query.operation) {
+        let candidates: Box<dyn Iterator<Item = TraceId>> = match (&query.service, &query.operation)
+        {
             (Some(svc), Some(op)) => {
                 let key = (svc.clone(), op.clone());
                 if let Some(ids) = self.operation_index.get(&key) {
@@ -407,9 +421,10 @@ impl TraceStore {
         };
 
         // Apply tag filters
-        let tag_required: Option<Vec<(String, String)>> = query.tags.as_ref().map(|t| {
-            t.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
-        });
+        let tag_required: Option<Vec<(String, String)>> = query
+            .tags
+            .as_ref()
+            .map(|t| t.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
 
         let mut seen = std::collections::HashSet::new();
         let mut results: Vec<&TraceRecord> = candidates
@@ -440,7 +455,9 @@ impl TraceStore {
                 }
 
                 // Duration range
-                let dur = record.trace_end_ns().saturating_sub(record.trace_start_ns());
+                let dur = record
+                    .trace_end_ns()
+                    .saturating_sub(record.trace_start_ns());
                 if let Some(min_dur) = query.min_duration_ns {
                     if dur < min_dur {
                         return None;
@@ -699,7 +716,8 @@ mod tests {
     fn tag_index() {
         let mut store = TraceStore::new(RetentionPolicy::default());
         let mut span = make_span(1, 1, "svc", "op");
-        span.tags.insert("http.method".into(), TagValue::String("GET".into()));
+        span.tags
+            .insert("http.method".into(), TagValue::String("GET".into()));
         store.ingest_spans(vec![span]);
         let vals = store.list_tag_values("http.method", None);
         assert!(vals.contains(&"GET".into()));

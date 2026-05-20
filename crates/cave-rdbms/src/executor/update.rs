@@ -2,15 +2,12 @@
 // Copyright 2026 Cave Runtime contributors
 //! UPDATE statement execution.
 
-use crate::sql::ast::{UpdateStmt, Literal};
+use crate::sql::ast::{Literal, UpdateStmt};
 use crate::storage::schema::Database;
 use crate::types::SqlValue;
 
 pub fn execute_update(update: &UpdateStmt, db: &mut Database) -> Result<u64, String> {
-    let schema = db
-        .schemas
-        .get_mut("public")
-        .ok_or("no public schema")?;
+    let schema = db.schemas.get_mut("public").ok_or("no public schema")?;
     let table = schema
         .tables
         .get_mut(&update.table)
@@ -20,9 +17,9 @@ pub fn execute_update(update: &UpdateStmt, db: &mut Database) -> Result<u64, Str
         .assignments
         .iter()
         .filter_map(|(col_name, expr)| {
-            table.column_index(col_name).and_then(|idx| {
-                expr_to_value(expr).ok().map(|val| (idx, val))
-            })
+            table
+                .column_index(col_name)
+                .and_then(|idx| expr_to_value(expr).ok().map(|val| (idx, val)))
         })
         .collect();
 

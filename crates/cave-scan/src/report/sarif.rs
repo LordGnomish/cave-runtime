@@ -5,7 +5,7 @@
 //! SARIF v2.1.0 serializer.
 
 use super::{Finding, Report, Severity};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub fn to_sarif(report: &Report) -> Value {
     let rules: Vec<Value> = report

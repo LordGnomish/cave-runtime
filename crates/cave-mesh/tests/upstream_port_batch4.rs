@@ -27,9 +27,9 @@
 use std::time::Duration;
 
 use cave_mesh::traffic_policy::{
-    merge_for_port, to_envoy_circuit_breakers, to_envoy_outlier, ConnectionPoolSettings,
-    H2UpgradePolicy, HttpSettings, OutlierDetection, PortLevelSettings, TcpKeepalive, TcpSettings,
-    TrafficPolicy,
+    ConnectionPoolSettings, H2UpgradePolicy, HttpSettings, OutlierDetection, PortLevelSettings,
+    TcpKeepalive, TcpSettings, TrafficPolicy, merge_for_port, to_envoy_circuit_breakers,
+    to_envoy_outlier,
 };
 
 // ──────────────────────────────────────────────────────────────
@@ -146,10 +146,16 @@ fn upstream_outlier_interval_and_base_ejection_time_passthrough() {
 #[test]
 fn upstream_outlier_max_ejection_percent_only_when_positive() {
     // Zero stays unset (Istio: `if > 0`), positive flows through.
-    let zero = OutlierDetection { max_ejection_percent: 0, ..Default::default() };
+    let zero = OutlierDetection {
+        max_ejection_percent: 0,
+        ..Default::default()
+    };
     assert_eq!(to_envoy_outlier(&zero).max_ejection_percent, None);
 
-    let fifty = OutlierDetection { max_ejection_percent: 50, ..Default::default() };
+    let fifty = OutlierDetection {
+        max_ejection_percent: 50,
+        ..Default::default()
+    };
     assert_eq!(to_envoy_outlier(&fifty).max_ejection_percent, Some(50));
 }
 
@@ -274,7 +280,10 @@ fn upstream_connection_pool_basic_settings() {
     assert_eq!(ka.time, Duration::from_secs(4));
     assert_eq!(ka.interval, Duration::from_secs(5));
 
-    let opts = envoy.common_http_protocol_options.as_ref().expect("http opts");
+    let opts = envoy
+        .common_http_protocol_options
+        .as_ref()
+        .expect("http opts");
     assert_eq!(opts.max_requests_per_connection, Some(3));
 }
 
@@ -313,7 +322,10 @@ fn upstream_connection_pool_http_idle_timeout_lifts_into_common_opts() {
         ..Default::default()
     };
     let envoy = to_envoy_circuit_breakers(&cp);
-    let opts = envoy.common_http_protocol_options.as_ref().expect("http opts");
+    let opts = envoy
+        .common_http_protocol_options
+        .as_ref()
+        .expect("http opts");
     assert_eq!(opts.idle_timeout, Some(Duration::from_secs(15)));
 }
 
@@ -332,7 +344,10 @@ fn upstream_connection_pool_tcp_idle_timeout_fallback() {
         ..Default::default()
     };
     let envoy = to_envoy_circuit_breakers(&cp);
-    let opts = envoy.common_http_protocol_options.as_ref().expect("http opts");
+    let opts = envoy
+        .common_http_protocol_options
+        .as_ref()
+        .expect("http opts");
     assert_eq!(opts.idle_timeout, Some(Duration::from_secs(7)));
 }
 
@@ -360,7 +375,10 @@ fn upstream_connection_pool_zero_means_unset_for_positive_fields() {
     // Every `> 0` guard in Go: explicit zero leaves the threshold
     // field at its default (None).
     let cp = ConnectionPoolSettings {
-        tcp: Some(TcpSettings { max_connections: 0, ..Default::default() }),
+        tcp: Some(TcpSettings {
+            max_connections: 0,
+            ..Default::default()
+        }),
         http: Some(HttpSettings {
             http1_max_pending_requests: 0,
             http2_max_requests: 0,
@@ -411,10 +429,14 @@ fn upstream_connection_pool_tcp_keepalive_packed() {
 fn upstream_merge_port_level_overrides_global_outlier() {
     // Global: consecutive_5xx=4. Per-port 8080: consecutive_5xx=7.
     // Lookup for port 8080 must yield 7, lookup for port 9090 yields 4.
-    let global_od =
-        OutlierDetection { consecutive_5xx_errors: Some(4), ..Default::default() };
-    let port_od =
-        OutlierDetection { consecutive_5xx_errors: Some(7), ..Default::default() };
+    let global_od = OutlierDetection {
+        consecutive_5xx_errors: Some(4),
+        ..Default::default()
+    };
+    let port_od = OutlierDetection {
+        consecutive_5xx_errors: Some(7),
+        ..Default::default()
+    };
     let policy = TrafficPolicy {
         outlier_detection: Some(global_od),
         port_level_settings: vec![PortLevelSettings {
@@ -427,13 +449,19 @@ fn upstream_merge_port_level_overrides_global_outlier() {
 
     let on_8080 = merge_for_port(&policy, 8080);
     assert_eq!(
-        on_8080.outlier_detection.expect("od on 8080").consecutive_5xx_errors,
+        on_8080
+            .outlier_detection
+            .expect("od on 8080")
+            .consecutive_5xx_errors,
         Some(7),
         "per-port wins on the matching port"
     );
     let on_9090 = merge_for_port(&policy, 9090);
     assert_eq!(
-        on_9090.outlier_detection.expect("od on 9090").consecutive_5xx_errors,
+        on_9090
+            .outlier_detection
+            .expect("od on 9090")
+            .consecutive_5xx_errors,
         Some(4),
         "global inherits on non-matching ports"
     );
@@ -445,11 +473,17 @@ fn upstream_merge_port_level_overrides_global_outlier() {
 #[test]
 fn upstream_merge_port_level_overrides_global_connection_pool() {
     let global_cp = ConnectionPoolSettings {
-        tcp: Some(TcpSettings { max_connections: 10, ..Default::default() }),
+        tcp: Some(TcpSettings {
+            max_connections: 10,
+            ..Default::default()
+        }),
         ..Default::default()
     };
     let port_cp = ConnectionPoolSettings {
-        tcp: Some(TcpSettings { max_connections: 50, ..Default::default() }),
+        tcp: Some(TcpSettings {
+            max_connections: 50,
+            ..Default::default()
+        }),
         ..Default::default()
     };
     let policy = TrafficPolicy {
@@ -481,10 +515,15 @@ fn upstream_merge_port_level_overrides_global_connection_pool() {
 fn upstream_merge_port_level_partial_inherits_missing_fields() {
     // Port-level provides connection_pool but no outlier_detection;
     // outlier_detection must inherit from the global policy.
-    let global_od =
-        OutlierDetection { consecutive_5xx_errors: Some(2), ..Default::default() };
+    let global_od = OutlierDetection {
+        consecutive_5xx_errors: Some(2),
+        ..Default::default()
+    };
     let port_cp = ConnectionPoolSettings {
-        tcp: Some(TcpSettings { max_connections: 33, ..Default::default() }),
+        tcp: Some(TcpSettings {
+            max_connections: 33,
+            ..Default::default()
+        }),
         ..Default::default()
     };
     let policy = TrafficPolicy {
@@ -499,7 +538,10 @@ fn upstream_merge_port_level_partial_inherits_missing_fields() {
 
     let merged = merge_for_port(&policy, 7000);
     assert_eq!(
-        merged.outlier_detection.expect("inherited").consecutive_5xx_errors,
+        merged
+            .outlier_detection
+            .expect("inherited")
+            .consecutive_5xx_errors,
         Some(2),
         "missing port-level outlier_detection inherits from global"
     );
@@ -515,10 +557,15 @@ fn upstream_merge_port_level_partial_inherits_missing_fields() {
 ///   selectTrafficPolicyComponents — no port-level entries
 #[test]
 fn upstream_merge_no_port_level_returns_global_clone() {
-    let global_od =
-        OutlierDetection { consecutive_5xx_errors: Some(9), ..Default::default() };
+    let global_od = OutlierDetection {
+        consecutive_5xx_errors: Some(9),
+        ..Default::default()
+    };
     let global_cp = ConnectionPoolSettings {
-        tcp: Some(TcpSettings { max_connections: 11, ..Default::default() }),
+        tcp: Some(TcpSettings {
+            max_connections: 11,
+            ..Default::default()
+        }),
         ..Default::default()
     };
     let policy = TrafficPolicy {

@@ -6,7 +6,7 @@
 //! Cave-domain rules apply: tenant scope mandatory by construction,
 //! audit trail emitted on every read.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Subcommand;
 use serde_json::json;
 
@@ -78,11 +78,10 @@ pub fn prepare(cmd: &SecretsCmd) -> Result<PreparedRequest> {
                 bail!("value required");
             }
             let body = json!({"name": name, "value": value, "kind": kind});
-            Ok(PreparedRequest::new(
-                HttpVerb::Post,
-                scoped("secrets", tenant.as_deref(), None),
+            Ok(
+                PreparedRequest::new(HttpVerb::Post, scoped("secrets", tenant.as_deref(), None))
+                    .with_body(body),
             )
-            .with_body(body))
         }
         SecretsCmd::Rotate { name, tenant } => {
             validate_name(name)?;
@@ -214,24 +213,28 @@ mod tests {
 
     #[test]
     fn add_rejects_unknown_kind() {
-        assert!(prepare(&SecretsCmd::Add {
-            name: "x".into(),
-            value: "y".into(),
-            kind: "nuke".into(),
-            tenant: None,
-        })
-        .is_err());
+        assert!(
+            prepare(&SecretsCmd::Add {
+                name: "x".into(),
+                value: "y".into(),
+                kind: "nuke".into(),
+                tenant: None,
+            })
+            .is_err()
+        );
     }
 
     #[test]
     fn add_rejects_empty_value() {
-        assert!(prepare(&SecretsCmd::Add {
-            name: "x".into(),
-            value: "".into(),
-            kind: "generic".into(),
-            tenant: None,
-        })
-        .is_err());
+        assert!(
+            prepare(&SecretsCmd::Add {
+                name: "x".into(),
+                value: "".into(),
+                kind: "generic".into(),
+                tenant: None,
+            })
+            .is_err()
+        );
     }
 
     #[test]
@@ -252,10 +255,7 @@ mod tests {
             tenant: Some("acme".into()),
         })
         .unwrap();
-        assert_eq!(
-            r.path,
-            "/api/native/tenants/acme/secrets/db-pass/rotate"
-        );
+        assert_eq!(r.path, "/api/native/tenants/acme/secrets/db-pass/rotate");
     }
 
     #[test]
@@ -317,30 +317,36 @@ mod tests {
 
     #[test]
     fn validate_rejects_empty_name() {
-        assert!(prepare(&SecretsCmd::Get {
-            name: "".into(),
-            tenant: None,
-        })
-        .is_err());
+        assert!(
+            prepare(&SecretsCmd::Get {
+                name: "".into(),
+                tenant: None,
+            })
+            .is_err()
+        );
     }
 
     #[test]
     fn validate_rejects_oversized_name() {
         let big = "a".repeat(257);
-        assert!(prepare(&SecretsCmd::Get {
-            name: big,
-            tenant: None,
-        })
-        .is_err());
+        assert!(
+            prepare(&SecretsCmd::Get {
+                name: big,
+                tenant: None,
+            })
+            .is_err()
+        );
     }
 
     #[test]
     fn validate_rejects_special_chars() {
-        assert!(prepare(&SecretsCmd::Get {
-            name: "bad name!".into(),
-            tenant: None,
-        })
-        .is_err());
+        assert!(
+            prepare(&SecretsCmd::Get {
+                name: "bad name!".into(),
+                tenant: None,
+            })
+            .is_err()
+        );
     }
 
     #[test]

@@ -121,7 +121,10 @@ mod tests {
             "tenant-eps-grow"
         );
         let s = slice(vec![("app", "web")]);
-        let obs = EndpointObservation { ready_pod_count: 250, current_slice_count: 1 };
+        let obs = EndpointObservation {
+            ready_pod_count: 250,
+            current_slice_count: 1,
+        };
         // need ceil(250 / 100) = 3, have 1 → create 2
         assert_eq!(reconcile(&s, &obs, &tenant).unwrap(), Reconcile::Create(2));
     }
@@ -134,7 +137,10 @@ mod tests {
             "tenant-eps-drain"
         );
         let s = slice(vec![("app", "web")]);
-        let obs = EndpointObservation { ready_pod_count: 0, current_slice_count: 3 };
+        let obs = EndpointObservation {
+            ready_pod_count: 0,
+            current_slice_count: 3,
+        };
         assert_eq!(reconcile(&s, &obs, &tenant).unwrap(), Reconcile::Delete(3));
     }
 }

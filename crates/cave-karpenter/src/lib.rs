@@ -39,7 +39,7 @@ pub use models::{
     Budget, Disruption, Limits, NodeClaim, NodeClaimSpec, NodeClaimStatus, NodeClaimTemplate,
     NodeClass, NodeClassRef, NodePool, Requirement, RequirementOperator, Taint,
 };
-pub use scheduler::{schedule_first_match, ScheduleOutcome};
+pub use scheduler::{ScheduleOutcome, schedule_first_match};
 pub use store::Store;
 
 pub const MODULE_NAME: &str = "cave-karpenter";
@@ -68,7 +68,10 @@ mod tests {
         let mut p = NodePool::default();
         p.name = "default".to_string();
         s.put_pool(p.clone());
-        assert_eq!(s.get_pool("default").map(|x| x.name), Some("default".to_string()));
+        assert_eq!(
+            s.get_pool("default").map(|x| x.name),
+            Some("default".to_string())
+        );
         assert_eq!(s.list_pools().len(), 1);
         assert!(s.delete_pool("default"));
         assert!(s.list_pools().is_empty());
@@ -76,10 +79,18 @@ mod tests {
 
     #[test]
     fn schedule_first_match_picks_in_operator_pool() {
-        let p = pool("gpu", "node.kubernetes.io/instance-type", RequirementOperator::In, &["g4dn.xlarge"]);
+        let p = pool(
+            "gpu",
+            "node.kubernetes.io/instance-type",
+            RequirementOperator::In,
+            &["g4dn.xlarge"],
+        );
         let outcome = schedule_first_match(
             &[p],
-            &[("node.kubernetes.io/instance-type".to_string(), "g4dn.xlarge".to_string())],
+            &[(
+                "node.kubernetes.io/instance-type".to_string(),
+                "g4dn.xlarge".to_string(),
+            )],
         );
         match outcome {
             ScheduleOutcome::Provisioned { pool, claim } => {
@@ -92,10 +103,18 @@ mod tests {
 
     #[test]
     fn schedule_first_match_skips_pool_with_not_in() {
-        let p = pool("default", "topology.kubernetes.io/zone", RequirementOperator::NotIn, &["us-east-1a"]);
+        let p = pool(
+            "default",
+            "topology.kubernetes.io/zone",
+            RequirementOperator::NotIn,
+            &["us-east-1a"],
+        );
         let outcome = schedule_first_match(
             &[p],
-            &[("topology.kubernetes.io/zone".to_string(), "us-east-1a".to_string())],
+            &[(
+                "topology.kubernetes.io/zone".to_string(),
+                "us-east-1a".to_string(),
+            )],
         );
         assert!(matches!(outcome, ScheduleOutcome::NoMatch { .. }));
     }

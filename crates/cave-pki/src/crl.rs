@@ -14,35 +14,37 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RevocationReason {
-    Unspecified            = 0,
-    KeyCompromise          = 1,
-    CaCompromise           = 2,
-    AffiliationChanged     = 3,
-    Superseded             = 4,
-    CessationOfOperation   = 5,
-    CertificateHold        = 6,
+    Unspecified = 0,
+    KeyCompromise = 1,
+    CaCompromise = 2,
+    AffiliationChanged = 3,
+    Superseded = 4,
+    CessationOfOperation = 5,
+    CertificateHold = 6,
     // 7 is unused per RFC 5280
-    RemoveFromCrl          = 8,
-    PrivilegeWithdrawn     = 9,
-    AaCompromise           = 10,
+    RemoveFromCrl = 8,
+    PrivilegeWithdrawn = 9,
+    AaCompromise = 10,
 }
 
 impl RevocationReason {
-    pub fn code(&self) -> u8 { *self as u8 }
+    pub fn code(&self) -> u8 {
+        *self as u8
+    }
 
     pub fn from_code(c: u8) -> Option<Self> {
         match c {
-            0  => Some(Self::Unspecified),
-            1  => Some(Self::KeyCompromise),
-            2  => Some(Self::CaCompromise),
-            3  => Some(Self::AffiliationChanged),
-            4  => Some(Self::Superseded),
-            5  => Some(Self::CessationOfOperation),
-            6  => Some(Self::CertificateHold),
-            8  => Some(Self::RemoveFromCrl),
-            9  => Some(Self::PrivilegeWithdrawn),
+            0 => Some(Self::Unspecified),
+            1 => Some(Self::KeyCompromise),
+            2 => Some(Self::CaCompromise),
+            3 => Some(Self::AffiliationChanged),
+            4 => Some(Self::Superseded),
+            5 => Some(Self::CessationOfOperation),
+            6 => Some(Self::CertificateHold),
+            8 => Some(Self::RemoveFromCrl),
+            9 => Some(Self::PrivilegeWithdrawn),
             10 => Some(Self::AaCompromise),
-            _  => None,
+            _ => None,
         }
     }
 }
@@ -68,7 +70,9 @@ pub struct CrlResponder {
 }
 
 impl CrlResponder {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Cite: openbao `pki/path_revoke.go` — revoking the same serial
     /// twice is idempotent: the timestamp is overwritten with the most
@@ -109,12 +113,19 @@ impl CrlResponder {
         self.by_serial.contains_key(serial)
     }
 
-    pub fn len(&self) -> usize { self.by_serial.len() }
-    pub fn is_empty(&self) -> bool { self.by_serial.is_empty() }
+    pub fn len(&self) -> usize {
+        self.by_serial.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.by_serial.is_empty()
+    }
 
     /// All entries owned by a tenant. Cite: cave multi-tenant invariant
     /// — operators see only their tenant's revocations.
     pub fn for_tenant(&self, tenant_id: &str) -> Vec<&CrlEntry> {
-        self.by_serial.values().filter(|e| e.tenant_id == tenant_id).collect()
+        self.by_serial
+            .values()
+            .filter(|e| e.tenant_id == tenant_id)
+            .collect()
     }
 }

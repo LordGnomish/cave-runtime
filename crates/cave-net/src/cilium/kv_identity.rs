@@ -67,7 +67,8 @@ pub struct KvIdentityAllocator {
 impl KvIdentityAllocator {
     pub fn new(tenant: TenantId, gc_grace_seconds: u64) -> Self {
         Self {
-            tenant, gc_grace_seconds,
+            tenant,
+            gc_grace_seconds,
             next_id: MIN_GLOBAL_IDENTITY,
             by_id: HashMap::new(),
             by_labels: HashMap::new(),
@@ -93,8 +94,10 @@ impl KvIdentityAllocator {
         let id = self.next_id;
         self.next_id += 1;
         let entry = GlobalIdentity {
-            identity: id, labels: labels.clone(),
-            refcount: 1, released_at_ns: None,
+            identity: id,
+            labels: labels.clone(),
+            refcount: 1,
+            released_at_ns: None,
         };
         self.by_id.insert(id, entry);
         self.by_labels.insert(labels.clone(), id);
@@ -106,7 +109,10 @@ impl KvIdentityAllocator {
         if id < MIN_GLOBAL_IDENTITY {
             return Err(KvIdentityError::BelowGlobalRange(id));
         }
-        let entry = self.by_id.get_mut(&id).ok_or(KvIdentityError::NotFound(id))?;
+        let entry = self
+            .by_id
+            .get_mut(&id)
+            .ok_or(KvIdentityError::NotFound(id))?;
         if entry.refcount > 0 {
             entry.refcount -= 1;
         }
@@ -136,7 +142,9 @@ impl KvIdentityAllocator {
     /// `gc_grace_seconds`. Returns count removed.
     pub fn gc(&mut self, now_ns: u64) -> usize {
         let grace_ns = self.gc_grace_seconds * 1_000_000_000;
-        let dead: Vec<u32> = self.by_id.iter()
+        let dead: Vec<u32> = self
+            .by_id
+            .iter()
             .filter(|(_, e)| {
                 if e.refcount > 0 {
                     return false;
@@ -166,8 +174,10 @@ impl KvIdentityAllocator {
             return Err(KvIdentityError::EmptyLabels);
         }
         let entry = GlobalIdentity {
-            identity, labels: labels.clone(),
-            refcount: 1, released_at_ns: None,
+            identity,
+            labels: labels.clone(),
+            refcount: 1,
+            released_at_ns: None,
         };
         self.by_labels.insert(labels, identity);
         self.by_id.insert(identity, entry);
@@ -179,7 +189,10 @@ impl KvIdentityAllocator {
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::cilium("pkg/identity/cache/kvstore_allocator.go", "KVStoreAllocator");
+const FILE_CITE: Cite = Cite::cilium(
+    "pkg/identity/cache/kvstore_allocator.go",
+    "KVStoreAllocator",
+);
 
 #[cfg(test)]
 mod tests {
@@ -198,7 +211,11 @@ mod tests {
 
     #[test]
     fn min_global_identity_at_2_to_24() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "MinGlobal", "tenant-kvi-min");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "MinGlobal",
+            "tenant-kvi-min"
+        );
         assert_eq!(MIN_GLOBAL_IDENTITY, 1 << 24);
     }
 
@@ -206,7 +223,11 @@ mod tests {
 
     #[test]
     fn allocate_first_call_starts_at_min_global() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Allocate.First", "tenant-kvi-af");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Allocate.First",
+            "tenant-kvi-af"
+        );
         let mut a = alloc(tenant);
         let id = a.allocate(&ls(&[("app", "web")]), 100).unwrap();
         assert_eq!(id, MIN_GLOBAL_IDENTITY);
@@ -214,7 +235,11 @@ mod tests {
 
     #[test]
     fn allocate_same_labels_returns_same_id_and_bumps_refcount() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Allocate.SameLabels", "tenant-kvi-asl");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Allocate.SameLabels",
+            "tenant-kvi-asl"
+        );
         let mut a = alloc(tenant);
         let labels = ls(&[("app", "web")]);
         let a1 = a.allocate(&labels, 100).unwrap();
@@ -225,7 +250,11 @@ mod tests {
 
     #[test]
     fn allocate_distinct_labels_returns_distinct_ids() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Allocate.Distinct", "tenant-kvi-ad");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Allocate.Distinct",
+            "tenant-kvi-ad"
+        );
         let mut a = alloc(tenant);
         let id1 = a.allocate(&ls(&[("app", "web")]), 100).unwrap();
         let id2 = a.allocate(&ls(&[("app", "api")]), 100).unwrap();
@@ -235,7 +264,11 @@ mod tests {
 
     #[test]
     fn allocate_empty_labels_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Allocate.EmptyLabels", "tenant-kvi-ae");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Allocate.EmptyLabels",
+            "tenant-kvi-ae"
+        );
         let mut a = alloc(tenant);
         let err = a.allocate(&LabelSet { pairs: vec![] }, 100).unwrap_err();
         assert_eq!(err, KvIdentityError::EmptyLabels);
@@ -245,7 +278,11 @@ mod tests {
 
     #[test]
     fn lookup_by_id_returns_entry() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Lookup.ByID", "tenant-kvi-lid");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Lookup.ByID",
+            "tenant-kvi-lid"
+        );
         let mut a = alloc(tenant);
         let labels = ls(&[("app", "web")]);
         let id = a.allocate(&labels, 100).unwrap();
@@ -255,14 +292,22 @@ mod tests {
 
     #[test]
     fn lookup_unknown_id_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Lookup.NotFound", "tenant-kvi-lnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Lookup.NotFound",
+            "tenant-kvi-lnf"
+        );
         let a = alloc(tenant);
         assert!(a.lookup(999).is_none());
     }
 
     #[test]
     fn lookup_by_labels_returns_id() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Lookup.ByLabels", "tenant-kvi-lbl");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Lookup.ByLabels",
+            "tenant-kvi-lbl"
+        );
         let mut a = alloc(tenant);
         let labels = ls(&[("app", "web")]);
         let id = a.allocate(&labels, 100).unwrap();
@@ -271,7 +316,11 @@ mod tests {
 
     #[test]
     fn lookup_by_unknown_labels_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Lookup.ByLabels.NotFound", "tenant-kvi-lblnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Lookup.ByLabels.NotFound",
+            "tenant-kvi-lblnf"
+        );
         let a = alloc(tenant);
         assert!(a.lookup_by_labels(&ls(&[("nope", "x")])).is_none());
     }
@@ -280,7 +329,11 @@ mod tests {
 
     #[test]
     fn release_decrements_refcount() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Release", "tenant-kvi-rel");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Release",
+            "tenant-kvi-rel"
+        );
         let mut a = alloc(tenant);
         let labels = ls(&[("app", "web")]);
         let id = a.allocate(&labels, 100).unwrap();
@@ -291,7 +344,11 @@ mod tests {
 
     #[test]
     fn release_below_global_range_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Release.BelowGlobal", "tenant-kvi-relbg");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Release.BelowGlobal",
+            "tenant-kvi-relbg"
+        );
         let mut a = alloc(tenant);
         let err = a.release(1 /* reserved */, 100).unwrap_err();
         assert_eq!(err, KvIdentityError::BelowGlobalRange(1));
@@ -299,7 +356,11 @@ mod tests {
 
     #[test]
     fn release_unknown_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Release.NotFound", "tenant-kvi-relnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Release.NotFound",
+            "tenant-kvi-relnf"
+        );
         let mut a = alloc(tenant);
         let err = a.release(MIN_GLOBAL_IDENTITY + 1, 100).unwrap_err();
         assert_eq!(err, KvIdentityError::NotFound(MIN_GLOBAL_IDENTITY + 1));
@@ -307,7 +368,11 @@ mod tests {
 
     #[test]
     fn release_to_zero_records_release_timestamp() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Release.RecordTimestamp", "tenant-kvi-relts");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Release.RecordTimestamp",
+            "tenant-kvi-relts"
+        );
         let mut a = alloc(tenant);
         let id = a.allocate(&ls(&[("app", "web")]), 100).unwrap();
         a.release(id, 200).unwrap();
@@ -316,7 +381,11 @@ mod tests {
 
     #[test]
     fn allocate_after_release_re_increments_refcount_and_clears_timestamp() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Reallocate", "tenant-kvi-real");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Reallocate",
+            "tenant-kvi-real"
+        );
         let mut a = alloc(tenant);
         let labels = ls(&[("app", "web")]);
         let id = a.allocate(&labels, 100).unwrap();
@@ -331,7 +400,11 @@ mod tests {
 
     #[test]
     fn gc_removes_released_after_grace() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "GC.Released", "tenant-kvi-gc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "GC.Released",
+            "tenant-kvi-gc"
+        );
         let mut a = alloc(tenant);
         let id = a.allocate(&ls(&[("app", "web")]), 100).unwrap();
         a.release(id, 100).unwrap();
@@ -342,7 +415,11 @@ mod tests {
 
     #[test]
     fn gc_keeps_released_within_grace() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "GC.WithinGrace", "tenant-kvi-gcg");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "GC.WithinGrace",
+            "tenant-kvi-gcg"
+        );
         let mut a = alloc(tenant);
         let id = a.allocate(&ls(&[("app", "web")]), 100).unwrap();
         a.release(id, 100).unwrap();
@@ -353,7 +430,11 @@ mod tests {
 
     #[test]
     fn gc_keeps_referenced_entries() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "GC.KeepRef", "tenant-kvi-gck");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "GC.KeepRef",
+            "tenant-kvi-gck"
+        );
         let mut a = alloc(tenant);
         let id = a.allocate(&ls(&[("app", "web")]), 100).unwrap();
         let n = a.gc(60_000_000_000 + 100);
@@ -365,26 +446,42 @@ mod tests {
 
     #[test]
     fn restore_inserts_with_provided_identity() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Restore", "tenant-kvi-rst");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Restore",
+            "tenant-kvi-rst"
+        );
         let mut a = alloc(tenant);
         let labels = ls(&[("app", "web")]);
-        a.restore(MIN_GLOBAL_IDENTITY + 100, labels.clone()).unwrap();
+        a.restore(MIN_GLOBAL_IDENTITY + 100, labels.clone())
+            .unwrap();
         assert_eq!(a.lookup_by_labels(&labels), Some(MIN_GLOBAL_IDENTITY + 100));
     }
 
     #[test]
     fn restore_empty_labels_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Restore.Empty", "tenant-kvi-rste");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Restore.Empty",
+            "tenant-kvi-rste"
+        );
         let mut a = alloc(tenant);
-        let err = a.restore(MIN_GLOBAL_IDENTITY + 1, LabelSet { pairs: vec![] }).unwrap_err();
+        let err = a
+            .restore(MIN_GLOBAL_IDENTITY + 1, LabelSet { pairs: vec![] })
+            .unwrap_err();
         assert_eq!(err, KvIdentityError::EmptyLabels);
     }
 
     #[test]
     fn restore_advances_next_id_to_avoid_collision() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Restore.NextID", "tenant-kvi-rstn");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Restore.NextID",
+            "tenant-kvi-rstn"
+        );
         let mut a = alloc(tenant);
-        a.restore(MIN_GLOBAL_IDENTITY + 99, ls(&[("app", "web")])).unwrap();
+        a.restore(MIN_GLOBAL_IDENTITY + 99, ls(&[("app", "web")]))
+            .unwrap();
         let next = a.allocate(&ls(&[("app", "api")]), 100).unwrap();
         assert!(next > MIN_GLOBAL_IDENTITY + 99);
     }
@@ -393,7 +490,11 @@ mod tests {
 
     #[test]
     fn count_tracks_alloc_and_gc() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Count", "tenant-kvi-cnt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Count",
+            "tenant-kvi-cnt"
+        );
         let mut a = alloc(tenant);
         let id1 = a.allocate(&ls(&[("app", "a")]), 0).unwrap();
         let _ = a.allocate(&ls(&[("app", "b")]), 0).unwrap();
@@ -404,7 +505,11 @@ mod tests {
 
     #[test]
     fn refcount_unknown_returns_zero() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "Refcount.NotFound", "tenant-kvi-rcnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "Refcount.NotFound",
+            "tenant-kvi-rcnf"
+        );
         let a = alloc(tenant);
         assert_eq!(a.refcount(MIN_GLOBAL_IDENTITY + 99), 0);
     }
@@ -413,11 +518,16 @@ mod tests {
 
     #[test]
     fn global_identity_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/cache/kvstore_allocator.go", "GlobalIdentity.Serde", "tenant-kvi-serde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/cache/kvstore_allocator.go",
+            "GlobalIdentity.Serde",
+            "tenant-kvi-serde"
+        );
         let g = GlobalIdentity {
             identity: MIN_GLOBAL_IDENTITY + 10,
             labels: ls(&[("app", "web")]),
-            refcount: 2, released_at_ns: None,
+            refcount: 2,
+            released_at_ns: None,
         };
         let s = serde_json::to_string(&g).unwrap();
         let back: GlobalIdentity = serde_json::from_str(&s).unwrap();

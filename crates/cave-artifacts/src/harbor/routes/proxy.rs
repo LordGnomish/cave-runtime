@@ -15,16 +15,16 @@
 //! The Docker v2 routes live in `routes::v2` and are untouched — OCI pull
 //! falls through the OCI adapter rather than this module.
 
+use crate::harbor::RegistryState;
 use crate::harbor::pipeline::{ScanPipelineOutcome, VerdictDecision};
 use crate::harbor::proxy::{Ecosystem, FetchedArtifact, ProxyError, ProxyMode};
-use crate::harbor::RegistryState;
 use axum::{
+    Json, Router,
     body::Body,
     extract::{Path, State},
-    http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::get,
-    Json, Router,
 };
 use serde_json::json;
 use std::sync::Arc;
@@ -41,7 +41,10 @@ pub fn router(state: Arc<RegistryState>) -> Router {
         .route("/api/registry/proxy/status", get(proxy_status))
         // PyPI Simple index + blobs
         .route("/api/registry/pypi/simple/", get(pypi_simple_root))
-        .route("/api/registry/pypi/simple/{package}/", get(pypi_simple_project))
+        .route(
+            "/api/registry/pypi/simple/{package}/",
+            get(pypi_simple_project),
+        )
         .route("/api/registry/pypi/blob/{*path}", get(pypi_blob))
         // npm metadata + tarballs
         .route("/api/registry/npm/{package}", get(npm_metadata))
@@ -95,7 +98,11 @@ async fn pypi_simple_root(State(state): State<Arc<RegistryState>>) -> Response {
         Ok((ct, bytes)) => {
             let rewritten = state
                 .proxy
-                .rewrite_urls(Ecosystem::PyPI, std::str::from_utf8(&bytes).unwrap_or(""), "")
+                .rewrite_urls(
+                    Ecosystem::PyPI,
+                    std::str::from_utf8(&bytes).unwrap_or(""),
+                    "",
+                )
                 .into_bytes();
             (StatusCode::OK, [(header::CONTENT_TYPE, ct)], rewritten).into_response()
         }
@@ -119,21 +126,13 @@ async fn pypi_simple_project(
                 .map(|s| s.to_string())
                 .unwrap_or_default();
             let rewritten = state.proxy.rewrite_urls(Ecosystem::PyPI, &body, host);
-            (
-                StatusCode::OK,
-                [(header::CONTENT_TYPE, ct)],
-                rewritten,
-            )
-                .into_response()
+            (StatusCode::OK, [(header::CONTENT_TYPE, ct)], rewritten).into_response()
         }
         Err(e) => upstream_to_status(&e),
     }
 }
 
-async fn pypi_blob(
-    Path(path): Path<String>,
-    State(state): State<Arc<RegistryState>>,
-) -> Response {
+async fn pypi_blob(Path(path): Path<String>, State(state): State<Arc<RegistryState>>) -> Response {
     // PyPI blob URL shape (after rewrite): `<package>/<wheel-or-sdist>`.
     let (package, _) = split_first_segment(&path);
     serve_blob(Ecosystem::PyPI, &package, None, &path, state).await
@@ -258,10 +257,7 @@ async fn serve_blob(
 fn blob_response(cache_key: &str, ecosystem: Ecosystem, bytes: bytes::Bytes) -> Response {
     let ct = default_content_type(ecosystem);
     let mut headers = HeaderMap::new();
-    headers.insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static(ct),
-    );
+    headers.insert(header::CONTENT_TYPE, HeaderValue::from_static(ct));
     headers.insert(
         header::CACHE_CONTROL,
         HeaderValue::from_static("public, max-age=31536000, immutable"),
@@ -359,12 +355,22 @@ fn build_451_response(
 fn upstream_to_status(err: &ProxyError) -> Response {
     match err {
         ProxyError::ProxyOff => (StatusCode::NOT_FOUND, "proxy off").into_response(),
-        ProxyError::NoUpstream(_) => (StatusCode::NOT_FOUND, "no upstream configured").into_response(),
-        ProxyError::UpstreamDisabled(_) => (StatusCode::SERVICE_UNAVAILABLE, "upstream disabled").into_response(),
-        ProxyError::Blocked { .. } => (StatusCode::from_u16(451).unwrap_or(StatusCode::FORBIDDEN), "blocked").into_response(),
-        ProxyError::UpstreamStatus { status, .. } => {
-            (StatusCode::from_u16(*status).unwrap_or(StatusCode::BAD_GATEWAY), "upstream error").into_response()
+        ProxyError::NoUpstream(_) => {
+            (StatusCode::NOT_FOUND, "no upstream configured").into_response()
         }
+        ProxyError::UpstreamDisabled(_) => {
+            (StatusCode::SERVICE_UNAVAILABLE, "upstream disabled").into_response()
+        }
+        ProxyError::Blocked { .. } => (
+            StatusCode::from_u16(451).unwrap_or(StatusCode::FORBIDDEN),
+            "blocked",
+        )
+            .into_response(),
+        ProxyError::UpstreamStatus { status, .. } => (
+            StatusCode::from_u16(*status).unwrap_or(StatusCode::BAD_GATEWAY),
+            "upstream error",
+        )
+            .into_response(),
         ProxyError::UpstreamFetch { .. } | ProxyError::ClientBuild(_) => {
             (StatusCode::BAD_GATEWAY, "upstream fetch failed").into_response()
         }

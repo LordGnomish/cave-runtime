@@ -62,12 +62,12 @@ pub fn compute_interval(from: &str, to: &str) -> String {
     // Rough heuristic from the from→to labels
     let secs = parse_relative_secs(from, to);
     match secs {
-        s if s <= 3600 => "10s".into(),            // ≤ 1h
-        s if s <= 6 * 3600 => "30s".into(),        // ≤ 6h
-        s if s < 24 * 3600 => "1m".into(),         // < 24h
-        s if s < 7 * 86400 => "5m".into(),         // < 7d
-        s if s < 30 * 86400 => "30m".into(),       // < 30d
-        s if s <= 90 * 86400 => "1h".into(),       // ≤ 90d
+        s if s <= 3600 => "10s".into(),      // ≤ 1h
+        s if s <= 6 * 3600 => "30s".into(),  // ≤ 6h
+        s if s < 24 * 3600 => "1m".into(),   // < 24h
+        s if s < 7 * 86400 => "5m".into(),   // < 7d
+        s if s < 30 * 86400 => "30m".into(), // < 30d
+        s if s <= 90 * 86400 => "1h".into(), // ≤ 90d
         _ => "1d".into(),
     }
 }
@@ -105,13 +105,28 @@ pub fn interpolate(input: &str, ctx: &InterpolationContext<'_>) -> String {
     var_map.insert("__from".into(), from.to_string());
     var_map.insert("__to".into(), to.to_string());
     var_map.insert("__range".into(), format!("{from}/{to}"));
-    var_map.insert("__range_s".into(), parse_relative_secs(from, to).to_string());
-    var_map.insert("__range_ms".into(), (parse_relative_secs(from, to) * 1000).to_string());
-    var_map.insert("__dashboard".into(), ctx.dashboard_title.unwrap_or("").to_string());
-    var_map.insert("__name".into(), ctx.dashboard_title.unwrap_or("").to_string());
+    var_map.insert(
+        "__range_s".into(),
+        parse_relative_secs(from, to).to_string(),
+    );
+    var_map.insert(
+        "__range_ms".into(),
+        (parse_relative_secs(from, to) * 1000).to_string(),
+    );
+    var_map.insert(
+        "__dashboard".into(),
+        ctx.dashboard_title.unwrap_or("").to_string(),
+    );
+    var_map.insert(
+        "__name".into(),
+        ctx.dashboard_title.unwrap_or("").to_string(),
+    );
     var_map.insert("__org".into(), ctx.org_name.unwrap_or("").to_string());
     var_map.insert("__user".into(), ctx.user_login.unwrap_or("").to_string());
-    var_map.insert("__timeFilter".into(), format!("time >= {now_ms}ms - {from} AND time <= {now_ms}ms"));
+    var_map.insert(
+        "__timeFilter".into(),
+        format!("time >= {now_ms}ms - {from} AND time <= {now_ms}ms"),
+    );
 
     replace_all(input, &var_map)
 }
@@ -126,22 +141,29 @@ fn replace_all(input: &str, vars: &HashMap<String, String>) -> String {
 
     let s = re_brace.replace_all(input, |caps: &regex::Captures<'_>| {
         let name = &caps[1];
-        vars.get(name).cloned().unwrap_or_else(|| caps[0].to_string())
+        vars.get(name)
+            .cloned()
+            .unwrap_or_else(|| caps[0].to_string())
     });
     let s = re_legacy.replace_all(&s, |caps: &regex::Captures<'_>| {
         let name = &caps[1];
-        vars.get(name).cloned().unwrap_or_else(|| caps[0].to_string())
+        vars.get(name)
+            .cloned()
+            .unwrap_or_else(|| caps[0].to_string())
     });
     let s = re_dollar.replace_all(&s, |caps: &regex::Captures<'_>| {
         let name = &caps[1];
-        vars.get(name).cloned().unwrap_or_else(|| caps[0].to_string())
+        vars.get(name)
+            .cloned()
+            .unwrap_or_else(|| caps[0].to_string())
     });
     s.into_owned()
 }
 
 /// Resolve ad-hoc filter variables into a label matcher string.
 pub fn adhoc_filters_to_label_matchers(filters: &[AdhocFilter]) -> String {
-    filters.iter()
+    filters
+        .iter()
         .map(|f| {
             let op = match f.operator.as_str() {
                 "=" => "=",
@@ -195,7 +217,9 @@ pub fn parse_interval_options(options_str: &str) -> Vec<VariableOption> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{Variable, VariableHide, VariableOption, VariableRefresh, VariableSort, VariableType};
+    use crate::models::{
+        Variable, VariableHide, VariableOption, VariableRefresh, VariableSort, VariableType,
+    };
 
     fn make_var(name: &str, value: &str) -> Variable {
         Variable {
@@ -248,7 +272,10 @@ mod tests {
     fn test_multiple_vars() {
         let vars = vec![make_var("ns", "default"), make_var("pod", "web-1")];
         let ctx = InterpolationContext::new(&vars);
-        assert_eq!(interpolate("namespace=$ns,pod=$pod", &ctx), "namespace=default,pod=web-1");
+        assert_eq!(
+            interpolate("namespace=$ns,pod=$pod", &ctx),
+            "namespace=default,pod=web-1"
+        );
     }
 
     #[test]

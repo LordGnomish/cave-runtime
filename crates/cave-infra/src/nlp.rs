@@ -29,7 +29,11 @@ pub fn parse_intent(text: &str) -> InfraIntent {
     let lower = text.to_lowercase();
     let action = detect_action(&lower);
     let specs = extract_specs(&lower, &action);
-    let confidence = if action == IntentAction::Unknown { 0.2 } else { 0.8 };
+    let confidence = if action == IntentAction::Unknown {
+        0.2
+    } else {
+        0.8
+    };
 
     InfraIntent {
         action,
@@ -40,24 +44,42 @@ pub fn parse_intent(text: &str) -> InfraIntent {
 }
 
 fn detect_action(text: &str) -> IntentAction {
-    if text.contains("create") || text.contains("provision") || text.contains("spin up")
-        || text.contains("deploy") || text.contains("set up") || text.contains("launch")
-        || text.contains("add") || text.contains("new ")
+    if text.contains("create")
+        || text.contains("provision")
+        || text.contains("spin up")
+        || text.contains("deploy")
+        || text.contains("set up")
+        || text.contains("launch")
+        || text.contains("add")
+        || text.contains("new ")
     {
         IntentAction::Provision
-    } else if text.contains("scale") || text.contains("resize") || text.contains("upgrade")
-        || text.contains("downgrade") || text.contains("increase") || text.contains("decrease")
+    } else if text.contains("scale")
+        || text.contains("resize")
+        || text.contains("upgrade")
+        || text.contains("downgrade")
+        || text.contains("increase")
+        || text.contains("decrease")
     {
         IntentAction::Scale
-    } else if text.contains("delete") || text.contains("destroy") || text.contains("remove")
-        || text.contains("terminate") || text.contains("tear down")
+    } else if text.contains("delete")
+        || text.contains("destroy")
+        || text.contains("remove")
+        || text.contains("terminate")
+        || text.contains("tear down")
     {
         IntentAction::Destroy
-    } else if text.contains("show") || text.contains("list") || text.contains("describe")
-        || text.contains("status") || text.contains("inspect") || text.contains("check")
+    } else if text.contains("show")
+        || text.contains("list")
+        || text.contains("describe")
+        || text.contains("status")
+        || text.contains("inspect")
+        || text.contains("check")
     {
         IntentAction::Inspect
-    } else if text.contains("plan") || text.contains("preview") || text.contains("what would")
+    } else if text.contains("plan")
+        || text.contains("preview")
+        || text.contains("what would")
         || text.contains("dry run")
     {
         IntentAction::Plan
@@ -74,8 +96,11 @@ fn extract_specs(text: &str, action: &IntentAction) -> Vec<ResourceSpec> {
     let mut specs = Vec::new();
 
     // Server patterns
-    if text.contains("server") || text.contains("vm") || text.contains("instance")
-        || text.contains("machine") || text.contains("node")
+    if text.contains("server")
+        || text.contains("vm")
+        || text.contains("instance")
+        || text.contains("machine")
+        || text.contains("node")
     {
         let mut props = HashMap::new();
         props.insert("os".into(), serde_json::json!("ubuntu-22.04"));
@@ -114,13 +139,20 @@ fn extract_specs(text: &str, action: &IntentAction) -> Vec<ResourceSpec> {
     }
 
     // Database patterns
-    if text.contains("database") || text.contains("postgres") || text.contains("mysql")
+    if text.contains("database")
+        || text.contains("postgres")
+        || text.contains("mysql")
         || text.contains("db ")
     {
         let mut props = HashMap::new();
-        props.insert("engine".into(), serde_json::json!(
-            if text.contains("mysql") { "mysql" } else { "postgresql" }
-        ));
+        props.insert(
+            "engine".into(),
+            serde_json::json!(if text.contains("mysql") {
+                "mysql"
+            } else {
+                "postgresql"
+            }),
+        );
         props.insert("version".into(), serde_json::json!("16"));
         if let Some(storage) = extract_storage_gb(text) {
             props.insert("storage_gb".into(), serde_json::json!(storage));
@@ -220,7 +252,11 @@ fn extract_name(text: &str, kind: &str) -> Option<String> {
                 .next()?
                 .trim_matches(|c: char| c == '\'' || c == '"')
                 .to_string();
-            if !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+            if !name.is_empty()
+                && name
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+            {
                 return Some(name);
             }
         }
@@ -255,7 +291,10 @@ mod tests {
     fn parse_provision_database() {
         let intent = parse_intent("Deploy a postgres database with 100gb storage");
         assert_eq!(intent.action, IntentAction::Provision);
-        let db = intent.resource_specs.iter().find(|s| s.kind == ResourceKind::Database);
+        let db = intent
+            .resource_specs
+            .iter()
+            .find(|s| s.kind == ResourceKind::Database);
         assert!(db.is_some());
     }
 

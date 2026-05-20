@@ -110,7 +110,11 @@ source_root = "src"
         let crates = tmp.join("crates");
         let bad = crates.join("cave-broken");
         fs::create_dir_all(bad.join("src")).unwrap();
-        fs::write(bad.join("parity.manifest.toml"), "this is not = valid [[ toml").unwrap();
+        fs::write(
+            bad.join("parity.manifest.toml"),
+            "this is not = valid [[ toml",
+        )
+        .unwrap();
         write_manifest(&crates.join("cave-good"), "good");
 
         let results = discover_workspace(&tmp);

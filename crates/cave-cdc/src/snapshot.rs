@@ -41,18 +41,24 @@ impl SnapshotMode {
 
     pub fn streams_after(&self) -> bool {
         // InitialOnly and SchemaOnlyRecovery exit after the snapshot phase.
-        matches!(self, Self::Initial | Self::Never | Self::WhenNeeded | Self::SchemaOnly)
+        matches!(
+            self,
+            Self::Initial | Self::Never | Self::WhenNeeded | Self::SchemaOnly
+        )
     }
 
     pub fn parse(s: &str) -> CdcResult<Self> {
         match s.trim() {
-            "initial"               => Ok(Self::Initial),
-            "initial_only"          => Ok(Self::InitialOnly),
-            "never"                 => Ok(Self::Never),
-            "when_needed"           => Ok(Self::WhenNeeded),
-            "schema_only"           => Ok(Self::SchemaOnly),
-            "schema_only_recovery"  => Ok(Self::SchemaOnlyRecovery),
-            other => Err(CdcError::InvalidConfig(format!("unknown snapshot mode '{}'", other))),
+            "initial" => Ok(Self::Initial),
+            "initial_only" => Ok(Self::InitialOnly),
+            "never" => Ok(Self::Never),
+            "when_needed" => Ok(Self::WhenNeeded),
+            "schema_only" => Ok(Self::SchemaOnly),
+            "schema_only_recovery" => Ok(Self::SchemaOnlyRecovery),
+            other => Err(CdcError::InvalidConfig(format!(
+                "unknown snapshot mode '{}'",
+                other
+            ))),
         }
     }
 }
@@ -103,7 +109,8 @@ impl SnapshotProgress {
     ) -> CdcResult<()> {
         if self.completed {
             return Err(CdcError::InvalidConfig(format!(
-                "snapshot for {} already completed", self.table_id,
+                "snapshot for {} already completed",
+                self.table_id,
             )));
         }
         self.last_low_watermark = low;
@@ -123,7 +130,9 @@ impl SnapshotProgress {
 
     pub fn percent(&self) -> Option<f64> {
         let total = self.chunks_total?;
-        if total == 0 { return Some(100.0); }
+        if total == 0 {
+            return Some(100.0);
+        }
         Some((self.chunks_completed as f64 / total as f64) * 100.0)
     }
 }

@@ -17,7 +17,7 @@ use crate::{
         RequestContext, Source,
     },
 };
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 use serde_json::Value;
 use std::{
     collections::HashMap,
@@ -65,7 +65,12 @@ impl AuthEngine {
     }
 
     pub fn list_request_auth(&self) -> Vec<RequestAuthentication> {
-        self.request_auth.read().unwrap().values().cloned().collect()
+        self.request_auth
+            .read()
+            .unwrap()
+            .values()
+            .cloned()
+            .collect()
     }
 
     // ─── AuthorizationPolicy CRUD ────────────────────────────
@@ -81,7 +86,12 @@ impl AuthEngine {
     }
 
     pub fn list_authz_policies(&self) -> Vec<AuthorizationPolicy> {
-        self.authz_policies.read().unwrap().values().cloned().collect()
+        self.authz_policies
+            .read()
+            .unwrap()
+            .values()
+            .cloned()
+            .collect()
     }
 
     // ─── JWT Validation ──────────────────────────────────────
@@ -208,8 +218,10 @@ impl AuthEngine {
         }
 
         // ── 4. ALLOW ─────────────────────────────────────────
-        let allow_policies: Vec<&AuthorizationPolicy> =
-            policies.iter().filter(|p| p.action == AuthzAction::Allow).collect();
+        let allow_policies: Vec<&AuthorizationPolicy> = policies
+            .iter()
+            .filter(|p| p.action == AuthzAction::Allow)
+            .collect();
 
         if allow_policies.is_empty() {
             return Ok(()); // default-allow
@@ -221,7 +233,9 @@ impl AuthEngine {
             }
         }
 
-        Err(MeshError::AuthzDenied("No ALLOW policy matched".to_string()))
+        Err(MeshError::AuthzDenied(
+            "No ALLOW policy matched".to_string(),
+        ))
     }
 
     // ─── Internal helpers ────────────────────────────────────
@@ -318,8 +332,7 @@ impl AuthEngine {
                 return false;
             }
         }
-        if !op.not_methods.is_empty()
-            && op.not_methods.iter().any(|m| m == &ctx.method || m == "*")
+        if !op.not_methods.is_empty() && op.not_methods.iter().any(|m| m == &ctx.method || m == "*")
         {
             return false;
         }
@@ -345,9 +358,7 @@ impl AuthEngine {
         if !cond.values.is_empty() && !cond.values.iter().any(|v| v == val_str || v == "*") {
             return false;
         }
-        if !cond.not_values.is_empty()
-            && cond.not_values.iter().any(|v| v == val_str || v == "*")
-        {
+        if !cond.not_values.is_empty() && cond.not_values.iter().any(|v| v == val_str || v == "*") {
             return false;
         }
         true
@@ -365,10 +376,13 @@ impl AuthEngine {
                 let claim_name = key
                     .trim_start_matches("request.auth.claims[")
                     .trim_end_matches(']');
-                ctx.jwt_claims.as_ref().and_then(|c| c.get(claim_name)).and_then(|v| match v {
-                    Value::String(s) => Some(s.clone()),
-                    other => Some(other.to_string()),
-                })
+                ctx.jwt_claims
+                    .as_ref()
+                    .and_then(|c| c.get(claim_name))
+                    .and_then(|v| match v {
+                        Value::String(s) => Some(s.clone()),
+                        other => Some(other.to_string()),
+                    })
             }
             _ => None,
         }

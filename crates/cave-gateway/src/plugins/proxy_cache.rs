@@ -101,10 +101,10 @@ impl GatewayPlugin for ProxyCachePlugin {
                     ctx.response_status = Some(entry.status);
                     ctx.response_headers = entry.headers.clone();
                     ctx.response_body = entry.body.clone();
-                    ctx.response_headers.insert("X-Cache-Status".to_string(), "Hit".to_string());
+                    ctx.response_headers
+                        .insert("X-Cache-Status".to_string(), "Hit".to_string());
 
-                    let mut resp = axum::response::Response::builder()
-                        .status(entry.status);
+                    let mut resp = axum::response::Response::builder().status(entry.status);
                     for (k, v) in &entry.headers {
                         resp = resp.header(k, v);
                     }
@@ -113,9 +113,9 @@ impl GatewayPlugin for ProxyCachePlugin {
                     return PluginResult::Halt(
                         resp.body(axum::body::Body::from(entry.body.clone()))
                             .unwrap_or_else(|_| {
-                        use axum::response::IntoResponse;
-                        axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
-                    }),
+                                use axum::response::IntoResponse;
+                                axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                            }),
                     );
                 } else {
                     cache.pop(&key);

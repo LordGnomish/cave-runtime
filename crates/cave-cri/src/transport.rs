@@ -23,10 +23,10 @@ use crate::error::{CriError, CriResult};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
-pub const CHANNEL_STDIN:  u8 = 0;
+pub const CHANNEL_STDIN: u8 = 0;
 pub const CHANNEL_STDOUT: u8 = 1;
 pub const CHANNEL_STDERR: u8 = 2;
-pub const CHANNEL_ERROR:  u8 = 3;
+pub const CHANNEL_ERROR: u8 = 3;
 pub const CHANNEL_RESIZE: u8 = 4;
 
 /// Cite: SPDY/3.1 "Data frame" structure
@@ -54,13 +54,23 @@ pub struct SpdyFrame {
 
 impl SpdyFrame {
     pub fn data(stream_id: u32, channel: u8, data: impl Into<Vec<u8>>) -> Self {
-        Self { stream_id, flags: 0, channel, data: data.into() }
+        Self {
+            stream_id,
+            flags: 0,
+            channel,
+            data: data.into(),
+        }
     }
 
     /// Frame with the FIN flag set (last frame on a stream — channel close).
     /// See SPDY/3.1 §2.6.2 (`FLAG_FIN = 0x01`).
     pub fn fin(stream_id: u32, channel: u8) -> Self {
-        Self { stream_id, flags: 0x01, channel, data: Vec::new() }
+        Self {
+            stream_id,
+            flags: 0x01,
+            channel,
+            data: Vec::new(),
+        }
     }
 
     /// Encode into the on-wire byte sequence. The `channel` byte is
@@ -86,7 +96,9 @@ impl SpdyFrame {
         }
         let sid_word = u32::from_be_bytes([buf[0], buf[1], buf[2], buf[3]]);
         if sid_word & 0x8000_0000 != 0 {
-            return Err(CriError::Exec("spdy frame: control frame not supported".into()));
+            return Err(CriError::Exec(
+                "spdy frame: control frame not supported".into(),
+            ));
         }
         let stream_id = sid_word & 0x7FFF_FFFF;
         let flags_len = u32::from_be_bytes([buf[4], buf[5], buf[6], buf[7]]);
@@ -98,11 +110,27 @@ impl SpdyFrame {
         if payload_len == 0 {
             // FIN frame with no payload — treat as a synthetic close on
             // channel 0 (caller usually inspects flags directly).
-            return Ok((Self { stream_id, flags, channel: 0, data: Vec::new() }, 8));
+            return Ok((
+                Self {
+                    stream_id,
+                    flags,
+                    channel: 0,
+                    data: Vec::new(),
+                },
+                8,
+            ));
         }
         let channel = buf[8];
         let data = buf[9..8 + payload_len].to_vec();
-        Ok((Self { stream_id, flags, channel, data }, 8 + payload_len))
+        Ok((
+            Self {
+                stream_id,
+                flags,
+                channel,
+                data,
+            },
+            8 + payload_len,
+        ))
     }
 }
 
@@ -121,7 +149,8 @@ pub fn ws_encode(channel: u8, data: &[u8]) -> Vec<u8> {
 }
 
 pub fn ws_decode(payload: &[u8]) -> CriResult<(u8, &[u8])> {
-    payload.split_first()
+    payload
+        .split_first()
         .map(|(c, rest)| (*c, rest))
         .ok_or_else(|| CriError::Exec("ws frame: empty payload".into()))
 }
@@ -130,10 +159,10 @@ pub fn ws_decode(payload: &[u8]) -> CriResult<(u8, &[u8])> {
 /// per-channel buffers. Used by the exec/attach session manager.
 #[derive(Debug, Default, Clone)]
 pub struct ChannelDemux {
-    stdin:  Vec<u8>,
+    stdin: Vec<u8>,
     stdout: Vec<u8>,
     stderr: Vec<u8>,
-    error:  Vec<u8>,
+    error: Vec<u8>,
     resize: Vec<u8>,
     closed: [bool; 5],
 }
@@ -141,10 +170,10 @@ pub struct ChannelDemux {
 impl ChannelDemux {
     pub fn feed(&mut self, channel: u8, data: &[u8]) -> CriResult<()> {
         match channel {
-            CHANNEL_STDIN  => self.stdin.extend_from_slice(data),
+            CHANNEL_STDIN => self.stdin.extend_from_slice(data),
             CHANNEL_STDOUT => self.stdout.extend_from_slice(data),
             CHANNEL_STDERR => self.stderr.extend_from_slice(data),
-            CHANNEL_ERROR  => self.error.extend_from_slice(data),
+            CHANNEL_ERROR => self.error.extend_from_slice(data),
             CHANNEL_RESIZE => self.resize.extend_from_slice(data),
             other => return Err(CriError::Exec(format!("unknown channel {}", other))),
         }
@@ -163,11 +192,21 @@ impl ChannelDemux {
         self.closed.get(channel as usize).copied().unwrap_or(false)
     }
 
-    pub fn stdin(&self)  -> &[u8] { &self.stdin }
-    pub fn stdout(&self) -> &[u8] { &self.stdout }
-    pub fn stderr(&self) -> &[u8] { &self.stderr }
-    pub fn error(&self)  -> &[u8] { &self.error }
-    pub fn resize(&self) -> &[u8] { &self.resize }
+    pub fn stdin(&self) -> &[u8] {
+        &self.stdin
+    }
+    pub fn stdout(&self) -> &[u8] {
+        &self.stdout
+    }
+    pub fn stderr(&self) -> &[u8] {
+        &self.stderr
+    }
+    pub fn error(&self) -> &[u8] {
+        &self.error
+    }
+    pub fn resize(&self) -> &[u8] {
+        &self.resize
+    }
 }
 
 /// Tenant-scoped exec/attach session. Each container gets at most one
@@ -181,8 +220,8 @@ pub struct ExecSession {
     pub tenant_id: String,
     pub container_id: String,
     pub session_id: String,
-    inbox:  Mutex<VecDeque<SpdyFrame>>,
-    demux:  Mutex<ChannelDemux>,
+    inbox: Mutex<VecDeque<SpdyFrame>>,
+    demux: Mutex<ChannelDemux>,
     closed: Mutex<bool>,
 }
 
@@ -216,7 +255,8 @@ impl ExecSession {
         }
         if frame.channel != CHANNEL_STDIN && frame.channel != CHANNEL_RESIZE {
             return Err(CriError::Exec(format!(
-                "client may only write to channels stdin(0) and resize(4); got {}", frame.channel
+                "client may only write to channels stdin(0) and resize(4); got {}",
+                frame.channel
             )));
         }
         let mut demux = self.demux.lock().unwrap();
@@ -234,7 +274,8 @@ impl ExecSession {
     pub fn emit_to_client(&self, channel: u8, data: impl Into<Vec<u8>>) -> CriResult<SpdyFrame> {
         if channel != CHANNEL_STDOUT && channel != CHANNEL_STDERR && channel != CHANNEL_ERROR {
             return Err(CriError::Exec(format!(
-                "runtime may only write to channels stdout(1), stderr(2), error(3); got {}", channel
+                "runtime may only write to channels stdout(1), stderr(2), error(3); got {}",
+                channel
             )));
         }
         if *self.closed.lock().unwrap() {
@@ -256,10 +297,10 @@ impl ExecSession {
     pub fn buffered(&self, channel: u8) -> Vec<u8> {
         let demux = self.demux.lock().unwrap();
         match channel {
-            CHANNEL_STDIN  => demux.stdin().to_vec(),
+            CHANNEL_STDIN => demux.stdin().to_vec(),
             CHANNEL_STDOUT => demux.stdout().to_vec(),
             CHANNEL_STDERR => demux.stderr().to_vec(),
-            CHANNEL_ERROR  => demux.error().to_vec(),
+            CHANNEL_ERROR => demux.error().to_vec(),
             CHANNEL_RESIZE => demux.resize().to_vec(),
             _ => Vec::new(),
         }

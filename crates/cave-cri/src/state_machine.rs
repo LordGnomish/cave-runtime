@@ -35,7 +35,7 @@ fn status_name(s: &ContainerStatus) -> &'static str {
     match s {
         ContainerStatus::Created => "Created",
         ContainerStatus::Running => "Running",
-        ContainerStatus::Paused  => "Paused",
+        ContainerStatus::Paused => "Paused",
         ContainerStatus::Stopped => "Stopped",
         ContainerStatus::Failed(_) => "Failed",
     }
@@ -48,7 +48,7 @@ pub fn check_start(status: &ContainerStatus) -> CriResult<()> {
 pub fn check_stop(status: &ContainerStatus) -> CriResult<()> {
     match status {
         ContainerStatus::Running | ContainerStatus::Paused => Ok(()),
-        ContainerStatus::Stopped => Ok(()),  // idempotent
+        ContainerStatus::Stopped => Ok(()), // idempotent
         _ => validate(status, "stop", &["Running", "Paused", "Stopped"]),
     }
 }
@@ -323,6 +323,10 @@ mod tests {
     fn error_message_contains_allowed_states() {
         let e = check_pause(&ContainerStatus::Stopped).unwrap_err();
         let msg = e.to_string();
-        assert!(msg.contains("Running"), "allowed states missing from: {}", msg);
+        assert!(
+            msg.contains("Running"),
+            "allowed states missing from: {}",
+            msg
+        );
     }
 }

@@ -19,14 +19,14 @@ use super::models::{
     WritePolicy,
 };
 use super::routing;
-use super::store::{sha256_hex, NexusStore};
+use super::store::{NexusStore, sha256_hex};
 use axum::{
+    Json, Router,
     body::Bytes,
     extract::{Path, Query, State},
-    http::{header, HeaderMap, HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{delete, get, post, put},
-    Json, Router,
 };
 use chrono::Utc;
 use serde::Deserialize;
@@ -68,7 +68,9 @@ pub fn router(state: Arc<NexusState>) -> Router {
         )
         .route(
             "/api/nexus/v1/repositories/{name}",
-            get(get_repository).put(update_repository).delete(delete_repository),
+            get(get_repository)
+                .put(update_repository)
+                .delete(delete_repository),
         )
         // Components
         .route("/api/nexus/v1/components", get(list_components))
@@ -260,20 +262,14 @@ async fn list_components(
     Json(state.store.list_components(q.repository.as_deref()))
 }
 
-async fn get_component(
-    State(state): State<Arc<NexusState>>,
-    Path(id): Path<Uuid>,
-) -> Response {
+async fn get_component(State(state): State<Arc<NexusState>>, Path(id): Path<Uuid>) -> Response {
     match state.store.get_component(id) {
         Ok(c) => Json(c).into_response(),
         Err(e) => map_err(e),
     }
 }
 
-async fn delete_component(
-    State(state): State<Arc<NexusState>>,
-    Path(id): Path<Uuid>,
-) -> Response {
+async fn delete_component(State(state): State<Arc<NexusState>>, Path(id): Path<Uuid>) -> Response {
     match state.store.delete_component(id) {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(e) => map_err(e),
@@ -473,7 +469,7 @@ async fn upload_raw(
                 "raw upload requires hosted, got {} for {}",
                 repo_type_name(&repo.repo_type),
                 name
-            )))
+            )));
         }
     };
     let adapter = match state.formats.get(repo.format) {
@@ -523,10 +519,7 @@ async fn upload_raw(
         repository_id: repo.id,
         repository_name: repo.name.clone(),
         path: path.clone(),
-        blob: BlobRef {
-            sha256: sha,
-            size,
-        },
+        blob: BlobRef { sha256: sha, size },
         content_type: adapter.content_type(&path).to_string(),
         created_at: now,
         last_modified: now,
@@ -561,8 +554,7 @@ async fn download_raw(
     );
     headers.insert(
         "X-Nexus-SHA256",
-        HeaderValue::from_str(&asset.blob.sha256)
-            .unwrap_or_else(|_| HeaderValue::from_static("")),
+        HeaderValue::from_str(&asset.blob.sha256).unwrap_or_else(|_| HeaderValue::from_static("")),
     );
     (StatusCode::OK, headers, blob).into_response()
 }

@@ -104,7 +104,10 @@ impl GlobalSearchIndex {
             .iter()
             .filter(|d| visible_to(d, ctx))
             .filter_map(|d| {
-                score_doc(d, q, &q_lower).map(|s| GlobalSearchHit { doc: d.clone(), score: s })
+                score_doc(d, q, &q_lower).map(|s| GlobalSearchHit {
+                    doc: d.clone(),
+                    score: s,
+                })
             })
             .collect();
         hits.sort_by(|a, b| {
@@ -277,7 +280,11 @@ mod tests {
     #[test]
     fn fuzzy_does_not_match_random_strings() {
         let idx = seeded();
-        assert!(idx.query(&ctx_platform(), "xyzzyqq", 10).unwrap().is_empty());
+        assert!(
+            idx.query(&ctx_platform(), "xyzzyqq", 10)
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
@@ -325,7 +332,10 @@ mod tests {
     fn query_refuses_without_permission() {
         let idx = seeded();
         let ctx = RequestCtx::developer("acme", &[]);
-        assert!(matches!(idx.query(&ctx, "x", 1).unwrap_err(), GlobalSearchError::Auth(_)));
+        assert!(matches!(
+            idx.query(&ctx, "x", 1).unwrap_err(),
+            GlobalSearchError::Auth(_)
+        ));
     }
 
     #[test]

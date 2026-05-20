@@ -32,10 +32,10 @@
 
 use std::collections::BTreeMap;
 
+use super::LdapError;
 use super::group_mapper::GroupMapper;
 use super::query::{Filter, LdapSearchSpec, Scope};
 use super::user_mapper::{LdapUser, UserAttributeMapper};
-use super::LdapError;
 
 /// What every cave-auth federation provider has to answer.
 /// Synchronous trait — async wrapping is a job for the cave
@@ -201,7 +201,10 @@ impl InMemoryDirectory {
         self.entries.insert(dn.into(), attrs);
     }
 
-    fn entries_matching(&self, spec: &LdapSearchSpec) -> Vec<(&String, &BTreeMap<String, Vec<String>>)> {
+    fn entries_matching(
+        &self,
+        spec: &LdapSearchSpec,
+    ) -> Vec<(&String, &BTreeMap<String, Vec<String>>)> {
         self.entries
             .iter()
             .filter(|(dn, _)| match spec.scope {
@@ -216,9 +219,7 @@ impl InMemoryDirectory {
                     let head = head.trim_end_matches(',');
                     !head.contains(',')
                 }
-                Scope::Subtree => {
-                    dn.ends_with(&spec.base_dn) || spec.base_dn.is_empty()
-                }
+                Scope::Subtree => dn.ends_with(&spec.base_dn) || spec.base_dn.is_empty(),
             })
             .filter(|(_, attrs)| spec.filter.matches(attrs))
             .collect()
@@ -283,8 +284,8 @@ impl UserStorageProvider for InMemoryDirectory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ldap::query::{Filter, LdapQueryBuilder, Scope};
     use crate::ldap::ResultCode;
+    use crate::ldap::query::{Filter, LdapQueryBuilder, Scope};
 
     fn seed_directory() -> InMemoryDirectory {
         let mut d = InMemoryDirectory::new();
@@ -294,15 +295,10 @@ mod tests {
             ("givenName".to_string(), vec!["Jane".to_string()]),
             ("sn".to_string(), vec!["Doe".to_string()]),
             ("cn".to_string(), vec!["Jane Doe".to_string()]),
-            (
-                "objectClass".to_string(),
-                vec!["inetOrgPerson".to_string()],
-            ),
+            ("objectClass".to_string(), vec!["inetOrgPerson".to_string()]),
             (
                 "memberOf".to_string(),
-                vec![
-                    "cn=engineers,ou=groups,dc=example,dc=com".to_string(),
-                ],
+                vec!["cn=engineers,ou=groups,dc=example,dc=com".to_string()],
             ),
         ]
         .into_iter()
@@ -313,21 +309,12 @@ mod tests {
             ("givenName".to_string(), vec!["Alice".to_string()]),
             ("sn".to_string(), vec!["Smith".to_string()]),
             ("cn".to_string(), vec!["Alice Smith".to_string()]),
-            (
-                "objectClass".to_string(),
-                vec!["inetOrgPerson".to_string()],
-            ),
+            ("objectClass".to_string(), vec!["inetOrgPerson".to_string()]),
         ]
         .into_iter()
         .collect();
-        d.insert(
-            "uid=jdoe,ou=people,dc=example,dc=com",
-            jdoe,
-        );
-        d.insert(
-            "uid=asmith,ou=people,dc=example,dc=com",
-            asmith,
-        );
+        d.insert("uid=jdoe,ou=people,dc=example,dc=com", jdoe);
+        d.insert("uid=asmith,ou=people,dc=example,dc=com", asmith);
         d
     }
 
@@ -358,9 +345,7 @@ mod tests {
         let d = seed_directory();
         let spec = LdapQueryBuilder::new("ou=people,dc=example,dc=com")
             .scope(Scope::Subtree)
-            .add_filter(Filter::Present {
-                attr: "uid".into(),
-            })
+            .add_filter(Filter::Present { attr: "uid".into() })
             .build();
         let users = d.search(&spec).unwrap();
         assert_eq!(users.len(), 2);
@@ -371,9 +356,7 @@ mod tests {
         let d = seed_directory();
         let spec = LdapQueryBuilder::new("ou=people,dc=example,dc=com")
             .scope(Scope::Subtree)
-            .add_filter(Filter::Present {
-                attr: "uid".into(),
-            })
+            .add_filter(Filter::Present { attr: "uid".into() })
             .size_limit(1)
             .build();
         let users = d.search(&spec).unwrap();
@@ -400,9 +383,7 @@ mod tests {
         let d = seed_directory();
         let spec = LdapQueryBuilder::new("ou=people,dc=example,dc=com")
             .scope(Scope::Subtree)
-            .add_filter(Filter::Present {
-                attr: "uid".into(),
-            })
+            .add_filter(Filter::Present { attr: "uid".into() })
             .build();
         assert_eq!(d.count(&spec).unwrap(), 2);
     }

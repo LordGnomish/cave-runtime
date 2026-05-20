@@ -5,10 +5,10 @@
 //! PATs are long-lived tokens scoped to specific capabilities.
 //! The token is shown only once at creation; only its hash is stored.
 
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
 use rand::RngCore;
-use ring::digest::{digest, SHA256};
+use ring::digest::{SHA256, digest};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -156,7 +156,11 @@ impl PatService {
     }
 
     /// Validate a raw PAT string — returns the PAT record if valid.
-    pub async fn validate(&self, raw_token: &str, required_scope: Option<&str>) -> Result<PersonalAccessToken, String> {
+    pub async fn validate(
+        &self,
+        raw_token: &str,
+        required_scope: Option<&str>,
+    ) -> Result<PersonalAccessToken, String> {
         let token_hash = hash_token(raw_token);
         let mut tokens = self.tokens.write().await;
 
@@ -283,7 +287,11 @@ mod tests {
         // Has flags:read
         assert!(svc.validate(&resp.token, Some("flags:read")).await.is_ok());
         // Doesn't have flags:write
-        assert!(svc.validate(&resp.token, Some("flags:write")).await.is_err());
+        assert!(
+            svc.validate(&resp.token, Some("flags:write"))
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]
@@ -292,18 +300,26 @@ mod tests {
         let user_id = Uuid::new_v4();
 
         let r1 = svc
-            .create(user_id, "acme".to_string(), CreatePatRequest {
-                name: "active".to_string(),
-                scopes: vec![],
-                expires_at: None,
-            })
+            .create(
+                user_id,
+                "acme".to_string(),
+                CreatePatRequest {
+                    name: "active".to_string(),
+                    scopes: vec![],
+                    expires_at: None,
+                },
+            )
             .await;
         let r2 = svc
-            .create(user_id, "acme".to_string(), CreatePatRequest {
-                name: "revoked".to_string(),
-                scopes: vec![],
-                expires_at: None,
-            })
+            .create(
+                user_id,
+                "acme".to_string(),
+                CreatePatRequest {
+                    name: "revoked".to_string(),
+                    scopes: vec![],
+                    expires_at: None,
+                },
+            )
             .await;
 
         svc.revoke(r2.pat.id, user_id).await.unwrap();

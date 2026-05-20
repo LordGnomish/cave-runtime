@@ -63,11 +63,18 @@ pub struct Request {
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum WaypointError {
     #[error("no route matched {method} {authority}{path}")]
-    NoRoute { method: String, authority: String, path: String },
+    NoRoute {
+        method: String,
+        authority: String,
+        path: String,
+    },
     #[error("tenant {tenant} not authorised for waypoint {waypoint}")]
     TenantDenied { tenant: TenantId, waypoint: String },
     #[error("protocol mismatch: route expects {expected:?}, request is {actual:?}")]
-    ProtocolMismatch { expected: Protocol, actual: Protocol },
+    ProtocolMismatch {
+        expected: Protocol,
+        actual: Protocol,
+    },
 }
 
 impl RouteMatch {
@@ -139,7 +146,10 @@ mod tests {
         Route {
             name: name.into(),
             r#match: m,
-            backend: Backend { cluster: cluster.into(), weight: 100 },
+            backend: Backend {
+                cluster: cluster.into(),
+                weight: 100,
+            },
             protocol: proto,
         }
     }
@@ -154,7 +164,12 @@ mod tests {
     }
 
     fn req(method: &str, authority: &str, path: &str, proto: Protocol) -> Request {
-        Request { method: method.into(), authority: authority.into(), path: path.into(), protocol: proto }
+        Request {
+            method: method.into(),
+            authority: authority.into(),
+            path: path.into(),
+            protocol: proto,
+        }
     }
 
     #[test]
@@ -169,14 +184,24 @@ mod tests {
             vec![
                 route(
                     "v1",
-                    RouteMatch { path_prefix: Some("/v1".into()), ..Default::default() },
+                    RouteMatch {
+                        path_prefix: Some("/v1".into()),
+                        ..Default::default()
+                    },
                     "web-v1",
                     Protocol::Http,
                 ),
-                route("default", RouteMatch::default(), "web-default", Protocol::Http),
+                route(
+                    "default",
+                    RouteMatch::default(),
+                    "web-default",
+                    Protocol::Http,
+                ),
             ],
         );
-        let r = c.route(&tenant, &req("GET", "web", "/v1/users", Protocol::Http)).unwrap();
+        let r = c
+            .route(&tenant, &req("GET", "web", "/v1/users", Protocol::Http))
+            .unwrap();
         assert_eq!(r.backend.cluster, "web-v1");
     }
 
@@ -191,12 +216,17 @@ mod tests {
             "acme",
             vec![route(
                 "post-only",
-                RouteMatch { method: Some("POST".into()), ..Default::default() },
+                RouteMatch {
+                    method: Some("POST".into()),
+                    ..Default::default()
+                },
                 "writes",
                 Protocol::Http,
             )],
         );
-        let r = c.route(&tenant, &req("post", "web", "/", Protocol::Http)).unwrap();
+        let r = c
+            .route(&tenant, &req("post", "web", "/", Protocol::Http))
+            .unwrap();
         assert_eq!(r.backend.cluster, "writes");
     }
 
@@ -211,12 +241,17 @@ mod tests {
             "acme",
             vec![route(
                 "post-only",
-                RouteMatch { method: Some("POST".into()), ..Default::default() },
+                RouteMatch {
+                    method: Some("POST".into()),
+                    ..Default::default()
+                },
                 "writes",
                 Protocol::Http,
             )],
         );
-        let err = c.route(&tenant, &req("GET", "web", "/", Protocol::Http)).unwrap_err();
+        let err = c
+            .route(&tenant, &req("GET", "web", "/", Protocol::Http))
+            .unwrap_err();
         assert!(matches!(err, WaypointError::NoRoute { .. }));
     }
 
@@ -227,8 +262,18 @@ mod tests {
             "tenantCheck",
             "tenant-attacker"
         );
-        let c = cfg("acme", vec![route("default", RouteMatch::default(), "web", Protocol::Http)]);
-        let err = c.route(&attacker, &req("GET", "web", "/", Protocol::Http)).unwrap_err();
+        let c = cfg(
+            "acme",
+            vec![route(
+                "default",
+                RouteMatch::default(),
+                "web",
+                Protocol::Http,
+            )],
+        );
+        let err = c
+            .route(&attacker, &req("GET", "web", "/", Protocol::Http))
+            .unwrap_err();
         assert!(matches!(err, WaypointError::TenantDenied { .. }));
     }
 
@@ -248,7 +293,9 @@ mod tests {
                 Protocol::Http,
             )],
         );
-        let err = c.route(&tenant, &req("POST", "web", "/svc/Method", Protocol::Grpc)).unwrap_err();
+        let err = c
+            .route(&tenant, &req("POST", "web", "/svc/Method", Protocol::Grpc))
+            .unwrap_err();
         assert!(matches!(err, WaypointError::ProtocolMismatch { .. }));
     }
 
@@ -264,19 +311,27 @@ mod tests {
             vec![
                 route(
                     "exact-health",
-                    RouteMatch { path_exact: Some("/healthz".into()), ..Default::default() },
+                    RouteMatch {
+                        path_exact: Some("/healthz".into()),
+                        ..Default::default()
+                    },
                     "health-svc",
                     Protocol::Http,
                 ),
                 route(
                     "prefix-all",
-                    RouteMatch { path_prefix: Some("/".into()), ..Default::default() },
+                    RouteMatch {
+                        path_prefix: Some("/".into()),
+                        ..Default::default()
+                    },
                     "default-svc",
                     Protocol::Http,
                 ),
             ],
         );
-        let r = c.route(&tenant, &req("GET", "web", "/healthz", Protocol::Http)).unwrap();
+        let r = c
+            .route(&tenant, &req("GET", "web", "/healthz", Protocol::Http))
+            .unwrap();
         assert_eq!(r.backend.cluster, "health-svc");
     }
 }

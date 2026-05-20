@@ -56,7 +56,11 @@ mod tests {
             success,
             latency_ms,
             status_code: if success { Some(200) } else { None },
-            error: if success { None } else { Some("timeout".to_string()) },
+            error: if success {
+                None
+            } else {
+                Some("timeout".to_string())
+            },
             checked_at: Utc::now(),
         }
     }

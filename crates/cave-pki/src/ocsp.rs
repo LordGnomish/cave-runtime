@@ -40,7 +40,11 @@ impl<'a> OcspResponder<'a> {
         crl: &'a CrlResponder,
         known_serials: &'a std::collections::HashSet<String>,
     ) -> Self {
-        Self { crl, known_serials, produced_at: Utc::now() }
+        Self {
+            crl,
+            known_serials,
+            produced_at: Utc::now(),
+        }
     }
 
     /// Cite: RFC 6960 §2.2 — single-cert query.

@@ -66,14 +66,16 @@ fn partition_for_is_stable_and_tenant_isolated() {
     // partitions on a 16-way fan-out.
     let p_other = r_a.partition_for(b"order-99", 16);
     let p_third = r_a.partition_for(b"customer-77", 16);
-    assert!(p_a1 != p_other || p_a1 != p_third,
-        "at least one of the alternates differs");
+    assert!(
+        p_a1 != p_other || p_a1 != p_third,
+        "at least one of the alternates differs"
+    );
 
     // Cross-tenant: same key, different tenant ⇒ partitions are
     // computed independently (tenant_id mixed into the hash).
     let p_b = r_b.partition_for(key, 16);
-    let _ = (p_a1, p_b);  // don't assert inequality (collisions exist) but
-                          // confirm both map within [0, 16).
+    let _ = (p_a1, p_b); // don't assert inequality (collisions exist) but
+    // confirm both map within [0, 16).
     assert!(p_b >= 0 && p_b < 16);
 
     // partition_count = 0 / negative ⇒ partition 0 (degenerate).

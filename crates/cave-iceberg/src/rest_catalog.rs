@@ -166,7 +166,10 @@ impl Catalog for RestCatalog {
         Ok(())
     }
 
-    async fn list_namespaces(&self, _parent: Option<&NamespaceIdent>) -> Result<Vec<NamespaceIdent>> {
+    async fn list_namespaces(
+        &self,
+        _parent: Option<&NamespaceIdent>,
+    ) -> Result<Vec<NamespaceIdent>> {
         let req = RestRequest {
             method: HttpMethod::Get,
             url: self.namespaces_url(),
@@ -347,10 +350,15 @@ mod tests {
     impl Transport for MockTransport {
         async fn send(&self, req: RestRequest) -> Result<RestResponse> {
             self.sent.lock().unwrap().push(req);
-            Ok(self.response.lock().unwrap().clone().unwrap_or(RestResponse {
-                status: 200,
-                body_json: Some("{}".into()),
-            }))
+            Ok(self
+                .response
+                .lock()
+                .unwrap()
+                .clone()
+                .unwrap_or(RestResponse {
+                    status: 200,
+                    body_json: Some("{}".into()),
+                }))
         }
     }
 
@@ -411,13 +419,19 @@ mod tests {
         });
         let cat = RestCatalog::new("http://x", Box::new(mt));
         let t = cat.load_table(&TableIdent::from_dot("ns.t")).await.unwrap();
-        assert_eq!(t.metadata_location.as_deref(), Some("s3://x/t/metadata.json"));
+        assert_eq!(
+            t.metadata_location.as_deref(),
+            Some("s3://x/t/metadata.json")
+        );
     }
 
     #[tokio::test]
     async fn load_table_error_status_returns_not_found() {
         let mt = MockTransport::default();
-        mt.set_response(RestResponse { status: 404, body_json: None });
+        mt.set_response(RestResponse {
+            status: 404,
+            body_json: None,
+        });
         let cat = RestCatalog::new("http://x", Box::new(mt));
         let r = cat.load_table(&TableIdent::from_dot("ns.t")).await;
         assert!(matches!(r, Err(Error::NotFound(_))));

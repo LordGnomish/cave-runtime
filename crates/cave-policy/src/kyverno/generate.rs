@@ -100,7 +100,9 @@ fn merge_into(target: &mut Value, source: &Value) {
             match (t.get_mut(k), v) {
                 (Some(tv @ Value::Object(_)), v @ Value::Object(_)) => merge_into(tv, v),
                 (Some(entry), v) => *entry = v.clone(),
-                (None, v) => { t.insert(k.clone(), v.clone()); }
+                (None, v) => {
+                    t.insert(k.clone(), v.clone());
+                }
             }
         }
     }

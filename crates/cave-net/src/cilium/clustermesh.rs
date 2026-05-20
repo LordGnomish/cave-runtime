@@ -83,7 +83,9 @@ impl ClusterMesh {
     /// Join a cluster. Refuses cross-tenant joins and double-registration.
     pub fn join(&mut self, cluster: RemoteCluster) -> Result<(), MeshError> {
         if cluster.tenant != self.tenant {
-            return Err(MeshError::TenantMismatch { tenant: cluster.tenant });
+            return Err(MeshError::TenantMismatch {
+                tenant: cluster.tenant,
+            });
         }
         if self.clusters.contains_key(&cluster.name) {
             return Err(MeshError::ClusterAlreadyExists(cluster.name));
@@ -107,9 +109,10 @@ impl ClusterMesh {
 
     /// Leave: drops every identity and service the cluster announced.
     pub fn leave(&mut self, cluster: &str) -> Result<(), MeshError> {
-        let removed = self.clusters.remove(cluster).ok_or_else(|| {
-            MeshError::ClusterNotFound(cluster.to_string())
-        })?;
+        let removed = self
+            .clusters
+            .remove(cluster)
+            .ok_or_else(|| MeshError::ClusterNotFound(cluster.to_string()))?;
         for (local, _) in &removed.identities {
             let key = (removed.name.clone(), *local);
             if let Some(g) = self.global_ids.remove(&key) {
@@ -127,12 +130,17 @@ impl ClusterMesh {
         self.global_ids
             .get(&(cluster.to_string(), local))
             .copied()
-            .ok_or_else(|| MeshError::UnknownIdentity { cluster: cluster.into(), local })
+            .ok_or_else(|| MeshError::UnknownIdentity {
+                cluster: cluster.into(),
+                local,
+            })
     }
 
     /// Reverse-lookup: which cluster owns this global id?
     pub fn owner_of(&self, global: u32) -> Option<(&str, u32)> {
-        self.global_owners.get(&global).map(|(c, l)| (c.as_str(), *l))
+        self.global_owners
+            .get(&global)
+            .map(|(c, l)| (c.as_str(), *l))
     }
 
     /// Return every endpoint announcing the named service across the mesh.
@@ -150,7 +158,9 @@ impl ClusterMesh {
             }
         }
         if out.is_empty() {
-            Err(MeshError::UnknownService { service: name.into() })
+            Err(MeshError::UnknownService {
+                service: name.into(),
+            })
         } else {
             // Stable ordering: by cluster name.
             out.sort_by(|a, b| a.cluster.cmp(&b.cluster));
@@ -178,7 +188,10 @@ mod tests {
             identities: ids
                 .iter()
                 .map(|(id, labels)| {
-                    (*id, LabelSet::from_iter(labels.iter().map(|(k, v)| (*k, *v))))
+                    (
+                        *id,
+                        LabelSet::from_iter(labels.iter().map(|(k, v)| (*k, *v))),
+                    )
                 })
                 .collect(),
             services: vec![],
@@ -266,11 +279,8 @@ mod tests {
 
     #[test]
     fn reserved_ids_translate_to_themselves() {
-        let (_cite, tenant) = cilium_test_ctx!(
-            "pkg/identity/numericidentity.go",
-            "GetReservedID",
-            "acme"
-        );
+        let (_cite, tenant) =
+            cilium_test_ctx!("pkg/identity/numericidentity.go", "GetReservedID", "acme");
         let mesh = ClusterMesh::new(tenant);
         // No cluster joined; reserved IDs are mesh-global by definition.
         assert_eq!(mesh.translate("anywhere", 1).unwrap(), 1);
@@ -279,16 +289,15 @@ mod tests {
 
     #[test]
     fn announced_services_are_discoverable_across_clusters() {
-        let (_cite, tenant) = cilium_test_ctx!(
-            "pkg/clustermesh/clustermesh.go",
-            "ServiceMerger",
-            "acme"
-        );
+        let (_cite, tenant) =
+            cilium_test_ctx!("pkg/clustermesh/clustermesh.go", "ServiceMerger", "acme");
         let mut mesh = ClusterMesh::new(tenant);
         let mut us = cluster("us-east", "acme", &[(256, &[("a", "b")])]);
-        us.services.push(("web".into(), "default".into(), "10.0.0.1".into()));
+        us.services
+            .push(("web".into(), "default".into(), "10.0.0.1".into()));
         let mut eu = cluster("eu-west", "acme", &[(256, &[("a", "b")])]);
-        eu.services.push(("web".into(), "default".into(), "10.1.0.1".into()));
+        eu.services
+            .push(("web".into(), "default".into(), "10.1.0.1".into()));
         mesh.join(us).unwrap();
         mesh.join(eu).unwrap();
         let endpoints = mesh.lookup_service("web").unwrap();
@@ -299,11 +308,8 @@ mod tests {
 
     #[test]
     fn unknown_service_returns_error() {
-        let (_cite, tenant) = cilium_test_ctx!(
-            "pkg/clustermesh/clustermesh.go",
-            "ServiceLookup",
-            "acme"
-        );
+        let (_cite, tenant) =
+            cilium_test_ctx!("pkg/clustermesh/clustermesh.go", "ServiceLookup", "acme");
         let mesh = ClusterMesh::new(tenant);
         assert!(matches!(
             mesh.lookup_service("ghost").unwrap_err(),

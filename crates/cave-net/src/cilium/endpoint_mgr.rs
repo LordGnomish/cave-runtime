@@ -52,7 +52,11 @@ pub struct EndpointManager {
 
 impl EndpointManager {
     pub fn new(tenant: TenantId) -> Self {
-        Self { tenant, by_id: BTreeMap::new(), by_container: BTreeMap::new() }
+        Self {
+            tenant,
+            by_id: BTreeMap::new(),
+            by_container: BTreeMap::new(),
+        }
     }
 
     pub fn add(&mut self, ep: EndpointHandle) {
@@ -60,13 +64,18 @@ impl EndpointManager {
         self.by_id.insert(ep.id, ep);
     }
 
-    pub fn lookup(&self, id: u64) -> Option<&EndpointHandle> { self.by_id.get(&id) }
+    pub fn lookup(&self, id: u64) -> Option<&EndpointHandle> {
+        self.by_id.get(&id)
+    }
     pub fn lookup_by_container(&self, c: &str) -> Option<&EndpointHandle> {
         self.by_container.get(c).and_then(|id| self.by_id.get(id))
     }
 
     pub fn set_state(&mut self, id: u64, st: EndpointState) -> Result<(), EndpointMgrError> {
-        let ep = self.by_id.get_mut(&id).ok_or(EndpointMgrError::NotFound(id))?;
+        let ep = self
+            .by_id
+            .get_mut(&id)
+            .ok_or(EndpointMgrError::NotFound(id))?;
         ep.state = st;
         Ok(())
     }
@@ -74,7 +83,9 @@ impl EndpointManager {
     /// Sweep one GC pass — drop endpoints in `Disconnected`. Mirrors the
     /// behaviour of `pkg/endpointmanager/gc.go` "delete after disconnect".
     pub fn gc_once(&mut self) -> usize {
-        let to_drop: Vec<u64> = self.by_id.values()
+        let to_drop: Vec<u64> = self
+            .by_id
+            .values()
             .filter(|e| e.state == EndpointState::Disconnected)
             .map(|e| e.id)
             .collect();
@@ -86,12 +97,19 @@ impl EndpointManager {
         to_drop.len()
     }
 
-    pub fn len(&self) -> usize { self.by_id.len() }
-    pub fn is_empty(&self) -> bool { self.by_id.is_empty() }
+    pub fn len(&self) -> usize {
+        self.by_id.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.by_id.is_empty()
+    }
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::cilium("pkg/endpointmanager/endpointsynchronizer.go", "EndpointSynchronizer");
+const FILE_CITE: Cite = Cite::cilium(
+    "pkg/endpointmanager/endpointsynchronizer.go",
+    "EndpointSynchronizer",
+);
 
 #[cfg(test)]
 mod tests {
@@ -99,7 +117,12 @@ mod tests {
     use crate::cilium_test_ctx;
 
     fn ep(id: u64, c: &str, state: EndpointState) -> EndpointHandle {
-        EndpointHandle { id, identity: 1024 + id as u32, state, container_id: c.into() }
+        EndpointHandle {
+            id,
+            identity: 1024 + id as u32,
+            state,
+            container_id: c.into(),
+        }
     }
 
     #[test]
@@ -110,7 +133,11 @@ mod tests {
 
     #[test]
     fn add_then_lookup_returns_endpoint() {
-        let (_c, t) = cilium_test_ctx!("pkg/endpointmanager/endpointsynchronizer.go", "Lookup", "tenant-em-l");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/endpointmanager/endpointsynchronizer.go",
+            "Lookup",
+            "tenant-em-l"
+        );
         let mut m = EndpointManager::new(t);
         m.add(ep(1, "c1", EndpointState::Ready));
         assert_eq!(m.lookup(1).unwrap().identity, 1025);
@@ -118,7 +145,11 @@ mod tests {
 
     #[test]
     fn lookup_by_container_id() {
-        let (_c, t) = cilium_test_ctx!("pkg/endpointmanager/endpointsynchronizer.go", "LookupByContainer", "tenant-em-lc");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/endpointmanager/endpointsynchronizer.go",
+            "LookupByContainer",
+            "tenant-em-lc"
+        );
         let mut m = EndpointManager::new(t);
         m.add(ep(2, "ctr-abc", EndpointState::Ready));
         let found = m.lookup_by_container("ctr-abc").unwrap();
@@ -127,7 +158,11 @@ mod tests {
 
     #[test]
     fn set_state_unknown_endpoint_errors() {
-        let (_c, t) = cilium_test_ctx!("pkg/endpointmanager/endpointsynchronizer.go", "SetState.Miss", "tenant-em-ssm");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/endpointmanager/endpointsynchronizer.go",
+            "SetState.Miss",
+            "tenant-em-ssm"
+        );
         let mut m = EndpointManager::new(t);
         let e = m.set_state(99, EndpointState::Ready).unwrap_err();
         assert_eq!(e, EndpointMgrError::NotFound(99));
@@ -156,7 +191,11 @@ mod tests {
 
     #[test]
     fn set_state_transitions_through_lifecycle() {
-        let (_c, t) = cilium_test_ctx!("pkg/endpointmanager/endpointsynchronizer.go", "Lifecycle", "tenant-em-lf");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/endpointmanager/endpointsynchronizer.go",
+            "Lifecycle",
+            "tenant-em-lf"
+        );
         let mut m = EndpointManager::new(t);
         m.add(ep(1, "c1", EndpointState::Restoring));
         m.set_state(1, EndpointState::WaitForIdentity).unwrap();
@@ -168,7 +207,11 @@ mod tests {
 
     #[test]
     fn empty_manager_reports_zero() {
-        let (_c, t) = cilium_test_ctx!("pkg/endpointmanager/endpointsynchronizer.go", "Empty", "tenant-em-e");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/endpointmanager/endpointsynchronizer.go",
+            "Empty",
+            "tenant-em-e"
+        );
         let m = EndpointManager::new(t);
         assert!(m.is_empty());
         assert_eq!(m.len(), 0);
@@ -185,10 +228,16 @@ mod tests {
 
     #[test]
     fn endpoint_mgr_error_renders() {
-        let (_c, _t) = cilium_test_ctx!("pkg/endpointmanager/endpointsynchronizer.go", "Errors", "tenant-em-er");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/endpointmanager/endpointsynchronizer.go",
+            "Errors",
+            "tenant-em-er"
+        );
         let e = EndpointMgrError::NotFound(7);
         assert!(format!("{}", e).contains("7"));
-        let e = EndpointMgrError::TenantDenied { tenant: TenantId::new("t").expect("test fixture") };
+        let e = EndpointMgrError::TenantDenied {
+            tenant: TenantId::new("t").expect("test fixture"),
+        };
         assert!(format!("{}", e).contains("t"));
     }
 }

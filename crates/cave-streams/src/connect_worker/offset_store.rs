@@ -73,7 +73,11 @@ impl OffsetStore {
     /// Bulk read — order-preserving since the underlying map is
     /// a `BTreeMap`. Used by a SourceTask at start-up to load
     /// every partition it owns.
-    pub fn get_many(&self, connector: &str, partitions: &[BTreeMap<String, String>]) -> BTreeMap<BTreeMap<String, String>, OffsetValue> {
+    pub fn get_many(
+        &self,
+        connector: &str,
+        partitions: &[BTreeMap<String, String>],
+    ) -> BTreeMap<BTreeMap<String, String>, OffsetValue> {
         let g = self.inner.read().expect("poisoned");
         let mut out = BTreeMap::new();
         for p in partitions {

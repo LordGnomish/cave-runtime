@@ -59,8 +59,7 @@ pub use connector_runtime::{ConnectorRuntime, ConnectorSpec};
 pub use distributed_herder::{DistributedHerder, HerderState, MemberId};
 pub use kafka_offset_backing_store::{KafkaOffsetBackingStore, OffsetRecord, RecordLog};
 pub use offset_backing_kafka::{
-    InMemoryOffsetTopicClient, KafkaBackedOffsetStore, KafkaOffsetTopicClient,
-    OffsetTopicRecord,
+    InMemoryOffsetTopicClient, KafkaBackedOffsetStore, KafkaOffsetTopicClient, OffsetTopicRecord,
 };
 pub use offset_store::{OffsetBackingStore, OffsetKey, OffsetStore, OffsetValue};
 pub use plugin_registry::{ConnectorFactory, PluginEntry, PluginRegistry, PluginVersion};
@@ -69,8 +68,8 @@ pub use rest_extension::{
     RestFilterChain, RestRequestCtx,
 };
 pub use smt::{
-    global_smt_registry, RecordEnvelope as SmtRecordEnvelope, Smt, SmtChain, SmtRegistry,
-    Value as SmtValue,
+    RecordEnvelope as SmtRecordEnvelope, Smt, SmtChain, SmtRegistry, Value as SmtValue,
+    global_smt_registry,
 };
 pub use standalone_herder::{ConnectorInfo, HerderError, StandaloneHerder, TargetState, TaskInfo};
 pub use task_runtime::{

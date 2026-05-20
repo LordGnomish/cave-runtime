@@ -23,10 +23,8 @@ pub enum SubjectTokenType {
 }
 
 impl SubjectTokenType {
-    pub const ACCESS_TOKEN: &'static str =
-        "urn:ietf:params:oauth:token-type:access_token";
-    pub const REFRESH_TOKEN: &'static str =
-        "urn:ietf:params:oauth:token-type:refresh_token";
+    pub const ACCESS_TOKEN: &'static str = "urn:ietf:params:oauth:token-type:access_token";
+    pub const REFRESH_TOKEN: &'static str = "urn:ietf:params:oauth:token-type:refresh_token";
     pub const ID_TOKEN: &'static str = "urn:ietf:params:oauth:token-type:id_token";
     pub const SAML1: &'static str = "urn:ietf:params:oauth:token-type:saml1";
     pub const SAML2: &'static str = "urn:ietf:params:oauth:token-type:saml2";
@@ -167,7 +165,12 @@ mod tests {
     }
 
     fn jwt(body: &str) -> String {
-        format!("{}.{}.{}", b64u(r#"{"alg":"none"}"#), b64u(body), b64u("sig"))
+        format!(
+            "{}.{}.{}",
+            b64u(r#"{"alg":"none"}"#),
+            b64u(body),
+            b64u("sig")
+        )
     }
 
     #[test]

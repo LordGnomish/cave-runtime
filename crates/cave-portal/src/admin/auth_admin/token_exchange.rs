@@ -5,9 +5,9 @@
 //! cave-auth surfaces. Visual port of
 //! `js/apps/admin-ui/src/clients/scopes/PermissionsTab.tsx`.
 
+use super::{AuthAdminError, render_admin_nav, require_platform};
 use crate::admin::permission::RequestCtx;
 use crate::admin::render::{escape, page_shell_full, table_html};
-use super::{render_admin_nav, require_platform, AuthAdminError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TokenExchangePolicy {
@@ -100,7 +100,15 @@ pub fn render(ctx: &RequestCtx) -> Result<String, AuthAdminError> {
         nav = render_admin_nav("/admin/auth/token-exchange"),
         n = pols.len(),
         tbl = table_html(
-            &["source client", "target client", "subject kind", "audiences", "actors", "status", "action"],
+            &[
+                "source client",
+                "target client",
+                "subject kind",
+                "audiences",
+                "actors",
+                "status",
+                "action"
+            ],
             &rows
         ),
     );

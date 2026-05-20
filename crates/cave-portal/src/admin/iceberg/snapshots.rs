@@ -56,7 +56,13 @@ fn derive_history(t: &IcebergTable) -> Vec<IcebergSnapshot> {
                 parent_snapshot_id: if k < 2 { Some(id - 1) } else { None },
                 sequence_number: u64::try_from(3 - k).unwrap_or(0),
                 timestamp_ms: t.last_updated_ms - i64::from(k) * 60_000,
-                operation: if k == 0 { "append".into() } else if k == 1 { "overwrite".into() } else { "append".into() },
+                operation: if k == 0 {
+                    "append".into()
+                } else if k == 1 {
+                    "overwrite".into()
+                } else {
+                    "append".into()
+                },
                 manifest_list: format!("s3://lake/{}/snap-{}.avro", t.fqn(), id),
                 summary_added_records: if k < 2 { 10_000 } else { 50_000 },
                 summary_added_files: if k < 2 { 2 } else { 5 },
@@ -111,7 +117,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, IcebergVie
             vec![
                 escape(&s.table_fqn),
                 s.snapshot_id.to_string(),
-                s.parent_snapshot_id.map(|p| p.to_string()).unwrap_or_else(|| "—".into()),
+                s.parent_snapshot_id
+                    .map(|p| p.to_string())
+                    .unwrap_or_else(|| "—".into()),
                 s.operation.clone(),
                 s.summary_added_records.to_string(),
                 s.summary_deleted_records.to_string(),
@@ -182,7 +190,8 @@ mod tests {
     #[test]
     fn list_for_table_filters_to_table() {
         let s = seeded();
-        let rows = list_for_table(&s, &ctx(&[Permission::IcebergRead]), "analytics", "orders").unwrap();
+        let rows =
+            list_for_table(&s, &ctx(&[Permission::IcebergRead]), "analytics", "orders").unwrap();
         assert!(rows.iter().all(|r| r.table_fqn == "analytics.orders"));
         assert_eq!(rows.len(), 3);
     }
@@ -222,8 +231,16 @@ mod tests {
         let s = seeded();
         let rows = list_all(&s, &ctx(&[Permission::IcebergRead])).unwrap();
         let hist = op_histogram(&rows);
-        let append = hist.iter().find(|(op, _)| op == "append").map(|(_, n)| *n).unwrap_or(0);
-        let over = hist.iter().find(|(op, _)| op == "overwrite").map(|(_, n)| *n).unwrap_or(0);
+        let append = hist
+            .iter()
+            .find(|(op, _)| op == "append")
+            .map(|(_, n)| *n)
+            .unwrap_or(0);
+        let over = hist
+            .iter()
+            .find(|(op, _)| op == "overwrite")
+            .map(|(_, n)| *n)
+            .unwrap_or(0);
         assert_eq!(append + over, 3);
     }
 

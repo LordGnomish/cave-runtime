@@ -6,9 +6,9 @@
 
 use super::{ScanError, ScanReport, ScanRequest, ScanTarget, Scanner};
 use crate::analyzer::{
+    AnalyzerRegistry, AnalyzerType, PackageInfo,
     language::{CargoLockAnalyzer, NpmLockAnalyzer},
     os::{AlpineApkAnalyzer, DpkgStatusAnalyzer},
-    AnalyzerType, AnalyzerRegistry, PackageInfo,
 };
 use std::path::Path;
 

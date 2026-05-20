@@ -15,7 +15,11 @@ use crate::types::Span;
 /// Normalise a service name: trim, fall back to "unknown" if empty.
 pub(crate) fn normalise_service(s: &str) -> String {
     let s = s.trim();
-    if s.is_empty() { "unknown".into() } else { s.into() }
+    if s.is_empty() {
+        "unknown".into()
+    } else {
+        s.into()
+    }
 }
 
 /// Epoch microseconds → nanoseconds.

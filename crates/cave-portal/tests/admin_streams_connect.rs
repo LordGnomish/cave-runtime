@@ -76,12 +76,8 @@ fn inspect_connector_returns_owned_connector() {
     let s = AdminState::seeded();
     let cs = connect::list_connectors(&s, &ctx_with(&[Permission::StreamsRead])).unwrap();
     let first = &cs[0];
-    let got = connect::inspect_connector(
-        &s,
-        &ctx_with(&[Permission::StreamsRead]),
-        &first.name,
-    )
-    .unwrap();
+    let got =
+        connect::inspect_connector(&s, &ctx_with(&[Permission::StreamsRead]), &first.name).unwrap();
     assert_eq!(got.name, first.name);
 }
 
@@ -99,11 +95,8 @@ fn inspect_connector_unknown_returns_not_found() {
 #[test]
 fn inspect_connector_cross_tenant_returns_not_found() {
     let s = AdminState::seeded();
-    let res = connect::inspect_connector(
-        &s,
-        &ctx_with(&[Permission::StreamsRead]),
-        "evil-connector",
-    );
+    let res =
+        connect::inspect_connector(&s, &ctx_with(&[Permission::StreamsRead]), "evil-connector");
     assert!(res.is_err());
 }
 
@@ -112,22 +105,18 @@ fn inspect_connector_cross_tenant_returns_not_found() {
 #[test]
 fn pause_connector_transitions_to_paused() {
     let s = AdminState::seeded();
-    let target_name = connect::list_connectors(&s, &ctx_with(&[Permission::StreamsRead]))
-        .unwrap()[0]
-        .name
-        .clone();
+    let target_name = connect::list_connectors(&s, &ctx_with(&[Permission::StreamsRead])).unwrap()
+        [0]
+    .name
+    .clone();
     connect::pause_connector(
         &s,
         &ctx_with(&[Permission::StreamsRead, Permission::StreamsAdmin]),
         &target_name,
     )
     .unwrap();
-    let got = connect::inspect_connector(
-        &s,
-        &ctx_with(&[Permission::StreamsRead]),
-        &target_name,
-    )
-    .unwrap();
+    let got = connect::inspect_connector(&s, &ctx_with(&[Permission::StreamsRead]), &target_name)
+        .unwrap();
     assert_eq!(got.state, "Paused");
 }
 
@@ -137,9 +126,7 @@ fn pause_connector_refuses_without_admin() {
     let n = connect::list_connectors(&s, &ctx_with(&[Permission::StreamsRead])).unwrap()[0]
         .name
         .clone();
-    assert!(
-        connect::pause_connector(&s, &ctx_with(&[Permission::StreamsRead]), &n).is_err()
-    );
+    assert!(connect::pause_connector(&s, &ctx_with(&[Permission::StreamsRead]), &n).is_err());
 }
 
 #[test]
@@ -205,8 +192,7 @@ fn restart_task_clears_failure_trace() {
 #[test]
 fn render_main_view_contains_tab_anchors() {
     let s = AdminState::seeded();
-    let html =
-        connect::render(&s, &ctx_with(&[Permission::StreamsRead])).unwrap();
+    let html = connect::render(&s, &ctx_with(&[Permission::StreamsRead])).unwrap();
     // The 4 sub-views are reachable by anchor + href.
     assert!(html.contains("workers"), "missing workers tab");
     assert!(html.contains("connectors"), "missing connectors tab");
@@ -232,16 +218,14 @@ fn render_connectors_view_has_lifecycle_buttons() {
 #[test]
 fn render_connectors_hides_buttons_without_admin() {
     let s = AdminState::seeded();
-    let html =
-        connect::render_connectors(&s, &ctx_with(&[Permission::StreamsRead])).unwrap();
+    let html = connect::render_connectors(&s, &ctx_with(&[Permission::StreamsRead])).unwrap();
     assert!(!html.contains("aria-label=\"Pause connector"));
 }
 
 #[test]
 fn render_workers_view_lists_seeded_workers() {
     let s = AdminState::seeded();
-    let html =
-        connect::render_workers(&s, &ctx_with(&[Permission::StreamsRead])).unwrap();
+    let html = connect::render_workers(&s, &ctx_with(&[Permission::StreamsRead])).unwrap();
     // The seeded acme worker(s) must appear; an "evil" tenant
     // worker must NOT.
     assert!(!html.contains("evil-"));
@@ -266,8 +250,7 @@ fn render_configs_view_lists_connector_config() {
 #[test]
 fn render_excludes_evil_tenant() {
     let s = AdminState::seeded();
-    let html =
-        connect::render(&s, &ctx_with(&[Permission::StreamsRead])).unwrap();
+    let html = connect::render(&s, &ctx_with(&[Permission::StreamsRead])).unwrap();
     assert!(
         !html.contains("evil-connector"),
         "cross-tenant data leaked into main view"

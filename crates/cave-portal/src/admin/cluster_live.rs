@@ -231,7 +231,10 @@ mod tests {
     fn read_requires_permission() {
         let s = ClusterLiveState::new();
         let ctx = RequestCtx::developer("acme", &[]);
-        assert!(matches!(s.read(&ctx).unwrap_err(), ClusterLiveError::Auth(_)));
+        assert!(matches!(
+            s.read(&ctx).unwrap_err(),
+            ClusterLiveError::Auth(_)
+        ));
     }
 
     #[test]

@@ -30,7 +30,8 @@ pub mod panels;
 
 // Legacy compatibility — old call sites used these names.
 pub use dashboards::{
-    detail, group_by_folder, list_dashboards as list_panels, panel_count_total, DashboardRow as GrafanaPanelRow,
+    DashboardRow as GrafanaPanelRow, detail, group_by_folder, list_dashboards as list_panels,
+    panel_count_total,
 };
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]

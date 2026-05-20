@@ -3,14 +3,14 @@
 //! HTTP routes for cave-admission.
 
 use crate::{
-    engine::{evaluate_all_policies},
-    models::{AdmissionResult, Operation, Policy, PolicyReport, Resource, Violation},
     AdmissionState,
+    engine::evaluate_all_policies,
+    models::{AdmissionResult, Operation, Policy, PolicyReport, Resource, Violation},
 };
 use axum::{
+    Json, Router,
     extract::{Path, State},
     routing::{get, post},
-    Json, Router,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -131,7 +131,9 @@ async fn generate_report(State(state): State<Arc<AdmissionState>>) -> Json<Polic
 
     let mut violations_by_policy: HashMap<String, usize> = HashMap::new();
     for v in violations.iter() {
-        *violations_by_policy.entry(v.policy_name.clone()).or_insert(0) += 1;
+        *violations_by_policy
+            .entry(v.policy_name.clone())
+            .or_insert(0) += 1;
     }
 
     let failing: Vec<String> = violations_by_policy.keys().cloned().collect();

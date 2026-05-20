@@ -76,7 +76,10 @@ impl DiskFreeChecker for SystemDiskChecker {
             .split_whitespace()
             .nth(3)
             .ok_or_else(|| {
-                std::io::Error::new(std::io::ErrorKind::InvalidData, "df: missing available field")
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "df: missing available field",
+                )
             })?
             .parse()
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{e}")))?;
@@ -113,7 +116,11 @@ pub struct Scheduler<D: DiskFreeChecker = SystemDiskChecker> {
 
 impl Scheduler<SystemDiskChecker> {
     pub fn new(workspace_root: &Path) -> Self {
-        Self::with_checker(workspace_root, GuardrailConfig::default(), SystemDiskChecker)
+        Self::with_checker(
+            workspace_root,
+            GuardrailConfig::default(),
+            SystemDiskChecker,
+        )
     }
 }
 
@@ -178,9 +185,10 @@ impl<D: DiskFreeChecker> Scheduler<D> {
             )));
         }
 
-        let free = self.disk.free_bytes(&self.workspace_root).map_err(|e| {
-            SchedulerError::GuardViolated(format!("disk free check failed: {e}"))
-        })?;
+        let free = self
+            .disk
+            .free_bytes(&self.workspace_root)
+            .map_err(|e| SchedulerError::GuardViolated(format!("disk free check failed: {e}")))?;
         if free < self.config.min_disk_free_bytes {
             return Err(SchedulerError::GuardViolated(format!(
                 "disk free {free} bytes < {} bytes required",
@@ -262,13 +270,15 @@ impl<D: DiskFreeChecker> Scheduler<D> {
         } else {
             QueueStatus::Pending
         };
-        self.store_for(item).update_item(&item.id, status, item.attempts, Some(error.into()))?;
+        self.store_for(item)
+            .update_item(&item.id, status, item.attempts, Some(error.into()))?;
         Ok(())
     }
 
     /// Marks an item as done and increments today's commit counter (primary queue).
     pub fn mark_done(&self, item: &QueueItem) -> Result<(), SchedulerError> {
-        self.store_for(item).update_item(&item.id, QueueStatus::Done, 0, None)?;
+        self.store_for(item)
+            .update_item(&item.id, QueueStatus::Done, 0, None)?;
         // Daily commit counter lives in the primary queue regardless of source repo.
         self.queue.increment_daily_commits()?;
         Ok(())
@@ -297,7 +307,11 @@ impl<D: DiskFreeChecker> Scheduler<D> {
             new_attempts,
             item.last_error.clone(),
         )?;
-        let updated = self.queue.list()?.into_iter().find(|i| i.id == item.id)
+        let updated = self
+            .queue
+            .list()?
+            .into_iter()
+            .find(|i| i.id == item.id)
             .ok_or_else(|| SchedulerError::Queue(QueueError::ItemNotFound(item.id.clone())))?;
         Ok(Some(updated))
     }
@@ -316,7 +330,11 @@ impl<D: DiskFreeChecker> Scheduler<D> {
             new_attempts,
             item.last_error.clone(),
         )?;
-        let mut updated = sec.queue.list()?.into_iter().find(|i| i.id == item.id)
+        let mut updated = sec
+            .queue
+            .list()?
+            .into_iter()
+            .find(|i| i.id == item.id)
             .ok_or_else(|| SchedulerError::Queue(QueueError::ItemNotFound(item.id.clone())))?;
         // Inject repo context if not already set in the YAML item.
         if updated.repo_path.is_none() {
@@ -349,7 +367,10 @@ mod tests {
     struct FailDisk;
     impl DiskFreeChecker for FailDisk {
         fn free_bytes(&self, _: &Path) -> Result<u64, std::io::Error> {
-            Err(std::io::Error::new(std::io::ErrorKind::Other, "simulated failure"))
+            Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "simulated failure",
+            ))
         }
     }
 
@@ -358,7 +379,11 @@ mod tests {
     }
 
     fn sched(dir: &TempDir) -> Scheduler<MockDisk> {
-        Scheduler::with_checker(dir.path(), GuardrailConfig::default(), MockDisk(plenty_of_disk()))
+        Scheduler::with_checker(
+            dir.path(),
+            GuardrailConfig::default(),
+            MockDisk(plenty_of_disk()),
+        )
     }
 
     // ── pick_next happy path ──────────────────────────────────────────────────
@@ -385,7 +410,9 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let s = sched(&dir);
         for i in s.queue().list().unwrap() {
-            s.queue().update_item(&i.id, QueueStatus::Done, 0, None).unwrap();
+            s.queue()
+                .update_item(&i.id, QueueStatus::Done, 0, None)
+                .unwrap();
         }
         assert!(s.pick_next().unwrap().is_none());
     }
@@ -395,7 +422,10 @@ mod tests {
     #[test]
     fn test_guard_max_in_progress() {
         let dir = TempDir::new().unwrap();
-        let cfg = GuardrailConfig { max_in_progress: 1, ..GuardrailConfig::default() };
+        let cfg = GuardrailConfig {
+            max_in_progress: 1,
+            ..GuardrailConfig::default()
+        };
         let s = Scheduler::with_checker(dir.path(), cfg, MockDisk(plenty_of_disk()));
         // First pick succeeds.
         s.pick_next().unwrap().unwrap();
@@ -408,7 +438,10 @@ mod tests {
     #[test]
     fn test_guard_daily_commit_quota() {
         let dir = TempDir::new().unwrap();
-        let cfg = GuardrailConfig { daily_commit_quota: 0, ..GuardrailConfig::default() };
+        let cfg = GuardrailConfig {
+            daily_commit_quota: 0,
+            ..GuardrailConfig::default()
+        };
         let s = Scheduler::with_checker(dir.path(), cfg, MockDisk(plenty_of_disk()));
         let err = s.pick_next().unwrap_err();
         assert!(err.to_string().contains("daily_commit_quota"));
@@ -511,7 +544,9 @@ mod tests {
         let s = sched(&dir);
         // Complete all seeded items.
         for i in s.queue().list().unwrap() {
-            s.queue().update_item(&i.id, QueueStatus::Done, 0, None).unwrap();
+            s.queue()
+                .update_item(&i.id, QueueStatus::Done, 0, None)
+                .unwrap();
         }
         s.queue()
             .add(QueueItem::new("new-crate", "org/repo", "f.go", "Fn", 1))
@@ -531,7 +566,9 @@ mod tests {
         // Mark all primary items done so secondary must be used.
         let primary_store = QueueStore::open(primary_dir.path());
         for item in primary_store.list().unwrap() {
-            primary_store.update_item(&item.id, QueueStatus::Done, 0, None).unwrap();
+            primary_store
+                .update_item(&item.id, QueueStatus::Done, 0, None)
+                .unwrap();
         }
 
         let sec = SecondaryRepo {
@@ -565,7 +602,10 @@ mod tests {
             .update_item(&sec_item.id, QueueStatus::InProgress, 1, None)
             .unwrap();
 
-        let cfg = GuardrailConfig { max_in_progress: 1, ..GuardrailConfig::default() };
+        let cfg = GuardrailConfig {
+            max_in_progress: 1,
+            ..GuardrailConfig::default()
+        };
         let mut s = Scheduler::with_checker(primary_dir.path(), cfg, MockDisk(plenty_of_disk()));
         s.set_secondary(SecondaryRepo {
             queue: QueueStore::open(secondary_dir.path()),
@@ -588,13 +628,19 @@ mod tests {
         let pri = QueueStore::open(primary_dir.path());
         let sec_store = QueueStore::open(secondary_dir.path());
         for i in 0..20u32 {
-            pri.add(QueueItem::new(format!("p-{i}"), "o/r", "f.go", "Fn", i + 1)).unwrap();
-            sec_store.add(QueueItem::new(format!("s-{i}"), "o/r", "f.go", "Fn", i + 1)).unwrap();
+            pri.add(QueueItem::new(format!("p-{i}"), "o/r", "f.go", "Fn", i + 1))
+                .unwrap();
+            sec_store
+                .add(QueueItem::new(format!("s-{i}"), "o/r", "f.go", "Fn", i + 1))
+                .unwrap();
         }
 
         let mut s = Scheduler::with_checker(
             primary_dir.path(),
-            GuardrailConfig { max_in_progress: 100, ..GuardrailConfig::default() },
+            GuardrailConfig {
+                max_in_progress: 100,
+                ..GuardrailConfig::default()
+            },
             MockDisk(plenty_of_disk()),
         );
         s.set_secondary(SecondaryRepo {
@@ -616,8 +662,14 @@ mod tests {
             }
         }
         // 10-slot window: 7 primary slots, 3 secondary slots.
-        assert_eq!(primary_picks, 7, "expected 7 primary picks in 10-slot window");
-        assert_eq!(secondary_picks, 3, "expected 3 secondary picks in 10-slot window");
+        assert_eq!(
+            primary_picks, 7,
+            "expected 7 primary picks in 10-slot window"
+        );
+        assert_eq!(
+            secondary_picks, 3,
+            "expected 3 secondary picks in 10-slot window"
+        );
     }
 
     #[test]

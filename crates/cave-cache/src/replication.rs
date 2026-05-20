@@ -162,7 +162,10 @@ impl MasterState {
     pub fn info(&self) -> Vec<(String, String)> {
         let mut out = vec![
             ("role".to_string(), "master".to_string()),
-            ("connected_slaves".to_string(), self.replicas.len().to_string()),
+            (
+                "connected_slaves".to_string(),
+                self.replicas.len().to_string(),
+            ),
             ("master_replid".to_string(), self.repl_id.clone()),
             (
                 "master_repl_offset".to_string(),
@@ -182,7 +185,10 @@ impl MasterState {
                 format!("slave{i}"),
                 format!(
                     "ip={},state={:?},offset={},lag={}",
-                    r.addr, r.state, r.offset, self.master_repl_offset.saturating_sub(r.offset)
+                    r.addr,
+                    r.state,
+                    r.offset,
+                    self.master_repl_offset.saturating_sub(r.offset)
                 ),
             ));
         }
@@ -372,7 +378,10 @@ mod tests {
     #[test]
     fn update_unknown_replica_errors() {
         let mut m = MasterState::new("r", 1024);
-        assert!(matches!(m.update_replica_ack("nope", 0, 0).unwrap_err(), ReplicationError::UnknownReplica(_)));
+        assert!(matches!(
+            m.update_replica_ack("nope", 0, 0).unwrap_err(),
+            ReplicationError::UnknownReplica(_)
+        ));
     }
 
     #[test]

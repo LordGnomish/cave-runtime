@@ -42,7 +42,9 @@ pub use catalog::Catalog;
 pub use error::{Error, Result};
 pub use expr::{Predicate, Reference, Term};
 pub use file_io::{FileIo, MemFileIo};
-pub use manifest::{DataFile, DataFileContent, FileFormat, Manifest, ManifestEntry, ManifestEntryStatus};
+pub use manifest::{
+    DataFile, DataFileContent, FileFormat, Manifest, ManifestEntry, ManifestEntryStatus,
+};
 pub use manifest_list::{ManifestFile, ManifestList, ManifestListContent};
 pub use memory_catalog::MemoryCatalog;
 pub use namespace::{Namespace, NamespaceIdent};

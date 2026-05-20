@@ -4,10 +4,11 @@
 //! Integration tests for cave-scan IaC + secrets + license scanners.
 
 use cave_scan::iac::{
-    cloudformation::CloudFormationScanner, dockerfile::DockerfileScanner, helm::HelmScanner,
-    kubernetes::KubernetesScanner, terraform::TerraformScanner, IacScanner, Severity as IacSev,
+    IacScanner, Severity as IacSev, cloudformation::CloudFormationScanner,
+    dockerfile::DockerfileScanner, helm::HelmScanner, kubernetes::KubernetesScanner,
+    terraform::TerraformScanner,
 };
-use cave_scan::license::{spdx::LicenseScanner, License};
+use cave_scan::license::{License, spdx::LicenseScanner};
 use cave_scan::secrets::{entropy::shannon_entropy, patterns::SecretScanner};
 
 // ── IaC: Terraform ──────────────────────────────────────────────────────────
@@ -301,7 +302,10 @@ Resources:
 "#;
     let s = CloudFormationScanner::new();
     let findings = s.scan_str(y, "stack.yaml").unwrap();
-    let pub_finding = findings.iter().find(|f| f.rule_id == "AVD-CFN-0001").unwrap();
+    let pub_finding = findings
+        .iter()
+        .find(|f| f.rule_id == "AVD-CFN-0001")
+        .unwrap();
     assert_eq!(pub_finding.severity, IacSev::High);
 }
 
@@ -350,7 +354,8 @@ fn test_secret_pem_private_key() {
 #[test]
 fn test_secret_jwt() {
     let s = SecretScanner::new();
-    let content = "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyIn0.abc";
+    let content =
+        "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyIn0.abc";
     let hits = s.scan(content, "log.txt");
     assert!(hits.iter().any(|h| h.rule_id == "jwt"));
 }

@@ -68,9 +68,7 @@ impl CsvSource {
     /// become NULL.
     pub fn from_str(schema: SchemaRef, csv: &str) -> Result<Self> {
         let mut lines = csv.lines();
-        let header = lines
-            .next()
-            .ok_or_else(|| Error::Io("empty csv".into()))?;
+        let header = lines.next().ok_or_else(|| Error::Io("empty csv".into()))?;
         let header_cols: Vec<&str> = header.split(',').map(str::trim).collect();
         if header_cols.len() != schema.fields.len() {
             return Err(Error::Schema(format!(
@@ -125,9 +123,10 @@ fn parse_cell(cell: &str, field: &Field) -> Value {
         },
         DataType::Int32 => cell.parse::<i32>().map(Value::Int32).unwrap_or(Value::Null),
         DataType::Int64 => cell.parse::<i64>().map(Value::Int64).unwrap_or(Value::Null),
-        DataType::Float32 | DataType::Float64 => {
-            cell.parse::<f64>().map(Value::Float64).unwrap_or(Value::Null)
-        }
+        DataType::Float32 | DataType::Float64 => cell
+            .parse::<f64>()
+            .map(Value::Float64)
+            .unwrap_or(Value::Null),
         DataType::Utf8 => Value::Utf8(cell.to_string()),
         _ => Value::Utf8(cell.to_string()),
     }
@@ -175,7 +174,10 @@ mod tests {
         let t = CsvSource::from_str(schema(), csv).unwrap();
         let rows = t.scan().await.unwrap();
         assert_eq!(rows.len(), 2);
-        assert_eq!(rows[0].values, vec![Value::Int64(1), Value::Utf8("hello".into())]);
+        assert_eq!(
+            rows[0].values,
+            vec![Value::Int64(1), Value::Utf8("hello".into())]
+        );
         assert_eq!(rows[1].values, vec![Value::Int64(2), Value::Null]);
     }
 

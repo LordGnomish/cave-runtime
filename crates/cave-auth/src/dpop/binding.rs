@@ -20,11 +20,7 @@ use sha2::{Digest, Sha256};
 pub enum Jwk {
     /// EC key — RFC 7638 §3.2: required members are `crv`, `kty`, `x`, `y`.
     #[serde(rename = "EC")]
-    Ec {
-        crv: String,
-        x: String,
-        y: String,
-    },
+    Ec { crv: String, x: String, y: String },
     /// RSA key — RFC 7638 §3.2: required members are `e`, `kty`, `n`.
     #[serde(rename = "RSA")]
     Rsa { e: String, n: String },
@@ -85,7 +81,10 @@ mod tests {
         let e_pos = canon.find("\"e\":").unwrap();
         let kty_pos = canon.find("\"kty\":").unwrap();
         let n_pos = canon.find("\"n\":").unwrap();
-        assert!(e_pos < kty_pos && kty_pos < n_pos, "members out of order: {canon}");
+        assert!(
+            e_pos < kty_pos && kty_pos < n_pos,
+            "members out of order: {canon}"
+        );
     }
 
     #[test]
@@ -120,7 +119,10 @@ mod tests {
 
     #[test]
     fn thumbprint_is_stable() {
-        let k = Jwk::Rsa { n: "X".to_string(), e: "AQAB".to_string() };
+        let k = Jwk::Rsa {
+            n: "X".to_string(),
+            e: "AQAB".to_string(),
+        };
         let a = jkt_thumbprint(&k);
         let b = jkt_thumbprint(&k);
         assert_eq!(a, b, "thumbprint must be deterministic");
@@ -128,7 +130,10 @@ mod tests {
 
     #[test]
     fn thumbprint_is_base64url_no_pad() {
-        let k = Jwk::Rsa { n: "X".to_string(), e: "AQAB".to_string() };
+        let k = Jwk::Rsa {
+            n: "X".to_string(),
+            e: "AQAB".to_string(),
+        };
         let t = jkt_thumbprint(&k);
         assert!(!t.contains('='), "padding leaked into thumbprint: {t}");
         assert!(!t.contains('+'), "non-url-safe char: {t}");

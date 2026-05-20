@@ -8,7 +8,7 @@
 //!
 //! Compat shims (`cavectl kubectl get pods`) delegate here.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Args;
 
 use super::{HttpVerb, PreparedRequest};

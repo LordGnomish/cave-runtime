@@ -38,7 +38,6 @@ impl Default for RolloutsState {
     fn default() -> Self {
         Self {
             pool: Arc::new(cave_db::CavePool::mock()),
-            
         }
     }
 }

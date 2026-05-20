@@ -61,7 +61,10 @@ impl FrameCodec<Resp> for Resp3Codec {
         let mut tmp = Vec::with_capacity(64);
         encode_resp(&mut tmp, &frame);
         if tmp.len() > self.max_frame_size {
-            return Err(FrameError::Limit { actual: tmp.len(), max: self.max_frame_size });
+            return Err(FrameError::Limit {
+                actual: tmp.len(),
+                max: self.max_frame_size,
+            });
         }
         buf.extend_from_slice(&tmp);
         Ok(())
@@ -91,14 +94,19 @@ fn decode_resp(src: &[u8], max_frame_size: usize) -> DecodeStep<Resp> {
     if src.len() > max_frame_size {
         // The peer has already pushed more bytes than we'll accept in
         // one frame — bail before parsing rather than hold the bytes.
-        return Err(FrameError::Limit { actual: src.len(), max: max_frame_size });
+        return Err(FrameError::Limit {
+            actual: src.len(),
+            max: max_frame_size,
+        });
     }
 
     let prefix = src[0];
     let rest = &src[1..];
 
     match prefix {
-        b'+' => decode_simple_string(rest).map(|opt| opt.map(|(s, c)| (Resp::SimpleString(s), 1 + c))),
+        b'+' => {
+            decode_simple_string(rest).map(|opt| opt.map(|(s, c)| (Resp::SimpleString(s), 1 + c)))
+        }
         b'-' => decode_simple_error(rest).map(|opt| opt.map(|(s, c)| (Resp::Error(s), 1 + c))),
         b':' => decode_integer(rest).map(|opt| opt.map(|(n, c)| (Resp::Integer(n), 1 + c))),
         b'$' => decode_bulk_string(rest).map(|opt| opt.map(|(b, c)| (Resp::BulkString(b), 1 + c))),
@@ -122,7 +130,10 @@ fn decode_resp(src: &[u8], max_frame_size: usize) -> DecodeStep<Resp> {
             Some((items, c)) => Ok(Some((Resp::Push(items), 1 + c))),
             None => Ok(None),
         },
-        other => Err(FrameError::invalid(format!("unknown RESP prefix: 0x{:02x}", other))),
+        other => Err(FrameError::invalid(format!(
+            "unknown RESP prefix: 0x{:02x}",
+            other
+        ))),
     }
 }
 
@@ -256,7 +267,9 @@ fn decode_array(src: &[u8], max_frame_size: usize) -> DecodeStep<Option<Vec<Resp
         return Ok(Some((None, len_idx + 2)));
     }
     if count < 0 {
-        return Err(FrameError::invalid(format!("negative array count: {count}")));
+        return Err(FrameError::invalid(format!(
+            "negative array count: {count}"
+        )));
     }
     let count = count as usize;
     let mut consumed = len_idx + 2;
@@ -408,9 +421,15 @@ mod tests {
     fn decode_resp3_boolean_and_null() {
         let mut buf = BytesMut::from(&b"#t\r\n_\r\n#f\r\n"[..]);
         let mut codec = Resp3Codec::new();
-        assert_eq!(codec.decode(&mut buf).unwrap().unwrap(), Resp::Boolean(true));
+        assert_eq!(
+            codec.decode(&mut buf).unwrap().unwrap(),
+            Resp::Boolean(true)
+        );
         assert_eq!(codec.decode(&mut buf).unwrap().unwrap(), Resp::Null);
-        assert_eq!(codec.decode(&mut buf).unwrap().unwrap(), Resp::Boolean(false));
+        assert_eq!(
+            codec.decode(&mut buf).unwrap().unwrap(),
+            Resp::Boolean(false)
+        );
     }
 
     #[test]
@@ -421,8 +440,14 @@ mod tests {
             Resp::Double(f) => assert!((f - 3.14).abs() < 1e-9),
             other => panic!("expected Double, got {other:?}"),
         }
-        assert_eq!(codec.decode(&mut buf).unwrap().unwrap(), Resp::Double(f64::INFINITY));
-        assert_eq!(codec.decode(&mut buf).unwrap().unwrap(), Resp::Double(f64::NEG_INFINITY));
+        assert_eq!(
+            codec.decode(&mut buf).unwrap().unwrap(),
+            Resp::Double(f64::INFINITY)
+        );
+        assert_eq!(
+            codec.decode(&mut buf).unwrap().unwrap(),
+            Resp::Double(f64::NEG_INFINITY)
+        );
     }
 
     #[test]
@@ -481,6 +506,10 @@ mod tests {
             let _ = codec.decode(&mut buf);
         }
         // Final state: buffer should be empty (last decode succeeded).
-        assert!(buf.is_empty(), "expected buffer drained, got {} bytes", buf.len());
+        assert!(
+            buf.is_empty(),
+            "expected buffer drained, got {} bytes",
+            buf.len()
+        );
     }
 }

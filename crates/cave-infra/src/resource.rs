@@ -137,7 +137,11 @@ impl ResourceState {
         self.updated_at = Utc::now();
     }
 
-    pub fn apply_actual(&mut self, actual: HashMap<String, serde_json::Value>, provider_id: Option<String>) {
+    pub fn apply_actual(
+        &mut self,
+        actual: HashMap<String, serde_json::Value>,
+        provider_id: Option<String>,
+    ) {
         self.actual_properties = actual;
         self.provider_id = provider_id;
         self.transition(ResourceStatus::Running);
@@ -198,23 +202,23 @@ impl ResourceStore {
         let key = state.key();
         // Save to history before overwriting
         if let Some(existing) = self.resources.get(&key) {
-            self.history.entry(key.clone()).or_default().push(existing.clone());
+            self.history
+                .entry(key.clone())
+                .or_default()
+                .push(existing.clone());
         }
         self.resources.insert(key.clone(), state);
         key
     }
 
     pub fn get(&self, key: &str) -> InfraResult<ResourceState> {
-        self.resources
-            .get(key)
-            .map(|r| r.clone())
-            .ok_or_else(|| {
-                let parts: Vec<&str> = key.splitn(2, '/').collect();
-                InfraError::NotFound {
-                    kind: parts.first().copied().unwrap_or("Unknown").to_string(),
-                    name: parts.get(1).copied().unwrap_or(key).to_string(),
-                }
-            })
+        self.resources.get(key).map(|r| r.clone()).ok_or_else(|| {
+            let parts: Vec<&str> = key.splitn(2, '/').collect();
+            InfraError::NotFound {
+                kind: parts.first().copied().unwrap_or("Unknown").to_string(),
+                name: parts.get(1).copied().unwrap_or(key).to_string(),
+            }
+        })
     }
 
     pub fn get_by_name(&self, kind: &ResourceKind, name: &str) -> InfraResult<ResourceState> {
@@ -255,9 +259,9 @@ impl ResourceStore {
             .history
             .get_mut(key)
             .ok_or_else(|| InfraError::RollbackFailed(format!("no history for {key}")))?;
-        let prev = history.pop().ok_or_else(|| {
-            InfraError::RollbackFailed(format!("empty history for {key}"))
-        })?;
+        let prev = history
+            .pop()
+            .ok_or_else(|| InfraError::RollbackFailed(format!("empty history for {key}")))?;
         self.resources.insert(key.to_string(), prev.clone());
         Ok(prev)
     }
@@ -346,7 +350,10 @@ mod tests {
         let key = store.upsert(state.clone());
 
         // Update
-        state.spec.properties.insert("cpu".into(), serde_json::json!(8));
+        state
+            .spec
+            .properties
+            .insert("cpu".into(), serde_json::json!(8));
         state.transition(ResourceStatus::Updating);
         store.upsert(state);
 

@@ -13,7 +13,10 @@ fn order_validate_identifiers_rejects_empty_and_uppercase() {
     let mut o = Order::new("ord-1", TENANT, "acct-1", vec![]);
     assert!(o.validate_identifiers().is_err());
 
-    o.identifiers = vec![Identifier { kind: IdentifierType::Dns, value: "API.Example.com".into() }];
+    o.identifiers = vec![Identifier {
+        kind: IdentifierType::Dns,
+        value: "API.Example.com".into(),
+    }];
     let err = o.validate_identifiers().unwrap_err();
     assert!(err.to_string().contains("must be lowercase"));
 
@@ -51,8 +54,12 @@ fn order_status_state_machine_allowed_transitions() {
 /// finalize URL is derived from the order id.
 #[test]
 fn order_new_default_fields() {
-    let o = Order::new("ord-tenant", TENANT, "acct-tenant",
-        vec![Identifier::dns(format!("svc.{}.cave-runtime.test", TENANT))]);
+    let o = Order::new(
+        "ord-tenant",
+        TENANT,
+        "acct-tenant",
+        vec![Identifier::dns(format!("svc.{}.cave-runtime.test", TENANT))],
+    );
     assert_eq!(o.tenant_id, TENANT);
     assert_eq!(o.account_id, "acct-tenant");
     assert_eq!(o.status, OrderStatus::Pending);

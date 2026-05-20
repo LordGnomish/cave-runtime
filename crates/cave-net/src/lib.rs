@@ -11,8 +11,8 @@
 //! On Linux kernel 7.0+: uses eBPF programs for kernel-level enforcement.
 //! On other platforms: userspace simulation for development.
 
-pub mod models;
 pub mod dataplane;
+pub mod models;
 pub mod routes;
 
 /// Cilium-parity batch (numeric identity allocator, L7 policy,

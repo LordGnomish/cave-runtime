@@ -232,17 +232,25 @@ mod tests {
     use super::*;
     use crate::routes::rbac::Persona;
 
-    fn op() -> Principal { Principal::new("o", Persona::Operator) }
-    fn dev(t: &str) -> Principal { Principal::new("d", Persona::Tenant).with_tenant(t) }
+    fn op() -> Principal {
+        Principal::new("o", Persona::Operator)
+    }
+    fn dev(t: &str) -> Principal {
+        Principal::new("d", Persona::Tenant).with_tenant(t)
+    }
 
     fn append(s: &LogStore, t: &str, app: &str, lvl: LogLevel, msg: &str) -> LogEntry {
-        s.append(Some(&op()), AppendLogRequest {
-            tenant: t.into(),
-            app: app.into(),
-            instance: "i-1".into(),
-            level: lvl,
-            message: msg.into(),
-        }).unwrap()
+        s.append(
+            Some(&op()),
+            AppendLogRequest {
+                tenant: t.into(),
+                app: app.into(),
+                instance: "i-1".into(),
+                level: lvl,
+                message: msg.into(),
+            },
+        )
+        .unwrap()
     }
 
     #[test]
@@ -299,39 +307,57 @@ mod tests {
     #[test]
     fn append_anonymous_denied() {
         let s = LogStore::new();
-        let err = s.append(None, AppendLogRequest {
-            tenant: "acme".into(),
-            app: "web".into(),
-            instance: "i".into(),
-            level: LogLevel::Info,
-            message: "m".into(),
-        }).unwrap_err();
+        let err = s
+            .append(
+                None,
+                AppendLogRequest {
+                    tenant: "acme".into(),
+                    app: "web".into(),
+                    instance: "i".into(),
+                    level: LogLevel::Info,
+                    message: "m".into(),
+                },
+            )
+            .unwrap_err();
         assert!(matches!(err, LogsError::Guard(GuardError::Anonymous)));
     }
 
     #[test]
     fn append_tenant_persona_denied() {
         let s = LogStore::new();
-        let err = s.append(Some(&dev("acme")), AppendLogRequest {
-            tenant: "acme".into(),
-            app: "web".into(),
-            instance: "i".into(),
-            level: LogLevel::Info,
-            message: "m".into(),
-        }).unwrap_err();
-        assert!(matches!(err, LogsError::Guard(GuardError::PersonaForbidden { .. })));
+        let err = s
+            .append(
+                Some(&dev("acme")),
+                AppendLogRequest {
+                    tenant: "acme".into(),
+                    app: "web".into(),
+                    instance: "i".into(),
+                    level: LogLevel::Info,
+                    message: "m".into(),
+                },
+            )
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            LogsError::Guard(GuardError::PersonaForbidden { .. })
+        ));
     }
 
     #[test]
     fn append_empty_message_rejected() {
         let s = LogStore::new();
-        let err = s.append(Some(&op()), AppendLogRequest {
-            tenant: "acme".into(),
-            app: "web".into(),
-            instance: "i".into(),
-            level: LogLevel::Info,
-            message: "".into(),
-        }).unwrap_err();
+        let err = s
+            .append(
+                Some(&op()),
+                AppendLogRequest {
+                    tenant: "acme".into(),
+                    app: "web".into(),
+                    instance: "i".into(),
+                    level: LogLevel::Info,
+                    message: "".into(),
+                },
+            )
+            .unwrap_err();
         assert!(matches!(err, LogsError::InvalidMessage(_)));
     }
 
@@ -339,13 +365,18 @@ mod tests {
     fn append_huge_message_rejected() {
         let s = LogStore::new();
         let m = "x".repeat(20_000);
-        let err = s.append(Some(&op()), AppendLogRequest {
-            tenant: "acme".into(),
-            app: "web".into(),
-            instance: "i".into(),
-            level: LogLevel::Info,
-            message: m,
-        }).unwrap_err();
+        let err = s
+            .append(
+                Some(&op()),
+                AppendLogRequest {
+                    tenant: "acme".into(),
+                    app: "web".into(),
+                    instance: "i".into(),
+                    level: LogLevel::Info,
+                    message: m,
+                },
+            )
+            .unwrap_err();
         assert!(matches!(err, LogsError::InvalidMessage(_)));
     }
 
@@ -360,7 +391,10 @@ mod tests {
     #[test]
     fn query_anonymous_denied() {
         let s = LogStore::new();
-        let q = LogQuery { tenant: "acme".into(), ..Default::default() };
+        let q = LogQuery {
+            tenant: "acme".into(),
+            ..Default::default()
+        };
         let err = s.query(None, &q).unwrap_err();
         assert!(matches!(err, LogsError::Guard(GuardError::Anonymous)));
     }
@@ -369,9 +403,15 @@ mod tests {
     fn query_dev_cross_tenant_denied() {
         let s = LogStore::new();
         append(&s, "acme", "web", LogLevel::Info, "m");
-        let q = LogQuery { tenant: "acme".into(), ..Default::default() };
+        let q = LogQuery {
+            tenant: "acme".into(),
+            ..Default::default()
+        };
         let err = s.query(Some(&dev("globex")), &q).unwrap_err();
-        assert!(matches!(err, LogsError::Guard(GuardError::TenantMismatch { .. })));
+        assert!(matches!(
+            err,
+            LogsError::Guard(GuardError::TenantMismatch { .. })
+        ));
     }
 
     #[test]
@@ -423,20 +463,28 @@ mod tests {
     #[test]
     fn query_filters_by_instance() {
         let s = LogStore::new();
-        s.append(Some(&op()), AppendLogRequest {
-            tenant: "acme".into(),
-            app: "web".into(),
-            instance: "i-1".into(),
-            level: LogLevel::Info,
-            message: "from-1".into(),
-        }).unwrap();
-        s.append(Some(&op()), AppendLogRequest {
-            tenant: "acme".into(),
-            app: "web".into(),
-            instance: "i-2".into(),
-            level: LogLevel::Info,
-            message: "from-2".into(),
-        }).unwrap();
+        s.append(
+            Some(&op()),
+            AppendLogRequest {
+                tenant: "acme".into(),
+                app: "web".into(),
+                instance: "i-1".into(),
+                level: LogLevel::Info,
+                message: "from-1".into(),
+            },
+        )
+        .unwrap();
+        s.append(
+            Some(&op()),
+            AppendLogRequest {
+                tenant: "acme".into(),
+                app: "web".into(),
+                instance: "i-2".into(),
+                level: LogLevel::Info,
+                message: "from-2".into(),
+            },
+        )
+        .unwrap();
         let q = LogQuery {
             tenant: "acme".into(),
             instance: Some("i-2".into()),
@@ -467,7 +515,11 @@ mod tests {
         for i in 0..500 {
             append(&s, "acme", "web", LogLevel::Info, &format!("m{i}"));
         }
-        let q = LogQuery { tenant: "acme".into(), limit: Some(20), ..Default::default() };
+        let q = LogQuery {
+            tenant: "acme".into(),
+            limit: Some(20),
+            ..Default::default()
+        };
         let out = s.query(Some(&dev("acme")), &q).unwrap();
         assert_eq!(out.len(), 20);
     }
@@ -478,7 +530,10 @@ mod tests {
         for i in 0..500 {
             append(&s, "acme", "web", LogLevel::Info, &format!("m{i}"));
         }
-        let q = LogQuery { tenant: "acme".into(), ..Default::default() };
+        let q = LogQuery {
+            tenant: "acme".into(),
+            ..Default::default()
+        };
         let out = s.query(Some(&dev("acme")), &q).unwrap();
         assert_eq!(out.len(), 200);
     }
@@ -486,7 +541,11 @@ mod tests {
     #[test]
     fn query_limit_too_large_rejected() {
         let s = LogStore::new();
-        let q = LogQuery { tenant: "acme".into(), limit: Some(10_000), ..Default::default() };
+        let q = LogQuery {
+            tenant: "acme".into(),
+            limit: Some(10_000),
+            ..Default::default()
+        };
         let err = s.query(Some(&dev("acme")), &q).unwrap_err();
         assert_eq!(err, LogsError::LimitTooLarge);
     }
@@ -497,7 +556,10 @@ mod tests {
         for i in 0..5 {
             append(&s, "acme", "web", LogLevel::Info, &format!("m{i}"));
         }
-        let q = LogQuery { tenant: "acme".into(), ..Default::default() };
+        let q = LogQuery {
+            tenant: "acme".into(),
+            ..Default::default()
+        };
         let out = s.query(Some(&dev("acme")), &q).unwrap();
         let ids: Vec<u64> = out.iter().map(|e| e.id).collect();
         let mut desc = ids.clone();

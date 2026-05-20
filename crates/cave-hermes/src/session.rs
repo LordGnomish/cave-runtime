@@ -86,10 +86,7 @@ impl SessionStore {
     pub fn append(&self, event: Event) -> crate::error::Result<()> {
         if let Some(path) = self.sink.read().as_ref() {
             let body = serde_json::to_string(&event)?;
-            let mut f = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(path)?;
+            let mut f = OpenOptions::new().create(true).append(true).open(path)?;
             writeln!(f, "{body}")?;
         }
         self.events.write().push(event);
@@ -121,11 +118,7 @@ impl SessionStore {
                 continue;
             }
             let ev: Event = serde_json::from_str(line).map_err(|e| {
-                HermesError::SessionCorrupted(format!(
-                    "{}:{} {e}",
-                    path.display(),
-                    lineno + 1
-                ))
+                HermesError::SessionCorrupted(format!("{}:{} {e}", path.display(), lineno + 1))
             })?;
             store.events.write().push(ev);
         }
@@ -186,11 +179,8 @@ mod tests {
         let path = dir.path().join("log.jsonl");
         let s = SessionStore::new().with_sink(&path);
         for i in 0..3 {
-            s.append(Event::new(
-                EventKind::ToolCall,
-                serde_json::json!({"n": i}),
-            ))
-            .unwrap();
+            s.append(Event::new(EventKind::ToolCall, serde_json::json!({"n": i})))
+                .unwrap();
         }
         let raw = std::fs::read_to_string(&path).unwrap();
         assert_eq!(raw.lines().count(), 3);

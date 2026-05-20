@@ -35,7 +35,9 @@ pub fn tenant_from_headers(headers: &HashMap<String, String>) -> String {
 /// Add `tenant_id={tenant}` to a stream's label-set. Idempotent (overwrites
 /// any spoofed value coming in through user input).
 pub fn inject_tenant_stream_label(labels: &mut Labels, tenant: &str) {
-    labels.0.insert(TENANT_LABEL.to_string(), tenant.to_string());
+    labels
+        .0
+        .insert(TENANT_LABEL.to_string(), tenant.to_string());
 }
 
 /// Normalize a stream label-set: ensure `tenant_id` exists *and* equals
@@ -65,10 +67,18 @@ pub struct RetentionOverride {
 
 impl RetentionPolicy {
     pub fn new(default: Duration) -> Self {
-        RetentionPolicy { default, overrides: Vec::new() }
+        RetentionPolicy {
+            default,
+            overrides: Vec::new(),
+        }
     }
 
-    pub fn with_override(mut self, label: impl Into<String>, value: impl Into<String>, d: Duration) -> Self {
+    pub fn with_override(
+        mut self,
+        label: impl Into<String>,
+        value: impl Into<String>,
+        d: Duration,
+    ) -> Self {
         self.overrides.push(RetentionOverride {
             label: label.into(),
             value: value.into(),
@@ -93,7 +103,11 @@ impl RetentionPolicy {
         let nanos = d.as_nanos();
         // Cap at i64::MAX so casting can't wrap, and clamp the result at 0
         // (TimestampNs is signed but we don't expose negative cutoffs).
-        let to_subtract = if nanos > i64::MAX as u128 { i64::MAX } else { nanos as i64 };
+        let to_subtract = if nanos > i64::MAX as u128 {
+            i64::MAX
+        } else {
+            nanos as i64
+        };
         now_ns.saturating_sub(to_subtract).max(0)
     }
 }
@@ -186,7 +200,10 @@ pub fn plan_compaction(
         groups.push(current);
     }
 
-    CompactionPlan { merge_groups: groups, total_compactable_bytes: total_compactable }
+    CompactionPlan {
+        merge_groups: groups,
+        total_compactable_bytes: total_compactable,
+    }
 }
 
 #[cfg(test)]
@@ -205,7 +222,11 @@ mod tests {
     }
 
     fn entry(ts: TimestampNs, line: &str) -> LogEntry {
-        LogEntry { ts, line: line.into(), metadata: HashMap::new() }
+        LogEntry {
+            ts,
+            line: line.into(),
+            metadata: HashMap::new(),
+        }
     }
 
     // ─── tenant_from_headers ─────────────────────────────────────────────
@@ -266,7 +287,10 @@ mod tests {
     #[test]
     fn test_policy_default_for_unmatched_stream() {
         let p = RetentionPolicy::new(Duration::from_secs(3600));
-        assert_eq!(p.for_stream(&lbl(&[("app", "x")])), Duration::from_secs(3600));
+        assert_eq!(
+            p.for_stream(&lbl(&[("app", "x")])),
+            Duration::from_secs(3600)
+        );
     }
 
     #[test]
@@ -282,8 +306,11 @@ mod tests {
 
     #[test]
     fn test_policy_override_stream_specific() {
-        let p = RetentionPolicy::new(Duration::from_secs(3600))
-            .with_override("env", "prod", Duration::from_secs(86_400));
+        let p = RetentionPolicy::new(Duration::from_secs(3600)).with_override(
+            "env",
+            "prod",
+            Duration::from_secs(86_400),
+        );
         assert_eq!(
             p.for_stream(&lbl(&[("env", "stage")])),
             Duration::from_secs(3600)
@@ -311,9 +338,9 @@ mod tests {
         let p = RetentionPolicy::new(Duration::from_nanos(100));
         let now = 1000;
         let entries = vec![
-            entry(800, "drop-1"),  // 800 < cutoff 900
+            entry(800, "drop-1"), // 800 < cutoff 900
             entry(850, "drop-2"),
-            entry(900, "keep-1"),  // 900 not < 900
+            entry(900, "keep-1"), // 900 not < 900
             entry(950, "keep-2"),
         ];
         let plan = dry_run_retention(&lbl(&[]), &entries, &p, now);
@@ -367,7 +394,11 @@ mod tests {
 
     #[test]
     fn test_plan_compaction_skips_already_large_chunks() {
-        let p = CompactionPolicy { min_chunks: 2, max_chunk_bytes: 50, small_chunk_count_trigger: 8 };
+        let p = CompactionPolicy {
+            min_chunks: 2,
+            max_chunk_bytes: 50,
+            small_chunk_count_trigger: 8,
+        };
         let sizes = vec![10, 10, 1000, 10, 10];
         let plan = plan_compaction(&sizes, 50, &p);
         // The 1000-byte chunk isn't a candidate; first pair {0,1} is OK
@@ -380,7 +411,11 @@ mod tests {
 
     #[test]
     fn test_plan_compaction_below_min_chunks_drops_group() {
-        let p = CompactionPolicy { min_chunks: 5, max_chunk_bytes: 1024, small_chunk_count_trigger: 16 };
+        let p = CompactionPolicy {
+            min_chunks: 5,
+            max_chunk_bytes: 1024,
+            small_chunk_count_trigger: 16,
+        };
         let sizes = vec![10, 10, 10];
         let plan = plan_compaction(&sizes, 50, &p);
         // Only 3 chunks but min_chunks=5 → no group
@@ -389,7 +424,11 @@ mod tests {
 
     #[test]
     fn test_plan_compaction_target_split_into_chunks() {
-        let p = CompactionPolicy { min_chunks: 1, max_chunk_bytes: 1024, small_chunk_count_trigger: 16 };
+        let p = CompactionPolicy {
+            min_chunks: 1,
+            max_chunk_bytes: 1024,
+            small_chunk_count_trigger: 16,
+        };
         let sizes = vec![100, 100, 100, 100];
         let plan = plan_compaction(&sizes, 200, &p);
         // 100+100=200 → flush; 100+100=200 → flush
@@ -406,7 +445,11 @@ mod tests {
 
     #[test]
     fn test_plan_compaction_single_oversize_chunk_no_groups() {
-        let p = CompactionPolicy { min_chunks: 1, max_chunk_bytes: 50, small_chunk_count_trigger: 16 };
+        let p = CompactionPolicy {
+            min_chunks: 1,
+            max_chunk_bytes: 50,
+            small_chunk_count_trigger: 16,
+        };
         let sizes = vec![1000];
         let plan = plan_compaction(&sizes, 200, &p);
         assert!(plan.merge_groups.is_empty());
@@ -436,9 +479,18 @@ mod tests {
         let p = RetentionPolicy::new(Duration::from_nanos(1000))
             .with_override("env", "prod", Duration::from_nanos(100))
             .with_override("env", "stage", Duration::from_nanos(10_000));
-        assert_eq!(p.for_stream(&lbl(&[("env", "prod")])), Duration::from_nanos(100));
-        assert_eq!(p.for_stream(&lbl(&[("env", "stage")])), Duration::from_nanos(10_000));
-        assert_eq!(p.for_stream(&lbl(&[("env", "qa")])), Duration::from_nanos(1000));
+        assert_eq!(
+            p.for_stream(&lbl(&[("env", "prod")])),
+            Duration::from_nanos(100)
+        );
+        assert_eq!(
+            p.for_stream(&lbl(&[("env", "stage")])),
+            Duration::from_nanos(10_000)
+        );
+        assert_eq!(
+            p.for_stream(&lbl(&[("env", "qa")])),
+            Duration::from_nanos(1000)
+        );
     }
 
     #[test]
@@ -451,7 +503,11 @@ mod tests {
 
     #[test]
     fn test_compaction_plan_total_excludes_oversized() {
-        let p = CompactionPolicy { min_chunks: 1, max_chunk_bytes: 100, small_chunk_count_trigger: 8 };
+        let p = CompactionPolicy {
+            min_chunks: 1,
+            max_chunk_bytes: 100,
+            small_chunk_count_trigger: 8,
+        };
         let sizes = vec![50, 50, 200, 50, 50];
         let plan = plan_compaction(&sizes, 100, &p);
         // 200 is excluded; small ones sum to 200

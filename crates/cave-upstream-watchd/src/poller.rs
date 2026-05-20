@@ -63,16 +63,12 @@ pub enum PollOutcome {
     },
     /// Server returned 304 — our cached etag/last-modified still
     /// reflects reality. No body to update.
-    NotModified {
-        rate_limit_remaining: Option<u32>,
-    },
+    NotModified { rate_limit_remaining: Option<u32> },
     /// Repo has no releases yet (404 on `/releases/latest`).
     NoRelease,
     /// Hit the rate-limit ceiling. `reset_at_epoch_seconds` is the
     /// `X-RateLimit-Reset` header.
-    RateLimited {
-        reset_at_epoch_seconds: Option<u64>,
-    },
+    RateLimited { reset_at_epoch_seconds: Option<u64> },
 }
 
 #[derive(Debug, Clone)]
@@ -165,11 +161,15 @@ pub async fn fetch_latest(
     etag: Option<&str>,
     last_modified: Option<&str>,
 ) -> Result<PollOutcome, PollError> {
-    GitHubClient::new(token).fetch_latest(repo, etag, last_modified).await
+    GitHubClient::new(token)
+        .fetch_latest(repo, etag, last_modified)
+        .await
 }
 
 fn header_str(h: &reqwest::header::HeaderMap, name: &str) -> Option<String> {
-    h.get(name).and_then(|v| v.to_str().ok()).map(str::to_string)
+    h.get(name)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string)
 }
 fn header_u32(h: &reqwest::header::HeaderMap, name: &str) -> Option<u32> {
     h.get(name)
@@ -270,7 +270,9 @@ mod tests {
         let outcome = cli.fetch_latest("x/y", None, None).await.unwrap();
         m.assert();
         match outcome {
-            PollOutcome::RateLimited { reset_at_epoch_seconds } => {
+            PollOutcome::RateLimited {
+                reset_at_epoch_seconds,
+            } => {
                 assert_eq!(reset_at_epoch_seconds, Some(1714665600));
             }
             other => panic!("expected RateLimited, got {other:?}"),

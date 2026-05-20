@@ -13,22 +13,21 @@
 //! GET  /api/sbom/:image         — generate SBOM for an image reference
 
 use crate::{
-    falco,
+    SecurityState, falco,
     trivy::{
         output::{render_json, render_sarif, render_table},
         scanner::{ScanOptions, ScanType, Scanner},
     },
-    SecurityState,
 };
 use axum::{
+    Json, Router,
     extract::{
-        ws::{Message, WebSocket, WebSocketUpgrade},
         Path, Query, State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
     },
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post, put},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use std::{path, sync::Arc};
@@ -276,7 +275,12 @@ async fn get_sbom(
 
     let (os_pkgs, lang_pkgs) = if root.exists() {
         // Inline package collection — reuse scanner logic via a temp scan
-        let opts = ScanOptions { generate_sbom: false, scan_secrets: false, scan_misconfig: false, ..Default::default() };
+        let opts = ScanOptions {
+            generate_sbom: false,
+            scan_secrets: false,
+            scan_misconfig: false,
+            ..Default::default()
+        };
         let result = scanner.scan_filesystem(root, &opts);
         // Retrieve packages from the scan result via sbom fields (not directly exposed)
         // Fall back: generate empty SBOM with the image label
@@ -339,27 +343,15 @@ fn render_result(
     match format {
         Some("table") => {
             let text = render_table(result);
-            (
-                [("content-type", "text/plain")],
-                text,
-            )
-                .into_response()
+            ([("content-type", "text/plain")], text).into_response()
         }
         Some("sarif") => {
             let sarif = render_sarif(result);
-            (
-                [("content-type", "application/json")],
-                sarif,
-            )
-                .into_response()
+            ([("content-type", "application/json")], sarif).into_response()
         }
         _ => {
             let json = render_json(result);
-            (
-                [("content-type", "application/json")],
-                json,
-            )
-                .into_response()
+            ([("content-type", "application/json")], json).into_response()
         }
     }
 }
@@ -402,7 +394,9 @@ mod tests {
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert!(json["total_rules"].as_u64().unwrap() > 0);
     }
@@ -420,7 +414,9 @@ mod tests {
             .method("PUT")
             .uri("/api/rules")
             .header("content-type", "application/json")
-            .body(Body::from(serde_json::to_string(&serde_json::json!({"yaml": yaml})).unwrap()))
+            .body(Body::from(
+                serde_json::to_string(&serde_json::json!({"yaml": yaml})).unwrap(),
+            ))
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
@@ -463,7 +459,9 @@ mod tests {
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert!(!json["misconfigs"].as_array().unwrap().is_empty());
     }

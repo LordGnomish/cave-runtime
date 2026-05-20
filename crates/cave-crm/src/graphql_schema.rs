@@ -39,10 +39,7 @@ pub fn render_type(object: &ObjectMetadata, fields: &[FieldMetadata]) -> String 
 
 /// Render the workspace's schema as a single SDL string (Query root +
 /// every standard object + every custom object).
-pub fn render_workspace_schema(
-    objects: &[ObjectMetadata],
-    fields: &[FieldMetadata],
-) -> String {
+pub fn render_workspace_schema(objects: &[ObjectMetadata], fields: &[FieldMetadata]) -> String {
     let mut out = String::from(SCHEMA_PRELUDE);
     out.push_str("\ntype Query {\n");
     for o in objects {

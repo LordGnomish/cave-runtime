@@ -121,7 +121,9 @@ pub struct AllowList {
 
 impl AllowList {
     pub fn allows(&self, name: &str) -> bool {
-        self.patterns.iter().any(|p| crate::cilium::l7policy::dns_matches(p, name))
+        self.patterns
+            .iter()
+            .any(|p| crate::cilium::l7policy::dns_matches(p, name))
     }
 }
 
@@ -157,7 +159,8 @@ pub struct DnsProxy {
 impl DnsProxy {
     pub fn new(tenant: TenantId, mode: DnsMode) -> Self {
         Self {
-            tenant, mode,
+            tenant,
+            mode,
             allow_lists: HashMap::new(),
             captures: BTreeMap::new(),
             resolved: BTreeMap::new(),
@@ -179,13 +182,21 @@ impl DnsProxy {
     /// Decide what to do with a DNS query from `endpoint_id` for
     /// `question`. Mirrors the proxy decision in
     /// `pkg/proxy/dns/dnsproxy.go::ServeDNS`.
-    pub fn on_query(&mut self, endpoint_id: u64, question: &DnsQuestion, now_ns: u64) -> Result<DnsVerdict, DnsProxyError> {
+    pub fn on_query(
+        &mut self,
+        endpoint_id: u64,
+        question: &DnsQuestion,
+        now_ns: u64,
+    ) -> Result<DnsVerdict, DnsProxyError> {
         // Always capture for visibility.
-        self.captures.insert((question.qname.clone(), question.qtype), now_ns);
+        self.captures
+            .insert((question.qname.clone(), question.qtype), now_ns);
         match self.mode {
             DnsMode::CaptureOnly => Ok(DnsVerdict::PassThrough),
             DnsMode::Intercept => {
-                let list = self.allow_lists.get(&endpoint_id)
+                let list = self
+                    .allow_lists
+                    .get(&endpoint_id)
                     .ok_or(DnsProxyError::NoAllowList(endpoint_id))?;
                 if list.allows(&question.qname) {
                     Ok(DnsVerdict::Allow)
@@ -217,9 +228,15 @@ impl DnsProxy {
     }
 
     pub fn lookup_resolved(&self, qname: &str, now_ns: u64) -> Vec<IpAddr> {
-        self.resolved.get(qname).map(|v| {
-            v.iter().filter(|(_, e)| now_ns < *e).map(|(ip, _)| *ip).collect()
-        }).unwrap_or_default()
+        self.resolved
+            .get(qname)
+            .map(|v| {
+                v.iter()
+                    .filter(|(_, e)| now_ns < *e)
+                    .map(|(ip, _)| *ip)
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     pub fn captured_count(&self) -> usize {
@@ -262,15 +279,20 @@ mod tests {
     }
 
     fn question(qname: &str, qt: QType) -> DnsQuestion {
-        DnsQuestion { qname: qname.into(), qtype: qt }
+        DnsQuestion {
+            qname: qname.into(),
+            qtype: qt,
+        }
     }
 
     fn response_a(name: &str, ip: Ipv4Addr, ttl: u32) -> DnsResponse {
         DnsResponse {
             rcode: DnsRcode::NoError,
             answers: vec![DnsAnswer {
-                name: name.into(), qtype: QType::A,
-                ttl_seconds: ttl, data: AnswerData::A(ip),
+                name: name.into(),
+                qtype: QType::A,
+                ttl_seconds: ttl,
+                data: AnswerData::A(ip),
             }],
         }
     }
@@ -279,7 +301,11 @@ mod tests {
 
     #[test]
     fn qtype_numeric_known_values() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "QType.Numeric", "tenant-dns-qn");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "QType.Numeric",
+            "tenant-dns-qn"
+        );
         assert_eq!(QType::A.numeric(), 1);
         assert_eq!(QType::Aaaa.numeric(), 28);
         assert_eq!(QType::Cname.numeric(), 5);
@@ -289,15 +315,32 @@ mod tests {
 
     #[test]
     fn qtype_from_numeric_round_trip_for_known() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "QType.FromNumeric", "tenant-dns-qfn");
-        for q in [QType::A, QType::Aaaa, QType::Cname, QType::Mx, QType::Srv, QType::Txt, QType::Ptr, QType::Ns] {
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "QType.FromNumeric",
+            "tenant-dns-qfn"
+        );
+        for q in [
+            QType::A,
+            QType::Aaaa,
+            QType::Cname,
+            QType::Mx,
+            QType::Srv,
+            QType::Txt,
+            QType::Ptr,
+            QType::Ns,
+        ] {
             assert_eq!(QType::from_numeric(q.numeric()), q);
         }
     }
 
     #[test]
     fn qtype_from_numeric_unknown_falls_to_other() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "QType.Other", "tenant-dns-qother");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "QType.Other",
+            "tenant-dns-qother"
+        );
         assert_eq!(QType::from_numeric(99), QType::Other(99));
     }
 
@@ -305,16 +348,28 @@ mod tests {
 
     #[test]
     fn allow_list_exact_match() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "AllowList.Exact", "tenant-dns-alex");
-        let l = AllowList { patterns: vec!["api.example.com".into()] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "AllowList.Exact",
+            "tenant-dns-alex"
+        );
+        let l = AllowList {
+            patterns: vec!["api.example.com".into()],
+        };
         assert!(l.allows("api.example.com"));
         assert!(!l.allows("other.example.com"));
     }
 
     #[test]
     fn allow_list_wildcard_match() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "AllowList.Wildcard", "tenant-dns-alwc");
-        let l = AllowList { patterns: vec!["*.example.com".into()] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "AllowList.Wildcard",
+            "tenant-dns-alwc"
+        );
+        let l = AllowList {
+            patterns: vec!["*.example.com".into()],
+        };
         assert!(l.allows("api.example.com"));
         assert!(l.allows("other.example.com"));
         assert!(!l.allows("example.com"));
@@ -322,14 +377,24 @@ mod tests {
 
     #[test]
     fn allow_list_star_matches_all() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "AllowList.Star", "tenant-dns-alstar");
-        let l = AllowList { patterns: vec!["*".into()] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "AllowList.Star",
+            "tenant-dns-alstar"
+        );
+        let l = AllowList {
+            patterns: vec!["*".into()],
+        };
         assert!(l.allows("anything.example.com"));
     }
 
     #[test]
     fn allow_list_empty_denies_all() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "AllowList.Empty", "tenant-dns-alempty");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "AllowList.Empty",
+            "tenant-dns-alempty"
+        );
         let l = AllowList { patterns: vec![] };
         assert!(!l.allows("anything"));
     }
@@ -338,33 +403,60 @@ mod tests {
 
     #[test]
     fn intercept_mode_allow_when_pattern_matches() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "Intercept.Allow", "tenant-dns-iall");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "Intercept.Allow",
+            "tenant-dns-iall"
+        );
         let mut p = proxy(tenant, DnsMode::Intercept);
-        p.set_allow_list(1, AllowList { patterns: vec!["*.example.com".into()] });
-        let v = p.on_query(1, &question("api.example.com", QType::A), 0).unwrap();
+        p.set_allow_list(
+            1,
+            AllowList {
+                patterns: vec!["*.example.com".into()],
+            },
+        );
+        let v = p
+            .on_query(1, &question("api.example.com", QType::A), 0)
+            .unwrap();
         assert_eq!(v, DnsVerdict::Allow);
     }
 
     #[test]
     fn intercept_mode_refused_when_pattern_does_not_match() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "Intercept.Refused", "tenant-dns-iref");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "Intercept.Refused",
+            "tenant-dns-iref"
+        );
         let mut p = proxy(tenant, DnsMode::Intercept);
-        p.set_allow_list(1, AllowList { patterns: vec!["*.example.com".into()] });
+        p.set_allow_list(
+            1,
+            AllowList {
+                patterns: vec!["*.example.com".into()],
+            },
+        );
         let v = p.on_query(1, &question("evil.com", QType::A), 0).unwrap();
         assert_eq!(v, DnsVerdict::Refused);
     }
 
     #[test]
     fn intercept_mode_no_allow_list_returns_error() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "Intercept.NoAllowList", "tenant-dns-inal");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "Intercept.NoAllowList",
+            "tenant-dns-inal"
+        );
         let mut p = proxy(tenant, DnsMode::Intercept);
-        let err = p.on_query(99, &question("api.example.com", QType::A), 0).unwrap_err();
+        let err = p
+            .on_query(99, &question("api.example.com", QType::A), 0)
+            .unwrap_err();
         assert_eq!(err, DnsProxyError::NoAllowList(99));
     }
 
     #[test]
     fn capture_only_mode_pass_through_regardless() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "CaptureOnly", "tenant-dns-co");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "CaptureOnly", "tenant-dns-co");
         let mut p = proxy(tenant, DnsMode::CaptureOnly);
         let v = p.on_query(1, &question("evil.com", QType::A), 0).unwrap();
         assert_eq!(v, DnsVerdict::PassThrough);
@@ -372,9 +464,18 @@ mod tests {
 
     #[test]
     fn capture_records_query_regardless_of_verdict() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "CaptureRecord", "tenant-dns-rec");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "CaptureRecord",
+            "tenant-dns-rec"
+        );
         let mut p = proxy(tenant, DnsMode::Intercept);
-        p.set_allow_list(1, AllowList { patterns: vec!["*.example.com".into()] });
+        p.set_allow_list(
+            1,
+            AllowList {
+                patterns: vec!["*.example.com".into()],
+            },
+        );
         let _ = p.on_query(1, &question("evil.com", QType::A), 100);
         let _ = p.on_query(1, &question("api.example.com", QType::A), 200);
         assert_eq!(p.captured_count(), 2);
@@ -384,25 +485,44 @@ mod tests {
 
     #[test]
     fn allow_list_lookup_returns_set() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "AllowList.Lookup", "tenant-dns-allk");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "AllowList.Lookup",
+            "tenant-dns-allk"
+        );
         let mut p = proxy(tenant, DnsMode::Intercept);
-        let l = AllowList { patterns: vec!["*.example.com".into()] };
+        let l = AllowList {
+            patterns: vec!["*.example.com".into()],
+        };
         p.set_allow_list(1, l.clone());
         assert_eq!(p.allow_list(1), Some(&l));
     }
 
     #[test]
     fn allow_list_remove_drops() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "AllowList.Remove", "tenant-dns-alrm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "AllowList.Remove",
+            "tenant-dns-alrm"
+        );
         let mut p = proxy(tenant, DnsMode::Intercept);
-        p.set_allow_list(1, AllowList { patterns: vec!["*".into()] });
+        p.set_allow_list(
+            1,
+            AllowList {
+                patterns: vec!["*".into()],
+            },
+        );
         assert!(p.remove_allow_list(1));
         assert!(p.allow_list(1).is_none());
     }
 
     #[test]
     fn allow_list_remove_unknown_returns_false() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "AllowList.Remove.NotFound", "tenant-dns-alrmn");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "AllowList.Remove.NotFound",
+            "tenant-dns-alrmn"
+        );
         let mut p = proxy(tenant, DnsMode::Intercept);
         assert!(!p.remove_allow_list(1));
     }
@@ -411,25 +531,39 @@ mod tests {
 
     #[test]
     fn on_response_records_a_record_with_ttl_window() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "Response.A", "tenant-dns-resa");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "Response.A", "tenant-dns-resa");
         let mut p = proxy(tenant, DnsMode::Intercept);
-        p.set_allow_list(1, AllowList { patterns: vec!["*".into()] });
-        p.on_response(&question("api.example.com", QType::A),
-                      &response_a("api.example.com", Ipv4Addr::new(1, 2, 3, 4), 60),
-                      100);
+        p.set_allow_list(
+            1,
+            AllowList {
+                patterns: vec!["*".into()],
+            },
+        );
+        p.on_response(
+            &question("api.example.com", QType::A),
+            &response_a("api.example.com", Ipv4Addr::new(1, 2, 3, 4), 60),
+            100,
+        );
         let r = p.lookup_resolved("api.example.com", 100);
         assert_eq!(r, vec![IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4))]);
     }
 
     #[test]
     fn on_response_skips_non_noerror_rcode() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "Response.NXDOMAIN", "tenant-dns-resnx");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "Response.NXDOMAIN",
+            "tenant-dns-resnx"
+        );
         let mut p = proxy(tenant, DnsMode::Intercept);
         let resp = DnsResponse {
             rcode: DnsRcode::NxDomain,
             answers: vec![DnsAnswer {
-                name: "api.example.com".into(), qtype: QType::A,
-                ttl_seconds: 60, data: AnswerData::A(Ipv4Addr::new(1, 2, 3, 4)),
+                name: "api.example.com".into(),
+                qtype: QType::A,
+                ttl_seconds: 60,
+                data: AnswerData::A(Ipv4Addr::new(1, 2, 3, 4)),
             }],
         };
         p.on_response(&question("api.example.com", QType::A), &resp, 100);
@@ -438,21 +572,38 @@ mod tests {
 
     #[test]
     fn on_response_dedupes_repeated_ip() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "Response.Dedup", "tenant-dns-resd");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "Response.Dedup",
+            "tenant-dns-resd"
+        );
         let mut p = proxy(tenant, DnsMode::Intercept);
-        p.on_response(&question("api.example.com", QType::A),
-                      &response_a("api.example.com", Ipv4Addr::new(1, 2, 3, 4), 60), 100);
-        p.on_response(&question("api.example.com", QType::A),
-                      &response_a("api.example.com", Ipv4Addr::new(1, 2, 3, 4), 120), 200);
+        p.on_response(
+            &question("api.example.com", QType::A),
+            &response_a("api.example.com", Ipv4Addr::new(1, 2, 3, 4), 60),
+            100,
+        );
+        p.on_response(
+            &question("api.example.com", QType::A),
+            &response_a("api.example.com", Ipv4Addr::new(1, 2, 3, 4), 120),
+            200,
+        );
         assert_eq!(p.lookup_resolved("api.example.com", 200).len(), 1);
     }
 
     #[test]
     fn lookup_resolved_filters_expired() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "LookupResolved.Expiry", "tenant-dns-exp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "LookupResolved.Expiry",
+            "tenant-dns-exp"
+        );
         let mut p = proxy(tenant, DnsMode::Intercept);
-        p.on_response(&question("api.example.com", QType::A),
-                      &response_a("api.example.com", Ipv4Addr::new(1, 2, 3, 4), 60), 0);
+        p.on_response(
+            &question("api.example.com", QType::A),
+            &response_a("api.example.com", Ipv4Addr::new(1, 2, 3, 4), 60),
+            0,
+        );
         // 60s expiry → at t=70s the entry should be gone from the live view.
         let r = p.lookup_resolved("api.example.com", 70_000_000_000);
         assert!(r.is_empty());
@@ -460,7 +611,11 @@ mod tests {
 
     #[test]
     fn lookup_unknown_qname_returns_empty() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "LookupResolved.NotFound", "tenant-dns-lkn");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "LookupResolved.NotFound",
+            "tenant-dns-lkn"
+        );
         let p = proxy(tenant, DnsMode::Intercept);
         assert!(p.lookup_resolved("nope.com", 0).is_empty());
     }
@@ -469,12 +624,19 @@ mod tests {
 
     #[test]
     fn gc_removes_expired_entries() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "GC.Expired", "tenant-dns-gc");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "GC.Expired", "tenant-dns-gc");
         let mut p = proxy(tenant, DnsMode::Intercept);
-        p.on_response(&question("a.example.com", QType::A),
-                      &response_a("a.example.com", Ipv4Addr::new(1, 2, 3, 4), 60), 0);
-        p.on_response(&question("b.example.com", QType::A),
-                      &response_a("b.example.com", Ipv4Addr::new(1, 2, 3, 5), 600), 0);
+        p.on_response(
+            &question("a.example.com", QType::A),
+            &response_a("a.example.com", Ipv4Addr::new(1, 2, 3, 4), 60),
+            0,
+        );
+        p.on_response(
+            &question("b.example.com", QType::A),
+            &response_a("b.example.com", Ipv4Addr::new(1, 2, 3, 5), 600),
+            0,
+        );
         let n = p.gc(70 * 1_000_000_000);
         assert_eq!(n, 1);
         assert_eq!(p.resolved_name_count(), 1);
@@ -482,10 +644,14 @@ mod tests {
 
     #[test]
     fn gc_keeps_fresh_entries() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "GC.Fresh", "tenant-dns-gcf");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "GC.Fresh", "tenant-dns-gcf");
         let mut p = proxy(tenant, DnsMode::Intercept);
-        p.on_response(&question("a.example.com", QType::A),
-                      &response_a("a.example.com", Ipv4Addr::new(1, 2, 3, 4), 600), 0);
+        p.on_response(
+            &question("a.example.com", QType::A),
+            &response_a("a.example.com", Ipv4Addr::new(1, 2, 3, 4), 600),
+            0,
+        );
         let n = p.gc(60 * 1_000_000_000);
         assert_eq!(n, 0);
     }
@@ -494,25 +660,56 @@ mod tests {
 
     #[test]
     fn multiple_endpoints_have_independent_allow_lists() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "AllowList.PerEndpoint", "tenant-dns-multi");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "AllowList.PerEndpoint",
+            "tenant-dns-multi"
+        );
         let mut p = proxy(tenant, DnsMode::Intercept);
-        p.set_allow_list(1, AllowList { patterns: vec!["*.example.com".into()] });
-        p.set_allow_list(2, AllowList { patterns: vec!["*.other.com".into()] });
-        assert_eq!(p.on_query(1, &question("api.example.com", QType::A), 0).unwrap(), DnsVerdict::Allow);
-        assert_eq!(p.on_query(2, &question("api.example.com", QType::A), 0).unwrap(), DnsVerdict::Refused);
-        assert_eq!(p.on_query(2, &question("api.other.com", QType::A), 0).unwrap(), DnsVerdict::Allow);
+        p.set_allow_list(
+            1,
+            AllowList {
+                patterns: vec!["*.example.com".into()],
+            },
+        );
+        p.set_allow_list(
+            2,
+            AllowList {
+                patterns: vec!["*.other.com".into()],
+            },
+        );
+        assert_eq!(
+            p.on_query(1, &question("api.example.com", QType::A), 0)
+                .unwrap(),
+            DnsVerdict::Allow
+        );
+        assert_eq!(
+            p.on_query(2, &question("api.example.com", QType::A), 0)
+                .unwrap(),
+            DnsVerdict::Refused
+        );
+        assert_eq!(
+            p.on_query(2, &question("api.other.com", QType::A), 0)
+                .unwrap(),
+            DnsVerdict::Allow
+        );
     }
 
     // ── AAAA / CNAME ────────────────────────────────────────────────────────
 
     #[test]
     fn aaaa_record_captured_as_v6() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "Response.AAAA", "tenant-dns-aaaa");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "Response.AAAA",
+            "tenant-dns-aaaa"
+        );
         let mut p = proxy(tenant, DnsMode::Intercept);
         let resp = DnsResponse {
             rcode: DnsRcode::NoError,
             answers: vec![DnsAnswer {
-                name: "api.example.com".into(), qtype: QType::Aaaa,
+                name: "api.example.com".into(),
+                qtype: QType::Aaaa,
                 ttl_seconds: 60,
                 data: AnswerData::Aaaa("fd00::1".parse().unwrap()),
             }],
@@ -524,13 +721,19 @@ mod tests {
 
     #[test]
     fn cname_answer_not_captured_as_ip() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "Response.CNAME", "tenant-dns-cn");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "Response.CNAME",
+            "tenant-dns-cn"
+        );
         let mut p = proxy(tenant, DnsMode::Intercept);
         let resp = DnsResponse {
             rcode: DnsRcode::NoError,
             answers: vec![DnsAnswer {
-                name: "api.example.com".into(), qtype: QType::Cname,
-                ttl_seconds: 60, data: AnswerData::Cname("alias.example.com".into()),
+                name: "api.example.com".into(),
+                qtype: QType::Cname,
+                ttl_seconds: 60,
+                data: AnswerData::Cname("alias.example.com".into()),
             }],
         };
         p.on_response(&question("api.example.com", QType::Cname), &resp, 0);
@@ -541,8 +744,18 @@ mod tests {
 
     #[test]
     fn dns_rcode_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "Rcode.Serde", "tenant-dns-rcserde");
-        for r in [DnsRcode::NoError, DnsRcode::FormErr, DnsRcode::ServFail, DnsRcode::NxDomain, DnsRcode::Refused] {
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "Rcode.Serde",
+            "tenant-dns-rcserde"
+        );
+        for r in [
+            DnsRcode::NoError,
+            DnsRcode::FormErr,
+            DnsRcode::ServFail,
+            DnsRcode::NxDomain,
+            DnsRcode::Refused,
+        ] {
             let s = serde_json::to_string(&r).unwrap();
             let back: DnsRcode = serde_json::from_str(&s).unwrap();
             assert_eq!(back, r);
@@ -551,7 +764,11 @@ mod tests {
 
     #[test]
     fn dns_question_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "Question.Serde", "tenant-dns-qserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "Question.Serde",
+            "tenant-dns-qserde"
+        );
         let q = question("api.example.com", QType::A);
         let s = serde_json::to_string(&q).unwrap();
         let back: DnsQuestion = serde_json::from_str(&s).unwrap();
@@ -560,7 +777,11 @@ mod tests {
 
     #[test]
     fn dns_response_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "Response.Serde", "tenant-dns-rserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "Response.Serde",
+            "tenant-dns-rserde"
+        );
         let r = response_a("api.example.com", Ipv4Addr::new(1, 2, 3, 4), 60);
         let s = serde_json::to_string(&r).unwrap();
         let back: DnsResponse = serde_json::from_str(&s).unwrap();
@@ -569,7 +790,11 @@ mod tests {
 
     #[test]
     fn dns_mode_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/option/config.go", "DNSProxyMode.Serde", "tenant-dns-mserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/option/config.go",
+            "DNSProxyMode.Serde",
+            "tenant-dns-mserde"
+        );
         for m in [DnsMode::Intercept, DnsMode::CaptureOnly] {
             let s = serde_json::to_string(&m).unwrap();
             let back: DnsMode = serde_json::from_str(&s).unwrap();
@@ -579,8 +804,16 @@ mod tests {
 
     #[test]
     fn dns_verdict_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/dns/dnsproxy.go", "Verdict.Serde", "tenant-dns-vserde");
-        for v in [DnsVerdict::Allow, DnsVerdict::Refused, DnsVerdict::PassThrough] {
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/dns/dnsproxy.go",
+            "Verdict.Serde",
+            "tenant-dns-vserde"
+        );
+        for v in [
+            DnsVerdict::Allow,
+            DnsVerdict::Refused,
+            DnsVerdict::PassThrough,
+        ] {
             let s = serde_json::to_string(&v).unwrap();
             let back: DnsVerdict = serde_json::from_str(&s).unwrap();
             assert_eq!(back, v);

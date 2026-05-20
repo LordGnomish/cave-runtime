@@ -4,7 +4,7 @@
 //! upstream: knative/serving v1.18.x — pkg/apis/serving/v1/service_types.go
 
 use crate::meta::{
-    validate_template, validate_traffic, ObjectMeta, RevisionTemplateSpec, TrafficTarget,
+    ObjectMeta, RevisionTemplateSpec, TrafficTarget, validate_template, validate_traffic,
 };
 
 #[derive(Default, Debug, Clone)]

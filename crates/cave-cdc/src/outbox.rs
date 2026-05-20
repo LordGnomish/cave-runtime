@@ -36,16 +36,24 @@ impl OutboxEntry {
     /// the explicit invariant for the scaffold).
     pub fn validate(&self) -> CdcResult<()> {
         if self.id.trim().is_empty() {
-            return Err(CdcError::InvalidConfig("outbox id must be non-empty".into()));
+            return Err(CdcError::InvalidConfig(
+                "outbox id must be non-empty".into(),
+            ));
         }
         if self.aggregate_type.trim().is_empty() {
-            return Err(CdcError::InvalidConfig("aggregate_type must be non-empty".into()));
+            return Err(CdcError::InvalidConfig(
+                "aggregate_type must be non-empty".into(),
+            ));
         }
         if self.aggregate_id.trim().is_empty() {
-            return Err(CdcError::InvalidConfig("aggregate_id must be non-empty".into()));
+            return Err(CdcError::InvalidConfig(
+                "aggregate_id must be non-empty".into(),
+            ));
         }
         if self.tenant_id.trim().is_empty() {
-            return Err(CdcError::InvalidConfig("tenant_id must be non-empty".into()));
+            return Err(CdcError::InvalidConfig(
+                "tenant_id must be non-empty".into(),
+            ));
         }
         Ok(())
     }
@@ -92,8 +100,10 @@ impl OutboxEventRouter {
         if !self.seen_ids.insert(entry.id.clone()) {
             return Err(CdcError::DuplicateOutboxEventId(entry.id.clone()));
         }
-        let topic = format!("{}.{}.{}",
-            self.topic_prefix, self.tenant_id, entry.aggregate_type);
+        let topic = format!(
+            "{}.{}.{}",
+            self.topic_prefix, self.tenant_id, entry.aggregate_type
+        );
 
         let mut headers = std::collections::HashMap::new();
         headers.insert("id".into(), entry.id.clone());
@@ -108,8 +118,12 @@ impl OutboxEventRouter {
         })
     }
 
-    pub fn seen(&self, id: &str) -> bool { self.seen_ids.contains(id) }
-    pub fn dedupe_size(&self) -> usize { self.seen_ids.len() }
+    pub fn seen(&self, id: &str) -> bool {
+        self.seen_ids.contains(id)
+    }
+    pub fn dedupe_size(&self) -> usize {
+        self.seen_ids.len()
+    }
 
     /// Operator-driven cleanup. Cite: debezium recommends pruning the
     /// outbox table after the CDC pipeline confirms delivery; the

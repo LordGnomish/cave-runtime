@@ -112,7 +112,9 @@ mod tests {
 
         // Update to v2
         let mut v2 = make_resource("srv-01", 8);
-        v2.spec.properties.insert("cpu".into(), serde_json::json!(8));
+        v2.spec
+            .properties
+            .insert("cpu".into(), serde_json::json!(8));
         store.upsert(v2);
 
         // Rollback

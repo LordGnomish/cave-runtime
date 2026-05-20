@@ -8,11 +8,15 @@
 //! Phase 2 — Once C_old,new is committed, leader appends C_new.
 //!            From this point the new config is authoritative.
 
-use std::collections::BTreeSet;
 use crate::raft::types::{MembershipConfig, NodeId};
+use std::collections::BTreeSet;
 
 /// Compute the joint configuration for adding a node.
-pub fn joint_for_add(current: &MembershipConfig, new_id: NodeId, is_learner: bool) -> MembershipConfig {
+pub fn joint_for_add(
+    current: &MembershipConfig,
+    new_id: NodeId,
+    is_learner: bool,
+) -> MembershipConfig {
     let mut new_voters = current.voters.clone();
     let mut new_learners = current.learners.clone();
     if is_learner {
@@ -62,7 +66,9 @@ pub fn validate(current: &MembershipConfig, proposed: &MembershipConfig) -> Resu
     }
     let overlap: BTreeSet<_> = proposed.voters.intersection(&proposed.learners).collect();
     if !overlap.is_empty() {
-        return Err(format!("nodes {overlap:?} appear in both voters and learners"));
+        return Err(format!(
+            "nodes {overlap:?} appear in both voters and learners"
+        ));
     }
     // Warn if removing more than one node at a time (not strictly invalid but risky).
     let removed: BTreeSet<_> = current.voters.difference(&proposed.voters).collect();

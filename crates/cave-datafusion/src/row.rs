@@ -131,16 +131,28 @@ mod tests {
     #[test]
     fn cmp_nulls_first_orders_null_low() {
         use std::cmp::Ordering;
-        assert_eq!(Value::Null.cmp_nulls_first(&Value::Int64(1)), Ordering::Less);
-        assert_eq!(Value::Int64(1).cmp_nulls_first(&Value::Null), Ordering::Greater);
+        assert_eq!(
+            Value::Null.cmp_nulls_first(&Value::Int64(1)),
+            Ordering::Less
+        );
+        assert_eq!(
+            Value::Int64(1).cmp_nulls_first(&Value::Null),
+            Ordering::Greater
+        );
         assert_eq!(Value::Null.cmp_nulls_first(&Value::Null), Ordering::Equal);
     }
 
     #[test]
     fn cmp_mixed_numeric_coerces() {
         use std::cmp::Ordering;
-        assert_eq!(Value::Int64(1).cmp_nulls_first(&Value::Float64(1.0)), Ordering::Equal);
-        assert_eq!(Value::Int64(1).cmp_nulls_first(&Value::Float64(2.0)), Ordering::Less);
+        assert_eq!(
+            Value::Int64(1).cmp_nulls_first(&Value::Float64(1.0)),
+            Ordering::Equal
+        );
+        assert_eq!(
+            Value::Int64(1).cmp_nulls_first(&Value::Float64(2.0)),
+            Ordering::Less
+        );
     }
 
     #[test]

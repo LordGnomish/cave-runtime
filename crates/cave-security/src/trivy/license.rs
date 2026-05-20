@@ -47,28 +47,138 @@ pub enum LicenseCategory {
 
 /// (spdx_id, display_name, risk, category)
 pub static SPDX_LICENSES: &[(&str, &str, LicenseRisk, LicenseCategory)] = &[
-    ("MIT", "MIT License", LicenseRisk::Low, LicenseCategory::Permissive),
-    ("Apache-2.0", "Apache License 2.0", LicenseRisk::Low, LicenseCategory::Permissive),
-    ("BSD-2-Clause", "BSD 2-Clause", LicenseRisk::Low, LicenseCategory::Permissive),
-    ("BSD-3-Clause", "BSD 3-Clause", LicenseRisk::Low, LicenseCategory::Permissive),
-    ("ISC", "ISC License", LicenseRisk::Low, LicenseCategory::Permissive),
-    ("CC0-1.0", "Creative Commons Zero", LicenseRisk::Low, LicenseCategory::PublicDomain),
-    ("Unlicense", "The Unlicense", LicenseRisk::Low, LicenseCategory::PublicDomain),
-    ("0BSD", "Zero-Clause BSD", LicenseRisk::Low, LicenseCategory::Permissive),
-    ("Zlib", "zlib License", LicenseRisk::Low, LicenseCategory::Permissive),
-    ("MPL-2.0", "Mozilla Public License 2.0", LicenseRisk::Medium, LicenseCategory::WeakCopyleft),
-    ("LGPL-2.0-only", "GNU LGPL v2.0", LicenseRisk::Medium, LicenseCategory::WeakCopyleft),
-    ("LGPL-2.1-only", "GNU LGPL v2.1", LicenseRisk::Medium, LicenseCategory::WeakCopyleft),
-    ("LGPL-3.0-only", "GNU LGPL v3.0", LicenseRisk::Medium, LicenseCategory::WeakCopyleft),
-    ("EUPL-1.1", "European Union Public Licence 1.1", LicenseRisk::Medium, LicenseCategory::WeakCopyleft),
-    ("EUPL-1.2", "European Union Public Licence 1.2", LicenseRisk::Medium, LicenseCategory::WeakCopyleft),
-    ("GPL-2.0-only", "GNU GPL v2.0", LicenseRisk::High, LicenseCategory::StrongCopyleft),
-    ("GPL-2.0-or-later", "GNU GPL v2.0+", LicenseRisk::High, LicenseCategory::StrongCopyleft),
-    ("GPL-3.0-only", "GNU GPL v3.0", LicenseRisk::High, LicenseCategory::StrongCopyleft),
-    ("GPL-3.0-or-later", "GNU GPL v3.0+", LicenseRisk::High, LicenseCategory::StrongCopyleft),
-    ("AGPL-3.0-only", "GNU AGPL v3.0", LicenseRisk::High, LicenseCategory::NetworkCopyleft),
-    ("AGPL-3.0-or-later", "GNU AGPL v3.0+", LicenseRisk::High, LicenseCategory::NetworkCopyleft),
-    ("SSPL-1.0", "Server Side Public License", LicenseRisk::High, LicenseCategory::NetworkCopyleft),
+    (
+        "MIT",
+        "MIT License",
+        LicenseRisk::Low,
+        LicenseCategory::Permissive,
+    ),
+    (
+        "Apache-2.0",
+        "Apache License 2.0",
+        LicenseRisk::Low,
+        LicenseCategory::Permissive,
+    ),
+    (
+        "BSD-2-Clause",
+        "BSD 2-Clause",
+        LicenseRisk::Low,
+        LicenseCategory::Permissive,
+    ),
+    (
+        "BSD-3-Clause",
+        "BSD 3-Clause",
+        LicenseRisk::Low,
+        LicenseCategory::Permissive,
+    ),
+    (
+        "ISC",
+        "ISC License",
+        LicenseRisk::Low,
+        LicenseCategory::Permissive,
+    ),
+    (
+        "CC0-1.0",
+        "Creative Commons Zero",
+        LicenseRisk::Low,
+        LicenseCategory::PublicDomain,
+    ),
+    (
+        "Unlicense",
+        "The Unlicense",
+        LicenseRisk::Low,
+        LicenseCategory::PublicDomain,
+    ),
+    (
+        "0BSD",
+        "Zero-Clause BSD",
+        LicenseRisk::Low,
+        LicenseCategory::Permissive,
+    ),
+    (
+        "Zlib",
+        "zlib License",
+        LicenseRisk::Low,
+        LicenseCategory::Permissive,
+    ),
+    (
+        "MPL-2.0",
+        "Mozilla Public License 2.0",
+        LicenseRisk::Medium,
+        LicenseCategory::WeakCopyleft,
+    ),
+    (
+        "LGPL-2.0-only",
+        "GNU LGPL v2.0",
+        LicenseRisk::Medium,
+        LicenseCategory::WeakCopyleft,
+    ),
+    (
+        "LGPL-2.1-only",
+        "GNU LGPL v2.1",
+        LicenseRisk::Medium,
+        LicenseCategory::WeakCopyleft,
+    ),
+    (
+        "LGPL-3.0-only",
+        "GNU LGPL v3.0",
+        LicenseRisk::Medium,
+        LicenseCategory::WeakCopyleft,
+    ),
+    (
+        "EUPL-1.1",
+        "European Union Public Licence 1.1",
+        LicenseRisk::Medium,
+        LicenseCategory::WeakCopyleft,
+    ),
+    (
+        "EUPL-1.2",
+        "European Union Public Licence 1.2",
+        LicenseRisk::Medium,
+        LicenseCategory::WeakCopyleft,
+    ),
+    (
+        "GPL-2.0-only",
+        "GNU GPL v2.0",
+        LicenseRisk::High,
+        LicenseCategory::StrongCopyleft,
+    ),
+    (
+        "GPL-2.0-or-later",
+        "GNU GPL v2.0+",
+        LicenseRisk::High,
+        LicenseCategory::StrongCopyleft,
+    ),
+    (
+        "GPL-3.0-only",
+        "GNU GPL v3.0",
+        LicenseRisk::High,
+        LicenseCategory::StrongCopyleft,
+    ),
+    (
+        "GPL-3.0-or-later",
+        "GNU GPL v3.0+",
+        LicenseRisk::High,
+        LicenseCategory::StrongCopyleft,
+    ),
+    (
+        "AGPL-3.0-only",
+        "GNU AGPL v3.0",
+        LicenseRisk::High,
+        LicenseCategory::NetworkCopyleft,
+    ),
+    (
+        "AGPL-3.0-or-later",
+        "GNU AGPL v3.0+",
+        LicenseRisk::High,
+        LicenseCategory::NetworkCopyleft,
+    ),
+    (
+        "SSPL-1.0",
+        "Server Side Public License",
+        LicenseRisk::High,
+        LicenseCategory::NetworkCopyleft,
+    ),
 ];
 
 /// Aliases used by packages in the wild → canonical SPDX id.
@@ -162,9 +272,13 @@ pub fn detect_from_license_file(content: &str, file_path: &str) -> Option<Licens
         "MPL-2.0"
     } else if lower.contains("apache license") && lower.contains("version 2") {
         "Apache-2.0"
-    } else if lower.contains("mit license") || (lower.contains("permission is hereby granted") && lower.contains("mit")) {
+    } else if lower.contains("mit license")
+        || (lower.contains("permission is hereby granted") && lower.contains("mit"))
+    {
         "MIT"
-    } else if lower.contains("isc license") || (lower.contains("isc") && lower.contains("permission to use")) {
+    } else if lower.contains("isc license")
+        || (lower.contains("isc") && lower.contains("permission to use"))
+    {
         "ISC"
     } else if lower.contains("bsd 2-clause") || lower.contains("simplified bsd") {
         "BSD-2-Clause"

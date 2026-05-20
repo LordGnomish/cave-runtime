@@ -404,11 +404,7 @@ fn upstream_relist_ip_change_preserves_previous_ip_on_exit() {
     // preserves the previously-cached IP.
     let pods2 = vec![pod("test-pod-0", vec![c("c0", ContainerState::Exited)])];
     let out2 = pleg.relist(t0() + ChronoDuration::seconds(1), pods2);
-    let expected2 = vec![ev(
-        "test-pod-0",
-        PodLifecycleEventType::ContainerDied,
-        "c0",
-    )];
+    let expected2 = vec![ev("test-pod-0", PodLifecycleEventType::ContainerDied, "c0")];
     verify_events(&expected2, &out2.events);
     let cached2 = pleg.cache_get("test-pod-0").expect("cached entry");
     assert_eq!(
@@ -536,7 +532,8 @@ fn upstream_pleg_event_type_variants_are_distinct() {
 #[test]
 fn upstream_relist_outcome_no_drop_in_unbounded_run() {
     let mut pleg = GenericPleg::new(usize::MAX);
-    let out: RelistOutcome = pleg.relist(t0(), vec![pod("p", vec![c("c", ContainerState::Running)])]);
+    let out: RelistOutcome =
+        pleg.relist(t0(), vec![pod("p", vec![c("c", ContainerState::Running)])]);
     assert_eq!(out.dropped, 0);
     assert_eq!(out.events.len(), 1);
 }

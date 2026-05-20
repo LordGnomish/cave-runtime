@@ -8,7 +8,9 @@ use cave_vault::engines::identity::{GroupType, IdentityStore};
 
 const TENANT: &str = "tenant-acme-prod";
 
-fn store() -> IdentityStore { IdentityStore::default() }
+fn store() -> IdentityStore {
+    IdentityStore::default()
+}
 
 /// Cite: openbao `vault/identity_store_entities.go:312`
 /// (handleEntityUpdateCommon) — entity name is unique per namespace.
@@ -29,8 +31,11 @@ fn upsert_entity_is_idempotent_on_name() {
     );
     assert_eq!(id1, id2, "same name ⇒ same entity ID");
     let e = s.entities.get(&id1).unwrap();
-    assert_eq!(e.policies, vec!["default".to_string(), "ops".into()],
-        "policies updated in place");
+    assert_eq!(
+        e.policies,
+        vec!["default".to_string(), "ops".into()],
+        "policies updated in place"
+    );
 }
 
 /// Cite: openbao `vault/identity_store_aliases.go:270`
@@ -42,11 +47,15 @@ fn duplicate_alias_on_same_mount_accessor_is_rejected() {
     let mut s = store();
     let entity_id = s.upsert_entity("alice", vec!["default".into()], Default::default());
     let mount = format!("auth_userpass_{}", &TENANT[..6]);
-    let alias_id = s.attach_entity_alias(&entity_id, &mount, "userpass", "alice").unwrap();
+    let alias_id = s
+        .attach_entity_alias(&entity_id, &mount, "userpass", "alice")
+        .unwrap();
     assert!(!alias_id.is_empty());
 
     // Second attach on the SAME (mount, name) ⇒ error.
-    let err = s.attach_entity_alias(&entity_id, &mount, "userpass", "alice").unwrap_err();
+    let err = s
+        .attach_entity_alias(&entity_id, &mount, "userpass", "alice")
+        .unwrap_err();
     assert!(err.contains("already exists"));
 }
 
@@ -57,13 +66,19 @@ fn duplicate_alias_on_same_mount_accessor_is_rejected() {
 fn entity_by_alias_resolves_back_to_canonical_entity() {
     let mut s = store();
     let entity_id = s.upsert_entity("bob", vec!["default".into()], Default::default());
-    s.attach_entity_alias(&entity_id, "auth_oidc_abc", "oidc", "bob@example.com").unwrap();
+    s.attach_entity_alias(&entity_id, "auth_oidc_abc", "oidc", "bob@example.com")
+        .unwrap();
 
-    let resolved = s.entity_by_alias("auth_oidc_abc", "bob@example.com").expect("found");
+    let resolved = s
+        .entity_by_alias("auth_oidc_abc", "bob@example.com")
+        .expect("found");
     assert_eq!(resolved.id, entity_id);
     assert_eq!(resolved.name, "bob");
     // Wrong mount_accessor ⇒ no resolution (cross-mount alias not leaked).
-    assert!(s.entity_by_alias("auth_oidc_xyz", "bob@example.com").is_none());
+    assert!(
+        s.entity_by_alias("auth_oidc_xyz", "bob@example.com")
+            .is_none()
+    );
 }
 
 /// Cite: openbao `vault/identity_store_entities.go:535`
@@ -73,10 +88,17 @@ fn entity_by_alias_resolves_back_to_canonical_entity() {
 fn delete_entity_cascades_to_aliases_and_group_memberships() {
     let mut s = store();
     let alice = s.upsert_entity("alice", vec!["default".into()], Default::default());
-    let _ = s.attach_entity_alias(&alice, "auth_userpass_x", "userpass", "alice").unwrap();
-    let _ = s.attach_entity_alias(&alice, "auth_oidc_x", "oidc", "alice@example.com").unwrap();
-    let team_id = s.upsert_group("team-platform", GroupType::Internal,
-        vec!["platform-policy".into()]);
+    let _ = s
+        .attach_entity_alias(&alice, "auth_userpass_x", "userpass", "alice")
+        .unwrap();
+    let _ = s
+        .attach_entity_alias(&alice, "auth_oidc_x", "oidc", "alice@example.com")
+        .unwrap();
+    let team_id = s.upsert_group(
+        "team-platform",
+        GroupType::Internal,
+        vec!["platform-policy".into()],
+    );
     s.add_entity_to_group(&team_id, &alice).unwrap();
 
     assert!(s.entity_is_member(&team_id, &alice));
@@ -87,8 +109,10 @@ fn delete_entity_cascades_to_aliases_and_group_memberships() {
     assert!(s.entity_names.get("alice").is_none());
     assert!(s.entities.get(&alice).is_none());
     assert!(s.entity_aliases.is_empty(), "all aliases purged");
-    assert!(!s.entity_is_member(&team_id, &alice),
-        "membership purged from group");
+    assert!(
+        !s.entity_is_member(&team_id, &alice),
+        "membership purged from group"
+    );
 }
 
 /// Cite: openbao `vault/identity_store_groups.go:247`
@@ -99,16 +123,18 @@ fn delete_entity_cascades_to_aliases_and_group_memberships() {
 fn internal_group_supports_direct_membership_external_does_not() {
     let mut s = store();
     let alice = s.upsert_entity("alice", vec!["default".into()], Default::default());
-    let internal = s.upsert_group("ops", GroupType::Internal,
-        vec!["ops-policy".into()]);
+    let internal = s.upsert_group("ops", GroupType::Internal, vec!["ops-policy".into()]);
     s.add_entity_to_group(&internal, &alice).unwrap();
-    s.add_entity_to_group(&internal, &alice).unwrap();  // dedupe
+    s.add_entity_to_group(&internal, &alice).unwrap(); // dedupe
     let g = s.groups.get(&internal).unwrap();
     assert_eq!(g.member_entity_ids, vec![alice.clone()]);
 
     // External groups reject direct membership.
-    let external = s.upsert_group("oidc-admins", GroupType::External,
-        vec!["admin-policy".into()]);
+    let external = s.upsert_group(
+        "oidc-admins",
+        GroupType::External,
+        vec!["admin-policy".into()],
+    );
     let err = s.add_entity_to_group(&external, &alice).unwrap_err();
     assert!(err.contains("external"));
 }
@@ -121,23 +147,34 @@ fn external_group_matches_members_via_alias_mount_accessor() {
     let mut s = store();
     // Alice has an OIDC alias whose name matches a future group_alias.
     let alice = s.upsert_entity("alice", vec!["default".into()], Default::default());
-    s.attach_entity_alias(&alice, "auth_oidc_corp", "oidc", "platform-admins").unwrap();
+    s.attach_entity_alias(&alice, "auth_oidc_corp", "oidc", "platform-admins")
+        .unwrap();
     let bob = s.upsert_entity("bob", vec!["default".into()], Default::default());
-    s.attach_entity_alias(&bob, "auth_oidc_corp", "oidc", "viewers").unwrap();
+    s.attach_entity_alias(&bob, "auth_oidc_corp", "oidc", "viewers")
+        .unwrap();
 
-    let admins = s.upsert_group("oidc-admins", GroupType::External,
-        vec!["admin-policy".into()]);
-    s.attach_group_alias(&admins, "auth_oidc_corp", "oidc", "platform-admins").unwrap();
+    let admins = s.upsert_group(
+        "oidc-admins",
+        GroupType::External,
+        vec!["admin-policy".into()],
+    );
+    s.attach_group_alias(&admins, "auth_oidc_corp", "oidc", "platform-admins")
+        .unwrap();
 
     assert!(s.entity_is_member(&admins, &alice));
-    assert!(!s.entity_is_member(&admins, &bob),
-        "bob's alias is in a different OIDC group");
+    assert!(
+        !s.entity_is_member(&admins, &bob),
+        "bob's alias is in a different OIDC group"
+    );
 
     // Wrong mount_accessor (different OIDC mount) ⇒ no membership.
     let other_admins = s.upsert_group("other-admins", GroupType::External, vec![]);
-    s.attach_group_alias(&other_admins, "auth_oidc_other", "oidc", "platform-admins").unwrap();
-    assert!(!s.entity_is_member(&other_admins, &alice),
-        "mount_accessor isolation enforced");
+    s.attach_group_alias(&other_admins, "auth_oidc_other", "oidc", "platform-admins")
+        .unwrap();
+    assert!(
+        !s.entity_is_member(&other_admins, &alice),
+        "mount_accessor isolation enforced"
+    );
 }
 
 /// Cite: openbao `vault/identity_store_groups.go::collectPoliciesByEntityID`
@@ -147,27 +184,38 @@ fn external_group_matches_members_via_alias_mount_accessor() {
 #[test]
 fn effective_policies_unions_entity_and_group_memberships() {
     let mut s = store();
-    let alice = s.upsert_entity("alice",
-        vec!["default".into(), "personal".into()], Default::default());
-    s.attach_entity_alias(&alice, "auth_oidc_corp", "oidc", "engineers").unwrap();
+    let alice = s.upsert_entity(
+        "alice",
+        vec!["default".into(), "personal".into()],
+        Default::default(),
+    );
+    s.attach_entity_alias(&alice, "auth_oidc_corp", "oidc", "engineers")
+        .unwrap();
 
-    let ops = s.upsert_group("ops", GroupType::Internal,
-        vec!["ops-policy".into()]);
+    let ops = s.upsert_group("ops", GroupType::Internal, vec!["ops-policy".into()]);
     s.add_entity_to_group(&ops, &alice).unwrap();
 
-    let oidc_eng = s.upsert_group("oidc-engineers", GroupType::External,
-        vec!["engineering-policy".into()]);
-    s.attach_group_alias(&oidc_eng, "auth_oidc_corp", "oidc", "engineers").unwrap();
+    let oidc_eng = s.upsert_group(
+        "oidc-engineers",
+        GroupType::External,
+        vec!["engineering-policy".into()],
+    );
+    s.attach_group_alias(&oidc_eng, "auth_oidc_corp", "oidc", "engineers")
+        .unwrap();
 
     // Group bob belongs to NEITHER membership avenue; his policies stay personal.
-    let bob = s.upsert_entity("bob",
-        vec!["default".into()], Default::default());
+    let bob = s.upsert_entity("bob", vec!["default".into()], Default::default());
 
     let alice_p = s.effective_policies(&alice);
-    assert_eq!(alice_p, vec![
-        "default".to_string(), "engineering-policy".into(),
-        "ops-policy".into(), "personal".into(),
-    ]);
+    assert_eq!(
+        alice_p,
+        vec![
+            "default".to_string(),
+            "engineering-policy".into(),
+            "ops-policy".into(),
+            "personal".into(),
+        ]
+    );
 
     let bob_p = s.effective_policies(&bob);
     assert_eq!(bob_p, vec!["default".to_string()]);

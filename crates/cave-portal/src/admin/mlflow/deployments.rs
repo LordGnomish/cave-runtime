@@ -5,7 +5,7 @@
 use super::types::{MlflowViewError, ModelDeployment};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
+use crate::admin::state::{AdminState, scope};
 
 pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<ModelDeployment>, MlflowViewError> {
     ctx.authorise(Permission::MlflowRead)?;
@@ -17,12 +17,22 @@ pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<ModelDeployment>
     .into_iter()
     .cloned()
     .collect();
-    rows.sort_by(|a, b| b.request_count_24h.cmp(&a.request_count_24h).then(a.deployment_name.cmp(&b.deployment_name)));
+    rows.sort_by(|a, b| {
+        b.request_count_24h
+            .cmp(&a.request_count_24h)
+            .then(a.deployment_name.cmp(&b.deployment_name))
+    });
     Ok(rows)
 }
 
-pub fn list_ready(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<ModelDeployment>, MlflowViewError> {
-    Ok(list(state, ctx)?.into_iter().filter(|d| d.status == "READY").collect())
+pub fn list_ready(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<ModelDeployment>, MlflowViewError> {
+    Ok(list(state, ctx)?
+        .into_iter()
+        .filter(|d| d.status == "READY")
+        .collect())
 }
 
 pub fn status_histogram(rows: &[ModelDeployment]) -> Vec<(String, usize)> {
@@ -38,8 +48,13 @@ pub fn total_requests_24h(rows: &[ModelDeployment]) -> u64 {
     rows.iter().map(|d| d.request_count_24h).sum()
 }
 
-pub fn slow_deployments<'a>(rows: &'a [ModelDeployment], p95_threshold_ms: u32) -> Vec<&'a ModelDeployment> {
-    rows.iter().filter(|d| d.p95_latency_ms > p95_threshold_ms).collect()
+pub fn slow_deployments<'a>(
+    rows: &'a [ModelDeployment],
+    p95_threshold_ms: u32,
+) -> Vec<&'a ModelDeployment> {
+    rows.iter()
+        .filter(|d| d.p95_latency_ms > p95_threshold_ms)
+        .collect()
 }
 
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, MlflowViewError> {
@@ -75,7 +90,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, MlflowView
         total = total_24h,
         chips = chips,
         tbl = table(
-            &["name", "model", "version", "status", "endpoint", "req_24h", "p95"],
+            &[
+                "name", "model", "version", "status", "endpoint", "req_24h", "p95"
+            ],
             &rows_html,
         ),
     );
@@ -149,7 +166,11 @@ mod tests {
         let s = seeded();
         let rows = list(&s, &ctx(&[Permission::MlflowRead])).unwrap();
         let h = status_histogram(&rows);
-        let ready = h.iter().find(|(s, _)| s == "READY").map(|(_, n)| *n).unwrap();
+        let ready = h
+            .iter()
+            .find(|(s, _)| s == "READY")
+            .map(|(_, n)| *n)
+            .unwrap();
         assert_eq!(ready, 2);
     }
 

@@ -10,7 +10,9 @@ use std::collections::HashMap;
 // Severity
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Hash, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Hash, Default,
+)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum Severity {
     #[default]
@@ -117,11 +119,7 @@ impl VulnDb {
         let key = format!("{ecosystem}/{pkg}");
         self.by_package
             .get(&key)
-            .map(|ids| {
-                ids.iter()
-                    .filter_map(|id| self.by_cve.get(id))
-                    .collect()
-            })
+            .map(|ids| ids.iter().filter_map(|id| self.by_cve.get(id)).collect())
             .unwrap_or_default()
     }
 
@@ -165,7 +163,8 @@ pub fn builtin_records() -> Vec<VulnRecord> {
         VulnRecord {
             cve_id: "CVE-2021-44228".into(),
             title: "Log4Shell: Remote code execution in log4j".into(),
-            description: "Apache Log4j2 <= 2.14.1 JNDI features allow remote code execution.".into(),
+            description: "Apache Log4j2 <= 2.14.1 JNDI features allow remote code execution."
+                .into(),
             severity: Severity::Critical,
             cvss: Some(Cvss {
                 v2_score: None,
@@ -321,7 +320,8 @@ pub fn builtin_records() -> Vec<VulnRecord> {
         VulnRecord {
             cve_id: "CVE-2022-3786".into(),
             title: "OpenSSL X.509 Email Address Buffer Overflow".into(),
-            description: "Buffer overflow in X.509 certificate verification in OpenSSL 3.0.x.".into(),
+            description: "Buffer overflow in X.509 certificate verification in OpenSSL 3.0.x."
+                .into(),
             severity: Severity::High,
             cvss: Some(Cvss {
                 v2_score: None,

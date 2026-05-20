@@ -272,22 +272,24 @@ impl DraManager {
         if let Some(existing) = self.pod_claim_bindings.get(&key) {
             return Ok(existing.value().clone());
         }
-        let tpl = self.get_template(template_namespace, template_name).ok_or_else(|| {
-            DraError::NotFound(format!(
-                "template {}/{} not found",
-                template_namespace, template_name
-            ))
-        })?;
-        if !self.classes.contains_key(&tpl.spec_template.resource_class_name) {
+        let tpl = self
+            .get_template(template_namespace, template_name)
+            .ok_or_else(|| {
+                DraError::NotFound(format!(
+                    "template {}/{} not found",
+                    template_namespace, template_name
+                ))
+            })?;
+        if !self
+            .classes
+            .contains_key(&tpl.spec_template.resource_class_name)
+        {
             return Err(DraError::NotFound(format!(
                 "class {} referenced by template not found",
                 tpl.spec_template.resource_class_name
             )));
         }
-        let claim_uid = format!(
-            "claim-{}-{}-{}",
-            pod_uid, pod_claim_name, &tpl.name
-        );
+        let claim_uid = format!("claim-{}-{}-{}", pod_uid, pod_claim_name, &tpl.name);
         let claim = ResourceClaim {
             name: format!("{}-{}", pod_claim_name, pod_uid),
             namespace: template_namespace.to_string(),
@@ -333,11 +335,7 @@ impl DraManager {
 
     /// Driver-side: record the allocation result for a claim. Transitions
     /// Pending → Allocated. Idempotent if already allocated with the same result.
-    pub fn allocate_claim(
-        &self,
-        claim_uid: &str,
-        result: AllocationResult,
-    ) -> DraResult<()> {
+    pub fn allocate_claim(&self, claim_uid: &str, result: AllocationResult) -> DraResult<()> {
         let mut claim = self
             .claims
             .get_mut(claim_uid)
@@ -361,11 +359,7 @@ impl DraManager {
 
     /// Reserve the claim for a pod consumer. Allowed only if the claim is
     /// allocated and the consumer matches the shareability rules.
-    pub fn reserve_for(
-        &self,
-        claim_uid: &str,
-        consumer: ConsumerReference,
-    ) -> DraResult<()> {
+    pub fn reserve_for(&self, claim_uid: &str, consumer: ConsumerReference) -> DraResult<()> {
         let mut claim = self
             .claims
             .get_mut(claim_uid)
@@ -392,11 +386,7 @@ impl DraManager {
         Ok(())
     }
 
-    pub fn unreserve(
-        &self,
-        claim_uid: &str,
-        consumer: &ConsumerReference,
-    ) -> DraResult<()> {
+    pub fn unreserve(&self, claim_uid: &str, consumer: &ConsumerReference) -> DraResult<()> {
         let mut claim = self
             .claims
             .get_mut(claim_uid)
@@ -463,7 +453,9 @@ impl DraManager {
             || slice.driver_name.is_empty()
             || slice.pool_name.is_empty()
         {
-            return Err(DraError::Invalid("ResourceSlice requires name+node+driver+pool".into()));
+            return Err(DraError::Invalid(
+                "ResourceSlice requires name+node+driver+pool".into(),
+            ));
         }
         // Device names within a slice must be unique.
         let mut seen = BTreeSet::new();
@@ -513,9 +505,9 @@ impl DraManager {
             let claim = self
                 .get_claim(uid)
                 .ok_or_else(|| DraError::NotFound(format!("claim {}", uid)))?;
-            let alloc = claim.allocation.ok_or_else(|| {
-                DraError::Forbidden(format!("claim {} not allocated", uid))
-            })?;
+            let alloc = claim
+                .allocation
+                .ok_or_else(|| DraError::Forbidden(format!("claim {} not allocated", uid)))?;
             if let Some(sel) = &alloc.available_on_nodes {
                 if !sel.matches(node_name, node_labels) {
                     return Err(DraError::NotAllocatable(format!(
@@ -611,7 +603,9 @@ mod tests {
     #[test]
     fn create_claim_requires_known_class() {
         let m = DraManager::new();
-        let err = m.create_claim(claim("u1", "ns", "missing-class")).unwrap_err();
+        let err = m
+            .create_claim(claim("u1", "ns", "missing-class"))
+            .unwrap_err();
         assert!(matches!(err, DraError::NotFound(_)));
     }
 
@@ -668,7 +662,9 @@ mod tests {
         m.create_class(class("c", "drv")).unwrap();
         m.create_claim(claim("u1", "ns", "c")).unwrap();
         m.allocate_claim("u1", alloc("drv", false, None)).unwrap();
-        let err = m.allocate_claim("u1", alloc("drv", true, None)).unwrap_err();
+        let err = m
+            .allocate_claim("u1", alloc("drv", true, None))
+            .unwrap_err();
         assert!(matches!(err, DraError::AlreadyAllocated(_)));
     }
 
@@ -679,14 +675,18 @@ mod tests {
         m.create_claim(claim("u1", "ns", "c")).unwrap();
         m.allocate_claim("u1", alloc("drv", false, None)).unwrap();
         m.request_deallocation("u1").unwrap();
-        let err = m.allocate_claim("u1", alloc("drv", true, None)).unwrap_err();
+        let err = m
+            .allocate_claim("u1", alloc("drv", true, None))
+            .unwrap_err();
         assert!(matches!(err, DraError::Forbidden(_)));
     }
 
     #[test]
     fn allocate_unknown_claim_errors() {
         let m = DraManager::new();
-        let err = m.allocate_claim("ghost", alloc("drv", false, None)).unwrap_err();
+        let err = m
+            .allocate_claim("ghost", alloc("drv", false, None))
+            .unwrap_err();
         assert!(matches!(err, DraError::NotFound(_)));
     }
 
@@ -883,7 +883,9 @@ mod tests {
             },
         };
         m.create_template(t).unwrap();
-        let uid = m.instantiate_template_for_pod("ns", "t1", "pod-A", "claim-name").unwrap();
+        let uid = m
+            .instantiate_template_for_pod("ns", "t1", "pod-A", "claim-name")
+            .unwrap();
         assert!(!uid.is_empty());
         assert_eq!(m.claim_count(), 1);
     }
@@ -902,8 +904,12 @@ mod tests {
             },
         };
         m.create_template(t).unwrap();
-        let a = m.instantiate_template_for_pod("ns", "t1", "pod-A", "claim-name").unwrap();
-        let b = m.instantiate_template_for_pod("ns", "t1", "pod-A", "claim-name").unwrap();
+        let a = m
+            .instantiate_template_for_pod("ns", "t1", "pod-A", "claim-name")
+            .unwrap();
+        let b = m
+            .instantiate_template_for_pod("ns", "t1", "pod-A", "claim-name")
+            .unwrap();
         assert_eq!(a, b);
         assert_eq!(m.claim_count(), 1);
     }
@@ -911,7 +917,9 @@ mod tests {
     #[test]
     fn template_instantiate_unknown_template_errors() {
         let m = DraManager::new();
-        let err = m.instantiate_template_for_pod("ns", "missing", "pod-A", "claim").unwrap_err();
+        let err = m
+            .instantiate_template_for_pod("ns", "missing", "pod-A", "claim")
+            .unwrap_err();
         assert!(matches!(err, DraError::NotFound(_)));
     }
 
@@ -1046,8 +1054,10 @@ mod tests {
         let m = DraManager::new();
         m.create_class(class("c", "drv")).unwrap();
         m.create_claim(claim("u1", "ns", "c")).unwrap();
-        m.allocate_claim("u1", alloc("drv", false, Some("n1"))).unwrap();
-        m.admit_pod_on_node("n1", &BTreeMap::new(), &["u1"]).unwrap();
+        m.allocate_claim("u1", alloc("drv", false, Some("n1")))
+            .unwrap();
+        m.admit_pod_on_node("n1", &BTreeMap::new(), &["u1"])
+            .unwrap();
     }
 
     #[test]
@@ -1055,7 +1065,8 @@ mod tests {
         let m = DraManager::new();
         m.create_class(class("c", "drv")).unwrap();
         m.create_claim(claim("u1", "ns", "c")).unwrap();
-        m.allocate_claim("u1", alloc("drv", false, Some("n1"))).unwrap();
+        m.allocate_claim("u1", alloc("drv", false, Some("n1")))
+            .unwrap();
         let err = m
             .admit_pod_on_node("n2", &BTreeMap::new(), &["u1"])
             .unwrap_err();
@@ -1065,7 +1076,9 @@ mod tests {
     #[test]
     fn admit_pod_unknown_claim_errors() {
         let m = DraManager::new();
-        let err = m.admit_pod_on_node("n", &BTreeMap::new(), &["ghost"]).unwrap_err();
+        let err = m
+            .admit_pod_on_node("n", &BTreeMap::new(), &["ghost"])
+            .unwrap_err();
         assert!(matches!(err, DraError::NotFound(_)));
     }
 
@@ -1092,7 +1105,10 @@ mod tests {
 
     #[test]
     fn allocation_mode_default_is_wait_for_first_consumer() {
-        assert_eq!(AllocationMode::default(), AllocationMode::WaitForFirstConsumer);
+        assert_eq!(
+            AllocationMode::default(),
+            AllocationMode::WaitForFirstConsumer
+        );
     }
 
     #[test]

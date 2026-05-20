@@ -2,8 +2,8 @@
 // Copyright 2026 Cave Runtime contributors
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ScaffoldTemplate {
@@ -75,15 +75,13 @@ mod tests {
             description: "A Rust microservice template".to_string(),
             language: "rust".to_string(),
             category: TemplateCategory::Microservice,
-            variables: vec![
-                TemplateVariable {
-                    name: "service_name".to_string(),
-                    description: "Name of the service".to_string(),
-                    var_type: VariableType::String,
-                    required: true,
-                    default_value: None,
-                },
-            ],
+            variables: vec![TemplateVariable {
+                name: "service_name".to_string(),
+                description: "Name of the service".to_string(),
+                var_type: VariableType::String,
+                required: true,
+                default_value: None,
+            }],
             created_at: Utc::now(),
             tags: vec!["rust".to_string(), "backend".to_string()],
         }

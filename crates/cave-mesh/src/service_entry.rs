@@ -24,9 +24,7 @@
 //! offline; a `StubResolver` lets a test pre-populate the answer set.
 
 use crate::error::{MeshError, MeshResult};
-use crate::models::{
-    ServiceEntry, ServiceLocation, ServicePort, ServiceResolution, WorkloadEntry,
-};
+use crate::models::{ServiceEntry, ServiceLocation, ServicePort, ServiceResolution, WorkloadEntry};
 use chrono::Utc;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
@@ -90,10 +88,7 @@ impl ServiceEntryManager {
         format!("{namespace}/{name}")
     }
 
-    pub fn create(
-        &self,
-        mut se: ServiceEntry,
-    ) -> MeshResult<ServiceEntry> {
+    pub fn create(&self, mut se: ServiceEntry) -> MeshResult<ServiceEntry> {
         validate(&se)?;
         let now = Utc::now();
         se.created_at = now;
@@ -334,7 +329,11 @@ mod tests {
     #[test]
     fn create_static_entry_round_trips() {
         let (m, _r) = manager();
-        let se = entry("acme", ServiceResolution::Static, vec!["10.0.0.1", "10.0.0.2"]);
+        let se = entry(
+            "acme",
+            ServiceResolution::Static,
+            vec!["10.0.0.1", "10.0.0.2"],
+        );
         m.create(se).unwrap();
         let got = m.get("ns", "acme").unwrap();
         assert_eq!(got.endpoints.len(), 2);
@@ -343,8 +342,11 @@ mod tests {
     #[test]
     fn duplicate_create_refused() {
         let (m, _r) = manager();
-        m.create(entry("a", ServiceResolution::Static, vec!["1.1.1.1"])).unwrap();
-        let err = m.create(entry("a", ServiceResolution::Static, vec!["1.1.1.1"])).unwrap_err();
+        m.create(entry("a", ServiceResolution::Static, vec!["1.1.1.1"]))
+            .unwrap();
+        let err = m
+            .create(entry("a", ServiceResolution::Static, vec!["1.1.1.1"]))
+            .unwrap_err();
         assert!(matches!(err, MeshError::Conflict(_)));
     }
 
@@ -353,20 +355,27 @@ mod tests {
         let (m, _r) = manager();
         let mut se = entry("e", ServiceResolution::None, vec![]);
         se.hosts.clear();
-        assert!(matches!(m.create(se).unwrap_err(), MeshError::InvalidInput(_)));
+        assert!(matches!(
+            m.create(se).unwrap_err(),
+            MeshError::InvalidInput(_)
+        ));
     }
 
     #[test]
     fn validate_rejects_static_without_endpoints() {
         let (m, _r) = manager();
         let se = entry("e", ServiceResolution::Static, vec![]);
-        assert!(matches!(m.create(se).unwrap_err(), MeshError::InvalidInput(_)));
+        assert!(matches!(
+            m.create(se).unwrap_err(),
+            MeshError::InvalidInput(_)
+        ));
     }
 
     #[test]
     fn none_resolution_passes_host_through() {
         let (m, _r) = manager();
-        m.create(entry("a", ServiceResolution::None, vec![])).unwrap();
+        m.create(entry("a", ServiceResolution::None, vec![]))
+            .unwrap();
         let eps = m.resolve("example.com", "https").unwrap();
         assert_eq!(eps.len(), 1);
         assert_eq!(eps[0].address, "example.com");
@@ -376,7 +385,12 @@ mod tests {
     #[test]
     fn static_resolution_returns_all_endpoints() {
         let (m, _r) = manager();
-        m.create(entry("a", ServiceResolution::Static, vec!["10.0.0.1", "10.0.0.2", "10.0.0.3"])).unwrap();
+        m.create(entry(
+            "a",
+            ServiceResolution::Static,
+            vec!["10.0.0.1", "10.0.0.2", "10.0.0.3"],
+        ))
+        .unwrap();
         let eps = m.resolve("example.com", "https").unwrap();
         assert_eq!(eps.len(), 3);
     }
@@ -384,8 +398,12 @@ mod tests {
     #[test]
     fn dns_resolution_picks_first_record_per_endpoint() {
         let (m, r) = manager();
-        r.add("svc-a.internal", vec!["192.0.2.10".into(), "192.0.2.11".into()]);
-        m.create(entry("a", ServiceResolution::Dns, vec!["svc-a.internal"])).unwrap();
+        r.add(
+            "svc-a.internal",
+            vec!["192.0.2.10".into(), "192.0.2.11".into()],
+        );
+        m.create(entry("a", ServiceResolution::Dns, vec!["svc-a.internal"]))
+            .unwrap();
         let eps = m.resolve("example.com", "https").unwrap();
         assert_eq!(eps.len(), 1);
         assert_eq!(eps[0].address, "192.0.2.10");
@@ -394,20 +412,45 @@ mod tests {
     #[test]
     fn dns_resolution_fails_on_unknown_host() {
         let (m, _r) = manager();
-        m.create(entry("a", ServiceResolution::Dns, vec!["missing.internal"])).unwrap();
+        m.create(entry("a", ServiceResolution::Dns, vec!["missing.internal"]))
+            .unwrap();
         assert!(m.resolve("example.com", "https").is_err());
     }
 
     #[test]
     fn dns_round_robin_cycles_through_addresses() {
         let (m, r) = manager();
-        r.add("svc.internal", vec!["10.0.0.1".into(), "10.0.0.2".into(), "10.0.0.3".into()]);
-        m.create(entry("rr", ServiceResolution::DnsRoundRobin, vec!["svc.internal"])).unwrap();
-        let a = m.resolve("example.com", "https").unwrap()[0].address.clone();
-        let b = m.resolve("example.com", "https").unwrap()[0].address.clone();
-        let c = m.resolve("example.com", "https").unwrap()[0].address.clone();
-        let d = m.resolve("example.com", "https").unwrap()[0].address.clone();
-        assert_eq!(vec![a, b, c, d], vec!["10.0.0.1".to_string(), "10.0.0.2".into(), "10.0.0.3".into(), "10.0.0.1".into()]);
+        r.add(
+            "svc.internal",
+            vec!["10.0.0.1".into(), "10.0.0.2".into(), "10.0.0.3".into()],
+        );
+        m.create(entry(
+            "rr",
+            ServiceResolution::DnsRoundRobin,
+            vec!["svc.internal"],
+        ))
+        .unwrap();
+        let a = m.resolve("example.com", "https").unwrap()[0]
+            .address
+            .clone();
+        let b = m.resolve("example.com", "https").unwrap()[0]
+            .address
+            .clone();
+        let c = m.resolve("example.com", "https").unwrap()[0]
+            .address
+            .clone();
+        let d = m.resolve("example.com", "https").unwrap()[0]
+            .address
+            .clone();
+        assert_eq!(
+            vec![a, b, c, d],
+            vec![
+                "10.0.0.1".to_string(),
+                "10.0.0.2".into(),
+                "10.0.0.3".into(),
+                "10.0.0.1".into()
+            ]
+        );
     }
 
     #[test]
@@ -426,7 +469,9 @@ mod tests {
     #[test]
     fn update_preserves_created_at() {
         let (m, _r) = manager();
-        let se = m.create(entry("a", ServiceResolution::Static, vec!["1.1.1.1"])).unwrap();
+        let se = m
+            .create(entry("a", ServiceResolution::Static, vec!["1.1.1.1"]))
+            .unwrap();
         let original = se.created_at;
         std::thread::sleep(std::time::Duration::from_millis(2));
         let mut updated = se.clone();
@@ -439,15 +484,20 @@ mod tests {
     #[test]
     fn delete_removes_entry() {
         let (m, _r) = manager();
-        m.create(entry("a", ServiceResolution::Static, vec!["1.1.1.1"])).unwrap();
+        m.create(entry("a", ServiceResolution::Static, vec!["1.1.1.1"]))
+            .unwrap();
         m.delete("ns", "a").unwrap();
-        assert!(matches!(m.get("ns", "a").unwrap_err(), MeshError::NotFound(_)));
+        assert!(matches!(
+            m.get("ns", "a").unwrap_err(),
+            MeshError::NotFound(_)
+        ));
     }
 
     #[test]
     fn resolve_unknown_host_returns_empty() {
         let (m, _r) = manager();
-        m.create(entry("a", ServiceResolution::Static, vec!["1.1.1.1"])).unwrap();
+        m.create(entry("a", ServiceResolution::Static, vec!["1.1.1.1"]))
+            .unwrap();
         let eps = m.resolve("totally-unknown.host", "https").unwrap();
         assert!(eps.is_empty());
     }

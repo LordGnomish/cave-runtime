@@ -3,11 +3,11 @@
 use crate::models::*;
 use crate::store::ErpStore;
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, post, put},
-    Json, Router,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -119,9 +119,7 @@ async fn get_employee(
     }
 }
 
-async fn list_employees(
-    State(store): State<Arc<ErpStore>>,
-) -> impl IntoResponse {
+async fn list_employees(State(store): State<Arc<ErpStore>>) -> impl IntoResponse {
     let employees: Vec<_> = store.employees.read().await.values().cloned().collect();
     Json(employees)
 }
@@ -149,9 +147,15 @@ async fn update_employee(
             if let Some(manager_id) = req.manager_id {
                 emp.manager_id = manager_id;
             }
-            (StatusCode::OK, Json(serde_json::to_value(emp.clone()).unwrap_or_default()))
+            (
+                StatusCode::OK,
+                Json(serde_json::to_value(emp.clone()).unwrap_or_default()),
+            )
         }
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"not_found"}))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"not_found"})),
+        ),
     }
 }
 
@@ -182,9 +186,7 @@ async fn create_department(
     (StatusCode::CREATED, Json(dept))
 }
 
-async fn list_departments(
-    State(store): State<Arc<ErpStore>>,
-) -> impl IntoResponse {
+async fn list_departments(State(store): State<Arc<ErpStore>>) -> impl IntoResponse {
     let depts: Vec<_> = store.departments.read().await.values().cloned().collect();
     Json(depts)
 }
@@ -209,9 +211,7 @@ async fn create_contract(
     (StatusCode::CREATED, Json(contract))
 }
 
-async fn list_contracts(
-    State(store): State<Arc<ErpStore>>,
-) -> impl IntoResponse {
+async fn list_contracts(State(store): State<Arc<ErpStore>>) -> impl IntoResponse {
     let contracts: Vec<_> = store.contracts.read().await.values().cloned().collect();
     Json(contracts)
 }
@@ -237,9 +237,7 @@ async fn create_leave(
     (StatusCode::CREATED, Json(leave))
 }
 
-async fn list_leaves(
-    State(store): State<Arc<ErpStore>>,
-) -> impl IntoResponse {
+async fn list_leaves(State(store): State<Arc<ErpStore>>) -> impl IntoResponse {
     let leaves: Vec<_> = store.leaves.read().await.values().cloned().collect();
     Json(leaves)
 }
@@ -260,17 +258,20 @@ async fn approve_leave(
                 (StatusCode::BAD_REQUEST, Json(leave.clone()))
             }
         }
-        None => (StatusCode::NOT_FOUND, Json(Leave {
-            id: Uuid::nil(),
-            employee_id: Uuid::nil(),
-            leave_type: String::new(),
-            start: Utc::now(),
-            end: Utc::now(),
-            status: LeaveStatus::Pending,
-            approver_id: None,
-            notes: None,
-            created_at: Utc::now(),
-        })),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(Leave {
+                id: Uuid::nil(),
+                employee_id: Uuid::nil(),
+                leave_type: String::new(),
+                start: Utc::now(),
+                end: Utc::now(),
+                status: LeaveStatus::Pending,
+                approver_id: None,
+                notes: None,
+                created_at: Utc::now(),
+            }),
+        ),
     }
 }
 
@@ -290,17 +291,20 @@ async fn reject_leave(
                 (StatusCode::BAD_REQUEST, Json(leave.clone()))
             }
         }
-        None => (StatusCode::NOT_FOUND, Json(Leave {
-            id: Uuid::nil(),
-            employee_id: Uuid::nil(),
-            leave_type: String::new(),
-            start: Utc::now(),
-            end: Utc::now(),
-            status: LeaveStatus::Pending,
-            approver_id: None,
-            notes: None,
-            created_at: Utc::now(),
-        })),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(Leave {
+                id: Uuid::nil(),
+                employee_id: Uuid::nil(),
+                leave_type: String::new(),
+                start: Utc::now(),
+                end: Utc::now(),
+                status: LeaveStatus::Pending,
+                approver_id: None,
+                notes: None,
+                created_at: Utc::now(),
+            }),
+        ),
     }
 }
 
@@ -324,9 +328,7 @@ async fn create_timesheet(
     (StatusCode::CREATED, Json(timesheet))
 }
 
-async fn list_timesheets(
-    State(store): State<Arc<ErpStore>>,
-) -> impl IntoResponse {
+async fn list_timesheets(State(store): State<Arc<ErpStore>>) -> impl IntoResponse {
     let timesheets: Vec<_> = store.timesheets.read().await.values().cloned().collect();
     Json(timesheets)
 }
@@ -335,25 +337,27 @@ async fn list_timesheets(
 
 pub fn create_router(state: Arc<ErpStore>) -> Router {
     Router::new()
-        .route("/api/erp/hr/employees", post(create_employee).get(list_employees))
+        .route(
+            "/api/erp/hr/employees",
+            post(create_employee).get(list_employees),
+        )
         .route(
             "/api/erp/hr/employees/{id}",
-            get(get_employee).put(update_employee).delete(delete_employee),
+            get(get_employee)
+                .put(update_employee)
+                .delete(delete_employee),
         )
         .route(
             "/api/erp/hr/departments",
             post(create_department).get(list_departments),
         )
-        .route("/api/erp/hr/contracts", post(create_contract).get(list_contracts))
+        .route(
+            "/api/erp/hr/contracts",
+            post(create_contract).get(list_contracts),
+        )
         .route("/api/erp/hr/leaves", post(create_leave).get(list_leaves))
-        .route(
-            "/api/erp/hr/leaves/{id}/approve",
-            post(approve_leave),
-        )
-        .route(
-            "/api/erp/hr/leaves/{id}/reject",
-            post(reject_leave),
-        )
+        .route("/api/erp/hr/leaves/{id}/approve", post(approve_leave))
+        .route("/api/erp/hr/leaves/{id}/reject", post(reject_leave))
         .route(
             "/api/erp/hr/timesheets",
             post(create_timesheet).get(list_timesheets),

@@ -113,7 +113,8 @@ mod tests {
     #[test]
     fn render_section_emits_prometheus_series() {
         let s = AdminState::seeded();
-        let html = render_section(&s, &ctx(&[Permission::EtcdRead, Permission::EtcdWatch])).unwrap();
+        let html =
+            render_section(&s, &ctx(&[Permission::EtcdRead, Permission::EtcdWatch])).unwrap();
         assert!(html.contains("etcd_server_has_leader"));
         assert!(html.contains("etcd_disk_wal_fsync_duration_seconds"));
     }

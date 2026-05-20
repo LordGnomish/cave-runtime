@@ -8,5 +8,5 @@ pub mod model;
 pub mod routes;
 pub mod silence;
 
-pub use model::{Alert, AlertGroup, Receiver, Route, Silence, InhibitRule};
 pub use client::AlertmanagerClient;
+pub use model::{Alert, AlertGroup, InhibitRule, Receiver, Route, Silence};

@@ -165,10 +165,7 @@ mod tests {
 
     #[test]
     fn aggregate_any_fail_returns_false() {
-        let s = aggregate(
-            1,
-            &[check("Deployment", true), check("StatefulSet", false)],
-        );
+        let s = aggregate(1, &[check("Deployment", true), check("StatefulSet", false)]);
         assert_eq!(s.type_checking, ConditionState::False);
         assert_eq!(s.warnings.len(), 1);
         assert!(s.warnings[0].gvk.ends_with("StatefulSet"));
@@ -178,11 +175,7 @@ mod tests {
     fn aggregate_warnings_sorted_lex_by_gvk() {
         let s = aggregate(
             1,
-            &[
-                check("Z", false),
-                check("A", false),
-                check("M", false),
-            ],
+            &[check("Z", false), check("A", false), check("M", false)],
         );
         assert_eq!(s.warnings.len(), 3);
         for w in s.warnings.windows(2) {

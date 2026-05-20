@@ -6,8 +6,8 @@
 //! §8.4 (DNS-01), §8.5 (TLS-ALPN-01 — RFC 8737).
 
 use crate::account::Jwk;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -25,9 +25,9 @@ pub enum ChallengeType {
 impl ChallengeType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            Self::Http01     => "http-01",
-            Self::Dns01      => "dns-01",
-            Self::TlsAlpn01  => "tls-alpn-01",
+            Self::Http01 => "http-01",
+            Self::Dns01 => "dns-01",
+            Self::TlsAlpn01 => "tls-alpn-01",
         }
     }
 }
@@ -36,7 +36,12 @@ impl ChallengeType {
 /// terminal; `pending → processing → valid|invalid` is the forward path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum ChallengeStatus { Pending, Processing, Valid, Invalid }
+pub enum ChallengeStatus {
+    Pending,
+    Processing,
+    Valid,
+    Invalid,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Challenge {

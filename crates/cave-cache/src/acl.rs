@@ -21,7 +21,11 @@ impl AclUser {
             name: "default".into(),
             enabled: true,
             passwords: vec![],
-            flags: UserFlags { no_pass: true, no_touch_keys: false, reset_keys: false },
+            flags: UserFlags {
+                no_pass: true,
+                no_touch_keys: false,
+                reset_keys: false,
+            },
             allowed_commands: CommandPermissions::All,
             allowed_keys: KeyPermissions::All,
             allowed_channels: ChannelPermissions::All,
@@ -140,7 +144,10 @@ impl AclState {
     }
 
     pub fn authenticate(&self, username: &str, password: &str) -> bool {
-        self.users.get(username).map(|u| u.authenticate(password)).unwrap_or(false)
+        self.users
+            .get(username)
+            .map(|u| u.authenticate(password))
+            .unwrap_or(false)
     }
 
     pub fn list_users(&self) -> Vec<String> {

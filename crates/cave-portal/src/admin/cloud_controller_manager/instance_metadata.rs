@@ -26,7 +26,12 @@ pub fn list_instances(
     Ok(nodes
         .into_iter()
         .map(|n| InstanceMetaRow {
-            instance_id: n.provider_id.split('/').last().unwrap_or("unknown").to_string(),
+            instance_id: n
+                .provider_id
+                .split('/')
+                .last()
+                .unwrap_or("unknown")
+                .to_string(),
             instance_type: match n.provider {
                 "aws" => "m5.xlarge",
                 "gcp" => "n2-standard-4",
@@ -94,7 +99,9 @@ mod tests {
         );
         let s = AdminState::seeded();
         let rows = list_instances(&s, &ctx(&[Permission::CloudControllerRead])).unwrap();
-        let nodes = super::super::node_controller::list_nodes(&s, &ctx(&[Permission::CloudControllerRead])).unwrap();
+        let nodes =
+            super::super::node_controller::list_nodes(&s, &ctx(&[Permission::CloudControllerRead]))
+                .unwrap();
         assert_eq!(rows.len(), nodes.len());
     }
 
@@ -109,13 +116,7 @@ mod tests {
         let s = AdminState::seeded();
         let rows = list_instances(&s, &ctx(&[Permission::CloudControllerRead])).unwrap();
         for r in &rows {
-            assert!([
-                "m5.xlarge",
-                "n2-standard-4",
-                "CCX23",
-                "metal-1"
-            ]
-            .contains(&r.instance_type));
+            assert!(["m5.xlarge", "n2-standard-4", "CCX23", "metal-1"].contains(&r.instance_type));
         }
     }
 

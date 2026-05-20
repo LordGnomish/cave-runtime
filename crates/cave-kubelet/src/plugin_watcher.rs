@@ -99,10 +99,7 @@ impl PluginWatcher {
     /// Uses Kubernetes-aware version ordering: GA > beta > alpha,
     /// then by numeric major / sub.  Mirrors upstream
     /// `apimachinery/pkg/version.CompareKubeAwareVersionStrings`.
-    pub fn negotiate_version(
-        kubelet: &[String],
-        plugin: &[String],
-    ) -> Result<String, PluginError> {
+    pub fn negotiate_version(kubelet: &[String], plugin: &[String]) -> Result<String, PluginError> {
         let mut common: Vec<&String> = kubelet.iter().filter(|v| plugin.contains(v)).collect();
         if common.is_empty() {
             return Err(PluginError::NoCommonVersion {
@@ -226,10 +223,7 @@ mod tests {
 
     #[test]
     fn negotiate_no_common_errors() {
-        let r = PluginWatcher::negotiate_version(
-            &["v1".into()],
-            &["v2".into()],
-        );
+        let r = PluginWatcher::negotiate_version(&["v1".into()], &["v2".into()]);
         assert!(matches!(r, Err(PluginError::NoCommonVersion { .. })));
     }
 
@@ -301,7 +295,10 @@ mod tests {
     fn invalid_name_rejected_at_register() {
         let mut w = watcher();
         let bad = info(PluginType::Csi, "BadName!", &["v1"]);
-        assert!(matches!(w.register(bad, "acme"), Err(PluginError::InvalidName(_))));
+        assert!(matches!(
+            w.register(bad, "acme"),
+            Err(PluginError::InvalidName(_))
+        ));
     }
 
     #[test]

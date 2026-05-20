@@ -62,7 +62,9 @@ struct WormInner {
 
 impl WormSink {
     pub fn new() -> Self {
-        Self { inner: Mutex::new(WormInner::default()) }
+        Self {
+            inner: Mutex::new(WormInner::default()),
+        }
     }
 
     /// Append `event` for `tenant_id`. The sink computes the chain hashes;
@@ -86,8 +88,13 @@ impl WormSink {
 
     /// Read the full chain for `tenant_id`. Returned in seq order.
     pub fn chain_for(&self, tenant_id: &str) -> Vec<WormEntry> {
-        self.inner.lock().unwrap()
-            .chains.get(tenant_id).cloned().unwrap_or_default()
+        self.inner
+            .lock()
+            .unwrap()
+            .chains
+            .get(tenant_id)
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// Verify the chain for `tenant_id` end-to-end. Mirrors the
@@ -99,7 +106,8 @@ impl WormSink {
             let expected_seq = (idx as u64) + 1;
             if entry.seq != expected_seq {
                 return Err(WormError::SequenceGap {
-                    expected: expected_seq, found: entry.seq,
+                    expected: expected_seq,
+                    found: entry.seq,
                 });
             }
             if entry.prev_hash != prev {
@@ -116,13 +124,20 @@ impl WormSink {
 
     /// Length of the chain for `tenant_id`. Useful for monitoring.
     pub fn len_for(&self, tenant_id: &str) -> usize {
-        self.inner.lock().unwrap()
-            .chains.get(tenant_id).map(|c| c.len()).unwrap_or(0)
+        self.inner
+            .lock()
+            .unwrap()
+            .chains
+            .get(tenant_id)
+            .map(|c| c.len())
+            .unwrap_or(0)
     }
 }
 
 impl Default for WormSink {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn compute_entry_hash(seq: u64, prev_hash: &[u8; 32], event: &AuditEvent) -> [u8; 32] {
@@ -142,9 +157,17 @@ mod tests {
 
     fn ev(audit_id: &str, tenant: &str, code: u16) -> AuditEvent {
         AuditEvent::new(
-            audit_id, AuditLevel::Metadata, AuditStage::ResponseComplete,
-            "alice", tenant, "default", "create", "configmaps", "cm1",
-            "/api/v1/namespaces/default/configmaps", code,
+            audit_id,
+            AuditLevel::Metadata,
+            AuditStage::ResponseComplete,
+            "alice",
+            tenant,
+            "default",
+            "create",
+            "configmaps",
+            "cm1",
+            "/api/v1/namespaces/default/configmaps",
+            code,
         )
     }
 
@@ -163,8 +186,10 @@ mod tests {
         assert_eq!(e1.prev_hash, [0u8; 32], "first entry has zero prev_hash");
         assert_eq!(e2.prev_hash, e1.entry_hash);
         assert_eq!(e3.prev_hash, e2.entry_hash);
-        assert!(e1.tenant_id == "acme" && e2.tenant_id == "acme" && e3.tenant_id == "acme",
-            "tenant_id invariant: every entry tagged with acme");
+        assert!(
+            e1.tenant_id == "acme" && e2.tenant_id == "acme" && e3.tenant_id == "acme",
+            "tenant_id invariant: every entry tagged with acme"
+        );
     }
 
     /// Upstream parity: `TestAuditBackend_PerTenantChainsAreIsolated`
@@ -181,8 +206,10 @@ mod tests {
         assert_eq!(acme.len(), 2);
         assert_eq!(globex.len(), 1);
         assert_eq!(acme[0].seq, 1);
-        assert_eq!(acme[1].seq, 2,
-            "tenant_id invariant: globex's append doesn't bump acme's seq");
+        assert_eq!(
+            acme[1].seq, 2,
+            "tenant_id invariant: globex's append doesn't bump acme's seq"
+        );
         assert!(acme.iter().all(|e| e.tenant_id == "acme"));
         assert!(globex.iter().all(|e| e.tenant_id == "globex"));
     }
@@ -256,7 +283,10 @@ mod tests {
         sink.append(ev("u-3", "globex", 200));
         assert_eq!(sink.len_for("acme"), 2);
         assert_eq!(sink.len_for("globex"), 1);
-        assert_eq!(sink.len_for("unknown-tenant"), 0,
-            "tenant_id invariant: unknown tenant returns 0, never aggregate");
+        assert_eq!(
+            sink.len_for("unknown-tenant"),
+            0,
+            "tenant_id invariant: unknown tenant returns 0, never aggregate"
+        );
     }
 }

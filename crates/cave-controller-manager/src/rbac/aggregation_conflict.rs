@@ -23,8 +23,7 @@ pub fn try_compact_pair(a: &PolicyRule, b: &PolicyRule) -> Option<PolicyRule> {
     if a.api_groups != b.api_groups || a.resources != b.resources {
         return None;
     }
-    let verbs: BTreeSet<String> =
-        a.verbs.iter().chain(b.verbs.iter()).cloned().collect();
+    let verbs: BTreeSet<String> = a.verbs.iter().chain(b.verbs.iter()).cloned().collect();
     let verbs_v: Vec<String> = verbs.into_iter().collect();
     Some(PolicyRule {
         api_groups: a.api_groups.clone(),
@@ -39,9 +38,10 @@ pub fn try_compact_pair(a: &PolicyRule, b: &PolicyRule) -> Option<PolicyRule> {
 pub fn compact_rules(rules: &[PolicyRule]) -> Vec<PolicyRule> {
     let mut out: Vec<PolicyRule> = Vec::new();
     for r in rules {
-        if let Some(slot) = out.iter_mut().find(|s| {
-            s.api_groups == r.api_groups && s.resources == r.resources
-        }) {
+        if let Some(slot) = out
+            .iter_mut()
+            .find(|s| s.api_groups == r.api_groups && s.resources == r.resources)
+        {
             let verbs: BTreeSet<String> =
                 slot.verbs.iter().chain(r.verbs.iter()).cloned().collect();
             slot.verbs = verbs.into_iter().collect();
@@ -83,12 +83,22 @@ mod tests {
         }
     }
     fn lbl(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
     fn sel(pairs: &[(&str, &str)]) -> LabelSelector {
-        LabelSelector { match_labels: lbl(pairs) }
+        LabelSelector {
+            match_labels: lbl(pairs),
+        }
     }
-    fn cr(name: &str, lbls: &[(&str, &str)], rules: Vec<PolicyRule>, agg: Option<Vec<LabelSelector>>) -> ClusterRole {
+    fn cr(
+        name: &str,
+        lbls: &[(&str, &str)],
+        rules: Vec<PolicyRule>,
+        agg: Option<Vec<LabelSelector>>,
+    ) -> ClusterRole {
         ClusterRole {
             name: name.into(),
             labels: lbl(lbls),

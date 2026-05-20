@@ -29,8 +29,12 @@ use std::collections::VecDeque;
 pub struct ClusterId(pub String);
 
 impl ClusterId {
-    pub fn new(s: impl Into<String>) -> Self { ClusterId(s.into()) }
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn new(s: impl Into<String>) -> Self {
+        ClusterId(s.into())
+    }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -46,7 +50,9 @@ pub struct ClusterRegistry {
 }
 
 impl ClusterRegistry {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn register(&mut self, c: ClusterDescriptor) {
         self.clusters.insert(c.id.clone(), c);
@@ -56,7 +62,9 @@ impl ClusterRegistry {
         self.clusters.get(id)
     }
 
-    pub fn count(&self) -> usize { self.clusters.len() }
+    pub fn count(&self) -> usize {
+        self.clusters.len()
+    }
 }
 
 /// One message destined to be replicated.
@@ -174,8 +182,11 @@ impl PersistentReplicator {
     /// Retry every message currently in `in_flight` (used after a peer
     /// reconnects). Returns the number of retries that succeeded.
     pub fn retry_in_flight<S: ReplicationSender>(&mut self, sender: &mut S) -> usize {
-        let entries: Vec<((ClusterId, (u64, u64)), ReplicatedMessage)> =
-            self.in_flight.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+        let entries: Vec<((ClusterId, (u64, u64)), ReplicatedMessage)> = self
+            .in_flight
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
         let mut ok = 0;
         for (key, msg) in entries {
             match sender.send(&key.0, &msg) {
@@ -221,9 +232,16 @@ mod tests {
 
     impl MockSender {
         fn new() -> Self {
-            Self { ack_for: HashSet::new(), reject_for: HashSet::new(), sent: Vec::new() }
+            Self {
+                ack_for: HashSet::new(),
+                reject_for: HashSet::new(),
+                sent: Vec::new(),
+            }
         }
-        fn ack_all(mut self) -> Self { self.ack_for.clear(); self }
+        fn ack_all(mut self) -> Self {
+            self.ack_for.clear();
+            self
+        }
     }
 
     impl ReplicationSender for MockSender {
@@ -316,7 +334,9 @@ mod tests {
         );
         rep.enqueue(msg("topic", "us-east", (1, 1), "p1"));
         let mut sender = MockSender::new();
-        sender.reject_for.insert((ClusterId::new("eu-west"), (1, 1)));
+        sender
+            .reject_for
+            .insert((ClusterId::new("eu-west"), (1, 1)));
         rep.drain(&mut sender);
         assert_eq!(rep.rejected[&ClusterId::new("eu-west")], 1);
         assert_eq!(rep.sent.get(&ClusterId::new("eu-west")), None);

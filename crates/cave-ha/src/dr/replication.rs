@@ -14,7 +14,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tokio::sync::{mpsc, Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock, mpsc};
 use tracing::{debug, info, warn};
 
 use crate::config::DrConfig;
@@ -128,7 +128,8 @@ impl DrReplicator {
             tokio::time::sleep(Duration::from_secs(5)).await;
             return Ok(());
         }
-        let mut stream = TcpStream::connect(&self.config.remote_addr).await
+        let mut stream = TcpStream::connect(&self.config.remote_addr)
+            .await
             .map_err(|e| HaError::Dr(format!("connect DR: {e}")))?;
         info!(remote = %self.config.remote_addr, "DR connection established");
         *self.connected.write().await = true;
@@ -144,23 +145,37 @@ impl DrReplicator {
             if !entries.is_empty() {
                 let commit_index = *self.primary_commit.read().await;
                 let from_index = entries.first().map(|e| e.index).unwrap_or(0);
-                let batch = DrBatch { from_index, entries, commit_index };
+                let batch = DrBatch {
+                    from_index,
+                    entries,
+                    commit_index,
+                };
                 batch_buf.clear();
                 serde_json::to_writer(&mut batch_buf, &batch)
                     .map_err(|e| HaError::Dr(format!("serialize: {e}")))?;
 
                 let len = (batch_buf.len() as u32).to_be_bytes();
-                stream.write_all(&len).await.map_err(|e| HaError::Dr(e.to_string()))?;
-                stream.write_all(&batch_buf).await.map_err(|e| HaError::Dr(e.to_string()))?;
+                stream
+                    .write_all(&len)
+                    .await
+                    .map_err(|e| HaError::Dr(e.to_string()))?;
+                stream
+                    .write_all(&batch_buf)
+                    .await
+                    .map_err(|e| HaError::Dr(e.to_string()))?;
 
                 if !self.config.async_mode {
                     // Sync mode: wait for ack.
                     let mut len_buf = [0u8; 4];
-                    stream.read_exact(&mut len_buf).await
+                    stream
+                        .read_exact(&mut len_buf)
+                        .await
                         .map_err(|e| HaError::Dr(format!("ack recv: {e}")))?;
                     let ack_len = u32::from_be_bytes(len_buf) as usize;
                     let mut ack_buf = vec![0u8; ack_len];
-                    stream.read_exact(&mut ack_buf).await
+                    stream
+                        .read_exact(&mut ack_buf)
+                        .await
                         .map_err(|e| HaError::Dr(format!("ack recv: {e}")))?;
                     let ack: DrAck = serde_json::from_slice(&ack_buf)
                         .map_err(|e| HaError::Dr(format!("ack decode: {e}")))?;
@@ -170,7 +185,11 @@ impl DrReplicator {
                 }
 
                 // Update lag metric.
-                let lag = self.primary_commit.read().await.saturating_sub(*self.dr_applied.read().await);
+                let lag = self
+                    .primary_commit
+                    .read()
+                    .await
+                    .saturating_sub(*self.dr_applied.read().await);
                 self.metrics.dr_lag_entries.set(lag as i64);
             } else {
                 tokio::time::sleep(Duration::from_millis(10)).await;
@@ -209,19 +228,34 @@ async fn handle_dr_connection(
     let mut last_applied: LogIndex = 0;
     loop {
         let mut len_buf = [0u8; 4];
-        if stream.read_exact(&mut len_buf).await.is_err() { break; }
+        if stream.read_exact(&mut len_buf).await.is_err() {
+            break;
+        }
         let len = u32::from_be_bytes(len_buf) as usize;
-        if len > 64 * 1024 * 1024 { break; }
+        if len > 64 * 1024 * 1024 {
+            break;
+        }
         let mut buf = vec![0u8; len];
-        if stream.read_exact(&mut buf).await.is_err() { break; }
+        if stream.read_exact(&mut buf).await.is_err() {
+            break;
+        }
         let batch: DrBatch = match serde_json::from_slice(&buf) {
             Ok(b) => b,
-            Err(e) => { warn!("DR decode: {e}"); break; }
+            Err(e) => {
+                warn!("DR decode: {e}");
+                break;
+            }
         };
         last_applied = batch.commit_index;
-        if apply_tx.send(batch.entries).is_err() { break; }
+        if apply_tx.send(batch.entries).is_err() {
+            break;
+        }
         // Send ack.
-        let ack = DrAck { last_applied, ok: true, error: None };
+        let ack = DrAck {
+            last_applied,
+            ok: true,
+            error: None,
+        };
         if let Ok(ack_bytes) = serde_json::to_vec(&ack) {
             let len = (ack_bytes.len() as u32).to_be_bytes();
             let _ = stream.write_all(&len).await;

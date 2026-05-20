@@ -275,7 +275,9 @@ mod tests {
         let tenant_id = "kms-005";
         let kms = InMemoryKmsProvider::new("k1", fixed_kek());
         let mut new_kek = fixed_kek();
-        for b in new_kek.iter_mut() { *b ^= 0xaa; }
+        for b in new_kek.iter_mut() {
+            *b ^= 0xaa;
+        }
         kms.rotate("k2", new_kek);
         let env = encrypt(&kms, &payload(tenant_id, "after-rotate")).unwrap();
         assert_eq!(env.kek_id, "k2");

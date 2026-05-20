@@ -17,7 +17,10 @@ pub fn validate_tenant_id(s: &str) -> DfResult<()> {
         return Err(DataFusionError::InvalidTenant("empty".into()));
     }
     if s.len() > 63 {
-        return Err(DataFusionError::InvalidTenant(format!("length {} > 63", s.len())));
+        return Err(DataFusionError::InvalidTenant(format!(
+            "length {} > 63",
+            s.len()
+        )));
     }
     if s.starts_with('-') || s.ends_with('-') {
         return Err(DataFusionError::InvalidTenant(
@@ -27,7 +30,10 @@ pub fn validate_tenant_id(s: &str) -> DfResult<()> {
     for ch in s.chars() {
         let ok = ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-';
         if !ok {
-            return Err(DataFusionError::InvalidTenant(format!("invalid char '{}'", ch)));
+            return Err(DataFusionError::InvalidTenant(format!(
+                "invalid char '{}'",
+                ch
+            )));
         }
     }
     Ok(())

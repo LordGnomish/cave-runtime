@@ -2,8 +2,10 @@
 // Source: aquasecurity/trivy-db@2034dd8 pkg/db/db_test.go
 //! Integration tests for cave-scan-db.
 
-use cave_scan_db::matcher::{match_purl, version_cmp, version_satisfies, PackageRef};
-use cave_scan_db::sources::{alpine, almalinux, debian, ghsa, nvd, redhat, FeedRecord, FeedPackage};
+use cave_scan_db::matcher::{PackageRef, match_purl, version_cmp, version_satisfies};
+use cave_scan_db::sources::{
+    FeedPackage, FeedRecord, almalinux, alpine, debian, ghsa, nvd, redhat,
+};
 use cave_scan_db::{
     Advisory, IacRule, IacRuleDb, LangAdvisoryDb, OsAdvisoryDb, Severity, SledStore, VulnDb,
     Vulnerability,

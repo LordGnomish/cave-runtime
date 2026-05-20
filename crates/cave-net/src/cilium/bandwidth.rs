@@ -64,8 +64,11 @@ pub fn parse_bandwidth_annotation(s: &str) -> Result<u64, BandwidthError> {
     } else {
         (s, 1u64)
     };
-    let num: u64 = num_str.parse().map_err(|_| BandwidthError::BadAnnotation(s.to_string()))?;
-    num.checked_mul(mult).ok_or_else(|| BandwidthError::BadAnnotation(s.to_string()))
+    let num: u64 = num_str
+        .parse()
+        .map_err(|_| BandwidthError::BadAnnotation(s.to_string()))?;
+    num.checked_mul(mult)
+        .ok_or_else(|| BandwidthError::BadAnnotation(s.to_string()))
 }
 
 /// Per-endpoint bandwidth entry. Mirrors
@@ -85,7 +88,9 @@ impl BandwidthEntry {
     pub fn new(endpoint_id: u64, rate_bps: u64) -> Self {
         let burst = if rate_bps > 0 { rate_bps / 4 } else { 0 };
         Self {
-            endpoint_id, rate_bps, burst_bytes: burst,
+            endpoint_id,
+            rate_bps,
+            burst_bytes: burst,
             tokens: burst as i64,
             last_update_ns: 0,
         }
@@ -151,7 +156,11 @@ pub struct BandwidthManager {
 
 impl BandwidthManager {
     pub fn new(tenant: TenantId, congestion: CongestionControl) -> Self {
-        Self { tenant, congestion, entries: HashMap::new() }
+        Self {
+            tenant,
+            congestion,
+            entries: HashMap::new(),
+        }
     }
 
     pub fn set_bandwidth(&mut self, endpoint_id: u64, rate_bps: u64) {
@@ -159,7 +168,11 @@ impl BandwidthManager {
         self.entries.insert(endpoint_id, entry);
     }
 
-    pub fn set_bandwidth_from_annotation(&mut self, endpoint_id: u64, annotation: &str) -> Result<(), BandwidthError> {
+    pub fn set_bandwidth_from_annotation(
+        &mut self,
+        endpoint_id: u64,
+        annotation: &str,
+    ) -> Result<(), BandwidthError> {
         let bps = parse_bandwidth_annotation(annotation)?;
         self.set_bandwidth(endpoint_id, bps);
         Ok(())
@@ -210,13 +223,21 @@ mod tests {
 
     #[test]
     fn parse_bw_plain_bytes() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/linux/bandwidth/bandwidth.go", "ParseBandwidth.Plain", "tenant-bw-plain");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/datapath/linux/bandwidth/bandwidth.go",
+            "ParseBandwidth.Plain",
+            "tenant-bw-plain"
+        );
         assert_eq!(parse_bandwidth_annotation("1000").unwrap(), 1000);
     }
 
     #[test]
     fn parse_bw_si_kilo_mega_giga() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/linux/bandwidth/bandwidth.go", "ParseBandwidth.SI", "tenant-bw-si");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/datapath/linux/bandwidth/bandwidth.go",
+            "ParseBandwidth.SI",
+            "tenant-bw-si"
+        );
         assert_eq!(parse_bandwidth_annotation("10K").unwrap(), 10_000);
         assert_eq!(parse_bandwidth_annotation("10M").unwrap(), 10_000_000);
         assert_eq!(parse_bandwidth_annotation("1G").unwrap(), 1_000_000_000);
@@ -224,29 +245,48 @@ mod tests {
 
     #[test]
     fn parse_bw_binary_kibibyte_mebibyte_gibibyte() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/linux/bandwidth/bandwidth.go", "ParseBandwidth.Binary", "tenant-bw-bin");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/datapath/linux/bandwidth/bandwidth.go",
+            "ParseBandwidth.Binary",
+            "tenant-bw-bin"
+        );
         assert_eq!(parse_bandwidth_annotation("1Ki").unwrap(), 1024);
         assert_eq!(parse_bandwidth_annotation("1Mi").unwrap(), 1024 * 1024);
-        assert_eq!(parse_bandwidth_annotation("1Gi").unwrap(), 1024 * 1024 * 1024);
+        assert_eq!(
+            parse_bandwidth_annotation("1Gi").unwrap(),
+            1024 * 1024 * 1024
+        );
     }
 
     #[test]
     fn parse_bw_invalid_annotation_rejected() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/linux/bandwidth/bandwidth.go", "ParseBandwidth.Invalid", "tenant-bw-bad");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/datapath/linux/bandwidth/bandwidth.go",
+            "ParseBandwidth.Invalid",
+            "tenant-bw-bad"
+        );
         let err = parse_bandwidth_annotation("garbage").unwrap_err();
         assert!(matches!(err, BandwidthError::BadAnnotation(_)));
     }
 
     #[test]
     fn parse_bw_empty_rejected() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/linux/bandwidth/bandwidth.go", "ParseBandwidth.Empty", "tenant-bw-empty");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/datapath/linux/bandwidth/bandwidth.go",
+            "ParseBandwidth.Empty",
+            "tenant-bw-empty"
+        );
         let err = parse_bandwidth_annotation("").unwrap_err();
         assert!(matches!(err, BandwidthError::BadAnnotation(_)));
     }
 
     #[test]
     fn parse_bw_terabyte() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/linux/bandwidth/bandwidth.go", "ParseBandwidth.T", "tenant-bw-t");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/datapath/linux/bandwidth/bandwidth.go",
+            "ParseBandwidth.T",
+            "tenant-bw-t"
+        );
         assert_eq!(parse_bandwidth_annotation("1T").unwrap(), 1_000_000_000_000);
         assert_eq!(parse_bandwidth_annotation("1Ti").unwrap(), 1u64 << 40);
     }
@@ -271,7 +311,11 @@ mod tests {
 
     #[test]
     fn bw_entry_packet_within_tokens_consumes_immediately() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/bandwidth.h", "edt.WithinBudget", "tenant-bw-within");
+        let (_c, _t) = cilium_test_ctx!(
+            "bpf/lib/bandwidth.h",
+            "edt.WithinBudget",
+            "tenant-bw-within"
+        );
         let mut e = BandwidthEntry::new(1, 10_000_000); // 10 MB/s, burst 2.5 MB
         let (edt, _) = e.edt_for(1_000_000_000, 1500);
         assert_eq!(edt, 1_000_000_000);
@@ -282,7 +326,7 @@ mod tests {
     fn bw_entry_packet_exceeding_tokens_gets_future_edt() {
         let (_c, _t) = cilium_test_ctx!("bpf/lib/bandwidth.h", "edt.OverBudget", "tenant-bw-over");
         let mut e = BandwidthEntry::new(1, 1000); // 1000 B/s, burst 250 B
-        // Send a 10 KB packet at t=0 — only 250 tokens available, need 10000.
+                                                  // Send a 10 KB packet at t=0 — only 250 tokens available, need 10000.
         let (edt, accepted) = e.edt_for(0, 10_000);
         assert!(accepted);
         // Need ~9750 extra bytes at 1000 B/s = 9.75 seconds = 9_750_000_000 ns.
@@ -304,7 +348,11 @@ mod tests {
 
     #[test]
     fn bw_entry_tokens_capped_at_burst() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/bandwidth.h", "edt.RefillCap", "tenant-bw-refillcap");
+        let (_c, _t) = cilium_test_ctx!(
+            "bpf/lib/bandwidth.h",
+            "edt.RefillCap",
+            "tenant-bw-refillcap"
+        );
         let mut e = BandwidthEntry::new(1, 1_000_000); // burst 250000
         e.tokens = 100;
         e.last_update_ns = 0;
@@ -317,7 +365,11 @@ mod tests {
 
     #[test]
     fn bw_manager_set_and_lookup() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/bandwidth/bandwidth.go", "Manager.Set", "tenant-bw-set");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/bandwidth/bandwidth.go",
+            "Manager.Set",
+            "tenant-bw-set"
+        );
         let mut m = mgr(tenant);
         m.set_bandwidth(7, 1_000_000);
         let e = m.lookup(7).unwrap();
@@ -326,7 +378,11 @@ mod tests {
 
     #[test]
     fn bw_manager_set_from_annotation() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/bandwidth/bandwidth.go", "Manager.SetFromAnnotation", "tenant-bw-ann");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/bandwidth/bandwidth.go",
+            "Manager.SetFromAnnotation",
+            "tenant-bw-ann"
+        );
         let mut m = mgr(tenant);
         m.set_bandwidth_from_annotation(7, "10M").unwrap();
         assert_eq!(m.lookup(7).unwrap().rate_bps, 10_000_000);
@@ -334,14 +390,22 @@ mod tests {
 
     #[test]
     fn bw_manager_set_from_bad_annotation_errors() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/bandwidth/bandwidth.go", "Manager.SetFromAnnotation.Bad", "tenant-bw-annbad");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/bandwidth/bandwidth.go",
+            "Manager.SetFromAnnotation.Bad",
+            "tenant-bw-annbad"
+        );
         let mut m = mgr(tenant);
         assert!(m.set_bandwidth_from_annotation(7, "nope").is_err());
     }
 
     #[test]
     fn bw_manager_remove_drops_entry() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/bandwidth/bandwidth.go", "Manager.Delete", "tenant-bw-rm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/bandwidth/bandwidth.go",
+            "Manager.Delete",
+            "tenant-bw-rm"
+        );
         let mut m = mgr(tenant);
         m.set_bandwidth(7, 1000);
         assert!(m.remove(7));
@@ -350,14 +414,22 @@ mod tests {
 
     #[test]
     fn bw_manager_remove_unknown_returns_false() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/bandwidth/bandwidth.go", "Manager.Delete.NotFound", "tenant-bw-rmnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/bandwidth/bandwidth.go",
+            "Manager.Delete.NotFound",
+            "tenant-bw-rmnf"
+        );
         let mut m = mgr(tenant);
         assert!(!m.remove(999));
     }
 
     #[test]
     fn bw_manager_schedule_unknown_endpoint_returns_now() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/bpf_host.c", "throttle_egress.NoEntry", "tenant-bw-sched-nf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/bpf_host.c",
+            "throttle_egress.NoEntry",
+            "tenant-bw-sched-nf"
+        );
         let mut m = mgr(tenant);
         let now = 1_000_000_000;
         assert_eq!(m.schedule(999, now, 1500), now);
@@ -365,7 +437,11 @@ mod tests {
 
     #[test]
     fn bw_manager_schedule_within_budget_returns_now() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/bpf_host.c", "throttle_egress.Now", "tenant-bw-sched-now");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/bpf_host.c",
+            "throttle_egress.Now",
+            "tenant-bw-sched-now"
+        );
         let mut m = mgr(tenant);
         m.set_bandwidth(7, 10_000_000);
         let now = 1_000_000_000;
@@ -374,7 +450,11 @@ mod tests {
 
     #[test]
     fn bw_manager_schedule_exceeding_budget_returns_future() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/bpf_host.c", "throttle_egress.Future", "tenant-bw-sched-fut");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/bpf_host.c",
+            "throttle_egress.Future",
+            "tenant-bw-sched-fut"
+        );
         let mut m = mgr(tenant);
         m.set_bandwidth(7, 1000);
         let now = 0;
@@ -384,7 +464,11 @@ mod tests {
 
     #[test]
     fn bw_manager_entry_count_tracks_sets() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/bandwidth/bandwidth.go", "Manager.Len", "tenant-bw-len");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/bandwidth/bandwidth.go",
+            "Manager.Len",
+            "tenant-bw-len"
+        );
         let mut m = mgr(tenant);
         for i in 0..5u64 {
             m.set_bandwidth(i, 1_000_000);
@@ -394,7 +478,11 @@ mod tests {
 
     #[test]
     fn bw_manager_set_replaces_existing_entry() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/bandwidth/bandwidth.go", "Manager.Set.Replace", "tenant-bw-rep");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/bandwidth/bandwidth.go",
+            "Manager.Set.Replace",
+            "tenant-bw-rep"
+        );
         let mut m = mgr(tenant);
         m.set_bandwidth(7, 1000);
         m.set_bandwidth(7, 2000);
@@ -406,21 +494,33 @@ mod tests {
 
     #[test]
     fn cc_bbr_requires_pacing() {
-        let (_c, _t) = cilium_test_ctx!("pkg/option/config.go", "CongestionControl.BBR", "tenant-bw-cc-bbr");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/option/config.go",
+            "CongestionControl.BBR",
+            "tenant-bw-cc-bbr"
+        );
         assert!(CongestionControl::Bbr.requires_pacing());
         assert!(CongestionControl::BbrV2.requires_pacing());
     }
 
     #[test]
     fn cc_cubic_does_not_require_pacing() {
-        let (_c, _t) = cilium_test_ctx!("pkg/option/config.go", "CongestionControl.Cubic", "tenant-bw-cc-cubic");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/option/config.go",
+            "CongestionControl.Cubic",
+            "tenant-bw-cc-cubic"
+        );
         assert!(!CongestionControl::Cubic.requires_pacing());
         assert!(!CongestionControl::Reno.requires_pacing());
     }
 
     #[test]
     fn bw_manager_bbr_enabled_when_bbr_and_entries_present() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/config.go", "EnableBBRHostRouting", "tenant-bw-bbren");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/option/config.go",
+            "EnableBBRHostRouting",
+            "tenant-bw-bbren"
+        );
         let mut m = BandwidthManager::new(tenant, CongestionControl::Bbr);
         m.set_bandwidth(7, 1_000_000);
         assert!(m.bbr_enabled());
@@ -428,14 +528,22 @@ mod tests {
 
     #[test]
     fn bw_manager_bbr_disabled_when_no_entries() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/config.go", "EnableBBRHostRouting.Empty", "tenant-bw-bbroff");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/option/config.go",
+            "EnableBBRHostRouting.Empty",
+            "tenant-bw-bbroff"
+        );
         let m = BandwidthManager::new(tenant, CongestionControl::Bbr);
         assert!(!m.bbr_enabled());
     }
 
     #[test]
     fn bw_manager_bbr_disabled_with_cubic_cc() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/config.go", "EnableBBRHostRouting.Cubic", "tenant-bw-bbrcubic");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/option/config.go",
+            "EnableBBRHostRouting.Cubic",
+            "tenant-bw-bbrcubic"
+        );
         let mut m = BandwidthManager::new(tenant, CongestionControl::Cubic);
         m.set_bandwidth(7, 1_000_000);
         assert!(!m.bbr_enabled());
@@ -454,8 +562,17 @@ mod tests {
 
     #[test]
     fn cc_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/option/config.go", "CongestionControl.Serde", "tenant-bw-ccserde");
-        for c in [CongestionControl::Cubic, CongestionControl::Bbr, CongestionControl::BbrV2, CongestionControl::Reno] {
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/option/config.go",
+            "CongestionControl.Serde",
+            "tenant-bw-ccserde"
+        );
+        for c in [
+            CongestionControl::Cubic,
+            CongestionControl::Bbr,
+            CongestionControl::BbrV2,
+            CongestionControl::Reno,
+        ] {
             let s = serde_json::to_string(&c).unwrap();
             let back: CongestionControl = serde_json::from_str(&s).unwrap();
             assert_eq!(back, c);
@@ -466,7 +583,8 @@ mod tests {
 
     #[test]
     fn bw_pacing_distributes_packets_over_time() {
-        let (_c, _t) = cilium_test_ctx!("bpf/bpf_host.c", "throttle_egress.Pacing", "tenant-bw-pace");
+        let (_c, _t) =
+            cilium_test_ctx!("bpf/bpf_host.c", "throttle_egress.Pacing", "tenant-bw-pace");
         let mut e = BandwidthEntry::new(1, 1_000); // 1000 B/s
         let mut last_edt = 0u64;
         for _ in 0..10 {
@@ -481,7 +599,8 @@ mod tests {
 
     #[test]
     fn bw_pacing_zero_size_packet_does_not_advance() {
-        let (_c, _t) = cilium_test_ctx!("bpf/bpf_host.c", "throttle_egress.Zero", "tenant-bw-pace0");
+        let (_c, _t) =
+            cilium_test_ctx!("bpf/bpf_host.c", "throttle_egress.Zero", "tenant-bw-pace0");
         let mut e = BandwidthEntry::new(1, 1_000_000);
         let (edt, _) = e.edt_for(1000, 0);
         assert_eq!(edt, 1000);

@@ -65,28 +65,31 @@ pub fn cwe_to_owasp(cwe: u32) -> Option<OwaspTop10> {
         | 425 | 441 | 497 | 538 | 540 | 548 | 552 | 566 | 601 | 639 | 651 | 668 | 706 | 862
         | 863 | 913 | 922 | 1275 => A01BrokenAccessControl,
         // A02 Cryptographic Failures.
-        261 | 296 | 310 | 311 | 312 | 319 | 321 | 322 | 323 | 324 | 325 | 326 | 327 | 328
-        | 329 | 330 | 331 | 335 | 336 | 337 | 338 | 340 | 347 | 523 | 720 | 757 | 759 | 760
-        | 818 | 916 => A02CryptographicFailures,
+        261 | 296 | 310 | 311 | 312 | 319 | 321 | 322 | 323 | 324 | 325 | 326 | 327 | 328 | 329
+        | 330 | 331 | 335 | 336 | 337 | 338 | 340 | 347 | 523 | 720 | 757 | 759 | 760 | 818
+        | 916 => A02CryptographicFailures,
         // A03 Injection.
         20 | 74 | 75 | 77 | 78 | 79 | 80 | 83 | 87 | 88 | 89 | 90 | 91 | 93 | 94 | 95 | 96 | 97
-        | 98 | 99 | 100 | 113 | 116 | 138 | 184 | 470 | 471 | 564 | 610 | 643 | 644 | 652
-        | 917 => A03Injection,
+        | 98 | 99 | 100 | 113 | 116 | 138 | 184 | 470 | 471 | 564 | 610 | 643 | 644 | 652 | 917 => {
+            A03Injection
+        }
         // A04 Insecure Design. CWE 311/312/313/316 already mapped to A02
         // (the OWASP 2021 doc lists them in both buckets — primary stays
         // A02 per ZAP's lookup).
-        209 | 256 | 257 | 266 | 269 | 280 | 419 | 430 | 434 | 444 | 451 | 472 | 501 | 522
-        | 555 | 656 | 657 | 799 | 807 | 840 | 841 | 927 | 1021 | 1173 => A04InsecureDesign,
+        209 | 256 | 257 | 266 | 269 | 280 | 419 | 430 | 434 | 444 | 451 | 472 | 501 | 522 | 555
+        | 656 | 657 | 799 | 807 | 840 | 841 | 927 | 1021 | 1173 => A04InsecureDesign,
         // A05 Security Misconfiguration.
-        2 | 11 | 13 | 15 | 16 | 260 | 315 | 520 | 526 | 537 | 541 | 547 | 611 | 614 | 756
-        | 776 | 942 | 1004 | 1032 | 1174 => A05SecurityMisconfiguration,
+        2 | 11 | 13 | 15 | 16 | 260 | 315 | 520 | 526 | 537 | 541 | 547 | 611 | 614 | 756 | 776
+        | 942 | 1004 | 1032 | 1174 => A05SecurityMisconfiguration,
         // A06 Vulnerable and Outdated Components.
         937 | 1035 | 1104 => A06VulnerableComponents,
         // A07 Identification and Authentication Failures.
-        255 | 259 | 287 | 288 | 290 | 294 | 295 | 297 | 300 | 302 | 304 | 306 | 307 | 346
-        | 384 | 521 | 613 | 620 | 640 | 798 => A07IdentificationAuthnFailures,
+        255 | 259 | 287 | 288 | 290 | 294 | 295 | 297 | 300 | 302 | 304 | 306 | 307 | 346 | 384
+        | 521 | 613 | 620 | 640 | 798 => A07IdentificationAuthnFailures,
         // A08 Software and Data Integrity Failures.
-        345 | 353 | 426 | 494 | 502 | 565 | 784 | 829 | 830 | 915 => A08SoftwareDataIntegrityFailures,
+        345 | 353 | 426 | 494 | 502 | 565 | 784 | 829 | 830 | 915 => {
+            A08SoftwareDataIntegrityFailures
+        }
         // A09 Security Logging and Monitoring Failures.
         117 | 223 | 532 | 778 => A09SecurityLoggingMonitoringFailures,
         // A10 SSRF.
@@ -125,11 +128,26 @@ mod tests {
         assert_eq!(cwe_to_owasp(78), Some(OwaspTop10::A03Injection));
         assert_eq!(cwe_to_owasp(22), Some(OwaspTop10::A01BrokenAccessControl));
         assert_eq!(cwe_to_owasp(352), Some(OwaspTop10::A01BrokenAccessControl));
-        assert_eq!(cwe_to_owasp(918), Some(OwaspTop10::A10ServerSideRequestForgery));
-        assert_eq!(cwe_to_owasp(611), Some(OwaspTop10::A05SecurityMisconfiguration));
-        assert_eq!(cwe_to_owasp(614), Some(OwaspTop10::A05SecurityMisconfiguration));
-        assert_eq!(cwe_to_owasp(287), Some(OwaspTop10::A07IdentificationAuthnFailures));
-        assert_eq!(cwe_to_owasp(327), Some(OwaspTop10::A02CryptographicFailures));
+        assert_eq!(
+            cwe_to_owasp(918),
+            Some(OwaspTop10::A10ServerSideRequestForgery)
+        );
+        assert_eq!(
+            cwe_to_owasp(611),
+            Some(OwaspTop10::A05SecurityMisconfiguration)
+        );
+        assert_eq!(
+            cwe_to_owasp(614),
+            Some(OwaspTop10::A05SecurityMisconfiguration)
+        );
+        assert_eq!(
+            cwe_to_owasp(287),
+            Some(OwaspTop10::A07IdentificationAuthnFailures)
+        );
+        assert_eq!(
+            cwe_to_owasp(327),
+            Some(OwaspTop10::A02CryptographicFailures)
+        );
     }
 
     #[test]

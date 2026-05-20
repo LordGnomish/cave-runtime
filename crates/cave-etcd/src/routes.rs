@@ -58,25 +58,58 @@ pub fn create_router(state: Arc<KvStore>) -> Router {
         .route("/api/etcd/v3/auth/role/delete", post(auth_role_delete))
         .route("/api/etcd/v3/auth/role/get", post(auth_role_get))
         .route("/api/etcd/v3/auth/role/list", post(auth_role_list))
-        .route("/api/etcd/v3/auth/role/grant", post(auth_role_grant_permission))
-        .route("/api/etcd/v3/auth/role/revoke", post(auth_role_revoke_permission))
+        .route(
+            "/api/etcd/v3/auth/role/grant",
+            post(auth_role_grant_permission),
+        )
+        .route(
+            "/api/etcd/v3/auth/role/revoke",
+            post(auth_role_revoke_permission),
+        )
         // Maintenance
         .route("/api/etcd/v3/maintenance/status", post(maintenance_status))
         .route("/api/etcd/v3/maintenance/alarm", post(maintenance_alarm))
-        .route("/api/etcd/v3/maintenance/defragment", post(maintenance_defragment))
+        .route(
+            "/api/etcd/v3/maintenance/defragment",
+            post(maintenance_defragment),
+        )
         .route("/api/etcd/v3/maintenance/hash", post(maintenance_hash))
-        .route("/api/etcd/v3/maintenance/snapshot", post(maintenance_snapshot))
+        .route(
+            "/api/etcd/v3/maintenance/snapshot",
+            post(maintenance_snapshot),
+        )
         // Cluster
         .route("/api/etcd/v3/cluster/member/add", post(cluster_member_add))
-        .route("/api/etcd/v3/cluster/member/remove", post(cluster_member_remove))
-        .route("/api/etcd/v3/cluster/member/update", post(cluster_member_update))
-        .route("/api/etcd/v3/cluster/member/list", post(cluster_member_list))
+        .route(
+            "/api/etcd/v3/cluster/member/remove",
+            post(cluster_member_remove),
+        )
+        .route(
+            "/api/etcd/v3/cluster/member/update",
+            post(cluster_member_update),
+        )
+        .route(
+            "/api/etcd/v3/cluster/member/list",
+            post(cluster_member_list),
+        )
         // Cluster v3.6: promotion + joint consensus
-        .route("/api/etcd/v3/cluster/member/promote", post(cluster_member_promote))
-        .route("/api/etcd/v3/cluster/joint/enter", post(cluster_joint_enter))
-        .route("/api/etcd/v3/cluster/joint/leave", post(cluster_joint_leave))
+        .route(
+            "/api/etcd/v3/cluster/member/promote",
+            post(cluster_member_promote),
+        )
+        .route(
+            "/api/etcd/v3/cluster/joint/enter",
+            post(cluster_joint_enter),
+        )
+        .route(
+            "/api/etcd/v3/cluster/joint/leave",
+            post(cluster_joint_leave),
+        )
         // Maintenance v3.6: streamed snapshot
-        .route("/api/etcd/v3/maintenance/snapshot/stream", post(maintenance_snapshot_stream))
+        .route(
+            "/api/etcd/v3/maintenance/snapshot/stream",
+            post(maintenance_snapshot_stream),
+        )
         // Version
         .route("/api/etcd/v3/version", get(version))
         // Parity
@@ -88,10 +121,7 @@ pub fn create_router(state: Arc<KvStore>) -> Router {
 /// pick it up via `Option<Extension<SharedRaftBridge>>`; when absent
 /// the handlers fall through to the existing direct-write path so
 /// single-node deployments are unchanged.
-pub fn create_router_with_bridge(
-    state: Arc<KvStore>,
-    bridge: Option<SharedRaftBridge>,
-) -> Router {
+pub fn create_router_with_bridge(state: Arc<KvStore>, bridge: Option<SharedRaftBridge>) -> Router {
     let router = create_router(state);
     match bridge {
         Some(b) => router.layer(Extension(b)),
@@ -118,7 +148,6 @@ fn extract_token(headers: &HeaderMap) -> Option<String> {
 }
 
 // ── Health / Status ────────────────────────────────────────────────────────
-
 
 /// Decode base64 keys/values in PutRequest (etcd v3 API compat).
 fn decode_put_request(mut req: PutRequest) -> PutRequest {
@@ -206,7 +235,9 @@ async fn kv_range(
             Json(resp)
         })
         .map_err(|e| match &e {
-            crate::error::EtcdError::RevisionCompacted { .. } => (StatusCode::BAD_REQUEST, e.to_string()),
+            crate::error::EtcdError::RevisionCompacted { .. } => {
+                (StatusCode::BAD_REQUEST, e.to_string())
+            }
             crate::error::EtcdError::KeyNotFound(_) => (StatusCode::OK, e.to_string()),
             _ => (StatusCode::BAD_REQUEST, e.to_string()),
         })
@@ -220,16 +251,17 @@ async fn kv_put(
 ) -> Response {
     let token = extract_token(&headers);
     let req = decode_put_request(req);
-    if let Err(e) =
-        store.check_auth_token(token.as_deref(), req.key.as_bytes(), PermType::Write)
-    {
+    if let Err(e) = store.check_auth_token(token.as_deref(), req.key.as_bytes(), PermType::Write) {
         return (StatusCode::UNAUTHORIZED, e.to_string()).into_response();
     }
     // Multi-node Raft mode: propose-and-wait through the bridge.
     // The apply daemon writes the key into the local KvStore on commit;
     // by the time the bridge returns Ok, this node has the entry.
     if let Some(Extension(b)) = bridge {
-        match b.propose_put(req.key.clone(), req.value.clone(), req.lease).await {
+        match b
+            .propose_put(req.key.clone(), req.value.clone(), req.lease)
+            .await
+        {
             Ok(()) => {
                 // The bridge has already applied through the daemon.
                 // Re-read the row so the response carries the same
@@ -247,7 +279,10 @@ async fn kv_put(
                     Ok(r) => r.header,
                     Err(_) => ResponseHeader::default(),
                 };
-                let resp = PutResponse { header, prev_kv: None };
+                let resp = PutResponse {
+                    header,
+                    prev_kv: None,
+                };
                 return Json(resp).into_response();
             }
             Err(RaftBridgeError::NotLeader { leader_url }) => {
@@ -297,9 +332,7 @@ async fn kv_delete_range(
 ) -> Response {
     let token = extract_token(&headers);
     let req = decode_delete_request(req);
-    if let Err(e) =
-        store.check_auth_token(token.as_deref(), req.key.as_bytes(), PermType::Write)
-    {
+    if let Err(e) = store.check_auth_token(token.as_deref(), req.key.as_bytes(), PermType::Write) {
         return (StatusCode::UNAUTHORIZED, e.to_string()).into_response();
     }
     // Multi-node Raft mode: propose-and-wait through the bridge.
@@ -390,9 +423,7 @@ async fn watch_stream(
 ) -> Sse<UnboundedReceiverStream<Result<Event, Infallible>>> {
     let (tx, inner_rx) = mpsc::unbounded_channel::<Result<Event, Infallible>>();
 
-    let watch_config = params
-        .watch_id
-        .and_then(|id| store.get_watch_config(id));
+    let watch_config = params.watch_id.and_then(|id| store.get_watch_config(id));
 
     // Historical replay: send events from start_revision before going live.
     if let Some(ref config) = watch_config {
@@ -693,14 +724,11 @@ async fn cluster_member_promote(
     State(store): State<Arc<KvStore>>,
     Json(req): Json<MemberPromoteRequest>,
 ) -> Result<Json<MemberPromoteResponse>, (StatusCode, String)> {
-    store
-        .member_promote(&req)
-        .map(Json)
-        .map_err(|e| match &e {
-            crate::error::EtcdError::MemberNotFound(_) => (StatusCode::NOT_FOUND, e.to_string()),
-            crate::error::EtcdError::MemberNotLearner(_) => (StatusCode::BAD_REQUEST, e.to_string()),
-            _ => (StatusCode::BAD_REQUEST, e.to_string()),
-        })
+    store.member_promote(&req).map(Json).map_err(|e| match &e {
+        crate::error::EtcdError::MemberNotFound(_) => (StatusCode::NOT_FOUND, e.to_string()),
+        crate::error::EtcdError::MemberNotLearner(_) => (StatusCode::BAD_REQUEST, e.to_string()),
+        _ => (StatusCode::BAD_REQUEST, e.to_string()),
+    })
 }
 
 async fn cluster_joint_enter(
@@ -887,11 +915,14 @@ mod tests {
     #[tokio::test]
     async fn test_auth_enable_disable_endpoints() {
         let app = test_app();
-        let resp =
-            post_json(app.clone(), "/api/etcd/v3/auth/enable", serde_json::json!({})).await;
+        let resp = post_json(
+            app.clone(),
+            "/api/etcd/v3/auth/enable",
+            serde_json::json!({}),
+        )
+        .await;
         assert_eq!(resp.status(), StatusCode::OK);
-        let resp2 =
-            post_json(app, "/api/etcd/v3/auth/disable", serde_json::json!({})).await;
+        let resp2 = post_json(app, "/api/etcd/v3/auth/disable", serde_json::json!({})).await;
         assert_eq!(resp2.status(), StatusCode::OK);
     }
 
@@ -1200,7 +1231,9 @@ mod tests {
             serde_json::json!({"peer_ur_ls": ["http://learner:2380"], "is_learner": true}),
         )
         .await;
-        let body = axum::body::to_bytes(add.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(add.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let added: serde_json::Value = serde_json::from_slice(&body).unwrap();
         let id = added["member"]["id"].as_u64().unwrap();
         let resp = post_json(
@@ -1268,7 +1301,9 @@ mod tests {
         )
         .await;
         assert_eq!(resp.status(), StatusCode::OK);
-        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let chunks: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
         assert!(!chunks.is_empty());
         assert_eq!(chunks[0]["checksum"].as_str().unwrap().len(), 64);
@@ -1458,7 +1493,9 @@ mod tests {
         )
         .await;
         assert_eq!(resp.status(), StatusCode::OK);
-        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert!(v["header"]["revision"].as_u64().unwrap() >= 1);
         // Read it back.

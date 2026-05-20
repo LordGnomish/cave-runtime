@@ -3,16 +3,16 @@
 /// Forward plugin — recursive resolution with multiple upstreams.
 use std::net::SocketAddr;
 use std::sync::{
-    atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use std::time::Duration;
 
 use async_trait::async_trait;
 use hickory_proto::op::ResponseCode;
 use hickory_resolver::{
-    config::{NameServerConfig, Protocol as RProto, ResolverConfig, ResolverOpts},
     TokioAsyncResolver,
+    config::{NameServerConfig, Protocol as RProto, ResolverConfig, ResolverOpts},
 };
 use tracing::{debug, warn};
 
@@ -74,8 +74,7 @@ impl ForwardPlugin {
         match self.config.policy {
             ForwardPolicy::Sequential => healthy.into_iter().next(),
             ForwardPolicy::RoundRobin => {
-                let idx =
-                    self.round_robin_idx.fetch_add(1, Ordering::Relaxed) % healthy.len();
+                let idx = self.round_robin_idx.fetch_add(1, Ordering::Relaxed) % healthy.len();
                 healthy.into_iter().nth(idx)
             }
             ForwardPolicy::Random => {

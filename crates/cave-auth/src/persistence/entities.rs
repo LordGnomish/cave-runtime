@@ -52,8 +52,8 @@ pub struct RealmEntity {
     pub name: String,
     pub display_name: Option<String>,
     pub enabled: bool,
-    pub ssl_required: String,        // "external" | "all" | "none"
-    pub access_token_lifespan: i32,  // seconds
+    pub ssl_required: String,       // "external" | "all" | "none"
+    pub access_token_lifespan: i32, // seconds
     pub sso_session_idle_timeout: i32,
     pub sso_session_max_lifespan: i32,
     pub registration_allowed: bool,
@@ -269,11 +269,7 @@ pub struct IdentityProviderEntity {
 }
 
 impl IdentityProviderEntity {
-    pub fn new(
-        realm_id: Uuid,
-        alias: impl Into<String>,
-        provider_id: impl Into<String>,
-    ) -> Self {
+    pub fn new(realm_id: Uuid, alias: impl Into<String>, provider_id: impl Into<String>) -> Self {
         Self {
             id: Uuid::new_v4(),
             realm_id,
@@ -395,7 +391,10 @@ mod tests {
     fn role_realm_vs_client_distinction() {
         let realm = RealmEntity::new("r3");
         let realm_role = RoleEntity::new(realm.id, "admin");
-        assert!(realm_role.client_id.is_none(), "realm role has no client_id");
+        assert!(
+            realm_role.client_id.is_none(),
+            "realm role has no client_id"
+        );
 
         let client = ClientEntity::new(realm.id, "api");
         let mut client_role = RoleEntity::new(realm.id, "viewer");

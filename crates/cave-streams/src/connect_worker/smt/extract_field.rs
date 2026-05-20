@@ -53,9 +53,7 @@ impl Smt for ExtractField {
 
     fn apply(&self, mut r: RecordEnvelope) -> StreamsResult<Option<RecordEnvelope>> {
         let obj = r.value.as_object_mut().ok_or_else(|| {
-            StreamsError::Internal(
-                "ExtractField: cannot extract from non-object value".into(),
-            )
+            StreamsError::Internal("ExtractField: cannot extract from non-object value".into())
         })?;
         let extracted = obj.remove(&self.field).unwrap_or(Value::Null);
         r.value = extracted;

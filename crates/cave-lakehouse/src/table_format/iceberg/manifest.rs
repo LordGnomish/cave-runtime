@@ -158,7 +158,12 @@ impl Manifest {
         {
             return Err(IcebergError::Manifest(format!(
                 "counters mismatch: added {}/{} existing {}/{} deleted {}/{}",
-                a, self.added_files_count, e, self.existing_files_count, d, self.deleted_files_count
+                a,
+                self.added_files_count,
+                e,
+                self.existing_files_count,
+                d,
+                self.deleted_files_count
             )));
         }
         Ok(())
@@ -224,7 +229,11 @@ mod tests {
 
     #[test]
     fn data_file_format_round_trip_all() {
-        for f in [DataFileFormat::Parquet, DataFileFormat::Avro, DataFileFormat::Orc] {
+        for f in [
+            DataFileFormat::Parquet,
+            DataFileFormat::Avro,
+            DataFileFormat::Orc,
+        ] {
             let j = serde_json::to_string(&f).unwrap();
             let back: DataFileFormat = serde_json::from_str(&j).unwrap();
             assert_eq!(back, f);

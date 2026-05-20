@@ -75,11 +75,20 @@ pub struct ListenerTrigger {
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum Interceptor {
     /// CEL filter — event only passes if expression evaluates to true.
-    Cel { filter: String, overlays: Vec<CelOverlay> },
+    Cel {
+        filter: String,
+        overlays: Vec<CelOverlay>,
+    },
     /// GitHub-specific interceptor (HMAC signature validation).
-    GitHub { secret_ref: String, event_types: Vec<String> },
+    GitHub {
+        secret_ref: String,
+        event_types: Vec<String>,
+    },
     /// Bitbucket interceptor.
-    Bitbucket { secret_ref: String, event_types: Vec<String> },
+    Bitbucket {
+        secret_ref: String,
+        event_types: Vec<String>,
+    },
     /// Webhook interceptor (URL-based forwarding).
     Webhook { url: String },
 }
@@ -133,7 +142,9 @@ pub fn evaluate_cel(expr: &str, body: &serde_json::Value) -> bool {
         if let Some(end) = rest.find("')") {
             let pattern = &rest[..end];
             if let Some(val) = resolve_cel_path(path, body) {
-                return regex::Regex::new(pattern).map(|r| r.is_match(&val)).unwrap_or(false);
+                return regex::Regex::new(pattern)
+                    .map(|r| r.is_match(&val))
+                    .unwrap_or(false);
             }
         }
     }
@@ -149,7 +160,9 @@ fn split_logical<'a>(expr: &'a str, op: &str) -> Option<(&'a str, &'a str)> {
     let op_bytes = op.as_bytes();
     let n = bytes.len();
     let m = op_bytes.len();
-    if n < m { return None; }
+    if n < m {
+        return None;
+    }
     for i in 0..=(n - m) {
         match bytes[i] {
             b'(' => depth += 1,
@@ -168,9 +181,7 @@ fn split_at_op<'a>(expr: &'a str, op: &str) -> Option<(&'a str, &'a str)> {
 }
 
 fn strip_quotes(s: &str) -> &str {
-    if (s.starts_with('\'') && s.ends_with('\''))
-        || (s.starts_with('"') && s.ends_with('"'))
-    {
+    if (s.starts_with('\'') && s.ends_with('\'')) || (s.starts_with('"') && s.ends_with('"')) {
         &s[1..s.len() - 1]
     } else {
         s
@@ -314,7 +325,10 @@ mod tests {
     #[test]
     fn cel_or_operator() {
         let body = json!({"action": "opened"});
-        assert!(evaluate_cel("body.action == 'opened' || body.action == 'reopened'", &body));
+        assert!(evaluate_cel(
+            "body.action == 'opened' || body.action == 'reopened'",
+            &body
+        ));
     }
 
     #[test]
@@ -327,7 +341,9 @@ mod tests {
     #[test]
     fn passes_interceptors_github() {
         let mut event = WebhookEvent::new("push", json!({}));
-        event.headers.insert("x-github-event".to_string(), "push".to_string());
+        event
+            .headers
+            .insert("x-github-event".to_string(), "push".to_string());
         let interceptors = vec![Interceptor::GitHub {
             secret_ref: "my-secret".to_string(),
             event_types: vec!["push".to_string()],
@@ -338,7 +354,9 @@ mod tests {
     #[test]
     fn passes_interceptors_github_filtered() {
         let mut event = WebhookEvent::new("pull_request", json!({}));
-        event.headers.insert("x-github-event".to_string(), "pull_request".to_string());
+        event
+            .headers
+            .insert("x-github-event".to_string(), "pull_request".to_string());
         let interceptors = vec![Interceptor::GitHub {
             secret_ref: "my-secret".to_string(),
             event_types: vec!["push".to_string()],

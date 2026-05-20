@@ -7,14 +7,16 @@
 //! enough that consumers familiar with `cosign sign` and `cosign verify`
 //! can reach for the same verbs without learning a new vocabulary.
 
-use super::manifest::{build_payload, manifest_digest, signature_tag, SignatureIndex, SignatureRecord};
-use super::{sign, verify, Alg, CosignError, KeyPair, PublicKeyHandle, Signature};
+use super::manifest::{
+    SignatureIndex, SignatureRecord, build_payload, manifest_digest, signature_tag,
+};
+use super::{Alg, CosignError, KeyPair, PublicKeyHandle, Signature, sign, verify};
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{get, post},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -155,10 +157,7 @@ async fn generate_keypair(
     (StatusCode::CREATED, Json(pub_handle)).into_response()
 }
 
-async fn get_public_key(
-    State(state): State<Arc<CosignState>>,
-    Path(id): Path<String>,
-) -> Response {
+async fn get_public_key(State(state): State<Arc<CosignState>>, Path(id): Path<String>) -> Response {
     match state.publics.read().unwrap().get(&id) {
         Some(h) => Json(h.clone()).into_response(),
         None => map_err(CosignError::KeyNotFound(id)),
@@ -209,8 +208,8 @@ async fn sign_payload(
         }
     }
 
-    use base64::engine::general_purpose::STANDARD;
     use base64::Engine as _;
+    use base64::engine::general_purpose::STANDARD;
     (
         StatusCode::CREATED,
         Json(SignResponse {
@@ -237,8 +236,8 @@ async fn verify_payload(
         Some(p) => p,
         None => return map_err(CosignError::KeyNotFound(req.key_id)),
     };
-    use base64::engine::general_purpose::STANDARD;
     use base64::Engine as _;
+    use base64::engine::general_purpose::STANDARD;
     let payload = match STANDARD.decode(req.payload_b64) {
         Ok(p) => p,
         Err(e) => return map_err(CosignError::MalformedKey(format!("payload_b64: {e}"))),

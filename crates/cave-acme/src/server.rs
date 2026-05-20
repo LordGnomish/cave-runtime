@@ -24,7 +24,9 @@ pub struct AcmeServer {
 }
 
 impl AcmeServer {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Cite: RFC 8555 §7.3 (newAccount) — when the JWK is already
     /// associated with an account, returns the existing id (idempotent
@@ -54,7 +56,8 @@ impl AcmeServer {
             created_at: Utc::now(),
         };
         acct.validate()?;
-        self.account_by_thumbprint.insert(dedupe_key, acct.id.clone());
+        self.account_by_thumbprint
+            .insert(dedupe_key, acct.id.clone());
         let id = acct.id.clone();
         self.accounts.insert(id.clone(), acct);
         Ok(id)
@@ -70,9 +73,10 @@ impl AcmeServer {
     }
 
     pub fn account(&self, requesting_tenant: &str, id: &str) -> AcmeResult<&Account> {
-        let acct = self.accounts.get(id).ok_or_else(|| {
-            AcmeError::AccountNotFound(id.to_string())
-        })?;
+        let acct = self
+            .accounts
+            .get(id)
+            .ok_or_else(|| AcmeError::AccountNotFound(id.to_string()))?;
         if acct.tenant_id != requesting_tenant {
             return Err(AcmeError::CrossTenantDenied {
                 store: acct.tenant_id.clone(),
@@ -83,9 +87,10 @@ impl AcmeServer {
     }
 
     fn account_mut(&mut self, requesting_tenant: &str, id: &str) -> AcmeResult<&mut Account> {
-        let acct = self.accounts.get_mut(id).ok_or_else(|| {
-            AcmeError::AccountNotFound(id.to_string())
-        })?;
+        let acct = self
+            .accounts
+            .get_mut(id)
+            .ok_or_else(|| AcmeError::AccountNotFound(id.to_string()))?;
         if acct.tenant_id != requesting_tenant {
             return Err(AcmeError::CrossTenantDenied {
                 store: acct.tenant_id.clone(),
@@ -106,7 +111,8 @@ impl AcmeServer {
         let acct = self.account(requesting_tenant, account_id)?;
         if acct.status != AccountStatus::Valid {
             return Err(AcmeError::Unauthorized(format!(
-                "account {} is {:?}", account_id, acct.status,
+                "account {} is {:?}",
+                account_id, acct.status,
             )));
         }
         let order_id = Uuid::new_v4().to_string();
@@ -139,7 +145,9 @@ impl AcmeServer {
     }
 
     pub fn order(&self, requesting_tenant: &str, id: &str) -> AcmeResult<&Order> {
-        let order = self.orders.get(id)
+        let order = self
+            .orders
+            .get(id)
             .ok_or_else(|| AcmeError::Malformed(format!("order {} not found", id)))?;
         if order.tenant_id != requesting_tenant {
             return Err(AcmeError::CrossTenantDenied {
@@ -160,13 +168,20 @@ impl AcmeServer {
         challenge_id: &str,
     ) -> AcmeResult<()> {
         // Find authz containing this challenge
-        let authz_id = self.authorizations.iter()
-            .find(|(_, a)| a.tenant_id == requesting_tenant
-                && a.challenges.iter().any(|c| c.id == challenge_id))
+        let authz_id = self
+            .authorizations
+            .iter()
+            .find(|(_, a)| {
+                a.tenant_id == requesting_tenant
+                    && a.challenges.iter().any(|c| c.id == challenge_id)
+            })
             .map(|(id, _)| id.clone())
-            .ok_or_else(|| AcmeError::ChallengeInvalid(
-                challenge_id.to_string(), "challenge or tenant mismatch".into(),
-            ))?;
+            .ok_or_else(|| {
+                AcmeError::ChallengeInvalid(
+                    challenge_id.to_string(),
+                    "challenge or tenant mismatch".into(),
+                )
+            })?;
         let authz = self.authorizations.get_mut(&authz_id).unwrap();
         for ch in authz.challenges.iter_mut() {
             if ch.id == challenge_id {
@@ -177,14 +192,17 @@ impl AcmeServer {
         authz.status = AuthzStatus::Valid;
 
         // Promote the order if every authorization is now valid
-        let order_id = self.orders.values()
+        let order_id = self
+            .orders
+            .values()
             .find(|o| o.authorization_ids.iter().any(|id| id == &authz_id))
             .map(|o| o.id.clone());
         if let Some(order_id) = order_id {
             let all_valid = {
                 let order = &self.orders[&order_id];
                 order.authorization_ids.iter().all(|aid| {
-                    self.authorizations.get(aid)
+                    self.authorizations
+                        .get(aid)
                         .map(|a| a.status == AuthzStatus::Valid)
                         .unwrap_or(false)
                 })
@@ -208,7 +226,9 @@ impl AcmeServer {
         order_id: &str,
         certificate_url: impl Into<String>,
     ) -> AcmeResult<()> {
-        let order = self.orders.get_mut(order_id)
+        let order = self
+            .orders
+            .get_mut(order_id)
             .ok_or_else(|| AcmeError::Malformed(format!("order {} not found", order_id)))?;
         if order.tenant_id != requesting_tenant {
             return Err(AcmeError::CrossTenantDenied {
@@ -228,15 +248,20 @@ impl AcmeServer {
         Ok(())
     }
 
-    pub fn account_count(&self) -> usize { self.accounts.len() }
-    pub fn order_count(&self) -> usize { self.orders.len() }
-    pub fn authorization_count(&self) -> usize { self.authorizations.len() }
+    pub fn account_count(&self) -> usize {
+        self.accounts.len()
+    }
+    pub fn order_count(&self) -> usize {
+        self.orders.len()
+    }
+    pub fn authorization_count(&self) -> usize {
+        self.authorizations.len()
+    }
 }
 
 fn make_challenge(authz_id: &str, kind: ChallengeType) -> Challenge {
     use base64::Engine as _;
-    let token = base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .encode(Uuid::new_v4().as_bytes());
+    let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(Uuid::new_v4().as_bytes());
     Challenge {
         id: Uuid::new_v4().to_string(),
         kind,

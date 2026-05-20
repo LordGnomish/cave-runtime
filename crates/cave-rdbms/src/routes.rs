@@ -5,11 +5,11 @@
 use crate::engine::Engine;
 use crate::models::*;
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
 use std::sync::Arc;
 
@@ -30,10 +30,7 @@ pub fn create_router(state: Arc<RdbmsState>) -> Router {
     Router::new()
         .route("/api/rdbms/health", get(health))
         .route("/api/rdbms/databases", get(databases))
-        .route(
-            "/api/rdbms/databases/{db}/schemas",
-            get(schemas),
-        )
+        .route("/api/rdbms/databases/{db}/schemas", get(schemas))
         .route(
             "/api/rdbms/databases/{db}/schemas/{schema}/tables",
             get(tables),
@@ -84,11 +81,19 @@ async fn tables(
     let database = state.engine.get_database().await;
     if let Some(s) = database.schemas.get(&schema) {
         let table_names: Vec<_> = s.tables.keys().cloned().collect();
-        (StatusCode::OK, Json(serde_json::json!({
-            "tables": table_names
-        }))).into_response()
+        (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "tables": table_names
+            })),
+        )
+            .into_response()
     } else {
-        (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "schema not found"}))).into_response()
+        (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "schema not found"})),
+        )
+            .into_response()
     }
 }
 
@@ -117,7 +122,11 @@ async fn table_info(
             .into_response();
         }
     }
-    (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "table not found"}))).into_response()
+    (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({"error": "table not found"})),
+    )
+        .into_response()
 }
 
 async fn table_rows(
@@ -130,11 +139,7 @@ async fn table_rows(
             let rows: Vec<Vec<serde_json::Value>> = t
                 .rows
                 .iter()
-                .map(|row| {
-                    row.iter()
-                        .map(|v| v.to_json())
-                        .collect()
-                })
+                .map(|row| row.iter().map(|v| v.to_json()).collect())
                 .collect();
             return Json(serde_json::json!({
                 "rows": rows,
@@ -143,7 +148,11 @@ async fn table_rows(
             .into_response();
         }
     }
-    (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "table not found"}))).into_response()
+    (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({"error": "table not found"})),
+    )
+        .into_response()
 }
 
 async fn exec(

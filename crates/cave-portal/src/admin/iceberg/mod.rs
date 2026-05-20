@@ -16,11 +16,11 @@
 //! Real-runtime wiring goes through the Iceberg REST API (`/v1/{prefix}/...`)
 //! which lives outside this module.
 
-pub mod tables;
-pub mod snapshots;
+pub mod manifests;
 pub mod partitions;
 pub mod schemas;
-pub mod manifests;
+pub mod snapshots;
+pub mod tables;
 pub mod types;
 
 pub use types::{

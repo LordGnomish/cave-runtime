@@ -63,7 +63,10 @@ pub struct SortOrder {
 impl SortOrder {
     /// The Iceberg default — order-id 0, empty fields (unsorted).
     pub fn unsorted() -> Self {
-        Self { order_id: 0, fields: vec![] }
+        Self {
+            order_id: 0,
+            fields: vec![],
+        }
     }
 
     pub fn is_unsorted(&self) -> bool {
@@ -98,7 +101,8 @@ mod tests {
     fn sort_order_serializes_with_kebab_case() {
         let mut o = SortOrder::default();
         o.order_id = 1;
-        o.fields.push(SortField::new(1, Transform::Identity, SortDirection::Asc));
+        o.fields
+            .push(SortField::new(1, Transform::Identity, SortDirection::Asc));
         let j = serde_json::to_value(&o).unwrap();
         assert_eq!(j["fields"][0]["direction"], "asc");
         assert_eq!(j["fields"][0]["null-order"], "nulls-first");

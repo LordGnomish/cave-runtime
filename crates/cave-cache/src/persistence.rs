@@ -13,8 +13,8 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock;
 
 use crate::db::{Db, ServerState};
-use crate::resp::encode_resp2;
 use crate::resp::Resp;
+use crate::resp::encode_resp2;
 
 // ── AOF ───────────────────────────────────────────────────────────────────────
 
@@ -80,7 +80,10 @@ pub async fn bgsave_task(state: Arc<ServerState>) -> io::Result<()> {
         // Resize DB opcode
         data.push(0xFB); // RESIZEDB
         write_length(&mut data, db.keys.len());
-        write_length(&mut data, db.keys.values().filter(|e| e.expires_at.is_some()).count());
+        write_length(
+            &mut data,
+            db.keys.values().filter(|e| e.expires_at.is_some()).count(),
+        );
 
         // Write each key
         for (key, entry) in &db.keys {
@@ -105,10 +108,10 @@ pub async fn bgsave_task(state: Arc<ServerState>) -> io::Result<()> {
             // Type byte
             let type_byte: u8 = match &entry.value {
                 crate::types::Value::String(_) => 0,
-                crate::types::Value::List(_) => 10,   // listpack encoding
-                crate::types::Value::Set(_) => 11,    // listpack encoding
-                crate::types::Value::ZSet(_) => 17,   // listpack encoding
-                crate::types::Value::Hash(_) => 16,   // listpack encoding
+                crate::types::Value::List(_) => 10, // listpack encoding
+                crate::types::Value::Set(_) => 11,  // listpack encoding
+                crate::types::Value::ZSet(_) => 17, // listpack encoding
+                crate::types::Value::Hash(_) => 16, // listpack encoding
                 crate::types::Value::Stream(_) => 19, // stream listpack v3
             };
             data.push(type_byte);
@@ -205,9 +208,9 @@ pub async fn save_scheduler_task(state: Arc<ServerState>) {
         let dirty = state.dirty.load(std::sync::atomic::Ordering::Relaxed);
         let elapsed = last_save.elapsed().as_secs();
 
-        let should_save = intervals.iter().any(|(secs, changes)| {
-            elapsed >= *secs && dirty >= *changes
-        });
+        let should_save = intervals
+            .iter()
+            .any(|(secs, changes)| elapsed >= *secs && dirty >= *changes);
 
         if should_save && dirty > 0 {
             match bgsave_task(Arc::clone(&state)).await {

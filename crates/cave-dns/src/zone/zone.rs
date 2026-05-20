@@ -51,12 +51,7 @@ impl Zone {
     }
 
     /// Remove all records matching name + type; optionally match rdata too.
-    pub fn remove_record(
-        &mut self,
-        name: &Name,
-        rtype: RecordType,
-        rdata: Option<&RData>,
-    ) {
+    pub fn remove_record(&mut self, name: &Name, rtype: RecordType, rdata: Option<&RData>) {
         let key = (name.clone(), rtype);
         if let Some(rdata_filter) = rdata {
             if let Some(vec) = self.records.get_mut(&key) {
@@ -95,11 +90,7 @@ impl Zone {
     }
 
     /// Lookup with wildcard synthesis (RFC 4592).
-    pub fn lookup_with_wildcards(
-        &self,
-        name: &Name,
-        qtype: RecordType,
-    ) -> LookupResult {
+    pub fn lookup_with_wildcards(&self, name: &Name, qtype: RecordType) -> LookupResult {
         // 1. Exact match
         let exact = self.lookup(name, qtype);
         if !exact.is_empty() {
@@ -167,7 +158,10 @@ impl Zone {
 
     /// All records in the zone (for AXFR).
     pub fn all_records(&self) -> Vec<Record> {
-        self.records.values().flat_map(|v| v.iter().cloned()).collect()
+        self.records
+            .values()
+            .flat_map(|v| v.iter().cloned())
+            .collect()
     }
 
     /// All records in canonical RFC 5936 AXFR order: SOA, others, SOA again.
@@ -278,8 +272,18 @@ mod tests {
     fn axfr_records_starts_and_ends_with_soa() {
         let zone = make_zone();
         let records = zone.axfr_records();
-        assert!(records.first().map(|r| r.record_type() == RecordType::SOA).unwrap_or(false));
-        assert!(records.last().map(|r| r.record_type() == RecordType::SOA).unwrap_or(false));
+        assert!(
+            records
+                .first()
+                .map(|r| r.record_type() == RecordType::SOA)
+                .unwrap_or(false)
+        );
+        assert!(
+            records
+                .last()
+                .map(|r| r.record_type() == RecordType::SOA)
+                .unwrap_or(false)
+        );
     }
 
     #[test]
@@ -288,10 +292,8 @@ mod tests {
         // Add a wildcard record
         zone.add_record(a_record("*.example.com.", Ipv4Addr::new(9, 9, 9, 9)));
 
-        let result = zone.lookup_with_wildcards(
-            &"anything.example.com.".parse().unwrap(),
-            RecordType::A,
-        );
+        let result =
+            zone.lookup_with_wildcards(&"anything.example.com.".parse().unwrap(), RecordType::A);
         assert!(!result.records.is_empty());
         assert!(result.was_wildcard);
         // Synthesised record name should be the query name

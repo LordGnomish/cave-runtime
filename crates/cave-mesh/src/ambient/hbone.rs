@@ -60,7 +60,10 @@ pub struct HboneRequest {
 impl HboneRequest {
     /// Read the tenant out of the Baggage header, if any.
     pub fn baggage_tenant(&self) -> Option<&str> {
-        self.baggage.iter().find(|(k, _)| k == "tenant").map(|(_, v)| v.as_str())
+        self.baggage
+            .iter()
+            .find(|(k, _)| k == "tenant")
+            .map(|(_, v)| v.as_str())
     }
 
     /// Concatenate `host` + `:` + `port` — what goes into `:authority`.
@@ -102,11 +105,17 @@ pub fn parse_request(headers: &[(&str, &str)]) -> Result<HboneRequest, HboneErro
     }
 
     let (host, port) = split_authority(&authority)?;
-    Ok(HboneRequest { host, port, baggage })
+    Ok(HboneRequest {
+        host,
+        port,
+        baggage,
+    })
 }
 
 fn split_authority(s: &str) -> Result<(String, u16), HboneError> {
-    let (h, p) = s.rsplit_once(':').ok_or_else(|| HboneError::BadAuthority(s.into()))?;
+    let (h, p) = s
+        .rsplit_once(':')
+        .ok_or_else(|| HboneError::BadAuthority(s.into()))?;
     if h.is_empty() {
         return Err(HboneError::BadAuthority(s.into()));
     }
@@ -170,7 +179,11 @@ mod tests {
         path: &'a str,
         baggage: Option<&'a str>,
     ) -> Vec<(&'a str, &'a str)> {
-        let mut v = vec![(":method", method), (":authority", authority), (":path", path)];
+        let mut v = vec![
+            (":method", method),
+            (":authority", authority),
+            (":path", path),
+        ];
         if let Some(b) = baggage {
             v.push(("baggage", b));
         }
@@ -179,13 +192,14 @@ mod tests {
 
     #[test]
     fn parses_valid_connect_request() {
-        let (_cite, tenant) = ambient_test_ctx!(
-            "pkg/hbone/server.go",
-            "ServeHTTP",
-            "acme"
-        );
-        let req = parse_request(&h("CONNECT", "10.0.0.42:8080", "/", Some("tenant=acme,workload=web")))
-            .unwrap();
+        let (_cite, tenant) = ambient_test_ctx!("pkg/hbone/server.go", "ServeHTTP", "acme");
+        let req = parse_request(&h(
+            "CONNECT",
+            "10.0.0.42:8080",
+            "/",
+            Some("tenant=acme,workload=web"),
+        ))
+        .unwrap();
         assert_eq!(req.host, "10.0.0.42");
         assert_eq!(req.port, 8080);
         assert_eq!(req.target(), "10.0.0.42:8080");
@@ -206,33 +220,24 @@ mod tests {
 
     #[test]
     fn rejects_non_root_path() {
-        let (_cite, _t) = ambient_test_ctx!(
-            "pkg/hbone/server.go",
-            "ServeHTTP",
-            "tenant-hbone-bad-path"
-        );
+        let (_cite, _t) =
+            ambient_test_ctx!("pkg/hbone/server.go", "ServeHTTP", "tenant-hbone-bad-path");
         let err = parse_request(&h("CONNECT", "10.0.0.42:8080", "/v1", None)).unwrap_err();
         assert!(matches!(err, HboneError::BadPath(_)));
     }
 
     #[test]
     fn rejects_authority_without_port() {
-        let (_cite, _t) = ambient_test_ctx!(
-            "pkg/hbone/server.go",
-            "ServeHTTP",
-            "tenant-hbone-bad-auth"
-        );
+        let (_cite, _t) =
+            ambient_test_ctx!("pkg/hbone/server.go", "ServeHTTP", "tenant-hbone-bad-auth");
         let err = parse_request(&h("CONNECT", "10.0.0.42", "/", None)).unwrap_err();
         assert!(matches!(err, HboneError::BadAuthority(_)));
     }
 
     #[test]
     fn rejects_zero_port() {
-        let (_cite, _t) = ambient_test_ctx!(
-            "pkg/hbone/server.go",
-            "ServeHTTP",
-            "tenant-hbone-zero-port"
-        );
+        let (_cite, _t) =
+            ambient_test_ctx!("pkg/hbone/server.go", "ServeHTTP", "tenant-hbone-zero-port");
         let err = parse_request(&h("CONNECT", "10.0.0.42:0", "/", None)).unwrap_err();
         assert!(matches!(err, HboneError::BadPort(_)));
     }
@@ -245,19 +250,19 @@ mod tests {
             "tenant-hbone-baggage-fmt"
         );
         let parsed = parse_baggage("tenant = acme ;property, workload= web ;a=b");
-        assert_eq!(parsed, vec![
-            ("tenant".to_string(), "acme".to_string()),
-            ("workload".to_string(), "web".to_string()),
-        ]);
+        assert_eq!(
+            parsed,
+            vec![
+                ("tenant".to_string(), "acme".to_string()),
+                ("workload".to_string(), "web".to_string()),
+            ]
+        );
     }
 
     #[test]
     fn authorise_refuses_when_baggage_tenant_mismatches() {
-        let (_cite, attacker) = ambient_test_ctx!(
-            "pkg/hbone/server.go",
-            "ServeHTTP",
-            "tenant-attacker"
-        );
+        let (_cite, attacker) =
+            ambient_test_ctx!("pkg/hbone/server.go", "ServeHTTP", "tenant-attacker");
         let req = parse_request(&h("CONNECT", "10.0.0.42:8080", "/", Some("tenant=acme"))).unwrap();
         let err = authorise(&req, &attacker).unwrap_err();
         assert!(matches!(err, HboneError::TenantDenied { .. }));
@@ -265,11 +270,8 @@ mod tests {
 
     #[test]
     fn accept_response_uses_status_200() {
-        let (_cite, _t) = ambient_test_ctx!(
-            "pkg/hbone/server.go",
-            "writeResponse",
-            "tenant-hbone-resp"
-        );
+        let (_cite, _t) =
+            ambient_test_ctx!("pkg/hbone/server.go", "writeResponse", "tenant-hbone-resp");
         let r = accept_response_headers();
         assert_eq!(r.first().map(|(k, _)| *k), Some(":status"));
         assert_eq!(r.first().map(|(_, v)| v.as_str()), Some("200"));

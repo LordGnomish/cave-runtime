@@ -29,7 +29,12 @@ pub struct ProducerState {
 }
 
 impl ProducerState {
-    pub fn new(producer_id: i64, epoch: i16, transaction_id: Option<String>, txn_timeout_ms: i32) -> Self {
+    pub fn new(
+        producer_id: i64,
+        epoch: i16,
+        transaction_id: Option<String>,
+        txn_timeout_ms: i32,
+    ) -> Self {
         Self {
             producer_id,
             epoch,
@@ -305,10 +310,9 @@ impl TransactionCoordinator {
     // ── Describe transactions ─────────────────────────────────────────────────
 
     pub fn describe_transaction(&self, transactional_id: &str) -> StreamsResult<TxnSummary> {
-        let txn = self
-            .transactions
-            .get(transactional_id)
-            .ok_or_else(|| StreamsError::InvalidTxnState(format!("{transactional_id} not found")))?;
+        let txn = self.transactions.get(transactional_id).ok_or_else(|| {
+            StreamsError::InvalidTxnState(format!("{transactional_id} not found"))
+        })?;
         Ok(TxnSummary {
             transactional_id: txn.transactional_id.clone(),
             producer_id: txn.producer_id,
@@ -374,7 +378,9 @@ mod tests {
     fn init_idempotent_producer() {
         let c = coordinator();
         let counter = AtomicI64::new(1);
-        let (pid, epoch) = c.init_producer(None, 60000, || counter.fetch_add(1, Ordering::SeqCst)).unwrap();
+        let (pid, epoch) = c
+            .init_producer(None, 60000, || counter.fetch_add(1, Ordering::SeqCst))
+            .unwrap();
         assert!(pid >= 1);
         assert_eq!(epoch, 0);
     }
@@ -384,14 +390,18 @@ mod tests {
         let c = coordinator();
         let counter = AtomicI64::new(100);
         let (pid, epoch) = c
-            .init_producer(Some("my-txn".into()), 60000, || counter.fetch_add(1, Ordering::SeqCst))
+            .init_producer(Some("my-txn".into()), 60000, || {
+                counter.fetch_add(1, Ordering::SeqCst)
+            })
             .unwrap();
         assert!(pid >= 100);
         assert_eq!(epoch, 0);
 
         // Re-init bumps epoch
         let (pid2, epoch2) = c
-            .init_producer(Some("my-txn".into()), 60000, || counter.fetch_add(1, Ordering::SeqCst))
+            .init_producer(Some("my-txn".into()), 60000, || {
+                counter.fetch_add(1, Ordering::SeqCst)
+            })
             .unwrap();
         assert_eq!(pid, pid2);
         assert_eq!(epoch2, 1);
@@ -402,10 +412,13 @@ mod tests {
         let c = coordinator();
         let counter = AtomicI64::new(1);
         let (pid, epoch) = c
-            .init_producer(Some("txn-1".into()), 60000, || counter.fetch_add(1, Ordering::SeqCst))
+            .init_producer(Some("txn-1".into()), 60000, || {
+                counter.fetch_add(1, Ordering::SeqCst)
+            })
             .unwrap();
 
-        c.add_partitions_to_txn("txn-1", pid, epoch, vec![("orders".into(), 0)]).unwrap();
+        c.add_partitions_to_txn("txn-1", pid, epoch, vec![("orders".into(), 0)])
+            .unwrap();
         c.end_txn("txn-1", pid, epoch, true).unwrap();
 
         let desc = c.describe_transaction("txn-1").unwrap();
@@ -416,7 +429,9 @@ mod tests {
     fn sequence_check_idempotent() {
         let c = coordinator();
         let counter = AtomicI64::new(50);
-        let (pid, _) = c.init_producer(None, 30000, || counter.fetch_add(1, Ordering::SeqCst)).unwrap();
+        let (pid, _) = c
+            .init_producer(None, 30000, || counter.fetch_add(1, Ordering::SeqCst))
+            .unwrap();
         c.check_sequence(pid, "topic", 0, 0).unwrap();
         c.check_sequence(pid, "topic", 0, 1).unwrap();
         // Retry of seq 0 should also be ok (idempotent)

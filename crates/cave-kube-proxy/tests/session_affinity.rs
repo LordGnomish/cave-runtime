@@ -29,9 +29,11 @@ fn svc_with_affinity(ttl: Option<u32>) -> ServicePortInfo {
 
 fn endpoints_for(name: &ServicePortName) -> EndpointSliceMap {
     let mut m = EndpointSliceMap::new(TENANT);
-    m.upsert_slice(name.clone(), "slice-1", vec![
-        EndpointInfo::ready("10.1.0.1".parse().unwrap(), 8080),
-    ]);
+    m.upsert_slice(
+        name.clone(),
+        "slice-1",
+        vec![EndpointInfo::ready("10.1.0.1".parse().unwrap(), 8080)],
+    );
     m
 }
 
@@ -50,8 +52,10 @@ fn no_affinity_emits_no_recent_rule() {
     );
     let eps = endpoints_for(&s.name);
     let rules = p.build_svc_chain_rules(&s, &eps).unwrap();
-    assert!(rules.iter().all(|r| !r.contains("--rcheck")),
-        "no affinity → no -m recent rule");
+    assert!(
+        rules.iter().all(|r| !r.contains("--rcheck")),
+        "no affinity → no -m recent rule"
+    );
 }
 
 /// Cite: `pkg/proxy/serviceport.go:115` (StickyMaxAgeSeconds) +
@@ -64,7 +68,10 @@ fn iptables_emits_recent_rcheck_for_clientip_affinity() {
     let s = svc_with_affinity(Some(7200));
     let eps = endpoints_for(&s.name);
     let rules = p.build_svc_chain_rules(&s, &eps).unwrap();
-    let affinity = rules.iter().find(|r| r.contains("--rcheck")).expect("affinity rule emitted");
+    let affinity = rules
+        .iter()
+        .find(|r| r.contains("--rcheck"))
+        .expect("affinity rule emitted");
     assert!(affinity.contains("--seconds 7200"));
     assert!(affinity.contains("-AFFINITY"));
 }
@@ -80,7 +87,10 @@ fn iptables_falls_back_to_10800s_default_when_ttl_unset() {
     let eps = endpoints_for(&s.name);
     let rules = p.build_svc_chain_rules(&s, &eps).unwrap();
     let affinity = rules.iter().find(|r| r.contains("--rcheck")).unwrap();
-    assert!(affinity.contains("--seconds 10800"), "default sticky TTL = 3 hours");
+    assert!(
+        affinity.contains("--seconds 10800"),
+        "default sticky TTL = 3 hours"
+    );
 }
 
 /// Cite: `pkg/proxy/nftables/proxier.go` per-service affinity — the
@@ -92,7 +102,9 @@ fn nftables_emits_saddr_set_with_timeout_for_clientip_affinity() {
     let s = svc_with_affinity(Some(900));
     let eps = endpoints_for(&s.name);
     let rules = p.build_svc_chain_rules(&s, &eps).unwrap();
-    let line = rules.iter().find(|r| r.contains("ip saddr @"))
+    let line = rules
+        .iter()
+        .find(|r| r.contains("ip saddr @"))
         .expect("nftables affinity rule emitted");
     assert!(line.contains("-affinity"));
     assert!(line.contains("timeout 900s"));

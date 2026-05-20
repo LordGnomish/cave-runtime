@@ -8,10 +8,10 @@
 //!
 //! Upstream: <https://twenty.com/docs>
 
+use super::CrmViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
-use super::CrmViewError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActivityRow {
@@ -19,7 +19,10 @@ pub struct ActivityRow {
     pub activity_type: &'static str,
 }
 
-pub fn list_activities(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<ActivityRow>, CrmViewError> {
+pub fn list_activities(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<ActivityRow>, CrmViewError> {
     let contacts = super::contacts::list_contacts(state, ctx)?;
     Ok(contacts
         .iter()
@@ -62,7 +65,12 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, CrmViewErr
         n = rows.len(),
         tbl = table(&["account", "activity_type"], &table_rows),
     );
-    Ok(page_shell_full(ctx, "/admin/crm/activities", &format!("crm/activities · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/crm/activities",
+        &format!("crm/activities · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
 }
 
 #[cfg(test)]
@@ -74,8 +82,13 @@ mod tests {
 
     #[test]
     fn list_one_activity_per_contact() {
-        let contacts = super::super::contacts::list_contacts(&AdminState::seeded(), &ctx(&[Permission::CrmRead])).unwrap();
-        let activities = list_activities(&AdminState::seeded(), &ctx(&[Permission::CrmRead])).unwrap();
+        let contacts = super::super::contacts::list_contacts(
+            &AdminState::seeded(),
+            &ctx(&[Permission::CrmRead]),
+        )
+        .unwrap();
+        let activities =
+            list_activities(&AdminState::seeded(), &ctx(&[Permission::CrmRead])).unwrap();
         assert_eq!(activities.len(), contacts.len());
     }
 
@@ -83,7 +96,10 @@ mod tests {
     fn high_mrr_gets_business_review() {
         let rows = list_activities(&AdminState::seeded(), &ctx(&[Permission::CrmRead])).unwrap();
         // Acme Robotics has mrr_cents=1_000_000 → BUSINESS_REVIEW.
-        assert!(rows.iter().any(|r| r.account == "Acme Robotics" && r.activity_type == "BUSINESS_REVIEW"));
+        assert!(
+            rows.iter()
+                .any(|r| r.account == "Acme Robotics" && r.activity_type == "BUSINESS_REVIEW")
+        );
     }
 
     #[test]

@@ -58,12 +58,7 @@ impl ExchangePolicy {
     }
 
     pub fn decide(&self, client_id: &str, audience: &str) -> PolicyDecision {
-        if self
-            .wildcard_clients
-            .lock()
-            .unwrap()
-            .contains(client_id)
-        {
+        if self.wildcard_clients.lock().unwrap().contains(client_id) {
             return PolicyDecision::Allow;
         }
         if self

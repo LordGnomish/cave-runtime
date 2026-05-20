@@ -6,9 +6,9 @@
 //! the actual KV/PKI/transit/SSH/TOTP backends; the shim translates
 //! Vault's CLI shape into routed requests.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Subcommand;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::native::{HttpVerb, PreparedRequest};
 
@@ -173,7 +173,11 @@ pub fn prepare(cmd: &VaultCmd) -> Result<PreparedRequest> {
         VaultCmd::Token { cmd } => prepare_token(cmd),
         VaultCmd::Login { method, params } => {
             if !LOGIN_METHODS.contains(&method.as_str()) {
-                bail!("unknown auth method `{}`; want one of {:?}", method, LOGIN_METHODS);
+                bail!(
+                    "unknown auth method `{}`; want one of {:?}",
+                    method,
+                    LOGIN_METHODS
+                );
             }
             let kvs = parse_kv(params).unwrap_or_else(|_| json!({}));
             Ok(PreparedRequest::new(
@@ -192,7 +196,11 @@ pub fn prepare(cmd: &VaultCmd) -> Result<PreparedRequest> {
 fn prepare_kv(cmd: &KvCmd) -> Result<PreparedRequest> {
     match cmd {
         KvCmd::Get { path, version } => {
-            let mut p = format!("/api/compat/vault/v1/{}/data/{}", split_mount(path)?.0, split_mount(path)?.1);
+            let mut p = format!(
+                "/api/compat/vault/v1/{}/data/{}",
+                split_mount(path)?.0,
+                split_mount(path)?.1
+            );
             if let Some(v) = version {
                 p.push_str(&format!("?version={}", v));
             }
@@ -423,11 +431,13 @@ mod tests {
 
     #[test]
     fn write_rejects_bad_kv() {
-        assert!(prepare(&VaultCmd::Write {
-            path: "x".into(),
-            kv: vec!["no_equals".into()],
-        })
-        .is_err());
+        assert!(
+            prepare(&VaultCmd::Write {
+                path: "x".into(),
+                kv: vec!["no_equals".into()],
+            })
+            .is_err()
+        );
     }
 
     #[test]
@@ -513,24 +523,28 @@ mod tests {
 
     #[test]
     fn kv_undelete_requires_versions() {
-        assert!(prepare(&VaultCmd::Kv {
-            cmd: KvCmd::Undelete {
-                path: "secret/x".into(),
-                versions: vec![],
-            },
-        })
-        .is_err());
+        assert!(
+            prepare(&VaultCmd::Kv {
+                cmd: KvCmd::Undelete {
+                    path: "secret/x".into(),
+                    versions: vec![],
+                },
+            })
+            .is_err()
+        );
     }
 
     #[test]
     fn kv_destroy_requires_versions() {
-        assert!(prepare(&VaultCmd::Kv {
-            cmd: KvCmd::Destroy {
-                path: "secret/x".into(),
-                versions: vec![],
-            },
-        })
-        .is_err());
+        assert!(
+            prepare(&VaultCmd::Kv {
+                cmd: KvCmd::Destroy {
+                    path: "secret/x".into(),
+                    versions: vec![],
+                },
+            })
+            .is_err()
+        );
     }
 
     #[test]
@@ -577,13 +591,15 @@ mod tests {
 
     #[test]
     fn auth_enable_rejects_unknown() {
-        assert!(prepare(&VaultCmd::Auth {
-            cmd: AuthCmd::Enable {
-                kind: "voodoo".into(),
-                path: None,
-            },
-        })
-        .is_err());
+        assert!(
+            prepare(&VaultCmd::Auth {
+                cmd: AuthCmd::Enable {
+                    kind: "voodoo".into(),
+                    path: None,
+                },
+            })
+            .is_err()
+        );
     }
 
     #[test]
@@ -612,13 +628,15 @@ mod tests {
 
     #[test]
     fn secrets_enable_rejects_unknown() {
-        assert!(prepare(&VaultCmd::Secrets {
-            cmd: SecretsCmd::Enable {
-                kind: "blockchain".into(),
-                path: None,
-            },
-        })
-        .is_err());
+        assert!(
+            prepare(&VaultCmd::Secrets {
+                cmd: SecretsCmd::Enable {
+                    kind: "blockchain".into(),
+                    path: None,
+                },
+            })
+            .is_err()
+        );
     }
 
     #[test]
@@ -738,11 +756,13 @@ mod tests {
 
     #[test]
     fn login_rejects_unknown_method() {
-        assert!(prepare(&VaultCmd::Login {
-            method: "telepathy".into(),
-            params: vec![],
-        })
-        .is_err());
+        assert!(
+            prepare(&VaultCmd::Login {
+                method: "telepathy".into(),
+                params: vec![],
+            })
+            .is_err()
+        );
     }
 
     #[test]

@@ -77,7 +77,10 @@ impl ScaffolderPlugin {
     }
 
     pub fn list_by_category(&self, cat: &str) -> Vec<&Template> {
-        self.templates.iter().filter(|t| t.category == cat).collect()
+        self.templates
+            .iter()
+            .filter(|t| t.category == cat)
+            .collect()
     }
 
     pub fn find(&self, id: &str) -> Option<&Template> {
@@ -97,7 +100,7 @@ impl ScaffolderPlugin {
             let value = params.get(&tp.name);
             match (value, &tp.default, tp.required) {
                 (None, None, true) => {
-                    return Err(ScaffolderError::MissingRequired(tp.name.clone()))
+                    return Err(ScaffolderError::MissingRequired(tp.name.clone()));
                 }
                 (None, _, _) => continue, // optional or has default
                 (Some(v), _, _) => Self::check_value(tp, v)?,
@@ -218,7 +221,8 @@ mod tests {
     #[test]
     fn validate_missing_required() {
         let mut s = ScaffolderPlugin::new();
-        s.register(template("t1", vec![req("name", ParamKind::String)])).unwrap();
+        s.register(template("t1", vec![req("name", ParamKind::String)]))
+            .unwrap();
         let p = HashMap::new();
         let err = s.validate_params("t1", &p).unwrap_err();
         assert!(matches!(err, ScaffolderError::MissingRequired(n) if n == "name"));
@@ -265,7 +269,8 @@ mod tests {
     #[test]
     fn validate_string_empty_rejected() {
         let mut s = ScaffolderPlugin::new();
-        s.register(template("t1", vec![req("name", ParamKind::String)])).unwrap();
+        s.register(template("t1", vec![req("name", ParamKind::String)]))
+            .unwrap();
         let mut p = HashMap::new();
         p.insert("name".into(), "".into());
         let err = s.validate_params("t1", &p).unwrap_err();
@@ -275,7 +280,8 @@ mod tests {
     #[test]
     fn validate_number_format() {
         let mut s = ScaffolderPlugin::new();
-        s.register(template("t1", vec![req("count", ParamKind::Number)])).unwrap();
+        s.register(template("t1", vec![req("count", ParamKind::Number)]))
+            .unwrap();
         let mut p = HashMap::new();
         p.insert("count".into(), "abc".into());
         let err = s.validate_params("t1", &p).unwrap_err();
@@ -285,7 +291,8 @@ mod tests {
     #[test]
     fn validate_number_accepts_negative() {
         let mut s = ScaffolderPlugin::new();
-        s.register(template("t1", vec![req("count", ParamKind::Number)])).unwrap();
+        s.register(template("t1", vec![req("count", ParamKind::Number)]))
+            .unwrap();
         let mut p = HashMap::new();
         p.insert("count".into(), "-42".into());
         assert!(s.validate_params("t1", &p).is_ok());
@@ -294,7 +301,8 @@ mod tests {
     #[test]
     fn validate_bool_strict() {
         let mut s = ScaffolderPlugin::new();
-        s.register(template("t1", vec![req("flag", ParamKind::Bool)])).unwrap();
+        s.register(template("t1", vec![req("flag", ParamKind::Bool)]))
+            .unwrap();
         let mut p = HashMap::new();
         p.insert("flag".into(), "yes".into());
         let err = s.validate_params("t1", &p).unwrap_err();

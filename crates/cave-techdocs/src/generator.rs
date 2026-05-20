@@ -17,11 +17,7 @@ pub trait TechDocsGenerator: Send + Sync {
     /// Generate documentation from `source_dir` into `output_dir`.
     ///
     /// Upstream: generateDocs(entity, source, output) in TechDocsGenerator.ts
-    async fn generate(
-        &self,
-        source_dir: &Path,
-        output_dir: &Path,
-    ) -> Result<(), TechDocsError>;
+    async fn generate(&self, source_dir: &Path, output_dir: &Path) -> Result<(), TechDocsError>;
 }
 
 /// No-op generator — passes source through without running mkdocs.
@@ -31,11 +27,7 @@ pub struct NoopGenerator;
 
 #[async_trait]
 impl TechDocsGenerator for NoopGenerator {
-    async fn generate(
-        &self,
-        _source_dir: &Path,
-        _output_dir: &Path,
-    ) -> Result<(), TechDocsError> {
+    async fn generate(&self, _source_dir: &Path, _output_dir: &Path) -> Result<(), TechDocsError> {
         Ok(())
     }
 }

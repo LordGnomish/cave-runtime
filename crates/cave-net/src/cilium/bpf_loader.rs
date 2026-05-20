@@ -110,16 +110,22 @@ impl BpfLoader {
     /// Load a program. Mirrors `loader.LoadCollection`.
     pub fn load(&mut self, prog: BpfProgram) -> Result<(), LoaderError> {
         let verdict = simulated_verifier(&prog);
-        self.verifier_log.insert(prog.section.clone(), verdict.clone());
+        self.verifier_log
+            .insert(prog.section.clone(), verdict.clone());
         if !verdict.ok {
-            return Err(LoaderError::VerifierRejected(prog.section.clone(), verdict.log));
+            return Err(LoaderError::VerifierRejected(
+                prog.section.clone(),
+                verdict.log,
+            ));
         }
         self.loaded.insert(prog.section.clone(), prog);
         Ok(())
     }
 
     pub fn unload(&mut self, section: &str) -> Result<(), LoaderError> {
-        self.loaded.remove(section).ok_or_else(|| LoaderError::ProgNotLoaded(section.to_string()))?;
+        self.loaded
+            .remove(section)
+            .ok_or_else(|| LoaderError::ProgNotLoaded(section.to_string()))?;
         self.attached.retain(|_, sec| sec != section);
         Ok(())
     }
@@ -175,7 +181,10 @@ fn simulated_verifier(prog: &BpfProgram) -> VerifierResult {
     if prog.instructions > 1_000_000 {
         return VerifierResult {
             ok: false,
-            log: format!("program too large: {} instructions (max 1M)", prog.instructions),
+            log: format!(
+                "program too large: {} instructions (max 1M)",
+                prog.instructions
+            ),
         };
     }
     for m in &prog.map_refs {
@@ -186,7 +195,10 @@ fn simulated_verifier(prog: &BpfProgram) -> VerifierResult {
             };
         }
     }
-    VerifierResult { ok: true, log: "verifier accepted".into() }
+    VerifierResult {
+        ok: true,
+        log: "verifier accepted".into(),
+    }
 }
 
 #[allow(dead_code)]
@@ -212,17 +224,28 @@ mod tests {
     }
 
     fn attach(kind: BpfProgKind, iface: &str, dir: AttachDirection) -> AttachPoint {
-        AttachPoint { kind, iface_or_cgroup: iface.into(), direction: dir }
+        AttachPoint {
+            kind,
+            iface_or_cgroup: iface.into(),
+            direction: dir,
+        }
     }
 
     // ── ProgKind ───────────────────────────────────────────────────────────
 
     #[test]
     fn prog_kind_names_match_kernel() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "ProgKind.Name", "tenant-bl-pn");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "ProgKind.Name",
+            "tenant-bl-pn"
+        );
         assert_eq!(BpfProgKind::SchedCls.name(), "BPF_PROG_TYPE_SCHED_CLS");
         assert_eq!(BpfProgKind::Xdp.name(), "BPF_PROG_TYPE_XDP");
-        assert_eq!(BpfProgKind::CgroupSockAddr.name(), "BPF_PROG_TYPE_CGROUP_SOCK_ADDR");
+        assert_eq!(
+            BpfProgKind::CgroupSockAddr.name(),
+            "BPF_PROG_TYPE_CGROUP_SOCK_ADDR"
+        );
         assert_eq!(BpfProgKind::SockOps.name(), "BPF_PROG_TYPE_SOCK_OPS");
     }
 
@@ -238,7 +261,11 @@ mod tests {
 
     #[test]
     fn load_too_large_program_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Load.TooLarge", "tenant-bl-ltl");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "Load.TooLarge",
+            "tenant-bl-ltl"
+        );
         let mut l = loader(tenant);
         let mut p = good_program("from-container");
         p.instructions = 2_000_000;
@@ -248,7 +275,11 @@ mod tests {
 
     #[test]
     fn load_with_invalid_map_ref_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Load.InvalidMap", "tenant-bl-lim");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "Load.InvalidMap",
+            "tenant-bl-lim"
+        );
         let mut l = loader(tenant);
         let mut p = good_program("from-container");
         p.map_refs = vec!["_internal".into()];
@@ -258,7 +289,11 @@ mod tests {
 
     #[test]
     fn load_records_verifier_result() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Load.VerifierLog", "tenant-bl-lv");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "Load.VerifierLog",
+            "tenant-bl-lv"
+        );
         let mut l = loader(tenant);
         l.load(good_program("from-container")).unwrap();
         assert!(l.verifier_result("from-container").unwrap().ok);
@@ -266,7 +301,11 @@ mod tests {
 
     #[test]
     fn load_failed_records_verifier_log() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Load.VerifierLog.Failure", "tenant-bl-lvf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "Load.VerifierLog.Failure",
+            "tenant-bl-lvf"
+        );
         let mut l = loader(tenant);
         let mut p = good_program("from-container");
         p.instructions = 5_000_000;
@@ -280,7 +319,8 @@ mod tests {
 
     #[test]
     fn unload_drops_program() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Unload", "tenant-bl-u");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/datapath/loader/loader.go", "Unload", "tenant-bl-u");
         let mut l = loader(tenant);
         l.load(good_program("from-container")).unwrap();
         l.unload("from-container").unwrap();
@@ -289,7 +329,11 @@ mod tests {
 
     #[test]
     fn unload_unknown_returns_not_loaded() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Unload.NotLoaded", "tenant-bl-unl");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "Unload.NotLoaded",
+            "tenant-bl-unl"
+        );
         let mut l = loader(tenant);
         let err = l.unload("ghost").unwrap_err();
         assert!(matches!(err, LoaderError::ProgNotLoaded(_)));
@@ -297,10 +341,18 @@ mod tests {
 
     #[test]
     fn unload_also_drops_attachments() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Unload.DropAttach", "tenant-bl-uda");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "Unload.DropAttach",
+            "tenant-bl-uda"
+        );
         let mut l = loader(tenant);
         l.load(good_program("from-container")).unwrap();
-        l.attach("from-container", attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress)).unwrap();
+        l.attach(
+            "from-container",
+            attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress),
+        )
+        .unwrap();
         l.unload("from-container").unwrap();
         assert_eq!(l.attached_count(), 0);
     }
@@ -309,64 +361,125 @@ mod tests {
 
     #[test]
     fn attach_loaded_program_succeeds() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Attach", "tenant-bl-a");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/datapath/loader/loader.go", "Attach", "tenant-bl-a");
         let mut l = loader(tenant);
         l.load(good_program("from-container")).unwrap();
-        let key = l.attach("from-container", attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress)).unwrap();
+        let key = l
+            .attach(
+                "from-container",
+                attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress),
+            )
+            .unwrap();
         assert!(key.contains("eth0"));
     }
 
     #[test]
     fn attach_unloaded_program_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Attach.NotLoaded", "tenant-bl-anl");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "Attach.NotLoaded",
+            "tenant-bl-anl"
+        );
         let mut l = loader(tenant);
-        let err = l.attach("from-container", attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress)).unwrap_err();
+        let err = l
+            .attach(
+                "from-container",
+                attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress),
+            )
+            .unwrap_err();
         assert!(matches!(err, LoaderError::ProgNotLoaded(_)));
     }
 
     #[test]
     fn attach_in_use_by_other_program_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Attach.InUse", "tenant-bl-aiu");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "Attach.InUse",
+            "tenant-bl-aiu"
+        );
         let mut l = loader(tenant);
         l.load(good_program("from-container")).unwrap();
         let mut p2 = good_program("from-host");
         p2.section = "from-host".into();
         l.load(p2).unwrap();
-        l.attach("from-container", attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress)).unwrap();
-        let err = l.attach("from-host", attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress)).unwrap_err();
+        l.attach(
+            "from-container",
+            attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress),
+        )
+        .unwrap();
+        let err = l
+            .attach(
+                "from-host",
+                attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress),
+            )
+            .unwrap_err();
         assert!(matches!(err, LoaderError::AttachInUse(_, _)));
     }
 
     #[test]
     fn attach_same_program_twice_idempotent() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Attach.Idempotent", "tenant-bl-aid");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "Attach.Idempotent",
+            "tenant-bl-aid"
+        );
         let mut l = loader(tenant);
         l.load(good_program("from-container")).unwrap();
-        l.attach("from-container", attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress)).unwrap();
-        l.attach("from-container", attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress)).unwrap();
+        l.attach(
+            "from-container",
+            attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress),
+        )
+        .unwrap();
+        l.attach(
+            "from-container",
+            attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress),
+        )
+        .unwrap();
         assert_eq!(l.attached_count(), 1);
     }
 
     #[test]
     fn detach_drops_attachment() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Detach", "tenant-bl-d");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/datapath/loader/loader.go", "Detach", "tenant-bl-d");
         let mut l = loader(tenant);
         l.load(good_program("from-container")).unwrap();
-        l.attach("from-container", attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress)).unwrap();
-        assert!(l.detach(&attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress)));
+        l.attach(
+            "from-container",
+            attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress),
+        )
+        .unwrap();
+        assert!(l.detach(&attach(
+            BpfProgKind::SchedCls,
+            "eth0",
+            AttachDirection::Ingress
+        )));
         assert_eq!(l.attached_count(), 0);
     }
 
     #[test]
     fn detach_unknown_returns_false() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Detach.NotFound", "tenant-bl-dnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "Detach.NotFound",
+            "tenant-bl-dnf"
+        );
         let mut l = loader(tenant);
-        assert!(!l.detach(&attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress)));
+        assert!(!l.detach(&attach(
+            BpfProgKind::SchedCls,
+            "eth0",
+            AttachDirection::Ingress
+        )));
     }
 
     #[test]
     fn attached_program_at_returns_section_name() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "AttachedAt", "tenant-bl-at");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "AttachedAt",
+            "tenant-bl-at"
+        );
         let mut l = loader(tenant);
         l.load(good_program("from-container")).unwrap();
         let p = attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress);
@@ -376,40 +489,80 @@ mod tests {
 
     #[test]
     fn attached_program_at_unknown_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "AttachedAt.NotFound", "tenant-bl-atnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "AttachedAt.NotFound",
+            "tenant-bl-atnf"
+        );
         let l = loader(tenant);
-        assert!(l.attached_program_at(&attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress)).is_none());
+        assert!(l
+            .attached_program_at(&attach(
+                BpfProgKind::SchedCls,
+                "eth0",
+                AttachDirection::Ingress
+            ))
+            .is_none());
     }
 
     // ── Different attach points ────────────────────────────────────────────
 
     #[test]
     fn ingress_and_egress_attach_points_distinct() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "AttachPoints.Distinct", "tenant-bl-apd");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "AttachPoints.Distinct",
+            "tenant-bl-apd"
+        );
         let mut l = loader(tenant);
         l.load(good_program("from-container")).unwrap();
         l.load(BpfProgram {
-            object_path: "bpf_lxc.o".into(), section: "to-container".into(),
-            kind: BpfProgKind::SchedCls, instructions: 1024,
+            object_path: "bpf_lxc.o".into(),
+            section: "to-container".into(),
+            kind: BpfProgKind::SchedCls,
+            instructions: 1024,
             map_refs: vec!["cilium_ipcache".into()],
-        }).unwrap();
-        l.attach("from-container", attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress)).unwrap();
-        l.attach("to-container", attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Egress)).unwrap();
+        })
+        .unwrap();
+        l.attach(
+            "from-container",
+            attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress),
+        )
+        .unwrap();
+        l.attach(
+            "to-container",
+            attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Egress),
+        )
+        .unwrap();
         assert_eq!(l.attached_count(), 2);
     }
 
     #[test]
     fn xdp_attach_distinct_from_tc_attach() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Attach.XdpVsTc", "tenant-bl-axt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "Attach.XdpVsTc",
+            "tenant-bl-axt"
+        );
         let mut l = loader(tenant);
         l.load(good_program("from-container")).unwrap();
         l.load(BpfProgram {
-            object_path: "bpf_xdp.o".into(), section: "from-netdev-xdp".into(),
-            kind: BpfProgKind::Xdp, instructions: 2048,
+            object_path: "bpf_xdp.o".into(),
+            section: "from-netdev-xdp".into(),
+            kind: BpfProgKind::Xdp,
+            instructions: 2048,
             map_refs: vec!["cilium_lb4_services".into()],
-        }).unwrap();
-        l.attach("from-container", attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress)).unwrap();
-        l.attach("from-netdev-xdp", attach(BpfProgKind::Xdp, "eth0", AttachDirection::None)).unwrap();
+        })
+        .unwrap();
+        l.attach(
+            "from-container",
+            attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress),
+        )
+        .unwrap();
+        l.attach(
+            "from-netdev-xdp",
+            attach(BpfProgKind::Xdp, "eth0", AttachDirection::None),
+        )
+        .unwrap();
         assert_eq!(l.attached_count(), 2);
     }
 
@@ -417,14 +570,18 @@ mod tests {
 
     #[test]
     fn loaded_count_tracks_loads() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Count", "tenant-bl-c");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/datapath/loader/loader.go", "Count", "tenant-bl-c");
         let mut l = loader(tenant);
         for s in ["a", "b", "c"] {
             l.load(BpfProgram {
-                object_path: format!("{s}.o"), section: s.into(),
-                kind: BpfProgKind::SchedCls, instructions: 1000,
+                object_path: format!("{s}.o"),
+                section: s.into(),
+                kind: BpfProgKind::SchedCls,
+                instructions: 1000,
                 map_refs: vec![],
-            }).unwrap();
+            })
+            .unwrap();
         }
         assert_eq!(l.loaded_count(), 3);
     }
@@ -433,7 +590,11 @@ mod tests {
 
     #[test]
     fn verifier_result_unknown_section_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Verifier.NotFound", "tenant-bl-vnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "Verifier.NotFound",
+            "tenant-bl-vnf"
+        );
         let l = loader(tenant);
         assert!(l.verifier_result("ghost").is_none());
     }
@@ -442,7 +603,11 @@ mod tests {
 
     #[test]
     fn bpf_program_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Program.Serde", "tenant-bl-pserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "Program.Serde",
+            "tenant-bl-pserde"
+        );
         let p = good_program("from-container");
         let s = serde_json::to_string(&p).unwrap();
         let back: BpfProgram = serde_json::from_str(&s).unwrap();
@@ -451,7 +616,11 @@ mod tests {
 
     #[test]
     fn attach_point_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "AttachPoint.Serde", "tenant-bl-aserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "AttachPoint.Serde",
+            "tenant-bl-aserde"
+        );
         let a = attach(BpfProgKind::SchedCls, "eth0", AttachDirection::Ingress);
         let s = serde_json::to_string(&a).unwrap();
         let back: AttachPoint = serde_json::from_str(&s).unwrap();
@@ -460,8 +629,15 @@ mod tests {
 
     #[test]
     fn verifier_result_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/loader/loader.go", "Verifier.Serde", "tenant-bl-vserde");
-        let v = VerifierResult { ok: true, log: "ok".into() };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/datapath/loader/loader.go",
+            "Verifier.Serde",
+            "tenant-bl-vserde"
+        );
+        let v = VerifierResult {
+            ok: true,
+            log: "ok".into(),
+        };
         let s = serde_json::to_string(&v).unwrap();
         let back: VerifierResult = serde_json::from_str(&s).unwrap();
         assert_eq!(back, v);

@@ -173,11 +173,7 @@ impl StandaloneHerder {
         })
     }
 
-    pub fn set_target_state(
-        &mut self,
-        name: &str,
-        state: TargetState,
-    ) -> Result<(), HerderError> {
+    pub fn set_target_state(&mut self, name: &str, state: TargetState) -> Result<(), HerderError> {
         let entry = self
             .connectors
             .get_mut(name)
@@ -262,10 +258,7 @@ impl StandaloneHerder {
         })
     }
 
-    pub fn connector_config(
-        &self,
-        name: &str,
-    ) -> Result<BTreeMap<String, String>, HerderError> {
+    pub fn connector_config(&self, name: &str) -> Result<BTreeMap<String, String>, HerderError> {
         self.connectors
             .get(name)
             .map(|e| e.config.clone())
@@ -325,10 +318,7 @@ impl StandaloneHerder {
     pub fn connector_offsets(
         &self,
         name: &str,
-    ) -> Result<
-        BTreeMap<BTreeMap<String, String>, BTreeMap<String, String>>,
-        HerderError,
-    > {
+    ) -> Result<BTreeMap<BTreeMap<String, String>, BTreeMap<String, String>>, HerderError> {
         self.connectors
             .get(name)
             .map(|e| e.offsets.clone())
@@ -354,9 +344,7 @@ impl StandaloneHerder {
 
 fn validate_config(cfg: &BTreeMap<String, String>) -> Result<(), HerderError> {
     if !cfg.contains_key("connector.class") {
-        return Err(HerderError::BadConfig(
-            "connector.class is required".into(),
-        ));
+        return Err(HerderError::BadConfig("connector.class is required".into()));
     }
     Ok(())
 }
@@ -415,23 +403,35 @@ mod tests {
     #[test]
     fn create_sink_classifies_kind_correctly() {
         let mut h = StandaloneHerder::new();
-        let info = h.put_connector_config("a", cfg("...HdfsSink", 1), false).unwrap();
+        let info = h
+            .put_connector_config("a", cfg("...HdfsSink", 1), false)
+            .unwrap();
         assert_eq!(info.kind, TaskKind::Sink);
     }
 
     #[test]
     fn duplicate_create_is_rejected_unless_allow_replace() {
         let mut h = StandaloneHerder::new();
-        h.put_connector_config("a", cfg("...Source", 1), false).unwrap();
-        assert!(h.put_connector_config("a", cfg("...Source", 1), false).is_err());
-        assert!(h.put_connector_config("a", cfg("...Source", 2), true).is_ok());
+        h.put_connector_config("a", cfg("...Source", 1), false)
+            .unwrap();
+        assert!(
+            h.put_connector_config("a", cfg("...Source", 1), false)
+                .is_err()
+        );
+        assert!(
+            h.put_connector_config("a", cfg("...Source", 2), true)
+                .is_ok()
+        );
         assert_eq!(h.task_configs("a").unwrap().len(), 2);
     }
 
     #[test]
     fn empty_name_is_rejected() {
         let mut h = StandaloneHerder::new();
-        assert!(h.put_connector_config("", cfg("...Source", 1), false).is_err());
+        assert!(
+            h.put_connector_config("", cfg("...Source", 1), false)
+                .is_err()
+        );
     }
 
     #[test]
@@ -457,7 +457,8 @@ mod tests {
     #[test]
     fn patch_merges_and_revalidates() {
         let mut h = StandaloneHerder::new();
-        h.put_connector_config("a", cfg("...Source", 1), false).unwrap();
+        h.put_connector_config("a", cfg("...Source", 1), false)
+            .unwrap();
         let mut p = BTreeMap::new();
         p.insert("topics".into(), "orders".into());
         h.patch_connector_config("a", p).unwrap();
@@ -470,7 +471,8 @@ mod tests {
     #[test]
     fn stopped_state_drops_task_slots() {
         let mut h = StandaloneHerder::new();
-        h.put_connector_config("a", cfg("...Source", 4), false).unwrap();
+        h.put_connector_config("a", cfg("...Source", 4), false)
+            .unwrap();
         h.stop_connector("a").unwrap();
         assert_eq!(h.task_configs("a").unwrap().len(), 0);
     }
@@ -478,7 +480,8 @@ mod tests {
     #[test]
     fn paused_keeps_task_slots() {
         let mut h = StandaloneHerder::new();
-        h.put_connector_config("a", cfg("...Source", 4), false).unwrap();
+        h.put_connector_config("a", cfg("...Source", 4), false)
+            .unwrap();
         h.set_target_state("a", TargetState::Paused).unwrap();
         assert_eq!(h.task_configs("a").unwrap().len(), 4);
         assert_eq!(h.target_state("a").unwrap(), TargetState::Paused);
@@ -487,7 +490,8 @@ mod tests {
     #[test]
     fn restart_task_clears_trace() {
         let mut h = StandaloneHerder::new();
-        h.put_connector_config("a", cfg("...Source", 1), false).unwrap();
+        h.put_connector_config("a", cfg("...Source", 1), false)
+            .unwrap();
         h.fail_task("a", 0, "boom").unwrap();
         assert!(h.task_configs("a").unwrap()[0].failure_trace.is_some());
         h.restart_task("a", 0).unwrap();
@@ -497,7 +501,8 @@ mod tests {
     #[test]
     fn alter_offsets_rejected_when_running() {
         let mut h = StandaloneHerder::new();
-        h.put_connector_config("a", cfg("...Source", 1), false).unwrap();
+        h.put_connector_config("a", cfg("...Source", 1), false)
+            .unwrap();
         let res = h.alter_connector_offsets("a", vec![(BTreeMap::new(), None)]);
         assert!(matches!(res.unwrap_err(), HerderError::IllegalState(_)));
     }
@@ -505,7 +510,8 @@ mod tests {
     #[test]
     fn alter_offsets_works_when_stopped() {
         let mut h = StandaloneHerder::new();
-        h.put_connector_config("a", cfg("...Source", 1), false).unwrap();
+        h.put_connector_config("a", cfg("...Source", 1), false)
+            .unwrap();
         h.stop_connector("a").unwrap();
         let mut part = BTreeMap::new();
         part.insert("table".into(), "orders".into());
@@ -537,7 +543,8 @@ mod tests {
     #[test]
     fn reset_offsets_requires_stopped() {
         let mut h = StandaloneHerder::new();
-        h.put_connector_config("a", cfg("...Source", 1), false).unwrap();
+        h.put_connector_config("a", cfg("...Source", 1), false)
+            .unwrap();
         assert!(matches!(
             h.reset_connector_offsets("a").unwrap_err(),
             HerderError::IllegalState(_)

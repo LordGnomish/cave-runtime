@@ -55,7 +55,10 @@ fn classify_reason(reason: &str) -> ErrorClass {
 
 /// Helper: should the controller retry the next cloud call?
 pub fn should_retry(err: &CloudError) -> bool {
-    matches!(classify_error(err), ErrorClass::Retryable | ErrorClass::Throttled)
+    matches!(
+        classify_error(err),
+        ErrorClass::Retryable | ErrorClass::Throttled
+    )
 }
 
 // ─── Token-bucket rate limiter ───────────────────────────────────────────────
@@ -76,7 +79,11 @@ impl TokenBucket {
                 reason: "rate-limiter capacity and refill must be > 0".into(),
             });
         }
-        Ok(Self { capacity, tokens: capacity, refill_per_second })
+        Ok(Self {
+            capacity,
+            tokens: capacity,
+            refill_per_second,
+        })
     }
 
     pub fn capacity(&self) -> u32 {
@@ -210,7 +217,11 @@ mod tests {
 
     #[test]
     fn rate_limit_reason_is_throttled() {
-        ctx("acme", "staging/src/k8s.io/client-go/util/retry/util.go", "IsErrorRetryable");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/client-go/util/retry/util.go",
+            "IsErrorRetryable",
+        );
         let err = CloudError::Upstream {
             provider: ProviderName::Hetzner,
             reason: "HTTP 429: rate limit exceeded".into(),
@@ -221,7 +232,11 @@ mod tests {
 
     #[test]
     fn http_5xx_reason_is_retryable() {
-        ctx("acme", "staging/src/k8s.io/client-go/util/retry/util.go", "IsErrorRetryable");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/client-go/util/retry/util.go",
+            "IsErrorRetryable",
+        );
         for code in ["500", "502", "503", "504"] {
             let err = CloudError::Upstream {
                 provider: ProviderName::Hetzner,
@@ -233,7 +248,11 @@ mod tests {
 
     #[test]
     fn timeout_and_connection_reset_are_retryable() {
-        ctx("acme", "staging/src/k8s.io/client-go/util/retry/util.go", "IsErrorRetryable");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/client-go/util/retry/util.go",
+            "IsErrorRetryable",
+        );
         let err = CloudError::Upstream {
             provider: ProviderName::Hetzner,
             reason: "i/o timeout".into(),
@@ -248,7 +267,11 @@ mod tests {
 
     #[test]
     fn invalid_config_is_permanent() {
-        ctx("acme", "staging/src/k8s.io/client-go/util/retry/util.go", "IsErrorRetryable");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/client-go/util/retry/util.go",
+            "IsErrorRetryable",
+        );
         let err = CloudError::InvalidConfig {
             provider: ProviderName::Hetzner,
             reason: "x".into(),
@@ -259,7 +282,11 @@ mod tests {
 
     #[test]
     fn tenant_denied_is_permanent() {
-        ctx("acme", "staging/src/k8s.io/client-go/util/retry/util.go", "IsErrorRetryable");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/client-go/util/retry/util.go",
+            "IsErrorRetryable",
+        );
         let err = CloudError::TenantDenied {
             tenant: crate::types::TenantId::new("attacker").expect("test fixture"),
             kind: "Service",
@@ -270,14 +297,22 @@ mod tests {
 
     #[test]
     fn unimplemented_is_permanent() {
-        ctx("acme", "staging/src/k8s.io/client-go/util/retry/util.go", "IsErrorRetryable");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/client-go/util/retry/util.go",
+            "IsErrorRetryable",
+        );
         let err = CloudError::Unimplemented("v6 allocator");
         assert_eq!(classify_error(&err), ErrorClass::Permanent);
     }
 
     #[test]
     fn unknown_upstream_reason_defaults_to_permanent() {
-        ctx("acme", "staging/src/k8s.io/client-go/util/retry/util.go", "IsErrorRetryable");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/client-go/util/retry/util.go",
+            "IsErrorRetryable",
+        );
         let err = CloudError::Upstream {
             provider: ProviderName::Hetzner,
             reason: "object not found".into(),
@@ -290,14 +325,22 @@ mod tests {
 
     #[test]
     fn token_bucket_constructor_rejects_zero_capacity() {
-        ctx("acme", "staging/src/k8s.io/client-go/util/flowcontrol/throttle.go", "tokenBucketRateLimiter");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/client-go/util/flowcontrol/throttle.go",
+            "tokenBucketRateLimiter",
+        );
         assert!(TokenBucket::new(0, 5).is_err());
         assert!(TokenBucket::new(10, 0).is_err());
     }
 
     #[test]
     fn token_bucket_starts_full_and_drains_with_take() {
-        ctx("acme", "staging/src/k8s.io/client-go/util/flowcontrol/throttle.go", "tokenBucketRateLimiter");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/client-go/util/flowcontrol/throttle.go",
+            "tokenBucketRateLimiter",
+        );
         let mut tb = TokenBucket::new(10, 5).unwrap();
         assert_eq!(tb.available(), 10);
         assert!(tb.try_take(7).is_ok());
@@ -306,7 +349,11 @@ mod tests {
 
     #[test]
     fn token_bucket_returns_wait_when_empty() {
-        ctx("acme", "staging/src/k8s.io/client-go/util/flowcontrol/throttle.go", "tokenBucketRateLimiter");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/client-go/util/flowcontrol/throttle.go",
+            "tokenBucketRateLimiter",
+        );
         let mut tb = TokenBucket::new(5, 5).unwrap();
         tb.try_take(5).unwrap();
         let wait = tb.try_take(3).unwrap_err();
@@ -315,7 +362,11 @@ mod tests {
 
     #[test]
     fn token_bucket_refill_caps_at_capacity() {
-        ctx("acme", "staging/src/k8s.io/client-go/util/flowcontrol/throttle.go", "tokenBucketRateLimiter");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/client-go/util/flowcontrol/throttle.go",
+            "tokenBucketRateLimiter",
+        );
         let mut tb = TokenBucket::new(10, 5).unwrap();
         tb.try_take(5).unwrap();
         tb.refill(60_000); // 60 s × 5/s = 300 tokens, but capped at 10
@@ -324,7 +375,11 @@ mod tests {
 
     #[test]
     fn token_bucket_refill_partial_window() {
-        ctx("acme", "staging/src/k8s.io/client-go/util/flowcontrol/throttle.go", "tokenBucketRateLimiter");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/client-go/util/flowcontrol/throttle.go",
+            "tokenBucketRateLimiter",
+        );
         let mut tb = TokenBucket::new(20, 10).unwrap();
         tb.try_take(15).unwrap();
         tb.refill(500); // 500 ms × 10/s = 5
@@ -333,7 +388,11 @@ mod tests {
 
     #[test]
     fn token_bucket_capacity_is_constant() {
-        ctx("acme", "staging/src/k8s.io/client-go/util/flowcontrol/throttle.go", "tokenBucketRateLimiter");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/client-go/util/flowcontrol/throttle.go",
+            "tokenBucketRateLimiter",
+        );
         let tb = TokenBucket::new(7, 1).unwrap();
         assert_eq!(tb.capacity(), 7);
     }
@@ -342,44 +401,82 @@ mod tests {
 
     #[test]
     fn controller_options_defaults_validate() {
-        ctx("acme", "cmd/cloud-controller-manager/app/options/options.go", "Validate");
+        ctx(
+            "acme",
+            "cmd/cloud-controller-manager/app/options/options.go",
+            "Validate",
+        );
         assert!(ControllerOptions::defaults().validate().is_ok());
     }
 
     #[test]
     fn controller_options_concurrent_node_syncs_must_be_in_range() {
-        ctx("acme", "cmd/cloud-controller-manager/app/options/options.go", "Validate");
+        ctx(
+            "acme",
+            "cmd/cloud-controller-manager/app/options/options.go",
+            "Validate",
+        );
         let mut o = ControllerOptions::defaults();
         o.concurrent_node_syncs = 0;
-        assert!(matches!(o.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            o.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         o.concurrent_node_syncs = 100;
-        assert!(matches!(o.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            o.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn controller_options_concurrent_service_syncs_must_be_in_range() {
-        ctx("acme", "cmd/cloud-controller-manager/app/options/options.go", "Validate");
+        ctx(
+            "acme",
+            "cmd/cloud-controller-manager/app/options/options.go",
+            "Validate",
+        );
         let mut o = ControllerOptions::defaults();
         o.concurrent_service_syncs = 0;
-        assert!(matches!(o.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            o.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn controller_options_node_monitor_period_must_be_in_range() {
-        ctx("acme", "cmd/cloud-controller-manager/app/options/options.go", "Validate");
+        ctx(
+            "acme",
+            "cmd/cloud-controller-manager/app/options/options.go",
+            "Validate",
+        );
         let mut o = ControllerOptions::defaults();
         o.node_monitor_period_seconds = 0;
-        assert!(matches!(o.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            o.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         o.node_monitor_period_seconds = 1000;
-        assert!(matches!(o.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            o.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn controller_options_route_reconciliation_must_be_in_range() {
-        ctx("acme", "cmd/cloud-controller-manager/app/options/options.go", "Validate");
+        ctx(
+            "acme",
+            "cmd/cloud-controller-manager/app/options/options.go",
+            "Validate",
+        );
         let mut o = ControllerOptions::defaults();
         o.route_reconciliation_period_seconds = 0;
-        assert!(matches!(o.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            o.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     // ─── PreInitNodeHook ─────────────────────────────────────────────────────
@@ -403,13 +500,21 @@ mod tests {
 
     #[test]
     fn run_pre_init_returns_ok_for_accepting_hook() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/cloud.go", "Initialize");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/cloud.go",
+            "Initialize",
+        );
         assert!(run_pre_init(&AcceptingHook, "node-1").is_ok());
     }
 
     #[test]
     fn run_pre_init_propagates_hook_error() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/cloud.go", "Initialize");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/cloud.go",
+            "Initialize",
+        );
         let err = run_pre_init(&RejectingHook, "node-1").unwrap_err();
         assert!(matches!(err, CloudError::Upstream { .. }));
     }
@@ -438,7 +543,11 @@ mod tests {
 
     #[test]
     fn health_probe_alive_no_error() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/cloud.go", "HasClusterID");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/cloud.go",
+            "HasClusterID",
+        );
         let p = OkProbe;
         assert!(p.alive());
         assert!(p.last_error().is_none());
@@ -446,7 +555,11 @@ mod tests {
 
     #[test]
     fn health_probe_dead_carries_last_error() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/cloud.go", "HasClusterID");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/cloud.go",
+            "HasClusterID",
+        );
         let p = DeadProbe("503");
         assert!(!p.alive());
         assert_eq!(p.last_error(), Some("503"));

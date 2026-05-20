@@ -79,12 +79,15 @@ impl MapsGcController {
         if self.schedules.contains_key(&target) {
             return Err(MapsGcError::AlreadyScheduled(target));
         }
-        self.schedules.insert(target, interval_seconds * 1_000_000_000);
+        self.schedules
+            .insert(target, interval_seconds * 1_000_000_000);
         Ok(())
     }
 
     pub fn unschedule(&mut self, target: GcTarget) -> Result<(), MapsGcError> {
-        self.schedules.remove(&target).ok_or(MapsGcError::NotScheduled(target))?;
+        self.schedules
+            .remove(&target)
+            .ok_or(MapsGcError::NotScheduled(target))?;
         self.last_run.remove(&target);
         Ok(())
     }
@@ -149,7 +152,13 @@ mod tests {
     }
 
     fn report(target: GcTarget, scanned: u64, deleted: u64, ts: u64) -> GcSweepReport {
-        GcSweepReport { target, scanned, deleted, duration_us: 100, timestamp_ns: ts }
+        GcSweepReport {
+            target,
+            scanned,
+            deleted,
+            duration_us: 100,
+            timestamp_ns: ts,
+        }
     }
 
     // ── Target labels ──────────────────────────────────────────────────────
@@ -177,7 +186,8 @@ mod tests {
 
     #[test]
     fn schedule_duplicate_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maps/gc/gc.go", "Schedule.Duplicate", "tenant-mg-sd");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/maps/gc/gc.go", "Schedule.Duplicate", "tenant-mg-sd");
         let mut c = ctrl(tenant);
         c.schedule(GcTarget::Conntrack, 60).unwrap();
         let err = c.schedule(GcTarget::Conntrack, 30).unwrap_err();
@@ -195,7 +205,11 @@ mod tests {
 
     #[test]
     fn unschedule_unknown_returns_not_scheduled() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maps/gc/gc.go", "Unschedule.NotScheduled", "tenant-mg-uns");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/maps/gc/gc.go",
+            "Unschedule.NotScheduled",
+            "tenant-mg-uns"
+        );
         let mut c = ctrl(tenant);
         let err = c.unschedule(GcTarget::Conntrack).unwrap_err();
         assert!(matches!(err, MapsGcError::NotScheduled(_)));
@@ -257,7 +271,8 @@ mod tests {
 
     #[test]
     fn last_report_for_unknown_target_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maps/gc/gc.go", "LastReport.NotFound", "tenant-mg-lrnf");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/maps/gc/gc.go", "LastReport.NotFound", "tenant-mg-lrnf");
         let c = ctrl(tenant);
         assert!(c.last_report_for(GcTarget::Auth).is_none());
     }
@@ -314,8 +329,12 @@ mod tests {
     fn gc_target_serde_round_trip() {
         let (_c, _t) = cilium_test_ctx!("pkg/maps/gc/gc.go", "Target.Serde", "tenant-mg-tserde");
         for t in [
-            GcTarget::Conntrack, GcTarget::Nat, GcTarget::Ipcache,
-            GcTarget::Policy, GcTarget::Lb, GcTarget::Auth,
+            GcTarget::Conntrack,
+            GcTarget::Nat,
+            GcTarget::Ipcache,
+            GcTarget::Policy,
+            GcTarget::Lb,
+            GcTarget::Auth,
         ] {
             let s = serde_json::to_string(&t).unwrap();
             let back: GcTarget = serde_json::from_str(&s).unwrap();

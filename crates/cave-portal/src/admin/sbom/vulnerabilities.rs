@@ -5,10 +5,10 @@
 //!
 //! Upstream: <https://dependencytrack.org/docs/glossary/#vulnerability>
 
+use super::SbomViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, SbomComponent};
-use super::SbomViewError;
+use crate::admin::state::{AdminState, SbomComponent, scope};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VulnRow {
@@ -31,14 +31,13 @@ fn catalogue(component: &str) -> Option<(&'static str, &'static str)> {
 
 pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<VulnRow>, SbomViewError> {
     ctx.authorise(Permission::SbomRead)?;
-    let rows: Vec<SbomComponent> = scope(
-        &state.sbom_components.read().unwrap(),
-        &ctx.tenant,
-        |r| &r.tenant,
-    )
-    .into_iter()
-    .cloned()
-    .collect();
+    let rows: Vec<SbomComponent> =
+        scope(&state.sbom_components.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     let mut out: Vec<VulnRow> = rows
         .iter()
         .filter_map(|c| {
@@ -50,7 +49,11 @@ pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<VulnRow>, SbomVi
             })
         })
         .collect();
-    out.sort_by(|a, b| severity_rank(a.severity).cmp(&severity_rank(b.severity)).reverse());
+    out.sort_by(|a, b| {
+        severity_rank(a.severity)
+            .cmp(&severity_rank(b.severity))
+            .reverse()
+    });
     Ok(out)
 }
 
@@ -70,12 +73,14 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SbomViewEr
     let high = rows.iter().filter(|r| r.severity == "HIGH").count();
     let table_rows: Vec<Vec<String>> = rows
         .iter()
-        .map(|r| vec![
-            escape(&r.cve_id),
-            escape(&r.component),
-            escape(&r.version),
-            r.severity.to_string(),
-        ])
+        .map(|r| {
+            vec![
+                escape(&r.cve_id),
+                escape(&r.component),
+                escape(&r.version),
+                r.severity.to_string(),
+            ]
+        })
         .collect();
     let body = format!(
         r#"<section>
@@ -87,7 +92,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SbomViewEr
   </div>
   {tbl}
 </section>"#,
-        n = rows.len(), c = critical, h = high,
+        n = rows.len(),
+        c = critical,
+        h = high,
         tbl = table(&["cve", "component", "version", "severity"], &table_rows),
     );
     Ok(page_shell_full(
@@ -101,7 +108,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SbomViewEr
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
+    fn ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer("acme", perms)
+    }
 
     #[test]
     fn list_rejects_no_perm() {

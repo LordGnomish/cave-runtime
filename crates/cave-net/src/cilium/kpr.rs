@@ -72,7 +72,10 @@ mod tests {
     #[test]
     fn resolve_passes_through_when_kpr_disabled() {
         let (_c, _t) = cilium_test_ctx!("pkg/kpr/kpr.go", "Resolve.PassThrough", "tenant-kpr-rp");
-        let cfg = resolve(KprFlags { kube_proxy_replacement: false, enable_socket_lb: false });
+        let cfg = resolve(KprFlags {
+            kube_proxy_replacement: false,
+            enable_socket_lb: false,
+        });
         assert!(!cfg.kube_proxy_replacement);
         assert!(!cfg.enable_socket_lb);
     }
@@ -80,15 +83,22 @@ mod tests {
     #[test]
     fn resolve_forces_socket_lb_when_kpr_enabled() {
         let (_c, _t) = cilium_test_ctx!("pkg/kpr/kpr.go", "Resolve.ForceSockLB", "tenant-kpr-rf");
-        let cfg = resolve(KprFlags { kube_proxy_replacement: true, enable_socket_lb: false });
+        let cfg = resolve(KprFlags {
+            kube_proxy_replacement: true,
+            enable_socket_lb: false,
+        });
         assert!(cfg.kube_proxy_replacement);
         assert!(cfg.enable_socket_lb, "KPR=true must force socket-LB on");
     }
 
     #[test]
     fn resolve_keeps_socket_lb_when_explicit_and_kpr_off() {
-        let (_c, _t) = cilium_test_ctx!("pkg/kpr/kpr.go", "Resolve.ExplicitSockLB", "tenant-kpr-re");
-        let cfg = resolve(KprFlags { kube_proxy_replacement: false, enable_socket_lb: true });
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/kpr/kpr.go", "Resolve.ExplicitSockLB", "tenant-kpr-re");
+        let cfg = resolve(KprFlags {
+            kube_proxy_replacement: false,
+            enable_socket_lb: true,
+        });
         assert!(!cfg.kube_proxy_replacement);
         assert!(cfg.enable_socket_lb);
     }
@@ -96,7 +106,10 @@ mod tests {
     #[test]
     fn config_serde_round_trip() {
         let (_c, _t) = cilium_test_ctx!("pkg/kpr/kpr.go", "Config.Serde", "tenant-kpr-cs");
-        let c = KprConfig { kube_proxy_replacement: true, enable_socket_lb: true };
+        let c = KprConfig {
+            kube_proxy_replacement: true,
+            enable_socket_lb: true,
+        };
         let s = serde_json::to_string(&c).unwrap();
         let back: KprConfig = serde_json::from_str(&s).unwrap();
         assert_eq!(c, back);
@@ -105,7 +118,10 @@ mod tests {
     #[test]
     fn flags_serde_round_trip() {
         let (_c, _t) = cilium_test_ctx!("pkg/kpr/kpr.go", "Flags.Serde", "tenant-kpr-fs");
-        let f = KprFlags { kube_proxy_replacement: true, enable_socket_lb: false };
+        let f = KprFlags {
+            kube_proxy_replacement: true,
+            enable_socket_lb: false,
+        };
         let s = serde_json::to_string(&f).unwrap();
         let back: KprFlags = serde_json::from_str(&s).unwrap();
         assert_eq!(f, back);
@@ -114,9 +130,15 @@ mod tests {
     #[test]
     fn resolve_is_idempotent() {
         let (_c, _t) = cilium_test_ctx!("pkg/kpr/kpr.go", "Resolve.Idempotent", "tenant-kpr-ri");
-        let f = KprFlags { kube_proxy_replacement: true, enable_socket_lb: false };
+        let f = KprFlags {
+            kube_proxy_replacement: true,
+            enable_socket_lb: false,
+        };
         let a = resolve(f);
-        let b = resolve(KprFlags { kube_proxy_replacement: a.kube_proxy_replacement, enable_socket_lb: a.enable_socket_lb });
+        let b = resolve(KprFlags {
+            kube_proxy_replacement: a.kube_proxy_replacement,
+            enable_socket_lb: a.enable_socket_lb,
+        });
         assert_eq!(a, b);
     }
 }

@@ -20,7 +20,14 @@ pub struct Lease {
 }
 
 impl Lease {
-    pub fn new(path: &str, token: &str, mount: &str, ttl_secs: i64, max_ttl_secs: i64, renewable: bool) -> Self {
+    pub fn new(
+        path: &str,
+        token: &str,
+        mount: &str,
+        ttl_secs: i64,
+        max_ttl_secs: i64,
+        renewable: bool,
+    ) -> Self {
         let now = Utc::now();
         let id = format!("{}/{}", path, Uuid::new_v4());
         Lease {
@@ -77,33 +84,51 @@ impl LeaseStore {
     }
 
     pub fn revoke_prefix(&mut self, prefix: &str) -> usize {
-        let to_remove: Vec<String> = self.leases.keys()
+        let to_remove: Vec<String> = self
+            .leases
+            .keys()
             .filter(|k| k.starts_with(prefix))
-            .cloned().collect();
+            .cloned()
+            .collect();
         let count = to_remove.len();
-        for k in to_remove { self.leases.remove(&k); }
+        for k in to_remove {
+            self.leases.remove(&k);
+        }
         count
     }
 
     pub fn revoke_by_token(&mut self, token: &str) -> usize {
-        let to_remove: Vec<String> = self.leases.values()
+        let to_remove: Vec<String> = self
+            .leases
+            .values()
             .filter(|l| l.token == token)
-            .map(|l| l.id.clone()).collect();
+            .map(|l| l.id.clone())
+            .collect();
         let count = to_remove.len();
-        for k in to_remove { self.leases.remove(&k); }
+        for k in to_remove {
+            self.leases.remove(&k);
+        }
         count
     }
 
     pub fn list_by_prefix(&self, prefix: &str) -> Vec<&Lease> {
-        self.leases.values().filter(|l| l.path.starts_with(prefix)).collect()
+        self.leases
+            .values()
+            .filter(|l| l.path.starts_with(prefix))
+            .collect()
     }
 
     pub fn purge_expired(&mut self) -> usize {
-        let expired: Vec<String> = self.leases.values()
+        let expired: Vec<String> = self
+            .leases
+            .values()
             .filter(|l| l.is_expired())
-            .map(|l| l.id.clone()).collect();
+            .map(|l| l.id.clone())
+            .collect();
         let count = expired.len();
-        for k in expired { self.leases.remove(&k); }
+        for k in expired {
+            self.leases.remove(&k);
+        }
         count
     }
 }

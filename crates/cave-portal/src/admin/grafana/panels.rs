@@ -5,7 +5,7 @@
 //! catalog so the surface is meaningful without a real Grafana data
 //! source. Panel `type` cycles through the upstream registered types.
 
-use super::{dashboards, GrafanaViewError};
+use super::{GrafanaViewError, dashboards};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, table};
 use crate::admin::state::AdminState;
@@ -21,7 +21,13 @@ pub struct PanelRow {
 
 /// Grafana's primary panel types (subset of upstream registry).
 const PANEL_KINDS: &[&str] = &[
-    "timeseries", "stat", "gauge", "barchart", "table", "logs", "heatmap",
+    "timeseries",
+    "stat",
+    "gauge",
+    "barchart",
+    "table",
+    "logs",
+    "heatmap",
 ];
 
 pub fn list_panels(
@@ -96,10 +102,7 @@ pub(super) fn render_section(
 </section>"#,
         n = panels.len(),
         chips = chips,
-        tbl = table(
-            &["dashboard", "id", "title", "type", "datasource"],
-            &rows
-        ),
+        tbl = table(&["dashboard", "id", "title", "type", "datasource"], &rows),
     ))
 }
 
@@ -121,7 +124,8 @@ mod tests {
         );
         let s = AdminState::seeded();
         let panels = list_panels(&s, &ctx(&[Permission::GrafanaRead])).unwrap();
-        let dashboards = super::dashboards::list_dashboards(&s, &ctx(&[Permission::GrafanaRead])).unwrap();
+        let dashboards =
+            super::dashboards::list_dashboards(&s, &ctx(&[Permission::GrafanaRead])).unwrap();
         let expected: u32 = dashboards.iter().map(|d| d.panels).sum();
         assert_eq!(panels.len() as u32, expected);
     }

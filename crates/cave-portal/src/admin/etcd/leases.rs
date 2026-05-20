@@ -5,7 +5,7 @@
 use super::EtcdViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::table;
-use crate::admin::state::{scope, AdminState, EtcdLease};
+use crate::admin::state::{AdminState, EtcdLease, scope};
 
 pub fn list_leases(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<EtcdLease>, EtcdViewError> {
     ctx.authorise(Permission::EtcdRead)?;

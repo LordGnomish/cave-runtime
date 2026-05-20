@@ -154,18 +154,16 @@ where
 {
     match (a.as_i64(), b.as_i64()) {
         (Some(av), Some(bv)) => cmp(av, bv),
-        _ => {
-            match (a.as_f64(), b.as_f64()) {
-                (Some(av), Some(bv)) => {
-                    if av.is_nan() || bv.is_nan() {
-                        false
-                    } else {
-                        cmp(av as i64, bv as i64)
-                    }
+        _ => match (a.as_f64(), b.as_f64()) {
+            (Some(av), Some(bv)) => {
+                if av.is_nan() || bv.is_nan() {
+                    false
+                } else {
+                    cmp(av as i64, bv as i64)
                 }
-                _ => false,
             }
-        }
+            _ => false,
+        },
     }
 }
 
@@ -254,10 +252,10 @@ mod tests {
         cond2.insert("status".to_string(), Value::String("active".to_string()));
 
         let mut query = Document::new();
-        query.insert("$and".to_string(), Value::Array(vec![
-            Value::Object(cond1),
-            Value::Object(cond2),
-        ]));
+        query.insert(
+            "$and".to_string(),
+            Value::Array(vec![Value::Object(cond1), Value::Object(cond2)]),
+        );
 
         assert!(matches_query(&doc, &query));
     }
@@ -273,10 +271,10 @@ mod tests {
         cond2.insert("status".to_string(), Value::String("inactive".to_string()));
 
         let mut query = Document::new();
-        query.insert("$or".to_string(), Value::Array(vec![
-            Value::Object(cond1),
-            Value::Object(cond2),
-        ]));
+        query.insert(
+            "$or".to_string(),
+            Value::Array(vec![Value::Object(cond1), Value::Object(cond2)]),
+        );
 
         assert!(matches_query(&doc, &query));
     }
@@ -284,10 +282,16 @@ mod tests {
     #[test]
     fn test_regex_operator() {
         let mut doc = Document::new();
-        doc.insert("email".to_string(), Value::String("test@example.com".to_string()));
+        doc.insert(
+            "email".to_string(),
+            Value::String("test@example.com".to_string()),
+        );
 
         let mut op = serde_json::Map::new();
-        op.insert("$regex".to_string(), Value::String(".*@example\\.com".to_string()));
+        op.insert(
+            "$regex".to_string(),
+            Value::String(".*@example\\.com".to_string()),
+        );
         let mut query = Document::new();
         query.insert("email".to_string(), Value::Object(op));
 

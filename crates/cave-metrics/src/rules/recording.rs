@@ -4,7 +4,7 @@
 
 use crate::error::Result;
 use crate::model::{Labels, QueryResult, Sample};
-use crate::promql::{parse, Engine};
+use crate::promql::{Engine, parse};
 use crate::tsdb::Tsdb;
 use std::sync::Arc;
 
@@ -18,7 +18,11 @@ pub struct RecordingRule {
 
 impl RecordingRule {
     pub fn new(name: impl Into<String>, expr: impl Into<String>) -> Self {
-        Self { name: name.into(), expr: expr.into(), labels: Labels::new() }
+        Self {
+            name: name.into(),
+            expr: expr.into(),
+            labels: Labels::new(),
+        }
     }
 
     pub fn with_labels(mut self, labels: Labels) -> Self {
@@ -56,8 +60,8 @@ impl RecordingRule {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsdb::{Tsdb, TsdbConfig};
     use crate::model::LabelMatcher;
+    use crate::tsdb::{Tsdb, TsdbConfig};
 
     #[test]
     fn test_recording_rule() {
@@ -79,7 +83,8 @@ mod tests {
         // Check the recorded series
         let series = tsdb.select(
             &[LabelMatcher::equal("__name__", "job:http_requests:sum")],
-            0, 3000,
+            0,
+            3000,
         );
         assert!(!series.is_empty());
     }

@@ -26,7 +26,7 @@ pub use error::{KubeProxyError, KubeProxyResult};
 pub use healthcheck::HealthCheckServer;
 pub use iptables::IptablesProxier;
 pub use nftables::NftablesProxier;
-pub use nodeport::{NodePortAllocator, DEFAULT_MAX_NODE_PORT, DEFAULT_MIN_NODE_PORT};
+pub use nodeport::{DEFAULT_MAX_NODE_PORT, DEFAULT_MIN_NODE_PORT, NodePortAllocator};
 pub use service::{
     Cidr, Protocol, ServiceChangeTracker, ServicePortInfo, ServicePortName, SessionAffinity,
     TrafficPolicy,

@@ -20,16 +20,24 @@ pub struct RpmFilter {
 impl RpmFilter {
     pub fn matches(&self, pkg: &RpmPackage) -> bool {
         if let Some(ref n) = self.name {
-            if !pkg.name.contains(n.as_str()) { return false; }
+            if !pkg.name.contains(n.as_str()) {
+                return false;
+            }
         }
         if let Some(ref v) = self.version {
-            if pkg.version != *v { return false; }
+            if pkg.version != *v {
+                return false;
+            }
         }
         if let Some(ref r) = self.release {
-            if pkg.release != *r { return false; }
+            if pkg.release != *r {
+                return false;
+            }
         }
         if let Some(ref a) = self.arch {
-            if pkg.arch != *a { return false; }
+            if pkg.arch != *a {
+                return false;
+            }
         }
         true
     }
@@ -46,13 +54,19 @@ pub struct DebFilter {
 impl DebFilter {
     pub fn matches(&self, pkg: &DebPackage) -> bool {
         if let Some(ref n) = self.package {
-            if !pkg.package.contains(n.as_str()) { return false; }
+            if !pkg.package.contains(n.as_str()) {
+                return false;
+            }
         }
         if let Some(ref v) = self.version {
-            if pkg.version != *v { return false; }
+            if pkg.version != *v {
+                return false;
+            }
         }
         if let Some(ref a) = self.architecture {
-            if pkg.architecture != *a { return false; }
+            if pkg.architecture != *a {
+                return false;
+            }
         }
         true
     }
@@ -69,13 +83,19 @@ pub struct PypiFilter {
 impl PypiFilter {
     pub fn matches(&self, pkg: &PythonPackage) -> bool {
         if let Some(ref n) = self.name {
-            if !pkg.name.to_lowercase().contains(&n.to_lowercase()) { return false; }
+            if !pkg.name.to_lowercase().contains(&n.to_lowercase()) {
+                return false;
+            }
         }
         if let Some(ref v) = self.version {
-            if pkg.version != *v { return false; }
+            if pkg.version != *v {
+                return false;
+            }
         }
         if let Some(ref t) = self.package_type {
-            if pkg.packagetype != *t { return false; }
+            if pkg.packagetype != *t {
+                return false;
+            }
         }
         true
     }
@@ -87,7 +107,8 @@ impl PypiFilter {
 pub fn verify_sha256(data: &[u8], expected_hex: &str) -> bool {
     // In production this would use ring or sha2 crate.
     // For now: length-check + non-empty.
-    !expected_hex.is_empty() && expected_hex.len() == 64
+    !expected_hex.is_empty()
+        && expected_hex.len() == 64
         && expected_hex.chars().all(|c| c.is_ascii_hexdigit())
 }
 
@@ -135,9 +156,7 @@ pub fn generate_pypi_simple_page(name: &str, packages: &[PythonPackage]) -> Stri
         name, name
     );
     for pkg in packages {
-        let sha256_fragment = pkg.sha256
-            .split(':').next_back()
-            .unwrap_or(&pkg.sha256);
+        let sha256_fragment = pkg.sha256.split(':').next_back().unwrap_or(&pkg.sha256);
         html.push_str(&format!(
             "<a href=\"{}#sha256={}\" data-requires-python=\"{}\">{}</a><br/>\n",
             pkg.url,
@@ -152,14 +171,17 @@ pub fn generate_pypi_simple_page(name: &str, packages: &[PythonPackage]) -> Stri
 
 /// Generate a PyPI project JSON (PEP 691).
 pub fn generate_pypi_project_json(name: &str, packages: &[PythonPackage]) -> serde_json::Value {
-    let files: Vec<serde_json::Value> = packages.iter().map(|pkg| {
-        serde_json::json!({
-            "filename": pkg.filename,
-            "url": pkg.url,
-            "hashes": { "sha256": pkg.sha256 },
-            "requires-python": pkg.requires_python,
+    let files: Vec<serde_json::Value> = packages
+        .iter()
+        .map(|pkg| {
+            serde_json::json!({
+                "filename": pkg.filename,
+                "url": pkg.url,
+                "hashes": { "sha256": pkg.sha256 },
+                "requires-python": pkg.requires_python,
+            })
         })
-    }).collect();
+        .collect();
 
     serde_json::json!({
         "meta": { "api-version": "1.0" },
@@ -172,7 +194,8 @@ pub fn generate_pypi_project_json(name: &str, packages: &[PythonPackage]) -> ser
 
 /// Generate a minimal RPM repository repomd.xml outline.
 pub fn generate_repomd_xml(packages: &[RpmPackage], repo_path: &str) -> String {
-    format!(r#"<?xml version="1.0" encoding="UTF-8"?>
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
 <repomd xmlns="http://linux.duke.edu/metadata/repo" xmlns:rpm="http://linux.duke.edu/metadata/rpm">
   <revision>{}</revision>
   <data type="primary">
@@ -271,7 +294,10 @@ mod tests {
 
     #[test]
     fn rpm_filter_by_name() {
-        let filter = RpmFilter { name: Some("httpd".to_string()), ..Default::default() };
+        let filter = RpmFilter {
+            name: Some("httpd".to_string()),
+            ..Default::default()
+        };
         let pkg1 = make_rpm("httpd", "2.4.57", "x86_64");
         let pkg2 = make_rpm("nginx", "1.25", "x86_64");
         assert!(filter.matches(&pkg1));
@@ -280,7 +306,10 @@ mod tests {
 
     #[test]
     fn rpm_filter_by_arch() {
-        let filter = RpmFilter { arch: Some("aarch64".to_string()), ..Default::default() };
+        let filter = RpmFilter {
+            arch: Some("aarch64".to_string()),
+            ..Default::default()
+        };
         let pkg1 = make_rpm("httpd", "2.4.57", "x86_64");
         let pkg2 = make_rpm("httpd", "2.4.57", "aarch64");
         assert!(!filter.matches(&pkg1));
@@ -289,7 +318,10 @@ mod tests {
 
     #[test]
     fn deb_filter_by_arch() {
-        let filter = DebFilter { architecture: Some("arm64".to_string()), ..Default::default() };
+        let filter = DebFilter {
+            architecture: Some("arm64".to_string()),
+            ..Default::default()
+        };
         let pkg1 = make_deb("curl", "8.5.0", "amd64");
         let pkg2 = make_deb("curl", "8.5.0", "arm64");
         assert!(!filter.matches(&pkg1));
@@ -298,7 +330,10 @@ mod tests {
 
     #[test]
     fn pypi_filter_by_name_case_insensitive() {
-        let filter = PypiFilter { name: Some("Requests".to_string()), ..Default::default() };
+        let filter = PypiFilter {
+            name: Some("Requests".to_string()),
+            ..Default::default()
+        };
         let pkg = PythonPackage {
             pulp_href: "/pulp/api/v3/content/python/packages/abc/".to_string(),
             pulp_id: Uuid::new_v4(),

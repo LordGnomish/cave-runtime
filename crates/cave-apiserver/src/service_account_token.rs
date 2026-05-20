@@ -16,9 +16,7 @@
 //! `kubernetes.io.tenant_id`. The issuer MUST set this from the calling
 //! ServiceAccount's tenant; verification MUST refuse a mismatch.
 
-use jsonwebtoken::{
-    decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation,
-};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 
@@ -36,7 +34,7 @@ pub struct TokenRequestSpec {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BoundObjectReference {
-    pub kind: String,        // "Pod" | "Secret"
+    pub kind: String, // "Pod" | "Secret"
     pub name: String,
     pub uid: String,
     pub api_version: String, // typically "v1"
@@ -130,14 +128,20 @@ pub struct TokenIssuer {
 impl TokenIssuer {
     pub fn new(issuer: impl Into<String>) -> Self {
         let secret = generate_secret();
-        Self { issuer: issuer.into(), secret }
+        Self {
+            issuer: issuer.into(),
+            secret,
+        }
     }
 
     /// Build with a deterministic secret — only used for cross-instance
     /// verification tests where the same secret must verify what another
     /// instance signed.
     pub fn with_secret(issuer: impl Into<String>, secret: Vec<u8>) -> Self {
-        Self { issuer: issuer.into(), secret }
+        Self {
+            issuer: issuer.into(),
+            secret,
+        }
     }
 
     /// Issue a TokenRequest. Mirrors
@@ -169,14 +173,29 @@ impl TokenIssuer {
             jti: uuid::Uuid::new_v4().to_string(),
             kubernetes_io: KubernetesClaim {
                 namespace: sa.namespace.clone(),
-                serviceaccount: NamedRef { name: sa.name.clone(), uid: sa.uid.clone() },
+                serviceaccount: NamedRef {
+                    name: sa.name.clone(),
+                    uid: sa.uid.clone(),
+                },
                 pod: spec.bound_object.as_ref().and_then(|b| {
-                    if b.kind == "Pod" { Some(NamedRef { name: b.name.clone(), uid: b.uid.clone() }) }
-                    else { None }
+                    if b.kind == "Pod" {
+                        Some(NamedRef {
+                            name: b.name.clone(),
+                            uid: b.uid.clone(),
+                        })
+                    } else {
+                        None
+                    }
                 }),
                 secret: spec.bound_object.as_ref().and_then(|b| {
-                    if b.kind == "Secret" { Some(NamedRef { name: b.name.clone(), uid: b.uid.clone() }) }
-                    else { None }
+                    if b.kind == "Secret" {
+                        Some(NamedRef {
+                            name: b.name.clone(),
+                            uid: b.uid.clone(),
+                        })
+                    } else {
+                        None
+                    }
                 }),
                 tenant_id: sa.tenant_id.clone(),
             },
@@ -203,9 +222,9 @@ impl TokenIssuer {
         validation.set_issuer(&[&self.issuer]);
         validation.validate_exp = true;
         validation.validate_nbf = true;
-        let data = decode::<TokenClaims>(
-            token, &DecodingKey::from_secret(&self.secret), &validation,
-        ).map_err(|e| TokenError::Jwt(e.to_string()))?;
+        let data =
+            decode::<TokenClaims>(token, &DecodingKey::from_secret(&self.secret), &validation)
+                .map_err(|e| TokenError::Jwt(e.to_string()))?;
         if !data.claims.aud.iter().any(|a| a == audience) {
             return Err(TokenError::AudienceMismatch {
                 token: data.claims.aud,
@@ -255,12 +274,15 @@ mod tests {
             bound_object: None,
         };
         let status = issuer.issue(&s, &spec).unwrap();
-        let claims = issuer.verify(&status.token,
-            "https://kubernetes.default.svc", "acme").unwrap();
+        let claims = issuer
+            .verify(&status.token, "https://kubernetes.default.svc", "acme")
+            .unwrap();
         assert_eq!(claims.iss, "https://kubernetes.default.svc");
         assert_eq!(claims.sub, "system:serviceaccount:default:default");
-        assert_eq!(claims.kubernetes_io.tenant_id, "acme",
-            "tenant_id invariant: token claims carry SA's tenant_id");
+        assert_eq!(
+            claims.kubernetes_io.tenant_id, "acme",
+            "tenant_id invariant: token claims carry SA's tenant_id"
+        );
         assert_eq!(claims.kubernetes_io.namespace, "default");
     }
 
@@ -283,13 +305,20 @@ mod tests {
         };
         let status = issuer.issue(&s, &spec).unwrap();
         let claims = issuer.verify(&status.token, "api", "acme").unwrap();
-        let pod = claims.kubernetes_io.pod.expect("bound pod claim must be present");
+        let pod = claims
+            .kubernetes_io
+            .pod
+            .expect("bound pod claim must be present");
         assert_eq!(pod.name, "myapp-7d8");
         assert_eq!(pod.uid, "pod-uid-1");
-        assert!(claims.kubernetes_io.secret.is_none(),
-            "Pod-bound token MUST NOT have a secret claim");
-        assert_eq!(claims.kubernetes_io.tenant_id, "acme",
-            "tenant_id invariant: bound-token retains tenant scoping");
+        assert!(
+            claims.kubernetes_io.secret.is_none(),
+            "Pod-bound token MUST NOT have a secret claim"
+        );
+        assert_eq!(
+            claims.kubernetes_io.tenant_id, "acme",
+            "tenant_id invariant: bound-token retains tenant scoping"
+        );
     }
 
     /// Upstream parity: `TestTokenRequest_TtlCappedByMax`
@@ -311,8 +340,10 @@ mod tests {
         assert!(dt.num_seconds() >= MAX_TOKEN_TTL_SECS - 5);
         // Verify still works.
         let claims = issuer.verify(&status.token, "api", "acme").unwrap();
-        assert_eq!(claims.kubernetes_io.tenant_id, "acme",
-            "tenant_id invariant after cap");
+        assert_eq!(
+            claims.kubernetes_io.tenant_id, "acme",
+            "tenant_id invariant after cap"
+        );
     }
 
     /// Upstream parity: `TestTokenRequest_AudienceMismatchRejected`
@@ -328,9 +359,13 @@ mod tests {
             bound_object: None,
         };
         let status = issuer.issue(&s, &spec).unwrap();
-        let err = issuer.verify(&status.token, "wrong-audience", "acme").unwrap_err();
-        assert!(matches!(err, TokenError::Jwt(_)),
-            "audience mismatch surfaces as JWT validation error");
+        let err = issuer
+            .verify(&status.token, "wrong-audience", "acme")
+            .unwrap_err();
+        assert!(
+            matches!(err, TokenError::Jwt(_)),
+            "audience mismatch surfaces as JWT validation error"
+        );
     }
 
     /// Upstream parity: `TestTokenRequest_TenantIsolation`
@@ -349,8 +384,10 @@ mod tests {
         let err = issuer.verify(&status.token, "api", "globex").unwrap_err();
         match err {
             TokenError::TenantMismatch { token, expected } => {
-                assert_eq!(token, "acme",
-                    "tenant_id invariant: token's tenant_id is exposed verbatim");
+                assert_eq!(
+                    token, "acme",
+                    "tenant_id invariant: token's tenant_id is exposed verbatim"
+                );
                 assert_eq!(expected, "globex");
             }
             other => panic!("expected TenantMismatch, got {:?}", other),
@@ -406,9 +443,14 @@ mod tests {
         let status = issuer.issue(&s, &spec).unwrap();
         let claims = issuer.verify(&status.token, "api", "acme").unwrap();
         assert!(claims.kubernetes_io.pod.is_none());
-        let secret = claims.kubernetes_io.secret.expect("bound secret claim present");
+        let secret = claims
+            .kubernetes_io
+            .secret
+            .expect("bound secret claim present");
         assert_eq!(secret.name, "default-token-abc");
-        assert_eq!(claims.kubernetes_io.tenant_id, "acme",
-            "tenant_id invariant on Secret-bound token");
+        assert_eq!(
+            claims.kubernetes_io.tenant_id, "acme",
+            "tenant_id invariant on Secret-bound token"
+        );
     }
 }

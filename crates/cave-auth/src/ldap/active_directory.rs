@@ -84,12 +84,7 @@ pub fn parse_object_sid(bytes: &[u8]) -> Option<String> {
     let mut out = format!("S-{}-{}", revision, authority);
     for i in 0..sub_count {
         let off = 8 + i * 4;
-        let sub = u32::from_le_bytes([
-            bytes[off],
-            bytes[off + 1],
-            bytes[off + 2],
-            bytes[off + 3],
-        ]);
+        let sub = u32::from_le_bytes([bytes[off], bytes[off + 1], bytes[off + 2], bytes[off + 3]]);
         out.push('-');
         out.push_str(&sub.to_string());
     }

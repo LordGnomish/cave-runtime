@@ -27,11 +27,16 @@ fn parity_is_full_for_cri_surface() {
     let r = cave_cri::calculate_parity().expect("manifest must parse");
     eprintln!(
         "cave-cri parity: file={}/{} fn={}/{} test={}/{} surface={}/{} stubs={} overall={:.3}",
-        r.file_parity.matched, r.file_parity.total,
-        r.function_parity.matched, r.function_parity.total,
-        r.test_parity.matched, r.test_parity.total,
-        r.surface_parity.matched, r.surface_parity.total,
-        r.stubs_detected, r.overall,
+        r.file_parity.matched,
+        r.file_parity.total,
+        r.function_parity.matched,
+        r.function_parity.total,
+        r.test_parity.matched,
+        r.test_parity.total,
+        r.surface_parity.matched,
+        r.surface_parity.total,
+        r.stubs_detected,
+        r.overall,
     );
     for g in &r.gaps {
         eprintln!("  gap: {:?} {} → {:?}", g.kind, g.upstream, g.local);

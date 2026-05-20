@@ -2,12 +2,16 @@
 // Copyright 2026 Cave Runtime contributors
 //! HTTP routes for cave-docs-site.
 
-use crate::{models::{DocPage, DocSite}, renderer, DocsSiteState};
+use crate::{
+    DocsSiteState,
+    models::{DocPage, DocSite},
+    renderer,
+};
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     routing::get,
-    Json, Router,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -134,7 +138,10 @@ async fn update_site(
     Json(req): Json<CreateSiteRequest>,
 ) -> Result<Json<DocSite>, StatusCode> {
     let mut sites = state.sites.lock().unwrap();
-    let site = sites.iter_mut().find(|s| s.id == id).ok_or(StatusCode::NOT_FOUND)?;
+    let site = sites
+        .iter_mut()
+        .find(|s| s.id == id)
+        .ok_or(StatusCode::NOT_FOUND)?;
     site.name = req.name;
     site.slug = req.slug;
     site.description = req.description;
@@ -143,14 +150,15 @@ async fn update_site(
     Ok(Json(site.clone()))
 }
 
-async fn delete_site(
-    State(state): State<Arc<DocsSiteState>>,
-    Path(id): Path<Uuid>,
-) -> StatusCode {
+async fn delete_site(State(state): State<Arc<DocsSiteState>>, Path(id): Path<Uuid>) -> StatusCode {
     let mut sites = state.sites.lock().unwrap();
     let before = sites.len();
     sites.retain(|s| s.id != id);
-    if sites.len() < before { StatusCode::NO_CONTENT } else { StatusCode::NOT_FOUND }
+    if sites.len() < before {
+        StatusCode::NO_CONTENT
+    } else {
+        StatusCode::NOT_FOUND
+    }
 }
 
 async fn get_nav(
@@ -219,9 +227,15 @@ async fn update_page(
         .iter_mut()
         .find(|p| p.site_id == site_id && p.id == page_id)
         .ok_or(StatusCode::NOT_FOUND)?;
-    if let Some(t) = req.title { page.title = t; }
-    if let Some(c) = req.content { page.content = c; }
-    if let Some(o) = req.order { page.order = o; }
+    if let Some(t) = req.title {
+        page.title = t;
+    }
+    if let Some(c) = req.content {
+        page.content = c;
+    }
+    if let Some(o) = req.order {
+        page.order = o;
+    }
     page.updated_at = Utc::now();
     Ok(Json(page.clone()))
 }
@@ -233,7 +247,11 @@ async fn delete_page(
     let mut pages = state.pages.lock().unwrap();
     let before = pages.len();
     pages.retain(|p| !(p.site_id == site_id && p.id == page_id));
-    if pages.len() < before { StatusCode::NO_CONTENT } else { StatusCode::NOT_FOUND }
+    if pages.len() < before {
+        StatusCode::NO_CONTENT
+    } else {
+        StatusCode::NOT_FOUND
+    }
 }
 
 async fn search_pages(
@@ -260,7 +278,12 @@ async fn search_pages(
                 .chars()
                 .take(160)
                 .collect();
-            SearchResult { page_id: p.id, title: p.title.clone(), path: p.path.clone(), excerpt }
+            SearchResult {
+                page_id: p.id,
+                title: p.title.clone(),
+                path: p.path.clone(),
+                excerpt,
+            }
         })
         .collect();
 

@@ -2,10 +2,7 @@
 // Copyright 2026 Cave Runtime contributors
 //! SBOM generation — CycloneDX 1.4 and SPDX 2.3 (JSON format).
 
-use crate::trivy::{
-    lang_pkg::LangPackage,
-    os_pkg::OsPackage,
-};
+use crate::trivy::{lang_pkg::LangPackage, os_pkg::OsPackage};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -92,12 +89,7 @@ pub fn generate_cyclonedx(
 
     for pkg in os_packages {
         let bom_ref = format!("os/{}@{}", pkg.name, pkg.version);
-        let purl = format!(
-            "pkg:{}/{}@{}",
-            pkg.package_manager,
-            pkg.name,
-            pkg.version
-        );
+        let purl = format!("pkg:{}/{}@{}", pkg.package_manager, pkg.name, pkg.version);
         components.push(CycloneDxComponent {
             component_type: "library".into(),
             bom_ref: bom_ref.clone(),
@@ -126,7 +118,10 @@ pub fn generate_cyclonedx(
             } else {
                 ("SHA-256", h.clone())
             };
-            CycloneDxHash { alg: alg.to_string(), content }
+            CycloneDxHash {
+                alg: alg.to_string(),
+                content,
+            }
         });
         components.push(CycloneDxComponent {
             component_type: "library".into(),
@@ -234,7 +229,13 @@ pub struct SpdxRelationship {
 fn spdx_safe_id(name: &str, version: &str) -> String {
     let safe: String = format!("{name}-{version}")
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '.' { c } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '.' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect();
     format!("SPDXRef-{safe}")
 }
@@ -360,11 +361,7 @@ mod tests {
 
     #[test]
     fn cyclonedx_structure() {
-        let bom = generate_cyclonedx(
-            "myimage:latest",
-            &[sample_os_pkg()],
-            &[sample_lang_pkg()],
-        );
+        let bom = generate_cyclonedx("myimage:latest", &[sample_os_pkg()], &[sample_lang_pkg()]);
         assert_eq!(bom.bom_format, "CycloneDX");
         assert_eq!(bom.spec_version, "1.4");
         assert_eq!(bom.components.len(), 2);

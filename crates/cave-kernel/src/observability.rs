@@ -111,10 +111,18 @@ impl SpanGuard {
         }
     }
 
-    pub fn name(&self) -> &str { &self.name }
-    pub fn start_ns(&self) -> u128 { self.start_ns }
-    pub fn end_ns(&self) -> Option<u128> { self.end_ns }
-    pub fn attributes(&self) -> &BTreeMap<String, String> { &self.attributes }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn start_ns(&self) -> u128 {
+        self.start_ns
+    }
+    pub fn end_ns(&self) -> Option<u128> {
+        self.end_ns
+    }
+    pub fn attributes(&self) -> &BTreeMap<String, String> {
+        &self.attributes
+    }
 
     /// Tag the span with a key=value attribute. Mirrors
     /// `tracing::Span::record` (string-keyed, string-valued).
@@ -134,7 +142,9 @@ impl SpanGuard {
     /// Duration in nanoseconds; defaults to "from start to now" when
     /// the guard has not been ended yet.
     pub fn duration_ns(&self) -> u128 {
-        self.end_ns.unwrap_or_else(now_ns).saturating_sub(self.start_ns)
+        self.end_ns
+            .unwrap_or_else(now_ns)
+            .saturating_sub(self.start_ns)
     }
 }
 
@@ -168,8 +178,16 @@ impl Tracer for NoopTracer {
 /// renderer can format the OpenMetrics `_bucket{le="..."}` lines.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Metric {
-    Counter { name: String, value: u64, labels: BTreeMap<String, String> },
-    Gauge { name: String, value: f64, labels: BTreeMap<String, String> },
+    Counter {
+        name: String,
+        value: u64,
+        labels: BTreeMap<String, String>,
+    },
+    Gauge {
+        name: String,
+        value: f64,
+        labels: BTreeMap<String, String>,
+    },
     Histogram {
         name: String,
         buckets_le_ms: Vec<f64>,
@@ -181,11 +199,19 @@ pub enum Metric {
 
 impl Metric {
     pub fn counter(name: impl Into<String>) -> Self {
-        Metric::Counter { name: name.into(), value: 0, labels: BTreeMap::new() }
+        Metric::Counter {
+            name: name.into(),
+            value: 0,
+            labels: BTreeMap::new(),
+        }
     }
 
     pub fn gauge(name: impl Into<String>) -> Self {
-        Metric::Gauge { name: name.into(), value: 0.0, labels: BTreeMap::new() }
+        Metric::Gauge {
+            name: name.into(),
+            value: 0.0,
+            labels: BTreeMap::new(),
+        }
     }
 
     pub fn histogram(name: impl Into<String>, buckets_le_ms: Vec<f64>) -> Self {
@@ -214,7 +240,9 @@ impl Metric {
             Metric::Counter { value, .. } => *value += delta,
             Metric::Histogram { sum_ms, counts, .. } => {
                 *sum_ms += delta as f64;
-                if let Some(last) = counts.last_mut() { *last += 1; }
+                if let Some(last) = counts.last_mut() {
+                    *last += 1;
+                }
             }
             Metric::Gauge { .. } => panic!("inc_by called on Gauge — use set()"),
         }
@@ -233,7 +261,12 @@ impl Metric {
     /// counters/gauges.
     pub fn observe_ms(&mut self, value_ms: f64) {
         match self {
-            Metric::Histogram { buckets_le_ms, counts, sum_ms, .. } => {
+            Metric::Histogram {
+                buckets_le_ms,
+                counts,
+                sum_ms,
+                ..
+            } => {
                 *sum_ms += value_ms;
                 for (i, le) in buckets_le_ms.iter().enumerate() {
                     if value_ms <= *le {
@@ -242,7 +275,9 @@ impl Metric {
                     }
                 }
                 // Above the largest bucket — record in +Inf (last bucket).
-                if let Some(last) = counts.last_mut() { *last += 1; }
+                if let Some(last) = counts.last_mut() {
+                    *last += 1;
+                }
             }
             _ => panic!("observe_ms called on non-Histogram"),
         }
@@ -262,8 +297,7 @@ mod tests {
 
     #[test]
     fn log_record_now_stamps_current_time() {
-        let r = LogRecord::now(LogLevel::Info, "test", "hello")
-            .with_field("k", "v");
+        let r = LogRecord::now(LogLevel::Info, "test", "hello").with_field("k", "v");
         assert_eq!(r.level, LogLevel::Info);
         assert_eq!(r.target, "test");
         assert_eq!(r.message, "hello");
@@ -372,8 +406,8 @@ mod tests {
     #[test]
     fn metric_histogram_observe_records_correct_bucket() {
         let mut h = Metric::histogram("latency_ms", vec![10.0, 100.0, 1000.0]);
-        h.observe_ms(5.0);   // bucket[0] (≤10)
-        h.observe_ms(50.0);  // bucket[1] (≤100)
+        h.observe_ms(5.0); // bucket[0] (≤10)
+        h.observe_ms(50.0); // bucket[1] (≤100)
         h.observe_ms(500.0); // bucket[2] (≤1000)
         h.observe_ms(5000.0); // > 1000 → +Inf (last bucket)
         match h {
@@ -410,8 +444,7 @@ mod tests {
 
     #[test]
     fn log_record_round_trips_through_json() {
-        let r = LogRecord::now(LogLevel::Warn, "auth", "denied")
-            .with_field("user", "alice");
+        let r = LogRecord::now(LogLevel::Warn, "auth", "denied").with_field("user", "alice");
         let s = serde_json::to_string(&r).unwrap();
         let back: LogRecord = serde_json::from_str(&s).unwrap();
         assert_eq!(r, back);

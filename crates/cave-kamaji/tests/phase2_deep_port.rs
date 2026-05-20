@@ -9,13 +9,13 @@ use cave_kamaji::datastore::{
     DataStore, DataStoreKind, DataStoreSpec, EtcdSnapshotConfig, KineDriver,
 };
 use cave_kamaji::konnectivity::{Konnectivity, KonnectivityMode};
-use cave_kamaji::kubeadm::{render_kubeadm_init_config, KubeadmConfig};
+use cave_kamaji::kubeadm::{KubeadmConfig, render_kubeadm_init_config};
 use cave_kamaji::models::{TenantControlPlane, TenantPhase, TenantSpec, TenantStatus};
-use cave_kamaji::pod_mgmt::{plan_apiserver_pod, ApiServerPodPlan};
+use cave_kamaji::pod_mgmt::{ApiServerPodPlan, plan_apiserver_pod};
 use cave_kamaji::status::{
-    set_condition, status_summary, Condition, ConditionStatus, ConditionType,
+    Condition, ConditionStatus, ConditionType, set_condition, status_summary,
 };
-use cave_kamaji::webhook::{validate_create, validate_update, WebhookError};
+use cave_kamaji::webhook::{WebhookError, validate_create, validate_update};
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -185,10 +185,7 @@ fn plan_apiserver_pod_emits_one_pod_per_replica() {
     assert_eq!(plan.replicas, 2);
     assert!(plan.image.contains("kube-apiserver:v1.31.0"));
     assert!(plan.command.iter().any(|c| c == "kube-apiserver"));
-    assert!(plan
-        .args
-        .iter()
-        .any(|a| a.starts_with("--etcd-servers=")));
+    assert!(plan.args.iter().any(|a| a.starts_with("--etcd-servers=")));
 }
 
 #[test]
@@ -264,20 +261,26 @@ fn status_summary_reflects_running_tcp() {
     tcp.status.api_server_endpoint = Some("https://10.0.0.1:6443".into());
     tcp.status.ready = true;
     let conds = status_summary(&tcp);
-    assert!(conds
-        .iter()
-        .any(|c| c.cond_type == ConditionType::Ready && c.status == ConditionStatus::True));
-    assert!(conds
-        .iter()
-        .any(|c| c.cond_type == ConditionType::ControlPlaneHealthy
-            && c.status == ConditionStatus::True));
+    assert!(
+        conds
+            .iter()
+            .any(|c| c.cond_type == ConditionType::Ready && c.status == ConditionStatus::True)
+    );
+    assert!(
+        conds
+            .iter()
+            .any(|c| c.cond_type == ConditionType::ControlPlaneHealthy
+                && c.status == ConditionStatus::True)
+    );
 }
 
 #[test]
 fn status_summary_reflects_provisioning_tcp() {
     let tcp = base_tcp();
     let conds = status_summary(&tcp);
-    assert!(conds
-        .iter()
-        .any(|c| c.cond_type == ConditionType::Ready && c.status == ConditionStatus::False));
+    assert!(
+        conds
+            .iter()
+            .any(|c| c.cond_type == ConditionType::Ready && c.status == ConditionStatus::False)
+    );
 }

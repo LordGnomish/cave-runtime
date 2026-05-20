@@ -43,7 +43,11 @@ pub fn list_events(
                     controller: l.controller.clone(),
                     kind: "Normal",
                     reason: "ReconcileSuccess",
-                    message: format!("Reconciled {} resources owned by {}", 10 + idx, l.controller),
+                    message: format!(
+                        "Reconciled {} resources owned by {}",
+                        10 + idx,
+                        l.controller
+                    ),
                 },
             ]
         })
@@ -80,10 +84,7 @@ pub(super) fn render_section(
 </section>"#,
         n = events.len(),
         w = warning_count(&events),
-        tbl = table(
-            &["time", "controller", "type", "reason", "message"],
-            &rows
-        ),
+        tbl = table(&["time", "controller", "type", "reason", "message"], &rows),
     ))
 }
 
@@ -106,7 +107,11 @@ mod tests {
         );
         let s = AdminState::seeded();
         let events = list_events(&s, &ctx(&[Permission::ControllerManagerRead])).unwrap();
-        let leases = super::super::leader_election::list_leases(&s, &ctx(&[Permission::ControllerManagerRead])).unwrap();
+        let leases = super::super::leader_election::list_leases(
+            &s,
+            &ctx(&[Permission::ControllerManagerRead]),
+        )
+        .unwrap();
         assert_eq!(events.len(), leases.len() * 2);
     }
 

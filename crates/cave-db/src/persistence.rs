@@ -13,13 +13,7 @@
 
 use async_trait::async_trait;
 use serde::{Serialize, de::DeserializeOwned};
-use std::{
-    collections::HashMap,
-    future::Future,
-    path::PathBuf,
-    pin::Pin,
-    sync::Arc,
-};
+use std::{collections::HashMap, future::Future, path::PathBuf, pin::Pin, sync::Arc};
 use thiserror::Error;
 use tokio::sync::Mutex;
 
@@ -218,10 +212,7 @@ impl Default for MemoryStorage {
 impl Storage for MemoryStorage {
     async fn get_raw(&self, collection: &str, id: &str) -> StorageResult<Option<String>> {
         let guard = self.data.lock().await;
-        Ok(guard
-            .get(collection)
-            .and_then(|c| c.get(id))
-            .cloned())
+        Ok(guard.get(collection).and_then(|c| c.get(id)).cloned())
     }
 
     async fn list_raw(&self, collection: &str) -> StorageResult<Vec<String>> {
@@ -333,12 +324,9 @@ impl Storage for DiskStorage {
         let collection = collection.to_owned();
         tokio::task::spawn_blocking(move || -> StorageResult<Vec<String>> {
             let conn = rusqlite::Connection::open(&path)?;
-            let mut stmt =
-                conn.prepare("SELECT data FROM kv WHERE collection = ?1")?;
+            let mut stmt = conn.prepare("SELECT data FROM kv WHERE collection = ?1")?;
             let rows = stmt
-                .query_map(rusqlite::params![collection], |row| {
-                    row.get::<_, String>(0)
-                })?
+                .query_map(rusqlite::params![collection], |row| row.get::<_, String>(0))?
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(rows)
         })
@@ -382,7 +370,10 @@ impl Storage for DiskStorage {
     async fn query_raw(&self, collection: &str, filter: &Filter) -> StorageResult<Vec<String>> {
         // Fetch all, filter in Rust — avoids complex SQLite JSON path handling.
         let all = self.list_raw(collection).await?;
-        Ok(all.into_iter().filter(|s| filter_matches(s, filter)).collect())
+        Ok(all
+            .into_iter()
+            .filter(|s| filter_matches(s, filter))
+            .collect())
     }
 }
 
@@ -449,10 +440,7 @@ impl PostgresStorage {
             .await
             .map_err(|e| StorageError::Database(e.to_string()))?;
 
-        Ok(Self {
-            pool,
-            schema,
-        })
+        Ok(Self { pool, schema })
     }
 }
 
@@ -550,6 +538,9 @@ impl Storage for PostgresStorage {
         // For high-cardinality use cases, push the filter down to SQL via
         // JSONB operators; this in-memory path is intentionally simple.
         let all = self.list_raw(collection).await?;
-        Ok(all.into_iter().filter(|s| filter_matches(s, filter)).collect())
+        Ok(all
+            .into_iter()
+            .filter(|s| filter_matches(s, filter))
+            .collect())
     }
 }

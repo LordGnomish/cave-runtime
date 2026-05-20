@@ -32,7 +32,7 @@ fn kube_services_emits_one_rule_per_clusterip_service() {
     let p = IptablesProxier::new(TENANT);
     let services = vec![
         svc("api", "10.0.0.1", 80, None),
-        svc("db",  "10.0.0.2", 5432, None),
+        svc("db", "10.0.0.2", 5432, None),
     ];
     let rules = p.build_kube_services_rules(&services).unwrap();
     assert_eq!(rules.len(), 2);
@@ -47,8 +47,8 @@ fn kube_services_emits_one_rule_per_clusterip_service() {
 fn headless_services_skipped_from_kube_services() {
     let p = IptablesProxier::new(TENANT);
     let services = vec![
-        svc("headless", "0.0.0.0", 80, None),  // skip sentinel
-        svc("api",      "10.0.0.1", 80, None),
+        svc("headless", "0.0.0.0", 80, None), // skip sentinel
+        svc("api", "10.0.0.1", 80, None),
     ];
     let rules = p.build_kube_services_rules(&services).unwrap();
     assert_eq!(rules.len(), 1);
@@ -63,11 +63,15 @@ fn kube_nodeports_emits_only_for_nodeport_services() {
     let p = IptablesProxier::new(TENANT);
     let services = vec![
         svc("api", "10.0.0.1", 80, Some(31080)),
-        svc("db",  "10.0.0.2", 5432, None),       // no NodePort
-        svc("ui",  "10.0.0.3", 8080, Some(31443)),
+        svc("db", "10.0.0.2", 5432, None), // no NodePort
+        svc("ui", "10.0.0.3", 8080, Some(31443)),
     ];
     let rules = p.build_kube_nodeports_rules(&services).unwrap();
-    assert_eq!(rules.len(), 2, "db has no NodePort → no KUBE-NODEPORTS rule");
+    assert_eq!(
+        rules.len(),
+        2,
+        "db has no NodePort → no KUBE-NODEPORTS rule"
+    );
     assert!(rules.iter().any(|r| r.contains("--dport 31080")));
     assert!(rules.iter().any(|r| r.contains("--dport 31443")));
 }
@@ -81,8 +85,10 @@ fn kube_services_to_nodeports_jump_uses_addrtype_local() {
     let line = p.build_kube_services_nodeports_terminator();
     assert!(line.contains("KUBE-SERVICES"));
     assert!(line.contains("KUBE-NODEPORTS"));
-    assert!(line.contains("--dst-type LOCAL"),
-        "addrtype LOCAL match required so only host-bound traffic hits NodePort");
+    assert!(
+        line.contains("--dst-type LOCAL"),
+        "addrtype LOCAL match required so only host-bound traffic hits NodePort"
+    );
 }
 
 /// Cite: `pkg/proxy/iptables/proxier.go` per-service SVC chain — the
@@ -93,11 +99,15 @@ fn svc_chain_emits_one_dnat_per_ready_endpoint_with_decaying_probability() {
     let p = IptablesProxier::new(TENANT);
     let s = svc("api", "10.0.0.1", 80, None);
     let mut eps = EndpointSliceMap::new(TENANT);
-    eps.upsert_slice(s.name.clone(), "slice-1", vec![
-        EndpointInfo::ready("10.1.0.1".parse().unwrap(), 8080),
-        EndpointInfo::ready("10.1.0.2".parse().unwrap(), 8080),
-        EndpointInfo::ready("10.1.0.3".parse().unwrap(), 8080),
-    ]);
+    eps.upsert_slice(
+        s.name.clone(),
+        "slice-1",
+        vec![
+            EndpointInfo::ready("10.1.0.1".parse().unwrap(), 8080),
+            EndpointInfo::ready("10.1.0.2".parse().unwrap(), 8080),
+            EndpointInfo::ready("10.1.0.3".parse().unwrap(), 8080),
+        ],
+    );
 
     let rules = p.build_svc_chain_rules(&s, &eps).unwrap();
     assert_eq!(rules.len(), 3, "one DNAT per endpoint");

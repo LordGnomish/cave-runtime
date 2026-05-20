@@ -82,9 +82,9 @@ impl AdoptionPlan {
 }
 
 fn selector_matches(spec_selector: &[(String, String)], labels: &[(String, String)]) -> bool {
-    spec_selector.iter().all(|(k, v)| {
-        labels.iter().any(|(lk, lv)| lk == k && lv == v)
-    })
+    spec_selector
+        .iter()
+        .all(|(k, v)| labels.iter().any(|(lk, lv)| lk == k && lv == v))
 }
 
 /// Adopt orphan pods that match the selector. Mirrors
@@ -106,9 +106,15 @@ pub fn adopt_orphans(
     }
     let mut claimed = vec![];
     for p in pods {
-        if p.namespace != spec.namespace { continue; }
-        if p.controller_ref.is_some() { continue; }
-        if !selector_matches(&spec.selector, &p.labels) { continue; }
+        if p.namespace != spec.namespace {
+            continue;
+        }
+        if p.controller_ref.is_some() {
+            continue;
+        }
+        if !selector_matches(&spec.selector, &p.labels) {
+            continue;
+        }
         claimed.push(p.name.clone());
     }
     Ok(AdoptionPlan { claimed })
@@ -125,7 +131,9 @@ pub fn release_mismatched(
     let mut released = vec![];
     for p in pods {
         let owned = p.controller_ref.as_deref() == Some(rs_uid);
-        if !owned { continue; }
+        if !owned {
+            continue;
+        }
         if !selector_matches(&spec.selector, &p.labels) {
             released.push(p.name.clone());
         }
@@ -134,7 +142,10 @@ pub fn release_mismatched(
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::new("pkg/controller/replicaset/replica_set.go", "ReplicaSetController");
+const FILE_CITE: Cite = Cite::new(
+    "pkg/controller/replicaset/replica_set.go",
+    "ReplicaSetController",
+);
 
 #[cfg(test)]
 mod tests {
@@ -157,9 +168,18 @@ mod tests {
             "syncReplicaSet",
             "tenant-rs-bad-selector"
         );
-        let bad = ReplicaSetSpec { selector: vec![], ..spec(1) };
+        let bad = ReplicaSetSpec {
+            selector: vec![],
+            ..spec(1)
+        };
         let err = reconcile(&bad, &ReplicaSetStatus::default(), &tenant).unwrap_err();
-        assert!(matches!(err, ControllerError::InvalidSpec { kind: "ReplicaSet", .. }));
+        assert!(matches!(
+            err,
+            ControllerError::InvalidSpec {
+                kind: "ReplicaSet",
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -169,8 +189,14 @@ mod tests {
             "manageReplicas",
             "tenant-rs-create"
         );
-        let st = ReplicaSetStatus { running_pods: 1, ..Default::default() };
-        assert_eq!(reconcile(&spec(4), &st, &tenant).unwrap(), Reconcile::Create(3));
+        let st = ReplicaSetStatus {
+            running_pods: 1,
+            ..Default::default()
+        };
+        assert_eq!(
+            reconcile(&spec(4), &st, &tenant).unwrap(),
+            Reconcile::Create(3)
+        );
     }
 
     #[test]
@@ -180,8 +206,14 @@ mod tests {
             "manageReplicas",
             "tenant-rs-delete"
         );
-        let st = ReplicaSetStatus { running_pods: 7, ..Default::default() };
-        assert_eq!(reconcile(&spec(2), &st, &tenant).unwrap(), Reconcile::Delete(5));
+        let st = ReplicaSetStatus {
+            running_pods: 7,
+            ..Default::default()
+        };
+        assert_eq!(
+            reconcile(&spec(2), &st, &tenant).unwrap(),
+            Reconcile::Delete(5)
+        );
     }
 
     #[test]
@@ -192,8 +224,14 @@ mod tests {
             "tenant-rs-burst"
         );
         let _ = tenant;
-        assert_eq!(clamp_burst(Reconcile::Create(50), 10), Reconcile::Create(10));
-        assert_eq!(clamp_burst(Reconcile::Delete(50), 10), Reconcile::Delete(10));
+        assert_eq!(
+            clamp_burst(Reconcile::Create(50), 10),
+            Reconcile::Create(10)
+        );
+        assert_eq!(
+            clamp_burst(Reconcile::Delete(50), 10),
+            Reconcile::Delete(10)
+        );
         assert_eq!(clamp_burst(Reconcile::NoOp, 10), Reconcile::NoOp);
     }
 
@@ -203,7 +241,10 @@ mod tests {
         PodView {
             name: name.into(),
             namespace: ns.into(),
-            labels: labels.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            labels: labels
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
             controller_ref: owner.map(String::from),
         }
     }
@@ -220,8 +261,8 @@ mod tests {
         );
         let s = spec(3);
         let pods = vec![
-            pod("p1", "default", &[("app","nginx")], None),
-            pod("p2", "default", &[("app","nginx")], None),
+            pod("p1", "default", &[("app", "nginx")], None),
+            pod("p2", "default", &[("app", "nginx")], None),
         ];
         let plan = adopt_orphans(&s, &pods, &tenant).unwrap();
         assert_eq!(plan.count(), 2);
@@ -240,8 +281,13 @@ mod tests {
         );
         let s = spec(3);
         let pods = vec![
-            pod("orphan", "default", &[("app","nginx")], None),
-            pod("owned",  "default", &[("app","nginx")], Some("rs-other-uid")),
+            pod("orphan", "default", &[("app", "nginx")], None),
+            pod(
+                "owned",
+                "default",
+                &[("app", "nginx")],
+                Some("rs-other-uid"),
+            ),
         ];
         let plan = adopt_orphans(&s, &pods, &tenant).unwrap();
         assert_eq!(plan.count(), 1, "only the orphan is claimed");
@@ -259,8 +305,8 @@ mod tests {
         );
         let s = spec(3);
         let pods = vec![
-            pod("hit",  "default", &[("app","nginx")], None),
-            pod("miss", "default", &[("app","redis")], None),
+            pod("hit", "default", &[("app", "nginx")], None),
+            pod("miss", "default", &[("app", "redis")], None),
         ];
         let plan = adopt_orphans(&s, &pods, &tenant).unwrap();
         assert_eq!(plan.count(), 1);
@@ -279,12 +325,15 @@ mod tests {
         );
         let s = spec(3); // namespace=default
         let pods = vec![
-            pod("local",  "default",     &[("app","nginx")], None),
-            pod("alien",  "kube-system", &[("app","nginx")], None),
+            pod("local", "default", &[("app", "nginx")], None),
+            pod("alien", "kube-system", &[("app", "nginx")], None),
         ];
         let plan = adopt_orphans(&s, &pods, &tenant).unwrap();
-        assert_eq!(plan.count(), 1,
-            "tenant_id invariant: cross-namespace pods are NOT adopted");
+        assert_eq!(
+            plan.count(),
+            1,
+            "tenant_id invariant: cross-namespace pods are NOT adopted"
+        );
         assert_eq!(plan.claimed, vec!["local".to_string()]);
     }
 
@@ -303,12 +352,20 @@ mod tests {
         let s = spec(3);
         let rs_uid = "rs-1-uid";
         let pods = vec![
-            pod("kept", "default", &[("app","nginx")], Some(rs_uid)),
-            pod("drift","default", &[("app","sidekiq")], Some(rs_uid)),
-            pod("not-mine", "default", &[("app","sidekiq")], Some("rs-other")),
+            pod("kept", "default", &[("app", "nginx")], Some(rs_uid)),
+            pod("drift", "default", &[("app", "sidekiq")], Some(rs_uid)),
+            pod(
+                "not-mine",
+                "default",
+                &[("app", "sidekiq")],
+                Some("rs-other"),
+            ),
         ];
         let released = release_mismatched(&s, &pods, rs_uid).unwrap();
-        assert_eq!(released, vec!["drift".to_string()],
-            "only owned pods with mismatched labels are released");
+        assert_eq!(
+            released,
+            vec!["drift".to_string()],
+            "only owned pods with mismatched labels are released"
+        );
     }
 }

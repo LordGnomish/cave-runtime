@@ -141,8 +141,8 @@ impl MetricDef {
 /// `pkg/metrics/metrics.go` v1.19.3, with subsystem and kind preserved.
 /// Order follows upstream definition order.
 pub fn registry() -> Vec<MetricDef> {
-    use Kind::*;
     use subsystem as s;
+    use Kind::*;
     const NS: &str = NAMESPACE_AGENT;
     vec![
         // ── workqueue (k8s_workqueue) ────────────────────────────────────
@@ -297,7 +297,8 @@ mod tests {
 
     #[test]
     fn registry_has_all_seventy_three_upstream_metrics() {
-        let (_c, _t) = cilium_test_ctx!("pkg/metrics/metrics.go", "Registry.Count", "tenant-met-cnt");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/metrics/metrics.go", "Registry.Count", "tenant-met-cnt");
         // 73 metrics is the canonical count parsed from upstream
         // pkg/metrics/metrics.go @ v1.19.3 (every line matching `Name: "…"`).
         assert_eq!(registry().len(), 73, "metric count drifted from upstream");
@@ -307,7 +308,10 @@ mod tests {
     fn namespace_constants_match_upstream() {
         let (_c, _t) = cilium_test_ctx!("pkg/metrics/metrics.go", "Namespaces", "tenant-met-ns");
         assert_eq!(NAMESPACE_AGENT, "cilium");
-        assert_eq!(NAMESPACE_CLUSTERMESH_APISERVER, "cilium_clustermesh_apiserver");
+        assert_eq!(
+            NAMESPACE_CLUSTERMESH_APISERVER,
+            "cilium_clustermesh_apiserver"
+        );
         assert_eq!(NAMESPACE_KVSTOREMESH, "cilium_kvstoremesh");
         assert_eq!(NAMESPACE_OPERATOR, "cilium_operator");
     }
@@ -332,7 +336,11 @@ mod tests {
 
     #[test]
     fn full_name_combines_namespace_subsystem_name() {
-        let (_c, _t) = cilium_test_ctx!("pkg/metrics/metrics.go", "FullName.WithSub", "tenant-met-fn");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/metrics/metrics.go",
+            "FullName.WithSub",
+            "tenant-met-fn"
+        );
         let m = MetricDef {
             namespace: "cilium",
             subsystem: "agent",
@@ -345,7 +353,8 @@ mod tests {
 
     #[test]
     fn full_name_skips_subsystem_when_empty() {
-        let (_c, _t) = cilium_test_ctx!("pkg/metrics/metrics.go", "FullName.NoSub", "tenant-met-fne");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/metrics/metrics.go", "FullName.NoSub", "tenant-met-fne");
         let m = MetricDef {
             namespace: "cilium",
             subsystem: "",
@@ -358,7 +367,11 @@ mod tests {
 
     #[test]
     fn key_canonical_metrics_are_present() {
-        let (_c, _t) = cilium_test_ctx!("pkg/metrics/metrics.go", "Registry.HasKeys", "tenant-met-keys");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/metrics/metrics.go",
+            "Registry.HasKeys",
+            "tenant-met-keys"
+        );
         let names: std::collections::BTreeSet<String> =
             registry().iter().map(|m| m.full_name()).collect();
         // sample of 10 well-known metrics that absolutely must be present
@@ -380,7 +393,11 @@ mod tests {
 
     #[test]
     fn registry_metric_kinds_balance_correctly() {
-        let (_c, _t) = cilium_test_ctx!("pkg/metrics/metrics.go", "Registry.Kinds", "tenant-met-kinds");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/metrics/metrics.go",
+            "Registry.Kinds",
+            "tenant-met-kinds"
+        );
         let r = registry();
         let counters = r.iter().filter(|m| m.kind == Kind::Counter).count();
         let gauges = r.iter().filter(|m| m.kind == Kind::Gauge).count();
@@ -391,13 +408,20 @@ mod tests {
 
     #[test]
     fn render_exposition_emits_help_and_type_lines() {
-        let (_c, _t) = cilium_test_ctx!("pkg/metrics/metrics.go", "Render.HelpType", "tenant-met-rht");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/metrics/metrics.go",
+            "Render.HelpType",
+            "tenant-met-rht"
+        );
         let defs = registry();
         let mut values = BTreeMap::new();
         let mut empty_labels = BTreeMap::new();
         // No labels, scalar value
         empty_labels.clear();
-        values.insert("cilium_agent_policy".to_string(), (empty_labels.clone(), 5.0));
+        values.insert(
+            "cilium_agent_policy".to_string(),
+            (empty_labels.clone(), 5.0),
+        );
         let out = render_exposition(&defs, &values);
         assert!(out.contains("# HELP cilium_agent_policy"));
         assert!(out.contains("# TYPE cilium_agent_policy gauge"));
@@ -417,22 +441,23 @@ mod tests {
             (labels, 42.0),
         );
         let out = render_exposition(&defs, &values);
-        assert!(out.contains(
-            "cilium_agent_policy_change_total{outcome=\"success\",source=\"k8s\"} 42"
-        ));
+        assert!(
+            out.contains("cilium_agent_policy_change_total{outcome=\"success\",source=\"k8s\"} 42")
+        );
     }
 
     #[test]
     fn render_exposition_escapes_label_values() {
-        let (_c, _t) = cilium_test_ctx!("pkg/metrics/metrics.go", "Render.Escape", "tenant-met-esc");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/metrics/metrics.go", "Render.Escape", "tenant-met-esc");
         let defs = registry();
         let mut values = BTreeMap::new();
         let mut labels = BTreeMap::new();
-        labels.insert("error".to_string(), "broken \"quote\" and \\ slash".to_string());
-        values.insert(
-            "cilium_ipcache_errors_total".to_string(),
-            (labels, 1.0),
+        labels.insert(
+            "error".to_string(),
+            "broken \"quote\" and \\ slash".to_string(),
         );
+        values.insert("cilium_ipcache_errors_total".to_string(), (labels, 1.0));
         let out = render_exposition(&defs, &values);
         // Both \ and " must be escaped in label values per Prom text format.
         assert!(out.contains("error=\"broken \\\"quote\\\" and \\\\ slash\""));
@@ -465,7 +490,9 @@ mod tests {
         let (_c, _t) = cilium_test_ctx!("pkg/metrics/metrics.go", "Errors", "tenant-met-err");
         let e = MetricsError::NotInRegistry("foo".into());
         assert!(format!("{}", e).contains("foo"));
-        let e = MetricsError::TenantDenied { tenant: TenantId::new("t1").expect("test fixture") };
+        let e = MetricsError::TenantDenied {
+            tenant: TenantId::new("t1").expect("test fixture"),
+        };
         assert!(format!("{}", e).contains("t1"));
     }
 
@@ -480,8 +507,20 @@ mod tests {
     #[test]
     fn metric_def_equality_is_structural() {
         let (_c, _t) = cilium_test_ctx!("pkg/metrics/metrics.go", "Eq", "tenant-met-eq");
-        let a = MetricDef { namespace: "cilium", subsystem: "agent", name: "policy", help: "h", kind: Kind::Gauge };
-        let b = MetricDef { namespace: "cilium", subsystem: "agent", name: "policy", help: "h", kind: Kind::Gauge };
+        let a = MetricDef {
+            namespace: "cilium",
+            subsystem: "agent",
+            name: "policy",
+            help: "h",
+            kind: Kind::Gauge,
+        };
+        let b = MetricDef {
+            namespace: "cilium",
+            subsystem: "agent",
+            name: "policy",
+            help: "h",
+            kind: Kind::Gauge,
+        };
         assert_eq!(a, b);
     }
 

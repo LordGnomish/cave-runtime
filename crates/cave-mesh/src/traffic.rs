@@ -64,7 +64,10 @@ impl TrafficManager {
     pub fn list_virtual_services(&self) -> Vec<VirtualService> {
         let map = self.virtual_services.read().unwrap();
         let mut seen = std::collections::HashSet::new();
-        map.values().filter(|v| seen.insert(v.name.clone())).cloned().collect()
+        map.values()
+            .filter(|v| seen.insert(v.name.clone()))
+            .cloned()
+            .collect()
     }
 
     pub fn get_virtual_service(&self, host: &str) -> Option<VirtualService> {
@@ -154,7 +157,11 @@ impl TrafficManager {
             }
         }
         for (param, param_match) in &rule.query_params {
-            let value = req.query_params.get(param).map(|s| s.as_str()).unwrap_or("");
+            let value = req
+                .query_params
+                .get(param)
+                .map(|s| s.as_str())
+                .unwrap_or("");
             if !param_match.matches(value) {
                 return false;
             }
@@ -232,13 +239,11 @@ impl TrafficManager {
         }
 
         // Mirror decision
-        let mirror = route.mirror.as_ref().map(|m| {
-            MirrorDecision {
-                host: m.host.clone(),
-                subset: m.subset.clone(),
-                port: m.port.as_ref().map(|p| p.number),
-                percentage: route.mirror_percentage.unwrap_or(100.0),
-            }
+        let mirror = route.mirror.as_ref().map(|m| MirrorDecision {
+            host: m.host.clone(),
+            subset: m.subset.clone(),
+            port: m.port.as_ref().map(|p| p.number),
+            percentage: route.mirror_percentage.unwrap_or(100.0),
         });
 
         debug!(
@@ -330,9 +335,14 @@ impl TrafficManager {
                         .and_then(|sub| sub.traffic_policy.as_ref())
                         .and_then(|tp| tp.load_balancer.as_ref())
                 });
-                let policy = subset_policy
-                    .or_else(|| d.traffic_policy.as_ref().and_then(|tp| tp.load_balancer.as_ref()));
-                let mode = policy.map(|lb| &lb.mode).unwrap_or(&LoadBalancerMode::RoundRobin);
+                let policy = subset_policy.or_else(|| {
+                    d.traffic_policy
+                        .as_ref()
+                        .and_then(|tp| tp.load_balancer.as_ref())
+                });
+                let mode = policy
+                    .map(|lb| &lb.mode)
+                    .unwrap_or(&LoadBalancerMode::RoundRobin);
                 let ch = policy.and_then(|lb| lb.consistent_hash.as_ref());
                 (mode.clone(), ch.cloned())
             })
@@ -394,10 +404,10 @@ impl TrafficManager {
             .iter()
             .enumerate()
             .filter(|(_, e)| {
-                e.locality.as_ref().map(|l| {
-                    l.region == req_loc.region
-                        && l.zone == req_loc.zone
-                }).unwrap_or(false)
+                e.locality
+                    .as_ref()
+                    .map(|l| l.region == req_loc.region && l.zone == req_loc.zone)
+                    .unwrap_or(false)
             })
             .map(|(i, _)| i)
             .collect();
@@ -410,13 +420,15 @@ impl TrafficManager {
             .iter()
             .enumerate()
             .filter(|(_, e)| {
-                e.locality.as_ref().map(|l| l.region == req_loc.region).unwrap_or(false)
+                e.locality
+                    .as_ref()
+                    .map(|l| l.region == req_loc.region)
+                    .unwrap_or(false)
             })
             .map(|(i, _)| i)
             .collect();
         if !same_region.is_empty() {
-            return same_region
-                [(Uuid::new_v4().as_u128() % same_region.len() as u128) as usize];
+            return same_region[(Uuid::new_v4().as_u128() % same_region.len() as u128) as usize];
         }
 
         // Fallback: any

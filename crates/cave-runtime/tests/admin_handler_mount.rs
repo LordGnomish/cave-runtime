@@ -17,20 +17,20 @@
 // claim (`platform_admin` vs `tenant_admin`).
 
 use axum::{
+    Json, Router,
     body::Body,
-    http::{header, Request, StatusCode},
+    http::{Request, StatusCode, header},
     middleware::Next,
     response::{IntoResponse, Response},
-    Json, Router,
 };
 use cave_auth::{
     admin_flows::{self, AdminFlowsState},
     admin_idp::{self, AdminIdpState},
-    jwt_middleware::{auth_middleware_inner, AuthState, JwtClaims},
+    jwt_middleware::{AuthState, JwtClaims, auth_middleware_inner},
 };
 use http_body_util::BodyExt;
-use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
-use serde_json::{json, Value};
+use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
+use serde_json::{Value, json};
 use std::sync::Arc;
 use tower::ServiceExt;
 
@@ -86,11 +86,7 @@ fn build_app() -> Router {
 
     let auth_state = Arc::new(AuthState {
         jwt_secret: JWT_SECRET.into(),
-        bypass_paths: vec![
-            "_exact:/".into(),
-            "/health".into(),
-            "/ready".into(),
-        ],
+        bypass_paths: vec!["_exact:/".into(), "/health".into(), "/ready".into()],
     });
 
     Router::new()
@@ -113,12 +109,7 @@ async fn body_to_value(resp: Response) -> Value {
     serde_json::from_slice(&bytes).unwrap_or(Value::Null)
 }
 
-fn req_json(
-    method: &str,
-    uri: &str,
-    token: Option<&str>,
-    body: Option<Value>,
-) -> Request<Body> {
+fn req_json(method: &str, uri: &str, token: Option<&str>, body: Option<Value>) -> Request<Body> {
     let mut b = Request::builder()
         .method(method)
         .uri(uri)
@@ -176,7 +167,12 @@ async fn idp_create_returns_201_with_location() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
-    let loc = resp.headers().get(header::LOCATION).unwrap().to_str().unwrap();
+    let loc = resp
+        .headers()
+        .get(header::LOCATION)
+        .unwrap()
+        .to_str()
+        .unwrap();
     assert_eq!(
         loc,
         "/admin/realms/master/identity-provider/instances/google"
@@ -566,11 +562,8 @@ async fn no_jwt_returns_401() {
 
 #[test]
 fn main_rs_mounts_admin_idp_router() {
-    let src = std::fs::read_to_string(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/src/main.rs"
-    ))
-    .expect("read main.rs");
+    let src = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/main.rs"))
+        .expect("read main.rs");
     assert!(
         src.contains("cave_auth::admin_idp::router"),
         "main.rs must .merge(cave_auth::admin_idp::router(...))"
@@ -579,11 +572,8 @@ fn main_rs_mounts_admin_idp_router() {
 
 #[test]
 fn main_rs_mounts_admin_flows_router() {
-    let src = std::fs::read_to_string(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/src/main.rs"
-    ))
-    .expect("read main.rs");
+    let src = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/main.rs"))
+        .expect("read main.rs");
     assert!(
         src.contains("cave_auth::admin_flows::router"),
         "main.rs must .merge(cave_auth::admin_flows::router(...))"

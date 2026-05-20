@@ -61,7 +61,11 @@ pub enum CompareOp {
 pub enum Predicate {
     True,
     False,
-    Compare { op: CompareOp, left: Term, right: Term },
+    Compare {
+        op: CompareOp,
+        left: Term,
+        right: Term,
+    },
     And(Box<Predicate>, Box<Predicate>),
     Or(Box<Predicate>, Box<Predicate>),
     Not(Box<Predicate>),
@@ -69,28 +73,60 @@ pub enum Predicate {
 
 impl Predicate {
     pub fn eq(left: Term, right: Term) -> Self {
-        Self::Compare { op: CompareOp::Equal, left, right }
+        Self::Compare {
+            op: CompareOp::Equal,
+            left,
+            right,
+        }
     }
     pub fn ne(left: Term, right: Term) -> Self {
-        Self::Compare { op: CompareOp::NotEqual, left, right }
+        Self::Compare {
+            op: CompareOp::NotEqual,
+            left,
+            right,
+        }
     }
     pub fn lt(left: Term, right: Term) -> Self {
-        Self::Compare { op: CompareOp::Less, left, right }
+        Self::Compare {
+            op: CompareOp::Less,
+            left,
+            right,
+        }
     }
     pub fn le(left: Term, right: Term) -> Self {
-        Self::Compare { op: CompareOp::LessOrEqual, left, right }
+        Self::Compare {
+            op: CompareOp::LessOrEqual,
+            left,
+            right,
+        }
     }
     pub fn gt(left: Term, right: Term) -> Self {
-        Self::Compare { op: CompareOp::Greater, left, right }
+        Self::Compare {
+            op: CompareOp::Greater,
+            left,
+            right,
+        }
     }
     pub fn ge(left: Term, right: Term) -> Self {
-        Self::Compare { op: CompareOp::GreaterOrEqual, left, right }
+        Self::Compare {
+            op: CompareOp::GreaterOrEqual,
+            left,
+            right,
+        }
     }
     pub fn is_null(term: Term) -> Self {
-        Self::Compare { op: CompareOp::IsNull, left: term, right: Term::Literal(Json::Null) }
+        Self::Compare {
+            op: CompareOp::IsNull,
+            left: term,
+            right: Term::Literal(Json::Null),
+        }
     }
     pub fn is_not_null(term: Term) -> Self {
-        Self::Compare { op: CompareOp::IsNotNull, left: term, right: Term::Literal(Json::Null) }
+        Self::Compare {
+            op: CompareOp::IsNotNull,
+            left: term,
+            right: Term::Literal(Json::Null),
+        }
     }
     pub fn and(self, other: Self) -> Self {
         Self::And(Box::new(self), Box::new(other))

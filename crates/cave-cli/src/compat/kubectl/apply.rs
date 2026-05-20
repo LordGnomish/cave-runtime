@@ -2,7 +2,7 @@
 // Copyright 2026 Cave Runtime contributors
 //! `cavectl kubectl apply -f file.yaml` — server-side apply.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::Args;
 use serde_json::Value;
 
@@ -102,9 +102,11 @@ mod tests {
     fn apply_default_path() {
         let m = json!({"kind": "Deployment", "metadata": {"name": "api"}});
         let r = prepare(&args(), &m).unwrap();
-        assert!(r.path.starts_with(
-            "/api/compat/kubectl/v1/namespaces/default/deployments/api?apply=true"
-        ));
+        assert!(
+            r.path.starts_with(
+                "/api/compat/kubectl/v1/namespaces/default/deployments/api?apply=true"
+            )
+        );
     }
 
     #[test]
@@ -113,9 +115,10 @@ mod tests {
         a.namespace = Some("prod".into());
         let m = json!({"kind": "Pod", "metadata": {"name": "x"}});
         let r = prepare(&a, &m).unwrap();
-        assert!(r.path.starts_with(
-            "/api/compat/kubectl/v1/namespaces/prod/pods/x?apply=true"
-        ));
+        assert!(
+            r.path
+                .starts_with("/api/compat/kubectl/v1/namespaces/prod/pods/x?apply=true")
+        );
     }
 
     #[test]

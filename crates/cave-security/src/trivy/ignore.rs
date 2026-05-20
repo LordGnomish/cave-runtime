@@ -60,11 +60,7 @@ impl TrivyIgnore {
                         let date_str = &t[4..];
                         chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
                             .ok()
-                            .map(|d| {
-                                d.and_hms_opt(0, 0, 0)
-                                    .unwrap()
-                                    .and_utc()
-                            })
+                            .map(|d| d.and_hms_opt(0, 0, 0).unwrap().and_utc())
                     })
             });
 
@@ -92,7 +88,10 @@ impl TrivyIgnore {
 
     /// Filter a list of IDs, returning only the ones NOT ignored.
     pub fn filter_ignored<'a>(&self, ids: &[&'a str]) -> Vec<&'a str> {
-        ids.iter().copied().filter(|id| !self.is_ignored(id)).collect()
+        ids.iter()
+            .copied()
+            .filter(|id| !self.is_ignored(id))
+            .collect()
     }
 }
 

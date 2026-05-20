@@ -19,15 +19,15 @@
 //! Keycloak realm wiring is handled by `cave-auth/keycloak/*` and is opt-in.
 
 use axum::{
+    Json, Router,
     extract::Form,
-    http::{header, HeaderMap, HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
-    Json, Router,
 };
 use cave_auth::jwt_middleware::JwtClaims;
 use chrono::Utc;
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -71,8 +71,7 @@ pub const DEV_USERS: &[DevUser] = &[
 ];
 
 fn jwt_secret() -> String {
-    std::env::var("CAVE_JWT_SECRET")
-        .expect("CAVE_JWT_SECRET must be set (use any string for dev)")
+    std::env::var("CAVE_JWT_SECRET").expect("CAVE_JWT_SECRET must be set (use any string for dev)")
 }
 
 fn dev_mode_enabled() -> bool {
@@ -236,7 +235,7 @@ mod tests {
     use axum::body::to_bytes;
     use axum::http::{Method, Request};
     use http_body_util::BodyExt;
-    use jsonwebtoken::{decode, DecodingKey, Validation};
+    use jsonwebtoken::{DecodingKey, Validation, decode};
     use tower::ServiceExt;
 
     fn set_env() {
@@ -253,7 +252,12 @@ mod tests {
         set_env();
         let app = router();
         let resp = app
-            .oneshot(Request::builder().uri("/login").body(axum::body::Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/login")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
@@ -280,7 +284,11 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::SEE_OTHER, "expected 303 redirect");
+        assert_eq!(
+            resp.status(),
+            StatusCode::SEE_OTHER,
+            "expected 303 redirect"
+        );
         let cookie = resp
             .headers()
             .get(header::SET_COOKIE)
@@ -377,7 +385,12 @@ mod tests {
     async fn whoami_unauthenticated() {
         let app = router();
         let resp = app
-            .oneshot(Request::builder().uri("/api/auth/whoami").body(axum::body::Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/api/auth/whoami")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         let bytes = resp.into_body().collect().await.unwrap().to_bytes();

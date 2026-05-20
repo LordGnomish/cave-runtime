@@ -60,17 +60,17 @@ impl Transform {
                     let n_str = rest.strip_suffix(']').ok_or_else(|| {
                         Error::InvalidMetadata(format!("bad bucket[..]: {}", other))
                     })?;
-                    let n: u32 = n_str
-                        .parse()
-                        .map_err(|_| Error::InvalidMetadata(format!("bad bucket[..]: {}", other)))?;
+                    let n: u32 = n_str.parse().map_err(|_| {
+                        Error::InvalidMetadata(format!("bad bucket[..]: {}", other))
+                    })?;
                     Self::Bucket(n)
                 } else if let Some(rest) = other.strip_prefix("truncate[") {
                     let n_str = rest.strip_suffix(']').ok_or_else(|| {
                         Error::InvalidMetadata(format!("bad truncate[..]: {}", other))
                     })?;
-                    let n: u32 = n_str
-                        .parse()
-                        .map_err(|_| Error::InvalidMetadata(format!("bad truncate[..]: {}", other)))?;
+                    let n: u32 = n_str.parse().map_err(|_| {
+                        Error::InvalidMetadata(format!("bad truncate[..]: {}", other))
+                    })?;
                     Self::Truncate(n)
                 } else {
                     return Err(Error::InvalidMetadata(format!(
@@ -153,8 +153,14 @@ mod tests {
 
     #[test]
     fn parse_bucket_and_truncate() {
-        assert_eq!(Transform::parse("bucket[16]").unwrap(), Transform::Bucket(16));
-        assert_eq!(Transform::parse("truncate[8]").unwrap(), Transform::Truncate(8));
+        assert_eq!(
+            Transform::parse("bucket[16]").unwrap(),
+            Transform::Bucket(16)
+        );
+        assert_eq!(
+            Transform::parse("truncate[8]").unwrap(),
+            Transform::Truncate(8)
+        );
     }
 
     #[test]

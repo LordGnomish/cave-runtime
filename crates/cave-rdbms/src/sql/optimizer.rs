@@ -42,9 +42,15 @@ impl Optimizer {
 
     fn eval_binop(left: &Literal, op: BinaryOp, right: &Literal) -> Option<Literal> {
         match (left, op, right) {
-            (Literal::Integer(a), BinaryOp::Add, Literal::Integer(b)) => Some(Literal::Integer(a + b)),
-            (Literal::Integer(a), BinaryOp::Sub, Literal::Integer(b)) => Some(Literal::Integer(a - b)),
-            (Literal::Integer(a), BinaryOp::Mul, Literal::Integer(b)) => Some(Literal::Integer(a * b)),
+            (Literal::Integer(a), BinaryOp::Add, Literal::Integer(b)) => {
+                Some(Literal::Integer(a + b))
+            }
+            (Literal::Integer(a), BinaryOp::Sub, Literal::Integer(b)) => {
+                Some(Literal::Integer(a - b))
+            }
+            (Literal::Integer(a), BinaryOp::Mul, Literal::Integer(b)) => {
+                Some(Literal::Integer(a * b))
+            }
             (Literal::Integer(a), BinaryOp::Div, Literal::Integer(b)) if *b != 0 => {
                 Some(Literal::Integer(a / b))
             }

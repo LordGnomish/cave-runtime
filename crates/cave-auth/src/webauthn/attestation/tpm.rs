@@ -22,9 +22,9 @@
 
 use ciborium::value::Value;
 
-use crate::webauthn::cbor;
-use crate::webauthn::WebAuthnError;
 use crate::webauthn::CoseAlg;
+use crate::webauthn::WebAuthnError;
+use crate::webauthn::cbor;
 
 #[derive(Debug, Clone)]
 pub struct TpmAttStmt {

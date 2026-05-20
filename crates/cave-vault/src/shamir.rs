@@ -56,9 +56,7 @@ pub fn split(secret: &[u8], threshold: u8, shares: u8) -> Vec<Vec<u8>> {
 
     let mut rng = rand::thread_rng();
     // result[i] = [x=i+1, y_0, y_1, ...]
-    let mut result: Vec<Vec<u8>> = (0..shares as usize)
-        .map(|i| vec![i as u8 + 1])
-        .collect();
+    let mut result: Vec<Vec<u8>> = (0..shares as usize).map(|i| vec![i as u8 + 1]).collect();
 
     for &byte in secret {
         // Polynomial f(x) with f(0) = byte and random coefficients for degree 1..threshold-1
@@ -99,8 +97,8 @@ pub fn combine(shares: &[Vec<u8>]) -> Vec<u8> {
             let mut den = 1u8;
             for (k, &xk) in xs.iter().enumerate() {
                 if k != j {
-                    num = gf_mul(num, xk);          // multiply numerator by x_k
-                    den = gf_mul(den, xs[j] ^ xk);  // multiply denom by (x_j - x_k) = x_j XOR x_k
+                    num = gf_mul(num, xk); // multiply numerator by x_k
+                    den = gf_mul(den, xs[j] ^ xk); // multiply denom by (x_j - x_k) = x_j XOR x_k
                 }
             }
             result ^= gf_mul(num, gf_inv(den));

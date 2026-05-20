@@ -17,7 +17,8 @@ pub fn downsample_series(samples: &[Sample], resolution_ms: i64) -> Vec<Sample> 
         buckets.entry(bucket_ts).or_default().push(s.value);
     }
 
-    buckets.into_iter()
+    buckets
+        .into_iter()
         .map(|(ts, values)| {
             let avg = values.iter().sum::<f64>() / values.len() as f64;
             Sample::new(ts, avg)
@@ -31,9 +32,19 @@ pub fn merge_samples(a: &[Sample], b: &[Sample]) -> Vec<Sample> {
     let (mut i, mut j) = (0, 0);
     while i < a.len() && j < b.len() {
         match a[i].timestamp_ms.cmp(&b[j].timestamp_ms) {
-            std::cmp::Ordering::Less    => { out.push(a[i]); i += 1; }
-            std::cmp::Ordering::Greater => { out.push(b[j]); j += 1; }
-            std::cmp::Ordering::Equal   => { out.push(b[j]); i += 1; j += 1; } // b wins
+            std::cmp::Ordering::Less => {
+                out.push(a[i]);
+                i += 1;
+            }
+            std::cmp::Ordering::Greater => {
+                out.push(b[j]);
+                j += 1;
+            }
+            std::cmp::Ordering::Equal => {
+                out.push(b[j]);
+                i += 1;
+                j += 1;
+            } // b wins
         }
     }
     out.extend_from_slice(&a[i..]);
@@ -54,10 +65,10 @@ mod tests {
     #[test]
     fn test_downsample() {
         let samples = vec![
-            Sample::new(0,      1.0),
-            Sample::new(1_000,  3.0),
-            Sample::new(5_000,  2.0),
-            Sample::new(6_000,  4.0),
+            Sample::new(0, 1.0),
+            Sample::new(1_000, 3.0),
+            Sample::new(5_000, 2.0),
+            Sample::new(6_000, 4.0),
         ];
         let ds = downsample_series(&samples, 5_000);
         assert_eq!(ds.len(), 2);
@@ -67,8 +78,16 @@ mod tests {
 
     #[test]
     fn test_merge() {
-        let a = vec![Sample::new(1, 1.0), Sample::new(3, 3.0), Sample::new(5, 5.0)];
-        let b = vec![Sample::new(2, 2.0), Sample::new(3, 3.5), Sample::new(4, 4.0)];
+        let a = vec![
+            Sample::new(1, 1.0),
+            Sample::new(3, 3.0),
+            Sample::new(5, 5.0),
+        ];
+        let b = vec![
+            Sample::new(2, 2.0),
+            Sample::new(3, 3.5),
+            Sample::new(4, 4.0),
+        ];
         let m = merge_samples(&a, &b);
         assert_eq!(m.len(), 5);
         assert_eq!(m[2].value, 3.5); // b wins at ts=3

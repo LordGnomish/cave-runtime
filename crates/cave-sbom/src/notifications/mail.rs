@@ -32,7 +32,10 @@ pub struct InMemoryMail {
 
 impl InMemoryMail {
     pub fn new(to: impl Into<String>) -> Self {
-        Self { to: to.into(), sent: Mutex::new(Vec::new()) }
+        Self {
+            to: to.into(),
+            sent: Mutex::new(Vec::new()),
+        }
     }
 }
 
@@ -41,7 +44,10 @@ impl Publisher for InMemoryMail {
     async fn publish(&self, n: &Notification) -> Result<(), PublishError> {
         let subj = build_subject("cave-sbom", n);
         let body = build_text_body(n);
-        self.sent.lock().unwrap().push((self.to.clone(), subj, body));
+        self.sent
+            .lock()
+            .unwrap()
+            .push((self.to.clone(), subj, body));
         Ok(())
     }
     fn kind_name(&self) -> &'static str {

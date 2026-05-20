@@ -93,7 +93,11 @@ impl UserNamespace {
     /// Build a "host" namespace — no remapping, identity 1:1 over the
     /// full ID space. Used when `hostUsers: true`.
     pub fn host_passthrough() -> Self {
-        let identity = IdMapping { container_id: 0, host_id: 0, size: u32::MAX };
+        let identity = IdMapping {
+            container_id: 0,
+            host_id: 0,
+            size: u32::MAX,
+        };
         Self {
             uid_mappings: vec![identity],
             gid_mappings: vec![identity],
@@ -103,7 +107,11 @@ impl UserNamespace {
     /// Build the standard KEP-127 mapping: container `[0, range_size)`
     /// → host `[base, base+range_size)` for both UID and GID.
     pub fn for_pod(host_base: u32, range_size: u32) -> Self {
-        let m = IdMapping { container_id: 0, host_id: host_base, size: range_size };
+        let m = IdMapping {
+            container_id: 0,
+            host_id: host_base,
+            size: range_size,
+        };
         Self {
             uid_mappings: vec![m],
             gid_mappings: vec![m],
@@ -112,7 +120,11 @@ impl UserNamespace {
 
     /// True if every mapping is `0 → 0 → u32::MAX` (i.e. host-passthrough).
     pub fn is_host(&self) -> bool {
-        let identity = IdMapping { container_id: 0, host_id: 0, size: u32::MAX };
+        let identity = IdMapping {
+            container_id: 0,
+            host_id: 0,
+            size: u32::MAX,
+        };
         self.uid_mappings == vec![identity] && self.gid_mappings == vec![identity]
     }
 
@@ -219,7 +231,11 @@ pub fn parse_subid_file(content: &str, username: &str) -> Vec<IdMapping> {
             Ok(v) => v,
             Err(_) => continue,
         };
-        out.push(IdMapping { container_id: 0, host_id, size });
+        out.push(IdMapping {
+            container_id: 0,
+            host_id,
+            size,
+        });
     }
     out
 }
@@ -232,28 +248,44 @@ mod tests {
 
     #[test]
     fn render_proc_line_uses_three_space_separated_ints() {
-        let m = IdMapping { container_id: 0, host_id: 100_000, size: 65_536 };
+        let m = IdMapping {
+            container_id: 0,
+            host_id: 100_000,
+            size: 65_536,
+        };
         assert_eq!(m.render_proc_line(), "0 100000 65536");
     }
 
     #[test]
     fn translate_to_host_inside_range_offsets_base() {
-        let m = IdMapping { container_id: 0, host_id: 1_000_000, size: 100 };
-        assert_eq!(m.translate_to_host(0),  Some(1_000_000));
+        let m = IdMapping {
+            container_id: 0,
+            host_id: 1_000_000,
+            size: 100,
+        };
+        assert_eq!(m.translate_to_host(0), Some(1_000_000));
         assert_eq!(m.translate_to_host(50), Some(1_000_050));
         assert_eq!(m.translate_to_host(99), Some(1_000_099));
     }
 
     #[test]
     fn translate_to_host_outside_range_is_none() {
-        let m = IdMapping { container_id: 0, host_id: 1_000_000, size: 100 };
+        let m = IdMapping {
+            container_id: 0,
+            host_id: 1_000_000,
+            size: 100,
+        };
         assert!(m.translate_to_host(100).is_none());
         assert!(m.translate_to_host(500).is_none());
     }
 
     #[test]
     fn translate_to_host_below_container_id_is_none() {
-        let m = IdMapping { container_id: 1000, host_id: 1_000_000, size: 100 };
+        let m = IdMapping {
+            container_id: 1000,
+            host_id: 1_000_000,
+            size: 100,
+        };
         assert!(m.translate_to_host(500).is_none());
         assert!(m.translate_to_host(999).is_none());
         assert_eq!(m.translate_to_host(1000), Some(1_000_000));
@@ -261,7 +293,11 @@ mod tests {
 
     #[test]
     fn translate_to_container_inverts_translate_to_host() {
-        let m = IdMapping { container_id: 0, host_id: 1_000_000, size: 100 };
+        let m = IdMapping {
+            container_id: 0,
+            host_id: 1_000_000,
+            size: 100,
+        };
         assert_eq!(m.translate_to_container(1_000_050), Some(50));
         assert!(m.translate_to_container(999_999).is_none());
         assert!(m.translate_to_container(1_000_100).is_none());
@@ -269,8 +305,14 @@ mod tests {
 
     #[test]
     fn covers_container_matches_translate() {
-        let m = IdMapping { container_id: 0, host_id: 100, size: 10 };
-        for c in 0..10 { assert!(m.covers_container(c)); }
+        let m = IdMapping {
+            container_id: 0,
+            host_id: 100,
+            size: 10,
+        };
+        for c in 0..10 {
+            assert!(m.covers_container(c));
+        }
         assert!(!m.covers_container(10));
     }
 
@@ -289,7 +331,10 @@ mod tests {
         assert!(!ns.is_host());
         assert_eq!(ns.uid_mappings.len(), 1);
         assert_eq!(ns.uid_mappings[0].translate_to_host(0), Some(1_000_000));
-        assert_eq!(ns.uid_mappings[0].translate_to_host(65_535), Some(1_065_535));
+        assert_eq!(
+            ns.uid_mappings[0].translate_to_host(65_535),
+            Some(1_065_535)
+        );
         assert!(ns.uid_mappings[0].translate_to_host(65_536).is_none());
     }
 
@@ -311,8 +356,16 @@ mod tests {
     fn render_uid_map_file_handles_multiple_mappings() {
         let ns = UserNamespace {
             uid_mappings: vec![
-                IdMapping { container_id: 0, host_id: 100_000, size: 1 },
-                IdMapping { container_id: 1, host_id: 200_000, size: 65_535 },
+                IdMapping {
+                    container_id: 0,
+                    host_id: 100_000,
+                    size: 1,
+                },
+                IdMapping {
+                    container_id: 1,
+                    host_id: 200_000,
+                    size: 65_535,
+                },
             ],
             gid_mappings: vec![],
         };
@@ -388,7 +441,11 @@ mod tests {
         let mut bases: Vec<u32> = handles.into_iter().map(|h| h.join().unwrap()).collect();
         bases.sort();
         bases.dedup();
-        assert_eq!(bases.len(), 16, "every concurrent allocation must be unique");
+        assert_eq!(
+            bases.len(),
+            16,
+            "every concurrent allocation must be unique"
+        );
     }
 
     // ── parse_subid_file ─────────────────────────────────────────────────────
@@ -438,7 +495,11 @@ mod tests {
 
     #[test]
     fn id_mapping_serializes_with_lowercase_field_names() {
-        let m = IdMapping { container_id: 1, host_id: 2, size: 3 };
+        let m = IdMapping {
+            container_id: 1,
+            host_id: 2,
+            size: 3,
+        };
         let json = serde_json::to_string(&m).unwrap();
         assert!(json.contains("\"container_id\":1"));
         assert!(json.contains("\"host_id\":2"));

@@ -14,14 +14,14 @@
 //! of stampeding the filesystem walk on every request.
 
 use axum::{
+    Json, Router,
     extract::Extension,
-    http::{header, HeaderMap, HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{get, post},
-    Json, Router,
 };
 use cave_portal::admin::compliance::{
-    cached_snapshot_or_refresh, force_refresh, ComplianceSnapshot,
+    ComplianceSnapshot, cached_snapshot_or_refresh, force_refresh,
 };
 use serde::Serialize;
 
@@ -114,7 +114,7 @@ pub fn router() -> Router {
 mod tests {
     use super::*;
     use crate::routes::rbac::Persona;
-    use axum::body::{to_bytes, Body};
+    use axum::body::{Body, to_bytes};
     use axum::http::Request;
     use std::time::Instant;
     use tower::util::ServiceExt;

@@ -12,22 +12,44 @@ use std::collections::HashMap;
 
 /// Attack vector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AV { Network, Adjacent, Local, Physical }
+pub enum AV {
+    Network,
+    Adjacent,
+    Local,
+    Physical,
+}
 /// Attack complexity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AC { Low, High }
+pub enum AC {
+    Low,
+    High,
+}
 /// Privileges required.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PR { None, Low, High }
+pub enum PR {
+    None,
+    Low,
+    High,
+}
 /// User interaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UI { None, Required }
+pub enum UI {
+    None,
+    Required,
+}
 /// Scope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum S { Unchanged, Changed }
+pub enum S {
+    Unchanged,
+    Changed,
+}
 /// CIA impact.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CIA { None, Low, High }
+pub enum CIA {
+    None,
+    Low,
+    High,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Vector {
@@ -75,28 +97,38 @@ impl Vector {
             }
         }
         let av = match *kv.get("AV").ok_or(ParseError::MissingMetric("AV"))? {
-            "N" => AV::Network, "A" => AV::Adjacent, "L" => AV::Local, "P" => AV::Physical,
+            "N" => AV::Network,
+            "A" => AV::Adjacent,
+            "L" => AV::Local,
+            "P" => AV::Physical,
             other => return Err(ParseError::BadValue("AV", other.into())),
         };
         let ac = match *kv.get("AC").ok_or(ParseError::MissingMetric("AC"))? {
-            "L" => AC::Low, "H" => AC::High,
+            "L" => AC::Low,
+            "H" => AC::High,
             other => return Err(ParseError::BadValue("AC", other.into())),
         };
         let pr = match *kv.get("PR").ok_or(ParseError::MissingMetric("PR"))? {
-            "N" => PR::None, "L" => PR::Low, "H" => PR::High,
+            "N" => PR::None,
+            "L" => PR::Low,
+            "H" => PR::High,
             other => return Err(ParseError::BadValue("PR", other.into())),
         };
         let ui = match *kv.get("UI").ok_or(ParseError::MissingMetric("UI"))? {
-            "N" => UI::None, "R" => UI::Required,
+            "N" => UI::None,
+            "R" => UI::Required,
             other => return Err(ParseError::BadValue("UI", other.into())),
         };
         let s_metric = match *kv.get("S").ok_or(ParseError::MissingMetric("S"))? {
-            "U" => S::Unchanged, "C" => S::Changed,
+            "U" => S::Unchanged,
+            "C" => S::Changed,
             other => return Err(ParseError::BadValue("S", other.into())),
         };
         let cia = |k: &'static str| -> Result<CIA, ParseError> {
             match *kv.get(k).ok_or(ParseError::MissingMetric(k))? {
-                "N" => Ok(CIA::None), "L" => Ok(CIA::Low), "H" => Ok(CIA::High),
+                "N" => Ok(CIA::None),
+                "L" => Ok(CIA::Low),
+                "H" => Ok(CIA::High),
                 other => Err(ParseError::BadValue(k, other.into())),
             }
         };
@@ -137,18 +169,22 @@ impl Vector {
             UI::None => 0.85,
             UI::Required => 0.62,
         };
-        let cia = |x: CIA| -> f32 { match x {
-            CIA::None => 0.0,
-            CIA::Low => 0.22,
-            CIA::High => 0.56,
-        }};
+        let cia = |x: CIA| -> f32 {
+            match x {
+                CIA::None => 0.0,
+                CIA::Low => 0.22,
+                CIA::High => 0.56,
+            }
+        };
         let c = cia(self.c);
         let i = cia(self.i);
         let a = cia(self.a);
         let isc_base: f32 = 1.0_f32 - ((1.0_f32 - c) * (1.0_f32 - i) * (1.0_f32 - a));
         let impact: f32 = match self.s {
             S::Unchanged => 6.42_f32 * isc_base,
-            S::Changed => 7.52_f32 * (isc_base - 0.029_f32) - 3.25_f32 * (isc_base - 0.02_f32).powf(15.0),
+            S::Changed => {
+                7.52_f32 * (isc_base - 0.029_f32) - 3.25_f32 * (isc_base - 0.02_f32).powf(15.0)
+            }
         };
         let exploitability: f32 = 8.22_f32 * av * ac * pr * ui;
         if impact <= 0.0 {

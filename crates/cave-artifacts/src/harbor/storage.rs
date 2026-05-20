@@ -59,7 +59,11 @@ impl RegistryStorage {
 
     pub async fn put_blob_with_alias(&self, alias: String, data: Bytes) {
         let digest = compute_digest(&data);
-        self.blobs.write().await.entry(digest.clone()).or_insert(data);
+        self.blobs
+            .write()
+            .await
+            .entry(digest.clone())
+            .or_insert(data);
         self.aliases.write().await.insert(alias, digest);
     }
 }
@@ -194,11 +198,7 @@ impl RegistryStorage {
     }
 
     pub async fn upload_offset(&self, uuid: &str) -> Option<usize> {
-        self.uploads
-            .read()
-            .await
-            .get(uuid)
-            .map(|s| s.offset())
+        self.uploads.read().await.get(uuid).map(|s| s.offset())
     }
 
     // ── Manifests ─────────────────────────────────────────────────────────────
@@ -207,11 +207,15 @@ impl RegistryStorage {
     pub async fn get_manifest(&self, repo: &str, reference: &str) -> Option<ManifestEntry> {
         let idx = self.manifests.read().await;
         if reference.starts_with("sha256:") {
-            idx.by_digest.get(&(repo.to_string(), reference.to_string())).cloned()
+            idx.by_digest
+                .get(&(repo.to_string(), reference.to_string()))
+                .cloned()
         } else {
             // tag lookup
             let digest = idx.by_tag.get(&(repo.to_string(), reference.to_string()))?;
-            idx.by_digest.get(&(repo.to_string(), digest.clone())).cloned()
+            idx.by_digest
+                .get(&(repo.to_string(), digest.clone()))
+                .cloned()
         }
     }
 
@@ -244,10 +248,7 @@ impl RegistryStorage {
         }
         // OCI 1.1 referrers index
         if let Some(subj) = subject_digest {
-            idx.referrers
-                .entry(subj)
-                .or_default()
-                .push(digest.clone());
+            idx.referrers.entry(subj).or_default().push(digest.clone());
         }
         debug!(repo = %repo, reference = %reference, digest = %digest, "manifest stored");
         digest
@@ -258,7 +259,10 @@ impl RegistryStorage {
         let digest = if reference.starts_with("sha256:") {
             reference.to_string()
         } else {
-            match idx.by_tag.remove(&(repo.to_string(), reference.to_string())) {
+            match idx
+                .by_tag
+                .remove(&(repo.to_string(), reference.to_string()))
+            {
                 Some(d) => d,
                 None => return false,
             }
@@ -268,10 +272,7 @@ impl RegistryStorage {
             .remove(&(repo.to_string(), digest.clone()))
             .is_some();
         // Remove from repo if no manifests remain
-        let still_has = idx
-            .by_digest
-            .keys()
-            .any(|(r, _)| r == repo);
+        let still_has = idx.by_digest.keys().any(|(r, _)| r == repo);
         if !still_has {
             idx.repos.remove(repo);
         }
@@ -403,9 +404,14 @@ mod tests {
     async fn upload_digest_mismatch() {
         let s = RegistryStorage::default();
         let uuid = s.start_upload("myrepo").await;
-        s.patch_upload(&uuid, Bytes::from_static(b"real data")).await;
+        s.patch_upload(&uuid, Bytes::from_static(b"real data"))
+            .await;
         let result = s
-            .complete_upload(&uuid, Bytes::new(), "sha256:0000000000000000000000000000000000000000000000000000000000000000")
+            .complete_upload(
+                &uuid,
+                Bytes::new(),
+                "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+            )
             .await;
         assert!(result.is_err());
     }

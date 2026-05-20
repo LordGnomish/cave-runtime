@@ -16,7 +16,7 @@
 //! GitHub token is read from `$GITHUB_TOKEN` if not set in the TOML.
 
 use cave_upstream::{
-    daemon::{install_signal_handler, Config, Daemon},
+    daemon::{Config, Daemon, install_signal_handler},
     projects::TRACKED_PROJECTS,
 };
 use clap::Parser;
@@ -66,8 +66,8 @@ fn load_config(path: &std::path::Path) -> anyhow::Result<Config> {
         return Ok(Config::default());
     }
     let body = std::fs::read_to_string(path)?;
-    let cfg: Config = toml::from_str(&body)
-        .map_err(|e| anyhow::anyhow!("parse {}: {}", path.display(), e))?;
+    let cfg: Config =
+        toml::from_str(&body).map_err(|e| anyhow::anyhow!("parse {}: {}", path.display(), e))?;
     Ok(cfg)
 }
 

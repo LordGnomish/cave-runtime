@@ -21,8 +21,8 @@
 //! `<ArtifactResponse>`. Decoding here is wire-format only; the
 //! SOAP resolution step lives in the broker.
 
-use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD as B64;
 
 use crate::saml::SamlError;
 

@@ -126,11 +126,14 @@ impl VaultPlugin {
     }
 
     pub fn engine(&self, tenant: &str, mount: &str) -> Option<&SecretEngine> {
-        self.engines.iter().find(|e| e.tenant == tenant && e.mount == mount)
+        self.engines
+            .iter()
+            .find(|e| e.tenant == tenant && e.mount == mount)
     }
 
     pub fn list_engines(&self, tenant: &str) -> Vec<&SecretEngine> {
-        let mut out: Vec<&SecretEngine> = self.engines.iter().filter(|e| e.tenant == tenant).collect();
+        let mut out: Vec<&SecretEngine> =
+            self.engines.iter().filter(|e| e.tenant == tenant).collect();
         out.sort_by(|a, b| a.mount.cmp(&b.mount));
         out
     }
@@ -183,8 +186,7 @@ impl VaultPlugin {
             .iter()
             .find(|e| e.tenant == tenant && e.mount == mount)
             .ok_or_else(|| VaultError::NotFound(mount.into()))?;
-        let mut out: Vec<&SecretEntry> =
-            self.entries.iter().filter(|x| x.mount == mount).collect();
+        let mut out: Vec<&SecretEntry> = self.entries.iter().filter(|x| x.mount == mount).collect();
         out.sort_by(|a, b| a.path.cmp(&b.path).then(a.version.cmp(&b.version)));
         Ok(out)
     }
@@ -356,8 +358,14 @@ mod tests {
     fn put_separate_paths_each_v1() {
         let mut v = VaultPlugin::new();
         v.mount(engine("kv", "acme"));
-        let a = v.put(ViewPersona::Tenant, "acme", "kv", "a").unwrap().clone();
-        let b = v.put(ViewPersona::Tenant, "acme", "kv", "b").unwrap().clone();
+        let a = v
+            .put(ViewPersona::Tenant, "acme", "kv", "a")
+            .unwrap()
+            .clone();
+        let b = v
+            .put(ViewPersona::Tenant, "acme", "kv", "b")
+            .unwrap()
+            .clone();
         assert_eq!(a.version, 1);
         assert_eq!(b.version, 1);
     }
@@ -390,7 +398,9 @@ mod tests {
     fn put_path_traversal_blocked() {
         let mut v = VaultPlugin::new();
         v.mount(engine("kv", "acme"));
-        let err = v.put(ViewPersona::Tenant, "acme", "kv", "a/../b").unwrap_err();
+        let err = v
+            .put(ViewPersona::Tenant, "acme", "kv", "a/../b")
+            .unwrap_err();
         assert!(matches!(err, VaultError::PathTraversal(_)));
     }
 
@@ -409,7 +419,9 @@ mod tests {
     #[test]
     fn list_entries_unknown_engine_errors() {
         let v = VaultPlugin::new();
-        let err = v.list_entries(ViewPersona::Tenant, "acme", "kv").unwrap_err();
+        let err = v
+            .list_entries(ViewPersona::Tenant, "acme", "kv")
+            .unwrap_err();
         assert!(matches!(err, VaultError::NotFound(_)));
     }
 
@@ -429,7 +441,9 @@ mod tests {
         v.mount(engine("kv", "acme"));
         v.put(ViewPersona::Tenant, "acme", "kv", "p").unwrap();
         v.delete(ViewPersona::Tenant, "acme", "kv", "p").unwrap();
-        let err = v.delete(ViewPersona::Tenant, "acme", "kv", "p").unwrap_err();
+        let err = v
+            .delete(ViewPersona::Tenant, "acme", "kv", "p")
+            .unwrap_err();
         assert_eq!(err, VaultError::AlreadyDeleted);
     }
 
@@ -438,7 +452,9 @@ mod tests {
         let mut v = VaultPlugin::new();
         v.mount(engine("kv", "acme"));
         v.put(ViewPersona::Tenant, "acme", "kv", "p").unwrap();
-        let err = v.delete(ViewPersona::Operator, "acme", "kv", "p").unwrap_err();
+        let err = v
+            .delete(ViewPersona::Operator, "acme", "kv", "p")
+            .unwrap_err();
         assert!(matches!(err, VaultError::Forbidden(_)));
     }
 
@@ -465,7 +481,11 @@ mod tests {
         v.mount(SecretEngine::new("zeta", EngineKind::KvV2, "acme"));
         v.mount(SecretEngine::new("alpha", EngineKind::KvV1, "acme"));
         v.mount(SecretEngine::new("mu", EngineKind::Pki, "globex"));
-        let acme: Vec<&str> = v.list_engines("acme").iter().map(|e| e.mount.as_str()).collect();
+        let acme: Vec<&str> = v
+            .list_engines("acme")
+            .iter()
+            .map(|e| e.mount.as_str())
+            .collect();
         assert_eq!(acme, vec!["alpha", "zeta"]);
     }
 

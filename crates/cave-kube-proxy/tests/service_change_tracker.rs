@@ -46,7 +46,10 @@ fn add_event_records_one_pending_change() {
 fn add_then_update_coalesces_to_single_pending_change() {
     let mut t = ServiceChangeTracker::new(TENANT);
     let s_v1 = svc("api", "10.0.0.1", 80);
-    let s_v2 = ServicePortInfo { port: 8080, ..s_v1.clone() };
+    let s_v2 = ServicePortInfo {
+        port: 8080,
+        ..s_v1.clone()
+    };
     t.update(None, Some(s_v1.clone())).unwrap();
     t.update(Some(s_v1.clone()), Some(s_v2.clone())).unwrap();
 

@@ -31,7 +31,10 @@ pub struct ExemplarRing {
 
 impl ExemplarRing {
     pub fn new(capacity: usize) -> Self {
-        Self { capacity: capacity.max(1), buf: Vec::with_capacity(capacity.max(1)) }
+        Self {
+            capacity: capacity.max(1),
+            buf: Vec::with_capacity(capacity.max(1)),
+        }
     }
 
     /// Push a new exemplar. Drops the oldest if at capacity. Exemplars
@@ -49,8 +52,12 @@ impl ExemplarRing {
         self.buf.push(e);
     }
 
-    pub fn len(&self) -> usize { self.buf.len() }
-    pub fn is_empty(&self) -> bool { self.buf.is_empty() }
+    pub fn len(&self) -> usize {
+        self.buf.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.buf.is_empty()
+    }
 
     /// Return exemplars in the given [start_ms, end_ms] window (inclusive).
     pub fn in_range(&self, start_ms: i64, end_ms: i64) -> Vec<&Exemplar> {

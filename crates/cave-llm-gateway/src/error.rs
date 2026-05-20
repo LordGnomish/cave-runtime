@@ -27,7 +27,10 @@ pub enum GatewayError {
     NotFound(String),
 
     #[error("Rate limit exceeded for consumer '{consumer}', retry after {retry_after_ms}ms")]
-    RateLimitExceeded { consumer: String, retry_after_ms: u64 },
+    RateLimitExceeded {
+        consumer: String,
+        retry_after_ms: u64,
+    },
 
     #[error("Token budget exceeded: requested={requested}, budget={budget}")]
     TokenBudgetExceeded { requested: u32, budget: u32 },

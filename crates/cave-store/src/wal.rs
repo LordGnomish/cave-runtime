@@ -5,8 +5,8 @@
 //! `WalEntry` owns the S3 + etcd domain op shapes.
 //! The append/replay machinery is provided by `cave_core::wal::{AppendLog, replay}`.
 
-use cave_core::wal::{AppendLog, WalError};
 use crate::error::{StoreError, StoreResult};
+use cave_core::wal::{AppendLog, WalError};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tokio::sync::Mutex;
@@ -136,7 +136,10 @@ impl WalWriter {
         std::fs::create_dir_all(dir)?;
         let path = dir.join("store.wal");
         let log = AppendLog::open(&path).map_err(|e| StoreError::Io(map_wal_err(e)))?;
-        Ok(Self { path, log: Mutex::new(log) })
+        Ok(Self {
+            path,
+            log: Mutex::new(log),
+        })
     }
 
     /// Append one entry to the WAL.
@@ -187,10 +190,10 @@ pub async fn compact_wal(dir: &Path, snapshot: Vec<WalEntry>) -> StoreResult<()>
     let _ = std::fs::remove_file(&tmp);
 
     {
-        let mut log =
-            AppendLog::open(&tmp).map_err(|e| StoreError::Io(map_wal_err(e)))?;
+        let mut log = AppendLog::open(&tmp).map_err(|e| StoreError::Io(map_wal_err(e)))?;
         for entry in &snapshot {
-            log.append(entry).map_err(|e| StoreError::Io(map_wal_err(e)))?;
+            log.append(entry)
+                .map_err(|e| StoreError::Io(map_wal_err(e)))?;
         }
         log.sync().map_err(|e| StoreError::Io(map_wal_err(e)))?;
     }

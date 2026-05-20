@@ -26,16 +26,14 @@
 //! * No failover voting at the data plane — cave-cluster's Raft
 //!   already handles the equivalent at a higher layer.
 
-pub mod state;
-pub mod slots;
+pub mod epoch;
 pub mod gossip;
 pub mod migration;
-pub mod epoch;
+pub mod slots;
+pub mod state;
 
-pub use state::{
-    crc16, generate_node_id, hash_slot, ClusterNode, ClusterState, ClusterStatus,
-};
-pub use slots::{SlotMap, SlotOwnership, SlotStats, RedirectKind};
+pub use epoch::EpochCounter;
 pub use gossip::{GossipBus, GossipMessage, GossipMessageKind};
 pub use migration::{MigrationLedger, MigrationState, SlotMigration};
-pub use epoch::EpochCounter;
+pub use slots::{RedirectKind, SlotMap, SlotOwnership, SlotStats};
+pub use state::{ClusterNode, ClusterState, ClusterStatus, crc16, generate_node_id, hash_slot};

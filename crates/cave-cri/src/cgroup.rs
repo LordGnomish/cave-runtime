@@ -50,7 +50,11 @@ pub fn create_cgroup(container_id: &str, _limits: &ResourceLimits) -> CriResult<
     #[cfg(target_os = "linux")]
     {
         std::fs::create_dir_all(&handle.path).map_err(|e| {
-            CriError::Cgroup(format!("failed to create cgroup {}: {}", handle.path.display(), e))
+            CriError::Cgroup(format!(
+                "failed to create cgroup {}: {}",
+                handle.path.display(),
+                e
+            ))
         })?;
         apply_limits(&handle, limits)?;
     }
@@ -72,9 +76,8 @@ pub fn remove_cgroup(_handle: &CgroupHandle) -> CriResult<()> {
     #[cfg(target_os = "linux")]
     {
         if handle.path.exists() {
-            std::fs::remove_dir(&handle.path).map_err(|e| {
-                CriError::Cgroup(format!("failed to remove cgroup: {}", e))
-            })?;
+            std::fs::remove_dir(&handle.path)
+                .map_err(|e| CriError::Cgroup(format!("failed to remove cgroup: {}", e)))?;
         }
     }
     Ok(())
@@ -86,7 +89,8 @@ pub fn read_stats(_handle: &CgroupHandle) -> CriResult<CgroupStats> {
 
     #[cfg(target_os = "linux")]
     {
-        stats.cpu_usage_usec = read_cpu_stat(&handle.path.join("cpu.stat"), "usage_usec").unwrap_or(0);
+        stats.cpu_usage_usec =
+            read_cpu_stat(&handle.path.join("cpu.stat"), "usage_usec").unwrap_or(0);
         stats.memory_current = read_file_u64(&handle.path.join("memory.current")).unwrap_or(0);
         stats.memory_peak = read_file_u64(&handle.path.join("memory.peak")).unwrap_or(0);
         stats.pids_current = read_file_u64(&handle.path.join("pids.current")).unwrap_or(0);
@@ -102,20 +106,21 @@ pub fn read_stats_v2(_handle: &CgroupHandle) -> CriResult<crate::models::CgroupS
     #[cfg(target_os = "linux")]
     {
         let cpu_stat_path = handle.path.join("cpu.stat");
-        stats.cpu_usage_usec  = read_cpu_stat(&cpu_stat_path, "usage_usec").unwrap_or(0);
-        stats.cpu_user_usec   = read_cpu_stat(&cpu_stat_path, "user_usec").unwrap_or(0);
+        stats.cpu_usage_usec = read_cpu_stat(&cpu_stat_path, "usage_usec").unwrap_or(0);
+        stats.cpu_user_usec = read_cpu_stat(&cpu_stat_path, "user_usec").unwrap_or(0);
         stats.cpu_system_usec = read_cpu_stat(&cpu_stat_path, "system_usec").unwrap_or(0);
         stats.cpu_nr_throttled = read_cpu_stat(&cpu_stat_path, "nr_throttled").unwrap_or(0);
 
-        stats.memory_current      = read_file_u64(&handle.path.join("memory.current")).unwrap_or(0);
-        stats.memory_peak         = read_file_u64(&handle.path.join("memory.peak")).unwrap_or(0);
-        stats.memory_swap_current = read_file_u64(&handle.path.join("memory.swap.current")).unwrap_or(0);
+        stats.memory_current = read_file_u64(&handle.path.join("memory.current")).unwrap_or(0);
+        stats.memory_peak = read_file_u64(&handle.path.join("memory.peak")).unwrap_or(0);
+        stats.memory_swap_current =
+            read_file_u64(&handle.path.join("memory.swap.current")).unwrap_or(0);
 
-        stats.pids_current    = read_file_u64(&handle.path.join("pids.current")).unwrap_or(0);
+        stats.pids_current = read_file_u64(&handle.path.join("pids.current")).unwrap_or(0);
         stats.pids_max_reached = read_pids_events(&handle.path.join("pids.events")).unwrap_or(0);
 
         let (rbytes, wbytes) = read_io_stat(&handle.path.join("io.stat")).unwrap_or((0, 0));
-        stats.io_read_bytes  = rbytes;
+        stats.io_read_bytes = rbytes;
         stats.io_write_bytes = wbytes;
     }
 
@@ -129,7 +134,10 @@ fn apply_limits(handle: &CgroupHandle, limits: &ResourceLimits) -> CriResult<()>
             write_file(&handle.path.join("cpu.weight"), &cpu_shares.to_string())?;
         }
         if let Some(cpu_quota) = limits.cpu_quota {
-            write_file(&handle.path.join("cpu.max"), &format!("{} 100000", cpu_quota))?;
+            write_file(
+                &handle.path.join("cpu.max"),
+                &format!("{} 100000", cpu_quota),
+            )?;
         }
         if let Some(mem) = limits.memory_limit {
             write_file(&handle.path.join("memory.max"), &mem.to_string())?;
@@ -174,9 +182,8 @@ pub fn create_cgroup_in(
     limits: &ResourceLimits,
 ) -> CriResult<CgroupHandle> {
     let handle = CgroupHandle::with_root(container_id, tenant_id, root);
-    std::fs::create_dir_all(&handle.path).map_err(|e| {
-        CriError::Cgroup(format!("create {} failed: {}", handle.path.display(), e))
-    })?;
+    std::fs::create_dir_all(&handle.path)
+        .map_err(|e| CriError::Cgroup(format!("create {} failed: {}", handle.path.display(), e)))?;
     apply_limits_in(&handle, limits)?;
     Ok(handle)
 }
@@ -190,7 +197,10 @@ pub fn apply_limits_in(handle: &CgroupHandle, limits: &ResourceLimits) -> CriRes
         write_real(&handle.path.join("cpu.weight"), &cpu_shares.to_string())?;
     }
     if let Some(cpu_quota) = limits.cpu_quota {
-        write_real(&handle.path.join("cpu.max"), &format!("{} 100000", cpu_quota))?;
+        write_real(
+            &handle.path.join("cpu.max"),
+            &format!("{} 100000", cpu_quota),
+        )?;
     }
     if let Some(mem) = limits.memory_limit {
         write_real(&handle.path.join("memory.max"), &mem.to_string())?;
@@ -210,32 +220,38 @@ pub fn attach_pid(handle: &CgroupHandle, pid: u32) -> CriResult<()> {
 /// Set a freezer state. Cite: runc v1.4.2 `libcontainer/cgroups/fs2/freezer.go`
 /// — accepts `THAWED` / `FROZEN`.
 pub fn set_freezer(handle: &CgroupHandle, state: FreezerState) -> CriResult<()> {
-    let value = match state { FreezerState::Thawed => "0", FreezerState::Frozen => "1" };
+    let value = match state {
+        FreezerState::Thawed => "0",
+        FreezerState::Frozen => "1",
+    };
     write_real(&handle.path.join("cgroup.freeze"), value)
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum FreezerState { Thawed, Frozen }
+pub enum FreezerState {
+    Thawed,
+    Frozen,
+}
 
 /// Read the canonical cgroup v2 stats from `handle.path` regardless of OS.
 /// Cite: containerd `pkg/cri/server/container_stats_list_linux.go` v2.2.3.
 pub fn read_stats_in(handle: &CgroupHandle) -> CriResult<crate::models::CgroupStatsV2> {
     let mut stats = crate::models::CgroupStatsV2::default();
     let cpu_stat_path = handle.path.join("cpu.stat");
-    stats.cpu_usage_usec   = read_cpu_stat_real(&cpu_stat_path, "usage_usec");
-    stats.cpu_user_usec    = read_cpu_stat_real(&cpu_stat_path, "user_usec");
-    stats.cpu_system_usec  = read_cpu_stat_real(&cpu_stat_path, "system_usec");
+    stats.cpu_usage_usec = read_cpu_stat_real(&cpu_stat_path, "usage_usec");
+    stats.cpu_user_usec = read_cpu_stat_real(&cpu_stat_path, "user_usec");
+    stats.cpu_system_usec = read_cpu_stat_real(&cpu_stat_path, "system_usec");
     stats.cpu_nr_throttled = read_cpu_stat_real(&cpu_stat_path, "nr_throttled");
 
-    stats.memory_current      = read_u64_real(&handle.path.join("memory.current"));
-    stats.memory_peak         = read_u64_real(&handle.path.join("memory.peak"));
+    stats.memory_current = read_u64_real(&handle.path.join("memory.current"));
+    stats.memory_peak = read_u64_real(&handle.path.join("memory.peak"));
     stats.memory_swap_current = read_u64_real(&handle.path.join("memory.swap.current"));
 
-    stats.pids_current     = read_u64_real(&handle.path.join("pids.current"));
+    stats.pids_current = read_u64_real(&handle.path.join("pids.current"));
     stats.pids_max_reached = read_pids_events_real(&handle.path.join("pids.events"));
 
     let (rbytes, wbytes) = read_io_stat_real(&handle.path.join("io.stat"));
-    stats.io_read_bytes  = rbytes;
+    stats.io_read_bytes = rbytes;
     stats.io_write_bytes = wbytes;
     Ok(stats)
 }
@@ -256,19 +272,21 @@ fn write_real(path: &Path, content: &str) -> CriResult<()> {
             CriError::Cgroup(format!("ensure parent {} failed: {}", parent.display(), e))
         })?;
     }
-    std::fs::write(path, content).map_err(|e| {
-        CriError::Cgroup(format!("write {} failed: {}", path.display(), e))
-    })
+    std::fs::write(path, content)
+        .map_err(|e| CriError::Cgroup(format!("write {} failed: {}", path.display(), e)))
 }
 
 fn read_u64_real(path: &Path) -> u64 {
-    std::fs::read_to_string(path).ok()
+    std::fs::read_to_string(path)
+        .ok()
         .and_then(|s| s.trim().parse().ok())
         .unwrap_or(0)
 }
 
 fn read_cpu_stat_real(path: &Path, key: &str) -> u64 {
-    let Ok(content) = std::fs::read_to_string(path) else { return 0 };
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return 0;
+    };
     for line in content.lines() {
         if let Some(rest) = line.strip_prefix(&format!("{} ", key)) {
             return rest.trim().parse().unwrap_or(0);
@@ -278,7 +296,9 @@ fn read_cpu_stat_real(path: &Path, key: &str) -> u64 {
 }
 
 fn read_pids_events_real(path: &Path) -> u64 {
-    let Ok(content) = std::fs::read_to_string(path) else { return 0 };
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return 0;
+    };
     for line in content.lines() {
         if let Some(rest) = line.strip_prefix("max ") {
             return rest.trim().parse().unwrap_or(0);
@@ -288,7 +308,9 @@ fn read_pids_events_real(path: &Path) -> u64 {
 }
 
 fn read_io_stat_real(path: &Path) -> (u64, u64) {
-    let Ok(content) = std::fs::read_to_string(path) else { return (0, 0) };
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return (0, 0);
+    };
     let mut total_r = 0u64;
     let mut total_w = 0u64;
     for line in content.lines() {
@@ -361,19 +383,27 @@ fn read_io_stat(path: &std::path::Path) -> Option<(u64, u64)> {
 // On macOS/Windows these are never called, so allow dead_code.
 #[cfg(not(target_os = "linux"))]
 #[allow(dead_code)]
-fn read_cpu_stat(_path: &std::path::Path, _key: &str) -> Option<u64> { None }
+fn read_cpu_stat(_path: &std::path::Path, _key: &str) -> Option<u64> {
+    None
+}
 
 #[cfg(not(target_os = "linux"))]
 #[allow(dead_code)]
-fn read_file_u64(_path: &std::path::Path) -> Option<u64> { None }
+fn read_file_u64(_path: &std::path::Path) -> Option<u64> {
+    None
+}
 
 #[cfg(not(target_os = "linux"))]
 #[allow(dead_code)]
-fn read_pids_events(_path: &std::path::Path) -> Option<u64> { None }
+fn read_pids_events(_path: &std::path::Path) -> Option<u64> {
+    None
+}
 
 #[cfg(not(target_os = "linux"))]
 #[allow(dead_code)]
-fn read_io_stat(_path: &std::path::Path) -> Option<(u64, u64)> { None }
+fn read_io_stat(_path: &std::path::Path) -> Option<(u64, u64)> {
+    None
+}
 
 #[cfg(test)]
 mod tests {
@@ -524,11 +554,19 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("io.stat");
         let mut f = std::fs::File::create(&path).unwrap();
-        writeln!(f, "8:0 rbytes=1024 wbytes=2048 rios=10 wios=20 dbytes=0 dios=0").unwrap();
-        writeln!(f, "8:16 rbytes=512 wbytes=256 rios=5 wios=3 dbytes=0 dios=0").unwrap();
+        writeln!(
+            f,
+            "8:0 rbytes=1024 wbytes=2048 rios=10 wios=20 dbytes=0 dios=0"
+        )
+        .unwrap();
+        writeln!(
+            f,
+            "8:16 rbytes=512 wbytes=256 rios=5 wios=3 dbytes=0 dios=0"
+        )
+        .unwrap();
         let (r, w) = read_io_stat(&path).unwrap();
-        assert_eq!(r, 1536);  // 1024 + 512
-        assert_eq!(w, 2304);  // 2048 + 256
+        assert_eq!(r, 1536); // 1024 + 512
+        assert_eq!(w, 2304); // 2048 + 256
     }
 
     #[cfg(target_os = "linux")]

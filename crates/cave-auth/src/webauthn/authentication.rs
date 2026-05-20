@@ -18,12 +18,12 @@
 
 use sha2::{Digest, Sha256};
 
+use super::WebAuthnError;
 use super::authenticator_data::{self, AuthFlags};
 use super::client_data::{self, ClientDataType};
 use super::cose;
 use super::credential_store::{CredentialStore, StoredCredential};
 use super::registration::UserVerification;
-use super::WebAuthnError;
 
 #[derive(Debug, Clone)]
 pub struct AssertionOptions {
@@ -74,7 +74,10 @@ impl<S: CredentialStore> AuthenticationManager<S> {
 
         // §7.2 step 2 — allow-list (if present).
         if !opts.allow_credentials.is_empty()
-            && !opts.allow_credentials.iter().any(|c| c == &resp.credential_id)
+            && !opts
+                .allow_credentials
+                .iter()
+                .any(|c| c == &resp.credential_id)
         {
             return Err(WebAuthnError::Authentication(
                 "credential id not in allowCredentials".into(),
@@ -117,8 +120,7 @@ impl<S: CredentialStore> AuthenticationManager<S> {
         // §7.2 step 11 — sign-count.
         // If both stored and incoming are zero, no replay check applies (W3C
         // explicitly allows this). Otherwise incoming MUST be greater.
-        if !(stored.sign_count == 0 && auth.sign_count == 0)
-            && auth.sign_count <= stored.sign_count
+        if !(stored.sign_count == 0 && auth.sign_count == 0) && auth.sign_count <= stored.sign_count
         {
             return Err(WebAuthnError::Authentication(format!(
                 "sign_count replay: stored={} incoming={}",
@@ -197,8 +199,7 @@ mod tests {
                 transports: vec!["internal".into()],
             })
             .unwrap();
-        let mgr =
-            AuthenticationManager::new(store, "login.cave.dev", "https://login.cave.dev");
+        let mgr = AuthenticationManager::new(store, "login.cave.dev", "https://login.cave.dev");
         (sk, mgr, b"cred-A".to_vec())
     }
 
@@ -284,8 +285,8 @@ mod tests {
         let mut signed = auth_data.clone();
         signed.extend_from_slice(&cd_hash);
         let sig = sk.sign(&signed);
-        assert!(mgr
-            .verify(
+        assert!(
+            mgr.verify(
                 &AssertionOptions {
                     challenge,
                     rp_id: "login.cave.dev".into(),
@@ -300,7 +301,8 @@ mod tests {
                     user_handle: None,
                 }
             )
-            .is_err());
+            .is_err()
+        );
     }
 
     #[test]
@@ -310,8 +312,8 @@ mod tests {
         let challenge = b"x".to_vec();
         let cd = client_data_get(&challenge, "https://login.cave.dev");
         let sig = sk.sign(b"something-else");
-        assert!(mgr
-            .verify(
+        assert!(
+            mgr.verify(
                 &AssertionOptions {
                     challenge,
                     rp_id: "login.cave.dev".into(),
@@ -326,7 +328,8 @@ mod tests {
                     user_handle: None,
                 }
             )
-            .is_err());
+            .is_err()
+        );
     }
 
     #[test]
@@ -341,8 +344,8 @@ mod tests {
         let mut signed = auth_data.clone();
         signed.extend_from_slice(&cd_hash);
         let sig = sk.sign(&signed);
-        assert!(mgr
-            .verify(
+        assert!(
+            mgr.verify(
                 &AssertionOptions {
                     challenge,
                     rp_id: "login.cave.dev".into(),
@@ -357,7 +360,8 @@ mod tests {
                     user_handle: None,
                 }
             )
-            .is_err());
+            .is_err()
+        );
     }
 
     #[test]
@@ -372,8 +376,8 @@ mod tests {
         let mut signed = auth_data.clone();
         signed.extend_from_slice(&cd_hash);
         let sig = sk.sign(&signed);
-        assert!(mgr
-            .verify(
+        assert!(
+            mgr.verify(
                 &AssertionOptions {
                     challenge,
                     rp_id: "login.cave.dev".into(),
@@ -388,6 +392,7 @@ mod tests {
                     user_handle: None,
                 }
             )
-            .is_err());
+            .is_err()
+        );
     }
 }

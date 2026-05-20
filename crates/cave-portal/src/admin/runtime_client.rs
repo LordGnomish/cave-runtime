@@ -92,10 +92,8 @@ pub trait RuntimeClient: Send + Sync + std::fmt::Debug {
         &self,
         tenant: &TenantId,
     ) -> Result<Vec<SchedulerNode>, RuntimeError>;
-    async fn list_net_endpoints(
-        &self,
-        tenant: &TenantId,
-    ) -> Result<Vec<NetEndpoint>, RuntimeError>;
+    async fn list_net_endpoints(&self, tenant: &TenantId)
+    -> Result<Vec<NetEndpoint>, RuntimeError>;
     async fn list_keda_scaled_objects(
         &self,
         tenant: &TenantId,
@@ -133,10 +131,7 @@ impl RuntimeClient for MockClient {
     async fn list_kubelet_pods(&self, _: &TenantId) -> Result<Vec<KubeletPod>, RuntimeError> {
         Ok(Vec::new())
     }
-    async fn list_scheduler_nodes(
-        &self,
-        _: &TenantId,
-    ) -> Result<Vec<SchedulerNode>, RuntimeError> {
+    async fn list_scheduler_nodes(&self, _: &TenantId) -> Result<Vec<SchedulerNode>, RuntimeError> {
         Ok(Vec::new())
     }
     async fn list_net_endpoints(&self, _: &TenantId) -> Result<Vec<NetEndpoint>, RuntimeError> {
@@ -148,10 +143,7 @@ impl RuntimeClient for MockClient {
     ) -> Result<Vec<KedaScaledObject>, RuntimeError> {
         Ok(Vec::new())
     }
-    async fn list_vault_secrets(
-        &self,
-        _: &TenantId,
-    ) -> Result<Vec<VaultSecretMeta>, RuntimeError> {
+    async fn list_vault_secrets(&self, _: &TenantId) -> Result<Vec<VaultSecretMeta>, RuntimeError> {
         Ok(Vec::new())
     }
 }
@@ -185,11 +177,9 @@ impl ApiserverConfig {
             .current_context
             .as_deref()
             .ok_or(KubeconfigError::MissingField("current-context"))?;
-        let ctx = kc
-            .contexts
-            .iter()
-            .find(|c| c.name == ctx_name)
-            .ok_or(KubeconfigError::MissingField("context entry for current-context"))?;
+        let ctx = kc.contexts.iter().find(|c| c.name == ctx_name).ok_or(
+            KubeconfigError::MissingField("context entry for current-context"),
+        )?;
         let cluster = kc
             .clusters
             .iter()
@@ -316,7 +306,9 @@ impl ApiserverClient {
         if !resp.status().is_success() {
             return Err(RuntimeError::Status(resp.status()));
         }
-        resp.json::<T>().await.map_err(|e| RuntimeError::Decode(e.to_string()))
+        resp.json::<T>()
+            .await
+            .map_err(|e| RuntimeError::Decode(e.to_string()))
     }
 }
 
@@ -432,12 +424,7 @@ impl RuntimeClient for ApiserverClient {
             .items
             .into_iter()
             .map(|so| {
-                let triggers = so
-                    .spec
-                    .triggers
-                    .iter()
-                    .map(|t| t.r#type.clone())
-                    .collect();
+                let triggers = so.spec.triggers.iter().map(|t| t.r#type.clone()).collect();
                 let current_replicas = so
                     .status
                     .as_ref()
@@ -478,7 +465,9 @@ impl RuntimeClient for ApiserverClient {
         // from the same data-dir's vault.json. Out of scope for this
         // wiring sweep; documented in
         // docs/synergy/portal-runtime-wiring-2026-05-12.md.
-        Err(RuntimeError::NotWired { resource: "vault_secrets" })
+        Err(RuntimeError::NotWired {
+            resource: "vault_secrets",
+        })
     }
 }
 
@@ -848,8 +837,10 @@ mod tests {
         let server = MockServer::start();
         let _m = server.mock(|when, then| {
             when.method(GET).path("/api/v1/nodes");
-            then.status(200).header("content-type", "application/json").body(
-                r#"{"items":[
+            then.status(200)
+                .header("content-type", "application/json")
+                .body(
+                    r#"{"items":[
                   {"metadata":{"name":"node-a"},
                    "spec":{"taints":[{"key":"reserved","effect":"NoSchedule"}]},
                    "status":{"conditions":[{"type":"Ready","status":"True"}],
@@ -858,7 +849,7 @@ mod tests {
                    "status":{"conditions":[{"type":"Ready","status":"False"}],
                              "allocatable":{"cpu":"500m","memory":"512Mi"}}}
                 ]}"#,
-            );
+                );
         });
         let c = ApiserverClient::test_against(server.base_url());
         let nodes = c.list_scheduler_nodes(&tenant()).await.unwrap();
@@ -879,13 +870,15 @@ mod tests {
         let server = MockServer::start();
         let _m = server.mock(|when, then| {
             when.method(GET).path("/api/v1/endpoints");
-            then.status(200).header("content-type", "application/json").body(
-                r#"{"items":[
+            then.status(200)
+                .header("content-type", "application/json")
+                .body(
+                    r#"{"items":[
                   {"metadata":{"name":"svc-a","namespace":"prod"},
                    "subsets":[{"addresses":[{"ip":"10.0.0.1"},{"ip":"10.0.0.2"}],
                               "notReadyAddresses":[{"ip":"10.0.0.3"}]}]}
                 ]}"#,
-            );
+                );
         });
         let c = ApiserverClient::test_against(server.base_url());
         let eps = c.list_net_endpoints(&tenant()).await.unwrap();
@@ -899,14 +892,17 @@ mod tests {
     async fn apiserver_list_keda_scaled_objects_parses_crd_spec() {
         let server = MockServer::start();
         let _m = server.mock(|when, then| {
-            when.method(GET).path("/apis/keda.sh/v1alpha1/scaledobjects");
-            then.status(200).header("content-type", "application/json").body(
-                r#"{"items":[
+            when.method(GET)
+                .path("/apis/keda.sh/v1alpha1/scaledobjects");
+            then.status(200)
+                .header("content-type", "application/json")
+                .body(
+                    r#"{"items":[
                   {"metadata":{"name":"http-scaler","namespace":"prod"},
                    "spec":{"scaleTargetRef":{"name":"http-app"},
                            "minReplicaCount":0,"maxReplicaCount":50}}
                 ]}"#,
-            );
+                );
         });
         let c = ApiserverClient::test_against(server.base_url());
         let sos = c.list_keda_scaled_objects(&tenant()).await.unwrap();
@@ -952,7 +948,9 @@ mod tests {
         let server = MockServer::start();
         let _m = server.mock(|when, then| {
             when.method(GET).path("/api/v1/pods");
-            then.status(200).header("content-type", "application/json").body("not-json");
+            then.status(200)
+                .header("content-type", "application/json")
+                .body("not-json");
         });
         let c = ApiserverClient::test_against(server.base_url());
         let err = c.list_kubelet_pods(&tenant()).await.unwrap_err();
@@ -965,7 +963,9 @@ mod tests {
         let err = c.list_vault_secrets(&tenant()).await.unwrap_err();
         assert!(matches!(
             err,
-            RuntimeError::NotWired { resource: "vault_secrets" }
+            RuntimeError::NotWired {
+                resource: "vault_secrets"
+            }
         ));
     }
 
@@ -1022,7 +1022,10 @@ mod tests {
         let path = tmp.path().join("broken.kubeconfig");
         std::fs::write(&path, "apiVersion: v1\nkind: Config\nclusters: []\n").unwrap();
         let err = ApiserverConfig::from_kubeconfig(&path).unwrap_err();
-        assert!(matches!(err, KubeconfigError::MissingField("current-context")));
+        assert!(matches!(
+            err,
+            KubeconfigError::MissingField("current-context")
+        ));
     }
 
     // ── materialise integration tests (AdminState ↔ RuntimeClient seam) ──
@@ -1033,13 +1036,15 @@ mod tests {
         let server = MockServer::start();
         let _m = server.mock(|when, then| {
             when.method(GET).path("/api/v1/pods");
-            then.status(200).header("content-type", "application/json").body(
-                r#"{"items":[
+            then.status(200)
+                .header("content-type", "application/json")
+                .body(
+                    r#"{"items":[
                   {"metadata":{"name":"live-pod","labels":{"cave.io/tenant":"acme"}},
                    "spec":{"nodeName":"n-live"},
                    "status":{"phase":"Running","containerStatuses":[{"restartCount":4}]}}
                 ]}"#,
-            );
+                );
         });
         let state = AdminState::empty();
         state.set_runtime_client(Arc::new(ApiserverClient::test_against(server.base_url())));
@@ -1095,8 +1100,14 @@ mod tests {
         let acme = tenant();
         state.materialise_kubelet_pods(&acme).await.unwrap();
         let pods = state.kubelet_pods.read().unwrap();
-        assert!(pods.iter().any(|p| p.tenant == evil && p.pod_name == "evil-pod"));
-        assert!(pods.iter().any(|p| p.tenant == acme && p.pod_name == "acme-pod"));
+        assert!(
+            pods.iter()
+                .any(|p| p.tenant == evil && p.pod_name == "evil-pod")
+        );
+        assert!(
+            pods.iter()
+                .any(|p| p.tenant == acme && p.pod_name == "acme-pod")
+        );
     }
 
     #[tokio::test]
@@ -1154,6 +1165,9 @@ mod tests {
         // the "operator should investigate" branch we want to test.
         // With a real CA the same path yields Wired (covered by
         // kubeconfig_roundtrip_from_cluster_init_format above).
-        assert!(matches!(outcome, WireOutcome::Wired | WireOutcome::KubeconfigBroken));
+        assert!(matches!(
+            outcome,
+            WireOutcome::Wired | WireOutcome::KubeconfigBroken
+        ));
     }
 }

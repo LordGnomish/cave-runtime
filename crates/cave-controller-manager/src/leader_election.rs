@@ -96,12 +96,23 @@ impl LeaderElector {
     /// Build a [`LeaderElector`] with the upstream-default
     /// `kube-controller-manager` lease name and TTL.
     pub fn default_for_replica(manager: LeaseManager, replica_id: impl Into<String>) -> Self {
-        Self::new(manager, CONTROLLER_MANAGER_LEASE, replica_id, DEFAULT_LEASE_TTL)
+        Self::new(
+            manager,
+            CONTROLLER_MANAGER_LEASE,
+            replica_id,
+            DEFAULT_LEASE_TTL,
+        )
     }
 
-    pub fn replica_id(&self) -> &str { &self.replica_id }
-    pub fn lease_name(&self) -> &str { &self.lease_name }
-    pub fn lease_ttl(&self) -> Duration { self.lease_ttl }
+    pub fn replica_id(&self) -> &str {
+        &self.replica_id
+    }
+    pub fn lease_name(&self) -> &str {
+        &self.lease_name
+    }
+    pub fn lease_ttl(&self) -> Duration {
+        self.lease_ttl
+    }
 
     /// Attempt to become the leader. Succeeds in two cases:
     ///
@@ -113,7 +124,10 @@ impl LeaderElector {
     /// Returns the new [`Role`]: `Leader` on success, `Standby` if
     /// another replica still holds an unexpired lease.
     pub fn acquire(&self, now: SystemTime) -> Role {
-        match self.manager.acquire(&self.lease_name, &self.replica_id, self.lease_ttl, now) {
+        match self
+            .manager
+            .acquire(&self.lease_name, &self.replica_id, self.lease_ttl, now)
+        {
             Ok(_) => Role::Leader,
             Err(LeaseError::Held { .. }) => Role::Standby,
             Err(LeaseError::InvalidTtl) | Err(LeaseError::NotFound(_)) => Role::Standby,
@@ -125,7 +139,8 @@ impl LeaderElector {
     /// the lease (someone else acquired it — the replica should
     /// step down to standby and stop reconcilers immediately).
     pub fn renew(&self, now: SystemTime) -> Result<(), LeaseError> {
-        self.manager.renew(&self.lease_name, &self.replica_id, self.lease_ttl, now)?;
+        self.manager
+            .renew(&self.lease_name, &self.replica_id, self.lease_ttl, now)?;
         Ok(())
     }
 
@@ -150,7 +165,11 @@ impl LeaderElector {
             .unwrap_or(0);
         match info {
             Some(i) if i.expires_at_unix > now_unix => {
-                let role = if i.holder == self.replica_id { Role::Leader } else { Role::Standby };
+                let role = if i.holder == self.replica_id {
+                    Role::Leader
+                } else {
+                    Role::Standby
+                };
                 ElectionStatus {
                     role,
                     current_holder: Some(i.holder),

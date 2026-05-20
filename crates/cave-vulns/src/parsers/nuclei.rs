@@ -63,7 +63,9 @@ struct NuInfo {
 }
 
 impl ScanParser for NucleiParser {
-    fn scan_type(&self) -> &'static str { "Nuclei Scan" }
+    fn scan_type(&self) -> &'static str {
+        "Nuclei Scan"
+    }
     fn dedupe_fields(&self) -> &'static [&'static str] {
         &["title", "severity", "vuln_id_from_tool"]
     }
@@ -77,7 +79,9 @@ impl ScanParser for NucleiParser {
             let mut acc: Vec<NuItem> = Vec::new();
             for line in trimmed.lines() {
                 let line = line.trim();
-                if line.is_empty() { continue; }
+                if line.is_empty() {
+                    continue;
+                }
                 acc.push(serde_json::from_str(line)?);
             }
             acc
@@ -86,11 +90,16 @@ impl ScanParser for NucleiParser {
         let mut dupes: HashMap<String, Finding> = HashMap::new();
         let mut order: Vec<String> = Vec::new();
         for item in items {
-            let template_id = item.template_id.or(item.template_id_alt).unwrap_or_default();
+            let template_id = item
+                .template_id
+                .or(item.template_id_alt)
+                .unwrap_or_default();
             let sev = FindingSeverity::parse(&item.info.severity).unwrap_or(FindingSeverity::Low);
             let mut f = Finding::new(item.info.name.clone(), sev);
             f.vuln_id_from_tool = Some(template_id.clone());
-            if let Some(d) = item.info.description { f.description = d; }
+            if let Some(d) = item.info.description {
+                f.description = d;
+            }
             if !item.extracted.is_empty() {
                 f.description.push_str("\n**Results:**\n");
                 f.description.push_str(&item.extracted.join("\n"));
@@ -98,44 +107,86 @@ impl ScanParser for NucleiParser {
             // References can be string or array.
             match &item.info.reference {
                 Value::Array(a) => {
-                    let lines: Vec<String> = a.iter().filter_map(|v| v.as_str().map(String::from)).collect();
-                    if !lines.is_empty() { f.references = Some(lines.join("\n")); }
+                    let lines: Vec<String> = a
+                        .iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect();
+                    if !lines.is_empty() {
+                        f.references = Some(lines.join("\n"));
+                    }
                 }
                 Value::String(s) => f.references = Some(s.clone()),
                 _ => {}
             }
             // Classification.
-            if let Some(cve_ids) = item.info.classification.get("cve-id").and_then(|v| v.as_array()) {
-                let ids: Vec<String> = cve_ids.iter().filter_map(|v| v.as_str().map(|s| s.to_uppercase())).collect();
+            if let Some(cve_ids) = item
+                .info
+                .classification
+                .get("cve-id")
+                .and_then(|v| v.as_array())
+            {
+                let ids: Vec<String> = cve_ids
+                    .iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_uppercase()))
+                    .collect();
                 if let Some(first) = ids.first() {
                     f.cve = Some(first.clone());
                 }
                 f.vulnerability_ids = ids;
             }
-            if let Some(cwe_arr) = item.info.classification.get("cwe-id").and_then(|v| v.as_array()) {
+            if let Some(cwe_arr) = item
+                .info
+                .classification
+                .get("cwe-id")
+                .and_then(|v| v.as_array())
+            {
                 if let Some(first) = cwe_arr.first().and_then(|v| v.as_str()) {
                     // Format like "cwe-79"
-                    if let Some(num) = first.to_ascii_lowercase().strip_prefix("cwe-").and_then(|x| x.parse().ok()) {
+                    if let Some(num) = first
+                        .to_ascii_lowercase()
+                        .strip_prefix("cwe-")
+                        .and_then(|x| x.parse().ok())
+                    {
                         f.cwe = Some(num);
                     }
                 }
             }
-            if let Some(score) = item.info.classification.get("cvss-score").and_then(|v| v.as_f64()) {
+            if let Some(score) = item
+                .info
+                .classification
+                .get("cvss-score")
+                .and_then(|v| v.as_f64())
+            {
                 f.cvssv3_score = Some(score as f32);
             }
-            if let Some(vector) = item.info.classification.get("cvss-metrics").and_then(|v| v.as_str()) {
+            if let Some(vector) = item
+                .info
+                .classification
+                .get("cvss-metrics")
+                .and_then(|v| v.as_str())
+            {
                 f.cvssv3 = Some(vector.into());
             }
             if let Some(cmd) = item.curl_command {
                 f.steps_to_reproduce = Some(format!("curl command to reproduce:\n`{cmd}`"));
             }
-            if let Some(r) = item.info.remediation { f.mitigation = Some(r); }
-            if let Some(name) = item.matcher_name.clone() { f.component_name = Some(name); }
+            if let Some(r) = item.info.remediation {
+                f.mitigation = Some(r);
+            }
+            if let Some(name) = item.matcher_name.clone() {
+                f.component_name = Some(name);
+            }
             f.dynamic_finding = true;
             f.found_by_scanner = Some("Nuclei Scan".into());
             let matched = item.matched.or(item.matched_at).unwrap_or_default();
-            let dupe_host = matched.split("://").nth(1).unwrap_or(&matched)
-                .split('/').next().unwrap_or(&matched).to_string();
+            let dupe_host = matched
+                .split("://")
+                .nth(1)
+                .unwrap_or(&matched)
+                .split('/')
+                .next()
+                .unwrap_or(&matched)
+                .to_string();
             let item_type = item.item_type.unwrap_or_default();
             let matcher = item.matcher_name.unwrap_or_default();
             let raw = format!("{template_id}{item_type}{matcher}{dupe_host}");
@@ -155,7 +206,9 @@ impl ScanParser for NucleiParser {
                 f.description.push_str("\n```");
             }
             match dupes.get_mut(&dupe_key) {
-                Some(existing) => { existing.nb_occurences += 1; }
+                Some(existing) => {
+                    existing.nb_occurences += 1;
+                }
                 None => {
                     order.push(dupe_key.clone());
                     dupes.insert(dupe_key, f);
@@ -216,7 +269,13 @@ mod tests {
     #[test]
     fn curl_command_recorded_in_steps() {
         let out = NucleiParser.parse(SAMPLE_ARRAY).unwrap();
-        assert!(out[0].steps_to_reproduce.as_deref().unwrap().contains("curl"));
+        assert!(
+            out[0]
+                .steps_to_reproduce
+                .as_deref()
+                .unwrap()
+                .contains("curl")
+        );
     }
 
     #[test]

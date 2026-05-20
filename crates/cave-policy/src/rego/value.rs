@@ -16,8 +16,12 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn null() -> Self { Value::Json(serde_json::Value::Null) }
-    pub fn bool(b: bool) -> Self { Value::Json(serde_json::Value::Bool(b)) }
+    pub fn null() -> Self {
+        Value::Json(serde_json::Value::Null)
+    }
+    pub fn bool(b: bool) -> Self {
+        Value::Json(serde_json::Value::Bool(b))
+    }
     pub fn number_f64(f: f64) -> Self {
         Value::Json(serde_json::json!(f))
     }
@@ -34,7 +38,9 @@ impl Value {
         Value::Json(serde_json::Value::Object(m))
     }
 
-    pub fn is_undefined(&self) -> bool { matches!(self, Value::Undefined) }
+    pub fn is_undefined(&self) -> bool {
+        matches!(self, Value::Undefined)
+    }
 
     pub fn is_truthy(&self) -> bool {
         match self {
@@ -119,7 +125,9 @@ impl PartialEq for Value {
         match (self, other) {
             (Value::Json(a), Value::Json(b)) => a == b,
             (Value::Set(a), Value::Set(b)) => {
-                if a.len() != b.len() { return false; }
+                if a.len() != b.len() {
+                    return false;
+                }
                 let mut sa = a.clone();
                 let mut sb = b.clone();
                 sa.sort_by(json_cmp);
@@ -156,7 +164,9 @@ pub fn json_cmp(a: &serde_json::Value, b: &serde_json::Value) -> std::cmp::Order
         (J::Array(x), J::Array(y)) => {
             for (xi, yi) in x.iter().zip(y.iter()) {
                 let c = json_cmp(xi, yi);
-                if c != Ordering::Equal { return c; }
+                if c != Ordering::Equal {
+                    return c;
+                }
             }
             x.len().cmp(&y.len())
         }
@@ -256,7 +266,11 @@ fn json_get<'a>(v: &'a serde_json::Value, parts: &[&str]) -> Option<&'a serde_js
     Some(cur)
 }
 
-fn json_set(v: &mut serde_json::Value, parts: &[&str], val: serde_json::Value) -> Result<(), String> {
+fn json_set(
+    v: &mut serde_json::Value,
+    parts: &[&str],
+    val: serde_json::Value,
+) -> Result<(), String> {
     if parts.is_empty() {
         *v = val;
         return Ok(());
@@ -268,7 +282,9 @@ fn json_set(v: &mut serde_json::Value, parts: &[&str], val: serde_json::Value) -
             if tail.is_empty() {
                 m.insert(key.to_string(), val);
             } else {
-                let entry = m.entry(key.to_string()).or_insert(serde_json::Value::Object(Default::default()));
+                let entry = m
+                    .entry(key.to_string())
+                    .or_insert(serde_json::Value::Object(Default::default()));
                 json_set(entry, tail, val)?;
             }
         }
@@ -276,7 +292,8 @@ fn json_set(v: &mut serde_json::Value, parts: &[&str], val: serde_json::Value) -
             let idx: usize = if key == "-" {
                 arr.len()
             } else {
-                key.parse().map_err(|_| format!("invalid array index: {key}"))?
+                key.parse()
+                    .map_err(|_| format!("invalid array index: {key}"))?
             };
             if tail.is_empty() {
                 if idx == arr.len() {
@@ -309,17 +326,24 @@ fn json_remove(v: &mut serde_json::Value, parts: &[&str]) -> Result<(), String> 
         json_get_mut(v, head).ok_or("remove: path not found")?
     };
     match parent {
-        serde_json::Value::Object(m) => { m.remove(*last); }
+        serde_json::Value::Object(m) => {
+            m.remove(*last);
+        }
         serde_json::Value::Array(arr) => {
             let idx: usize = last.parse().map_err(|_| format!("invalid index: {last}"))?;
-            if idx < arr.len() { arr.remove(idx); }
+            if idx < arr.len() {
+                arr.remove(idx);
+            }
         }
         _ => return Err("cannot remove from non-object/array".into()),
     }
     Ok(())
 }
 
-fn json_get_mut<'a>(v: &'a mut serde_json::Value, parts: &[&str]) -> Option<&'a mut serde_json::Value> {
+fn json_get_mut<'a>(
+    v: &'a mut serde_json::Value,
+    parts: &[&str],
+) -> Option<&'a mut serde_json::Value> {
     let mut cur = v;
     for part in parts {
         cur = cur.get_mut(*part)?;

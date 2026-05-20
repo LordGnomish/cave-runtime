@@ -21,10 +21,7 @@ pub fn aggregate_costs(
                 .clone()
                 .unwrap_or_else(|| "__none__".to_string()),
             AggregateBy::Node => "node".to_string(),
-            AggregateBy::Pod => cost
-                .pod
-                .clone()
-                .unwrap_or_else(|| cost.namespace.clone()),
+            AggregateBy::Pod => cost.pod.clone().unwrap_or_else(|| cost.namespace.clone()),
             AggregateBy::Label => cost
                 .labels
                 .iter()

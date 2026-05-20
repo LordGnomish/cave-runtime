@@ -19,7 +19,7 @@ fn revocation_reason_codes_match_rfc5280_table() {
     assert_eq!(Superseded.code(), 4);
     assert_eq!(CessationOfOperation.code(), 5);
     assert_eq!(CertificateHold.code(), 6);
-    assert_eq!(RemoveFromCrl.code(), 8);   // 7 is reserved/unassigned
+    assert_eq!(RemoveFromCrl.code(), 8); // 7 is reserved/unassigned
     assert_eq!(PrivilegeWithdrawn.code(), 9);
     assert_eq!(AaCompromise.code(), 10);
 
@@ -40,14 +40,19 @@ fn revoke_unrevoke_is_idempotent() {
     let entry2 = crl.revoke(serial, RevocationReason::Superseded, TENANT_A);
     assert_eq!(crl.len(), 1, "duplicate revoke is overwrite, not insert");
     assert_eq!(entry1.serial, entry2.serial);
-    assert_eq!(crl.lookup(serial).unwrap().reason, RevocationReason::Superseded);
+    assert_eq!(
+        crl.lookup(serial).unwrap().reason,
+        RevocationReason::Superseded
+    );
 
     assert!(crl.unrevoke(serial));
     assert!(crl.lookup(serial).is_none());
     assert!(!crl.unrevoke(serial), "second unrevoke is a no-op");
 
-    assert!(crl.last_rebuilt_at.is_some(),
-        "every mutation stamps last_rebuilt_at (RFC 5280 §5.1.2.1 thisUpdate)");
+    assert!(
+        crl.last_rebuilt_at.is_some(),
+        "every mutation stamps last_rebuilt_at (RFC 5280 §5.1.2.1 thisUpdate)"
+    );
 }
 
 /// Cite: cave multi-tenant invariant — `for_tenant(t)` only returns

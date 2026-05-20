@@ -17,7 +17,11 @@ pub trait Provider: Send + Sync {
     fn supported_kinds(&self) -> Vec<ResourceKind>;
 
     async fn create(&self, spec: &ResourceSpec) -> InfraResult<ProvisionResult>;
-    async fn read(&self, provider_id: &str, kind: &ResourceKind) -> InfraResult<HashMap<String, serde_json::Value>>;
+    async fn read(
+        &self,
+        provider_id: &str,
+        kind: &ResourceKind,
+    ) -> InfraResult<HashMap<String, serde_json::Value>>;
     async fn update(&self, provider_id: &str, spec: &ResourceSpec) -> InfraResult<ProvisionResult>;
     async fn delete(&self, provider_id: &str, kind: &ResourceKind) -> InfraResult<()>;
 
@@ -62,7 +66,12 @@ impl BareMetalProvider {
         for i in 1..=20 {
             p.inventory.insert(
                 format!("baremetal-{i:03}"),
-                ServerTemplate { cpu: 32, memory_gb: 128, disk_gb: 1000, available: true },
+                ServerTemplate {
+                    cpu: 32,
+                    memory_gb: 128,
+                    disk_gb: 1000,
+                    available: true,
+                },
             );
         }
         p
@@ -76,7 +85,11 @@ impl Provider for BareMetalProvider {
     }
 
     fn supported_kinds(&self) -> Vec<ResourceKind> {
-        vec![ResourceKind::Server, ResourceKind::IpAddress, ResourceKind::SshKey]
+        vec![
+            ResourceKind::Server,
+            ResourceKind::IpAddress,
+            ResourceKind::SshKey,
+        ]
     }
 
     async fn create(&self, spec: &ResourceSpec) -> InfraResult<ProvisionResult> {
@@ -84,8 +97,16 @@ impl Provider for BareMetalProvider {
 
         match spec.kind {
             ResourceKind::Server => {
-                let cpu = spec.properties.get("cpu").and_then(|v| v.as_i64()).unwrap_or(2) as i32;
-                let memory_gb = spec.properties.get("memory_gb").and_then(|v| v.as_i64()).unwrap_or(4) as i32;
+                let cpu = spec
+                    .properties
+                    .get("cpu")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(2) as i32;
+                let memory_gb = spec
+                    .properties
+                    .get("memory_gb")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(4) as i32;
 
                 // Find an available server in inventory
                 let provider_id = self
@@ -105,32 +126,70 @@ impl Provider for BareMetalProvider {
 
                 let mut actual = spec.properties.clone();
                 actual.insert("provider_id".into(), serde_json::json!(&provider_id));
-                actual.insert("ip_address".into(), serde_json::json!(format!("10.0.1.{}", provider_id.chars().filter(|c| c.is_numeric()).collect::<String>().chars().take(3).collect::<String>())));
+                actual.insert(
+                    "ip_address".into(),
+                    serde_json::json!(format!(
+                        "10.0.1.{}",
+                        provider_id
+                            .chars()
+                            .filter(|c| c.is_numeric())
+                            .collect::<String>()
+                            .chars()
+                            .take(3)
+                            .collect::<String>()
+                    )),
+                );
                 actual.insert("status".into(), serde_json::json!("running"));
 
                 let mut outputs = HashMap::new();
                 outputs.insert("provider_id".into(), serde_json::json!(&provider_id));
                 outputs.insert("private_ip".into(), actual["ip_address"].clone());
 
-                Ok(ProvisionResult { provider_id, actual, outputs })
+                Ok(ProvisionResult {
+                    provider_id,
+                    actual,
+                    outputs,
+                })
             }
             ResourceKind::IpAddress => {
-                let provider_id = format!("ip-{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap_or("xxxx"));
+                let provider_id = format!(
+                    "ip-{}",
+                    uuid::Uuid::new_v4()
+                        .to_string()
+                        .split('-')
+                        .next()
+                        .unwrap_or("xxxx")
+                );
                 let ip = format!("185.{}.{}.{}", rand_byte(), rand_byte(), rand_byte());
                 let mut actual = HashMap::new();
                 actual.insert("ip".into(), serde_json::json!(&ip));
                 actual.insert("type".into(), serde_json::json!("public"));
                 let mut outputs = HashMap::new();
                 outputs.insert("ip".into(), serde_json::json!(&ip));
-                Ok(ProvisionResult { provider_id, actual, outputs })
+                Ok(ProvisionResult {
+                    provider_id,
+                    actual,
+                    outputs,
+                })
             }
             ResourceKind::SshKey => {
-                let provider_id = format!("key-{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap_or("xxxx"));
+                let provider_id = format!(
+                    "key-{}",
+                    uuid::Uuid::new_v4()
+                        .to_string()
+                        .split('-')
+                        .next()
+                        .unwrap_or("xxxx")
+                );
                 let fingerprint = format!("SHA256:{}", uuid::Uuid::new_v4());
                 let mut actual = HashMap::new();
                 actual.insert("fingerprint".into(), serde_json::json!(&fingerprint));
                 let outputs = actual.clone();
-                Ok(ProvisionResult { provider_id, actual, outputs })
+                Ok(ProvisionResult {
+                    provider_id,
+                    actual,
+                    outputs,
+                })
             }
             ref other => Err(InfraError::ProviderError {
                 provider: self.name.clone(),
@@ -139,12 +198,23 @@ impl Provider for BareMetalProvider {
         }
     }
 
-    async fn read(&self, provider_id: &str, kind: &ResourceKind) -> InfraResult<HashMap<String, serde_json::Value>> {
+    async fn read(
+        &self,
+        provider_id: &str,
+        kind: &ResourceKind,
+    ) -> InfraResult<HashMap<String, serde_json::Value>> {
         let mut actual = HashMap::new();
         match kind {
             ResourceKind::Server => {
-                let available = !self.inventory.get(provider_id).map(|h| h.available).unwrap_or(true);
-                actual.insert("status".into(), serde_json::json!(if available { "running" } else { "deleted" }));
+                let available = !self
+                    .inventory
+                    .get(provider_id)
+                    .map(|h| h.available)
+                    .unwrap_or(true);
+                actual.insert(
+                    "status".into(),
+                    serde_json::json!(if available { "running" } else { "deleted" }),
+                );
                 actual.insert("provider_id".into(), serde_json::json!(provider_id));
             }
             _ => {
@@ -202,17 +272,33 @@ impl Provider for NoopProvider {
 
     fn supported_kinds(&self) -> Vec<ResourceKind> {
         vec![
-            ResourceKind::Server, ResourceKind::Network, ResourceKind::Subnet,
-            ResourceKind::LoadBalancer, ResourceKind::BlockStorage,
-            ResourceKind::ObjectStorage, ResourceKind::Database, ResourceKind::Cache,
-            ResourceKind::Dns, ResourceKind::Firewall, ResourceKind::IpAddress,
-            ResourceKind::SshKey, ResourceKind::KubernetesCluster,
+            ResourceKind::Server,
+            ResourceKind::Network,
+            ResourceKind::Subnet,
+            ResourceKind::LoadBalancer,
+            ResourceKind::BlockStorage,
+            ResourceKind::ObjectStorage,
+            ResourceKind::Database,
+            ResourceKind::Cache,
+            ResourceKind::Dns,
+            ResourceKind::Firewall,
+            ResourceKind::IpAddress,
+            ResourceKind::SshKey,
+            ResourceKind::KubernetesCluster,
         ]
     }
 
     async fn create(&self, spec: &ResourceSpec) -> InfraResult<ProvisionResult> {
         self.validate(spec)?;
-        let provider_id = format!("{}-{}", self.name, uuid::Uuid::new_v4().to_string().split('-').next().unwrap_or("xxxx"));
+        let provider_id = format!(
+            "{}-{}",
+            self.name,
+            uuid::Uuid::new_v4()
+                .to_string()
+                .split('-')
+                .next()
+                .unwrap_or("xxxx")
+        );
         Ok(ProvisionResult {
             provider_id,
             actual: spec.properties.clone(),
@@ -220,7 +306,11 @@ impl Provider for NoopProvider {
         })
     }
 
-    async fn read(&self, provider_id: &str, _kind: &ResourceKind) -> InfraResult<HashMap<String, serde_json::Value>> {
+    async fn read(
+        &self,
+        provider_id: &str,
+        _kind: &ResourceKind,
+    ) -> InfraResult<HashMap<String, serde_json::Value>> {
         let mut actual = HashMap::new();
         actual.insert("provider_id".into(), serde_json::json!(provider_id));
         actual.insert("status".into(), serde_json::json!("running"));
@@ -274,32 +364,55 @@ impl ProviderRegistry {
     }
 
     /// Execute a create operation via the named provider.
-    pub async fn create(&self, provider_name: &str, spec: &ResourceSpec) -> InfraResult<ProvisionResult> {
+    pub async fn create(
+        &self,
+        provider_name: &str,
+        spec: &ResourceSpec,
+    ) -> InfraResult<ProvisionResult> {
         // We need to hold the ref within the scope of this function
-        let guard = self.providers.get(provider_name).ok_or_else(|| {
-            InfraError::ProviderNotFound(provider_name.to_string())
-        })?;
+        let guard = self
+            .providers
+            .get(provider_name)
+            .ok_or_else(|| InfraError::ProviderNotFound(provider_name.to_string()))?;
         guard.create(spec).await
     }
 
-    pub async fn read(&self, provider_name: &str, provider_id: &str, kind: &ResourceKind) -> InfraResult<HashMap<String, serde_json::Value>> {
-        let guard = self.providers.get(provider_name).ok_or_else(|| {
-            InfraError::ProviderNotFound(provider_name.to_string())
-        })?;
+    pub async fn read(
+        &self,
+        provider_name: &str,
+        provider_id: &str,
+        kind: &ResourceKind,
+    ) -> InfraResult<HashMap<String, serde_json::Value>> {
+        let guard = self
+            .providers
+            .get(provider_name)
+            .ok_or_else(|| InfraError::ProviderNotFound(provider_name.to_string()))?;
         guard.read(provider_id, kind).await
     }
 
-    pub async fn update(&self, provider_name: &str, provider_id: &str, spec: &ResourceSpec) -> InfraResult<ProvisionResult> {
-        let guard = self.providers.get(provider_name).ok_or_else(|| {
-            InfraError::ProviderNotFound(provider_name.to_string())
-        })?;
+    pub async fn update(
+        &self,
+        provider_name: &str,
+        provider_id: &str,
+        spec: &ResourceSpec,
+    ) -> InfraResult<ProvisionResult> {
+        let guard = self
+            .providers
+            .get(provider_name)
+            .ok_or_else(|| InfraError::ProviderNotFound(provider_name.to_string()))?;
         guard.update(provider_id, spec).await
     }
 
-    pub async fn delete(&self, provider_name: &str, provider_id: &str, kind: &ResourceKind) -> InfraResult<()> {
-        let guard = self.providers.get(provider_name).ok_or_else(|| {
-            InfraError::ProviderNotFound(provider_name.to_string())
-        })?;
+    pub async fn delete(
+        &self,
+        provider_name: &str,
+        provider_id: &str,
+        kind: &ResourceKind,
+    ) -> InfraResult<()> {
+        let guard = self
+            .providers
+            .get(provider_name)
+            .ok_or_else(|| InfraError::ProviderNotFound(provider_name.to_string()))?;
         guard.delete(provider_id, kind).await
     }
 }

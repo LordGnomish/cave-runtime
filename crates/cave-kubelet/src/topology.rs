@@ -159,14 +159,12 @@ pub fn best_hint(merged: &[TopologyHint]) -> Option<TopologyHint> {
         return None;
     }
     let mut sorted = merged.to_vec();
-    sorted.sort_by(|a, b| {
-        match b.preferred.cmp(&a.preferred) {
-            std::cmp::Ordering::Equal => match a.mask.count().cmp(&b.mask.count()) {
-                std::cmp::Ordering::Equal => a.mask.0.cmp(&b.mask.0),
-                o => o,
-            },
+    sorted.sort_by(|a, b| match b.preferred.cmp(&a.preferred) {
+        std::cmp::Ordering::Equal => match a.mask.count().cmp(&b.mask.count()) {
+            std::cmp::Ordering::Equal => a.mask.0.cmp(&b.mask.0),
             o => o,
-        }
+        },
+        o => o,
     });
     Some(sorted[0])
 }
@@ -174,10 +172,7 @@ pub fn best_hint(merged: &[TopologyHint]) -> Option<TopologyHint> {
 /// Run topology admission for a single container / pod scope decision.
 /// `provider_hints` must already be ordered (one Vec per provider); the
 /// merge produces all valid alignments and the policy chooses among them.
-pub fn admit(
-    policy: Policy,
-    provider_hints: &[Vec<TopologyHint>],
-) -> AdmissionResult {
+pub fn admit(policy: Policy, provider_hints: &[Vec<TopologyHint>]) -> AdmissionResult {
     if matches!(policy, Policy::None) {
         return AdmissionResult::admit(None);
     }
@@ -367,11 +362,7 @@ mod tests {
 
     #[test]
     fn best_hint_picks_smallest_preferred() {
-        let merged = vec![
-            h(&[0, 1, 2], true),
-            h(&[0], true),
-            h(&[0, 1], true),
-        ];
+        let merged = vec![h(&[0, 1, 2], true), h(&[0], true), h(&[0, 1], true)];
         let best = best_hint(&merged).unwrap();
         assert_eq!(best.mask, NumaMask::from_nodes(&[0]));
     }
@@ -411,19 +402,13 @@ mod tests {
 
     #[test]
     fn admit_best_effort_admits_unpreferred() {
-        let res = admit(
-            Policy::BestEffort,
-            &[vec![h(&[0, 1], false)]],
-        );
+        let res = admit(Policy::BestEffort, &[vec![h(&[0, 1], false)]]);
         assert!(res.admit);
     }
 
     #[test]
     fn admit_restricted_denies_unpreferred() {
-        let res = admit(
-            Policy::Restricted,
-            &[vec![h(&[0, 1], false)]],
-        );
+        let res = admit(Policy::Restricted, &[vec![h(&[0, 1], false)]]);
         assert!(!res.admit);
         assert_eq!(res.reason.as_deref(), Some("TopologyAffinityError"));
     }
@@ -436,28 +421,19 @@ mod tests {
 
     #[test]
     fn admit_single_numa_denies_multi_node() {
-        let res = admit(
-            Policy::SingleNumaNode,
-            &[vec![h(&[0, 1], true)]],
-        );
+        let res = admit(Policy::SingleNumaNode, &[vec![h(&[0, 1], true)]]);
         assert!(!res.admit);
     }
 
     #[test]
     fn admit_single_numa_admits_single_preferred_node() {
-        let res = admit(
-            Policy::SingleNumaNode,
-            &[vec![h(&[0], true)]],
-        );
+        let res = admit(Policy::SingleNumaNode, &[vec![h(&[0], true)]]);
         assert!(res.admit);
     }
 
     #[test]
     fn admit_single_numa_denies_unpreferred_single_node() {
-        let res = admit(
-            Policy::SingleNumaNode,
-            &[vec![h(&[0], false)]],
-        );
+        let res = admit(Policy::SingleNumaNode, &[vec![h(&[0], false)]]);
         assert!(!res.admit);
     }
 
@@ -564,7 +540,11 @@ mod tests {
     #[test]
     fn admit_handles_zero_hint_lists_for_non_none_policy() {
         // No providers ⇒ nothing to align ⇒ deny except for None.
-        for p in [Policy::BestEffort, Policy::Restricted, Policy::SingleNumaNode] {
+        for p in [
+            Policy::BestEffort,
+            Policy::Restricted,
+            Policy::SingleNumaNode,
+        ] {
             let res = admit(p, &[]);
             assert!(!res.admit, "policy {:?} should deny with no providers", p);
         }

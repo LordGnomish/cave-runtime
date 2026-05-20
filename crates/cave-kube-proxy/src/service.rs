@@ -23,8 +23,16 @@ pub struct ServicePortName {
 }
 
 impl ServicePortName {
-    pub fn new(namespace: impl Into<String>, name: impl Into<String>, port: impl Into<String>) -> Self {
-        Self { namespace: namespace.into(), name: name.into(), port: port.into() }
+    pub fn new(
+        namespace: impl Into<String>,
+        name: impl Into<String>,
+        port: impl Into<String>,
+    ) -> Self {
+        Self {
+            namespace: namespace.into(),
+            name: name.into(),
+            port: port.into(),
+        }
     }
 
     /// Cite: `pkg/proxy/types.go:50` (ServicePortName.String) — formatted
@@ -36,23 +44,37 @@ impl ServicePortName {
 
 /// Cite: `pkg/proxy/serviceport.go` Protocol field (TCP/UDP/SCTP).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Protocol { Tcp, Udp, Sctp }
+pub enum Protocol {
+    Tcp,
+    Udp,
+    Sctp,
+}
 
 impl Protocol {
     pub fn as_str(&self) -> &'static str {
-        match self { Self::Tcp => "tcp", Self::Udp => "udp", Self::Sctp => "sctp" }
+        match self {
+            Self::Tcp => "tcp",
+            Self::Udp => "udp",
+            Self::Sctp => "sctp",
+        }
     }
 }
 
 /// Cite: `pkg/proxy/serviceport.go:43` (SessionAffinityType) — reflects
 /// `v1.ServiceAffinityClientIP` vs `v1.ServiceAffinityNone`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SessionAffinity { None, ClientIp }
+pub enum SessionAffinity {
+    None,
+    ClientIp,
+}
 
 /// Cite: `pkg/proxy/serviceport.go:154` (ExternalPolicyLocal) +
 /// `:159` (InternalPolicyLocal) — the per-direction traffic policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TrafficPolicy { Cluster, Local }
+pub enum TrafficPolicy {
+    Cluster,
+    Local,
+}
 
 /// A trivially-parsed CIDR for LoadBalancerSourceRanges. IPv4 only;
 /// IPv6 lands in a follow-up batch.
@@ -69,14 +91,16 @@ impl Cidr {
         let (addr_part, prefix_part) = s.split_once('/').ok_or_else(|| {
             KubeProxyError::InvalidCidr(s.to_string(), "missing '/' separator".into())
         })?;
-        let addr = Ipv4Addr::from_str(addr_part).map_err(|e| {
-            KubeProxyError::InvalidCidr(s.to_string(), e.to_string())
-        })?;
-        let prefix: u8 = prefix_part.parse().map_err(|_| {
-            KubeProxyError::InvalidCidr(s.to_string(), "non-numeric prefix".into())
-        })?;
+        let addr = Ipv4Addr::from_str(addr_part)
+            .map_err(|e| KubeProxyError::InvalidCidr(s.to_string(), e.to_string()))?;
+        let prefix: u8 = prefix_part
+            .parse()
+            .map_err(|_| KubeProxyError::InvalidCidr(s.to_string(), "non-numeric prefix".into()))?;
         if prefix > 32 {
-            return Err(KubeProxyError::InvalidCidr(s.to_string(), "prefix > 32".into()));
+            return Err(KubeProxyError::InvalidCidr(
+                s.to_string(),
+                "prefix > 32".into(),
+            ));
         }
         Ok(Self { addr, prefix })
     }
@@ -161,7 +185,9 @@ impl ServicePortInfo {
         if self.load_balancer_source_ranges.is_empty() {
             return true;
         }
-        self.load_balancer_source_ranges.iter().any(|c| c.contains(src))
+        self.load_balancer_source_ranges
+            .iter()
+            .any(|c| c.contains(src))
     }
 }
 
@@ -175,9 +201,15 @@ pub struct ServiceChange {
 }
 
 impl ServiceChange {
-    pub fn is_add(&self) -> bool { self.previous.is_none() && self.current.is_some() }
-    pub fn is_delete(&self) -> bool { self.previous.is_some() && self.current.is_none() }
-    pub fn is_update(&self) -> bool { self.previous.is_some() && self.current.is_some() }
+    pub fn is_add(&self) -> bool {
+        self.previous.is_none() && self.current.is_some()
+    }
+    pub fn is_delete(&self) -> bool {
+        self.previous.is_some() && self.current.is_none()
+    }
+    pub fn is_update(&self) -> bool {
+        self.previous.is_some() && self.current.is_some()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -188,7 +220,10 @@ pub struct ServiceChangeTracker {
 
 impl ServiceChangeTracker {
     pub fn new(tenant_id: impl Into<String>) -> Self {
-        Self { tenant_id: tenant_id.into(), pending: BTreeMap::new() }
+        Self {
+            tenant_id: tenant_id.into(),
+            pending: BTreeMap::new(),
+        }
     }
 
     /// Cite: `pkg/proxy/config/config.go:212` (handleAddService) /
@@ -200,7 +235,9 @@ impl ServiceChangeTracker {
         previous: Option<ServicePortInfo>,
         current: Option<ServicePortInfo>,
     ) -> KubeProxyResult<()> {
-        let svc = previous.as_ref().or(current.as_ref())
+        let svc = previous
+            .as_ref()
+            .or(current.as_ref())
             .map(|s| (s.name.clone(), s.tenant_id.clone()));
         let (name, t) = match svc {
             Some(x) => x,

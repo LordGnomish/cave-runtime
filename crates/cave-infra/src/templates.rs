@@ -2,11 +2,11 @@
 // Copyright 2026 Cave Runtime contributors
 //! Infrastructure modules/templates — reusable resource blueprints.
 
+use crate::error::{InfraError, InfraResult};
 use crate::resource::{ResourceKind, ResourceSpec};
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use dashmap::DashMap;
-use crate::error::{InfraError, InfraResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TemplateParam {
@@ -38,7 +38,10 @@ pub struct TemplateResource {
 }
 
 /// Render a template with the given parameter values.
-pub fn render(template: &InfraTemplate, params: &HashMap<String, serde_json::Value>) -> InfraResult<Vec<ResourceSpec>> {
+pub fn render(
+    template: &InfraTemplate,
+    params: &HashMap<String, serde_json::Value>,
+) -> InfraResult<Vec<ResourceSpec>> {
     // Validate required params
     for p in &template.params {
         if p.required && !params.contains_key(&p.name) && p.default.is_none() {
@@ -50,7 +53,9 @@ pub fn render(template: &InfraTemplate, params: &HashMap<String, serde_json::Val
     }
 
     // Build effective params (defaults + overrides)
-    let mut effective: HashMap<String, serde_json::Value> = template.params.iter()
+    let mut effective: HashMap<String, serde_json::Value> = template
+        .params
+        .iter()
         .filter_map(|p| p.default.as_ref().map(|d| (p.name.clone(), d.clone())))
         .collect();
     effective.extend(params.clone());
@@ -68,7 +73,9 @@ pub fn render(template: &InfraTemplate, params: &HashMap<String, serde_json::Val
             name,
             provider: res.provider.clone(),
             properties,
-            depends_on: res.depends_on.iter()
+            depends_on: res
+                .depends_on
+                .iter()
                 .map(|d| substitute(d, &effective))
                 .collect(),
             tags: HashMap::new(),
@@ -90,12 +97,15 @@ fn substitute(s: &str, params: &HashMap<String, serde_json::Value>) -> String {
     result
 }
 
-fn substitute_value(v: &serde_json::Value, params: &HashMap<String, serde_json::Value>) -> serde_json::Value {
+fn substitute_value(
+    v: &serde_json::Value,
+    params: &HashMap<String, serde_json::Value>,
+) -> serde_json::Value {
     match v {
         serde_json::Value::String(s) => {
             // Check if this is a param reference like "${param_name}"
             if s.starts_with("${") && s.ends_with('}') {
-                let key = &s[2..s.len()-1];
+                let key = &s[2..s.len() - 1];
                 if let Some(val) = params.get(key) {
                     return val.clone();
                 }
@@ -258,7 +268,10 @@ fn database_cluster_template() -> InfraTemplate {
                     let mut m = HashMap::new();
                     m.insert("engine".into(), serde_json::json!("${engine}"));
                     m.insert("role".into(), serde_json::json!("replica"));
-                    m.insert("primary".into(), serde_json::json!("${cluster_name}-primary"));
+                    m.insert(
+                        "primary".into(),
+                        serde_json::json!("${cluster_name}-primary"),
+                    );
                     m.insert("storage_gb".into(), serde_json::json!("${storage_gb}"));
                     m
                 },
@@ -275,23 +288,33 @@ fn kubernetes_infra_template() -> InfraTemplate {
         version: "1.0.0".into(),
         author: "cave-infra".into(),
         params: vec![
-            TemplateParam { name: "cluster_name".into(), description: "Cluster name".into(), required: true, default: None, param_type: "string".into() },
-            TemplateParam { name: "worker_count".into(), description: "Worker node count".into(), required: false, default: Some(serde_json::json!(3)), param_type: "number".into() },
-        ],
-        resources: vec![
-            TemplateResource {
-                kind: "KubernetesCluster".into(),
-                name_template: "${cluster_name}".into(),
-                provider: "noop".into(),
-                properties: {
-                    let mut m = HashMap::new();
-                    m.insert("version".into(), serde_json::json!("1.30"));
-                    m.insert("worker_count".into(), serde_json::json!("${worker_count}"));
-                    m
-                },
-                depends_on: vec![],
+            TemplateParam {
+                name: "cluster_name".into(),
+                description: "Cluster name".into(),
+                required: true,
+                default: None,
+                param_type: "string".into(),
+            },
+            TemplateParam {
+                name: "worker_count".into(),
+                description: "Worker node count".into(),
+                required: false,
+                default: Some(serde_json::json!(3)),
+                param_type: "number".into(),
             },
         ],
+        resources: vec![TemplateResource {
+            kind: "KubernetesCluster".into(),
+            name_template: "${cluster_name}".into(),
+            provider: "noop".into(),
+            properties: {
+                let mut m = HashMap::new();
+                m.insert("version".into(), serde_json::json!("1.30"));
+                m.insert("worker_count".into(), serde_json::json!("${worker_count}"));
+                m
+            },
+            depends_on: vec![],
+        }],
     }
 }
 
@@ -301,22 +324,35 @@ fn ha_lb_template() -> InfraTemplate {
         description: "High-availability load balancer with health checks".into(),
         version: "1.0.0".into(),
         author: "cave-infra".into(),
-        params: vec![
-            TemplateParam { name: "name".into(), description: "LB name".into(), required: true, default: None, param_type: "string".into() },
-        ],
+        params: vec![TemplateParam {
+            name: "name".into(),
+            description: "LB name".into(),
+            required: true,
+            default: None,
+            param_type: "string".into(),
+        }],
         resources: vec![
             TemplateResource {
                 kind: "IpAddress".into(),
                 name_template: "${name}-vip".into(),
                 provider: "noop".into(),
-                properties: { let mut m = HashMap::new(); m.insert("type".into(), serde_json::json!("public")); m },
+                properties: {
+                    let mut m = HashMap::new();
+                    m.insert("type".into(), serde_json::json!("public"));
+                    m
+                },
                 depends_on: vec![],
             },
             TemplateResource {
                 kind: "LoadBalancer".into(),
                 name_template: "${name}".into(),
                 provider: "noop".into(),
-                properties: { let mut m = HashMap::new(); m.insert("type".into(), serde_json::json!("tcp")); m.insert("ha".into(), serde_json::json!(true)); m },
+                properties: {
+                    let mut m = HashMap::new();
+                    m.insert("type".into(), serde_json::json!("tcp"));
+                    m.insert("ha".into(), serde_json::json!(true));
+                    m
+                },
                 depends_on: vec!["${name}-vip".into()],
             },
         ],
@@ -331,7 +367,9 @@ pub struct TemplateRegistry {
 
 impl TemplateRegistry {
     pub fn new() -> Self {
-        let r = Self { templates: DashMap::new() };
+        let r = Self {
+            templates: DashMap::new(),
+        };
         for t in builtin_templates() {
             r.register(t);
         }
@@ -343,14 +381,21 @@ impl TemplateRegistry {
     }
 
     pub fn get(&self, name: &str) -> InfraResult<InfraTemplate> {
-        self.templates.get(name).map(|t| t.clone()).ok_or_else(|| InfraError::TemplateNotFound(name.to_string()))
+        self.templates
+            .get(name)
+            .map(|t| t.clone())
+            .ok_or_else(|| InfraError::TemplateNotFound(name.to_string()))
     }
 
     pub fn list(&self) -> Vec<InfraTemplate> {
         self.templates.iter().map(|e| e.value().clone()).collect()
     }
 
-    pub fn render(&self, name: &str, params: &HashMap<String, serde_json::Value>) -> InfraResult<Vec<ResourceSpec>> {
+    pub fn render(
+        &self,
+        name: &str,
+        params: &HashMap<String, serde_json::Value>,
+    ) -> InfraResult<Vec<ResourceSpec>> {
         let template = self.get(name)?;
         render(&template, params)
     }

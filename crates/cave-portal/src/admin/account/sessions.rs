@@ -5,33 +5,38 @@
 //! per-session revoke. Visual port of
 //! `js/apps/account-ui/src/account-security/DeviceActivity.tsx`.
 
+use super::{AccountError, account_chrome::render_account_nav, require_account_user};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table_html};
-use crate::admin::state::{scope, AdminState, AuthSession};
-use super::{account_chrome::render_account_nav, require_account_user, AccountError};
+use crate::admin::state::{AdminState, AuthSession, scope};
 
 /// List sessions belonging to the *signed-in caller*. We filter the
 /// existing tenant-scoped session table down to the caller's
 /// principal so a tenant_admin in tenant `acme` does not see other
 /// users' sessions.
-pub fn list_my_sessions(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<AuthSession>, AccountError> {
+pub fn list_my_sessions(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<AuthSession>, AccountError> {
     require_account_user(ctx)?;
     ctx.authorise(Permission::AuthSessionsRead)?;
-    let rows: Vec<AuthSession> = scope(&state.auth_sessions.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter()
-        .filter(|s| {
-            // Match either by full principal or by trailing identity.
-            s.principal == ctx.principal
-                || ctx.principal.ends_with(s.principal.as_str())
-                || s.principal.ends_with(
-                    ctx.principal
-                        .rsplit('/')
-                        .next()
-                        .unwrap_or(ctx.principal.as_str()),
-                )
-        })
-        .cloned()
-        .collect();
+    let rows: Vec<AuthSession> = scope(&state.auth_sessions.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
+    .into_iter()
+    .filter(|s| {
+        // Match either by full principal or by trailing identity.
+        s.principal == ctx.principal
+            || ctx.principal.ends_with(s.principal.as_str())
+            || s.principal.ends_with(
+                ctx.principal
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or(ctx.principal.as_str()),
+            )
+    })
+    .cloned()
+    .collect();
     Ok(rows)
 }
 
@@ -87,7 +92,11 @@ mod tests {
         // Match the seed: principal ends in `/sa/dev`; seeded
         // AuthSession.principal also includes "dev" so the filter
         // matches.
-        RequestCtx::developer_as("acme", &[Permission::AuthSessionsRead], Persona::TenantAdmin)
+        RequestCtx::developer_as(
+            "acme",
+            &[Permission::AuthSessionsRead],
+            Persona::TenantAdmin,
+        )
     }
 
     #[test]

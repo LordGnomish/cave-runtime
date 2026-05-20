@@ -49,8 +49,8 @@ pub mod proxy;
 pub mod store;
 pub mod tls;
 
-use axum::{routing::any, Router};
-use handler::{proxy_handler, GatewayHandlerState};
+use axum::{Router, routing::any};
+use handler::{GatewayHandlerState, proxy_handler};
 use plugins::PluginChain;
 use proxy::ProxyEngine;
 use std::sync::Arc;
@@ -118,11 +118,10 @@ pub fn proxy_router(state: Arc<GatewayState>) -> Router {
 
 /// Build the Admin API router (Kong-compatible management plane).
 pub fn admin_router(state: Arc<GatewayState>) -> Router {
-    Router::new()
-        .nest("/admin/v1", admin::admin_router(state.store.clone()))
-        // Kong-style: also mount at root for compat
-        // removed: root nest breaks axum 0.8
-        // .nest("", admin::admin_router(state.store.clone()))
+    Router::new().nest("/admin/v1", admin::admin_router(state.store.clone()))
+    // Kong-style: also mount at root for compat
+    // removed: root nest breaks axum 0.8
+    // .nest("", admin::admin_router(state.store.clone()))
 }
 
 /// Build the Gravitee API/plan/application/subscription router.

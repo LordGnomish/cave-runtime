@@ -58,7 +58,10 @@ impl MemNetwork {
         let (tx, rx) = mpsc::unbounded_channel();
         self.inner.lock().unwrap().senders.insert(id, tx);
         (
-            MemTransport { from: id, network: Arc::clone(&self.inner) },
+            MemTransport {
+                from: id,
+                network: Arc::clone(&self.inner),
+            },
             rx,
         )
     }
@@ -107,7 +110,8 @@ impl Transport for MemTransport {
             }
         }
         if let Some(tx) = g.senders.get(&to) {
-            tx.send((self.from, msg)).map_err(|_| HaError::Transport(format!("node {to} gone")))?;
+            tx.send((self.from, msg))
+                .map_err(|_| HaError::Transport(format!("node {to} gone")))?;
         } else {
             debug!(to, "no route to node");
         }

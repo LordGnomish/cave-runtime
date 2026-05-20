@@ -46,8 +46,16 @@ pub fn create_router(state: Arc<CriState>) -> Router {
         .route("/api/cri/events", get(get_events))
         .route("/api/cri/metrics", get(get_metrics))
         // Container CRUD + update (5)
-        .route("/api/cri/containers", get(list_containers).post(create_container))
-        .route("/api/cri/containers/{id}", get(inspect_container).put(update_container).delete(delete_container))
+        .route(
+            "/api/cri/containers",
+            get(list_containers).post(create_container),
+        )
+        .route(
+            "/api/cri/containers/{id}",
+            get(inspect_container)
+                .put(update_container)
+                .delete(delete_container),
+        )
         // Container lifecycle (5)
         .route("/api/cri/containers/{id}/start", post(start_container))
         .route("/api/cri/containers/{id}/stop", post(stop_container))
@@ -57,28 +65,55 @@ pub fn create_router(state: Arc<CriState>) -> Router {
         // Container operations (4)
         .route("/api/cri/containers/{id}/exec", post(exec_in_container))
         .route("/api/cri/containers/{id}/attach", post(attach_container))
-        .route("/api/cri/containers/{id}/checkpoint", post(checkpoint_container))
+        .route(
+            "/api/cri/containers/{id}/checkpoint",
+            post(checkpoint_container),
+        )
         .route("/api/cri/containers/{id}/restore", post(restore_container))
         // Streaming endpoints (kubelet WebSocket / SPDY upgrade URLs)
-        .route("/api/cri/containers/{id}/exec/stream", post(exec_streaming_url))
-        .route("/api/cri/sandboxes/{id}/portforward", post(portforward_sandbox))
+        .route(
+            "/api/cri/containers/{id}/exec/stream",
+            post(exec_streaming_url),
+        )
+        .route(
+            "/api/cri/sandboxes/{id}/portforward",
+            post(portforward_sandbox),
+        )
         // Container info (3)
         .route("/api/cri/containers/{id}/logs", get(get_container_logs))
         .route("/api/cri/containers/{id}/stats", get(get_container_stats))
-        .route("/api/cri/containers/{id}/processes", get(get_container_processes))
+        .route(
+            "/api/cri/containers/{id}/processes",
+            get(get_container_processes),
+        )
         // Images (6: list, pull, inspect, delete, tag, history)
         .route("/api/cri/images", get(list_images))
         .route("/api/cri/images/pull", post(pull_image))
-        .route("/api/cri/images/{reference}", get(inspect_image).delete(delete_image))
+        .route(
+            "/api/cri/images/{reference}",
+            get(inspect_image).delete(delete_image),
+        )
         .route("/api/cri/images/{reference}/tag", post(tag_image))
-        .route("/api/cri/images/{reference}/history", get(get_image_history))
+        .route(
+            "/api/cri/images/{reference}/history",
+            get(get_image_history),
+        )
         // Sandboxes (6)
-        .route("/api/cri/sandboxes", get(list_sandboxes).post(create_sandbox))
-        .route("/api/cri/sandboxes/{id}", get(get_sandbox).delete(delete_sandbox))
+        .route(
+            "/api/cri/sandboxes",
+            get(list_sandboxes).post(create_sandbox),
+        )
+        .route(
+            "/api/cri/sandboxes/{id}",
+            get(get_sandbox).delete(delete_sandbox),
+        )
         .route("/api/cri/sandboxes/{id}/stats", get(get_sandbox_stats))
         .route("/api/cri/sandboxes/{id}/stop", post(stop_sandbox))
         // Snapshots (5)
-        .route("/api/cri/snapshots", get(list_snapshots).post(create_snapshot))
+        .route(
+            "/api/cri/snapshots",
+            get(list_snapshots).post(create_snapshot),
+        )
         .route("/api/cri/snapshots/{id}", delete(delete_snapshot))
         .route("/api/cri/snapshots/{id}/mounts", get(get_snapshot_mounts))
         .route("/api/cri/snapshots/{id}/usage", get(get_snapshot_usage))
@@ -89,17 +124,32 @@ pub fn create_router(state: Arc<CriState>) -> Router {
         // Runtime handlers (3) — KEP-585 / RuntimeClass
         .route("/api/cri/runtime/handlers", get(list_runtime_handlers))
         .route("/api/cri/runtime/handlers/{name}", get(get_runtime_handler))
-        .route("/api/cri/runtime/handlers/default", get(get_default_runtime_handler))
+        .route(
+            "/api/cri/runtime/handlers/default",
+            get(get_default_runtime_handler),
+        )
         // Stats v2 — cAdvisor / Linux / Windows variants (4)
         .route("/api/cri/stats/containers", get(list_container_stats_v2))
-        .route("/api/cri/stats/containers/{id}/linux", get(get_container_stats_linux))
-        .route("/api/cri/stats/containers/{id}/windows", get(get_container_stats_windows))
+        .route(
+            "/api/cri/stats/containers/{id}/linux",
+            get(get_container_stats_linux),
+        )
+        .route(
+            "/api/cri/stats/containers/{id}/windows",
+            get(get_container_stats_windows),
+        )
         .route("/api/cri/stats/imagefs", get(get_image_fs_info))
         .route("/api/cri/metrics/descriptors", get(get_metric_descriptors))
         .route("/api/cri/metrics/cadvisor", get(get_cadvisor_metrics))
         // Image pull auth + progress (M6)
-        .route("/api/cri/auth/credentials", get(list_credentials).post(set_credential))
-        .route("/api/cri/auth/credentials/{registry}", get(get_credential).delete(delete_credential))
+        .route(
+            "/api/cri/auth/credentials",
+            get(list_credentials).post(set_credential),
+        )
+        .route(
+            "/api/cri/auth/credentials/{registry}",
+            get(get_credential).delete(delete_credential),
+        )
         .route("/api/cri/images/pulls", get(list_pull_progress))
         .route("/api/cri/images/pulls/{id}", get(get_pull_progress))
         .route("/api/cri/images/pulls/{id}/events", get(get_pull_events))
@@ -108,7 +158,10 @@ pub fn create_router(state: Arc<CriState>) -> Router {
         .route("/api/cri/userns/allocated", get(allocated_userns))
         // Cgroup v2 unified hierarchy (M9)
         .route("/api/cri/cgroup/v2/controllers", get(get_v2_controllers))
-        .route("/api/cri/cgroup/v2/devices/program", post(assemble_v2_devices_program))
+        .route(
+            "/api/cri/cgroup/v2/devices/program",
+            post(assemble_v2_devices_program),
+        )
         // Parity
         .route("/api/cri/parity", get(parity))
         .with_state(state)
@@ -165,9 +218,7 @@ async fn get_runtime_status(State(state): State<Arc<CriState>>) -> Json<RuntimeS
     })
 }
 
-async fn list_runtime_handlers(
-    State(state): State<Arc<CriState>>,
-) -> Json<Vec<RuntimeHandler>> {
+async fn list_runtime_handlers(State(state): State<Arc<CriState>>) -> Json<Vec<RuntimeHandler>> {
     Json(state.runtime_handlers.list())
 }
 
@@ -179,7 +230,12 @@ async fn get_runtime_handler(
         .runtime_handlers
         .lookup(&name)
         .map(Json)
-        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("runtime handler not found: {}", name)))
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                format!("runtime handler not found: {}", name),
+            )
+        })
 }
 
 async fn get_default_runtime_handler(
@@ -189,7 +245,12 @@ async fn get_default_runtime_handler(
         .runtime_handlers
         .default_handler()
         .map(Json)
-        .ok_or_else(|| (StatusCode::NOT_FOUND, "no default runtime handler configured".to_string()))
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                "no default runtime handler configured".to_string(),
+            )
+        })
 }
 
 // ── Stats v2 / cAdvisor ───────────────────────────────────────────────────────
@@ -231,9 +292,7 @@ async fn get_container_stats_windows(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
-async fn get_image_fs_info(
-    State(state): State<Arc<CriState>>,
-) -> Json<crate::stats::ImageFsInfo> {
+async fn get_image_fs_info(State(state): State<Arc<CriState>>) -> Json<crate::stats::ImageFsInfo> {
     let images = state.images.list();
     let root = crate::paths::image_cache_dir().display().to_string();
     Json(crate::stats::image_fs_info(&root, &images))
@@ -275,12 +334,15 @@ async fn delete_credential(
         .credentials
         .remove(&registry)
         .map(|_| StatusCode::NO_CONTENT)
-        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("no credentials for {}", registry)))
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                format!("no credentials for {}", registry),
+            )
+        })
 }
 
-async fn list_credentials(
-    State(state): State<Arc<CriState>>,
-) -> Json<serde_json::Value> {
+async fn list_credentials(State(state): State<Arc<CriState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({ "count": state.credentials.len() }))
 }
 
@@ -342,7 +404,14 @@ async fn get_cadvisor_metrics(State(state): State<Arc<CriState>>) -> Response {
         }
     }
     let body = crate::stats::render_prometheus(&all);
-    ([(header::CONTENT_TYPE, "text/plain; version=0.0.4; charset=utf-8")], body).into_response()
+    (
+        [(
+            header::CONTENT_TYPE,
+            "text/plain; version=0.0.4; charset=utf-8",
+        )],
+        body,
+    )
+        .into_response()
 }
 
 async fn get_node_stats(State(state): State<Arc<CriState>>) -> Json<NodeStats> {
@@ -378,7 +447,14 @@ async fn get_metrics(State(state): State<Arc<CriState>>) -> Response {
          # TYPE cave_snapshots_total gauge\n\
          cave_snapshots_total {snapshot_count}\n"
     );
-    ([(header::CONTENT_TYPE, "text/plain; version=0.0.4; charset=utf-8")], body).into_response()
+    (
+        [(
+            header::CONTENT_TYPE,
+            "text/plain; version=0.0.4; charset=utf-8",
+        )],
+        body,
+    )
+        .into_response()
 }
 
 // ── Containers ────────────────────────────────────────────────────────────────
@@ -399,7 +475,10 @@ async fn create_container(
     let image = match state.images.get(&req.spec.image) {
         Some(img) => img,
         None => match state.registry.pull_image(&req.spec.image).await {
-            Ok(img) => { state.images.insert(img.clone()); img }
+            Ok(img) => {
+                state.images.insert(img.clone());
+                img
+            }
             Err(e) => return Err((StatusCode::BAD_REQUEST, format!("image pull failed: {}", e))),
         },
     };
@@ -468,7 +547,9 @@ struct StopReq {
     timeout: u32,
 }
 #[allow(dead_code)]
-fn default_timeout() -> u32 { 10 }
+fn default_timeout() -> u32 {
+    10
+}
 
 async fn stop_container(
     State(state): State<Arc<CriState>>,
@@ -487,7 +568,9 @@ struct KillReq {
     signal: i32,
 }
 #[allow(dead_code)]
-fn default_signal() -> i32 { 15 }
+fn default_signal() -> i32 {
+    15
+}
 
 async fn kill_container(
     State(state): State<Arc<CriState>>,
@@ -602,7 +685,9 @@ async fn restore_container(
     Json(req): Json<RestoreReq>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     let path = if req.checkpoint_path.is_empty() {
-        crate::paths::checkpoint_dir(&id.to_string()).display().to_string()
+        crate::paths::checkpoint_dir(&id.to_string())
+            .display()
+            .to_string()
     } else {
         req.checkpoint_path
     };
@@ -640,12 +725,20 @@ async fn get_container_logs(
         };
         let entries = crate::log_v2::read_logs(&container.log_path, &opts)
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        return Ok(Json(entries.into_iter().map(|e| serde_json::json!({
-            "timestamp": e.timestamp,
-            "stream": e.stream.as_str(),
-            "tag": e.tag.as_str(),
-            "message": e.message,
-        })).collect::<Vec<_>>()).into_response());
+        return Ok(Json(
+            entries
+                .into_iter()
+                .map(|e| {
+                    serde_json::json!({
+                        "timestamp": e.timestamp,
+                        "stream": e.stream.as_str(),
+                        "tag": e.tag.as_str(),
+                        "message": e.message,
+                    })
+                })
+                .collect::<Vec<_>>(),
+        )
+        .into_response());
     }
     runtime::get_container_logs(id, q.tail, &state.containers)
         .map(|entries| Json(entries).into_response())
@@ -698,18 +791,28 @@ async fn inspect_image(
     State(state): State<Arc<CriState>>,
     Path(reference): Path<String>,
 ) -> Result<Json<OciImage>, (StatusCode, String)> {
-    state.images.get(&reference)
-        .map(Json)
-        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("image not found: {}", reference)))
+    state.images.get(&reference).map(Json).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            format!("image not found: {}", reference),
+        )
+    })
 }
 
 async fn delete_image(
     State(state): State<Arc<CriState>>,
     Path(reference): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    state.images.remove(&reference)
+    state
+        .images
+        .remove(&reference)
         .map(|_| StatusCode::NO_CONTENT)
-        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("image not found: {}", reference)))
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                format!("image not found: {}", reference),
+            )
+        })
 }
 
 #[derive(Deserialize)]
@@ -722,8 +825,12 @@ async fn tag_image(
     Path(reference): Path<String>,
     Json(req): Json<TagImageReq>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    let mut image = state.images.get(&reference)
-        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("image not found: {}", reference)))?;
+    let mut image = state.images.get(&reference).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            format!("image not found: {}", reference),
+        )
+    })?;
     image.reference = req.target;
     state.images.insert(image);
     Ok(StatusCode::NO_CONTENT)
@@ -733,16 +840,24 @@ async fn get_image_history(
     State(state): State<Arc<CriState>>,
     Path(reference): Path<String>,
 ) -> Result<Json<Vec<ImageHistoryEntry>>, (StatusCode, String)> {
-    let image = state.images.get(&reference)
-        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("image not found: {}", reference)))?;
+    let image = state.images.get(&reference).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            format!("image not found: {}", reference),
+        )
+    })?;
 
-    let history: Vec<ImageHistoryEntry> = image.layers.iter().map(|layer| ImageHistoryEntry {
-        digest: layer.digest.clone(),
-        created_at: image.pulled_at,
-        created_by: format!("ADD layer {}", layer.digest),
-        size_bytes: layer.size,
-        comment: String::new(),
-    }).collect();
+    let history: Vec<ImageHistoryEntry> = image
+        .layers
+        .iter()
+        .map(|layer| ImageHistoryEntry {
+            digest: layer.digest.clone(),
+            created_at: image.pulled_at,
+            created_by: format!("ADD layer {}", layer.digest),
+            size_bytes: layer.size,
+            comment: String::new(),
+        })
+        .collect();
 
     Ok(Json(history))
 }
@@ -765,10 +880,12 @@ async fn create_sandbox(
     // Validate the requested runtime handler name (if any) against the registry.
     if let Some(name) = req.spec.runtime_handler.as_deref() {
         if !name.is_empty() {
-            state
-                .runtime_handlers
-                .lookup(name)
-                .ok_or_else(|| (StatusCode::BAD_REQUEST, format!("runtime handler not found: {}", name)))?;
+            state.runtime_handlers.lookup(name).ok_or_else(|| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    format!("runtime handler not found: {}", name),
+                )
+            })?;
         }
     }
     let result = crate::sandbox::run_pod_sandbox(req.spec, Some(&state.userns_allocator))
@@ -797,7 +914,9 @@ async fn get_sandbox(
     State(state): State<Arc<CriState>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Sandbox>, (StatusCode, String)> {
-    state.sandboxes.get(&id)
+    state
+        .sandboxes
+        .get(&id)
         .map(Json)
         .ok_or_else(|| (StatusCode::NOT_FOUND, format!("sandbox not found: {}", id)))
 }
@@ -806,7 +925,9 @@ async fn delete_sandbox(
     State(state): State<Arc<CriState>>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    state.sandboxes.remove(&id)
+    state
+        .sandboxes
+        .remove(&id)
         .map(|_| StatusCode::NO_CONTENT)
         .ok_or_else(|| (StatusCode::NOT_FOUND, format!("sandbox not found: {}", id)))
 }
@@ -815,7 +936,9 @@ async fn get_sandbox_stats(
     State(state): State<Arc<CriState>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<SandboxStats>, (StatusCode, String)> {
-    state.sandboxes.get(&id)
+    state
+        .sandboxes
+        .get(&id)
         .ok_or_else(|| (StatusCode::NOT_FOUND, format!("sandbox not found: {}", id)))?;
     Ok(Json(SandboxStats {
         sandbox_id: id,
@@ -859,7 +982,9 @@ async fn delete_snapshot(
     State(state): State<Arc<CriState>>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    state.snapshots.remove(&id)
+    state
+        .snapshots
+        .remove(&id)
         .map(|_| StatusCode::NO_CONTENT)
         .ok_or_else(|| (StatusCode::NOT_FOUND, format!("snapshot not found: {}", id)))
 }
@@ -868,7 +993,9 @@ async fn get_snapshot_mounts(
     State(state): State<Arc<CriState>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Vec<SnapshotMount>>, (StatusCode, String)> {
-    let snap = state.snapshots.get(&id)
+    let snap = state
+        .snapshots
+        .get(&id)
         .ok_or_else(|| (StatusCode::NOT_FOUND, format!("snapshot not found: {}", id)))?;
 
     let mounts = vec![SnapshotMount {
@@ -883,9 +1010,15 @@ async fn get_snapshot_usage(
     State(state): State<Arc<CriState>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<SnapshotUsage>, (StatusCode, String)> {
-    state.snapshots.get(&id)
+    state
+        .snapshots
+        .get(&id)
         .ok_or_else(|| (StatusCode::NOT_FOUND, format!("snapshot not found: {}", id)))?;
-    Ok(Json(SnapshotUsage { snapshot_id: id, size_bytes: 0, inodes: 0 }))
+    Ok(Json(SnapshotUsage {
+        snapshot_id: id,
+        size_bytes: 0,
+        inodes: 0,
+    }))
 }
 
 // ── Network ───────────────────────────────────────────────────────────────────
@@ -927,7 +1060,9 @@ async fn detach_network(
     State(state): State<Arc<CriState>>,
     Json(req): Json<NetworkDetachReq>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    let entry = state.network.get(&req.container_id)
+    let entry = state
+        .network
+        .get(&req.container_id)
         .filter(|s| s.network_name == req.network_name)
         .map(|s| s.container_id);
 
@@ -936,9 +1071,13 @@ async fn detach_network(
             state.network.remove(&id);
             Ok(StatusCode::NO_CONTENT)
         }
-        None => Err((StatusCode::NOT_FOUND, format!(
-            "no attachment for container {} on network {}", req.container_id, req.network_name
-        ))),
+        None => Err((
+            StatusCode::NOT_FOUND,
+            format!(
+                "no attachment for container {} on network {}",
+                req.container_id, req.network_name
+            ),
+        )),
     }
 }
 
@@ -952,7 +1091,11 @@ async fn get_network_status(
     Query(q): Query<NetworkStatusQuery>,
 ) -> Json<Vec<NetworkStatus>> {
     let statuses: Vec<NetworkStatus> = match q.container_id {
-        Some(id) => state.network.get(&id).map(|s| vec![s.clone()]).unwrap_or_default(),
+        Some(id) => state
+            .network
+            .get(&id)
+            .map(|s| vec![s.clone()])
+            .unwrap_or_default(),
         None => state.network.iter().map(|r| r.value().clone()).collect(),
     };
     Json(statuses)

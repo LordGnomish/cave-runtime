@@ -1,24 +1,25 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+use crate::VaultState;
 use crate::error::{VaultError, VaultResult};
 use crate::response::VaultResponse;
-use crate::VaultState;
 use axum::{
+    Router,
     extract::{Json, Path, State},
     http::HeaderMap,
     routing::{delete, get, post},
-    Router,
 };
 use base64::Engine as _;
 use ring::aead;
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 fn extract_token(headers: &HeaderMap) -> VaultResult<String> {
-    headers.get("x-vault-token")
+    headers
+        .get("x-vault-token")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or(VaultError::BadToken)
@@ -85,7 +86,8 @@ pub struct TransitStore {
 fn generate_aes256_key() -> VaultResult<Vec<u8>> {
     let rng = SystemRandom::new();
     let mut key = vec![0u8; 32];
-    rng.fill(&mut key).map_err(|_| VaultError::Crypto("rng failure".into()))?;
+    rng.fill(&mut key)
+        .map_err(|_| VaultError::Crypto("rng failure".into()))?;
     Ok(key)
 }
 
@@ -96,15 +98,14 @@ fn generate_ed25519_key() -> VaultResult<(Vec<u8>, String)> {
         .map_err(|_| VaultError::Crypto("key generation failed".into()))?;
     let pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref())
         .map_err(|_| VaultError::Crypto("key decode failed".into()))?;
-    let public_key_b64 = base64::engine::general_purpose::STANDARD.encode(pair.public_key().as_ref());
+    let public_key_b64 =
+        base64::engine::general_purpose::STANDARD.encode(pair.public_key().as_ref());
     Ok((pkcs8.as_ref().to_vec(), public_key_b64))
 }
 
 fn create_transit_key(name: &str, key_type: KeyType) -> VaultResult<TransitKey> {
     let (key_bytes, public_key) = match &key_type {
-        KeyType::Aes256Gcm96 | KeyType::Chacha20Poly1305 => {
-            (generate_aes256_key()?, None)
-        }
+        KeyType::Aes256Gcm96 | KeyType::Chacha20Poly1305 => (generate_aes256_key()?, None),
         KeyType::Ed25519 => {
             let (kb, pk) = generate_ed25519_key()?;
             (kb, Some(pk))
@@ -113,7 +114,8 @@ fn create_transit_key(name: &str, key_type: KeyType) -> VaultResult<TransitKey> 
             // For these, use a placeholder key (real impl would use ring/rsa crates)
             let rng = SystemRandom::new();
             let mut key = vec![0u8; 32];
-            rng.fill(&mut key).map_err(|_| VaultError::Crypto("rng failure".into()))?;
+            rng.fill(&mut key)
+                .map_err(|_| VaultError::Crypto("rng failure".into()))?;
             (key, Some("placeholder-public-key".to_string()))
         }
     };
@@ -147,7 +149,8 @@ fn aes256_gcm_encrypt(key: &[u8], plaintext: &[u8]) -> VaultResult<Vec<u8>> {
     let unbound_key = aead::UnboundKey::new(&aead::AES_256_GCM, key)
         .map_err(|_| VaultError::Crypto("key creation failed".into()))?;
     let mut nonce_bytes = [0u8; 12];
-    rng.fill(&mut nonce_bytes).map_err(|_| VaultError::Crypto("rng failure".into()))?;
+    rng.fill(&mut nonce_bytes)
+        .map_err(|_| VaultError::Crypto("rng failure".into()))?;
     let nonce = aead::Nonce::assume_unique_for_key(nonce_bytes);
     let key = aead::LessSafeKey::new(unbound_key);
     let mut in_out = plaintext.to_vec();
@@ -169,7 +172,8 @@ fn aes256_gcm_decrypt(key: &[u8], ciphertext: &[u8]) -> VaultResult<Vec<u8>> {
         .map_err(|_| VaultError::Crypto("nonce error".into()))?;
     let key = aead::LessSafeKey::new(unbound_key);
     let mut in_out = encrypted.to_vec();
-    let plaintext = key.open_in_place(nonce, aead::Aad::empty(), &mut in_out)
+    let plaintext = key
+        .open_in_place(nonce, aead::Aad::empty(), &mut in_out)
         .map_err(|_| VaultError::Crypto("decryption failed".into()))?;
     Ok(plaintext.to_vec())
 }
@@ -179,7 +183,8 @@ fn chacha20_encrypt(key_bytes: &[u8], plaintext: &[u8]) -> VaultResult<Vec<u8>> 
     let unbound_key = aead::UnboundKey::new(&aead::CHACHA20_POLY1305, key_bytes)
         .map_err(|_| VaultError::Crypto("key creation failed".into()))?;
     let mut nonce_bytes = [0u8; 12];
-    rng.fill(&mut nonce_bytes).map_err(|_| VaultError::Crypto("rng failure".into()))?;
+    rng.fill(&mut nonce_bytes)
+        .map_err(|_| VaultError::Crypto("rng failure".into()))?;
     let nonce = aead::Nonce::assume_unique_for_key(nonce_bytes);
     let key = aead::LessSafeKey::new(unbound_key);
     let mut in_out = plaintext.to_vec();
@@ -201,7 +206,8 @@ fn chacha20_decrypt(key_bytes: &[u8], ciphertext: &[u8]) -> VaultResult<Vec<u8>>
         .map_err(|_| VaultError::Crypto("nonce error".into()))?;
     let key = aead::LessSafeKey::new(unbound_key);
     let mut in_out = encrypted.to_vec();
-    let plaintext = key.open_in_place(nonce, aead::Aad::empty(), &mut in_out)
+    let plaintext = key
+        .open_in_place(nonce, aead::Aad::empty(), &mut in_out)
         .map_err(|_| VaultError::Crypto("decryption failed".into()))?;
     Ok(plaintext.to_vec())
 }
@@ -213,7 +219,10 @@ pub async fn create_key(
     Json(body): Json<serde_json::Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    let key_type_str = body.get("type").and_then(|v| v.as_str()).unwrap_or("aes256-gcm96");
+    let key_type_str = body
+        .get("type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("aes256-gcm96");
     let key_type = KeyType::from_str(key_type_str)
         .ok_or_else(|| VaultError::InvalidRequest(format!("unknown key type: {}", key_type_str)))?;
 
@@ -239,15 +248,24 @@ pub async fn read_key(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.transit_store.read().await;
-    let key = store.keys.get(&key_name)
+    let key = store
+        .keys
+        .get(&key_name)
         .ok_or_else(|| VaultError::KeyNotFound(key_name))?;
-    let keys_info: HashMap<String, Value> = key.versions.iter().map(|(v, kv)| {
-        (v.to_string(), json!({
-            "name": key.name,
-            "creation_time": kv.creation_time.to_rfc3339(),
-            "public_key": kv.public_key,
-        }))
-    }).collect();
+    let keys_info: HashMap<String, Value> = key
+        .versions
+        .iter()
+        .map(|(v, kv)| {
+            (
+                v.to_string(),
+                json!({
+                    "name": key.name,
+                    "creation_time": kv.creation_time.to_rfc3339(),
+                    "public_key": kv.public_key,
+                }),
+            )
+        })
+        .collect();
     Ok(VaultResponse::new().with_data(json!({
         "name": key.name,
         "type": format!("{:?}", key.key_type).to_lowercase(),
@@ -267,10 +285,14 @@ pub async fn delete_key(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.transit_store.write().await;
-    let key = store.keys.get(&key_name)
+    let key = store
+        .keys
+        .get(&key_name)
         .ok_or_else(|| VaultError::KeyNotFound(key_name.clone()))?;
     if !key.deletion_allowed {
-        return Err(VaultError::InvalidRequest("key deletion not allowed".into()));
+        return Err(VaultError::InvalidRequest(
+            "key deletion not allowed".into(),
+        ));
     }
     store.keys.remove(&key_name);
     Ok(VaultResponse::new())
@@ -294,7 +316,9 @@ pub async fn rotate_key(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.transit_store.write().await;
-    let key = store.keys.get_mut(&key_name)
+    let key = store
+        .keys
+        .get_mut(&key_name)
         .ok_or_else(|| VaultError::KeyNotFound(key_name))?;
     let new_version = key.latest_version + 1;
     let (key_bytes, public_key) = match &key.key_type {
@@ -306,16 +330,20 @@ pub async fn rotate_key(
         _ => {
             let rng = SystemRandom::new();
             let mut k = vec![0u8; 32];
-            rng.fill(&mut k).map_err(|_| VaultError::Crypto("rng failure".into()))?;
+            rng.fill(&mut k)
+                .map_err(|_| VaultError::Crypto("rng failure".into()))?;
             (k, Some("placeholder-public-key".to_string()))
         }
     };
-    key.versions.insert(new_version, KeyVersion {
-        version: new_version,
-        key_bytes,
-        creation_time: chrono::Utc::now(),
-        public_key,
-    });
+    key.versions.insert(
+        new_version,
+        KeyVersion {
+            version: new_version,
+            key_bytes,
+            creation_time: chrono::Utc::now(),
+            public_key,
+        },
+    );
     key.latest_version = new_version;
     Ok(VaultResponse::new())
 }
@@ -336,24 +364,36 @@ pub async fn encrypt(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.transit_store.read().await;
-    let key = store.keys.get(&key_name)
+    let key = store
+        .keys
+        .get(&key_name)
         .ok_or_else(|| VaultError::KeyNotFound(key_name))?;
 
     let version = body.key_version.unwrap_or(key.latest_version);
-    let kv = key.versions.get(&version)
+    let kv = key
+        .versions
+        .get(&version)
         .ok_or_else(|| VaultError::Crypto("key version not found".into()))?;
 
-    let plaintext = base64::engine::general_purpose::STANDARD.decode(&body.plaintext)
+    let plaintext = base64::engine::general_purpose::STANDARD
+        .decode(&body.plaintext)
         .map_err(|_| VaultError::InvalidRequest("invalid base64 plaintext".into()))?;
 
     let ciphertext_bytes = match &key.key_type {
         KeyType::Aes256Gcm96 => aes256_gcm_encrypt(&kv.key_bytes, &plaintext)?,
         KeyType::Chacha20Poly1305 => chacha20_encrypt(&kv.key_bytes, &plaintext)?,
-        _ => return Err(VaultError::InvalidRequest("encryption not supported for this key type".into())),
+        _ => {
+            return Err(VaultError::InvalidRequest(
+                "encryption not supported for this key type".into(),
+            ));
+        }
     };
 
-    let ciphertext = format!("vault:v{}:{}", version,
-        base64::engine::general_purpose::STANDARD.encode(&ciphertext_bytes));
+    let ciphertext = format!(
+        "vault:v{}:{}",
+        version,
+        base64::engine::general_purpose::STANDARD.encode(&ciphertext_bytes)
+    );
 
     Ok(VaultResponse::new().with_data(json!({ "ciphertext": ciphertext })))
 }
@@ -373,30 +413,45 @@ pub async fn decrypt(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.transit_store.read().await;
-    let key = store.keys.get(&key_name)
+    let key = store
+        .keys
+        .get(&key_name)
         .ok_or_else(|| VaultError::KeyNotFound(key_name))?;
 
     // Parse ciphertext: vault:v{N}:{base64}
     let parts: Vec<&str> = body.ciphertext.splitn(3, ':').collect();
     if parts.len() != 3 || parts[0] != "vault" {
-        return Err(VaultError::InvalidRequest("invalid ciphertext format".into()));
+        return Err(VaultError::InvalidRequest(
+            "invalid ciphertext format".into(),
+        ));
     }
-    let version: u64 = parts[1].trim_start_matches('v').parse()
+    let version: u64 = parts[1]
+        .trim_start_matches('v')
+        .parse()
         .map_err(|_| VaultError::InvalidRequest("invalid ciphertext version".into()))?;
-    let ciphertext_bytes = base64::engine::general_purpose::STANDARD.decode(parts[2])
+    let ciphertext_bytes = base64::engine::general_purpose::STANDARD
+        .decode(parts[2])
         .map_err(|_| VaultError::InvalidRequest("invalid base64 in ciphertext".into()))?;
 
     if version < key.min_decryption_version {
-        return Err(VaultError::Crypto("key version too old for decryption".into()));
+        return Err(VaultError::Crypto(
+            "key version too old for decryption".into(),
+        ));
     }
 
-    let kv = key.versions.get(&version)
+    let kv = key
+        .versions
+        .get(&version)
         .ok_or_else(|| VaultError::Crypto("key version not found".into()))?;
 
     let plaintext_bytes = match &key.key_type {
         KeyType::Aes256Gcm96 => aes256_gcm_decrypt(&kv.key_bytes, &ciphertext_bytes)?,
         KeyType::Chacha20Poly1305 => chacha20_decrypt(&kv.key_bytes, &ciphertext_bytes)?,
-        _ => return Err(VaultError::InvalidRequest("decryption not supported for this key type".into())),
+        _ => {
+            return Err(VaultError::InvalidRequest(
+                "decryption not supported for this key type".into(),
+            ));
+        }
     };
 
     let plaintext = base64::engine::general_purpose::STANDARD.encode(&plaintext_bytes);
@@ -419,29 +474,44 @@ pub async fn rewrap(
 
     // We need to do both ops inline
     let store = state.transit_store.read().await;
-    let key = store.keys.get(&key_name)
+    let key = store
+        .keys
+        .get(&key_name)
         .ok_or_else(|| VaultError::KeyNotFound(key_name.clone()))?;
 
     let parts: Vec<&str> = body.ciphertext.splitn(3, ':').collect();
     if parts.len() != 3 || parts[0] != "vault" {
-        return Err(VaultError::InvalidRequest("invalid ciphertext format".into()));
+        return Err(VaultError::InvalidRequest(
+            "invalid ciphertext format".into(),
+        ));
     }
-    let old_version: u64 = parts[1].trim_start_matches('v').parse()
+    let old_version: u64 = parts[1]
+        .trim_start_matches('v')
+        .parse()
         .map_err(|_| VaultError::InvalidRequest("invalid version".into()))?;
-    let ciphertext_bytes = base64::engine::general_purpose::STANDARD.decode(parts[2])
+    let ciphertext_bytes = base64::engine::general_purpose::STANDARD
+        .decode(parts[2])
         .map_err(|_| VaultError::InvalidRequest("invalid base64".into()))?;
 
-    let old_kv = key.versions.get(&old_version)
+    let old_kv = key
+        .versions
+        .get(&old_version)
         .ok_or_else(|| VaultError::Crypto("old key version not found".into()))?;
 
     let plaintext_bytes = match &key.key_type {
         KeyType::Aes256Gcm96 => aes256_gcm_decrypt(&old_kv.key_bytes, &ciphertext_bytes)?,
         KeyType::Chacha20Poly1305 => chacha20_decrypt(&old_kv.key_bytes, &ciphertext_bytes)?,
-        _ => return Err(VaultError::InvalidRequest("rewrap not supported for this key type".into())),
+        _ => {
+            return Err(VaultError::InvalidRequest(
+                "rewrap not supported for this key type".into(),
+            ));
+        }
     };
 
     let new_version = key.latest_version;
-    let new_kv = key.versions.get(&new_version)
+    let new_kv = key
+        .versions
+        .get(&new_version)
         .ok_or_else(|| VaultError::Crypto("latest key version not found".into()))?;
 
     let new_ct_bytes = match &key.key_type {
@@ -450,8 +520,11 @@ pub async fn rewrap(
         _ => return Err(VaultError::InvalidRequest("rewrap not supported".into())),
     };
 
-    let new_ciphertext = format!("vault:v{}:{}", new_version,
-        base64::engine::general_purpose::STANDARD.encode(&new_ct_bytes));
+    let new_ciphertext = format!(
+        "vault:v{}:{}",
+        new_version,
+        base64::engine::general_purpose::STANDARD.encode(&new_ct_bytes)
+    );
 
     Ok(VaultResponse::new().with_data(json!({ "ciphertext": new_ciphertext })))
 }
@@ -475,14 +548,19 @@ pub async fn sign(
     use ring::signature::{Ed25519KeyPair, KeyPair};
 
     let store = state.transit_store.read().await;
-    let key = store.keys.get(&key_name)
+    let key = store
+        .keys
+        .get(&key_name)
         .ok_or_else(|| VaultError::KeyNotFound(key_name.clone()))?;
 
-    let input = base64::engine::general_purpose::STANDARD.decode(&body.input)
+    let input = base64::engine::general_purpose::STANDARD
+        .decode(&body.input)
         .map_err(|_| VaultError::InvalidRequest("invalid base64 input".into()))?;
 
     let version = key.latest_version;
-    let kv = key.versions.get(&version)
+    let kv = key
+        .versions
+        .get(&version)
         .ok_or_else(|| VaultError::Crypto("key version not found".into()))?;
 
     let signature_b64 = match &key.key_type {
@@ -492,7 +570,11 @@ pub async fn sign(
             let sig = pair.sign(&input);
             base64::engine::general_purpose::STANDARD.encode(sig.as_ref())
         }
-        _ => return Err(VaultError::InvalidRequest("signing not supported for this key type".into())),
+        _ => {
+            return Err(VaultError::InvalidRequest(
+                "signing not supported for this key type".into(),
+            ));
+        }
     };
 
     let signature = format!("vault:v{}:{}", version, signature_b64);
@@ -515,25 +597,35 @@ pub async fn verify(
     Json(body): Json<VerifyRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    use ring::signature::{Ed25519KeyPair, KeyPair, UnparsedPublicKey, ED25519};
+    use ring::signature::{ED25519, Ed25519KeyPair, KeyPair, UnparsedPublicKey};
 
     let store = state.transit_store.read().await;
-    let key = store.keys.get(&key_name)
+    let key = store
+        .keys
+        .get(&key_name)
         .ok_or_else(|| VaultError::KeyNotFound(key_name.clone()))?;
 
     let parts: Vec<&str> = body.signature.splitn(3, ':').collect();
     if parts.len() != 3 {
-        return Err(VaultError::InvalidRequest("invalid signature format".into()));
+        return Err(VaultError::InvalidRequest(
+            "invalid signature format".into(),
+        ));
     }
-    let version: u64 = parts[1].trim_start_matches('v').parse()
+    let version: u64 = parts[1]
+        .trim_start_matches('v')
+        .parse()
         .map_err(|_| VaultError::InvalidRequest("invalid version".into()))?;
-    let sig_bytes = base64::engine::general_purpose::STANDARD.decode(parts[2])
+    let sig_bytes = base64::engine::general_purpose::STANDARD
+        .decode(parts[2])
         .map_err(|_| VaultError::InvalidRequest("invalid base64 signature".into()))?;
 
-    let kv = key.versions.get(&version)
+    let kv = key
+        .versions
+        .get(&version)
         .ok_or_else(|| VaultError::Crypto("key version not found".into()))?;
 
-    let input = base64::engine::general_purpose::STANDARD.decode(&body.input)
+    let input = base64::engine::general_purpose::STANDARD
+        .decode(&body.input)
         .map_err(|_| VaultError::InvalidRequest("invalid base64 input".into()))?;
 
     let valid = match &key.key_type {
@@ -543,7 +635,11 @@ pub async fn verify(
             let public_key = UnparsedPublicKey::new(&ED25519, pair.public_key().as_ref());
             public_key.verify(&input, &sig_bytes).is_ok()
         }
-        _ => return Err(VaultError::InvalidRequest("verify not supported for this key type".into())),
+        _ => {
+            return Err(VaultError::InvalidRequest(
+                "verify not supported for this key type".into(),
+            ));
+        }
     };
 
     Ok(VaultResponse::new().with_data(json!({ "valid": valid })))
@@ -566,18 +662,26 @@ pub async fn generate_data_key(
     let bits = body.bits.unwrap_or(256);
     let key_len = (bits / 8) as usize;
     let mut data_key = vec![0u8; key_len];
-    rng.fill(&mut data_key).map_err(|_| VaultError::Crypto("rng failure".into()))?;
+    rng.fill(&mut data_key)
+        .map_err(|_| VaultError::Crypto("rng failure".into()))?;
 
     let store = state.transit_store.read().await;
-    let key = store.keys.get(&key_name)
+    let key = store
+        .keys
+        .get(&key_name)
         .ok_or_else(|| VaultError::KeyNotFound(key_name.clone()))?;
     let version = key.latest_version;
-    let kv = key.versions.get(&version)
+    let kv = key
+        .versions
+        .get(&version)
         .ok_or_else(|| VaultError::Crypto("key version not found".into()))?;
 
     let wrapped_bytes = aes256_gcm_encrypt(&kv.key_bytes, &data_key)?;
-    let ciphertext_key = format!("vault:v{}:{}", version,
-        base64::engine::general_purpose::STANDARD.encode(&wrapped_bytes));
+    let ciphertext_key = format!(
+        "vault:v{}:{}",
+        version,
+        base64::engine::general_purpose::STANDARD.encode(&wrapped_bytes)
+    );
 
     let mut response = json!({
         "ciphertext": ciphertext_key,
@@ -598,7 +702,9 @@ pub async fn export_key(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.transit_store.read().await;
-    let key = store.keys.get(&key_name)
+    let key = store
+        .keys
+        .get(&key_name)
         .ok_or_else(|| VaultError::KeyNotFound(key_name.clone()))?;
 
     if !key.exportable {
@@ -616,9 +722,10 @@ pub async fn export_key(
     let mut keys_map = serde_json::Map::new();
     for v in versions_to_export {
         if let Some(kv) = key.versions.get(&v) {
-            keys_map.insert(v.to_string(), json!(
-                base64::engine::general_purpose::STANDARD.encode(&kv.key_bytes)
-            ));
+            keys_map.insert(
+                v.to_string(),
+                json!(base64::engine::general_purpose::STANDARD.encode(&kv.key_bytes)),
+            );
         }
     }
 
@@ -774,7 +881,7 @@ mod tests {
 
     #[test]
     fn test_ed25519_key_sign_verify() {
-        use ring::signature::{Ed25519KeyPair, KeyPair, UnparsedPublicKey, ED25519};
+        use ring::signature::{ED25519, Ed25519KeyPair, KeyPair, UnparsedPublicKey};
         let (pkcs8_bytes, _pub_b64) = generate_ed25519_key().unwrap();
         let pair = Ed25519KeyPair::from_pkcs8(&pkcs8_bytes).unwrap();
         let message = b"test message for signing";

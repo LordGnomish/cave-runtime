@@ -13,9 +13,9 @@
 // account themselves — the authenticator returns the `userHandle` inside
 // `AuthenticatorAssertionResponse`. We use that to drive the lookup.
 
+use super::WebAuthnError;
 use super::authentication::{AssertionResponse, AuthenticationManager};
 use super::credential_store::{CredentialStore, StoredCredential};
-use super::WebAuthnError;
 
 /// Outcome of a discoverable-credential ceremony — includes the resolved
 /// user handle alongside the stored credential row.
@@ -128,8 +128,7 @@ mod tests {
                 transports: vec!["internal".into(), "hybrid".into()],
             })
             .unwrap();
-        let mgr =
-            AuthenticationManager::new(store, "login.cave.dev", "https://login.cave.dev");
+        let mgr = AuthenticationManager::new(store, "login.cave.dev", "https://login.cave.dev");
         (sk, mgr, b"passkey-1".to_vec(), b"user-7".to_vec())
     }
 
@@ -181,8 +180,8 @@ mod tests {
         let challenge = b"x".to_vec();
         let cd = client_data_get(&challenge, "https://login.cave.dev");
         let sig = sk.sign(b"anything");
-        assert!(mgr
-            .verify_discoverable(
+        assert!(
+            mgr.verify_discoverable(
                 &super::super::authentication::AssertionOptions {
                     challenge,
                     rp_id: "login.cave.dev".into(),
@@ -197,7 +196,8 @@ mod tests {
                     user_handle: None,
                 },
             )
-            .is_err());
+            .is_err()
+        );
     }
 
     #[test]
@@ -211,8 +211,8 @@ mod tests {
         let challenge = b"x".to_vec();
         let cd = client_data_get(&challenge, "https://login.cave.dev");
         let sig = sk.sign(b"x");
-        assert!(mgr
-            .verify_discoverable(
+        assert!(
+            mgr.verify_discoverable(
                 &super::super::authentication::AssertionOptions {
                     challenge,
                     rp_id: "login.cave.dev".into(),
@@ -227,7 +227,8 @@ mod tests {
                     user_handle: Some(b"wrong-user".to_vec()),
                 },
             )
-            .is_err());
+            .is_err()
+        );
     }
 
     #[test]

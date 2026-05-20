@@ -36,7 +36,10 @@ pub struct InMemoryJira {
 
 impl InMemoryJira {
     pub fn new(project_key: impl Into<String>) -> Self {
-        Self { project_key: project_key.into(), created: Mutex::new(Vec::new()) }
+        Self {
+            project_key: project_key.into(),
+            created: Mutex::new(Vec::new()),
+        }
     }
 }
 

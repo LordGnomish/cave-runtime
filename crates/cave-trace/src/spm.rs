@@ -40,19 +40,35 @@ pub struct SpanMetric {
 
 impl SpanMetric {
     pub fn request_rate(&self) -> f64 {
-        if self.window_secs == 0 { 0.0 } else { self.calls as f64 / self.window_secs as f64 }
+        if self.window_secs == 0 {
+            0.0
+        } else {
+            self.calls as f64 / self.window_secs as f64
+        }
     }
 
     pub fn error_rate(&self) -> f64 {
-        if self.window_secs == 0 { 0.0 } else { self.errors as f64 / self.window_secs as f64 }
+        if self.window_secs == 0 {
+            0.0
+        } else {
+            self.errors as f64 / self.window_secs as f64
+        }
     }
 
     pub fn error_fraction(&self) -> f64 {
-        if self.calls == 0 { 0.0 } else { self.errors as f64 / self.calls as f64 }
+        if self.calls == 0 {
+            0.0
+        } else {
+            self.errors as f64 / self.calls as f64
+        }
     }
 
     pub fn avg_duration_ms(&self) -> f64 {
-        if self.calls == 0 { 0.0 } else { self.duration_sum_ns as f64 / self.calls as f64 / 1_000_000.0 }
+        if self.calls == 0 {
+            0.0
+        } else {
+            self.duration_sum_ns as f64 / self.calls as f64 / 1_000_000.0
+        }
     }
 }
 
@@ -95,7 +111,9 @@ pub fn to_prometheus(metrics: &[SpanMetric]) -> String {
 }
 
 fn escape_prom_label(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n")
+    s.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
 }
 
 // ─── SPM registry ──────────────────────────────────────────────────────────
@@ -122,9 +140,20 @@ struct BucketAccum {
 }
 
 const BUCKETS_NS: [u64; 14] = [
-    500_000, 1_000_000, 2_500_000, 5_000_000, 10_000_000,
-    25_000_000, 50_000_000, 100_000_000, 250_000_000, 500_000_000,
-    1_000_000_000, 2_500_000_000, 5_000_000_000, u64::MAX,
+    500_000,
+    1_000_000,
+    2_500_000,
+    5_000_000,
+    10_000_000,
+    25_000_000,
+    50_000_000,
+    100_000_000,
+    250_000_000,
+    500_000_000,
+    1_000_000_000,
+    2_500_000_000,
+    5_000_000_000,
+    u64::MAX,
 ];
 
 impl SpmRegistry {
@@ -147,7 +176,9 @@ impl SpmRegistry {
             let entry = state.buckets.entry(key).or_default();
 
             entry.calls += 1;
-            if span.has_error() { entry.errors += 1; }
+            if span.has_error() {
+                entry.errors += 1;
+            }
             entry.dur_sum += span.duration_ns;
             if entry.dur_min == 0 || span.duration_ns < entry.dur_min {
                 entry.dur_min = span.duration_ns;
@@ -169,25 +200,31 @@ impl SpmRegistry {
         let state = self.window.read().unwrap();
         let window_start_ns = state.started_at_ns;
 
-        state.buckets.iter().map(|((svc, op), acc)| {
-            let histogram: Vec<(u64, u64)> = BUCKETS_NS.iter().zip(acc.histogram.iter())
-                .map(|(&le, &count)| (le, count))
-                .collect();
+        state
+            .buckets
+            .iter()
+            .map(|((svc, op), acc)| {
+                let histogram: Vec<(u64, u64)> = BUCKETS_NS
+                    .iter()
+                    .zip(acc.histogram.iter())
+                    .map(|(&le, &count)| (le, count))
+                    .collect();
 
-            SpanMetric {
-                service: svc.clone(),
-                operation: op.clone(),
-                span_kind: "SPAN_KIND_UNSPECIFIED".into(),
-                calls: acc.calls,
-                errors: acc.errors,
-                duration_sum_ns: acc.dur_sum,
-                min_duration_ns: acc.dur_min,
-                max_duration_ns: acc.dur_max,
-                histogram,
-                window_start_ns,
-                window_secs: self.window_secs,
-            }
-        }).collect()
+                SpanMetric {
+                    service: svc.clone(),
+                    operation: op.clone(),
+                    span_kind: "SPAN_KIND_UNSPECIFIED".into(),
+                    calls: acc.calls,
+                    errors: acc.errors,
+                    duration_sum_ns: acc.dur_sum,
+                    min_duration_ns: acc.dur_min,
+                    max_duration_ns: acc.dur_max,
+                    histogram,
+                    window_start_ns,
+                    window_secs: self.window_secs,
+                }
+            })
+            .collect()
     }
 
     /// Rotate window (call periodically to reset counters).
@@ -263,9 +300,18 @@ pub fn to_jaeger_metrics(metrics: &[SpanMetric]) -> MetricsResponse {
 
     for m in metrics {
         let labels = vec![
-            Label { name: "service".into(), value: m.service.clone() },
-            Label { name: "operation".into(), value: m.operation.clone() },
-            Label { name: "span_kind".into(), value: m.span_kind.clone() },
+            Label {
+                name: "service".into(),
+                value: m.service.clone(),
+            },
+            Label {
+                name: "operation".into(),
+                value: m.operation.clone(),
+            },
+            Label {
+                name: "span_kind".into(),
+                value: m.span_kind.clone(),
+            },
         ];
 
         call_points.push(MetricPoint {
@@ -285,13 +331,21 @@ pub fn to_jaeger_metrics(metrics: &[SpanMetric]) -> MetricsResponse {
         });
 
         let mut cumulative = 0u64;
-        let buckets: Vec<HistogramBucketValue> = m.histogram.iter().map(|&(le, count)| {
-            cumulative += count;
-            HistogramBucketValue {
-                upper_bound: if le == u64::MAX { f64::INFINITY } else { le as f64 / 1_000_000.0 },
-                cumulative_count: cumulative,
-            }
-        }).collect();
+        let buckets: Vec<HistogramBucketValue> = m
+            .histogram
+            .iter()
+            .map(|&(le, count)| {
+                cumulative += count;
+                HistogramBucketValue {
+                    upper_bound: if le == u64::MAX {
+                        f64::INFINITY
+                    } else {
+                        le as f64 / 1_000_000.0
+                    },
+                    cumulative_count: cumulative,
+                }
+            })
+            .collect();
 
         dur_points.push(MetricPoint {
             labels,
@@ -308,9 +362,24 @@ pub fn to_jaeger_metrics(metrics: &[SpanMetric]) -> MetricsResponse {
 
     MetricsResponse {
         metrics: vec![
-            MetricFamily { name: "calls".into(), r#type: "GAUGE".into(), help: "Request rate per second".into(), metric_points: call_points },
-            MetricFamily { name: "errors".into(), r#type: "GAUGE".into(), help: "Error rate per second".into(), metric_points: err_points },
-            MetricFamily { name: "duration".into(), r#type: "HISTOGRAM".into(), help: "Span duration in ms".into(), metric_points: dur_points },
+            MetricFamily {
+                name: "calls".into(),
+                r#type: "GAUGE".into(),
+                help: "Request rate per second".into(),
+                metric_points: call_points,
+            },
+            MetricFamily {
+                name: "errors".into(),
+                r#type: "GAUGE".into(),
+                help: "Error rate per second".into(),
+                metric_points: err_points,
+            },
+            MetricFamily {
+                name: "duration".into(),
+                r#type: "HISTOGRAM".into(),
+                help: "Span duration in ms".into(),
+                metric_points: dur_points,
+            },
         ],
     }
 }
@@ -325,21 +394,37 @@ mod tests {
 
     fn span(svc: &str, op: &str, dur_ns: u64, error: bool) -> Span {
         Span {
-            trace_id: 1, span_id: 1, parent_span_id: None,
-            operation_name: op.into(), service_name: svc.into(),
-            start_time_unix_nano: 0, end_time_unix_nano: dur_ns, duration_ns: dur_ns,
-            status: if error { SpanStatus::Error } else { SpanStatus::Ok },
+            trace_id: 1,
+            span_id: 1,
+            parent_span_id: None,
+            operation_name: op.into(),
+            service_name: svc.into(),
+            start_time_unix_nano: 0,
+            end_time_unix_nano: dur_ns,
+            duration_ns: dur_ns,
+            status: if error {
+                SpanStatus::Error
+            } else {
+                SpanStatus::Ok
+            },
             kind: SpanKind::Server,
-            tags: HashMap::new(), events: vec![], links: vec![],
+            tags: HashMap::new(),
+            events: vec![],
+            links: vec![],
             resource_attributes: HashMap::new(),
-            tenant_id: "default".into(), baggage: HashMap::new(), log_labels: HashMap::new(),
+            tenant_id: "default".into(),
+            baggage: HashMap::new(),
+            log_labels: HashMap::new(),
         }
     }
 
     #[test]
     fn spm_accumulates_calls() {
         let reg = SpmRegistry::new(60);
-        reg.record_spans(&[span("svc", "op", 1_000_000, false), span("svc", "op", 2_000_000, true)]);
+        reg.record_spans(&[
+            span("svc", "op", 1_000_000, false),
+            span("svc", "op", 2_000_000, true),
+        ]);
         let snap = reg.snapshot();
         assert_eq!(snap.len(), 1);
         assert_eq!(snap[0].calls, 2);

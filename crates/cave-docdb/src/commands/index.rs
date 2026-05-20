@@ -57,7 +57,10 @@ pub async fn create_indexes(cmd_doc: &Document, engine: Arc<Engine>) -> Result<D
     }
 
     let mut resp = Document::new();
-    resp.insert("numIndexesAfter".to_string(), Value::Number((indexes.len()).into()));
+    resp.insert(
+        "numIndexesAfter".to_string(),
+        Value::Number((indexes.len()).into()),
+    );
     resp.insert("ok".to_string(), Value::Number(1.into()));
     Ok(resp)
 }

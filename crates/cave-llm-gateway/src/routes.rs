@@ -2,19 +2,19 @@
 // Copyright 2026 Cave Runtime contributors
 //! HTTP routes for cave-llm-gateway — OpenAI-compatible API + admin endpoints.
 
-use crate::api_keys::{ApiKeyStore, Scope};
+use crate::GatewayState;
 use crate::alias::{AliasRegistry, ModelAlias};
+use crate::api_keys::{ApiKeyStore, Scope};
 use crate::error::GatewayError;
 use crate::openai::{ChatCompletionRequest, ModelList, ModelObject, OpenAIError};
 use crate::rate_limit::RateLimit;
 use crate::router::GatewayRouter;
-use crate::GatewayState;
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{delete, get, post, put},
-    Json, Router,
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -46,9 +46,15 @@ pub fn create_router(state: Arc<GatewayState>) -> Router {
         .route("/api/gateway/aliases", get(list_aliases).post(create_alias))
         .route("/api/gateway/aliases/{alias}", delete(delete_alias))
         // Admin — rate limits
-        .route("/api/gateway/rate-limits/{consumer}", get(get_rate_limit).put(set_rate_limit))
+        .route(
+            "/api/gateway/rate-limits/{consumer}",
+            get(get_rate_limit).put(set_rate_limit),
+        )
         // Admin — API keys
-        .route("/api/gateway/api-keys", get(list_api_keys).post(create_api_key))
+        .route(
+            "/api/gateway/api-keys",
+            get(list_api_keys).post(create_api_key),
+        )
         .route("/api/gateway/api-keys/{id}", delete(revoke_api_key))
         // Admin — usage / cost
         .route("/api/gateway/usage", get(global_usage))
@@ -92,7 +98,11 @@ async fn chat_completions(
         Ok(resp) => Json(serde_json::to_value(resp).unwrap()).into_response(),
         Err(GatewayError::RateLimitExceeded { retry_after_ms, .. }) => {
             let err = OpenAIError::rate_limit("Rate limit exceeded");
-            let mut resp = (StatusCode::TOO_MANY_REQUESTS, Json(serde_json::to_value(err).unwrap())).into_response();
+            let mut resp = (
+                StatusCode::TOO_MANY_REQUESTS,
+                Json(serde_json::to_value(err).unwrap()),
+            )
+                .into_response();
             resp.headers_mut().insert(
                 "Retry-After",
                 format!("{}", retry_after_ms / 1000 + 1).parse().unwrap(),
@@ -100,16 +110,29 @@ async fn chat_completions(
             resp
         }
         Err(GatewayError::GuardrailBlocked { rule, .. }) => {
-            let err = OpenAIError::invalid_request(&format!("Request blocked by guardrail: {rule}"));
-            (StatusCode::BAD_REQUEST, Json(serde_json::to_value(err).unwrap())).into_response()
+            let err =
+                OpenAIError::invalid_request(&format!("Request blocked by guardrail: {rule}"));
+            (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::to_value(err).unwrap()),
+            )
+                .into_response()
         }
         Err(GatewayError::Unauthorized(msg)) => {
             let err = OpenAIError::invalid_request(&msg);
-            (StatusCode::UNAUTHORIZED, Json(serde_json::to_value(err).unwrap())).into_response()
+            (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::to_value(err).unwrap()),
+            )
+                .into_response()
         }
         Err(e) => {
             let err = OpenAIError::server_error(&e.to_string());
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::to_value(err).unwrap())).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::to_value(err).unwrap()),
+            )
+                .into_response()
         }
     }
 }
@@ -141,14 +164,14 @@ async fn list_models(State(s): State<AppState>) -> Json<serde_json::Value> {
         });
     }
 
-    let list = ModelList { object: "list".into(), data: models };
+    let list = ModelList {
+        object: "list".into(),
+        data: models,
+    };
     Json(serde_json::to_value(list).unwrap())
 }
 
-async fn get_model(
-    State(s): State<AppState>,
-    Path(model): Path<String>,
-) -> impl IntoResponse {
+async fn get_model(State(s): State<AppState>, Path(model): Path<String>) -> impl IntoResponse {
     let now = chrono::Utc::now().timestamp();
 
     // Check aliases first
@@ -158,7 +181,8 @@ async fn get_model(
             "object": "model",
             "created": now,
             "owned_by": alias.provider,
-        })).into_response();
+        }))
+        .into_response();
     }
 
     // Check provider models
@@ -170,7 +194,8 @@ async fn get_model(
                     "object": "model",
                     "created": now,
                     "owned_by": provider_name,
-                })).into_response();
+                }))
+                .into_response();
             }
         }
     }
@@ -179,12 +204,20 @@ async fn get_model(
 }
 
 async fn list_providers(State(s): State<AppState>) -> Json<Vec<serde_json::Value>> {
-    let providers: Vec<serde_json::Value> = s.router.provider_names().into_iter().map(|name| {
-        let models = s.router.providers.get(&name)
-            .map(|p| p.supported_models())
-            .unwrap_or_default();
-        json!({ "name": name, "models": models })
-    }).collect();
+    let providers: Vec<serde_json::Value> = s
+        .router
+        .provider_names()
+        .into_iter()
+        .map(|name| {
+            let models = s
+                .router
+                .providers
+                .get(&name)
+                .map(|p| p.supported_models())
+                .unwrap_or_default();
+            json!({ "name": name, "models": models })
+        })
+        .collect();
     Json(providers)
 }
 
@@ -213,10 +246,7 @@ async fn create_alias(
     (StatusCode::CREATED, Json(json!({ "alias": req.alias }))).into_response()
 }
 
-async fn delete_alias(
-    State(s): State<AppState>,
-    Path(alias): Path<String>,
-) -> impl IntoResponse {
+async fn delete_alias(State(s): State<AppState>, Path(alias): Path<String>) -> impl IntoResponse {
     if s.router.aliases.delete(&alias) {
         StatusCode::NO_CONTENT.into_response()
     } else {
@@ -252,25 +282,32 @@ async fn create_api_key(
     State(s): State<AppState>,
     Json(req): Json<CreateApiKeyRequest>,
 ) -> impl IntoResponse {
-    let scopes: Vec<Scope> = req.scopes.iter().map(|s| match s.as_str() {
-        "chat_completions" => Scope::ChatCompletions,
-        "models_list" => Scope::ModelsList,
-        "admin" => Scope::Admin,
-        _ => Scope::All,
-    }).collect();
+    let scopes: Vec<Scope> = req
+        .scopes
+        .iter()
+        .map(|s| match s.as_str() {
+            "chat_completions" => Scope::ChatCompletions,
+            "models_list" => Scope::ModelsList,
+            "admin" => Scope::Admin,
+            _ => Scope::All,
+        })
+        .collect();
 
-    let key = s.api_keys.create(&req.name, &req.consumer, scopes, req.ttl_days);
-    (StatusCode::CREATED, Json(serde_json::to_value(key).unwrap())).into_response()
+    let key = s
+        .api_keys
+        .create(&req.name, &req.consumer, scopes, req.ttl_days);
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(key).unwrap()),
+    )
+        .into_response()
 }
 
 async fn list_api_keys(State(s): State<AppState>) -> Json<serde_json::Value> {
     Json(json!({ "keys": s.api_keys.list() }))
 }
 
-async fn revoke_api_key(
-    State(s): State<AppState>,
-    Path(id): Path<String>,
-) -> impl IntoResponse {
+async fn revoke_api_key(State(s): State<AppState>, Path(id): Path<String>) -> impl IntoResponse {
     match s.api_keys.revoke(&id) {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),

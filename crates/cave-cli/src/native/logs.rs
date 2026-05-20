@@ -6,7 +6,7 @@
 //! When the target is a module, the runtime fans out across every
 //! pod that crate currently runs in.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Args;
 
 use super::{HttpVerb, PreparedRequest};
@@ -119,10 +119,12 @@ mod tests {
     fn logs_since() {
         let mut a = args("cave-x");
         a.since = Some("2026-04-26T10:00:00Z".into());
-        assert!(prepare(&a)
-            .unwrap()
-            .path
-            .contains("since=2026-04-26T10:00:00Z"));
+        assert!(
+            prepare(&a)
+                .unwrap()
+                .path
+                .contains("since=2026-04-26T10:00:00Z")
+        );
     }
 
     #[test]

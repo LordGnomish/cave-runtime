@@ -11,35 +11,30 @@
 //!                         ?acl, ?encryption, ?location
 
 use axum::{
+    Router,
     body::Bytes,
     extract::{Path, Query, State},
-    http::{header, HeaderMap, StatusCode},
+    http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{delete, get, head, post, put},
-    Router,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::StoreState;
 use crate::s3::presigned;
 use crate::s3::store::{DeleteObjectEntry, ObjectStore};
 use crate::s3::types::{
-    BucketEncryption, BucketAcl, LifecycleRule, NotificationConfiguration,
-    SseAlgorithm, StorageClass, VersioningState,
+    BucketAcl, BucketEncryption, LifecycleRule, NotificationConfiguration, SseAlgorithm,
+    StorageClass, VersioningState,
 };
 use crate::s3::xml;
-use crate::StoreState;
 
 const XML_CONTENT_TYPE: &str = "application/xml";
 
 fn xml_response(status: StatusCode, body: String) -> Response {
-    (
-        status,
-        [(header::CONTENT_TYPE, XML_CONTENT_TYPE)],
-        body,
-    )
-        .into_response()
+    (status, [(header::CONTENT_TYPE, XML_CONTENT_TYPE)], body).into_response()
 }
 
 fn s3_error(status: StatusCode, code: &str, message: &str, resource: &str) -> Response {
@@ -153,10 +148,8 @@ async fn create_bucket(
     match state.s3.create_bucket(&bucket, &region, "cave").await {
         Ok(()) => {
             let mut resp = StatusCode::OK.into_response();
-            resp.headers_mut().insert(
-                header::LOCATION,
-                format!("/{bucket}").parse().unwrap(),
-            );
+            resp.headers_mut()
+                .insert(header::LOCATION, format!("/{bucket}").parse().unwrap());
             resp
         }
         Err(e) => store_error_response(e, &format!("/{bucket}")),
@@ -182,13 +175,12 @@ async fn delete_bucket(
 }
 
 /// HEAD /{bucket}
-async fn head_bucket(
-    State(state): State<Arc<StoreState>>,
-    Path(bucket): Path<String>,
-) -> Response {
+async fn head_bucket(State(state): State<Arc<StoreState>>, Path(bucket): Path<String>) -> Response {
     match state.s3.head_bucket(&bucket).await {
         Ok(()) => StatusCode::OK.into_response(),
-        Err(e) => StatusCode::from_u16(e.s3_status()).unwrap_or(StatusCode::NOT_FOUND).into_response(),
+        Err(e) => StatusCode::from_u16(e.s3_status())
+            .unwrap_or(StatusCode::NOT_FOUND)
+            .into_response(),
     }
 }
 
@@ -297,7 +289,10 @@ async fn list_object_versions(
                     });
                 }
             }
-            xml_response(StatusCode::OK, xml::list_object_versions(&bucket, &prefix, &items))
+            xml_response(
+                StatusCode::OK,
+                xml::list_object_versions(&bucket, &prefix, &items),
+            )
         }
         Err(e) => store_error_response(e, &format!("/{bucket}")),
     }
@@ -345,9 +340,18 @@ async fn put_bucket_policy(state: Arc<StoreState>, bucket: String, body: Bytes) 
 async fn get_bucket_policy(state: Arc<StoreState>, bucket: String) -> Response {
     match state.s3.get_bucket(&bucket).await {
         Ok(b) => match b.policy {
-            Some(p) => (StatusCode::OK, [(header::CONTENT_TYPE, "application/json")], p)
+            Some(p) => (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, "application/json")],
+                p,
+            )
                 .into_response(),
-            None => s3_error(StatusCode::NOT_FOUND, "NoSuchBucketPolicy", "no policy", &format!("/{bucket}")),
+            None => s3_error(
+                StatusCode::NOT_FOUND,
+                "NoSuchBucketPolicy",
+                "no policy",
+                &format!("/{bucket}"),
+            ),
         },
         Err(e) => store_error_response(e, &format!("/{bucket}?policy")),
     }
@@ -358,7 +362,12 @@ async fn put_bucket_lifecycle(state: Arc<StoreState>, bucket: String, body: Byte
     let rules: Vec<LifecycleRule> = match serde_json::from_slice(&body) {
         Ok(r) => r,
         Err(e) => {
-            return s3_error(StatusCode::BAD_REQUEST, "MalformedXML", &e.to_string(), &format!("/{bucket}?lifecycle"));
+            return s3_error(
+                StatusCode::BAD_REQUEST,
+                "MalformedXML",
+                &e.to_string(),
+                &format!("/{bucket}?lifecycle"),
+            );
         }
     };
     match state.s3.put_bucket_lifecycle(&bucket, rules).await {
@@ -369,12 +378,20 @@ async fn put_bucket_lifecycle(state: Arc<StoreState>, bucket: String, body: Byte
 
 async fn get_bucket_lifecycle(state: Arc<StoreState>, bucket: String) -> Response {
     match state.s3.get_bucket(&bucket).await {
-        Ok(b) => {
-            match serde_json::to_string(&b.lifecycle_rules) {
-                Ok(json) => (StatusCode::OK, [(header::CONTENT_TYPE, "application/json")], json).into_response(),
-                Err(e) => s3_error(StatusCode::INTERNAL_SERVER_ERROR, "InternalError", &e.to_string(), &format!("/{bucket}?lifecycle")),
-            }
-        }
+        Ok(b) => match serde_json::to_string(&b.lifecycle_rules) {
+            Ok(json) => (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, "application/json")],
+                json,
+            )
+                .into_response(),
+            Err(e) => s3_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "InternalError",
+                &e.to_string(),
+                &format!("/{bucket}?lifecycle"),
+            ),
+        },
         Err(e) => store_error_response(e, &format!("/{bucket}?lifecycle")),
     }
 }
@@ -383,7 +400,12 @@ async fn put_bucket_notification(state: Arc<StoreState>, bucket: String, body: B
     let config: NotificationConfiguration = match serde_json::from_slice(&body) {
         Ok(c) => c,
         Err(e) => {
-            return s3_error(StatusCode::BAD_REQUEST, "MalformedXML", &e.to_string(), &format!("/{bucket}?notification"));
+            return s3_error(
+                StatusCode::BAD_REQUEST,
+                "MalformedXML",
+                &e.to_string(),
+                &format!("/{bucket}?notification"),
+            );
         }
     };
     match state.s3.put_bucket_notification(&bucket, config).await {
@@ -397,7 +419,12 @@ async fn put_bucket_encryption(state: Arc<StoreState>, bucket: String, body: Byt
     let enc: serde_json::Value = match serde_json::from_slice(&body) {
         Ok(v) => v,
         Err(_) => {
-            return s3_error(StatusCode::BAD_REQUEST, "MalformedXML", "invalid body", &format!("/{bucket}?encryption"));
+            return s3_error(
+                StatusCode::BAD_REQUEST,
+                "MalformedXML",
+                "invalid body",
+                &format!("/{bucket}?encryption"),
+            );
         }
     };
     let algorithm = enc
@@ -415,7 +442,13 @@ async fn put_bucket_encryption(state: Arc<StoreState>, bucket: String, body: Byt
         .map(|s| s.to_string());
     match state
         .s3
-        .put_bucket_encryption(&bucket, BucketEncryption { sse_algorithm: sse_alg, kms_master_key_id: kms_key })
+        .put_bucket_encryption(
+            &bucket,
+            BucketEncryption {
+                sse_algorithm: sse_alg,
+                kms_master_key_id: kms_key,
+            },
+        )
         .await
     {
         Ok(()) => StatusCode::OK.into_response(),
@@ -432,7 +465,12 @@ async fn put_bucket_tagging(state: Arc<StoreState>, bucket: String, body: Bytes)
     let tags: HashMap<String, String> = match serde_json::from_slice(&body) {
         Ok(t) => t,
         Err(e) => {
-            return s3_error(StatusCode::BAD_REQUEST, "MalformedXML", &e.to_string(), &format!("/{bucket}?tagging"));
+            return s3_error(
+                StatusCode::BAD_REQUEST,
+                "MalformedXML",
+                &e.to_string(),
+                &format!("/{bucket}?tagging"),
+            );
         }
     };
     match state.s3.put_bucket_tags(&bucket, tags).await {
@@ -470,7 +508,10 @@ async fn put_object(
     }
 
     // Copy source
-    if let Some(copy_src) = headers.get("x-amz-copy-source").and_then(|v| v.to_str().ok()) {
+    if let Some(copy_src) = headers
+        .get("x-amz-copy-source")
+        .and_then(|v| v.to_str().ok())
+    {
         let (src_bucket, src_key) = parse_copy_source(copy_src);
         let metadata_directive = headers
             .get("x-amz-metadata-directive")
@@ -483,17 +524,23 @@ async fn put_object(
         };
         return match state
             .s3
-            .copy_object(&src_bucket, &src_key, None, &bucket, &key, metadata_directive, new_metadata)
+            .copy_object(
+                &src_bucket,
+                &src_key,
+                None,
+                &bucket,
+                &key,
+                metadata_directive,
+                new_metadata,
+            )
             .await
         {
             Ok(r) => {
                 let body = xml::copy_object_result(&r.etag, &r.last_modified);
                 let mut resp = xml_response(StatusCode::OK, body);
                 if let Some(vid) = r.version_id {
-                    resp.headers_mut().insert(
-                        "x-amz-version-id",
-                        vid.parse().unwrap(),
-                    );
+                    resp.headers_mut()
+                        .insert("x-amz-version-id", vid.parse().unwrap());
                 }
                 resp
             }
@@ -508,19 +555,35 @@ async fn put_object(
         .to_string();
     let metadata = extract_user_metadata(&headers);
     let tags = extract_tags(&headers);
-    let sse = headers.get("x-amz-server-side-encryption").and_then(|v| v.to_str().ok());
-    let sse_c_key = headers.get("x-amz-server-side-encryption-customer-key").and_then(|v| v.to_str().ok());
+    let sse = headers
+        .get("x-amz-server-side-encryption")
+        .and_then(|v| v.to_str().ok());
+    let sse_c_key = headers
+        .get("x-amz-server-side-encryption-customer-key")
+        .and_then(|v| v.to_str().ok());
 
     match state
         .s3
-        .put_object(&bucket, &key, body.to_vec(), &content_type, metadata, tags, sse, sse_c_key, None)
+        .put_object(
+            &bucket,
+            &key,
+            body.to_vec(),
+            &content_type,
+            metadata,
+            tags,
+            sse,
+            sse_c_key,
+            None,
+        )
         .await
     {
         Ok(r) => {
             let mut resp = StatusCode::OK.into_response();
-            resp.headers_mut().insert("ETag", format!("\"{}\"", r.etag).parse().unwrap());
+            resp.headers_mut()
+                .insert("ETag", format!("\"{}\"", r.etag).parse().unwrap());
             if let Some(vid) = r.version_id {
-                resp.headers_mut().insert("x-amz-version-id", vid.parse().unwrap());
+                resp.headers_mut()
+                    .insert("x-amz-version-id", vid.parse().unwrap());
             }
             resp
         }
@@ -528,14 +591,27 @@ async fn put_object(
     }
 }
 
-async fn upload_part(state: Arc<StoreState>, upload_id: String, part_number: u32, body: Bytes) -> Response {
-    match state.s3.upload_part(&upload_id, part_number, body.to_vec()).await {
+async fn upload_part(
+    state: Arc<StoreState>,
+    upload_id: String,
+    part_number: u32,
+    body: Bytes,
+) -> Response {
+    match state
+        .s3
+        .upload_part(&upload_id, part_number, body.to_vec())
+        .await
+    {
         Ok(etag) => {
             let mut resp = StatusCode::OK.into_response();
-            resp.headers_mut().insert("ETag", format!("\"{}\"", etag).parse().unwrap());
+            resp.headers_mut()
+                .insert("ETag", format!("\"{}\"", etag).parse().unwrap());
             resp
         }
-        Err(e) => store_error_response(e, &format!("?uploadId={upload_id}&partNumber={part_number}")),
+        Err(e) => store_error_response(
+            e,
+            &format!("?uploadId={upload_id}&partNumber={part_number}"),
+        ),
     }
 }
 
@@ -551,7 +627,9 @@ async fn get_object(
     }
 
     // Presigned URL check
-    if let (Some(cred), Some(exp), Some(sig)) = (&q.cave_credential, q.cave_expires, &q.cave_signature) {
+    if let (Some(cred), Some(exp), Some(sig)) =
+        (&q.cave_credential, q.cave_expires, &q.cave_signature)
+    {
         let secret = state.s3_secret_key.as_bytes();
         if let Err(e) = presigned::verify("GET", &bucket, &key, cred, exp, sig, secret) {
             return store_error_response(e, &format!("/{bucket}/{key}"));
@@ -560,7 +638,9 @@ async fn get_object(
 
     // Range header
     let range = parse_range_header(headers.get(header::RANGE).and_then(|v| v.to_str().ok()));
-    let sse_c_key = headers.get("x-amz-server-side-encryption-customer-key").and_then(|v| v.to_str().ok());
+    let sse_c_key = headers
+        .get("x-amz-server-side-encryption-customer-key")
+        .and_then(|v| v.to_str().ok());
 
     match state
         .s3
@@ -575,14 +655,31 @@ async fn get_object(
             };
             let mut resp = (status, obj.body).into_response();
             let h = resp.headers_mut();
-            h.insert(header::CONTENT_TYPE, obj.content_type.parse().unwrap_or(header::HeaderValue::from_static("application/octet-stream")));
+            h.insert(
+                header::CONTENT_TYPE,
+                obj.content_type
+                    .parse()
+                    .unwrap_or(header::HeaderValue::from_static("application/octet-stream")),
+            );
             h.insert("ETag", format!("\"{}\"", obj.etag).parse().unwrap());
-            h.insert(header::LAST_MODIFIED, obj.last_modified.format("%a, %d %b %Y %H:%M:%S GMT").to_string().parse().unwrap());
-            h.insert(header::CONTENT_LENGTH, obj.size.to_string().parse().unwrap());
+            h.insert(
+                header::LAST_MODIFIED,
+                obj.last_modified
+                    .format("%a, %d %b %Y %H:%M:%S GMT")
+                    .to_string()
+                    .parse()
+                    .unwrap(),
+            );
+            h.insert(
+                header::CONTENT_LENGTH,
+                obj.size.to_string().parse().unwrap(),
+            );
             for (k, v) in &obj.metadata {
                 if let Ok(hv) = v.parse() {
                     h.insert(
-                        format!("x-amz-meta-{k}").parse::<header::HeaderName>().unwrap(),
+                        format!("x-amz-meta-{k}")
+                            .parse::<header::HeaderName>()
+                            .unwrap(),
                         hv,
                     );
                 }
@@ -605,14 +702,33 @@ async fn head_object(
     Path((bucket, key)): Path<(String, String)>,
     Query(q): Query<ObjectQuery>,
 ) -> Response {
-    match state.s3.head_object(&bucket, &key, q.version_id.as_deref()).await {
+    match state
+        .s3
+        .head_object(&bucket, &key, q.version_id.as_deref())
+        .await
+    {
         Ok(obj) => {
             let mut resp = StatusCode::OK.into_response();
             let h = resp.headers_mut();
-            h.insert(header::CONTENT_TYPE, obj.content_type.parse().unwrap_or(header::HeaderValue::from_static("application/octet-stream")));
+            h.insert(
+                header::CONTENT_TYPE,
+                obj.content_type
+                    .parse()
+                    .unwrap_or(header::HeaderValue::from_static("application/octet-stream")),
+            );
             h.insert("ETag", format!("\"{}\"", obj.etag).parse().unwrap());
-            h.insert(header::LAST_MODIFIED, obj.last_modified.format("%a, %d %b %Y %H:%M:%S GMT").to_string().parse().unwrap());
-            h.insert(header::CONTENT_LENGTH, obj.size.to_string().parse().unwrap());
+            h.insert(
+                header::LAST_MODIFIED,
+                obj.last_modified
+                    .format("%a, %d %b %Y %H:%M:%S GMT")
+                    .to_string()
+                    .parse()
+                    .unwrap(),
+            );
+            h.insert(
+                header::CONTENT_LENGTH,
+                obj.size.to_string().parse().unwrap(),
+            );
             if let Some(vid) = obj.version_id {
                 h.insert("x-amz-version-id", vid.parse().unwrap());
             }
@@ -621,7 +737,9 @@ async fn head_object(
             }
             resp
         }
-        Err(e) => StatusCode::from_u16(e.s3_status()).unwrap_or(StatusCode::NOT_FOUND).into_response(),
+        Err(e) => StatusCode::from_u16(e.s3_status())
+            .unwrap_or(StatusCode::NOT_FOUND)
+            .into_response(),
     }
 }
 
@@ -641,20 +759,30 @@ async fn delete_object(
 
     if q.tagging.is_some() {
         // Delete object tagging
-        return match state.s3.put_object_tagging(&bucket, &key, q.version_id.as_deref(), HashMap::new()).await {
+        return match state
+            .s3
+            .put_object_tagging(&bucket, &key, q.version_id.as_deref(), HashMap::new())
+            .await
+        {
             Ok(()) => StatusCode::NO_CONTENT.into_response(),
             Err(e) => store_error_response(e, &format!("/{bucket}/{key}?tagging")),
         };
     }
 
-    match state.s3.delete_object(&bucket, &key, q.version_id.as_deref()).await {
+    match state
+        .s3
+        .delete_object(&bucket, &key, q.version_id.as_deref())
+        .await
+    {
         Ok(r) => {
             let mut resp = StatusCode::NO_CONTENT.into_response();
             if let Some(vid) = r.version_id {
-                resp.headers_mut().insert("x-amz-version-id", vid.parse().unwrap());
+                resp.headers_mut()
+                    .insert("x-amz-version-id", vid.parse().unwrap());
             }
             if r.delete_marker {
-                resp.headers_mut().insert("x-amz-delete-marker", "true".parse().unwrap());
+                resp.headers_mut()
+                    .insert("x-amz-delete-marker", "true".parse().unwrap());
             }
             resp
         }
@@ -678,7 +806,11 @@ async fn post_object(
             .unwrap_or("application/octet-stream")
             .to_string();
         let metadata = extract_user_metadata(&headers);
-        return match state.s3.create_multipart_upload(&bucket, &key, &content_type, metadata).await {
+        return match state
+            .s3
+            .create_multipart_upload(&bucket, &key, &content_type, metadata)
+            .await
+        {
             Ok(upload_id) => xml_response(
                 StatusCode::OK,
                 xml::initiate_multipart_upload(&bucket, &key, &upload_id),
@@ -697,7 +829,13 @@ async fn post_object(
                 let location = format!("/{}/{}", r.bucket, r.key);
                 xml_response(
                     StatusCode::OK,
-                    xml::complete_multipart_upload(&location, &r.bucket, &r.key, &r.etag, r.version_id.as_deref()),
+                    xml::complete_multipart_upload(
+                        &location,
+                        &r.bucket,
+                        &r.key,
+                        &r.etag,
+                        r.version_id.as_deref(),
+                    ),
                 )
             }
             Err(e) => store_error_response(e, &format!("/{bucket}/{key}")),
@@ -762,7 +900,10 @@ async fn list_parts_handler(
                         size: p.size,
                     })
                     .collect();
-                xml_response(StatusCode::OK, xml::list_parts(&bucket, &key, upload_id, &items))
+                xml_response(
+                    StatusCode::OK,
+                    xml::list_parts(&bucket, &key, upload_id, &items),
+                )
             }
             Err(e) => store_error_response(e, &format!("/{bucket}/{key}")),
         };
@@ -791,7 +932,11 @@ async fn put_object_tagging(
     body: Bytes,
 ) -> Response {
     let tags: HashMap<String, String> = serde_json::from_slice(&body).unwrap_or_default();
-    match state.s3.put_object_tagging(&bucket, &key, q.version_id.as_deref(), tags).await {
+    match state
+        .s3
+        .put_object_tagging(&bucket, &key, q.version_id.as_deref(), tags)
+        .await
+    {
         Ok(()) => StatusCode::OK.into_response(),
         Err(e) => store_error_response(e, &format!("/{bucket}/{key}?tagging")),
     }
@@ -818,7 +963,11 @@ async fn generate_presigned_url(
         access_key: "cave-access-key".to_string(),
         extra_headers: HashMap::new(),
     };
-    let url = presigned::generate("http://localhost:9000", &params, state.s3_secret_key.as_bytes());
+    let url = presigned::generate(
+        "http://localhost:9000",
+        &params,
+        state.s3_secret_key.as_bytes(),
+    );
     axum::Json(serde_json::json!({
         "url": url.url,
         "expires_at": url.expires_at,

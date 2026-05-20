@@ -70,7 +70,9 @@ pub enum PvcRetentionPolicy {
 }
 
 impl Default for PvcRetentionPolicy {
-    fn default() -> Self { Self::Retain }
+    fn default() -> Self {
+        Self::Retain
+    }
 }
 
 /// Volume claim template — name plus the retention policies.
@@ -84,7 +86,11 @@ pub struct VolumeClaimTemplate {
 /// Compute the canonical PVC name for `(template, ordinal)`. Mirrors
 /// `pkg/controller/statefulset/stateful_set_utils.go::getPersistentVolumeClaimName`:
 ///   `<template-name>-<sts-name>-<ordinal>`
-pub fn pvc_name_for(spec: &StatefulSetSpec, template: &VolumeClaimTemplate, ordinal: u32) -> String {
+pub fn pvc_name_for(
+    spec: &StatefulSetSpec,
+    template: &VolumeClaimTemplate,
+    ordinal: u32,
+) -> String {
     format!("{}-{}-{}", template.name, spec.name, ordinal)
 }
 
@@ -100,7 +106,9 @@ pub fn pvcs_to_delete_on_scale_down(
     if now >= was || template.when_scaled == PvcRetentionPolicy::Retain {
         return vec![];
     }
-    (now..was).map(|i| pvc_name_for(spec, template, i)).collect()
+    (now..was)
+        .map(|i| pvc_name_for(spec, template, i))
+        .collect()
 }
 
 /// Plan PVCs to delete when the entire StatefulSet is deleted. Honours
@@ -114,7 +122,9 @@ pub fn pvcs_to_delete_on_set_deletion(
     if template.when_deleted == PvcRetentionPolicy::Retain {
         return vec![];
     }
-    (0..current).map(|i| pvc_name_for(spec, template, i)).collect()
+    (0..current)
+        .map(|i| pvc_name_for(spec, template, i))
+        .collect()
 }
 
 /// Ordinal range. With KEP-3335 (`spec.ordinals.start`) the lower bound
@@ -139,7 +149,10 @@ pub fn ordered_deletion_sequence(spec: &StatefulSetSpec, current: u32) -> Vec<St
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::new("pkg/controller/statefulset/stateful_set.go", "StatefulSetController");
+const FILE_CITE: Cite = Cite::new(
+    "pkg/controller/statefulset/stateful_set.go",
+    "StatefulSetController",
+);
 
 #[cfg(test)]
 mod tests {
@@ -147,7 +160,12 @@ mod tests {
     use crate::test_ctx;
 
     fn spec(replicas: u32, policy: PodManagementPolicy) -> StatefulSetSpec {
-        StatefulSetSpec { name: "db".into(), namespace: "ns".into(), replicas, policy }
+        StatefulSetSpec {
+            name: "db".into(),
+            namespace: "ns".into(),
+            replicas,
+            policy,
+        }
     }
 
     #[test]
@@ -171,7 +189,10 @@ mod tests {
             "tenant-sts-ordered"
         );
         let s = spec(5, PodManagementPolicy::OrderedReady);
-        let st = StatefulSetStatus { current_replicas: 1, ..Default::default() };
+        let st = StatefulSetStatus {
+            current_replicas: 1,
+            ..Default::default()
+        };
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::Create(1));
     }
 
@@ -183,7 +204,10 @@ mod tests {
             "tenant-sts-parallel"
         );
         let s = spec(5, PodManagementPolicy::Parallel);
-        let st = StatefulSetStatus { current_replicas: 1, ..Default::default() };
+        let st = StatefulSetStatus {
+            current_replicas: 1,
+            ..Default::default()
+        };
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::Create(4));
     }
 
@@ -195,15 +219,24 @@ mod tests {
             "tenant-sts-scale-down"
         );
         let s = spec(2, PodManagementPolicy::OrderedReady);
-        let st = StatefulSetStatus { current_replicas: 5, ..Default::default() };
+        let st = StatefulSetStatus {
+            current_replicas: 5,
+            ..Default::default()
+        };
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::Delete(1));
     }
 
     // ── Deeper coverage (deeper-001) ─────────────────────────────────────────
 
-    fn vct(name: &str, when_deleted: PvcRetentionPolicy, when_scaled: PvcRetentionPolicy) -> VolumeClaimTemplate {
+    fn vct(
+        name: &str,
+        when_deleted: PvcRetentionPolicy,
+        when_scaled: PvcRetentionPolicy,
+    ) -> VolumeClaimTemplate {
         VolumeClaimTemplate {
-            name: name.into(), when_deleted, when_scaled,
+            name: name.into(),
+            when_deleted,
+            when_scaled,
         }
     }
 
@@ -251,7 +284,11 @@ mod tests {
         );
         let _ = tenant;
         let s = spec(3, PodManagementPolicy::OrderedReady);
-        let t = vct("data", PvcRetentionPolicy::Retain, PvcRetentionPolicy::Retain);
+        let t = vct(
+            "data",
+            PvcRetentionPolicy::Retain,
+            PvcRetentionPolicy::Retain,
+        );
         assert_eq!(pvc_name_for(&s, &t, 0), "data-db-0");
         assert_eq!(pvc_name_for(&s, &t, 2), "data-db-2");
     }
@@ -268,10 +305,16 @@ mod tests {
         );
         let _ = tenant;
         let s = spec(3, PodManagementPolicy::OrderedReady);
-        let t = vct("data", PvcRetentionPolicy::Retain, PvcRetentionPolicy::Retain);
+        let t = vct(
+            "data",
+            PvcRetentionPolicy::Retain,
+            PvcRetentionPolicy::Retain,
+        );
         let to_delete = pvcs_to_delete_on_scale_down(&s, &t, /*was=*/ 5, /*now=*/ 3);
-        assert!(to_delete.is_empty(),
-            "Retain policy keeps PVCs even after pod scale-down");
+        assert!(
+            to_delete.is_empty(),
+            "Retain policy keeps PVCs even after pod scale-down"
+        );
     }
 
     /// Upstream parity: `TestStatefulSet_PvcDeleteOnScaleDown`
@@ -286,13 +329,20 @@ mod tests {
         );
         let _ = tenant;
         let s = spec(2, PodManagementPolicy::OrderedReady);
-        let t = vct("data", PvcRetentionPolicy::Retain, PvcRetentionPolicy::Delete);
+        let t = vct(
+            "data",
+            PvcRetentionPolicy::Retain,
+            PvcRetentionPolicy::Delete,
+        );
         let to_delete = pvcs_to_delete_on_scale_down(&s, &t, /*was=*/ 5, /*now=*/ 2);
-        assert_eq!(to_delete, vec![
-            "data-db-2".to_string(),
-            "data-db-3".to_string(),
-            "data-db-4".to_string(),
-        ]);
+        assert_eq!(
+            to_delete,
+            vec![
+                "data-db-2".to_string(),
+                "data-db-3".to_string(),
+                "data-db-4".to_string(),
+            ]
+        );
     }
 
     /// Upstream parity: `TestStatefulSet_PvcDeleteOnSetDeletion`
@@ -307,12 +357,19 @@ mod tests {
         );
         let _ = tenant;
         let s = spec(3, PodManagementPolicy::OrderedReady);
-        let t = vct("data", PvcRetentionPolicy::Delete, PvcRetentionPolicy::Retain);
+        let t = vct(
+            "data",
+            PvcRetentionPolicy::Delete,
+            PvcRetentionPolicy::Retain,
+        );
         let to_delete = pvcs_to_delete_on_set_deletion(&s, &t, /*current=*/ 3);
-        assert_eq!(to_delete, vec![
-            "data-db-0".to_string(),
-            "data-db-1".to_string(),
-            "data-db-2".to_string(),
-        ]);
+        assert_eq!(
+            to_delete,
+            vec![
+                "data-db-0".to_string(),
+                "data-db-1".to_string(),
+                "data-db-2".to_string(),
+            ]
+        );
     }
 }

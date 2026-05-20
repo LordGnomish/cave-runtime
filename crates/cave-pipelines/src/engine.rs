@@ -38,7 +38,10 @@ impl Dag {
             let deps = t.run_after.clone();
             nodes.insert(
                 t.name.clone(),
-                DagNode { task: t.clone(), deps },
+                DagNode {
+                    task: t.clone(),
+                    deps,
+                },
             );
         }
         Self { nodes }
@@ -162,10 +165,7 @@ pub fn resolve_param_string(
 }
 
 /// Validate parameter values against their specs.
-pub fn validate_params(
-    specs: &[ParamSpec],
-    provided: &[Param],
-) -> Vec<String> {
+pub fn validate_params(specs: &[ParamSpec], provided: &[Param]) -> Vec<String> {
     let mut errors = Vec::new();
     let provided_map: HashMap<&str, &Param> =
         provided.iter().map(|p| (p.name.as_str(), p)).collect();
@@ -231,7 +231,7 @@ pub fn should_run_finally(_phase: &RunPhase) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{PipelineTask, ParamSpec, ParamType, ParamValue, Param};
+    use crate::models::{Param, ParamSpec, ParamType, ParamValue, PipelineTask};
 
     fn make_task(name: &str, deps: &[&str]) -> PipelineTask {
         PipelineTask {
@@ -287,12 +287,12 @@ mod tests {
 
     #[test]
     fn dag_cycle_detected() {
-        let tasks = vec![
-            make_task("a", &["b"]),
-            make_task("b", &["a"]),
-        ];
+        let tasks = vec![make_task("a", &["b"]), make_task("b", &["a"])];
         let dag = Dag::from_spec(&tasks);
-        assert!(matches!(dag.execution_waves(), Err(DagError::CycleDetected)));
+        assert!(matches!(
+            dag.execution_waves(),
+            Err(DagError::CycleDetected)
+        ));
     }
 
     #[test]
@@ -320,7 +320,10 @@ mod tests {
     #[test]
     fn resolve_param_string_basic() {
         let mut params = HashMap::new();
-        params.insert("image".to_string(), ParamValue::String("alpine:3.18".to_string()));
+        params.insert(
+            "image".to_string(),
+            ParamValue::String("alpine:3.18".to_string()),
+        );
         let task_results = HashMap::new();
         let out = resolve_param_string("docker pull $(params.image)", &params, &task_results);
         assert_eq!(out, "docker pull alpine:3.18");
@@ -331,7 +334,10 @@ mod tests {
         let params = HashMap::new();
         let mut task_results = HashMap::new();
         let mut build_results = HashMap::new();
-        build_results.insert("digest".to_string(), ParamValue::String("sha256:abc123".to_string()));
+        build_results.insert(
+            "digest".to_string(),
+            ParamValue::String("sha256:abc123".to_string()),
+        );
         task_results.insert("build".to_string(), build_results);
         let out = resolve_param_string(
             "digest=$(tasks.build.results.digest)",

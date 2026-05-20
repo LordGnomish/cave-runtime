@@ -6,7 +6,7 @@
 //! status, the active strategy, and the latest analysis results.
 
 use crate::models::{
-    AnalysisPhase, AnalysisRun, BlueGreenStrategy, BlueGreenStatus, CanaryStatus, CanaryStep,
+    AnalysisPhase, AnalysisRun, BlueGreenStatus, BlueGreenStrategy, CanaryStatus, CanaryStep,
     CanaryStrategy, RolloutAction, RolloutPhase, RolloutStatus, RolloutStrategy, TrafficWeights,
     WeightDestination,
 };
@@ -49,14 +49,19 @@ pub fn advance_canary(
         return EngineDecision::NoOp;
     }
     if status.phase == RolloutPhase::Paused {
-        return EngineDecision::Pause { duration_seconds: None };
+        return EngineDecision::Pause {
+            duration_seconds: None,
+        };
     }
 
     // Check if the current analysis failed → abort
     if let Some(run) = latest_analysis {
         if run.phase == AnalysisPhase::Failed || run.phase == AnalysisPhase::Error {
             status.phase = RolloutPhase::Aborted;
-            status.message = run.message.clone().or_else(|| Some("analysis failed".to_string()));
+            status.message = run
+                .message
+                .clone()
+                .or_else(|| Some("analysis failed".to_string()));
             warn!(rollout_name = "?", "analysis failed, aborting canary");
             return EngineDecision::Abort {
                 reason: run
@@ -149,7 +154,9 @@ pub fn apply_canary_action(
         }
         RolloutAction::Pause => {
             status.phase = RolloutPhase::Paused;
-            EngineDecision::Pause { duration_seconds: None }
+            EngineDecision::Pause {
+                duration_seconds: None,
+            }
         }
         RolloutAction::Resume => {
             status.phase = RolloutPhase::Progressing;
@@ -207,10 +214,7 @@ pub fn advance_blue_green(
     // Pre-promotion analysis
     if strategy.pre_promotion_analysis.is_some() && pre_analysis.is_none() && preview_ready {
         return EngineDecision::RunAnalysis {
-            template_name: strategy
-                .pre_promotion_analysis
-                .clone()
-                .unwrap(),
+            template_name: strategy.pre_promotion_analysis.clone().unwrap(),
         };
     }
 
@@ -225,7 +229,9 @@ pub fn advance_blue_green(
     if status.phase != RolloutPhase::Paused {
         status.phase = RolloutPhase::Paused;
     }
-    EngineDecision::Pause { duration_seconds: None }
+    EngineDecision::Pause {
+        duration_seconds: None,
+    }
 }
 
 // ── Analysis evaluation ───────────────────────────────────────────────────────
@@ -344,7 +350,9 @@ mod tests {
         CanaryStrategy {
             steps: vec![
                 CanaryStep::SetWeight { weight: 10 },
-                CanaryStep::Pause { duration_seconds: Some(60) },
+                CanaryStep::Pause {
+                    duration_seconds: Some(60),
+                },
                 CanaryStep::SetWeight { weight: 50 },
             ],
             stable_service: "app-stable".to_string(),
@@ -379,7 +387,12 @@ mod tests {
         let mut status = default_status();
         status.current_step_index = Some(1);
         let decision = advance_canary(&strategy, &mut status, None);
-        assert!(matches!(decision, EngineDecision::Pause { duration_seconds: Some(60) }));
+        assert!(matches!(
+            decision,
+            EngineDecision::Pause {
+                duration_seconds: Some(60)
+            }
+        ));
         assert_eq!(status.phase, RolloutPhase::Paused);
     }
 
@@ -438,7 +451,13 @@ mod tests {
 
     #[test]
     fn metric_evaluation_success() {
-        let phase = evaluate_metric("success-rate", &[0.98, 0.99, 0.97], 0, Some(">= 0.95"), None);
+        let phase = evaluate_metric(
+            "success-rate",
+            &[0.98, 0.99, 0.97],
+            0,
+            Some(">= 0.95"),
+            None,
+        );
         assert_eq!(phase, AnalysisPhase::Successful);
     }
 }

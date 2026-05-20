@@ -121,13 +121,19 @@ mod cycle_1779014729_a2 {
     #[test]
     #[ignore = "impl pending"]
     fn test_controllers_list_is_non_empty_20240520120001() {
-        assert!(!CONTROLLERS.is_empty(), "CONTROLLERS list should not be empty");
+        assert!(
+            !CONTROLLERS.is_empty(),
+            "CONTROLLERS list should not be empty"
+        );
     }
 
     #[test]
     #[ignore = "impl pending"]
     fn test_node_client_group_constant_20240520120002() {
-        assert_eq!(NODE_CLIENT_GROUP, "system:bootstrappers:kubeadm:default-node-token");
+        assert_eq!(
+            NODE_CLIENT_GROUP,
+            "system:bootstrappers:kubeadm:default-node-token"
+        );
     }
 
     #[test]
@@ -205,6 +211,9 @@ mod cycle_1779014729_a2 {
     #[test]
     #[ignore = "impl pending"]
     fn test_signer_kube_apiserver_client_kubelet_constant_20240520120015() {
-        assert_eq!(SIGNER_KUBE_APISERVER_CLIENT_KUBELET, "kubernetes.io/kube-apiserver-client-kubelet");
+        assert_eq!(
+            SIGNER_KUBE_APISERVER_CLIENT_KUBELET,
+            "kubernetes.io/kube-apiserver-client-kubelet"
+        );
     }
 }

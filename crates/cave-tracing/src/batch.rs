@@ -93,7 +93,9 @@ impl BatchSpanProcessor {
         self.inner.queue.lock().len()
     }
 
-    pub fn config(&self) -> &BatchConfig { &self.inner.config }
+    pub fn config(&self) -> &BatchConfig {
+        &self.inner.config
+    }
 
     /// Synchronously drain the queue and export everything currently
     /// queued. Used by tests and `shutdown`.
@@ -102,7 +104,9 @@ impl BatchSpanProcessor {
         loop {
             let drained = {
                 let mut q = self.inner.queue.lock();
-                if q.is_empty() { break; }
+                if q.is_empty() {
+                    break;
+                }
                 let take = q.len().min(self.inner.config.max_export_batch_size);
                 q.drain(..take).collect::<Vec<_>>()
             };
@@ -145,7 +149,9 @@ impl BatchSpanProcessor {
                         let _ = self.force_flush().await;
                     }
                 }
-                if *self.inner.closed.read() { break; }
+                if *self.inner.closed.read() {
+                    break;
+                }
             }
         })
     }
@@ -195,7 +201,9 @@ mod tests {
     #[tokio::test]
     async fn test_force_flush_drains_queue() {
         let (p, e) = proc_with(100, 10);
-        for i in 0..5 { p.on_end(span(i)); }
+        for i in 0..5 {
+            p.on_end(span(i));
+        }
         assert_eq!(p.queue_len(), 5);
         let n = p.force_flush().await.unwrap();
         assert_eq!(n, 5);
@@ -206,7 +214,9 @@ mod tests {
     #[tokio::test]
     async fn test_drop_on_overflow_increments_counter() {
         let (p, _e) = proc_with(3, 10);
-        for i in 0..10 { p.on_end(span(i)); }
+        for i in 0..10 {
+            p.on_end(span(i));
+        }
         let s = p.stats();
         assert_eq!(s.queued, 3);
         assert_eq!(s.dropped, 7);
@@ -215,7 +225,9 @@ mod tests {
     #[tokio::test]
     async fn test_force_flush_chunks_by_max_export_batch_size() {
         let (p, e) = proc_with(100, 4);
-        for i in 0..10 { p.on_end(span(i)); }
+        for i in 0..10 {
+            p.on_end(span(i));
+        }
         // 10 spans / batch 4 → three exports of 4, 4, 2 — all collected
         let n = p.force_flush().await.unwrap();
         assert_eq!(n, 10);
@@ -226,7 +238,9 @@ mod tests {
     async fn test_force_flush_returns_export_error() {
         let (p, e) = proc_with(100, 10);
         e.fail_next(1);
-        for i in 0..5 { p.on_end(span(i)); }
+        for i in 0..5 {
+            p.on_end(span(i));
+        }
         let res = p.force_flush().await;
         assert!(res.is_err());
         assert_eq!(p.stats().export_errors, 1);
@@ -237,18 +251,24 @@ mod tests {
     #[tokio::test]
     async fn test_shutdown_drains_and_blocks_further_writes() {
         let (p, e) = proc_with(100, 10);
-        for i in 0..3 { p.on_end(span(i)); }
+        for i in 0..3 {
+            p.on_end(span(i));
+        }
         p.shutdown().await.unwrap();
         assert_eq!(e.count(), 3);
         // After shutdown, on_end drops silently
-        for i in 100..105 { p.on_end(span(i)); }
+        for i in 100..105 {
+            p.on_end(span(i));
+        }
         assert_eq!(p.queue_len(), 0);
     }
 
     #[tokio::test]
     async fn test_stats_track_exports_and_dropped() {
         let (p, e) = proc_with(2, 10);
-        for i in 0..5 { p.on_end(span(i)); } // 2 queued, 3 dropped
+        for i in 0..5 {
+            p.on_end(span(i));
+        } // 2 queued, 3 dropped
         p.force_flush().await.unwrap();
         let s = p.stats();
         assert_eq!(s.queued, 2);
@@ -261,7 +281,9 @@ mod tests {
     async fn test_ticker_flushes_periodically() {
         let (p, e) = proc_with(100, 100);
         let handle = p.clone().spawn_ticker();
-        for i in 0..3 { p.on_end(span(i)); }
+        for i in 0..3 {
+            p.on_end(span(i));
+        }
         // Wait a couple of ticker cycles (50ms each)
         tokio::time::sleep(Duration::from_millis(200)).await;
         handle.abort();

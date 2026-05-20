@@ -9,7 +9,7 @@
 use super::PrometheusViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, table};
-use crate::admin::state::{scope, AdminState};
+use crate::admin::state::{AdminState, scope};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuleRow {

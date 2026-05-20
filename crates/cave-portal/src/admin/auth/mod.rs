@@ -24,7 +24,7 @@ pub mod users;
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, AuthSession};
+use crate::admin::state::{AdminState, AuthSession, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -33,13 +33,18 @@ pub enum AuthViewError {
     Auth(#[from] crate::admin::permission::AuthError),
 }
 
-pub fn list_records(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<AuthSession>, AuthViewError> {
+pub fn list_records(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<AuthSession>, AuthViewError> {
     ctx.authorise(Permission::AuthSessionsRead)?;
     let mut rows: Vec<AuthSession> =
-        scope(&state.auth_sessions.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-            .into_iter()
-            .cloned()
-            .collect();
+        scope(&state.auth_sessions.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| a.realm.cmp(&b.realm).then(a.principal.cmp(&b.principal)));
     Ok(rows)
 }
@@ -61,7 +66,11 @@ pub fn expired_before<'a>(rows: &'a [AuthSession], now: i64) -> Vec<&'a AuthSess
     rows.iter().filter(|s| s.expires_unix < now).collect()
 }
 
-pub fn detail(state: &AdminState, ctx: &RequestCtx, session_id: &str) -> Result<Option<AuthSession>, AuthViewError> {
+pub fn detail(
+    state: &AdminState,
+    ctx: &RequestCtx,
+    session_id: &str,
+) -> Result<Option<AuthSession>, AuthViewError> {
     let rows = list_records(state, ctx)?;
     Ok(rows.into_iter().find(|s| s.session_id == session_id))
 }
@@ -104,12 +113,19 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, AuthViewEr
         n = rows.len(),
         tbl = table(&["session", "principal", "realm", "expires"], &table_rows),
     );
-    Ok(page_shell_full(ctx, "/admin/auth", &format!("auth · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/auth",
+        &format!("auth · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite =
-    Cite::backstage("plugins/auth/src/components/SessionsList.tsx", "SessionsList");
+const FILE_CITE: Cite = Cite::backstage(
+    "plugins/auth/src/components/SessionsList.tsx",
+    "SessionsList",
+);
 
 #[cfg(test)]
 mod tests {
@@ -144,7 +160,8 @@ mod tests {
 
     #[test]
     fn group_by_realm_collects_sessions() {
-        let rows = list_records(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
+        let rows =
+            list_records(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
         let groups = group_by_realm(&rows);
         let total: usize = groups.iter().map(|(_, v)| v.len()).sum();
         assert_eq!(total, rows.len());
@@ -152,7 +169,8 @@ mod tests {
 
     #[test]
     fn expired_before_filters_stale_sessions() {
-        let rows = list_records(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
+        let rows =
+            list_records(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
         let none = expired_before(&rows, 0);
         assert!(none.is_empty());
         let all = expired_before(&rows, i64::MAX);
@@ -165,9 +183,17 @@ mod tests {
         let rows = list_records(&s, &ctx(&[Permission::AuthSessionsRead])).unwrap();
         if let Some(first) = rows.first() {
             let id = first.session_id.clone();
-            assert!(detail(&s, &ctx(&[Permission::AuthSessionsRead]), &id).unwrap().is_some());
+            assert!(
+                detail(&s, &ctx(&[Permission::AuthSessionsRead]), &id)
+                    .unwrap()
+                    .is_some()
+            );
         }
-        assert!(detail(&s, &ctx(&[Permission::AuthSessionsRead]), "no-such").unwrap().is_none());
+        assert!(
+            detail(&s, &ctx(&[Permission::AuthSessionsRead]), "no-such")
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

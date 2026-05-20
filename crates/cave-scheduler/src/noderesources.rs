@@ -90,23 +90,38 @@ pub struct ExtendedResourcesState {
 
 impl ExtendedResourcesState {
     pub fn set_capacity(&mut self, node: &str, resource: &str, qty: u64) {
-        self.capacity.entry(node.into()).or_default().insert(resource.into(), qty);
+        self.capacity
+            .entry(node.into())
+            .or_default()
+            .insert(resource.into(), qty);
     }
 
     pub fn set_allocated(&mut self, node: &str, resource: &str, qty: u64) {
-        self.allocated.entry(node.into()).or_default().insert(resource.into(), qty);
+        self.allocated
+            .entry(node.into())
+            .or_default()
+            .insert(resource.into(), qty);
     }
 
     pub fn capacity_of(&self, node: &str, resource: &str) -> u64 {
-        self.capacity.get(node).and_then(|m| m.get(resource)).copied().unwrap_or(0)
+        self.capacity
+            .get(node)
+            .and_then(|m| m.get(resource))
+            .copied()
+            .unwrap_or(0)
     }
 
     pub fn allocated_of(&self, node: &str, resource: &str) -> u64 {
-        self.allocated.get(node).and_then(|m| m.get(resource)).copied().unwrap_or(0)
+        self.allocated
+            .get(node)
+            .and_then(|m| m.get(resource))
+            .copied()
+            .unwrap_or(0)
     }
 
     pub fn free_of(&self, node: &str, resource: &str) -> u64 {
-        self.capacity_of(node, resource).saturating_sub(self.allocated_of(node, resource))
+        self.capacity_of(node, resource)
+            .saturating_sub(self.allocated_of(node, resource))
     }
 }
 
@@ -118,7 +133,10 @@ pub struct NodeResourcesFit {
 
 impl NodeResourcesFit {
     pub fn new(args: NodeResourcesFitArgs) -> Self {
-        Self { args, extended: ExtendedResourcesState::default() }
+        Self {
+            args,
+            extended: ExtendedResourcesState::default(),
+        }
     }
 
     pub fn with_extended(mut self, ext: ExtendedResourcesState) -> Self {
@@ -133,19 +151,27 @@ impl NodeResourcesFit {
         for group in &self.args.ignored_resource_groups {
             // Group is "example.com" → resource "example.com/foo" matches.
             if let Some(rest) = name.strip_prefix(group) {
-                if rest.starts_with('/') { return true; }
+                if rest.starts_with('/') {
+                    return true;
+                }
             }
         }
         false
     }
 
     fn weight(&self, resource: &str) -> u64 {
-        self.args.resource_weights.get(resource).copied().unwrap_or(1)
+        self.args
+            .resource_weights
+            .get(resource)
+            .copied()
+            .unwrap_or(1)
     }
 }
 
 impl FilterPlugin for NodeResourcesFit {
-    fn name(&self) -> &str { "NodeResourcesFit" }
+    fn name(&self) -> &str {
+        "NodeResourcesFit"
+    }
 
     fn filter(&self, pod: &Pod, node: &Node, _: &ClusterSnapshot) -> Status {
         let allocatable = &node.allocatable;
@@ -160,34 +186,51 @@ impl FilterPlugin for NodeResourcesFit {
         let req = &pod.spec.resources;
 
         if !self.is_ignored("cpu") {
-            let cpu_free = allocatable.cpu_millicores.saturating_sub(allocated.cpu_millicores);
+            let cpu_free = allocatable
+                .cpu_millicores
+                .saturating_sub(allocated.cpu_millicores);
             if cpu_free < req.cpu_millicores {
                 return Status::unschedulable(
                     "NodeResourcesFit",
-                    format!("insufficient cpu: requested {} > free {}", req.cpu_millicores, cpu_free),
+                    format!(
+                        "insufficient cpu: requested {} > free {}",
+                        req.cpu_millicores, cpu_free
+                    ),
                 );
             }
         }
         if !self.is_ignored("memory") {
-            let mem_free = allocatable.memory_bytes.saturating_sub(allocated.memory_bytes);
+            let mem_free = allocatable
+                .memory_bytes
+                .saturating_sub(allocated.memory_bytes);
             if mem_free < req.memory_bytes {
                 return Status::unschedulable(
                     "NodeResourcesFit",
-                    format!("insufficient memory: requested {} > free {}", req.memory_bytes, mem_free),
+                    format!(
+                        "insufficient memory: requested {} > free {}",
+                        req.memory_bytes, mem_free
+                    ),
                 );
             }
         }
         if !self.is_ignored("ephemeral-storage") {
-            let eph_free = allocatable.ephemeral_storage_bytes.saturating_sub(allocated.ephemeral_storage_bytes);
+            let eph_free = allocatable
+                .ephemeral_storage_bytes
+                .saturating_sub(allocated.ephemeral_storage_bytes);
             if eph_free < req.ephemeral_storage_bytes {
                 return Status::unschedulable(
                     "NodeResourcesFit",
-                    format!("insufficient ephemeral storage: requested {} > free {}", req.ephemeral_storage_bytes, eph_free),
+                    format!(
+                        "insufficient ephemeral storage: requested {} > free {}",
+                        req.ephemeral_storage_bytes, eph_free
+                    ),
                 );
             }
         }
         for (name, qty) in &req.extended {
-            if self.is_ignored(name) { continue; }
+            if self.is_ignored(name) {
+                continue;
+            }
             let free = self.extended.free_of(&node.name, name);
             if free < *qty {
                 return Status::unschedulable(
@@ -201,7 +244,9 @@ impl FilterPlugin for NodeResourcesFit {
 }
 
 impl ScorePlugin for NodeResourcesFit {
-    fn name(&self) -> &str { "NodeResourcesFit" }
+    fn name(&self) -> &str {
+        "NodeResourcesFit"
+    }
 
     fn score(&self, pod: &Pod, node: &Node, _: &ClusterSnapshot) -> i64 {
         // Per upstream: score is a weighted average of per-resource utilisation
@@ -210,8 +255,12 @@ impl ScorePlugin for NodeResourcesFit {
         let mut weight_sum: u64 = 0;
 
         let mut consider = |name: &str, requested: u64, capacity: u64| {
-            if self.is_ignored(name) { return; }
-            if capacity == 0 { return; }
+            if self.is_ignored(name) {
+                return;
+            }
+            if capacity == 0 {
+                return;
+            }
             let w = self.weight(name);
             let utilisation_pct = (requested.saturating_mul(100) / capacity).min(100) as i64;
             let s = match &self.args.scoring_strategy {
@@ -229,11 +278,16 @@ impl ScorePlugin for NodeResourcesFit {
         // the node (matches upstream "requested = existing + new pod").
         let cpu_req = pod.spec.resources.cpu_millicores + node.allocated.cpu_millicores;
         let mem_req = pod.spec.resources.memory_bytes + node.allocated.memory_bytes;
-        let eph_req = pod.spec.resources.ephemeral_storage_bytes + node.allocated.ephemeral_storage_bytes;
+        let eph_req =
+            pod.spec.resources.ephemeral_storage_bytes + node.allocated.ephemeral_storage_bytes;
 
         consider("cpu", cpu_req, node.allocatable.cpu_millicores);
         consider("memory", mem_req, node.allocatable.memory_bytes);
-        consider("ephemeral-storage", eph_req, node.allocatable.ephemeral_storage_bytes);
+        consider(
+            "ephemeral-storage",
+            eph_req,
+            node.allocatable.ephemeral_storage_bytes,
+        );
 
         for (name, qty) in &pod.spec.resources.extended {
             let cap = self.extended.capacity_of(&node.name, name);
@@ -241,15 +295,23 @@ impl ScorePlugin for NodeResourcesFit {
             consider(name, *qty + used, cap);
         }
 
-        if weight_sum == 0 { return 0; }
+        if weight_sum == 0 {
+            return 0;
+        }
         sum / weight_sum as i64
     }
 }
 
 fn interpolate_shape(shape: &[(i64, i64)], x: i64) -> i64 {
-    if shape.is_empty() { return 0; }
-    if x <= shape[0].0 { return shape[0].1; }
-    if x >= shape[shape.len() - 1].0 { return shape[shape.len() - 1].1; }
+    if shape.is_empty() {
+        return 0;
+    }
+    if x <= shape[0].0 {
+        return shape[0].1;
+    }
+    if x >= shape[shape.len() - 1].0 {
+        return shape[shape.len() - 1].1;
+    }
     for w in shape.windows(2) {
         let (x0, y0) = w[0];
         let (x1, y1) = w[1];
@@ -273,16 +335,22 @@ pub struct NodeResourcesBalancedAllocation {
 
 impl NodeResourcesBalancedAllocation {
     pub fn new() -> Self {
-        Self { args: NodeResourcesFitArgs::default() }
+        Self {
+            args: NodeResourcesFitArgs::default(),
+        }
     }
 }
 
 impl Default for NodeResourcesBalancedAllocation {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ScorePlugin for NodeResourcesBalancedAllocation {
-    fn name(&self) -> &str { "NodeResourcesBalancedAllocation" }
+    fn name(&self) -> &str {
+        "NodeResourcesBalancedAllocation"
+    }
     fn score(&self, pod: &Pod, node: &Node, _: &ClusterSnapshot) -> i64 {
         let cap_cpu = node.allocatable.cpu_millicores.max(1);
         let cap_mem = node.allocatable.memory_bytes.max(1);
@@ -307,23 +375,45 @@ mod tests {
 
     fn n(name: &str, cpu: u64, mem: u64, eph: u64, pods: u64) -> Node {
         Node {
-            name: name.into(), uid: Uuid::new_v4(), status: NodeStatus::Ready,
-            capacity: ResourceCapacity { cpu_millicores: cpu, memory_bytes: mem, pods, ephemeral_storage_bytes: eph },
-            allocatable: ResourceCapacity { cpu_millicores: cpu, memory_bytes: mem, pods, ephemeral_storage_bytes: eph },
+            name: name.into(),
+            uid: Uuid::new_v4(),
+            status: NodeStatus::Ready,
+            capacity: ResourceCapacity {
+                cpu_millicores: cpu,
+                memory_bytes: mem,
+                pods,
+                ephemeral_storage_bytes: eph,
+            },
+            allocatable: ResourceCapacity {
+                cpu_millicores: cpu,
+                memory_bytes: mem,
+                pods,
+                ephemeral_storage_bytes: eph,
+            },
             allocated: ResourceCapacity::default(),
-            labels: HashMap::new(), taints: vec![], conditions: vec![],
-            registered_at: Utc::now(), last_heartbeat: Utc::now(),
+            labels: HashMap::new(),
+            taints: vec![],
+            conditions: vec![],
+            registered_at: Utc::now(),
+            last_heartbeat: Utc::now(),
         }
     }
 
     fn pod_req(cpu: u64, mem: u64) -> Pod {
         let mut p = Pod::new("t", "ns", "p");
-        p.spec.resources = ResourceRequest { cpu_millicores: cpu, memory_bytes: mem, ..Default::default() };
+        p.spec.resources = ResourceRequest {
+            cpu_millicores: cpu,
+            memory_bytes: mem,
+            ..Default::default()
+        };
         p
     }
 
     fn empty_snap() -> ClusterSnapshot {
-        ClusterSnapshot { nodes: vec![], pods_by_node: HashMap::new() }
+        ClusterSnapshot {
+            nodes: vec![],
+            pods_by_node: HashMap::new(),
+        }
     }
 
     // ─── Filter ───────────────────────────────────────────────────────────
@@ -332,7 +422,9 @@ mod tests {
     fn filter_passes_when_resources_fit() {
         let plug = NodeResourcesFit::new(NodeResourcesFitArgs::default());
         let p = pod_req(500, 1024);
-        assert!(plug.filter(&p, &n("a", 4000, 8192, 0, 110), &empty_snap()).is_success());
+        assert!(plug
+            .filter(&p, &n("a", 4000, 8192, 0, 110), &empty_snap())
+            .is_success());
     }
 
     #[test]
@@ -416,7 +508,10 @@ mod tests {
         let plug = NodeResourcesFit::new(args);
         let node = n("a", 4000, 8192, 0, 110);
         let mut p = pod_req(0, 0);
-        p.spec.resources.extended.insert("nvidia.com/gpu".into(), 100);
+        p.spec
+            .resources
+            .extended
+            .insert("nvidia.com/gpu".into(), 100);
         // Plugin has no capacity for the resource but it's ignored → success.
         assert!(plug.filter(&p, &node, &empty_snap()).is_success());
     }
@@ -428,11 +523,17 @@ mod tests {
         let plug = NodeResourcesFit::new(args);
         let node = n("a", 4000, 8192, 0, 110);
         let mut p = pod_req(0, 0);
-        p.spec.resources.extended.insert("example.com/widget".into(), 5);
+        p.spec
+            .resources
+            .extended
+            .insert("example.com/widget".into(), 5);
         assert!(plug.filter(&p, &node, &empty_snap()).is_success());
         // Other groups still checked.
         let mut p2 = pod_req(0, 0);
-        p2.spec.resources.extended.insert("other.com/widget".into(), 5);
+        p2.spec
+            .resources
+            .extended
+            .insert("other.com/widget".into(), 5);
         assert!(plug.filter(&p2, &node, &empty_snap()).is_rejected());
     }
 
@@ -441,7 +542,8 @@ mod tests {
     #[test]
     fn score_least_allocated_prefers_more_free() {
         let plug = NodeResourcesFit::new(NodeResourcesFitArgs::default());
-        let mut a = n("a", 4000, 8192, 0, 110); a.allocated.cpu_millicores = 3500;
+        let mut a = n("a", 4000, 8192, 0, 110);
+        a.allocated.cpu_millicores = 3500;
         let b = n("b", 4000, 8192, 0, 110); // empty
         let p = pod_req(100, 0);
         assert!(plug.score(&p, &b, &empty_snap()) > plug.score(&p, &a, &empty_snap()));
@@ -452,7 +554,8 @@ mod tests {
         let mut args = NodeResourcesFitArgs::default();
         args.scoring_strategy = ScoringStrategyType::MostAllocated;
         let plug = NodeResourcesFit::new(args);
-        let mut a = n("a", 4000, 8192, 0, 110); a.allocated.cpu_millicores = 3500;
+        let mut a = n("a", 4000, 8192, 0, 110);
+        a.allocated.cpu_millicores = 3500;
         let b = n("b", 4000, 8192, 0, 110);
         let p = pod_req(100, 0);
         assert!(plug.score(&p, &a, &empty_snap()) > plug.score(&p, &b, &empty_snap()));
@@ -473,8 +576,12 @@ mod tests {
         let mut full_node = n("c", 4000, 8192, 0, 110);
         full_node.allocated.cpu_millicores = 4000;
         let p = pod_req(0, 0);
-        assert!(plug.score(&p, &half_node, &empty_snap()) > plug.score(&p, &empty_node, &empty_snap()));
-        assert!(plug.score(&p, &half_node, &empty_snap()) > plug.score(&p, &full_node, &empty_snap()));
+        assert!(
+            plug.score(&p, &half_node, &empty_snap()) > plug.score(&p, &empty_node, &empty_snap())
+        );
+        assert!(
+            plug.score(&p, &half_node, &empty_snap()) > plug.score(&p, &full_node, &empty_snap())
+        );
     }
 
     #[test]
@@ -484,7 +591,8 @@ mod tests {
         args.resource_weights.clear();
         args.resource_weights.insert("memory".into(), 10);
         let plug = NodeResourcesFit::new(args);
-        let mut a = n("a", 4000, 8192, 0, 110); a.allocated.memory_bytes = 8000;
+        let mut a = n("a", 4000, 8192, 0, 110);
+        a.allocated.memory_bytes = 8000;
         let b = n("b", 4000, 8192, 0, 110); // empty memory
         let p = pod_req(0, 0);
         let sb = plug.score(&p, &b, &empty_snap());
@@ -592,12 +700,25 @@ mod tests {
 
     #[test]
     fn fit_plugin_name() {
-        assert_eq!(<NodeResourcesFit as FilterPlugin>::name(&NodeResourcesFit::new(NodeResourcesFitArgs::default())), "NodeResourcesFit");
-        assert_eq!(<NodeResourcesFit as ScorePlugin>::name(&NodeResourcesFit::new(NodeResourcesFitArgs::default())), "NodeResourcesFit");
+        assert_eq!(
+            <NodeResourcesFit as FilterPlugin>::name(&NodeResourcesFit::new(
+                NodeResourcesFitArgs::default()
+            )),
+            "NodeResourcesFit"
+        );
+        assert_eq!(
+            <NodeResourcesFit as ScorePlugin>::name(&NodeResourcesFit::new(
+                NodeResourcesFitArgs::default()
+            )),
+            "NodeResourcesFit"
+        );
     }
 
     #[test]
     fn balanced_plugin_name() {
-        assert_eq!(NodeResourcesBalancedAllocation::new().name(), "NodeResourcesBalancedAllocation");
+        assert_eq!(
+            NodeResourcesBalancedAllocation::new().name(),
+            "NodeResourcesBalancedAllocation"
+        );
     }
 }

@@ -78,26 +78,43 @@ impl GatewayRouter {
         req.model = model;
 
         // Rate limit (estimate token cost from messages length)
-        let estimated_tokens: u32 = req.messages.iter()
+        let estimated_tokens: u32 = req
+            .messages
+            .iter()
             .filter_map(|m| m.content.as_text())
             .map(|t| crate::cost::estimate_tokens(t))
             .sum();
 
         if let Err(e) = self.rate_limiter.check(consumer, estimated_tokens) {
-            self.logger.log_error(consumer, &provider_name, &req.model, 0, LogStatus::RateLimited, &e.to_string());
+            self.logger.log_error(
+                consumer,
+                &provider_name,
+                &req.model,
+                0,
+                LogStatus::RateLimited,
+                &e.to_string(),
+            );
             return Err(e);
         }
 
         // Guardrail input check
         if let Err(e) = self.guardrails.check_input(&req) {
-            self.logger.log_error(consumer, &provider_name, &req.model, 0, LogStatus::GuardrailBlocked, &e.to_string());
+            self.logger.log_error(
+                consumer,
+                &provider_name,
+                &req.model,
+                0,
+                LogStatus::GuardrailBlocked,
+                &e.to_string(),
+            );
             return Err(e);
         }
 
         // Cache check
         if let Some(cached) = self.cache.get(&req) {
             let latency = start.elapsed().as_millis() as u64;
-            self.logger.log_success(consumer, &provider_name, &req, &cached, latency, true);
+            self.logger
+                .log_success(consumer, &provider_name, &req, &cached, latency, true);
             return Ok(cached);
         }
 
@@ -107,19 +124,33 @@ impl GatewayRouter {
         // Guardrail output check
         if let Err(e) = self.guardrails.check_output(&resp) {
             let latency = start.elapsed().as_millis() as u64;
-            self.logger.log_error(consumer, &provider_name, &req.model, latency, LogStatus::GuardrailBlocked, &e.to_string());
+            self.logger.log_error(
+                consumer,
+                &provider_name,
+                &req.model,
+                latency,
+                LogStatus::GuardrailBlocked,
+                &e.to_string(),
+            );
             return Err(e);
         }
 
         // Record cost
-        self.cost_tracker.record(consumer, &req.model, &provider_name, resp.usage.prompt_tokens, resp.usage.completion_tokens);
+        self.cost_tracker.record(
+            consumer,
+            &req.model,
+            &provider_name,
+            resp.usage.prompt_tokens,
+            resp.usage.completion_tokens,
+        );
 
         // Cache store
         self.cache.insert(&req, resp.clone());
 
         // Log
         let latency = start.elapsed().as_millis() as u64;
-        self.logger.log_success(consumer, &provider_name, &req, &resp, latency, false);
+        self.logger
+            .log_success(consumer, &provider_name, &req, &resp, latency, false);
 
         Ok(resp)
     }
@@ -131,7 +162,8 @@ impl GatewayRouter {
             // Try to infer provider from model name
             let provider = if model.starts_with("claude") {
                 "anthropic"
-            } else if model.starts_with("gpt") || model.starts_with("o1") || model.starts_with("o3") {
+            } else if model.starts_with("gpt") || model.starts_with("o1") || model.starts_with("o3")
+            {
                 "openai"
             } else {
                 "local"
@@ -140,10 +172,18 @@ impl GatewayRouter {
         }
     }
 
-    async fn dispatch(&self, consumer: &str, preferred_provider: &str, req: &ChatCompletionRequest) -> GatewayResult<ChatCompletionResponse> {
+    async fn dispatch(
+        &self,
+        consumer: &str,
+        preferred_provider: &str,
+        req: &ChatCompletionRequest,
+    ) -> GatewayResult<ChatCompletionResponse> {
         match &self.strategy {
             RoutingStrategy::Fixed { provider } => {
-                let name = if preferred_provider == "local" || preferred_provider == "openai" || preferred_provider == "anthropic" {
+                let name = if preferred_provider == "local"
+                    || preferred_provider == "openai"
+                    || preferred_provider == "anthropic"
+                {
                     preferred_provider
                 } else {
                     provider.as_str()
@@ -167,7 +207,10 @@ impl GatewayRouter {
                 if providers.is_empty() {
                     return Err(GatewayError::NoProvidersAvailable);
                 }
-                let idx = self.rr_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % providers.len();
+                let idx = self
+                    .rr_counter
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                    % providers.len();
                 self.call_provider(&providers[idx], req).await
             }
             RoutingStrategy::Weighted { providers } => {
@@ -176,20 +219,37 @@ impl GatewayRouter {
                 }
                 // Simple weighted selection using modulo on counter
                 let total: u32 = providers.iter().map(|(_, w)| w).sum();
-                let idx = self.rr_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed) as u32 % total;
+                let idx = self
+                    .rr_counter
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                    as u32
+                    % total;
                 let mut cumulative = 0u32;
-                let selected = providers.iter().find(|(_, w)| {
-                    cumulative += w;
-                    cumulative > idx
-                }).map(|(name, _)| name.as_str()).unwrap_or(&providers[0].0);
+                let selected = providers
+                    .iter()
+                    .find(|(_, w)| {
+                        cumulative += w;
+                        cumulative > idx
+                    })
+                    .map(|(name, _)| name.as_str())
+                    .unwrap_or(&providers[0].0);
                 self.call_provider(selected, req).await
             }
         }
     }
 
-    async fn call_provider(&self, name: &str, req: &ChatCompletionRequest) -> GatewayResult<ChatCompletionResponse> {
-        let provider = self.providers.get(name)
-            .ok_or_else(|| GatewayError::ProviderUnavailable { provider: name.to_string(), reason: "not registered".into() })?;
+    async fn call_provider(
+        &self,
+        name: &str,
+        req: &ChatCompletionRequest,
+    ) -> GatewayResult<ChatCompletionResponse> {
+        let provider =
+            self.providers
+                .get(name)
+                .ok_or_else(|| GatewayError::ProviderUnavailable {
+                    provider: name.to_string(),
+                    reason: "not registered".into(),
+                })?;
         provider.complete(req).await
     }
 
@@ -201,24 +261,40 @@ impl GatewayRouter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::provider::{MockProvider, ProviderRegistry};
     use crate::openai::ChatMessage;
+    use crate::provider::{MockProvider, ProviderRegistry};
 
     fn make_router() -> GatewayRouter {
         let registry = Arc::new(ProviderRegistry::new());
         registry.register(Arc::new(MockProvider::new("mock")));
         let aliases = Arc::new(AliasRegistry::new());
-        GatewayRouter::new(registry, aliases, RoutingStrategy::Fixed { provider: "mock".into() })
+        GatewayRouter::new(
+            registry,
+            aliases,
+            RoutingStrategy::Fixed {
+                provider: "mock".into(),
+            },
+        )
     }
 
     fn make_req() -> ChatCompletionRequest {
         ChatCompletionRequest {
             model: "mock-model".into(),
             messages: vec![ChatMessage::user("hello")],
-            temperature: None, top_p: None, max_tokens: None, stream: None,
-            stop: None, presence_penalty: None, frequency_penalty: None,
-            n: None, user: None, tools: None, tool_choice: None,
-            response_format: None, seed: None, logprobs: None,
+            temperature: None,
+            top_p: None,
+            max_tokens: None,
+            stream: None,
+            stop: None,
+            presence_penalty: None,
+            frequency_penalty: None,
+            n: None,
+            user: None,
+            tools: None,
+            tool_choice: None,
+            response_format: None,
+            seed: None,
+            logprobs: None,
         }
     }
 
@@ -250,7 +326,9 @@ mod tests {
         let router = GatewayRouter::new(
             registry,
             aliases,
-            RoutingStrategy::Fallback { providers: vec!["broken".into(), "mock".into()] },
+            RoutingStrategy::Fallback {
+                providers: vec!["broken".into(), "mock".into()],
+            },
         );
         let resp = router.complete("user-1", make_req()).await.unwrap();
         assert!(!resp.choices.is_empty());

@@ -162,9 +162,7 @@ impl CatalogStore for MemoryCatalogStore {
     async fn add_entities(&self, entities: Vec<Entity>) -> Result<(), CatalogStoreError> {
         for entity in entities {
             let id = Self::entity_id(&entity);
-            self.storage
-                .put(COL_ENTITIES, &id, &entity)
-                .await?;
+            self.storage.put(COL_ENTITIES, &id, &entity).await?;
         }
         Ok(())
     }
@@ -191,7 +189,10 @@ impl CatalogStore for MemoryCatalogStore {
         filter: &EntityFilter,
     ) -> Result<Vec<Entity>, CatalogStoreError> {
         let all: Vec<Entity> = self.storage.list(COL_ENTITIES).await?;
-        Ok(all.into_iter().filter(|e| entity_matches(e, filter)).collect())
+        Ok(all
+            .into_iter()
+            .filter(|e| entity_matches(e, filter))
+            .collect())
     }
 
     async fn entity_by_ref(
@@ -301,7 +302,10 @@ impl CatalogStore for PostgresCatalogStore {
         filter: &EntityFilter,
     ) -> Result<Vec<Entity>, CatalogStoreError> {
         let all: Vec<Entity> = self.storage.list(COL_ENTITIES).await?;
-        Ok(all.into_iter().filter(|e| entity_matches(e, filter)).collect())
+        Ok(all
+            .into_iter()
+            .filter(|e| entity_matches(e, filter))
+            .collect())
     }
 
     async fn entity_by_ref(
@@ -551,13 +555,7 @@ mod tests {
         store
             .add_entities(vec![
                 make_entity_with_labels("uid-1", "Component", "default", "svc-a", labels_match),
-                make_entity_with_labels(
-                    "uid-2",
-                    "Component",
-                    "default",
-                    "svc-b",
-                    labels_no_match,
-                ),
+                make_entity_with_labels("uid-2", "Component", "default", "svc-b", labels_no_match),
             ])
             .await
             .unwrap();
@@ -675,10 +673,7 @@ mod tests {
             .await
             .unwrap();
         assert!(found.is_some());
-        assert_eq!(
-            found.unwrap().entity_ref,
-            "component:default/my-svc"
-        );
+        assert_eq!(found.unwrap().entity_ref, "component:default/my-svc");
     }
 
     /// Test 15: upsert same ref twice, second write wins.

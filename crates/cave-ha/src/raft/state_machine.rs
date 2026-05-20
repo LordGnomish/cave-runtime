@@ -45,7 +45,9 @@ pub struct KvStateMachine {
 
 impl KvStateMachine {
     pub fn new() -> Self {
-        Self { inner: tokio::sync::RwLock::new(std::collections::HashMap::new()) }
+        Self {
+            inner: tokio::sync::RwLock::new(std::collections::HashMap::new()),
+        }
     }
 
     pub async fn get(&self, key: &str) -> Option<String> {
@@ -54,7 +56,9 @@ impl KvStateMachine {
 }
 
 impl Default for KvStateMachine {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -73,16 +77,19 @@ impl StateMachine for KvStateMachine {
             .map_err(|e| ConsensusError::Storage(format!("kv decode: {e}")))?;
         let mut store = self.inner.write().await;
         match cmd {
-            KvCommand::Set { key, value } => { store.insert(key, value); }
-            KvCommand::Delete { key } => { store.remove(&key); }
+            KvCommand::Set { key, value } => {
+                store.insert(key, value);
+            }
+            KvCommand::Delete { key } => {
+                store.remove(&key);
+            }
         }
         Ok(vec![])
     }
 
     async fn snapshot(&self) -> ConsensusResult<Vec<u8>> {
         let store = self.inner.read().await;
-        serde_json::to_vec(&*store)
-            .map_err(|e| ConsensusError::Storage(format!("kv encode: {e}")))
+        serde_json::to_vec(&*store).map_err(|e| ConsensusError::Storage(format!("kv encode: {e}")))
     }
 
     async fn restore(&self, data: &[u8]) -> ConsensusResult<()> {

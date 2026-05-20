@@ -9,7 +9,7 @@
 
 use anyhow::{Context, Result};
 use cave_local_llm::{
-    daemon::{DaemonConfig, Daemon},
+    daemon::{Daemon, DaemonConfig},
     metrics::DaemonMetrics,
 };
 use clap::{Parser, Subcommand};
@@ -65,15 +65,20 @@ async fn main() {
 }
 
 async fn run(cli: Cli) -> Result<()> {
-    let workspace_root = cli
-        .workspace_root
-        .canonicalize()
-        .with_context(|| format!("workspace root '{}' not found", cli.workspace_root.display()))?;
+    let workspace_root = cli.workspace_root.canonicalize().with_context(|| {
+        format!(
+            "workspace root '{}' not found",
+            cli.workspace_root.display()
+        )
+    })?;
 
     let mut cfg = DaemonConfig::new(&workspace_root);
 
     match cli.command {
-        Commands::Start { tick_secs, test_timeout_secs } => {
+        Commands::Start {
+            tick_secs,
+            test_timeout_secs,
+        } => {
             cfg.tick_interval = std::time::Duration::from_secs(tick_secs);
             cfg.cargo_test_timeout = std::time::Duration::from_secs(test_timeout_secs);
 
@@ -83,8 +88,9 @@ async fn run(cli: Cli) -> Result<()> {
             daemon.run().await?;
         }
         Commands::Stop => {
-            std::fs::write(&cfg.stop_signal_path, b"stop")
-                .with_context(|| format!("writing stop signal to {}", cfg.stop_signal_path.display()))?;
+            std::fs::write(&cfg.stop_signal_path, b"stop").with_context(|| {
+                format!("writing stop signal to {}", cfg.stop_signal_path.display())
+            })?;
             println!("stop signal written → {}", cfg.stop_signal_path.display());
         }
         Commands::Status => {

@@ -98,7 +98,8 @@ impl ProbeSpec {
             ));
         }
         match &self.action {
-            ProbeAction::HttpGet { port, .. } | ProbeAction::TcpSocket { port, .. }
+            ProbeAction::HttpGet { port, .. }
+            | ProbeAction::TcpSocket { port, .. }
             | ProbeAction::Grpc { port, .. } => {
                 if *port == 0 {
                     return Err("port must be in 1..=65535".into());
@@ -161,7 +162,10 @@ impl ProbeSpec {
     pub fn grpc(port: u16) -> Self {
         Self {
             kind: ProbeKind::Liveness,
-            action: ProbeAction::Grpc { port, service: None },
+            action: ProbeAction::Grpc {
+                port,
+                service: None,
+            },
             initial_delay_seconds: 0,
             period_seconds: 10,
             timeout_seconds: 1,
@@ -445,10 +449,22 @@ mod tests {
 
     #[test]
     fn grpc_serving_success_others_fail() {
-        assert_eq!(grpc_status_to_result(GrpcServingStatus::Serving), ProbeResult::Success);
-        assert_eq!(grpc_status_to_result(GrpcServingStatus::NotServing), ProbeResult::Failure);
-        assert_eq!(grpc_status_to_result(GrpcServingStatus::ServiceUnknown), ProbeResult::Failure);
-        assert_eq!(grpc_status_to_result(GrpcServingStatus::Unknown), ProbeResult::Unknown);
+        assert_eq!(
+            grpc_status_to_result(GrpcServingStatus::Serving),
+            ProbeResult::Success
+        );
+        assert_eq!(
+            grpc_status_to_result(GrpcServingStatus::NotServing),
+            ProbeResult::Failure
+        );
+        assert_eq!(
+            grpc_status_to_result(GrpcServingStatus::ServiceUnknown),
+            ProbeResult::Failure
+        );
+        assert_eq!(
+            grpc_status_to_result(GrpcServingStatus::Unknown),
+            ProbeResult::Unknown
+        );
     }
 
     #[test]
@@ -693,7 +709,8 @@ mod tests {
         let spec = ProbeSpec::http_get(80, "/h");
         m.register("p", "c", spec, now()).unwrap();
         for _ in 0..2 {
-            m.record_sample("p", "c", ProbeKind::Liveness, ProbeResult::Failure, now()).unwrap();
+            m.record_sample("p", "c", ProbeKind::Liveness, ProbeResult::Failure, now())
+                .unwrap();
         }
         let act = m
             .record_sample("p", "c", ProbeKind::Liveness, ProbeResult::Failure, now())
@@ -721,7 +738,8 @@ mod tests {
         startup.kind = ProbeKind::Startup;
         m.register("p", "c", startup, now()).unwrap();
         assert!(!m.liveness_should_run("p", "c"));
-        m.record_sample("p", "c", ProbeKind::Startup, ProbeResult::Success, now()).unwrap();
+        m.record_sample("p", "c", ProbeKind::Startup, ProbeResult::Success, now())
+            .unwrap();
         assert!(m.liveness_should_run("p", "c"));
     }
 
@@ -754,7 +772,8 @@ mod tests {
         let spec = ProbeSpec::http_get(80, "/h");
         m.register("p", "c", spec, now()).unwrap();
         for _ in 0..3 {
-            m.record_sample("p", "c", ProbeKind::Liveness, ProbeResult::Unknown, now()).unwrap();
+            m.record_sample("p", "c", ProbeKind::Liveness, ProbeResult::Unknown, now())
+                .unwrap();
         }
         let (_, s) = m.snapshot("p", "c", ProbeKind::Liveness).unwrap();
         assert_eq!(s.last_outcome, ProbeOutcome::Failure);
@@ -770,7 +789,11 @@ mod tests {
 
     #[test]
     fn http_action_carries_headers() {
-        if let ProbeAction::HttpGet { ref mut http_headers, .. } = ProbeSpec::http_get(80, "/h").action.clone() {
+        if let ProbeAction::HttpGet {
+            ref mut http_headers,
+            ..
+        } = ProbeSpec::http_get(80, "/h").action.clone()
+        {
             http_headers.push(("X-Token".into(), "abc".into()));
             assert_eq!(http_headers.len(), 1);
         }

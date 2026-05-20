@@ -7,8 +7,8 @@
 
 #[cfg(test)]
 mod tests {
-    use cave_status::models::{ComponentStatus, StatusComponent, StatusPage};
     use cave_status::engine::{compute_overall_status, count_by_status, has_issues};
+    use cave_status::models::{ComponentStatus, StatusComponent, StatusPage};
     use chrono::Utc;
     use uuid::Uuid;
 
@@ -26,9 +26,18 @@ mod tests {
     #[test]
     fn compute_overall_status_picks_worst_when_mixed() {
         let components = vec![
-            make_component("11111111-1111-1111-1111-111111111111", ComponentStatus::Operational),
-            make_component("22222222-2222-2222-2222-222222222222", ComponentStatus::DegradedPerformance),
-            make_component("33333333-3333-3333-3333-333333333333", ComponentStatus::MajorOutage),
+            make_component(
+                "11111111-1111-1111-1111-111111111111",
+                ComponentStatus::Operational,
+            ),
+            make_component(
+                "22222222-2222-2222-2222-222222222222",
+                ComponentStatus::DegradedPerformance,
+            ),
+            make_component(
+                "33333333-3333-3333-3333-333333333333",
+                ComponentStatus::MajorOutage,
+            ),
         ];
 
         let overall = compute_overall_status(&components);
@@ -45,18 +54,30 @@ mod tests {
     #[test]
     fn count_by_status_groups_correctly() {
         let components = vec![
-            make_component("11111111-1111-1111-1111-111111111111", ComponentStatus::Operational),
-            make_component("22222222-2222-2222-2222-222222222222", ComponentStatus::Operational),
-            make_component("33333333-3333-3333-3333-333333333333", ComponentStatus::DegradedPerformance),
-            make_component("44444444-4444-4444-4444-444444444444", ComponentStatus::MajorOutage),
+            make_component(
+                "11111111-1111-1111-1111-111111111111",
+                ComponentStatus::Operational,
+            ),
+            make_component(
+                "22222222-2222-2222-2222-222222222222",
+                ComponentStatus::Operational,
+            ),
+            make_component(
+                "33333333-3333-3333-3333-333333333333",
+                ComponentStatus::DegradedPerformance,
+            ),
+            make_component(
+                "44444444-4444-4444-4444-444444444444",
+                ComponentStatus::MajorOutage,
+            ),
         ];
 
         let counts = count_by_status(&components);
-        
+
         assert_eq!(counts.get("Operational"), Some(&2));
         assert_eq!(counts.get("DegradedPerformance"), Some(&1));
         assert_eq!(counts.get("MajorOutage"), Some(&1));
-        
+
         // Ensure no unexpected keys exist
         assert_eq!(counts.len(), 3);
     }
@@ -64,8 +85,14 @@ mod tests {
     #[test]
     fn has_issues_true_when_any_non_operational() {
         let components = vec![
-            make_component("11111111-1111-1111-1111-111111111111", ComponentStatus::Operational),
-            make_component("22222222-2222-2222-2222-222222222222", ComponentStatus::PartialOutage),
+            make_component(
+                "11111111-1111-1111-1111-111111111111",
+                ComponentStatus::Operational,
+            ),
+            make_component(
+                "22222222-2222-2222-2222-222222222222",
+                ComponentStatus::PartialOutage,
+            ),
         ];
 
         let page = StatusPage {
@@ -81,8 +108,14 @@ mod tests {
     #[test]
     fn has_issues_false_when_all_operational() {
         let components = vec![
-            make_component("11111111-1111-1111-1111-111111111111", ComponentStatus::Operational),
-            make_component("22222222-2222-2222-2222-222222222222", ComponentStatus::Operational),
+            make_component(
+                "11111111-1111-1111-1111-111111111111",
+                ComponentStatus::Operational,
+            ),
+            make_component(
+                "22222222-2222-2222-2222-222222222222",
+                ComponentStatus::Operational,
+            ),
         ];
 
         let page = StatusPage {

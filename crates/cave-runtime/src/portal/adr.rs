@@ -15,14 +15,14 @@
 use std::path::PathBuf;
 
 use axum::{
+    Json, Router,
     extract::Path,
     http::StatusCode,
     response::{Html, IntoResponse, Redirect, Response},
     routing::get,
-    Json, Router,
 };
 use cave_upstream::adr_links;
-use pulldown_cmark::{html as pd_html, Options, Parser};
+use pulldown_cmark::{Options, Parser, html as pd_html};
 use serde::Serialize;
 use serde_json::json;
 
@@ -230,18 +230,31 @@ fn extract_title(markdown: &str) -> Option<String> {
 fn classify(id: &str, title: &str) -> String {
     let lower = format!("{} {}", id.to_ascii_lowercase(), title.to_ascii_lowercase());
     let pick = |needles: &[&str]| -> bool { needles.iter().any(|n| lower.contains(n)) };
-    if pick(&["portal", "persona", "auth", "keycloak", "okta", "sso", "rbac", "abac"]) {
+    if pick(&[
+        "portal", "persona", "auth", "keycloak", "okta", "sso", "rbac", "abac",
+    ]) {
         return "Identity & Portal".into();
     }
-    if pick(&["mesh", "cilium", "istio", "kong", "gateway", "network", "dns", "cdn"]) {
+    if pick(&[
+        "mesh", "cilium", "istio", "kong", "gateway", "network", "dns", "cdn",
+    ]) {
         return "Networking".into();
     }
-    if pick(&["secrets", "vault", "openbao", "policy", "compliance", "tetragon", "trivy", "scan"]) {
+    if pick(&[
+        "secrets",
+        "vault",
+        "openbao",
+        "policy",
+        "compliance",
+        "tetragon",
+        "trivy",
+        "scan",
+    ]) {
         return "Security".into();
     }
     if pick(&[
-        "kafka", "stream", "postgres", "rdbms", "minio", "iceberg", "data", "valkey",
-        "qdrant", "search",
+        "kafka", "stream", "postgres", "rdbms", "minio", "iceberg", "data", "valkey", "qdrant",
+        "search",
     ]) {
         return "Data".into();
     }
@@ -251,10 +264,25 @@ fn classify(id: &str, title: &str) -> String {
     if pick(&["argo", "gitops", "ci", "pipeline", "deploy", "rollout"]) {
         return "GitOps & Delivery".into();
     }
-    if pick(&["cluster", "k8s", "kubernetes", "scheduler", "etcd", "talos", "kamaji"]) {
+    if pick(&[
+        "cluster",
+        "k8s",
+        "kubernetes",
+        "scheduler",
+        "etcd",
+        "talos",
+        "kamaji",
+    ]) {
         return "Kubernetes Core".into();
     }
-    if pick(&["observability", "prometheus", "grafana", "loki", "tempo", "telemetry"]) {
+    if pick(&[
+        "observability",
+        "prometheus",
+        "grafana",
+        "loki",
+        "tempo",
+        "telemetry",
+    ]) {
         return "Observability".into();
     }
     if pick(&["chaos", "backup", "uptime", "incident"]) {
@@ -347,7 +375,10 @@ mod tests {
             parse_id_from_filename("ADR-PORTAL-PERSONAS-001.md"),
             "ADR-PORTAL-PERSONAS-001"
         );
-        assert_eq!(parse_id_from_filename("ADR-MULTI-TENANT-001.md"), "ADR-MULTI-TENANT-001");
+        assert_eq!(
+            parse_id_from_filename("ADR-MULTI-TENANT-001.md"),
+            "ADR-MULTI-TENANT-001"
+        );
     }
 
     #[test]
@@ -359,11 +390,11 @@ mod tests {
     #[test]
     fn classifier_buckets_known_topics() {
         assert_eq!(classify("ADR-027", "Kong API Gateway"), "Networking");
-        assert_eq!(classify("ADR-006", "Keycloak Identity"), "Identity & Portal");
         assert_eq!(
-            classify("ADR-021", "Strimzi Kafka Operator"),
-            "Data"
+            classify("ADR-006", "Keycloak Identity"),
+            "Identity & Portal"
         );
+        assert_eq!(classify("ADR-021", "Strimzi Kafka Operator"), "Data");
         assert_eq!(classify("ADR-099", "random unrelated thing"), "General");
     }
 
@@ -426,7 +457,9 @@ mod tests {
         seed_adrs(&d);
         // SAFETY: guarded by ENV_GUARD above — only one test at a
         // time writes CAVE_WORKSPACE_ROOT.
-        unsafe { std::env::set_var("CAVE_WORKSPACE_ROOT", d.parent().unwrap()); }
+        unsafe {
+            std::env::set_var("CAVE_WORKSPACE_ROOT", d.parent().unwrap());
+        }
         // adr_dir() uses workspace_root()/docs/adr — recreate that layout
         let adr_actual = d.parent().unwrap().join("docs").join("adr");
         fs::create_dir_all(&adr_actual).unwrap();
@@ -436,7 +469,12 @@ mod tests {
         }
         let app = router_as_platform();
         let resp = app
-            .oneshot(Request::builder().uri("/api/adr").body(axum::body::Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/api/adr")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
@@ -454,7 +492,9 @@ mod tests {
         fs::create_dir_all(&adr_actual).unwrap();
         seed_adrs(&adr_actual);
         // SAFETY: guarded by ENV_GUARD.
-        unsafe { std::env::set_var("CAVE_WORKSPACE_ROOT", &d); }
+        unsafe {
+            std::env::set_var("CAVE_WORKSPACE_ROOT", &d);
+        }
         let app = router_as_platform();
         let resp = app
             .oneshot(
@@ -480,7 +520,9 @@ mod tests {
         let adr_actual = d.join("docs").join("adr");
         fs::create_dir_all(&adr_actual).unwrap();
         // SAFETY: guarded by ENV_GUARD.
-        unsafe { std::env::set_var("CAVE_WORKSPACE_ROOT", &d); }
+        unsafe {
+            std::env::set_var("CAVE_WORKSPACE_ROOT", &d);
+        }
         let app = router_as_platform();
         let resp = app
             .oneshot(

@@ -94,20 +94,50 @@ pub const ALLOW_LOCALHOST_POLICY: &str = "policy";
 /// `cilium-agent --help` style introspection.
 pub fn all_flag_names() -> Vec<&'static str> {
     let mut v: Vec<&'static str> = vec![
-        CONFIG_FILE, CONFIG_DIR, DEBUG_ARG, DEBUG_VERBOSE,
-        HIVE_START_TIMEOUT, HIVE_STOP_TIMEOUT, HIVE_LOG_THRESHOLD,
-        BPF_ROOT, CGROUP_ROOT, BPF_DISTRIBUTED_LRU,
-        DEVICES, FORCE_DEVICE_DETECTION, DIRECT_ROUTING_DEVICE,
-        IPV4_RANGE, IPV6_RANGE, IPV4_SERVICE_RANGE, IPV6_SERVICE_RANGE,
+        CONFIG_FILE,
+        CONFIG_DIR,
+        DEBUG_ARG,
+        DEBUG_VERBOSE,
+        HIVE_START_TIMEOUT,
+        HIVE_STOP_TIMEOUT,
+        HIVE_LOG_THRESHOLD,
+        BPF_ROOT,
+        CGROUP_ROOT,
+        BPF_DISTRIBUTED_LRU,
+        DEVICES,
+        FORCE_DEVICE_DETECTION,
+        DIRECT_ROUTING_DEVICE,
+        IPV4_RANGE,
+        IPV6_RANGE,
+        IPV4_SERVICE_RANGE,
+        IPV6_SERVICE_RANGE,
         IPV6_CLUSTER_ALLOC_CIDR_NAME,
-        ENABLE_K8S, K8S_API_SERVER, K8S_API_SERVER_URLS,
-        K8S_KUBE_CONFIG_PATH, K8S_SYNC_TIMEOUT_NAME, ANNOTATE_K8S_NODE,
-        ENABLE_POLICY, ENABLE_L7_PROXY, ENABLE_HOST_FIREWALL,
-        ENABLE_TRACING, ENABLE_GOPS, GOPS_PORT, CLUSTER_HEALTH_PORT,
-        ENCRYPT_INTERFACE, ENCRYPT_NODE, ENABLE_IPIP_TERMINATION,
-        ALLOW_ICMP_FRAG_NEEDED, ENABLE_UNREACHABLE_ROUTES,
-        FIXED_IDENTITY_MAPPING, FIXED_ZONE_MAPPING, LABELS, LABEL_PREFIX_FILE,
-        KVSTORE, KVSTORE_OPT, KEEP_CONFIG, ALLOCATOR_LIST_TIMEOUT_NAME,
+        ENABLE_K8S,
+        K8S_API_SERVER,
+        K8S_API_SERVER_URLS,
+        K8S_KUBE_CONFIG_PATH,
+        K8S_SYNC_TIMEOUT_NAME,
+        ANNOTATE_K8S_NODE,
+        ENABLE_POLICY,
+        ENABLE_L7_PROXY,
+        ENABLE_HOST_FIREWALL,
+        ENABLE_TRACING,
+        ENABLE_GOPS,
+        GOPS_PORT,
+        CLUSTER_HEALTH_PORT,
+        ENCRYPT_INTERFACE,
+        ENCRYPT_NODE,
+        ENABLE_IPIP_TERMINATION,
+        ALLOW_ICMP_FRAG_NEEDED,
+        ENABLE_UNREACHABLE_ROUTES,
+        FIXED_IDENTITY_MAPPING,
+        FIXED_ZONE_MAPPING,
+        LABELS,
+        LABEL_PREFIX_FILE,
+        KVSTORE,
+        KVSTORE_OPT,
+        KEEP_CONFIG,
+        ALLOCATOR_LIST_TIMEOUT_NAME,
         ALLOW_LOCALHOST,
     ];
     v.sort();
@@ -130,7 +160,8 @@ mod tests {
 
     #[test]
     fn all_flag_names_sorted() {
-        let (_c, _t) = cilium_test_ctx!("pkg/option/config.go", "AllFlags.Sorted", "tenant-opt-sort");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/option/config.go", "AllFlags.Sorted", "tenant-opt-sort");
         let v = all_flag_names();
         let mut s = v.clone();
         s.sort();
@@ -139,7 +170,11 @@ mod tests {
 
     #[test]
     fn no_duplicate_flag_names() {
-        let (_c, _t) = cilium_test_ctx!("pkg/option/config.go", "AllFlags.Distinct", "tenant-opt-dup");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/option/config.go",
+            "AllFlags.Distinct",
+            "tenant-opt-dup"
+        );
         let v = all_flag_names();
         let unique: std::collections::BTreeSet<&&str> = v.iter().collect();
         assert_eq!(v.len(), unique.len());
@@ -148,7 +183,12 @@ mod tests {
     #[test]
     fn k8s_flag_names_use_k8s_prefix_or_enable_k8s() {
         let (_c, _t) = cilium_test_ctx!("pkg/option/config.go", "Flags.K8s", "tenant-opt-k8s");
-        for f in [K8S_API_SERVER, K8S_API_SERVER_URLS, K8S_KUBE_CONFIG_PATH, K8S_SYNC_TIMEOUT_NAME] {
+        for f in [
+            K8S_API_SERVER,
+            K8S_API_SERVER_URLS,
+            K8S_KUBE_CONFIG_PATH,
+            K8S_SYNC_TIMEOUT_NAME,
+        ] {
             assert!(f.starts_with("k8s-"), "{} missing k8s- prefix", f);
         }
         assert_eq!(ENABLE_K8S, "enable-k8s");
@@ -157,9 +197,16 @@ mod tests {
     #[test]
     fn enable_flag_names_use_enable_prefix() {
         let (_c, _t) = cilium_test_ctx!("pkg/option/config.go", "Flags.Enable", "tenant-opt-en");
-        for f in [ENABLE_POLICY, ENABLE_L7_PROXY, ENABLE_HOST_FIREWALL,
-                  ENABLE_TRACING, ENABLE_GOPS, ENABLE_K8S,
-                  ENABLE_IPIP_TERMINATION, ENABLE_UNREACHABLE_ROUTES] {
+        for f in [
+            ENABLE_POLICY,
+            ENABLE_L7_PROXY,
+            ENABLE_HOST_FIREWALL,
+            ENABLE_TRACING,
+            ENABLE_GOPS,
+            ENABLE_K8S,
+            ENABLE_IPIP_TERMINATION,
+            ENABLE_UNREACHABLE_ROUTES,
+        ] {
             assert!(f.starts_with("enable-"), "{} missing enable- prefix", f);
         }
     }
@@ -175,7 +222,11 @@ mod tests {
 
     #[test]
     fn allow_localhost_enum_values() {
-        let (_c, _t) = cilium_test_ctx!("pkg/option/config.go", "Flags.AllowLocalhost", "tenant-opt-al");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/option/config.go",
+            "Flags.AllowLocalhost",
+            "tenant-opt-al"
+        );
         assert_eq!(ALLOW_LOCALHOST_AUTO, "auto");
         assert_eq!(ALLOW_LOCALHOST_ALWAYS, "always");
         assert_eq!(ALLOW_LOCALHOST_POLICY, "policy");
@@ -205,7 +256,11 @@ mod tests {
 
     #[test]
     fn cluster_health_port_default_constant() {
-        let (_c, _t) = cilium_test_ctx!("pkg/option/config.go", "Flags.ClusterHealth", "tenant-opt-ch");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/option/config.go",
+            "Flags.ClusterHealth",
+            "tenant-opt-ch"
+        );
         assert_eq!(CLUSTER_HEALTH_PORT, "cluster-health-port");
     }
 
@@ -213,7 +268,11 @@ mod tests {
     fn flag_names_kebab_case_only() {
         let (_c, _t) = cilium_test_ctx!("pkg/option/config.go", "Flags.KebabCase", "tenant-opt-kc");
         for f in all_flag_names() {
-            assert!(!f.contains('_'), "{} contains underscore (must be kebab-case)", f);
+            assert!(
+                !f.contains('_'),
+                "{} contains underscore (must be kebab-case)",
+                f
+            );
             assert_eq!(f.to_lowercase(), f, "{} not lowercase", f);
         }
     }

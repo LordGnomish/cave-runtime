@@ -20,8 +20,8 @@ pub fn list_pending(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<Vec<PendingPodRow>, SchedulerViewError> {
-    use crate::admin::state::scope;
     use crate::admin::permission::Permission;
+    use crate::admin::state::scope;
     ctx.authorise(Permission::SchedulerRead)?;
     let guard = state.kubelet_pods.read().unwrap();
     let pods = scope(&guard, &ctx.tenant, |r| &r.tenant);
@@ -34,17 +34,18 @@ pub fn list_pending(
             namespace: "default".into(),
             priority: 1000 - (idx as i32 * 100),
             age_secs: (idx as u32 + 1) * 30,
-            gating: if idx == 0 { Some("InsufficientCPU") } else { None },
+            gating: if idx == 0 {
+                Some("InsufficientCPU")
+            } else {
+                None
+            },
         })
         .collect();
     out.sort_by(|a, b| b.priority.cmp(&a.priority));
     Ok(out)
 }
 
-pub fn render_section(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, SchedulerViewError> {
+pub fn render_section(state: &AdminState, ctx: &RequestCtx) -> Result<String, SchedulerViewError> {
     let rows = list_pending(state, ctx)?;
     let table_rows: Vec<Vec<String>> = rows
         .iter()

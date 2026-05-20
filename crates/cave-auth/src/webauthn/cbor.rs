@@ -38,7 +38,9 @@ pub fn map_get<'a>(map: &'a Value, key: &Value) -> Option<&'a Value> {
     let Value::Map(entries) = map else {
         return None;
     };
-    entries.iter().find_map(|(k, v)| if k == key { Some(v) } else { None })
+    entries
+        .iter()
+        .find_map(|(k, v)| if k == key { Some(v) } else { None })
 }
 
 /// Look up a string-keyed entry — convenience for the attestation-object outer map.
@@ -96,18 +98,20 @@ mod tests {
 
     #[test]
     fn map_get_str_finds_string_key() {
-        let m = Value::Map(vec![
-            (Value::Text("fmt".into()), Value::Text("packed".into())),
-        ]);
+        let m = Value::Map(vec![(
+            Value::Text("fmt".into()),
+            Value::Text("packed".into()),
+        )]);
         assert_eq!(map_get_str(&m, "fmt"), Some(&Value::Text("packed".into())));
         assert_eq!(map_get_str(&m, "missing"), None);
     }
 
     #[test]
     fn map_get_int_finds_integer_key() {
-        let m = Value::Map(vec![
-            (Value::Integer(1i64.into()), Value::Integer(2i64.into())),
-        ]);
+        let m = Value::Map(vec![(
+            Value::Integer(1i64.into()),
+            Value::Integer(2i64.into()),
+        )]);
         assert_eq!(map_get_int(&m, 1), Some(&Value::Integer(2i64.into())));
         assert_eq!(map_get_int(&m, 2), None);
     }

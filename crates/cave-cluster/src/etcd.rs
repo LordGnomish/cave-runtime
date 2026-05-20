@@ -112,11 +112,8 @@ impl EtcdBackupStore {
         cluster_name: &str,
         k8s_version: &str,
     ) -> ClusterResult<EtcdBackup> {
-        let mut backup = EtcdBackup::new(
-            cluster_name.to_string(),
-            &self.storage_prefix,
-            k8s_version,
-        );
+        let mut backup =
+            EtcdBackup::new(cluster_name.to_string(), &self.storage_prefix, k8s_version);
 
         // Simulate backup: transition through Running → Succeeded
         backup.status = BackupStatus::Running;

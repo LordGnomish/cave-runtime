@@ -31,9 +31,7 @@
 //! the per-tenant Namespace object. A `NamespaceLevelLister` always
 //! resolves with the request's tenant_id.
 
-use crate::admission::{
-    AdmissionRequest, AdmissionResponse, Operation, ValidatingWebhook,
-};
+use crate::admission::{AdmissionRequest, AdmissionResponse, Operation, ValidatingWebhook};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -46,7 +44,9 @@ pub enum Level {
 }
 
 impl Default for Level {
-    fn default() -> Self { Level::Privileged }
+    fn default() -> Self {
+        Level::Privileged
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -73,9 +73,15 @@ pub struct LevelTriple {
 ///     as version-agnostic.)
 pub fn parse_namespace_labels(labels: &HashMap<String, String>) -> LevelTriple {
     LevelTriple {
-        enforce: labels.get("pod-security.kubernetes.io/enforce").and_then(|s| parse_level(s)),
-        audit: labels.get("pod-security.kubernetes.io/audit").and_then(|s| parse_level(s)),
-        warn: labels.get("pod-security.kubernetes.io/warn").and_then(|s| parse_level(s)),
+        enforce: labels
+            .get("pod-security.kubernetes.io/enforce")
+            .and_then(|s| parse_level(s)),
+        audit: labels
+            .get("pod-security.kubernetes.io/audit")
+            .and_then(|s| parse_level(s)),
+        warn: labels
+            .get("pod-security.kubernetes.io/warn")
+            .and_then(|s| parse_level(s)),
     }
 }
 
@@ -101,7 +107,7 @@ pub struct PodSecuritySpec {
     pub host_ports: Vec<i32>,
     pub privileged_containers: Vec<String>,
     pub allow_privilege_escalation: HashMap<String, bool>, // container → APE
-    pub run_as_non_root: HashMap<String, Option<bool>>, // None == unset
+    pub run_as_non_root: HashMap<String, Option<bool>>,    // None == unset
     pub run_as_user: HashMap<String, i64>,
     pub seccomp_profile: HashMap<String, String>, // container → profile type
     pub capabilities_add: HashMap<String, Vec<String>>,
@@ -116,7 +122,10 @@ pub struct Violation {
 
 impl Violation {
     fn new(control: impl Into<String>, message: impl Into<String>) -> Self {
-        Self { control: control.into(), message: message.into() }
+        Self {
+            control: control.into(),
+            message: message.into(),
+        }
     }
 }
 
@@ -124,10 +133,15 @@ impl Violation {
 /// violations (upstream returns a sorted list to keep messages stable).
 pub fn check_level(level: Level, spec: &PodSecuritySpec) -> Vec<Violation> {
     let mut out = vec![];
-    if level == Level::Privileged { return out; }
+    if level == Level::Privileged {
+        return out;
+    }
     // Baseline controls
     if spec.host_network {
-        out.push(Violation::new("hostNetwork", "host network must not be set"));
+        out.push(Violation::new(
+            "hostNetwork",
+            "host network must not be set",
+        ));
     }
     if spec.host_pid {
         out.push(Violation::new("hostPID", "host PID must not be set"));
@@ -136,49 +150,83 @@ pub fn check_level(level: Level, spec: &PodSecuritySpec) -> Vec<Violation> {
         out.push(Violation::new("hostIPC", "host IPC must not be set"));
     }
     if !spec.host_path_volumes.is_empty() {
-        out.push(Violation::new("hostPathVolumes",
-            format!("hostPath volumes are forbidden: {}", spec.host_path_volumes.join(", "))));
+        out.push(Violation::new(
+            "hostPathVolumes",
+            format!(
+                "hostPath volumes are forbidden: {}",
+                spec.host_path_volumes.join(", ")
+            ),
+        ));
     }
     if !spec.host_ports.is_empty() {
-        out.push(Violation::new("hostPorts",
-            format!("hostPort declarations forbidden: {:?}", spec.host_ports)));
+        out.push(Violation::new(
+            "hostPorts",
+            format!("hostPort declarations forbidden: {:?}", spec.host_ports),
+        ));
     }
     if !spec.privileged_containers.is_empty() {
-        out.push(Violation::new("privileged",
-            format!("privileged containers: {}", spec.privileged_containers.join(", "))));
+        out.push(Violation::new(
+            "privileged",
+            format!(
+                "privileged containers: {}",
+                spec.privileged_containers.join(", ")
+            ),
+        ));
     }
     // Capabilities — baseline forbids adding any except a small allowlist.
     let cap_allowlist: std::collections::HashSet<&str> = [
-        "AUDIT_WRITE","CHOWN","DAC_OVERRIDE","FOWNER","FSETID",
-        "KILL","MKNOD","NET_BIND_SERVICE","SETFCAP","SETGID",
-        "SETPCAP","SETUID","SYS_CHROOT",
-    ].into_iter().collect();
+        "AUDIT_WRITE",
+        "CHOWN",
+        "DAC_OVERRIDE",
+        "FOWNER",
+        "FSETID",
+        "KILL",
+        "MKNOD",
+        "NET_BIND_SERVICE",
+        "SETFCAP",
+        "SETGID",
+        "SETPCAP",
+        "SETUID",
+        "SYS_CHROOT",
+    ]
+    .into_iter()
+    .collect();
     for (c, caps) in &spec.capabilities_add {
         for cap in caps {
             if !cap_allowlist.contains(cap.as_str()) {
-                out.push(Violation::new("capabilities",
-                    format!("container {c} adds disallowed capability {cap}")));
+                out.push(Violation::new(
+                    "capabilities",
+                    format!("container {c} adds disallowed capability {cap}"),
+                ));
             }
         }
     }
-    if level == Level::Baseline { return out; }
+    if level == Level::Baseline {
+        return out;
+    }
     // Restricted controls (additive on top of baseline)
     for (c, ape) in &spec.allow_privilege_escalation {
         if *ape {
-            out.push(Violation::new("allowPrivilegeEscalation",
-                format!("container {c} sets allowPrivilegeEscalation=true")));
+            out.push(Violation::new(
+                "allowPrivilegeEscalation",
+                format!("container {c} sets allowPrivilegeEscalation=true"),
+            ));
         }
     }
     for (c, rnru) in &spec.run_as_non_root {
         if rnru.is_none() || rnru == &Some(false) {
-            out.push(Violation::new("runAsNonRoot",
-                format!("container {c} must set runAsNonRoot=true")));
+            out.push(Violation::new(
+                "runAsNonRoot",
+                format!("container {c} must set runAsNonRoot=true"),
+            ));
         }
     }
     for (c, uid) in &spec.run_as_user {
         if *uid == 0 {
-            out.push(Violation::new("runAsUser",
-                format!("container {c} sets runAsUser=0 (root)")));
+            out.push(Violation::new(
+                "runAsUser",
+                format!("container {c} sets runAsUser=0 (root)"),
+            ));
         }
     }
     for (c, profile) in &spec.seccomp_profile {
@@ -188,8 +236,10 @@ pub fn check_level(level: Level, spec: &PodSecuritySpec) -> Vec<Violation> {
         }
     }
     // restricted requires `capabilities.drop` to include "ALL" on every container.
-    let containers_seen: std::collections::HashSet<String> =
-        spec.privileged_containers.iter().cloned()
+    let containers_seen: std::collections::HashSet<String> = spec
+        .privileged_containers
+        .iter()
+        .cloned()
         .chain(spec.allow_privilege_escalation.keys().cloned())
         .chain(spec.capabilities_add.keys().cloned())
         .chain(spec.capabilities_drop.keys().cloned())
@@ -198,8 +248,10 @@ pub fn check_level(level: Level, spec: &PodSecuritySpec) -> Vec<Violation> {
     for c in containers_seen {
         let drops = spec.capabilities_drop.get(&c).cloned().unwrap_or_default();
         if !drops.iter().any(|d| d == "ALL") {
-            out.push(Violation::new("capabilities",
-                format!("container {c} must drop ALL capabilities")));
+            out.push(Violation::new(
+                "capabilities",
+                format!("container {c} must drop ALL capabilities"),
+            ));
         }
     }
     out
@@ -215,13 +267,22 @@ pub struct InMemoryLevelStore {
 }
 
 impl InMemoryLevelStore {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
     pub fn set(&self, tenant: &str, namespace: &str, t: LevelTriple) {
-        self.inner.write().unwrap().insert((tenant.into(), namespace.into()), t);
+        self.inner
+            .write()
+            .unwrap()
+            .insert((tenant.into(), namespace.into()), t);
     }
     pub fn get(&self, tenant: &str, namespace: &str) -> LevelTriple {
-        self.inner.read().unwrap().get(&(tenant.into(), namespace.into()))
-            .cloned().unwrap_or_default()
+        self.inner
+            .read()
+            .unwrap()
+            .get(&(tenant.into(), namespace.into()))
+            .cloned()
+            .unwrap_or_default()
     }
 }
 
@@ -237,9 +298,13 @@ pub struct PodSecurityPlugin {
 }
 
 impl ValidatingWebhook for PodSecurityPlugin {
-    fn name(&self) -> &str { "PodSecurity" }
+    fn name(&self) -> &str {
+        "PodSecurity"
+    }
     fn validate(&self, req: &AdmissionRequest) -> AdmissionResponse {
-        if req.kind != "Pod" { return AdmissionResponse::allow(req); }
+        if req.kind != "Pod" {
+            return AdmissionResponse::allow(req);
+        }
         if !matches!(req.operation, Operation::Create | Operation::Update) {
             return AdmissionResponse::allow(req);
         }
@@ -252,8 +317,11 @@ impl ValidatingWebhook for PodSecurityPlugin {
         if let Some(level) = triple.enforce {
             let v = check_level(level, &spec);
             if !v.is_empty() {
-                let msg = v.iter().map(|x| format!("{}: {}", x.control, x.message))
-                    .collect::<Vec<_>>().join("; ");
+                let msg = v
+                    .iter()
+                    .map(|x| format!("{}: {}", x.control, x.message))
+                    .collect::<Vec<_>>()
+                    .join("; ");
                 let mut r = AdmissionResponse::deny(req, 403, msg);
                 r.warnings = warnings;
                 return r;

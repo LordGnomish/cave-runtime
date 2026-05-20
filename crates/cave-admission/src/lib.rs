@@ -67,11 +67,18 @@ mod tests {
 
     fn pod_with_app_label(name: &str) -> Resource {
         let mut r = make_resource("Pod", name, Some("default"));
-        r.metadata.labels.insert("app".to_string(), "my-app".to_string());
+        r.metadata
+            .labels
+            .insert("app".to_string(), "my-app".to_string());
         r
     }
 
-    fn make_policy(kinds: Vec<String>, operations: Vec<Operation>, rules: Vec<PolicyRule>, audit: bool) -> Policy {
+    fn make_policy(
+        kinds: Vec<String>,
+        operations: Vec<Operation>,
+        rules: Vec<PolicyRule>,
+        audit: bool,
+    ) -> Policy {
         Policy {
             id: uuid::Uuid::new_v4(),
             name: "test-policy".to_string(),
@@ -142,7 +149,10 @@ mod tests {
     // 6
     #[test]
     fn test_required_label_missing_is_violation() {
-        let rule = PolicyRule::RequiredLabel { key: "app".to_string(), allowed_values: Vec::new() };
+        let rule = PolicyRule::RequiredLabel {
+            key: "app".to_string(),
+            allowed_values: Vec::new(),
+        };
         let pod = make_resource("Pod", "p", Some("default"));
         let result = evaluate_validation_rule(&rule, &pod);
         assert!(result.is_some());
@@ -152,7 +162,10 @@ mod tests {
     // 7
     #[test]
     fn test_required_label_present_passes() {
-        let rule = PolicyRule::RequiredLabel { key: "app".to_string(), allowed_values: Vec::new() };
+        let rule = PolicyRule::RequiredLabel {
+            key: "app".to_string(),
+            allowed_values: Vec::new(),
+        };
         assert!(evaluate_validation_rule(&rule, &pod_with_app_label("p")).is_none());
     }
 
@@ -164,7 +177,9 @@ mod tests {
             allowed_values: vec!["prod".to_string(), "staging".to_string()],
         };
         let mut pod = make_resource("Pod", "p", Some("default"));
-        pod.metadata.labels.insert("env".to_string(), "dev".to_string());
+        pod.metadata
+            .labels
+            .insert("env".to_string(), "dev".to_string());
         let result = evaluate_validation_rule(&rule, &pod);
         assert!(result.is_some());
         assert!(result.unwrap().contains("disallowed value"));
@@ -235,8 +250,11 @@ mod tests {
     fn test_evaluate_all_policies_passes_with_required_labels() {
         let policies = builtin_policies();
         // Pod with 'app' label; require-resource-limits is audit-only → allowed
-        let result =
-            evaluate_all_policies(&policies, &pod_with_app_label("good-pod"), Operation::Create);
+        let result = evaluate_all_policies(
+            &policies,
+            &pod_with_app_label("good-pod"),
+            Operation::Create,
+        );
         assert!(result.allowed);
     }
 
@@ -276,7 +294,10 @@ mod tests {
         let policy = make_policy(
             vec!["Pod".to_string()],
             Vec::new(),
-            vec![PolicyRule::RequiredLabel { key: "env".to_string(), allowed_values: Vec::new() }],
+            vec![PolicyRule::RequiredLabel {
+                key: "env".to_string(),
+                allowed_values: Vec::new(),
+            }],
             true, // audit_mode = true
         );
         let pod = make_resource("Pod", "p", Some("default"));

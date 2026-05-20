@@ -14,20 +14,20 @@
 use std::sync::Arc;
 
 use axum::{
+    Json, Router,
     body::Bytes,
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::post,
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    TraceState,
     ingestion::{jaeger, opencensus, otlp, zipkin},
     multi_tenant::tenant_from_headers,
     sampling::Sampler,
-    TraceState,
 };
 
 pub fn create_router(state: Arc<TraceState>) -> Router {
@@ -57,7 +57,8 @@ async fn ingest_otlp(
 
     let tenant_id = tenant_from_headers(&headers);
 
-    if content_type.contains("application/x-protobuf") || content_type.contains("application/grpc") {
+    if content_type.contains("application/x-protobuf") || content_type.contains("application/grpc")
+    {
         return (
             StatusCode::NOT_IMPLEMENTED,
             Json(serde_json::json!({
@@ -155,7 +156,9 @@ async fn ingest_opencensus(
 // ─── Shared ingestion helper ───────────────────────────────────────────────
 
 async fn ingest_spans_with_sampling(state: &TraceState, spans: Vec<crate::types::Span>) -> usize {
-    if spans.is_empty() { return 0; }
+    if spans.is_empty() {
+        return 0;
+    }
 
     // Group spans by trace_id to apply head-based sampling
     use std::collections::HashMap;

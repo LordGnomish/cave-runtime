@@ -24,11 +24,10 @@
 use crate::admission::{AdmissionRequest, AdmissionResponse, JsonPatch, MutatingWebhook};
 use crate::resources::ObjectMeta;
 use crate::vap_advanced::{
-    CelActivation, CelError, CelEvaluator, CelValue, FailurePolicyType,
-    LabelSelector, MatchCondition, MatchInput, MatchResources,
-    NamedRuleWithOperations, ParamKind, ParamRef, ParamResolveError,
-    ParamResolver, RuleWithOperations, ScopeType, match_resources_matches,
-    label_selector_matches, named_rule_matches,
+    label_selector_matches, match_resources_matches, named_rule_matches, CelActivation, CelError,
+    CelEvaluator, CelValue, FailurePolicyType, LabelSelector, MatchCondition, MatchInput,
+    MatchResources, NamedRuleWithOperations, ParamKind, ParamRef, ParamResolveError, ParamResolver,
+    RuleWithOperations, ScopeType,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -72,7 +71,9 @@ pub enum ReinvocationPolicyType {
 }
 
 impl Default for ReinvocationPolicyType {
-    fn default() -> Self { ReinvocationPolicyType::Never }
+    fn default() -> Self {
+        ReinvocationPolicyType::Never
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -133,7 +134,10 @@ pub struct MutatingAdmissionPolicyBinding {
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn tenant_of(meta: &ObjectMeta) -> String {
-    meta.annotations.get("cave.runtime/tenant-id").cloned().unwrap_or_default()
+    meta.annotations
+        .get("cave.runtime/tenant-id")
+        .cloned()
+        .unwrap_or_default()
 }
 
 #[derive(Default)]
@@ -143,7 +147,9 @@ pub struct MapStore {
 }
 
 impl MapStore {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn put_policy(&self, p: MutatingAdmissionPolicy) {
         let key = (tenant_of(&p.metadata), p.metadata.name.clone());
@@ -154,19 +160,34 @@ impl MapStore {
         self.bindings.write().unwrap().insert(key, b);
     }
     pub fn list_policies(&self, tenant: &str) -> Vec<MutatingAdmissionPolicy> {
-        self.policies.read().unwrap().iter()
-            .filter(|((t, _), _)| t == tenant).map(|(_, v)| v.clone()).collect()
+        self.policies
+            .read()
+            .unwrap()
+            .iter()
+            .filter(|((t, _), _)| t == tenant)
+            .map(|(_, v)| v.clone())
+            .collect()
     }
     pub fn list_bindings(&self, tenant: &str) -> Vec<MutatingAdmissionPolicyBinding> {
-        self.bindings.read().unwrap().iter()
-            .filter(|((t, _), _)| t == tenant).map(|(_, v)| v.clone()).collect()
+        self.bindings
+            .read()
+            .unwrap()
+            .iter()
+            .filter(|((t, _), _)| t == tenant)
+            .map(|(_, v)| v.clone())
+            .collect()
     }
-    pub fn pairs_for_tenant(&self, tenant: &str)
-        -> Vec<(MutatingAdmissionPolicy, MutatingAdmissionPolicyBinding)>
-    {
-        let policies: HashMap<String, _> = self.list_policies(tenant)
-            .into_iter().map(|p| (p.metadata.name.clone(), p)).collect();
-        self.list_bindings(tenant).into_iter()
+    pub fn pairs_for_tenant(
+        &self,
+        tenant: &str,
+    ) -> Vec<(MutatingAdmissionPolicy, MutatingAdmissionPolicyBinding)> {
+        let policies: HashMap<String, _> = self
+            .list_policies(tenant)
+            .into_iter()
+            .map(|p| (p.metadata.name.clone(), p))
+            .collect();
+        self.list_bindings(tenant)
+            .into_iter()
             .filter_map(|b| policies.get(&b.spec.policy_name).cloned().map(|p| (p, b)))
             .collect()
     }
@@ -180,7 +201,12 @@ impl MapStore {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum JsonPatchOp {
-    Add, Remove, Replace, Move, Copy, Test,
+    Add,
+    Remove,
+    Replace,
+    Move,
+    Copy,
+    Test,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -216,8 +242,12 @@ pub fn parse_patch_ops(v: &serde_json::Value) -> Result<Vec<JsonPatchOpRecord>, 
     let arr = v.as_array().ok_or_else(|| "expected array".to_string())?;
     let mut out = vec![];
     for el in arr {
-        let obj = el.as_object().ok_or_else(|| "patch op must be object".to_string())?;
-        let op_s = obj.get("op").and_then(|s| s.as_str())
+        let obj = el
+            .as_object()
+            .ok_or_else(|| "patch op must be object".to_string())?;
+        let op_s = obj
+            .get("op")
+            .and_then(|s| s.as_str())
             .ok_or_else(|| "missing op".to_string())?;
         let op = match op_s {
             "add" => JsonPatchOp::Add,
@@ -228,11 +258,19 @@ pub fn parse_patch_ops(v: &serde_json::Value) -> Result<Vec<JsonPatchOpRecord>, 
             "test" => JsonPatchOp::Test,
             other => return Err(format!("unknown op {other}")),
         };
-        let path = obj.get("path").and_then(|s| s.as_str())
-            .ok_or_else(|| "missing path".to_string())?.to_string();
+        let path = obj
+            .get("path")
+            .and_then(|s| s.as_str())
+            .ok_or_else(|| "missing path".to_string())?
+            .to_string();
         let value = obj.get("value").cloned();
         let from = obj.get("from").and_then(|s| s.as_str()).map(String::from);
-        out.push(JsonPatchOpRecord { op, path, value, from });
+        out.push(JsonPatchOpRecord {
+            op,
+            path,
+            value,
+            from,
+        });
     }
     Ok(out)
 }
@@ -272,8 +310,7 @@ pub fn apply_config_to_patches(v: &serde_json::Value) -> Vec<JsonPatchOpRecord> 
 // caller can flip the outcome.
 // ─────────────────────────────────────────────────────────────────────────────
 
-pub const TENANT_ANNOTATION_PATH: &str =
-    "/metadata/annotations/cave.runtime~1tenant-id";
+pub const TENANT_ANNOTATION_PATH: &str = "/metadata/annotations/cave.runtime~1tenant-id";
 
 pub fn enforce_tenant_invariant(
     ops: Vec<JsonPatchOpRecord>,
@@ -281,7 +318,9 @@ pub fn enforce_tenant_invariant(
     for o in &ops {
         if o.path == TENANT_ANNOTATION_PATH {
             return Err(format!(
-                "mutation forbidden: op {:?} on tenant-id annotation", o.op));
+                "mutation forbidden: op {:?} on tenant-id annotation",
+                o.op
+            ));
         }
     }
     Ok(ops)
@@ -310,17 +349,23 @@ impl MapDispatcher {
     }
 
     pub fn dispatch_one(
-        &self, tenant: &str,
+        &self,
+        tenant: &str,
         policy: &MutatingAdmissionPolicy,
         binding: &MutatingAdmissionPolicyBinding,
-        req: &AdmissionRequest, input: &MatchInput,
+        req: &AdmissionRequest,
+        input: &MatchInput,
     ) -> MutationOutcome {
         // 1. matchConstraints + matchResources
         if let Some(mc) = &policy.spec.match_constraints {
-            if !match_resources_matches(mc, input) { return MutationOutcome::Skipped; }
+            if !match_resources_matches(mc, input) {
+                return MutationOutcome::Skipped;
+            }
         }
         if let Some(mr) = &binding.spec.match_resources {
-            if !match_resources_matches(mr, input) { return MutationOutcome::Skipped; }
+            if !match_resources_matches(mr, input) {
+                return MutationOutcome::Skipped;
+            }
         }
         // 2. matchConditions
         for cond in &policy.spec.match_conditions {
@@ -328,21 +373,23 @@ impl MapDispatcher {
             match self.evaluator.evaluate(&cond.expression, &act) {
                 Ok(CelValue::Bool(true)) => continue,
                 Ok(CelValue::Bool(false)) => return MutationOutcome::Skipped,
-                Ok(_) => return self.fail_outcome(policy,
-                    "matchCondition returned non-bool".to_string()),
-                Err(e) => return self.fail_outcome(policy,
-                    format!("matchCondition error: {e}")),
+                Ok(_) => {
+                    return self
+                        .fail_outcome(policy, "matchCondition returned non-bool".to_string())
+                }
+                Err(e) => return self.fail_outcome(policy, format!("matchCondition error: {e}")),
             }
         }
         // 3. resolve params
-        let params: Option<serde_json::Value> = if let (Some(kind), Some(pref)) =
-            (&policy.spec.param_kind, &binding.spec.param_ref)
-        {
-            match self.params.resolve(tenant, kind, pref) {
-                Ok(v) if !v.is_empty() => Some(serde_json::Value::Array(v)),
-                Ok(_) | Err(ParamResolveError::NotFound) | Err(_) => None,
-            }
-        } else { None };
+        let params: Option<serde_json::Value> =
+            if let (Some(kind), Some(pref)) = (&policy.spec.param_kind, &binding.spec.param_ref) {
+                match self.params.resolve(tenant, kind, pref) {
+                    Ok(v) if !v.is_empty() => Some(serde_json::Value::Array(v)),
+                    Ok(_) | Err(ParamResolveError::NotFound) | Err(_) => None,
+                }
+            } else {
+                None
+            };
         // 4. evaluate mutations in order
         let act = self.activation_for(req, params);
         let mut all_ops = vec![];
@@ -350,17 +397,25 @@ impl MapDispatcher {
             match m.patch_type {
                 PatchType::JSONPatch => {
                     let Some(jp) = &m.json_patch else {
-                        return self.fail_outcome(policy,
-                            "mutation type=JSONPatch requires json_patch field".into());
+                        return self.fail_outcome(
+                            policy,
+                            "mutation type=JSONPatch requires json_patch field".into(),
+                        );
                     };
                     let val = match self.evaluator.evaluate(&jp.expression, &act) {
                         Ok(CelValue::String(s)) => match serde_json::from_str(&s) {
                             Ok(v) => v,
-                            Err(e) => return self.fail_outcome(policy,
-                                format!("malformed JSONPatch JSON: {e}")),
+                            Err(e) => {
+                                return self
+                                    .fail_outcome(policy, format!("malformed JSONPatch JSON: {e}"))
+                            }
                         },
-                        Ok(_) => return self.fail_outcome(policy,
-                            "JSONPatch CEL must return JSON string".into()),
+                        Ok(_) => {
+                            return self.fail_outcome(
+                                policy,
+                                "JSONPatch CEL must return JSON string".into(),
+                            )
+                        }
                         Err(e) => return self.fail_outcome(policy, format!("CEL error: {e}")),
                     };
                     let ops = match parse_patch_ops(&val) {
@@ -375,17 +430,25 @@ impl MapDispatcher {
                 }
                 PatchType::ApplyConfiguration => {
                     let Some(ac) = &m.apply_configuration else {
-                        return self.fail_outcome(policy,
-                            "mutation type=ApplyConfiguration requires apply_configuration".into());
+                        return self.fail_outcome(
+                            policy,
+                            "mutation type=ApplyConfiguration requires apply_configuration".into(),
+                        );
                     };
                     let val = match self.evaluator.evaluate(&ac.expression, &act) {
                         Ok(CelValue::String(s)) => match serde_json::from_str(&s) {
                             Ok(v) => v,
-                            Err(e) => return self.fail_outcome(policy,
-                                format!("malformed apply object: {e}")),
+                            Err(e) => {
+                                return self
+                                    .fail_outcome(policy, format!("malformed apply object: {e}"))
+                            }
                         },
-                        Ok(_) => return self.fail_outcome(policy,
-                            "ApplyConfig CEL must return JSON string".into()),
+                        Ok(_) => {
+                            return self.fail_outcome(
+                                policy,
+                                "ApplyConfig CEL must return JSON string".into(),
+                            )
+                        }
                         Err(e) => return self.fail_outcome(policy, format!("CEL error: {e}")),
                     };
                     let ops = apply_config_to_patches(&val);
@@ -408,13 +471,22 @@ impl MapDispatcher {
     }
 
     fn activation_for(
-        &self, req: &AdmissionRequest, params: Option<serde_json::Value>,
+        &self,
+        req: &AdmissionRequest,
+        params: Option<serde_json::Value>,
     ) -> CelActivation {
         CelActivation {
             request: serde_json::to_value(req).ok(),
-            object: req.object.as_ref().and_then(|o| serde_json::to_value(o).ok()),
-            old_object: req.old_object.as_ref().and_then(|o| serde_json::to_value(o).ok()),
-            params, namespace_object: None,
+            object: req
+                .object
+                .as_ref()
+                .and_then(|o| serde_json::to_value(o).ok()),
+            old_object: req
+                .old_object
+                .as_ref()
+                .and_then(|o| serde_json::to_value(o).ok()),
+            params,
+            namespace_object: None,
             variables: HashMap::new(),
             authorizer: None,
         }
@@ -431,7 +503,9 @@ pub struct MapPlugin {
 }
 
 impl MutatingWebhook for MapPlugin {
-    fn name(&self) -> &str { "mutating-admission-policy" }
+    fn name(&self) -> &str {
+        "mutating-admission-policy"
+    }
     fn admit(&self, req: &mut AdmissionRequest) -> AdmissionResponse {
         let mut all_patches: Vec<JsonPatch> = vec![];
         let resource = req.kind.to_lowercase();
@@ -439,14 +513,24 @@ impl MutatingWebhook for MapPlugin {
         let operation = req.operation.clone();
         let empty = HashMap::new();
         let input = MatchInput {
-            group: "", version: "v1", resource: &resource,
-            name: &req.name, namespace: &namespace, operation: &operation,
-            object_labels: &empty, namespace_labels: &empty,
+            group: "",
+            version: "v1",
+            resource: &resource,
+            name: &req.name,
+            namespace: &namespace,
+            operation: &operation,
+            object_labels: &empty,
+            namespace_labels: &empty,
         };
         for (p, b) in self.store.pairs_for_tenant(&req.tenant_id) {
-            match self.dispatcher.dispatch_one(&req.tenant_id, &p, &b, req, &input) {
+            match self
+                .dispatcher
+                .dispatch_one(&req.tenant_id, &p, &b, req, &input)
+            {
                 MutationOutcome::Patches(ops) => {
-                    for o in ops { all_patches.push(o.to_admission_patch()); }
+                    for o in ops {
+                        all_patches.push(o.to_admission_patch());
+                    }
                 }
                 MutationOutcome::Skipped | MutationOutcome::SilencedError => {}
                 MutationOutcome::Error(m) => {

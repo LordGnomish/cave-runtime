@@ -38,8 +38,7 @@ impl ResourceRequest {
     };
 
     pub fn covers(&self, deficit: &ResourceRequest) -> bool {
-        self.cpu_millicores >= deficit.cpu_millicores
-            && self.memory_bytes >= deficit.memory_bytes
+        self.cpu_millicores >= deficit.cpu_millicores && self.memory_bytes >= deficit.memory_bytes
     }
 
     pub fn add(&mut self, other: &ResourceRequest) {
@@ -132,7 +131,9 @@ pub fn evaluate(req: &PreemptionRequest) -> PreemptionDecision {
     }
 
     if freed.covers(&deficit) {
-        PreemptionDecision::Evict { victim_uids: victims }
+        PreemptionDecision::Evict {
+            victim_uids: victims,
+        }
     } else {
         PreemptionDecision::Insufficient {
             reason: format!(
@@ -162,12 +163,25 @@ mod tests {
         }
     }
 
-    fn req(incoming_priority: i32, incoming_cpu: u64, incoming_mem: u64, free_cpu: u64, free_mem: u64, candidates: Vec<CandidatePod>) -> PreemptionRequest {
+    fn req(
+        incoming_priority: i32,
+        incoming_cpu: u64,
+        incoming_mem: u64,
+        free_cpu: u64,
+        free_mem: u64,
+        candidates: Vec<CandidatePod>,
+    ) -> PreemptionRequest {
         PreemptionRequest {
             incoming_uid: "newp".into(),
             incoming_priority,
-            incoming_resources: ResourceRequest { cpu_millicores: incoming_cpu, memory_bytes: incoming_mem },
-            node_free: ResourceRequest { cpu_millicores: free_cpu, memory_bytes: free_mem },
+            incoming_resources: ResourceRequest {
+                cpu_millicores: incoming_cpu,
+                memory_bytes: incoming_mem,
+            },
+            node_free: ResourceRequest {
+                cpu_millicores: free_cpu,
+                memory_bytes: free_mem,
+            },
             candidates,
         }
     }
@@ -181,7 +195,11 @@ mod tests {
     #[test]
     fn evicts_lowest_priority_pod_first() {
         let r = req(
-            1000, 100, 100, 0, 0,
+            1000,
+            100,
+            100,
+            0,
+            0,
             vec![cand("low", 0, 100, 100), cand("hi", 999, 100, 100)],
         );
         match evaluate(&r) {
@@ -195,7 +213,11 @@ mod tests {
     #[test]
     fn skips_candidates_at_equal_or_higher_priority() {
         let r = req(
-            1000, 100, 100, 0, 0,
+            1000,
+            100,
+            100,
+            0,
+            0,
             vec![cand("p1", 1000, 100, 100), cand("p2", 1001, 100, 100)],
         );
         match evaluate(&r) {
@@ -207,7 +229,11 @@ mod tests {
     #[test]
     fn evicts_multiple_pods_until_deficit_covered() {
         let r = req(
-            1000, 200, 200, 0, 0,
+            1000,
+            200,
+            200,
+            0,
+            0,
             vec![
                 cand("a", 0, 100, 100),
                 cand("b", 100, 100, 100),
@@ -237,10 +263,7 @@ mod tests {
     #[test]
     fn deficit_one_axis_only_still_triggers_preemption() {
         // Node has CPU headroom but no memory.
-        let r = req(
-            1000, 100, 200, 500, 0,
-            vec![cand("low", 0, 0, 300)],
-        );
+        let r = req(1000, 100, 200, 500, 0, vec![cand("low", 0, 0, 300)]);
         match evaluate(&r) {
             PreemptionDecision::Evict { victim_uids } => assert_eq!(victim_uids, vec!["low"]),
             other => panic!("got {other:?}"),
@@ -250,7 +273,11 @@ mod tests {
     #[test]
     fn tie_break_on_resources_picks_larger_first_within_same_priority() {
         let r = req(
-            1000, 50, 50, 0, 0,
+            1000,
+            50,
+            50,
+            0,
+            0,
             vec![cand("small", 0, 30, 30), cand("large", 0, 60, 60)],
         );
         match evaluate(&r) {
@@ -266,7 +293,11 @@ mod tests {
     #[test]
     fn tie_break_on_name_when_priority_and_resources_equal() {
         let r = req(
-            1000, 50, 50, 0, 0,
+            1000,
+            50,
+            50,
+            0,
+            0,
             vec![cand("zzz", 0, 100, 100), cand("aaa", 0, 100, 100)],
         );
         match evaluate(&r) {
@@ -280,10 +311,22 @@ mod tests {
 
     #[test]
     fn covers_returns_true_only_when_both_axes_satisfied() {
-        let r = ResourceRequest { cpu_millicores: 100, memory_bytes: 100 };
-        let d_ok = ResourceRequest { cpu_millicores: 50, memory_bytes: 50 };
-        let d_cpu_short = ResourceRequest { cpu_millicores: 150, memory_bytes: 50 };
-        let d_mem_short = ResourceRequest { cpu_millicores: 50, memory_bytes: 150 };
+        let r = ResourceRequest {
+            cpu_millicores: 100,
+            memory_bytes: 100,
+        };
+        let d_ok = ResourceRequest {
+            cpu_millicores: 50,
+            memory_bytes: 50,
+        };
+        let d_cpu_short = ResourceRequest {
+            cpu_millicores: 150,
+            memory_bytes: 50,
+        };
+        let d_mem_short = ResourceRequest {
+            cpu_millicores: 50,
+            memory_bytes: 150,
+        };
         assert!(r.covers(&d_ok));
         assert!(!r.covers(&d_cpu_short));
         assert!(!r.covers(&d_mem_short));
@@ -299,7 +342,11 @@ mod tests {
     #[test]
     fn evicts_all_lower_when_deficit_huge() {
         let r = req(
-            1000, 10_000, 10_000, 0, 0,
+            1000,
+            10_000,
+            10_000,
+            0,
+            0,
             vec![cand("a", 0, 100, 100), cand("b", 100, 200, 200)],
         );
         match evaluate(&r) {
@@ -314,7 +361,11 @@ mod tests {
     fn priority_ordering_picks_lowest_first_even_when_higher_alone_would_cover() {
         // 'low' alone covers; 'higher' alone also covers; pick 'low'.
         let r = req(
-            1000, 50, 50, 0, 0,
+            1000,
+            50,
+            50,
+            0,
+            0,
             vec![cand("higher", 500, 200, 200), cand("low", 0, 200, 200)],
         );
         match evaluate(&r) {

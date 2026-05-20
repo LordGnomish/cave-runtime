@@ -25,7 +25,11 @@ pub struct ApiKey {
 }
 
 impl ApiKey {
-    pub fn new(workspace_id: Uuid, name: impl Into<String>, secret_hash: impl Into<String>) -> Self {
+    pub fn new(
+        workspace_id: Uuid,
+        name: impl Into<String>,
+        secret_hash: impl Into<String>,
+    ) -> Self {
         Self {
             id: Uuid::new_v4(),
             workspace_id,

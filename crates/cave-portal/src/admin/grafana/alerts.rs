@@ -7,7 +7,7 @@
 use super::GrafanaViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, table};
-use crate::admin::state::{scope, ActiveAlert, AdminState};
+use crate::admin::state::{ActiveAlert, AdminState, scope};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GrafanaAlertRow {
@@ -22,12 +22,14 @@ pub fn list_alerts(
     ctx: &RequestCtx,
 ) -> Result<Vec<GrafanaAlertRow>, GrafanaViewError> {
     ctx.authorise(Permission::GrafanaRead)?;
-    Ok(scope(&state.active_alerts.read().unwrap(), &ctx.tenant, |r| {
-        &r.tenant
-    })
-    .into_iter()
-    .map(map_to_row)
-    .collect())
+    Ok(
+        scope(&state.active_alerts.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .map(map_to_row)
+        .collect(),
+    )
 }
 
 fn map_to_row(a: &ActiveAlert) -> GrafanaAlertRow {

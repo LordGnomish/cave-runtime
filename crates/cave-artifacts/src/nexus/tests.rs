@@ -15,11 +15,11 @@ use super::cleanup;
 use super::error::NexusError;
 use super::format::{FormatAdapter, FormatRegistry, RawFormat};
 use super::models::{
-    Asset, BlobRef, CleanupCriteria, CleanupPolicy, Component, Format, Repository,
-    RepositoryType, RoutingDecision, RoutingMode, RoutingRule, WritePolicy,
+    Asset, BlobRef, CleanupCriteria, CleanupPolicy, Component, Format, Repository, RepositoryType,
+    RoutingDecision, RoutingMode, RoutingRule, WritePolicy,
 };
 use super::routing;
-use super::store::{sha256_hex, NexusStore};
+use super::store::{NexusStore, sha256_hex};
 use chrono::{Duration, Utc};
 use uuid::Uuid;
 
@@ -115,7 +115,10 @@ fn raw_validate_accepts_normal_path() {
 fn raw_content_type_sniffs_extensions() {
     assert_eq!(RawFormat.content_type("foo.json"), "application/json");
     assert_eq!(RawFormat.content_type("foo.tar.gz"), "application/gzip");
-    assert_eq!(RawFormat.content_type("foo.unknown"), "application/octet-stream");
+    assert_eq!(
+        RawFormat.content_type("foo.unknown"),
+        "application/octet-stream"
+    );
     assert_eq!(RawFormat.content_type("noext"), "application/octet-stream");
 }
 
@@ -439,15 +442,27 @@ fn rule(name: &str, mode: RoutingMode, matchers: &[&str]) -> RoutingRule {
 #[test]
 fn routing_allow_passes_matching_path() {
     let r = rule("a", RoutingMode::Allow, &[r"^pkg/.*"]);
-    assert_eq!(routing::evaluate(&r, "pkg/x").unwrap(), RoutingDecision::Allowed);
-    assert_eq!(routing::evaluate(&r, "other/y").unwrap(), RoutingDecision::Blocked);
+    assert_eq!(
+        routing::evaluate(&r, "pkg/x").unwrap(),
+        RoutingDecision::Allowed
+    );
+    assert_eq!(
+        routing::evaluate(&r, "other/y").unwrap(),
+        RoutingDecision::Blocked
+    );
 }
 
 #[test]
 fn routing_block_blocks_matching_path() {
     let r = rule("b", RoutingMode::Block, &[r"^secret/.*"]);
-    assert_eq!(routing::evaluate(&r, "secret/x").unwrap(), RoutingDecision::Blocked);
-    assert_eq!(routing::evaluate(&r, "public/y").unwrap(), RoutingDecision::Allowed);
+    assert_eq!(
+        routing::evaluate(&r, "secret/x").unwrap(),
+        RoutingDecision::Blocked
+    );
+    assert_eq!(
+        routing::evaluate(&r, "public/y").unwrap(),
+        RoutingDecision::Allowed
+    );
 }
 
 #[test]
@@ -496,7 +511,7 @@ fn routing_invalid_regex_surfaces_error() {
 // ── HTTP integration tests (axum router via tower::ServiceExt) ─────────
 
 mod http {
-    use super::super::routes::{router, NexusState};
+    use super::super::routes::{NexusState, router};
     use axum::{
         body::{Body, to_bytes},
         http::{Method, Request, StatusCode},
@@ -529,11 +544,13 @@ mod http {
         let body = body_json(resp).await;
         assert_eq!(body["status"], "ok");
         assert_eq!(body["module"], "nexus");
-        assert!(body["supported_formats"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|v| v == "raw"));
+        assert!(
+            body["supported_formats"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|v| v == "raw")
+        );
     }
 
     #[tokio::test]
@@ -804,7 +821,9 @@ mod http {
             .oneshot(
                 Request::builder()
                     .method(Method::POST)
-                    .uri("/api/nexus/v1/cleanup-policies/purge-snap/apply?repository=r&dry_run=true")
+                    .uri(
+                        "/api/nexus/v1/cleanup-policies/purge-snap/apply?repository=r&dry_run=true",
+                    )
                     .body(Body::empty())
                     .unwrap(),
             )

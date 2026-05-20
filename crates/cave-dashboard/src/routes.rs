@@ -61,17 +61,17 @@ use crate::{
         parse_alert_rule_provisioning, parse_contact_point_provisioning,
         parse_datasource_provisioning, parse_notification_policy_provisioning,
     },
-    query::{apply_transformations, QueryCache},
+    query::{QueryCache, apply_transformations},
     renderer::render_dashboard,
     store::{DashboardStore, StoreError},
 };
 use axum::{
+    Json, Router,
     body::Body,
     extract::{Path, Query, State},
-    http::{header, HeaderMap, StatusCode},
+    http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{delete, get, post, put},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -113,7 +113,11 @@ fn bad_request(msg: &str) -> Response {
 }
 
 fn internal_error(msg: &str) -> Response {
-    (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"message": msg}))).into_response()
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(json!({"message": msg})),
+    )
+        .into_response()
 }
 
 fn conflict(msg: &str) -> Response {
@@ -134,108 +138,173 @@ pub fn create_router(state: AppState) -> Router {
     Router::new()
         // Health
         .route("/api/dashboard/health", get(health))
-
         // Dashboard CRUD
         .route("/api/dashboards/db", post(save_dashboard))
-        .route("/api/dashboards/uid/{uid}", get(get_dashboard_by_uid).delete(delete_dashboard_by_uid))
-        .route("/api/dashboards/id/{id}/versions", get(get_dashboard_versions))
-        .route("/api/dashboards/id/{id}/restore", post(restore_dashboard_version))
+        .route(
+            "/api/dashboards/uid/{uid}",
+            get(get_dashboard_by_uid).delete(delete_dashboard_by_uid),
+        )
+        .route(
+            "/api/dashboards/id/{id}/versions",
+            get(get_dashboard_versions),
+        )
+        .route(
+            "/api/dashboards/id/{id}/restore",
+            post(restore_dashboard_version),
+        )
         .route("/api/dashboards/tags", get(get_dashboard_tags))
-        .route("/api/dashboards/id/{id}/permissions", get(get_dashboard_permissions).post(set_dashboard_permissions))
-
+        .route(
+            "/api/dashboards/id/{id}/permissions",
+            get(get_dashboard_permissions).post(set_dashboard_permissions),
+        )
         // Stars
-        .route("/api/user/stars/dashboard/{uid}", post(star_dashboard).delete(unstar_dashboard))
-
+        .route(
+            "/api/user/stars/dashboard/{uid}",
+            post(star_dashboard).delete(unstar_dashboard),
+        )
         // Search
         .route("/api/search", get(search))
-
         // Home dashboard
         .route("/api/dashboards/home", get(home_dashboard))
-
         // Folders
         .route("/api/folders", get(list_folders).post(create_folder))
-        .route("/api/folders/{uid}", get(get_folder).put(update_folder).delete(delete_folder))
-        .route("/api/folders/{uid}/permissions", get(get_folder_permissions).post(set_folder_permissions))
-
+        .route(
+            "/api/folders/{uid}",
+            get(get_folder).put(update_folder).delete(delete_folder),
+        )
+        .route(
+            "/api/folders/{uid}/permissions",
+            get(get_folder_permissions).post(set_folder_permissions),
+        )
         // DataSources
-        .route("/api/datasources", get(list_datasources).post(create_datasource))
-        .route("/api/datasources/{id}", get(get_datasource).put(update_datasource).delete(delete_datasource))
+        .route(
+            "/api/datasources",
+            get(list_datasources).post(create_datasource),
+        )
+        .route(
+            "/api/datasources/{id}",
+            get(get_datasource)
+                .put(update_datasource)
+                .delete(delete_datasource),
+        )
         .route("/api/datasources/uid/{uid}", get(get_datasource_by_uid))
         .route("/api/datasources/{id}/health", get(datasource_health))
-
         // Unified query
         .route("/api/ds/query", post(ds_query))
-
         // Annotations
-        .route("/api/annotations", get(list_annotations).post(create_annotation))
+        .route(
+            "/api/annotations",
+            get(list_annotations).post(create_annotation),
+        )
         .route("/api/annotations/{id}", delete(delete_annotation))
-
         // Snapshots
         .route("/api/snapshots", post(create_snapshot))
-        .route("/api/snapshots/{key}", get(get_snapshot).delete(delete_snapshot))
+        .route(
+            "/api/snapshots/{key}",
+            get(get_snapshot).delete(delete_snapshot),
+        )
         .route("/api/dashboard/snapshots", get(list_snapshots))
-
         // Playlists
         .route("/api/playlists", get(list_playlists).post(create_playlist))
-        .route("/api/playlists/{id}", get(get_playlist).put(update_playlist).delete(delete_playlist))
-
+        .route(
+            "/api/playlists/{id}",
+            get(get_playlist)
+                .put(update_playlist)
+                .delete(delete_playlist),
+        )
         // Orgs
         .route("/api/orgs", get(list_orgs).post(create_org))
         .route("/api/orgs/{id}", get(get_org))
         .route("/api/org", get(current_org))
-
         // Users
         .route("/api/users", get(list_users).post(create_user))
         .route("/api/users/{id}", get(get_user))
         .route("/api/user", get(current_user))
-
         // Teams
         .route("/api/teams/search", get(list_teams))
         .route("/api/teams", post(create_team))
         .route("/api/teams/{id}", get(get_team))
-        .route("/api/teams/{id}/members", get(list_team_members).post(add_team_member))
-
+        .route(
+            "/api/teams/{id}/members",
+            get(list_team_members).post(add_team_member),
+        )
         // API Keys
         .route("/api/auth/keys", get(list_api_keys).post(create_api_key))
         .route("/api/auth/keys/{id}", delete(delete_api_key))
-
         // Service Accounts
-        .route("/api/serviceaccounts", get(list_service_accounts).post(create_service_account))
+        .route(
+            "/api/serviceaccounts",
+            get(list_service_accounts).post(create_service_account),
+        )
         .route("/api/serviceaccounts/{id}", get(get_service_account))
-
         // Unified Alerting — Ruler API
         .route("/api/ruler/grafana/api/v1/rules", get(list_ruler_groups))
-        .route("/api/ruler/grafana/api/v1/rules/{folder_uid}", get(list_folder_rules))
-        .route("/api/ruler/grafana/api/v1/rules/{folder_uid}/{group}", get(get_rule_group).put(put_rule_group).delete(delete_rule_group))
-
+        .route(
+            "/api/ruler/grafana/api/v1/rules/{folder_uid}",
+            get(list_folder_rules),
+        )
+        .route(
+            "/api/ruler/grafana/api/v1/rules/{folder_uid}/{group}",
+            get(get_rule_group)
+                .put(put_rule_group)
+                .delete(delete_rule_group),
+        )
         // Alert instances / groups (Alertmanager API)
-        .route("/api/alertmanager/grafana/api/v2/alerts", get(get_alert_groups))
-        .route("/api/alertmanager/grafana/api/v2/alerts/groups", get(get_alert_groups))
-        .route("/api/alertmanager/grafana/api/v2/silences", get(list_silences).post(create_silence))
-        .route("/api/alertmanager/grafana/api/v2/silence/{id}", delete(delete_silence))
-
+        .route(
+            "/api/alertmanager/grafana/api/v2/alerts",
+            get(get_alert_groups),
+        )
+        .route(
+            "/api/alertmanager/grafana/api/v2/alerts/groups",
+            get(get_alert_groups),
+        )
+        .route(
+            "/api/alertmanager/grafana/api/v2/silences",
+            get(list_silences).post(create_silence),
+        )
+        .route(
+            "/api/alertmanager/grafana/api/v2/silence/{id}",
+            delete(delete_silence),
+        )
         // Contact Points (provisioning API)
-        .route("/api/v1/provisioning/contact-points", get(list_contact_points).post(create_contact_point))
-        .route("/api/v1/provisioning/contact-points/{uid}", put(update_contact_point).delete(delete_contact_point))
-
+        .route(
+            "/api/v1/provisioning/contact-points",
+            get(list_contact_points).post(create_contact_point),
+        )
+        .route(
+            "/api/v1/provisioning/contact-points/{uid}",
+            put(update_contact_point).delete(delete_contact_point),
+        )
         // Notification Policy
-        .route("/api/v1/provisioning/policies", get(get_notification_policy).put(put_notification_policy))
-
+        .route(
+            "/api/v1/provisioning/policies",
+            get(get_notification_policy).put(put_notification_policy),
+        )
         // Mute Timings
-        .route("/api/v1/provisioning/mute-timings", get(list_mute_timings).post(create_mute_timing))
-        .route("/api/v1/provisioning/mute-timings/{name}", delete(delete_mute_timing))
-
+        .route(
+            "/api/v1/provisioning/mute-timings",
+            get(list_mute_timings).post(create_mute_timing),
+        )
+        .route(
+            "/api/v1/provisioning/mute-timings/{name}",
+            delete(delete_mute_timing),
+        )
         // Legacy alert notifications
-        .route("/api/alert-notifications", get(list_alert_notifications).post(create_alert_notification))
-        .route("/api/alert-notifications/{id}", get(get_alert_notification).put(update_alert_notification).delete(delete_alert_notification))
-
+        .route(
+            "/api/alert-notifications",
+            get(list_alert_notifications).post(create_alert_notification),
+        )
+        .route(
+            "/api/alert-notifications/{id}",
+            get(get_alert_notification)
+                .put(update_alert_notification)
+                .delete(delete_alert_notification),
+        )
         // Legacy alerts (panel-level)
         .route("/api/alerts", get(list_legacy_alerts))
-
         // HTML Renderer
         .route("/render/d/{uid}", get(render_dashboard_html))
         .route("/api/dashboards/render/{uid}", get(render_dashboard_html))
-
         .with_state(state)
 }
 
@@ -287,17 +356,16 @@ async fn save_dashboard(
             };
             (StatusCode::OK, Json(resp)).into_response()
         }
-        Err(StoreError::Conflict(msg)) => {
-            (StatusCode::PRECONDITION_FAILED, Json(json!({"status":"version-mismatch","message":msg}))).into_response()
-        }
+        Err(StoreError::Conflict(msg)) => (
+            StatusCode::PRECONDITION_FAILED,
+            Json(json!({"status":"version-mismatch","message":msg})),
+        )
+            .into_response(),
         Err(e) => store_err(e),
     }
 }
 
-async fn get_dashboard_by_uid(
-    State(state): State<AppState>,
-    Path(uid): Path<String>,
-) -> Response {
+async fn get_dashboard_by_uid(State(state): State<AppState>, Path(uid): Path<String>) -> Response {
     match state.store.get_dashboard_by_uid(&uid) {
         Ok(d) => Json(json!({
             "dashboard": d,
@@ -329,7 +397,8 @@ async fn get_dashboard_by_uid(
                     "organization": {"canAdd":true,"canEdit":true,"canDelete":true}
                 }
             }
-        })).into_response(),
+        }))
+        .into_response(),
         Err(e) => store_err(e),
     }
 }
@@ -339,15 +408,14 @@ async fn delete_dashboard_by_uid(
     Path(uid): Path<String>,
 ) -> Response {
     match state.store.delete_dashboard(&uid) {
-        Ok(_) => Json(json!({"title": uid, "message": "Dashboard deleted", "id": 0})).into_response(),
+        Ok(_) => {
+            Json(json!({"title": uid, "message": "Dashboard deleted", "id": 0})).into_response()
+        }
         Err(e) => store_err(e),
     }
 }
 
-async fn get_dashboard_versions(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Response {
+async fn get_dashboard_versions(State(state): State<AppState>, Path(id): Path<i64>) -> Response {
     match state.store.get_dashboard_versions(id) {
         Ok(versions) => Json(versions).into_response(),
         Err(e) => store_err(e),
@@ -364,8 +432,14 @@ async fn restore_dashboard_version(
     Path(id): Path<i64>,
     Json(req): Json<RestoreVersionRequest>,
 ) -> Response {
-    match state.store.restore_dashboard_version(id, req.version, "admin") {
-        Ok(d) => Json(json!({"id":d.id,"uid":d.uid,"version":d.version,"message":"Dashboard restored"})).into_response(),
+    match state
+        .store
+        .restore_dashboard_version(id, req.version, "admin")
+    {
+        Ok(d) => {
+            Json(json!({"id":d.id,"uid":d.uid,"version":d.version,"message":"Dashboard restored"}))
+                .into_response()
+        }
         Err(e) => store_err(e),
     }
 }
@@ -373,13 +447,15 @@ async fn restore_dashboard_version(
 async fn get_dashboard_tags(State(state): State<AppState>) -> Response {
     match state.store.list_dashboards(1) {
         Ok(dashboards) => {
-            let mut tag_counts: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+            let mut tag_counts: std::collections::HashMap<String, i64> =
+                std::collections::HashMap::new();
             for d in &dashboards {
                 for tag in &d.tags {
                     *tag_counts.entry(tag.clone()).or_insert(0) += 1;
                 }
             }
-            let tags: Vec<serde_json::Value> = tag_counts.iter()
+            let tags: Vec<serde_json::Value> = tag_counts
+                .iter()
                 .map(|(t, c)| json!({"term": t, "count": c}))
                 .collect();
             Json(tags).into_response()
@@ -388,10 +464,7 @@ async fn get_dashboard_tags(State(state): State<AppState>) -> Response {
     }
 }
 
-async fn get_dashboard_permissions(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Response {
+async fn get_dashboard_permissions(State(state): State<AppState>, Path(id): Path<i64>) -> Response {
     match state.store.get_dashboard_permissions(id) {
         Ok(perms) => Json(perms).into_response(),
         Err(e) => store_err(e),
@@ -411,20 +484,14 @@ async fn set_dashboard_permissions(
 
 // ─── Stars ────────────────────────────────────────────────────────────────────
 
-async fn star_dashboard(
-    State(state): State<AppState>,
-    Path(uid): Path<String>,
-) -> Response {
+async fn star_dashboard(State(state): State<AppState>, Path(uid): Path<String>) -> Response {
     match state.store.star_dashboard(1, &uid, true) {
         Ok(_) => Json(json!({"message":"Dashboard starred!"})).into_response(),
         Err(e) => store_err(e),
     }
 }
 
-async fn unstar_dashboard(
-    State(state): State<AppState>,
-    Path(uid): Path<String>,
-) -> Response {
+async fn unstar_dashboard(State(state): State<AppState>, Path(uid): Path<String>) -> Response {
     match state.store.star_dashboard(1, &uid, false) {
         Ok(_) => Json(json!({"message":"Dashboard unstarred"})).into_response(),
         Err(e) => store_err(e),
@@ -439,12 +506,18 @@ async fn search(
 ) -> Response {
     let q = SearchQuery {
         query: params.get("query").cloned().filter(|s| !s.is_empty()),
-        tag: params.get("tag").map(|t| t.split(',').map(String::from).collect()).unwrap_or_default(),
+        tag: params
+            .get("tag")
+            .map(|t| t.split(',').map(String::from).collect())
+            .unwrap_or_default(),
         result_type: params.get("type").cloned(),
         dashboard_ids: vec![],
         dashboard_uids: vec![],
         folder_ids: vec![],
-        folder_uids: params.get("folderUid").map(|u| vec![u.clone()]).unwrap_or_default(),
+        folder_uids: params
+            .get("folderUid")
+            .map(|u| vec![u.clone()])
+            .unwrap_or_default(),
         starred: params.get("starred").and_then(|v| v.parse().ok()),
         limit: params.get("limit").and_then(|v| v.parse().ok()),
         page: params.get("page").and_then(|v| v.parse().ok()),
@@ -466,7 +539,8 @@ async fn home_dashboard(State(state): State<AppState>) -> Response {
                 Json(json!({
                     "dashboard": d,
                     "meta": {"isHome": true, "canSave": false}
-                })).into_response()
+                }))
+                .into_response()
             } else {
                 Json(json!({
                     "dashboard": {
@@ -477,7 +551,8 @@ async fn home_dashboard(State(state): State<AppState>) -> Response {
                         "version": 1
                     },
                     "meta": {"isHome": true, "canSave": false}
-                })).into_response()
+                }))
+                .into_response()
             }
         }
         Err(e) => store_err(e),
@@ -497,16 +572,16 @@ async fn create_folder(
     State(state): State<AppState>,
     Json(req): Json<CreateFolderRequest>,
 ) -> Response {
-    match state.store.create_folder(1, req.uid.as_deref(), &req.title, req.parent_uid.as_deref()) {
+    match state
+        .store
+        .create_folder(1, req.uid.as_deref(), &req.title, req.parent_uid.as_deref())
+    {
         Ok(f) => (StatusCode::OK, Json(f)).into_response(),
         Err(e) => store_err(e),
     }
 }
 
-async fn get_folder(
-    State(state): State<AppState>,
-    Path(uid): Path<String>,
-) -> Response {
+async fn get_folder(State(state): State<AppState>, Path(uid): Path<String>) -> Response {
     match state.store.get_folder_by_uid(&uid) {
         Ok(f) => Json(f).into_response(),
         Err(e) => store_err(e),
@@ -533,10 +608,7 @@ async fn update_folder(
     }
 }
 
-async fn delete_folder(
-    State(state): State<AppState>,
-    Path(uid): Path<String>,
-) -> Response {
+async fn delete_folder(State(state): State<AppState>, Path(uid): Path<String>) -> Response {
     match state.store.delete_folder(&uid) {
         Ok(_) => Json(json!({"message": "Folder deleted", "id": 0, "uid": uid})).into_response(),
         Err(e) => store_err(e),
@@ -577,20 +649,14 @@ async fn create_datasource(
     }
 }
 
-async fn get_datasource(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Response {
+async fn get_datasource(State(state): State<AppState>, Path(id): Path<i64>) -> Response {
     match state.store.get_datasource_by_id(id) {
         Ok(ds) => Json(ds).into_response(),
         Err(e) => store_err(e),
     }
 }
 
-async fn get_datasource_by_uid(
-    State(state): State<AppState>,
-    Path(uid): Path<String>,
-) -> Response {
+async fn get_datasource_by_uid(State(state): State<AppState>, Path(uid): Path<String>) -> Response {
     match state.store.get_datasource_by_uid(&uid) {
         Ok(ds) => Json(ds).into_response(),
         Err(e) => store_err(e),
@@ -607,15 +673,14 @@ async fn update_datasource(
         Err(e) => return store_err(e),
     };
     match state.store.update_datasource(&ds.uid, req) {
-        Ok(updated) => Json(json!({"datasource": updated, "message": "Datasource updated"})).into_response(),
+        Ok(updated) => {
+            Json(json!({"datasource": updated, "message": "Datasource updated"})).into_response()
+        }
         Err(e) => store_err(e),
     }
 }
 
-async fn delete_datasource(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Response {
+async fn delete_datasource(State(state): State<AppState>, Path(id): Path<i64>) -> Response {
     let ds = match state.store.get_datasource_by_id(id) {
         Ok(ds) => ds,
         Err(e) => return store_err(e),
@@ -626,10 +691,7 @@ async fn delete_datasource(
     }
 }
 
-async fn datasource_health(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Response {
+async fn datasource_health(State(state): State<AppState>, Path(id): Path<i64>) -> Response {
     match state.store.get_datasource_by_id(id) {
         Ok(ds) => {
             let status = check_health(&ds).await;
@@ -641,10 +703,7 @@ async fn datasource_health(
 
 // ─── Unified Query ────────────────────────────────────────────────────────────
 
-async fn ds_query(
-    State(state): State<AppState>,
-    Json(req): Json<DsQueryRequest>,
-) -> Response {
+async fn ds_query(State(state): State<AppState>, Json(req): Json<DsQueryRequest>) -> Response {
     let mut response = DsQueryResponse::default();
 
     for query in &req.queries {
@@ -652,12 +711,15 @@ async fn ds_query(
         let ds = match state.store.get_datasource_by_uid(ds_uid) {
             Ok(ds) => ds,
             Err(_) => {
-                response.results.insert(query.ref_id.clone(), QueryResult {
-                    frames: vec![],
-                    status: 400,
-                    error: Some(format!("datasource {ds_uid} not found")),
-                    error_source: Some("server".into()),
-                });
+                response.results.insert(
+                    query.ref_id.clone(),
+                    QueryResult {
+                        frames: vec![],
+                        status: 400,
+                        error: Some(format!("datasource {ds_uid} not found")),
+                        error_source: Some("server".into()),
+                    },
+                );
                 continue;
             }
         };
@@ -670,7 +732,11 @@ async fn ds_query(
             let r = crate::datasource::execute_query(&ds, query).await;
             // Cache for 30s if TTL not specified
             if let Some(ttl_ms) = query.params.get("queryCachingTTL").and_then(|v| v.as_u64()) {
-                state.query_cache.put(cache_key, r.clone(), std::time::Duration::from_millis(ttl_ms));
+                state.query_cache.put(
+                    cache_key,
+                    r.clone(),
+                    std::time::Duration::from_millis(ttl_ms),
+                );
             }
             r
         };
@@ -704,10 +770,7 @@ async fn create_annotation(
     }
 }
 
-async fn delete_annotation(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Response {
+async fn delete_annotation(State(state): State<AppState>, Path(id): Path<i64>) -> Response {
     match state.store.delete_annotation(id) {
         Ok(_) => Json(json!({"message":"Annotation deleted"})).into_response(),
         Err(e) => store_err(e),
@@ -726,15 +789,13 @@ async fn create_snapshot(
             "deleteUrl": format!("/api/snapshots-delete/{}", snap.delete_key),
             "key": snap.key,
             "url": snap.url,
-        })).into_response(),
+        }))
+        .into_response(),
         Err(e) => store_err(e),
     }
 }
 
-async fn get_snapshot(
-    State(state): State<AppState>,
-    Path(key): Path<String>,
-) -> Response {
+async fn get_snapshot(State(state): State<AppState>, Path(key): Path<String>) -> Response {
     match state.store.get_snapshot(&key) {
         Ok(snap) => Json(json!({
             "dashboard": snap.dashboard,
@@ -750,10 +811,13 @@ async fn get_snapshot(
                 "expires": snap.expires,
                 "created": snap.created,
             }
-        })).into_response(),
-        Err(StoreError::NotFound(msg)) if msg.contains("expired") => {
-            (StatusCode::GONE, Json(json!({"message":"Snapshot has expired"}))).into_response()
-        }
+        }))
+        .into_response(),
+        Err(StoreError::NotFound(msg)) if msg.contains("expired") => (
+            StatusCode::GONE,
+            Json(json!({"message":"Snapshot has expired"})),
+        )
+            .into_response(),
         Err(e) => store_err(e),
     }
 }
@@ -792,16 +856,16 @@ async fn create_playlist(
     State(state): State<AppState>,
     Json(req): Json<CreatePlaylistRequest>,
 ) -> Response {
-    match state.store.create_playlist(1, &req.name, &req.interval, req.items) {
+    match state
+        .store
+        .create_playlist(1, &req.name, &req.interval, req.items)
+    {
         Ok(p) => (StatusCode::OK, Json(p)).into_response(),
         Err(e) => store_err(e),
     }
 }
 
-async fn get_playlist(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Response {
+async fn get_playlist(State(state): State<AppState>, Path(id): Path<i64>) -> Response {
     match state.store.get_playlist(id) {
         Ok(p) => Json(p).into_response(),
         Err(e) => store_err(e),
@@ -813,16 +877,16 @@ async fn update_playlist(
     Path(id): Path<i64>,
     Json(req): Json<CreatePlaylistRequest>,
 ) -> Response {
-    match state.store.update_playlist(id, &req.name, &req.interval, req.items) {
+    match state
+        .store
+        .update_playlist(id, &req.name, &req.interval, req.items)
+    {
         Ok(p) => Json(p).into_response(),
         Err(e) => store_err(e),
     }
 }
 
-async fn delete_playlist(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Response {
+async fn delete_playlist(State(state): State<AppState>, Path(id): Path<i64>) -> Response {
     match state.store.delete_playlist(id) {
         Ok(_) => Json(json!({"message":"Playlist deleted"})).into_response(),
         Err(e) => store_err(e),
@@ -838,20 +902,16 @@ async fn list_orgs(State(state): State<AppState>) -> Response {
     }
 }
 
-async fn create_org(
-    State(state): State<AppState>,
-    Json(req): Json<CreateOrgRequest>,
-) -> Response {
+async fn create_org(State(state): State<AppState>, Json(req): Json<CreateOrgRequest>) -> Response {
     match state.store.create_org(&req.name) {
-        Ok(org) => Json(json!({"orgId": org.id, "message": "Organization created"})).into_response(),
+        Ok(org) => {
+            Json(json!({"orgId": org.id, "message": "Organization created"})).into_response()
+        }
         Err(e) => store_err(e),
     }
 }
 
-async fn get_org(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Response {
+async fn get_org(State(state): State<AppState>, Path(id): Path<i64>) -> Response {
     match state.store.get_org(id) {
         Ok(org) => Json(org).into_response(),
         Err(e) => store_err(e),
@@ -884,10 +944,7 @@ async fn create_user(
     }
 }
 
-async fn get_user(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Response {
+async fn get_user(State(state): State<AppState>, Path(id): Path<i64>) -> Response {
     match state.store.get_user(id) {
         Ok(u) => Json(u).into_response(),
         Err(e) => store_err(e),
@@ -906,7 +963,8 @@ async fn current_user(State(state): State<AppState>) -> Response {
         "isGrafanaAdmin": true,
         "theme": "dark",
         "avatarUrl": "/avatar/46d229b033af06a191ff2267bca9ae56",
-    })).into_response()
+    }))
+    .into_response()
 }
 
 // ─── Teams ────────────────────────────────────────────────────────────────────
@@ -934,20 +992,14 @@ async fn create_team(
     }
 }
 
-async fn get_team(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Response {
+async fn get_team(State(state): State<AppState>, Path(id): Path<i64>) -> Response {
     match state.store.get_team(id) {
         Ok(t) => Json(t).into_response(),
         Err(e) => store_err(e),
     }
 }
 
-async fn list_team_members(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Response {
+async fn list_team_members(State(state): State<AppState>, Path(id): Path<i64>) -> Response {
     match state.store.list_team_members(id) {
         Ok(m) => Json(m).into_response(),
         Err(e) => store_err(e),
@@ -982,16 +1034,16 @@ async fn create_api_key(
     let hash = hash_api_key(&token);
     let ttl = req.seconds_to_live;
 
-    match state.store.create_api_key(1, &req.name, req.role, ttl, &hash, &token) {
+    match state
+        .store
+        .create_api_key(1, &req.name, req.role, ttl, &hash, &token)
+    {
         Ok(key) => Json(key).into_response(),
         Err(e) => store_err(e),
     }
 }
 
-async fn delete_api_key(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Response {
+async fn delete_api_key(State(state): State<AppState>, Path(id): Path<i64>) -> Response {
     match state.store.delete_api_key(id) {
         Ok(_) => Json(json!({"message":"API key deleted"})).into_response(),
         Err(e) => store_err(e),
@@ -1023,10 +1075,7 @@ async fn create_service_account(
     }
 }
 
-async fn get_service_account(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Response {
+async fn get_service_account(State(state): State<AppState>, Path(id): Path<i64>) -> Response {
     match state.store.get_service_account(id) {
         Ok(sa) => Json(sa).into_response(),
         Err(e) => store_err(e),
@@ -1038,7 +1087,8 @@ async fn get_service_account(
 async fn list_ruler_groups(State(state): State<AppState>) -> Response {
     match state.store.list_rule_groups(1) {
         Ok(groups) => {
-            let mut by_folder: std::collections::HashMap<String, Vec<serde_json::Value>> = std::collections::HashMap::new();
+            let mut by_folder: std::collections::HashMap<String, Vec<serde_json::Value>> =
+                std::collections::HashMap::new();
             for group in groups {
                 let entry = by_folder.entry(group.folder_uid.clone()).or_default();
                 entry.push(json!({
@@ -1059,10 +1109,17 @@ async fn list_folder_rules(
 ) -> Response {
     match state.store.list_alert_rules(1) {
         Ok(rules) => {
-            let folder_rules: Vec<&AlertRule> = rules.iter().filter(|r| r.folder_uid == folder_uid).collect();
-            let mut groups: std::collections::HashMap<String, Vec<&AlertRule>> = std::collections::HashMap::new();
+            let folder_rules: Vec<&AlertRule> = rules
+                .iter()
+                .filter(|r| r.folder_uid == folder_uid)
+                .collect();
+            let mut groups: std::collections::HashMap<String, Vec<&AlertRule>> =
+                std::collections::HashMap::new();
             for rule in folder_rules {
-                groups.entry(rule.rule_group.clone()).or_default().push(rule);
+                groups
+                    .entry(rule.rule_group.clone())
+                    .or_default()
+                    .push(rule);
             }
             let result: serde_json::Value = json!({
                 folder_uid: groups.into_iter().map(|(name, rules)| json!({
@@ -1082,7 +1139,8 @@ async fn get_rule_group(
 ) -> Response {
     match state.store.list_alert_rules(1) {
         Ok(rules) => {
-            let group_rules: Vec<AlertRule> = rules.into_iter()
+            let group_rules: Vec<AlertRule> = rules
+                .into_iter()
                 .filter(|r| r.folder_uid == folder_uid && r.rule_group == group)
                 .collect();
             Json(json!({"name": group, "interval": 60, "rules": group_rules})).into_response()
@@ -1114,7 +1172,11 @@ async fn put_rule_group(
             return store_err(e);
         }
     }
-    (StatusCode::ACCEPTED, Json(json!({"message":"Rule group updated"}))).into_response()
+    (
+        StatusCode::ACCEPTED,
+        Json(json!({"message":"Rule group updated"})),
+    )
+        .into_response()
 }
 
 async fn delete_rule_group(
@@ -1123,14 +1185,19 @@ async fn delete_rule_group(
 ) -> Response {
     match state.store.list_alert_rules(1) {
         Ok(rules) => {
-            let to_delete: Vec<String> = rules.into_iter()
+            let to_delete: Vec<String> = rules
+                .into_iter()
                 .filter(|r| r.folder_uid == folder_uid && r.rule_group == group)
                 .map(|r| r.uid)
                 .collect();
             for uid in to_delete {
                 let _ = state.store.delete_alert_rule(&uid);
             }
-            (StatusCode::ACCEPTED, Json(json!({"message":"Rule group deleted"}))).into_response()
+            (
+                StatusCode::ACCEPTED,
+                Json(json!({"message":"Rule group deleted"})),
+            )
+                .into_response()
         }
         Err(e) => store_err(e),
     }
@@ -1141,21 +1208,24 @@ async fn delete_rule_group(
 async fn get_alert_groups(State(state): State<AppState>) -> Response {
     match state.store.list_alert_rules(1) {
         Ok(rules) => {
-            let instances: Vec<AlertInstance> = rules.iter().map(|r| AlertInstance {
-                state: r.state,
-                labels: r.labels.clone(),
-                annotations: r.annotations.clone(),
-                value: String::new(),
-                starts_at: r.updated,
-                ends_at: None,
-                generator_url: format!("/alerting/grafana/{}/view", r.uid),
-                fingerprint: format!("{:x}", r.id),
-                silence_urls: vec![],
-                dashboard_url: None,
-                panel_url: None,
-                values: None,
-                evaluations: None,
-            }).collect();
+            let instances: Vec<AlertInstance> = rules
+                .iter()
+                .map(|r| AlertInstance {
+                    state: r.state,
+                    labels: r.labels.clone(),
+                    annotations: r.annotations.clone(),
+                    value: String::new(),
+                    starts_at: r.updated,
+                    ends_at: None,
+                    generator_url: format!("/alerting/grafana/{}/view", r.uid),
+                    fingerprint: format!("{:x}", r.id),
+                    silence_urls: vec![],
+                    dashboard_url: None,
+                    panel_url: None,
+                    values: None,
+                    evaluations: None,
+                })
+                .collect();
 
             let policy = state.store.get_notification_policy().unwrap_or_default();
             let groups = build_alert_groups(instances, &policy);
@@ -1174,20 +1244,14 @@ async fn list_silences(State(state): State<AppState>) -> Response {
     }
 }
 
-async fn create_silence(
-    State(state): State<AppState>,
-    Json(silence): Json<Silence>,
-) -> Response {
+async fn create_silence(State(state): State<AppState>, Json(silence): Json<Silence>) -> Response {
     match state.store.create_silence(silence) {
         Ok(s) => Json(json!({"silenceID": s.id})).into_response(),
         Err(e) => store_err(e),
     }
 }
 
-async fn delete_silence(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Response {
+async fn delete_silence(State(state): State<AppState>, Path(id): Path<String>) -> Response {
     match state.store.delete_silence(&id) {
         Ok(_) => (StatusCode::OK, Json(json!({}))).into_response(),
         Err(e) => store_err(e),
@@ -1228,10 +1292,7 @@ async fn update_contact_point(
     }
 }
 
-async fn delete_contact_point(
-    State(state): State<AppState>,
-    Path(uid): Path<String>,
-) -> Response {
+async fn delete_contact_point(State(state): State<AppState>, Path(uid): Path<String>) -> Response {
     match state.store.delete_contact_point(&uid) {
         Ok(_) => (StatusCode::ACCEPTED, Json(json!({}))).into_response(),
         Err(e) => store_err(e),
@@ -1252,7 +1313,11 @@ async fn put_notification_policy(
     Json(policy): Json<NotificationPolicy>,
 ) -> Response {
     match state.store.set_notification_policy(policy) {
-        Ok(_) => (StatusCode::ACCEPTED, Json(json!({"message":"Notification policy updated"}))).into_response(),
+        Ok(_) => (
+            StatusCode::ACCEPTED,
+            Json(json!({"message":"Notification policy updated"})),
+        )
+            .into_response(),
         Err(e) => store_err(e),
     }
 }
@@ -1266,20 +1331,14 @@ async fn list_mute_timings(State(state): State<AppState>) -> Response {
     }
 }
 
-async fn create_mute_timing(
-    State(state): State<AppState>,
-    Json(mt): Json<MuteTiming>,
-) -> Response {
+async fn create_mute_timing(State(state): State<AppState>, Json(mt): Json<MuteTiming>) -> Response {
     match state.store.upsert_mute_timing(mt) {
         Ok(m) => (StatusCode::CREATED, Json(m)).into_response(),
         Err(e) => store_err(e),
     }
 }
 
-async fn delete_mute_timing(
-    State(state): State<AppState>,
-    Path(name): Path<String>,
-) -> Response {
+async fn delete_mute_timing(State(state): State<AppState>, Path(name): Path<String>) -> Response {
     match state.store.delete_mute_timing(&name) {
         Ok(_) => (StatusCode::NO_CONTENT, Body::empty()).into_response(),
         Err(e) => store_err(e),
@@ -1305,10 +1364,7 @@ async fn create_alert_notification(
     }
 }
 
-async fn get_alert_notification(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Response {
+async fn get_alert_notification(State(state): State<AppState>, Path(id): Path<i64>) -> Response {
     match state.store.get_notification_channel(id) {
         Ok(ch) => Json(ch).into_response(),
         Err(e) => store_err(e),
@@ -1326,10 +1382,7 @@ async fn update_alert_notification(
     }
 }
 
-async fn delete_alert_notification(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Response {
+async fn delete_alert_notification(State(state): State<AppState>, Path(id): Path<i64>) -> Response {
     match state.store.delete_notification_channel(id) {
         Ok(_) => Json(json!({"message":"Notification deleted"})).into_response(),
         Err(e) => store_err(e),
@@ -1341,20 +1394,27 @@ async fn delete_alert_notification(
 async fn list_legacy_alerts(State(state): State<AppState>) -> Response {
     match state.store.list_dashboards(1) {
         Ok(dashboards) => {
-            let alerts: Vec<serde_json::Value> = dashboards.iter().flat_map(|d| {
-                d.panels.iter().filter_map(|p| p.alert.as_ref().map(|a| json!({
-                    "id": a.id,
-                    "dashboardId": d.id,
-                    "dashboardUid": d.uid,
-                    "dashboardSlug": d.slug,
-                    "panelId": p.id,
-                    "name": a.name,
-                    "state": a.state,
-                    "newStateDate": chrono::Utc::now(),
-                    "evalDate": chrono::Utc::now(),
-                    "url": format!("/d/{}/{}", d.uid, d.slug),
-                })))
-            }).collect();
+            let alerts: Vec<serde_json::Value> = dashboards
+                .iter()
+                .flat_map(|d| {
+                    d.panels.iter().filter_map(|p| {
+                        p.alert.as_ref().map(|a| {
+                            json!({
+                                "id": a.id,
+                                "dashboardId": d.id,
+                                "dashboardUid": d.uid,
+                                "dashboardSlug": d.slug,
+                                "panelId": p.id,
+                                "name": a.name,
+                                "state": a.state,
+                                "newStateDate": chrono::Utc::now(),
+                                "evalDate": chrono::Utc::now(),
+                                "url": format!("/d/{}/{}", d.uid, d.slug),
+                            })
+                        })
+                    })
+                })
+                .collect();
             Json(alerts).into_response()
         }
         Err(e) => store_err(e),
@@ -1363,10 +1423,7 @@ async fn list_legacy_alerts(State(state): State<AppState>) -> Response {
 
 // ─── HTML Renderer ────────────────────────────────────────────────────────────
 
-async fn render_dashboard_html(
-    State(state): State<AppState>,
-    Path(uid): Path<String>,
-) -> Response {
+async fn render_dashboard_html(State(state): State<AppState>, Path(uid): Path<String>) -> Response {
     match state.store.get_dashboard_by_uid(&uid) {
         Ok(d) => {
             let html = render_dashboard(&d);

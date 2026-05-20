@@ -173,8 +173,8 @@ mod tests {
         let _tenant_id = "lid-006";
         let g = LeaseIdGenerator::new(11);
         // Inject a known taken id, then a free one (LIFO via enqueue).
-        g.enqueue_fixed(7);   // tried second
-        g.enqueue_fixed(99);  // tried first (popped first)
+        g.enqueue_fixed(7); // tried second
+        g.enqueue_fixed(99); // tried first (popped first)
         let mut taken = std::collections::HashSet::new();
         taken.insert(99);
         let id = g.allocate(|c| taken.contains(&c)).unwrap();

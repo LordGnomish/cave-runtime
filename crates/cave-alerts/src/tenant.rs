@@ -64,7 +64,10 @@ mod tests {
     #[test]
     fn test_tenant_invalid_utf8_falls_back() {
         let mut h = HeaderMap::new();
-        h.insert(X_SCOPE_ORG_ID, HeaderValue::from_bytes(b"\xff\xff").unwrap());
+        h.insert(
+            X_SCOPE_ORG_ID,
+            HeaderValue::from_bytes(b"\xff\xff").unwrap(),
+        );
         assert_eq!(tenant_from_headers(&h), DEFAULT_TENANT);
     }
 

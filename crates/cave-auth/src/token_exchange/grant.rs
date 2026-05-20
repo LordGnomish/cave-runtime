@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use super::actor_token::{parse_actor, ActorClaim, ActorTokenError};
+use super::actor_token::{ActorClaim, ActorTokenError, parse_actor};
 use super::audience_switch::{AudienceError, AudienceRequest};
 use super::policy::{ExchangePolicy, PolicyDecision};
 use super::subject_token::{SubjectToken, SubjectTokenError, SubjectTokenType};
@@ -124,9 +124,9 @@ impl TokenExchanger {
             .requested_token_type
             .clone()
             .unwrap_or_else(|| SubjectTokenType::AccessToken.as_uri().to_string());
-        let requested_type: SubjectTokenType = requested_type_str.parse().map_err(|_| {
-            ExchangeError::UnsupportedRequestedType(requested_type_str.clone())
-        })?;
+        let requested_type: SubjectTokenType = requested_type_str
+            .parse()
+            .map_err(|_| ExchangeError::UnsupportedRequestedType(requested_type_str.clone()))?;
 
         // RFC 8693 only mandates support for issuing access_token / jwt / id_token.
         if !matches!(
@@ -214,7 +214,12 @@ mod tests {
 
     fn jwt(sub: &str) -> String {
         let body = format!(r#"{{"sub":"{sub}","iss":"idp","aud":"rs"}}"#);
-        format!("{}.{}.{}", b64u(r#"{"alg":"none"}"#), b64u(&body), b64u("sig"))
+        format!(
+            "{}.{}.{}",
+            b64u(r#"{"alg":"none"}"#),
+            b64u(&body),
+            b64u("sig")
+        )
     }
 
     fn req() -> ExchangeRequest {

@@ -55,7 +55,10 @@ impl AlertStore {
     // ─── Silences ──────────────────────────────────────────────────────
 
     pub fn create_silence(&self, silence: Silence) -> Silence {
-        self.inner.write().silences.insert(silence.id, silence.clone());
+        self.inner
+            .write()
+            .silences
+            .insert(silence.id, silence.clone());
         silence
     }
 
@@ -80,7 +83,10 @@ impl AlertStore {
     // ─── Inhibit rules ────────────────────────────────────────────────
 
     pub fn create_inhibit_rule(&self, rule: InhibitRule) -> InhibitRule {
-        self.inner.write().inhibit_rules.insert(rule.id, rule.clone());
+        self.inner
+            .write()
+            .inhibit_rules
+            .insert(rule.id, rule.clone());
         rule
     }
 
@@ -101,7 +107,10 @@ impl AlertStore {
     // ─── Receivers ─────────────────────────────────────────────────────
 
     pub fn upsert_receiver(&self, receiver: Receiver) {
-        self.inner.write().receivers.insert(receiver.name.clone(), receiver);
+        self.inner
+            .write()
+            .receivers
+            .insert(receiver.name.clone(), receiver);
     }
 
     pub fn list_receivers(&self) -> Vec<Receiver> {
@@ -181,7 +190,12 @@ mod tests {
     #[test]
     fn test_create_and_delete_inhibit_rule() {
         let store = AlertStore::new();
-        let rule = InhibitRule::new("r", vec![Matcher::equal("a", "b")], vec![Matcher::equal("c", "d")], vec![]);
+        let rule = InhibitRule::new(
+            "r",
+            vec![Matcher::equal("a", "b")],
+            vec![Matcher::equal("c", "d")],
+            vec![],
+        );
         let r = store.create_inhibit_rule(rule);
         assert!(store.delete_inhibit_rule(r.id));
     }

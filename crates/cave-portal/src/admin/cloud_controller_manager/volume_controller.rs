@@ -5,17 +5,21 @@
 use super::CloudControllerViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::table;
-use crate::admin::state::{scope, AdminState, CloudVolume};
+use crate::admin::state::{AdminState, CloudVolume, scope};
 
 pub fn list_volumes(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<Vec<CloudVolume>, CloudControllerViewError> {
     ctx.authorise(Permission::CloudControllerRead)?;
-    Ok(scope(&state.cloud_volumes.read().unwrap(), &ctx.tenant, |r| &r.tenant)
+    Ok(
+        scope(&state.cloud_volumes.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
         .into_iter()
         .cloned()
-        .collect())
+        .collect(),
+    )
 }
 
 pub fn unattached_volumes(
@@ -23,7 +27,10 @@ pub fn unattached_volumes(
     ctx: &RequestCtx,
 ) -> Result<Vec<CloudVolume>, CloudControllerViewError> {
     let all = list_volumes(state, ctx)?;
-    Ok(all.into_iter().filter(|v| v.attached_node.is_none()).collect())
+    Ok(all
+        .into_iter()
+        .filter(|v| v.attached_node.is_none())
+        .collect())
 }
 
 pub(super) fn render_section(

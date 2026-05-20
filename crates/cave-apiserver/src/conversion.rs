@@ -71,17 +71,17 @@ impl CoreConverter {
                 // a simple rename as illustration of the scheme.
                 RenameRule {
                     from_version: "apps/v1beta1".into(),
-                    to_version:   "apps/v1".into(),
-                    kind:         "Deployment".into(),
-                    from_field:   "rollbackTo".into(),
-                    to_field:     "_deprecated_rollbackTo".into(),
+                    to_version: "apps/v1".into(),
+                    kind: "Deployment".into(),
+                    from_field: "rollbackTo".into(),
+                    to_field: "_deprecated_rollbackTo".into(),
                 },
                 RenameRule {
                     from_version: "v1beta1".into(),
-                    to_version:   "v1".into(),
-                    kind:         "ConfigMap".into(),
-                    from_field:   "binaryData".into(),
-                    to_field:     "binaryData".into(),
+                    to_version: "v1".into(),
+                    kind: "ConfigMap".into(),
+                    from_field: "binaryData".into(),
+                    to_field: "binaryData".into(),
                 },
             ],
         }
@@ -123,11 +123,15 @@ impl CoreConverter {
         }
     }
 
-    pub fn rule_count(&self) -> usize { self.rules.len() }
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
 }
 
 impl Default for CoreConverter {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── Webhook conversion (v1beta1 → v1 migration) ──────────────────────────────
@@ -154,7 +158,10 @@ pub struct WebhookConverter<C: ConversionWebhookClient> {
 
 impl<C: ConversionWebhookClient> WebhookConverter<C> {
     pub fn new(name: impl Into<String>, client: C) -> Self {
-        Self { name: name.into(), client }
+        Self {
+            name: name.into(),
+            client,
+        }
     }
 
     /// Run the webhook conversion. Tenant invariant is enforced by re-checking
@@ -162,8 +169,8 @@ impl<C: ConversionWebhookClient> WebhookConverter<C> {
     /// any divergence flips the outcome to `Failure` and drops the body.
     pub fn convert(&self, req: ConversionRequest) -> ConversionResponse {
         // Snapshot per-object tenant_ids, in input order.
-        let expected_tenants: Vec<String> = req.objects.iter()
-            .map(|o| o.tenant_id.clone()).collect();
+        let expected_tenants: Vec<String> =
+            req.objects.iter().map(|o| o.tenant_id.clone()).collect();
         let mut resp = self.client.convert(req);
         if resp.result_status != "Success" {
             return resp;
@@ -173,8 +180,7 @@ impl<C: ConversionWebhookClient> WebhookConverter<C> {
                 uid: resp.uid,
                 converted_objects: vec![],
                 result_status: "Failure".into(),
-                result_message:
-                    "webhook returned object count differs from input".into(),
+                result_message: "webhook returned object count differs from input".into(),
             };
         }
         for (i, o) in resp.converted_objects.iter().enumerate() {
@@ -186,7 +192,8 @@ impl<C: ConversionWebhookClient> WebhookConverter<C> {
                     result_message: format!(
                         "tenant_id invariant: webhook altered tenant_id at index {} \
                          (expected `{}`, got `{}`)",
-                        i, expected_tenants[i], o.tenant_id),
+                        i, expected_tenants[i], o.tenant_id
+                    ),
                 };
             }
         }
@@ -227,25 +234,29 @@ mod tests {
         let resp = conv.convert(req);
         assert_eq!(resp.result_status, "Success");
         assert_eq!(resp.converted_objects[0].api_version, "v1");
-        assert_eq!(resp.converted_objects[0].tenant_id, "acme",
-            "tenant_id invariant preserved across conversion");
+        assert_eq!(
+            resp.converted_objects[0].tenant_id, "acme",
+            "tenant_id invariant preserved across conversion"
+        );
     }
 
     /// Upstream parity: `TestConverter_FieldRename`.
     #[test]
     fn test_convert_applies_field_rename() {
-        let conv = CoreConverter::new()
-            .with_rule(RenameRule {
-                from_version: "v1beta1".into(),
-                to_version: "v1".into(),
-                kind: "Widget".into(),
-                from_field: "oldName".into(),
-                to_field: "newName".into(),
-            });
+        let conv = CoreConverter::new().with_rule(RenameRule {
+            from_version: "v1beta1".into(),
+            to_version: "v1".into(),
+            kind: "Widget".into(),
+            from_field: "oldName".into(),
+            to_field: "newName".into(),
+        });
         let mut o = obj("Widget", "v1beta1", "acme");
-        o.fields.insert("oldName".into(), serde_json::Value::String("hello".into()));
+        o.fields
+            .insert("oldName".into(), serde_json::Value::String("hello".into()));
         let req = ConversionRequest {
-            uid: "u1".into(), desired_api_version: "v1".into(), objects: vec![o],
+            uid: "u1".into(),
+            desired_api_version: "v1".into(),
+            objects: vec![o],
         };
         let resp = conv.convert(req);
         let out = &resp.converted_objects[0];
@@ -265,8 +276,10 @@ mod tests {
         };
         let resp = conv.convert(req);
         assert_eq!(resp.converted_objects[0].api_version, "v1");
-        assert_eq!(resp.converted_objects[0].tenant_id, "acme",
-            "tenant_id invariant preserved on noop");
+        assert_eq!(
+            resp.converted_objects[0].tenant_id, "acme",
+            "tenant_id invariant preserved on noop"
+        );
     }
 
     /// Upstream parity: `TestConverter_PreservesTenantAcrossBatch`.
@@ -292,46 +305,58 @@ mod tests {
     /// Upstream parity: `TestConverter_RuleScopedByKind`.
     #[test]
     fn test_rule_scoped_by_kind_does_not_apply_to_other_kinds() {
-        let conv = CoreConverter::new()
-            .with_rule(RenameRule {
-                from_version: "v1beta1".into(),
-                to_version: "v1".into(),
-                kind: "Foo".into(),
-                from_field: "old".into(),
-                to_field: "new".into(),
-            });
+        let conv = CoreConverter::new().with_rule(RenameRule {
+            from_version: "v1beta1".into(),
+            to_version: "v1".into(),
+            kind: "Foo".into(),
+            from_field: "old".into(),
+            to_field: "new".into(),
+        });
         let mut o = obj("Bar", "v1beta1", "acme");
         o.fields.insert("old".into(), serde_json::Value::Bool(true));
         let req = ConversionRequest {
-            uid: "u1".into(), desired_api_version: "v1".into(), objects: vec![o],
+            uid: "u1".into(),
+            desired_api_version: "v1".into(),
+            objects: vec![o],
         };
         let resp = conv.convert(req);
-        assert!(resp.converted_objects[0].fields.contains_key("old"),
-            "rule for Foo MUST NOT touch Bar");
-        assert_eq!(resp.converted_objects[0].tenant_id, "acme", "tenant_id invariant");
+        assert!(
+            resp.converted_objects[0].fields.contains_key("old"),
+            "rule for Foo MUST NOT touch Bar"
+        );
+        assert_eq!(
+            resp.converted_objects[0].tenant_id, "acme",
+            "tenant_id invariant"
+        );
     }
 
     /// Upstream parity: `TestConverter_RuleScopedByDirection`.
     #[test]
     fn test_rule_scoped_by_direction_not_reversed() {
-        let conv = CoreConverter::new()
-            .with_rule(RenameRule {
-                from_version: "v1beta1".into(),
-                to_version: "v1".into(),
-                kind: "Foo".into(),
-                from_field: "old".into(),
-                to_field: "new".into(),
-            });
+        let conv = CoreConverter::new().with_rule(RenameRule {
+            from_version: "v1beta1".into(),
+            to_version: "v1".into(),
+            kind: "Foo".into(),
+            from_field: "old".into(),
+            to_field: "new".into(),
+        });
         // Convert in reverse direction — rule must not apply.
         let mut o = obj("Foo", "v1", "acme");
         o.fields.insert("new".into(), serde_json::Value::Bool(true));
         let req = ConversionRequest {
-            uid: "u1".into(), desired_api_version: "v1beta1".into(), objects: vec![o],
+            uid: "u1".into(),
+            desired_api_version: "v1beta1".into(),
+            objects: vec![o],
         };
         let resp = conv.convert(req);
-        assert!(resp.converted_objects[0].fields.contains_key("new"),
-            "v1→v1beta1 must not apply v1beta1→v1 rule");
-        assert_eq!(resp.converted_objects[0].tenant_id, "acme", "tenant_id invariant");
+        assert!(
+            resp.converted_objects[0].fields.contains_key("new"),
+            "v1→v1beta1 must not apply v1beta1→v1 rule"
+        );
+        assert_eq!(
+            resp.converted_objects[0].tenant_id, "acme",
+            "tenant_id invariant"
+        );
     }
 
     /// Upstream parity: `TestConverter_EmptyBatchSucceeds`.
@@ -352,11 +377,15 @@ mod tests {
     #[test]
     fn test_default_rule_set_present() {
         let conv = CoreConverter::new();
-        assert!(conv.rule_count() >= 2,
-            "default converter ships at least 2 baseline rules");
+        assert!(
+            conv.rule_count() >= 2,
+            "default converter ships at least 2 baseline rules"
+        );
         // tenant_id invariant smoke: empty batch still preserves shape.
         let resp = conv.convert(ConversionRequest {
-            uid: "u".into(), desired_api_version: "v1".into(), objects: vec![],
+            uid: "u".into(),
+            desired_api_version: "v1".into(),
+            objects: vec![],
         });
         assert_eq!(resp.result_status, "Success");
     }
@@ -372,20 +401,30 @@ mod tests {
         let req = ConversionRequest {
             uid: "u1".into(),
             desired_api_version: "v1".into(),
-            objects: (0..5).map(|i| {
-                let tenant = format!("tenant-{}", i);
-                let mut o = obj("ConfigMap", "v1beta1", &tenant);
-                o.name = format!("cm-{}", i);
-                o
-            }).collect(),
+            objects: (0..5)
+                .map(|i| {
+                    let tenant = format!("tenant-{}", i);
+                    let mut o = obj("ConfigMap", "v1beta1", &tenant);
+                    o.name = format!("cm-{}", i);
+                    o
+                })
+                .collect(),
         };
         let resp = conv.convert(req);
         assert_eq!(resp.converted_objects.len(), 5);
         for (i, o) in resp.converted_objects.iter().enumerate() {
-            assert_eq!(o.name, format!("cm-{}", i),
-                "output order matches input order at index {}", i);
-            assert_eq!(o.tenant_id, format!("tenant-{}", i),
-                "tenant_id invariant: per-object tenant preserved at index {}", i);
+            assert_eq!(
+                o.name,
+                format!("cm-{}", i),
+                "output order matches input order at index {}",
+                i
+            );
+            assert_eq!(
+                o.tenant_id,
+                format!("tenant-{}", i),
+                "tenant_id invariant: per-object tenant preserved at index {}",
+                i
+            );
         }
     }
 
@@ -393,24 +432,26 @@ mod tests {
     /// (rename rule whose source field is absent yields a no-op for that obj).
     #[test]
     fn test_field_rename_is_noop_when_source_field_absent() {
-        let conv = CoreConverter::new()
-            .with_rule(RenameRule {
-                from_version: "v1beta1".into(),
-                to_version: "v1".into(),
-                kind: "Widget".into(),
-                from_field: "missingField".into(),
-                to_field: "newName".into(),
-            });
+        let conv = CoreConverter::new().with_rule(RenameRule {
+            from_version: "v1beta1".into(),
+            to_version: "v1".into(),
+            kind: "Widget".into(),
+            from_field: "missingField".into(),
+            to_field: "newName".into(),
+        });
         let o = obj("Widget", "v1beta1", "acme"); // has only "foo"
         let req = ConversionRequest {
-            uid: "u1".into(), desired_api_version: "v1".into(), objects: vec![o],
+            uid: "u1".into(),
+            desired_api_version: "v1".into(),
+            objects: vec![o],
         };
         let resp = conv.convert(req);
         let out = &resp.converted_objects[0];
-        assert!(!out.fields.contains_key("newName"),
-            "no rename when source field is absent");
-        assert!(out.fields.contains_key("foo"),
-            "untouched fields retained");
+        assert!(
+            !out.fields.contains_key("newName"),
+            "no rename when source field is absent"
+        );
+        assert!(out.fields.contains_key("foo"), "untouched fields retained");
         assert_eq!(out.tenant_id, "acme", "tenant_id invariant on noop rename");
     }
 
@@ -434,10 +475,14 @@ mod tests {
                 to_field: "betaV1".into(),
             });
         let mut o = obj("Widget", "v1beta1", "acme");
-        o.fields.insert("alpha".into(), serde_json::Value::Bool(true));
-        o.fields.insert("beta".into(), serde_json::Value::Bool(false));
+        o.fields
+            .insert("alpha".into(), serde_json::Value::Bool(true));
+        o.fields
+            .insert("beta".into(), serde_json::Value::Bool(false));
         let req = ConversionRequest {
-            uid: "u1".into(), desired_api_version: "v1".into(), objects: vec![o],
+            uid: "u1".into(),
+            desired_api_version: "v1".into(),
+            objects: vec![o],
         };
         let resp = conv.convert(req);
         let out = &resp.converted_objects[0];
@@ -445,25 +490,29 @@ mod tests {
         assert!(out.fields.contains_key("betaV1"));
         assert!(!out.fields.contains_key("alpha"));
         assert!(!out.fields.contains_key("beta"));
-        assert_eq!(out.tenant_id, "acme", "tenant_id invariant across multi-rule pass");
+        assert_eq!(
+            out.tenant_id, "acme",
+            "tenant_id invariant across multi-rule pass"
+        );
     }
 
     /// Upstream parity: `TestConverter_MixedKindBatch`
     /// (per-object rules applied selectively in a heterogeneous batch).
     #[test]
     fn test_mixed_kind_batch_applies_rules_selectively() {
-        let conv = CoreConverter::new()
-            .with_rule(RenameRule {
-                from_version: "v1beta1".into(),
-                to_version: "v1".into(),
-                kind: "Widget".into(),
-                from_field: "x".into(),
-                to_field: "y".into(),
-            });
+        let conv = CoreConverter::new().with_rule(RenameRule {
+            from_version: "v1beta1".into(),
+            to_version: "v1".into(),
+            kind: "Widget".into(),
+            from_field: "x".into(),
+            to_field: "y".into(),
+        });
         let mut w = obj("Widget", "v1beta1", "acme");
-        w.fields.insert("x".into(), serde_json::Value::String("v".into()));
+        w.fields
+            .insert("x".into(), serde_json::Value::String("v".into()));
         let mut g = obj("Gadget", "v1beta1", "globex");
-        g.fields.insert("x".into(), serde_json::Value::String("v".into()));
+        g.fields
+            .insert("x".into(), serde_json::Value::String("v".into()));
         let req = ConversionRequest {
             uid: "u1".into(),
             desired_api_version: "v1".into(),
@@ -472,13 +521,22 @@ mod tests {
         let resp = conv.convert(req);
         let widget = &resp.converted_objects[0];
         let gadget = &resp.converted_objects[1];
-        assert!(widget.fields.contains_key("y"),
-            "Widget rule applied to Widget");
-        assert!(gadget.fields.contains_key("x"),
-            "Gadget unaffected by Widget-scoped rule");
-        assert_eq!(widget.tenant_id, "acme", "tenant_id invariant: widget tenant");
-        assert_eq!(gadget.tenant_id, "globex",
-            "tenant_id invariant: gadget tenant — no cross-object bleed");
+        assert!(
+            widget.fields.contains_key("y"),
+            "Widget rule applied to Widget"
+        );
+        assert!(
+            gadget.fields.contains_key("x"),
+            "Gadget unaffected by Widget-scoped rule"
+        );
+        assert_eq!(
+            widget.tenant_id, "acme",
+            "tenant_id invariant: widget tenant"
+        );
+        assert_eq!(
+            gadget.tenant_id, "globex",
+            "tenant_id invariant: gadget tenant — no cross-object bleed"
+        );
     }
 
     // ── Webhook conversion (deeper-003) ──────────────────────────────────────
@@ -547,10 +605,14 @@ mod tests {
         let resp = wh.convert(req);
         assert_eq!(resp.result_status, "Success");
         assert_eq!(resp.converted_objects[0].api_version, "v1");
-        assert_eq!(resp.converted_objects[0].tenant_id, "acme",
-            "tenant_id invariant: webhook trip preserves acme tenant");
-        assert_eq!(resp.converted_objects[1].tenant_id, "globex",
-            "tenant_id invariant: per-object tenant preserved through batch");
+        assert_eq!(
+            resp.converted_objects[0].tenant_id, "acme",
+            "tenant_id invariant: webhook trip preserves acme tenant"
+        );
+        assert_eq!(
+            resp.converted_objects[1].tenant_id, "globex",
+            "tenant_id invariant: per-object tenant preserved through batch"
+        );
     }
 
     /// Upstream parity: `TestWebhookConverter_FailureBubblesUp`
@@ -566,8 +628,10 @@ mod tests {
         let resp = wh.convert(req);
         assert_eq!(resp.result_status, "Failure");
         assert_eq!(resp.result_message, "backend down");
-        assert!(resp.converted_objects.is_empty(),
-            "failure path returns no objects, never partial output");
+        assert!(
+            resp.converted_objects.is_empty(),
+            "failure path returns no objects, never partial output"
+        );
     }
 
     /// Upstream parity: `TestWebhookConverter_RejectsTenantIdMutation`
@@ -583,11 +647,15 @@ mod tests {
             objects: vec![obj("Widget", "v1beta1", "acme")],
         };
         let resp = wh.convert(req);
-        assert_eq!(resp.result_status, "Failure",
-            "tenant_id invariant: tenant flip MUST demote webhook response");
+        assert_eq!(
+            resp.result_status, "Failure",
+            "tenant_id invariant: tenant flip MUST demote webhook response"
+        );
         assert!(resp.result_message.contains("tenant_id invariant"));
-        assert!(resp.converted_objects.is_empty(),
-            "tenant_id invariant: poisoned objects MUST NOT be exposed to caller");
+        assert!(
+            resp.converted_objects.is_empty(),
+            "tenant_id invariant: poisoned objects MUST NOT be exposed to caller"
+        );
     }
 
     /// Upstream parity: `TestWebhookConverter_ObjectCountMismatchRejected`
@@ -616,8 +684,10 @@ mod tests {
             ],
         };
         let resp = wh.convert(req);
-        assert_eq!(resp.result_status, "Failure",
-            "count mismatch demoted to Failure, never silently accepted");
+        assert_eq!(
+            resp.result_status, "Failure",
+            "count mismatch demoted to Failure, never silently accepted"
+        );
         assert!(resp.result_message.contains("object count"));
         // tenant_id invariant: empty body ensures no acme leak via the count-skew payload.
         assert!(resp.converted_objects.is_empty());
@@ -637,7 +707,10 @@ mod tests {
 
     impl HttpWebhookClient {
         fn new(endpoint: String, runtime_handle: tokio::runtime::Handle) -> Self {
-            Self { endpoint, runtime_handle }
+            Self {
+                endpoint,
+                runtime_handle,
+            }
         }
     }
 
@@ -649,12 +722,17 @@ mod tests {
             let resp_result: Result<ConversionResponse, String> =
                 self.runtime_handle.block_on(async move {
                     let client = reqwest::Client::new();
-                    let resp = client.post(&endpoint).json(&req_clone).send().await
+                    let resp = client
+                        .post(&endpoint)
+                        .json(&req_clone)
+                        .send()
+                        .await
                         .map_err(|e| format!("transport: {}", e))?;
                     if !resp.status().is_success() {
                         return Err(format!("non-2xx: {}", resp.status()));
                     }
-                    resp.json::<ConversionResponse>().await
+                    resp.json::<ConversionResponse>()
+                        .await
                         .map_err(|e| format!("decode: {}", e))
                 });
             match resp_result {
@@ -672,7 +750,7 @@ mod tests {
     async fn spawn_mock_webhook(
         handler: impl Fn(ConversionRequest) -> ConversionResponse + Send + Sync + 'static,
     ) -> String {
-        use axum::{routing::post, Router, Json, extract::State};
+        use axum::{extract::State, routing::post, Json, Router};
         use std::sync::Arc;
         let state = Arc::new(handler);
         async fn handle(
@@ -681,13 +759,15 @@ mod tests {
         ) -> Json<ConversionResponse> {
             Json((h)(req))
         }
-        let app: Router = Router::new()
-            .route("/convert", post(handle))
-            .with_state(state as Arc<dyn Fn(ConversionRequest) -> ConversionResponse + Send + Sync>);
+        let app: Router = Router::new().route("/convert", post(handle)).with_state(
+            state as Arc<dyn Fn(ConversionRequest) -> ConversionResponse + Send + Sync>,
+        );
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         tokio::spawn(async move {
-            axum::serve(listener, app.into_make_service()).await.unwrap();
+            axum::serve(listener, app.into_make_service())
+                .await
+                .unwrap();
         });
         format!("http://{}/convert", addr)
     }
@@ -709,10 +789,10 @@ mod tests {
                 result_status: "Success".into(),
                 result_message: String::new(),
             }
-        }).await;
+        })
+        .await;
         let handle = tokio::runtime::Handle::current();
-        let wh = WebhookConverter::new("http-webhook",
-            HttpWebhookClient::new(endpoint, handle));
+        let wh = WebhookConverter::new("http-webhook", HttpWebhookClient::new(endpoint, handle));
         let req = ConversionRequest {
             uid: "u-http".into(),
             desired_api_version: "v1".into(),
@@ -722,12 +802,15 @@ mod tests {
         // can actually execute (current_thread runtime in #[tokio::test]
         // would otherwise deadlock).
         let resp = tokio::task::spawn_blocking(move || wh.convert(req))
-            .await.unwrap();
+            .await
+            .unwrap();
         assert_eq!(resp.result_status, "Success");
         assert_eq!(resp.converted_objects.len(), 1);
         assert_eq!(resp.converted_objects[0].api_version, "v1");
-        assert_eq!(resp.converted_objects[0].tenant_id, "acme",
-            "tenant_id invariant: HTTP roundtrip preserves tenant");
+        assert_eq!(
+            resp.converted_objects[0].tenant_id, "acme",
+            "tenant_id invariant: HTTP roundtrip preserves tenant"
+        );
     }
 
     /// Upstream parity: `TestWebhookConverter_HttpFailureBubblesUp`
@@ -735,28 +818,29 @@ mod tests {
     /// Failure response without invented objects).
     #[tokio::test]
     async fn test_webhook_converter_real_http_failure_status_bubbles_up() {
-        let endpoint = spawn_mock_webhook(|req: ConversionRequest| {
-            ConversionResponse {
-                uid: req.uid,
-                converted_objects: vec![],
-                result_status: "Failure".into(),
-                result_message: "schema invalid".into(),
-            }
-        }).await;
+        let endpoint = spawn_mock_webhook(|req: ConversionRequest| ConversionResponse {
+            uid: req.uid,
+            converted_objects: vec![],
+            result_status: "Failure".into(),
+            result_message: "schema invalid".into(),
+        })
+        .await;
         let handle = tokio::runtime::Handle::current();
-        let wh = WebhookConverter::new("http-webhook",
-            HttpWebhookClient::new(endpoint, handle));
+        let wh = WebhookConverter::new("http-webhook", HttpWebhookClient::new(endpoint, handle));
         let req = ConversionRequest {
             uid: "u-fail".into(),
             desired_api_version: "v1".into(),
             objects: vec![obj("Widget", "v1beta1", "acme")],
         };
         let resp = tokio::task::spawn_blocking(move || wh.convert(req))
-            .await.unwrap();
+            .await
+            .unwrap();
         assert_eq!(resp.result_status, "Failure");
         assert_eq!(resp.result_message, "schema invalid");
-        assert!(resp.converted_objects.is_empty(),
-            "tenant_id invariant: failure path returns no objects, never partial");
+        assert!(
+            resp.converted_objects.is_empty(),
+            "tenant_id invariant: failure path returns no objects, never partial"
+        );
     }
 
     /// Upstream parity: `TestWebhookConverter_HttpRejectsTenantFlip`
@@ -777,22 +861,27 @@ mod tests {
                 result_status: "Success".into(),
                 result_message: String::new(),
             }
-        }).await;
+        })
+        .await;
         let handle = tokio::runtime::Handle::current();
-        let wh = WebhookConverter::new("http-webhook",
-            HttpWebhookClient::new(endpoint, handle));
+        let wh = WebhookConverter::new("http-webhook", HttpWebhookClient::new(endpoint, handle));
         let req = ConversionRequest {
             uid: "u-flip".into(),
             desired_api_version: "v1".into(),
             objects: vec![obj("Widget", "v1beta1", "acme")],
         };
         let resp = tokio::task::spawn_blocking(move || wh.convert(req))
-            .await.unwrap();
-        assert_eq!(resp.result_status, "Failure",
-            "tenant_id invariant: HTTP success with tenant flip is demoted");
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.result_status, "Failure",
+            "tenant_id invariant: HTTP success with tenant flip is demoted"
+        );
         assert!(resp.result_message.contains("tenant_id invariant"));
-        assert!(resp.converted_objects.is_empty(),
-            "tenant_id invariant: poisoned body never exposed to caller");
+        assert!(
+            resp.converted_objects.is_empty(),
+            "tenant_id invariant: poisoned body never exposed to caller"
+        );
     }
 
     /// Upstream parity: `TestWebhookConverter_HttpTransportErrorIsFailure`
@@ -803,23 +892,25 @@ mod tests {
         // 127.0.0.1:1 is reserved as a closed port by every modern OS.
         let endpoint = "http://127.0.0.1:1/convert".to_string();
         let handle = tokio::runtime::Handle::current();
-        let wh = WebhookConverter::new("http-webhook",
-            HttpWebhookClient::new(endpoint, handle));
+        let wh = WebhookConverter::new("http-webhook", HttpWebhookClient::new(endpoint, handle));
         let req = ConversionRequest {
             uid: "u-unreach".into(),
             desired_api_version: "v1".into(),
             objects: vec![obj("Widget", "v1beta1", "acme")],
         };
         let resp = tokio::task::spawn_blocking(move || wh.convert(req))
-            .await.unwrap();
+            .await
+            .unwrap();
         assert_eq!(resp.result_status, "Failure");
         assert!(
-            resp.result_message.starts_with("transport:")
-                || resp.result_message.contains("error"),
-            "transport error reason surfaced verbatim: {}", resp.result_message
+            resp.result_message.starts_with("transport:") || resp.result_message.contains("error"),
+            "transport error reason surfaced verbatim: {}",
+            resp.result_message
         );
-        assert!(resp.converted_objects.is_empty(),
-            "tenant_id invariant: transport failure never invents acme objects");
+        assert!(
+            resp.converted_objects.is_empty(),
+            "tenant_id invariant: transport failure never invents acme objects"
+        );
     }
 
     /// Upstream parity: `TestConverter_NoRuleMutationOfTenantId`
@@ -827,26 +918,31 @@ mod tests {
     /// like tenant_id appear in the rename map).
     #[test]
     fn test_converter_never_strips_tenant_id_via_field_rename() {
-        let conv = CoreConverter::new()
-            .with_rule(RenameRule {
-                from_version: "v1beta1".into(),
-                to_version: "v1".into(),
-                kind: "ConfigMap".into(),
-                from_field: "tenant_id".into(),  // intentionally adversarial name
-                to_field: "renamed_tenant_id".into(),
-            });
+        let conv = CoreConverter::new().with_rule(RenameRule {
+            from_version: "v1beta1".into(),
+            to_version: "v1".into(),
+            kind: "ConfigMap".into(),
+            from_field: "tenant_id".into(), // intentionally adversarial name
+            to_field: "renamed_tenant_id".into(),
+        });
         let mut o = obj("ConfigMap", "v1beta1", "acme");
         // Adversarial: a field literally named tenant_id inside fields map.
-        o.fields.insert("tenant_id".into(),
-            serde_json::Value::String("wannabe-attacker".into()));
+        o.fields.insert(
+            "tenant_id".into(),
+            serde_json::Value::String("wannabe-attacker".into()),
+        );
         let req = ConversionRequest {
-            uid: "u1".into(), desired_api_version: "v1".into(), objects: vec![o],
+            uid: "u1".into(),
+            desired_api_version: "v1".into(),
+            objects: vec![o],
         };
         let resp = conv.convert(req);
         let out = &resp.converted_objects[0];
         // The rule moves the in-fields entry, but the canonical tenant_id on
         // the ConvertibleObject must remain "acme".
-        assert_eq!(out.tenant_id, "acme",
-            "tenant_id invariant: canonical tenant_id MUST NOT be overwritten by field rename");
+        assert_eq!(
+            out.tenant_id, "acme",
+            "tenant_id invariant: canonical tenant_id MUST NOT be overwritten by field rename"
+        );
     }
 }

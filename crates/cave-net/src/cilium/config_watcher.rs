@@ -83,7 +83,10 @@ impl ConfigWatcher {
                     ChangeAction::Reconfigure
                 };
                 self.pending_changes.push(ConfigChange {
-                    key: k.clone(), from: prev, to: Some(v.clone()), action,
+                    key: k.clone(),
+                    from: prev,
+                    to: Some(v.clone()),
+                    action,
                 });
             }
         }
@@ -97,14 +100,22 @@ impl ConfigWatcher {
                     ChangeAction::Reconfigure
                 };
                 self.pending_changes.push(ConfigChange {
-                    key: k.clone(), from: prev, to: None, action,
+                    key: k.clone(),
+                    from: prev,
+                    to: None,
+                    action,
                 });
             }
         }
         self.cluster_config = new_config;
     }
 
-    pub fn set_node_override(&mut self, node: impl Into<String>, key: impl Into<String>, value: String) {
+    pub fn set_node_override(
+        &mut self,
+        node: impl Into<String>,
+        key: impl Into<String>,
+        value: String,
+    ) {
         let node = node.into();
         let key = key.into();
         let restart = restart_required_options();
@@ -116,7 +127,10 @@ impl ConfigWatcher {
         let entry = self.node_overrides.entry(node).or_default();
         let prev = entry.insert(key.clone(), value.clone());
         self.pending_changes.push(ConfigChange {
-            key, from: prev, to: Some(value), action,
+            key,
+            from: prev,
+            to: Some(value),
+            action,
         });
     }
 
@@ -131,7 +145,10 @@ impl ConfigWatcher {
                     ChangeAction::Reconfigure
                 };
                 self.pending_changes.push(ConfigChange {
-                    key: key.to_string(), from: Some(p), to: None, action,
+                    key: key.to_string(),
+                    from: Some(p),
+                    to: None,
+                    action,
                 });
                 return true;
             }
@@ -172,7 +189,10 @@ mod tests {
     }
 
     fn map(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
-        pairs.iter().map(|(k, v)| ((*k).into(), (*v).into())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| ((*k).into(), (*v).into()))
+            .collect()
     }
 
     // ── restart_required_options ───────────────────────────────────────────
@@ -191,17 +211,27 @@ mod tests {
 
     #[test]
     fn first_update_emits_reconfigure_per_key() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/resolver/resolver.go", "Update.First", "tenant-cw-u");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/option/resolver/resolver.go",
+            "Update.First",
+            "tenant-cw-u"
+        );
         let mut w = watcher(tenant);
         w.update_cluster_config(map(&[("a", "1"), ("b", "2")]));
         let changes = w.drain_changes();
         assert_eq!(changes.len(), 2);
-        assert!(changes.iter().all(|c| matches!(c.action, ChangeAction::Reconfigure)));
+        assert!(changes
+            .iter()
+            .all(|c| matches!(c.action, ChangeAction::Reconfigure)));
     }
 
     #[test]
     fn changing_value_emits_reconfigure() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/resolver/resolver.go", "Update.Change", "tenant-cw-uc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/option/resolver/resolver.go",
+            "Update.Change",
+            "tenant-cw-uc"
+        );
         let mut w = watcher(tenant);
         w.update_cluster_config(map(&[("a", "1")]));
         let _ = w.drain_changes();
@@ -214,7 +244,11 @@ mod tests {
 
     #[test]
     fn changing_restart_required_option_emits_require_restart() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/resolver/resolver.go", "Update.Restart", "tenant-cw-ur");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/option/resolver/resolver.go",
+            "Update.Restart",
+            "tenant-cw-ur"
+        );
         let mut w = watcher(tenant);
         w.update_cluster_config(map(&[("enable-ipsec", "false")]));
         let _ = w.drain_changes();
@@ -225,7 +259,11 @@ mod tests {
 
     #[test]
     fn unchanged_value_emits_no_change() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/resolver/resolver.go", "Update.Unchanged", "tenant-cw-uu");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/option/resolver/resolver.go",
+            "Update.Unchanged",
+            "tenant-cw-uu"
+        );
         let mut w = watcher(tenant);
         w.update_cluster_config(map(&[("a", "1")]));
         let _ = w.drain_changes();
@@ -236,7 +274,11 @@ mod tests {
 
     #[test]
     fn removed_key_emits_change_with_to_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/resolver/resolver.go", "Update.Removed", "tenant-cw-rmv");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/option/resolver/resolver.go",
+            "Update.Removed",
+            "tenant-cw-rmv"
+        );
         let mut w = watcher(tenant);
         w.update_cluster_config(map(&[("a", "1"), ("b", "2")]));
         let _ = w.drain_changes();
@@ -251,7 +293,11 @@ mod tests {
 
     #[test]
     fn set_node_override_records_change() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/resolver/resolver.go", "NodeOverride.Set", "tenant-cw-nos");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/option/resolver/resolver.go",
+            "NodeOverride.Set",
+            "tenant-cw-nos"
+        );
         let mut w = watcher(tenant);
         w.set_node_override("node-a", "debug", "true".into());
         let changes = w.drain_changes();
@@ -261,7 +307,11 @@ mod tests {
 
     #[test]
     fn set_node_override_for_restart_option_emits_restart() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/resolver/resolver.go", "NodeOverride.Restart", "tenant-cw-norr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/option/resolver/resolver.go",
+            "NodeOverride.Restart",
+            "tenant-cw-norr"
+        );
         let mut w = watcher(tenant);
         w.set_node_override("node-a", "kube-proxy-replacement", "strict".into());
         let changes = w.drain_changes();
@@ -270,7 +320,11 @@ mod tests {
 
     #[test]
     fn remove_node_override_emits_to_none_change() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/resolver/resolver.go", "NodeOverride.Remove", "tenant-cw-nor");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/option/resolver/resolver.go",
+            "NodeOverride.Remove",
+            "tenant-cw-nor"
+        );
         let mut w = watcher(tenant);
         w.set_node_override("node-a", "debug", "true".into());
         let _ = w.drain_changes();
@@ -282,7 +336,11 @@ mod tests {
 
     #[test]
     fn remove_unknown_node_override_returns_false() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/resolver/resolver.go", "NodeOverride.Remove.NotFound", "tenant-cw-nornf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/option/resolver/resolver.go",
+            "NodeOverride.Remove.NotFound",
+            "tenant-cw-nornf"
+        );
         let mut w = watcher(tenant);
         assert!(!w.remove_node_override("node-a", "debug"));
     }
@@ -291,7 +349,11 @@ mod tests {
 
     #[test]
     fn effective_returns_cluster_config_when_no_overrides() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/resolver/resolver.go", "Effective.NoOverride", "tenant-cw-eno");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/option/resolver/resolver.go",
+            "Effective.NoOverride",
+            "tenant-cw-eno"
+        );
         let mut w = watcher(tenant);
         w.update_cluster_config(map(&[("a", "1"), ("b", "2")]));
         let eff = w.effective("node-a");
@@ -301,7 +363,11 @@ mod tests {
 
     #[test]
     fn effective_overrides_take_precedence() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/resolver/resolver.go", "Effective.Override", "tenant-cw-eo");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/option/resolver/resolver.go",
+            "Effective.Override",
+            "tenant-cw-eo"
+        );
         let mut w = watcher(tenant);
         w.update_cluster_config(map(&[("a", "1")]));
         w.set_node_override("node-a", "a", "9".into());
@@ -311,18 +377,26 @@ mod tests {
 
     #[test]
     fn effective_overrides_only_apply_to_named_node() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/resolver/resolver.go", "Effective.PerNode", "tenant-cw-epn");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/option/resolver/resolver.go",
+            "Effective.PerNode",
+            "tenant-cw-epn"
+        );
         let mut w = watcher(tenant);
         w.update_cluster_config(map(&[("a", "1")]));
         w.set_node_override("node-a", "a", "9".into());
-        assert_eq!(w.effective("node-b").get("a").map(|s| s.as_str()), Some("1"));
+        assert_eq!(
+            w.effective("node-b").get("a").map(|s| s.as_str()),
+            Some("1")
+        );
     }
 
     // ── Drain semantics ────────────────────────────────────────────────────
 
     #[test]
     fn drain_clears_pending_changes() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/resolver/resolver.go", "Drain", "tenant-cw-d");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/option/resolver/resolver.go", "Drain", "tenant-cw-d");
         let mut w = watcher(tenant);
         w.update_cluster_config(map(&[("a", "1")]));
         w.drain_changes();
@@ -333,7 +407,11 @@ mod tests {
 
     #[test]
     fn key_count_tracks_cluster_config() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/resolver/resolver.go", "KeyCount", "tenant-cw-kc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/option/resolver/resolver.go",
+            "KeyCount",
+            "tenant-cw-kc"
+        );
         let mut w = watcher(tenant);
         w.update_cluster_config(map(&[("a", "1"), ("b", "2"), ("c", "3")]));
         assert_eq!(w.key_count(), 3);
@@ -343,7 +421,11 @@ mod tests {
 
     #[test]
     fn second_update_only_emits_diff() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/option/resolver/resolver.go", "Update.Diff", "tenant-cw-ud");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/option/resolver/resolver.go",
+            "Update.Diff",
+            "tenant-cw-ud"
+        );
         let mut w = watcher(tenant);
         w.update_cluster_config(map(&[("a", "1"), ("b", "2"), ("c", "3")]));
         let _ = w.drain_changes();
@@ -361,7 +443,11 @@ mod tests {
 
     #[test]
     fn config_change_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/option/resolver/resolver.go", "Change.Serde", "tenant-cw-cserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/option/resolver/resolver.go",
+            "Change.Serde",
+            "tenant-cw-cserde"
+        );
         let c = ConfigChange {
             key: "enable-ipsec".into(),
             from: Some("false".into()),
@@ -375,8 +461,16 @@ mod tests {
 
     #[test]
     fn change_action_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/option/resolver/resolver.go", "Action.Serde", "tenant-cw-aserde");
-        for a in [ChangeAction::Reconfigure, ChangeAction::RequireRestart, ChangeAction::NoOp] {
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/option/resolver/resolver.go",
+            "Action.Serde",
+            "tenant-cw-aserde"
+        );
+        for a in [
+            ChangeAction::Reconfigure,
+            ChangeAction::RequireRestart,
+            ChangeAction::NoOp,
+        ] {
             let s = serde_json::to_string(&a).unwrap();
             let back: ChangeAction = serde_json::from_str(&s).unwrap();
             assert_eq!(back, a);

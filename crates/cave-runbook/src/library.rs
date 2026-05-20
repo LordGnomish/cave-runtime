@@ -173,9 +173,8 @@ pub fn deployment_rollback_template() -> Runbook {
                 id: "check-history".to_string(),
                 name: "Check rollout history".to_string(),
                 step_type: StepType::Shell {
-                    command:
-                        "kubectl rollout history deployment/{{deployment}} -n {{namespace}}"
-                            .to_string(),
+                    command: "kubectl rollout history deployment/{{deployment}} -n {{namespace}}"
+                        .to_string(),
                     working_dir: None,
                     env: HashMap::new(),
                 },
@@ -207,9 +206,8 @@ pub fn deployment_rollback_template() -> Runbook {
                 id: "rollback".to_string(),
                 name: "Execute rollback".to_string(),
                 step_type: StepType::Shell {
-                    command:
-                        "kubectl rollout undo deployment/{{deployment}} -n {{namespace}}"
-                            .to_string(),
+                    command: "kubectl rollout undo deployment/{{deployment}} -n {{namespace}}"
+                        .to_string(),
                     working_dir: None,
                     env: HashMap::new(),
                 },
@@ -225,9 +223,8 @@ pub fn deployment_rollback_template() -> Runbook {
                 id: "verify".to_string(),
                 name: "Verify rollback".to_string(),
                 step_type: StepType::Shell {
-                    command:
-                        "kubectl rollout status deployment/{{deployment}} -n {{namespace}}"
-                            .to_string(),
+                    command: "kubectl rollout status deployment/{{deployment}} -n {{namespace}}"
+                        .to_string(),
                     working_dir: None,
                     env: HashMap::new(),
                 },
@@ -352,8 +349,8 @@ pub fn incident_response_template() -> Runbook {
     Runbook {
         id: Uuid::new_v4(),
         name: "Incident Response".to_string(),
-        description:
-            "Standard incident response runbook: triage, notify, mitigate, document".to_string(),
+        description: "Standard incident response runbook: triage, notify, mitigate, document"
+            .to_string(),
         version: "1.0.0".to_string(),
         tags: vec!["incident".to_string(), "on-call".to_string()],
         parameters: vec![
@@ -414,8 +411,8 @@ pub fn incident_response_template() -> Runbook {
                 id: "collect-diagnostics".to_string(),
                 name: "Collect diagnostics".to_string(),
                 step_type: StepType::Shell {
-                    command:
-                        "kubectl get events --sort-by=.lastTimestamp -A | tail -50".to_string(),
+                    command: "kubectl get events --sort-by=.lastTimestamp -A | tail -50"
+                        .to_string(),
                     working_dir: None,
                     env: HashMap::new(),
                 },
@@ -460,9 +457,8 @@ pub fn database_failover_template() -> Runbook {
     Runbook {
         id: Uuid::new_v4(),
         name: "Database Failover".to_string(),
-        description:
-            "Controlled database failover with pre-checks, approval, and post-validation"
-                .to_string(),
+        description: "Controlled database failover with pre-checks, approval, and post-validation"
+            .to_string(),
         version: "1.0.0".to_string(),
         tags: vec![
             "database".to_string(),
@@ -508,9 +504,8 @@ pub fn database_failover_template() -> Runbook {
                 id: "dba-approval".to_string(),
                 name: "DBA approval required".to_string(),
                 step_type: StepType::ManualApproval {
-                    message:
-                        "CRITICAL: Approve failover of {{db_name}} to {{target_replica}}?"
-                            .to_string(),
+                    message: "CRITICAL: Approve failover of {{db_name}} to {{target_replica}}?"
+                        .to_string(),
                     approvers: vec!["dba-team".to_string(), "platform-lead".to_string()],
                     timeout_seconds: 1800,
                 },
@@ -526,8 +521,9 @@ pub fn database_failover_template() -> Runbook {
                 id: "initiate-failover".to_string(),
                 name: "Initiate failover".to_string(),
                 step_type: StepType::Shell {
-                    command: "kubectl patch statefulset {{db_name}} -p '{\"spec\":{\"replicas\":0}}'"
-                        .to_string(),
+                    command:
+                        "kubectl patch statefulset {{db_name}} -p '{\"spec\":{\"replicas\":0}}'"
+                            .to_string(),
                     working_dir: None,
                     env: HashMap::new(),
                 },
@@ -569,7 +565,11 @@ mod tests {
     #[test]
     fn test_all_templates_are_marked_as_template() {
         for t in builtin_templates() {
-            assert!(t.is_template, "Template '{}' is not marked as template", t.name);
+            assert!(
+                t.is_template,
+                "Template '{}' is not marked as template",
+                t.name
+            );
         }
     }
 }

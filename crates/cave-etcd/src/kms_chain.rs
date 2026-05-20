@@ -54,7 +54,9 @@ impl std::fmt::Display for ChainError {
 impl std::error::Error for ChainError {}
 
 impl From<KmsError> for ChainError {
-    fn from(e: KmsError) -> Self { Self::Provider(e) }
+    fn from(e: KmsError) -> Self {
+        Self::Provider(e)
+    }
 }
 
 // ── Wire format for chained ciphertext ────────────────────────────────────
@@ -68,7 +70,9 @@ pub const CHAIN_MAGIC: [u8; 2] = [0x6B, 0x63]; // "kc"
 /// and what `decrypt` consumes.
 pub fn encode_chain(provider_name: &str, inner: &[u8]) -> Result<Vec<u8>, ChainError> {
     if provider_name.len() > u8::MAX as usize {
-        return Err(ChainError::Provider(KmsError::Internal("provider name > 255".into())));
+        return Err(ChainError::Provider(KmsError::Internal(
+            "provider name > 255".into(),
+        )));
     }
     let mut out = Vec::with_capacity(2 + 1 + provider_name.len() + inner.len());
     out.extend_from_slice(&CHAIN_MAGIC);
@@ -80,15 +84,22 @@ pub fn encode_chain(provider_name: &str, inner: &[u8]) -> Result<Vec<u8>, ChainE
 
 /// Parse a chain ciphertext into `(provider_name, inner)`.
 pub fn decode_chain(buf: &[u8]) -> Result<(String, &[u8]), ChainError> {
-    if buf.len() < 3 { return Err(ChainError::Provider(KmsError::Decrypt("chain truncated".into()))); }
+    if buf.len() < 3 {
+        return Err(ChainError::Provider(KmsError::Decrypt(
+            "chain truncated".into(),
+        )));
+    }
     if buf[0..2] != CHAIN_MAGIC {
         return Err(ChainError::Provider(KmsError::Decrypt(format!(
-            "bad chain magic: 0x{:02x}{:02x}", buf[0], buf[1]
+            "bad chain magic: 0x{:02x}{:02x}",
+            buf[0], buf[1]
         ))));
     }
     let name_len = buf[2] as usize;
     if buf.len() < 3 + name_len {
-        return Err(ChainError::Provider(KmsError::Decrypt("chain header truncated".into())));
+        return Err(ChainError::Provider(KmsError::Decrypt(
+            "chain header truncated".into(),
+        )));
     }
     let name = std::str::from_utf8(&buf[3..3 + name_len])
         .map_err(|_| ChainError::Provider(KmsError::Decrypt("non-utf8 provider name".into())))?
@@ -131,7 +142,10 @@ impl ChainProvider {
         }
     }
 
-    pub fn kms_v2(name: impl Into<String>, inner: impl KmsProvider + Send + Sync + 'static) -> Self {
+    pub fn kms_v2(
+        name: impl Into<String>,
+        inner: impl KmsProvider + Send + Sync + 'static,
+    ) -> Self {
         Self {
             name: name.into(),
             kind: ProviderKind::KmsV2,
@@ -204,19 +218,38 @@ impl ProviderChain {
         inner.providers.pop().map(|p| p.name)
     }
 
-    pub fn len(&self) -> usize { self.inner.read().unwrap().providers.len() }
-    pub fn is_empty(&self) -> bool { self.len() == 0 }
+    pub fn len(&self) -> usize {
+        self.inner.read().unwrap().providers.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 
     pub fn names(&self) -> Vec<String> {
-        self.inner.read().unwrap().providers.iter().map(|p| p.name.clone()).collect()
+        self.inner
+            .read()
+            .unwrap()
+            .providers
+            .iter()
+            .map(|p| p.name.clone())
+            .collect()
     }
 
     pub fn write_provider_name(&self) -> Option<String> {
-        self.inner.read().unwrap().providers.first().map(|p| p.name.clone())
+        self.inner
+            .read()
+            .unwrap()
+            .providers
+            .first()
+            .map(|p| p.name.clone())
     }
 
-    pub fn encrypt_count(&self) -> u64 { self.encrypt_count.load(Ordering::SeqCst) }
-    pub fn decrypt_count(&self) -> u64 { self.decrypt_count.load(Ordering::SeqCst) }
+    pub fn encrypt_count(&self) -> u64 {
+        self.encrypt_count.load(Ordering::SeqCst)
+    }
+    pub fn decrypt_count(&self) -> u64 {
+        self.decrypt_count.load(Ordering::SeqCst)
+    }
 
     /// Encrypt under the active write provider.
     pub fn encrypt(&self, plaintext: &[u8], aad: &[u8]) -> Result<Vec<u8>, ChainError> {
@@ -242,7 +275,9 @@ impl ProviderChain {
         let (name, inner_ct) = decode_chain(envelope)?;
         let inner = self.inner.read().unwrap();
         for p in inner.providers.iter() {
-            if p.name != name { continue; }
+            if p.name != name {
+                continue;
+            }
             let combined_aad = combine_aad(&p.aad_namespace, aad);
             let pt = match p.kind {
                 ProviderKind::Identity => combined_aad_identity_open(inner_ct, &combined_aad)?,
@@ -251,7 +286,8 @@ impl ProviderChain {
                     let dek_vec = p.inner.unwrap_dek(&kek_id, &wrapped)?;
                     if dek_vec.len() != 32 {
                         return Err(ChainError::Provider(KmsError::Decrypt(format!(
-                            "unwrapped DEK length {} != 32", dek_vec.len()
+                            "unwrapped DEK length {} != 32",
+                            dek_vec.len()
                         ))));
                     }
                     let mut dek = [0u8; 32];
@@ -294,7 +330,9 @@ impl ProviderChain {
                     ProviderKind::Identity => {
                         let sealed = combined_aad_identity_seal(probe_pt, &combined);
                         let opened = combined_aad_identity_open(&sealed, &combined)?;
-                        if opened != probe_pt { return Err(ChainError::Unhealthy(p.name.clone())); }
+                        if opened != probe_pt {
+                            return Err(ChainError::Unhealthy(p.name.clone()));
+                        }
                     }
                     ProviderKind::AesCbc | ProviderKind::KmsV2 => {
                         let dek = [0x42u8; 32];
@@ -311,8 +349,14 @@ impl ProviderChain {
         let mut h = self.health.write().unwrap();
         h.last_check = Some(now);
         match &result {
-            Ok(()) => { h.healthy = true; h.error = None; }
-            Err(e) => { h.healthy = false; h.error = Some(e.to_string()); }
+            Ok(()) => {
+                h.healthy = true;
+                h.error = None;
+            }
+            Err(e) => {
+                h.healthy = false;
+                h.error = Some(e.to_string());
+            }
         }
         result
     }
@@ -331,7 +375,9 @@ impl ProviderChain {
 }
 
 impl Default for ProviderChain {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── Codec helpers ─────────────────────────────────────────────────────────
@@ -348,7 +394,9 @@ const TAG_LEN: usize = 16;
 
 fn fnv_byte(seed: u64, byte_idx: usize, data: &[u8]) -> u8 {
     let mut h: u64 = 0xcbf29ce484222325 ^ seed ^ (byte_idx as u64).wrapping_mul(0x100000001b3);
-    for &b in data { h = h.wrapping_mul(0x100000001b3).wrapping_add(b as u64); }
+    for &b in data {
+        h = h.wrapping_mul(0x100000001b3).wrapping_add(b as u64);
+    }
     (h ^ h.rotate_right(31)) as u8
 }
 
@@ -370,7 +418,11 @@ fn xor_seal(key: &[u8; 32], plaintext: &[u8], aad: &[u8]) -> Vec<u8> {
 }
 
 fn xor_open(key: &[u8; 32], ct: &[u8], aad: &[u8]) -> Result<Vec<u8>, ChainError> {
-    if ct.len() < TAG_LEN { return Err(ChainError::Provider(KmsError::Decrypt("ct too short".into()))); }
+    if ct.len() < TAG_LEN {
+        return Err(ChainError::Provider(KmsError::Decrypt(
+            "ct too short".into(),
+        )));
+    }
     let split = ct.len() - TAG_LEN;
     let (body, tag) = (&ct[..split], &ct[split..]);
     let mut want = [0u8; TAG_LEN];
@@ -382,9 +434,17 @@ fn xor_open(key: &[u8; 32], ct: &[u8], aad: &[u8]) -> Result<Vec<u8>, ChainError
         *slot = (h ^ h.rotate_right(31)) as u8;
     }
     let mut diff: u8 = 0;
-    for (a, b) in tag.iter().zip(want.iter()) { diff |= a ^ b; }
-    if diff != 0 { return Err(ChainError::Provider(KmsError::Decrypt("auth fail".into()))); }
-    Ok(body.iter().enumerate().map(|(i, &b)| b ^ fnv_byte(u64::from_be_bytes(key[..8].try_into().unwrap()), i, key)).collect())
+    for (a, b) in tag.iter().zip(want.iter()) {
+        diff |= a ^ b;
+    }
+    if diff != 0 {
+        return Err(ChainError::Provider(KmsError::Decrypt("auth fail".into())));
+    }
+    Ok(body
+        .iter()
+        .enumerate()
+        .map(|(i, &b)| b ^ fnv_byte(u64::from_be_bytes(key[..8].try_into().unwrap()), i, key))
+        .collect())
 }
 
 /// Identity provider: passthrough body + small AAD-bound mac so AAD
@@ -406,7 +466,11 @@ fn combined_aad_identity_seal(plaintext: &[u8], aad: &[u8]) -> Vec<u8> {
 }
 
 fn combined_aad_identity_open(ct: &[u8], aad: &[u8]) -> Result<Vec<u8>, ChainError> {
-    if ct.len() < TAG_LEN { return Err(ChainError::Provider(KmsError::Decrypt("ct too short".into()))); }
+    if ct.len() < TAG_LEN {
+        return Err(ChainError::Provider(KmsError::Decrypt(
+            "ct too short".into(),
+        )));
+    }
     let split = ct.len() - TAG_LEN;
     let (body, tag) = (&ct[..split], &ct[split..]);
     let mut want = [0u8; TAG_LEN];
@@ -418,8 +482,12 @@ fn combined_aad_identity_open(ct: &[u8], aad: &[u8]) -> Result<Vec<u8>, ChainErr
         *slot = (h ^ h.rotate_right(31)) as u8;
     }
     let mut diff: u8 = 0;
-    for (a, b) in tag.iter().zip(want.iter()) { diff |= a ^ b; }
-    if diff != 0 { return Err(ChainError::Provider(KmsError::Decrypt("auth fail".into()))); }
+    for (a, b) in tag.iter().zip(want.iter()) {
+        diff |= a ^ b;
+    }
+    if diff != 0 {
+        return Err(ChainError::Provider(KmsError::Decrypt("auth fail".into())));
+    }
     Ok(body.to_vec())
 }
 
@@ -434,14 +502,26 @@ fn pack_kmsv2_inner(kek_id: &str, wrapped: &[u8], body: &[u8]) -> Vec<u8> {
 }
 
 fn unpack_kmsv2_inner(buf: &[u8]) -> Result<(String, Vec<u8>, &[u8]), ChainError> {
-    if buf.is_empty() { return Err(ChainError::Provider(KmsError::Decrypt("inner empty".into()))); }
+    if buf.is_empty() {
+        return Err(ChainError::Provider(KmsError::Decrypt(
+            "inner empty".into(),
+        )));
+    }
     let n = buf[0] as usize;
-    if buf.len() < 1 + n + 2 { return Err(ChainError::Provider(KmsError::Decrypt("inner truncated".into()))); }
+    if buf.len() < 1 + n + 2 {
+        return Err(ChainError::Provider(KmsError::Decrypt(
+            "inner truncated".into(),
+        )));
+    }
     let kek_id = std::str::from_utf8(&buf[1..1 + n])
         .map_err(|_| ChainError::Provider(KmsError::Decrypt("non-utf8 kek id".into())))?
         .to_string();
     let wlen = u16::from_be_bytes(buf[1 + n..1 + n + 2].try_into().unwrap()) as usize;
-    if buf.len() < 1 + n + 2 + wlen { return Err(ChainError::Provider(KmsError::Decrypt("wrapped truncated".into()))); }
+    if buf.len() < 1 + n + 2 + wlen {
+        return Err(ChainError::Provider(KmsError::Decrypt(
+            "wrapped truncated".into(),
+        )));
+    }
     let wrapped = buf[1 + n + 2..1 + n + 2 + wlen].to_vec();
     let body = &buf[1 + n + 2 + wlen..];
     Ok((kek_id, wrapped, body))
@@ -482,21 +562,29 @@ mod tests {
         let mut bytes = encode_chain("p", b"x").unwrap();
         bytes[0] = 0;
         match decode_chain(&bytes).unwrap_err() {
-            ChainError::Provider(KmsError::Decrypt(m)) => assert!(m.contains("bad chain magic"), "{m}"),
+            ChainError::Provider(KmsError::Decrypt(m)) => {
+                assert!(m.contains("bad chain magic"), "{m}")
+            }
             other => panic!("{other:?}"),
         }
     }
 
     #[test]
     fn test_chain_codec_truncated() {
-        assert!(matches!(decode_chain(&[0x6B]).unwrap_err(), ChainError::Provider(_)));
+        assert!(matches!(
+            decode_chain(&[0x6B]).unwrap_err(),
+            ChainError::Provider(_)
+        ));
     }
 
     #[test]
     fn test_chain_codec_long_name_overflow() {
         // cite: name length encoded in 1 byte ⇒ max 255
         let name = "x".repeat(300);
-        assert!(matches!(encode_chain(&name, b"x").unwrap_err(), ChainError::Provider(_)));
+        assert!(matches!(
+            encode_chain(&name, b"x").unwrap_err(),
+            ChainError::Provider(_)
+        ));
     }
 
     // ── Single-provider chain ──────────────────────────────────────────
@@ -568,7 +656,10 @@ mod tests {
         let chain = ProviderChain::new();
         chain.push(ChainProvider::kms_v2("p1", kms_provider("k", 0x11)));
         let foreign = encode_chain("ghost", b"x").unwrap();
-        assert_eq!(chain.decrypt(&foreign, b"aad").unwrap_err(), ChainError::NoMatchingProvider);
+        assert_eq!(
+            chain.decrypt(&foreign, b"aad").unwrap_err(),
+            ChainError::NoMatchingProvider
+        );
     }
 
     // ── Identity provider ──────────────────────────────────────────────
@@ -711,9 +802,12 @@ mod tests {
     fn test_aad_namespace_distinguishes_envelopes() {
         // cite: per-resource AAD namespace (Kubernetes secret vs configmap)
         let chain_a = ProviderChain::new();
-        chain_a.push(ChainProvider::kms_v2("p", kms_provider("k", 0x11)).with_namespace(b"secrets"));
+        chain_a
+            .push(ChainProvider::kms_v2("p", kms_provider("k", 0x11)).with_namespace(b"secrets"));
         let chain_b = ProviderChain::new();
-        chain_b.push(ChainProvider::kms_v2("p", kms_provider("k", 0x11)).with_namespace(b"configmaps"));
+        chain_b.push(
+            ChainProvider::kms_v2("p", kms_provider("k", 0x11)).with_namespace(b"configmaps"),
+        );
         let ct_a = chain_a.encrypt(b"data", b"aad").unwrap();
         // chain_b uses a different namespace so AAD differs ⇒ auth fails.
         assert!(chain_b.decrypt(&ct_a, b"aad").is_err());

@@ -15,9 +15,7 @@
 //!   * staging/src/k8s.io/apimachinery/pkg/api/meta/discovery_test.go
 //!   * staging/src/k8s.io/api/v1/openapi_v3_test.go (subset)
 
-use cave_apiserver::conversion::{
-    ConversionRequest, ConvertibleObject, CoreConverter, RenameRule,
-};
+use cave_apiserver::conversion::{ConversionRequest, ConvertibleObject, CoreConverter, RenameRule};
 use cave_apiserver::discovery::{APIResource, APIResourceList, DiscoveryRegistry, OpenApiV3Schema};
 use cave_apiserver::server_side_apply::{
     ApplyOutcome, ConflictReason, FieldManagerRegistry, ManagerOperation, ObjectKey,
@@ -203,7 +201,12 @@ fn upstream_ssa_force_transfers_ownership_and_logs_transfer() {
 #[test]
 fn upstream_ssa_update_seeds_updated_by_conflict_reason() {
     let reg = FieldManagerRegistry::new();
-    reg.record_update(&key("acme", "pod-1"), "kubectl-edit", "v1", &["spec.x".into()]);
+    reg.record_update(
+        &key("acme", "pod-1"),
+        "kubectl-edit",
+        "v1",
+        &["spec.x".into()],
+    );
     let outcome = reg.apply(
         &key("acme", "pod-1"),
         "kubectl-apply",
@@ -343,7 +346,13 @@ fn upstream_discovery_openapi_v3_schema_round_trips() {
 fn upstream_discovery_openapi_v3_index_url_includes_hash_query() {
     let reg = DiscoveryRegistry::new();
     reg.register_schema("acme", "", "v1", "ConfigMap", OpenApiV3Schema::object());
-    reg.register_schema("acme", "apps", "v1", "Deployment", OpenApiV3Schema::object());
+    reg.register_schema(
+        "acme",
+        "apps",
+        "v1",
+        "Deployment",
+        OpenApiV3Schema::object(),
+    );
     let index: BTreeMap<String, String> = reg.openapi_v3_index("acme");
     assert!(index.contains_key("api/v1"));
     assert!(index.contains_key("apis/apps/v1"));

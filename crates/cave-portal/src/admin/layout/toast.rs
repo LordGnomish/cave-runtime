@@ -85,7 +85,10 @@ mod tests {
     fn dark_mode_variant_classes_present_for_every_kind() {
         let html = toast_container();
         for kind in &["green", "red", "yellow", "blue"] {
-            assert!(html.contains(&format!("dark:bg-{}-900", kind)), "missing dark variant for {kind}");
+            assert!(
+                html.contains(&format!("dark:bg-{}-900", kind)),
+                "missing dark variant for {kind}"
+            );
         }
     }
 

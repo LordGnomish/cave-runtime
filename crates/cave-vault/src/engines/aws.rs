@@ -1,23 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+use crate::VaultState;
 use crate::error::{VaultError, VaultResult};
 use crate::response::VaultResponse;
-use crate::VaultState;
 use axum::{
+    Router,
     extract::{Json, Path, State},
     http::HeaderMap,
     routing::{delete, get, post},
-    Router,
 };
 use chrono::Utc;
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 fn extract_token(headers: &HeaderMap) -> VaultResult<String> {
-    headers.get("x-vault-token")
+    headers
+        .get("x-vault-token")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or(VaultError::BadToken)
@@ -74,27 +75,35 @@ pub struct AwsStore {
 fn random_aws_key_id() -> VaultResult<String> {
     let rng = SystemRandom::new();
     let mut bytes = [0u8; 10];
-    rng.fill(&mut bytes).map_err(|_| VaultError::Crypto("rng failure".into()))?;
-    let chars: String = bytes.iter().map(|b| {
-        let idx = (b % 26) as usize;
-        (b'A' + idx as u8) as char
-    }).collect();
+    rng.fill(&mut bytes)
+        .map_err(|_| VaultError::Crypto("rng failure".into()))?;
+    let chars: String = bytes
+        .iter()
+        .map(|b| {
+            let idx = (b % 26) as usize;
+            (b'A' + idx as u8) as char
+        })
+        .collect();
     Ok(format!("ASIA{}", chars))
 }
 
 fn random_secret_key() -> VaultResult<String> {
     let rng = SystemRandom::new();
     let mut bytes = vec![0u8; 20];
-    rng.fill(&mut bytes).map_err(|_| VaultError::Crypto("rng failure".into()))?;
+    rng.fill(&mut bytes)
+        .map_err(|_| VaultError::Crypto("rng failure".into()))?;
     Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
 }
 
 fn random_session_token() -> VaultResult<String> {
     let rng = SystemRandom::new();
     let mut bytes = vec![0u8; 32];
-    rng.fill(&mut bytes).map_err(|_| VaultError::Crypto("rng failure".into()))?;
-    Ok(format!("FQoGZXIvYXdzENH//////////wEaDNT{}",
-        base64::engine::general_purpose::STANDARD.encode(&bytes)))
+    rng.fill(&mut bytes)
+        .map_err(|_| VaultError::Crypto("rng failure".into()))?;
+    Ok(format!(
+        "FQoGZXIvYXdzENH//////////wEaDNT{}",
+        base64::engine::general_purpose::STANDARD.encode(&bytes)
+    ))
 }
 
 pub async fn configure_root(
@@ -105,11 +114,21 @@ pub async fn configure_root(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.aws_store.write().await;
-    if let Some(v) = body.get("access_key").and_then(|v| v.as_str()) { store.config.access_key = v.to_string(); }
-    if let Some(v) = body.get("secret_key").and_then(|v| v.as_str()) { store.config.secret_key = v.to_string(); }
-    if let Some(v) = body.get("region").and_then(|v| v.as_str()) { store.config.region = v.to_string(); }
-    if let Some(v) = body.get("iam_endpoint").and_then(|v| v.as_str()) { store.config.iam_endpoint = v.to_string(); }
-    if let Some(v) = body.get("sts_endpoint").and_then(|v| v.as_str()) { store.config.sts_endpoint = v.to_string(); }
+    if let Some(v) = body.get("access_key").and_then(|v| v.as_str()) {
+        store.config.access_key = v.to_string();
+    }
+    if let Some(v) = body.get("secret_key").and_then(|v| v.as_str()) {
+        store.config.secret_key = v.to_string();
+    }
+    if let Some(v) = body.get("region").and_then(|v| v.as_str()) {
+        store.config.region = v.to_string();
+    }
+    if let Some(v) = body.get("iam_endpoint").and_then(|v| v.as_str()) {
+        store.config.iam_endpoint = v.to_string();
+    }
+    if let Some(v) = body.get("sts_endpoint").and_then(|v| v.as_str()) {
+        store.config.sts_endpoint = v.to_string();
+    }
     Ok(VaultResponse::new())
 }
 
@@ -136,20 +155,37 @@ pub async fn create_role(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.aws_store.write().await;
-    let mut role = store.roles.entry(role_name.clone()).or_insert_with(|| AwsRole {
-        name: role_name.clone(),
-        ..Default::default()
-    });
-    if let Some(v) = body.get("credential_type").and_then(|v| v.as_str()) { role.credential_type = v.to_string(); }
+    let mut role = store
+        .roles
+        .entry(role_name.clone())
+        .or_insert_with(|| AwsRole {
+            name: role_name.clone(),
+            ..Default::default()
+        });
+    if let Some(v) = body.get("credential_type").and_then(|v| v.as_str()) {
+        role.credential_type = v.to_string();
+    }
     if let Some(arns) = body.get("policy_arns").and_then(|v| v.as_array()) {
-        role.policy_arns = arns.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
+        role.policy_arns = arns
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect();
     }
-    if let Some(v) = body.get("policy_document").and_then(|v| v.as_str()) { role.policy_document = v.to_string(); }
+    if let Some(v) = body.get("policy_document").and_then(|v| v.as_str()) {
+        role.policy_document = v.to_string();
+    }
     if let Some(arns) = body.get("role_arns").and_then(|v| v.as_array()) {
-        role.role_arns = arns.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
+        role.role_arns = arns
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect();
     }
-    if let Some(ttl) = body.get("default_sts_ttl").and_then(|v| v.as_str()) { role.default_sts_ttl = crate::token::parse_duration(ttl); }
-    if let Some(ttl) = body.get("max_sts_ttl").and_then(|v| v.as_str()) { role.max_sts_ttl = crate::token::parse_duration(ttl); }
+    if let Some(ttl) = body.get("default_sts_ttl").and_then(|v| v.as_str()) {
+        role.default_sts_ttl = crate::token::parse_duration(ttl);
+    }
+    if let Some(ttl) = body.get("max_sts_ttl").and_then(|v| v.as_str()) {
+        role.max_sts_ttl = crate::token::parse_duration(ttl);
+    }
     Ok(VaultResponse::new())
 }
 
@@ -160,7 +196,9 @@ pub async fn read_role(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.aws_store.read().await;
-    let role = store.roles.get(&role_name)
+    let role = store
+        .roles
+        .get(&role_name)
         .ok_or_else(|| VaultError::RoleNotFound(role_name))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(role).unwrap_or_default()))
 }
@@ -194,8 +232,11 @@ pub async fn generate_credentials(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.aws_store.read().await;
-    let role = store.roles.get(&role_name)
-        .ok_or_else(|| VaultError::RoleNotFound(role_name.clone()))?.clone();
+    let role = store
+        .roles
+        .get(&role_name)
+        .ok_or_else(|| VaultError::RoleNotFound(role_name.clone()))?
+        .clone();
     drop(store);
 
     let access_key_id = random_aws_key_id()?;

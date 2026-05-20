@@ -9,7 +9,7 @@ use crate::error::{StoreError, StoreResult};
 use crate::s3::encryption::{self, ServerKeyStore};
 use crate::s3::lifecycle;
 use crate::s3::notification;
-use crate::s3::policy::{evaluate, BucketPolicy, Effect, PolicyContext};
+use crate::s3::policy::{BucketPolicy, Effect, PolicyContext, evaluate};
 use crate::s3::types::*;
 use crate::wal::{WalEntry, WalWriter};
 use base64::Engine;
@@ -20,7 +20,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::io::AsyncReadExt;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{RwLock, broadcast};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
@@ -53,7 +53,11 @@ impl ObjectStore {
     pub async fn replay_wal(&self, entries: &[WalEntry]) {
         for entry in entries {
             match entry {
-                WalEntry::BucketCreate { name, region, owner } => {
+                WalEntry::BucketCreate {
+                    name,
+                    region,
+                    owner,
+                } => {
                     self.buckets.write().await.insert(
                         name.clone(),
                         Bucket::new(name.clone(), region.clone(), owner.clone()),
@@ -212,19 +216,17 @@ impl ObjectStore {
 
     // ── Bucket operations ───────────────────────────────────────────────────────
 
-    pub async fn create_bucket(
-        &self,
-        name: &str,
-        region: &str,
-        owner: &str,
-    ) -> StoreResult<()> {
+    pub async fn create_bucket(&self, name: &str, region: &str, owner: &str) -> StoreResult<()> {
         validate_bucket_name(name)?;
         let mut buckets = self.buckets.write().await;
         if buckets.contains_key(name) {
             return Err(StoreError::BucketAlreadyExists(name.to_string()));
         }
         std::fs::create_dir_all(self.data_dir.join(name))?;
-        buckets.insert(name.to_string(), Bucket::new(name.to_string(), region.to_string(), owner.to_string()));
+        buckets.insert(
+            name.to_string(),
+            Bucket::new(name.to_string(), region.to_string(), owner.to_string()),
+        );
         drop(buckets);
         self.wal
             .append(&WalEntry::BucketCreate {
@@ -250,7 +252,9 @@ impl ObjectStore {
             .ok_or_else(|| StoreError::BucketNotFound(name.to_string()))?;
         let _ = std::fs::remove_dir_all(self.data_dir.join(name));
         self.wal
-            .append(&WalEntry::BucketDelete { name: name.to_string() })
+            .append(&WalEntry::BucketDelete {
+                name: name.to_string(),
+            })
             .await?;
         Ok(())
     }
@@ -407,8 +411,8 @@ impl ObjectStore {
         content_type: &str,
         metadata: HashMap<String, String>,
         tags: HashMap<String, String>,
-        sse: Option<&str>,          // "AES256" | "aws:kms" | None
-        sse_key_b64: Option<&str>,  // SSE-C key
+        sse: Option<&str>,         // "AES256" | "aws:kms" | None
+        sse_key_b64: Option<&str>, // SSE-C key
         storage_class: Option<StorageClass>,
     ) -> StoreResult<PutObjectResult> {
         // Ensure bucket exists
@@ -417,7 +421,11 @@ impl ObjectStore {
             let b = buckets
                 .get(bucket)
                 .ok_or_else(|| StoreError::BucketNotFound(bucket.to_string()))?;
-            (b.versioning.clone(), b.encryption.clone(), b.notification_config.clone())
+            (
+                b.versioning.clone(),
+                b.encryption.clone(),
+                b.notification_config.clone(),
+            )
         };
 
         // Determine version ID
@@ -431,36 +439,44 @@ impl ObjectStore {
         let size = data.len() as u64;
 
         // Encrypt if requested
-        let (stored_data, enc_meta) = match sse.or(bucket_enc.as_ref().map(|e| match e.sse_algorithm {
-            SseAlgorithm::Aes256 => "AES256",
-            SseAlgorithm::AwsKms => "aws:kms",
-        })) {
-            Some("AES256") => {
-                if let Some(sse_key_b64) = sse_key_b64 {
-                    // SSE-C
-                    let key = encryption::parse_sse_c_key(sse_key_b64)?;
-                    let ciphertext = encryption::encrypt_aes256gcm(&data, &key)?;
-                    let md5 = encryption::key_md5(&key);
-                    (ciphertext, Some(ObjectEncryption {
-                        algorithm: "SSE-C".to_string(),
-                        key_md5: Some(md5),
-                        kms_key_id: None,
-                    }))
-                } else {
-                    // SSE-S3
-                    let ks = self.key_store.read().await;
-                    let (key_id, root_key) = ks.current_key();
-                    let obj_key = encryption::derive_sse_s3_key(root_key, &format!("{bucket}/{key}"));
-                    let ciphertext = encryption::encrypt_aes256gcm(&data, &obj_key)?;
-                    (ciphertext, Some(ObjectEncryption {
-                        algorithm: "AES256".to_string(),
-                        key_md5: Some(key_id.to_string()),
-                        kms_key_id: None,
-                    }))
+        let (stored_data, enc_meta) =
+            match sse.or(bucket_enc.as_ref().map(|e| match e.sse_algorithm {
+                SseAlgorithm::Aes256 => "AES256",
+                SseAlgorithm::AwsKms => "aws:kms",
+            })) {
+                Some("AES256") => {
+                    if let Some(sse_key_b64) = sse_key_b64 {
+                        // SSE-C
+                        let key = encryption::parse_sse_c_key(sse_key_b64)?;
+                        let ciphertext = encryption::encrypt_aes256gcm(&data, &key)?;
+                        let md5 = encryption::key_md5(&key);
+                        (
+                            ciphertext,
+                            Some(ObjectEncryption {
+                                algorithm: "SSE-C".to_string(),
+                                key_md5: Some(md5),
+                                kms_key_id: None,
+                            }),
+                        )
+                    } else {
+                        // SSE-S3
+                        let ks = self.key_store.read().await;
+                        let (key_id, root_key) = ks.current_key();
+                        let obj_key =
+                            encryption::derive_sse_s3_key(root_key, &format!("{bucket}/{key}"));
+                        let ciphertext = encryption::encrypt_aes256gcm(&data, &obj_key)?;
+                        (
+                            ciphertext,
+                            Some(ObjectEncryption {
+                                algorithm: "AES256".to_string(),
+                                key_md5: Some(key_id.to_string()),
+                                kms_key_id: None,
+                            }),
+                        )
+                    }
                 }
-            }
-            _ => (data, None),
-        };
+                _ => (data, None),
+            };
 
         // Write to disk
         let rel_path = object_path(bucket, key, version_id.as_deref());
@@ -556,9 +572,8 @@ impl ObjectStore {
         // Decrypt if encrypted
         let data = match &version.encryption {
             Some(enc) if enc.algorithm == "SSE-C" => {
-                let key_b64 = sse_c_key.ok_or_else(|| {
-                    StoreError::EncryptionError("SSE-C key required".into())
-                })?;
+                let key_b64 = sse_c_key
+                    .ok_or_else(|| StoreError::EncryptionError("SSE-C key required".into()))?;
                 let key = encryption::parse_sse_c_key(key_b64)?;
                 encryption::decrypt_aes256gcm(&raw, &key)?
             }
@@ -566,9 +581,9 @@ impl ObjectStore {
                 // SSE-S3: re-derive key
                 let ks = self.key_store.read().await;
                 let key_id = enc.key_md5.as_deref().unwrap_or("");
-                let root_key = ks
-                    .get_key(key_id)
-                    .ok_or_else(|| StoreError::EncryptionError("encryption key not found".into()))?;
+                let root_key = ks.get_key(key_id).ok_or_else(|| {
+                    StoreError::EncryptionError("encryption key not found".into())
+                })?;
                 let obj_key = encryption::derive_sse_s3_key(root_key, &format!("{bucket}/{key}"));
                 encryption::decrypt_aes256gcm(&raw, &obj_key)?
             }
@@ -614,7 +629,10 @@ impl ObjectStore {
                 key: key.to_string(),
             })?;
         let version = if let Some(vid) = version_id {
-            versions.iter().rev().find(|v| v.version_id.as_deref() == Some(vid))
+            versions
+                .iter()
+                .rev()
+                .find(|v| v.version_id.as_deref() == Some(vid))
         } else {
             versions.last()
         }
@@ -660,7 +678,9 @@ impl ObjectStore {
 
         let result = if let Some(vid) = version_id {
             // Delete specific version
-            let idx = versions.iter().rposition(|v| v.version_id.as_deref() == Some(vid));
+            let idx = versions
+                .iter()
+                .rposition(|v| v.version_id.as_deref() == Some(vid));
             if let Some(i) = idx {
                 let removed = versions.remove(i);
                 if let Ok(p) = self.data_dir.join(&removed.storage_path).canonicalize() {
@@ -738,7 +758,9 @@ impl ObjectStore {
         metadata_directive: &str, // "COPY" | "REPLACE"
         new_metadata: Option<HashMap<String, String>>,
     ) -> StoreResult<CopyObjectResult> {
-        let src = self.get_object(src_bucket, src_key, src_version, None, None).await?;
+        let src = self
+            .get_object(src_bucket, src_key, src_version, None, None)
+            .await?;
         let metadata = match metadata_directive {
             "REPLACE" => new_metadata.unwrap_or_default(),
             _ => src.metadata.clone(),
@@ -758,7 +780,13 @@ impl ObjectStore {
             .await?;
 
         let event = S3Event::object_created_copy(dst_bucket, dst_key, src.size, &r.etag);
-        let notification_cfg = self.buckets.read().await.get(dst_bucket).map(|b| b.notification_config.clone()).unwrap_or_default();
+        let notification_cfg = self
+            .buckets
+            .read()
+            .await
+            .get(dst_bucket)
+            .map(|b| b.notification_config.clone())
+            .unwrap_or_default();
         notification::dispatch(&notification_cfg, &event, &self.event_tx).await;
 
         Ok(CopyObjectResult {
@@ -910,7 +938,10 @@ impl ObjectStore {
                 key: key.to_string(),
             })?;
         let version = if let Some(vid) = version_id {
-            versions.iter_mut().rev().find(|v| v.version_id.as_deref() == Some(vid))
+            versions
+                .iter_mut()
+                .rev()
+                .find(|v| v.version_id.as_deref() == Some(vid))
         } else {
             versions.last_mut()
         }
@@ -936,7 +967,10 @@ impl ObjectStore {
                 key: key.to_string(),
             })?;
         let version = if let Some(vid) = version_id {
-            versions.iter().rev().find(|v| v.version_id.as_deref() == Some(vid))
+            versions
+                .iter()
+                .rev()
+                .find(|v| v.version_id.as_deref() == Some(vid))
         } else {
             versions.last()
         }
@@ -1009,10 +1043,7 @@ impl ObjectStore {
 
         let etag = compute_etag(&data);
         let size = data.len() as u64;
-        let rel_path = format!(
-            "{}/.multipart/{}/{}.part",
-            bucket, upload_id, part_number
-        );
+        let rel_path = format!("{}/.multipart/{}/{}.part", bucket, upload_id, part_number);
         let abs_path = self.data_dir.join(&rel_path);
         if let Some(p) = abs_path.parent() {
             std::fs::create_dir_all(p)?;
@@ -1067,16 +1098,19 @@ impl ObjectStore {
         }
         for (i, (pn, _)) in parts.iter().enumerate() {
             if i > 0 && *pn <= parts[i - 1].0 {
-                return Err(StoreError::InvalidPart("parts must be in ascending order".into()));
+                return Err(StoreError::InvalidPart(
+                    "parts must be in ascending order".into(),
+                ));
             }
         }
 
         // Assemble parts into final object
         let mut assembled = Vec::new();
         for (pn, expected_etag) in &parts {
-            let part = mp.parts.get(pn).ok_or_else(|| {
-                StoreError::InvalidPart(format!("part {pn} not found"))
-            })?;
+            let part = mp
+                .parts
+                .get(pn)
+                .ok_or_else(|| StoreError::InvalidPart(format!("part {pn} not found")))?;
             if &part.etag != expected_etag {
                 return Err(StoreError::InvalidPart(format!(
                     "part {pn} etag mismatch: expected {expected_etag}, got {}",
@@ -1092,7 +1126,11 @@ impl ObjectStore {
         }
 
         // Compute final ETag (AWS uses MD5 of part ETags concatenated)
-        let part_etags: String = parts.iter().map(|(_, e)| e.as_str()).collect::<Vec<_>>().join("");
+        let part_etags: String = parts
+            .iter()
+            .map(|(_, e)| e.as_str())
+            .collect::<Vec<_>>()
+            .join("");
         let final_etag = format!("{}-{}", compute_etag(part_etags.as_bytes()), parts.len());
 
         let versioning = self
@@ -1245,7 +1283,9 @@ impl ObjectStore {
 
                 for (key, version_id) in to_delete {
                     debug!("Lifecycle expiring {bucket_name}/{key}");
-                    let _ = store.delete_object(&bucket_name, &key, version_id.as_deref()).await;
+                    let _ = store
+                        .delete_object(&bucket_name, &key, version_id.as_deref())
+                        .await;
                 }
 
                 // Abort incomplete multipart uploads
@@ -1373,7 +1413,8 @@ fn validate_bucket_name(name: &str) -> StoreResult<()> {
             "bucket name may only contain lowercase letters, numbers, hyphens, and dots".into(),
         ));
     }
-    if name.starts_with('-') || name.ends_with('-') || name.starts_with('.') || name.ends_with('.') {
+    if name.starts_with('-') || name.ends_with('-') || name.starts_with('.') || name.ends_with('.')
+    {
         return Err(StoreError::InvalidBucketName(
             "bucket name cannot start or end with hyphen or dot".into(),
         ));

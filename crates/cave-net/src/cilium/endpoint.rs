@@ -60,12 +60,15 @@ pub struct Endpoint {
 
 impl Endpoint {
     pub fn new_creating(
-        id: u64, tenant: TenantId,
-        pod_name: impl Into<String>, pod_namespace: impl Into<String>,
+        id: u64,
+        tenant: TenantId,
+        pod_name: impl Into<String>,
+        pod_namespace: impl Into<String>,
         pod_ip: IpAddr,
     ) -> Self {
         Self {
-            id, tenant,
+            id,
+            tenant,
             pod_name: pod_name.into(),
             pod_namespace: pod_namespace.into(),
             pod_ip,
@@ -85,7 +88,10 @@ pub enum EndpointError {
     #[error("endpoint id {0} not found")]
     NotFound(u64),
     #[error("invalid state transition {from:?} → {to:?}")]
-    BadTransition { from: EndpointState, to: EndpointState },
+    BadTransition {
+        from: EndpointState,
+        to: EndpointState,
+    },
     #[error("tenant {tenant} cannot mutate endpoint owned by another tenant")]
     TenantDenied { tenant: TenantId },
 }
@@ -99,13 +105,19 @@ pub struct EndpointManager {
 
 impl EndpointManager {
     pub fn new() -> Self {
-        Self { next_id: 1, by_id: HashMap::new(), by_pod_ip: HashMap::new() }
+        Self {
+            next_id: 1,
+            by_id: HashMap::new(),
+            by_pod_ip: HashMap::new(),
+        }
     }
 
     /// Create a new endpoint, auto-assigning an ID.
     pub fn create(
-        &mut self, tenant: TenantId,
-        pod_name: impl Into<String>, pod_namespace: impl Into<String>,
+        &mut self,
+        tenant: TenantId,
+        pod_name: impl Into<String>,
+        pod_namespace: impl Into<String>,
         pod_ip: IpAddr,
     ) -> u64 {
         let id = self.next_id;
@@ -143,7 +155,12 @@ impl EndpointManager {
         Ok(())
     }
 
-    pub fn set_identity(&mut self, id: u64, identity: u32, labels: LabelSet) -> Result<(), EndpointError> {
+    pub fn set_identity(
+        &mut self,
+        id: u64,
+        identity: u32,
+        labels: LabelSet,
+    ) -> Result<(), EndpointError> {
         let ep = self.by_id.get_mut(&id).ok_or(EndpointError::NotFound(id))?;
         ep.identity = identity;
         ep.labels = labels;
@@ -170,7 +187,11 @@ impl EndpointManager {
         Ok(())
     }
 
-    pub fn set_program_chain(&mut self, id: u64, chain: Vec<BpfProgram>) -> Result<(), EndpointError> {
+    pub fn set_program_chain(
+        &mut self,
+        id: u64,
+        chain: Vec<BpfProgram>,
+    ) -> Result<(), EndpointError> {
         let ep = self.by_id.get_mut(&id).ok_or(EndpointError::NotFound(id))?;
         ep.program_chain = chain;
         Ok(())
@@ -217,7 +238,8 @@ mod tests {
 
     #[test]
     fn endpoint_create_assigns_monotonic_id() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/endpoint.go", "Endpoint.New", "tenant-ep-id");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/endpoint/endpoint.go", "Endpoint.New", "tenant-ep-id");
         let mut mgr = EndpointManager::new();
         let a = mgr.create(tenant.clone(), "p1", "default", ip(10, 0, 1, 1));
         let b = mgr.create(tenant, "p2", "default", ip(10, 0, 1, 2));
@@ -227,7 +249,11 @@ mod tests {
 
     #[test]
     fn endpoint_lookup_by_id_round_trips() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/endpoint.go", "Endpoint.LookupByID", "tenant-ep-lk");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/endpoint.go",
+            "Endpoint.LookupByID",
+            "tenant-ep-lk"
+        );
         let mut mgr = EndpointManager::new();
         let id = mgr.create(tenant, "p1", "default", ip(10, 0, 1, 1));
         let ep = mgr.lookup(id).unwrap();
@@ -237,7 +263,11 @@ mod tests {
 
     #[test]
     fn endpoint_lookup_by_pod_ip() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/endpoint.go", "Endpoint.LookupByIP", "tenant-ep-lkip");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/endpoint.go",
+            "Endpoint.LookupByIP",
+            "tenant-ep-lkip"
+        );
         let mut mgr = EndpointManager::new();
         mgr.create(tenant, "p1", "default", ip(10, 0, 1, 5));
         let ep = mgr.lookup_by_pod_ip(ip(10, 0, 1, 5)).unwrap();
@@ -246,7 +276,11 @@ mod tests {
 
     #[test]
     fn endpoint_lookup_unknown_returns_none() {
-        let (_c, _t) = cilium_test_ctx!("pkg/endpoint/endpoint.go", "Endpoint.LookupByID.NotFound", "tenant-ep-nf");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/endpoint/endpoint.go",
+            "Endpoint.LookupByID.NotFound",
+            "tenant-ep-nf"
+        );
         let mgr = EndpointManager::new();
         assert!(mgr.lookup(999).is_none());
         assert!(mgr.lookup_by_pod_ip(ip(10, 0, 1, 99)).is_none());
@@ -254,7 +288,11 @@ mod tests {
 
     #[test]
     fn endpoint_remove_drops_state() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/endpoint.go", "Endpoint.Delete", "tenant-ep-rm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/endpoint.go",
+            "Endpoint.Delete",
+            "tenant-ep-rm"
+        );
         let mut mgr = EndpointManager::new();
         let id = mgr.create(tenant, "p1", "default", ip(10, 0, 1, 1));
         mgr.remove(id).unwrap();
@@ -264,7 +302,11 @@ mod tests {
 
     #[test]
     fn endpoint_remove_unknown_returns_not_found() {
-        let (_c, _t) = cilium_test_ctx!("pkg/endpoint/endpoint.go", "Endpoint.Delete.NotFound", "tenant-ep-rmnf");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/endpoint/endpoint.go",
+            "Endpoint.Delete.NotFound",
+            "tenant-ep-rmnf"
+        );
         let mut mgr = EndpointManager::new();
         let err = mgr.remove(99).unwrap_err();
         assert_eq!(err, EndpointError::NotFound(99));
@@ -272,7 +314,11 @@ mod tests {
 
     #[test]
     fn endpoint_insert_with_duplicate_id_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/endpoint.go", "Endpoint.Insert.Duplicate", "tenant-ep-dup");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/endpoint.go",
+            "Endpoint.Insert.Duplicate",
+            "tenant-ep-dup"
+        );
         let mut mgr = EndpointManager::new();
         let ep = Endpoint::new_creating(7, tenant.clone(), "p", "default", ip(10, 0, 1, 1));
         mgr.insert(ep.clone()).unwrap();
@@ -284,7 +330,11 @@ mod tests {
 
     #[test]
     fn endpoint_set_identity_records_labels() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/endpoint.go", "Endpoint.SetIdentity", "tenant-ep-idt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/endpoint.go",
+            "Endpoint.SetIdentity",
+            "tenant-ep-idt"
+        );
         let mut mgr = EndpointManager::new();
         let id = mgr.create(tenant, "p1", "default", ip(10, 0, 1, 1));
         mgr.set_identity(id, 256, ls(&[("app", "web")])).unwrap();
@@ -297,38 +347,66 @@ mod tests {
 
     #[test]
     fn endpoint_state_transition_creating_to_waiting() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/endpoint.go", "Endpoint.SetState", "tenant-ep-st1");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/endpoint.go",
+            "Endpoint.SetState",
+            "tenant-ep-st1"
+        );
         let mut mgr = EndpointManager::new();
         let id = mgr.create(tenant, "p", "default", ip(10, 0, 1, 1));
-        mgr.transition(id, EndpointState::WaitingForIdentity).unwrap();
-        assert_eq!(mgr.lookup(id).unwrap().state, EndpointState::WaitingForIdentity);
+        mgr.transition(id, EndpointState::WaitingForIdentity)
+            .unwrap();
+        assert_eq!(
+            mgr.lookup(id).unwrap().state,
+            EndpointState::WaitingForIdentity
+        );
     }
 
     #[test]
     fn endpoint_state_transition_to_ready() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/endpoint.go", "Endpoint.SetState.Ready", "tenant-ep-st2");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/endpoint.go",
+            "Endpoint.SetState.Ready",
+            "tenant-ep-st2"
+        );
         let mut mgr = EndpointManager::new();
         let id = mgr.create(tenant, "p", "default", ip(10, 0, 1, 1));
-        mgr.transition(id, EndpointState::WaitingForIdentity).unwrap();
+        mgr.transition(id, EndpointState::WaitingForIdentity)
+            .unwrap();
         mgr.transition(id, EndpointState::Ready).unwrap();
         assert_eq!(mgr.lookup(id).unwrap().state, EndpointState::Ready);
     }
 
     #[test]
     fn endpoint_invalid_state_transition_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/endpoint.go", "Endpoint.SetState.Invalid", "tenant-ep-stbad");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/endpoint.go",
+            "Endpoint.SetState.Invalid",
+            "tenant-ep-stbad"
+        );
         let mut mgr = EndpointManager::new();
         let id = mgr.create(tenant, "p", "default", ip(10, 0, 1, 1));
         let err = mgr.transition(id, EndpointState::Disconnected).unwrap_err();
-        assert_eq!(err, EndpointError::BadTransition { from: EndpointState::Creating, to: EndpointState::Disconnected });
+        assert_eq!(
+            err,
+            EndpointError::BadTransition {
+                from: EndpointState::Creating,
+                to: EndpointState::Disconnected
+            }
+        );
     }
 
     #[test]
     fn endpoint_state_transition_to_disconnecting() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/endpoint.go", "Endpoint.SetState.Disconnect", "tenant-ep-dis");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/endpoint.go",
+            "Endpoint.SetState.Disconnect",
+            "tenant-ep-dis"
+        );
         let mut mgr = EndpointManager::new();
         let id = mgr.create(tenant, "p", "default", ip(10, 0, 1, 1));
-        mgr.transition(id, EndpointState::WaitingForIdentity).unwrap();
+        mgr.transition(id, EndpointState::WaitingForIdentity)
+            .unwrap();
         mgr.transition(id, EndpointState::Ready).unwrap();
         mgr.transition(id, EndpointState::Disconnecting).unwrap();
         assert_eq!(mgr.lookup(id).unwrap().state, EndpointState::Disconnecting);
@@ -351,7 +429,11 @@ mod tests {
 
     #[test]
     fn endpoint_set_program_chain_records_progs() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/endpoint.go", "Endpoint.RegenerateBPF", "tenant-ep-prog");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/endpoint.go",
+            "Endpoint.RegenerateBPF",
+            "tenant-ep-prog"
+        );
         let mut mgr = EndpointManager::new();
         let id = mgr.create(tenant, "p", "default", ip(10, 0, 1, 1));
         mgr.set_program_chain(id, canonical_egress_chain()).unwrap();
@@ -362,17 +444,30 @@ mod tests {
 
     #[test]
     fn endpoint_count_tracks_creates() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/endpoint.go", "Endpoint.Count", "tenant-ep-cnt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/endpoint.go",
+            "Endpoint.Count",
+            "tenant-ep-cnt"
+        );
         let mut mgr = EndpointManager::new();
         for i in 0..5u32 {
-            mgr.create(tenant.clone(), format!("p{i}"), "default", ip(10, 0, 1, i as u8 + 1));
+            mgr.create(
+                tenant.clone(),
+                format!("p{i}"),
+                "default",
+                ip(10, 0, 1, i as u8 + 1),
+            );
         }
         assert_eq!(mgr.count(), 5);
     }
 
     #[test]
     fn endpoint_serde_round_trip() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/endpoint.go", "Endpoint.Serde", "tenant-ep-serde");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/endpoint.go",
+            "Endpoint.Serde",
+            "tenant-ep-serde"
+        );
         let mut ep = Endpoint::new_creating(1, tenant, "p", "default", ip(10, 0, 1, 1));
         ep.identity = 256;
         ep.labels = ls(&[("app", "web")]);

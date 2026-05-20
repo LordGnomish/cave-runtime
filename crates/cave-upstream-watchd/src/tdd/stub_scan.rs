@@ -10,7 +10,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::tdd::classifier::{classify_file, FileKind};
+use crate::tdd::classifier::{FileKind, classify_file};
 use crate::tdd::git_inspector::{GitError, GitInspector};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -281,7 +281,10 @@ fn other() { unimplemented!() }
 
     #[test]
     fn strip_string_literals_basic() {
-        assert_eq!(strip_string_literals(r#"a + "hello" + b"#), r#"a +         + b"#);
+        assert_eq!(
+            strip_string_literals(r#"a + "hello" + b"#),
+            r#"a +         + b"#
+        );
     }
 
     #[test]

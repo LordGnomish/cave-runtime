@@ -145,7 +145,10 @@ fn render_exposition_matches_prometheus_text_grammar() {
     let mut labels = BTreeMap::new();
     labels.insert("outcome".to_string(), "success".to_string());
     labels.insert("source".to_string(), "k8s".to_string());
-    values.insert("cilium_agent_policy_change_total".to_string(), (labels, 42.0));
+    values.insert(
+        "cilium_agent_policy_change_total".to_string(),
+        (labels, 42.0),
+    );
 
     let out = render_exposition(&defs, &values);
     // Golden expectation — what an upstream Prometheus client produces.
@@ -230,7 +233,10 @@ fn reserved_identity_label_strings_byte_match_upstream() {
     // and need to round-trip through the CRD plane unchanged.
     assert_eq!(ReservedIdentity::Host.label(), "reserved:host");
     assert_eq!(ReservedIdentity::World.label(), "reserved:world");
-    assert_eq!(ReservedIdentity::KubeApiServer.label(), "reserved:kube-apiserver");
+    assert_eq!(
+        ReservedIdentity::KubeApiServer.label(),
+        "reserved:kube-apiserver"
+    );
     assert_eq!(ReservedIdentity::Ingress.label(), "reserved:ingress");
     assert_eq!(ReservedIdentity::WorldIPv4.label(), "reserved:world-ipv4");
     assert_eq!(ReservedIdentity::WorldIPv6.label(), "reserved:world-ipv6");

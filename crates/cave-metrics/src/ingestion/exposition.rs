@@ -3,9 +3,9 @@
 //! Prometheus text exposition format parser (0.0.4) and OpenMetrics is handled
 //! by openmetrics.rs.  This parser handles the standard `/metrics` text format.
 
+use super::IngestedBatch;
 use crate::error::{MetricsError, Result};
 use crate::model::{Labels, MetricType, Sample, TimeSeries};
-use super::IngestedBatch;
 
 /// Parse a Prometheus text exposition body into a batch of time series.
 pub fn parse(input: &str) -> Result<IngestedBatch> {
@@ -14,7 +14,9 @@ pub fn parse(input: &str) -> Result<IngestedBatch> {
 
     for line in input.lines() {
         let line = line.trim();
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
 
         if line.starts_with("# HELP ") {
             continue; // skip HELP comments
@@ -28,7 +30,9 @@ pub fn parse(input: &str) -> Result<IngestedBatch> {
             continue;
         }
 
-        if line.starts_with('#') { continue; }
+        if line.starts_with('#') {
+            continue;
+        }
 
         match parse_line(line) {
             Ok((labels, value, opt_ts)) => {
@@ -48,7 +52,6 @@ pub fn parse(input: &str) -> Result<IngestedBatch> {
     Ok(batch.into_values().collect())
 }
 
-
 fn parse_line(line: &str) -> Result<(Labels, f64, Option<i64>)> {
     // Format: metric_name[{label="value",...}] value [timestamp]
     let (name_and_labels, rest) = if let Some(idx) = line.find('{') {
@@ -67,8 +70,10 @@ fn parse_line(line: &str) -> Result<(Labels, f64, Option<i64>)> {
 
     // Parse label block
     let (label_str, remainder) = if rest.starts_with('{') {
-        let end = rest.find('}').ok_or_else(|| MetricsError::Parse("unclosed {".into()))?;
-        (&rest[1..end], rest[end+1..].trim())
+        let end = rest
+            .find('}')
+            .ok_or_else(|| MetricsError::Parse("unclosed {".into()))?;
+        (&rest[1..end], rest[end + 1..].trim())
     } else {
         ("", rest.trim())
     };
@@ -84,14 +89,18 @@ fn parse_line(line: &str) -> Result<(Labels, f64, Option<i64>)> {
 
 fn parse_labels(s: &str) -> Result<Labels> {
     let mut labels = Labels::new();
-    if s.is_empty() { return Ok(labels); }
+    if s.is_empty() {
+        return Ok(labels);
+    }
 
     let mut rest = s.trim();
     while !rest.is_empty() {
         // name=
-        let eq = rest.find('=').ok_or_else(|| MetricsError::Parse(format!("bad label pair: {}", rest)))?;
+        let eq = rest
+            .find('=')
+            .ok_or_else(|| MetricsError::Parse(format!("bad label pair: {}", rest)))?;
         let name = rest[..eq].trim().to_string();
-        rest = rest[eq+1..].trim_start();
+        rest = rest[eq + 1..].trim_start();
 
         // value: quoted string
         let (value, consumed) = if rest.starts_with('"') {
@@ -103,7 +112,9 @@ fn parse_labels(s: &str) -> Result<Labels> {
         rest = rest[consumed..].trim_start();
 
         labels.insert(name, value);
-        if rest.starts_with(',') { rest = rest[1..].trim_start(); }
+        if rest.starts_with(',') {
+            rest = rest[1..].trim_start();
+        }
     }
     Ok(labels)
 }
@@ -116,11 +127,14 @@ fn parse_quoted_string(s: &str) -> Result<(String, usize)> {
             None => return Err(MetricsError::Parse("unclosed string".into())),
             Some((i, '"')) => return Ok((out, i + 2)), // +1 for opening quote, +1 for closing
             Some((_, '\\')) => match chars.next() {
-                Some((_, 'n'))  => out.push('\n'),
-                Some((_, 't'))  => out.push('\t'),
-                Some((_, '\\'))=> out.push('\\'),
+                Some((_, 'n')) => out.push('\n'),
+                Some((_, 't')) => out.push('\t'),
+                Some((_, '\\')) => out.push('\\'),
                 Some((_, '"')) => out.push('"'),
-                Some((_, c))   => { out.push('\\'); out.push(c); }
+                Some((_, c)) => {
+                    out.push('\\');
+                    out.push(c);
+                }
                 None => return Err(MetricsError::Parse("bad escape".into())),
             },
             Some((_, c)) => out.push(c),
@@ -132,10 +146,12 @@ fn parse_value_and_ts(s: &str) -> Result<(f64, Option<i64>)> {
     let mut parts = s.split_whitespace();
     let val_str = parts.next().unwrap_or("NaN");
     let value = match val_str {
-        "+Inf" | "Inf"  => f64::INFINITY,
-        "-Inf"          => f64::NEG_INFINITY,
-        "NaN"           => f64::NAN,
-        v => v.parse::<f64>().map_err(|e| MetricsError::Parse(e.to_string()))?,
+        "+Inf" | "Inf" => f64::INFINITY,
+        "-Inf" => f64::NEG_INFINITY,
+        "NaN" => f64::NAN,
+        v => v
+            .parse::<f64>()
+            .map_err(|e| MetricsError::Parse(e.to_string()))?,
     };
     let ts = parts.next().and_then(|t| t.parse::<i64>().ok());
     Ok((value, ts))

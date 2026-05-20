@@ -7,9 +7,9 @@
 //! command remains as a compat alias in main.rs but new code targets
 //! this module.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Subcommand;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::{HttpVerb, PreparedRequest};
 
@@ -56,9 +56,10 @@ impl FlagValue {
             "on" | "true" | "enabled" => Ok(FlagValue::On),
             "off" | "false" | "disabled" => Ok(FlagValue::Off),
             other if other.ends_with('%') => {
-                let n: u8 = other.trim_end_matches('%').parse().map_err(|_| {
-                    anyhow::anyhow!("invalid percentage `{}` (want 0..=100)", s)
-                })?;
+                let n: u8 = other
+                    .trim_end_matches('%')
+                    .parse()
+                    .map_err(|_| anyhow::anyhow!("invalid percentage `{}` (want 0..=100)", s))?;
                 if n > 100 {
                     bail!("percentage out of range: {}", n);
                 }
@@ -89,8 +90,10 @@ pub fn prepare(cmd: &FlagCmd) -> Result<PreparedRequest> {
         FlagCmd::Set { key, value, tenant } => {
             validate_key(key)?;
             let body = FlagValue::parse(value)?.to_body();
-            Ok(PreparedRequest::new(HttpVerb::Put, scoped_key(key, tenant.as_deref(), ""))
-                .with_body(body))
+            Ok(
+                PreparedRequest::new(HttpVerb::Put, scoped_key(key, tenant.as_deref(), ""))
+                    .with_body(body),
+            )
         }
         FlagCmd::Unset { key, tenant } => {
             validate_key(key)?;
@@ -268,7 +271,10 @@ mod tests {
 
     #[test]
     fn parse_full_pct() {
-        assert_eq!(FlagValue::parse("100%").unwrap(), FlagValue::Percentage(100));
+        assert_eq!(
+            FlagValue::parse("100%").unwrap(),
+            FlagValue::Percentage(100)
+        );
     }
 
     #[test]
@@ -303,31 +309,37 @@ mod tests {
 
     #[test]
     fn toggle_rejects_empty_key() {
-        assert!(prepare(&FlagCmd::Toggle {
-            key: "".into(),
-            tenant: None,
-        })
-        .is_err());
+        assert!(
+            prepare(&FlagCmd::Toggle {
+                key: "".into(),
+                tenant: None,
+            })
+            .is_err()
+        );
     }
 
     #[test]
     fn set_rejects_oversized_key() {
-        assert!(prepare(&FlagCmd::Set {
-            key: "x".repeat(257),
-            value: "on".into(),
-            tenant: None,
-        })
-        .is_err());
+        assert!(
+            prepare(&FlagCmd::Set {
+                key: "x".repeat(257),
+                value: "on".into(),
+                tenant: None,
+            })
+            .is_err()
+        );
     }
 
     #[test]
     fn set_rejects_bad_value() {
-        assert!(prepare(&FlagCmd::Set {
-            key: "x".into(),
-            value: "yolo".into(),
-            tenant: None,
-        })
-        .is_err());
+        assert!(
+            prepare(&FlagCmd::Set {
+                key: "x".into(),
+                value: "yolo".into(),
+                tenant: None,
+            })
+            .is_err()
+        );
     }
 
     #[test]

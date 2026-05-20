@@ -10,8 +10,8 @@
 //! Fingerprint algorithm: FNV-1a 64-bit (same as Prometheus `labels.go`).
 //! Selector format: `{k="v",...}` (same as Loki/PromQL label selector syntax).
 
-use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -30,7 +30,12 @@ impl Labels {
     pub fn from_pairs(
         pairs: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>,
     ) -> Self {
-        Self(pairs.into_iter().map(|(k, v)| (k.into(), v.into())).collect())
+        Self(
+            pairs
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect(),
+        )
     }
 
     pub fn get(&self, name: &str) -> Option<&str> {
@@ -172,9 +177,16 @@ mod tests {
 
     #[test]
     fn test_selector_excludes_name() {
-        let l = Labels::from_pairs([("__name__", "cpu"), ("job", "prometheus"), ("instance", "localhost:9090")]);
+        let l = Labels::from_pairs([
+            ("__name__", "cpu"),
+            ("job", "prometheus"),
+            ("instance", "localhost:9090"),
+        ]);
         let sel = l.to_selector();
-        assert!(!sel.contains("__name__"), "selector must not contain __name__");
+        assert!(
+            !sel.contains("__name__"),
+            "selector must not contain __name__"
+        );
         assert!(sel.contains("job=\"prometheus\""));
         assert!(sel.contains("instance=\"localhost:9090\""));
     }

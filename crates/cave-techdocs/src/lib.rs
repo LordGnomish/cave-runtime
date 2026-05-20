@@ -24,4 +24,4 @@ pub mod routes;
 pub use models::{EntityMetadata, EntityMetadataInner, EntityName, TechDocsMetadata};
 pub use publisher::local::LocalPublisher;
 pub use publisher::{Publisher, TechDocsError};
-pub use routes::{create_router, TechDocsState};
+pub use routes::{TechDocsState, create_router};

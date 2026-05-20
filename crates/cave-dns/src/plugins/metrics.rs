@@ -4,13 +4,13 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 use prometheus_client::{
     encoding::text::encode,
     metrics::{
         counter::Counter,
         family::Family,
-        histogram::{exponential_buckets, Histogram},
+        histogram::{Histogram, exponential_buckets},
     },
     registry::Registry,
 };
@@ -42,16 +42,10 @@ impl MetricsPlugin {
         let mut registry = Registry::default();
 
         let requests_total: Family<QueryLabels, Counter> = Family::default();
-        registry.register(
-            "dns_requests",
-            "Total DNS requests",
-            requests_total.clone(),
-        );
+        registry.register("dns_requests", "Total DNS requests", requests_total.clone());
 
         let request_duration: Family<QueryLabels, Histogram> =
-            Family::new_with_constructor(|| {
-                Histogram::new(exponential_buckets(0.001, 2.0, 12))
-            });
+            Family::new_with_constructor(|| Histogram::new(exponential_buckets(0.001, 2.0, 12)));
         registry.register(
             "dns_request_duration_seconds",
             "DNS request latency",

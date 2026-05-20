@@ -14,8 +14,8 @@ use cave_cache::db::{Db, PubSubKind, PubSubRegistry, ScriptStore};
 use cave_cache::error::CacheError;
 use cave_cache::resp::Resp;
 use cave_cache::types::{
-    bytes_to_f64, bytes_to_i64, f64_to_bytes, i64_to_bytes, normalize_index, Entry, LexBound,
-    ScoreBound, Stream, StreamId, Value, ZKey, ZSet,
+    Entry, LexBound, ScoreBound, Stream, StreamId, Value, ZKey, ZSet, bytes_to_f64, bytes_to_i64,
+    f64_to_bytes, i64_to_bytes, normalize_index,
 };
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
@@ -48,9 +48,18 @@ fn lex_bound_rejects_unprefixed_input() {
 
 #[test]
 fn score_bound_parses_inf_variants() {
-    assert!(matches!(ScoreBound::parse(b"-inf"), Some(ScoreBound::NegInf)));
-    assert!(matches!(ScoreBound::parse(b"+inf"), Some(ScoreBound::PosInf)));
-    assert!(matches!(ScoreBound::parse(b"inf"), Some(ScoreBound::PosInf)));
+    assert!(matches!(
+        ScoreBound::parse(b"-inf"),
+        Some(ScoreBound::NegInf)
+    ));
+    assert!(matches!(
+        ScoreBound::parse(b"+inf"),
+        Some(ScoreBound::PosInf)
+    ));
+    assert!(matches!(
+        ScoreBound::parse(b"inf"),
+        Some(ScoreBound::PosInf)
+    ));
 }
 
 #[test]
@@ -232,9 +241,18 @@ fn zset_lex_range_within_same_score() {
 
 #[test]
 fn zkey_orders_by_score_then_member() {
-    let a = ZKey { score: 1.0, member: b"a".to_vec() };
-    let b = ZKey { score: 1.0, member: b"b".to_vec() };
-    let c = ZKey { score: 2.0, member: b"a".to_vec() };
+    let a = ZKey {
+        score: 1.0,
+        member: b"a".to_vec(),
+    };
+    let b = ZKey {
+        score: 1.0,
+        member: b"b".to_vec(),
+    };
+    let c = ZKey {
+        score: 2.0,
+        member: b"a".to_vec(),
+    };
     assert!(a < b);
     assert!(b < c);
 }

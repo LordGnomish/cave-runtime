@@ -80,9 +80,7 @@ impl CaveIdentity {
         for role in &self.roles {
             let allowed = match role {
                 CaveRole::PlatformAdmin => true,
-                CaveRole::TenantAdmin | CaveRole::ModuleAdmin => {
-                    !action.contains("platform:")
-                }
+                CaveRole::TenantAdmin | CaveRole::ModuleAdmin => !action.contains("platform:"),
                 CaveRole::TenantDeveloper | CaveRole::Developer => {
                     !action.contains("admin") && !action.contains("platform:")
                 }
@@ -90,9 +88,7 @@ impl CaveIdentity {
                     action.contains("read") || action.contains("list")
                 }
                 CaveRole::Auditor => {
-                    action.contains("read")
-                        || action.contains("list")
-                        || action.contains("audit")
+                    action.contains("read") || action.contains("list") || action.contains("audit")
                 }
             };
             if allowed {

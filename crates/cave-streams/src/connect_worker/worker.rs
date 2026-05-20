@@ -79,7 +79,8 @@ impl Worker {
         let mut connector = ConnectorRuntime::new(spec);
         connector.validate()?;
         let ids = connector.generate_tasks()?;
-        self.connectors.insert(connector.spec.name.clone(), connector);
+        self.connectors
+            .insert(connector.spec.name.clone(), connector);
         // Add the task ids into the assignment table and run a
         // rebalance so the Worker knows which it owns.
         let all_task_ids: Vec<String> = self
@@ -181,7 +182,9 @@ impl Worker {
                 c.pause();
                 Ok(())
             }
-            None => Err(StreamsError::Internal(format!("unknown connector: {connector}"))),
+            None => Err(StreamsError::Internal(format!(
+                "unknown connector: {connector}"
+            ))),
         }
     }
 
@@ -191,7 +194,9 @@ impl Worker {
                 c.resume();
                 Ok(())
             }
-            None => Err(StreamsError::Internal(format!("unknown connector: {connector}"))),
+            None => Err(StreamsError::Internal(format!(
+                "unknown connector: {connector}"
+            ))),
         }
     }
 
@@ -199,7 +204,9 @@ impl Worker {
     /// connector entry, scrub its offsets.
     pub fn delete_connector(&mut self, connector: &str) -> StreamsResult<()> {
         let Some(mut c) = self.connectors.remove(connector) else {
-            return Err(StreamsError::Internal(format!("unknown connector: {connector}")));
+            return Err(StreamsError::Internal(format!(
+                "unknown connector: {connector}"
+            )));
         };
         for tid in &c.task_ids {
             self.tasks.remove(tid);
@@ -243,7 +250,9 @@ impl Worker {
 
 #[cfg(test)]
 mod tests {
-    use super::super::task_runtime::{SinkRecord, SinkRuntime, SinkTask, SourceRecord, SourceRuntime, SourceTask};
+    use super::super::task_runtime::{
+        SinkRecord, SinkRuntime, SinkTask, SourceRecord, SourceRuntime, SourceTask,
+    };
     use super::*;
 
     struct CannedSource {

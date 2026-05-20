@@ -145,7 +145,11 @@ impl ResourceManager {
                 }
             }
             for d in &c.devices {
-                if let Some(declared) = alloc.devices.iter().find(|x| x.resource_name == d.resource_name) {
+                if let Some(declared) = alloc
+                    .devices
+                    .iter()
+                    .find(|x| x.resource_name == d.resource_name)
+                {
                     for id in &d.device_ids {
                         if !declared.device_ids.contains(id) {
                             return Err(PodResourcesError::Invalid(format!(
@@ -203,7 +207,8 @@ impl ResourceManager {
             }
             for d in &c.devices {
                 for id in &d.device_ids {
-                    self.device_claims.remove(&(d.resource_name.clone(), id.clone()));
+                    self.device_claims
+                        .remove(&(d.resource_name.clone(), id.clone()));
                 }
             }
         }
@@ -367,7 +372,9 @@ mod tests {
         let m = ResourceManager::new();
         m.set_allocatable(alloc_with(&[0, 1, 2, 3], vec![]));
         m.upsert_pod(pod_simple("p1", "n1", vec![0, 1])).unwrap();
-        let err = m.upsert_pod(pod_simple("p2", "n2", vec![1, 2])).unwrap_err();
+        let err = m
+            .upsert_pod(pod_simple("p2", "n2", vec![1, 2]))
+            .unwrap_err();
         assert!(matches!(err, PodResourcesError::Conflict(_)));
     }
 
@@ -462,7 +469,10 @@ mod tests {
             device_ids: vec!["uuid-99".into()],
             topology: None,
         }];
-        assert!(matches!(m.upsert_pod(p), Err(PodResourcesError::Invalid(_))));
+        assert!(matches!(
+            m.upsert_pod(p),
+            Err(PodResourcesError::Invalid(_))
+        ));
     }
 
     #[test]
@@ -491,7 +501,10 @@ mod tests {
             device_ids: vec!["uuid-1".into()], // dup
             topology: None,
         }];
-        assert!(matches!(m.upsert_pod(p2), Err(PodResourcesError::Conflict(_))));
+        assert!(matches!(
+            m.upsert_pod(p2),
+            Err(PodResourcesError::Conflict(_))
+        ));
     }
 
     #[test]

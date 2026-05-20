@@ -53,10 +53,16 @@ pub struct NodeManager {
 }
 
 impl NodeManager {
-    pub fn new(tenant: TenantId) -> Self { Self { tenant: Some(tenant), nodes: BTreeMap::new() } }
+    pub fn new(tenant: TenantId) -> Self {
+        Self {
+            tenant: Some(tenant),
+            nodes: BTreeMap::new(),
+        }
+    }
 
     pub fn upsert(&mut self, node: Node) {
-        self.nodes.insert((node.cluster.clone(), node.name.clone()), node);
+        self.nodes
+            .insert((node.cluster.clone(), node.name.clone()), node);
     }
     pub fn delete(&mut self, cluster: &str, name: &str) -> Option<Node> {
         self.nodes.remove(&(cluster.to_string(), name.to_string()))
@@ -64,10 +70,18 @@ impl NodeManager {
     pub fn get(&self, cluster: &str, name: &str) -> Option<&Node> {
         self.nodes.get(&(cluster.to_string(), name.to_string()))
     }
-    pub fn list(&self) -> Vec<&Node> { self.nodes.values().collect() }
-    pub fn len(&self) -> usize { self.nodes.len() }
-    pub fn is_empty(&self) -> bool { self.nodes.is_empty() }
-    pub fn tenant(&self) -> Option<&TenantId> { self.tenant.as_ref() }
+    pub fn list(&self) -> Vec<&Node> {
+        self.nodes.values().collect()
+    }
+    pub fn len(&self) -> usize {
+        self.nodes.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
+    pub fn tenant(&self) -> Option<&TenantId> {
+        self.tenant.as_ref()
+    }
 }
 
 #[allow(dead_code)]
@@ -80,17 +94,27 @@ mod tests {
 
     fn n(name: &str, cluster: &str, ipv4: &str) -> Node {
         Node {
-            name: name.into(), cluster: cluster.into(),
+            name: name.into(),
+            cluster: cluster.into(),
             source: NodeSource::Kubernetes,
-            ipv4: Some(ipv4.into()), ipv6: None,
-            labels: BTreeMap::new(), identity: 6, // RemoteNode
+            ipv4: Some(ipv4.into()),
+            ipv6: None,
+            labels: BTreeMap::new(),
+            identity: 6, // RemoteNode
         }
     }
 
     #[test]
     fn node_source_serde_round_trip() {
         let (_c, _t) = cilium_test_ctx!("pkg/node/types/node.go", "Source.Serde", "tenant-nm-srd");
-        for s in [NodeSource::Local, NodeSource::Kvstore, NodeSource::Kubernetes, NodeSource::Custom, NodeSource::Restored, NodeSource::Unspec] {
+        for s in [
+            NodeSource::Local,
+            NodeSource::Kvstore,
+            NodeSource::Kubernetes,
+            NodeSource::Custom,
+            NodeSource::Restored,
+            NodeSource::Unspec,
+        ] {
             let j = serde_json::to_string(&s).unwrap();
             let back: NodeSource = serde_json::from_str(&j).unwrap();
             assert_eq!(s, back);
@@ -118,13 +142,23 @@ mod tests {
 
     #[test]
     fn manager_supports_multi_cluster_entries() {
-        let (_c, t) = cilium_test_ctx!("pkg/node/types/node.go", "Manager.MultiCluster", "tenant-nm-mc");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/node/types/node.go",
+            "Manager.MultiCluster",
+            "tenant-nm-mc"
+        );
         let mut m = NodeManager::new(t);
         m.upsert(n("node-a", "cluster-1", "10.1.0.1"));
         m.upsert(n("node-a", "cluster-2", "10.2.0.1"));
         assert_eq!(m.len(), 2);
-        assert_eq!(m.get("cluster-1", "node-a").unwrap().ipv4.as_deref(), Some("10.1.0.1"));
-        assert_eq!(m.get("cluster-2", "node-a").unwrap().ipv4.as_deref(), Some("10.2.0.1"));
+        assert_eq!(
+            m.get("cluster-1", "node-a").unwrap().ipv4.as_deref(),
+            Some("10.1.0.1")
+        );
+        assert_eq!(
+            m.get("cluster-2", "node-a").unwrap().ipv4.as_deref(),
+            Some("10.2.0.1")
+        );
     }
 
     #[test]
@@ -139,14 +173,22 @@ mod tests {
 
     #[test]
     fn delete_unknown_node_returns_none() {
-        let (_c, t) = cilium_test_ctx!("pkg/node/types/node.go", "Manager.DeleteMiss", "tenant-nm-dm");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/node/types/node.go",
+            "Manager.DeleteMiss",
+            "tenant-nm-dm"
+        );
         let mut m = NodeManager::new(t);
         assert!(m.delete("c", "missing").is_none());
     }
 
     #[test]
     fn upsert_overwrites_existing_entry() {
-        let (_c, t) = cilium_test_ctx!("pkg/node/types/node.go", "Manager.Overwrite", "tenant-nm-ow");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/node/types/node.go",
+            "Manager.Overwrite",
+            "tenant-nm-ow"
+        );
         let mut m = NodeManager::new(t);
         m.upsert(n("a", "c", "10.0.0.1"));
         m.upsert(n("a", "c", "10.0.0.99"));
@@ -160,9 +202,13 @@ mod tests {
         let mut labels = BTreeMap::new();
         labels.insert("k".into(), "v".into());
         let nd = Node {
-            name: "a".into(), cluster: "c".into(), source: NodeSource::Kvstore,
-            ipv4: Some("1.1.1.1".into()), ipv6: Some("::1".into()),
-            labels, identity: 6,
+            name: "a".into(),
+            cluster: "c".into(),
+            source: NodeSource::Kvstore,
+            ipv4: Some("1.1.1.1".into()),
+            ipv6: Some("::1".into()),
+            labels,
+            identity: 6,
         };
         let s = serde_json::to_string(&nd).unwrap();
         let back: Node = serde_json::from_str(&s).unwrap();
@@ -181,7 +227,9 @@ mod tests {
         let (_c, _t) = cilium_test_ctx!("pkg/node/types/node.go", "Errors", "tenant-nm-err");
         let e = NodeError::NotFound("x".into());
         assert!(format!("{}", e).contains("x"));
-        let e = NodeError::TenantDenied { tenant: TenantId::new("t").expect("test fixture") };
+        let e = NodeError::TenantDenied {
+            tenant: TenantId::new("t").expect("test fixture"),
+        };
         assert!(format!("{}", e).contains("t"));
     }
 }

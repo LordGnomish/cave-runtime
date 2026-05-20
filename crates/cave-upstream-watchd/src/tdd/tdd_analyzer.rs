@@ -29,11 +29,9 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use crate::tdd::classifier::{classify_file, module_of, FileKind};
+use crate::tdd::classifier::{FileKind, classify_file, module_of};
 use crate::tdd::git_inspector::GitInspector;
-use crate::tdd::{
-    ClassifiedCommit, CommitKind, TddError, TddCompliance, TddDetails, TddFinding,
-};
+use crate::tdd::{ClassifiedCommit, CommitKind, TddCompliance, TddDetails, TddError, TddFinding};
 
 /// Stateless façade. Convenience wrapper around [`analyze_tdd_compliance`].
 pub struct TddAnalyzer<'a, I: GitInspector + ?Sized> {
@@ -70,10 +68,8 @@ pub fn analyze_tdd_compliance<I: GitInspector + ?Sized>(
         .map_err(TddError::Git)?;
 
     // 1. classify every commit
-    let classified: Vec<ClassifiedCommit> = raw_commits
-        .iter()
-        .map(|c| classify_commit(c))
-        .collect();
+    let classified: Vec<ClassifiedCommit> =
+        raw_commits.iter().map(|c| classify_commit(c)).collect();
 
     // 2. test_first — module-by-module ordering
     let mut violations = Vec::new();
@@ -124,9 +120,9 @@ pub fn analyze_tdd_compliance<I: GitInspector + ?Sized>(
     let test_first = if impl_count == 0 {
         true
     } else {
-        let impl_without_prior = violations.iter().any(|v| {
-            matches!(v, TddFinding::ImplWithoutPriorTest { .. })
-        });
+        let impl_without_prior = violations
+            .iter()
+            .any(|v| matches!(v, TddFinding::ImplWithoutPriorTest { .. }));
         !impl_without_prior && mixed_count == 0
     };
 
@@ -225,7 +221,10 @@ fn scan_for_ignore_attr<I: GitInspector + ?Sized>(
 
     let mut findings = Vec::new();
     for path in test_paths.values() {
-        let body = match inspector.read_at_commit(branch, path).map_err(TddError::Git)? {
+        let body = match inspector
+            .read_at_commit(branch, path)
+            .map_err(TddError::Git)?
+        {
             Some(b) => b,
             None => continue,
         };
@@ -262,9 +261,7 @@ pub fn scan_ignore_in_body(path: &Path, body: &str) -> Vec<TddFinding> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tdd::git_inspector::{
-        CommitInfo, FileChange, FileChangeKind, GitError,
-    };
+    use crate::tdd::git_inspector::{CommitInfo, FileChange, FileChangeKind, GitError};
     use std::collections::HashMap;
     use std::path::PathBuf;
     use std::sync::Mutex;
@@ -289,12 +286,7 @@ mod tests {
             }
         }
 
-        fn add_commit(
-            &mut self,
-            sha: &str,
-            subject: &str,
-            files: Vec<(&str, FileChangeKind)>,
-        ) {
+        fn add_commit(&mut self, sha: &str, subject: &str, files: Vec<(&str, FileChangeKind)>) {
             self.commits.push(CommitInfo {
                 sha: sha.to_string(),
                 subject: subject.to_string(),
@@ -315,11 +307,7 @@ mod tests {
     }
 
     impl GitInspector for MockInspector {
-        fn commits_between(
-            &self,
-            base: &str,
-            branch: &str,
-        ) -> Result<Vec<CommitInfo>, GitError> {
+        fn commits_between(&self, base: &str, branch: &str) -> Result<Vec<CommitInfo>, GitError> {
             self.log
                 .lock()
                 .unwrap()
@@ -327,11 +315,7 @@ mod tests {
             Ok(self.commits.clone())
         }
 
-        fn read_at_commit(
-            &self,
-            sha: &str,
-            path: &Path,
-        ) -> Result<Option<String>, GitError> {
+        fn read_at_commit(&self, sha: &str, path: &Path) -> Result<Option<String>, GitError> {
             let k = format!("{}::{}", sha, path.display());
             if let Some(c) = self.tip_content.get(&k) {
                 return Ok(Some(c.clone()));
@@ -475,9 +459,11 @@ mod tests {
 
         let r = analyze_tdd_compliance(&m, "main", "branch", true).unwrap();
         assert!(!r.no_skip_attribute);
-        let found = r.details.violations.iter().any(|v| {
-            matches!(v, TddFinding::IgnoreAttribute { line, .. } if *line == 2)
-        });
+        let found = r
+            .details
+            .violations
+            .iter()
+            .any(|v| matches!(v, TddFinding::IgnoreAttribute { line, .. } if *line == 2));
         assert!(found, "ignore not surfaced: {:?}", r.details.violations);
     }
 
@@ -574,10 +560,12 @@ mod tests {
 
         let r = analyze_tdd_compliance(&m, "main", "branch", true).unwrap();
         assert!(!r.test_first);
-        let bar_violation = r.details.violations.iter().any(|v| matches!(
-            v,
-            TddFinding::ImplWithoutPriorTest { module, .. } if module == "crates/cave-bar"
-        ));
+        let bar_violation = r.details.violations.iter().any(|v| {
+            matches!(
+                v,
+                TddFinding::ImplWithoutPriorTest { module, .. } if module == "crates/cave-bar"
+            )
+        });
         assert!(bar_violation);
     }
 
@@ -590,7 +578,11 @@ mod tests {
             "test: foo",
             vec![("crates/cave-foo/tests/x.rs", FileChangeKind::Added)],
         );
-        m.add_commit("C", "manifest", vec![("Cargo.toml", FileChangeKind::Modified)]);
+        m.add_commit(
+            "C",
+            "manifest",
+            vec![("Cargo.toml", FileChangeKind::Modified)],
+        );
         m.add_commit(
             "D",
             "feat: foo",

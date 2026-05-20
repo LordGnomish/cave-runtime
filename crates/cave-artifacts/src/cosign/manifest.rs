@@ -80,9 +80,9 @@ pub fn manifest_digest(bytes: &[u8]) -> String {
 /// Compute the OCI tag Cosign would push the signature artifact under.
 /// Cite: sigstore/cosign README — `sha256-XYZ.sig` for image signatures.
 pub fn signature_tag(digest: &str) -> Result<String, CosignError> {
-    let stripped = digest
-        .strip_prefix("sha256:")
-        .ok_or_else(|| CosignError::PayloadInvalid(format!("digest must be sha256:HEX, got {digest}")))?;
+    let stripped = digest.strip_prefix("sha256:").ok_or_else(|| {
+        CosignError::PayloadInvalid(format!("digest must be sha256:HEX, got {digest}"))
+    })?;
     Ok(format!("sha256-{stripped}.sig"))
 }
 
@@ -106,8 +106,8 @@ impl SignatureIndex {
     }
 
     pub fn attach(&self, digest: &str, payload: &[u8], signature: Signature) {
-        use base64::engine::general_purpose::STANDARD;
         use base64::Engine as _;
+        use base64::engine::general_purpose::STANDARD;
         let rec = SignatureRecord {
             payload_b64: STANDARD.encode(payload),
             signature,

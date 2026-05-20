@@ -22,17 +22,11 @@ impl MediaType {
         match s {
             "application/vnd.oci.image.manifest.v1+json" => Some(Self::OciManifestV1),
             "application/vnd.oci.image.index.v1+json" => Some(Self::OciIndexV1),
-            "application/vnd.docker.distribution.manifest.v2+json" => {
-                Some(Self::DockerManifestV2)
-            }
-            "application/vnd.docker.container.image.v1+json" => {
-                Some(Self::DockerImageConfigV1)
-            }
+            "application/vnd.docker.distribution.manifest.v2+json" => Some(Self::DockerManifestV2),
+            "application/vnd.docker.container.image.v1+json" => Some(Self::DockerImageConfigV1),
             "application/vnd.oci.image.layer.v1.tar+gzip" => Some(Self::OciLayerV1TarGzip),
             "application/vnd.oci.image.layer.v1.tar+zstd" => Some(Self::OciLayerV1TarZstd),
-            "application/vnd.docker.image.rootfs.diff.tar.gzip" => {
-                Some(Self::DockerLayerV1TarGzip)
-            }
+            "application/vnd.docker.image.rootfs.diff.tar.gzip" => Some(Self::DockerLayerV1TarGzip),
             _ => None,
         }
     }

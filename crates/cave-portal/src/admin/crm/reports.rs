@@ -5,10 +5,10 @@
 //!
 //! Upstream: <https://twenty.com/docs>
 
+use super::CrmViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
-use super::CrmViewError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReportRow {
@@ -22,7 +22,8 @@ pub struct ReportRow {
 
 pub fn build_reports(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<ReportRow>, CrmViewError> {
     let contacts = super::contacts::list_contacts(state, ctx)?;
-    let mut acc: std::collections::BTreeMap<&'static str, ReportRow> = std::collections::BTreeMap::new();
+    let mut acc: std::collections::BTreeMap<&'static str, ReportRow> =
+        std::collections::BTreeMap::new();
     for a in &contacts {
         let r = acc.entry(a.plan).or_insert(ReportRow {
             plan: a.plan,
@@ -67,7 +68,12 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, CrmViewErr
         arr_d = (arr as f64 / 100.0),
         tbl = table(&["plan", "accounts", "mrr", "arr"], &table_rows),
     );
-    Ok(page_shell_full(ctx, "/admin/crm/reports", &format!("crm/reports · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/crm/reports",
+        &format!("crm/reports · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
 }
 
 #[cfg(test)]

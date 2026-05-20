@@ -28,10 +28,7 @@ impl TenantId {
             return Err(TenantError::TooLong);
         }
         for ch in slug.chars() {
-            let ok = ch.is_ascii_lowercase()
-                || ch.is_ascii_digit()
-                || ch == '-'
-                || ch == '_';
+            let ok = ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-' || ch == '_';
             if !ok {
                 return Err(TenantError::InvalidChar(ch));
             }
@@ -190,8 +187,14 @@ mod tests {
 
     #[test]
     fn tenant_id_rejects_path_traversal() {
-        assert!(matches!(TenantId::new("../etc"), Err(TenantError::InvalidChar('.'))));
-        assert!(matches!(TenantId::new("a/b"), Err(TenantError::InvalidChar('/'))));
+        assert!(matches!(
+            TenantId::new("../etc"),
+            Err(TenantError::InvalidChar('.'))
+        ));
+        assert!(matches!(
+            TenantId::new("a/b"),
+            Err(TenantError::InvalidChar('/'))
+        ));
     }
 
     #[test]

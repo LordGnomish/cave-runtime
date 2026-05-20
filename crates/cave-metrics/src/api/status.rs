@@ -2,9 +2,9 @@
 // Copyright 2026 Cave Runtime contributors
 //! /api/v1/status/* endpoints
 
-use axum::{extract::State, Json};
-use std::sync::Arc;
 use crate::state::MetricsState;
+use axum::{Json, extract::State};
+use std::sync::Arc;
 
 pub async fn config(State(_state): State<Arc<MetricsState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({

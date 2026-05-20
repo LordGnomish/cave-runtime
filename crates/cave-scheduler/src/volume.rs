@@ -101,7 +101,9 @@ pub struct BindRecord {
 }
 
 impl VolumeStore {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn add_pv(&self, pv: PersistentVolume) {
         self.pvs.lock().unwrap().insert(pv.name.clone(), pv);
@@ -111,11 +113,18 @@ impl VolumeStore {
         self.pvcs.lock().unwrap().insert(key, pvc);
     }
     pub fn add_storage_class(&self, sc: StorageClass) {
-        self.storage_classes.lock().unwrap().insert(sc.name.clone(), sc);
+        self.storage_classes
+            .lock()
+            .unwrap()
+            .insert(sc.name.clone(), sc);
     }
 
     pub fn get_pvc(&self, ns: &str, name: &str) -> Option<PersistentVolumeClaim> {
-        self.pvcs.lock().unwrap().get(&format!("{}/{}", ns, name)).cloned()
+        self.pvcs
+            .lock()
+            .unwrap()
+            .get(&format!("{}/{}", ns, name))
+            .cloned()
     }
 
     pub fn get_storage_class(&self, name: &str) -> Option<StorageClass> {
@@ -186,10 +195,16 @@ fn lookup_pvc(
     store: &VolumeStore,
 ) -> Result<PersistentVolumeClaim, Status> {
     let pvc = store.get_pvc(&pod.namespace, pvc_name).ok_or_else(|| {
-        Status::unresolvable("VolumeBinding", format!("pvc {}/{} not found", pod.namespace, pvc_name))
+        Status::unresolvable(
+            "VolumeBinding",
+            format!("pvc {}/{} not found", pod.namespace, pvc_name),
+        )
     })?;
     if pvc.tenant_id != pod.tenant_id && !pvc.tenant_id.is_empty() {
-        return Err(Status::unresolvable("VolumeBinding", "cross-tenant PVC reference"));
+        return Err(Status::unresolvable(
+            "VolumeBinding",
+            "cross-tenant PVC reference",
+        ));
     }
     Ok(pvc)
 }
@@ -198,8 +213,12 @@ fn lookup_pvc(
 /// when every (key, allowed_values) entry is satisfied.
 fn node_matches_topology(node: &Node, term: &HashMap<String, Vec<String>>) -> bool {
     for (k, allowed) in term {
-        let Some(v) = node.labels.get(k) else { return false; };
-        if !allowed.iter().any(|x| x == v) { return false; }
+        let Some(v) = node.labels.get(k) else {
+            return false;
+        };
+        if !allowed.iter().any(|x| x == v) {
+            return false;
+        }
     }
     true
 }
@@ -212,21 +231,34 @@ pub struct VolumeBinding {
 }
 
 impl VolumeBinding {
-    pub fn new(store: std::sync::Arc<VolumeStore>) -> Self { Self { store } }
+    pub fn new(store: std::sync::Arc<VolumeStore>) -> Self {
+        Self { store }
+    }
 }
 
 impl FilterPlugin for VolumeBinding {
-    fn name(&self) -> &str { "VolumeBinding" }
+    fn name(&self) -> &str {
+        "VolumeBinding"
+    }
 
     fn filter(&self, pod: &Pod, node: &Node, _: &ClusterSnapshot) -> Status {
         for v in &pod.spec.volumes {
-            let crate::framework::VolumeKind::PersistentVolumeClaim { claim_name, bound_node } = &v.kind else { continue; };
+            let crate::framework::VolumeKind::PersistentVolumeClaim {
+                claim_name,
+                bound_node,
+            } = &v.kind
+            else {
+                continue;
+            };
 
             // Legacy direct bound_node short-circuit (kept for backwards compat
             // with pods that already encode the binding inline).
             if let Some(bn) = bound_node {
                 if bn != &node.name {
-                    return Status::unschedulable("VolumeBinding", format!("PVC {} bound to {}", claim_name, bn));
+                    return Status::unschedulable(
+                        "VolumeBinding",
+                        format!("PVC {} bound to {}", claim_name, bn),
+                    );
                 }
                 continue;
             }
@@ -239,37 +271,53 @@ impl FilterPlugin for VolumeBinding {
             // Already-bound PVC: must run on the same node.
             if let Some(existing_node) = &pvc.bound_node {
                 if existing_node != &node.name {
-                    return Status::unschedulable("VolumeBinding",
-                        format!("PVC {} bound to {}", claim_name, existing_node));
+                    return Status::unschedulable(
+                        "VolumeBinding",
+                        format!("PVC {} bound to {}", claim_name, existing_node),
+                    );
                 }
                 continue;
             }
 
             // Storage class interaction.
-            let sc = pvc.storage_class.as_ref()
+            let sc = pvc
+                .storage_class
+                .as_ref()
                 .and_then(|n| self.store.get_storage_class(n));
 
             match sc.as_ref().map(|s| s.volume_binding_mode) {
                 // Immediate: PVC must already be bound to a PV.
                 Some(VolumeBindingMode::Immediate) => {
                     let Some(pv_name) = &pvc.volume_name else {
-                        return Status::unschedulable("VolumeBinding",
-                            format!("immediate PVC {} not yet bound", claim_name));
+                        return Status::unschedulable(
+                            "VolumeBinding",
+                            format!("immediate PVC {} not yet bound", claim_name),
+                        );
                     };
                     let pv = match self.store.get_pv(pv_name) {
                         Some(p) => p,
-                        None => return Status::unresolvable("VolumeBinding",
-                            format!("PV {} missing for immediate PVC {}", pv_name, claim_name)),
+                        None => {
+                            return Status::unresolvable(
+                                "VolumeBinding",
+                                format!("PV {} missing for immediate PVC {}", pv_name, claim_name),
+                            )
+                        }
                     };
-                    if !pv.node_affinity.is_empty() && !node_matches_topology(node, &pv.node_affinity) {
-                        return Status::unschedulable("VolumeBinding",
-                            format!("PV {} node-affinity excludes {}", pv_name, node.name));
+                    if !pv.node_affinity.is_empty()
+                        && !node_matches_topology(node, &pv.node_affinity)
+                    {
+                        return Status::unschedulable(
+                            "VolumeBinding",
+                            format!("PV {} node-affinity excludes {}", pv_name, node.name),
+                        );
                     }
                     if let Some(claim_user) = &pv.claim_ref {
                         let want = format!("{}/{}", pvc.namespace, pvc.name);
                         if claim_user != &want {
-                            return Status::unschedulable("VolumeBinding",
-                                format!("PV {} bound to a different PVC {}", pv_name, claim_user));
+                            return Status::unschedulable(
+                                "VolumeBinding",
+                                format!("PV {} bound to a different PVC {}", pv_name, claim_user),
+                            );
                         }
                     }
                 }
@@ -279,18 +327,30 @@ impl FilterPlugin for VolumeBinding {
                 Some(VolumeBindingMode::WaitForFirstConsumer) | None => {
                     if let Some(s) = &sc {
                         if !s.allowed_topologies.is_empty() {
-                            let any = s.allowed_topologies.iter().any(|t| node_matches_topology(node, t));
+                            let any = s
+                                .allowed_topologies
+                                .iter()
+                                .any(|t| node_matches_topology(node, t));
                             if !any {
-                                return Status::unschedulable("VolumeBinding",
-                                    format!("node {} not in allowed_topologies of class {}", node.name, s.name));
+                                return Status::unschedulable(
+                                    "VolumeBinding",
+                                    format!(
+                                        "node {} not in allowed_topologies of class {}",
+                                        node.name, s.name
+                                    ),
+                                );
                             }
                         }
                     }
                     if let Some(pv_name) = &pvc.volume_name {
                         if let Some(pv) = self.store.get_pv(pv_name) {
-                            if !pv.node_affinity.is_empty() && !node_matches_topology(node, &pv.node_affinity) {
-                                return Status::unschedulable("VolumeBinding",
-                                    format!("PV {} node-affinity excludes {}", pv_name, node.name));
+                            if !pv.node_affinity.is_empty()
+                                && !node_matches_topology(node, &pv.node_affinity)
+                            {
+                                return Status::unschedulable(
+                                    "VolumeBinding",
+                                    format!("PV {} node-affinity excludes {}", pv_name, node.name),
+                                );
                             }
                         }
                     }
@@ -302,29 +362,51 @@ impl FilterPlugin for VolumeBinding {
 }
 
 impl ReservePlugin for VolumeBinding {
-    fn name(&self) -> &str { "VolumeBinding" }
+    fn name(&self) -> &str {
+        "VolumeBinding"
+    }
 
     fn reserve(&self, pod: &Pod, node: &str, state: &CycleState) -> Status {
         let mut decisions: Vec<(String, String, Option<String>)> = Vec::new();
         for v in &pod.spec.volumes {
-            let crate::framework::VolumeKind::PersistentVolumeClaim { claim_name, bound_node } = &v.kind else { continue; };
+            let crate::framework::VolumeKind::PersistentVolumeClaim {
+                claim_name,
+                bound_node,
+            } = &v.kind
+            else {
+                continue;
+            };
             // Legacy literal bound_node — assumed already materialised.
-            if bound_node.is_some() { continue; }
+            if bound_node.is_some() {
+                continue;
+            }
             let pvc = match lookup_pvc(pod, claim_name, &self.store) {
                 Ok(p) => p,
                 Err(s) => return s,
             };
-            if pvc.bound_node.is_some() { continue; }
+            if pvc.bound_node.is_some() {
+                continue;
+            }
             // Decision: pin pvc to this node. Optionally bind a matching PV.
             let pv_name = pvc.volume_name.clone();
-            decisions.push((format!("{}/{}", pvc.namespace, pvc.name), node.into(), pv_name));
+            decisions.push((
+                format!("{}/{}", pvc.namespace, pvc.name),
+                node.into(),
+                pv_name,
+            ));
         }
-        state.write(VOLUME_BINDING_STATE_KEY, VolumeBindingCycleState { decisions });
+        state.write(
+            VOLUME_BINDING_STATE_KEY,
+            VolumeBindingCycleState { decisions },
+        );
         Status::success("VolumeBinding")
     }
 
     fn unreserve(&self, _pod: &Pod, _node: &str, state: &CycleState) {
-        let Some(cycle): Option<VolumeBindingCycleState> = state.read(VOLUME_BINDING_STATE_KEY) else { return };
+        let Some(cycle): Option<VolumeBindingCycleState> = state.read(VOLUME_BINDING_STATE_KEY)
+        else {
+            return;
+        };
         for (pvc_key, _, _) in cycle.decisions {
             self.store.rollback_binding(&pvc_key);
         }
@@ -333,10 +415,13 @@ impl ReservePlugin for VolumeBinding {
 }
 
 impl PreBindPlugin for VolumeBinding {
-    fn name(&self) -> &str { "VolumeBinding" }
+    fn name(&self) -> &str {
+        "VolumeBinding"
+    }
 
     fn pre_bind(&self, _pod: &Pod, _node: &str, state: &CycleState) -> Status {
-        let Some(cycle): Option<VolumeBindingCycleState> = state.read(VOLUME_BINDING_STATE_KEY) else {
+        let Some(cycle): Option<VolumeBindingCycleState> = state.read(VOLUME_BINDING_STATE_KEY)
+        else {
             return Status::success("VolumeBinding");
         };
         for (pvc_key, node, pv_name) in &cycle.decisions {
@@ -367,27 +452,52 @@ pub struct VolumeZone {
 }
 
 impl VolumeZone {
-    pub fn new(store: std::sync::Arc<VolumeStore>) -> Self { Self { store } }
+    pub fn new(store: std::sync::Arc<VolumeStore>) -> Self {
+        Self { store }
+    }
 }
 
 impl FilterPlugin for VolumeZone {
-    fn name(&self) -> &str { "VolumeZone" }
+    fn name(&self) -> &str {
+        "VolumeZone"
+    }
 
     fn filter(&self, pod: &Pod, node: &Node, _: &ClusterSnapshot) -> Status {
         for v in &pod.spec.volumes {
-            let crate::framework::VolumeKind::PersistentVolumeClaim { claim_name, bound_node: _ } = &v.kind else { continue; };
-            let Some(pvc) = self.store.get_pvc(&pod.namespace, claim_name) else { continue; };
-            let Some(pv_name) = &pvc.volume_name else { continue; };
-            let Some(pv) = self.store.get_pv(pv_name) else { continue; };
+            let crate::framework::VolumeKind::PersistentVolumeClaim {
+                claim_name,
+                bound_node: _,
+            } = &v.kind
+            else {
+                continue;
+            };
+            let Some(pvc) = self.store.get_pvc(&pod.namespace, claim_name) else {
+                continue;
+            };
+            let Some(pv_name) = &pvc.volume_name else {
+                continue;
+            };
+            let Some(pv) = self.store.get_pv(pv_name) else {
+                continue;
+            };
             for label in ZONE_LABELS {
-                let Some(allowed) = pv.node_affinity.get(*label) else { continue; };
+                let Some(allowed) = pv.node_affinity.get(*label) else {
+                    continue;
+                };
                 let Some(node_val) = node.labels.get(*label) else {
-                    return Status::unschedulable("VolumeZone",
-                        format!("node lacks {} required by PV {}", label, pv_name));
+                    return Status::unschedulable(
+                        "VolumeZone",
+                        format!("node lacks {} required by PV {}", label, pv_name),
+                    );
                 };
                 if !allowed.iter().any(|x| x == node_val) {
-                    return Status::unschedulable("VolumeZone",
-                        format!("node {}={} not in PV {} allowed zones", label, node_val, pv_name));
+                    return Status::unschedulable(
+                        "VolumeZone",
+                        format!(
+                            "node {}={} not in PV {} allowed zones",
+                            label, node_val, pv_name
+                        ),
+                    );
                 }
             }
         }
@@ -396,7 +506,9 @@ impl FilterPlugin for VolumeZone {
 }
 
 impl ScorePlugin for VolumeZone {
-    fn name(&self) -> &str { "VolumeZone" }
+    fn name(&self) -> &str {
+        "VolumeZone"
+    }
     fn score(&self, _pod: &Pod, _node: &Node, _: &ClusterSnapshot) -> i64 {
         // VolumeZone is a hard predicate; score plugin is a no-op (every
         // node that passes Filter scores the max).
@@ -415,24 +527,34 @@ mod tests {
 
     fn node_with_labels(name: &str, labels: &[(&str, &str)]) -> Node {
         let mut node = Node {
-            name: name.into(), uid: Uuid::new_v4(), status: NodeStatus::Ready,
+            name: name.into(),
+            uid: Uuid::new_v4(),
+            status: NodeStatus::Ready,
             capacity: ResourceCapacity::default(),
             allocatable: ResourceCapacity::default(),
             allocated: ResourceCapacity::default(),
-            labels: HashMap::new(), taints: vec![], conditions: vec![],
-            registered_at: Utc::now(), last_heartbeat: Utc::now(),
+            labels: HashMap::new(),
+            taints: vec![],
+            conditions: vec![],
+            registered_at: Utc::now(),
+            last_heartbeat: Utc::now(),
         };
-        for (k, v) in labels { node.labels.insert((*k).into(), (*v).into()); }
+        for (k, v) in labels {
+            node.labels.insert((*k).into(), (*v).into());
+        }
         node
     }
 
     fn pvc(name: &str, sc: Option<&str>) -> PersistentVolumeClaim {
         PersistentVolumeClaim {
-            name: name.into(), namespace: "ns".into(), tenant_id: "t".into(),
+            name: name.into(),
+            namespace: "ns".into(),
+            tenant_id: "t".into(),
             storage_class: sc.map(Into::into),
             access_modes: HashSet::from([AccessMode::ReadWriteOnce]),
             requested_bytes: 1_000_000_000,
-            volume_name: None, bound_node: None,
+            volume_name: None,
+            bound_node: None,
         }
     }
 
@@ -440,13 +562,19 @@ mod tests {
         let mut p = Pod::new("t", "ns", name);
         p.spec.volumes.push(VolumeSpec {
             name: "v".into(),
-            kind: VolumeKind::PersistentVolumeClaim { claim_name: claim_name.into(), bound_node: None },
+            kind: VolumeKind::PersistentVolumeClaim {
+                claim_name: claim_name.into(),
+                bound_node: None,
+            },
         });
         p
     }
 
     fn snap() -> ClusterSnapshot {
-        ClusterSnapshot { nodes: vec![], pods_by_node: HashMap::new() }
+        ClusterSnapshot {
+            nodes: vec![],
+            pods_by_node: HashMap::new(),
+        }
     }
 
     // ── VolumeBinding Filter ──────────────────────────────────────────────
@@ -492,7 +620,9 @@ mod tests {
         store.add_pvc(c);
         let plug = VolumeBinding::new(store.clone());
         let p = pod_with_pvc("p", "c");
-        assert!(plug.filter(&p, &node_with_labels("a", &[]), &snap()).is_success());
+        assert!(plug
+            .filter(&p, &node_with_labels("a", &[]), &snap())
+            .is_success());
     }
 
     #[test]
@@ -523,7 +653,8 @@ mod tests {
         });
         let mut pv = PersistentVolume::default();
         pv.name = "pv0".into();
-        pv.node_affinity.insert("zone".into(), vec!["us-east-1a".into()]);
+        pv.node_affinity
+            .insert("zone".into(), vec!["us-east-1a".into()]);
         store.add_pv(pv);
         let mut c = pvc("c", Some("fast"));
         c.volume_name = Some("pv0".into());
@@ -532,10 +663,20 @@ mod tests {
         let plug = VolumeBinding::new(store.clone());
         let p = pod_with_pvc("p", "c");
         // Wrong zone → reject.
-        let s = plug.filter(&p, &node_with_labels("a", &[("zone", "us-east-1b")]), &snap());
+        let s = plug.filter(
+            &p,
+            &node_with_labels("a", &[("zone", "us-east-1b")]),
+            &snap(),
+        );
         assert!(s.is_rejected());
         // Right zone → success.
-        assert!(plug.filter(&p, &node_with_labels("a", &[("zone", "us-east-1a")]), &snap()).is_success());
+        assert!(plug
+            .filter(
+                &p,
+                &node_with_labels("a", &[("zone", "us-east-1a")]),
+                &snap()
+            )
+            .is_success());
     }
 
     #[test]
@@ -545,18 +686,31 @@ mod tests {
             name: "wfc".into(),
             provisioner: "test".into(),
             volume_binding_mode: VolumeBindingMode::WaitForFirstConsumer,
-            allowed_topologies: vec![
-                HashMap::from([("zone".into(), vec!["us-east-1a".into(), "us-east-1b".into()])]),
-            ],
+            allowed_topologies: vec![HashMap::from([(
+                "zone".into(),
+                vec!["us-east-1a".into(), "us-east-1b".into()],
+            )])],
         });
         store.add_pvc(pvc("c", Some("wfc")));
 
         let plug = VolumeBinding::new(store.clone());
         let p = pod_with_pvc("p", "c");
         // Allowed zone.
-        assert!(plug.filter(&p, &node_with_labels("a", &[("zone", "us-east-1a")]), &snap()).is_success());
+        assert!(plug
+            .filter(
+                &p,
+                &node_with_labels("a", &[("zone", "us-east-1a")]),
+                &snap()
+            )
+            .is_success());
         // Disallowed zone.
-        assert!(plug.filter(&p, &node_with_labels("b", &[("zone", "eu-west-1")]), &snap()).is_rejected());
+        assert!(plug
+            .filter(
+                &p,
+                &node_with_labels("b", &[("zone", "eu-west-1")]),
+                &snap()
+            )
+            .is_rejected());
     }
 
     #[test]
@@ -565,7 +719,9 @@ mod tests {
         store.add_pvc(pvc("c", None));
         let plug = VolumeBinding::new(store.clone());
         let p = pod_with_pvc("p", "c");
-        assert!(plug.filter(&p, &node_with_labels("a", &[]), &snap()).is_success());
+        assert!(plug
+            .filter(&p, &node_with_labels("a", &[]), &snap())
+            .is_success());
     }
 
     // ── VolumeBinding late-binding handshake (Reserve + PreBind + Unreserve) ──
@@ -655,10 +811,8 @@ mod tests {
     fn make_zoned_pv(name: &str, zone: &str) -> PersistentVolume {
         let mut pv = PersistentVolume::default();
         pv.name = name.into();
-        pv.node_affinity.insert(
-            "topology.kubernetes.io/zone".into(),
-            vec![zone.into()],
-        );
+        pv.node_affinity
+            .insert("topology.kubernetes.io/zone".into(), vec![zone.into()]);
         pv
     }
 
@@ -666,37 +820,50 @@ mod tests {
     fn volume_zone_passes_when_zone_matches() {
         let store = Arc::new(VolumeStore::new());
         store.add_pv(make_zoned_pv("pv0", "us-east-1a"));
-        let mut c = pvc("c", None); c.volume_name = Some("pv0".into());
+        let mut c = pvc("c", None);
+        c.volume_name = Some("pv0".into());
         store.add_pvc(c);
         let plug = VolumeZone::new(store.clone());
         let p = pod_with_pvc("p", "c");
-        assert!(plug.filter(&p, &node_with_labels("a", &[
-            ("topology.kubernetes.io/zone", "us-east-1a"),
-        ]), &snap()).is_success());
+        assert!(plug
+            .filter(
+                &p,
+                &node_with_labels("a", &[("topology.kubernetes.io/zone", "us-east-1a"),]),
+                &snap()
+            )
+            .is_success());
     }
 
     #[test]
     fn volume_zone_rejects_wrong_zone() {
         let store = Arc::new(VolumeStore::new());
         store.add_pv(make_zoned_pv("pv0", "us-east-1a"));
-        let mut c = pvc("c", None); c.volume_name = Some("pv0".into());
+        let mut c = pvc("c", None);
+        c.volume_name = Some("pv0".into());
         store.add_pvc(c);
         let plug = VolumeZone::new(store.clone());
         let p = pod_with_pvc("p", "c");
-        assert!(plug.filter(&p, &node_with_labels("a", &[
-            ("topology.kubernetes.io/zone", "eu-west-1"),
-        ]), &snap()).is_rejected());
+        assert!(plug
+            .filter(
+                &p,
+                &node_with_labels("a", &[("topology.kubernetes.io/zone", "eu-west-1"),]),
+                &snap()
+            )
+            .is_rejected());
     }
 
     #[test]
     fn volume_zone_rejects_node_missing_zone_label() {
         let store = Arc::new(VolumeStore::new());
         store.add_pv(make_zoned_pv("pv0", "us-east-1a"));
-        let mut c = pvc("c", None); c.volume_name = Some("pv0".into());
+        let mut c = pvc("c", None);
+        c.volume_name = Some("pv0".into());
         store.add_pvc(c);
         let plug = VolumeZone::new(store.clone());
         let p = pod_with_pvc("p", "c");
-        assert!(plug.filter(&p, &node_with_labels("a", &[]), &snap()).is_rejected());
+        assert!(plug
+            .filter(&p, &node_with_labels("a", &[]), &snap())
+            .is_rejected());
     }
 
     #[test]
@@ -706,7 +873,9 @@ mod tests {
         let plug = VolumeZone::new(store.clone());
         let p = pod_with_pvc("p", "c");
         // Nothing to enforce yet.
-        assert!(plug.filter(&p, &node_with_labels("a", &[]), &snap()).is_success());
+        assert!(plug
+            .filter(&p, &node_with_labels("a", &[]), &snap())
+            .is_success());
     }
 
     #[test]
@@ -719,14 +888,22 @@ mod tests {
             vec!["us-west-2c".into()],
         );
         store.add_pv(pv);
-        let mut c = pvc("c", None); c.volume_name = Some("pv0".into());
+        let mut c = pvc("c", None);
+        c.volume_name = Some("pv0".into());
         store.add_pvc(c);
         let plug = VolumeZone::new(store.clone());
         let p = pod_with_pvc("p", "c");
         // Right legacy label.
-        assert!(plug.filter(&p, &node_with_labels("a", &[
-            ("failure-domain.beta.kubernetes.io/zone", "us-west-2c"),
-        ]), &snap()).is_success());
+        assert!(plug
+            .filter(
+                &p,
+                &node_with_labels(
+                    "a",
+                    &[("failure-domain.beta.kubernetes.io/zone", "us-west-2c"),]
+                ),
+                &snap()
+            )
+            .is_success());
     }
 
     #[test]
@@ -734,7 +911,10 @@ mod tests {
         let store = Arc::new(VolumeStore::new());
         let plug = VolumeZone::new(store);
         let p = Pod::new("t", "ns", "p");
-        assert_eq!(plug.score(&p, &node_with_labels("a", &[]), &snap()), MAX_NODE_SCORE);
+        assert_eq!(
+            plug.score(&p, &node_with_labels("a", &[]), &snap()),
+            MAX_NODE_SCORE
+        );
     }
 
     // ── StorageClass / PV bookkeeping ─────────────────────────────────────
@@ -763,6 +943,8 @@ mod tests {
         store.add_pvc(pvc("c", None));
         let plug = VolumeBinding::new(store.clone());
         let p = pod_with_pvc("p", "c");
-        assert!(plug.filter(&p, &node_with_labels("a", &[]), &snap()).is_success());
+        assert!(plug
+            .filter(&p, &node_with_labels("a", &[]), &snap())
+            .is_success());
     }
 }

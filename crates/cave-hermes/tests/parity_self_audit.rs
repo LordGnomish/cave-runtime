@@ -49,8 +49,7 @@ fn gate_1_upstream_version_pinned_v2026_5_16() {
 #[test]
 fn gate_2_source_sha_present_and_matches_version() {
     let m = manifest_text();
-    let sha = extract_after(&m, "\nsource_sha ")
-        .or_else(|| extract_after(&m, "\nsource_sha="));
+    let sha = extract_after(&m, "\nsource_sha ").or_else(|| extract_after(&m, "\nsource_sha="));
     assert!(
         sha.is_some() && !sha.as_deref().unwrap().is_empty(),
         "manifest [upstream] source_sha must be set for reproducibility (got {:?})",
@@ -67,8 +66,7 @@ fn gate_2_source_sha_present_and_matches_version() {
 #[test]
 fn gate_3_fill_ratio_is_measured_and_at_least_0_40() {
     let m = manifest_text();
-    let raw = extract_after(&m, "\nfill_ratio ")
-        .or_else(|| extract_after(&m, "\nfill_ratio="));
+    let raw = extract_after(&m, "\nfill_ratio ").or_else(|| extract_after(&m, "\nfill_ratio="));
     let ratio: f64 = raw
         .as_deref()
         .expect("[parity] fill_ratio must be present")
@@ -80,7 +78,11 @@ fn gate_3_fill_ratio_is_measured_and_at_least_0_40() {
          Either improve coverage or document scope-cuts as [[skipped]].",
         ratio
     );
-    assert!(ratio <= 1.0, "fill_ratio must be a fraction (got {})", ratio);
+    assert!(
+        ratio <= 1.0,
+        "fill_ratio must be a fraction (got {})",
+        ratio
+    );
 }
 
 #[test]
@@ -99,8 +101,7 @@ fn gate_4_parity_ratio_source_is_manifest() {
 #[test]
 fn gate_5_last_audit_is_2026_05_19() {
     let m = manifest_text();
-    let when = extract_after(&m, "\nlast_audit ")
-        .or_else(|| extract_after(&m, "\nlast_audit="));
+    let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert_eq!(
         when.as_deref(),
         Some("2026-05-19"),
@@ -200,7 +201,12 @@ fn gate_9_default_runtime_wires_four_named_builtins() {
             "missing built-in tool: {must} (have: {names:?})"
         );
     }
-    assert_eq!(rt.tools.len(), 4, "expected exactly 4 built-ins, got {}", rt.tools.len());
+    assert_eq!(
+        rt.tools.len(),
+        4,
+        "expected exactly 4 built-ins, got {}",
+        rt.tools.len()
+    );
     for tier in [
         cave_hermes::router::ModelTier::Local,
         cave_hermes::router::ModelTier::Mid,

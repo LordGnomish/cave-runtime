@@ -37,8 +37,12 @@ pub mod sources_container;
 pub mod sources_ping;
 pub mod webhook;
 
-pub use autoscaler::{Autoscaler, AutoscalerConfig, AutoscalerMetric, AutoscalerMode, ScaleDecision};
-pub use broker_controller::{Broker, BrokerSpec, BrokerStatus, ConditionState, DeliverySpec, ReconcileAction};
+pub use autoscaler::{
+    Autoscaler, AutoscalerConfig, AutoscalerMetric, AutoscalerMode, ScaleDecision,
+};
+pub use broker_controller::{
+    Broker, BrokerSpec, BrokerStatus, ConditionState, DeliverySpec, ReconcileAction,
+};
 pub use cert_bridge::{
     CertManagerCertificate, CertManagerStatus, IssuerRef, KnativeCertificate,
     KnativeCertificateSpec, KnativeCertificateStatus, project_status_back, to_cert_manager,
@@ -51,10 +55,10 @@ pub use eventing_transports::{
 };
 pub use ksvc::{Ksvc, ServiceSpec, ServiceStatus};
 pub use meta::{
-    Container, EnvVar, ObjectMeta, PodSpec, RevisionTemplateSpec, TrafficTarget,
-    validate_template, validate_traffic, ANNOTATION_AUTOSCALER_CLASS, ANNOTATION_CREATOR,
-    ANNOTATION_LAST_MODIFIER, ANNOTATION_MAX_SCALE, ANNOTATION_METRIC, ANNOTATION_MIN_SCALE,
-    ANNOTATION_TARGET,
+    ANNOTATION_AUTOSCALER_CLASS, ANNOTATION_CREATOR, ANNOTATION_LAST_MODIFIER,
+    ANNOTATION_MAX_SCALE, ANNOTATION_METRIC, ANNOTATION_MIN_SCALE, ANNOTATION_TARGET, Container,
+    EnvVar, ObjectMeta, PodSpec, RevisionTemplateSpec, TrafficTarget, validate_template,
+    validate_traffic,
 };
 pub use revision::{Revision, RevisionSpec, RevisionStatus};
 pub use route::{Route, RouteSpec, RouteStatus};
@@ -65,8 +69,8 @@ pub use sources_apiserver::{
 pub use sources_container::{ContainerSource, ContainerSourceSpec, ContainerSourceStatus};
 pub use sources_ping::{CloudEvent, PingSource, PingSourceSpec, PingSourceStatus};
 pub use webhook::{
-    admit, validate_ksvc_template, AdmissionObject, AdmissionOp, PatchOp, WebhookRequest,
-    WebhookResponse,
+    AdmissionObject, AdmissionOp, PatchOp, WebhookRequest, WebhookResponse, admit,
+    validate_ksvc_template,
 };
 
 #[cfg(test)]
@@ -76,13 +80,19 @@ mod tests {
     use std::time::{Duration, Instant};
 
     fn container(name: &str, image: &str) -> Container {
-        Container { name: name.to_string(), image: image.to_string(), env: vec![] }
+        Container {
+            name: name.to_string(),
+            image: image.to_string(),
+            env: vec![],
+        }
     }
 
     fn template(image: &str) -> RevisionTemplateSpec {
         RevisionTemplateSpec {
             metadata: ObjectMeta::default(),
-            spec: PodSpec { containers: vec![container("app", image)] },
+            spec: PodSpec {
+                containers: vec![container("app", image)],
+            },
         }
     }
 
@@ -99,7 +109,8 @@ mod tests {
         let mut svc = Ksvc::new("t");
         svc.status.traffic = vec![TrafficTarget {
             revision_name: Some("rev-0".to_string()),
-            percent: Some(100), ..Default::default()
+            percent: Some(100),
+            ..Default::default()
         }];
         svc.scale_to_zero();
         assert_eq!(svc.status.traffic[0].percent, Some(0));
@@ -110,7 +121,8 @@ mod tests {
         let mut svc = Ksvc::new("alpha");
         svc.status.traffic = vec![TrafficTarget {
             revision_name: Some("r".to_string()),
-            percent: Some(100), ..Default::default()
+            percent: Some(100),
+            ..Default::default()
         }];
         svc.scale_to_zero();
         assert_eq!(svc.metadata.creator(), Some(&"alpha".to_string()));
@@ -141,8 +153,16 @@ mod tests {
         let mut svc = Ksvc::new("t");
         svc.spec.template = template("img");
         svc.spec.traffic = vec![
-            TrafficTarget { revision_name: Some("a".to_string()), percent: Some(40), ..Default::default() },
-            TrafficTarget { revision_name: Some("b".to_string()), percent: Some(40), ..Default::default() },
+            TrafficTarget {
+                revision_name: Some("a".to_string()),
+                percent: Some(40),
+                ..Default::default()
+            },
+            TrafficTarget {
+                revision_name: Some("b".to_string()),
+                percent: Some(40),
+                ..Default::default()
+            },
         ];
         let err = svc.validate().unwrap_err();
         assert!(err.contains("100"));
@@ -154,7 +174,10 @@ mod tests {
     fn configuration_records_created_revision() {
         let mut cfg = Configuration::new("t");
         cfg.record_created_revision("rev-0001");
-        assert_eq!(cfg.status.latestCreatedRevisionName, Some("rev-0001".to_string()));
+        assert_eq!(
+            cfg.status.latestCreatedRevisionName,
+            Some("rev-0001".to_string())
+        );
     }
 
     #[test]
@@ -162,8 +185,14 @@ mod tests {
         let mut cfg = Configuration::new("t");
         cfg.record_created_revision("rev-1");
         cfg.record_ready_revision("rev-0"); // older one becomes ready
-        assert_eq!(cfg.status.latestCreatedRevisionName, Some("rev-1".to_string()));
-        assert_eq!(cfg.status.latestReadyRevisionName, Some("rev-0".to_string()));
+        assert_eq!(
+            cfg.status.latestCreatedRevisionName,
+            Some("rev-1".to_string())
+        );
+        assert_eq!(
+            cfg.status.latestReadyRevisionName,
+            Some("rev-0".to_string())
+        );
     }
 
     #[test]
@@ -171,7 +200,9 @@ mod tests {
         let mut cfg = Configuration::new("t");
         cfg.spec.template = RevisionTemplateSpec {
             metadata: ObjectMeta::default(),
-            spec: PodSpec { containers: vec![container("c", "")] },
+            spec: PodSpec {
+                containers: vec![container("c", "")],
+            },
         };
         assert!(cfg.validate().is_err());
     }
@@ -242,15 +273,26 @@ mod tests {
         r.promote("rev-blue");
         assert_eq!(r.spec.traffic.len(), 1);
         assert_eq!(r.spec.traffic[0].percent, Some(100));
-        assert_eq!(r.spec.traffic[0].revision_name, Some("rev-blue".to_string()));
+        assert_eq!(
+            r.spec.traffic[0].revision_name,
+            Some("rev-blue".to_string())
+        );
     }
 
     #[test]
     fn route_resolve_revision_returns_correct_target_for_percentile() {
         let mut r = Route::new("t");
         r.status.traffic = vec![
-            TrafficTarget { revision_name: Some("rev-a".to_string()), percent: Some(80), ..Default::default() },
-            TrafficTarget { revision_name: Some("rev-b".to_string()), percent: Some(20), ..Default::default() },
+            TrafficTarget {
+                revision_name: Some("rev-a".to_string()),
+                percent: Some(80),
+                ..Default::default()
+            },
+            TrafficTarget {
+                revision_name: Some("rev-b".to_string()),
+                percent: Some(20),
+                ..Default::default()
+            },
         ];
         assert_eq!(r.resolve_revision(50), Some("rev-a"));
         assert_eq!(r.resolve_revision(85), Some("rev-b"));
@@ -259,18 +301,22 @@ mod tests {
     #[test]
     fn route_resolve_revision_clamps_high_percentile() {
         let mut r = Route::new("t");
-        r.status.traffic = vec![
-            TrafficTarget { revision_name: Some("rev-x".to_string()), percent: Some(100), ..Default::default() },
-        ];
+        r.status.traffic = vec![TrafficTarget {
+            revision_name: Some("rev-x".to_string()),
+            percent: Some(100),
+            ..Default::default()
+        }];
         assert_eq!(r.resolve_revision(999), Some("rev-x"));
     }
 
     #[test]
     fn route_validate_rejects_traffic_not_summing_to_100() {
         let mut r = Route::new("t");
-        r.spec.traffic = vec![
-            TrafficTarget { revision_name: Some("a".to_string()), percent: Some(50), ..Default::default() },
-        ];
+        r.spec.traffic = vec![TrafficTarget {
+            revision_name: Some("a".to_string()),
+            percent: Some(50),
+            ..Default::default()
+        }];
         assert!(r.validate().is_err());
     }
 
@@ -280,7 +326,12 @@ mod tests {
         r.promote("rev-stable");
         r.tag("rev-canary", "canary");
         assert_eq!(r.spec.traffic.len(), 2);
-        let canary = r.spec.traffic.iter().find(|t| t.tag.as_deref() == Some("canary")).unwrap();
+        let canary = r
+            .spec
+            .traffic
+            .iter()
+            .find(|t| t.tag.as_deref() == Some("canary"))
+            .unwrap();
         assert_eq!(canary.percent, Some(0));
     }
 
@@ -308,21 +359,30 @@ mod tests {
     fn channel_subscribe_and_fanout() {
         let mut c = Channel::new("t");
         c.subscribe(Subscription {
-            uid: "u1".to_string(), subscriber_uri: "http://a".to_string(), reply_uri: None,
+            uid: "u1".to_string(),
+            subscriber_uri: "http://a".to_string(),
+            reply_uri: None,
         });
         c.subscribe(Subscription {
-            uid: "u2".to_string(), subscriber_uri: "http://b".to_string(), reply_uri: None,
+            uid: "u2".to_string(),
+            subscriber_uri: "http://b".to_string(),
+            reply_uri: None,
         });
         let mut targets = c.fanout();
         targets.sort();
-        assert_eq!(targets, vec!["http://a".to_string(), "http://b".to_string()]);
+        assert_eq!(
+            targets,
+            vec!["http://a".to_string(), "http://b".to_string()]
+        );
     }
 
     #[test]
     fn channel_unsubscribe_removes_target() {
         let mut c = Channel::new("t");
         c.subscribe(Subscription {
-            uid: "u1".to_string(), subscriber_uri: "http://a".to_string(), reply_uri: None,
+            uid: "u1".to_string(),
+            subscriber_uri: "http://a".to_string(),
+            reply_uri: None,
         });
         c.unsubscribe("u1");
         assert!(c.fanout().is_empty());
@@ -338,7 +398,9 @@ mod tests {
     #[test]
     fn trigger_filter_exact_attributes_match_required() {
         let mut trig = Trigger::new("t", "default");
-        trig.filter.attributes.insert("type".to_string(), "com.example.foo".to_string());
+        trig.filter
+            .attributes
+            .insert("type".to_string(), "com.example.foo".to_string());
         let good = HashMap::from([("type".to_string(), "com.example.foo".to_string())]);
         let bad = HashMap::from([("type".to_string(), "com.example.bar".to_string())]);
         assert!(trig.matches(&good));
@@ -348,7 +410,9 @@ mod tests {
     #[test]
     fn trigger_filter_missing_attribute_is_no_match() {
         let mut trig = Trigger::new("t", "default");
-        trig.filter.attributes.insert("source".to_string(), "/devices/1".to_string());
+        trig.filter
+            .attributes
+            .insert("source".to_string(), "/devices/1".to_string());
         let attrs = HashMap::new();
         assert!(!trig.matches(&attrs));
     }
@@ -374,7 +438,9 @@ mod tests {
     fn validate_template_requires_image() {
         let tpl = RevisionTemplateSpec {
             metadata: ObjectMeta::default(),
-            spec: PodSpec { containers: vec![Container::default()] },
+            spec: PodSpec {
+                containers: vec![Container::default()],
+            },
         };
         assert!(validate_template(&tpl).is_err());
     }
@@ -413,7 +479,8 @@ mod tests {
     #[test]
     fn autoscaler_respects_max_scale_ceiling() {
         let cfg = AutoscalerConfig {
-            min_scale: 1, max_scale: 5,
+            min_scale: 1,
+            max_scale: 5,
             target_concurrency: 10.0,
             scale_to_zero_grace_period: Duration::from_secs(0),
             ..AutoscalerConfig::default()
@@ -471,7 +538,8 @@ mod tests {
     #[test]
     fn autoscaler_concurrency_to_replicas_ceil() {
         let cfg = AutoscalerConfig {
-            min_scale: 1, max_scale: 100,
+            min_scale: 1,
+            max_scale: 100,
             target_concurrency: 100.0,
             scale_to_zero_grace_period: Duration::from_secs(0),
             ..AutoscalerConfig::default()

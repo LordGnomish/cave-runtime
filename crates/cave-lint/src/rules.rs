@@ -14,10 +14,19 @@ pub struct LintRule {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub enum Category { Dockerfile, Kubernetes, Security, BestPractice }
+pub enum Category {
+    Dockerfile,
+    Kubernetes,
+    Security,
+    BestPractice,
+}
 
 #[derive(Debug, Clone, Serialize)]
-pub enum Severity { Error, Warning, Info }
+pub enum Severity {
+    Error,
+    Warning,
+    Info,
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Violation {
@@ -31,7 +40,9 @@ fn check_dockerfile_root(content: &str) -> Vec<Violation> {
     let mut v = Vec::new();
     for (i, line) in content.lines().enumerate() {
         let trimmed = line.trim().to_uppercase();
-        if trimmed.starts_with("USER ROOT") || (trimmed.starts_with("USER") && trimmed.contains("0")) {
+        if trimmed.starts_with("USER ROOT")
+            || (trimmed.starts_with("USER") && trimmed.contains("0"))
+        {
             v.push(Violation {
                 rule_id: "DL3002".into(),
                 message: "Do not run as root user".into(),
@@ -92,7 +103,10 @@ fn check_deprecated_apis(content: &str) -> Vec<Violation> {
         ("extensions/v1beta1", "Use apps/v1 instead"),
         ("networking.k8s.io/v1beta1", "Use networking.k8s.io/v1"),
         ("policy/v1beta1", "Use policy/v1"),
-        ("rbac.authorization.k8s.io/v1beta1", "Use rbac.authorization.k8s.io/v1"),
+        (
+            "rbac.authorization.k8s.io/v1beta1",
+            "Use rbac.authorization.k8s.io/v1",
+        ),
     ];
     let mut v = Vec::new();
     for (i, line) in content.lines().enumerate() {
@@ -112,11 +126,41 @@ fn check_deprecated_apis(content: &str) -> Vec<Violation> {
 
 pub fn builtin_rules() -> Vec<LintRule> {
     vec![
-        LintRule { id: "DL3002", description: "Do not run as root", category: Category::Dockerfile, severity: Severity::Warning, check: check_dockerfile_root },
-        LintRule { id: "DL3007", description: "Pin image versions", category: Category::Dockerfile, severity: Severity::Warning, check: check_dockerfile_latest },
-        LintRule { id: "K8S001", description: "Resource limits required", category: Category::Kubernetes, severity: Severity::Warning, check: check_k8s_no_limits },
-        LintRule { id: "K8S002", description: "No privileged containers", category: Category::Security, severity: Severity::Error, check: check_k8s_privileged },
-        LintRule { id: "DEP001", description: "Deprecated K8s APIs", category: Category::Kubernetes, severity: Severity::Error, check: check_deprecated_apis },
+        LintRule {
+            id: "DL3002",
+            description: "Do not run as root",
+            category: Category::Dockerfile,
+            severity: Severity::Warning,
+            check: check_dockerfile_root,
+        },
+        LintRule {
+            id: "DL3007",
+            description: "Pin image versions",
+            category: Category::Dockerfile,
+            severity: Severity::Warning,
+            check: check_dockerfile_latest,
+        },
+        LintRule {
+            id: "K8S001",
+            description: "Resource limits required",
+            category: Category::Kubernetes,
+            severity: Severity::Warning,
+            check: check_k8s_no_limits,
+        },
+        LintRule {
+            id: "K8S002",
+            description: "No privileged containers",
+            category: Category::Security,
+            severity: Severity::Error,
+            check: check_k8s_privileged,
+        },
+        LintRule {
+            id: "DEP001",
+            description: "Deprecated K8s APIs",
+            category: Category::Kubernetes,
+            severity: Severity::Error,
+            check: check_deprecated_apis,
+        },
     ]
 }
 
@@ -137,57 +181,84 @@ mod tests {
     #[test]
     fn test_dockerfile_root_not_detected() {
         let violations = check_dockerfile_root("USER appuser\n");
-        assert!(violations.is_empty(), "Expected no violation for USER appuser");
+        assert!(
+            violations.is_empty(),
+            "Expected no violation for USER appuser"
+        );
     }
 
     #[test]
     fn test_dockerfile_latest_detected() {
         let violations = check_dockerfile_latest("FROM nginx:latest\n");
-        assert!(!violations.is_empty(), "Expected violation for FROM nginx:latest");
+        assert!(
+            !violations.is_empty(),
+            "Expected violation for FROM nginx:latest"
+        );
     }
 
     #[test]
     fn test_dockerfile_latest_no_tag_detected() {
         let violations = check_dockerfile_latest("FROM nginx\n");
-        assert!(!violations.is_empty(), "Expected violation for FROM nginx (no tag)");
+        assert!(
+            !violations.is_empty(),
+            "Expected violation for FROM nginx (no tag)"
+        );
     }
 
     #[test]
     fn test_dockerfile_latest_specific_version_ok() {
         let violations = check_dockerfile_latest("FROM nginx:1.21\n");
-        assert!(violations.is_empty(), "Expected no violation for pinned version");
+        assert!(
+            violations.is_empty(),
+            "Expected no violation for pinned version"
+        );
     }
 
     #[test]
     fn test_k8s_no_limits_detected() {
         let content = "kind: Deployment\nspec:\n  containers:\n  - name: app\n    image: nginx\n";
         let violations = check_k8s_no_limits(content);
-        assert!(!violations.is_empty(), "Expected violation for missing resource limits");
+        assert!(
+            !violations.is_empty(),
+            "Expected violation for missing resource limits"
+        );
     }
 
     #[test]
     fn test_k8s_no_limits_ok() {
         let content = "kind: Deployment\nspec:\n  containers:\n  - resources:\n      limits:\n        cpu: \"500m\"\n";
         let violations = check_k8s_no_limits(content);
-        assert!(violations.is_empty(), "Expected no violation when limits are defined");
+        assert!(
+            violations.is_empty(),
+            "Expected no violation when limits are defined"
+        );
     }
 
     #[test]
     fn test_k8s_privileged_detected() {
         let violations = check_k8s_privileged("privileged: true\n");
-        assert!(!violations.is_empty(), "Expected violation for privileged: true");
+        assert!(
+            !violations.is_empty(),
+            "Expected violation for privileged: true"
+        );
     }
 
     #[test]
     fn test_k8s_privileged_false_ok() {
         let violations = check_k8s_privileged("privileged: false\n");
-        assert!(violations.is_empty(), "Expected no violation for privileged: false");
+        assert!(
+            violations.is_empty(),
+            "Expected no violation for privileged: false"
+        );
     }
 
     #[test]
     fn test_deprecated_api_detected() {
         let violations = check_deprecated_apis("apiVersion: extensions/v1beta1\n");
-        assert!(!violations.is_empty(), "Expected violation for deprecated extensions/v1beta1");
+        assert!(
+            !violations.is_empty(),
+            "Expected violation for deprecated extensions/v1beta1"
+        );
     }
 
     #[test]
@@ -205,14 +276,22 @@ mod tests {
         // Should have violations from multiple rules
         assert!(!violations.is_empty(), "Expected violations from lint");
         // Check we got violations from at least 3 different rules
-        let unique_rule_ids: std::collections::HashSet<&str> = violations.iter().map(|v| v.rule_id.as_str()).collect();
-        assert!(unique_rule_ids.len() >= 3, "Expected violations from at least 3 rules");
+        let unique_rule_ids: std::collections::HashSet<&str> =
+            violations.iter().map(|v| v.rule_id.as_str()).collect();
+        assert!(
+            unique_rule_ids.len() >= 3,
+            "Expected violations from at least 3 rules"
+        );
     }
 
     #[test]
     fn test_builtin_rules_count() {
         let rules = builtin_rules();
-        assert!(rules.len() >= 5, "Expected at least 5 builtin rules, got {}", rules.len());
+        assert!(
+            rules.len() >= 5,
+            "Expected at least 5 builtin rules, got {}",
+            rules.len()
+        );
     }
 
     #[test]
@@ -220,7 +299,10 @@ mod tests {
         let violations = check_dockerfile_root("USER root\n");
         assert!(!violations.is_empty());
         for v in &violations {
-            assert!(!v.rule_id.is_empty(), "Violation rule_id should not be empty");
+            assert!(
+                !v.rule_id.is_empty(),
+                "Violation rule_id should not be empty"
+            );
         }
     }
 }

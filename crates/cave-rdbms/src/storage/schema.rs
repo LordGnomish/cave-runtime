@@ -16,7 +16,10 @@ impl Database {
         let mut schemas = HashMap::new();
         schemas.insert("public".to_string(), Schema::new("public"));
         schemas.insert("pg_catalog".to_string(), Schema::new("pg_catalog"));
-        schemas.insert("information_schema".to_string(), Schema::new("information_schema"));
+        schemas.insert(
+            "information_schema".to_string(),
+            Schema::new("information_schema"),
+        );
         Database {
             name: name.to_string(),
             schemas,

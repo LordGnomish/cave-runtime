@@ -179,7 +179,9 @@ impl LogicalPlan {
             }
             LogicalPlan::Projection { input, columns } => {
                 if columns.is_empty() {
-                    return Err(DataFusionError::Plan("projection must select ≥ 1 column".into()));
+                    return Err(DataFusionError::Plan(
+                        "projection must select ≥ 1 column".into(),
+                    ));
                 }
                 input.validate()?;
             }
@@ -192,7 +194,9 @@ impl LogicalPlan {
                 }
                 input.validate()?;
             }
-            LogicalPlan::Aggregate { input, aggregates, .. } => {
+            LogicalPlan::Aggregate {
+                input, aggregates, ..
+            } => {
                 if aggregates.is_empty() {
                     return Err(DataFusionError::Plan(
                         "aggregate must compute ≥ 1 aggregate function".into(),
@@ -273,13 +277,12 @@ mod tests {
             "Projection"
         );
         assert_eq!(
-            LogicalPlan::scan("t").filter(Expr::lit(Value::Bool(true))).name(),
+            LogicalPlan::scan("t")
+                .filter(Expr::lit(Value::Bool(true)))
+                .name(),
             "Filter"
         );
-        assert_eq!(
-            LogicalPlan::scan("t").limit(0, Some(5)).name(),
-            "Limit"
-        );
+        assert_eq!(LogicalPlan::scan("t").limit(0, Some(5)).name(), "Limit");
         assert_eq!(
             LogicalPlan::scan("t")
                 .aggregate(

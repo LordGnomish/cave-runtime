@@ -102,27 +102,34 @@ pub fn compute_condition(input: &AvailabilityInput) -> APIServiceCondition {
     if !input.service_resolved {
         return APIServiceCondition::failure(
             "ServiceNotFound",
-            format!("service for {} could not be resolved", input.api_service_name));
+            format!(
+                "service for {} could not be resolved",
+                input.api_service_name
+            ),
+        );
     }
     if input.endpoints_count == 0 {
         return APIServiceCondition::failure(
             "MissingEndpoints",
-            format!("service for {} has no endpoints", input.api_service_name));
+            format!("service for {} has no endpoints", input.api_service_name),
+        );
     }
     match &input.probe {
         Some(ProbeOutcome::Reachable) => APIServiceCondition::available(),
-        Some(ProbeOutcome::Unreachable(m)) =>
-            APIServiceCondition::failure("FailedDiscoveryCheck", m.clone()),
-        Some(ProbeOutcome::InvalidCertificate(m)) =>
-            APIServiceCondition::failure("FailedDiscoveryCheck",
-                format!("invalid certificate: {m}")),
-        Some(ProbeOutcome::DnsFailure(m)) =>
-            APIServiceCondition::failure("FailedDiscoveryCheck",
-                format!("dns failure: {m}")),
-        Some(ProbeOutcome::Timeout) =>
-            APIServiceCondition::failure("FailedDiscoveryCheck", "timeout"),
-        None => APIServiceCondition::unknown("Pending",
-            "probe has not yet run"),
+        Some(ProbeOutcome::Unreachable(m)) => {
+            APIServiceCondition::failure("FailedDiscoveryCheck", m.clone())
+        }
+        Some(ProbeOutcome::InvalidCertificate(m)) => APIServiceCondition::failure(
+            "FailedDiscoveryCheck",
+            format!("invalid certificate: {m}"),
+        ),
+        Some(ProbeOutcome::DnsFailure(m)) => {
+            APIServiceCondition::failure("FailedDiscoveryCheck", format!("dns failure: {m}"))
+        }
+        Some(ProbeOutcome::Timeout) => {
+            APIServiceCondition::failure("FailedDiscoveryCheck", "timeout")
+        }
+        None => APIServiceCondition::unknown("Pending", "probe has not yet run"),
     }
 }
 
@@ -134,11 +141,17 @@ pub fn compute_condition(input: &AvailabilityInput) -> APIServiceCondition {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProxyDecision {
     Forward,
-    ServiceUnavailable { reason: String, message: String, http_status: u16 },
+    ServiceUnavailable {
+        reason: String,
+        message: String,
+        http_status: u16,
+    },
 }
 
 pub fn evaluate_proxy(
-    cond: &APIServiceCondition, dry_run: bool, has_endpoints: bool,
+    cond: &APIServiceCondition,
+    dry_run: bool,
+    has_endpoints: bool,
 ) -> ProxyDecision {
     if cond.status == ConditionStatus::True {
         return ProxyDecision::Forward;
@@ -156,7 +169,11 @@ pub fn evaluate_proxy(
     if !has_endpoints {
         message.push_str(" (no endpoints)");
     }
-    ProxyDecision::ServiceUnavailable { reason, message, http_status: 503 }
+    ProxyDecision::ServiceUnavailable {
+        reason,
+        message,
+        http_status: 503,
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -181,7 +198,9 @@ pub struct OpenApiIndex {
 /// upstream priority where a registered APIService overlays the in-process
 /// view of the same group/version).
 pub fn merge_openapi_indexes(parent: &OpenApiIndex, child: &OpenApiIndex) -> OpenApiIndex {
-    let mut out = OpenApiIndex { paths: parent.paths.clone() };
+    let mut out = OpenApiIndex {
+        paths: parent.paths.clone(),
+    };
     for (k, v) in &child.paths {
         out.paths.insert(k.clone(), v.clone());
     }
@@ -202,7 +221,8 @@ pub struct PriorityKey {
 }
 
 pub fn priority_compare(a: &PriorityKey, b: &PriorityKey) -> std::cmp::Ordering {
-    a.group_priority.cmp(&b.group_priority)
+    a.group_priority
+        .cmp(&b.group_priority)
         .then(a.version_priority.cmp(&b.version_priority))
         .then(a.name.cmp(&b.name))
 }

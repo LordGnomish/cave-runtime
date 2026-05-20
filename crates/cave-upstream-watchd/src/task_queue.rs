@@ -182,7 +182,10 @@ pub struct PumpTaskQueue {
 
 impl PumpTaskQueue {
     pub fn new(queue_dir: PathBuf, completed_dir: PathBuf) -> Self {
-        Self { queue_dir, completed_dir }
+        Self {
+            queue_dir,
+            completed_dir,
+        }
     }
 
     /// Default paths under `~/Library/Application Support/cave-qwen-pump/`.
@@ -244,7 +247,9 @@ impl TaskQueue for PumpTaskQueue {
     }
 
     async fn status(&self, task_id: &TaskId) -> Result<TaskStatus, TaskQueueError> {
-        let path = self.completed_dir.join(format!("{}.json", task_id.as_str()));
+        let path = self
+            .completed_dir
+            .join(format!("{}.json", task_id.as_str()));
         if !path.is_file() {
             // Still in queue → Pending. Still being worked → Running
             // (queue dir has the env but completed_dir doesn't yet).
@@ -253,7 +258,9 @@ impl TaskQueue for PumpTaskQueue {
                 // Check if the pump moved it (mtime newer than ~5min
                 // is "in flight").
                 let meta = std::fs::metadata(&queued)?;
-                let modified = meta.modified().unwrap_or_else(|_| std::time::SystemTime::UNIX_EPOCH);
+                let modified = meta
+                    .modified()
+                    .unwrap_or_else(|_| std::time::SystemTime::UNIX_EPOCH);
                 let age = std::time::SystemTime::now()
                     .duration_since(modified)
                     .unwrap_or_default();
@@ -274,12 +281,16 @@ impl TaskQueue for PumpTaskQueue {
             "failed" => Ok(TaskStatus::Failed {
                 reason: c.reason.unwrap_or_else(|| "pump reported failure".into()),
             }),
-            other => Err(TaskQueueError::Http(format!("unknown pump status: {other}"))),
+            other => Err(TaskQueueError::Http(format!(
+                "unknown pump status: {other}"
+            ))),
         }
     }
 
     async fn output(&self, task_id: &TaskId) -> Result<Option<TaskOutput>, TaskQueueError> {
-        let path = self.completed_dir.join(format!("{}.json", task_id.as_str()));
+        let path = self
+            .completed_dir
+            .join(format!("{}.json", task_id.as_str()));
         if !path.is_file() {
             return Ok(None);
         }
@@ -334,11 +345,13 @@ impl OpusTaskQueue {
     /// the API key is absent so the dispatcher falls back to the
     /// pump backend without blowing up.
     pub fn from_env(state_dir: PathBuf) -> Option<Self> {
-        let key = std::env::var("ANTHROPIC_API_KEY").ok().filter(|k| !k.is_empty())?;
+        let key = std::env::var("ANTHROPIC_API_KEY")
+            .ok()
+            .filter(|k| !k.is_empty())?;
         let endpoint = std::env::var("ANTHROPIC_API_URL")
             .unwrap_or_else(|_| "https://api.anthropic.com".to_string());
-        let model = std::env::var("CAVE_OPUS_MODEL")
-            .unwrap_or_else(|_| "claude-opus-4-7".to_string());
+        let model =
+            std::env::var("CAVE_OPUS_MODEL").unwrap_or_else(|_| "claude-opus-4-7".to_string());
         Some(Self {
             api_endpoint: endpoint,
             api_key: key,
@@ -459,7 +472,12 @@ impl TaskQueue for OpusTaskQueue {
         let record = OpusRecord {
             task_id: id.clone(),
             target_branch: target_branch.to_string(),
-            status: if output.is_some() { "completed" } else { "failed" }.to_string(),
+            status: if output.is_some() {
+                "completed"
+            } else {
+                "failed"
+            }
+            .to_string(),
             output,
             reason: None,
             at: chrono::Utc::now(),
@@ -645,8 +663,7 @@ impl ClaudeCliTaskQueue {
 
     fn read_record(&self, task_id: &TaskId) -> Result<ClaudeCliRecord, TaskQueueError> {
         let p = self.record_path(task_id);
-        let raw = std::fs::read(&p)
-            .map_err(|_| TaskQueueError::NotFound(task_id.0.clone()))?;
+        let raw = std::fs::read(&p).map_err(|_| TaskQueueError::NotFound(task_id.0.clone()))?;
         let rec: ClaudeCliRecord = serde_json::from_slice(&raw)?;
         Ok(rec)
     }
@@ -915,8 +932,8 @@ mod tests {
         // Submit must return a stable TaskId and stash a per-task record
         // under output_log_dir so status() / output() can find it later.
         let dir = tempfile::TempDir::new().unwrap();
-        let mut q = ClaudeCliTaskQueue::from_env(dir.path().to_path_buf())
-            .expect("claude binary present");
+        let mut q =
+            ClaudeCliTaskQueue::from_env(dir.path().to_path_buf()).expect("claude binary present");
         // Use a sentinel binary that just echoes a fake completion line.
         q.set_claude_binary_for_test(std::path::PathBuf::from("/bin/echo"));
         let id = q
@@ -942,11 +959,7 @@ mod tests {
             .await
             .unwrap_err();
         // Unknown task → NotFound (mirrors OpusTaskQueue behaviour).
-        assert!(
-            matches!(err, TaskQueueError::NotFound(_)),
-            "got {:?}",
-            err
-        );
+        assert!(matches!(err, TaskQueueError::NotFound(_)), "got {:?}", err);
     }
 
     #[test]
@@ -1060,7 +1073,11 @@ mod tests {
             }
             other => panic!("expected Completed, got {other:?}"),
         }
-        let out = q.output(&TaskId::new("pump-fake-001")).await.unwrap().unwrap();
+        let out = q
+            .output(&TaskId::new("pump-fake-001"))
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(out.files_changed, 3);
         assert_eq!(out.test_count, 8);
     }
@@ -1151,7 +1168,10 @@ mod tests {
             when.method(POST).path("/v1/messages");
             then.status(200)
                 .header("content-type", "application/json")
-                .body(serde_json::json!({"content": [{"type": "text", "text": "no commit field"}]}).to_string());
+                .body(
+                    serde_json::json!({"content": [{"type": "text", "text": "no commit field"}]})
+                        .to_string(),
+                );
         });
         let dir = tempfile::TempDir::new().unwrap();
         let q = OpusTaskQueue::new(server.base_url(), "k".into(), dir.path().join("opus"));
@@ -1188,7 +1208,9 @@ mod tests {
     #[tokio::test]
     async fn opus_from_env_returns_none_when_api_key_missing() {
         // Make sure the var is unset for this test.
-        unsafe { std::env::remove_var("ANTHROPIC_API_KEY"); }
+        unsafe {
+            std::env::remove_var("ANTHROPIC_API_KEY");
+        }
         let dir = tempfile::TempDir::new().unwrap();
         assert!(OpusTaskQueue::from_env(dir.path().to_path_buf()).is_none());
     }

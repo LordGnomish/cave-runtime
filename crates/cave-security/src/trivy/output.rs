@@ -34,11 +34,7 @@ pub fn render_json(result: &ScanResult) -> String {
 pub fn render_table(result: &ScanResult) -> String {
     let mut out = String::new();
 
-    out.push_str(&format!(
-        "\n{} ({})\n",
-        result.target,
-        result.scan_type
-    ));
+    out.push_str(&format!("\n{} ({})\n", result.target, result.scan_type));
     out.push_str(&"=".repeat(60));
     out.push('\n');
 
@@ -82,13 +78,19 @@ pub fn render_table(result: &ScanResult) -> String {
         for s in &result.secrets {
             out.push_str(&format!(
                 "  {} [{}] {} line {}\n",
-                s.severity_str(), s.rule_id, s.file_path, s.line_number
+                s.severity_str(),
+                s.rule_id,
+                s.file_path,
+                s.line_number
             ));
         }
     }
 
     if !result.misconfigs.is_empty() {
-        out.push_str(&format!("\nMisconfigurations ({}):\n", result.misconfigs.len()));
+        out.push_str(&format!(
+            "\nMisconfigurations ({}):\n",
+            result.misconfigs.len()
+        ));
         out.push_str(&"-".repeat(40));
         out.push('\n');
         for m in &result.misconfigs {
@@ -256,7 +258,9 @@ pub fn render_sarif(result: &ScanResult) -> String {
             rules.push(SarifRule {
                 id: rule_id.clone(),
                 name: s.title.clone(),
-                short_description: SarifMessage { text: s.title.clone() },
+                short_description: SarifMessage {
+                    text: s.title.clone(),
+                },
                 default_configuration: SarifConfiguration {
                     level: "error".to_string(),
                 },
@@ -270,8 +274,12 @@ pub fn render_sarif(result: &ScanResult) -> String {
             },
             locations: vec![SarifLocation {
                 physical_location: SarifPhysicalLocation {
-                    artifact_location: SarifArtifactLocation { uri: s.file_path.clone() },
-                    region: Some(SarifRegion { start_line: s.line_number }),
+                    artifact_location: SarifArtifactLocation {
+                        uri: s.file_path.clone(),
+                    },
+                    region: Some(SarifRegion {
+                        start_line: s.line_number,
+                    }),
                 },
             }],
         });

@@ -6,10 +6,7 @@ use crate::sql::ast::DeleteStmt;
 use crate::storage::schema::Database;
 
 pub fn execute_delete(delete: &DeleteStmt, db: &mut Database) -> Result<u64, String> {
-    let schema = db
-        .schemas
-        .get_mut("public")
-        .ok_or("no public schema")?;
+    let schema = db.schemas.get_mut("public").ok_or("no public schema")?;
     let table = schema
         .tables
         .get_mut(&delete.table)

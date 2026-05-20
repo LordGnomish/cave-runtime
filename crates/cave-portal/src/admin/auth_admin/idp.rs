@@ -5,9 +5,9 @@
 //! `admin_idp` endpoints. Visual port of
 //! `js/apps/admin-ui/src/identity-providers/IdentityProvidersSection.tsx`.
 
+use super::{AuthAdminError, render_admin_nav, require_platform};
 use crate::admin::permission::RequestCtx;
 use crate::admin::render::{escape, page_shell_full, table_html};
-use super::{render_admin_nav, require_platform, AuthAdminError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IdpRow {
@@ -100,7 +100,14 @@ pub fn render(ctx: &RequestCtx) -> Result<String, AuthAdminError> {
         nav = render_admin_nav("/admin/auth/idp"),
         n = idps.len(),
         tbl = table_html(
-            &["alias", "display name", "provider", "status", "trust email", "first broker flow"],
+            &[
+                "alias",
+                "display name",
+                "provider",
+                "status",
+                "trust email",
+                "first broker flow"
+            ],
             &rows
         ),
     );

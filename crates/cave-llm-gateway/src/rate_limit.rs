@@ -29,7 +29,10 @@ pub struct RateLimit {
 
 impl Default for RateLimit {
     fn default() -> Self {
-        Self { requests_per_minute: 60, tokens_per_minute: 100_000 }
+        Self {
+            requests_per_minute: 60,
+            tokens_per_minute: 100_000,
+        }
     }
 }
 
@@ -145,7 +148,10 @@ mod tests {
 
     #[test]
     fn basic_rate_limiting() {
-        let limiter = RateLimiter::new(RateLimit { requests_per_minute: 3, tokens_per_minute: 1000 });
+        let limiter = RateLimiter::new(RateLimit {
+            requests_per_minute: 3,
+            tokens_per_minute: 1000,
+        });
         // Should allow 3 requests
         assert!(limiter.check("user-1", 10).is_ok());
         assert!(limiter.check("user-1", 10).is_ok());
@@ -156,7 +162,10 @@ mod tests {
 
     #[test]
     fn different_consumers_are_independent() {
-        let limiter = RateLimiter::new(RateLimit { requests_per_minute: 1, tokens_per_minute: 1000 });
+        let limiter = RateLimiter::new(RateLimit {
+            requests_per_minute: 1,
+            tokens_per_minute: 1000,
+        });
         assert!(limiter.check("user-a", 0).is_ok());
         assert!(limiter.check("user-b", 0).is_ok()); // separate bucket
         assert!(limiter.check("user-a", 0).is_err()); // user-a exhausted
@@ -164,8 +173,17 @@ mod tests {
 
     #[test]
     fn custom_limit_overrides_default() {
-        let limiter = RateLimiter::new(RateLimit { requests_per_minute: 1, tokens_per_minute: 100 });
-        limiter.set_limit("premium", RateLimit { requests_per_minute: 100, tokens_per_minute: 1_000_000 });
+        let limiter = RateLimiter::new(RateLimit {
+            requests_per_minute: 1,
+            tokens_per_minute: 100,
+        });
+        limiter.set_limit(
+            "premium",
+            RateLimit {
+                requests_per_minute: 100,
+                tokens_per_minute: 1_000_000,
+            },
+        );
         for _ in 0..10 {
             assert!(limiter.check("premium", 0).is_ok());
         }
@@ -173,7 +191,10 @@ mod tests {
 
     #[test]
     fn token_exhaustion() {
-        let limiter = RateLimiter::new(RateLimit { requests_per_minute: 1000, tokens_per_minute: 50 });
+        let limiter = RateLimiter::new(RateLimit {
+            requests_per_minute: 1000,
+            tokens_per_minute: 50,
+        });
         assert!(limiter.check("user", 40).is_ok());
         assert!(limiter.check("user", 40).is_err()); // 40 > remaining 10
     }
@@ -182,13 +203,21 @@ mod tests {
     /// `retry_after_ms` so the HTTP layer can set a Retry-After header.
     #[test]
     fn rejection_carries_nonzero_retry_after() {
-        let limiter = RateLimiter::new(RateLimit { requests_per_minute: 1, tokens_per_minute: 100 });
+        let limiter = RateLimiter::new(RateLimit {
+            requests_per_minute: 1,
+            tokens_per_minute: 100,
+        });
         // burn the single request slot
         assert!(limiter.check("user", 1).is_ok());
-        let err = limiter.check("user", 1).expect_err("second call exhausts request_bucket");
+        let err = limiter
+            .check("user", 1)
+            .expect_err("second call exhausts request_bucket");
         match err {
             GatewayError::RateLimitExceeded { retry_after_ms, .. } => {
-                assert!(retry_after_ms > 0, "Retry-After must be > 0, got {retry_after_ms}");
+                assert!(
+                    retry_after_ms > 0,
+                    "Retry-After must be > 0, got {retry_after_ms}"
+                );
             }
             other => panic!("unexpected error: {other:?}"),
         }

@@ -97,8 +97,7 @@ fn schedule_active_at(s: &HibernationSchedule, now: DateTime<Utc>) -> bool {
         } else if now_min < end_min {
             in_window = true;
             // Owning day is yesterday.
-            owning_dow_chrono =
-                (now.weekday().num_days_from_monday() + 6) % 7;
+            owning_dow_chrono = (now.weekday().num_days_from_monday() + 6) % 7;
         } else {
             in_window = false;
             owning_dow_chrono = now.weekday().num_days_from_monday();

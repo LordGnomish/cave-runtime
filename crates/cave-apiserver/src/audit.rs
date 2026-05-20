@@ -105,11 +105,7 @@ impl AuditEvent {
 
     /// Convenience builder: attach an audit annotation. Mirrors
     /// `audit.Event.Annotations` map updates from upstream filters.
-    pub fn with_annotation(
-        mut self,
-        key: impl Into<String>,
-        value: impl Into<String>,
-    ) -> Self {
+    pub fn with_annotation(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.annotations.insert(key.into(), value.into());
         self
     }
@@ -147,7 +143,10 @@ pub struct AuditPolicy {
 
 impl AuditPolicy {
     pub fn new(default_level: AuditLevel) -> Self {
-        Self { default_level, omit_stages: vec![] }
+        Self {
+            default_level,
+            omit_stages: vec![],
+        }
     }
     pub fn omit(mut self, stage: AuditStage) -> Self {
         self.omit_stages.push(stage);
@@ -172,7 +171,9 @@ pub struct AuditFilterChain {
 }
 
 impl AuditFilterChain {
-    pub fn new() -> Self { Self { filters: vec![] } }
+    pub fn new() -> Self {
+        Self { filters: vec![] }
+    }
 
     pub fn with(mut self, f: std::sync::Arc<dyn AuditFilter>) -> Self {
         self.filters.push(f);
@@ -183,12 +184,18 @@ impl AuditFilterChain {
         self.filters.iter().all(|f| f.keep(ev))
     }
 
-    pub fn len(&self) -> usize { self.filters.len() }
-    pub fn is_empty(&self) -> bool { self.filters.is_empty() }
+    pub fn len(&self) -> usize {
+        self.filters.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.filters.is_empty()
+    }
 }
 
 impl Default for AuditFilterChain {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Built-in filter — drop events whose stage is in the supplied set.
@@ -197,7 +204,9 @@ pub struct DropStageFilter {
 }
 
 impl AuditFilter for DropStageFilter {
-    fn name(&self) -> &str { "drop-stage" }
+    fn name(&self) -> &str {
+        "drop-stage"
+    }
     fn keep(&self, ev: &AuditEvent) -> bool {
         !self.stages.contains(&ev.stage)
     }
@@ -210,7 +219,9 @@ pub struct DropVerbFilter {
 }
 
 impl AuditFilter for DropVerbFilter {
-    fn name(&self) -> &str { "drop-verb" }
+    fn name(&self) -> &str {
+        "drop-verb"
+    }
     fn keep(&self, ev: &AuditEvent) -> bool {
         !self.verbs.iter().any(|v| v == &ev.verb)
     }
@@ -227,7 +238,8 @@ impl AuditLogger {
     pub fn new(capacity: usize, policy: AuditPolicy) -> Self {
         assert!(capacity > 0);
         Self {
-            capacity, policy,
+            capacity,
+            policy,
             sink: Mutex::new(VecDeque::with_capacity(capacity)),
             filter_chain: AuditFilterChain::new(),
         }
@@ -259,7 +271,9 @@ impl AuditLogger {
         ev.redact_for_level();
         let mut sink = self.sink.lock().unwrap();
         sink.push_back(ev);
-        if sink.len() > self.capacity { sink.pop_front(); }
+        if sink.len() > self.capacity {
+            sink.pop_front();
+        }
         true
     }
 
@@ -268,12 +282,21 @@ impl AuditLogger {
     }
 
     pub fn events_for_tenant(&self, tenant_id: &str) -> Vec<AuditEvent> {
-        self.sink.lock().unwrap().iter()
-            .filter(|e| e.tenant_id == tenant_id).cloned().collect()
+        self.sink
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|e| e.tenant_id == tenant_id)
+            .cloned()
+            .collect()
     }
 
-    pub fn len(&self) -> usize { self.sink.lock().unwrap().len() }
-    pub fn is_empty(&self) -> bool { self.len() == 0 }
+    pub fn len(&self) -> usize {
+        self.sink.lock().unwrap().len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 #[cfg(test)]
@@ -282,9 +305,17 @@ mod tests {
 
     fn ev(stage: AuditStage, tenant: &str, user: &str, code: u16) -> AuditEvent {
         AuditEvent::new(
-            "auid-1", AuditLevel::None, stage,
-            user, tenant, "default", "create", "configmaps", "cm1",
-            "/api/v1/namespaces/default/configmaps", code,
+            "auid-1",
+            AuditLevel::None,
+            stage,
+            user,
+            tenant,
+            "default",
+            "create",
+            "configmaps",
+            "cm1",
+            "/api/v1/namespaces/default/configmaps",
+            code,
         )
     }
 
@@ -300,8 +331,10 @@ mod tests {
         assert_eq!(stored.level, AuditLevel::Metadata);
         assert!(stored.request_object.is_none());
         assert!(stored.response_object.is_none());
-        assert_eq!(stored.tenant_id, "acme",
-            "tenant_id invariant: never stripped by redaction");
+        assert_eq!(
+            stored.tenant_id, "acme",
+            "tenant_id invariant: never stripped by redaction"
+        );
     }
 
     /// Upstream parity: `TestPolicy_LevelRequest_KeepsRequestStripsResponse`.
@@ -335,15 +368,20 @@ mod tests {
     /// Upstream parity: `TestPolicy_OmitStage`.
     #[test]
     fn test_omit_stage_drops_event() {
-        let logger = AuditLogger::new(64,
-            AuditPolicy::new(AuditLevel::Metadata).omit(AuditStage::RequestReceived));
+        let logger = AuditLogger::new(
+            64,
+            AuditPolicy::new(AuditLevel::Metadata).omit(AuditStage::RequestReceived),
+        );
         let dropped = !logger.emit(ev(AuditStage::RequestReceived, "acme", "alice", 0));
         assert!(dropped);
         let kept = logger.emit(ev(AuditStage::ResponseComplete, "acme", "alice", 200));
         assert!(kept);
         assert_eq!(logger.len(), 1);
-        assert_eq!(logger.events()[0].tenant_id, "acme",
-            "tenant_id invariant: stage-based omit MUST NOT cross-leak tenants");
+        assert_eq!(
+            logger.events()[0].tenant_id,
+            "acme",
+            "tenant_id invariant: stage-based omit MUST NOT cross-leak tenants"
+        );
     }
 
     /// Upstream parity: `TestPolicy_LevelNoneDropsAll`.
@@ -366,8 +404,10 @@ mod tests {
         let globex = logger.events_for_tenant("globex");
         assert_eq!(acme.len(), 2);
         assert_eq!(globex.len(), 1);
-        assert!(acme.iter().all(|e| e.tenant_id == "acme"),
-            "tenant_id invariant: query never crosses tenants");
+        assert!(
+            acme.iter().all(|e| e.tenant_id == "acme"),
+            "tenant_id invariant: query never crosses tenants"
+        );
     }
 
     /// Upstream parity: `TestAudit_RingBufferEvictsOldest`.
@@ -375,12 +415,20 @@ mod tests {
     fn test_ring_buffer_evicts_oldest_on_overflow() {
         let logger = AuditLogger::new(2, AuditPolicy::new(AuditLevel::Metadata));
         for i in 0..3 {
-            let e = ev(AuditStage::ResponseComplete, "acme", &format!("u{}", i), 200);
+            let e = ev(
+                AuditStage::ResponseComplete,
+                "acme",
+                &format!("u{}", i),
+                200,
+            );
             logger.emit(e);
         }
         assert_eq!(logger.len(), 2);
         let stored = logger.events();
-        assert!(stored.iter().all(|e| e.tenant_id == "acme"), "tenant_id invariant");
+        assert!(
+            stored.iter().all(|e| e.tenant_id == "acme"),
+            "tenant_id invariant"
+        );
         // Oldest (u0) evicted, only u1, u2 remain.
         assert!(!stored.iter().any(|e| e.user == "u0"));
     }
@@ -389,15 +437,22 @@ mod tests {
     #[test]
     fn test_all_four_stages_recorded_in_order() {
         let logger = AuditLogger::new(64, AuditPolicy::new(AuditLevel::Metadata));
-        for s in [AuditStage::RequestReceived, AuditStage::ResponseStarted,
-                  AuditStage::ResponseComplete, AuditStage::Panic] {
+        for s in [
+            AuditStage::RequestReceived,
+            AuditStage::ResponseStarted,
+            AuditStage::ResponseComplete,
+            AuditStage::Panic,
+        ] {
             logger.emit(ev(s, "acme", "alice", 200));
         }
         let stored = logger.events();
         assert_eq!(stored.len(), 4);
         assert_eq!(stored[0].stage, AuditStage::RequestReceived);
         assert_eq!(stored[3].stage, AuditStage::Panic);
-        assert!(stored.iter().all(|e| e.tenant_id == "acme"), "tenant_id invariant");
+        assert!(
+            stored.iter().all(|e| e.tenant_id == "acme"),
+            "tenant_id invariant"
+        );
     }
 
     /// Upstream parity: `TestAudit_LevelOrdering`.
@@ -427,13 +482,20 @@ mod tests {
         e.response_object = Some(serde_json::json!({"out": 1}));
         assert!(logger.emit(e));
         let stored = &logger.events()[0];
-        assert_eq!(stored.level, AuditLevel::Request,
-            "default level promoted onto unset event");
+        assert_eq!(
+            stored.level,
+            AuditLevel::Request,
+            "default level promoted onto unset event"
+        );
         assert!(stored.request_object.is_some());
-        assert!(stored.response_object.is_none(),
-            "Request level strips response after promotion");
-        assert_eq!(stored.tenant_id, "acme",
-            "tenant_id invariant: promotion never strips tenant");
+        assert!(
+            stored.response_object.is_none(),
+            "Request level strips response after promotion"
+        );
+        assert_eq!(
+            stored.tenant_id, "acme",
+            "tenant_id invariant: promotion never strips tenant"
+        );
     }
 
     /// Upstream parity: `TestAudit_OmitMultipleStages`
@@ -446,13 +508,15 @@ mod tests {
         let logger = AuditLogger::new(64, policy);
         let dropped_a = !logger.emit(ev(AuditStage::RequestReceived, "acme", "alice", 0));
         let dropped_b = !logger.emit(ev(AuditStage::Panic, "acme", "alice", 500));
-        let kept_a   =  logger.emit(ev(AuditStage::ResponseStarted, "acme", "alice", 0));
-        let kept_b   =  logger.emit(ev(AuditStage::ResponseComplete, "acme", "alice", 200));
+        let kept_a = logger.emit(ev(AuditStage::ResponseStarted, "acme", "alice", 0));
+        let kept_b = logger.emit(ev(AuditStage::ResponseComplete, "acme", "alice", 200));
         assert!(dropped_a && dropped_b);
         assert!(kept_a && kept_b);
         assert_eq!(logger.len(), 2);
-        assert!(logger.events().iter().all(|e| e.tenant_id == "acme"),
-            "tenant_id invariant: stage-omit policy never crosses tenant lines");
+        assert!(
+            logger.events().iter().all(|e| e.tenant_id == "acme"),
+            "tenant_id invariant: stage-omit policy never crosses tenant lines"
+        );
     }
 
     /// Upstream parity: `TestAudit_LifecycleAllStagesShareAuditId`
@@ -460,18 +524,25 @@ mod tests {
     #[test]
     fn test_lifecycle_emits_one_audit_id_per_stage_for_one_request() {
         let logger = AuditLogger::new(64, AuditPolicy::new(AuditLevel::Metadata));
-        for s in [AuditStage::RequestReceived, AuditStage::ResponseStarted,
-                  AuditStage::ResponseComplete] {
+        for s in [
+            AuditStage::RequestReceived,
+            AuditStage::ResponseStarted,
+            AuditStage::ResponseComplete,
+        ] {
             let mut e = ev(s, "acme", "alice", 200);
             e.audit_id = "lifecycle-uid-1".into();
             logger.emit(e);
         }
         let stored = logger.events();
         assert_eq!(stored.len(), 3);
-        assert!(stored.iter().all(|e| e.audit_id == "lifecycle-uid-1"),
-            "all lifecycle stages share one audit_id");
-        assert!(stored.iter().all(|e| e.tenant_id == "acme"),
-            "tenant_id invariant: lifecycle stages stay scoped");
+        assert!(
+            stored.iter().all(|e| e.audit_id == "lifecycle-uid-1"),
+            "all lifecycle stages share one audit_id"
+        );
+        assert!(
+            stored.iter().all(|e| e.tenant_id == "acme"),
+            "tenant_id invariant: lifecycle stages stay scoped"
+        );
     }
 
     /// Upstream parity: `TestAudit_TenantQueryEmptyForUnknown`
@@ -482,19 +553,22 @@ mod tests {
         logger.emit(ev(AuditStage::ResponseComplete, "acme", "alice", 200));
         logger.emit(ev(AuditStage::ResponseComplete, "globex", "bob", 200));
         let nobody = logger.events_for_tenant("nobody-tenant");
-        assert!(nobody.is_empty(),
-            "tenant_id invariant: unknown tenant query is empty, never bleed");
+        assert!(
+            nobody.is_empty(),
+            "tenant_id invariant: unknown tenant query is empty, never bleed"
+        );
         let acme = logger.events_for_tenant("acme");
-        assert!(acme.iter().all(|e| e.tenant_id == "acme"),
-            "tenant_id invariant: matching tenant returns only matching events");
+        assert!(
+            acme.iter().all(|e| e.tenant_id == "acme"),
+            "tenant_id invariant: matching tenant returns only matching events"
+        );
     }
 
     /// Upstream parity: `TestAudit_PolicyShouldRecordHonorsExplicitOmit`
     /// (Policy.should_record returns true for stages NOT in OmitStages).
     #[test]
     fn test_policy_should_record_returns_true_for_non_omitted_stages() {
-        let p = AuditPolicy::new(AuditLevel::Metadata)
-            .omit(AuditStage::RequestReceived);
+        let p = AuditPolicy::new(AuditLevel::Metadata).omit(AuditStage::RequestReceived);
         assert!(!p.should_record(AuditStage::RequestReceived));
         assert!(p.should_record(AuditStage::ResponseStarted));
         assert!(p.should_record(AuditStage::ResponseComplete));
@@ -503,8 +577,11 @@ mod tests {
         // tags emitted events with their tenant.
         let logger = AuditLogger::new(4, p);
         logger.emit(ev(AuditStage::ResponseComplete, "acme", "alice", 200));
-        assert_eq!(logger.events()[0].tenant_id, "acme",
-            "tenant_id invariant on filtered emission");
+        assert_eq!(
+            logger.events()[0].tenant_id,
+            "acme",
+            "tenant_id invariant on filtered emission"
+        );
     }
 
     // ── Deeper coverage (deeper-004) — KEP-1314 ──────────────────────────────
@@ -520,12 +597,18 @@ mod tests {
             .with_annotation("admission.cave.io/mutator", "tenant-id-injector");
         assert!(logger.emit(e));
         let stored = &logger.events()[0];
-        assert_eq!(stored.annotations.get("authorization.k8s.io/decision"),
-            Some(&"allow".to_string()));
-        assert_eq!(stored.annotations.get("admission.cave.io/mutator"),
-            Some(&"tenant-id-injector".to_string()));
-        assert_eq!(stored.tenant_id, "acme",
-            "tenant_id invariant: annotations never displace tenant_id");
+        assert_eq!(
+            stored.annotations.get("authorization.k8s.io/decision"),
+            Some(&"allow".to_string())
+        );
+        assert_eq!(
+            stored.annotations.get("admission.cave.io/mutator"),
+            Some(&"tenant-id-injector".to_string())
+        );
+        assert_eq!(
+            stored.tenant_id, "acme",
+            "tenant_id invariant: annotations never displace tenant_id"
+        );
     }
 
     /// Upstream parity: `TestStructuredAudit_SubresourceCarriedInEvent`
@@ -534,13 +617,14 @@ mod tests {
     #[test]
     fn test_structured_audit_records_subresource_path_segment() {
         let logger = AuditLogger::new(64, AuditPolicy::new(AuditLevel::Metadata));
-        let e = ev(AuditStage::ResponseComplete, "acme", "alice", 200)
-            .with_subresource("exec");
+        let e = ev(AuditStage::ResponseComplete, "acme", "alice", 200).with_subresource("exec");
         assert!(logger.emit(e));
         let stored = &logger.events()[0];
         assert_eq!(stored.subresource, "exec");
-        assert_eq!(stored.tenant_id, "acme",
-            "tenant_id invariant: subresource never replaces tenant scoping");
+        assert_eq!(
+            stored.tenant_id, "acme",
+            "tenant_id invariant: subresource never replaces tenant scoping"
+        );
     }
 
     /// Upstream parity: `TestPolicyChecker_DropStageFilter`
@@ -549,20 +633,22 @@ mod tests {
     /// record them).
     #[test]
     fn test_filter_chain_drops_events_for_stage_in_drop_filter() {
-        let chain = AuditFilterChain::new()
-            .with(std::sync::Arc::new(DropStageFilter {
-                stages: vec![AuditStage::RequestReceived],
-            }));
-        let logger = AuditLogger::new(64, AuditPolicy::new(AuditLevel::Metadata))
-            .with_filter_chain(chain);
+        let chain = AuditFilterChain::new().with(std::sync::Arc::new(DropStageFilter {
+            stages: vec![AuditStage::RequestReceived],
+        }));
+        let logger =
+            AuditLogger::new(64, AuditPolicy::new(AuditLevel::Metadata)).with_filter_chain(chain);
         // RequestReceived dropped by filter, even though policy would record.
         let dropped = !logger.emit(ev(AuditStage::RequestReceived, "acme", "alice", 0));
         let kept = logger.emit(ev(AuditStage::ResponseComplete, "acme", "alice", 200));
         assert!(dropped, "filter chain drops RequestReceived");
         assert!(kept, "filter chain preserves ResponseComplete");
         assert_eq!(logger.len(), 1);
-        assert_eq!(logger.events()[0].tenant_id, "acme",
-            "tenant_id invariant: surviving event still scoped to acme");
+        assert_eq!(
+            logger.events()[0].tenant_id,
+            "acme",
+            "tenant_id invariant: surviving event still scoped to acme"
+        );
     }
 
     /// Upstream parity: `TestPolicyChecker_VerbFilter`
@@ -570,22 +656,26 @@ mod tests {
     /// keep audit volume manageable).
     #[test]
     fn test_filter_chain_drops_events_for_excluded_verb() {
-        let chain = AuditFilterChain::new()
-            .with(std::sync::Arc::new(DropVerbFilter {
-                verbs: vec!["watch".into()],
-            }));
-        let logger = AuditLogger::new(64, AuditPolicy::new(AuditLevel::Metadata))
-            .with_filter_chain(chain);
+        let chain = AuditFilterChain::new().with(std::sync::Arc::new(DropVerbFilter {
+            verbs: vec!["watch".into()],
+        }));
+        let logger =
+            AuditLogger::new(64, AuditPolicy::new(AuditLevel::Metadata)).with_filter_chain(chain);
         let mut watch_ev = ev(AuditStage::ResponseComplete, "acme", "alice", 200);
         watch_ev.verb = "watch".into();
         let kept = logger.emit(ev(AuditStage::ResponseComplete, "acme", "bob", 200));
         let dropped = !logger.emit(watch_ev);
         assert!(kept);
-        assert!(dropped, "verb filter drops watch even at ResponseComplete stage");
+        assert!(
+            dropped,
+            "verb filter drops watch even at ResponseComplete stage"
+        );
         assert_eq!(logger.len(), 1);
         assert_eq!(logger.events()[0].verb, "create");
-        assert!(logger.events().iter().all(|e| e.tenant_id == "acme"),
-            "tenant_id invariant: verb filter never crosses tenants");
+        assert!(
+            logger.events().iter().all(|e| e.tenant_id == "acme"),
+            "tenant_id invariant: verb filter never crosses tenants"
+        );
     }
 
     /// Upstream parity: `TestPolicyChecker_ChainConjunction`
@@ -599,8 +689,8 @@ mod tests {
             .with(std::sync::Arc::new(DropVerbFilter {
                 verbs: vec!["delete".into()],
             }));
-        let logger = AuditLogger::new(64, AuditPolicy::new(AuditLevel::Metadata))
-            .with_filter_chain(chain);
+        let logger =
+            AuditLogger::new(64, AuditPolicy::new(AuditLevel::Metadata)).with_filter_chain(chain);
         let panic_ev = ev(AuditStage::Panic, "acme", "alice", 500);
         let mut delete_ev = ev(AuditStage::ResponseComplete, "acme", "alice", 200);
         delete_ev.verb = "delete".into();

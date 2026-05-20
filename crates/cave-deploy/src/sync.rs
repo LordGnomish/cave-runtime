@@ -119,14 +119,16 @@ pub fn parse_hook_phases(annotations: &HashMap<String, String>) -> Vec<SyncPhase
     annotations
         .get("argocd.argoproj.io/hook")
         .map(|s| {
-            s.split(',').filter_map(|p| match p.trim() {
-                "PreSync" => Some(SyncPhase::PreSync),
-                "Sync" => Some(SyncPhase::Sync),
-                "PostSync" => Some(SyncPhase::PostSync),
-                "SyncFail" => Some(SyncPhase::SyncFail),
-                "Skip" => Some(SyncPhase::Skip),
-                _ => None,
-            }).collect()
+            s.split(',')
+                .filter_map(|p| match p.trim() {
+                    "PreSync" => Some(SyncPhase::PreSync),
+                    "Sync" => Some(SyncPhase::Sync),
+                    "PostSync" => Some(SyncPhase::PostSync),
+                    "SyncFail" => Some(SyncPhase::SyncFail),
+                    "Skip" => Some(SyncPhase::Skip),
+                    _ => None,
+                })
+                .collect()
         })
         .unwrap_or_default()
 }
@@ -161,7 +163,10 @@ pub struct RollbackResult {
     pub started_at: chrono::DateTime<Utc>,
 }
 
-pub fn initiate_rollback(req: &RollbackRequest, history: &[RevisionHistory]) -> Option<RollbackResult> {
+pub fn initiate_rollback(
+    req: &RollbackRequest,
+    history: &[RevisionHistory],
+) -> Option<RollbackResult> {
     let entry = history.iter().find(|h| h.id == req.history_id)?;
     Some(RollbackResult {
         operation_id: Uuid::new_v4(),
@@ -196,10 +201,7 @@ pub fn should_auto_sync(
 }
 
 /// Determine whether pruning should occur for a resource.
-pub fn should_prune(
-    policy: &SyncPolicy,
-    resource: &ResourceStatus,
-) -> bool {
+pub fn should_prune(policy: &SyncPolicy, resource: &ResourceStatus) -> bool {
     let prune = policy.automated.as_ref().map(|a| a.prune).unwrap_or(false);
     prune && resource.require_pruning
 }
@@ -219,7 +221,10 @@ pub struct ParsedSyncOptions {
 }
 
 pub fn parse_sync_options(options: &[String]) -> ParsedSyncOptions {
-    let mut parsed = ParsedSyncOptions { validate: true, ..Default::default() };
+    let mut parsed = ParsedSyncOptions {
+        validate: true,
+        ..Default::default()
+    };
     for opt in options {
         match opt.as_str() {
             "CreateNamespace=true" => parsed.create_namespace = true,
@@ -239,7 +244,7 @@ pub fn parse_sync_options(options: &[String]) -> ParsedSyncOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{HealthStatus, SyncStatus, SyncPolicy, AutomatedSyncPolicy};
+    use crate::models::{AutomatedSyncPolicy, HealthStatus, SyncPolicy, SyncStatus};
 
     #[test]
     fn parse_wave_from_annotations() {
@@ -265,7 +270,10 @@ mod tests {
     #[test]
     fn parse_hook_phases_multiple() {
         let mut annotations = HashMap::new();
-        annotations.insert("argocd.argoproj.io/hook".to_string(), "PreSync,Sync".to_string());
+        annotations.insert(
+            "argocd.argoproj.io/hook".to_string(),
+            "PreSync,Sync".to_string(),
+        );
         let phases = parse_hook_phases(&annotations);
         assert_eq!(phases.len(), 2);
     }
@@ -273,9 +281,39 @@ mod tests {
     #[test]
     fn group_by_wave_ordering() {
         let resources = vec![
-            ManifestResource { group: "".to_string(), version: "v1".to_string(), kind: "ConfigMap".to_string(), namespace: "default".to_string(), name: "cm".to_string(), wave: 2, hook_phases: vec![], delete_on_success: false, manifest: serde_json::json!({}) },
-            ManifestResource { group: "apps".to_string(), version: "v1".to_string(), kind: "Deployment".to_string(), namespace: "default".to_string(), name: "dep".to_string(), wave: 0, hook_phases: vec![], delete_on_success: false, manifest: serde_json::json!({}) },
-            ManifestResource { group: "".to_string(), version: "v1".to_string(), kind: "Service".to_string(), namespace: "default".to_string(), name: "svc".to_string(), wave: 1, hook_phases: vec![], delete_on_success: false, manifest: serde_json::json!({}) },
+            ManifestResource {
+                group: "".to_string(),
+                version: "v1".to_string(),
+                kind: "ConfigMap".to_string(),
+                namespace: "default".to_string(),
+                name: "cm".to_string(),
+                wave: 2,
+                hook_phases: vec![],
+                delete_on_success: false,
+                manifest: serde_json::json!({}),
+            },
+            ManifestResource {
+                group: "apps".to_string(),
+                version: "v1".to_string(),
+                kind: "Deployment".to_string(),
+                namespace: "default".to_string(),
+                name: "dep".to_string(),
+                wave: 0,
+                hook_phases: vec![],
+                delete_on_success: false,
+                manifest: serde_json::json!({}),
+            },
+            ManifestResource {
+                group: "".to_string(),
+                version: "v1".to_string(),
+                kind: "Service".to_string(),
+                namespace: "default".to_string(),
+                name: "svc".to_string(),
+                wave: 1,
+                hook_phases: vec![],
+                delete_on_success: false,
+                manifest: serde_json::json!({}),
+            },
         ];
         let waves = group_by_wave(&resources);
         assert_eq!(waves[0].0, 0); // Deployment first
@@ -286,35 +324,62 @@ mod tests {
     #[test]
     fn should_auto_sync_out_of_sync() {
         let policy = SyncPolicy {
-            automated: Some(AutomatedSyncPolicy { prune: false, self_heal: false, allow_empty: false }),
+            automated: Some(AutomatedSyncPolicy {
+                prune: false,
+                self_heal: false,
+                allow_empty: false,
+            }),
             sync_options: vec![],
             retry: None,
             managed_namespace_metadata: None,
         };
-        assert!(should_auto_sync(&policy, &SyncStatus::OutOfSync, &HealthStatus::Healthy));
+        assert!(should_auto_sync(
+            &policy,
+            &SyncStatus::OutOfSync,
+            &HealthStatus::Healthy
+        ));
     }
 
     #[test]
     fn should_auto_sync_self_heal_degraded() {
         let policy = SyncPolicy {
-            automated: Some(AutomatedSyncPolicy { prune: false, self_heal: true, allow_empty: false }),
+            automated: Some(AutomatedSyncPolicy {
+                prune: false,
+                self_heal: true,
+                allow_empty: false,
+            }),
             sync_options: vec![],
             retry: None,
             managed_namespace_metadata: None,
         };
-        assert!(should_auto_sync(&policy, &SyncStatus::Synced, &HealthStatus::Degraded));
-        assert!(!should_auto_sync(&policy, &SyncStatus::Synced, &HealthStatus::Healthy));
+        assert!(should_auto_sync(
+            &policy,
+            &SyncStatus::Synced,
+            &HealthStatus::Degraded
+        ));
+        assert!(!should_auto_sync(
+            &policy,
+            &SyncStatus::Synced,
+            &HealthStatus::Healthy
+        ));
     }
 
     #[test]
     fn should_auto_sync_no_policy() {
         let policy = SyncPolicy::default();
-        assert!(!should_auto_sync(&policy, &SyncStatus::OutOfSync, &HealthStatus::Healthy));
+        assert!(!should_auto_sync(
+            &policy,
+            &SyncStatus::OutOfSync,
+            &HealthStatus::Healthy
+        ));
     }
 
     #[test]
     fn parse_sync_options_create_namespace() {
-        let opts = vec!["CreateNamespace=true".to_string(), "ServerSideApply=true".to_string()];
+        let opts = vec![
+            "CreateNamespace=true".to_string(),
+            "ServerSideApply=true".to_string(),
+        ];
         let parsed = parse_sync_options(&opts);
         assert!(parsed.create_namespace);
         assert!(parsed.server_side_apply);
@@ -331,22 +396,20 @@ mod tests {
     #[test]
     fn rollback_finds_history_entry() {
         let app_id = Uuid::new_v4();
-        let history = vec![
-            RevisionHistory {
-                id: 1,
-                revision: "abc123".to_string(),
-                deployed_at: Utc::now(),
-                initiated_by: "user".to_string(),
-                source: ApplicationSource {
-                    repo_url: "https://github.com/example/app".to_string(),
-                    target_revision: Some("abc123".to_string()),
-                    path: None,
-                    helm: None,
-                    kustomize: None,
-                    directory: None,
-                },
+        let history = vec![RevisionHistory {
+            id: 1,
+            revision: "abc123".to_string(),
+            deployed_at: Utc::now(),
+            initiated_by: "user".to_string(),
+            source: ApplicationSource {
+                repo_url: "https://github.com/example/app".to_string(),
+                target_revision: Some("abc123".to_string()),
+                path: None,
+                helm: None,
+                kustomize: None,
+                directory: None,
             },
-        ];
+        }];
         let req = RollbackRequest {
             application_id: app_id,
             history_id: 1,

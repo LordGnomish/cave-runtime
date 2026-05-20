@@ -40,8 +40,7 @@ impl ManifestFile {
     }
 
     pub fn live_files(&self) -> i32 {
-        self.added_data_files_count + self.existing_data_files_count
-            - self.deleted_data_files_count
+        self.added_data_files_count + self.existing_data_files_count - self.deleted_data_files_count
     }
 
     pub fn is_data(&self) -> bool {

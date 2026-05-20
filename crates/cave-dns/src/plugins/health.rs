@@ -2,15 +2,12 @@
 // Copyright 2026 Cave Runtime contributors
 /// Health plugin — HTTP /health endpoint.
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     Arc,
+    atomic::{AtomicBool, Ordering},
 };
 
 use async_trait::async_trait;
-use axum::{
-    routing::get,
-    Router,
-};
+use axum::{Router, routing::get};
 use tracing::info;
 
 use crate::{

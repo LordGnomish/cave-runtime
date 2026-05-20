@@ -5,21 +5,37 @@
 use super::types::{MlflowExperiment, MlflowViewError};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
+use crate::admin::state::{AdminState, scope};
 
-pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<MlflowExperiment>, MlflowViewError> {
+pub fn list(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<MlflowExperiment>, MlflowViewError> {
     ctx.authorise(Permission::MlflowRead)?;
-    let mut rows: Vec<MlflowExperiment> =
-        scope(&state.mlflow_experiments.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-            .into_iter()
-            .cloned()
-            .collect();
-    rows.sort_by(|a, b| b.last_update_time_ms.cmp(&a.last_update_time_ms).then(a.name.cmp(&b.name)));
+    let mut rows: Vec<MlflowExperiment> = scope(
+        &state.mlflow_experiments.read().unwrap(),
+        &ctx.tenant,
+        |r| &r.tenant,
+    )
+    .into_iter()
+    .cloned()
+    .collect();
+    rows.sort_by(|a, b| {
+        b.last_update_time_ms
+            .cmp(&a.last_update_time_ms)
+            .then(a.name.cmp(&b.name))
+    });
     Ok(rows)
 }
 
-pub fn list_active(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<MlflowExperiment>, MlflowViewError> {
-    Ok(list(state, ctx)?.into_iter().filter(|e| e.lifecycle_stage == "active").collect())
+pub fn list_active(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<MlflowExperiment>, MlflowViewError> {
+    Ok(list(state, ctx)?
+        .into_iter()
+        .filter(|e| e.lifecycle_stage == "active")
+        .collect())
 }
 
 pub fn get(
@@ -139,7 +155,10 @@ mod tests {
         let s = seeded();
         let c = ctx(&[Permission::MlflowRead]);
         assert_eq!(get(&s, &c, "exp-1").unwrap().name, "fraud");
-        assert!(matches!(get(&s, &c, "nope").unwrap_err(), MlflowViewError::ExperimentNotFound(_)));
+        assert!(matches!(
+            get(&s, &c, "nope").unwrap_err(),
+            MlflowViewError::ExperimentNotFound(_)
+        ));
     }
 
     #[test]
@@ -147,7 +166,11 @@ mod tests {
         let s = seeded();
         let rows = list(&s, &ctx(&[Permission::MlflowRead])).unwrap();
         let h = lifecycle_histogram(&rows);
-        let active = h.iter().find(|(s, _)| s == "active").map(|(_, n)| *n).unwrap();
+        let active = h
+            .iter()
+            .find(|(s, _)| s == "active")
+            .map(|(_, n)| *n)
+            .unwrap();
         assert_eq!(active, 2);
     }
 

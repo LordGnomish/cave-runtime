@@ -220,7 +220,10 @@ mod tests {
     #[test]
     fn get_unknown_lease_errors() {
         let m = LeaseManager::new();
-        assert!(matches!(m.get("nope").unwrap_err(), LeaseError::NotFound(_)));
+        assert!(matches!(
+            m.get("nope").unwrap_err(),
+            LeaseError::NotFound(_)
+        ));
     }
 
     #[test]

@@ -6,16 +6,22 @@
 //! fail-open/fail-closed, patch encoding, GVK/GVR types.
 
 use cave_policy::admission::{
-    AdmissionRequest, AdmissionResponse, AdmissionReview,
-    AdmissionWebhook, GroupVersionKind, GroupVersionResource, Operation, UserInfo,
+    AdmissionRequest, AdmissionResponse, AdmissionReview, AdmissionWebhook, GroupVersionKind,
+    GroupVersionResource, Operation, UserInfo,
 };
 use cave_policy::kyverno::KyvernoEngine;
 use cave_policy::rego::PolicyEngine;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-fn make_review(uid: &str, kind: &str, namespace: &str, name: &str, object: Value) -> AdmissionReview {
+fn make_review(
+    uid: &str,
+    kind: &str,
+    namespace: &str,
+    name: &str,
+    object: Value,
+) -> AdmissionReview {
     AdmissionReview {
         api_version: "admission.k8s.io/v1".to_string(),
         kind: "AdmissionReview".to_string(),
@@ -71,7 +77,8 @@ fn pod_object(name: &str, namespace: &str) -> Value {
 fn handle(webhook: &AdmissionWebhook, review: &AdmissionReview) -> AdmissionResponse {
     let opa = PolicyEngine::new();
     let kyverno = KyvernoEngine::new();
-    webhook.handle(review, &opa, &kyverno)
+    webhook
+        .handle(review, &opa, &kyverno)
         .unwrap()
         .response
         .unwrap()
@@ -134,8 +141,12 @@ fn base64_decode(s: &str) -> Vec<u8> {
         let b2 = decode(chunk.get(2).copied().unwrap_or(b'A'));
         let b3 = decode(chunk.get(3).copied().unwrap_or(b'A'));
         result.push(((b0 << 2) | (b1 >> 4)) as u8);
-        if chunk.len() > 2 { result.push(((b1 << 4) | (b2 >> 2)) as u8); }
-        if chunk.len() > 3 { result.push(((b2 << 6) | b3) as u8); }
+        if chunk.len() > 2 {
+            result.push(((b1 << 4) | (b2 >> 2)) as u8);
+        }
+        if chunk.len() > 3 {
+            result.push(((b2 << 6) | b3) as u8);
+        }
     }
     result
 }
@@ -145,7 +156,13 @@ fn base64_decode(s: &str) -> Vec<u8> {
 #[test]
 fn test_webhook_no_policies_defaults_allow() {
     let webhook = AdmissionWebhook::default();
-    let review = make_review("uid-1", "Pod", "default", "my-pod", pod_object("my-pod", "default"));
+    let review = make_review(
+        "uid-1",
+        "Pod",
+        "default",
+        "my-pod",
+        pod_object("my-pod", "default"),
+    );
     let resp = handle(&webhook, &review);
     assert!(resp.allowed, "no policies should default to allow");
     assert_eq!(resp.uid, "uid-1");
@@ -160,10 +177,21 @@ fn test_webhook_opa_allow_policy() {
     opa.load_module(
         "admission/allow",
         "package kubernetes.admission\ndefault allow = true\n",
-    ).unwrap();
+    )
+    .unwrap();
 
-    let review = make_review("uid-2", "Pod", "default", "test-pod", pod_object("test-pod", "default"));
-    let resp = webhook.handle(&review, &opa, &kyverno).unwrap().response.unwrap();
+    let review = make_review(
+        "uid-2",
+        "Pod",
+        "default",
+        "test-pod",
+        pod_object("test-pod", "default"),
+    );
+    let resp = webhook
+        .handle(&review, &opa, &kyverno)
+        .unwrap()
+        .response
+        .unwrap();
     assert!(resp.allowed);
 }
 
@@ -185,10 +213,21 @@ deny[msg] {
     msg := "Pods are not allowed"
 }
 "#,
-    ).unwrap();
+    )
+    .unwrap();
 
-    let review = make_review("uid-3", "Pod", "default", "blocked-pod", pod_object("blocked-pod", "default"));
-    let resp = webhook.handle(&review, &opa, &kyverno).unwrap().response.unwrap();
+    let review = make_review(
+        "uid-3",
+        "Pod",
+        "default",
+        "blocked-pod",
+        pod_object("blocked-pod", "default"),
+    );
+    let resp = webhook
+        .handle(&review, &opa, &kyverno)
+        .unwrap()
+        .response
+        .unwrap();
     assert!(!resp.allowed, "OPA deny should block");
 }
 
@@ -230,12 +269,18 @@ fn test_operation_display() {
 
 #[test]
 fn test_admission_review_structure() {
-    let review = make_review("test-uid", "Deployment", "production", "my-deploy", json!({
-        "apiVersion": "apps/v1",
-        "kind": "Deployment",
-        "metadata": {"name": "my-deploy", "namespace": "production"},
-        "spec": {"replicas": 3}
-    }));
+    let review = make_review(
+        "test-uid",
+        "Deployment",
+        "production",
+        "my-deploy",
+        json!({
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": {"name": "my-deploy", "namespace": "production"},
+            "spec": {"replicas": 3}
+        }),
+    );
 
     assert!(review.request.is_some());
     let req = review.request.as_ref().unwrap();
@@ -250,7 +295,13 @@ fn test_admission_review_structure() {
 
 #[test]
 fn test_dry_run_flag() {
-    let review = make_review("uid-dr", "Pod", "default", "dry-pod", pod_object("dry-pod", "default"));
+    let review = make_review(
+        "uid-dr",
+        "Pod",
+        "default",
+        "dry-pod",
+        pod_object("dry-pod", "default"),
+    );
     let req = review.request.as_ref().unwrap();
     assert!(!req.dry_run);
 
@@ -292,7 +343,12 @@ fn test_response_serialization() {
     let serialized = serde_json::to_value(&resp).unwrap();
     assert_eq!(serialized["allowed"], json!(false));
     assert_eq!(serialized["uid"], json!("denied-uid"));
-    assert!(serialized["status"]["message"].as_str().unwrap().contains("team label"));
+    assert!(
+        serialized["status"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("team label")
+    );
 }
 
 // ─── GVK / GVR Tests ─────────────────────────────────────────────────────────
@@ -336,7 +392,10 @@ fn test_user_info_groups() {
     let user = UserInfo {
         username: "admin".to_string(),
         uid: Some("user-123".to_string()),
-        groups: vec!["system:masters".to_string(), "system:authenticated".to_string()],
+        groups: vec![
+            "system:masters".to_string(),
+            "system:authenticated".to_string(),
+        ],
         extra: Default::default(),
     };
 
@@ -350,7 +409,7 @@ fn test_user_info_groups() {
 fn test_opa_allow_kyverno_deny() {
     use cave_policy::kyverno::models::{
         ClusterPolicy, KyvernoRule, MatchResources, ObjectMeta, PolicySpec, ResourceDescription,
-        ValidationFailureAction, Validation,
+        Validation, ValidationFailureAction,
     };
 
     let webhook = AdmissionWebhook::default();
@@ -361,7 +420,8 @@ fn test_opa_allow_kyverno_deny() {
     opa.load_module(
         "admission/allow",
         "package kubernetes.admission\ndefault allow = true\n",
-    ).unwrap();
+    )
+    .unwrap();
 
     // Kyverno denies pods without a specific label
     kyverno.add_cluster_policy(ClusterPolicy {
@@ -413,6 +473,13 @@ fn test_opa_allow_kyverno_deny() {
         }),
     );
 
-    let resp = webhook.handle(&review, &opa, &kyverno).unwrap().response.unwrap();
-    assert!(!resp.allowed, "Kyverno deny should block even when OPA allows");
+    let resp = webhook
+        .handle(&review, &opa, &kyverno)
+        .unwrap()
+        .response
+        .unwrap();
+    assert!(
+        !resp.allowed,
+        "Kyverno deny should block even when OPA allows"
+    );
 }

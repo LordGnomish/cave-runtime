@@ -49,9 +49,27 @@ pub fn list_replicas(
 ) -> Result<Vec<ReplicaPeer>, CacheViewError> {
     ctx.authorise(Permission::CacheRead)?;
     Ok(vec![
-        ReplicaPeer { ip: "10.244.1.10", port: 6379, state: "online", offset: 1_842_037_212, lag_sec: 0 },
-        ReplicaPeer { ip: "10.244.2.10", port: 6379, state: "online", offset: 1_842_037_180, lag_sec: 1 },
-        ReplicaPeer { ip: "10.244.3.10", port: 6379, state: "sync",   offset: 1_841_999_000, lag_sec: 12 },
+        ReplicaPeer {
+            ip: "10.244.1.10",
+            port: 6379,
+            state: "online",
+            offset: 1_842_037_212,
+            lag_sec: 0,
+        },
+        ReplicaPeer {
+            ip: "10.244.2.10",
+            port: 6379,
+            state: "online",
+            offset: 1_842_037_180,
+            lag_sec: 1,
+        },
+        ReplicaPeer {
+            ip: "10.244.3.10",
+            port: 6379,
+            state: "sync",
+            offset: 1_841_999_000,
+            lag_sec: 12,
+        },
     ])
 }
 

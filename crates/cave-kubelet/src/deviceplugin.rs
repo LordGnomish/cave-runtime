@@ -270,11 +270,7 @@ impl DeviceManager {
     /// device list each tick. Devices not in the update become stale → removed
     /// (unless allocated, in which case kubelet keeps them but marks unhealthy
     /// and lets normal cleanup release on container exit).
-    pub fn list_and_watch_update(
-        &self,
-        resource_name: &str,
-        devices: Vec<Device>,
-    ) -> DpResult<()> {
+    pub fn list_and_watch_update(&self, resource_name: &str, devices: Vec<Device>) -> DpResult<()> {
         let mut plugin = self
             .plugins
             .get_mut(resource_name)
@@ -308,15 +304,24 @@ impl DeviceManager {
     }
 
     pub fn capacity(&self, resource_name: &str) -> usize {
-        self.plugins.get(resource_name).map(|p| p.devices.len()).unwrap_or(0)
+        self.plugins
+            .get(resource_name)
+            .map(|p| p.devices.len())
+            .unwrap_or(0)
     }
 
     pub fn allocatable(&self, resource_name: &str) -> usize {
-        self.plugins.get(resource_name).map(|p| p.healthy_count()).unwrap_or(0)
+        self.plugins
+            .get(resource_name)
+            .map(|p| p.healthy_count())
+            .unwrap_or(0)
     }
 
     pub fn allocated(&self, resource_name: &str) -> usize {
-        self.plugins.get(resource_name).map(|p| p.allocated_count()).unwrap_or(0)
+        self.plugins
+            .get(resource_name)
+            .map(|p| p.allocated_count())
+            .unwrap_or(0)
     }
 
     /// Allocate `request` healthy, unallocated devices. Optional `prefer_numa`
@@ -608,7 +613,11 @@ mod tests {
     fn register_replacement_preserves_existing_allocations() {
         let m = DeviceManager::new();
         m.register(req("vendor.com/gpu", "/sock1")).unwrap();
-        m.list_and_watch_update("vendor.com/gpu", vec![Device::healthy("g1"), Device::healthy("g2")]).unwrap();
+        m.list_and_watch_update(
+            "vendor.com/gpu",
+            vec![Device::healthy("g1"), Device::healthy("g2")],
+        )
+        .unwrap();
         m.allocate("vendor.com/gpu", "p", "c", 1, None).unwrap();
         assert_eq!(m.allocated("vendor.com/gpu"), 1);
         m.register(req("vendor.com/gpu", "/sock2")).unwrap();
@@ -649,11 +658,14 @@ mod tests {
         m.register(req("vendor.com/gpu", "/s")).unwrap();
         m.list_and_watch_update(
             "vendor.com/gpu",
-            vec![Device::healthy("g1"), Device {
-                id: "g2".into(),
-                health: DeviceHealth::Unhealthy,
-                topology_numa: vec![],
-            }],
+            vec![
+                Device::healthy("g1"),
+                Device {
+                    id: "g2".into(),
+                    health: DeviceHealth::Unhealthy,
+                    topology_numa: vec![],
+                },
+            ],
         )
         .unwrap();
         assert_eq!(m.allocatable("vendor.com/gpu"), 1);
@@ -663,9 +675,13 @@ mod tests {
     fn list_and_watch_update_drops_vanished_unallocated_devices() {
         let m = DeviceManager::new();
         m.register(req("vendor.com/gpu", "/s")).unwrap();
-        m.list_and_watch_update("vendor.com/gpu", vec![Device::healthy("g1"), Device::healthy("g2")])
+        m.list_and_watch_update(
+            "vendor.com/gpu",
+            vec![Device::healthy("g1"), Device::healthy("g2")],
+        )
+        .unwrap();
+        m.list_and_watch_update("vendor.com/gpu", vec![Device::healthy("g1")])
             .unwrap();
-        m.list_and_watch_update("vendor.com/gpu", vec![Device::healthy("g1")]).unwrap();
         assert_eq!(m.capacity("vendor.com/gpu"), 1);
     }
 
@@ -706,7 +722,8 @@ mod tests {
     fn allocate_insufficient_returns_err() {
         let m = DeviceManager::new();
         m.register(req("vendor.com/gpu", "/s")).unwrap();
-        m.list_and_watch_update("vendor.com/gpu", vec![Device::healthy("g1")]).unwrap();
+        m.list_and_watch_update("vendor.com/gpu", vec![Device::healthy("g1")])
+            .unwrap();
         let err = m.allocate("vendor.com/gpu", "p", "c", 2, None).unwrap_err();
         assert!(matches!(err, DevicePluginError::Insufficient { .. }));
     }
@@ -735,7 +752,11 @@ mod tests {
     fn allocate_idempotent_for_same_request_count() {
         let m = DeviceManager::new();
         m.register(req("vendor.com/gpu", "/s")).unwrap();
-        m.list_and_watch_update("vendor.com/gpu", vec![Device::healthy("g1"), Device::healthy("g2")]).unwrap();
+        m.list_and_watch_update(
+            "vendor.com/gpu",
+            vec![Device::healthy("g1"), Device::healthy("g2")],
+        )
+        .unwrap();
         let a = m.allocate("vendor.com/gpu", "p", "c", 2, None).unwrap();
         let b = m.allocate("vendor.com/gpu", "p", "c", 2, None).unwrap();
         assert_eq!(a, b);
@@ -745,7 +766,11 @@ mod tests {
     fn allocate_conflict_when_request_changes() {
         let m = DeviceManager::new();
         m.register(req("vendor.com/gpu", "/s")).unwrap();
-        m.list_and_watch_update("vendor.com/gpu", vec![Device::healthy("g1"), Device::healthy("g2")]).unwrap();
+        m.list_and_watch_update(
+            "vendor.com/gpu",
+            vec![Device::healthy("g1"), Device::healthy("g2")],
+        )
+        .unwrap();
         m.allocate("vendor.com/gpu", "p", "c", 1, None).unwrap();
         let err = m.allocate("vendor.com/gpu", "p", "c", 2, None).unwrap_err();
         assert!(matches!(err, DevicePluginError::Conflict(_)));
@@ -763,7 +788,9 @@ mod tests {
             ],
         )
         .unwrap();
-        let chosen = m.allocate("vendor.com/gpu", "p", "c", 1, Some(&[1])).unwrap();
+        let chosen = m
+            .allocate("vendor.com/gpu", "p", "c", 1, Some(&[1]))
+            .unwrap();
         assert_eq!(chosen, vec!["g1".to_string()]);
     }
 
@@ -777,7 +804,9 @@ mod tests {
         )
         .unwrap();
         // Prefer NUMA 1, but there's no NUMA-1 device → fall back to g0.
-        let chosen = m.allocate("vendor.com/gpu", "p", "c", 1, Some(&[1])).unwrap();
+        let chosen = m
+            .allocate("vendor.com/gpu", "p", "c", 1, Some(&[1]))
+            .unwrap();
         assert_eq!(chosen, vec!["g0".to_string()]);
     }
 
@@ -785,7 +814,11 @@ mod tests {
     fn deallocate_container_releases_devices() {
         let m = DeviceManager::new();
         m.register(req("vendor.com/gpu", "/s")).unwrap();
-        m.list_and_watch_update("vendor.com/gpu", vec![Device::healthy("g1"), Device::healthy("g2")]).unwrap();
+        m.list_and_watch_update(
+            "vendor.com/gpu",
+            vec![Device::healthy("g1"), Device::healthy("g2")],
+        )
+        .unwrap();
         m.allocate("vendor.com/gpu", "p", "c", 2, None).unwrap();
         m.deallocate_container("vendor.com/gpu", "p", "c");
         assert_eq!(m.allocated("vendor.com/gpu"), 0);
@@ -795,7 +828,15 @@ mod tests {
     fn deallocate_pod_releases_all_containers() {
         let m = DeviceManager::new();
         m.register(req("vendor.com/gpu", "/s")).unwrap();
-        m.list_and_watch_update("vendor.com/gpu", vec![Device::healthy("g1"), Device::healthy("g2"), Device::healthy("g3")]).unwrap();
+        m.list_and_watch_update(
+            "vendor.com/gpu",
+            vec![
+                Device::healthy("g1"),
+                Device::healthy("g2"),
+                Device::healthy("g3"),
+            ],
+        )
+        .unwrap();
         m.allocate("vendor.com/gpu", "p", "c1", 1, None).unwrap();
         m.allocate("vendor.com/gpu", "p", "c2", 2, None).unwrap();
         m.deallocate_pod("vendor.com/gpu", "p");
@@ -813,7 +854,15 @@ mod tests {
     fn allocations_for_returns_sorted_ids() {
         let m = DeviceManager::new();
         m.register(req("vendor.com/gpu", "/s")).unwrap();
-        m.list_and_watch_update("vendor.com/gpu", vec![Device::healthy("g3"), Device::healthy("g1"), Device::healthy("g2")]).unwrap();
+        m.list_and_watch_update(
+            "vendor.com/gpu",
+            vec![
+                Device::healthy("g3"),
+                Device::healthy("g1"),
+                Device::healthy("g2"),
+            ],
+        )
+        .unwrap();
         m.allocate("vendor.com/gpu", "p", "c", 3, None).unwrap();
         let v = m.allocations_for("vendor.com/gpu", "p", "c");
         assert_eq!(v, vec!["g1".to_string(), "g2".into(), "g3".into()]);
@@ -840,7 +889,9 @@ mod tests {
         )
         .unwrap();
         let hints = m.topology_hints("vendor.com/gpu", 1);
-        assert!(hints.iter().any(|h| h.preferred && h.mask == crate::topology::NumaMask::from_nodes(&[0])));
+        assert!(hints
+            .iter()
+            .any(|h| h.preferred && h.mask == crate::topology::NumaMask::from_nodes(&[0])));
     }
 
     #[test]
@@ -856,7 +907,9 @@ mod tests {
         )
         .unwrap();
         let hints = m.topology_hints("vendor.com/gpu", 2);
-        assert!(hints.iter().any(|h| !h.preferred && h.mask == crate::topology::NumaMask::from_nodes(&[0, 1])));
+        assert!(hints
+            .iter()
+            .any(|h| !h.preferred && h.mask == crate::topology::NumaMask::from_nodes(&[0, 1])));
         assert!(!hints.iter().any(|h| h.preferred));
     }
 
@@ -864,7 +917,8 @@ mod tests {
     fn topology_hints_returns_empty_when_insufficient() {
         let m = DeviceManager::new();
         m.register(req("vendor.com/gpu", "/s")).unwrap();
-        m.list_and_watch_update("vendor.com/gpu", vec![Device::healthy("g0")]).unwrap();
+        m.list_and_watch_update("vendor.com/gpu", vec![Device::healthy("g0")])
+            .unwrap();
         assert!(m.topology_hints("vendor.com/gpu", 5).is_empty());
     }
 
@@ -872,7 +926,8 @@ mod tests {
     fn topology_hints_zero_request_empty() {
         let m = DeviceManager::new();
         m.register(req("vendor.com/gpu", "/s")).unwrap();
-        m.list_and_watch_update("vendor.com/gpu", vec![Device::healthy("g0")]).unwrap();
+        m.list_and_watch_update("vendor.com/gpu", vec![Device::healthy("g0")])
+            .unwrap();
         assert!(m.topology_hints("vendor.com/gpu", 0).is_empty());
     }
 
@@ -892,7 +947,9 @@ mod tests {
         )
         .unwrap();
         let hints = m.topology_hints("vendor.com/gpu", 1);
-        assert!(hints.iter().any(|h| h.mask == crate::topology::NumaMask(u64::MAX)));
+        assert!(hints
+            .iter()
+            .any(|h| h.mask == crate::topology::NumaMask(u64::MAX)));
     }
 
     #[test]
@@ -913,7 +970,8 @@ mod tests {
     fn devices_returns_clone() {
         let m = DeviceManager::new();
         m.register(req("vendor.com/gpu", "/s")).unwrap();
-        m.list_and_watch_update("vendor.com/gpu", vec![Device::healthy("g1")]).unwrap();
+        m.list_and_watch_update("vendor.com/gpu", vec![Device::healthy("g1")])
+            .unwrap();
         let v = m.devices("vendor.com/gpu");
         assert_eq!(v.len(), 1);
     }

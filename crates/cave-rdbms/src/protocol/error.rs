@@ -60,7 +60,13 @@ impl ErrorResponse {
     }
 
     pub fn not_null_violation(col: &str) -> Self {
-        Self::new("23502", &format!("null value in column \"{}\" violates not-null constraint", col))
+        Self::new(
+            "23502",
+            &format!(
+                "null value in column \"{}\" violates not-null constraint",
+                col
+            ),
+        )
     }
 
     pub fn div_by_zero() -> Self {
@@ -72,7 +78,10 @@ impl ErrorResponse {
     }
 
     pub fn failed_transaction() -> Self {
-        Self::new("25P02", "current transaction is aborted, commands ignored until end of transaction block")
+        Self::new(
+            "25P02",
+            "current transaction is aborted, commands ignored until end of transaction block",
+        )
     }
 }
 
@@ -89,8 +98,7 @@ mod tests {
 
     #[test]
     fn test_error_response_with_detail() {
-        let err = ErrorResponse::syntax_error("unexpected token")
-            .with_detail("at position 10");
+        let err = ErrorResponse::syntax_error("unexpected token").with_detail("at position 10");
         assert_eq!(err.detail, Some("at position 10".to_string()));
     }
 

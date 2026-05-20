@@ -18,7 +18,11 @@ pub struct EntityName {
 }
 
 impl EntityName {
-    pub fn new(namespace: impl Into<String>, kind: impl Into<String>, name: impl Into<String>) -> Self {
+    pub fn new(
+        namespace: impl Into<String>,
+        kind: impl Into<String>,
+        name: impl Into<String>,
+    ) -> Self {
         Self {
             namespace: namespace.into(),
             kind: kind.into(),

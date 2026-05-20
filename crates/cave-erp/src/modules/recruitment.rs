@@ -3,11 +3,11 @@
 use crate::models::*;
 use crate::store::ErpStore;
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -84,25 +84,25 @@ async fn list_jobs(State(store): State<Arc<ErpStore>>) -> impl IntoResponse {
     Json(jobs)
 }
 
-async fn close_job(
-    State(store): State<Arc<ErpStore>>,
-    Path(id): Path<Uuid>,
-) -> impl IntoResponse {
+async fn close_job(State(store): State<Arc<ErpStore>>, Path(id): Path<Uuid>) -> impl IntoResponse {
     let mut jobs = store.jobs.write().await;
     if let Some(job) = jobs.get_mut(&id) {
         job.state = JobState::Closed;
         (StatusCode::OK, Json(job.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(Job {
-            id: Uuid::nil(),
-            title: String::new(),
-            department_id: Uuid::nil(),
-            description: String::new(),
-            state: JobState::Closed,
-            posted_at: Utc::now(),
-            headcount_target: 0,
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(Job {
+                id: Uuid::nil(),
+                title: String::new(),
+                department_id: Uuid::nil(),
+                description: String::new(),
+                state: JobState::Closed,
+                posted_at: Utc::now(),
+                headcount_target: 0,
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -153,22 +153,25 @@ async fn advance_applicant(
         app.stage_id = req.stage_id;
         (StatusCode::OK, Json(app.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(Applicant {
-            id: Uuid::nil(),
-            job_id: Uuid::nil(),
-            name: String::new(),
-            email: String::new(),
-            phone: None,
-            resume_url: None,
-            source: String::new(),
-            stage_id: Uuid::nil(),
-            score: 0,
-            rating: 0,
-            status: ApplicantStatus::Active,
-            applied_at: Utc::now(),
-            recruiter_id: None,
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(Applicant {
+                id: Uuid::nil(),
+                job_id: Uuid::nil(),
+                name: String::new(),
+                email: String::new(),
+                phone: None,
+                resume_url: None,
+                source: String::new(),
+                stage_id: Uuid::nil(),
+                score: 0,
+                rating: 0,
+                status: ApplicantStatus::Active,
+                applied_at: Utc::now(),
+                recruiter_id: None,
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -181,22 +184,25 @@ async fn reject_applicant(
         app.status = ApplicantStatus::Rejected;
         (StatusCode::OK, Json(app.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(Applicant {
-            id: Uuid::nil(),
-            job_id: Uuid::nil(),
-            name: String::new(),
-            email: String::new(),
-            phone: None,
-            resume_url: None,
-            source: String::new(),
-            stage_id: Uuid::nil(),
-            score: 0,
-            rating: 0,
-            status: ApplicantStatus::Active,
-            applied_at: Utc::now(),
-            recruiter_id: None,
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(Applicant {
+                id: Uuid::nil(),
+                job_id: Uuid::nil(),
+                name: String::new(),
+                email: String::new(),
+                phone: None,
+                resume_url: None,
+                source: String::new(),
+                stage_id: Uuid::nil(),
+                score: 0,
+                rating: 0,
+                status: ApplicantStatus::Active,
+                applied_at: Utc::now(),
+                recruiter_id: None,
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -209,22 +215,25 @@ async fn hire_applicant(
         app.status = ApplicantStatus::Hired;
         (StatusCode::OK, Json(app.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(Applicant {
-            id: Uuid::nil(),
-            job_id: Uuid::nil(),
-            name: String::new(),
-            email: String::new(),
-            phone: None,
-            resume_url: None,
-            source: String::new(),
-            stage_id: Uuid::nil(),
-            score: 0,
-            rating: 0,
-            status: ApplicantStatus::Active,
-            applied_at: Utc::now(),
-            recruiter_id: None,
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(Applicant {
+                id: Uuid::nil(),
+                job_id: Uuid::nil(),
+                name: String::new(),
+                email: String::new(),
+                phone: None,
+                resume_url: None,
+                source: String::new(),
+                stage_id: Uuid::nil(),
+                score: 0,
+                rating: 0,
+                status: ApplicantStatus::Active,
+                applied_at: Utc::now(),
+                recruiter_id: None,
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -263,16 +272,19 @@ async fn interview_feedback(
         interview.outcome = req.outcome;
         (StatusCode::OK, Json(interview.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(Interview {
-            id: Uuid::nil(),
-            applicant_id: Uuid::nil(),
-            scheduled_at: Utc::now(),
-            interviewer_id: Uuid::nil(),
-            mode: InterviewMode::Phone,
-            feedback: None,
-            outcome: InterviewOutcome::Pending,
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(Interview {
+                id: Uuid::nil(),
+                applicant_id: Uuid::nil(),
+                scheduled_at: Utc::now(),
+                interviewer_id: Uuid::nil(),
+                mode: InterviewMode::Phone,
+                feedback: None,
+                outcome: InterviewOutcome::Pending,
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -300,25 +312,25 @@ async fn list_offers(State(store): State<Arc<ErpStore>>) -> impl IntoResponse {
     Json(offers)
 }
 
-async fn send_offer(
-    State(store): State<Arc<ErpStore>>,
-    Path(id): Path<Uuid>,
-) -> impl IntoResponse {
+async fn send_offer(State(store): State<Arc<ErpStore>>, Path(id): Path<Uuid>) -> impl IntoResponse {
     let mut offers = store.offers.write().await;
     if let Some(offer) = offers.get_mut(&id) {
         offer.state = OfferState::Sent;
         (StatusCode::OK, Json(offer.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(Offer {
-            id: Uuid::nil(),
-            applicant_id: Uuid::nil(),
-            salary: 0.0,
-            currency: String::new(),
-            start_date: Utc::now(),
-            state: OfferState::Draft,
-            expires_at: Utc::now(),
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(Offer {
+                id: Uuid::nil(),
+                applicant_id: Uuid::nil(),
+                salary: 0.0,
+                currency: String::new(),
+                start_date: Utc::now(),
+                state: OfferState::Draft,
+                expires_at: Utc::now(),
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -331,16 +343,19 @@ async fn accept_offer(
         offer.state = OfferState::Accepted;
         (StatusCode::OK, Json(offer.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(Offer {
-            id: Uuid::nil(),
-            applicant_id: Uuid::nil(),
-            salary: 0.0,
-            currency: String::new(),
-            start_date: Utc::now(),
-            state: OfferState::Draft,
-            expires_at: Utc::now(),
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(Offer {
+                id: Uuid::nil(),
+                applicant_id: Uuid::nil(),
+                salary: 0.0,
+                currency: String::new(),
+                start_date: Utc::now(),
+                state: OfferState::Draft,
+                expires_at: Utc::now(),
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -377,7 +392,10 @@ pub fn create_router(state: Arc<ErpStore>) -> Router {
             post(create_offer).get(list_offers),
         )
         .route("/api/erp/recruitment/offers/{id}/send", post(send_offer))
-        .route("/api/erp/recruitment/offers/{id}/accept", post(accept_offer))
+        .route(
+            "/api/erp/recruitment/offers/{id}/accept",
+            post(accept_offer),
+        )
         .with_state(state)
 }
 

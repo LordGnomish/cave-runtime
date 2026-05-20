@@ -94,10 +94,7 @@ pub trait RemoteStorageManager: Send + Sync {
 /// Mirrors `RemoteLogMetadataManager` — owns the *index* of
 /// segments per partition.
 pub trait RemoteLogMetadataManager: Send + Sync {
-    fn add_remote_log_segment(
-        &mut self,
-        metadata: RemoteLogSegmentMetadata,
-    ) -> StreamsResult<()>;
+    fn add_remote_log_segment(&mut self, metadata: RemoteLogSegmentMetadata) -> StreamsResult<()>;
 
     fn update_remote_log_segment_state(
         &mut self,
@@ -105,10 +102,7 @@ pub trait RemoteLogMetadataManager: Send + Sync {
         state: RemoteLogSegmentState,
     ) -> StreamsResult<()>;
 
-    fn list_segments(
-        &self,
-        partition: &TopicIdPartition,
-    ) -> Vec<RemoteLogSegmentMetadata>;
+    fn list_segments(&self, partition: &TopicIdPartition) -> Vec<RemoteLogSegmentMetadata>;
 
     fn remove_remote_log_segment(&mut self, id: &RemoteLogSegmentId) -> StreamsResult<()>;
 }
@@ -179,10 +173,7 @@ impl InMemoryRemoteLogMetadataManager {
 }
 
 impl RemoteLogMetadataManager for InMemoryRemoteLogMetadataManager {
-    fn add_remote_log_segment(
-        &mut self,
-        metadata: RemoteLogSegmentMetadata,
-    ) -> StreamsResult<()> {
+    fn add_remote_log_segment(&mut self, metadata: RemoteLogSegmentMetadata) -> StreamsResult<()> {
         let part = metadata.id.topic_partition.clone();
         let list = self.by_partition.entry(part).or_default();
         // Overlap check: any existing segment whose [start..=end]
@@ -218,10 +209,7 @@ impl RemoteLogMetadataManager for InMemoryRemoteLogMetadataManager {
         Err(StreamsError::Internal(format!("segment {id:?} not found")))
     }
 
-    fn list_segments(
-        &self,
-        partition: &TopicIdPartition,
-    ) -> Vec<RemoteLogSegmentMetadata> {
+    fn list_segments(&self, partition: &TopicIdPartition) -> Vec<RemoteLogSegmentMetadata> {
         self.by_partition
             .get(partition)
             .cloned()
@@ -308,10 +296,7 @@ pub struct RemoteLogManager {
 }
 
 impl RemoteLogManager {
-    pub fn new(
-        rsm: Box<dyn RemoteStorageManager>,
-        rmm: Box<dyn RemoteLogMetadataManager>,
-    ) -> Self {
+    pub fn new(rsm: Box<dyn RemoteStorageManager>, rmm: Box<dyn RemoteLogMetadataManager>) -> Self {
         Self { rsm, rmm }
     }
 
@@ -508,8 +493,10 @@ mod tests {
         let rsm = InMemoryRemoteStorageManager::new();
         let rmm = InMemoryRemoteLogMetadataManager::new();
         let mut mgr = RemoteLogManager::new(Box::new(rsm), Box::new(rmm));
-        mgr.copy_log_segment(meta("o", 0, 0, 100), vec![0; 100]).unwrap();
-        mgr.copy_log_segment(meta("o", 0, 100, 100), vec![0; 100]).unwrap();
+        mgr.copy_log_segment(meta("o", 0, 0, 100), vec![0; 100])
+            .unwrap();
+        mgr.copy_log_segment(meta("o", 0, 100, 100), vec![0; 100])
+            .unwrap();
         let hit = mgr.find_segment_for_offset(&tp("o", 0), 50);
         assert_eq!(hit.unwrap().start_offset, 0);
         let hit2 = mgr.find_segment_for_offset(&tp("o", 0), 150);
@@ -522,8 +509,10 @@ mod tests {
         let rsm = InMemoryRemoteStorageManager::new();
         let rmm = InMemoryRemoteLogMetadataManager::new();
         let mut mgr = RemoteLogManager::new(Box::new(rsm), Box::new(rmm));
-        mgr.copy_log_segment(meta("o", 0, 0, 100), vec![0; 100]).unwrap();
-        mgr.copy_log_segment(meta("o", 0, 100, 100), vec![0; 100]).unwrap();
+        mgr.copy_log_segment(meta("o", 0, 0, 100), vec![0; 100])
+            .unwrap();
+        mgr.copy_log_segment(meta("o", 0, 100, 100), vec![0; 100])
+            .unwrap();
         let removed = mgr.apply_retention(&tp("o", 0), 100);
         assert_eq!(removed.len(), 1);
         let remaining: Vec<_> = mgr.list_segments(&tp("o", 0)).collect();
@@ -558,8 +547,9 @@ mod tests {
             topic_partition: tp("o", 0),
             segment_uuid: 42,
         };
-        assert!(rmm
-            .update_remote_log_segment_state(&id, RemoteLogSegmentState::CopyFinished)
-            .is_err());
+        assert!(
+            rmm.update_remote_log_segment_state(&id, RemoteLogSegmentState::CopyFinished)
+                .is_err()
+        );
     }
 }

@@ -9,7 +9,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, GitopsApp};
+use crate::admin::state::{AdminState, GitopsApp, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -23,11 +23,9 @@ pub fn list_records(
     ctx: &RequestCtx,
 ) -> Result<Vec<GitopsApp>, GitopsConfigViewError> {
     ctx.authorise(Permission::GitopsRead)?;
-    let mut rows: Vec<GitopsApp> = scope(
-        &state.gitops_apps.read().unwrap(),
-        &ctx.tenant,
-        |r| &r.tenant,
-    )
+    let mut rows: Vec<GitopsApp> = scope(&state.gitops_apps.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
     .into_iter()
     .cloned()
     .collect();
@@ -57,7 +55,9 @@ pub fn group_by_repo(rows: &[GitopsApp]) -> Vec<(String, Vec<GitopsApp>)> {
 /// Apps whose `synced_at_unix` is at least `cutoff_unix` seconds ago
 /// look stale; Flux flags those in its dashboard.
 pub fn stale_since<'a>(rows: &'a [GitopsApp], stale_cutoff_unix: i64) -> Vec<&'a GitopsApp> {
-    rows.iter().filter(|r| r.synced_at_unix < stale_cutoff_unix).collect()
+    rows.iter()
+        .filter(|r| r.synced_at_unix < stale_cutoff_unix)
+        .collect()
 }
 
 pub fn detail(
@@ -139,8 +139,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, GitopsConf
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite =
-    Cite::backstage("plugins/gitops/src/components/AppsList.tsx", "AppsList");
+const FILE_CITE: Cite = Cite::backstage("plugins/gitops/src/components/AppsList.tsx", "AppsList");
 
 #[cfg(test)]
 mod tests {
@@ -211,13 +210,17 @@ mod tests {
         let rows = list_records(&s, &ctx(&[Permission::GitopsRead])).unwrap();
         if let Some(first) = rows.first() {
             let name = first.name.clone();
-            assert!(detail(&s, &ctx(&[Permission::GitopsRead]), &name)
-                .unwrap()
-                .is_some());
+            assert!(
+                detail(&s, &ctx(&[Permission::GitopsRead]), &name)
+                    .unwrap()
+                    .is_some()
+            );
         }
-        assert!(detail(&s, &ctx(&[Permission::GitopsRead]), "no-such")
-            .unwrap()
-            .is_none());
+        assert!(
+            detail(&s, &ctx(&[Permission::GitopsRead]), "no-such")
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

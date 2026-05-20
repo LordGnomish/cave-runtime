@@ -14,7 +14,9 @@ pub struct ContainerStore {
 
 impl ContainerStore {
     pub fn new() -> Self {
-        Self { containers: DashMap::new() }
+        Self {
+            containers: DashMap::new(),
+        }
     }
 
     pub fn insert(&self, container: Container) {
@@ -50,7 +52,9 @@ pub struct ImageStore {
 
 impl ImageStore {
     pub fn new() -> Self {
-        Self { images: DashMap::new() }
+        Self {
+            images: DashMap::new(),
+        }
     }
 
     pub fn insert(&self, image: crate::models::OciImage) {
@@ -78,7 +82,9 @@ pub struct SandboxStore {
 
 impl SandboxStore {
     pub fn new() -> Self {
-        Self { sandboxes: DashMap::new() }
+        Self {
+            sandboxes: DashMap::new(),
+        }
     }
 
     pub fn insert(&self, sandbox: crate::models::Sandbox) {
@@ -110,7 +116,9 @@ pub struct SnapshotStore {
 
 impl SnapshotStore {
     pub fn new() -> Self {
-        Self { snapshots: DashMap::new() }
+        Self {
+            snapshots: DashMap::new(),
+        }
     }
 
     pub fn insert(&self, snapshot: crate::models::Snapshot) {
@@ -192,7 +200,7 @@ mod tests {
 
     #[test]
     fn test_sandbox_store_crud() {
-        use crate::models::{Sandbox, SandboxSpec, SandboxState, DnsConfig};
+        use crate::models::{DnsConfig, Sandbox, SandboxSpec, SandboxState};
         let store = SandboxStore::new();
         let id = Uuid::new_v4();
         let sandbox = Sandbox {

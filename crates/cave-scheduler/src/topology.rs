@@ -31,27 +31,39 @@ fn node_eligible(c: &TopologySpreadConstraint, pod: &Pod, node: &Node) -> bool {
         // wires. Only the explicit nodeAffinity.required check is honored.
         if let Some(aff) = &pod.spec.node_affinity {
             if !aff.required.is_empty() {
-                let any = aff.required.iter().any(|t| crate::plugins::node_selector_term_matches(t, node));
-                if !any { return false; }
+                let any = aff
+                    .required
+                    .iter()
+                    .any(|t| crate::plugins::node_selector_term_matches(t, node));
+                if !any {
+                    return false;
+                }
             }
         }
     }
     if c.node_taints_policy == NodeInclusionPolicy::Honor {
         for taint in &node.taints {
-            if !matches!(taint.effect, TaintEffect::NoSchedule | TaintEffect::NoExecute) {
+            if !matches!(
+                taint.effect,
+                TaintEffect::NoSchedule | TaintEffect::NoExecute
+            ) {
                 continue;
             }
             let tolerated = pod.spec.tolerations.iter().any(|t| {
                 let key_ok = match (t.operator.as_str(), t.key.as_deref()) {
                     ("Exists", None) => true,
                     ("Exists", Some(k)) => k == taint.key,
-                    ("Equal", Some(k)) => k == taint.key && t.value.as_deref() == taint.value.as_deref(),
+                    ("Equal", Some(k)) => {
+                        k == taint.key && t.value.as_deref() == taint.value.as_deref()
+                    }
                     _ => false,
                 };
                 let effect_ok = t.effect.is_none() || t.effect.as_ref() == Some(&taint.effect);
                 key_ok && effect_ok
             });
-            if !tolerated { return false; }
+            if !tolerated {
+                return false;
+            }
         }
     }
     true
@@ -87,68 +99,87 @@ fn domain_counts<'a>(
     let sel = effective_selector(constraint, pod);
     let mut counts: HashMap<String, usize> = HashMap::new();
     for n in &snapshot.nodes {
-        if !node_eligible(constraint, pod, n) { continue; }
-        if n.status == NodeStatus::NotReady { continue; }
+        if !node_eligible(constraint, pod, n) {
+            continue;
+        }
+        if n.status == NodeStatus::NotReady {
+            continue;
+        }
         if let Some(v) = n.labels.get(&constraint.topology_key) {
             counts.entry(v.clone()).or_insert(0);
         }
     }
     for n in &snapshot.nodes {
-        if !node_eligible(constraint, pod, n) { continue; }
-        let Some(topo_v) = n.labels.get(&constraint.topology_key) else { continue; };
+        if !node_eligible(constraint, pod, n) {
+            continue;
+        }
+        let Some(topo_v) = n.labels.get(&constraint.topology_key) else {
+            continue;
+        };
         let entry = counts.entry(topo_v.clone()).or_insert(0);
         for p in snapshot.pods_on(&n.name) {
-            if p.namespace != pod.namespace { continue; }
-            let matches = sel.iter().all(|(k, v)| {
-                pod_labels(p).get(k) == Some(v)
-            });
-            if matches { *entry += 1; }
+            if p.namespace != pod.namespace {
+                continue;
+            }
+            let matches = sel.iter().all(|(k, v)| pod_labels(p).get(k) == Some(v));
+            if matches {
+                *entry += 1;
+            }
         }
     }
     counts
 }
 
 /// Effective domain count, padding with empty (0-count) domains up to minDomains.
-fn effective_counts(
-    raw: &HashMap<String, usize>,
-    min_domains: Option<i32>,
-) -> Vec<usize> {
+fn effective_counts(raw: &HashMap<String, usize>, min_domains: Option<i32>) -> Vec<usize> {
     let mut vals: Vec<usize> = raw.values().copied().collect();
     if let Some(min_d) = min_domains {
         let pad = (min_d as usize).saturating_sub(vals.len());
-        for _ in 0..pad { vals.push(0); }
+        for _ in 0..pad {
+            vals.push(0);
+        }
     }
     vals
 }
 
 /// Compute skew that would result from placing the pod on `target_topology_value`.
-fn projected_skew(
-    raw: &HashMap<String, usize>,
-    min_domains: Option<i32>,
-    target: &str,
-) -> i32 {
+fn projected_skew(raw: &HashMap<String, usize>, min_domains: Option<i32>, target: &str) -> i32 {
     let mut projected: HashMap<String, usize> = raw.clone();
     *projected.entry(target.to_string()).or_insert(0) += 1;
     let vals = effective_counts(&projected, min_domains);
-    if vals.is_empty() { return 0; }
+    if vals.is_empty() {
+        return 0;
+    }
     let max = *vals.iter().max().unwrap();
     let min = *vals.iter().min().unwrap();
     (max - min) as i32
 }
 
 impl FilterPlugin for PodTopologySpread {
-    fn name(&self) -> &str { "PodTopologySpread" }
+    fn name(&self) -> &str {
+        "PodTopologySpread"
+    }
     fn filter(&self, pod: &Pod, node: &Node, snap: &ClusterSnapshot) -> Status {
         for c in &pod.spec.topology_spread {
-            if c.when_unsatisfiable != UnsatisfiableAction::DoNotSchedule { continue; }
+            if c.when_unsatisfiable != UnsatisfiableAction::DoNotSchedule {
+                continue;
+            }
             let Some(target) = node.labels.get(&c.topology_key) else {
-                return Status::unschedulable("PodTopologySpread", format!("node lacks topology key {}", c.topology_key));
+                return Status::unschedulable(
+                    "PodTopologySpread",
+                    format!("node lacks topology key {}", c.topology_key),
+                );
             };
             let counts = domain_counts(c, snap, pod);
             let skew = projected_skew(&counts, c.min_domains, target);
             if skew > c.max_skew {
-                return Status::unschedulable("PodTopologySpread",
-                    format!("placing on {}={} yields skew {} > maxSkew {}", c.topology_key, target, skew, c.max_skew));
+                return Status::unschedulable(
+                    "PodTopologySpread",
+                    format!(
+                        "placing on {}={} yields skew {} > maxSkew {}",
+                        c.topology_key, target, skew, c.max_skew
+                    ),
+                );
             }
         }
         Status::success("PodTopologySpread")
@@ -156,20 +187,28 @@ impl FilterPlugin for PodTopologySpread {
 }
 
 impl ScorePlugin for PodTopologySpread {
-    fn name(&self) -> &str { "PodTopologySpread" }
+    fn name(&self) -> &str {
+        "PodTopologySpread"
+    }
     fn score(&self, pod: &Pod, node: &Node, snap: &ClusterSnapshot) -> i64 {
         // For ScheduleAnyway constraints, prefer nodes that minimize skew.
         // Score: MAX_NODE_SCORE - sum of projected skews across constraints (clamped).
         let mut penalty: i32 = 0;
         let mut active = 0;
         for c in &pod.spec.topology_spread {
-            if c.when_unsatisfiable != UnsatisfiableAction::ScheduleAnyway { continue; }
-            let Some(target) = node.labels.get(&c.topology_key) else { continue; };
+            if c.when_unsatisfiable != UnsatisfiableAction::ScheduleAnyway {
+                continue;
+            }
+            let Some(target) = node.labels.get(&c.topology_key) else {
+                continue;
+            };
             let counts = domain_counts(c, snap, pod);
             penalty += projected_skew(&counts, c.min_domains, target);
             active += 1;
         }
-        if active == 0 { return MAX_NODE_SCORE; }
+        if active == 0 {
+            return MAX_NODE_SCORE;
+        }
         let s = (MAX_NODE_SCORE - penalty as i64).max(0);
         s
     }
@@ -184,12 +223,27 @@ mod tests {
 
     fn n(name: &str, zone: &str) -> Node {
         let mut node = Node {
-            name: name.into(), uid: Uuid::new_v4(), status: NodeStatus::Ready,
-            capacity: ResourceCapacity { cpu_millicores: 4000, memory_bytes: 8_000_000_000, pods: 110, ephemeral_storage_bytes: 0 },
-            allocatable: ResourceCapacity { cpu_millicores: 4000, memory_bytes: 8_000_000_000, pods: 110, ephemeral_storage_bytes: 0 },
+            name: name.into(),
+            uid: Uuid::new_v4(),
+            status: NodeStatus::Ready,
+            capacity: ResourceCapacity {
+                cpu_millicores: 4000,
+                memory_bytes: 8_000_000_000,
+                pods: 110,
+                ephemeral_storage_bytes: 0,
+            },
+            allocatable: ResourceCapacity {
+                cpu_millicores: 4000,
+                memory_bytes: 8_000_000_000,
+                pods: 110,
+                ephemeral_storage_bytes: 0,
+            },
             allocated: ResourceCapacity::default(),
-            labels: HashMap::new(), taints: vec![], conditions: vec![],
-            registered_at: Utc::now(), last_heartbeat: Utc::now(),
+            labels: HashMap::new(),
+            taints: vec![],
+            conditions: vec![],
+            registered_at: Utc::now(),
+            last_heartbeat: Utc::now(),
         };
         node.labels.insert("zone".into(), zone.into());
         node
@@ -201,41 +255,77 @@ mod tests {
         p
     }
 
-    fn spread(max_skew: i32, action: UnsatisfiableAction, min_domains: Option<i32>) -> TopologySpreadConstraint {
-        let mut sel = HashMap::new(); sel.insert("app".into(), "web".into());
-        TopologySpreadConstraint { max_skew, topology_key: "zone".into(), when_unsatisfiable: action, label_selector: sel, min_domains, ..Default::default() }
+    fn spread(
+        max_skew: i32,
+        action: UnsatisfiableAction,
+        min_domains: Option<i32>,
+    ) -> TopologySpreadConstraint {
+        let mut sel = HashMap::new();
+        sel.insert("app".into(), "web".into());
+        TopologySpreadConstraint {
+            max_skew,
+            topology_key: "zone".into(),
+            when_unsatisfiable: action,
+            label_selector: sel,
+            min_domains,
+            ..Default::default()
+        }
     }
 
     #[test]
     fn do_not_schedule_blocks_when_skew_exceeded() {
-        let a = n("a", "z1"); let b = n("b", "z2");
-        let mut snap = ClusterSnapshot { nodes: vec![a.clone(), b.clone()], pods_by_node: HashMap::new() };
-        snap.pods_by_node.insert("a".into(), vec![web_pod("t", "p1"), web_pod("t", "p2")]);
+        let a = n("a", "z1");
+        let b = n("b", "z2");
+        let mut snap = ClusterSnapshot {
+            nodes: vec![a.clone(), b.clone()],
+            pods_by_node: HashMap::new(),
+        };
+        snap.pods_by_node
+            .insert("a".into(), vec![web_pod("t", "p1"), web_pod("t", "p2")]);
         // z1 has 2, z2 has 0 → placing on z1 → skew 3-0 = 3 > maxSkew 1.
         let mut p = web_pod("t", "newp");
-        p.spec.topology_spread.push(spread(1, UnsatisfiableAction::DoNotSchedule, None));
-        assert_eq!(PodTopologySpread.filter(&p, &a, &snap).code, Code::Unschedulable);
+        p.spec
+            .topology_spread
+            .push(spread(1, UnsatisfiableAction::DoNotSchedule, None));
+        assert_eq!(
+            PodTopologySpread.filter(&p, &a, &snap).code,
+            Code::Unschedulable
+        );
         // Placing on z2 → skew 2-1 = 1 ≤ 1 → OK.
         assert!(PodTopologySpread.filter(&p, &b, &snap).is_success());
     }
 
     #[test]
     fn schedule_anyway_does_not_filter() {
-        let a = n("a", "z1"); let b = n("b", "z2");
-        let mut snap = ClusterSnapshot { nodes: vec![a.clone(), b.clone()], pods_by_node: HashMap::new() };
-        snap.pods_by_node.insert("a".into(), vec![web_pod("t", "p1"), web_pod("t", "p2")]);
+        let a = n("a", "z1");
+        let b = n("b", "z2");
+        let mut snap = ClusterSnapshot {
+            nodes: vec![a.clone(), b.clone()],
+            pods_by_node: HashMap::new(),
+        };
+        snap.pods_by_node
+            .insert("a".into(), vec![web_pod("t", "p1"), web_pod("t", "p2")]);
         let mut p = web_pod("t", "newp");
-        p.spec.topology_spread.push(spread(1, UnsatisfiableAction::ScheduleAnyway, None));
+        p.spec
+            .topology_spread
+            .push(spread(1, UnsatisfiableAction::ScheduleAnyway, None));
         assert!(PodTopologySpread.filter(&p, &a, &snap).is_success());
     }
 
     #[test]
     fn schedule_anyway_score_prefers_low_skew_node() {
-        let a = n("a", "z1"); let b = n("b", "z2");
-        let mut snap = ClusterSnapshot { nodes: vec![a.clone(), b.clone()], pods_by_node: HashMap::new() };
-        snap.pods_by_node.insert("a".into(), vec![web_pod("t", "p1"), web_pod("t", "p2")]);
+        let a = n("a", "z1");
+        let b = n("b", "z2");
+        let mut snap = ClusterSnapshot {
+            nodes: vec![a.clone(), b.clone()],
+            pods_by_node: HashMap::new(),
+        };
+        snap.pods_by_node
+            .insert("a".into(), vec![web_pod("t", "p1"), web_pod("t", "p2")]);
         let mut p = web_pod("t", "newp");
-        p.spec.topology_spread.push(spread(1, UnsatisfiableAction::ScheduleAnyway, None));
+        p.spec
+            .topology_spread
+            .push(spread(1, UnsatisfiableAction::ScheduleAnyway, None));
         let sa = PodTopologySpread.score(&p, &a, &snap);
         let sb = PodTopologySpread.score(&p, &b, &snap);
         assert!(sb > sa, "z2 (rebalances) should outscore z1");
@@ -246,47 +336,77 @@ mod tests {
         // Only one domain known → minDomains=3 forces two synthetic empty domains,
         // making skew calc count placement against 3 domains, not 1.
         let a = n("a", "z1");
-        let mut snap = ClusterSnapshot { nodes: vec![a.clone()], pods_by_node: HashMap::new() };
-        snap.pods_by_node.insert("a".into(), vec![web_pod("t", "p1")]);
+        let mut snap = ClusterSnapshot {
+            nodes: vec![a.clone()],
+            pods_by_node: HashMap::new(),
+        };
+        snap.pods_by_node
+            .insert("a".into(), vec![web_pod("t", "p1")]);
         let mut p = web_pod("t", "newp");
-        p.spec.topology_spread.push(spread(1, UnsatisfiableAction::DoNotSchedule, Some(3)));
+        p.spec
+            .topology_spread
+            .push(spread(1, UnsatisfiableAction::DoNotSchedule, Some(3)));
         // Placing on z1 → counts {z1:2, _:0, _:0} → skew 2 > 1 → reject.
-        assert_eq!(PodTopologySpread.filter(&p, &a, &snap).code, Code::Unschedulable);
+        assert_eq!(
+            PodTopologySpread.filter(&p, &a, &snap).code,
+            Code::Unschedulable
+        );
     }
 
     #[test]
     fn missing_topology_key_on_node_rejected() {
-        let mut a = n("a", "z1"); a.labels.remove("zone");
-        let snap = ClusterSnapshot { nodes: vec![a.clone()], pods_by_node: HashMap::new() };
+        let mut a = n("a", "z1");
+        a.labels.remove("zone");
+        let snap = ClusterSnapshot {
+            nodes: vec![a.clone()],
+            pods_by_node: HashMap::new(),
+        };
         let mut p = web_pod("t", "newp");
-        p.spec.topology_spread.push(spread(1, UnsatisfiableAction::DoNotSchedule, None));
-        assert_eq!(PodTopologySpread.filter(&p, &a, &snap).code, Code::Unschedulable);
+        p.spec
+            .topology_spread
+            .push(spread(1, UnsatisfiableAction::DoNotSchedule, None));
+        assert_eq!(
+            PodTopologySpread.filter(&p, &a, &snap).code,
+            Code::Unschedulable
+        );
     }
 
     // ── matchLabelKeys (KEP-3243) ────────────────────────────────────────
 
     #[test]
     fn match_label_keys_lifts_pod_label_into_selector() {
-        let a = n("a", "z1"); let b = n("b", "z2");
-        let mut snap = ClusterSnapshot { nodes: vec![a.clone(), b.clone()], pods_by_node: HashMap::new() };
+        let a = n("a", "z1");
+        let b = n("b", "z2");
+        let mut snap = ClusterSnapshot {
+            nodes: vec![a.clone(), b.clone()],
+            pods_by_node: HashMap::new(),
+        };
         // Existing pods on z1: one with rev=1, one with rev=2. Selector
         // base: app=web. With matchLabelKeys=[rev], scheduling pod's rev=1
         // value lifts into selector → only the rev=1 pod counts.
-        let mut p1 = web_pod("t", "p1"); p1.spec.node_selector.insert("rev".into(), "1".into());
-        let mut p2 = web_pod("t", "p2"); p2.spec.node_selector.insert("rev".into(), "2".into());
-        let mut p3 = web_pod("t", "p3"); p3.spec.node_selector.insert("rev".into(), "1".into());
+        let mut p1 = web_pod("t", "p1");
+        p1.spec.node_selector.insert("rev".into(), "1".into());
+        let mut p2 = web_pod("t", "p2");
+        p2.spec.node_selector.insert("rev".into(), "2".into());
+        let mut p3 = web_pod("t", "p3");
+        p3.spec.node_selector.insert("rev".into(), "1".into());
         snap.pods_by_node.insert("a".into(), vec![p1, p2]);
         snap.pods_by_node.insert("b".into(), vec![p3]);
 
         let mut sched_pod = web_pod("t", "newp");
-        sched_pod.spec.node_selector.insert("rev".into(), "1".into());
+        sched_pod
+            .spec
+            .node_selector
+            .insert("rev".into(), "1".into());
         let mut c = spread(0, UnsatisfiableAction::DoNotSchedule, None);
         c.match_label_keys.push("rev".into());
         sched_pod.spec.topology_spread.push(c);
         // Effective counts (rev=1): z1=1, z2=1 → balanced. Place either side
         // → projected skew (2,1) - 1 = 1 > maxSkew 0 on whichever side.
         // We assert reject on a (after place: z1=2, z2=1, skew 1 > 0).
-        assert!(PodTopologySpread.filter(&sched_pod, &a, &snap).is_rejected());
+        assert!(PodTopologySpread
+            .filter(&sched_pod, &a, &snap)
+            .is_rejected());
     }
 
     #[test]
@@ -294,7 +414,10 @@ mod tests {
         // If scheduling pod doesn't carry the lifted label, it just doesn't
         // narrow the selector — behaviour reduces to the literal selector.
         let a = n("a", "z1");
-        let snap = ClusterSnapshot { nodes: vec![a.clone()], pods_by_node: HashMap::new() };
+        let snap = ClusterSnapshot {
+            nodes: vec![a.clone()],
+            pods_by_node: HashMap::new(),
+        };
         let mut sched_pod = web_pod("t", "newp");
         let mut c = spread(0, UnsatisfiableAction::DoNotSchedule, None);
         c.match_label_keys.push("missing-key".into());
@@ -307,10 +430,15 @@ mod tests {
 
     #[test]
     fn node_affinity_policy_honor_excludes_non_matching_nodes() {
-        let mut a = n("a", "z1"); a.labels.insert("gpu".into(), "true".into());
+        let mut a = n("a", "z1");
+        a.labels.insert("gpu".into(), "true".into());
         let b = n("b", "z2"); // no gpu label
-        let mut snap = ClusterSnapshot { nodes: vec![a.clone(), b.clone()], pods_by_node: HashMap::new() };
-        snap.pods_by_node.insert("a".into(), vec![web_pod("t", "p1")]);
+        let mut snap = ClusterSnapshot {
+            nodes: vec![a.clone(), b.clone()],
+            pods_by_node: HashMap::new(),
+        };
+        snap.pods_by_node
+            .insert("a".into(), vec![web_pod("t", "p1")]);
 
         // Pod requires nodeAffinity gpu=true. Under Honor (default), only z1
         // participates in the skew calc; minDomains=2 forces one synthetic
@@ -319,7 +447,9 @@ mod tests {
         p.spec.node_affinity = Some(NodeAffinitySpec {
             required: vec![NodeSelectorTerm {
                 match_expressions: vec![NodeSelectorRequirement {
-                    key: "gpu".into(), operator: NodeSelectorOp::In, values: vec!["true".into()],
+                    key: "gpu".into(),
+                    operator: NodeSelectorOp::In,
+                    values: vec!["true".into()],
                 }],
             }],
             ..Default::default()
@@ -333,16 +463,23 @@ mod tests {
 
     #[test]
     fn node_affinity_policy_ignore_includes_all_nodes() {
-        let mut a = n("a", "z1"); a.labels.insert("gpu".into(), "true".into());
+        let mut a = n("a", "z1");
+        a.labels.insert("gpu".into(), "true".into());
         let b = n("b", "z2"); // no gpu label
-        let mut snap = ClusterSnapshot { nodes: vec![a.clone(), b.clone()], pods_by_node: HashMap::new() };
-        snap.pods_by_node.insert("a".into(), vec![web_pod("t", "p1")]);
+        let mut snap = ClusterSnapshot {
+            nodes: vec![a.clone(), b.clone()],
+            pods_by_node: HashMap::new(),
+        };
+        snap.pods_by_node
+            .insert("a".into(), vec![web_pod("t", "p1")]);
 
         let mut p = web_pod("t", "newp");
         p.spec.node_affinity = Some(NodeAffinitySpec {
             required: vec![NodeSelectorTerm {
                 match_expressions: vec![NodeSelectorRequirement {
-                    key: "gpu".into(), operator: NodeSelectorOp::In, values: vec!["true".into()],
+                    key: "gpu".into(),
+                    operator: NodeSelectorOp::In,
+                    values: vec!["true".into()],
                 }],
             }],
             ..Default::default()
@@ -363,11 +500,16 @@ mod tests {
         let a = n("a", "z1");
         let mut b = n("b", "z2");
         b.taints.push(crate::models::Taint {
-            key: "dedicated".into(), value: Some("gpu".into()),
+            key: "dedicated".into(),
+            value: Some("gpu".into()),
             effect: crate::models::TaintEffect::NoSchedule,
         });
-        let mut snap = ClusterSnapshot { nodes: vec![a.clone(), b.clone()], pods_by_node: HashMap::new() };
-        snap.pods_by_node.insert("a".into(), vec![web_pod("t", "p1")]);
+        let mut snap = ClusterSnapshot {
+            nodes: vec![a.clone(), b.clone()],
+            pods_by_node: HashMap::new(),
+        };
+        snap.pods_by_node
+            .insert("a".into(), vec![web_pod("t", "p1")]);
 
         // Pod doesn't tolerate dedicated taint. Honor → b excluded from skew.
         // minDomains=2 forces a synthetic empty so the skew calc sees imbalance.
@@ -384,11 +526,16 @@ mod tests {
         let a = n("a", "z1");
         let mut b = n("b", "z2");
         b.taints.push(crate::models::Taint {
-            key: "x".into(), value: None,
+            key: "x".into(),
+            value: None,
             effect: crate::models::TaintEffect::NoSchedule,
         });
-        let mut snap = ClusterSnapshot { nodes: vec![a.clone(), b.clone()], pods_by_node: HashMap::new() };
-        snap.pods_by_node.insert("a".into(), vec![web_pod("t", "p1")]);
+        let mut snap = ClusterSnapshot {
+            nodes: vec![a.clone(), b.clone()],
+            pods_by_node: HashMap::new(),
+        };
+        snap.pods_by_node
+            .insert("a".into(), vec![web_pod("t", "p1")]);
 
         let mut p = web_pod("t", "newp");
         // Default node_taints_policy=Ignore — both zones counted.

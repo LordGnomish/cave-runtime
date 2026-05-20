@@ -50,7 +50,7 @@ fn cidr_parser_accepts_canonical_forms_rejects_garbage() {
         Err(KubeProxyError::InvalidCidr(_, _))
     ));
     assert!(matches!(
-        Cidr::parse("10.0.0.0"),  // missing /
+        Cidr::parse("10.0.0.0"), // missing /
         Err(KubeProxyError::InvalidCidr(_, _))
     ));
     assert!(matches!(
@@ -88,10 +88,16 @@ fn kube_fw_chain_emits_per_range_accepts_then_terminating_drop() {
     assert!(rules[0].contains("-s 10.0.0.0/8"));
     assert!(rules[0].contains("-j KUBE-SVC-"));
     assert!(rules[1].contains("-s 192.168.1.0/24"));
-    assert!(rules[2].contains("-j KUBE-MARK-DROP"),
-        "trailing drop is mandatory — otherwise traffic falls through to ACCEPT");
+    assert!(
+        rules[2].contains("-j KUBE-MARK-DROP"),
+        "trailing drop is mandatory — otherwise traffic falls through to ACCEPT"
+    );
 
     // No source ranges → no firewall chain
     let open = svc_with_ranges(&[]);
-    assert!(p.build_loadbalancer_firewall_rules(&open).unwrap().is_empty());
+    assert!(
+        p.build_loadbalancer_firewall_rules(&open)
+            .unwrap()
+            .is_empty()
+    );
 }

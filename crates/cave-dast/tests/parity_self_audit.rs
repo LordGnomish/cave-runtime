@@ -34,8 +34,7 @@ fn extract_after(text: &str, needle: &str) -> Option<String> {
 #[test]
 fn upstream_version_is_pinned_v2_14_0() {
     let m = manifest_text();
-    let v = extract_after(&m, "\nversion ")
-        .or_else(|| extract_after(&m, "\nversion="));
+    let v = extract_after(&m, "\nversion ").or_else(|| extract_after(&m, "\nversion="));
     assert_eq!(
         v.as_deref(),
         Some("v2.14.0"),
@@ -47,8 +46,7 @@ fn upstream_version_is_pinned_v2_14_0() {
 #[test]
 fn upstream_source_sha_is_present_and_matches_version() {
     let m = manifest_text();
-    let sha = extract_after(&m, "\nsource_sha ")
-        .or_else(|| extract_after(&m, "\nsource_sha="));
+    let sha = extract_after(&m, "\nsource_sha ").or_else(|| extract_after(&m, "\nsource_sha="));
     assert!(
         sha.is_some() && !sha.as_deref().unwrap().is_empty(),
         "manifest [upstream] source_sha must be set for reproducibility \
@@ -66,8 +64,7 @@ fn upstream_source_sha_is_present_and_matches_version() {
 #[test]
 fn parity_fill_ratio_is_measured_and_at_least_floor() {
     let m = manifest_text();
-    let raw = extract_after(&m, "\nfill_ratio ")
-        .or_else(|| extract_after(&m, "\nfill_ratio="));
+    let raw = extract_after(&m, "\nfill_ratio ").or_else(|| extract_after(&m, "\nfill_ratio="));
     let ratio: f64 = raw
         .as_deref()
         .expect("[parity] fill_ratio must be present")
@@ -81,7 +78,11 @@ fn parity_fill_ratio_is_measured_and_at_least_floor() {
         "cave-dast measured floor: fill_ratio must be >= 0.65 (got {})",
         ratio
     );
-    assert!(ratio <= 1.0, "fill_ratio must be a fraction (got {})", ratio);
+    assert!(
+        ratio <= 1.0,
+        "fill_ratio must be a fraction (got {})",
+        ratio
+    );
 }
 
 #[test]
@@ -101,8 +102,7 @@ fn parity_ratio_source_is_manifest() {
 #[test]
 fn parity_last_audit_is_2026_05_18() {
     let m = manifest_text();
-    let when = extract_after(&m, "\nlast_audit ")
-        .or_else(|| extract_after(&m, "\nlast_audit="));
+    let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert_eq!(
         when.as_deref(),
         Some("2026-05-18"),
@@ -113,8 +113,7 @@ fn parity_last_audit_is_2026_05_18() {
 #[test]
 fn parity_infra_only_is_false() {
     let m = manifest_text();
-    let v = extract_after(&m, "\ninfra_only ")
-        .or_else(|| extract_after(&m, "\ninfra_only="));
+    let v = extract_after(&m, "\ninfra_only ").or_else(|| extract_after(&m, "\ninfra_only="));
     assert_eq!(
         v.as_deref(),
         Some("false"),

@@ -105,7 +105,13 @@ mod tests {
     #[test]
     fn render_includes_all_five_tabs() {
         let html = render(&AdminState::seeded(), &ctx(&[Permission::NetRead])).unwrap();
-        for anchor in ["#net-flows", "#net-policies", "#net-services", "#net-nodes", "#net-identities"] {
+        for anchor in [
+            "#net-flows",
+            "#net-policies",
+            "#net-services",
+            "#net-nodes",
+            "#net-identities",
+        ] {
             assert!(html.contains(anchor));
         }
         assert!(html.contains("docs.cilium.io"));

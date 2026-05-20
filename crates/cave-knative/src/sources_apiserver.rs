@@ -12,9 +12,9 @@
 //! match, the optional resource-owner constraint, and the event mode
 //! (`Reference` vs `Resource`).
 
-use std::collections::HashMap;
 use crate::meta::ObjectMeta;
 use crate::sources_ping::CloudEvent;
+use std::collections::HashMap;
 
 #[derive(Default, Debug, Clone)]
 pub struct ApiServerSource {
@@ -32,7 +32,9 @@ pub enum EventMode {
 }
 
 impl Default for EventMode {
-    fn default() -> Self { EventMode::Reference }
+    fn default() -> Self {
+        EventMode::Reference
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -99,7 +101,9 @@ impl ApiServerSource {
     }
 
     pub fn with_resource(mut self, api_version: &str, kind: &str) -> Self {
-        self.spec.resources.push((api_version.to_string(), kind.to_string()));
+        self.spec
+            .resources
+            .push((api_version.to_string(), kind.to_string()));
         self
     }
 
@@ -207,7 +211,9 @@ mod tests {
     #[test]
     fn matches_label_selector_all_required() {
         let mut src = ApiServerSource::new("t").with_resource("v1", "Pod");
-        src.spec.label_selector.insert("app".to_string(), "demo".to_string());
+        src.spec
+            .label_selector
+            .insert("app".to_string(), "demo".to_string());
         let mut r = raw("Pod", "p1");
         r.labels.insert("app".to_string(), "demo".to_string());
         assert!(src.matches(&r));
@@ -261,7 +267,13 @@ mod tests {
     fn emit_extension_attributes_carry_uid_and_namespace() {
         let src = ApiServerSource::new("t").with_resource("v1", "Pod");
         let ev = src.emit(&raw("Pod", "p1"), "id-1").unwrap();
-        assert_eq!(ev.extensions.get("knsourceuid").map(|s| s.as_str()), Some("uid-1"));
-        assert_eq!(ev.extensions.get("knnamespace").map(|s| s.as_str()), Some("default"));
+        assert_eq!(
+            ev.extensions.get("knsourceuid").map(|s| s.as_str()),
+            Some("uid-1")
+        );
+        assert_eq!(
+            ev.extensions.get("knnamespace").map(|s| s.as_str()),
+            Some("default")
+        );
     }
 }

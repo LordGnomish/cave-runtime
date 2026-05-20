@@ -33,7 +33,11 @@ pub enum StreamsError {
     RebalanceInProgress(String),
 
     #[error("Invalid generation for group {group}: expected={expected}, got={got}")]
-    IllegalGeneration { group: String, expected: i32, got: i32 },
+    IllegalGeneration {
+        group: String,
+        expected: i32,
+        got: i32,
+    },
 
     #[error("Unknown protocol type: {0}")]
     InconsistentGroupProtocol(String),

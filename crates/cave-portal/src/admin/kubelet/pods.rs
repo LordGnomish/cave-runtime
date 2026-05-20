@@ -7,16 +7,21 @@
 use super::KubeletViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, table};
-use crate::admin::state::{scope, AdminState, KubeletPod};
+use crate::admin::state::{AdminState, KubeletPod, scope};
 
-pub fn list_pods(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<KubeletPod>, KubeletViewError> {
+pub fn list_pods(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<KubeletPod>, KubeletViewError> {
     ctx.authorise(Permission::KubeletRead)?;
-    Ok(scope(&state.kubelet_pods.read().unwrap(), &ctx.tenant, |r| {
-        &r.tenant
-    })
-    .into_iter()
-    .cloned()
-    .collect())
+    Ok(
+        scope(&state.kubelet_pods.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect(),
+    )
 }
 
 pub fn pods_on_node(
@@ -84,10 +89,7 @@ pub fn pods_with_status<'a>(pods: &'a [KubeletPod], status: &str) -> Vec<&'a Kub
     pods.iter().filter(|p| p.status == status).collect()
 }
 
-pub fn render_section(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, KubeletViewError> {
+pub fn render_section(state: &AdminState, ctx: &RequestCtx) -> Result<String, KubeletViewError> {
     let pods = list_pods(state, ctx)?;
     let summary = pod_summary(&pods);
     let rows: Vec<Vec<String>> = pods
@@ -125,10 +127,7 @@ pub fn render_section(
         failed = summary.failed,
         hot = summary.restart_hot,
         thresh = RESTART_HOT_THRESHOLD,
-        tbl = table(
-            &["node", "pod", "status", "restarts", ""],
-            &rows
-        ),
+        tbl = table(&["node", "pod", "status", "restarts", ""], &rows),
     ))
 }
 

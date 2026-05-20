@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
 //! HTTP routes for cave-runbook.
-use crate::models::*;
 use crate::RunbookState;
+use crate::models::*;
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, post},
-    Json, Router,
 };
 use chrono::Utc;
 use serde::Deserialize;
@@ -73,12 +73,13 @@ pub struct ApprovalQuery {
 pub fn create_router(state: Arc<RunbookState>) -> Router {
     Router::new()
         // Runbooks
-        .route("/api/runbook/runbooks", get(list_runbooks).post(create_runbook))
+        .route(
+            "/api/runbook/runbooks",
+            get(list_runbooks).post(create_runbook),
+        )
         .route(
             "/api/runbook/runbooks/{id}",
-            get(get_runbook)
-                .put(update_runbook)
-                .delete(delete_runbook),
+            get(get_runbook).put(update_runbook).delete(delete_runbook),
         )
         .route("/api/runbook/runbooks/{id}/steps", get(list_steps))
         // Executions
@@ -228,7 +229,10 @@ async fn list_steps(
 ) -> impl IntoResponse {
     let store = state.store.read().await;
     match store.runbooks.get(&id) {
-        Some(r) => (StatusCode::OK, Json(serde_json::to_value(&r.steps).unwrap())),
+        Some(r) => (
+            StatusCode::OK,
+            Json(serde_json::to_value(&r.steps).unwrap()),
+        ),
         None => (
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({ "error": "runbook not found" })),
@@ -274,12 +278,8 @@ async fn execute_runbook(
     let triggered_by = req.triggered_by.unwrap_or_else(|| "api".to_string());
     let parameters = req.parameters.unwrap_or_default();
 
-    let mut execution = crate::engine::create_execution(
-        &runbook,
-        &triggered_by,
-        TriggerType::Manual,
-        parameters,
-    );
+    let mut execution =
+        crate::engine::create_execution(&runbook, &triggered_by, TriggerType::Manual, parameters);
 
     crate::engine::run_execution(&runbook, &mut execution);
 
@@ -292,7 +292,10 @@ async fn execute_runbook(
     }
     store.executions.insert(execution.id, execution.clone());
 
-    (StatusCode::CREATED, Json(serde_json::to_value(&execution).unwrap()))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(&execution).unwrap()),
+    )
 }
 
 fn build_approval_requests(execution: &Execution, runbook: &Runbook) -> Vec<ApprovalRequest> {
@@ -537,8 +540,10 @@ fn resume_execution_after_approval(execution: &mut Execution) {
             sr.status = StepStatus::Completed;
             sr.started_at = Some(Utc::now());
             sr.completed_at = Some(Utc::now());
-            sr.logs
-                .push(format!("[{}] Step completed after approval", Utc::now().to_rfc3339()));
+            sr.logs.push(format!(
+                "[{}] Step completed after approval",
+                Utc::now().to_rfc3339()
+            ));
         }
     }
     execution.status = ExecutionStatus::Completed;
@@ -579,7 +584,10 @@ async fn create_trigger(
 
     let mut store = state.store.write().await;
     store.triggers.insert(trigger.id, trigger.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(&trigger).unwrap()))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(&trigger).unwrap()),
+    )
 }
 
 async fn list_triggers(State(state): State<Arc<RunbookState>>) -> impl IntoResponse {
@@ -622,7 +630,8 @@ mod tests {
     #[test]
     fn test_build_approval_requests_empty_when_no_approval_steps() {
         let rb = crate::library::pod_restart_template();
-        let exec = crate::engine::create_execution(&rb, "test", TriggerType::Manual, HashMap::new());
+        let exec =
+            crate::engine::create_execution(&rb, "test", TriggerType::Manual, HashMap::new());
         let reqs = build_approval_requests(&exec, &rb);
         // pod restart has no approval steps
         assert!(reqs.is_empty());

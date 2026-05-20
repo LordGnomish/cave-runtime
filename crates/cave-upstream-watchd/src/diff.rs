@@ -11,8 +11,8 @@
 //! diff as `Severity::Unknown` so the dispatcher doesn't auto-port
 //! against a comparison it can't grade.
 
-use serde::{Deserialize, Serialize};
 use semver::Version;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

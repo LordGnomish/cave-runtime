@@ -36,7 +36,9 @@ impl GatewayPlugin for RequestTerminationPlugin {
         let status = config["status_code"].as_u64().unwrap_or(503) as u16;
         let status = StatusCode::from_u16(status).unwrap_or(StatusCode::SERVICE_UNAVAILABLE);
 
-        let content_type = config["content_type"].as_str().unwrap_or("application/json");
+        let content_type = config["content_type"]
+            .as_str()
+            .unwrap_or("application/json");
 
         let body = if let Some(b) = config["body"].as_str() {
             b.to_string()

@@ -6,9 +6,9 @@
 //! own the actual chart resolution; this shim translates the helm
 //! verb shape into routed requests.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Subcommand;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::native::{HttpVerb, PreparedRequest};
 
@@ -443,7 +443,10 @@ mod tests {
             deployed: false,
             failed: false,
         };
-        assert_eq!(prepare(&c).unwrap().path, "/api/compat/helm/v3/all/releases");
+        assert_eq!(
+            prepare(&c).unwrap().path,
+            "/api/compat/helm/v3/all/releases"
+        );
     }
 
     #[test]

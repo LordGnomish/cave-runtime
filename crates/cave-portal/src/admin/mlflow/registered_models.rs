@@ -5,9 +5,12 @@
 use super::types::{MlflowViewError, ModelVersion};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
+use crate::admin::state::{AdminState, scope};
 
-pub fn list_all(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<ModelVersion>, MlflowViewError> {
+pub fn list_all(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<ModelVersion>, MlflowViewError> {
     ctx.authorise(Permission::MlflowRead)?;
     let mut rows: Vec<ModelVersion> = scope(
         &state.mlflow_model_versions.read().unwrap(),
@@ -82,7 +85,14 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, MlflowView
         r#"<section><div class="mb-3">{chips}</div>{tbl}</section>"#,
         chips = chips,
         tbl = table(
-            &["model", "version", "stage", "source_run", "status", "created"],
+            &[
+                "model",
+                "version",
+                "stage",
+                "source_run",
+                "status",
+                "created"
+            ],
             &rows_html,
         ),
     );
@@ -168,7 +178,11 @@ mod tests {
         let s = seeded();
         let rows = list_all(&s, &ctx(&[Permission::MlflowRead])).unwrap();
         let h = stage_histogram(&rows);
-        let prod = h.iter().find(|(s, _)| s == "Production").map(|(_, n)| *n).unwrap();
+        let prod = h
+            .iter()
+            .find(|(s, _)| s == "Production")
+            .map(|(_, n)| *n)
+            .unwrap();
         assert_eq!(prod, 2);
     }
 

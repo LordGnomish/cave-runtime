@@ -7,7 +7,7 @@
 //! the scripts in-house (rather than pulling `clap_complete`) so the
 //! verb list stays a pure data structure that's trivially testable.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shell {
@@ -42,8 +42,23 @@ impl Shell {
 /// shells that paginate (zsh) benefit, and tests can do an exact-list
 /// snapshot.
 pub const TOP_VERBS: &[&str] = &[
-    "argocd", "chaos", "completion", "deploy", "describe", "events", "flag", "get", "harbor",
-    "helm", "kubectl", "logs", "secrets", "tenant", "topology", "tui", "vault",
+    "argocd",
+    "chaos",
+    "completion",
+    "deploy",
+    "describe",
+    "events",
+    "flag",
+    "get",
+    "harbor",
+    "helm",
+    "kubectl",
+    "logs",
+    "secrets",
+    "tenant",
+    "topology",
+    "tui",
+    "vault",
 ];
 
 /// Generate the completion script for `shell` and the binary `name`.
@@ -199,10 +214,7 @@ mod tests {
     fn fish_uses_complete_per_verb() {
         let s = generate(Shell::Fish, "cavectl").unwrap();
         for v in TOP_VERBS {
-            let line = format!(
-                "complete -c cavectl -n '__fish_use_subcommand' -a '{}'",
-                v
-            );
+            let line = format!("complete -c cavectl -n '__fish_use_subcommand' -a '{}'", v);
             assert!(s.contains(&line), "fish line missing for {}", v);
         }
     }

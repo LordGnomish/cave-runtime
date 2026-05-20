@@ -74,7 +74,7 @@ mod tests {
         provisioning::{parse_datasource_provisioning, provision_from_json, provision_from_yaml},
         renderer::render_dashboard,
         store::DashboardStore,
-        variables::{compute_interval, interpolate, InterpolationContext},
+        variables::{InterpolationContext, compute_interval, interpolate},
     };
     use std::collections::HashMap;
 
@@ -84,7 +84,9 @@ mod tests {
     fn test_dashboard_create_and_retrieve() {
         let store = DashboardStore::new();
         let db = Dashboard::new(0, 1, "My Dashboard");
-        let saved = store.upsert_dashboard(1, db.clone(), None, "initial", "admin", false).unwrap();
+        let saved = store
+            .upsert_dashboard(1, db.clone(), None, "initial", "admin", false)
+            .unwrap();
         assert_eq!(saved.title, "My Dashboard");
         assert!(saved.id.is_some());
         assert_eq!(saved.version, 1);
@@ -97,10 +99,14 @@ mod tests {
     fn test_dashboard_update_increments_version() {
         let store = DashboardStore::new();
         let db = Dashboard::new(0, 1, "Versioned");
-        let saved = store.upsert_dashboard(1, db, None, "v1", "admin", false).unwrap();
+        let saved = store
+            .upsert_dashboard(1, db, None, "v1", "admin", false)
+            .unwrap();
         let mut updated = saved.clone();
         updated.title = "Versioned v2".into();
-        let v2 = store.upsert_dashboard(1, updated, None, "v2", "admin", true).unwrap();
+        let v2 = store
+            .upsert_dashboard(1, updated, None, "v2", "admin", true)
+            .unwrap();
         assert_eq!(v2.version, 2);
         assert_eq!(v2.title, "Versioned v2");
     }
@@ -109,7 +115,9 @@ mod tests {
     fn test_dashboard_version_conflict() {
         let store = DashboardStore::new();
         let db = Dashboard::new(0, 1, "Conflict Test");
-        let saved = store.upsert_dashboard(1, db, None, "init", "admin", false).unwrap();
+        let saved = store
+            .upsert_dashboard(1, db, None, "init", "admin", false)
+            .unwrap();
 
         // Simulate stale edit (wrong version)
         let mut stale = saved.clone();
@@ -123,7 +131,9 @@ mod tests {
     fn test_dashboard_delete() {
         let store = DashboardStore::new();
         let db = Dashboard::new(0, 1, "To Delete");
-        let saved = store.upsert_dashboard(1, db, None, "", "admin", false).unwrap();
+        let saved = store
+            .upsert_dashboard(1, db, None, "", "admin", false)
+            .unwrap();
         store.delete_dashboard(&saved.uid).unwrap();
         assert!(store.get_dashboard_by_uid(&saved.uid).is_err());
     }
@@ -133,7 +143,9 @@ mod tests {
         let store = DashboardStore::new();
         for title in &["DB1", "DB2", "DB3"] {
             let db = Dashboard::new(0, 1, title);
-            store.upsert_dashboard(1, db, None, "", "admin", false).unwrap();
+            store
+                .upsert_dashboard(1, db, None, "", "admin", false)
+                .unwrap();
         }
         let all = store.list_dashboards(1).unwrap();
         assert_eq!(all.len(), 3);
@@ -144,10 +156,17 @@ mod tests {
         let store = DashboardStore::new();
         let db1 = Dashboard::new(0, 1, "Kubernetes Nodes");
         let db2 = Dashboard::new(0, 1, "Redis Metrics");
-        store.upsert_dashboard(1, db1, None, "", "admin", false).unwrap();
-        store.upsert_dashboard(1, db2, None, "", "admin", false).unwrap();
+        store
+            .upsert_dashboard(1, db1, None, "", "admin", false)
+            .unwrap();
+        store
+            .upsert_dashboard(1, db2, None, "", "admin", false)
+            .unwrap();
 
-        let q = SearchQuery { query: Some("kubernetes".into()), ..Default::default() };
+        let q = SearchQuery {
+            query: Some("kubernetes".into()),
+            ..Default::default()
+        };
         let results = store.search_dashboards(&q).unwrap();
         assert_eq!(results.iter().filter(|r| r.r#type == "dash-db").count(), 1);
         assert!(results.iter().any(|r| r.title == "Kubernetes Nodes"));
@@ -158,9 +177,14 @@ mod tests {
         let store = DashboardStore::new();
         let mut db = Dashboard::new(0, 1, "Tagged Dashboard");
         db.tags = vec!["production".into(), "k8s".into()];
-        store.upsert_dashboard(1, db, None, "", "admin", false).unwrap();
+        store
+            .upsert_dashboard(1, db, None, "", "admin", false)
+            .unwrap();
 
-        let q = SearchQuery { tag: vec!["production".into()], ..Default::default() };
+        let q = SearchQuery {
+            tag: vec!["production".into()],
+            ..Default::default()
+        };
         let results = store.search_dashboards(&q).unwrap();
         assert!(results.iter().any(|r| r.title == "Tagged Dashboard"));
     }
@@ -169,7 +193,9 @@ mod tests {
     fn test_dashboard_versioning_history() {
         let store = DashboardStore::new();
         let db = Dashboard::new(0, 1, "Versioned");
-        let saved = store.upsert_dashboard(1, db, None, "v1", "admin", false).unwrap();
+        let saved = store
+            .upsert_dashboard(1, db, None, "v1", "admin", false)
+            .unwrap();
 
         let id = saved.id.unwrap();
         let versions = store.get_dashboard_versions(id).unwrap();
@@ -182,7 +208,9 @@ mod tests {
     fn test_star_dashboard() {
         let store = DashboardStore::new();
         let db = Dashboard::new(0, 1, "Starrable");
-        let saved = store.upsert_dashboard(1, db, None, "", "admin", false).unwrap();
+        let saved = store
+            .upsert_dashboard(1, db, None, "", "admin", false)
+            .unwrap();
         store.star_dashboard(1, &saved.uid, true).unwrap();
 
         let d = store.get_dashboard_by_uid(&saved.uid).unwrap();
@@ -198,7 +226,9 @@ mod tests {
     #[test]
     fn test_folder_crud() {
         let store = DashboardStore::new();
-        let folder = store.create_folder(1, Some("my-folder"), "My Folder", None).unwrap();
+        let folder = store
+            .create_folder(1, Some("my-folder"), "My Folder", None)
+            .unwrap();
         assert_eq!(folder.title, "My Folder");
         assert_eq!(folder.uid, "my-folder");
 
@@ -216,9 +246,13 @@ mod tests {
     #[test]
     fn test_dashboard_in_folder() {
         let store = DashboardStore::new();
-        let folder = store.create_folder(1, Some("infra"), "Infrastructure", None).unwrap();
+        let folder = store
+            .create_folder(1, Some("infra"), "Infrastructure", None)
+            .unwrap();
         let db = Dashboard::new(0, 1, "Infra Dashboard");
-        let saved = store.upsert_dashboard(1, db, Some("infra"), "", "admin", false).unwrap();
+        let saved = store
+            .upsert_dashboard(1, db, Some("infra"), "", "admin", false)
+            .unwrap();
 
         assert_eq!(saved.folder_uid, Some("infra".into()));
         assert_eq!(saved.folder_title, Some("Infrastructure".into()));
@@ -257,9 +291,18 @@ mod tests {
 
     #[test]
     fn test_datasource_type_serialization() {
-        assert_eq!(serde_json::to_string(&DataSourceType::Prometheus).unwrap(), "\"prometheus\"");
-        assert_eq!(serde_json::to_string(&DataSourceType::Loki).unwrap(), "\"loki\"");
-        assert_eq!(serde_json::to_string(&DataSourceType::Postgres).unwrap(), "\"postgres\"");
+        assert_eq!(
+            serde_json::to_string(&DataSourceType::Prometheus).unwrap(),
+            "\"prometheus\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DataSourceType::Loki).unwrap(),
+            "\"loki\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DataSourceType::Postgres).unwrap(),
+            "\"postgres\""
+        );
     }
 
     // ── Alert Evaluation ───────────────────────────────────────────────────
@@ -306,10 +349,20 @@ mod tests {
     fn test_evaluate_conditions_firing() {
         let condition = AlertCondition {
             condition_type: "query".into(),
-            query: AlertConditionQuery { params: vec!["A".into(), "5m".into(), "now".into()] },
-            reducer: AlertReducer { reducer_type: "last".into(), params: vec![] },
-            evaluator: AlertEvaluator { eval_type: "gt".into(), params: vec![50.0] },
-            operator: AlertOperator { op_type: "and".into() },
+            query: AlertConditionQuery {
+                params: vec!["A".into(), "5m".into(), "now".into()],
+            },
+            reducer: AlertReducer {
+                reducer_type: "last".into(),
+                params: vec![],
+            },
+            evaluator: AlertEvaluator {
+                eval_type: "gt".into(),
+                params: vec![50.0],
+            },
+            operator: AlertOperator {
+                op_type: "and".into(),
+            },
         };
         let mut values = HashMap::new();
         values.insert("A".to_string(), vec![10.0, 20.0, 80.0]);
@@ -321,10 +374,20 @@ mod tests {
     fn test_evaluate_conditions_normal() {
         let condition = AlertCondition {
             condition_type: "query".into(),
-            query: AlertConditionQuery { params: vec!["A".into()] },
-            reducer: AlertReducer { reducer_type: "avg".into(), params: vec![] },
-            evaluator: AlertEvaluator { eval_type: "gt".into(), params: vec![100.0] },
-            operator: AlertOperator { op_type: "and".into() },
+            query: AlertConditionQuery {
+                params: vec!["A".into()],
+            },
+            reducer: AlertReducer {
+                reducer_type: "avg".into(),
+                params: vec![],
+            },
+            evaluator: AlertEvaluator {
+                eval_type: "gt".into(),
+                params: vec![100.0],
+            },
+            operator: AlertOperator {
+                op_type: "and".into(),
+            },
         };
         let mut values = HashMap::new();
         values.insert("A".to_string(), vec![10.0, 20.0, 30.0]);
@@ -336,17 +399,37 @@ mod tests {
     fn test_evaluate_conditions_and_or() {
         let c1 = AlertCondition {
             condition_type: "query".into(),
-            query: AlertConditionQuery { params: vec!["A".into()] },
-            reducer: AlertReducer { reducer_type: "last".into(), params: vec![] },
-            evaluator: AlertEvaluator { eval_type: "gt".into(), params: vec![50.0] },
-            operator: AlertOperator { op_type: "and".into() },
+            query: AlertConditionQuery {
+                params: vec!["A".into()],
+            },
+            reducer: AlertReducer {
+                reducer_type: "last".into(),
+                params: vec![],
+            },
+            evaluator: AlertEvaluator {
+                eval_type: "gt".into(),
+                params: vec![50.0],
+            },
+            operator: AlertOperator {
+                op_type: "and".into(),
+            },
         };
         let c2 = AlertCondition {
             condition_type: "query".into(),
-            query: AlertConditionQuery { params: vec!["B".into()] },
-            reducer: AlertReducer { reducer_type: "last".into(), params: vec![] },
-            evaluator: AlertEvaluator { eval_type: "gt".into(), params: vec![50.0] },
-            operator: AlertOperator { op_type: "or".into() },
+            query: AlertConditionQuery {
+                params: vec!["B".into()],
+            },
+            reducer: AlertReducer {
+                reducer_type: "last".into(),
+                params: vec![],
+            },
+            evaluator: AlertEvaluator {
+                eval_type: "gt".into(),
+                params: vec![50.0],
+            },
+            operator: AlertOperator {
+                op_type: "or".into(),
+            },
         };
         let mut values = HashMap::new();
         values.insert("A".to_string(), vec![10.0]); // below threshold
@@ -447,7 +530,9 @@ mod tests {
             order: 1,
             title: "Test Dashboard".into(),
         }];
-        let p = store.create_playlist(1, "My Playlist", "5m", items).unwrap();
+        let p = store
+            .create_playlist(1, "My Playlist", "5m", items)
+            .unwrap();
         assert_eq!(p.name, "My Playlist");
         assert_eq!(p.interval, "5m");
         assert_eq!(p.items.len(), 1);
@@ -455,7 +540,9 @@ mod tests {
         let retrieved = store.get_playlist(p.id).unwrap();
         assert_eq!(retrieved.id, p.id);
 
-        let updated = store.update_playlist(p.id, "New Name", "10m", vec![]).unwrap();
+        let updated = store
+            .update_playlist(p.id, "New Name", "10m", vec![])
+            .unwrap();
         assert_eq!(updated.name, "New Name");
         assert_eq!(updated.interval, "10m");
         assert!(updated.items.is_empty());
@@ -470,7 +557,10 @@ mod tests {
     fn test_var_interpolation_dollar() {
         let vars = vec![make_var("namespace", "default")];
         let ctx = InterpolationContext::new(&vars);
-        assert_eq!(interpolate("namespace=$namespace", &ctx), "namespace=default");
+        assert_eq!(
+            interpolate("namespace=$namespace", &ctx),
+            "namespace=default"
+        );
     }
 
     #[test]
@@ -589,15 +679,29 @@ datasources:
     fn test_render_all_panel_types() {
         let mut db = Dashboard::new(1, 1, "All Panels");
         for (i, pt) in [
-            PanelType::Graph, PanelType::Stat, PanelType::Gauge,
-            PanelType::Table, PanelType::BarGauge, PanelType::Text,
-            PanelType::Logs, PanelType::AlertList,
-        ].iter().enumerate() {
+            PanelType::Graph,
+            PanelType::Stat,
+            PanelType::Gauge,
+            PanelType::Table,
+            PanelType::BarGauge,
+            PanelType::Text,
+            PanelType::Logs,
+            PanelType::AlertList,
+        ]
+        .iter()
+        .enumerate()
+        {
             db.panels.push(Panel {
                 id: i as i32 + 1,
                 title: format!("{pt} panel"),
                 panel_type: *pt,
-                grid_pos: GridPos { x: 0, y: i as i32 * 8, w: 12, h: 8, static_pos: false },
+                grid_pos: GridPos {
+                    x: 0,
+                    y: i as i32 * 8,
+                    w: 12,
+                    h: 8,
+                    static_pos: false,
+                },
                 datasource: None,
                 targets: vec![],
                 transformations: vec![],
@@ -630,9 +734,15 @@ datasources:
     #[test]
     fn test_slug_generation() {
         assert_eq!(Dashboard::slug_from_title("My Dashboard"), "my-dashboard");
-        assert_eq!(Dashboard::slug_from_title("Kubernetes / Node Metrics"), "kubernetes-node-metrics");
+        assert_eq!(
+            Dashboard::slug_from_title("Kubernetes / Node Metrics"),
+            "kubernetes-node-metrics"
+        );
         assert_eq!(Dashboard::slug_from_title("  spaces  "), "spaces");
-        assert_eq!(Dashboard::slug_from_title("Already-Slugged"), "already-slugged");
+        assert_eq!(
+            Dashboard::slug_from_title("Already-Slugged"),
+            "already-slugged"
+        );
     }
 
     // ── Org / User / Team ─────────────────────────────────────────────────
@@ -666,7 +776,9 @@ datasources:
     #[test]
     fn test_team_with_members() {
         let store = DashboardStore::new();
-        let team = store.create_team(1, "Platform", "platform@example.com").unwrap();
+        let team = store
+            .create_team(1, "Platform", "platform@example.com")
+            .unwrap();
         let member = TeamMember {
             org_id: 1,
             team_id: team.id,
@@ -741,7 +853,9 @@ datasources:
         let store = DashboardStore::new();
         let silence = Silence {
             id: String::new(),
-            status: SilenceStatus { state: "active".into() },
+            status: SilenceStatus {
+                state: "active".into(),
+            },
             updated_at: chrono::Utc::now(),
             comment: "maintenance window".into(),
             created_by: "admin".into(),
@@ -774,7 +888,9 @@ datasources:
         let store = DashboardStore::new();
         let token = generate_api_key();
         let hash = hash_api_key(&token);
-        let key = store.create_api_key(1, "ci-key", OrgRole::Editor, None, &hash, &token).unwrap();
+        let key = store
+            .create_api_key(1, "ci-key", OrgRole::Editor, None, &hash, &token)
+            .unwrap();
         assert!(key.key.is_some()); // returned on creation
 
         let found = store.lookup_api_key(&hash).unwrap();
@@ -796,24 +912,22 @@ datasources:
             group_interval: None,
             repeat_interval: None,
             mute_time_intervals: vec![],
-            routes: vec![
-                NotificationPolicy {
-                    receiver: "pagerduty".into(),
-                    group_by: vec![],
-                    continue_policy: false,
-                    matchers: vec![Matcher {
-                        name: "severity".into(),
-                        value: "critical".into(),
-                        is_equal: true,
-                        is_regex: false,
-                    }],
-                    group_wait: None,
-                    group_interval: None,
-                    repeat_interval: None,
-                    mute_time_intervals: vec![],
-                    routes: vec![],
-                }
-            ],
+            routes: vec![NotificationPolicy {
+                receiver: "pagerduty".into(),
+                group_by: vec![],
+                continue_policy: false,
+                matchers: vec![Matcher {
+                    name: "severity".into(),
+                    value: "critical".into(),
+                    is_equal: true,
+                    is_regex: false,
+                }],
+                group_wait: None,
+                group_interval: None,
+                repeat_interval: None,
+                mute_time_intervals: vec![],
+                routes: vec![],
+            }],
         };
 
         let mut critical_labels = HashMap::new();

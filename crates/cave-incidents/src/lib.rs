@@ -5,8 +5,8 @@
 //! Compatible with: Grafana OnCall
 //! Upstream tracking: see cave-upstream for monitored features.
 
-pub mod models;
 pub mod engine;
+pub mod models;
 pub mod routes;
 
 use axum::Router;

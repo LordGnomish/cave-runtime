@@ -94,7 +94,10 @@ impl RefillController {
     }
 
     pub fn remove_node(&mut self, name: &str) -> Result<(), RefillError> {
-        let removed = self.nodes.remove(name).ok_or_else(|| RefillError::NodeNotFound(name.to_string()))?;
+        let removed = self
+            .nodes
+            .remove(name)
+            .ok_or_else(|| RefillError::NodeNotFound(name.to_string()))?;
         for s in removed.allocated {
             self.pool_subnets.push_back(s);
         }
@@ -112,7 +115,10 @@ impl RefillController {
     /// Compute the next refill action for `node`. Returns `None` if no
     /// action is needed.
     pub fn plan(&self, node: &str) -> Result<Option<RefillAction>, RefillError> {
-        let spec = self.nodes.get(node).ok_or_else(|| RefillError::NodeNotFound(node.to_string()))?;
+        let spec = self
+            .nodes
+            .get(node)
+            .ok_or_else(|| RefillError::NodeNotFound(node.to_string()))?;
         if spec.needs_refill() {
             return Ok(self.pool_subnets.front().map(|s| RefillAction {
                 node: node.to_string(),
@@ -136,10 +142,16 @@ impl RefillController {
     /// Apply a planned action: add removes from the pool and appends to
     /// the node; release removes from the node and pushes back to the pool.
     pub fn apply(&mut self, action: RefillAction) -> Result<(), RefillError> {
-        let spec = self.nodes.get_mut(&action.node).ok_or_else(|| RefillError::NodeNotFound(action.node.clone()))?;
+        let spec = self
+            .nodes
+            .get_mut(&action.node)
+            .ok_or_else(|| RefillError::NodeNotFound(action.node.clone()))?;
         match action.kind {
             RefillKind::Add => {
-                let popped = self.pool_subnets.pop_front().ok_or(RefillError::PoolExhausted(spec.allocated.len()))?;
+                let popped = self
+                    .pool_subnets
+                    .pop_front()
+                    .ok_or(RefillError::PoolExhausted(spec.allocated.len()))?;
                 spec.allocated.push(popped);
             }
             RefillKind::Release => {
@@ -223,7 +235,11 @@ mod tests {
 
     #[test]
     fn cannot_release_when_only_one_subnet() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ipam/types.go", "Refill.CanReleaseSingle", "tenant-cpr-crs");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ipam/types.go",
+            "Refill.CanReleaseSingle",
+            "tenant-cpr-crs"
+        );
         let s = node_spec("a", &["10.244.0.0/24"], 0);
         assert!(!s.can_release_subnet());
     }
@@ -232,7 +248,11 @@ mod tests {
 
     #[test]
     fn seed_pool_records_subnets() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "SeedPool", "tenant-cpr-sp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "SeedPool",
+            "tenant-cpr-sp"
+        );
         let mut c = ctrl(tenant);
         c.seed_pool(vec!["10.244.0.0/24".into(), "10.244.1.0/24".into()]);
         assert_eq!(c.pool_remaining(), 2);
@@ -242,7 +262,11 @@ mod tests {
 
     #[test]
     fn plan_returns_add_when_node_needs_refill() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Plan.Add", "tenant-cpr-pa");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Plan.Add",
+            "tenant-cpr-pa"
+        );
         let mut c = ctrl(tenant);
         c.seed_pool(vec!["10.244.0.0/24".into(), "10.244.1.0/24".into()]);
         c.upsert_node(node_spec("a", &[], 0));
@@ -252,7 +276,11 @@ mod tests {
 
     #[test]
     fn plan_returns_none_when_within_watermarks() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Plan.None", "tenant-cpr-pn");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Plan.None",
+            "tenant-cpr-pn"
+        );
         let mut c = ctrl(tenant);
         c.upsert_node(node_spec("a", &["10.244.0.0/24"], 100));
         let action = c.plan("a").unwrap();
@@ -261,7 +289,11 @@ mod tests {
 
     #[test]
     fn plan_unknown_node_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Plan.NotFound", "tenant-cpr-pnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Plan.NotFound",
+            "tenant-cpr-pnf"
+        );
         let c = ctrl(tenant);
         let err = c.plan("ghost").unwrap_err();
         assert!(matches!(err, RefillError::NodeNotFound(_)));
@@ -269,7 +301,11 @@ mod tests {
 
     #[test]
     fn plan_returns_none_when_pool_empty() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Plan.PoolEmpty", "tenant-cpr-ppe");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Plan.PoolEmpty",
+            "tenant-cpr-ppe"
+        );
         let mut c = ctrl(tenant);
         c.upsert_node(node_spec("a", &[], 0));
         let action = c.plan("a").unwrap();
@@ -279,7 +315,11 @@ mod tests {
 
     #[test]
     fn plan_returns_release_when_excess() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Plan.Release", "tenant-cpr-pr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Plan.Release",
+            "tenant-cpr-pr"
+        );
         let mut c = ctrl(tenant);
         c.upsert_node(node_spec("a", &["10.244.0.0/24", "10.244.1.0/24"], 5));
         let action = c.plan("a").unwrap().unwrap();
@@ -288,7 +328,11 @@ mod tests {
 
     #[test]
     fn apply_add_pops_from_pool_and_appends_to_node() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Apply.Add", "tenant-cpr-aa");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Apply.Add",
+            "tenant-cpr-aa"
+        );
         let mut c = ctrl(tenant);
         c.seed_pool(vec!["10.244.0.0/24".into()]);
         c.upsert_node(node_spec("a", &[], 0));
@@ -300,7 +344,11 @@ mod tests {
 
     #[test]
     fn apply_release_returns_subnet_to_pool() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Apply.Release", "tenant-cpr-ar");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Apply.Release",
+            "tenant-cpr-ar"
+        );
         let mut c = ctrl(tenant);
         c.upsert_node(node_spec("a", &["10.244.0.0/24", "10.244.1.0/24"], 5));
         let action = c.plan("a").unwrap().unwrap();
@@ -311,22 +359,38 @@ mod tests {
 
     #[test]
     fn apply_add_with_empty_pool_errors() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Apply.PoolExhausted", "tenant-cpr-ape");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Apply.PoolExhausted",
+            "tenant-cpr-ape"
+        );
         let mut c = ctrl(tenant);
         c.upsert_node(node_spec("a", &[], 0));
-        let err = c.apply(RefillAction {
-            node: "a".into(), kind: RefillKind::Add, subnet: "".into(),
-        }).unwrap_err();
+        let err = c
+            .apply(RefillAction {
+                node: "a".into(),
+                kind: RefillKind::Add,
+                subnet: "".into(),
+            })
+            .unwrap_err();
         assert!(matches!(err, RefillError::PoolExhausted(_)));
     }
 
     #[test]
     fn apply_unknown_node_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Apply.UnknownNode", "tenant-cpr-aun");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Apply.UnknownNode",
+            "tenant-cpr-aun"
+        );
         let mut c = ctrl(tenant);
-        let err = c.apply(RefillAction {
-            node: "ghost".into(), kind: RefillKind::Add, subnet: "".into(),
-        }).unwrap_err();
+        let err = c
+            .apply(RefillAction {
+                node: "ghost".into(),
+                kind: RefillKind::Add,
+                subnet: "".into(),
+            })
+            .unwrap_err();
         assert!(matches!(err, RefillError::NodeNotFound(_)));
     }
 
@@ -334,7 +398,11 @@ mod tests {
 
     #[test]
     fn reconcile_refills_all_low_nodes() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Reconcile.RefillAll", "tenant-cpr-rra");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Reconcile.RefillAll",
+            "tenant-cpr-rra"
+        );
         let mut c = ctrl(tenant);
         c.seed_pool(vec![
             "10.244.0.0/24".into(),
@@ -350,7 +418,11 @@ mod tests {
 
     #[test]
     fn reconcile_no_action_when_all_satisfied() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Reconcile.NoAction", "tenant-cpr-rna");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Reconcile.NoAction",
+            "tenant-cpr-rna"
+        );
         let mut c = ctrl(tenant);
         c.upsert_node(node_spec("a", &["10.244.0.0/24"], 100));
         let actions = c.reconcile();
@@ -361,7 +433,11 @@ mod tests {
 
     #[test]
     fn remove_node_returns_subnets_to_pool() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "RemoveNode", "tenant-cpr-rm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "RemoveNode",
+            "tenant-cpr-rm"
+        );
         let mut c = ctrl(tenant);
         c.upsert_node(node_spec("a", &["10.244.0.0/24", "10.244.1.0/24"], 0));
         c.remove_node("a").unwrap();
@@ -370,7 +446,11 @@ mod tests {
 
     #[test]
     fn remove_unknown_node_errors() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "RemoveNode.NotFound", "tenant-cpr-rmnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "RemoveNode.NotFound",
+            "tenant-cpr-rmnf"
+        );
         let mut c = ctrl(tenant);
         let err = c.remove_node("ghost").unwrap_err();
         assert!(matches!(err, RefillError::NodeNotFound(_)));
@@ -378,7 +458,11 @@ mod tests {
 
     #[test]
     fn count_tracks_node_registrations() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Count", "tenant-cpr-c");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Count",
+            "tenant-cpr-c"
+        );
         let mut c = ctrl(tenant);
         for i in 0..3u8 {
             c.upsert_node(node_spec(&format!("n-{i}"), &[], 0));
@@ -390,12 +474,18 @@ mod tests {
 
     #[test]
     fn full_lifecycle_add_then_release() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Lifecycle", "tenant-cpr-lc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Lifecycle",
+            "tenant-cpr-lc"
+        );
         let mut c = ctrl(tenant);
         // Pre-seed the node with 2 subnets and tiny used count → release.
         c.upsert_node(node_spec("a", &["10.244.0.0/24", "10.244.1.0/24"], 0));
         let actions = c.reconcile();
-        assert!(actions.iter().any(|a| matches!(a.kind, RefillKind::Release)));
+        assert!(actions
+            .iter()
+            .any(|a| matches!(a.kind, RefillKind::Release)));
         assert_eq!(c.lookup("a").unwrap().allocated.len(), 1);
     }
 
@@ -403,8 +493,16 @@ mod tests {
 
     #[test]
     fn refill_action_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Action.Serde", "tenant-cpr-aserde");
-        let a = RefillAction { node: "a".into(), kind: RefillKind::Add, subnet: "10.0.0.0/24".into() };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Action.Serde",
+            "tenant-cpr-aserde"
+        );
+        let a = RefillAction {
+            node: "a".into(),
+            kind: RefillKind::Add,
+            subnet: "10.0.0.0/24".into(),
+        };
         let s = serde_json::to_string(&a).unwrap();
         let back: RefillAction = serde_json::from_str(&s).unwrap();
         assert_eq!(back, a);
@@ -412,7 +510,11 @@ mod tests {
 
     #[test]
     fn node_watermark_spec_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ipam/types.go", "NodeWatermark.Serde", "tenant-cpr-nserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ipam/types.go",
+            "NodeWatermark.Serde",
+            "tenant-cpr-nserde"
+        );
         let s = node_spec("a", &["10.244.0.0/24"], 100);
         let json = serde_json::to_string(&s).unwrap();
         let back: NodeWatermarkSpec = serde_json::from_str(&json).unwrap();

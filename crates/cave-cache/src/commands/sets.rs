@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use crate::db::Db;
 use crate::error::{CacheError, CacheResult};
 use crate::resp::Resp;
-use crate::types::{bytes_to_i64, Entry, Value};
+use crate::types::{Entry, Value, bytes_to_i64};
 
 fn get_set<'a>(db: &'a mut Db, key: &[u8]) -> CacheResult<Option<&'a HashSet<Vec<u8>>>> {
     match db.get_typed(key, "set")? {
@@ -26,7 +26,9 @@ fn get_set<'a>(db: &'a mut Db, key: &[u8]) -> CacheResult<Option<&'a HashSet<Vec
 }
 
 pub fn cmd_sadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 3 { return Err(CacheError::wrong_arity("sadd")); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity("sadd"));
+    }
     let key = args[1].clone();
 
     match db.get_typed_mut(&key, "set")? {
@@ -34,7 +36,9 @@ pub fn cmd_sadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
             Value::Set(set) => {
                 let mut added = 0i64;
                 for member in &args[2..] {
-                    if set.insert(member.clone()) { added += 1; }
+                    if set.insert(member.clone()) {
+                        added += 1;
+                    }
                 }
                 Ok(Resp::Integer(added))
             }
@@ -44,7 +48,9 @@ pub fn cmd_sadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
             let mut set = HashSet::new();
             let mut added = 0i64;
             for member in &args[2..] {
-                if set.insert(member.clone()) { added += 1; }
+                if set.insert(member.clone()) {
+                    added += 1;
+                }
             }
             db.insert(key, Entry::new(Value::Set(set)));
             Ok(Resp::Integer(added))
@@ -53,17 +59,23 @@ pub fn cmd_sadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 }
 
 pub fn cmd_srem(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 3 { return Err(CacheError::wrong_arity("srem")); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity("srem"));
+    }
     let key = &args[1];
     match db.get_typed_mut(key, "set")? {
         Some(entry) => match &mut entry.value {
             Value::Set(set) => {
                 let mut removed = 0i64;
                 for member in &args[2..] {
-                    if set.remove(member.as_slice()) { removed += 1; }
+                    if set.remove(member.as_slice()) {
+                        removed += 1;
+                    }
                 }
                 let is_empty = set.is_empty();
-                if is_empty { db.remove(key); }
+                if is_empty {
+                    db.remove(key);
+                }
                 Ok(Resp::Integer(removed))
             }
             _ => unreachable!(),
@@ -73,11 +85,16 @@ pub fn cmd_srem(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 }
 
 pub fn cmd_smembers(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 2 { return Err(CacheError::wrong_arity("smembers")); }
+    if args.len() != 2 {
+        return Err(CacheError::wrong_arity("smembers"));
+    }
     match db.get_typed(&args[1], "set")? {
         Some(e) => match &e.value {
             Value::Set(set) => {
-                let members: Vec<Resp> = set.iter().map(|m| Resp::BulkString(Some(m.clone()))).collect();
+                let members: Vec<Resp> = set
+                    .iter()
+                    .map(|m| Resp::BulkString(Some(m.clone())))
+                    .collect();
                 Ok(Resp::Array(Some(members)))
             }
             _ => unreachable!(),
@@ -87,10 +104,16 @@ pub fn cmd_smembers(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 }
 
 pub fn cmd_sismember(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 3 { return Err(CacheError::wrong_arity("sismember")); }
+    if args.len() != 3 {
+        return Err(CacheError::wrong_arity("sismember"));
+    }
     match db.get_typed(&args[1], "set")? {
         Some(e) => match &e.value {
-            Value::Set(set) => Ok(Resp::Integer(if set.contains(args[2].as_slice()) { 1 } else { 0 })),
+            Value::Set(set) => Ok(Resp::Integer(if set.contains(args[2].as_slice()) {
+                1
+            } else {
+                0
+            })),
             _ => unreachable!(),
         },
         None => Ok(Resp::Integer(0)),
@@ -98,7 +121,9 @@ pub fn cmd_sismember(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 }
 
 pub fn cmd_smismember(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 3 { return Err(CacheError::wrong_arity("smismember")); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity("smismember"));
+    }
     let set_opt = match db.get_typed(&args[1], "set")? {
         Some(e) => match &e.value {
             Value::Set(s) => Some(s.iter().map(|m| m.clone()).collect::<HashSet<_>>()),
@@ -109,7 +134,10 @@ pub fn cmd_smismember(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
     let results: Vec<Resp> = args[2..]
         .iter()
         .map(|m| {
-            let is_member = set_opt.as_ref().map(|s| s.contains(m.as_slice())).unwrap_or(false);
+            let is_member = set_opt
+                .as_ref()
+                .map(|s| s.contains(m.as_slice()))
+                .unwrap_or(false);
             Resp::Integer(if is_member { 1 } else { 0 })
         })
         .collect();
@@ -117,7 +145,9 @@ pub fn cmd_smismember(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 }
 
 pub fn cmd_scard(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 2 { return Err(CacheError::wrong_arity("scard")); }
+    if args.len() != 2 {
+        return Err(CacheError::wrong_arity("scard"));
+    }
     match db.get_typed(&args[1], "set")? {
         Some(e) => match &e.value {
             Value::Set(s) => Ok(Resp::Integer(s.len() as i64)),
@@ -128,7 +158,9 @@ pub fn cmd_scard(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 }
 
 pub fn cmd_spop(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 2 || args.len() > 3 { return Err(CacheError::wrong_arity("spop")); }
+    if args.len() < 2 || args.len() > 3 {
+        return Err(CacheError::wrong_arity("spop"));
+    }
     let count: Option<usize> = if args.len() == 3 {
         Some(bytes_to_i64(&args[2]).ok_or(CacheError::NotInteger)? as usize)
     } else {
@@ -148,14 +180,18 @@ pub fn cmd_spop(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
                         popped.push(Resp::BulkString(Some(m.clone())));
                     }
                     let is_empty = set.is_empty();
-                    if is_empty { db.remove(key); }
+                    if is_empty {
+                        db.remove(key);
+                    }
                     Ok(Resp::Array(Some(popped)))
                 } else {
                     let member = set.iter().next().cloned();
                     if let Some(m) = member {
                         set.remove(&m);
                         let is_empty = set.is_empty();
-                        if is_empty { db.remove(key); }
+                        if is_empty {
+                            db.remove(key);
+                        }
                         Ok(Resp::BulkString(Some(m)))
                     } else {
                         Ok(Resp::nil())
@@ -164,12 +200,18 @@ pub fn cmd_spop(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
             }
             _ => unreachable!(),
         },
-        None => Ok(if count.is_some() { Resp::Array(Some(vec![])) } else { Resp::nil() }),
+        None => Ok(if count.is_some() {
+            Resp::Array(Some(vec![]))
+        } else {
+            Resp::nil()
+        }),
     }
 }
 
 pub fn cmd_srandmember(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 2 || args.len() > 3 { return Err(CacheError::wrong_arity("srandmember")); }
+    if args.len() < 2 || args.len() > 3 {
+        return Err(CacheError::wrong_arity("srandmember"));
+    }
     let count: Option<i64> = if args.len() == 3 {
         Some(bytes_to_i64(&args[2]).ok_or(CacheError::NotInteger)?)
     } else {
@@ -181,14 +223,20 @@ pub fn cmd_srandmember(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
             Value::Set(set) => {
                 let members: Vec<&Vec<u8>> = set.iter().collect();
                 if members.is_empty() {
-                    return Ok(if count.is_some() { Resp::Array(Some(vec![])) } else { Resp::nil() });
+                    return Ok(if count.is_some() {
+                        Resp::Array(Some(vec![]))
+                    } else {
+                        Resp::nil()
+                    });
                 }
 
                 if let Some(n) = count {
                     if n >= 0 {
                         // Distinct members, up to n
                         let take = (n as usize).min(members.len());
-                        let result: Vec<Resp> = members.iter().take(take)
+                        let result: Vec<Resp> = members
+                            .iter()
+                            .take(take)
                             .map(|m| Resp::BulkString(Some(m.to_vec())))
                             .collect();
                         Ok(Resp::Array(Some(result)))
@@ -210,7 +258,11 @@ pub fn cmd_srandmember(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
             }
             _ => unreachable!(),
         },
-        None => Ok(if count.is_some() { Resp::Array(Some(vec![])) } else { Resp::nil() }),
+        None => Ok(if count.is_some() {
+            Resp::Array(Some(vec![]))
+        } else {
+            Resp::nil()
+        }),
     }
 }
 
@@ -227,36 +279,59 @@ fn collect_set(db: &mut Db, key: &[u8]) -> CacheResult<HashSet<Vec<u8>>> {
 }
 
 pub fn cmd_sdiff(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 2 { return Err(CacheError::wrong_arity("sdiff")); }
+    if args.len() < 2 {
+        return Err(CacheError::wrong_arity("sdiff"));
+    }
     let mut result = collect_set(db, &args[1])?;
     for key in &args[2..] {
         let other = collect_set(db, key)?;
         result.retain(|m| !other.contains(m.as_slice()));
     }
-    Ok(Resp::Array(Some(result.into_iter().map(|m| Resp::BulkString(Some(m))).collect())))
+    Ok(Resp::Array(Some(
+        result
+            .into_iter()
+            .map(|m| Resp::BulkString(Some(m)))
+            .collect(),
+    )))
 }
 
 pub fn cmd_sinter(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 2 { return Err(CacheError::wrong_arity("sinter")); }
+    if args.len() < 2 {
+        return Err(CacheError::wrong_arity("sinter"));
+    }
     let mut result = collect_set(db, &args[1])?;
     for key in &args[2..] {
         let other = collect_set(db, key)?;
         result.retain(|m| other.contains(m.as_slice()));
     }
-    Ok(Resp::Array(Some(result.into_iter().map(|m| Resp::BulkString(Some(m))).collect())))
+    Ok(Resp::Array(Some(
+        result
+            .into_iter()
+            .map(|m| Resp::BulkString(Some(m)))
+            .collect(),
+    )))
 }
 
 pub fn cmd_sunion(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 2 { return Err(CacheError::wrong_arity("sunion")); }
+    if args.len() < 2 {
+        return Err(CacheError::wrong_arity("sunion"));
+    }
     let mut result: HashSet<Vec<u8>> = HashSet::new();
     for key in &args[1..] {
         result.extend(collect_set(db, key)?);
     }
-    Ok(Resp::Array(Some(result.into_iter().map(|m| Resp::BulkString(Some(m))).collect())))
+    Ok(Resp::Array(Some(
+        result
+            .into_iter()
+            .map(|m| Resp::BulkString(Some(m)))
+            .collect(),
+    )))
 }
 
 pub fn cmd_sdiffstore(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 3 { return Err(CacheError::wrong_arity("sdiffstore")); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity("sdiffstore"));
+    }
     let dst = args[1].clone();
     let mut result = collect_set(db, &args[2])?;
     for key in &args[3..] {
@@ -269,7 +344,9 @@ pub fn cmd_sdiffstore(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 }
 
 pub fn cmd_sinterstore(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 3 { return Err(CacheError::wrong_arity("sinterstore")); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity("sinterstore"));
+    }
     let dst = args[1].clone();
     let mut result = collect_set(db, &args[2])?;
     for key in &args[3..] {
@@ -282,7 +359,9 @@ pub fn cmd_sinterstore(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 }
 
 pub fn cmd_sunionstore(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 3 { return Err(CacheError::wrong_arity("sunionstore")); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity("sunionstore"));
+    }
     let dst = args[1].clone();
     let mut result: HashSet<Vec<u8>> = HashSet::new();
     for key in &args[2..] {
@@ -294,7 +373,9 @@ pub fn cmd_sunionstore(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 }
 
 pub fn cmd_smove(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 4 { return Err(CacheError::wrong_arity("smove")); }
+    if args.len() != 4 {
+        return Err(CacheError::wrong_arity("smove"));
+    }
     let src = args[1].clone();
     let dst = args[2].clone();
     let member = args[3].clone();
@@ -314,13 +395,19 @@ pub fn cmd_smove(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 
     // Remove empty source
     if let Some(e) = db.keys.get(&src) {
-        if let Value::Set(s) = &e.value { if s.is_empty() { db.remove(&src); } }
+        if let Value::Set(s) = &e.value {
+            if s.is_empty() {
+                db.remove(&src);
+            }
+        }
     }
 
     // Add to destination
     match db.get_typed_mut(&dst, "set")? {
         Some(entry) => match &mut entry.value {
-            Value::Set(set) => { set.insert(member); }
+            Value::Set(set) => {
+                set.insert(member);
+            }
             _ => return Err(CacheError::WrongType),
         },
         None => {
@@ -336,9 +423,15 @@ pub fn cmd_smove(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 // ── SINTERCARD ───────────────────────────────────────────────────────────────
 
 pub fn cmd_sintercard(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 3 { return Err(CacheError::wrong_arity("sintercard")); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity("sintercard"));
+    }
     let numkeys = bytes_to_i64(&args[1]).ok_or(CacheError::NotInteger)? as usize;
-    if numkeys == 0 { return Err(CacheError::generic("ERR Number of keys can't be non-positive")); }
+    if numkeys == 0 {
+        return Err(CacheError::generic(
+            "ERR Number of keys can't be non-positive",
+        ));
+    }
 
     let mut limit = 0usize;
     let key_end = 1 + numkeys + 1;
@@ -354,6 +447,10 @@ pub fn cmd_sintercard(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
         result.retain(|m| other.contains(m.as_slice()));
     }
 
-    let count = if limit > 0 { result.len().min(limit) } else { result.len() };
+    let count = if limit > 0 {
+        result.len().min(limit)
+    } else {
+        result.len()
+    };
     Ok(Resp::Integer(count as i64))
 }

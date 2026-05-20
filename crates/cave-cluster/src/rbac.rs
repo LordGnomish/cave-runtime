@@ -95,37 +95,64 @@ pub fn default_bootstrap(cluster_name: &str) -> RbacBootstrap {
             PolicyRule {
                 api_groups: vec!["".into()],
                 resources: vec![
-                    "pods".into(), "services".into(), "configmaps".into(),
-                    "persistentvolumeclaims".into(), "events".into(), "secrets".into(),
+                    "pods".into(),
+                    "services".into(),
+                    "configmaps".into(),
+                    "persistentvolumeclaims".into(),
+                    "events".into(),
+                    "secrets".into(),
                 ],
                 verbs: vec![
-                    "get".into(), "list".into(), "watch".into(),
-                    "create".into(), "update".into(), "patch".into(), "delete".into(),
+                    "get".into(),
+                    "list".into(),
+                    "watch".into(),
+                    "create".into(),
+                    "update".into(),
+                    "patch".into(),
+                    "delete".into(),
                 ],
             },
             PolicyRule {
                 api_groups: vec!["apps".into()],
                 resources: vec![
-                    "deployments".into(), "replicasets".into(), "statefulsets".into(),
+                    "deployments".into(),
+                    "replicasets".into(),
+                    "statefulsets".into(),
                     "daemonsets".into(),
                 ],
                 verbs: vec![
-                    "get".into(), "list".into(), "watch".into(),
-                    "create".into(), "update".into(), "patch".into(), "delete".into(),
+                    "get".into(),
+                    "list".into(),
+                    "watch".into(),
+                    "create".into(),
+                    "update".into(),
+                    "patch".into(),
+                    "delete".into(),
                 ],
             },
             PolicyRule {
                 api_groups: vec!["batch".into()],
                 resources: vec!["jobs".into(), "cronjobs".into()],
                 verbs: vec![
-                    "get".into(), "list".into(), "watch".into(),
-                    "create".into(), "update".into(), "patch".into(), "delete".into(),
+                    "get".into(),
+                    "list".into(),
+                    "watch".into(),
+                    "create".into(),
+                    "update".into(),
+                    "patch".into(),
+                    "delete".into(),
                 ],
             },
             PolicyRule {
                 api_groups: vec!["networking.k8s.io".into()],
                 resources: vec!["ingresses".into(), "networkpolicies".into()],
-                verbs: vec!["get".into(), "list".into(), "watch".into(), "create".into(), "update".into()],
+                verbs: vec![
+                    "get".into(),
+                    "list".into(),
+                    "watch".into(),
+                    "create".into(),
+                    "update".into(),
+                ],
             },
         ],
     };
@@ -133,13 +160,16 @@ pub fn default_bootstrap(cluster_name: &str) -> RbacBootstrap {
     let viewer_role = ClusterRole {
         name: "cave:viewer".into(),
         labels: labels.clone(),
-        rules: vec![
-            PolicyRule {
-                api_groups: vec!["".into(), "apps".into(), "batch".into(), "networking.k8s.io".into()],
-                resources: vec!["*".into()],
-                verbs: vec!["get".into(), "list".into(), "watch".into()],
-            },
-        ],
+        rules: vec![PolicyRule {
+            api_groups: vec![
+                "".into(),
+                "apps".into(),
+                "batch".into(),
+                "networking.k8s.io".into(),
+            ],
+            resources: vec!["*".into()],
+            verbs: vec!["get".into(), "list".into(), "watch".into()],
+        }],
     };
 
     RbacBootstrap {
@@ -186,14 +216,19 @@ pub fn to_yaml_manifests(bootstrap: &RbacBootstrap) -> Vec<String> {
     let mut manifests = Vec::new();
 
     for cr in &bootstrap.cluster_roles {
-        let rules_yaml: String = cr.rules.iter().map(|r| {
-            format!(
-                "  - apiGroups: {}\n    resources: {}\n    verbs: {}",
-                serde_json::to_string(&r.api_groups).unwrap_or_default(),
-                serde_json::to_string(&r.resources).unwrap_or_default(),
-                serde_json::to_string(&r.verbs).unwrap_or_default(),
-            )
-        }).collect::<Vec<_>>().join("\n");
+        let rules_yaml: String = cr
+            .rules
+            .iter()
+            .map(|r| {
+                format!(
+                    "  - apiGroups: {}\n    resources: {}\n    verbs: {}",
+                    serde_json::to_string(&r.api_groups).unwrap_or_default(),
+                    serde_json::to_string(&r.resources).unwrap_or_default(),
+                    serde_json::to_string(&r.verbs).unwrap_or_default(),
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
 
         manifests.push(format!(
             r#"apiVersion: rbac.authorization.k8s.io/v1
@@ -208,9 +243,12 @@ rules:
     }
 
     for crb in &bootstrap.cluster_role_bindings {
-        let subjects_yaml: String = crb.subjects.iter().map(|s| {
-            format!("  - kind: {}\n    name: {}", s.kind, s.name)
-        }).collect::<Vec<_>>().join("\n");
+        let subjects_yaml: String = crb
+            .subjects
+            .iter()
+            .map(|s| format!("  - kind: {}\n    name: {}", s.kind, s.name))
+            .collect::<Vec<_>>()
+            .join("\n");
 
         manifests.push(format!(
             r#"apiVersion: rbac.authorization.k8s.io/v1
@@ -240,7 +278,11 @@ mod tests {
     fn default_bootstrap_has_three_roles() {
         let bootstrap = default_bootstrap("test-cluster");
         assert_eq!(bootstrap.cluster_roles.len(), 3);
-        let names: Vec<&str> = bootstrap.cluster_roles.iter().map(|r| r.name.as_str()).collect();
+        let names: Vec<&str> = bootstrap
+            .cluster_roles
+            .iter()
+            .map(|r| r.name.as_str())
+            .collect();
         assert!(names.contains(&"cave:cluster-admin"));
         assert!(names.contains(&"cave:developer"));
         assert!(names.contains(&"cave:viewer"));

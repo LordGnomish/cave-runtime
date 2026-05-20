@@ -45,8 +45,20 @@ pub struct Tuple {
 }
 
 impl Tuple {
-    pub fn new(src_ip: IpAddr, src_port: u16, dst_ip: IpAddr, dst_port: u16, protocol: L4Protocol) -> Self {
-        Self { src_ip, src_port, dst_ip, dst_port, protocol }
+    pub fn new(
+        src_ip: IpAddr,
+        src_port: u16,
+        dst_ip: IpAddr,
+        dst_port: u16,
+        protocol: L4Protocol,
+    ) -> Self {
+        Self {
+            src_ip,
+            src_port,
+            dst_ip,
+            dst_port,
+            protocol,
+        }
     }
     /// The reverse 5-tuple used to look up a reply packet (mirrors the
     /// `__ct_lookup4` second probe).
@@ -138,7 +150,11 @@ pub struct ConntrackTable {
 
 impl ConntrackTable {
     pub fn new(tenant: TenantId, capacity: usize) -> Self {
-        Self { tenant, capacity, entries: HashMap::new() }
+        Self {
+            tenant,
+            capacity,
+            entries: HashMap::new(),
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -266,7 +282,16 @@ mod tests {
     fn ip(a: u8, b: u8, c: u8, d: u8) -> IpAddr {
         IpAddr::V4(Ipv4Addr::new(a, b, c, d))
     }
-    fn t(a: u8, b: u8, c: u8, d: u8, sp: u16, dst: (u8, u8, u8, u8), dp: u16, p: L4Protocol) -> Tuple {
+    fn t(
+        a: u8,
+        b: u8,
+        c: u8,
+        d: u8,
+        sp: u16,
+        dst: (u8, u8, u8, u8),
+        dp: u16,
+        p: L4Protocol,
+    ) -> Tuple {
         Tuple::new(ip(a, b, c, d), sp, ip(dst.0, dst.1, dst.2, dst.3), dp, p)
     }
 
@@ -327,7 +352,8 @@ mod tests {
 
     #[test]
     fn ct_reverse_lookup_finds_dnat_reply() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/lib/conntrack.h", "ct_lookup4_reverse", "tenant-ct-rev");
+        let (_c, tenant) =
+            cilium_test_ctx!("bpf/lib/conntrack.h", "ct_lookup4_reverse", "tenant-ct-rev");
         let mut ct = ConntrackTable::new(tenant, 1024);
         let tup = t(10, 0, 0, 1, 1234, (10, 96, 0, 1), 80, L4Protocol::TCP);
         ct.upsert(tup, Direction::Egress, 100, 1, Some(7));
@@ -341,7 +367,8 @@ mod tests {
 
     #[test]
     fn ct_tcp_first_packet_creates_syn_sent() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/lib/conntrack.h", "__ct_create_tcp", "tenant-ct-syn");
+        let (_c, tenant) =
+            cilium_test_ctx!("bpf/lib/conntrack.h", "__ct_create_tcp", "tenant-ct-syn");
         let mut ct = ConntrackTable::new(tenant, 1024);
         let tup = t(10, 0, 0, 1, 1234, (10, 96, 0, 1), 80, L4Protocol::TCP);
         let e = ct.upsert(tup, Direction::Egress, 100, 1, None);
@@ -350,73 +377,110 @@ mod tests {
 
     #[test]
     fn ct_tcp_synack_advances_to_syn_recv() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/lib/conntrack.h", "__ct_update_tcp_state", "tenant-ct-synack");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/lib/conntrack.h",
+            "__ct_update_tcp_state",
+            "tenant-ct-synack"
+        );
         let mut ct = ConntrackTable::new(tenant, 1024);
         let tup = t(10, 0, 0, 1, 1234, (10, 96, 0, 1), 80, L4Protocol::TCP);
         ct.upsert(tup, Direction::Egress, 100, 1, None);
-        let e = ct.apply_tcp_flag(tup, Direction::Egress, TcpFlag::SynAck, 110).unwrap();
+        let e = ct
+            .apply_tcp_flag(tup, Direction::Egress, TcpFlag::SynAck, 110)
+            .unwrap();
         assert_eq!(e.tcp_state, Some(TcpState::SynRecv));
     }
 
     #[test]
     fn ct_tcp_ack_after_syn_recv_advances_to_established() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/lib/conntrack.h", "__ct_update_tcp_state", "tenant-ct-est");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/lib/conntrack.h",
+            "__ct_update_tcp_state",
+            "tenant-ct-est"
+        );
         let mut ct = ConntrackTable::new(tenant, 1024);
         let tup = t(10, 0, 0, 1, 1234, (10, 96, 0, 1), 80, L4Protocol::TCP);
         ct.upsert(tup, Direction::Egress, 100, 1, None);
         ct.apply_tcp_flag(tup, Direction::Egress, TcpFlag::SynAck, 110);
-        let e = ct.apply_tcp_flag(tup, Direction::Egress, TcpFlag::Ack, 111).unwrap();
+        let e = ct
+            .apply_tcp_flag(tup, Direction::Egress, TcpFlag::Ack, 111)
+            .unwrap();
         assert_eq!(e.tcp_state, Some(TcpState::Established));
     }
 
     #[test]
     fn ct_tcp_fin_advances_to_fin_wait() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/lib/conntrack.h", "__ct_update_tcp_state", "tenant-ct-fin");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/lib/conntrack.h",
+            "__ct_update_tcp_state",
+            "tenant-ct-fin"
+        );
         let mut ct = ConntrackTable::new(tenant, 1024);
         let tup = t(10, 0, 0, 1, 1234, (10, 96, 0, 1), 80, L4Protocol::TCP);
         ct.upsert(tup, Direction::Egress, 100, 1, None);
         ct.apply_tcp_flag(tup, Direction::Egress, TcpFlag::SynAck, 110);
         ct.apply_tcp_flag(tup, Direction::Egress, TcpFlag::Ack, 111);
-        let e = ct.apply_tcp_flag(tup, Direction::Egress, TcpFlag::Fin, 200).unwrap();
+        let e = ct
+            .apply_tcp_flag(tup, Direction::Egress, TcpFlag::Fin, 200)
+            .unwrap();
         assert_eq!(e.tcp_state, Some(TcpState::FinWait));
     }
 
     #[test]
     fn ct_tcp_fin_then_ack_advances_to_time_wait() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/lib/conntrack.h", "__ct_update_tcp_state", "tenant-ct-tw");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/lib/conntrack.h",
+            "__ct_update_tcp_state",
+            "tenant-ct-tw"
+        );
         let mut ct = ConntrackTable::new(tenant, 1024);
         let tup = t(10, 0, 0, 1, 1234, (10, 96, 0, 1), 80, L4Protocol::TCP);
         ct.upsert(tup, Direction::Egress, 100, 1, None);
         ct.apply_tcp_flag(tup, Direction::Egress, TcpFlag::SynAck, 110);
         ct.apply_tcp_flag(tup, Direction::Egress, TcpFlag::Ack, 111);
         ct.apply_tcp_flag(tup, Direction::Egress, TcpFlag::Fin, 200);
-        let e = ct.apply_tcp_flag(tup, Direction::Egress, TcpFlag::Ack, 201).unwrap();
+        let e = ct
+            .apply_tcp_flag(tup, Direction::Egress, TcpFlag::Ack, 201)
+            .unwrap();
         assert_eq!(e.tcp_state, Some(TcpState::TimeWait));
     }
 
     #[test]
     fn ct_tcp_rst_jumps_to_closed_from_any_state() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/lib/conntrack.h", "__ct_update_tcp_state", "tenant-ct-rst");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/lib/conntrack.h",
+            "__ct_update_tcp_state",
+            "tenant-ct-rst"
+        );
         let mut ct = ConntrackTable::new(tenant, 1024);
         let tup = t(10, 0, 0, 1, 1234, (10, 96, 0, 1), 80, L4Protocol::TCP);
         ct.upsert(tup, Direction::Egress, 100, 1, None);
         ct.apply_tcp_flag(tup, Direction::Egress, TcpFlag::SynAck, 110);
         ct.apply_tcp_flag(tup, Direction::Egress, TcpFlag::Ack, 111);
-        let e = ct.apply_tcp_flag(tup, Direction::Egress, TcpFlag::Rst, 200).unwrap();
+        let e = ct
+            .apply_tcp_flag(tup, Direction::Egress, TcpFlag::Rst, 200)
+            .unwrap();
         assert_eq!(e.tcp_state, Some(TcpState::Closed));
     }
 
     #[test]
     fn ct_apply_flag_to_unknown_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/lib/conntrack.h", "__ct_update_tcp_state", "tenant-ct-flagmiss");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/lib/conntrack.h",
+            "__ct_update_tcp_state",
+            "tenant-ct-flagmiss"
+        );
         let mut ct = ConntrackTable::new(tenant, 1024);
         let tup = t(10, 0, 0, 1, 1234, (10, 96, 0, 1), 80, L4Protocol::TCP);
-        assert!(ct.apply_tcp_flag(tup, Direction::Egress, TcpFlag::Syn, 100).is_none());
+        assert!(ct
+            .apply_tcp_flag(tup, Direction::Egress, TcpFlag::Syn, 100)
+            .is_none());
     }
 
     #[test]
     fn ct_udp_entry_has_no_tcp_state() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/lib/conntrack.h", "__ct_create_udp", "tenant-ct-udp");
+        let (_c, tenant) =
+            cilium_test_ctx!("bpf/lib/conntrack.h", "__ct_create_udp", "tenant-ct-udp");
         let mut ct = ConntrackTable::new(tenant, 1024);
         let tup = t(10, 0, 0, 1, 5353, (10, 96, 0, 10), 53, L4Protocol::UDP);
         let e = ct.upsert(tup, Direction::Egress, 100, 1, None);
@@ -425,7 +489,8 @@ mod tests {
 
     #[test]
     fn ct_icmp_entry_has_no_tcp_state() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/lib/conntrack.h", "__ct_create_icmp", "tenant-ct-icmp");
+        let (_c, tenant) =
+            cilium_test_ctx!("bpf/lib/conntrack.h", "__ct_create_icmp", "tenant-ct-icmp");
         let mut ct = ConntrackTable::new(tenant, 1024);
         let tup = t(10, 0, 0, 1, 0, (10, 0, 0, 2), 0, L4Protocol::ICMP);
         let e = ct.upsert(tup, Direction::Egress, 100, 1, None);
@@ -458,7 +523,11 @@ mod tests {
 
     #[test]
     fn ct_established_tcp_keeps_long_ttl() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maps/ctmap/ctmap.go", "GC.TCPEstablished", "tenant-ct-gc-est");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/maps/ctmap/ctmap.go",
+            "GC.TCPEstablished",
+            "tenant-ct-gc-est"
+        );
         let mut ct = ConntrackTable::new(tenant, 1024);
         let tup = t(10, 0, 0, 1, 1234, (10, 96, 0, 1), 80, L4Protocol::TCP);
         ct.upsert(tup, Direction::Egress, 100, 1, None);
@@ -486,21 +555,35 @@ mod tests {
 
     #[test]
     fn ct_rev_nat_index_persists_on_create() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/lib/conntrack.h", "__ct_create.rev_nat_index", "tenant-ct-rni");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/lib/conntrack.h",
+            "__ct_create.rev_nat_index",
+            "tenant-ct-rni"
+        );
         let mut ct = ConntrackTable::new(tenant, 1024);
         let tup = t(10, 0, 0, 1, 1234, (10, 96, 0, 1), 80, L4Protocol::TCP);
         ct.upsert(tup, Direction::Egress, 100, 1, Some(42));
-        assert_eq!(ct.lookup(tup, Direction::Egress).unwrap().rev_nat_index, Some(42));
+        assert_eq!(
+            ct.lookup(tup, Direction::Egress).unwrap().rev_nat_index,
+            Some(42)
+        );
     }
 
     #[test]
     fn ct_rev_nat_index_overwrites_on_subsequent_upsert() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/lib/conntrack.h", "__ct_update.rev_nat_index", "tenant-ct-rni-up");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/lib/conntrack.h",
+            "__ct_update.rev_nat_index",
+            "tenant-ct-rni-up"
+        );
         let mut ct = ConntrackTable::new(tenant, 1024);
         let tup = t(10, 0, 0, 1, 1234, (10, 96, 0, 1), 80, L4Protocol::TCP);
         ct.upsert(tup, Direction::Egress, 100, 1, None);
         ct.upsert(tup, Direction::Egress, 200, 1, Some(7));
-        assert_eq!(ct.lookup(tup, Direction::Egress).unwrap().rev_nat_index, Some(7));
+        assert_eq!(
+            ct.lookup(tup, Direction::Egress).unwrap().rev_nat_index,
+            Some(7)
+        );
     }
 
     #[test]

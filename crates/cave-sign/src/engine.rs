@@ -21,9 +21,9 @@ pub fn find_signatures<'a>(
 }
 
 pub fn is_signed_by(artifacts: &[SignedArtifact], digest: &str, signer: &str) -> bool {
-    artifacts.iter().any(|a| {
-        a.artifact_digest == digest && a.signer_identity == signer && a.verified
-    })
+    artifacts
+        .iter()
+        .any(|a| a.artifact_digest == digest && a.signer_identity == signer && a.verified)
 }
 
 pub fn filter_by_type<'a>(
@@ -46,7 +46,12 @@ mod tests {
     use chrono::Utc;
     use uuid::Uuid;
 
-    fn make_artifact(digest: &str, signer: &str, verified: bool, atype: ArtifactType) -> SignedArtifact {
+    fn make_artifact(
+        digest: &str,
+        signer: &str,
+        verified: bool,
+        atype: ArtifactType,
+    ) -> SignedArtifact {
         SignedArtifact {
             id: Uuid::new_v4(),
             artifact_digest: digest.to_string(),
@@ -81,8 +86,18 @@ mod tests {
     #[test]
     fn test_find_signatures_by_digest() {
         let artifacts = vec![
-            make_artifact(VALID_DIGEST, "alice@example.com", true, ArtifactType::ContainerImage),
-            make_artifact("sha256:0000000000000000000000000000000000000000000000000000000000000000", "bob@example.com", true, ArtifactType::Binary),
+            make_artifact(
+                VALID_DIGEST,
+                "alice@example.com",
+                true,
+                ArtifactType::ContainerImage,
+            ),
+            make_artifact(
+                "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+                "bob@example.com",
+                true,
+                ArtifactType::Binary,
+            ),
         ];
         let found = find_signatures(&artifacts, VALID_DIGEST);
         assert_eq!(found.len(), 1);
@@ -91,9 +106,12 @@ mod tests {
 
     #[test]
     fn test_is_signed_by_verified() {
-        let artifacts = vec![
-            make_artifact(VALID_DIGEST, "alice@example.com", true, ArtifactType::ContainerImage),
-        ];
+        let artifacts = vec![make_artifact(
+            VALID_DIGEST,
+            "alice@example.com",
+            true,
+            ArtifactType::ContainerImage,
+        )];
         assert!(is_signed_by(&artifacts, VALID_DIGEST, "alice@example.com"));
         assert!(!is_signed_by(&artifacts, VALID_DIGEST, "bob@example.com"));
     }
@@ -101,7 +119,12 @@ mod tests {
     #[test]
     fn test_count_verified() {
         let artifacts = vec![
-            make_artifact(VALID_DIGEST, "alice@example.com", true, ArtifactType::ContainerImage),
+            make_artifact(
+                VALID_DIGEST,
+                "alice@example.com",
+                true,
+                ArtifactType::ContainerImage,
+            ),
             make_artifact(VALID_DIGEST, "bob@example.com", false, ArtifactType::Binary),
             make_artifact(VALID_DIGEST, "carol@example.com", true, ArtifactType::Chart),
         ];

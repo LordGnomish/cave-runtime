@@ -22,20 +22,20 @@
 //!   GET  /api/vulns/reports/executive.html         — HTML exec summary
 //!   GET  /api/vulns/scan-types                     — registered parsers
 
-use crate::dedup::{deduplicate_batch, DedupAlgorithm};
+use crate::State;
+use crate::dedup::{DedupAlgorithm, deduplicate_batch};
 use crate::finding::Finding;
 use crate::hierarchy::{Engagement, Product, ProductType};
 use crate::parsers::find_parser;
 use crate::reports::{executive_summary, to_html, to_json};
 use crate::risk_accept::RiskAcceptance;
 use crate::sla::SlaConfiguration;
-use crate::State;
 use axum::{
+    Json, Router,
     extract::{Path, Query, State as AxState},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{get, post},
-    Json, Router,
 };
 use serde::Deserialize;
 use std::sync::Arc;
@@ -50,16 +50,34 @@ pub fn create_router(state: Arc<State>) -> Router {
     Router::new()
         .route("/api/vulns/health", get(health))
         .route("/api/vulns/scan-types", get(scan_types))
-        .route("/api/vulns/findings", get(list_findings).post(create_finding))
+        .route(
+            "/api/vulns/findings",
+            get(list_findings).post(create_finding),
+        )
         .route("/api/vulns/findings/{id}", get(get_finding))
-        .route("/api/vulns/products", get(list_products).post(create_product))
-        .route("/api/vulns/product-types", get(list_product_types).post(create_product_type))
-        .route("/api/vulns/engagements", get(list_engagements).post(create_engagement))
+        .route(
+            "/api/vulns/products",
+            get(list_products).post(create_product),
+        )
+        .route(
+            "/api/vulns/product-types",
+            get(list_product_types).post(create_product_type),
+        )
+        .route(
+            "/api/vulns/engagements",
+            get(list_engagements).post(create_engagement),
+        )
         .route("/api/vulns/import-scan", post(import_scan))
         .route("/api/vulns/sla", get(sla_rollup))
-        .route("/api/vulns/risk-acceptances", get(list_risk_acceptances).post(create_risk_acceptance))
+        .route(
+            "/api/vulns/risk-acceptances",
+            get(list_risk_acceptances).post(create_risk_acceptance),
+        )
         .route("/api/vulns/reports/executive", get(report_executive))
-        .route("/api/vulns/reports/executive.html", get(report_executive_html))
+        .route(
+            "/api/vulns/reports/executive.html",
+            get(report_executive_html),
+        )
         .with_state(state)
 }
 
@@ -86,7 +104,11 @@ async fn list_findings(
     Query(q): Query<PageQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     use cave_db::persistence::StorageExt;
-    let all: Vec<Finding> = state.storage.list(FINDINGS_COL).await.map_err(ApiError::Storage)?;
+    let all: Vec<Finding> = state
+        .storage
+        .list(FINDINGS_COL)
+        .await
+        .map_err(ApiError::Storage)?;
     let total = all.len();
     let offset = q.offset.unwrap_or(0);
     let limit = q.limit.unwrap_or(100).min(1000);
@@ -104,7 +126,11 @@ async fn get_finding(
     Path(id): Path<String>,
 ) -> Result<Json<Finding>, ApiError> {
     use cave_db::persistence::StorageExt;
-    let f: Option<Finding> = state.storage.get(FINDINGS_COL, &id).await.map_err(ApiError::Storage)?;
+    let f: Option<Finding> = state
+        .storage
+        .get(FINDINGS_COL, &id)
+        .await
+        .map_err(ApiError::Storage)?;
     f.map(Json).ok_or(ApiError::NotFound)
 }
 
@@ -113,13 +139,24 @@ async fn create_finding(
     Json(f): Json<Finding>,
 ) -> Result<Json<Finding>, ApiError> {
     use cave_db::persistence::StorageExt;
-    state.storage.put(FINDINGS_COL, &f.id.to_string(), &f).await.map_err(ApiError::Storage)?;
+    state
+        .storage
+        .put(FINDINGS_COL, &f.id.to_string(), &f)
+        .await
+        .map_err(ApiError::Storage)?;
     Ok(Json(f))
 }
 
-async fn list_products(AxState(state): AxState<Arc<State>>) -> Result<Json<Vec<Product>>, ApiError> {
+async fn list_products(
+    AxState(state): AxState<Arc<State>>,
+) -> Result<Json<Vec<Product>>, ApiError> {
     use cave_db::persistence::StorageExt;
-    state.storage.list(PRODUCTS_COL).await.map(Json).map_err(ApiError::Storage)
+    state
+        .storage
+        .list(PRODUCTS_COL)
+        .await
+        .map(Json)
+        .map_err(ApiError::Storage)
 }
 
 async fn create_product(
@@ -127,13 +164,24 @@ async fn create_product(
     Json(p): Json<Product>,
 ) -> Result<Json<Product>, ApiError> {
     use cave_db::persistence::StorageExt;
-    state.storage.put(PRODUCTS_COL, &p.id.to_string(), &p).await.map_err(ApiError::Storage)?;
+    state
+        .storage
+        .put(PRODUCTS_COL, &p.id.to_string(), &p)
+        .await
+        .map_err(ApiError::Storage)?;
     Ok(Json(p))
 }
 
-async fn list_product_types(AxState(state): AxState<Arc<State>>) -> Result<Json<Vec<ProductType>>, ApiError> {
+async fn list_product_types(
+    AxState(state): AxState<Arc<State>>,
+) -> Result<Json<Vec<ProductType>>, ApiError> {
     use cave_db::persistence::StorageExt;
-    state.storage.list(PRODUCT_TYPES_COL).await.map(Json).map_err(ApiError::Storage)
+    state
+        .storage
+        .list(PRODUCT_TYPES_COL)
+        .await
+        .map(Json)
+        .map_err(ApiError::Storage)
 }
 
 async fn create_product_type(
@@ -141,13 +189,24 @@ async fn create_product_type(
     Json(p): Json<ProductType>,
 ) -> Result<Json<ProductType>, ApiError> {
     use cave_db::persistence::StorageExt;
-    state.storage.put(PRODUCT_TYPES_COL, &p.id.to_string(), &p).await.map_err(ApiError::Storage)?;
+    state
+        .storage
+        .put(PRODUCT_TYPES_COL, &p.id.to_string(), &p)
+        .await
+        .map_err(ApiError::Storage)?;
     Ok(Json(p))
 }
 
-async fn list_engagements(AxState(state): AxState<Arc<State>>) -> Result<Json<Vec<Engagement>>, ApiError> {
+async fn list_engagements(
+    AxState(state): AxState<Arc<State>>,
+) -> Result<Json<Vec<Engagement>>, ApiError> {
     use cave_db::persistence::StorageExt;
-    state.storage.list(ENGAGEMENTS_COL).await.map(Json).map_err(ApiError::Storage)
+    state
+        .storage
+        .list(ENGAGEMENTS_COL)
+        .await
+        .map(Json)
+        .map_err(ApiError::Storage)
 }
 
 async fn create_engagement(
@@ -155,7 +214,11 @@ async fn create_engagement(
     Json(e): Json<Engagement>,
 ) -> Result<Json<Engagement>, ApiError> {
     use cave_db::persistence::StorageExt;
-    state.storage.put(ENGAGEMENTS_COL, &e.id.to_string(), &e).await.map_err(ApiError::Storage)?;
+    state
+        .storage
+        .put(ENGAGEMENTS_COL, &e.id.to_string(), &e)
+        .await
+        .map_err(ApiError::Storage)?;
     Ok(Json(e))
 }
 
@@ -182,7 +245,11 @@ async fn import_scan(
     let mut findings = parser
         .parse(req.content.as_bytes())
         .map_err(|e| ApiError::BadRequest(format!("parse error: {e}")))?;
-    let algo = req.dedup.as_deref().and_then(DedupAlgorithm::parse).unwrap_or(DedupAlgorithm::HashCode);
+    let algo = req
+        .dedup
+        .as_deref()
+        .and_then(DedupAlgorithm::parse)
+        .unwrap_or(DedupAlgorithm::HashCode);
     findings = deduplicate_batch(findings, algo, Some(&req.scan_type));
     let n = findings.len();
     for f in &findings {
@@ -192,8 +259,11 @@ async fn import_scan(
             // record the engagement test linkage so reports can group.
             to_save.test_id = Some(eid);
         }
-        state.storage.put(FINDINGS_COL, &to_save.id.to_string(), &to_save)
-            .await.map_err(ApiError::Storage)?;
+        state
+            .storage
+            .put(FINDINGS_COL, &to_save.id.to_string(), &to_save)
+            .await
+            .map_err(ApiError::Storage)?;
     }
     Ok(Json(serde_json::json!({
         "scan_type": req.scan_type,
@@ -211,9 +281,15 @@ fn algo_str(a: DedupAlgorithm) -> &'static str {
     }
 }
 
-async fn sla_rollup(AxState(state): AxState<Arc<State>>) -> Result<Json<serde_json::Value>, ApiError> {
+async fn sla_rollup(
+    AxState(state): AxState<Arc<State>>,
+) -> Result<Json<serde_json::Value>, ApiError> {
     use cave_db::persistence::StorageExt;
-    let findings: Vec<Finding> = state.storage.list(FINDINGS_COL).await.map_err(ApiError::Storage)?;
+    let findings: Vec<Finding> = state
+        .storage
+        .list(FINDINGS_COL)
+        .await
+        .map_err(ApiError::Storage)?;
     let cfg = SlaConfiguration::default();
     let r = crate::sla::rollup(&cfg, &findings, chrono::Utc::now());
     Ok(Json(serde_json::json!({
@@ -227,9 +303,16 @@ async fn sla_rollup(AxState(state): AxState<Arc<State>>) -> Result<Json<serde_js
     })))
 }
 
-async fn list_risk_acceptances(AxState(state): AxState<Arc<State>>) -> Result<Json<Vec<RiskAcceptance>>, ApiError> {
+async fn list_risk_acceptances(
+    AxState(state): AxState<Arc<State>>,
+) -> Result<Json<Vec<RiskAcceptance>>, ApiError> {
     use cave_db::persistence::StorageExt;
-    state.storage.list(RISK_ACC_COL).await.map(Json).map_err(ApiError::Storage)
+    state
+        .storage
+        .list(RISK_ACC_COL)
+        .await
+        .map(Json)
+        .map_err(ApiError::Storage)
 }
 
 async fn create_risk_acceptance(
@@ -237,28 +320,51 @@ async fn create_risk_acceptance(
     Json(ra): Json<RiskAcceptance>,
 ) -> Result<Json<RiskAcceptance>, ApiError> {
     use cave_db::persistence::StorageExt;
-    state.storage.put(RISK_ACC_COL, &ra.id.to_string(), &ra).await.map_err(ApiError::Storage)?;
+    state
+        .storage
+        .put(RISK_ACC_COL, &ra.id.to_string(), &ra)
+        .await
+        .map_err(ApiError::Storage)?;
     Ok(Json(ra))
 }
 
-async fn report_executive(AxState(state): AxState<Arc<State>>) -> Result<Json<serde_json::Value>, ApiError> {
+async fn report_executive(
+    AxState(state): AxState<Arc<State>>,
+) -> Result<Json<serde_json::Value>, ApiError> {
     use cave_db::persistence::StorageExt;
-    let findings: Vec<Finding> = state.storage.list(FINDINGS_COL).await.map_err(ApiError::Storage)?;
+    let findings: Vec<Finding> = state
+        .storage
+        .list(FINDINGS_COL)
+        .await
+        .map_err(ApiError::Storage)?;
     let cfg = SlaConfiguration::default();
     let s = executive_summary(None, None, &findings, &cfg);
-    Ok(Json(serde_json::from_str(&to_json(&s)).expect("round-trip")))
+    Ok(Json(
+        serde_json::from_str(&to_json(&s)).expect("round-trip"),
+    ))
 }
 
-async fn report_executive_html(AxState(state): AxState<Arc<State>>) -> Result<axum::response::Html<String>, ApiError> {
+async fn report_executive_html(
+    AxState(state): AxState<Arc<State>>,
+) -> Result<axum::response::Html<String>, ApiError> {
     use cave_db::persistence::StorageExt;
-    let findings: Vec<Finding> = state.storage.list(FINDINGS_COL).await.map_err(ApiError::Storage)?;
+    let findings: Vec<Finding> = state
+        .storage
+        .list(FINDINGS_COL)
+        .await
+        .map_err(ApiError::Storage)?;
     let cfg = SlaConfiguration::default();
     let s = executive_summary(None, None, &findings, &cfg);
     Ok(axum::response::Html(to_html(&s)))
 }
 
 async fn scan_types() -> Json<Vec<&'static str>> {
-    Json(crate::parsers::registry().iter().map(|p| p.scan_type()).collect())
+    Json(
+        crate::parsers::registry()
+            .iter()
+            .map(|p| p.scan_type())
+            .collect(),
+    )
 }
 
 #[derive(Debug)]
@@ -271,11 +377,23 @@ pub enum ApiError {
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         match self {
-            ApiError::NotFound => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"not_found"}))).into_response(),
-            ApiError::BadRequest(m) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"bad_request","message":m}))).into_response(),
+            ApiError::NotFound => (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error":"not_found"})),
+            )
+                .into_response(),
+            ApiError::BadRequest(m) => (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error":"bad_request","message":m})),
+            )
+                .into_response(),
             ApiError::Storage(e) => {
                 tracing::error!("vulns storage error: {e}");
-                (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error":"storage"}))).into_response()
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"error":"storage"})),
+                )
+                    .into_response()
             }
         }
     }
@@ -294,13 +412,29 @@ mod tests {
 
     #[tokio::test]
     async fn health_returns_200() {
-        let resp = router().oneshot(Request::builder().uri("/api/vulns/health").body(Body::empty()).unwrap()).await.unwrap();
+        let resp = router()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/vulns/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), 200);
     }
 
     #[tokio::test]
     async fn scan_types_lists_all_seven_parsers() {
-        let resp = router().oneshot(Request::builder().uri("/api/vulns/scan-types").body(Body::empty()).unwrap()).await.unwrap();
+        let resp = router()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/vulns/scan-types")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), 200);
         let body = axum::body::to_bytes(resp.into_body(), 65536).await.unwrap();
         let v: Vec<String> = serde_json::from_slice(&body).unwrap();
@@ -324,8 +458,18 @@ mod tests {
         let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(v["imported"], 1);
         // Now list:
-        let resp2 = r.oneshot(Request::builder().uri("/api/vulns/findings").body(Body::empty()).unwrap()).await.unwrap();
-        let body2 = axum::body::to_bytes(resp2.into_body(), 65536).await.unwrap();
+        let resp2 = r
+            .oneshot(
+                Request::builder()
+                    .uri("/api/vulns/findings")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body2 = axum::body::to_bytes(resp2.into_body(), 65536)
+            .await
+            .unwrap();
         let v2: serde_json::Value = serde_json::from_slice(&body2).unwrap();
         assert_eq!(v2["count"], 1);
     }
@@ -334,7 +478,8 @@ mod tests {
     async fn import_scan_rejects_unknown_scan_type() {
         let req = Request::post("/api/vulns/import-scan")
             .header("content-type", "application/json")
-            .body(Body::from(r#"{"scan_type":"NopeScan","content":"{}"}"#)).unwrap();
+            .body(Body::from(r#"{"scan_type":"NopeScan","content":"{}"}"#))
+            .unwrap();
         let resp = router().oneshot(req).await.unwrap();
         assert_eq!(resp.status(), 400);
     }
@@ -354,7 +499,15 @@ mod tests {
                 ]}"#,
             }).to_string())).unwrap();
         r.clone().oneshot(req).await.unwrap();
-        let resp = r.oneshot(Request::builder().uri("/api/vulns/findings?limit=2").body(Body::empty()).unwrap()).await.unwrap();
+        let resp = r
+            .oneshot(
+                Request::builder()
+                    .uri("/api/vulns/findings?limit=2")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         let body = axum::body::to_bytes(resp.into_body(), 65536).await.unwrap();
         let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(v["count"], 3);
@@ -369,11 +522,22 @@ mod tests {
         let p = Product::new(pt.id, "App1");
         let req = Request::post("/api/vulns/products")
             .header("content-type", "application/json")
-            .body(Body::from(serde_json::to_string(&p).unwrap())).unwrap();
+            .body(Body::from(serde_json::to_string(&p).unwrap()))
+            .unwrap();
         let resp = r.clone().oneshot(req).await.unwrap();
         assert_eq!(resp.status(), 200);
-        let resp2 = r.oneshot(Request::builder().uri("/api/vulns/products").body(Body::empty()).unwrap()).await.unwrap();
-        let body = axum::body::to_bytes(resp2.into_body(), 65536).await.unwrap();
+        let resp2 = r
+            .oneshot(
+                Request::builder()
+                    .uri("/api/vulns/products")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body = axum::body::to_bytes(resp2.into_body(), 65536)
+            .await
+            .unwrap();
         let v: Vec<Product> = serde_json::from_slice(&body).unwrap();
         assert_eq!(v.len(), 1);
         assert_eq!(v[0].name, "App1");
@@ -381,7 +545,15 @@ mod tests {
 
     #[tokio::test]
     async fn sla_rollup_endpoint() {
-        let resp = router().oneshot(Request::builder().uri("/api/vulns/sla").body(Body::empty()).unwrap()).await.unwrap();
+        let resp = router()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/vulns/sla")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), 200);
         let body = axum::body::to_bytes(resp.into_body(), 65536).await.unwrap();
         let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
@@ -391,13 +563,29 @@ mod tests {
 
     #[tokio::test]
     async fn report_executive_endpoint() {
-        let resp = router().oneshot(Request::builder().uri("/api/vulns/reports/executive").body(Body::empty()).unwrap()).await.unwrap();
+        let resp = router()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/vulns/reports/executive")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), 200);
     }
 
     #[tokio::test]
     async fn report_executive_html_endpoint() {
-        let resp = router().oneshot(Request::builder().uri("/api/vulns/reports/executive.html").body(Body::empty()).unwrap()).await.unwrap();
+        let resp = router()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/vulns/reports/executive.html")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), 200);
         let body = axum::body::to_bytes(resp.into_body(), 65536).await.unwrap();
         let s = String::from_utf8(body.to_vec()).unwrap();
@@ -406,7 +594,15 @@ mod tests {
 
     #[tokio::test]
     async fn finding_not_found_returns_404() {
-        let resp = router().oneshot(Request::builder().uri("/api/vulns/findings/00000000-0000-0000-0000-000000000000").body(Body::empty()).unwrap()).await.unwrap();
+        let resp = router()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/vulns/findings/00000000-0000-0000-0000-000000000000")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), 404);
     }
 }

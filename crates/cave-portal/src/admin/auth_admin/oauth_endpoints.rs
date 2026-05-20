@@ -6,9 +6,9 @@
 //! `.well-known/openid-configuration` summary panel from
 //! `js/apps/admin-ui/src/realm-settings/GeneralTab.tsx`.
 
+use super::{AuthAdminError, render_admin_nav, require_platform};
 use crate::admin::permission::RequestCtx;
 use crate::admin::render::{escape, page_shell_full, table_html};
-use super::{render_admin_nav, require_platform, AuthAdminError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OauthEndpoint {
@@ -154,7 +154,13 @@ mod tests {
     fn endpoint_catalog_covers_keycloak_core_oidc_endpoints() {
         let e = endpoint_catalog();
         let names: Vec<&str> = e.iter().map(|x| x.name.as_str()).collect();
-        for needed in ["Authorization", "Token", "UserInfo", "JWKS", "OpenID configuration"] {
+        for needed in [
+            "Authorization",
+            "Token",
+            "UserInfo",
+            "JWKS",
+            "OpenID configuration",
+        ] {
             assert!(names.contains(&needed), "missing {needed}");
         }
     }

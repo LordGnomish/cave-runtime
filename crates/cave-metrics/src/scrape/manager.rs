@@ -2,18 +2,18 @@
 // Copyright 2026 Cave Runtime contributors
 //! Scrape manager: discovers, scrapes, and injects metrics into the TSDB.
 
+use parking_lot::RwLock;
 use std::sync::Arc;
 use std::time::Duration;
-use parking_lot::RwLock;
 use tokio::time::interval;
 use tracing::{error, info, warn};
 
+use super::discovery;
+use super::target::{ScrapeConfig, ScrapeTarget};
 use crate::ingestion::exposition;
 use crate::ingestion::openmetrics;
 use crate::model::{Labels, Sample};
 use crate::tsdb::Tsdb;
-use super::target::{ScrapeConfig, ScrapeTarget};
-use super::discovery;
 
 pub struct ScrapeManager {
     configs: Arc<RwLock<Vec<ScrapeConfig>>>,
@@ -38,7 +38,9 @@ impl ScrapeManager {
 
     pub fn remove_config(&self, job_name: &str) {
         self.configs.write().retain(|c| c.job_name != job_name);
-        self.targets.write().retain(|t| t.config.job_name != job_name);
+        self.targets
+            .write()
+            .retain(|t| t.config.job_name != job_name);
     }
 
     pub fn targets(&self) -> Vec<ScrapeTarget> {
@@ -48,7 +50,11 @@ impl ScrapeManager {
     /// Perform one scrape cycle: iterate targets due for scraping.
     pub async fn scrape_cycle(&self) {
         let now_ms = now_ms();
-        let targets_snap: Vec<(usize, ScrapeTarget)> = self.targets.read().iter().enumerate()
+        let targets_snap: Vec<(usize, ScrapeTarget)> = self
+            .targets
+            .read()
+            .iter()
+            .enumerate()
             .filter(|(_, t)| now_ms - t.last_scrape_ms >= t.config.scrape_interval_ms)
             .map(|(i, t)| (i, t.clone()))
             .collect();
@@ -81,18 +87,22 @@ impl ScrapeManager {
             .build()
             .unwrap_or_default();
 
-        let resp = client.get(&target.url)
+        let resp = client
+            .get(&target.url)
             .send()
             .await
             .map_err(|e| crate::error::MetricsError::Scrape(e.to_string()))?;
 
-        let content_type = resp.headers()
+        let content_type = resp
+            .headers()
             .get(reqwest::header::CONTENT_TYPE)
             .and_then(|v| v.to_str().ok())
             .unwrap_or("")
             .to_string();
 
-        let body = resp.text().await
+        let body = resp
+            .text()
+            .await
             .map_err(|e| crate::error::MetricsError::Scrape(e.to_string()))?;
 
         let batch = if openmetrics::is_openmetrics(&content_type) {

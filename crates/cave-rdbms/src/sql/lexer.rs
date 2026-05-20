@@ -115,7 +115,11 @@ pub struct Lexer {
 impl Lexer {
     pub fn new(input: &str) -> Self {
         let chars: Vec<char> = input.chars().collect();
-        let current = if chars.is_empty() { None } else { Some(chars[0]) };
+        let current = if chars.is_empty() {
+            None
+        } else {
+            Some(chars[0])
+        };
         Lexer {
             input: chars,
             position: 0,

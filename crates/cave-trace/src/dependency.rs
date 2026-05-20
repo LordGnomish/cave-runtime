@@ -6,10 +6,10 @@
 //! relationships across all ingested traces, suitable for the Jaeger
 //! /api/dependencies endpoint.
 
-use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
-use crate::types::{Span, ServiceDependency, Trace};
+use crate::types::{ServiceDependency, Span, Trace};
 
 // ─── Graph types ───────────────────────────────────────────────────────────
 
@@ -54,14 +54,15 @@ pub fn build_dependency_graph(traces: &[Trace]) -> DependencyGraph {
     let mut node_map: HashMap<String, (u64, u64)> = HashMap::new(); // (calls, errors)
 
     for trace in traces {
-        let span_map: HashMap<u64, &Span> =
-            trace.spans.iter().map(|s| (s.span_id, s)).collect();
+        let span_map: HashMap<u64, &Span> = trace.spans.iter().map(|s| (s.span_id, s)).collect();
 
         for span in &trace.spans {
             // Count this span for its service
             let e = node_map.entry(span.service_name.clone()).or_insert((0, 0));
             e.0 += 1;
-            if span.has_error() { e.1 += 1; }
+            if span.has_error() {
+                e.1 += 1;
+            }
 
             // Build edge: parent_service → this_service
             if let Some(parent_id) = span.parent_span_id {
@@ -70,7 +71,9 @@ pub fn build_dependency_graph(traces: &[Trace]) -> DependencyGraph {
                         let key = (parent.service_name.clone(), span.service_name.clone());
                         let edge = edge_map.entry(key).or_insert((0, 0));
                         edge.0 += 1;
-                        if span.has_error() { edge.1 += 1; }
+                        if span.has_error() {
+                            edge.1 += 1;
+                        }
                     }
                 }
             }
@@ -81,7 +84,11 @@ pub fn build_dependency_graph(traces: &[Trace]) -> DependencyGraph {
 
     let nodes = node_map
         .into_iter()
-        .map(|(name, (calls, errors))| ServiceNode { name, call_count: calls, error_count: errors })
+        .map(|(name, (calls, errors))| ServiceNode {
+            name,
+            call_count: calls,
+            error_count: errors,
+        })
         .collect();
 
     let edges = edge_map
@@ -94,7 +101,11 @@ pub fn build_dependency_graph(traces: &[Trace]) -> DependencyGraph {
         })
         .collect();
 
-    DependencyGraph { nodes, edges, timestamp: now }
+    DependencyGraph {
+        nodes,
+        edges,
+        timestamp: now,
+    }
 }
 
 /// Convert to Jaeger /api/dependencies format.
@@ -118,7 +129,9 @@ pub fn reachable_from(graph: &DependencyGraph, service: &str) -> HashSet<String>
     let mut queue = vec![service.to_owned()];
 
     while let Some(svc) = queue.pop() {
-        if !visited.insert(svc.clone()) { continue; }
+        if !visited.insert(svc.clone()) {
+            continue;
+        }
         for edge in &graph.edges {
             if edge.parent == svc && !visited.contains(&edge.child) {
                 queue.push(edge.child.clone());
@@ -136,7 +149,9 @@ pub fn callers_of(graph: &DependencyGraph, service: &str) -> HashSet<String> {
     let mut queue = vec![service.to_owned()];
 
     while let Some(svc) = queue.pop() {
-        if !visited.insert(svc.clone()) { continue; }
+        if !visited.insert(svc.clone()) {
+            continue;
+        }
         for edge in &graph.edges {
             if edge.child == svc && !visited.contains(&edge.parent) {
                 queue.push(edge.parent.clone());
@@ -161,8 +176,12 @@ mod tests {
     }
 
     fn span_with_parent(
-        trace_id: TraceId, span_id: SpanId, parent_id: Option<SpanId>,
-        svc: &str, op: &str, error: bool,
+        trace_id: TraceId,
+        span_id: SpanId,
+        parent_id: Option<SpanId>,
+        svc: &str,
+        op: &str,
+        error: bool,
     ) -> Span {
         Span {
             trace_id,
@@ -171,9 +190,13 @@ mod tests {
             operation_name: op.into(),
             service_name: svc.into(),
             start_time_unix_nano: 1_000_000_000,
-            end_time_unix_nano:   1_005_000_000,
+            end_time_unix_nano: 1_005_000_000,
             duration_ns: 5_000_000,
-            status: if error { SpanStatus::Error } else { SpanStatus::Ok },
+            status: if error {
+                SpanStatus::Error
+            } else {
+                SpanStatus::Ok
+            },
             kind: SpanKind::Server,
             tags: HashMap::new(),
             events: vec![],
@@ -188,8 +211,8 @@ mod tests {
     #[test]
     fn build_graph_single_edge() {
         let trace = make_trace(vec![
-            span_with_parent(1, 1, None,    "frontend", "GET /", false),
-            span_with_parent(1, 2, Some(1), "backend",  "query", false),
+            span_with_parent(1, 1, None, "frontend", "GET /", false),
+            span_with_parent(1, 2, Some(1), "backend", "query", false),
         ]);
         let graph = build_dependency_graph(&[trace]);
         assert_eq!(graph.edges.len(), 1);
@@ -202,7 +225,7 @@ mod tests {
     fn build_graph_same_service_spans_no_edge() {
         // Two spans of the same service do not create an edge
         let trace = make_trace(vec![
-            span_with_parent(1, 1, None,    "svc", "op1", false),
+            span_with_parent(1, 1, None, "svc", "op1", false),
             span_with_parent(1, 2, Some(1), "svc", "op2", false),
         ]);
         let graph = build_dependency_graph(&[trace]);
@@ -214,8 +237,18 @@ mod tests {
         let graph = DependencyGraph {
             nodes: vec![],
             edges: vec![
-                DependencyEdge { parent: "a".into(), child: "b".into(), call_count: 1, error_count: 0 },
-                DependencyEdge { parent: "b".into(), child: "c".into(), call_count: 1, error_count: 0 },
+                DependencyEdge {
+                    parent: "a".into(),
+                    child: "b".into(),
+                    call_count: 1,
+                    error_count: 0,
+                },
+                DependencyEdge {
+                    parent: "b".into(),
+                    child: "c".into(),
+                    call_count: 1,
+                    error_count: 0,
+                },
             ],
             timestamp: String::new(),
         };
@@ -230,8 +263,18 @@ mod tests {
         let graph = DependencyGraph {
             nodes: vec![],
             edges: vec![
-                DependencyEdge { parent: "a".into(), child: "b".into(), call_count: 1, error_count: 0 },
-                DependencyEdge { parent: "b".into(), child: "c".into(), call_count: 1, error_count: 0 },
+                DependencyEdge {
+                    parent: "a".into(),
+                    child: "b".into(),
+                    call_count: 1,
+                    error_count: 0,
+                },
+                DependencyEdge {
+                    parent: "b".into(),
+                    child: "c".into(),
+                    call_count: 1,
+                    error_count: 0,
+                },
             ],
             timestamp: String::new(),
         };
@@ -245,7 +288,10 @@ mod tests {
         let graph = DependencyGraph {
             nodes: vec![],
             edges: vec![DependencyEdge {
-                parent: "a".into(), child: "b".into(), call_count: 42, error_count: 0,
+                parent: "a".into(),
+                child: "b".into(),
+                call_count: 42,
+                error_count: 0,
             }],
             timestamp: String::new(),
         };

@@ -6,7 +6,7 @@
 //! malformed fields. `tracestate` enforces 32-entry HEAD-of-list cap and
 //! validates keys/values against the W3C grammar.
 
-use crate::types::{format_span_id, format_trace_id, parse_span_id, parse_trace_id, SpanContext};
+use crate::types::{SpanContext, format_span_id, format_trace_id, parse_span_id, parse_trace_id};
 use thiserror::Error;
 
 /// The standard header name for the W3C traceparent.
@@ -27,26 +27,26 @@ pub const MAX_TRACESTATE_ENTRIES: usize = 32;
 /// Errors that can occur during trace context propagation.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum PropagationError {
-     /// The traceparent header did not contain exactly four fields.
-     #[error("traceparent has wrong field count")]
+    /// The traceparent header did not contain exactly four fields.
+    #[error("traceparent has wrong field count")]
     WrongFieldCount,
-     /// The traceparent version field is invalid.
-     #[error("traceparent version invalid: {0}")]
+    /// The traceparent version field is invalid.
+    #[error("traceparent version invalid: {0}")]
     InvalidVersion(String),
-     /// The traceparent trace_id field is invalid.
-     #[error("traceparent trace_id invalid: {0}")]
+    /// The traceparent trace_id field is invalid.
+    #[error("traceparent trace_id invalid: {0}")]
     InvalidTraceId(String),
-     /// The traceparent span_id field is invalid.
-     #[error("traceparent span_id invalid: {0}")]
+    /// The traceparent span_id field is invalid.
+    #[error("traceparent span_id invalid: {0}")]
     InvalidSpanId(String),
-     /// The traceparent flags field is invalid.
-     #[error("traceparent flags invalid: {0}")]
+    /// The traceparent flags field is invalid.
+    #[error("traceparent flags invalid: {0}")]
     InvalidFlags(String),
-     /// The traceparent trace_id is all zeros.
-     #[error("traceparent trace_id is all zeros")]
+    /// The traceparent trace_id is all zeros.
+    #[error("traceparent trace_id is all zeros")]
     ZeroTraceId,
-     /// The traceparent span_id is all zeros.
-     #[error("traceparent span_id is all zeros")]
+    /// The traceparent span_id is all zeros.
+    #[error("traceparent span_id is all zeros")]
     ZeroSpanId,
 }
 
@@ -65,7 +65,7 @@ pub fn parse_traceparent(header: &str) -> PropagationResult<SpanContext> {
         return Err(PropagationError::InvalidVersion(parts[0].to_string()));
     }
     let version = u8::from_str_radix(parts[0], 16)
-         .map_err(|_| PropagationError::InvalidVersion(parts[0].to_string()))?;
+        .map_err(|_| PropagationError::InvalidVersion(parts[0].to_string()))?;
     if version == 0xff {
         return Err(PropagationError::InvalidVersion("ff".into()));
     }
@@ -74,7 +74,7 @@ pub fn parse_traceparent(header: &str) -> PropagationResult<SpanContext> {
         return Err(PropagationError::InvalidTraceId(parts[1].to_string()));
     }
     let trace_id = parse_trace_id(parts[1])
-         .ok_or_else(|| PropagationError::InvalidTraceId(parts[1].to_string()))?;
+        .ok_or_else(|| PropagationError::InvalidTraceId(parts[1].to_string()))?;
     if trace_id == 0 {
         return Err(PropagationError::ZeroTraceId);
     }
@@ -83,7 +83,7 @@ pub fn parse_traceparent(header: &str) -> PropagationResult<SpanContext> {
         return Err(PropagationError::InvalidSpanId(parts[2].to_string()));
     }
     let span_id = parse_span_id(parts[2])
-         .ok_or_else(|| PropagationError::InvalidSpanId(parts[2].to_string()))?;
+        .ok_or_else(|| PropagationError::InvalidSpanId(parts[2].to_string()))?;
     if span_id == 0 {
         return Err(PropagationError::ZeroSpanId);
     }
@@ -92,32 +92,39 @@ pub fn parse_traceparent(header: &str) -> PropagationResult<SpanContext> {
         return Err(PropagationError::InvalidFlags(parts[3].to_string()));
     }
     let flags = u8::from_str_radix(parts[3], 16)
-         .map_err(|_| PropagationError::InvalidFlags(parts[3].to_string()))?;
+        .map_err(|_| PropagationError::InvalidFlags(parts[3].to_string()))?;
 
-    Ok(SpanContext { trace_id, span_id, trace_flags: flags, is_remote: true })
+    Ok(SpanContext {
+        trace_id,
+        span_id,
+        trace_flags: flags,
+        is_remote: true,
+    })
 }
 
 /// Render a `traceparent` from a SpanContext.
 pub fn format_traceparent(ctx: &SpanContext) -> String {
     format!(
-         "{:02x}-{}-{}-{:02x}",
+        "{:02x}-{}-{}-{:02x}",
         VERSION,
         format_trace_id(ctx.trace_id),
         format_span_id(ctx.span_id),
         ctx.trace_flags
-     )
+    )
 }
 
 /// Represents the W3C TraceState header content.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TraceState {
-     /// HEAD-of-list precedence: index 0 is the most-recent vendor.
+    /// HEAD-of-list precedence: index 0 is the most-recent vendor.
     pub entries: Vec<(String, String)>,
 }
 
 impl TraceState {
     /// Creates a new, empty TraceState.
-    pub fn new() -> Self { Default::default() }
+    pub fn new() -> Self {
+        Default::default()
+    }
 
     /// Inserts or updates a key-value pair, enforcing the 32-entry limit.
     pub fn upsert(&mut self, key: &str, value: &str) {
@@ -128,13 +135,20 @@ impl TraceState {
 
     /// Retrieves the value for a given key.
     pub fn get(&self, key: &str) -> Option<&str> {
-        self.entries.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+        self.entries
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
     }
 
     /// Serializes the TraceState into a header string.
     pub fn to_header(&self) -> String {
-        self.entries.iter().map(|(k, v)| format!("{}={}", k, v)).collect::<Vec<_>>().join(",")
-     }
+        self.entries
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>()
+            .join(",")
+    }
 }
 
 /// Parses a `tracestate` header string into a TraceState struct.
@@ -142,45 +156,62 @@ pub fn parse_tracestate(header: &str) -> TraceState {
     let mut entries = Vec::new();
     for raw in header.split(',') {
         let trimmed = raw.trim();
-        if trimmed.is_empty() { continue; }
+        if trimmed.is_empty() {
+            continue;
+        }
         let mut parts = trimmed.splitn(2, '=');
         let key = parts.next().unwrap_or("").trim();
         let value = parts.next().unwrap_or("").trim();
-        if !is_valid_key(key) || !is_valid_value(value) { continue; }
+        if !is_valid_key(key) || !is_valid_value(value) {
+            continue;
+        }
         entries.push((key.to_string(), value.to_string()));
-        if entries.len() == MAX_TRACESTATE_ENTRIES { break; }
+        if entries.len() == MAX_TRACESTATE_ENTRIES {
+            break;
+        }
     }
     TraceState { entries }
 }
 
 /// Validates a tracestate key against W3C grammar rules.
 fn is_valid_key(k: &str) -> bool {
-    if k.is_empty() || k.len() > 256 { return false; }
+    if k.is_empty() || k.len() > 256 {
+        return false;
+    }
     let bytes = k.as_bytes();
-    if !bytes[0].is_ascii_lowercase() && !bytes[0].is_ascii_digit() { return false; }
+    if !bytes[0].is_ascii_lowercase() && !bytes[0].is_ascii_digit() {
+        return false;
+    }
     bytes.iter().all(|b| {
-        b.is_ascii_lowercase() || b.is_ascii_digit()
-             || matches!(b, b'_' | b'-' | b'*' | b'/' | b'@')
-     })
+        b.is_ascii_lowercase()
+            || b.is_ascii_digit()
+            || matches!(b, b'_' | b'-' | b'*' | b'/' | b'@')
+    })
 }
 
 /// Validates a tracestate value against W3C grammar rules.
 fn is_valid_value(v: &str) -> bool {
-    if v.is_empty() || v.len() > 256 { return false; }
-    v.bytes().all(|b| (0x20..=0x7e).contains(&b) && b != b',' && b != b'=')
+    if v.is_empty() || v.len() > 256 {
+        return false;
+    }
+    v.bytes()
+        .all(|b| (0x20..=0x7e).contains(&b) && b != b',' && b != b'=')
 }
 
 /// Lossy extract — returns a fresh sampled context if the header is missing
 /// or malformed. Used by SDK ingest paths that MUST always have a context.
-pub fn extract_or_new(traceparent: Option<&str>, tracestate: Option<&str>) -> (SpanContext, TraceState) {
+pub fn extract_or_new(
+    traceparent: Option<&str>,
+    tracestate: Option<&str>,
+) -> (SpanContext, TraceState) {
     let ctx = traceparent
-         .and_then(|h| parse_traceparent(h).ok())
-         .unwrap_or_else(|| SpanContext {
+        .and_then(|h| parse_traceparent(h).ok())
+        .unwrap_or_else(|| SpanContext {
             trace_id: crate::id::new_trace_id(),
             span_id: crate::id::new_span_id(),
             trace_flags: FLAG_SAMPLED,
             is_remote: false,
-         });
+        });
     let state = tracestate.map(parse_tracestate).unwrap_or_default();
     (ctx, state)
 }
@@ -214,13 +245,17 @@ mod tests {
 
     #[test]
     fn test_unsampled_flag() {
-        let c = parse_traceparent("00-0af7651916cd43dd8448eb211c80319c-b9c7c989f97918e1-00").unwrap();
+        let c =
+            parse_traceparent("00-0af7651916cd43dd8448eb211c80319c-b9c7c989f97918e1-00").unwrap();
         assert!(!c.is_sampled());
     }
 
     #[test]
     fn test_rejects_wrong_field_count() {
-        assert_eq!(parse_traceparent("00-aa-bb").unwrap_err(), PropagationError::WrongFieldCount);
+        assert_eq!(
+            parse_traceparent("00-aa-bb").unwrap_err(),
+            PropagationError::WrongFieldCount
+        );
     }
 
     #[test]
@@ -238,19 +273,28 @@ mod tests {
     #[test]
     fn test_rejects_zero_trace_id() {
         let h = "00-00000000000000000000000000000000-b9c7c989f97918e1-01";
-        assert_eq!(parse_traceparent(h).unwrap_err(), PropagationError::ZeroTraceId);
+        assert_eq!(
+            parse_traceparent(h).unwrap_err(),
+            PropagationError::ZeroTraceId
+        );
     }
 
     #[test]
     fn test_rejects_zero_span_id() {
         let h = "00-0af7651916cd43dd8448eb211c80319c-0000000000000000-01";
-        assert_eq!(parse_traceparent(h).unwrap_err(), PropagationError::ZeroSpanId);
+        assert_eq!(
+            parse_traceparent(h).unwrap_err(),
+            PropagationError::ZeroSpanId
+        );
     }
 
     #[test]
     fn test_rejects_version_ff() {
         let h = "ff-0af7651916cd43dd8448eb211c80319c-b9c7c989f97918e1-01";
-        assert!(matches!(parse_traceparent(h).unwrap_err(), PropagationError::InvalidVersion(_)));
+        assert!(matches!(
+            parse_traceparent(h).unwrap_err(),
+            PropagationError::InvalidVersion(_)
+        ));
     }
 
     #[test]
@@ -269,7 +313,10 @@ mod tests {
 
     #[test]
     fn test_tracestate_caps_at_32() {
-        let huge: String = (0..40).map(|i| format!("k{}=v{}", i, i)).collect::<Vec<_>>().join(",");
+        let huge: String = (0..40)
+            .map(|i| format!("k{}=v{}", i, i))
+            .collect::<Vec<_>>()
+            .join(",");
         let s = parse_tracestate(&huge);
         assert_eq!(s.entries.len(), MAX_TRACESTATE_ENTRIES);
     }

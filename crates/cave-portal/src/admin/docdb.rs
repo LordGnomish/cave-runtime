@@ -7,7 +7,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, DocdbCollection};
+use crate::admin::state::{AdminState, DocdbCollection, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -21,10 +21,14 @@ pub fn list_collections(
     ctx: &RequestCtx,
 ) -> Result<Vec<DocdbCollection>, DocdbViewError> {
     ctx.authorise(Permission::DocdbRead)?;
-    Ok(scope(&state.docdb_collections.read().unwrap(), &ctx.tenant, |r| &r.tenant)
+    Ok(
+        scope(&state.docdb_collections.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
         .into_iter()
         .cloned()
-        .collect())
+        .collect(),
+    )
 }
 
 pub fn collections_in(
@@ -40,7 +44,13 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, DocdbViewE
     let cols = list_collections(state, ctx)?;
     let rows: Vec<Vec<String>> = cols
         .iter()
-        .map(|c| vec![c.database.clone(), c.collection.clone(), c.document_count.to_string()])
+        .map(|c| {
+            vec![
+                c.database.clone(),
+                c.collection.clone(),
+                c.document_count.to_string(),
+            ]
+        })
         .collect();
     let body = format!(
         r#"<section><h2 class="text-lg font-semibold mb-2">Collections ({n})</h2>{tbl}</section>"#,

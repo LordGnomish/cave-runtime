@@ -122,7 +122,8 @@ pub struct NeighborCache {
 impl NeighborCache {
     pub fn new(tenant: TenantId) -> Self {
         Self {
-            tenant, entries: HashMap::new(),
+            tenant,
+            entries: HashMap::new(),
             reachable_ns: 30 * 1_000_000_000,
             delay_ns: 5 * 1_000_000_000,
         }
@@ -137,7 +138,10 @@ impl NeighborCache {
             Some(other) => other,
         };
         let entry = self.entries.entry(ip).or_insert(NeighborEntry {
-            ip, mac: MacAddr::zero(), state: next, last_update_ns: now_ns,
+            ip,
+            mac: MacAddr::zero(),
+            state: next,
+            last_update_ns: now_ns,
         });
         entry.state = next;
         entry.last_update_ns = now_ns;
@@ -146,9 +150,15 @@ impl NeighborCache {
 
     /// Got an advertisement (NA) from `ip` with `mac`. Move to Reachable.
     pub fn confirm(&mut self, ip: Ipv6Addr, mac: MacAddr, now_ns: u64) {
-        self.entries.insert(ip, NeighborEntry {
-            ip, mac, state: NudState::Reachable, last_update_ns: now_ns,
-        });
+        self.entries.insert(
+            ip,
+            NeighborEntry {
+                ip,
+                mac,
+                state: NudState::Reachable,
+                last_update_ns: now_ns,
+            },
+        );
     }
 
     /// Tick the cache forward — Reachable entries past the reachable
@@ -204,7 +214,10 @@ pub struct NdProxy {
 
 impl NdProxy {
     pub fn new(tenant: TenantId) -> Self {
-        Self { tenant, proxies: HashMap::new() }
+        Self {
+            tenant,
+            proxies: HashMap::new(),
+        }
     }
 
     pub fn upsert(&mut self, entry: NdProxyEntry) {
@@ -302,7 +315,11 @@ mod tests {
 
     #[test]
     fn neigh_solicit_fresh_entry_starts_incomplete() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "Solicit.Fresh", "tenant-v6-frnew");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/ipv6/ndp.go",
+            "Solicit.Fresh",
+            "tenant-v6-frnew"
+        );
         let mut c = NeighborCache::new(tenant);
         let s = c.solicit(v6("fd00::1"), 100);
         assert_eq!(s, NudState::Incomplete);
@@ -310,7 +327,11 @@ mod tests {
 
     #[test]
     fn neigh_confirm_moves_to_reachable() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "Confirm.Reachable", "tenant-v6-conf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/ipv6/ndp.go",
+            "Confirm.Reachable",
+            "tenant-v6-conf"
+        );
         let mut c = NeighborCache::new(tenant);
         c.confirm(v6("fd00::1"), mac(1), 100);
         assert_eq!(c.lookup(v6("fd00::1")).unwrap().state, NudState::Reachable);
@@ -318,7 +339,11 @@ mod tests {
 
     #[test]
     fn neigh_tick_moves_reachable_to_stale_after_window() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "Tick.Stale", "tenant-v6-stale");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/ipv6/ndp.go",
+            "Tick.Stale",
+            "tenant-v6-stale"
+        );
         let mut c = NeighborCache::new(tenant);
         c.confirm(v6("fd00::1"), mac(1), 0);
         let now = c.reachable_ns + 1;
@@ -329,7 +354,11 @@ mod tests {
 
     #[test]
     fn neigh_tick_keeps_recent_reachable() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "Tick.NoStale", "tenant-v6-fresh");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/ipv6/ndp.go",
+            "Tick.NoStale",
+            "tenant-v6-fresh"
+        );
         let mut c = NeighborCache::new(tenant);
         c.confirm(v6("fd00::1"), mac(1), 0);
         let n = c.tick(c.reachable_ns / 2);
@@ -339,7 +368,11 @@ mod tests {
 
     #[test]
     fn neigh_solicit_on_stale_moves_to_probe() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "Solicit.StaleToProbe", "tenant-v6-stp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/ipv6/ndp.go",
+            "Solicit.StaleToProbe",
+            "tenant-v6-stp"
+        );
         let mut c = NeighborCache::new(tenant);
         c.confirm(v6("fd00::1"), mac(1), 0);
         c.tick(c.reachable_ns + 1);
@@ -349,7 +382,11 @@ mod tests {
 
     #[test]
     fn neigh_probe_timeout_moves_to_failed() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "Probe.Failed", "tenant-v6-pfail");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/ipv6/ndp.go",
+            "Probe.Failed",
+            "tenant-v6-pfail"
+        );
         let mut c = NeighborCache::new(tenant);
         let now = 1_000_000_000;
         c.solicit(v6("fd00::1"), now);
@@ -364,7 +401,8 @@ mod tests {
 
     #[test]
     fn neigh_remove_drops_entry() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "Remove", "tenant-v6-rm");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "Remove", "tenant-v6-rm");
         let mut c = NeighborCache::new(tenant);
         c.confirm(v6("fd00::1"), mac(1), 0);
         assert!(c.remove(v6("fd00::1")));
@@ -373,7 +411,11 @@ mod tests {
 
     #[test]
     fn neigh_remove_unknown_returns_false() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "Remove.NotFound", "tenant-v6-rmnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/ipv6/ndp.go",
+            "Remove.NotFound",
+            "tenant-v6-rmnf"
+        );
         let mut c = NeighborCache::new(tenant);
         assert!(!c.remove(v6("fd00::1")));
     }
@@ -382,7 +424,11 @@ mod tests {
 
     #[test]
     fn ndproxy_answers_with_local_node_mac() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "Proxy.Answer", "tenant-v6-px");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/ipv6/ndp.go",
+            "Proxy.Answer",
+            "tenant-v6-px"
+        );
         let mut p = NdProxy::new(tenant);
         p.upsert(NdProxyEntry {
             remote_pod_ip: v6("fd00:1::5"),
@@ -395,14 +441,22 @@ mod tests {
 
     #[test]
     fn ndproxy_unknown_target_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "Proxy.Unknown", "tenant-v6-pxu");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/ipv6/ndp.go",
+            "Proxy.Unknown",
+            "tenant-v6-pxu"
+        );
         let p = NdProxy::new(tenant);
         assert!(p.answer_neighbor_solicit(v6("fd00:1::5")).is_none());
     }
 
     #[test]
     fn ndproxy_remove_drops_entry() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "Proxy.Remove", "tenant-v6-pxr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/ipv6/ndp.go",
+            "Proxy.Remove",
+            "tenant-v6-pxr"
+        );
         let mut p = NdProxy::new(tenant);
         p.upsert(NdProxyEntry {
             remote_pod_ip: v6("fd00:1::5"),
@@ -415,7 +469,11 @@ mod tests {
 
     #[test]
     fn ndproxy_count_tracks_upserts() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "Proxy.Count", "tenant-v6-pxc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/ipv6/ndp.go",
+            "Proxy.Count",
+            "tenant-v6-pxc"
+        );
         let mut p = NdProxy::new(tenant);
         for i in 0..5u8 {
             p.upsert(NdProxyEntry {
@@ -429,7 +487,11 @@ mod tests {
 
     #[test]
     fn ndproxy_upsert_replaces_existing() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "Proxy.Replace", "tenant-v6-pxr2");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/ipv6/ndp.go",
+            "Proxy.Replace",
+            "tenant-v6-pxr2"
+        );
         let mut p = NdProxy::new(tenant);
         p.upsert(NdProxyEntry {
             remote_pod_ip: v6("fd00:1::5"),
@@ -458,7 +520,11 @@ mod tests {
 
     #[test]
     fn slaac_address_distinct_suffixes_distinct_addresses() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ipam/ipv6/slaac.go", "Generate.Distinct", "tenant-v6-slaacd");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ipam/ipv6/slaac.go",
+            "Generate.Distinct",
+            "tenant-v6-slaacd"
+        );
         let a = slaac_address("fd00:1::/64", 1).unwrap();
         let b = slaac_address("fd00:1::/64", 2).unwrap();
         assert_ne!(a, b);
@@ -466,21 +532,33 @@ mod tests {
 
     #[test]
     fn slaac_with_too_long_prefix_rejected() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ipam/ipv6/slaac.go", "Generate.BadPrefix", "tenant-v6-slaacbad");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ipam/ipv6/slaac.go",
+            "Generate.BadPrefix",
+            "tenant-v6-slaacbad"
+        );
         let err = slaac_address("fd00:1::/96", 1).unwrap_err();
         assert!(matches!(err, Ipv6Error::BadCidr(_)));
     }
 
     #[test]
     fn slaac_with_invalid_cidr_rejected() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ipam/ipv6/slaac.go", "Generate.BadCidr", "tenant-v6-slaacinv");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ipam/ipv6/slaac.go",
+            "Generate.BadCidr",
+            "tenant-v6-slaacinv"
+        );
         let err = slaac_address("not-a-cidr", 1).unwrap_err();
         assert!(matches!(err, Ipv6Error::BadCidr(_)));
     }
 
     #[test]
     fn slaac_with_v4_cidr_rejected() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ipam/ipv6/slaac.go", "Generate.V4Cidr", "tenant-v6-slaacv4");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ipam/ipv6/slaac.go",
+            "Generate.V4Cidr",
+            "tenant-v6-slaacv4"
+        );
         let err = slaac_address("10.0.0.0/24", 1).unwrap_err();
         assert!(matches!(err, Ipv6Error::BadCidr(_)));
     }
@@ -489,7 +567,11 @@ mod tests {
 
     #[test]
     fn neigh_cache_count_tracks_confirms() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "Cache.Count", "tenant-v6-nc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/ipv6/ndp.go",
+            "Cache.Count",
+            "tenant-v6-nc"
+        );
         let mut c = NeighborCache::new(tenant);
         for i in 1..=5u8 {
             c.confirm(v6(&format!("fd00::{i}")), mac(i), 0);
@@ -515,8 +597,17 @@ mod tests {
 
     #[test]
     fn nud_state_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "NudState.Serde", "tenant-v6-nudserde");
-        for s in [NudState::Reachable, NudState::Stale, NudState::Probe, NudState::Failed] {
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/datapath/linux/ipv6/ndp.go",
+            "NudState.Serde",
+            "tenant-v6-nudserde"
+        );
+        for s in [
+            NudState::Reachable,
+            NudState::Stale,
+            NudState::Probe,
+            NudState::Failed,
+        ] {
             let j = serde_json::to_string(&s).unwrap();
             let back: NudState = serde_json::from_str(&j).unwrap();
             assert_eq!(back, s);
@@ -525,7 +616,11 @@ mod tests {
 
     #[test]
     fn nd_proxy_entry_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "Proxy.Serde", "tenant-v6-pxserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/datapath/linux/ipv6/ndp.go",
+            "Proxy.Serde",
+            "tenant-v6-pxserde"
+        );
         let e = NdProxyEntry {
             remote_pod_ip: v6("fd00:1::5"),
             remote_node_ip: IpAddr::V6(v6("2001:db8::1")),
@@ -538,10 +633,16 @@ mod tests {
 
     #[test]
     fn neighbor_entry_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/linux/ipv6/ndp.go", "Entry.Serde", "tenant-v6-eserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/datapath/linux/ipv6/ndp.go",
+            "Entry.Serde",
+            "tenant-v6-eserde"
+        );
         let e = NeighborEntry {
-            ip: v6("fd00::1"), mac: mac(1),
-            state: NudState::Reachable, last_update_ns: 100,
+            ip: v6("fd00::1"),
+            mac: mac(1),
+            state: NudState::Reachable,
+            last_update_ns: 100,
         };
         let s = serde_json::to_string(&e).unwrap();
         let back: NeighborEntry = serde_json::from_str(&s).unwrap();

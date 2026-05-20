@@ -62,8 +62,10 @@ fn changed_paths_nested_object() {
     let b = json!({"spec": {"replicas": 2, "selector": {"app": "a"}}});
     let p = changed_paths(&a, &b);
     assert!(p.contains("/spec/replicas"));
-    assert!(!p.iter().any(|s| s.starts_with("/spec/selector")),
-        "untouched subtree must NOT appear");
+    assert!(
+        !p.iter().any(|s| s.starts_with("/spec/selector")),
+        "untouched subtree must NOT appear"
+    );
 }
 
 #[test]
@@ -99,7 +101,10 @@ fn ratchet_drops_failures_in_unchanged_subtree() {
         message: "obsolete".into(),
     }];
     let kept = ratchet_failures(fails, &changed);
-    assert!(kept.is_empty(), "untouched-subtree failure must be ratcheted in");
+    assert!(
+        kept.is_empty(),
+        "untouched-subtree failure must be ratcheted in"
+    );
 }
 
 #[test]
@@ -111,8 +116,11 @@ fn ratchet_keeps_failure_on_ancestor_of_changed_path() {
         message: "spec invalid".into(),
     }];
     let kept = ratchet_failures(fails, &changed);
-    assert_eq!(kept.len(), 1,
-        "failure on an ancestor of a changed path is blocking");
+    assert_eq!(
+        kept.len(),
+        1,
+        "failure on an ancestor of a changed path is blocking"
+    );
 }
 
 #[test]
@@ -133,8 +141,12 @@ fn ratchet_keeps_failure_on_descendant_of_changed_path() {
 
 fn cr(reqs: &[(&str, i64)], lims: &[(&str, i64)]) -> ContainerResources {
     let mut c = ContainerResources::default();
-    for (k, v) in reqs { c.requests.insert((*k).into(), *v); }
-    for (k, v) in lims { c.limits.insert((*k).into(), *v); }
+    for (k, v) in reqs {
+        c.requests.insert((*k).into(), *v);
+    }
+    for (k, v) in lims {
+        c.limits.insert((*k).into(), *v);
+    }
     c
 }
 
@@ -166,7 +178,12 @@ fn resize_restart_required_when_policy_says_so() {
         restart_policy: ResourceResizeRestartPolicy::RestartContainer,
     }];
     let d = evaluate_resize("c", &old_r, &new_r, &policies, &alloc(&[("memory", 1000)]));
-    assert_eq!(d, ResizeDecision::RestartRequired { containers: vec!["c".into()] });
+    assert_eq!(
+        d,
+        ResizeDecision::RestartRequired {
+            containers: vec!["c".into()]
+        }
+    );
 }
 
 #[test]
@@ -202,8 +219,10 @@ fn resize_status_default_is_empty() {
 
 #[test]
 fn restart_policy_default_is_not_required() {
-    assert_eq!(ResourceResizeRestartPolicy::default(),
-               ResourceResizeRestartPolicy::NotRequired);
+    assert_eq!(
+        ResourceResizeRestartPolicy::default(),
+        ResourceResizeRestartPolicy::NotRequired
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -213,12 +232,16 @@ fn restart_policy_default_is_not_required() {
 fn jwt_basic(url: &str, audience: &str, username_claim: &str) -> JWTAuthenticator {
     JWTAuthenticator {
         issuer: Issuer {
-            url: url.into(), audiences: vec![audience.into()],
+            url: url.into(),
+            audiences: vec![audience.into()],
             certificate_authority: vec![],
         },
         claim_mappings: ClaimMappings {
-            username: ClaimOrExpression { claim: username_claim.into(),
-                expression: "".into(), prefix: None },
+            username: ClaimOrExpression {
+                claim: username_claim.into(),
+                expression: "".into(),
+                prefix: None,
+            },
             groups: ClaimOrExpression::default(),
             uid: ClaimOrExpression::default(),
         },
@@ -236,7 +259,10 @@ fn authn_validate_requires_at_least_one_jwt() {
 fn authn_validate_issuer_must_be_https() {
     let mut c = AuthenticationConfiguration::default();
     c.jwt.push(jwt_basic("http://issuer/", "aud", "sub"));
-    assert_eq!(validate_authn_config(&c), Err(AuthnConfigError::IssuerNotHttps));
+    assert_eq!(
+        validate_authn_config(&c),
+        Err(AuthnConfigError::IssuerNotHttps)
+    );
 }
 
 #[test]
@@ -245,7 +271,10 @@ fn authn_validate_requires_audience() {
     let mut j = jwt_basic("https://issuer/", "aud", "sub");
     j.issuer.audiences = vec![];
     c.jwt.push(j);
-    assert_eq!(validate_authn_config(&c), Err(AuthnConfigError::NoAudiences));
+    assert_eq!(
+        validate_authn_config(&c),
+        Err(AuthnConfigError::NoAudiences)
+    );
 }
 
 #[test]
@@ -254,7 +283,10 @@ fn authn_validate_requires_username_mapping() {
     let mut j = jwt_basic("https://issuer/", "aud", "");
     j.claim_mappings.username = ClaimOrExpression::default();
     c.jwt.push(j);
-    assert_eq!(validate_authn_config(&c), Err(AuthnConfigError::UsernameMissing));
+    assert_eq!(
+        validate_authn_config(&c),
+        Err(AuthnConfigError::UsernameMissing)
+    );
 }
 
 #[test]
@@ -262,8 +294,10 @@ fn authn_validate_rejects_duplicate_issuer() {
     let mut c = AuthenticationConfiguration::default();
     c.jwt.push(jwt_basic("https://issuer/", "aud", "sub"));
     c.jwt.push(jwt_basic("https://issuer/", "aud", "sub"));
-    assert_eq!(validate_authn_config(&c),
-        Err(AuthnConfigError::DuplicateIssuer("https://issuer/".into())));
+    assert_eq!(
+        validate_authn_config(&c),
+        Err(AuthnConfigError::DuplicateIssuer("https://issuer/".into()))
+    );
 }
 
 #[test]
@@ -288,8 +322,11 @@ fn authn_validate_two_distinct_issuers_ok() {
 #[test]
 fn claim_mappings_basic_username() {
     let m = ClaimMappings {
-        username: ClaimOrExpression { claim: "preferred_username".into(),
-            expression: "".into(), prefix: None },
+        username: ClaimOrExpression {
+            claim: "preferred_username".into(),
+            expression: "".into(),
+            prefix: None,
+        },
         groups: ClaimOrExpression::default(),
         uid: ClaimOrExpression::default(),
     };
@@ -302,8 +339,11 @@ fn claim_mappings_basic_username() {
 #[test]
 fn claim_mappings_username_with_prefix() {
     let m = ClaimMappings {
-        username: ClaimOrExpression { claim: "sub".into(),
-            expression: "".into(), prefix: Some("oidc:".into()) },
+        username: ClaimOrExpression {
+            claim: "sub".into(),
+            expression: "".into(),
+            prefix: Some("oidc:".into()),
+        },
         groups: ClaimOrExpression::default(),
         uid: ClaimOrExpression::default(),
     };
@@ -315,10 +355,16 @@ fn claim_mappings_username_with_prefix() {
 #[test]
 fn claim_mappings_groups_array() {
     let m = ClaimMappings {
-        username: ClaimOrExpression { claim: "sub".into(),
-            expression: "".into(), prefix: None },
-        groups: ClaimOrExpression { claim: "groups".into(),
-            expression: "".into(), prefix: None },
+        username: ClaimOrExpression {
+            claim: "sub".into(),
+            expression: "".into(),
+            prefix: None,
+        },
+        groups: ClaimOrExpression {
+            claim: "groups".into(),
+            expression: "".into(),
+            prefix: None,
+        },
         uid: ClaimOrExpression::default(),
     };
     let claims = json!({"sub": "1", "groups": ["devs", "ops"]});
@@ -329,10 +375,16 @@ fn claim_mappings_groups_array() {
 #[test]
 fn claim_mappings_groups_with_prefix() {
     let m = ClaimMappings {
-        username: ClaimOrExpression { claim: "sub".into(),
-            expression: "".into(), prefix: None },
-        groups: ClaimOrExpression { claim: "groups".into(),
-            expression: "".into(), prefix: Some("ldap:".into()) },
+        username: ClaimOrExpression {
+            claim: "sub".into(),
+            expression: "".into(),
+            prefix: None,
+        },
+        groups: ClaimOrExpression {
+            claim: "groups".into(),
+            expression: "".into(),
+            prefix: Some("ldap:".into()),
+        },
         uid: ClaimOrExpression::default(),
     };
     let claims = json!({"sub": "1", "groups": ["devs"]});
@@ -343,10 +395,16 @@ fn claim_mappings_groups_with_prefix() {
 #[test]
 fn claim_mappings_groups_non_array_yields_empty() {
     let m = ClaimMappings {
-        username: ClaimOrExpression { claim: "sub".into(),
-            expression: "".into(), prefix: None },
-        groups: ClaimOrExpression { claim: "groups".into(),
-            expression: "".into(), prefix: None },
+        username: ClaimOrExpression {
+            claim: "sub".into(),
+            expression: "".into(),
+            prefix: None,
+        },
+        groups: ClaimOrExpression {
+            claim: "groups".into(),
+            expression: "".into(),
+            prefix: None,
+        },
         uid: ClaimOrExpression::default(),
     };
     let claims = json!({"sub": "1", "groups": "not-array"});
@@ -357,8 +415,11 @@ fn claim_mappings_groups_non_array_yields_empty() {
 #[test]
 fn claim_mappings_missing_username_returns_empty() {
     let m = ClaimMappings {
-        username: ClaimOrExpression { claim: "sub".into(),
-            expression: "".into(), prefix: None },
+        username: ClaimOrExpression {
+            claim: "sub".into(),
+            expression: "".into(),
+            prefix: None,
+        },
         groups: ClaimOrExpression::default(),
         uid: ClaimOrExpression::default(),
     };
@@ -370,11 +431,17 @@ fn claim_mappings_missing_username_returns_empty() {
 #[test]
 fn claim_mappings_uid_extracted() {
     let m = ClaimMappings {
-        username: ClaimOrExpression { claim: "sub".into(),
-            expression: "".into(), prefix: None },
+        username: ClaimOrExpression {
+            claim: "sub".into(),
+            expression: "".into(),
+            prefix: None,
+        },
         groups: ClaimOrExpression::default(),
-        uid: ClaimOrExpression { claim: "uid".into(), expression: "".into(),
-            prefix: None },
+        uid: ClaimOrExpression {
+            claim: "uid".into(),
+            expression: "".into(),
+            prefix: None,
+        },
     };
     let claims = json!({"sub": "x", "uid": "u-42"});
     let (_, _, uid) = apply_claim_mappings(&m, &claims);
@@ -385,27 +452,32 @@ fn claim_mappings_uid_extracted() {
 // `#[ignore]` — gated on real CEL / OIDC discovery
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_claim_mapping_expression_evaluates() {
     // pending: requires CEL evaluator (M1) — `claims.email + '@' + claims.iss`
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn oidc_discovery_fetches_jwks() {
     // pending: requires HTTPS + JSON parser for `<issuer>/.well-known/openid-configuration`
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn jwt_signature_verification_against_jwks() {
     // pending: requires `jsonwebtoken` or rustcrypto — RS256/ES256/EdDSA
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn ratcheting_validates_full_object_when_subtree_changed() {
     // pending: requires real CRD validator integration
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn in_place_resize_status_progression() {
     // pending: requires kubelet-side state machine — Proposed→InProgress→Deferred
 }

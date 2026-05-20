@@ -93,7 +93,16 @@ impl PluginManifest {
         if version.is_empty() {
             return Err("plugin manifest missing version".into());
         }
-        Ok(PluginManifest { id, kind, name, version, author, executable, signature, meta })
+        Ok(PluginManifest {
+            id,
+            kind,
+            name,
+            version,
+            author,
+            executable,
+            signature,
+            meta,
+        })
     }
 }
 
@@ -102,7 +111,9 @@ impl PluginManifest {
 pub trait BackendPlugin: Send + Sync {
     fn id(&self) -> &str;
     fn version(&self) -> &str;
-    fn supports_health_check(&self) -> bool { true }
+    fn supports_health_check(&self) -> bool {
+        true
+    }
     fn health_check(&self) -> HealthCheck;
     fn query(&self, request: &PluginQueryRequest) -> Vec<PluginQueryResponse>;
 }
@@ -157,9 +168,15 @@ pub struct PluginRegistry {
 }
 
 impl PluginRegistry {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-    pub fn register(&mut self, manifest: PluginManifest, plugin: Box<dyn BackendPlugin>) -> Result<(), String> {
+    pub fn register(
+        &mut self,
+        manifest: PluginManifest,
+        plugin: Box<dyn BackendPlugin>,
+    ) -> Result<(), String> {
         if manifest.id != plugin.id() {
             return Err(format!(
                 "manifest id ({}) does not match plugin id ({})",
@@ -194,7 +211,9 @@ impl PluginRegistry {
         out
     }
 
-    pub fn count(&self) -> usize { self.plugins.len() }
+    pub fn count(&self) -> usize {
+        self.plugins.len()
+    }
 }
 
 #[cfg(test)]
@@ -203,10 +222,17 @@ mod tests {
 
     struct EchoPlugin;
     impl BackendPlugin for EchoPlugin {
-        fn id(&self) -> &str { "test-echo" }
-        fn version(&self) -> &str { "1.0.0" }
+        fn id(&self) -> &str {
+            "test-echo"
+        }
+        fn version(&self) -> &str {
+            "1.0.0"
+        }
         fn health_check(&self) -> HealthCheck {
-            HealthCheck { status: HealthStatus::Ok, message: "echo plugin alive".into() }
+            HealthCheck {
+                status: HealthStatus::Ok,
+                message: "echo plugin alive".into(),
+            }
         }
         fn query(&self, req: &PluginQueryRequest) -> Vec<PluginQueryResponse> {
             vec![PluginQueryResponse {
@@ -287,22 +313,28 @@ mod tests {
     #[test]
     fn registry_rejects_id_mismatch() {
         let mut r = PluginRegistry::new();
-        let err = r.register(manifest_for("other"), Box::new(EchoPlugin)).unwrap_err();
+        let err = r
+            .register(manifest_for("other"), Box::new(EchoPlugin))
+            .unwrap_err();
         assert!(err.contains("manifest id"));
     }
 
     #[test]
     fn registry_rejects_duplicate_id() {
         let mut r = PluginRegistry::new();
-        r.register(manifest_for("test-echo"), Box::new(EchoPlugin)).unwrap();
-        let err = r.register(manifest_for("test-echo"), Box::new(EchoPlugin)).unwrap_err();
+        r.register(manifest_for("test-echo"), Box::new(EchoPlugin))
+            .unwrap();
+        let err = r
+            .register(manifest_for("test-echo"), Box::new(EchoPlugin))
+            .unwrap_err();
         assert!(err.contains("already registered"));
     }
 
     #[test]
     fn registry_returns_plugin_via_get() {
         let mut r = PluginRegistry::new();
-        r.register(manifest_for("test-echo"), Box::new(EchoPlugin)).unwrap();
+        r.register(manifest_for("test-echo"), Box::new(EchoPlugin))
+            .unwrap();
         let p = r.get("test-echo").unwrap();
         assert_eq!(p.id(), "test-echo");
         assert_eq!(p.health_check().status, HealthStatus::Ok);
@@ -311,19 +343,24 @@ mod tests {
     #[test]
     fn registry_ids_of_filters_by_kind() {
         let mut r = PluginRegistry::new();
-        r.register(manifest_for("a"), Box::new(EchoPlugin)).unwrap_err();
+        r.register(manifest_for("a"), Box::new(EchoPlugin))
+            .unwrap_err();
         // register with matching id only
         let mut m = manifest_for("test-echo");
         m.kind = PluginType::Datasource;
         r.register(m, Box::new(EchoPlugin)).unwrap();
-        assert_eq!(r.ids_of(PluginType::Datasource), vec!["test-echo".to_string()]);
+        assert_eq!(
+            r.ids_of(PluginType::Datasource),
+            vec!["test-echo".to_string()]
+        );
         assert!(r.ids_of(PluginType::Panel).is_empty());
     }
 
     #[test]
     fn plugin_query_round_trip() {
         let mut r = PluginRegistry::new();
-        r.register(manifest_for("test-echo"), Box::new(EchoPlugin)).unwrap();
+        r.register(manifest_for("test-echo"), Box::new(EchoPlugin))
+            .unwrap();
         let p = r.get("test-echo").unwrap();
         let req = PluginQueryRequest {
             ref_id: "A".into(),

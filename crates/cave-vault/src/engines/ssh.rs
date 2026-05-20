@@ -1,24 +1,25 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+use crate::VaultState;
 use crate::error::{VaultError, VaultResult};
 use crate::response::VaultResponse;
-use crate::VaultState;
 use axum::{
+    Router,
     extract::{Json, Path, State},
     http::HeaderMap,
     routing::{delete, get, post},
-    Router,
 };
 use base64::Engine as _;
 use ring::rand::{SecureRandom, SystemRandom};
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 fn extract_token(headers: &HeaderMap) -> VaultResult<String> {
-    headers.get("x-vault-token")
+    headers
+        .get("x-vault-token")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or(VaultError::BadToken)
@@ -86,7 +87,10 @@ pub async fn configure_ca(
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    let generate = body.get("generate_signing_key").and_then(|v| v.as_bool()).unwrap_or(true);
+    let generate = body
+        .get("generate_signing_key")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
 
     let (private_key_bytes, public_key_str) = if generate {
         let rng = SystemRandom::new();
@@ -102,13 +106,21 @@ pub async fn configure_ca(
         encoded.extend_from_slice(algo);
         encoded.extend_from_slice(&(pub_key_bytes.len() as u32).to_be_bytes());
         encoded.extend_from_slice(&pub_key_bytes);
-        let pub_key_str = format!("ssh-ed25519 {}", base64::engine::general_purpose::STANDARD.encode(&encoded));
+        let pub_key_str = format!(
+            "ssh-ed25519 {}",
+            base64::engine::general_purpose::STANDARD.encode(&encoded)
+        );
         (pkcs8.as_ref().to_vec(), pub_key_str)
     } else {
-        let priv_key = body.get("private_key").and_then(|v| v.as_str())
+        let priv_key = body
+            .get("private_key")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| VaultError::InvalidRequest("private_key required".into()))?;
-        let pub_key = body.get("public_key").and_then(|v| v.as_str())
-            .unwrap_or("").to_string();
+        let pub_key = body
+            .get("public_key")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
         (priv_key.as_bytes().to_vec(), pub_key)
     };
 
@@ -128,7 +140,10 @@ pub async fn read_ca_public_key(
     Path(mount): Path<String>,
 ) -> Result<VaultResponse, VaultError> {
     let store = state.ssh_store.read().await;
-    let ca = store.ca.as_ref().ok_or_else(|| VaultError::NotFound("no CA configured".into()))?;
+    let ca = store
+        .ca
+        .as_ref()
+        .ok_or_else(|| VaultError::NotFound("no CA configured".into()))?;
     Ok(VaultResponse::new().with_data(json!({ "public_key": ca.public_key })))
 }
 
@@ -140,16 +155,31 @@ pub async fn create_role(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.ssh_store.write().await;
-    let mut role = store.roles.entry(role_name.clone()).or_insert_with(|| SshRole {
-        name: role_name.clone(),
-        ..Default::default()
-    });
-    if let Some(v) = body.get("key_type").and_then(|v| v.as_str()) { role.key_type = v.to_string(); }
-    if let Some(v) = body.get("allowed_users").and_then(|v| v.as_str()) { role.allowed_users = v.to_string(); }
-    if let Some(v) = body.get("allowed_domains").and_then(|v| v.as_str()) { role.allowed_domains = v.to_string(); }
-    if let Some(v) = body.get("ttl").and_then(|v| v.as_str()) { role.ttl = crate::token::parse_duration(v); }
-    if let Some(v) = body.get("max_ttl").and_then(|v| v.as_str()) { role.max_ttl = crate::token::parse_duration(v); }
-    if let Some(v) = body.get("algorithm_signer").and_then(|v| v.as_str()) { role.algorithm_signer = v.to_string(); }
+    let mut role = store
+        .roles
+        .entry(role_name.clone())
+        .or_insert_with(|| SshRole {
+            name: role_name.clone(),
+            ..Default::default()
+        });
+    if let Some(v) = body.get("key_type").and_then(|v| v.as_str()) {
+        role.key_type = v.to_string();
+    }
+    if let Some(v) = body.get("allowed_users").and_then(|v| v.as_str()) {
+        role.allowed_users = v.to_string();
+    }
+    if let Some(v) = body.get("allowed_domains").and_then(|v| v.as_str()) {
+        role.allowed_domains = v.to_string();
+    }
+    if let Some(v) = body.get("ttl").and_then(|v| v.as_str()) {
+        role.ttl = crate::token::parse_duration(v);
+    }
+    if let Some(v) = body.get("max_ttl").and_then(|v| v.as_str()) {
+        role.max_ttl = crate::token::parse_duration(v);
+    }
+    if let Some(v) = body.get("algorithm_signer").and_then(|v| v.as_str()) {
+        role.algorithm_signer = v.to_string();
+    }
     Ok(VaultResponse::new())
 }
 
@@ -160,7 +190,9 @@ pub async fn read_role(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.ssh_store.read().await;
-    let role = store.roles.get(&role_name)
+    let role = store
+        .roles
+        .get(&role_name)
         .ok_or_else(|| VaultError::RoleNotFound(role_name))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(role).unwrap_or_default()))
 }
@@ -206,9 +238,16 @@ pub async fn sign_key(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.ssh_store.read().await;
-    let ca = store.ca.as_ref().ok_or_else(|| VaultError::NotFound("no CA configured".into()))?.clone();
-    let role = store.roles.get(&role_name)
-        .ok_or_else(|| VaultError::RoleNotFound(role_name.clone()))?.clone();
+    let ca = store
+        .ca
+        .as_ref()
+        .ok_or_else(|| VaultError::NotFound("no CA configured".into()))?
+        .clone();
+    let role = store
+        .roles
+        .get(&role_name)
+        .ok_or_else(|| VaultError::RoleNotFound(role_name.clone()))?
+        .clone();
     drop(store);
 
     // Sign the provided SSH public key using Ed25519
@@ -217,18 +256,29 @@ pub async fn sign_key(
     let pair = Ed25519KeyPair::from_pkcs8(&ca.private_key)
         .map_err(|_| VaultError::Crypto("CA key decode failed".into()))?;
 
-    let ttl_secs = body.ttl.as_deref()
+    let ttl_secs = body
+        .ttl
+        .as_deref()
         .map(crate::token::parse_duration)
         .filter(|&t| t > 0)
         .unwrap_or(role.ttl);
 
-    let principals = body.valid_principals.clone().unwrap_or_else(|| role.allowed_users.clone());
+    let principals = body
+        .valid_principals
+        .clone()
+        .unwrap_or_else(|| role.allowed_users.clone());
     let cert_type = body.cert_type.as_deref().unwrap_or("user");
-    let key_id = body.key_id.clone().unwrap_or_else(|| format!("vault-{}", uuid::Uuid::new_v4()));
+    let key_id = body
+        .key_id
+        .clone()
+        .unwrap_or_else(|| format!("vault-{}", uuid::Uuid::new_v4()));
 
     // Create a simplified "certificate" by signing: key_id + principals + expiry
     let expiry = chrono::Utc::now().timestamp() + ttl_secs;
-    let to_sign = format!("{}:{}:{}:{}:{}", key_id, principals, cert_type, expiry, body.public_key);
+    let to_sign = format!(
+        "{}:{}:{}:{}:{}",
+        key_id, principals, cert_type, expiry, body.public_key
+    );
     let signature = pair.sign(to_sign.as_bytes());
     let sig_b64 = base64::engine::general_purpose::STANDARD.encode(signature.as_ref());
 
@@ -250,18 +300,26 @@ pub async fn generate_otp(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.ssh_store.read().await;
-    let role = store.roles.get(&role_name)
-        .ok_or_else(|| VaultError::RoleNotFound(role_name.clone()))?.clone();
+    let role = store
+        .roles
+        .get(&role_name)
+        .ok_or_else(|| VaultError::RoleNotFound(role_name.clone()))?
+        .clone();
     drop(store);
 
-    let username = body.get("username").and_then(|v| v.as_str())
+    let username = body
+        .get("username")
+        .and_then(|v| v.as_str())
         .ok_or_else(|| VaultError::InvalidRequest("username required".into()))?;
-    let ip = body.get("ip").and_then(|v| v.as_str())
+    let ip = body
+        .get("ip")
+        .and_then(|v| v.as_str())
         .ok_or_else(|| VaultError::InvalidRequest("ip required".into()))?;
 
     let rng = SystemRandom::new();
     let mut otp_bytes = vec![0u8; 8];
-    rng.fill(&mut otp_bytes).map_err(|_| VaultError::Crypto("rng failure".into()))?;
+    rng.fill(&mut otp_bytes)
+        .map_err(|_| VaultError::Crypto("rng failure".into()))?;
     let otp = hex::encode(&otp_bytes);
 
     let entry = OtpEntry {
@@ -294,7 +352,9 @@ pub async fn verify_otp(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.ssh_store.write().await;
-    let entry = store.otp_map.remove(&body.otp)
+    let entry = store
+        .otp_map
+        .remove(&body.otp)
         .ok_or_else(|| VaultError::NotFound("OTP not found".into()))?;
     Ok(VaultResponse::new().with_data(json!({
         "username": entry.username,

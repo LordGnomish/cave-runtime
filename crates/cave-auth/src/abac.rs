@@ -298,9 +298,7 @@ fn evaluate_condition(
             .split(',')
             .map(str::trim)
             .any(|v| actual.eq_ignore_ascii_case(v)),
-        ConditionOperator::Contains => actual
-            .to_lowercase()
-            .contains(&cond.value.to_lowercase()),
+        ConditionOperator::Contains => actual.to_lowercase().contains(&cond.value.to_lowercase()),
         ConditionOperator::StartsWith => actual
             .to_lowercase()
             .starts_with(&cond.value.to_lowercase()),

@@ -107,7 +107,12 @@ mod tests {
     fn events_all_tenants() {
         let mut a = args();
         a.all_tenants = true;
-        assert!(prepare(&a).unwrap().path.starts_with("/api/native/all/events"));
+        assert!(
+            prepare(&a)
+                .unwrap()
+                .path
+                .starts_with("/api/native/all/events")
+        );
     }
 
     #[test]
@@ -121,10 +126,7 @@ mod tests {
     fn events_source_filter() {
         let mut a = args();
         a.source = Some("cave-apiserver".into());
-        assert!(prepare(&a)
-            .unwrap()
-            .path
-            .contains("source=cave-apiserver"));
+        assert!(prepare(&a).unwrap().path.contains("source=cave-apiserver"));
     }
 
     #[test]

@@ -52,7 +52,9 @@ pub struct HealthRegistry {
 
 impl HealthRegistry {
     pub fn new() -> Self {
-        Self { states: Arc::new(DashMap::new()) }
+        Self {
+            states: Arc::new(DashMap::new()),
+        }
     }
 
     fn _state_map_unused(&self, _upstream_id: Uuid) {
@@ -200,7 +202,11 @@ impl HealthRegistry {
         self.states.entry(upstream_id).or_insert_with(DashMap::new);
         let up = self.states.get(&upstream_id).unwrap();
         let mut entry = up.entry(target_id).or_insert_with(TargetState::default);
-        entry.status = if healthy { HealthStatus::Healthy } else { HealthStatus::Unhealthy };
+        entry.status = if healthy {
+            HealthStatus::Healthy
+        } else {
+            HealthStatus::Unhealthy
+        };
         entry.consecutive_successes = 0;
         entry.consecutive_failures = 0;
     }

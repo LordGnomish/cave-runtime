@@ -132,7 +132,10 @@ pub fn detect_anomalies(reports: &[CostReport], deviation_threshold_pct: f64) ->
     // Compute per-cost-center mean across all historical reports.
     let mut by_cc: HashMap<Uuid, Vec<f64>> = HashMap::new();
     for r in reports {
-        by_cc.entry(r.cost_center_id).or_default().push(r.total_cost_usd);
+        by_cc
+            .entry(r.cost_center_id)
+            .or_default()
+            .push(r.total_cost_usd);
     }
 
     let now = Utc::now();

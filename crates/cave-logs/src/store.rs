@@ -10,17 +10,19 @@
 //!   - A background compaction task periodically flushes head chunks and
 //!     removes entries older than the tenant's retention window.
 
+use chrono::Utc;
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
 use tokio::sync::broadcast;
-use chrono::Utc;
 
-use crate::chunk::{HeadChunk, decode_chunk, DEFAULT_CHUNK_TARGET_SIZE, DEFAULT_CHUNK_MAX_AGE_SECS};
-use crate::index::{LabelIndex, StreamKey, ChunkMeta};
+use crate::chunk::{
+    DEFAULT_CHUNK_MAX_AGE_SECS, DEFAULT_CHUNK_TARGET_SIZE, HeadChunk, decode_chunk,
+};
+use crate::index::{ChunkMeta, LabelIndex, StreamKey};
 use crate::models::{
-    Chunk, Codec, Direction, IndexStats, Labels, LogEntry, LogStream, TailEvent,
-    TenantId, TimestampNs,
+    Chunk, Codec, Direction, IndexStats, Labels, LogEntry, LogStream, TailEvent, TenantId,
+    TimestampNs,
 };
 
 const TAIL_CHANNEL_CAPACITY: usize = 1024;
@@ -32,9 +34,13 @@ struct ChunkStore {
 }
 
 impl ChunkStore {
-    fn new() -> Self { Self { chunks: Vec::new() } }
+    fn new() -> Self {
+        Self { chunks: Vec::new() }
+    }
 
-    fn push(&mut self, chunk: Chunk) { self.chunks.push(chunk); }
+    fn push(&mut self, chunk: Chunk) {
+        self.chunks.push(chunk);
+    }
 
     /// Entries from chunks that overlap [start_ns, end_ns].
     fn entries_in_range(
@@ -138,12 +144,7 @@ impl LogStore {
     }
 
     /// Ingest a batch of entries for one stream.
-    pub fn push(
-        &self,
-        tenant: &str,
-        labels: Labels,
-        entries: Vec<LogEntry>,
-    ) -> anyhow::Result<()> {
+    pub fn push(&self, tenant: &str, labels: Labels, entries: Vec<LogEntry>) -> anyhow::Result<()> {
         if entries.is_empty() {
             return Ok(());
         }
@@ -152,12 +153,10 @@ impl LogStore {
 
         {
             let mut streams = self.streams.write();
-            let state = streams
-                .entry(key.clone())
-                .or_insert_with(|| {
-                    self.index.index_stream(tenant, fp, &labels);
-                    StreamState::new(labels.clone(), tenant, fp)
-                });
+            let state = streams.entry(key.clone()).or_insert_with(|| {
+                self.index.index_stream(tenant, fp, &labels);
+                StreamState::new(labels.clone(), tenant, fp)
+            });
 
             state.last_write = entries.last().map(|e| e.ts).unwrap_or(state.last_write);
             state.total_entries += entries.len() as u64;
@@ -173,7 +172,10 @@ impl LogStore {
             }
 
             // Check if head needs flushing.
-            if state.head.should_flush(self.chunk_target_size, self.chunk_max_age_secs) {
+            if state
+                .head
+                .should_flush(self.chunk_target_size, self.chunk_max_age_secs)
+            {
                 self.flush_head_locked(&mut streams, &key)?;
             }
         }
@@ -211,14 +213,7 @@ impl LogStore {
             // For simplicity we build an empty-lines bloom (real implementation would
             // pass the actual lines from the chunk; decoding here is expensive, so we
             // skip bloom population at flush time and populate it lazily on first query).
-            let meta = ChunkMeta::new(
-                StreamKey::new(&tenant, fp),
-                min_ts,
-                max_ts,
-                n,
-                sz,
-                &[],
-            );
+            let meta = ChunkMeta::new(StreamKey::new(&tenant, fp), min_ts, max_ts, n, sz, &[]);
             self.index.add_chunk(meta);
         }
         Ok(())
@@ -251,8 +246,7 @@ impl LogStore {
             };
 
             // Entries from sealed chunks.
-            let mut entries: Vec<LogEntry> =
-                chunks.entries_in_range(fp, tenant, start_ns, end_ns);
+            let mut entries: Vec<LogEntry> = chunks.entries_in_range(fp, tenant, start_ns, end_ns);
 
             // Entries from the active head chunk.
             if let Some(state) = streams.get(&key) {
@@ -376,7 +370,14 @@ impl LogStore {
         let bucket_count = ((end_ns - start_ns) / step_ns).max(1) as usize;
         let mut buckets = vec![0u64; bucket_count];
 
-        let results = self.query_entries(tenant, fps, start_ns, end_ns, usize::MAX, Direction::Forward);
+        let results = self.query_entries(
+            tenant,
+            fps,
+            start_ns,
+            end_ns,
+            usize::MAX,
+            Direction::Forward,
+        );
         for (_, _, entries) in results {
             for e in entries {
                 let idx = ((e.ts - start_ns) / step_ns) as usize;
@@ -405,7 +406,14 @@ impl LogStore {
         let bucket_count = ((end_ns - start_ns) / step_ns).max(1) as usize;
         let mut buckets = vec![0u64; bucket_count];
 
-        let results = self.query_entries(tenant, fps, start_ns, end_ns, usize::MAX, Direction::Forward);
+        let results = self.query_entries(
+            tenant,
+            fps,
+            start_ns,
+            end_ns,
+            usize::MAX,
+            Direction::Forward,
+        );
         for (_, _, entries) in results {
             for e in entries {
                 let idx = ((e.ts - start_ns) / step_ns) as usize;
@@ -437,7 +445,9 @@ mod tests {
     use crate::models::{Labels, LogEntry};
     use std::collections::HashMap;
 
-    fn tenant() -> &'static str { "test_tenant" }
+    fn tenant() -> &'static str {
+        "test_tenant"
+    }
 
     fn labels(app: &str) -> Labels {
         Labels::new(HashMap::from([("app".into(), app.into())]))
@@ -461,7 +471,12 @@ mod tests {
         assert_eq!(fps.len(), 1);
 
         let results = store.query_entries(
-            tenant(), &fps, t - 1, t + 2_000_000, 100, Direction::Forward,
+            tenant(),
+            &fps,
+            t - 1,
+            t + 2_000_000,
+            100,
+            Direction::Forward,
         );
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].2.len(), 2);
@@ -472,8 +487,12 @@ mod tests {
     fn label_names_and_values() {
         let store = LogStore::new();
         let t = now_ns();
-        store.push(tenant(), labels("nginx"), vec![LogEntry::new(t, "l")]).unwrap();
-        store.push(tenant(), labels("postgres"), vec![LogEntry::new(t, "l")]).unwrap();
+        store
+            .push(tenant(), labels("nginx"), vec![LogEntry::new(t, "l")])
+            .unwrap();
+        store
+            .push(tenant(), labels("postgres"), vec![LogEntry::new(t, "l")])
+            .unwrap();
 
         let names = store.label_names(tenant());
         assert!(names.contains(&"app".to_owned()));
@@ -500,7 +519,9 @@ mod tests {
         let store = LogStore::new();
         let t = 0i64;
         let step = 1_000_000_000i64; // 1s
-        let entries: Vec<LogEntry> = (0..10).map(|i| LogEntry::new(t + i * step / 2, "x")).collect();
+        let entries: Vec<LogEntry> = (0..10)
+            .map(|i| LogEntry::new(t + i * step / 2, "x"))
+            .collect();
         store.push(tenant(), labels("b"), entries).unwrap();
 
         let fps = store.matching_fps(tenant(), |_| true);
@@ -514,8 +535,12 @@ mod tests {
     fn stats() {
         let store = LogStore::new();
         let t = now_ns();
-        store.push("t1", labels("a"), vec![LogEntry::new(t, "l1")]).unwrap();
-        store.push("t2", labels("a"), vec![LogEntry::new(t, "l2")]).unwrap();
+        store
+            .push("t1", labels("a"), vec![LogEntry::new(t, "l1")])
+            .unwrap();
+        store
+            .push("t2", labels("a"), vec![LogEntry::new(t, "l2")])
+            .unwrap();
         let s = store.stats();
         assert_eq!(s.streams, 2);
         assert!(s.entries >= 2);

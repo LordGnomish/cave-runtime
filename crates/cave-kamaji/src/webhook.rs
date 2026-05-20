@@ -21,7 +21,9 @@ pub enum WebhookError {
     EmptyField { field: &'static str },
     #[error("replicas must be >= 1 (got {replicas})")]
     InvalidReplicas { replicas: u32 },
-    #[error("data_store kind {kind:?} is not recognised — must be one of shared-etcd / postgres / mysql")]
+    #[error(
+        "data_store kind {kind:?} is not recognised — must be one of shared-etcd / postgres / mysql"
+    )]
     UnknownDataStore { kind: String },
     #[error("field {field} is immutable once set (old={old:?}, new={new:?})")]
     ImmutableField {
@@ -125,7 +127,10 @@ mod tests {
         new.namespace = "different".into();
         assert!(matches!(
             validate_update(&old, &new).unwrap_err(),
-            WebhookError::ImmutableField { field: "namespace", .. }
+            WebhookError::ImmutableField {
+                field: "namespace",
+                ..
+            }
         ));
     }
 }

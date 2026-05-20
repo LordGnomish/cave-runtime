@@ -59,7 +59,10 @@ pub enum ConflictReason {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ApplyOutcome {
-    Applied { manager: String, fields: Vec<String> },
+    Applied {
+        manager: String,
+        fields: Vec<String>,
+    },
     Conflicts(Vec<ApplyConflict>),
 }
 
@@ -113,9 +116,10 @@ impl FieldManagerRegistry {
         // wholly scoped to (tenant_id, uid) and cannot leak.
         let mut conflicts: Vec<ApplyConflict> = vec![];
         for f in fields {
-            if let Some(owner) = entries.iter().find(|e|
-                e.manager != manager && e.fields_owned.iter().any(|x| x == f)
-            ) {
+            if let Some(owner) = entries
+                .iter()
+                .find(|e| e.manager != manager && e.fields_owned.iter().any(|x| x == f))
+            {
                 let reason = match owner.operation {
                     ManagerOperation::Apply => ConflictReason::AppliedBy,
                     ManagerOperation::Update => ConflictReason::UpdatedBy,
@@ -156,7 +160,10 @@ impl FieldManagerRegistry {
                 let now = Utc::now();
                 for (field, from) in to_record {
                     entry.push(OwnershipTransfer {
-                        field, from, to: manager.into(), at: now,
+                        field,
+                        from,
+                        to: manager.into(),
+                        at: now,
                     });
                 }
             }
@@ -166,7 +173,9 @@ impl FieldManagerRegistry {
         // Upsert this manager's entry.
         if let Some(e) = entries.iter_mut().find(|e| e.manager == manager) {
             for f in fields {
-                if !e.fields_owned.contains(f) { e.fields_owned.push(f.clone()); }
+                if !e.fields_owned.contains(f) {
+                    e.fields_owned.push(f.clone());
+                }
             }
             e.time = Utc::now();
             e.api_version = api_version.into();
@@ -179,16 +188,26 @@ impl FieldManagerRegistry {
                 fields_owned: fields.to_vec(),
             });
         }
-        ApplyOutcome::Applied { manager: manager.into(), fields: fields.to_vec() }
+        ApplyOutcome::Applied {
+            manager: manager.into(),
+            fields: fields.to_vec(),
+        }
     }
 
     pub fn entries(&self, key: &ObjectKey) -> Vec<ManagedFieldsEntry> {
-        self.inner.lock().unwrap().get(key).cloned().unwrap_or_default()
+        self.inner
+            .lock()
+            .unwrap()
+            .get(key)
+            .cloned()
+            .unwrap_or_default()
     }
 
     pub fn owner_of(&self, key: &ObjectKey, field: &str) -> Option<String> {
         let inner = self.inner.lock().unwrap();
-        inner.get(key)?.iter()
+        inner
+            .get(key)?
+            .iter()
             .find(|e| e.fields_owned.iter().any(|f| f == field))
             .map(|e| e.manager.clone())
     }
@@ -223,7 +242,9 @@ impl FieldManagerRegistry {
         entries.retain(|e| !e.fields_owned.is_empty() || e.manager == manager);
         if let Some(e) = entries.iter_mut().find(|e| e.manager == manager) {
             for f in fields {
-                if !e.fields_owned.contains(f) { e.fields_owned.push(f.clone()); }
+                if !e.fields_owned.contains(f) {
+                    e.fields_owned.push(f.clone());
+                }
             }
             e.operation = ManagerOperation::Update;
             e.api_version = api_version.into();
@@ -242,13 +263,19 @@ impl FieldManagerRegistry {
     /// Read the ownership-transfer audit log for `key`. Append-only since
     /// registry construction.
     pub fn transfer_log(&self, key: &ObjectKey) -> Vec<OwnershipTransfer> {
-        self.transfers.lock().unwrap()
-            .get(key).cloned().unwrap_or_default()
+        self.transfers
+            .lock()
+            .unwrap()
+            .get(key)
+            .cloned()
+            .unwrap_or_default()
     }
 }
 
 impl Default for FieldManagerRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -256,7 +283,10 @@ mod tests {
     use super::*;
 
     fn key(tenant: &str, uid: &str) -> ObjectKey {
-        ObjectKey { tenant_id: tenant.into(), uid: uid.into() }
+        ObjectKey {
+            tenant_id: tenant.into(),
+            uid: uid.into(),
+        }
     }
 
     /// Upstream parity: `TestApply_FirstWriterWins` (managedfields/internal/managedfields_test.go).
@@ -264,8 +294,13 @@ mod tests {
     fn test_first_writer_owns_fields() {
         let r = FieldManagerRegistry::new();
         let k = key("acme", "obj-1");
-        let res = r.apply(&k, "kubectl", "v1",
-            &["spec.replicas".into(), "spec.image".into()], false);
+        let res = r.apply(
+            &k,
+            "kubectl",
+            "v1",
+            &["spec.replicas".into(), "spec.image".into()],
+            false,
+        );
         assert!(matches!(res, ApplyOutcome::Applied { .. }));
         assert_eq!(r.owner_of(&k, "spec.replicas").as_deref(), Some("kubectl"));
         assert_eq!(r.owner_of(&k, "spec.image").as_deref(), Some("kubectl"));
@@ -329,10 +364,18 @@ mod tests {
         // Same field, same manager, different tenant — must not conflict and
         // must not show up under k_a.
         let res = r.apply(&k_b, "argo-cd", "v1", &["spec.replicas".into()], false);
-        assert!(matches!(res, ApplyOutcome::Applied { .. }),
-            "tenant_id invariant: ownership is per-tenant, no cross-tenant conflict");
-        assert_eq!(r.owner_of(&k_a, "spec.replicas").as_deref(), Some("kubectl"));
-        assert_eq!(r.owner_of(&k_b, "spec.replicas").as_deref(), Some("argo-cd"));
+        assert!(
+            matches!(res, ApplyOutcome::Applied { .. }),
+            "tenant_id invariant: ownership is per-tenant, no cross-tenant conflict"
+        );
+        assert_eq!(
+            r.owner_of(&k_a, "spec.replicas").as_deref(),
+            Some("kubectl")
+        );
+        assert_eq!(
+            r.owner_of(&k_b, "spec.replicas").as_deref(),
+            Some("argo-cd")
+        );
     }
 
     /// Upstream parity: `TestApply_SameManagerExtendsFields`.
@@ -344,7 +387,9 @@ mod tests {
         let _ = r.apply(&k, "kubectl", "v1", &["spec.image".into()], false);
         let entries = r.entries(&k);
         assert_eq!(entries.len(), 1, "same manager => single entry");
-        assert!(entries[0].fields_owned.contains(&"spec.replicas".to_string()));
+        assert!(entries[0]
+            .fields_owned
+            .contains(&"spec.replicas".to_string()));
         assert!(entries[0].fields_owned.contains(&"spec.image".to_string()));
         // tenant_id invariant.
         assert_eq!(k.tenant_id, "acme");
@@ -367,10 +412,14 @@ mod tests {
     fn test_force_strips_only_overlapping_fields_from_prior_owner() {
         let r = FieldManagerRegistry::new();
         let k = key("acme", "obj-1");
-        let _ = r.apply(&k, "kubectl", "v1",
-            &["spec.replicas".into(), "spec.strategy".into()], false);
-        let _ = r.apply(&k, "argo-cd", "v1",
-            &["spec.replicas".into()], true);
+        let _ = r.apply(
+            &k,
+            "kubectl",
+            "v1",
+            &["spec.replicas".into(), "spec.strategy".into()],
+            false,
+        );
+        let _ = r.apply(&k, "argo-cd", "v1", &["spec.replicas".into()], true);
         // kubectl should still own strategy; argo-cd took replicas.
         assert_eq!(r.owner_of(&k, "spec.strategy").as_deref(), Some("kubectl"));
         assert_eq!(r.owner_of(&k, "spec.replicas").as_deref(), Some("argo-cd"));
@@ -383,10 +432,14 @@ mod tests {
     fn test_conflicts_list_includes_all_overlapping_fields() {
         let r = FieldManagerRegistry::new();
         let k = key("acme", "obj-1");
-        let _ = r.apply(&k, "kubectl", "v1",
-            &["a".into(), "b".into(), "c".into()], false);
-        let res = r.apply(&k, "argo-cd", "v1",
-            &["a".into(), "b".into()], false);
+        let _ = r.apply(
+            &k,
+            "kubectl",
+            "v1",
+            &["a".into(), "b".into(), "c".into()],
+            false,
+        );
+        let res = r.apply(&k, "argo-cd", "v1", &["a".into(), "b".into()], false);
         match res {
             ApplyOutcome::Conflicts(c) => {
                 assert_eq!(c.len(), 2);
@@ -412,12 +465,17 @@ mod tests {
         let res1 = r.apply(&k, "kubectl", "v1", &["spec.image".into()], false);
         assert!(matches!(res1, ApplyOutcome::Applied { .. }));
         let res2 = r.apply(&k, "kubectl", "v1", &["spec.image".into()], false);
-        assert!(matches!(res2, ApplyOutcome::Applied { .. }),
-            "same manager re-applying same field MUST NOT conflict with itself");
+        assert!(
+            matches!(res2, ApplyOutcome::Applied { .. }),
+            "same manager re-applying same field MUST NOT conflict with itself"
+        );
         let entries = r.entries(&k);
         assert_eq!(entries.len(), 1, "single entry retained");
-        assert_eq!(entries[0].fields_owned, vec!["spec.image".to_string()],
-            "field set unchanged on idempotent reapply");
+        assert_eq!(
+            entries[0].fields_owned,
+            vec!["spec.image".to_string()],
+            "field set unchanged on idempotent reapply"
+        );
         assert_eq!(k.tenant_id, "acme", "tenant_id invariant");
     }
 
@@ -429,8 +487,11 @@ mod tests {
         let k = key("acme", "obj-1");
         let _ = r.apply(&k, "kubectl", "v1", &["x".into()], false);
         r.remove(&k, "ghost-manager");
-        assert_eq!(r.owner_of(&k, "x").as_deref(), Some("kubectl"),
-            "removing unknown manager preserves existing ownership");
+        assert_eq!(
+            r.owner_of(&k, "x").as_deref(),
+            Some("kubectl"),
+            "removing unknown manager preserves existing ownership"
+        );
         assert_eq!(k.tenant_id, "acme", "tenant_id invariant: scoped removal");
     }
 
@@ -445,8 +506,11 @@ mod tests {
         // globex tries to force — must not affect acme's ownership.
         let res = r.apply(&k_b, "argo-cd", "v1", &["spec.image".into()], true);
         assert!(matches!(res, ApplyOutcome::Applied { .. }));
-        assert_eq!(r.owner_of(&k_a, "spec.image").as_deref(), Some("kubectl"),
-            "tenant_id invariant: globex.force MUST NOT strip acme.kubectl ownership");
+        assert_eq!(
+            r.owner_of(&k_a, "spec.image").as_deref(),
+            Some("kubectl"),
+            "tenant_id invariant: globex.force MUST NOT strip acme.kubectl ownership"
+        );
         assert_eq!(r.owner_of(&k_b, "spec.image").as_deref(), Some("argo-cd"));
     }
 
@@ -457,8 +521,13 @@ mod tests {
     fn test_outcome_applied_echoes_manager_and_fields() {
         let r = FieldManagerRegistry::new();
         let k = key("acme", "obj-1");
-        let res = r.apply(&k, "kubectl", "v1",
-            &["spec.replicas".into(), "spec.image".into()], false);
+        let res = r.apply(
+            &k,
+            "kubectl",
+            "v1",
+            &["spec.replicas".into(), "spec.image".into()],
+            false,
+        );
         match res {
             ApplyOutcome::Applied { manager, fields } => {
                 assert_eq!(manager, "kubectl");
@@ -480,8 +549,11 @@ mod tests {
         let _ = r.apply(&k, "kubectl", "v1", &["spec.image".into()], false);
         let entries = r.entries(&k);
         assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].operation, ManagerOperation::Apply,
-            "Apply path tags entry as ManagerOperation::Apply");
+        assert_eq!(
+            entries[0].operation,
+            ManagerOperation::Apply,
+            "Apply path tags entry as ManagerOperation::Apply"
+        );
         assert_eq!(entries[0].api_version, "v1");
         assert!(!entries[0].manager.is_empty());
         assert_eq!(k.tenant_id, "acme", "tenant_id invariant");
@@ -501,16 +573,22 @@ mod tests {
         // an operator did `kubectl edit` — record Update path.
         r.record_update(&k, "operator", "v1", &["spec.replicas".into()]);
         // argo-cd tries to apply both fields without force.
-        let res = r.apply(&k, "argo-cd", "v1",
-            &["spec.image".into(), "spec.replicas".into()], false);
+        let res = r.apply(
+            &k,
+            "argo-cd",
+            "v1",
+            &["spec.image".into(), "spec.replicas".into()],
+            false,
+        );
         match res {
             ApplyOutcome::Conflicts(cs) => {
-                let by_field: std::collections::HashMap<_, _> = cs.iter()
-                    .map(|c| (c.field.clone(), c.reason)).collect();
-                assert_eq!(by_field.get("spec.image"),
-                    Some(&ConflictReason::AppliedBy));
-                assert_eq!(by_field.get("spec.replicas"),
-                    Some(&ConflictReason::UpdatedBy));
+                let by_field: std::collections::HashMap<_, _> =
+                    cs.iter().map(|c| (c.field.clone(), c.reason)).collect();
+                assert_eq!(by_field.get("spec.image"), Some(&ConflictReason::AppliedBy));
+                assert_eq!(
+                    by_field.get("spec.replicas"),
+                    Some(&ConflictReason::UpdatedBy)
+                );
             }
             _ => panic!("expected conflicts"),
         }
@@ -525,8 +603,13 @@ mod tests {
     fn test_force_apply_records_ownership_transfers_in_audit_log() {
         let r = FieldManagerRegistry::new();
         let k = key("acme", "obj-transfer");
-        let _ = r.apply(&k, "kubectl",
-            "v1", &["spec.replicas".into(), "spec.image".into()], false);
+        let _ = r.apply(
+            &k,
+            "kubectl",
+            "v1",
+            &["spec.replicas".into(), "spec.image".into()],
+            false,
+        );
         // argo-cd takes replicas with force; image stays with kubectl.
         let _ = r.apply(&k, "argo-cd", "v1", &["spec.replicas".into()], true);
         let log = r.transfer_log(&k);
@@ -534,8 +617,10 @@ mod tests {
         assert_eq!(log[0].field, "spec.replicas");
         assert_eq!(log[0].from, "kubectl");
         assert_eq!(log[0].to, "argo-cd");
-        assert_eq!(k.tenant_id, "acme",
-            "tenant_id invariant: transfer log scoped to acme key");
+        assert_eq!(
+            k.tenant_id, "acme",
+            "tenant_id invariant: transfer log scoped to acme key"
+        );
     }
 
     /// Upstream parity: `TestApply_TransferChainAcrossThreeManagers`
@@ -551,9 +636,9 @@ mod tests {
         let log = r.transfer_log(&k);
         assert_eq!(log.len(), 2, "two hops in the chain");
         assert_eq!(log[0].from, "A");
-        assert_eq!(log[0].to,   "B");
+        assert_eq!(log[0].to, "B");
         assert_eq!(log[1].from, "B");
-        assert_eq!(log[1].to,   "C");
+        assert_eq!(log[1].to, "C");
         assert_eq!(r.owner_of(&k, "spec.x").as_deref(), Some("C"));
         assert_eq!(k.tenant_id, "acme", "tenant_id invariant: scoped chain");
     }
@@ -565,15 +650,26 @@ mod tests {
     fn test_record_update_strips_overlapping_apply_ownership() {
         let r = FieldManagerRegistry::new();
         let k = key("acme", "obj-update-strip");
-        let _ = r.apply(&k, "kubectl", "v1",
-            &["spec.replicas".into(), "spec.image".into()], false);
+        let _ = r.apply(
+            &k,
+            "kubectl",
+            "v1",
+            &["spec.replicas".into(), "spec.image".into()],
+            false,
+        );
         r.record_update(&k, "kubectl-edit", "v1", &["spec.replicas".into()]);
         // kubectl loses replicas to kubectl-edit; image still kubectl.
-        assert_eq!(r.owner_of(&k, "spec.replicas").as_deref(), Some("kubectl-edit"));
+        assert_eq!(
+            r.owner_of(&k, "spec.replicas").as_deref(),
+            Some("kubectl-edit")
+        );
         assert_eq!(r.owner_of(&k, "spec.image").as_deref(), Some("kubectl"));
         // kubectl-edit's entry is tagged Operation::Update.
         let entries = r.entries(&k);
-        let editor = entries.iter().find(|e| e.manager == "kubectl-edit").unwrap();
+        let editor = entries
+            .iter()
+            .find(|e| e.manager == "kubectl-edit")
+            .unwrap();
         assert_eq!(editor.operation, ManagerOperation::Update);
         assert_eq!(k.tenant_id, "acme", "tenant_id invariant");
     }
@@ -588,8 +684,10 @@ mod tests {
         // First apply ever, force=true — no prior owner to take from.
         let _ = r.apply(&k, "argo-cd", "v1", &["spec.image".into()], true);
         let log = r.transfer_log(&k);
-        assert!(log.is_empty(),
-            "tenant_id invariant: empty transfer log when no prior owner exists");
+        assert!(
+            log.is_empty(),
+            "tenant_id invariant: empty transfer log when no prior owner exists"
+        );
         assert_eq!(r.owner_of(&k, "spec.image").as_deref(), Some("argo-cd"));
         assert_eq!(k.tenant_id, "acme", "tenant_id invariant");
     }

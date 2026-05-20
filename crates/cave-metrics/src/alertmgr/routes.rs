@@ -3,13 +3,16 @@
 //! AlertManager-compatible HTTP API routes.
 //! Implements: /api/v2/alerts, /api/v2/silences, /api/v2/status, /api/v2/receivers
 
+use crate::alertmgr::{
+    model::{Alert, Silence, SilenceStatus},
+    silence::SilenceStore,
+};
 use axum::{
+    Json, Router,
     extract::{Path, State},
     routing::{delete, get, post},
-    Json, Router,
 };
 use std::sync::Arc;
-use crate::alertmgr::{model::{Alert, Silence, SilenceStatus}, silence::SilenceStore};
 
 pub struct AlertmgrState {
     pub silences: Arc<SilenceStore>,
@@ -18,11 +21,11 @@ pub struct AlertmgrState {
 
 pub fn create_router(state: Arc<AlertmgrState>) -> Router {
     Router::new()
-        .route("/api/v2/alerts",            get(get_alerts).post(post_alerts))
-        .route("/api/v2/silences",          get(get_silences).post(create_silence))
-        .route("/api/v2/silence/{id}",       delete(delete_silence))
-        .route("/api/v2/status",            get(get_status))
-        .route("/api/v2/receivers",         get(get_receivers))
+        .route("/api/v2/alerts", get(get_alerts).post(post_alerts))
+        .route("/api/v2/silences", get(get_silences).post(create_silence))
+        .route("/api/v2/silence/{id}", delete(delete_silence))
+        .route("/api/v2/status", get(get_status))
+        .route("/api/v2/receivers", get(get_receivers))
         .with_state(state)
 }
 

@@ -51,9 +51,15 @@ pub struct SnapshotRef {
     #[serde(rename = "type")]
     pub ref_type: RefType,
     /// Optional minimum snapshot-to-keep age, expressed as ms (branch only).
-    #[serde(rename = "min-snapshots-to-keep", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "min-snapshots-to-keep",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub min_snapshots_to_keep: Option<i32>,
-    #[serde(rename = "max-snapshot-age-ms", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "max-snapshot-age-ms",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub max_snapshot_age_ms: Option<i64>,
     /// `max-ref-age-ms` controls automatic GC of the named reference.
     #[serde(rename = "max-ref-age-ms", skip_serializing_if = "Option::is_none")]
@@ -101,10 +107,7 @@ pub fn ancestors_of(snapshots: &[Snapshot], head: i64, limit: usize) -> Result<V
             break;
         }
         out.push(id);
-        let s = by_id
-            .get(&id)
-            .copied()
-            .ok_or(Error::SnapshotNotFound(id))?;
+        let s = by_id.get(&id).copied().ok_or(Error::SnapshotNotFound(id))?;
         cur = s.parent_snapshot_id;
     }
     Ok(out)

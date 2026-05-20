@@ -202,7 +202,11 @@ mod tests {
         let tree_oid = index.write_tree().unwrap();
         let tree = repo.find_tree(tree_oid).unwrap();
         let sig = Signature::now("test", "t@example.com").unwrap();
-        let parent = repo.head().ok().and_then(|h| h.target()).and_then(|oid| repo.find_commit(oid).ok());
+        let parent = repo
+            .head()
+            .ok()
+            .and_then(|h| h.target())
+            .and_then(|oid| repo.find_commit(oid).ok());
         let parents: Vec<&Commit> = parent.iter().collect();
         repo.commit(Some("HEAD"), &sig, &sig, msg, &tree, &parents)
             .unwrap();

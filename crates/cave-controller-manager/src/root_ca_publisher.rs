@@ -89,7 +89,10 @@ mod tests {
     use crate::test_ctx;
 
     fn ns(name: &str, phase: NamespacePhase) -> Namespace {
-        Namespace { name: name.into(), phase }
+        Namespace {
+            name: name.into(),
+            phase,
+        }
     }
     fn cm(ns_name: &str, ca: Option<&str>) -> ObservedConfigMap {
         ObservedConfigMap {
@@ -224,8 +227,7 @@ mod tests {
             "Run",
             "tenant-rca-plan-no-cm"
         );
-        let plan =
-            plan_for_namespaces(&[ns("fresh", NamespacePhase::Active)], &[], "CA");
+        let plan = plan_for_namespaces(&[ns("fresh", NamespacePhase::Active)], &[], "CA");
         assert_eq!(plan, vec![("fresh".into(), PublishAction::Create)]);
     }
 }

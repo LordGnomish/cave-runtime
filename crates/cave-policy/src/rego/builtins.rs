@@ -92,14 +92,23 @@ impl Builtins {
         fns.insert("strings.replace_n".into(), builtin_strings_replace_n);
         fns.insert("strings.reverse".into(), builtin_strings_reverse);
         fns.insert("strings.count".into(), builtin_strings_count);
-        fns.insert("strings.any_prefix_match".into(), builtin_strings_any_prefix_match);
-        fns.insert("strings.any_suffix_match".into(), builtin_strings_any_suffix_match);
+        fns.insert(
+            "strings.any_prefix_match".into(),
+            builtin_strings_any_prefix_match,
+        );
+        fns.insert(
+            "strings.any_suffix_match".into(),
+            builtin_strings_any_suffix_match,
+        );
 
         // Regex
         fns.insert("re_match".into(), builtin_regex_match);
         fns.insert("regex.match".into(), builtin_regex_match);
         fns.insert("regex.is_valid".into(), builtin_regex_is_valid);
-        fns.insert("regex.find_all_string_submatch_n".into(), builtin_regex_find_all_string_submatch_n);
+        fns.insert(
+            "regex.find_all_string_submatch_n".into(),
+            builtin_regex_find_all_string_submatch_n,
+        );
         fns.insert("regex.find_n".into(), builtin_regex_find_n);
         fns.insert("regex.split".into(), builtin_regex_split);
         fns.insert("regex.replace".into(), builtin_regex_replace);
@@ -164,26 +173,56 @@ impl Builtins {
         fns.insert("yaml.is_valid".into(), builtin_yaml_is_valid);
         fns.insert("urlquery.encode".into(), builtin_urlquery_encode);
         fns.insert("urlquery.decode".into(), builtin_urlquery_decode);
-        fns.insert("urlquery.encode_object".into(), builtin_urlquery_encode_object);
-        fns.insert("urlquery.decode_object".into(), builtin_urlquery_decode_object);
+        fns.insert(
+            "urlquery.encode_object".into(),
+            builtin_urlquery_encode_object,
+        );
+        fns.insert(
+            "urlquery.decode_object".into(),
+            builtin_urlquery_decode_object,
+        );
 
         // JWT
         fns.insert("io.jwt.decode".into(), builtin_jwt_decode);
         fns.insert("io.jwt.decode_verify".into(), builtin_jwt_decode_verify);
         fns.insert("io.jwt.encode_sign".into(), builtin_jwt_encode_sign);
         fns.insert("io.jwt.encode_sign_raw".into(), builtin_jwt_encode_sign_raw);
-        fns.insert("io.jwt.verify_hs256".into(), |args| builtin_jwt_verify_hmac(args, "HS256"));
-        fns.insert("io.jwt.verify_hs384".into(), |args| builtin_jwt_verify_hmac(args, "HS384"));
-        fns.insert("io.jwt.verify_hs512".into(), |args| builtin_jwt_verify_hmac(args, "HS512"));
-        fns.insert("io.jwt.verify_rs256".into(), |args| builtin_jwt_verify_rsa(args, "RS256"));
-        fns.insert("io.jwt.verify_rs384".into(), |args| builtin_jwt_verify_rsa(args, "RS384"));
-        fns.insert("io.jwt.verify_rs512".into(), |args| builtin_jwt_verify_rsa(args, "RS512"));
-        fns.insert("io.jwt.verify_es256".into(), |args| builtin_jwt_verify_rsa(args, "ES256"));
-        fns.insert("io.jwt.verify_es384".into(), |args| builtin_jwt_verify_rsa(args, "ES384"));
-        fns.insert("io.jwt.verify_es512".into(), |args| builtin_jwt_verify_rsa(args, "ES512"));
-        fns.insert("io.jwt.verify_ps256".into(), |args| builtin_jwt_verify_rsa(args, "PS256"));
-        fns.insert("io.jwt.verify_ps384".into(), |args| builtin_jwt_verify_rsa(args, "PS384"));
-        fns.insert("io.jwt.verify_ps512".into(), |args| builtin_jwt_verify_rsa(args, "PS512"));
+        fns.insert("io.jwt.verify_hs256".into(), |args| {
+            builtin_jwt_verify_hmac(args, "HS256")
+        });
+        fns.insert("io.jwt.verify_hs384".into(), |args| {
+            builtin_jwt_verify_hmac(args, "HS384")
+        });
+        fns.insert("io.jwt.verify_hs512".into(), |args| {
+            builtin_jwt_verify_hmac(args, "HS512")
+        });
+        fns.insert("io.jwt.verify_rs256".into(), |args| {
+            builtin_jwt_verify_rsa(args, "RS256")
+        });
+        fns.insert("io.jwt.verify_rs384".into(), |args| {
+            builtin_jwt_verify_rsa(args, "RS384")
+        });
+        fns.insert("io.jwt.verify_rs512".into(), |args| {
+            builtin_jwt_verify_rsa(args, "RS512")
+        });
+        fns.insert("io.jwt.verify_es256".into(), |args| {
+            builtin_jwt_verify_rsa(args, "ES256")
+        });
+        fns.insert("io.jwt.verify_es384".into(), |args| {
+            builtin_jwt_verify_rsa(args, "ES384")
+        });
+        fns.insert("io.jwt.verify_es512".into(), |args| {
+            builtin_jwt_verify_rsa(args, "ES512")
+        });
+        fns.insert("io.jwt.verify_ps256".into(), |args| {
+            builtin_jwt_verify_rsa(args, "PS256")
+        });
+        fns.insert("io.jwt.verify_ps384".into(), |args| {
+            builtin_jwt_verify_rsa(args, "PS384")
+        });
+        fns.insert("io.jwt.verify_ps512".into(), |args| {
+            builtin_jwt_verify_rsa(args, "PS512")
+        });
 
         // Time
         fns.insert("time.now_ns".into(), builtin_time_now_ns);
@@ -192,26 +231,59 @@ impl Builtins {
         fns.insert("time.weekday".into(), builtin_time_weekday);
         fns.insert("time.add_date".into(), builtin_time_add_date);
         fns.insert("time.diff".into(), builtin_time_diff);
-        fns.insert("time.parse_duration_ns".into(), builtin_time_parse_duration_ns);
-        fns.insert("time.parse_rfc3339_ns".into(), builtin_time_parse_rfc3339_ns);
+        fns.insert(
+            "time.parse_duration_ns".into(),
+            builtin_time_parse_duration_ns,
+        );
+        fns.insert(
+            "time.parse_rfc3339_ns".into(),
+            builtin_time_parse_rfc3339_ns,
+        );
         fns.insert("time.format".into(), builtin_time_format);
 
         // Crypto
         fns.insert("crypto.md5".into(), |args| builtin_crypto_hash(args, "md5"));
-        fns.insert("crypto.sha1".into(), |args| builtin_crypto_hash(args, "sha1"));
-        fns.insert("crypto.sha256".into(), |args| builtin_crypto_hash(args, "sha256"));
-        fns.insert("crypto.hmac.md5".into(), |args| builtin_crypto_hmac(args, "md5"));
-        fns.insert("crypto.hmac.sha1".into(), |args| builtin_crypto_hmac(args, "sha1"));
-        fns.insert("crypto.hmac.sha256".into(), |args| builtin_crypto_hmac(args, "sha256"));
-        fns.insert("crypto.hmac.sha512".into(), |args| builtin_crypto_hmac(args, "sha512"));
-        fns.insert("crypto.x509.parse_certificates".into(), builtin_x509_parse_certificates);
-        fns.insert("crypto.x509.parse_certificate_request".into(), builtin_x509_parse_certificate_request);
-        fns.insert("crypto.x509.parse_and_verify_certificates".into(), builtin_x509_parse_and_verify);
-        fns.insert("crypto.x509.parse_rsa_private_key".into(), builtin_x509_parse_rsa_private_key);
+        fns.insert("crypto.sha1".into(), |args| {
+            builtin_crypto_hash(args, "sha1")
+        });
+        fns.insert("crypto.sha256".into(), |args| {
+            builtin_crypto_hash(args, "sha256")
+        });
+        fns.insert("crypto.hmac.md5".into(), |args| {
+            builtin_crypto_hmac(args, "md5")
+        });
+        fns.insert("crypto.hmac.sha1".into(), |args| {
+            builtin_crypto_hmac(args, "sha1")
+        });
+        fns.insert("crypto.hmac.sha256".into(), |args| {
+            builtin_crypto_hmac(args, "sha256")
+        });
+        fns.insert("crypto.hmac.sha512".into(), |args| {
+            builtin_crypto_hmac(args, "sha512")
+        });
+        fns.insert(
+            "crypto.x509.parse_certificates".into(),
+            builtin_x509_parse_certificates,
+        );
+        fns.insert(
+            "crypto.x509.parse_certificate_request".into(),
+            builtin_x509_parse_certificate_request,
+        );
+        fns.insert(
+            "crypto.x509.parse_and_verify_certificates".into(),
+            builtin_x509_parse_and_verify,
+        );
+        fns.insert(
+            "crypto.x509.parse_rsa_private_key".into(),
+            builtin_x509_parse_rsa_private_key,
+        );
 
         // Net / CIDR
         fns.insert("net.cidr_contains".into(), builtin_cidr_contains);
-        fns.insert("net.cidr_contains_matches".into(), builtin_cidr_contains_matches);
+        fns.insert(
+            "net.cidr_contains_matches".into(),
+            builtin_cidr_contains_matches,
+        );
         fns.insert("net.cidr_expand".into(), builtin_cidr_expand);
         fns.insert("net.cidr_intersects".into(), builtin_cidr_intersects);
         fns.insert("net.cidr_merge".into(), builtin_cidr_merge);
@@ -231,10 +303,16 @@ impl Builtins {
         // GraphQL (stubs)
         fns.insert("graphql.is_valid".into(), builtin_graphql_is_valid);
         fns.insert("graphql.parse".into(), builtin_graphql_parse);
-        fns.insert("graphql.parse_and_verify".into(), builtin_graphql_parse_and_verify);
+        fns.insert(
+            "graphql.parse_and_verify".into(),
+            builtin_graphql_parse_and_verify,
+        );
         fns.insert("graphql.parse_query".into(), builtin_graphql_parse_query);
         fns.insert("graphql.parse_schema".into(), builtin_graphql_parse_schema);
-        fns.insert("graphql.schema_is_valid".into(), builtin_graphql_schema_is_valid);
+        fns.insert(
+            "graphql.schema_is_valid".into(),
+            builtin_graphql_schema_is_valid,
+        );
 
         // OPA
         fns.insert("opa.runtime".into(), builtin_opa_runtime);
@@ -258,7 +336,9 @@ impl Builtins {
 }
 
 impl Default for Builtins {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -287,7 +367,11 @@ fn arg_array(args: &[Value], i: usize, fname: &str) -> Result<Vec<serde_json::Va
         .ok_or_else(|| PolicyError::Eval(format!("{fname}: arg {i} must be array")))
 }
 
-fn arg_object(args: &[Value], i: usize, fname: &str) -> Result<serde_json::Map<String, serde_json::Value>, PolicyError> {
+fn arg_object(
+    args: &[Value],
+    i: usize,
+    fname: &str,
+) -> Result<serde_json::Map<String, serde_json::Value>, PolicyError> {
     args.get(i)
         .and_then(|v| v.as_object().cloned())
         .ok_or_else(|| PolicyError::Eval(format!("{fname}: arg {i} must be object")))
@@ -335,7 +419,9 @@ fn builtin_numbers_range_step(args: &[Value]) -> Result<Value, PolicyError> {
     let b = arg_i64(args, 1, "numbers.range_step")?;
     let step = arg_i64(args, 2, "numbers.range_step")?;
     if step <= 0 {
-        return Err(PolicyError::Eval("numbers.range_step: step must be positive".into()));
+        return Err(PolicyError::Eval(
+            "numbers.range_step: step must be positive".into(),
+        ));
     }
     let mut out = Vec::new();
     let mut cur = a;
@@ -350,7 +436,9 @@ fn builtin_numbers_range_step(args: &[Value]) -> Result<Value, PolicyError> {
 
 fn builtin_concat(args: &[Value]) -> Result<Value, PolicyError> {
     let delim = arg_str(args, 0, "concat")?;
-    let coll = args.get(1).ok_or_else(|| PolicyError::Eval("concat: missing arg 1".into()))?;
+    let coll = args
+        .get(1)
+        .ok_or_else(|| PolicyError::Eval("concat: missing arg 1".into()))?;
     let parts: Vec<String> = match coll {
         Value::Json(serde_json::Value::Array(a)) => a
             .iter()
@@ -360,7 +448,11 @@ fn builtin_concat(args: &[Value]) -> Result<Value, PolicyError> {
             .iter()
             .map(|v| v.as_str().unwrap_or("").to_string())
             .collect(),
-        _ => return Err(PolicyError::Eval("concat: arg 1 must be array or set".into())),
+        _ => {
+            return Err(PolicyError::Eval(
+                "concat: arg 1 must be array or set".into(),
+            ));
+        }
     };
     Ok(Value::string(parts.join(&delim)))
 }
@@ -385,7 +477,11 @@ fn builtin_format_int(args: &[Value]) -> Result<Value, PolicyError> {
         8 => format!("{:o}", num),
         10 => format!("{}", num),
         16 => format!("{:x}", num),
-        _ => return Err(PolicyError::Eval(format!("format_int: unsupported base {base}"))),
+        _ => {
+            return Err(PolicyError::Eval(format!(
+                "format_int: unsupported base {base}"
+            )));
+        }
     };
     Ok(Value::string(s))
 }
@@ -417,47 +513,63 @@ fn builtin_lower(args: &[Value]) -> Result<Value, PolicyError> {
 fn builtin_ltrim(args: &[Value]) -> Result<Value, PolicyError> {
     let s = arg_str(args, 0, "ltrim")?;
     let cutset = arg_str(args, 1, "ltrim")?;
-    Ok(Value::string(s.trim_start_matches(|c| cutset.contains(c)).to_string()))
+    Ok(Value::string(
+        s.trim_start_matches(|c| cutset.contains(c)).to_string(),
+    ))
 }
 
 fn builtin_rtrim(args: &[Value]) -> Result<Value, PolicyError> {
     let s = arg_str(args, 0, "rtrim")?;
     let cutset = arg_str(args, 1, "rtrim")?;
-    Ok(Value::string(s.trim_end_matches(|c| cutset.contains(c)).to_string()))
+    Ok(Value::string(
+        s.trim_end_matches(|c| cutset.contains(c)).to_string(),
+    ))
 }
 
 fn builtin_trim(args: &[Value]) -> Result<Value, PolicyError> {
     let s = arg_str(args, 0, "trim")?;
     let cutset = arg_str(args, 1, "trim")?;
-    Ok(Value::string(s.trim_matches(|c| cutset.contains(c)).to_string()))
+    Ok(Value::string(
+        s.trim_matches(|c| cutset.contains(c)).to_string(),
+    ))
 }
 
 fn builtin_trim_left(args: &[Value]) -> Result<Value, PolicyError> {
     let s = arg_str(args, 0, "trim_left")?;
     let cutset = arg_str(args, 1, "trim_left")?;
-    Ok(Value::string(s.trim_start_matches(|c| cutset.contains(c)).to_string()))
+    Ok(Value::string(
+        s.trim_start_matches(|c| cutset.contains(c)).to_string(),
+    ))
 }
 
 fn builtin_trim_right(args: &[Value]) -> Result<Value, PolicyError> {
     let s = arg_str(args, 0, "trim_right")?;
     let cutset = arg_str(args, 1, "trim_right")?;
-    Ok(Value::string(s.trim_end_matches(|c| cutset.contains(c)).to_string()))
+    Ok(Value::string(
+        s.trim_end_matches(|c| cutset.contains(c)).to_string(),
+    ))
 }
 
 fn builtin_trim_prefix(args: &[Value]) -> Result<Value, PolicyError> {
     let s = arg_str(args, 0, "trim_prefix")?;
     let prefix = arg_str(args, 1, "trim_prefix")?;
-    Ok(Value::string(s.strip_prefix(prefix.as_str()).unwrap_or(&s).to_string()))
+    Ok(Value::string(
+        s.strip_prefix(prefix.as_str()).unwrap_or(&s).to_string(),
+    ))
 }
 
 fn builtin_trim_suffix(args: &[Value]) -> Result<Value, PolicyError> {
     let s = arg_str(args, 0, "trim_suffix")?;
     let suffix = arg_str(args, 1, "trim_suffix")?;
-    Ok(Value::string(s.strip_suffix(suffix.as_str()).unwrap_or(&s).to_string()))
+    Ok(Value::string(
+        s.strip_suffix(suffix.as_str()).unwrap_or(&s).to_string(),
+    ))
 }
 
 fn builtin_trim_space(args: &[Value]) -> Result<Value, PolicyError> {
-    Ok(Value::string(arg_str(args, 0, "trim_space")?.trim().to_string()))
+    Ok(Value::string(
+        arg_str(args, 0, "trim_space")?.trim().to_string(),
+    ))
 }
 
 fn builtin_split(args: &[Value]) -> Result<Value, PolicyError> {
@@ -481,29 +593,31 @@ fn builtin_sprintf(args: &[Value]) -> Result<Value, PolicyError> {
         if c == '%' {
             match chars.next() {
                 Some('v') | Some('s') => {
-                    let val = vals.get(idx).map(|v| match v {
-                        serde_json::Value::String(s) => s.clone(),
-                        other => other.to_string(),
-                    }).unwrap_or_default();
+                    let val = vals
+                        .get(idx)
+                        .map(|v| match v {
+                            serde_json::Value::String(s) => s.clone(),
+                            other => other.to_string(),
+                        })
+                        .unwrap_or_default();
                     result.push_str(&val);
                     idx += 1;
                 }
                 Some('d') => {
-                    let val = vals.get(idx)
-                        .and_then(|v| v.as_i64())
-                        .unwrap_or(0);
+                    let val = vals.get(idx).and_then(|v| v.as_i64()).unwrap_or(0);
                     result.push_str(&val.to_string());
                     idx += 1;
                 }
                 Some('f') => {
-                    let val = vals.get(idx)
-                        .and_then(|v| v.as_f64())
-                        .unwrap_or(0.0);
+                    let val = vals.get(idx).and_then(|v| v.as_f64()).unwrap_or(0.0);
                     result.push_str(&format!("{val}"));
                     idx += 1;
                 }
                 Some('%') => result.push('%'),
-                Some(other) => { result.push('%'); result.push(other); }
+                Some(other) => {
+                    result.push('%');
+                    result.push(other);
+                }
                 None => result.push('%'),
             }
         } else {
@@ -567,15 +681,21 @@ fn builtin_strings_count(args: &[Value]) -> Result<Value, PolicyError> {
 }
 
 fn builtin_strings_any_prefix_match(args: &[Value]) -> Result<Value, PolicyError> {
-    let searches = collection_values(args.get(0).unwrap_or(&Value::Undefined))
-        .ok_or_else(|| PolicyError::Eval("strings.any_prefix_match: arg 0 must be collection".into()))?;
-    let prefixes = collection_values(args.get(1).unwrap_or(&Value::Undefined))
-        .ok_or_else(|| PolicyError::Eval("strings.any_prefix_match: arg 1 must be collection".into()))?;
+    let searches =
+        collection_values(args.get(0).unwrap_or(&Value::Undefined)).ok_or_else(|| {
+            PolicyError::Eval("strings.any_prefix_match: arg 0 must be collection".into())
+        })?;
+    let prefixes =
+        collection_values(args.get(1).unwrap_or(&Value::Undefined)).ok_or_else(|| {
+            PolicyError::Eval("strings.any_prefix_match: arg 1 must be collection".into())
+        })?;
     for s in &searches {
         if let Some(s_str) = s.as_str() {
             for p in &prefixes {
                 if let Some(p_str) = p.as_str() {
-                    if s_str.starts_with(p_str) { return Ok(Value::bool(true)); }
+                    if s_str.starts_with(p_str) {
+                        return Ok(Value::bool(true));
+                    }
                 }
             }
         }
@@ -584,15 +704,21 @@ fn builtin_strings_any_prefix_match(args: &[Value]) -> Result<Value, PolicyError
 }
 
 fn builtin_strings_any_suffix_match(args: &[Value]) -> Result<Value, PolicyError> {
-    let searches = collection_values(args.get(0).unwrap_or(&Value::Undefined))
-        .ok_or_else(|| PolicyError::Eval("strings.any_suffix_match: arg 0 must be collection".into()))?;
-    let suffixes = collection_values(args.get(1).unwrap_or(&Value::Undefined))
-        .ok_or_else(|| PolicyError::Eval("strings.any_suffix_match: arg 1 must be collection".into()))?;
+    let searches =
+        collection_values(args.get(0).unwrap_or(&Value::Undefined)).ok_or_else(|| {
+            PolicyError::Eval("strings.any_suffix_match: arg 0 must be collection".into())
+        })?;
+    let suffixes =
+        collection_values(args.get(1).unwrap_or(&Value::Undefined)).ok_or_else(|| {
+            PolicyError::Eval("strings.any_suffix_match: arg 1 must be collection".into())
+        })?;
     for s in &searches {
         if let Some(s_str) = s.as_str() {
             for suf in &suffixes {
                 if let Some(suf_str) = suf.as_str() {
-                    if s_str.ends_with(suf_str) { return Ok(Value::bool(true)); }
+                    if s_str.ends_with(suf_str) {
+                        return Ok(Value::bool(true));
+                    }
                 }
             }
         }
@@ -626,7 +752,10 @@ fn builtin_regex_find_all_string_submatch_n(args: &[Value]) -> Result<Value, Pol
     for caps in re.captures_iter(&value).take(limit) {
         let groups: Vec<serde_json::Value> = caps
             .iter()
-            .map(|m| m.map(|m| serde_json::json!(m.as_str())).unwrap_or(serde_json::json!("")))
+            .map(|m| {
+                m.map(|m| serde_json::json!(m.as_str()))
+                    .unwrap_or(serde_json::json!(""))
+            })
             .collect();
         results.push(serde_json::Value::Array(groups));
     }
@@ -663,7 +792,9 @@ fn builtin_regex_replace(args: &[Value]) -> Result<Value, PolicyError> {
     let replacement = arg_str(args, 2, "regex.replace")?;
     let re = regex::Regex::new(&pattern)
         .map_err(|e| PolicyError::Eval(format!("invalid regex: {e}")))?;
-    Ok(Value::string(re.replace_all(&s, replacement.as_str()).into_owned()))
+    Ok(Value::string(
+        re.replace_all(&s, replacement.as_str()).into_owned(),
+    ))
 }
 
 fn builtin_regex_globs_match(args: &[Value]) -> Result<Value, PolicyError> {
@@ -683,8 +814,16 @@ fn builtin_regex_globs_match(args: &[Value]) -> Result<Value, PolicyError> {
 fn builtin_regex_template_match(args: &[Value]) -> Result<Value, PolicyError> {
     let template = arg_str(args, 0, "regex.template_match")?;
     let value = arg_str(args, 1, "regex.template_match")?;
-    let delimiter_start = if args.len() > 2 { arg_str(args, 2, "regex.template_match")? } else { "{".into() };
-    let delimiter_end = if args.len() > 3 { arg_str(args, 3, "regex.template_match")? } else { "}".into() };
+    let delimiter_start = if args.len() > 2 {
+        arg_str(args, 2, "regex.template_match")?
+    } else {
+        "{".into()
+    };
+    let delimiter_end = if args.len() > 3 {
+        arg_str(args, 3, "regex.template_match")?
+    } else {
+        "}".into()
+    };
     // Replace {pattern} blocks with their regex content
     let mut regex_str = String::new();
     let mut remaining = template.as_str();
@@ -722,23 +861,38 @@ fn glob_to_regex(glob: &str) -> String {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 fn builtin_is_null(args: &[Value]) -> Result<Value, PolicyError> {
-    Ok(Value::bool(matches!(args.get(0), Some(Value::Json(serde_json::Value::Null)))))
+    Ok(Value::bool(matches!(
+        args.get(0),
+        Some(Value::Json(serde_json::Value::Null))
+    )))
 }
 
 fn builtin_is_boolean(args: &[Value]) -> Result<Value, PolicyError> {
-    Ok(Value::bool(matches!(args.get(0), Some(Value::Json(serde_json::Value::Bool(_))))))
+    Ok(Value::bool(matches!(
+        args.get(0),
+        Some(Value::Json(serde_json::Value::Bool(_)))
+    )))
 }
 
 fn builtin_is_number(args: &[Value]) -> Result<Value, PolicyError> {
-    Ok(Value::bool(matches!(args.get(0), Some(Value::Json(serde_json::Value::Number(_))))))
+    Ok(Value::bool(matches!(
+        args.get(0),
+        Some(Value::Json(serde_json::Value::Number(_)))
+    )))
 }
 
 fn builtin_is_string(args: &[Value]) -> Result<Value, PolicyError> {
-    Ok(Value::bool(matches!(args.get(0), Some(Value::Json(serde_json::Value::String(_))))))
+    Ok(Value::bool(matches!(
+        args.get(0),
+        Some(Value::Json(serde_json::Value::String(_)))
+    )))
 }
 
 fn builtin_is_array(args: &[Value]) -> Result<Value, PolicyError> {
-    Ok(Value::bool(matches!(args.get(0), Some(Value::Json(serde_json::Value::Array(_))))))
+    Ok(Value::bool(matches!(
+        args.get(0),
+        Some(Value::Json(serde_json::Value::Array(_)))
+    )))
 }
 
 fn builtin_is_set(args: &[Value]) -> Result<Value, PolicyError> {
@@ -746,7 +900,10 @@ fn builtin_is_set(args: &[Value]) -> Result<Value, PolicyError> {
 }
 
 fn builtin_is_object(args: &[Value]) -> Result<Value, PolicyError> {
-    Ok(Value::bool(matches!(args.get(0), Some(Value::Json(serde_json::Value::Object(_))))))
+    Ok(Value::bool(matches!(
+        args.get(0),
+        Some(Value::Json(serde_json::Value::Object(_)))
+    )))
 }
 
 fn builtin_type_name(args: &[Value]) -> Result<Value, PolicyError> {
@@ -771,7 +928,11 @@ fn builtin_count(args: &[Value]) -> Result<Value, PolicyError> {
         Some(Value::Json(serde_json::Value::Object(m))) => m.len(),
         Some(Value::Json(serde_json::Value::String(s))) => s.chars().count(),
         Some(Value::Set(s)) => s.len(),
-        _ => return Err(PolicyError::Eval("count: arg must be collection or string".into())),
+        _ => {
+            return Err(PolicyError::Eval(
+                "count: arg must be collection or string".into(),
+            ));
+        }
     };
     Ok(Value::number_i64(n as i64))
 }
@@ -818,13 +979,17 @@ fn builtin_sort(args: &[Value]) -> Result<Value, PolicyError> {
 fn builtin_all(args: &[Value]) -> Result<Value, PolicyError> {
     let coll = collection_values(args.get(0).unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("all: arg must be collection".into()))?;
-    Ok(Value::bool(coll.iter().all(|v| v.as_bool().unwrap_or(false))))
+    Ok(Value::bool(
+        coll.iter().all(|v| v.as_bool().unwrap_or(false)),
+    ))
 }
 
 fn builtin_any(args: &[Value]) -> Result<Value, PolicyError> {
     let coll = collection_values(args.get(0).unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("any: arg must be collection".into()))?;
-    Ok(Value::bool(coll.iter().any(|v| v.as_bool().unwrap_or(false))))
+    Ok(Value::bool(
+        coll.iter().any(|v| v.as_bool().unwrap_or(false)),
+    ))
 }
 
 // ─── Arrays ───────────────────────────────────────────────────────────────────
@@ -861,7 +1026,10 @@ fn builtin_array_keys(args: &[Value]) -> Result<Value, PolicyError> {
 fn builtin_object_get(args: &[Value]) -> Result<Value, PolicyError> {
     let obj = arg_object(args, 0, "object.get")?;
     let key = arg_str(args, 1, "object.get")?;
-    let default = args.get(2).and_then(|v| v.as_json()).cloned()
+    let default = args
+        .get(2)
+        .and_then(|v| v.as_json())
+        .cloned()
         .unwrap_or(serde_json::Value::Null);
     Ok(Value::Json(obj.get(&key).cloned().unwrap_or(default)))
 }
@@ -893,7 +1061,9 @@ fn builtin_object_remove(args: &[Value]) -> Result<Value, PolicyError> {
 fn builtin_object_union(args: &[Value]) -> Result<Value, PolicyError> {
     let mut a = arg_object(args, 0, "object.union")?;
     let b = arg_object(args, 1, "object.union")?;
-    for (k, v) in b { a.insert(k, v); }
+    for (k, v) in b {
+        a.insert(k, v);
+    }
     Ok(Value::Json(serde_json::Value::Object(a)))
 }
 
@@ -902,7 +1072,9 @@ fn builtin_object_union_n(args: &[Value]) -> Result<Value, PolicyError> {
     let mut result = serde_json::Map::new();
     for item in arr {
         if let serde_json::Value::Object(m) = item {
-            for (k, v) in m { result.insert(k, v); }
+            for (k, v) in m {
+                result.insert(k, v);
+            }
         }
     }
     Ok(Value::Json(serde_json::Value::Object(result)))
@@ -926,7 +1098,9 @@ fn builtin_object_filter(args: &[Value]) -> Result<Value, PolicyError> {
 fn builtin_object_subset(args: &[Value]) -> Result<Value, PolicyError> {
     let super_obj = arg_object(args, 0, "object.subset")?;
     let sub_obj = arg_object(args, 1, "object.subset")?;
-    let is_subset = sub_obj.iter().all(|(k, v)| super_obj.get(k).map(|sv| sv == v).unwrap_or(false));
+    let is_subset = sub_obj
+        .iter()
+        .all(|(k, v)| super_obj.get(k).map(|sv| sv == v).unwrap_or(false));
     Ok(Value::bool(is_subset))
 }
 
@@ -934,7 +1108,9 @@ fn builtin_object_subset(args: &[Value]) -> Result<Value, PolicyError> {
 
 fn builtin_intersection(args: &[Value]) -> Result<Value, PolicyError> {
     let sets = arg_array(args, 0, "intersection")?;
-    if sets.is_empty() { return Ok(Value::Set(vec![])); }
+    if sets.is_empty() {
+        return Ok(Value::Set(vec![]));
+    }
     let mut result: Vec<serde_json::Value> = match &sets[0] {
         serde_json::Value::Array(a) => a.clone(),
         _ => vec![sets[0].clone()],
@@ -958,7 +1134,9 @@ fn builtin_union_set(args: &[Value]) -> Result<Value, PolicyError> {
             _ => vec![set],
         };
         for item in items {
-            if !result.contains(&item) { result.push(item); }
+            if !result.contains(&item) {
+                result.push(item);
+            }
         }
     }
     Ok(Value::Set(result))
@@ -969,7 +1147,9 @@ fn builtin_union_set(args: &[Value]) -> Result<Value, PolicyError> {
 fn builtin_base64_encode(args: &[Value]) -> Result<Value, PolicyError> {
     use base64::Engine as _;
     let s = arg_str(args, 0, "base64.encode")?;
-    Ok(Value::string(base64::engine::general_purpose::STANDARD.encode(s.as_bytes())))
+    Ok(Value::string(
+        base64::engine::general_purpose::STANDARD.encode(s.as_bytes()),
+    ))
 }
 
 fn builtin_base64_decode(args: &[Value]) -> Result<Value, PolicyError> {
@@ -978,14 +1158,17 @@ fn builtin_base64_decode(args: &[Value]) -> Result<Value, PolicyError> {
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(s.as_bytes())
         .map_err(|e| PolicyError::Eval(format!("base64.decode: {e}")))?;
-    Ok(Value::string(String::from_utf8(bytes)
-        .map_err(|e| PolicyError::Eval(format!("base64.decode: {e}")))?))
+    Ok(Value::string(String::from_utf8(bytes).map_err(|e| {
+        PolicyError::Eval(format!("base64.decode: {e}"))
+    })?))
 }
 
 fn builtin_base64url_encode(args: &[Value]) -> Result<Value, PolicyError> {
     use base64::Engine as _;
     let s = arg_str(args, 0, "base64url.encode")?;
-    Ok(Value::string(base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(s.as_bytes())))
+    Ok(Value::string(
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(s.as_bytes()),
+    ))
 }
 
 fn builtin_base64url_decode(args: &[Value]) -> Result<Value, PolicyError> {
@@ -994,8 +1177,9 @@ fn builtin_base64url_decode(args: &[Value]) -> Result<Value, PolicyError> {
     let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .decode(s.as_bytes())
         .map_err(|e| PolicyError::Eval(format!("base64url.decode: {e}")))?;
-    Ok(Value::string(String::from_utf8(bytes)
-        .map_err(|e| PolicyError::Eval(format!("base64url.decode: {e}")))?))
+    Ok(Value::string(String::from_utf8(bytes).map_err(|e| {
+        PolicyError::Eval(format!("base64url.decode: {e}"))
+    })?))
 }
 
 fn builtin_hex_encode(args: &[Value]) -> Result<Value, PolicyError> {
@@ -1005,14 +1189,17 @@ fn builtin_hex_encode(args: &[Value]) -> Result<Value, PolicyError> {
 
 fn builtin_hex_decode(args: &[Value]) -> Result<Value, PolicyError> {
     let s = arg_str(args, 0, "hex.decode")?;
-    let bytes = hex::decode(s.as_str())
-        .map_err(|e| PolicyError::Eval(format!("hex.decode: {e}")))?;
-    Ok(Value::string(String::from_utf8(bytes)
-        .map_err(|e| PolicyError::Eval(format!("hex.decode: {e}")))?))
+    let bytes =
+        hex::decode(s.as_str()).map_err(|e| PolicyError::Eval(format!("hex.decode: {e}")))?;
+    Ok(Value::string(String::from_utf8(bytes).map_err(|e| {
+        PolicyError::Eval(format!("hex.decode: {e}"))
+    })?))
 }
 
 fn builtin_json_marshal(args: &[Value]) -> Result<Value, PolicyError> {
-    let v = args.get(0).ok_or_else(|| PolicyError::Eval("json.marshal: missing arg".into()))?;
+    let v = args
+        .get(0)
+        .ok_or_else(|| PolicyError::Eval("json.marshal: missing arg".into()))?;
     let j = v.to_json_lossy();
     Ok(Value::string(serde_json::to_string(&j)?))
 }
@@ -1025,7 +1212,9 @@ fn builtin_json_unmarshal(args: &[Value]) -> Result<Value, PolicyError> {
 
 fn builtin_json_is_valid(args: &[Value]) -> Result<Value, PolicyError> {
     let s = arg_str(args, 0, "json.is_valid")?;
-    Ok(Value::bool(serde_json::from_str::<serde_json::Value>(&s).is_ok()))
+    Ok(Value::bool(
+        serde_json::from_str::<serde_json::Value>(&s).is_ok(),
+    ))
 }
 
 fn builtin_json_filter(args: &[Value]) -> Result<Value, PolicyError> {
@@ -1036,19 +1225,31 @@ fn builtin_json_filter(args: &[Value]) -> Result<Value, PolicyError> {
         .into_iter()
         .filter_map(|v| v.as_str().map(|s| s.to_string()))
         .collect();
-    let filtered: serde_json::Map<_, _> = obj.into_iter().filter(|(k, _)| key_set.contains(k)).collect();
+    let filtered: serde_json::Map<_, _> = obj
+        .into_iter()
+        .filter(|(k, _)| key_set.contains(k))
+        .collect();
     Ok(Value::Json(serde_json::Value::Object(filtered)))
 }
 
 fn builtin_json_remove(args: &[Value]) -> Result<Value, PolicyError> {
-    let mut v = args.get(0).and_then(|a| a.as_json()).cloned()
+    let mut v = args
+        .get(0)
+        .and_then(|a| a.as_json())
+        .cloned()
         .ok_or_else(|| PolicyError::Eval("json.remove: missing arg".into()))?;
     let paths = collection_values(args.get(1).unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("json.remove: arg 1 must be collection".into()))?;
     for path in &paths {
         if let Some(path_str) = path.as_str() {
             let parts: Vec<&str> = path_str.split('/').collect();
-            let _ = super::value::apply_json_patch(&mut v, "remove", &format!("/{path_str}"), None, None);
+            let _ = super::value::apply_json_patch(
+                &mut v,
+                "remove",
+                &format!("/{path_str}"),
+                None,
+                None,
+            );
             let _ = parts; // suppress unused
         }
     }
@@ -1056,14 +1257,28 @@ fn builtin_json_remove(args: &[Value]) -> Result<Value, PolicyError> {
 }
 
 fn builtin_json_patch(args: &[Value]) -> Result<Value, PolicyError> {
-    let mut v = args.get(0).and_then(|a| a.as_json()).cloned()
+    let mut v = args
+        .get(0)
+        .and_then(|a| a.as_json())
+        .cloned()
         .ok_or_else(|| PolicyError::Eval("json.patch: missing arg 0".into()))?;
     let patches = arg_array(args, 1, "json.patch")?;
     for patch in &patches {
-        let op = patch.get("op").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let path = patch.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let op = patch
+            .get("op")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let path = patch
+            .get("path")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
         let value = patch.get("value");
-        let from = patch.get("from").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let from = patch
+            .get("from")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
         super::value::apply_json_patch(&mut v, &op, &path, value, from.as_deref())
             .map_err(|e| PolicyError::Eval(format!("json.patch: {e}")))?;
     }
@@ -1071,7 +1286,10 @@ fn builtin_json_patch(args: &[Value]) -> Result<Value, PolicyError> {
 }
 
 fn builtin_yaml_marshal(args: &[Value]) -> Result<Value, PolicyError> {
-    let v = args.get(0).and_then(|a| a.as_json()).cloned()
+    let v = args
+        .get(0)
+        .and_then(|a| a.as_json())
+        .cloned()
         .ok_or_else(|| PolicyError::Eval("yaml.marshal: missing arg".into()))?;
     let s = serde_yaml::to_string(&v)?;
     Ok(Value::string(s))
@@ -1085,7 +1303,9 @@ fn builtin_yaml_unmarshal(args: &[Value]) -> Result<Value, PolicyError> {
 
 fn builtin_yaml_is_valid(args: &[Value]) -> Result<Value, PolicyError> {
     let s = arg_str(args, 0, "yaml.is_valid")?;
-    Ok(Value::bool(serde_yaml::from_str::<serde_json::Value>(&s).is_ok()))
+    Ok(Value::bool(
+        serde_yaml::from_str::<serde_json::Value>(&s).is_ok(),
+    ))
 }
 
 fn builtin_urlquery_encode(args: &[Value]) -> Result<Value, PolicyError> {
@@ -1100,10 +1320,13 @@ fn builtin_urlquery_decode(args: &[Value]) -> Result<Value, PolicyError> {
 
 fn builtin_urlquery_encode_object(args: &[Value]) -> Result<Value, PolicyError> {
     let obj = arg_object(args, 0, "urlquery.encode_object")?;
-    let parts: Vec<String> = obj.iter().map(|(k, v)| {
-        let val = v.as_str().unwrap_or("").to_string();
-        format!("{}={}", urlquery_encode_str(k), urlquery_encode_str(&val))
-    }).collect();
+    let parts: Vec<String> = obj
+        .iter()
+        .map(|(k, v)| {
+            let val = v.as_str().unwrap_or("").to_string();
+            format!("{}={}", urlquery_encode_str(k), urlquery_encode_str(&val))
+        })
+        .collect();
     Ok(Value::string(parts.join("&")))
 }
 
@@ -1114,19 +1337,24 @@ fn builtin_urlquery_decode_object(args: &[Value]) -> Result<Value, PolicyError> 
         let mut parts = pair.splitn(2, '=');
         let k = parts.next().unwrap_or("").to_string();
         let v = parts.next().unwrap_or("").to_string();
-        m.insert(urlquery_decode_str(&k), serde_json::json!(urlquery_decode_str(&v)));
+        m.insert(
+            urlquery_decode_str(&k),
+            serde_json::json!(urlquery_decode_str(&v)),
+        );
     }
     Ok(Value::Json(serde_json::Value::Object(m)))
 }
 
 fn urlquery_encode_str(s: &str) -> String {
-    s.bytes().flat_map(|b| {
-        if b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.' || b == b'~' {
-            vec![b as char]
-        } else {
-            format!("%{:02X}", b).chars().collect()
-        }
-    }).collect()
+    s.bytes()
+        .flat_map(|b| {
+            if b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.' || b == b'~' {
+                vec![b as char]
+            } else {
+                format!("%{:02X}", b).chars().collect()
+            }
+        })
+        .collect()
 }
 
 fn urlquery_decode_str(s: &str) -> String {
@@ -1165,7 +1393,10 @@ fn builtin_jwt_decode(args: &[Value]) -> Result<Value, PolicyError> {
     };
     let header = decode_part(parts[0])?;
     let payload = decode_part(parts[1])?;
-    let sig = parts.get(2).map(|s| serde_json::json!(s)).unwrap_or(serde_json::json!(""));
+    let sig = parts
+        .get(2)
+        .map(|s| serde_json::json!(s))
+        .unwrap_or(serde_json::json!(""));
     Ok(Value::array(vec![header, payload, sig]))
 }
 
@@ -1184,14 +1415,18 @@ fn builtin_jwt_encode_sign(args: &[Value]) -> Result<Value, PolicyError> {
     let _headers = arg_object(args, 0, "io.jwt.encode_sign")?;
     let _payload = arg_object(args, 1, "io.jwt.encode_sign")?;
     let _key = arg_object(args, 2, "io.jwt.encode_sign")?;
-    Err(PolicyError::Unsupported("io.jwt.encode_sign: key signing not implemented".into()))
+    Err(PolicyError::Unsupported(
+        "io.jwt.encode_sign: key signing not implemented".into(),
+    ))
 }
 
 fn builtin_jwt_encode_sign_raw(args: &[Value]) -> Result<Value, PolicyError> {
     let _headers = arg_str(args, 0, "io.jwt.encode_sign_raw")?;
     let _payload = arg_str(args, 1, "io.jwt.encode_sign_raw")?;
     let _key = arg_str(args, 2, "io.jwt.encode_sign_raw")?;
-    Err(PolicyError::Unsupported("io.jwt.encode_sign_raw: key signing not implemented".into()))
+    Err(PolicyError::Unsupported(
+        "io.jwt.encode_sign_raw: key signing not implemented".into(),
+    ))
 }
 
 fn builtin_jwt_verify_hmac(args: &[Value], _alg: &str) -> Result<Value, PolicyError> {
@@ -1262,9 +1497,11 @@ fn builtin_time_add_date(args: &[Value]) -> Result<Value, PolicyError> {
     let dt = chrono::DateTime::from_timestamp(ns / 1_000_000_000, 0).unwrap_or_default();
     let months_total = years * 12 + months;
     let dt2 = if months_total >= 0 {
-        dt.checked_add_months(Months::new(months_total as u32)).unwrap_or(dt)
+        dt.checked_add_months(Months::new(months_total as u32))
+            .unwrap_or(dt)
     } else {
-        dt.checked_sub_months(Months::new((-months_total) as u32)).unwrap_or(dt)
+        dt.checked_sub_months(Months::new((-months_total) as u32))
+            .unwrap_or(dt)
     };
     let dt3 = dt2 + chrono::Duration::days(days);
     Ok(Value::number_i64(dt3.timestamp_nanos_opt().unwrap_or(0)))
@@ -1294,8 +1531,9 @@ fn builtin_time_diff(args: &[Value]) -> Result<Value, PolicyError> {
 
 fn builtin_time_parse_duration_ns(args: &[Value]) -> Result<Value, PolicyError> {
     let s = arg_str(args, 0, "time.parse_duration_ns")?;
-    let ns = parse_go_duration(&s)
-        .ok_or_else(|| PolicyError::Eval(format!("time.parse_duration_ns: invalid duration '{s}'")))?;
+    let ns = parse_go_duration(&s).ok_or_else(|| {
+        PolicyError::Eval(format!("time.parse_duration_ns: invalid duration '{s}'"))
+    })?;
     Ok(Value::number_i64(ns))
 }
 
@@ -1321,7 +1559,9 @@ fn parse_go_duration(s: &str) -> Option<i64> {
     while !remaining.is_empty() {
         let num_end = remaining.find(|c: char| c.is_alphabetic() || c == 'µ')?;
         let num: f64 = remaining[..num_end].parse().ok()?;
-        let unit_end = remaining[num_end..].find(|c: char| c.is_ascii_digit()).unwrap_or(remaining.len() - num_end);
+        let unit_end = remaining[num_end..]
+            .find(|c: char| c.is_ascii_digit())
+            .unwrap_or(remaining.len() - num_end);
         let unit = &remaining[num_end..num_end + unit_end];
         let multiplier: i64 = match unit {
             "ns" => 1,
@@ -1351,7 +1591,11 @@ fn builtin_crypto_hash(args: &[Value], alg: &str) -> Result<Value, PolicyError> 
         }
         "sha1" => &digest::SHA1_FOR_LEGACY_USE_ONLY,
         "sha256" => &digest::SHA256,
-        _ => return Err(PolicyError::Unsupported(format!("crypto hash: unknown alg {alg}"))),
+        _ => {
+            return Err(PolicyError::Unsupported(format!(
+                "crypto hash: unknown alg {alg}"
+            )));
+        }
     };
     let digest = digest::digest(algo, s.as_bytes());
     Ok(Value::string(hex::encode(digest.as_ref())))
@@ -1365,7 +1609,11 @@ fn builtin_crypto_hmac(args: &[Value], alg: &str) -> Result<Value, PolicyError> 
         "md5" | "sha1" => hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY,
         "sha256" => hmac::HMAC_SHA256,
         "sha512" => hmac::HMAC_SHA512,
-        _ => return Err(PolicyError::Unsupported(format!("crypto.hmac: unknown alg {alg}"))),
+        _ => {
+            return Err(PolicyError::Unsupported(format!(
+                "crypto.hmac: unknown alg {alg}"
+            )));
+        }
     };
     let key = hmac::Key::new(alg_key, key_str.as_bytes());
     let tag = hmac::sign(&key, message.as_bytes());
@@ -1393,7 +1641,10 @@ fn builtin_x509_parse_certificate_request(_args: &[Value]) -> Result<Value, Poli
 }
 
 fn builtin_x509_parse_and_verify(_args: &[Value]) -> Result<Value, PolicyError> {
-    Ok(Value::array(vec![serde_json::json!(false), serde_json::json!([])]))
+    Ok(Value::array(vec![
+        serde_json::json!(false),
+        serde_json::json!([]),
+    ]))
 }
 
 fn builtin_x509_parse_rsa_private_key(_args: &[Value]) -> Result<Value, PolicyError> {
@@ -1409,10 +1660,12 @@ fn builtin_cidr_contains(args: &[Value]) -> Result<Value, PolicyError> {
 }
 
 fn builtin_cidr_contains_matches(args: &[Value]) -> Result<Value, PolicyError> {
-    let cidrs = collection_values(args.get(0).unwrap_or(&Value::Undefined))
-        .ok_or_else(|| PolicyError::Eval("net.cidr_contains_matches: arg 0 must be collection".into()))?;
-    let addrs = collection_values(args.get(1).unwrap_or(&Value::Undefined))
-        .ok_or_else(|| PolicyError::Eval("net.cidr_contains_matches: arg 1 must be collection".into()))?;
+    let cidrs = collection_values(args.get(0).unwrap_or(&Value::Undefined)).ok_or_else(|| {
+        PolicyError::Eval("net.cidr_contains_matches: arg 0 must be collection".into())
+    })?;
+    let addrs = collection_values(args.get(1).unwrap_or(&Value::Undefined)).ok_or_else(|| {
+        PolicyError::Eval("net.cidr_contains_matches: arg 1 must be collection".into())
+    })?;
     let mut results = Vec::new();
     for (i, cidr) in cidrs.iter().enumerate() {
         for (j, addr) in addrs.iter().enumerate() {
@@ -1430,7 +1683,9 @@ fn builtin_cidr_expand(args: &[Value]) -> Result<Value, PolicyError> {
     let cidr = arg_str(args, 0, "net.cidr_expand")?;
     // Simplified: just return the network address
     let parts: Vec<&str> = cidr.split('/').collect();
-    if parts.len() != 2 { return Ok(Value::Set(vec![])); }
+    if parts.len() != 2 {
+        return Ok(Value::Set(vec![]));
+    }
     Ok(Value::Set(vec![serde_json::json!(parts[0])]))
 }
 
@@ -1455,16 +1710,31 @@ fn builtin_net_lookup_ip_addr(_args: &[Value]) -> Result<Value, PolicyError> {
 fn cidr_contains(cidr: &str, addr: &str) -> bool {
     // Very simplified IPv4 CIDR check
     let parts: Vec<&str> = cidr.split('/').collect();
-    if parts.len() != 2 { return false; }
+    if parts.len() != 2 {
+        return false;
+    }
     let network = parts[0];
     let prefix_len: u32 = parts[1].parse().unwrap_or(0);
-    if prefix_len > 32 { return false; }
+    if prefix_len > 32 {
+        return false;
+    }
     fn ip_to_u32(ip: &str) -> Option<u32> {
         let parts: Vec<u8> = ip.split('.').filter_map(|p| p.parse().ok()).collect();
-        if parts.len() != 4 { return None; }
-        Some(((parts[0] as u32) << 24) | ((parts[1] as u32) << 16) | ((parts[2] as u32) << 8) | parts[3] as u32)
+        if parts.len() != 4 {
+            return None;
+        }
+        Some(
+            ((parts[0] as u32) << 24)
+                | ((parts[1] as u32) << 16)
+                | ((parts[2] as u32) << 8)
+                | parts[3] as u32,
+        )
     }
-    let mask = if prefix_len == 0 { 0u32 } else { !0u32 << (32 - prefix_len) };
+    let mask = if prefix_len == 0 {
+        0u32
+    } else {
+        !0u32 << (32 - prefix_len)
+    };
     let net_addr = ip_to_u32(network).unwrap_or(0) & mask;
     let test_addr = ip_to_u32(addr).unwrap_or(0) & mask;
     net_addr == test_addr
@@ -1495,7 +1765,9 @@ fn parse_semver(s: &str) -> Option<(u64, u64, u64)> {
     let base = s.split('+').next().unwrap_or(s);
     let base = base.split('-').next().unwrap_or(base);
     let parts: Vec<&str> = base.split('.').collect();
-    if parts.len() < 3 { return None; }
+    if parts.len() < 3 {
+        return None;
+    }
     let major = parts[0].parse().ok()?;
     let minor = parts[1].parse().ok()?;
     let patch = parts[2].parse().ok()?;
@@ -1526,17 +1798,22 @@ fn builtin_glob_match(args: &[Value]) -> Result<Value, PolicyError> {
 
 fn builtin_glob_quote_meta(args: &[Value]) -> Result<Value, PolicyError> {
     let s = arg_str(args, 0, "glob.quote_meta")?;
-    let escaped: String = s.chars().map(|c| match c {
-        '*' | '?' | '[' | ']' | '{' | '}' | '\\' => format!("\\{c}"),
-        other => other.to_string(),
-    }).collect();
+    let escaped: String = s
+        .chars()
+        .map(|c| match c {
+            '*' | '?' | '[' | ']' | '{' | '}' | '\\' => format!("\\{c}"),
+            other => other.to_string(),
+        })
+        .collect();
     Ok(Value::string(escaped))
 }
 
 fn glob_match(pattern: &str, delimiters: &[char], value: &str) -> bool {
     // Simplified glob matching
     let re_str = glob_to_regex_with_delimiters(pattern, delimiters);
-    regex::Regex::new(&re_str).map(|re| re.is_match(value)).unwrap_or(false)
+    regex::Regex::new(&re_str)
+        .map(|re| re.is_match(value))
+        .unwrap_or(false)
 }
 
 fn glob_to_regex_with_delimiters(glob: &str, _delimiters: &[char]) -> String {
@@ -1578,13 +1855,20 @@ fn builtin_graphql_is_valid(args: &[Value]) -> Result<Value, PolicyError> {
 fn builtin_graphql_parse(args: &[Value]) -> Result<Value, PolicyError> {
     let _query = arg_str(args, 0, "graphql.parse")?;
     let _schema = arg_str(args, 1, "graphql.parse")?;
-    Ok(Value::array(vec![serde_json::json!({}), serde_json::json!({})]))
+    Ok(Value::array(vec![
+        serde_json::json!({}),
+        serde_json::json!({}),
+    ]))
 }
 
 fn builtin_graphql_parse_and_verify(args: &[Value]) -> Result<Value, PolicyError> {
     let _query = arg_str(args, 0, "graphql.parse_and_verify")?;
     let _schema = arg_str(args, 1, "graphql.parse_and_verify")?;
-    Ok(Value::array(vec![serde_json::json!(false), serde_json::json!({}), serde_json::json!({})]))
+    Ok(Value::array(vec![
+        serde_json::json!(false),
+        serde_json::json!({}),
+        serde_json::json!({}),
+    ]))
 }
 
 fn builtin_graphql_parse_query(args: &[Value]) -> Result<Value, PolicyError> {
@@ -1627,7 +1911,9 @@ fn builtin_rego_parse_module(args: &[Value]) -> Result<Value, PolicyError> {
     let _filename = arg_str(args, 0, "rego.parse_module")?;
     let src = arg_str(args, 1, "rego.parse_module")?;
     match super::parser::parse_module(&src) {
-        Ok(_) => Ok(Value::Json(serde_json::json!({ "package": {}, "rules": [] }))),
+        Ok(_) => Ok(Value::Json(
+            serde_json::json!({ "package": {}, "rules": [] }),
+        )),
         Err(e) => Err(e),
     }
 }

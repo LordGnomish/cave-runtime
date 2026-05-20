@@ -18,8 +18,7 @@ use uuid::Uuid;
 
 use super::epoch::{ControllerEpoch, VoterSet};
 use super::metadata::{
-    BrokerRegistration, ClusterMetadata, ConfigRecord, MetadataRecord, PartitionRecord,
-    TopicRecord,
+    BrokerRegistration, ClusterMetadata, ConfigRecord, MetadataRecord, PartitionRecord, TopicRecord,
 };
 use super::metadata_log::MetadataLog;
 
@@ -64,14 +63,10 @@ pub enum ControllerResponse {
     },
     /// The request can't be applied — pre-condition violated.
     /// `reason` matches Kafka's `*Exception` message style.
-    Rejected {
-        reason: String,
-    },
+    Rejected { reason: String },
     /// Caller wasn't the elected leader. Includes the current
     /// leader id (if any) so the caller can redirect.
-    NotLeader {
-        current_leader: Option<i32>,
-    },
+    NotLeader { current_leader: Option<i32> },
 }
 
 /// The state machine itself. `&self` everywhere; interior
@@ -184,7 +179,12 @@ impl QuorumController {
                 reason: format!("topic already exists: {name}"),
             };
         }
-        let live_brokers: Vec<i32> = snap.brokers.values().filter(|b| !b.fenced).map(|b| b.broker_id).collect();
+        let live_brokers: Vec<i32> = snap
+            .brokers
+            .values()
+            .filter(|b| !b.fenced)
+            .map(|b| b.broker_id)
+            .collect();
         if (replication_factor as usize) > live_brokers.len().max(1) {
             return ControllerResponse::Rejected {
                 reason: format!(
@@ -361,7 +361,10 @@ mod tests {
             replication_factor: 1,
         });
         match r {
-            ControllerResponse::Ok { offset, record_count } => {
+            ControllerResponse::Ok {
+                offset,
+                record_count,
+            } => {
                 assert_eq!(offset, 0);
                 assert_eq!(record_count, 4); // 1 topic + 3 partitions
             }
@@ -511,7 +514,8 @@ mod tests {
         });
         let snap = c.snapshot();
         assert_eq!(
-            snap.configs.get(&("broker".into(), "1".into(), "log.retention.ms".into())),
+            snap.configs
+                .get(&("broker".into(), "1".into(), "log.retention.ms".into())),
             Some(&"86400000".to_string())
         );
         c.submit_request(ControllerRequest::SetConfig {

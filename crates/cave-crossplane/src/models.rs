@@ -2,9 +2,9 @@
 // Copyright 2026 Cave Runtime contributors
 //! Data models for cave-crossplane.
 
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 // ── XRD ──────────────────────────────────────────────────────────────────────

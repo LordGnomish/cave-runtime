@@ -22,6 +22,7 @@ use std::sync::Arc;
 
 pub mod alert;
 pub mod ascan;
+pub mod auth;
 pub mod cli;
 pub mod context;
 pub mod engine;
@@ -31,7 +32,6 @@ pub mod pscan;
 pub mod report;
 pub mod routes;
 pub mod spider;
-pub mod auth;
 
 use axum::Router;
 

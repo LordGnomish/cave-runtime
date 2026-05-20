@@ -10,14 +10,14 @@
 // `hardcoded-role-idp-mapper`, `saml-role-idp-mapper`).
 
 use axum::{
+    Json,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -33,7 +33,11 @@ pub struct IdentityProviderMapper {
     #[serde(rename = "identityProviderMapper")]
     pub identity_provider_mapper: String,
     /// Owning alias — Keycloak surfaces this so reverse lookup works.
-    #[serde(default, rename = "identityProviderAlias", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "identityProviderAlias",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub identity_provider_alias: Option<String>,
     #[serde(default)]
     pub config: Map<String, Value>,
@@ -47,7 +51,9 @@ pub struct IdentityProviderMapperStore {
 
 impl IdentityProviderMapperStore {
     pub fn new() -> Self {
-        Self { inner: DashMap::new() }
+        Self {
+            inner: DashMap::new(),
+        }
     }
 
     pub fn list(&self, realm: &str, alias: &str) -> Vec<IdentityProviderMapper> {
@@ -72,8 +78,10 @@ impl IdentityProviderMapperStore {
     pub fn create(&self, realm: &str, alias: &str, mut m: IdentityProviderMapper) -> String {
         let id = m.id.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
         m.id = Some(id.clone());
-        m.identity_provider_alias.get_or_insert_with(|| alias.to_string());
-        self.inner.insert((realm.into(), alias.into(), id.clone()), m);
+        m.identity_provider_alias
+            .get_or_insert_with(|| alias.to_string());
+        self.inner
+            .insert((realm.into(), alias.into(), id.clone()), m);
         id
     }
 
@@ -84,7 +92,8 @@ impl IdentityProviderMapperStore {
         }
         let mut m = m;
         m.id = Some(id.to_string());
-        m.identity_provider_alias.get_or_insert_with(|| alias.to_string());
+        m.identity_provider_alias
+            .get_or_insert_with(|| alias.to_string());
         self.inner.insert(key, m);
         true
     }

@@ -8,14 +8,17 @@ use crate::discovery::{APIResource, APIResourceList};
 fn rl(group_version: &str, kinds: &[&str]) -> APIResourceList {
     APIResourceList {
         group_version: group_version.into(),
-        resources: kinds.iter().map(|k| APIResource {
-            name: k.to_lowercase(),
-            kind: (*k).into(),
-            namespaced: true,
-            verbs: vec!["get".into(), "list".into()],
-            short_names: vec![],
-            categories: vec![],
-        }).collect(),
+        resources: kinds
+            .iter()
+            .map(|k| APIResource {
+                name: k.to_lowercase(),
+                kind: (*k).into(),
+                namespaced: true,
+                verbs: vec!["get".into(), "list".into()],
+                short_names: vec![],
+                categories: vec![],
+            })
+            .collect(),
     }
 }
 
@@ -36,8 +39,10 @@ fn etag_differs_for_different_input() {
 #[test]
 fn etag_is_quoted_per_rfc7232() {
     let e = etag_for_bytes(b"x");
-    assert!(e.starts_with('"') && e.ends_with('"'),
-        "ETag must be a quoted-string per RFC 7232 §2.3");
+    assert!(
+        e.starts_with('"') && e.ends_with('"'),
+        "ETag must be a quoted-string per RFC 7232 §2.3"
+    );
 }
 
 #[test]
@@ -55,7 +60,10 @@ fn etag_differs_for_tenant_scoped_payload() {
     // top-level metadata.
     let acme = serde_json::json!({"tenant":"acme","items":[{"name":"pods"}]});
     let globex = serde_json::json!({"tenant":"globex","items":[{"name":"pods"}]});
-    assert_ne!(etag_for_json(&acme).unwrap(), etag_for_json(&globex).unwrap());
+    assert_ne!(
+        etag_for_json(&acme).unwrap(),
+        etag_for_json(&globex).unwrap()
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,20 +101,25 @@ fn gzip_envelope_too_short_is_not_gzip() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn make_groups(n: usize) -> Vec<APIGroupDiscovery> {
-    (0..n).map(|i| {
-        let group_name = format!("g{i}");
-        let list = rl(&format!("{group_name}/v1"), &["A"]);
-        APIGroupDiscovery {
-            name: group_name,
-            versions: vec![from_resource_list("v1", &list)],
-        }
-    }).collect()
+    (0..n)
+        .map(|i| {
+            let group_name = format!("g{i}");
+            let list = rl(&format!("{group_name}/v1"), &["A"]);
+            APIGroupDiscovery {
+                name: group_name,
+                versions: vec![from_resource_list("v1", &list)],
+            }
+        })
+        .collect()
 }
 
 #[test]
 fn page_groups_returns_first_page_when_under_limit() {
     let g = make_groups(3);
-    let req = PageRequest { limit: 10, continue_token: None };
+    let req = PageRequest {
+        limit: 10,
+        continue_token: None,
+    };
     let p = page_groups(&g, &req);
     assert_eq!(p.doc.items.len(), 3);
     assert!(p.doc.continue_token.is_empty());
@@ -115,7 +128,10 @@ fn page_groups_returns_first_page_when_under_limit() {
 #[test]
 fn page_groups_returns_partial_page_with_token() {
     let g = make_groups(10);
-    let req = PageRequest { limit: 3, continue_token: None };
+    let req = PageRequest {
+        limit: 3,
+        continue_token: None,
+    };
     let p = page_groups(&g, &req);
     assert_eq!(p.doc.items.len(), 3);
     assert!(!p.doc.continue_token.is_empty());
@@ -124,9 +140,20 @@ fn page_groups_returns_partial_page_with_token() {
 #[test]
 fn page_groups_consume_token_for_next_page() {
     let g = make_groups(10);
-    let p1 = page_groups(&g, &PageRequest { limit: 3, continue_token: None });
-    let p2 = page_groups(&g, &PageRequest {
-        limit: 3, continue_token: Some(p1.doc.continue_token.clone()) });
+    let p1 = page_groups(
+        &g,
+        &PageRequest {
+            limit: 3,
+            continue_token: None,
+        },
+    );
+    let p2 = page_groups(
+        &g,
+        &PageRequest {
+            limit: 3,
+            continue_token: Some(p1.doc.continue_token.clone()),
+        },
+    );
     assert_eq!(p2.doc.items.len(), 3);
     assert_eq!(p2.doc.items[0].name, "g3");
 }
@@ -134,17 +161,36 @@ fn page_groups_consume_token_for_next_page() {
 #[test]
 fn page_groups_final_page_clears_token() {
     let g = make_groups(5);
-    let p1 = page_groups(&g, &PageRequest { limit: 3, continue_token: None });
-    let p2 = page_groups(&g, &PageRequest {
-        limit: 3, continue_token: Some(p1.doc.continue_token.clone()) });
-    assert!(p2.doc.continue_token.is_empty(),
-        "last page must NOT carry a continuation token");
+    let p1 = page_groups(
+        &g,
+        &PageRequest {
+            limit: 3,
+            continue_token: None,
+        },
+    );
+    let p2 = page_groups(
+        &g,
+        &PageRequest {
+            limit: 3,
+            continue_token: Some(p1.doc.continue_token.clone()),
+        },
+    );
+    assert!(
+        p2.doc.continue_token.is_empty(),
+        "last page must NOT carry a continuation token"
+    );
 }
 
 #[test]
 fn page_groups_empty_input() {
     let g = vec![];
-    let p = page_groups(&g, &PageRequest { limit: 5, continue_token: None });
+    let p = page_groups(
+        &g,
+        &PageRequest {
+            limit: 5,
+            continue_token: None,
+        },
+    );
     assert!(p.doc.items.is_empty());
     assert!(p.doc.continue_token.is_empty());
 }
@@ -152,9 +198,13 @@ fn page_groups_empty_input() {
 #[test]
 fn page_groups_overflow_token_yields_empty_page() {
     let g = make_groups(2);
-    let p = page_groups(&g, &PageRequest {
-        limit: 5, continue_token: Some(encode_continue_pub(99)),
-    });
+    let p = page_groups(
+        &g,
+        &PageRequest {
+            limit: 5,
+            continue_token: Some(encode_continue_pub(99)),
+        },
+    );
     assert!(p.doc.items.is_empty());
     assert!(p.doc.continue_token.is_empty());
 }
@@ -164,7 +214,10 @@ fn encode_continue_pub(idx: usize) -> String {
     // we don't expose super::encode_continue, so use the public path:
     // crank through page_groups to derive the token format.
     let g = make_groups(idx + 1);
-    let req = PageRequest { limit: idx, continue_token: None };
+    let req = PageRequest {
+        limit: idx,
+        continue_token: None,
+    };
     let p = page_groups(&g, &req);
     p.doc.continue_token
 }
@@ -215,8 +268,12 @@ fn build_index_collects_paths_with_hash() {
     let idx = build_index(&specs);
     assert_eq!(idx.paths.len(), 2);
     let entry = &idx.paths["api/v1"];
-    assert!(entry.server_relative_url.starts_with("/openapi/v3/api/v1?hash="),
-        "entry must reference its content-hashed URL");
+    assert!(
+        entry
+            .server_relative_url
+            .starts_with("/openapi/v3/api/v1?hash="),
+        "entry must reference its content-hashed URL"
+    );
 }
 
 #[test]
@@ -225,8 +282,10 @@ fn build_index_hash_is_stable() {
     specs.insert("api/v1".to_string(), b"{\"y\":2}".to_vec());
     let a = build_index(&specs);
     let b = build_index(&specs);
-    assert_eq!(a.paths["api/v1"].server_relative_url,
-               b.paths["api/v1"].server_relative_url);
+    assert_eq!(
+        a.paths["api/v1"].server_relative_url,
+        b.paths["api/v1"].server_relative_url
+    );
 }
 
 #[test]
@@ -235,30 +294,36 @@ fn build_index_hash_changes_on_content_change() {
     specs1.insert("api/v1".to_string(), b"{\"y\":2}".to_vec());
     let mut specs2 = BTreeMap::new();
     specs2.insert("api/v1".to_string(), b"{\"y\":3}".to_vec());
-    assert_ne!(build_index(&specs1).paths["api/v1"].server_relative_url,
-               build_index(&specs2).paths["api/v1"].server_relative_url);
+    assert_ne!(
+        build_index(&specs1).paths["api/v1"].server_relative_url,
+        build_index(&specs2).paths["api/v1"].server_relative_url
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // `#[ignore]` — gated on real flate2 + sha2 deps.
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn gzip_real_deflate_round_trip() {
     // pending: requires `flate2` crate — full RFC 1951 deflate round-trip
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn etag_uses_sha256_when_dep_landed() {
     // pending: requires `sha2` crate — etag should be sha256-hex per upstream
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn aggregated_discovery_serves_via_http_handler() {
     // pending: requires axum wiring + Accept-Encoding negotiation
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn protobuf_response_for_application_vnd_kubernetes_protobuf() {
     // pending: requires Kubernetes protobuf wire format — `runtime.protobuf`
 }

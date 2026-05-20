@@ -1,23 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+use crate::VaultState;
 use crate::error::{VaultError, VaultResult};
 use crate::response::VaultResponse;
-use crate::VaultState;
 use axum::{
+    Router,
     extract::{Json, Path, State},
     http::HeaderMap,
     routing::{delete, get, post},
-    Router,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
 fn extract_token(headers: &HeaderMap) -> VaultResult<String> {
-    headers.get("x-vault-token")
+    headers
+        .get("x-vault-token")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or(VaultError::BadToken)
@@ -76,12 +77,12 @@ pub struct GroupAlias {
 
 #[derive(Default)]
 pub struct IdentityStore {
-    pub entities: HashMap<String, Entity>,   // id -> entity
+    pub entities: HashMap<String, Entity>,     // id -> entity
     pub entity_names: HashMap<String, String>, // name -> id
-    pub groups: HashMap<String, Group>,       // id -> group
+    pub groups: HashMap<String, Group>,        // id -> group
     pub group_names: HashMap<String, String>,  // name -> id
     pub entity_aliases: HashMap<String, EntityAlias>, // alias_id -> alias
-    pub group_aliases: HashMap<String, GroupAlias>,   // alias_id -> alias
+    pub group_aliases: HashMap<String, GroupAlias>, // alias_id -> alias
 }
 
 // ─── Direct API (deeper-001) ────────────────────────────────────────────────
@@ -149,9 +150,11 @@ impl IdentityStore {
         let mount_accessor = mount_accessor.into();
         let alias_name = alias_name.into();
         // Uniqueness: (mount_accessor, name) cannot duplicate.
-        if self.entity_aliases.values().any(|a|
-            a.mount_accessor == mount_accessor && a.name == alias_name
-        ) {
+        if self
+            .entity_aliases
+            .values()
+            .any(|a| a.mount_accessor == mount_accessor && a.name == alias_name)
+        {
             return Err(format!(
                 "alias ({}, {}) already exists",
                 mount_accessor, alias_name
@@ -180,9 +183,10 @@ impl IdentityStore {
     /// entity lookup by `(mount_accessor, alias_name)` is how the auth
     /// pipeline turns a successful login into the canonical entity ID.
     pub fn entity_by_alias(&self, mount_accessor: &str, alias_name: &str) -> Option<&Entity> {
-        let alias = self.entity_aliases.values().find(|a|
-            a.mount_accessor == mount_accessor && a.name == alias_name
-        )?;
+        let alias = self
+            .entity_aliases
+            .values()
+            .find(|a| a.mount_accessor == mount_accessor && a.name == alias_name)?;
         self.entities.get(&alias.canonical_id)
     }
 
@@ -190,9 +194,13 @@ impl IdentityStore {
     /// (pathEntityIDDelete) — deleting an entity also drops every
     /// alias that pointed at it.
     pub fn delete_entity(&mut self, entity_id: &str) -> bool {
-        let Some(entity) = self.entities.remove(entity_id) else { return false };
+        let Some(entity) = self.entities.remove(entity_id) else {
+            return false;
+        };
         self.entity_names.remove(&entity.name);
-        let alias_ids: Vec<String> = self.entity_aliases.iter()
+        let alias_ids: Vec<String> = self
+            .entity_aliases
+            .iter()
             .filter(|(_, a)| a.canonical_id == entity_id)
             .map(|(id, _)| id.clone())
             .collect();
@@ -250,7 +258,9 @@ impl IdentityStore {
         if !self.entities.contains_key(entity_id) {
             return Err(format!("entity {} not found", entity_id));
         }
-        let g = self.groups.get_mut(group_id)
+        let g = self
+            .groups
+            .get_mut(group_id)
             .ok_or_else(|| format!("group {} not found", group_id))?;
         if g.group_type == "external" {
             return Err("cannot add direct members to an external group".into());
@@ -271,7 +281,9 @@ impl IdentityStore {
         mount_type: impl Into<String>,
         alias_name: impl Into<String>,
     ) -> Result<String, String> {
-        let g = self.groups.get_mut(group_id)
+        let g = self
+            .groups
+            .get_mut(group_id)
             .ok_or_else(|| format!("group {} not found", group_id))?;
         if g.group_type != "external" {
             return Err("group_alias may only be attached to external groups".into());
@@ -296,16 +308,22 @@ impl IdentityStore {
     /// aliases matches one of the group's group_aliases on
     /// (mount_accessor, alias_name).
     pub fn entity_is_member(&self, group_id: &str, entity_id: &str) -> bool {
-        let Some(group) = self.groups.get(group_id) else { return false };
+        let Some(group) = self.groups.get(group_id) else {
+            return false;
+        };
         if group.group_type == "internal" {
             return group.member_entity_ids.iter().any(|m| m == entity_id);
         }
         // External: cross-match aliases
-        let Some(entity) = self.entities.get(entity_id) else { return false };
+        let Some(entity) = self.entities.get(entity_id) else {
+            return false;
+        };
         for ga in &group.aliases {
-            if entity.aliases.iter().any(|ea|
-                ea.mount_accessor == ga.mount_accessor && ea.name == ga.name
-            ) {
+            if entity
+                .aliases
+                .iter()
+                .any(|ea| ea.mount_accessor == ga.mount_accessor && ea.name == ga.name)
+            {
                 return true;
             }
         }
@@ -317,7 +335,9 @@ impl IdentityStore {
     /// Internal-group nesting is followed via `parent_group_ids` (one
     /// hop here; full recursion happens in upstream's `MemberGroupIDs`).
     pub fn effective_policies(&self, entity_id: &str) -> Vec<String> {
-        let mut policies: Vec<String> = self.entities.get(entity_id)
+        let mut policies: Vec<String> = self
+            .entities
+            .get(entity_id)
             .map(|e| e.policies.clone())
             .unwrap_or_default();
         for group in self.groups.values() {
@@ -335,11 +355,17 @@ impl IdentityStore {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GroupType { Internal, External }
+pub enum GroupType {
+    Internal,
+    External,
+}
 
 impl GroupType {
     pub fn as_str(&self) -> &'static str {
-        match self { Self::Internal => "internal", Self::External => "external" }
+        match self {
+            Self::Internal => "internal",
+            Self::External => "external",
+        }
     }
 }
 
@@ -351,7 +377,8 @@ pub async fn create_entity(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let id = Uuid::new_v4().to_string();
-    let name = body.get("name")
+    let name = body
+        .get("name")
         .and_then(|v| v.as_str())
         .unwrap_or(&id)
         .to_string();
@@ -359,14 +386,29 @@ pub async fn create_entity(
     let entity = Entity {
         id: id.clone(),
         name: name.clone(),
-        metadata: body.get("metadata").and_then(|v| v.as_object())
-            .map(|m| m.iter().filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string()))).collect())
+        metadata: body
+            .get("metadata")
+            .and_then(|v| v.as_object())
+            .map(|m| {
+                m.iter()
+                    .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                    .collect()
+            })
             .unwrap_or_default(),
-        policies: body.get("policies").and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+        policies: body
+            .get("policies")
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default(),
         aliases: Vec::new(),
-        disabled: body.get("disabled").and_then(|v| v.as_bool()).unwrap_or(false),
+        disabled: body
+            .get("disabled")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
         creation_time: Utc::now().to_rfc3339(),
         last_update_time: Utc::now().to_rfc3339(),
     };
@@ -385,7 +427,9 @@ pub async fn read_entity_by_id(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.identity_store.read().await;
-    let entity = store.entities.get(&id)
+    let entity = store
+        .entities
+        .get(&id)
         .ok_or_else(|| VaultError::NotFound(format!("entity {} not found", id)))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(entity).unwrap_or_default()))
 }
@@ -397,9 +441,13 @@ pub async fn read_entity_by_name(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.identity_store.read().await;
-    let id = store.entity_names.get(&name)
+    let id = store
+        .entity_names
+        .get(&name)
         .ok_or_else(|| VaultError::NotFound(format!("entity {} not found", name)))?;
-    let entity = store.entities.get(id)
+    let entity = store
+        .entities
+        .get(id)
         .ok_or_else(|| VaultError::NotFound(format!("entity {} not found", name)))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(entity).unwrap_or_default()))
 }
@@ -412,16 +460,24 @@ pub async fn update_entity(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.identity_store.write().await;
-    let entity = store.entities.get_mut(&id)
+    let entity = store
+        .entities
+        .get_mut(&id)
         .ok_or_else(|| VaultError::NotFound(format!("entity {} not found", id)))?;
     if let Some(name) = body.get("name").and_then(|v| v.as_str()) {
         entity.name = name.to_string();
     }
     if let Some(meta) = body.get("metadata").and_then(|v| v.as_object()) {
-        entity.metadata = meta.iter().filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string()))).collect();
+        entity.metadata = meta
+            .iter()
+            .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+            .collect();
     }
     if let Some(policies) = body.get("policies").and_then(|v| v.as_array()) {
-        entity.policies = policies.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
+        entity.policies = policies
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect();
     }
     if let Some(disabled) = body.get("disabled").and_then(|v| v.as_bool()) {
         entity.disabled = disabled;
@@ -461,17 +517,21 @@ pub async fn create_entity_alias(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let alias_id = Uuid::new_v4().to_string();
-    let canonical_id = body.get("canonical_id")
+    let canonical_id = body
+        .get("canonical_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| VaultError::InvalidRequest("canonical_id required".into()))?
         .to_string();
-    let name = body.get("name")
+    let name = body
+        .get("name")
         .and_then(|v| v.as_str())
         .ok_or_else(|| VaultError::InvalidRequest("name required".into()))?
         .to_string();
-    let mount_accessor = body.get("mount_accessor")
+    let mount_accessor = body
+        .get("mount_accessor")
         .and_then(|v| v.as_str())
-        .unwrap_or("").to_string();
+        .unwrap_or("")
+        .to_string();
 
     let alias = EntityAlias {
         id: alias_id.clone(),
@@ -502,7 +562,9 @@ pub async fn read_entity_alias(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.identity_store.read().await;
-    let alias = store.entity_aliases.get(&id)
+    let alias = store
+        .entity_aliases
+        .get(&id)
         .ok_or_else(|| VaultError::NotFound(format!("alias {} not found", id)))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(alias).unwrap_or_default()))
 }
@@ -536,7 +598,8 @@ pub async fn create_group(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let id = Uuid::new_v4().to_string();
-    let name = body.get("name")
+    let name = body
+        .get("name")
         .and_then(|v| v.as_str())
         .unwrap_or(&id)
         .to_string();
@@ -544,18 +607,46 @@ pub async fn create_group(
     let group = Group {
         id: id.clone(),
         name: name.clone(),
-        group_type: body.get("type").and_then(|v| v.as_str()).unwrap_or("internal").to_string(),
-        policies: body.get("policies").and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+        group_type: body
+            .get("type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("internal")
+            .to_string(),
+        policies: body
+            .get("policies")
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default(),
-        member_entity_ids: body.get("member_entity_ids").and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+        member_entity_ids: body
+            .get("member_entity_ids")
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default(),
-        member_group_ids: body.get("member_group_ids").and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+        member_group_ids: body
+            .get("member_group_ids")
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default(),
-        metadata: body.get("metadata").and_then(|v| v.as_object())
-            .map(|m| m.iter().filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string()))).collect())
+        metadata: body
+            .get("metadata")
+            .and_then(|v| v.as_object())
+            .map(|m| {
+                m.iter()
+                    .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                    .collect()
+            })
             .unwrap_or_default(),
         aliases: Vec::new(),
         creation_time: Utc::now().to_rfc3339(),
@@ -577,7 +668,9 @@ pub async fn read_group_by_id(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.identity_store.read().await;
-    let group = store.groups.get(&id)
+    let group = store
+        .groups
+        .get(&id)
         .ok_or_else(|| VaultError::NotFound(format!("group {} not found", id)))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(group).unwrap_or_default()))
 }
@@ -589,9 +682,13 @@ pub async fn read_group_by_name(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.identity_store.read().await;
-    let id = store.group_names.get(&name)
+    let id = store
+        .group_names
+        .get(&name)
         .ok_or_else(|| VaultError::NotFound(format!("group {} not found", name)))?;
-    let group = store.groups.get(id)
+    let group = store
+        .groups
+        .get(id)
         .ok_or_else(|| VaultError::NotFound(format!("group {} not found", name)))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(group).unwrap_or_default()))
 }
@@ -627,11 +724,13 @@ pub async fn create_group_alias(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let alias_id = Uuid::new_v4().to_string();
-    let canonical_id = body.get("canonical_id")
+    let canonical_id = body
+        .get("canonical_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| VaultError::InvalidRequest("canonical_id required".into()))?
         .to_string();
-    let name = body.get("name")
+    let name = body
+        .get("name")
         .and_then(|v| v.as_str())
         .ok_or_else(|| VaultError::InvalidRequest("name required".into()))?
         .to_string();
@@ -639,7 +738,11 @@ pub async fn create_group_alias(
     let alias = GroupAlias {
         id: alias_id.clone(),
         canonical_id: canonical_id.clone(),
-        mount_accessor: body.get("mount_accessor").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        mount_accessor: body
+            .get("mount_accessor")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
         mount_type: String::new(),
         name,
         creation_time: Utc::now().to_rfc3339(),
@@ -662,7 +765,9 @@ pub async fn read_group_alias(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.identity_store.read().await;
-    let alias = store.group_aliases.get(&id)
+    let alias = store
+        .group_aliases
+        .get(&id)
         .ok_or_else(|| VaultError::NotFound(format!("group alias {} not found", id)))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(alias).unwrap_or_default()))
 }
@@ -691,18 +796,41 @@ pub async fn list_group_aliases(
 pub fn router(state: Arc<VaultState>) -> Router {
     Router::new()
         // Entity
-        .route("/v1/identity/entity", post(create_entity).get(list_entities))
-        .route("/v1/identity/entity/id/{id}", get(read_entity_by_id).post(update_entity).delete(delete_entity))
+        .route(
+            "/v1/identity/entity",
+            post(create_entity).get(list_entities),
+        )
+        .route(
+            "/v1/identity/entity/id/{id}",
+            get(read_entity_by_id)
+                .post(update_entity)
+                .delete(delete_entity),
+        )
         .route("/v1/identity/entity/name/{name}", get(read_entity_by_name))
         // Entity Alias
-        .route("/v1/identity/entity-alias", post(create_entity_alias).get(list_entity_aliases))
-        .route("/v1/identity/entity-alias/id/{id}", get(read_entity_alias).delete(delete_entity_alias))
+        .route(
+            "/v1/identity/entity-alias",
+            post(create_entity_alias).get(list_entity_aliases),
+        )
+        .route(
+            "/v1/identity/entity-alias/id/{id}",
+            get(read_entity_alias).delete(delete_entity_alias),
+        )
         // Group
         .route("/v1/identity/group", post(create_group).get(list_groups))
-        .route("/v1/identity/group/id/{id}", get(read_group_by_id).delete(delete_group))
+        .route(
+            "/v1/identity/group/id/{id}",
+            get(read_group_by_id).delete(delete_group),
+        )
         .route("/v1/identity/group/name/{name}", get(read_group_by_name))
         // Group Alias
-        .route("/v1/identity/group-alias", post(create_group_alias).get(list_group_aliases))
-        .route("/v1/identity/group-alias/id/{id}", get(read_group_alias).delete(delete_group_alias))
+        .route(
+            "/v1/identity/group-alias",
+            post(create_group_alias).get(list_group_aliases),
+        )
+        .route(
+            "/v1/identity/group-alias/id/{id}",
+            get(read_group_alias).delete(delete_group_alias),
+        )
         .with_state(state)
 }

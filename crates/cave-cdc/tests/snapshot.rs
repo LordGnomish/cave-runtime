@@ -5,8 +5,8 @@
 //! `pipeline/source/spi/SnapshotChangeEventSource.java` +
 //! `IncrementalSnapshotContext`.
 
-use cave_cdc::snapshot::{SnapshotMode, SnapshotProgress};
 use cave_cdc::CdcError;
+use cave_cdc::snapshot::{SnapshotMode, SnapshotProgress};
 
 const TENANT: &str = "tenant-acme-prod";
 
@@ -46,8 +46,14 @@ fn snapshot_mode_predicates_match_documented_behaviour() {
     assert!(Never.streams_after());
     assert!(WhenNeeded.streams_after());
     assert!(SchemaOnly.streams_after());
-    assert!(!InitialOnly.streams_after(), "initial_only exits after snapshot");
-    assert!(!SchemaOnlyRecovery.streams_after(), "schema_only_recovery exits after recovery");
+    assert!(
+        !InitialOnly.streams_after(),
+        "initial_only exits after snapshot"
+    );
+    assert!(
+        !SchemaOnlyRecovery.streams_after(),
+        "schema_only_recovery exits after recovery"
+    );
 }
 
 /// Cite: debezium `IncrementalSnapshotContext::nextChunkId` — chunks
@@ -60,18 +66,23 @@ fn snapshot_progress_chunk_completion_advances_watermarks() {
     assert_eq!(p.chunks_completed, 0);
     assert_eq!(p.percent(), Some(0.0));
 
-    p.complete_chunk(serde_json::json!(0), serde_json::json!(1000)).unwrap();
+    p.complete_chunk(serde_json::json!(0), serde_json::json!(1000))
+        .unwrap();
     assert_eq!(p.chunks_completed, 1);
     assert!((p.percent().unwrap() - 33.333).abs() < 0.1);
 
-    p.complete_chunk(serde_json::json!(1000), serde_json::json!(2000)).unwrap();
-    p.complete_chunk(serde_json::json!(2000), serde_json::json!(3000)).unwrap();
+    p.complete_chunk(serde_json::json!(1000), serde_json::json!(2000))
+        .unwrap();
+    p.complete_chunk(serde_json::json!(2000), serde_json::json!(3000))
+        .unwrap();
     assert_eq!(p.chunks_completed, 3);
     assert!(p.completed, "auto-completes when chunks_completed >= total");
     assert_eq!(p.percent(), Some(100.0));
 
     // Once completed, further chunks are rejected.
-    let err = p.complete_chunk(serde_json::json!(3000), serde_json::json!(4000)).unwrap_err();
+    let err = p
+        .complete_chunk(serde_json::json!(3000), serde_json::json!(4000))
+        .unwrap_err();
     assert!(matches!(err, CdcError::InvalidConfig(_)));
 }
 
@@ -86,7 +97,8 @@ fn snapshot_progress_with_unknown_total_requires_explicit_complete() {
     assert!(p.percent().is_none(), "unbounded ⇒ no percent");
 
     for i in 0..5u64 {
-        p.complete_chunk(serde_json::json!(i * 100), serde_json::json!((i + 1) * 100)).unwrap();
+        p.complete_chunk(serde_json::json!(i * 100), serde_json::json!((i + 1) * 100))
+            .unwrap();
     }
     assert_eq!(p.chunks_completed, 5);
     assert!(!p.completed, "unbounded snapshot doesn't auto-complete");
@@ -101,7 +113,8 @@ fn snapshot_progress_with_unknown_total_requires_explicit_complete() {
 fn snapshot_progress_serde_round_trip() {
     let mut p = SnapshotProgress::new(TENANT, "billing.orders", SnapshotMode::Initial);
     p.chunks_total = Some(10);
-    p.complete_chunk(serde_json::json!("01"), serde_json::json!("02")).unwrap();
+    p.complete_chunk(serde_json::json!("01"), serde_json::json!("02"))
+        .unwrap();
 
     let json = serde_json::to_string(&p).unwrap();
     let back: SnapshotProgress = serde_json::from_str(&json).unwrap();

@@ -38,10 +38,7 @@ pub const ROOT_ROLE: &str = "root";
 /// Idempotently provision the root user + role with the supplied
 /// password.  Safe to call repeatedly — already-existing entries are a
 /// no-op.  Returns `true` when at least one entry was newly created.
-pub fn auto_create_root_user_role(
-    store: &KvStore,
-    password: &str,
-) -> EtcdResult<bool> {
+pub fn auto_create_root_user_role(store: &KvStore, password: &str) -> EtcdResult<bool> {
     let mut created = false;
     let role_add = store.role_add(&AuthRoleAddRequest {
         name: ROOT_ROLE.into(),
@@ -77,10 +74,7 @@ pub fn auto_create_root_user_role(
 /// Walk a user's role list and return one merged permission vector with
 /// duplicates removed.  Permissions are deduplicated by
 /// `(perm_type, key, range_end)` triple.
-pub fn effective_permissions(
-    store: &KvStore,
-    username: &str,
-) -> EtcdResult<Vec<Permission>> {
+pub fn effective_permissions(store: &KvStore, username: &str) -> EtcdResult<Vec<Permission>> {
     let user = store.user_get(&crate::models::AuthUserGetRequest {
         name: username.to_string(),
     })?;
@@ -116,9 +110,7 @@ pub fn permission_matches_key(perm: &Permission, key: &[u8], desired: PermType) 
     match perm.range_end.as_deref() {
         None => key == perm.key.as_bytes(),
         Some("\0") => key.starts_with(perm.key.as_bytes()),
-        Some(end) => {
-            key >= perm.key.as_bytes() && key < end.as_bytes()
-        }
+        Some(end) => key >= perm.key.as_bytes() && key < end.as_bytes(),
     }
 }
 
@@ -285,7 +277,13 @@ mod tests {
         let tenant_id = "rb-007";
         let store = KvStore::new();
         auto_create_root_user_role(&store, "p").unwrap();
-        assert!(user_can_access(&store, ROOT_USER, dt(tenant_id, "any").as_bytes(), PermType::Write).unwrap());
+        assert!(user_can_access(
+            &store,
+            ROOT_USER,
+            dt(tenant_id, "any").as_bytes(),
+            PermType::Write
+        )
+        .unwrap());
     }
 
     #[test]
@@ -293,27 +291,52 @@ mod tests {
         // cite: etcd v3.6.10 isOpPermitted walks role list
         let tenant_id = "rb-008";
         let store = KvStore::new();
-        store.user_add(&crate::models::AuthUserAddRequest {
-            name: "alice".into(),
-            password: "pw".into(),
-        }).unwrap();
-        store.role_add(&AuthRoleAddRequest {
-            name: "data-r".into(),
-        }).unwrap();
+        store
+            .user_add(&crate::models::AuthUserAddRequest {
+                name: "alice".into(),
+                password: "pw".into(),
+            })
+            .unwrap();
+        store
+            .role_add(&AuthRoleAddRequest {
+                name: "data-r".into(),
+            })
+            .unwrap();
         grant_role_permission(
             &store,
             "data-r",
             PermType::Read,
             dt(tenant_id, "data/").to_string(),
             Some("\0".into()),
-        ).unwrap();
-        store.user_grant_role(&AuthUserGrantRoleRequest {
-            user: "alice".into(),
-            role: "data-r".into(),
-        }).unwrap();
-        assert!(user_can_access(&store, "alice", dt(tenant_id, "data/x").as_bytes(), PermType::Read).unwrap());
-        assert!(!user_can_access(&store, "alice", dt(tenant_id, "data/x").as_bytes(), PermType::Write).unwrap());
-        assert!(!user_can_access(&store, "alice", dt(tenant_id, "private").as_bytes(), PermType::Read).unwrap());
+        )
+        .unwrap();
+        store
+            .user_grant_role(&AuthUserGrantRoleRequest {
+                user: "alice".into(),
+                role: "data-r".into(),
+            })
+            .unwrap();
+        assert!(user_can_access(
+            &store,
+            "alice",
+            dt(tenant_id, "data/x").as_bytes(),
+            PermType::Read
+        )
+        .unwrap());
+        assert!(!user_can_access(
+            &store,
+            "alice",
+            dt(tenant_id, "data/x").as_bytes(),
+            PermType::Write
+        )
+        .unwrap());
+        assert!(!user_can_access(
+            &store,
+            "alice",
+            dt(tenant_id, "private").as_bytes(),
+            PermType::Read
+        )
+        .unwrap());
     }
 
     #[test]
@@ -321,23 +344,33 @@ mod tests {
         // cite: etcd v3.6.10 range_perm_cache.go merges per role
         let tenant_id = "rb-009";
         let store = KvStore::new();
-        store.user_add(&crate::models::AuthUserAddRequest {
-            name: "u".into(),
-            password: "p".into(),
-        }).unwrap();
-        store.role_add(&AuthRoleAddRequest { name: "r1".into() }).unwrap();
-        store.role_add(&AuthRoleAddRequest { name: "r2".into() }).unwrap();
+        store
+            .user_add(&crate::models::AuthUserAddRequest {
+                name: "u".into(),
+                password: "p".into(),
+            })
+            .unwrap();
+        store
+            .role_add(&AuthRoleAddRequest { name: "r1".into() })
+            .unwrap();
+        store
+            .role_add(&AuthRoleAddRequest { name: "r2".into() })
+            .unwrap();
         // Both roles grant the same permission.
         grant_role_permission(&store, "r1", PermType::Read, dt(tenant_id, "k"), None).unwrap();
         grant_role_permission(&store, "r2", PermType::Read, dt(tenant_id, "k"), None).unwrap();
-        store.user_grant_role(&AuthUserGrantRoleRequest {
-            user: "u".into(),
-            role: "r1".into(),
-        }).unwrap();
-        store.user_grant_role(&AuthUserGrantRoleRequest {
-            user: "u".into(),
-            role: "r2".into(),
-        }).unwrap();
+        store
+            .user_grant_role(&AuthUserGrantRoleRequest {
+                user: "u".into(),
+                role: "r1".into(),
+            })
+            .unwrap();
+        store
+            .user_grant_role(&AuthUserGrantRoleRequest {
+                user: "u".into(),
+                role: "r2".into(),
+            })
+            .unwrap();
         let perms = effective_permissions(&store, "u").unwrap();
         assert_eq!(perms.len(), 1, "duplicates should fold");
     }

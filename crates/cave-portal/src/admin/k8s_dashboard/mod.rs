@@ -29,7 +29,7 @@ pub mod storage;
 pub mod workloads;
 
 pub use workloads::{
-    list_workloads, rows_for_node, workload_summary, WorkloadRow, WorkloadSummary,
+    WorkloadRow, WorkloadSummary, list_workloads, rows_for_node, workload_summary,
 };
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -93,8 +93,10 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, K8sDashboa
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite =
-    Cite::backstage("plugins/kubernetes/src/components/Workloads.tsx", "Workloads");
+const FILE_CITE: Cite = Cite::backstage(
+    "plugins/kubernetes/src/components/Workloads.tsx",
+    "Workloads",
+);
 
 #[cfg(test)]
 mod tests {

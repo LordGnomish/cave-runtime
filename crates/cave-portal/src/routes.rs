@@ -4,10 +4,10 @@
 
 use crate::State;
 use axum::{
+    Json, Router,
     extract::{Path, Query, State as AxumState},
     http::StatusCode,
     routing::{get, post},
-    Json, Router,
 };
 use serde::Deserialize;
 use std::sync::Arc;
@@ -59,7 +59,9 @@ async fn parity_module(
         ),
         None => (
             StatusCode::NOT_FOUND,
-            Json(serde_json::json!({ "error": format!("module '{}' not found in parity cache", module) })),
+            Json(
+                serde_json::json!({ "error": format!("module '{}' not found in parity cache", module) }),
+            ),
         ),
     }
 }
@@ -164,7 +166,9 @@ async fn list_adrs() -> Json<serde_json::Value> {
             if !fname.ends_with(".md") || fname == "README.md" {
                 continue;
             }
-            let Some(num) = adr_num_from_filename(&fname) else { continue };
+            let Some(num) = adr_num_from_filename(&fname) else {
+                continue;
+            };
             let title = adr_title_from_filename(&fname);
             let (scope, category) = adr_meta_from_file(&entry.path());
             adrs.push(serde_json::json!({
@@ -187,7 +191,13 @@ async fn get_adr(Path(id): Path<String>) -> (StatusCode, String) {
         return (StatusCode::NOT_FOUND, String::new());
     };
     // id is e.g. "001", "42", "130" — match filename prefix ADR-NNN
-    let padded = format!("ADR-{:0>3}", id.trim_start_matches("ADR-").trim_start_matches('0').parse::<u64>().unwrap_or(0));
+    let padded = format!(
+        "ADR-{:0>3}",
+        id.trim_start_matches("ADR-")
+            .trim_start_matches('0')
+            .parse::<u64>()
+            .unwrap_or(0)
+    );
     for entry in entries.flatten() {
         let fname = entry.file_name().to_string_lossy().to_string();
         if fname.starts_with(&padded) && fname.ends_with(".md") {
@@ -202,7 +212,10 @@ async fn get_adr(Path(id): Path<String>) -> (StatusCode, String) {
 
 fn adr_num_from_filename(fname: &str) -> Option<u64> {
     let stripped = fname.strip_prefix("ADR-")?;
-    let num_str: String = stripped.chars().take_while(|c| c.is_ascii_digit()).collect();
+    let num_str: String = stripped
+        .chars()
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
     num_str.parse().ok()
 }
 
@@ -253,8 +266,12 @@ struct AttributionQuery {
     repo: String,
 }
 
-fn default_attr_days() -> u32 { 7 }
-fn default_attr_repo() -> String { "all".into() }
+fn default_attr_days() -> u32 {
+    7
+}
+fn default_attr_repo() -> String {
+    "all".into()
+}
 
 async fn attribution_api(Query(q): Query<AttributionQuery>) -> Json<serde_json::Value> {
     let workspace = std::env::var("CAVE_WORKSPACE_ROOT").unwrap_or_else(|_| ".".into());
@@ -270,7 +287,15 @@ async fn attribution_api(Query(q): Query<AttributionQuery>) -> Json<serde_json::
             "--format=%s\x1f%an\x1f%(trailers:key=Co-Authored-By,separator=|)",
         ])
         .output();
-    let (mut qwen3, mut opus, mut sonnet, mut haiku, mut claude_legacy, mut burak, mut other): (u64, u64, u64, u64, u64, u64, u64) = (0, 0, 0, 0, 0, 0, 0);
+    let (mut qwen3, mut opus, mut sonnet, mut haiku, mut claude_legacy, mut burak, mut other): (
+        u64,
+        u64,
+        u64,
+        u64,
+        u64,
+        u64,
+        u64,
+    ) = (0, 0, 0, 0, 0, 0, 0);
     if let Ok(out) = out {
         for line in String::from_utf8_lossy(&out.stdout).lines() {
             let mut parts = line.splitn(3, '\x1f');
@@ -292,11 +317,16 @@ async fn attribution_api(Query(q): Query<AttributionQuery>) -> Json<serde_json::
                 burak += 1;
             } else if is_housekeeping {
                 other += 1;
-            } else if trailers.contains("claude opus") || trailers.contains("co-authored-by: opus") {
+            } else if trailers.contains("claude opus") || trailers.contains("co-authored-by: opus")
+            {
                 opus += 1;
-            } else if trailers.contains("claude sonnet") || trailers.contains("co-authored-by: sonnet") {
+            } else if trailers.contains("claude sonnet")
+                || trailers.contains("co-authored-by: sonnet")
+            {
                 sonnet += 1;
-            } else if trailers.contains("claude haiku") || trailers.contains("co-authored-by: haiku") {
+            } else if trailers.contains("claude haiku")
+                || trailers.contains("co-authored-by: haiku")
+            {
                 haiku += 1;
             } else if trailers.contains("co-authored-by: claude")
                 || author_lc.contains("claude")

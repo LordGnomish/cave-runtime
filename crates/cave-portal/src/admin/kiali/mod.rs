@@ -27,7 +27,7 @@ pub mod traffic;
 pub mod validations;
 pub mod workloads;
 
-pub use topology::{edge_health, list_edges, list_nodes, GraphNode, TopologyEdge};
+pub use topology::{GraphNode, TopologyEdge, edge_health, list_edges, list_nodes};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum KialiViewError {
@@ -74,8 +74,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, KialiViewE
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite =
-    Cite::backstage("plugins/kiali/src/components/Topology.tsx", "Topology");
+const FILE_CITE: Cite = Cite::backstage("plugins/kiali/src/components/Topology.tsx", "Topology");
 
 #[cfg(test)]
 mod tests {

@@ -2,18 +2,17 @@
 // Copyright 2026 Cave Runtime contributors
 //! HTTP routes for cave-backup.
 
+use crate::BackupState;
 use crate::models::{
     BackupSpec, BackupStorageLocation, BslAccessMode, BslPhase, ExistingResourcePolicy,
-    FsBackupMethod, PluginInfo, ServerPhase, ServerStatus, StorageProvider,
-    VolumeSnapshotLocation,
+    FsBackupMethod, PluginInfo, ServerPhase, ServerStatus, StorageProvider, VolumeSnapshotLocation,
 };
-use crate::BackupState;
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, post},
-    Json, Router,
 };
 use chrono::Utc;
 use serde::Deserialize;
@@ -112,9 +111,15 @@ pub fn create_router(state: Arc<BackupState>) -> Router {
         .route("/api/backup/schedules/{id}/pause", post(pause_schedule))
         .route("/api/backup/schedules/{id}/unpause", post(unpause_schedule))
         // Storage locations
-        .route("/api/backup/storage-locations", post(create_storage_location))
+        .route(
+            "/api/backup/storage-locations",
+            post(create_storage_location),
+        )
         .route("/api/backup/storage-locations", get(list_storage_locations))
-        .route("/api/backup/storage-locations/{id}", get(get_storage_location))
+        .route(
+            "/api/backup/storage-locations/{id}",
+            get(get_storage_location),
+        )
         // Volume snapshot locations
         .route(
             "/api/backup/volume-snapshot-locations",
@@ -182,11 +187,7 @@ async fn delete_backup(
 ) -> impl IntoResponse {
     let mut store = state.store.write().await;
     match store.backups.remove(&id) {
-        Some(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({"deleted": id})),
-        )
-            .into_response(),
+        Some(_) => (StatusCode::OK, Json(serde_json::json!({"deleted": id}))).into_response(),
         None => (
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({"error": "backup not found"})),
@@ -309,7 +310,11 @@ async fn create_restore(
     tracing::info!(restore_id = %id, "created restore");
     let mut store = state.store.write().await;
     store.restores.insert(id, restore.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(&restore).unwrap())).into_response()
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(&restore).unwrap()),
+    )
+        .into_response()
 }
 
 async fn list_restores(State(state): State<Arc<BackupState>>) -> Json<serde_json::Value> {
@@ -382,7 +387,11 @@ async fn create_schedule(
     tracing::info!(schedule_id = %id, "created schedule");
     let mut store = state.store.write().await;
     store.schedules.insert(id, schedule.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(&schedule).unwrap())).into_response()
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(&schedule).unwrap()),
+    )
+        .into_response()
 }
 
 async fn list_schedules(State(state): State<Arc<BackupState>>) -> Json<serde_json::Value> {
@@ -429,7 +438,11 @@ async fn pause_schedule(
     match store.schedules.get_mut(&id) {
         Some(s) => {
             s.paused = true;
-            (StatusCode::OK, Json(serde_json::json!({"paused": true, "id": id}))).into_response()
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({"paused": true, "id": id})),
+            )
+                .into_response()
         }
         None => (
             StatusCode::NOT_FOUND,
@@ -501,12 +514,14 @@ async fn create_storage_location(
     tracing::info!(bsl_id = %id, "created storage location");
     let mut store = state.store.write().await;
     store.storage_locations.insert(id, bsl.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(&bsl).unwrap())).into_response()
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(&bsl).unwrap()),
+    )
+        .into_response()
 }
 
-async fn list_storage_locations(
-    State(state): State<Arc<BackupState>>,
-) -> Json<serde_json::Value> {
+async fn list_storage_locations(State(state): State<Arc<BackupState>>) -> Json<serde_json::Value> {
     let store = state.store.read().await;
     let list: Vec<_> = store.storage_locations.values().collect();
     Json(serde_json::to_value(&list).unwrap())
@@ -518,9 +533,7 @@ async fn get_storage_location(
 ) -> impl IntoResponse {
     let store = state.store.read().await;
     match store.storage_locations.get(&id) {
-        Some(bsl) => {
-            (StatusCode::OK, Json(serde_json::to_value(bsl).unwrap())).into_response()
-        }
+        Some(bsl) => (StatusCode::OK, Json(serde_json::to_value(bsl).unwrap())).into_response(),
         None => (
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({"error": "storage location not found"})),
@@ -552,7 +565,11 @@ async fn create_volume_snapshot_location(
     tracing::info!(vsl_id = %id, "created volume snapshot location");
     let mut store = state.store.write().await;
     store.volume_snapshot_locations.insert(id, vsl.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(&vsl).unwrap())).into_response()
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(&vsl).unwrap()),
+    )
+        .into_response()
 }
 
 async fn list_volume_snapshot_locations(
@@ -569,9 +586,7 @@ async fn get_volume_snapshot_location(
 ) -> impl IntoResponse {
     let store = state.store.read().await;
     match store.volume_snapshot_locations.get(&id) {
-        Some(vsl) => {
-            (StatusCode::OK, Json(serde_json::to_value(vsl).unwrap())).into_response()
-        }
+        Some(vsl) => (StatusCode::OK, Json(serde_json::to_value(vsl).unwrap())).into_response(),
         None => (
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({"error": "volume snapshot location not found"})),
@@ -611,7 +626,11 @@ async fn create_fs_backup(
     tracing::info!(fs_job_id = %id, "created fs backup job");
     let mut store = state.store.write().await;
     store.fs_backup_jobs.insert(id, job.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(&job).unwrap())).into_response()
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(&job).unwrap()),
+    )
+        .into_response()
 }
 
 async fn list_fs_backup(State(state): State<Arc<BackupState>>) -> Json<serde_json::Value> {

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+use crate::KamajiState;
 use crate::lifecycle;
 use crate::models::{CreateTenantRequest, TenantControlPlane, TenantPhase, TenantStatus};
-use crate::KamajiState;
 use axum::{
+    Json,
     extract::{Path, State},
     http::StatusCode,
-    Json,
 };
 use chrono::Utc;
 use std::sync::Arc;
@@ -37,9 +37,7 @@ pub async fn create_tenant(
     Ok(Json(tcp))
 }
 
-pub async fn list_tenants(
-    State(state): State<Arc<KamajiState>>,
-) -> Json<Vec<TenantControlPlane>> {
+pub async fn list_tenants(State(state): State<Arc<KamajiState>>) -> Json<Vec<TenantControlPlane>> {
     let list = state.tenants.iter().map(|e| e.value().clone()).collect();
     Json(list)
 }

@@ -37,8 +37,10 @@ pub struct UserInfo {
 
 impl UserInfo {
     pub fn with_tenant(mut self, tenant: &str) -> Self {
-        self.extra.entry("cave.runtime/tenant-id".into())
-            .or_default().push(tenant.into());
+        self.extra
+            .entry("cave.runtime/tenant-id".into())
+            .or_default()
+            .push(tenant.into());
         self
     }
 }
@@ -77,7 +79,10 @@ pub struct TokenReview {
 pub trait TokenAuthenticator: Send + Sync {
     /// Returns (UserInfo, audiences) when the token is valid; error otherwise.
     fn authenticate(
-        &self, token: &str, expected_audiences: &[String], tenant_hint: &str,
+        &self,
+        token: &str,
+        expected_audiences: &[String],
+        tenant_hint: &str,
     ) -> Result<(UserInfo, Vec<String>), String>;
 }
 
@@ -88,39 +93,50 @@ pub struct StaticTokenAuthenticator {
 }
 
 impl StaticTokenAuthenticator {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
     pub fn register(&self, tenant: &str, token: &str, user: UserInfo, audiences: Vec<String>) {
-        self.inner.write().unwrap()
+        self.inner
+            .write()
+            .unwrap()
             .insert((tenant.into(), token.into()), (user, audiences));
     }
 }
 
 impl TokenAuthenticator for StaticTokenAuthenticator {
     fn authenticate(
-        &self, token: &str, expected_audiences: &[String], tenant: &str,
+        &self,
+        token: &str,
+        expected_audiences: &[String],
+        tenant: &str,
     ) -> Result<(UserInfo, Vec<String>), String> {
         let g = self.inner.read().unwrap();
-        let (user, auds) = g.get(&(tenant.into(), token.into()))
+        let (user, auds) = g
+            .get(&(tenant.into(), token.into()))
             .ok_or_else(|| "invalid token".to_string())?;
         // If audiences requested, at least one must overlap.
-        if !expected_audiences.is_empty()
-            && !expected_audiences.iter().any(|a| auds.contains(a))
-        {
-            return Err(format!("none of expected audiences {expected_audiences:?} present in token"));
+        if !expected_audiences.is_empty() && !expected_audiences.iter().any(|a| auds.contains(a)) {
+            return Err(format!(
+                "none of expected audiences {expected_audiences:?} present in token"
+            ));
         }
         Ok((user.clone().with_tenant(tenant), auds.clone()))
     }
 }
 
 pub fn run_token_review(
-    auth: &dyn TokenAuthenticator, tenant: &str, review: &TokenReview,
+    auth: &dyn TokenAuthenticator,
+    tenant: &str,
+    review: &TokenReview,
 ) -> TokenReview {
     let mut out = review.clone();
     match auth.authenticate(&review.spec.token, &review.spec.audiences, tenant) {
         Ok((user, auds)) => {
             out.status = TokenReviewStatus {
                 authenticated: true,
-                user, audiences: auds,
+                user,
+                audiences: auds,
                 error: String::new(),
             };
         }
@@ -206,16 +222,24 @@ pub struct StaticAuthorizer {
 }
 
 impl StaticAuthorizer {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
     pub fn allow(&self, tenant: &str, user: &str, verb: &str, resource: &str, reason: &str) {
         self.inner.write().unwrap().insert(
             (tenant.into(), user.into(), verb.into(), resource.into()),
-            AuthzDecision::Allow { reason: reason.into() });
+            AuthzDecision::Allow {
+                reason: reason.into(),
+            },
+        );
     }
     pub fn deny(&self, tenant: &str, user: &str, verb: &str, resource: &str, reason: &str) {
         self.inner.write().unwrap().insert(
             (tenant.into(), user.into(), verb.into(), resource.into()),
-            AuthzDecision::Deny { reason: reason.into() });
+            AuthzDecision::Deny {
+                reason: reason.into(),
+            },
+        );
     }
 }
 
@@ -226,29 +250,44 @@ impl Authorizer for StaticAuthorizer {
             None => return AuthzDecision::NoOpinion,
         };
         let g = self.inner.read().unwrap();
-        g.get(&(tenant.into(), spec.user.clone(), r.verb.clone(), r.resource.clone()))
-            .cloned().unwrap_or(AuthzDecision::NoOpinion)
+        g.get(&(
+            tenant.into(),
+            spec.user.clone(),
+            r.verb.clone(),
+            r.resource.clone(),
+        ))
+        .cloned()
+        .unwrap_or(AuthzDecision::NoOpinion)
     }
 }
 
 pub fn run_subject_access_review(
-    authz: &dyn Authorizer, tenant: &str, review: &SubjectAccessReview,
+    authz: &dyn Authorizer,
+    tenant: &str,
+    review: &SubjectAccessReview,
 ) -> SubjectAccessReview {
     let mut out = review.clone();
     match authz.authorize(tenant, &review.spec) {
         AuthzDecision::Allow { reason } => {
             out.status = SubjectAccessReviewStatus {
-                allowed: true, denied: false, reason, evaluation_error: String::new(),
+                allowed: true,
+                denied: false,
+                reason,
+                evaluation_error: String::new(),
             };
         }
         AuthzDecision::Deny { reason } => {
             out.status = SubjectAccessReviewStatus {
-                allowed: false, denied: true, reason, evaluation_error: String::new(),
+                allowed: false,
+                denied: true,
+                reason,
+                evaluation_error: String::new(),
             };
         }
         AuthzDecision::NoOpinion => {
             out.status = SubjectAccessReviewStatus {
-                allowed: false, denied: false,
+                allowed: false,
+                denied: false,
                 reason: "no opinion".into(),
                 evaluation_error: String::new(),
             };
@@ -263,7 +302,8 @@ pub fn run_subject_access_review(
 // ─────────────────────────────────────────────────────────────────────────────
 
 pub fn build_self_review_spec(
-    user: &UserInfo, attrs: ResourceAttributes,
+    user: &UserInfo,
+    attrs: ResourceAttributes,
 ) -> SubjectAccessReviewSpec {
     SubjectAccessReviewSpec {
         resource_attributes: Some(attrs),
@@ -296,7 +336,9 @@ pub struct NonResourceRule {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct SelfSubjectRulesReviewSpec { pub namespace: String }
+pub struct SelfSubjectRulesReviewSpec {
+    pub namespace: String,
+}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SelfSubjectRulesReviewStatus {
@@ -317,42 +359,65 @@ pub struct SelfSubjectRulesReview {
 }
 
 pub trait RulesResolver: Send + Sync {
-    fn rules_for(&self, tenant: &str, user: &UserInfo, namespace: &str)
-        -> (Vec<ResourceRule>, Vec<NonResourceRule>);
+    fn rules_for(
+        &self,
+        tenant: &str,
+        user: &UserInfo,
+        namespace: &str,
+    ) -> (Vec<ResourceRule>, Vec<NonResourceRule>);
 }
 
 #[derive(Default)]
 pub struct StaticRules {
-    pub by_user: RwLock<HashMap<(String, String, String),
-        (Vec<ResourceRule>, Vec<NonResourceRule>)>>,
+    pub by_user:
+        RwLock<HashMap<(String, String, String), (Vec<ResourceRule>, Vec<NonResourceRule>)>>,
 }
 
 impl StaticRules {
-    pub fn new() -> Self { Self::default() }
-    pub fn set(&self, tenant: &str, user: &str, namespace: &str,
-               r: Vec<ResourceRule>, nr: Vec<NonResourceRule>) {
-        self.by_user.write().unwrap().insert(
-            (tenant.into(), user.into(), namespace.into()), (r, nr));
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn set(
+        &self,
+        tenant: &str,
+        user: &str,
+        namespace: &str,
+        r: Vec<ResourceRule>,
+        nr: Vec<NonResourceRule>,
+    ) {
+        self.by_user
+            .write()
+            .unwrap()
+            .insert((tenant.into(), user.into(), namespace.into()), (r, nr));
     }
 }
 
 impl RulesResolver for StaticRules {
-    fn rules_for(&self, tenant: &str, user: &UserInfo, namespace: &str)
-        -> (Vec<ResourceRule>, Vec<NonResourceRule>) {
+    fn rules_for(
+        &self,
+        tenant: &str,
+        user: &UserInfo,
+        namespace: &str,
+    ) -> (Vec<ResourceRule>, Vec<NonResourceRule>) {
         let g = self.by_user.read().unwrap();
         g.get(&(tenant.into(), user.username.clone(), namespace.into()))
-            .cloned().unwrap_or_default()
+            .cloned()
+            .unwrap_or_default()
     }
 }
 
 pub fn run_self_subject_rules_review(
-    resolver: &dyn RulesResolver, tenant: &str, user: &UserInfo,
+    resolver: &dyn RulesResolver,
+    tenant: &str,
+    user: &UserInfo,
     review: &SelfSubjectRulesReview,
 ) -> SelfSubjectRulesReview {
     let (r, nr) = resolver.rules_for(tenant, user, &review.spec.namespace);
     let mut out = review.clone();
     out.status = SelfSubjectRulesReviewStatus {
-        resource_rules: r, non_resource_rules: nr, incomplete: false,
+        resource_rules: r,
+        non_resource_rules: nr,
+        incomplete: false,
     };
     out
 }
@@ -361,4 +426,6 @@ pub fn run_self_subject_rules_review(
 mod tests;
 
 #[allow(dead_code)]
-fn unused_arc() -> Arc<()> { Arc::new(()) }
+fn unused_arc() -> Arc<()> {
+    Arc::new(())
+}

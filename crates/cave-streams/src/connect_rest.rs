@@ -296,10 +296,7 @@ impl ConnectRestAdmin {
             .cluster
             .create_connector(normalised.clone(), config.clone())
             .map_err(|e| {
-                CreateError::Conflict(format!(
-                    "connector {} already exists ({})",
-                    normalised, e
-                ))
+                CreateError::Conflict(format!("connector {} already exists ({})", normalised, e))
             })?;
 
         let info = ConnectorInfo {
@@ -439,7 +436,10 @@ impl ConnectRestAdmin {
         let class_value = config.get("connector.class").cloned();
         let class_errors: Vec<String> = if class_value.is_none() {
             error_count += 1;
-            vec!["Missing required configuration \"connector.class\" which has no default value.".into()]
+            vec![
+                "Missing required configuration \"connector.class\" which has no default value."
+                    .into(),
+            ]
         } else {
             Vec::new()
         };

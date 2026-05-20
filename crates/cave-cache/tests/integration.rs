@@ -6,11 +6,11 @@
 //! hashes, streams, bitmaps, HyperLogLog, geo, expiry, transactions, scripting,
 //! and pub/sub.
 
-use cave_cache::db::{Db, ServerState};
 use cave_cache::commands::*;
+use cave_cache::config::Config;
+use cave_cache::db::{Db, ServerState};
 use cave_cache::resp::Resp;
 use cave_cache::types::{Entry, Value};
-use cave_cache::config::Config;
 use std::sync::Arc;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -71,7 +71,10 @@ fn test_set_nx() {
     strings::cmd_set(&args(&["SET", "k", "v1"]), &mut db).unwrap();
     let r = strings::cmd_set(&args(&["SET", "k", "v2", "NX"]), &mut db).unwrap();
     assert_eq!(r, nil()); // key exists, NX fails
-    assert_eq!(strings::cmd_get(&args(&["GET", "k"]), &mut db).unwrap(), bulk("v1"));
+    assert_eq!(
+        strings::cmd_get(&args(&["GET", "k"]), &mut db).unwrap(),
+        bulk("v1")
+    );
 }
 
 #[test]
@@ -86,24 +89,45 @@ fn test_mset_mget() {
     let mut db = new_db();
     strings::cmd_mset(&args(&["MSET", "a", "1", "b", "2", "c", "3"]), &mut db).unwrap();
     let r = strings::cmd_mget(&args(&["MGET", "a", "b", "c", "missing"]), &mut db).unwrap();
-    assert_eq!(r, Resp::Array(Some(vec![bulk("1"), bulk("2"), bulk("3"), nil()])));
+    assert_eq!(
+        r,
+        Resp::Array(Some(vec![bulk("1"), bulk("2"), bulk("3"), nil()]))
+    );
 }
 
 #[test]
 fn test_incr_decr() {
     let mut db = new_db();
     strings::cmd_set(&args(&["SET", "n", "10"]), &mut db).unwrap();
-    assert_eq!(strings::cmd_incr(&args(&["INCR", "n"]), &mut db).unwrap(), int(11));
-    assert_eq!(strings::cmd_decr(&args(&["DECR", "n"]), &mut db).unwrap(), int(10));
-    assert_eq!(strings::cmd_incrby(&args(&["INCRBY", "n", "5"]), &mut db).unwrap(), int(15));
-    assert_eq!(strings::cmd_decrby(&args(&["DECRBY", "n", "3"]), &mut db).unwrap(), int(12));
+    assert_eq!(
+        strings::cmd_incr(&args(&["INCR", "n"]), &mut db).unwrap(),
+        int(11)
+    );
+    assert_eq!(
+        strings::cmd_decr(&args(&["DECR", "n"]), &mut db).unwrap(),
+        int(10)
+    );
+    assert_eq!(
+        strings::cmd_incrby(&args(&["INCRBY", "n", "5"]), &mut db).unwrap(),
+        int(15)
+    );
+    assert_eq!(
+        strings::cmd_decrby(&args(&["DECRBY", "n", "3"]), &mut db).unwrap(),
+        int(12)
+    );
 }
 
 #[test]
 fn test_incr_creates_key() {
     let mut db = new_db();
-    assert_eq!(strings::cmd_incr(&args(&["INCR", "counter"]), &mut db).unwrap(), int(1));
-    assert_eq!(strings::cmd_incr(&args(&["INCR", "counter"]), &mut db).unwrap(), int(2));
+    assert_eq!(
+        strings::cmd_incr(&args(&["INCR", "counter"]), &mut db).unwrap(),
+        int(1)
+    );
+    assert_eq!(
+        strings::cmd_incr(&args(&["INCR", "counter"]), &mut db).unwrap(),
+        int(2)
+    );
 }
 
 #[test]
@@ -112,8 +136,14 @@ fn test_append_strlen() {
     strings::cmd_set(&args(&["SET", "k", "Hello"]), &mut db).unwrap();
     let n = strings::cmd_append(&args(&["APPEND", "k", " World"]), &mut db).unwrap();
     assert_eq!(n, int(11));
-    assert_eq!(strings::cmd_strlen(&args(&["STRLEN", "k"]), &mut db).unwrap(), int(11));
-    assert_eq!(strings::cmd_get(&args(&["GET", "k"]), &mut db).unwrap(), bulk("Hello World"));
+    assert_eq!(
+        strings::cmd_strlen(&args(&["STRLEN", "k"]), &mut db).unwrap(),
+        int(11)
+    );
+    assert_eq!(
+        strings::cmd_get(&args(&["GET", "k"]), &mut db).unwrap(),
+        bulk("Hello World")
+    );
 }
 
 #[test]
@@ -141,8 +171,14 @@ fn test_incrbyfloat() {
 #[test]
 fn test_setnx_setex() {
     let mut db = new_db();
-    assert_eq!(strings::cmd_setnx(&args(&["SETNX", "k", "v"]), &mut db).unwrap(), int(1));
-    assert_eq!(strings::cmd_setnx(&args(&["SETNX", "k", "v2"]), &mut db).unwrap(), int(0));
+    assert_eq!(
+        strings::cmd_setnx(&args(&["SETNX", "k", "v"]), &mut db).unwrap(),
+        int(1)
+    );
+    assert_eq!(
+        strings::cmd_setnx(&args(&["SETNX", "k", "v2"]), &mut db).unwrap(),
+        int(0)
+    );
     strings::cmd_setex(&args(&["SETEX", "k2", "100", "val"]), &mut db).unwrap();
     assert!(db.keys.get(b"k2".as_ref()).unwrap().expires_at.is_some());
 }
@@ -151,8 +187,14 @@ fn test_setnx_setex() {
 fn test_getdel() {
     let mut db = new_db();
     strings::cmd_set(&args(&["SET", "k", "v"]), &mut db).unwrap();
-    assert_eq!(strings::cmd_getdel(&args(&["GETDEL", "k"]), &mut db).unwrap(), bulk("v"));
-    assert_eq!(strings::cmd_get(&args(&["GET", "k"]), &mut db).unwrap(), nil());
+    assert_eq!(
+        strings::cmd_getdel(&args(&["GETDEL", "k"]), &mut db).unwrap(),
+        bulk("v")
+    );
+    assert_eq!(
+        strings::cmd_get(&args(&["GET", "k"]), &mut db).unwrap(),
+        nil()
+    );
 }
 
 // ── List commands ─────────────────────────────────────────────────────────────
@@ -169,24 +211,39 @@ fn test_lpush_rpush_lrange() {
 fn test_lpop_rpop() {
     let mut db = new_db();
     lists::cmd_rpush(&args(&["RPUSH", "l", "a", "b", "c"]), &mut db).unwrap();
-    assert_eq!(lists::cmd_lpop(&args(&["LPOP", "l"]), &mut db).unwrap(), bulk("a"));
-    assert_eq!(lists::cmd_rpop(&args(&["RPOP", "l"]), &mut db).unwrap(), bulk("c"));
+    assert_eq!(
+        lists::cmd_lpop(&args(&["LPOP", "l"]), &mut db).unwrap(),
+        bulk("a")
+    );
+    assert_eq!(
+        lists::cmd_rpop(&args(&["RPOP", "l"]), &mut db).unwrap(),
+        bulk("c")
+    );
 }
 
 #[test]
 fn test_llen() {
     let mut db = new_db();
     lists::cmd_rpush(&args(&["RPUSH", "l", "x", "y"]), &mut db).unwrap();
-    assert_eq!(lists::cmd_llen(&args(&["LLEN", "l"]), &mut db).unwrap(), int(2));
+    assert_eq!(
+        lists::cmd_llen(&args(&["LLEN", "l"]), &mut db).unwrap(),
+        int(2)
+    );
 }
 
 #[test]
 fn test_lindex_lset() {
     let mut db = new_db();
     lists::cmd_rpush(&args(&["RPUSH", "l", "a", "b", "c"]), &mut db).unwrap();
-    assert_eq!(lists::cmd_lindex(&args(&["LINDEX", "l", "1"]), &mut db).unwrap(), bulk("b"));
+    assert_eq!(
+        lists::cmd_lindex(&args(&["LINDEX", "l", "1"]), &mut db).unwrap(),
+        bulk("b")
+    );
     lists::cmd_lset(&args(&["LSET", "l", "1", "B"]), &mut db).unwrap();
-    assert_eq!(lists::cmd_lindex(&args(&["LINDEX", "l", "1"]), &mut db).unwrap(), bulk("B"));
+    assert_eq!(
+        lists::cmd_lindex(&args(&["LINDEX", "l", "1"]), &mut db).unwrap(),
+        bulk("B")
+    );
 }
 
 #[test]
@@ -195,7 +252,10 @@ fn test_lrem() {
     lists::cmd_rpush(&args(&["RPUSH", "l", "a", "b", "a", "c", "a"]), &mut db).unwrap();
     let r = lists::cmd_lrem(&args(&["LREM", "l", "2", "a"]), &mut db).unwrap();
     assert_eq!(r, int(2));
-    assert_eq!(lists::cmd_llen(&args(&["LLEN", "l"]), &mut db).unwrap(), int(3));
+    assert_eq!(
+        lists::cmd_llen(&args(&["LLEN", "l"]), &mut db).unwrap(),
+        int(3)
+    );
 }
 
 #[test]
@@ -224,8 +284,13 @@ fn test_sadd_smembers_scard() {
     let mut db = new_db();
     let r = sets::cmd_sadd(&args(&["SADD", "s", "a", "b", "c", "a"]), &mut db).unwrap();
     assert_eq!(r, int(3)); // only 3 unique
-    assert_eq!(sets::cmd_scard(&args(&["SCARD", "s"]), &mut db).unwrap(), int(3));
-    if let Resp::Array(Some(members)) = sets::cmd_smembers(&args(&["SMEMBERS", "s"]), &mut db).unwrap() {
+    assert_eq!(
+        sets::cmd_scard(&args(&["SCARD", "s"]), &mut db).unwrap(),
+        int(3)
+    );
+    if let Resp::Array(Some(members)) =
+        sets::cmd_smembers(&args(&["SMEMBERS", "s"]), &mut db).unwrap()
+    {
         assert_eq!(members.len(), 3);
     } else {
         panic!("Expected array");
@@ -236,9 +301,15 @@ fn test_sadd_smembers_scard() {
 fn test_srem_sismember() {
     let mut db = new_db();
     sets::cmd_sadd(&args(&["SADD", "s", "a", "b", "c"]), &mut db).unwrap();
-    assert_eq!(sets::cmd_sismember(&args(&["SISMEMBER", "s", "a"]), &mut db).unwrap(), int(1));
+    assert_eq!(
+        sets::cmd_sismember(&args(&["SISMEMBER", "s", "a"]), &mut db).unwrap(),
+        int(1)
+    );
     sets::cmd_srem(&args(&["SREM", "s", "a"]), &mut db).unwrap();
-    assert_eq!(sets::cmd_sismember(&args(&["SISMEMBER", "s", "a"]), &mut db).unwrap(), int(0));
+    assert_eq!(
+        sets::cmd_sismember(&args(&["SISMEMBER", "s", "a"]), &mut db).unwrap(),
+        int(0)
+    );
 }
 
 #[test]
@@ -247,19 +318,32 @@ fn test_set_operations() {
     sets::cmd_sadd(&args(&["SADD", "s1", "a", "b", "c"]), &mut db).unwrap();
     sets::cmd_sadd(&args(&["SADD", "s2", "b", "c", "d"]), &mut db).unwrap();
 
-    if let Resp::Array(Some(members)) = sets::cmd_sinter(&args(&["SINTER", "s1", "s2"]), &mut db).unwrap() {
-        let mut m: Vec<String> = members.iter().filter_map(|r| {
-            if let Resp::BulkString(Some(v)) = r { Some(String::from_utf8(v.clone()).unwrap()) } else { None }
-        }).collect();
+    if let Resp::Array(Some(members)) =
+        sets::cmd_sinter(&args(&["SINTER", "s1", "s2"]), &mut db).unwrap()
+    {
+        let mut m: Vec<String> = members
+            .iter()
+            .filter_map(|r| {
+                if let Resp::BulkString(Some(v)) = r {
+                    Some(String::from_utf8(v.clone()).unwrap())
+                } else {
+                    None
+                }
+            })
+            .collect();
         m.sort();
         assert_eq!(m, vec!["b", "c"]);
     }
 
-    if let Resp::Array(Some(members)) = sets::cmd_sdiff(&args(&["SDIFF", "s1", "s2"]), &mut db).unwrap() {
+    if let Resp::Array(Some(members)) =
+        sets::cmd_sdiff(&args(&["SDIFF", "s1", "s2"]), &mut db).unwrap()
+    {
         assert_eq!(members.len(), 1); // only "a"
     }
 
-    if let Resp::Array(Some(members)) = sets::cmd_sunion(&args(&["SUNION", "s1", "s2"]), &mut db).unwrap() {
+    if let Resp::Array(Some(members)) =
+        sets::cmd_sunion(&args(&["SUNION", "s1", "s2"]), &mut db).unwrap()
+    {
         assert_eq!(members.len(), 4); // a, b, c, d
     }
 }
@@ -271,8 +355,14 @@ fn test_smove() {
     sets::cmd_sadd(&args(&["SADD", "dst", "c"]), &mut db).unwrap();
     let r = sets::cmd_smove(&args(&["SMOVE", "src", "dst", "a"]), &mut db).unwrap();
     assert_eq!(r, int(1));
-    assert_eq!(sets::cmd_scard(&args(&["SCARD", "src"]), &mut db).unwrap(), int(1));
-    assert_eq!(sets::cmd_scard(&args(&["SCARD", "dst"]), &mut db).unwrap(), int(2));
+    assert_eq!(
+        sets::cmd_scard(&args(&["SCARD", "src"]), &mut db).unwrap(),
+        int(1)
+    );
+    assert_eq!(
+        sets::cmd_scard(&args(&["SCARD", "dst"]), &mut db).unwrap(),
+        int(2)
+    );
 }
 
 // ── Sorted Set commands ───────────────────────────────────────────────────────
@@ -280,17 +370,37 @@ fn test_smove() {
 #[test]
 fn test_zadd_zscore_zrank() {
     let mut db = new_db();
-    sorted_sets::cmd_zadd(&args(&["ZADD", "z", "1.0", "a", "2.0", "b", "3.0", "c"]), &mut db).unwrap();
-    assert_eq!(sorted_sets::cmd_zscore(&args(&["ZSCORE", "z", "b"]), &mut db).unwrap(), bulk("2"));
-    assert_eq!(sorted_sets::cmd_zrank(&args(&["ZRANK", "z", "a"]), &mut db).unwrap(), int(0));
-    assert_eq!(sorted_sets::cmd_zrank(&args(&["ZRANK", "z", "c"]), &mut db).unwrap(), int(2));
-    assert_eq!(sorted_sets::cmd_zcard(&args(&["ZCARD", "z"]), &mut db).unwrap(), int(3));
+    sorted_sets::cmd_zadd(
+        &args(&["ZADD", "z", "1.0", "a", "2.0", "b", "3.0", "c"]),
+        &mut db,
+    )
+    .unwrap();
+    assert_eq!(
+        sorted_sets::cmd_zscore(&args(&["ZSCORE", "z", "b"]), &mut db).unwrap(),
+        bulk("2")
+    );
+    assert_eq!(
+        sorted_sets::cmd_zrank(&args(&["ZRANK", "z", "a"]), &mut db).unwrap(),
+        int(0)
+    );
+    assert_eq!(
+        sorted_sets::cmd_zrank(&args(&["ZRANK", "z", "c"]), &mut db).unwrap(),
+        int(2)
+    );
+    assert_eq!(
+        sorted_sets::cmd_zcard(&args(&["ZCARD", "z"]), &mut db).unwrap(),
+        int(3)
+    );
 }
 
 #[test]
 fn test_zrange() {
     let mut db = new_db();
-    sorted_sets::cmd_zadd(&args(&["ZADD", "z", "1.0", "a", "2.0", "b", "3.0", "c"]), &mut db).unwrap();
+    sorted_sets::cmd_zadd(
+        &args(&["ZADD", "z", "1.0", "a", "2.0", "b", "3.0", "c"]),
+        &mut db,
+    )
+    .unwrap();
     let r = sorted_sets::cmd_zrange(&args(&["ZRANGE", "z", "0", "-1"]), &mut db).unwrap();
     assert_eq!(r, Resp::Array(Some(vec![bulk("a"), bulk("b"), bulk("c")])));
 }
@@ -299,7 +409,8 @@ fn test_zrange() {
 fn test_zrange_withscores() {
     let mut db = new_db();
     sorted_sets::cmd_zadd(&args(&["ZADD", "z", "1.0", "a", "2.0", "b"]), &mut db).unwrap();
-    let r = sorted_sets::cmd_zrange(&args(&["ZRANGE", "z", "0", "-1", "WITHSCORES"]), &mut db).unwrap();
+    let r =
+        sorted_sets::cmd_zrange(&args(&["ZRANGE", "z", "0", "-1", "WITHSCORES"]), &mut db).unwrap();
     if let Resp::Array(Some(items)) = r {
         assert_eq!(items.len(), 4); // a, 1, b, 2
     }
@@ -310,13 +421,18 @@ fn test_zrem_zincrby() {
     let mut db = new_db();
     sorted_sets::cmd_zadd(&args(&["ZADD", "z", "1.0", "a"]), &mut db).unwrap();
     sorted_sets::cmd_zincrby(&args(&["ZINCRBY", "z", "5.0", "a"]), &mut db).unwrap();
-    if let Resp::BulkString(Some(v)) = sorted_sets::cmd_zscore(&args(&["ZSCORE", "z", "a"]), &mut db).unwrap() {
+    if let Resp::BulkString(Some(v)) =
+        sorted_sets::cmd_zscore(&args(&["ZSCORE", "z", "a"]), &mut db).unwrap()
+    {
         let s = std::str::from_utf8(&v).unwrap();
         let f: f64 = s.parse().unwrap();
         assert!((f - 6.0).abs() < 1e-9);
     }
     sorted_sets::cmd_zrem(&args(&["ZREM", "z", "a"]), &mut db).unwrap();
-    assert_eq!(sorted_sets::cmd_zcard(&args(&["ZCARD", "z"]), &mut db).unwrap(), int(0));
+    assert_eq!(
+        sorted_sets::cmd_zcard(&args(&["ZCARD", "z"]), &mut db).unwrap(),
+        int(0)
+    );
 }
 
 #[test]
@@ -325,14 +441,18 @@ fn test_zadd_nx_xx_gt_lt() {
     sorted_sets::cmd_zadd(&args(&["ZADD", "z", "5.0", "a"]), &mut db).unwrap();
     // NX: don't update existing
     sorted_sets::cmd_zadd(&args(&["ZADD", "z", "NX", "10.0", "a"]), &mut db).unwrap();
-    if let Resp::BulkString(Some(v)) = sorted_sets::cmd_zscore(&args(&["ZSCORE", "z", "a"]), &mut db).unwrap() {
+    if let Resp::BulkString(Some(v)) =
+        sorted_sets::cmd_zscore(&args(&["ZSCORE", "z", "a"]), &mut db).unwrap()
+    {
         let s = std::str::from_utf8(&v).unwrap();
         let f: f64 = s.parse().unwrap();
         assert!((f - 5.0).abs() < 1e-9); // unchanged
     }
     // GT: only update if new > current
     sorted_sets::cmd_zadd(&args(&["ZADD", "z", "GT", "3.0", "a"]), &mut db).unwrap();
-    if let Resp::BulkString(Some(v)) = sorted_sets::cmd_zscore(&args(&["ZSCORE", "z", "a"]), &mut db).unwrap() {
+    if let Resp::BulkString(Some(v)) =
+        sorted_sets::cmd_zscore(&args(&["ZSCORE", "z", "a"]), &mut db).unwrap()
+    {
         let f: f64 = std::str::from_utf8(&v).unwrap().parse().unwrap();
         assert!((f - 5.0).abs() < 1e-9); // unchanged since 3 < 5
     }
@@ -341,7 +461,11 @@ fn test_zadd_nx_xx_gt_lt() {
 #[test]
 fn test_zpopmin_zpopmax() {
     let mut db = new_db();
-    sorted_sets::cmd_zadd(&args(&["ZADD", "z", "1.0", "a", "2.0", "b", "3.0", "c"]), &mut db).unwrap();
+    sorted_sets::cmd_zadd(
+        &args(&["ZADD", "z", "1.0", "a", "2.0", "b", "3.0", "c"]),
+        &mut db,
+    )
+    .unwrap();
     let r = sorted_sets::cmd_zpopmin(&args(&["ZPOPMIN", "z"]), &mut db).unwrap();
     if let Resp::Array(Some(items)) = r {
         assert_eq!(items[0], bulk("a"));
@@ -355,9 +479,17 @@ fn test_zpopmin_zpopmax() {
 #[test]
 fn test_zcount_zrangebyscore() {
     let mut db = new_db();
-    sorted_sets::cmd_zadd(&args(&["ZADD", "z", "1.0", "a", "2.0", "b", "3.0", "c", "4.0", "d"]), &mut db).unwrap();
-    assert_eq!(sorted_sets::cmd_zcount(&args(&["ZCOUNT", "z", "2", "3"]), &mut db).unwrap(), int(2));
-    let r = sorted_sets::cmd_zrangebyscore(&args(&["ZRANGEBYSCORE", "z", "2", "3"]), &mut db).unwrap();
+    sorted_sets::cmd_zadd(
+        &args(&["ZADD", "z", "1.0", "a", "2.0", "b", "3.0", "c", "4.0", "d"]),
+        &mut db,
+    )
+    .unwrap();
+    assert_eq!(
+        sorted_sets::cmd_zcount(&args(&["ZCOUNT", "z", "2", "3"]), &mut db).unwrap(),
+        int(2)
+    );
+    let r =
+        sorted_sets::cmd_zrangebyscore(&args(&["ZRANGEBYSCORE", "z", "2", "3"]), &mut db).unwrap();
     assert_eq!(r, Resp::Array(Some(vec![bulk("b"), bulk("c")])));
 }
 
@@ -367,9 +499,16 @@ fn test_zunionstore_zinterstore() {
     sorted_sets::cmd_zadd(&args(&["ZADD", "z1", "1.0", "a", "2.0", "b"]), &mut db).unwrap();
     sorted_sets::cmd_zadd(&args(&["ZADD", "z2", "3.0", "b", "4.0", "c"]), &mut db).unwrap();
     sorted_sets::cmd_zunionstore(&args(&["ZUNIONSTORE", "out", "2", "z1", "z2"]), &mut db).unwrap();
-    assert_eq!(sorted_sets::cmd_zcard(&args(&["ZCARD", "out"]), &mut db).unwrap(), int(3));
-    sorted_sets::cmd_zinterstore(&args(&["ZINTERSTORE", "out2", "2", "z1", "z2"]), &mut db).unwrap();
-    assert_eq!(sorted_sets::cmd_zcard(&args(&["ZCARD", "out2"]), &mut db).unwrap(), int(1)); // only "b"
+    assert_eq!(
+        sorted_sets::cmd_zcard(&args(&["ZCARD", "out"]), &mut db).unwrap(),
+        int(3)
+    );
+    sorted_sets::cmd_zinterstore(&args(&["ZINTERSTORE", "out2", "2", "z1", "z2"]), &mut db)
+        .unwrap();
+    assert_eq!(
+        sorted_sets::cmd_zcard(&args(&["ZCARD", "out2"]), &mut db).unwrap(),
+        int(1)
+    ); // only "b"
 }
 
 // ── Hash commands ─────────────────────────────────────────────────────────────
@@ -378,9 +517,17 @@ fn test_zunionstore_zinterstore() {
 fn test_hset_hget_hgetall() {
     let mut db = new_db();
     hashes::cmd_hset(&args(&["HSET", "h", "f1", "v1", "f2", "v2"]), &mut db).unwrap();
-    assert_eq!(hashes::cmd_hget(&args(&["HGET", "h", "f1"]), &mut db).unwrap(), bulk("v1"));
-    assert_eq!(hashes::cmd_hlen(&args(&["HLEN", "h"]), &mut db).unwrap(), int(2));
-    if let Resp::Array(Some(items)) = hashes::cmd_hgetall(&args(&["HGETALL", "h"]), &mut db).unwrap() {
+    assert_eq!(
+        hashes::cmd_hget(&args(&["HGET", "h", "f1"]), &mut db).unwrap(),
+        bulk("v1")
+    );
+    assert_eq!(
+        hashes::cmd_hlen(&args(&["HLEN", "h"]), &mut db).unwrap(),
+        int(2)
+    );
+    if let Resp::Array(Some(items)) =
+        hashes::cmd_hgetall(&args(&["HGETALL", "h"]), &mut db).unwrap()
+    {
         assert_eq!(items.len(), 4); // f1, v1, f2, v2
     }
 }
@@ -389,9 +536,15 @@ fn test_hset_hget_hgetall() {
 fn test_hdel_hexists() {
     let mut db = new_db();
     hashes::cmd_hset(&args(&["HSET", "h", "f", "v"]), &mut db).unwrap();
-    assert_eq!(hashes::cmd_hexists(&args(&["HEXISTS", "h", "f"]), &mut db).unwrap(), int(1));
+    assert_eq!(
+        hashes::cmd_hexists(&args(&["HEXISTS", "h", "f"]), &mut db).unwrap(),
+        int(1)
+    );
     hashes::cmd_hdel(&args(&["HDEL", "h", "f"]), &mut db).unwrap();
-    assert_eq!(hashes::cmd_hexists(&args(&["HEXISTS", "h", "f"]), &mut db).unwrap(), int(0));
+    assert_eq!(
+        hashes::cmd_hexists(&args(&["HEXISTS", "h", "f"]), &mut db).unwrap(),
+        int(0)
+    );
 }
 
 #[test]
@@ -406,7 +559,10 @@ fn test_hmget() {
 fn test_hincrby_hincrbyfloat() {
     let mut db = new_db();
     hashes::cmd_hset(&args(&["HSET", "h", "n", "10"]), &mut db).unwrap();
-    assert_eq!(hashes::cmd_hincrby(&args(&["HINCRBY", "h", "n", "5"]), &mut db).unwrap(), int(15));
+    assert_eq!(
+        hashes::cmd_hincrby(&args(&["HINCRBY", "h", "n", "5"]), &mut db).unwrap(),
+        int(15)
+    );
 }
 
 #[test]
@@ -426,9 +582,18 @@ fn test_hkeys_hvals() {
 #[test]
 fn test_setbit_getbit() {
     let mut db = new_db();
-    assert_eq!(bitmap::cmd_setbit(&args(&["SETBIT", "b", "7", "1"]), &mut db).unwrap(), int(0));
-    assert_eq!(bitmap::cmd_getbit(&args(&["GETBIT", "b", "7"]), &mut db).unwrap(), int(1));
-    assert_eq!(bitmap::cmd_getbit(&args(&["GETBIT", "b", "0"]), &mut db).unwrap(), int(0));
+    assert_eq!(
+        bitmap::cmd_setbit(&args(&["SETBIT", "b", "7", "1"]), &mut db).unwrap(),
+        int(0)
+    );
+    assert_eq!(
+        bitmap::cmd_getbit(&args(&["GETBIT", "b", "7"]), &mut db).unwrap(),
+        int(1)
+    );
+    assert_eq!(
+        bitmap::cmd_getbit(&args(&["GETBIT", "b", "0"]), &mut db).unwrap(),
+        int(0)
+    );
 }
 
 #[test]
@@ -444,12 +609,21 @@ fn test_bitop() {
     let mut db = new_db();
     // Insert raw bytes via direct DB manipulation to avoid string escaping limits
     use cave_cache::types::{Entry, Value};
-    db.keys.insert(b"k1".to_vec(), Entry::new(Value::String(vec![0xff, 0x0f])));
-    db.keys.insert(b"k2".to_vec(), Entry::new(Value::String(vec![0x0f, 0xff])));
+    db.keys
+        .insert(b"k1".to_vec(), Entry::new(Value::String(vec![0xff, 0x0f])));
+    db.keys
+        .insert(b"k2".to_vec(), Entry::new(Value::String(vec![0x0f, 0xff])));
     bitmap::cmd_bitop(
-        &[b"BITOP".to_vec(), b"AND".to_vec(), b"dest".to_vec(), b"k1".to_vec(), b"k2".to_vec()],
+        &[
+            b"BITOP".to_vec(),
+            b"AND".to_vec(),
+            b"dest".to_vec(),
+            b"k1".to_vec(),
+            b"k2".to_vec(),
+        ],
         &mut db,
-    ).unwrap();
+    )
+    .unwrap();
     let r = strings::cmd_get(&[b"GET".to_vec(), b"dest".to_vec()], &mut db).unwrap();
     if let Resp::BulkString(Some(v)) = r {
         assert_eq!(v[0], 0x0f);
@@ -464,7 +638,8 @@ fn test_bitop() {
 #[test]
 fn test_pfadd_pfcount() {
     let mut db = new_db();
-    let r = hyperloglog::cmd_pfadd(&args(&["PFADD", "hll", "a", "b", "c", "d", "e"]), &mut db).unwrap();
+    let r =
+        hyperloglog::cmd_pfadd(&args(&["PFADD", "hll", "a", "b", "c", "d", "e"]), &mut db).unwrap();
     assert_eq!(r, int(1)); // changed
     let count = hyperloglog::cmd_pfcount(&args(&["PFCOUNT", "hll"]), &mut db).unwrap();
     if let Resp::Integer(n) = count {
@@ -490,10 +665,19 @@ fn test_pfmerge() {
 fn test_del_exists_type() {
     let mut db = new_db();
     strings::cmd_set(&args(&["SET", "k", "v"]), &mut db).unwrap();
-    assert_eq!(keys::cmd_exists(&args(&["EXISTS", "k"]), &mut db).unwrap(), int(1));
-    assert_eq!(keys::cmd_type(&args(&["TYPE", "k"]), &mut db).unwrap(), Resp::SimpleString(b"string".to_vec()));
+    assert_eq!(
+        keys::cmd_exists(&args(&["EXISTS", "k"]), &mut db).unwrap(),
+        int(1)
+    );
+    assert_eq!(
+        keys::cmd_type(&args(&["TYPE", "k"]), &mut db).unwrap(),
+        Resp::SimpleString(b"string".to_vec())
+    );
     keys::cmd_del(&args(&["DEL", "k"]), &mut db).unwrap();
-    assert_eq!(keys::cmd_exists(&args(&["EXISTS", "k"]), &mut db).unwrap(), int(0));
+    assert_eq!(
+        keys::cmd_exists(&args(&["EXISTS", "k"]), &mut db).unwrap(),
+        int(0)
+    );
 }
 
 #[test]
@@ -501,8 +685,14 @@ fn test_rename() {
     let mut db = new_db();
     strings::cmd_set(&args(&["SET", "src", "hello"]), &mut db).unwrap();
     keys::cmd_rename(&args(&["RENAME", "src", "dst"]), &mut db).unwrap();
-    assert_eq!(strings::cmd_get(&args(&["GET", "dst"]), &mut db).unwrap(), bulk("hello"));
-    assert_eq!(strings::cmd_get(&args(&["GET", "src"]), &mut db).unwrap(), nil());
+    assert_eq!(
+        strings::cmd_get(&args(&["GET", "dst"]), &mut db).unwrap(),
+        bulk("hello")
+    );
+    assert_eq!(
+        strings::cmd_get(&args(&["GET", "src"]), &mut db).unwrap(),
+        nil()
+    );
 }
 
 #[test]
@@ -521,9 +711,15 @@ fn test_dbsize_flushdb() {
     let mut db = new_db();
     strings::cmd_set(&args(&["SET", "a", "1"]), &mut db).unwrap();
     strings::cmd_set(&args(&["SET", "b", "2"]), &mut db).unwrap();
-    assert_eq!(keys::cmd_dbsize(&args(&["DBSIZE"]), &mut db).unwrap(), int(2));
+    assert_eq!(
+        keys::cmd_dbsize(&args(&["DBSIZE"]), &mut db).unwrap(),
+        int(2)
+    );
     keys::cmd_flushdb(&args(&["FLUSHDB"]), &mut db).unwrap();
-    assert_eq!(keys::cmd_dbsize(&args(&["DBSIZE"]), &mut db).unwrap(), int(0));
+    assert_eq!(
+        keys::cmd_dbsize(&args(&["DBSIZE"]), &mut db).unwrap(),
+        int(0)
+    );
 }
 
 #[test]
@@ -532,8 +728,14 @@ fn test_copy() {
     strings::cmd_set(&args(&["SET", "src", "hello"]), &mut db).unwrap();
     let r = keys::cmd_copy(&args(&["COPY", "src", "dst"]), &mut db).unwrap();
     assert_eq!(r, int(1));
-    assert_eq!(strings::cmd_get(&args(&["GET", "dst"]), &mut db).unwrap(), bulk("hello"));
-    assert_eq!(strings::cmd_get(&args(&["GET", "src"]), &mut db).unwrap(), bulk("hello")); // unchanged
+    assert_eq!(
+        strings::cmd_get(&args(&["GET", "dst"]), &mut db).unwrap(),
+        bulk("hello")
+    );
+    assert_eq!(
+        strings::cmd_get(&args(&["GET", "src"]), &mut db).unwrap(),
+        bulk("hello")
+    ); // unchanged
 }
 
 #[test]
@@ -543,7 +745,9 @@ fn test_scan() {
         strings::cmd_set(&args(&["SET", &format!("key:{}", i), "v"]), &mut db).unwrap();
     }
     // SCAN 0 COUNT 100 should return all keys
-    if let Resp::Array(Some(items)) = keys::cmd_scan(&args(&["SCAN", "0", "COUNT", "100"]), &mut db).unwrap() {
+    if let Resp::Array(Some(items)) =
+        keys::cmd_scan(&args(&["SCAN", "0", "COUNT", "100"]), &mut db).unwrap()
+    {
         if let Resp::Array(Some(ks)) = &items[1] {
             assert_eq!(ks.len(), 20);
         }
@@ -562,7 +766,10 @@ fn test_expire_ttl_persist() {
         assert!(t > 90 && t <= 100);
     }
     expiry::cmd_persist(&args(&["PERSIST", "k"]), &mut db).unwrap();
-    assert_eq!(expiry::cmd_ttl(&args(&["TTL", "k"]), &mut db).unwrap(), int(-1));
+    assert_eq!(
+        expiry::cmd_ttl(&args(&["TTL", "k"]), &mut db).unwrap(),
+        int(-1)
+    );
 }
 
 #[test]
@@ -580,8 +787,14 @@ fn test_pexpire_pttl() {
 fn test_ttl_no_expire() {
     let mut db = new_db();
     strings::cmd_set(&args(&["SET", "k", "v"]), &mut db).unwrap();
-    assert_eq!(expiry::cmd_ttl(&args(&["TTL", "k"]), &mut db).unwrap(), int(-1));
-    assert_eq!(expiry::cmd_ttl(&args(&["TTL", "missing"]), &mut db).unwrap(), int(-2));
+    assert_eq!(
+        expiry::cmd_ttl(&args(&["TTL", "k"]), &mut db).unwrap(),
+        int(-1)
+    );
+    assert_eq!(
+        expiry::cmd_ttl(&args(&["TTL", "missing"]), &mut db).unwrap(),
+        int(-2)
+    );
 }
 
 // ── Geo commands ──────────────────────────────────────────────────────────────
@@ -589,13 +802,29 @@ fn test_ttl_no_expire() {
 #[test]
 fn test_geoadd_geopos() {
     let mut db = new_db();
-    let r = geo::cmd_geoadd(&args(&["GEOADD", "cities", "13.361389", "38.115556", "Palermo",
-                                    "15.087269", "37.502669", "Catania"]), &mut db).unwrap();
+    let r = geo::cmd_geoadd(
+        &args(&[
+            "GEOADD",
+            "cities",
+            "13.361389",
+            "38.115556",
+            "Palermo",
+            "15.087269",
+            "37.502669",
+            "Catania",
+        ]),
+        &mut db,
+    )
+    .unwrap();
     assert_eq!(r, int(2));
-    if let Resp::Array(Some(positions)) = geo::cmd_geopos(&args(&["GEOPOS", "cities", "Palermo"]), &mut db).unwrap() {
+    if let Resp::Array(Some(positions)) =
+        geo::cmd_geopos(&args(&["GEOPOS", "cities", "Palermo"]), &mut db).unwrap()
+    {
         if let Resp::Array(Some(coords)) = &positions[0] {
             // coords[0] ≈ 13.361389, coords[1] ≈ 38.115556
-            if let (Resp::BulkString(Some(lon)), Resp::BulkString(Some(lat))) = (&coords[0], &coords[1]) {
+            if let (Resp::BulkString(Some(lon)), Resp::BulkString(Some(lat))) =
+                (&coords[0], &coords[1])
+            {
                 let lon: f64 = std::str::from_utf8(lon).unwrap().parse().unwrap();
                 let lat: f64 = std::str::from_utf8(lat).unwrap().parse().unwrap();
                 assert!((lon - 13.361389).abs() < 0.001);
@@ -608,9 +837,26 @@ fn test_geoadd_geopos() {
 #[test]
 fn test_geodist() {
     let mut db = new_db();
-    geo::cmd_geoadd(&args(&["GEOADD", "cities", "13.361389", "38.115556", "Palermo",
-                             "15.087269", "37.502669", "Catania"]), &mut db).unwrap();
-    if let Resp::BulkString(Some(dist)) = geo::cmd_geodist(&args(&["GEODIST", "cities", "Palermo", "Catania", "km"]), &mut db).unwrap() {
+    geo::cmd_geoadd(
+        &args(&[
+            "GEOADD",
+            "cities",
+            "13.361389",
+            "38.115556",
+            "Palermo",
+            "15.087269",
+            "37.502669",
+            "Catania",
+        ]),
+        &mut db,
+    )
+    .unwrap();
+    if let Resp::BulkString(Some(dist)) = geo::cmd_geodist(
+        &args(&["GEODIST", "cities", "Palermo", "Catania", "km"]),
+        &mut db,
+    )
+    .unwrap()
+    {
         let d: f64 = std::str::from_utf8(&dist).unwrap().parse().unwrap();
         // Known distance: ~166.27 km
         assert!(d > 160.0 && d < 175.0);
@@ -622,10 +868,23 @@ fn test_geodist() {
 #[test]
 fn test_xadd_xlen_xrange() {
     let mut db = new_db();
-    streams::cmd_xadd(&args(&["XADD", "s", "*", "name", "Alice", "age", "30"]), &mut db).unwrap();
-    streams::cmd_xadd(&args(&["XADD", "s", "*", "name", "Bob", "age", "25"]), &mut db).unwrap();
-    assert_eq!(streams::cmd_xlen(&args(&["XLEN", "s"]), &mut db).unwrap(), int(2));
-    if let Resp::Array(Some(entries)) = streams::cmd_xrange(&args(&["XRANGE", "s", "-", "+"]), &mut db).unwrap() {
+    streams::cmd_xadd(
+        &args(&["XADD", "s", "*", "name", "Alice", "age", "30"]),
+        &mut db,
+    )
+    .unwrap();
+    streams::cmd_xadd(
+        &args(&["XADD", "s", "*", "name", "Bob", "age", "25"]),
+        &mut db,
+    )
+    .unwrap();
+    assert_eq!(
+        streams::cmd_xlen(&args(&["XLEN", "s"]), &mut db).unwrap(),
+        int(2)
+    );
+    if let Resp::Array(Some(entries)) =
+        streams::cmd_xrange(&args(&["XRANGE", "s", "-", "+"]), &mut db).unwrap()
+    {
         assert_eq!(entries.len(), 2);
     }
 }
@@ -633,13 +892,20 @@ fn test_xadd_xlen_xrange() {
 #[test]
 fn test_xdel() {
     let mut db = new_db();
-    let id1 = if let Resp::BulkString(Some(id)) = streams::cmd_xadd(&args(&["XADD", "s", "*", "k", "v"]), &mut db).unwrap() {
+    let id1 = if let Resp::BulkString(Some(id)) =
+        streams::cmd_xadd(&args(&["XADD", "s", "*", "k", "v"]), &mut db).unwrap()
+    {
         String::from_utf8(id).unwrap()
-    } else { panic!() };
+    } else {
+        panic!()
+    };
     streams::cmd_xadd(&args(&["XADD", "s", "*", "k", "v2"]), &mut db).unwrap();
     let r = streams::cmd_xdel(&args(&["XDEL", "s", &id1]), &mut db).unwrap();
     assert_eq!(r, int(1));
-    assert_eq!(streams::cmd_xlen(&args(&["XLEN", "s"]), &mut db).unwrap(), int(1));
+    assert_eq!(
+        streams::cmd_xlen(&args(&["XLEN", "s"]), &mut db).unwrap(),
+        int(1)
+    );
 }
 
 #[test]
@@ -650,7 +916,10 @@ fn test_xtrim() {
     }
     let trimmed = streams::cmd_xtrim(&args(&["XTRIM", "s", "MAXLEN", "5"]), &mut db).unwrap();
     assert_eq!(trimmed, int(5));
-    assert_eq!(streams::cmd_xlen(&args(&["XLEN", "s"]), &mut db).unwrap(), int(5));
+    assert_eq!(
+        streams::cmd_xlen(&args(&["XLEN", "s"]), &mut db).unwrap(),
+        int(5)
+    );
 }
 
 // ── Transaction support ───────────────────────────────────────────────────────
@@ -672,7 +941,11 @@ fn test_watch_dirty_detection() {
     let version = db.keys.get(b"k".as_ref()).unwrap().version;
 
     let mut tx = TransactionState::new();
-    tx.watched_keys.push(WatchedKey { key: b"k".to_vec(), version, db_index: 0 });
+    tx.watched_keys.push(WatchedKey {
+        key: b"k".to_vec(),
+        version,
+        db_index: 0,
+    });
 
     // Not dirty yet
     assert!(!tx.is_dirty(&db, 0));
@@ -688,7 +961,7 @@ fn test_watch_dirty_detection() {
 
 #[test]
 fn test_resp_encoding() {
-    use cave_cache::resp::{encode_resp, Resp};
+    use cave_cache::resp::{Resp, encode_resp};
 
     let mut buf = Vec::new();
     encode_resp(&mut buf, &Resp::SimpleString(b"OK".to_vec()));
@@ -711,10 +984,13 @@ fn test_resp_encoding() {
     assert_eq!(buf, b"-ERR bad\r\n");
 
     let mut buf = Vec::new();
-    encode_resp(&mut buf, &Resp::Array(Some(vec![
-        Resp::BulkString(Some(b"foo".to_vec())),
-        Resp::Integer(1),
-    ])));
+    encode_resp(
+        &mut buf,
+        &Resp::Array(Some(vec![
+            Resp::BulkString(Some(b"foo".to_vec())),
+            Resp::Integer(1),
+        ])),
+    );
     assert_eq!(buf, b"*2\r\n$3\r\nfoo\r\n:1\r\n");
 }
 
@@ -856,7 +1132,8 @@ fn test_eval_return_string() {
     use cave_cache::db::ScriptStore;
     let mut db = new_db();
     let store = ScriptStore::default();
-    let r = scripting::cmd_eval(&args(&["EVAL", r#"return "hello""#, "0"]), &mut db, &store).unwrap();
+    let r =
+        scripting::cmd_eval(&args(&["EVAL", r#"return "hello""#, "0"]), &mut db, &store).unwrap();
     assert_eq!(r, bulk("hello"));
 }
 
@@ -865,9 +1142,19 @@ fn test_eval_keys_argv() {
     use cave_cache::db::ScriptStore;
     let mut db = new_db();
     let store = ScriptStore::default();
-    let r = scripting::cmd_eval(&args(&["EVAL", "return KEYS[1]", "1", "mykey"]), &mut db, &store).unwrap();
+    let r = scripting::cmd_eval(
+        &args(&["EVAL", "return KEYS[1]", "1", "mykey"]),
+        &mut db,
+        &store,
+    )
+    .unwrap();
     assert_eq!(r, bulk("mykey"));
-    let r = scripting::cmd_eval(&args(&["EVAL", "return ARGV[1]", "0", "myarg"]), &mut db, &store).unwrap();
+    let r = scripting::cmd_eval(
+        &args(&["EVAL", "return ARGV[1]", "0", "myarg"]),
+        &mut db,
+        &store,
+    )
+    .unwrap();
     assert_eq!(r, bulk("myarg"));
 }
 
@@ -877,7 +1164,12 @@ fn test_eval_redis_call() {
     let mut db = new_db();
     strings::cmd_set(&args(&["SET", "mykey", "myval"]), &mut db).unwrap();
     let store = ScriptStore::default();
-    let r = scripting::cmd_eval(&args(&["EVAL", r#"return redis.call('GET', KEYS[1])"#, "1", "mykey"]), &mut db, &store).unwrap();
+    let r = scripting::cmd_eval(
+        &args(&["EVAL", r#"return redis.call('GET', KEYS[1])"#, "1", "mykey"]),
+        &mut db,
+        &store,
+    )
+    .unwrap();
     assert_eq!(r, bulk("myval"));
 }
 

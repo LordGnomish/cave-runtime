@@ -129,12 +129,15 @@ async fn first_tick_with_release_writes_pump_payload() {
     let entry = st.get("etcd-io/etcd").unwrap();
     assert_eq!(entry.last_known_tag.as_deref(), Some("v3.5.10"));
     assert_eq!(entry.etag.as_deref(), Some("\"v1\""));
-    assert_eq!(entry.last_pump_payload_id, Some(payloads[0].clone()).map(|p| {
-        format!(
-            "upstream-port-{}-etcd-io-etcd.json",
-            p.created_at.timestamp_millis()
-        )
-    }));
+    assert_eq!(
+        entry.last_pump_payload_id,
+        Some(payloads[0].clone()).map(|p| {
+            format!(
+                "upstream-port-{}-etcd-io-etcd.json",
+                p.created_at.timestamp_millis()
+            )
+        })
+    );
 }
 
 #[tokio::test]
@@ -183,9 +186,7 @@ async fn tag_transition_emits_payload_with_old_and_new() {
     let _m1 = server
         .mock("GET", "/repos/foo/bar/releases/latest")
         .with_status(200)
-        .with_body(
-            r#"{"tag_name":"v1.0.0","html_url":"https://x/v1.0.0"}"#,
-        )
+        .with_body(r#"{"tag_name":"v1.0.0","html_url":"https://x/v1.0.0"}"#)
         .expect(1)
         .create_async()
         .await;
@@ -200,9 +201,7 @@ async fn tag_transition_emits_payload_with_old_and_new() {
     let _m2 = server
         .mock("GET", "/repos/foo/bar/releases/latest")
         .with_status(200)
-        .with_body(
-            r#"{"tag_name":"v1.1.0","html_url":"https://x/v1.1.0"}"#,
-        )
+        .with_body(r#"{"tag_name":"v1.1.0","html_url":"https://x/v1.1.0"}"#)
         .expect_at_least(1)
         .create_async()
         .await;
@@ -330,6 +329,9 @@ async fn high_priority_repo_is_due_at_20_minutes() {
     let projects = vec![proj("etcd-io/etcd", "cave-etcd")];
     let daemon = Daemon::new(cfg, projects);
     let report = daemon.tick_once().await.unwrap();
-    assert_eq!(report.due, 1, "high-priority due at 20 min (cadence 15 min)");
+    assert_eq!(
+        report.due, 1,
+        "high-priority due at 20 min (cadence 15 min)"
+    );
     assert_eq!(report.new_releases, 1);
 }

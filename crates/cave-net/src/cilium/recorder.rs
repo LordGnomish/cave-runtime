@@ -50,8 +50,8 @@ impl RecorderProto {
 pub struct RecorderTuple {
     pub src_ip: Option<IpAddr>,
     pub dst_ip: Option<IpAddr>,
-    pub src_port: u16,    // 0 = any
-    pub dst_port: u16,    // 0 = any
+    pub src_port: u16, // 0 = any
+    pub dst_port: u16, // 0 = any
     pub protocol: RecorderProto,
 }
 
@@ -126,7 +126,8 @@ pub struct Recorder {
 impl Recorder {
     pub fn new(tenant: TenantId, ring_capacity: usize) -> Self {
         Self {
-            tenant, ring_capacity,
+            tenant,
+            ring_capacity,
             policies: HashMap::new(),
             counters: HashMap::new(),
             rings: HashMap::new(),
@@ -143,7 +144,9 @@ impl Recorder {
     }
 
     pub fn remove_policy(&mut self, id: u32) -> Result<(), RecorderError> {
-        self.policies.remove(&id).ok_or(RecorderError::NotFound(id))?;
+        self.policies
+            .remove(&id)
+            .ok_or(RecorderError::NotFound(id))?;
         self.counters.remove(&id);
         self.rings.remove(&id);
         self.overflows.remove(&id);
@@ -187,9 +190,14 @@ impl Recorder {
                 bytes.to_vec()
             };
             let pkt = CapturedPacket {
-                recorder_id: p.id, timestamp_ns,
-                src_ip: src, dst_ip: dst, src_port: sp, dst_port: dp,
-                protocol: proto, bytes: truncated,
+                recorder_id: p.id,
+                timestamp_ns,
+                src_ip: src,
+                dst_ip: dst,
+                src_port: sp,
+                dst_port: dp,
+                protocol: proto,
+                bytes: truncated,
             };
             let ring = self.rings.entry(p.id).or_insert_with(VecDeque::new);
             if ring.len() >= self.ring_capacity {
@@ -238,15 +246,18 @@ mod tests {
 
     fn match_all_tuple() -> RecorderTuple {
         RecorderTuple {
-            src_ip: None, dst_ip: None,
-            src_port: 0, dst_port: 0,
+            src_ip: None,
+            dst_ip: None,
+            src_port: 0,
+            dst_port: 0,
             protocol: RecorderProto::Any,
         }
     }
 
     fn policy(id: u32, priority: u32, sample: u32) -> RecorderPolicy {
         RecorderPolicy {
-            id, priority,
+            id,
+            priority,
             tuple: match_all_tuple(),
             capture_length: 1500,
             sample_one_in_n: sample,
@@ -272,7 +283,8 @@ mod tests {
 
     #[test]
     fn proto_icmp_covers_v4_and_v6_codes() {
-        let (_c, _t) = cilium_test_ctx!("pkg/recorder/recorder.go", "Proto.ICMP", "tenant-rec-icmp");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/recorder/recorder.go", "Proto.ICMP", "tenant-rec-icmp");
         assert!(RecorderProto::Icmp.covers(1)); // ICMPv4
         assert!(RecorderProto::Icmp.covers(58)); // ICMPv6
         assert!(!RecorderProto::Icmp.covers(6));
@@ -282,14 +294,22 @@ mod tests {
 
     #[test]
     fn tuple_matches_all_when_all_wildcards() {
-        let (_c, _t) = cilium_test_ctx!("pkg/recorder/recorder.go", "Tuple.MatchAll", "tenant-rec-tma");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Tuple.MatchAll",
+            "tenant-rec-tma"
+        );
         let t = match_all_tuple();
         assert!(t.matches(ip(10, 0, 0, 1), ip(10, 0, 0, 2), 1234, 80, 6));
     }
 
     #[test]
     fn tuple_filters_by_src_port() {
-        let (_c, _t) = cilium_test_ctx!("pkg/recorder/recorder.go", "Tuple.SrcPort", "tenant-rec-tsp");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Tuple.SrcPort",
+            "tenant-rec-tsp"
+        );
         let mut t = match_all_tuple();
         t.src_port = 1234;
         assert!(t.matches(ip(10, 0, 0, 1), ip(10, 0, 0, 2), 1234, 80, 6));
@@ -298,7 +318,11 @@ mod tests {
 
     #[test]
     fn tuple_filters_by_dst_port() {
-        let (_c, _t) = cilium_test_ctx!("pkg/recorder/recorder.go", "Tuple.DstPort", "tenant-rec-tdp");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Tuple.DstPort",
+            "tenant-rec-tdp"
+        );
         let mut t = match_all_tuple();
         t.dst_port = 80;
         assert!(t.matches(ip(10, 0, 0, 1), ip(10, 0, 0, 2), 1234, 80, 6));
@@ -307,7 +331,8 @@ mod tests {
 
     #[test]
     fn tuple_filters_by_dst_ip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/recorder/recorder.go", "Tuple.DstIP", "tenant-rec-tdi");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/recorder/recorder.go", "Tuple.DstIP", "tenant-rec-tdi");
         let mut t = match_all_tuple();
         t.dst_ip = Some(ip(10, 0, 0, 2));
         assert!(t.matches(ip(10, 0, 0, 1), ip(10, 0, 0, 2), 1234, 80, 6));
@@ -316,7 +341,8 @@ mod tests {
 
     #[test]
     fn tuple_filters_by_protocol() {
-        let (_c, _t) = cilium_test_ctx!("pkg/recorder/recorder.go", "Tuple.Proto", "tenant-rec-tpr");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/recorder/recorder.go", "Tuple.Proto", "tenant-rec-tpr");
         let mut t = match_all_tuple();
         t.protocol = RecorderProto::Tcp;
         assert!(t.matches(ip(10, 0, 0, 1), ip(10, 0, 0, 2), 1234, 80, 6));
@@ -327,7 +353,11 @@ mod tests {
 
     #[test]
     fn recorder_upsert_policy() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/recorder/recorder.go", "Recorder.Upsert", "tenant-rec-up");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Recorder.Upsert",
+            "tenant-rec-up"
+        );
         let mut r = rec(tenant, 100);
         r.upsert_policy(policy(1, 10, 1)).unwrap();
         assert_eq!(r.policy_count(), 1);
@@ -335,7 +365,11 @@ mod tests {
 
     #[test]
     fn recorder_upsert_with_zero_sample_rate_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/recorder/recorder.go", "Recorder.Upsert.BadRate", "tenant-rec-uprate");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Recorder.Upsert.BadRate",
+            "tenant-rec-uprate"
+        );
         let mut r = rec(tenant, 100);
         let err = r.upsert_policy(policy(1, 10, 0)).unwrap_err();
         assert_eq!(err, RecorderError::BadSampleRate(0));
@@ -343,7 +377,11 @@ mod tests {
 
     #[test]
     fn recorder_remove_policy() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/recorder/recorder.go", "Recorder.Remove", "tenant-rec-rm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Recorder.Remove",
+            "tenant-rec-rm"
+        );
         let mut r = rec(tenant, 100);
         r.upsert_policy(policy(1, 10, 1)).unwrap();
         r.remove_policy(1).unwrap();
@@ -352,7 +390,11 @@ mod tests {
 
     #[test]
     fn recorder_remove_unknown_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/recorder/recorder.go", "Recorder.Remove.NotFound", "tenant-rec-rmnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Recorder.Remove.NotFound",
+            "tenant-rec-rmnf"
+        );
         let mut r = rec(tenant, 100);
         let err = r.remove_policy(1).unwrap_err();
         assert_eq!(err, RecorderError::NotFound(1));
@@ -362,43 +404,84 @@ mod tests {
 
     #[test]
     fn capture_first_packet_records() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/recorder/recorder.go", "Capture.First", "tenant-rec-c1");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/recorder/recorder.go", "Capture.First", "tenant-rec-c1");
         let mut r = rec(tenant, 100);
         r.upsert_policy(policy(1, 10, 1)).unwrap();
-        let id = r.capture(ip(10, 0, 0, 1), ip(10, 0, 0, 2), 1234, 80, 6, 100, &[0u8; 64]).unwrap();
+        let id = r
+            .capture(
+                ip(10, 0, 0, 1),
+                ip(10, 0, 0, 2),
+                1234,
+                80,
+                6,
+                100,
+                &[0u8; 64],
+            )
+            .unwrap();
         assert_eq!(id, 1);
         assert_eq!(r.ring_len(1), 1);
     }
 
     #[test]
     fn capture_no_matching_policy_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/recorder/recorder.go", "Capture.NoMatch", "tenant-rec-cnm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Capture.NoMatch",
+            "tenant-rec-cnm"
+        );
         let mut r = rec(tenant, 100);
         let mut p = policy(1, 10, 1);
         p.tuple.dst_port = 443;
         r.upsert_policy(p).unwrap();
-        assert!(r.capture(ip(10, 0, 0, 1), ip(10, 0, 0, 2), 1234, 80, 6, 100, &[0; 32]).is_none());
+        assert!(r
+            .capture(ip(10, 0, 0, 1), ip(10, 0, 0, 2), 1234, 80, 6, 100, &[0; 32])
+            .is_none());
         assert_eq!(r.ring_len(1), 0);
     }
 
     #[test]
     fn capture_truncates_to_capture_length() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/recorder/recorder.go", "Capture.Truncate", "tenant-rec-ctr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Capture.Truncate",
+            "tenant-rec-ctr"
+        );
         let mut r = rec(tenant, 100);
         let mut p = policy(1, 10, 1);
         p.capture_length = 64;
         r.upsert_policy(p).unwrap();
-        r.capture(ip(10, 0, 0, 1), ip(10, 0, 0, 2), 1234, 80, 6, 100, &[0xAB; 1500]);
+        r.capture(
+            ip(10, 0, 0, 1),
+            ip(10, 0, 0, 2),
+            1234,
+            80,
+            6,
+            100,
+            &[0xAB; 1500],
+        );
         let pkts = r.drain(1).unwrap();
         assert_eq!(pkts[0].bytes.len(), 64);
     }
 
     #[test]
     fn capture_keeps_full_payload_when_smaller_than_capture_length() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/recorder/recorder.go", "Capture.Untruncated", "tenant-rec-cunt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Capture.Untruncated",
+            "tenant-rec-cunt"
+        );
         let mut r = rec(tenant, 100);
         r.upsert_policy(policy(1, 10, 1)).unwrap();
-        r.capture(ip(10, 0, 0, 1), ip(10, 0, 0, 2), 1234, 80, 6, 100, &[1u8; 100]);
+        r.capture(
+            ip(10, 0, 0, 1),
+            ip(10, 0, 0, 2),
+            1234,
+            80,
+            6,
+            100,
+            &[1u8; 100],
+        );
         let pkts = r.drain(1).unwrap();
         assert_eq!(pkts[0].bytes.len(), 100);
     }
@@ -407,7 +490,11 @@ mod tests {
 
     #[test]
     fn capture_samples_every_packet_when_rate_1() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/recorder/recorder.go", "Capture.Sample.AllPackets", "tenant-rec-samp1");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Capture.Sample.AllPackets",
+            "tenant-rec-samp1"
+        );
         let mut r = rec(tenant, 100);
         r.upsert_policy(policy(1, 10, 1)).unwrap();
         for _ in 0..10 {
@@ -418,7 +505,11 @@ mod tests {
 
     #[test]
     fn capture_samples_one_in_three_at_rate_3() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/recorder/recorder.go", "Capture.Sample.OneInThree", "tenant-rec-samp3");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Capture.Sample.OneInThree",
+            "tenant-rec-samp3"
+        );
         let mut r = rec(tenant, 100);
         r.upsert_policy(policy(1, 10, 3)).unwrap();
         for _ in 0..9 {
@@ -432,7 +523,11 @@ mod tests {
 
     #[test]
     fn capture_first_match_wins_by_priority() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/recorder/recorder.go", "Capture.Priority", "tenant-rec-pri");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Capture.Priority",
+            "tenant-rec-pri"
+        );
         let mut r = rec(tenant, 100);
         let mut low = policy(1, 5, 1);
         low.capture_length = 32;
@@ -440,7 +535,17 @@ mod tests {
         high.capture_length = 256;
         r.upsert_policy(low).unwrap();
         r.upsert_policy(high).unwrap();
-        let id = r.capture(ip(10, 0, 0, 1), ip(10, 0, 0, 2), 1234, 80, 6, 100, &[0; 1500]).unwrap();
+        let id = r
+            .capture(
+                ip(10, 0, 0, 1),
+                ip(10, 0, 0, 2),
+                1234,
+                80,
+                6,
+                100,
+                &[0; 1500],
+            )
+            .unwrap();
         // Higher priority wins.
         assert_eq!(id, 2);
         let pkts = r.drain(2).unwrap();
@@ -451,7 +556,8 @@ mod tests {
 
     #[test]
     fn ring_drops_oldest_when_full() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/recorder/recorder.go", "Ring.Overflow", "tenant-rec-ov");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/recorder/recorder.go", "Ring.Overflow", "tenant-rec-ov");
         let mut r = rec(tenant, 3);
         r.upsert_policy(policy(1, 10, 1)).unwrap();
         for _ in 0..5 {
@@ -465,7 +571,8 @@ mod tests {
 
     #[test]
     fn drain_returns_captured_in_fifo_order() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/recorder/recorder.go", "Drain.FIFO", "tenant-rec-dfifo");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/recorder/recorder.go", "Drain.FIFO", "tenant-rec-dfifo");
         let mut r = rec(tenant, 100);
         r.upsert_policy(policy(1, 10, 1)).unwrap();
         for ts in 0..5u64 {
@@ -480,7 +587,11 @@ mod tests {
 
     #[test]
     fn drain_clears_ring() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/recorder/recorder.go", "Drain.Clears", "tenant-rec-dclr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Drain.Clears",
+            "tenant-rec-dclr"
+        );
         let mut r = rec(tenant, 100);
         r.upsert_policy(policy(1, 10, 1)).unwrap();
         r.capture(ip(10, 0, 0, 1), ip(10, 0, 0, 2), 1234, 80, 6, 0, &[0; 64]);
@@ -490,7 +601,11 @@ mod tests {
 
     #[test]
     fn drain_unknown_recorder_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/recorder/recorder.go", "Drain.NotFound", "tenant-rec-dnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Drain.NotFound",
+            "tenant-rec-dnf"
+        );
         let mut r = rec(tenant, 100);
         let err = r.drain(99).unwrap_err();
         assert_eq!(err, RecorderError::NotFound(99));
@@ -500,20 +615,31 @@ mod tests {
 
     #[test]
     fn remove_policy_drops_ring_and_counters() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/recorder/recorder.go", "Remove.DropsRing", "tenant-rec-rmr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Remove.DropsRing",
+            "tenant-rec-rmr"
+        );
         let mut r = rec(tenant, 100);
         r.upsert_policy(policy(1, 10, 1)).unwrap();
         r.capture(ip(10, 0, 0, 1), ip(10, 0, 0, 2), 1234, 80, 6, 0, &[0; 64]);
         r.remove_policy(1).unwrap();
         // Drain after remove should error.
-        assert!(matches!(r.drain(1).unwrap_err(), RecorderError::NotFound(1)));
+        assert!(matches!(
+            r.drain(1).unwrap_err(),
+            RecorderError::NotFound(1)
+        ));
     }
 
     // ── Serde ──────────────────────────────────────────────────────────────
 
     #[test]
     fn recorder_policy_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/recorder/recorder.go", "Policy.Serde", "tenant-rec-pserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Policy.Serde",
+            "tenant-rec-pserde"
+        );
         let p = policy(1, 10, 1);
         let s = serde_json::to_string(&p).unwrap();
         let back: RecorderPolicy = serde_json::from_str(&s).unwrap();
@@ -522,11 +648,19 @@ mod tests {
 
     #[test]
     fn captured_packet_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/recorder/recorder.go", "Captured.Serde", "tenant-rec-cserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Captured.Serde",
+            "tenant-rec-cserde"
+        );
         let p = CapturedPacket {
-            recorder_id: 1, timestamp_ns: 100,
-            src_ip: ip(10, 0, 0, 1), dst_ip: ip(10, 0, 0, 2),
-            src_port: 1234, dst_port: 80, protocol: 6,
+            recorder_id: 1,
+            timestamp_ns: 100,
+            src_ip: ip(10, 0, 0, 1),
+            dst_ip: ip(10, 0, 0, 2),
+            src_port: 1234,
+            dst_port: 80,
+            protocol: 6,
             bytes: vec![1, 2, 3, 4],
         };
         let s = serde_json::to_string(&p).unwrap();
@@ -536,8 +670,17 @@ mod tests {
 
     #[test]
     fn recorder_proto_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/recorder/recorder.go", "Proto.Serde", "tenant-rec-prtserde");
-        for p in [RecorderProto::Any, RecorderProto::Tcp, RecorderProto::Udp, RecorderProto::Icmp] {
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Proto.Serde",
+            "tenant-rec-prtserde"
+        );
+        for p in [
+            RecorderProto::Any,
+            RecorderProto::Tcp,
+            RecorderProto::Udp,
+            RecorderProto::Icmp,
+        ] {
             let s = serde_json::to_string(&p).unwrap();
             let back: RecorderProto = serde_json::from_str(&s).unwrap();
             assert_eq!(back, p);
@@ -548,7 +691,11 @@ mod tests {
 
     #[test]
     fn multiple_recorders_independent_rings() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/recorder/recorder.go", "Multi.IndependentRings", "tenant-rec-multi");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/recorder/recorder.go",
+            "Multi.IndependentRings",
+            "tenant-rec-multi"
+        );
         let mut r = rec(tenant, 100);
         let mut p1 = policy(1, 100, 1);
         p1.tuple.dst_port = 80;

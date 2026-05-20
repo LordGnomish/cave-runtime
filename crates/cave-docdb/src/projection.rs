@@ -36,7 +36,12 @@ pub fn apply_projection(doc: &Document, projection: Option<&Document>) -> Docume
                     }
                 }
                 // Always include _id unless explicitly excluded
-                if !proj.contains_key("_id") || proj.get("_id").map(|v| v != &Value::Number(0.into())).unwrap_or(true) {
+                if !proj.contains_key("_id")
+                    || proj
+                        .get("_id")
+                        .map(|v| v != &Value::Number(0.into()))
+                        .unwrap_or(true)
+                {
                     if let Some(id) = doc.get("_id") {
                         result.insert("_id".to_string(), id.clone());
                     }
@@ -69,7 +74,10 @@ mod tests {
         let mut doc = Document::new();
         doc.insert("_id".to_string(), Value::String("1".to_string()));
         doc.insert("name".to_string(), Value::String("alice".to_string()));
-        doc.insert("email".to_string(), Value::String("alice@example.com".to_string()));
+        doc.insert(
+            "email".to_string(),
+            Value::String("alice@example.com".to_string()),
+        );
 
         let mut proj = Document::new();
         proj.insert("name".to_string(), Value::Number(1.into()));
@@ -85,7 +93,10 @@ mod tests {
         let mut doc = Document::new();
         doc.insert("_id".to_string(), Value::String("1".to_string()));
         doc.insert("name".to_string(), Value::String("alice".to_string()));
-        doc.insert("email".to_string(), Value::String("alice@example.com".to_string()));
+        doc.insert(
+            "email".to_string(),
+            Value::String("alice@example.com".to_string()),
+        );
         doc.insert("password".to_string(), Value::String("secret".to_string()));
 
         let mut proj = Document::new();

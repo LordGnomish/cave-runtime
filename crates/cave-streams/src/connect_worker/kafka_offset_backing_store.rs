@@ -119,7 +119,8 @@ impl KafkaOffsetBackingStore {
 
     /// Append a tombstone + drop the entry from the view.
     pub fn forget(&mut self, key: OffsetKey) {
-        self.log.append(OffsetRecord::Tombstone { key: key.clone() });
+        self.log
+            .append(OffsetRecord::Tombstone { key: key.clone() });
         self.materialised.remove(&key);
     }
 

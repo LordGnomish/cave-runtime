@@ -107,7 +107,11 @@ impl CiliumNodeStore {
         }
     }
 
-    pub fn configure_cluster_pool(&mut self, cidr: impl Into<String>, per_node_mask: u8) -> Result<(), NodeError> {
+    pub fn configure_cluster_pool(
+        &mut self,
+        cidr: impl Into<String>,
+        per_node_mask: u8,
+    ) -> Result<(), NodeError> {
         let cidr = cidr.into();
         IpNet::from_str(&cidr).map_err(|_| NodeError::BadCidr(cidr.clone()))?;
         self.cluster_cidr = Some(cidr);
@@ -130,7 +134,9 @@ impl CiliumNodeStore {
     }
 
     pub fn deregister(&mut self, name: &str) -> Result<(), NodeError> {
-        self.nodes.remove(name).ok_or_else(|| NodeError::NotFound(name.to_string()))?;
+        self.nodes
+            .remove(name)
+            .ok_or_else(|| NodeError::NotFound(name.to_string()))?;
         if let Some(subnet) = self.subnet_owner.remove(name) {
             self.issued_subnets.remove(&subnet);
         }
@@ -148,7 +154,10 @@ impl CiliumNodeStore {
     /// Allocate the next free `/{per_node_mask}` subnet from the cluster
     /// pool to `node_name`. Returns the assigned subnet.
     pub fn allocate_pod_cidr(&mut self, node_name: &str) -> Result<String, NodeError> {
-        let cidr = self.cluster_cidr.clone().ok_or(NodeError::PoolExhausted(0))?;
+        let cidr = self
+            .cluster_cidr
+            .clone()
+            .ok_or(NodeError::PoolExhausted(0))?;
         if !self.nodes.contains_key(node_name) {
             return Err(NodeError::NotFound(node_name.to_string()));
         }
@@ -156,13 +165,15 @@ impl CiliumNodeStore {
             return Err(NodeError::AlreadyAllocated);
         }
         let parent = IpNet::from_str(&cidr).map_err(|_| NodeError::BadCidr(cidr.clone()))?;
-        let subnets = parent.subnets(self.per_node_mask)
+        let subnets = parent
+            .subnets(self.per_node_mask)
             .map_err(|_| NodeError::BadCidr(cidr.clone()))?;
         for s in subnets {
             let sstr = s.to_string();
             if !self.issued_subnets.contains(&sstr) {
                 self.issued_subnets.insert(sstr.clone());
-                self.subnet_owner.insert(node_name.to_string(), sstr.clone());
+                self.subnet_owner
+                    .insert(node_name.to_string(), sstr.clone());
                 if let Some((spec, _)) = self.nodes.get_mut(node_name) {
                     spec.ipam.pod_cidrs.push(sstr.clone());
                 }
@@ -185,7 +196,10 @@ impl CiliumNodeStore {
     }
 
     pub fn heartbeat(&mut self, name: &str, now_ns: u64) -> Result<(), NodeError> {
-        let (_, status) = self.nodes.get_mut(name).ok_or_else(|| NodeError::NotFound(name.to_string()))?;
+        let (_, status) = self
+            .nodes
+            .get_mut(name)
+            .ok_or_else(|| NodeError::NotFound(name.to_string()))?;
         status.last_heartbeat_ns = now_ns;
         if matches!(status.state, NodeState::Joining) {
             status.state = NodeState::Ready;
@@ -194,7 +208,10 @@ impl CiliumNodeStore {
     }
 
     pub fn set_state(&mut self, name: &str, to: NodeState) -> Result<(), NodeError> {
-        let (_, status) = self.nodes.get_mut(name).ok_or_else(|| NodeError::NotFound(name.to_string()))?;
+        let (_, status) = self
+            .nodes
+            .get_mut(name)
+            .ok_or_else(|| NodeError::NotFound(name.to_string()))?;
         status.state = to;
         Ok(())
     }
@@ -225,11 +242,16 @@ mod tests {
         CiliumNodeSpec {
             name: name.into(),
             tenant,
-            addresses: vec![NodeAddress { ip: ip(10, 0, 0, 1), kind: AddressKind::InternalIP }],
+            addresses: vec![NodeAddress {
+                ip: ip(10, 0, 0, 1),
+                kind: AddressKind::InternalIP,
+            }],
             ipam: NodeIpamSpec {
                 pod_cidrs: vec![],
-                used_ipv4: 0, used_ipv6: 0,
-                pre_allocate: 8, max_above_watermark: 16,
+                used_ipv4: 0,
+                used_ipv6: 0,
+                pre_allocate: 8,
+                max_above_watermark: 16,
             },
             encryption_key: 0,
             cluster_id: 1,
@@ -244,7 +266,11 @@ mod tests {
 
     #[test]
     fn store_configure_cluster_pool() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Configure", "tenant-cn-cfg");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Configure",
+            "tenant-cn-cfg"
+        );
         let mut s = store(tenant);
         s.configure_cluster_pool("10.244.0.0/16", 24).unwrap();
         assert_eq!(s.cluster_cidr.as_deref(), Some("10.244.0.0/16"));
@@ -253,7 +279,11 @@ mod tests {
 
     #[test]
     fn store_configure_bad_cidr_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Configure.BadCidr", "tenant-cn-cfgbad");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Configure.BadCidr",
+            "tenant-cn-cfgbad"
+        );
         let mut s = store(tenant);
         let err = s.configure_cluster_pool("nope", 24).unwrap_err();
         assert_eq!(err, NodeError::BadCidr("nope".into()));
@@ -263,7 +293,11 @@ mod tests {
 
     #[test]
     fn store_register_succeeds() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2/types.go", "CiliumNode.Register", "tenant-cn-reg");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2/types.go",
+            "CiliumNode.Register",
+            "tenant-cn-reg"
+        );
         let mut s = store(tenant.clone());
         s.register(spec("node-a", tenant)).unwrap();
         assert_eq!(s.count(), 1);
@@ -271,7 +305,11 @@ mod tests {
 
     #[test]
     fn store_register_duplicate_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2/types.go", "CiliumNode.Register.Dup", "tenant-cn-dup");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2/types.go",
+            "CiliumNode.Register.Dup",
+            "tenant-cn-dup"
+        );
         let mut s = store(tenant.clone());
         s.register(spec("node-a", tenant.clone())).unwrap();
         let err = s.register(spec("node-a", tenant)).unwrap_err();
@@ -280,7 +318,11 @@ mod tests {
 
     #[test]
     fn store_lookup_returns_node() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2/types.go", "CiliumNode.Lookup", "tenant-cn-lk");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2/types.go",
+            "CiliumNode.Lookup",
+            "tenant-cn-lk"
+        );
         let mut s = store(tenant.clone());
         s.register(spec("node-a", tenant)).unwrap();
         assert!(s.lookup("node-a").is_some());
@@ -288,14 +330,22 @@ mod tests {
 
     #[test]
     fn store_lookup_unknown_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2/types.go", "CiliumNode.Lookup.NotFound", "tenant-cn-lknf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2/types.go",
+            "CiliumNode.Lookup.NotFound",
+            "tenant-cn-lknf"
+        );
         let s = store(tenant);
         assert!(s.lookup("ghost").is_none());
     }
 
     #[test]
     fn store_deregister_drops_node_and_subnet() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2/types.go", "CiliumNode.Deregister", "tenant-cn-rm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2/types.go",
+            "CiliumNode.Deregister",
+            "tenant-cn-rm"
+        );
         let mut s = store(tenant.clone());
         s.configure_cluster_pool("10.244.0.0/16", 24).unwrap();
         s.register(spec("node-a", tenant)).unwrap();
@@ -307,7 +357,11 @@ mod tests {
 
     #[test]
     fn store_deregister_unknown_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2/types.go", "CiliumNode.Deregister.NotFound", "tenant-cn-rmnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2/types.go",
+            "CiliumNode.Deregister.NotFound",
+            "tenant-cn-rmnf"
+        );
         let mut s = store(tenant);
         let err = s.deregister("ghost").unwrap_err();
         assert!(matches!(err, NodeError::NotFound(_)));
@@ -317,7 +371,11 @@ mod tests {
 
     #[test]
     fn allocate_first_subnet_starts_at_zero_offset() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Allocate.First", "tenant-cn-af");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Allocate.First",
+            "tenant-cn-af"
+        );
         let mut s = store(tenant.clone());
         s.configure_cluster_pool("10.244.0.0/16", 24).unwrap();
         s.register(spec("node-a", tenant)).unwrap();
@@ -327,7 +385,11 @@ mod tests {
 
     #[test]
     fn allocate_subsequent_subnets_advance() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Allocate.Sequential", "tenant-cn-as");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Allocate.Sequential",
+            "tenant-cn-as"
+        );
         let mut s = store(tenant.clone());
         s.configure_cluster_pool("10.244.0.0/16", 24).unwrap();
         s.register(spec("node-a", tenant.clone())).unwrap();
@@ -340,7 +402,11 @@ mod tests {
 
     #[test]
     fn allocate_records_subnet_in_node_spec() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Allocate.SpecRecord", "tenant-cn-asr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Allocate.SpecRecord",
+            "tenant-cn-asr"
+        );
         let mut s = store(tenant.clone());
         s.configure_cluster_pool("10.244.0.0/16", 24).unwrap();
         s.register(spec("node-a", tenant)).unwrap();
@@ -351,7 +417,11 @@ mod tests {
 
     #[test]
     fn allocate_double_for_same_node_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Allocate.AlreadyAllocated", "tenant-cn-aa");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Allocate.AlreadyAllocated",
+            "tenant-cn-aa"
+        );
         let mut s = store(tenant.clone());
         s.configure_cluster_pool("10.244.0.0/16", 24).unwrap();
         s.register(spec("node-a", tenant)).unwrap();
@@ -362,7 +432,11 @@ mod tests {
 
     #[test]
     fn allocate_unknown_node_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Allocate.UnknownNode", "tenant-cn-aun");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Allocate.UnknownNode",
+            "tenant-cn-aun"
+        );
         let mut s = store(tenant);
         s.configure_cluster_pool("10.244.0.0/16", 24).unwrap();
         let err = s.allocate_pod_cidr("ghost").unwrap_err();
@@ -371,7 +445,11 @@ mod tests {
 
     #[test]
     fn allocate_without_cluster_cidr_returns_pool_exhausted() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Allocate.NoPool", "tenant-cn-nop");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Allocate.NoPool",
+            "tenant-cn-nop"
+        );
         let mut s = store(tenant.clone());
         s.register(spec("node-a", tenant)).unwrap();
         let err = s.allocate_pod_cidr("node-a").unwrap_err();
@@ -380,7 +458,11 @@ mod tests {
 
     #[test]
     fn release_drops_subnet_and_returns_to_pool() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Release", "tenant-cn-rel");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Release",
+            "tenant-cn-rel"
+        );
         let mut s = store(tenant.clone());
         s.configure_cluster_pool("10.244.0.0/16", 24).unwrap();
         s.register(spec("node-a", tenant.clone())).unwrap();
@@ -400,7 +482,11 @@ mod tests {
 
     #[test]
     fn release_unknown_returns_false() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Release.NotFound", "tenant-cn-relnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Release.NotFound",
+            "tenant-cn-relnf"
+        );
         let mut s = store(tenant);
         assert!(!s.release_pod_cidr("ghost"));
     }
@@ -409,7 +495,11 @@ mod tests {
 
     #[test]
     fn node_initial_state_joining() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2/types.go", "CiliumNode.State.Joining", "tenant-cn-stj");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2/types.go",
+            "CiliumNode.State.Joining",
+            "tenant-cn-stj"
+        );
         let mut s = store(tenant.clone());
         s.register(spec("node-a", tenant)).unwrap();
         assert_eq!(s.lookup("node-a").unwrap().1.state, NodeState::Joining);
@@ -417,7 +507,11 @@ mod tests {
 
     #[test]
     fn heartbeat_advances_joining_to_ready() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2/types.go", "CiliumNode.Heartbeat", "tenant-cn-hbr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2/types.go",
+            "CiliumNode.Heartbeat",
+            "tenant-cn-hbr"
+        );
         let mut s = store(tenant.clone());
         s.register(spec("node-a", tenant)).unwrap();
         s.heartbeat("node-a", 100).unwrap();
@@ -426,16 +520,27 @@ mod tests {
 
     #[test]
     fn set_state_explicitly_changes_state() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2/types.go", "CiliumNode.SetState", "tenant-cn-ss");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2/types.go",
+            "CiliumNode.SetState",
+            "tenant-cn-ss"
+        );
         let mut s = store(tenant.clone());
         s.register(spec("node-a", tenant)).unwrap();
         s.set_state("node-a", NodeState::Decommissioning).unwrap();
-        assert_eq!(s.lookup("node-a").unwrap().1.state, NodeState::Decommissioning);
+        assert_eq!(
+            s.lookup("node-a").unwrap().1.state,
+            NodeState::Decommissioning
+        );
     }
 
     #[test]
     fn heartbeat_unknown_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2/types.go", "CiliumNode.Heartbeat.NotFound", "tenant-cn-hbnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2/types.go",
+            "CiliumNode.Heartbeat.NotFound",
+            "tenant-cn-hbnf"
+        );
         let mut s = store(tenant);
         let err = s.heartbeat("ghost", 100).unwrap_err();
         assert!(matches!(err, NodeError::NotFound(_)));
@@ -445,11 +550,16 @@ mod tests {
 
     #[test]
     fn multiple_nodes_get_distinct_subnets() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipam/clusterpool/clusterpool.go", "Allocate.Distinct", "tenant-cn-md");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipam/clusterpool/clusterpool.go",
+            "Allocate.Distinct",
+            "tenant-cn-md"
+        );
         let mut s = store(tenant.clone());
         s.configure_cluster_pool("10.244.0.0/16", 24).unwrap();
         for i in 0..5u8 {
-            s.register(spec(&format!("node-{i}"), tenant.clone())).unwrap();
+            s.register(spec(&format!("node-{i}"), tenant.clone()))
+                .unwrap();
             s.allocate_pod_cidr(&format!("node-{i}")).unwrap();
         }
         assert_eq!(s.issued_subnets().len(), 5);
@@ -457,7 +567,11 @@ mod tests {
 
     #[test]
     fn count_tracks_registrations() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2/types.go", "CiliumNode.Count", "tenant-cn-cnt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2/types.go",
+            "CiliumNode.Count",
+            "tenant-cn-cnt"
+        );
         let mut s = store(tenant.clone());
         for i in 0..7u8 {
             s.register(spec(&format!("n-{i}"), tenant.clone())).unwrap();
@@ -469,7 +583,11 @@ mod tests {
 
     #[test]
     fn cilium_node_spec_serde_round_trip() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2/types.go", "CiliumNode.Spec.Serde", "tenant-cn-sserde");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2/types.go",
+            "CiliumNode.Spec.Serde",
+            "tenant-cn-sserde"
+        );
         let s = spec("node-a", tenant);
         let json = serde_json::to_string(&s).unwrap();
         let back: CiliumNodeSpec = serde_json::from_str(&json).unwrap();
@@ -478,8 +596,17 @@ mod tests {
 
     #[test]
     fn node_state_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2/types.go", "CiliumNode.State.Serde", "tenant-cn-stserde");
-        for st in [NodeState::Joining, NodeState::Ready, NodeState::NotReady, NodeState::Decommissioning] {
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2/types.go",
+            "CiliumNode.State.Serde",
+            "tenant-cn-stserde"
+        );
+        for st in [
+            NodeState::Joining,
+            NodeState::Ready,
+            NodeState::NotReady,
+            NodeState::Decommissioning,
+        ] {
             let s = serde_json::to_string(&st).unwrap();
             let back: NodeState = serde_json::from_str(&s).unwrap();
             assert_eq!(back, st);

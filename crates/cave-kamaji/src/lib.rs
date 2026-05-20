@@ -15,7 +15,10 @@ pub mod routes;
 pub mod status;
 pub mod webhook;
 
-use axum::{routing::{get, post}, Router};
+use axum::{
+    Router,
+    routing::{get, post},
+};
 use dashmap::DashMap;
 use models::TenantControlPlane;
 use std::sync::Arc;
@@ -47,8 +50,17 @@ impl Default for KamajiState {
 /// Attaches the provided `KamajiState` to the router for request handling.
 pub fn router(state: Arc<KamajiState>) -> Router {
     Router::new()
-         .route("/api/kamaji/tenants", post(routes::create_tenant).get(routes::list_tenants))
-         .route("/api/kamaji/tenants/{id}", get(routes::get_tenant).delete(routes::delete_tenant))
-         .route("/api/kamaji/tenants/{id}/kubeconfig", post(routes::get_kubeconfig))
-         .with_state(state)
+        .route(
+            "/api/kamaji/tenants",
+            post(routes::create_tenant).get(routes::list_tenants),
+        )
+        .route(
+            "/api/kamaji/tenants/{id}",
+            get(routes::get_tenant).delete(routes::delete_tenant),
+        )
+        .route(
+            "/api/kamaji/tenants/{id}/kubeconfig",
+            post(routes::get_kubeconfig),
+        )
+        .with_state(state)
 }

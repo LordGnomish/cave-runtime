@@ -8,7 +8,7 @@
 //! lock down.
 
 use crate::ldap::{
-    active_directory::{parse_object_sid, pwd_last_set_to_unix_epoch, UacFlag, UserAccountControl},
+    active_directory::{UacFlag, UserAccountControl, parse_object_sid, pwd_last_set_to_unix_epoch},
     group_mapper::{GroupEntry, GroupMapper},
     query::{Filter, LdapQueryBuilder, Scope},
     storage_provider::{InMemoryDirectory, LdapStorageConfig, UserStorageProvider},
@@ -26,7 +26,7 @@ fn map_of(pairs: &[(&str, &[&str])]) -> BTreeMap<String, Vec<String>> {
             )
         })
         .collect()
-    }
+}
 
 #[test]
 fn ldap_providers_integration_test_search_user_by_username() {
@@ -84,15 +84,30 @@ fn ldap_group_mapper_test_group_member_strategy_reads_group_attr() {
         members: vec!["uid=jdoe,ou=people".into()],
     }];
     let inv = m.invert_group_members(&groups);
-    assert_eq!(inv.get("uid=jdoe,ou=people").unwrap(), &vec!["engineers".to_string()]);
+    assert_eq!(
+        inv.get("uid=jdoe,ou=people").unwrap(),
+        &vec!["engineers".to_string()]
+    );
 }
 
 #[test]
 fn ldap_user_mapper_test_keycloak_default_attribute_map() {
     let m = UserAttributeMapper::keycloak_defaults();
-    assert!(m.rows.iter().any(|r| r.user_field == "username" && r.ldap_attr == "uid"));
-    assert!(m.rows.iter().any(|r| r.user_field == "email" && r.ldap_attr == "mail"));
-    assert!(m.rows.iter().any(|r| r.user_field == "displayName" && r.ldap_attr == "cn"));
+    assert!(
+        m.rows
+            .iter()
+            .any(|r| r.user_field == "username" && r.ldap_attr == "uid")
+    );
+    assert!(
+        m.rows
+            .iter()
+            .any(|r| r.user_field == "email" && r.ldap_attr == "mail")
+    );
+    assert!(
+        m.rows
+            .iter()
+            .any(|r| r.user_field == "displayName" && r.ldap_attr == "cn")
+    );
 }
 
 #[test]

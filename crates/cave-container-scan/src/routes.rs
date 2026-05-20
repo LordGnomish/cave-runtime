@@ -2,12 +2,15 @@
 // Copyright 2026 Cave Runtime contributors
 use crate::engine::{ScanOrchestrator, aggregate_verdict};
 use crate::models::*;
-use crate::scanners::{image::ImageScanner, iac::IacScanner, fs::FsScanner, secret::SecretScanner, yara::YaraScanner, namespace::NamespaceScanner};
+use crate::scanners::{
+    fs::FsScanner, iac::IacScanner, image::ImageScanner, namespace::NamespaceScanner,
+    secret::SecretScanner, yara::YaraScanner,
+};
 use axum::{
+    Json, Router,
     extract::{Path, State as AxumState},
     http::StatusCode,
     routing::{get, post},
-    Json, Router,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -78,7 +81,10 @@ async fn scan_image(
         let mut stats = state.stats.write().await;
         stats.total_scans += 1;
         for finding in &result.findings {
-            *stats.findings_by_severity.entry(finding.severity).or_insert(0) += 1;
+            *stats
+                .findings_by_severity
+                .entry(finding.severity)
+                .or_insert(0) += 1;
         }
     }
 
@@ -112,7 +118,10 @@ async fn scan_iac(
         let mut stats = state.stats.write().await;
         stats.total_scans += 1;
         for finding in &result.findings {
-            *stats.findings_by_severity.entry(finding.severity).or_insert(0) += 1;
+            *stats
+                .findings_by_severity
+                .entry(finding.severity)
+                .or_insert(0) += 1;
         }
     }
 
@@ -149,7 +158,10 @@ async fn scan_fs(
         let mut stats = state.stats.write().await;
         stats.total_scans += 1;
         for finding in &result.findings {
-            *stats.findings_by_severity.entry(finding.severity).or_insert(0) += 1;
+            *stats
+                .findings_by_severity
+                .entry(finding.severity)
+                .or_insert(0) += 1;
         }
     }
 
@@ -180,7 +192,10 @@ async fn scan_secret(
         let mut stats = state.stats.write().await;
         stats.total_scans += 1;
         for finding in &result.findings {
-            *stats.findings_by_severity.entry(finding.severity).or_insert(0) += 1;
+            *stats
+                .findings_by_severity
+                .entry(finding.severity)
+                .or_insert(0) += 1;
         }
     }
 
@@ -211,7 +226,10 @@ async fn scan_yara(
         let mut stats = state.stats.write().await;
         stats.total_scans += 1;
         for finding in &result.findings {
-            *stats.findings_by_severity.entry(finding.severity).or_insert(0) += 1;
+            *stats
+                .findings_by_severity
+                .entry(finding.severity)
+                .or_insert(0) += 1;
         }
     }
 
@@ -245,7 +263,10 @@ async fn scan_namespace(
         let mut stats = state.stats.write().await;
         stats.total_scans += 1;
         for finding in &result.findings {
-            *stats.findings_by_severity.entry(finding.severity).or_insert(0) += 1;
+            *stats
+                .findings_by_severity
+                .entry(finding.severity)
+                .or_insert(0) += 1;
         }
     }
 
@@ -260,7 +281,9 @@ async fn evaluate_verdict(
     Json(verdict)
 }
 
-async fn list_results(AxumState(state): AxumState<Arc<ContainerScanStore>>) -> Json<Vec<ScanResult>> {
+async fn list_results(
+    AxumState(state): AxumState<Arc<ContainerScanStore>>,
+) -> Json<Vec<ScanResult>> {
     let results = state.results.read().await;
     let mut vec: Vec<ScanResult> = results.values().cloned().collect();
     vec.sort_by(|a, b| b.finished_at.cmp(&a.finished_at));
@@ -332,13 +355,11 @@ async fn list_rules() -> Json<RulesResponse> {
         },
     ];
 
-    let namespace_rules = vec![
-        NamespaceRuleMetadata {
-            id: "NS-001".to_string(),
-            name: "Potential namespace confusion / typosquat".to_string(),
-            ecosystem: "PyPI, Npm, Maven, etc.".to_string(),
-        },
-    ];
+    let namespace_rules = vec![NamespaceRuleMetadata {
+        id: "NS-001".to_string(),
+        name: "Potential namespace confusion / typosquat".to_string(),
+        ecosystem: "PyPI, Npm, Maven, etc.".to_string(),
+    }];
 
     Json(RulesResponse {
         yara: yara_rules,

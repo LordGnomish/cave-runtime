@@ -113,12 +113,14 @@ impl ScimUser {
             name: None,
             display_name: None,
             emails: email
-                .map(|e| vec![ScimMultiValue {
-                    value: e.to_string(),
-                    value_type: Some("work".to_string()),
-                    primary: Some(true),
-                    display: None,
-                }])
+                .map(|e| {
+                    vec![ScimMultiValue {
+                        value: e.to_string(),
+                        value_type: Some("work".to_string()),
+                        primary: Some(true),
+                        display: None,
+                    }]
+                })
                 .unwrap_or_default(),
             phone_numbers: vec![],
             active: true,
@@ -318,7 +320,10 @@ impl ScimService {
 
     pub async fn create_group(&self, mut group: ScimGroup) -> Result<ScimGroup, ScimError> {
         let mut groups = self.groups.write().await;
-        if groups.values().any(|g| g.display_name == group.display_name) {
+        if groups
+            .values()
+            .any(|g| g.display_name == group.display_name)
+        {
             return Err(ScimError::Conflict(format!(
                 "Group '{}' already exists",
                 group.display_name
@@ -361,7 +366,11 @@ impl ScimService {
         Ok(())
     }
 
-    pub async fn add_member_to_group(&self, group_id: &str, member: ScimMember) -> Result<(), ScimError> {
+    pub async fn add_member_to_group(
+        &self,
+        group_id: &str,
+        member: ScimMember,
+    ) -> Result<(), ScimError> {
         let mut groups = self.groups.write().await;
         let group = groups
             .get_mut(group_id)

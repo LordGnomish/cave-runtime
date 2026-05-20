@@ -54,9 +54,15 @@ pub fn default_behavior() -> HpaBehavior {
             select: SelectPolicy::Max,
             policies: vec![
                 // Scale up by 100% every 15s.
-                ScalingPolicy::Percent { value: 100, period_sec: 15 },
+                ScalingPolicy::Percent {
+                    value: 100,
+                    period_sec: 15,
+                },
                 // Or by 4 pods every 15s.
-                ScalingPolicy::Pods { value: 4, period_sec: 15 },
+                ScalingPolicy::Pods {
+                    value: 4,
+                    period_sec: 15,
+                },
             ],
             stabilization_window_sec: DEFAULT_UPSCALE_STABILISATION_SEC,
         }),
@@ -64,7 +70,10 @@ pub fn default_behavior() -> HpaBehavior {
             select: SelectPolicy::Max,
             policies: vec![
                 // Scale down by 100% every 15s (default permissive).
-                ScalingPolicy::Percent { value: 100, period_sec: 15 },
+                ScalingPolicy::Percent {
+                    value: 100,
+                    period_sec: 15,
+                },
             ],
             stabilization_window_sec: DEFAULT_DOWNSCALE_STABILISATION_SEC,
         }),
@@ -101,7 +110,11 @@ mod tests {
     use crate::test_ctx;
 
     fn rules_with(policies: Vec<ScalingPolicy>) -> ScalingRules {
-        ScalingRules { select: SelectPolicy::Max, policies, stabilization_window_sec: 0 }
+        ScalingRules {
+            select: SelectPolicy::Max,
+            policies,
+            stabilization_window_sec: 0,
+        }
     }
 
     #[test]
@@ -112,9 +125,18 @@ mod tests {
             "tenant-hpa-adv-longest"
         );
         let r = rules_with(vec![
-            ScalingPolicy::Pods { value: 4, period_sec: 30 },
-            ScalingPolicy::Percent { value: 100, period_sec: 60 },
-            ScalingPolicy::Pods { value: 2, period_sec: 15 },
+            ScalingPolicy::Pods {
+                value: 4,
+                period_sec: 30,
+            },
+            ScalingPolicy::Percent {
+                value: 100,
+                period_sec: 60,
+            },
+            ScalingPolicy::Pods {
+                value: 2,
+                period_sec: 15,
+            },
         ]);
         assert_eq!(longest_policy_period(&r), 60);
     }
@@ -138,8 +160,14 @@ mod tests {
             "tenant-hpa-adv-longest-equal"
         );
         let r = rules_with(vec![
-            ScalingPolicy::Pods { value: 4, period_sec: 30 },
-            ScalingPolicy::Percent { value: 100, period_sec: 30 },
+            ScalingPolicy::Pods {
+                value: 4,
+                period_sec: 30,
+            },
+            ScalingPolicy::Percent {
+                value: 100,
+                period_sec: 30,
+            },
         ]);
         assert_eq!(longest_policy_period(&r), 30);
     }
@@ -235,7 +263,10 @@ mod tests {
         );
         let r = ScalingRules {
             select: SelectPolicy::Disabled,
-            policies: vec![ScalingPolicy::Pods { value: 1, period_sec: 60 }],
+            policies: vec![ScalingPolicy::Pods {
+                value: 1,
+                period_sec: 60,
+            }],
             stabilization_window_sec: 0,
         };
         assert_eq!(effective_select(&r), SelectPolicy::Disabled);

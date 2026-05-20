@@ -237,11 +237,8 @@ mod tests {
     fn test_dispatch_exclusive_rejects_second_consumer() {
         // cite: pulsar 4.2.0 .../service/persistent/PersistentSubscription#addConsumer (Exclusive)
         let tenant_id = "pd-001";
-        let d = SubscriptionDispatcher::new(
-            topic(tenant_id, "t"),
-            "sub",
-            SubscriptionType::Exclusive,
-        );
+        let d =
+            SubscriptionDispatcher::new(topic(tenant_id, "t"), "sub", SubscriptionType::Exclusive);
         d.add_consumer(DispatchConsumer::new(1, 0)).unwrap();
         let err = d.add_consumer(DispatchConsumer::new(2, 0));
         assert!(err.is_err());
@@ -252,11 +249,8 @@ mod tests {
     fn test_dispatch_exclusive_returns_single_consumer() {
         // cite: pulsar 4.2.0 PersistentDispatcherSingleActiveConsumer
         let tenant_id = "pd-002";
-        let d = SubscriptionDispatcher::new(
-            topic(tenant_id, "t"),
-            "sub",
-            SubscriptionType::Exclusive,
-        );
+        let d =
+            SubscriptionDispatcher::new(topic(tenant_id, "t"), "sub", SubscriptionType::Exclusive);
         d.add_consumer(DispatchConsumer::new(7, 0)).unwrap();
         assert_eq!(d.dispatch_message(None), Some(7));
     }
@@ -265,11 +259,8 @@ mod tests {
     fn test_dispatch_failover_picks_lowest_priority() {
         // cite: pulsar 4.2.0 PersistentDispatcherSingleActiveConsumer (Failover priority)
         let tenant_id = "pd-003";
-        let d = SubscriptionDispatcher::new(
-            topic(tenant_id, "t"),
-            "sub",
-            SubscriptionType::Failover,
-        );
+        let d =
+            SubscriptionDispatcher::new(topic(tenant_id, "t"), "sub", SubscriptionType::Failover);
         d.add_consumer(DispatchConsumer {
             consumer_id: 1,
             priority: 0,
@@ -294,11 +285,8 @@ mod tests {
     fn test_dispatch_failover_falls_over_when_active_lacks_permits() {
         // cite: pulsar 4.2.0 active consumer must have permits to receive
         let tenant_id = "pd-004";
-        let d = SubscriptionDispatcher::new(
-            topic(tenant_id, "t"),
-            "sub",
-            SubscriptionType::Failover,
-        );
+        let d =
+            SubscriptionDispatcher::new(topic(tenant_id, "t"), "sub", SubscriptionType::Failover);
         d.add_consumer(DispatchConsumer {
             consumer_id: 1,
             priority: 0,
@@ -323,11 +311,7 @@ mod tests {
     fn test_dispatch_shared_round_robin() {
         // cite: pulsar 4.2.0 PersistentDispatcherMultipleConsumers (round-robin)
         let tenant_id = "pd-005";
-        let d = SubscriptionDispatcher::new(
-            topic(tenant_id, "t"),
-            "sub",
-            SubscriptionType::Shared,
-        );
+        let d = SubscriptionDispatcher::new(topic(tenant_id, "t"), "sub", SubscriptionType::Shared);
         for id in [10u64, 20, 30] {
             d.add_consumer(DispatchConsumer::new(id, 0)).unwrap();
         }
@@ -345,11 +329,7 @@ mod tests {
     fn test_dispatch_shared_skips_no_permit_consumers() {
         // cite: pulsar 4.2.0 (skip consumers without permits)
         let tenant_id = "pd-006";
-        let d = SubscriptionDispatcher::new(
-            topic(tenant_id, "t"),
-            "sub",
-            SubscriptionType::Shared,
-        );
+        let d = SubscriptionDispatcher::new(topic(tenant_id, "t"), "sub", SubscriptionType::Shared);
         d.add_consumer(DispatchConsumer {
             consumer_id: 1,
             priority: 0,
@@ -368,11 +348,8 @@ mod tests {
     fn test_dispatch_key_shared_sticky() {
         // cite: pulsar 4.2.0 PersistentStickyKeyDispatcherMultipleConsumers
         let tenant_id = "pd-007";
-        let d = SubscriptionDispatcher::new(
-            topic(tenant_id, "t"),
-            "sub",
-            SubscriptionType::KeyShared,
-        );
+        let d =
+            SubscriptionDispatcher::new(topic(tenant_id, "t"), "sub", SubscriptionType::KeyShared);
         d.add_consumer(DispatchConsumer::new(1, 0)).unwrap();
         d.add_consumer(DispatchConsumer::new(2, 0)).unwrap();
         let key = b"order-42";
@@ -386,11 +363,8 @@ mod tests {
     fn test_dispatch_key_shared_rebalances_on_consumer_loss() {
         // cite: pulsar 4.2.0 (ownership transfers when owner disconnects)
         let tenant_id = "pd-008";
-        let d = SubscriptionDispatcher::new(
-            topic(tenant_id, "t"),
-            "sub",
-            SubscriptionType::KeyShared,
-        );
+        let d =
+            SubscriptionDispatcher::new(topic(tenant_id, "t"), "sub", SubscriptionType::KeyShared);
         d.add_consumer(DispatchConsumer::new(1, 0)).unwrap();
         d.add_consumer(DispatchConsumer::new(2, 0)).unwrap();
         let key = b"k";
@@ -404,11 +378,7 @@ mod tests {
     fn test_dispatch_no_consumers_returns_none() {
         // cite: pulsar 4.2.0 (dispatch returns null with no consumers)
         let tenant_id = "pd-009";
-        let d = SubscriptionDispatcher::new(
-            topic(tenant_id, "t"),
-            "sub",
-            SubscriptionType::Shared,
-        );
+        let d = SubscriptionDispatcher::new(topic(tenant_id, "t"), "sub", SubscriptionType::Shared);
         assert_eq!(d.dispatch_message(None), None);
     }
 
@@ -416,11 +386,8 @@ mod tests {
     fn test_dispatch_remove_consumer_clears_key_owner() {
         // cite: pulsar 4.2.0 KeyShared (cleanup when consumer leaves)
         let tenant_id = "pd-010";
-        let d = SubscriptionDispatcher::new(
-            topic(tenant_id, "t"),
-            "sub",
-            SubscriptionType::KeyShared,
-        );
+        let d =
+            SubscriptionDispatcher::new(topic(tenant_id, "t"), "sub", SubscriptionType::KeyShared);
         d.add_consumer(DispatchConsumer::new(1, 0)).unwrap();
         let key = b"hot-key";
         let owner = d.dispatch_message(Some(key)).unwrap();

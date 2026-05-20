@@ -20,7 +20,7 @@
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, table, table_html};
 use crate::admin::state::{
-    scope, AdminState, StreamsConnectTask, StreamsConnectWorker, StreamsConnector,
+    AdminState, StreamsConnectTask, StreamsConnectWorker, StreamsConnector, scope,
 };
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -189,10 +189,7 @@ pub fn restart_task(
 
 // ── renderers ────────────────────────────────────────────────────────────────
 
-pub fn render(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, ConnectViewError> {
+pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ConnectViewError> {
     let workers = list_workers(state, ctx)?;
     let connectors = list_connectors(state, ctx)?;
     let tasks = list_tasks(state, ctx)?;
@@ -219,10 +216,7 @@ pub fn render(
     Ok(body)
 }
 
-pub fn render_workers(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, ConnectViewError> {
+pub fn render_workers(state: &AdminState, ctx: &RequestCtx) -> Result<String, ConnectViewError> {
     let workers = list_workers(state, ctx)?;
     let rows: Vec<Vec<String>> = workers
         .iter()
@@ -238,17 +232,11 @@ pub fn render_workers(
         .collect();
     Ok(format!(
         r#"<h2 class="text-lg font-semibold mb-2">Workers</h2>{t}"#,
-        t = table_html(
-            &["id", "host", "state", "connectors", "tasks"],
-            &rows,
-        ),
+        t = table_html(&["id", "host", "state", "connectors", "tasks"], &rows,),
     ))
 }
 
-pub fn render_connectors(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, ConnectViewError> {
+pub fn render_connectors(state: &AdminState, ctx: &RequestCtx) -> Result<String, ConnectViewError> {
     let connectors = list_connectors(state, ctx)?;
     let admin = ctx.authorise(Permission::StreamsAdmin).is_ok();
     let rows: Vec<Vec<String>> = connectors
@@ -278,10 +266,7 @@ pub fn render_connectors(
     ))
 }
 
-pub fn render_tasks(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, ConnectViewError> {
+pub fn render_tasks(state: &AdminState, ctx: &RequestCtx) -> Result<String, ConnectViewError> {
     let tasks = list_tasks(state, ctx)?;
     let admin = ctx.authorise(Permission::StreamsAdmin).is_ok();
     let rows: Vec<Vec<String>> = tasks
@@ -314,10 +299,7 @@ pub fn render_tasks(
     ))
 }
 
-pub fn render_configs(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, ConnectViewError> {
+pub fn render_configs(state: &AdminState, ctx: &RequestCtx) -> Result<String, ConnectViewError> {
     let connectors = list_connectors(state, ctx)?;
     let rows: Vec<Vec<String>> = connectors
         .iter()

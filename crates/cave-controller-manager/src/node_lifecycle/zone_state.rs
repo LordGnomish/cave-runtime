@@ -52,11 +52,7 @@ impl Default for ZoneConfig {
 /// * Otherwise compute the unhealthy fraction; in clusters above
 ///   `large_cluster_node_threshold`, only flip to `PartialDisruption` when
 ///   the fraction exceeds the threshold.
-pub fn compute_zone_state(
-    ready_nodes: u32,
-    total_nodes: u32,
-    cfg: &ZoneConfig,
-) -> ZoneState {
+pub fn compute_zone_state(ready_nodes: u32, total_nodes: u32, cfg: &ZoneConfig) -> ZoneState {
     if total_nodes < 3 {
         return ZoneState::Initial;
     }

@@ -21,7 +21,7 @@
 use crate::admin::keda::types::KedaScaledObjectDetail;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
+use crate::admin::state::{AdminState, scope};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum Error {
@@ -45,13 +45,14 @@ pub struct ScalerMetricsRow {
 
 pub fn rows(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<ScalerMetricsRow>, Error> {
     ctx.authorise(Permission::KedaMetricsRead)?;
-    let sos: Vec<KedaScaledObjectDetail> =
-        scope(&state.keda_scaled_object_details.read().unwrap(), &ctx.tenant, |r| {
-            &r.tenant
-        })
-        .into_iter()
-        .cloned()
-        .collect();
+    let sos: Vec<KedaScaledObjectDetail> = scope(
+        &state.keda_scaled_object_details.read().unwrap(),
+        &ctx.tenant,
+        |r| &r.tenant,
+    )
+    .into_iter()
+    .cloned()
+    .collect();
     let mut out = Vec::new();
     for so in sos {
         for t in &so.triggers {
@@ -64,7 +65,11 @@ pub fn rows(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<ScalerMetricsRow
                 "Unhealthy" => (3.5, 410.0),
                 _ => (0.1, 42.0),
             };
-            let active_factor = if so.status.active_triggers.contains(&t.kind) { 4.0 } else { 0.5 };
+            let active_factor = if so.status.active_triggers.contains(&t.kind) {
+                4.0
+            } else {
+                0.5
+            };
             let events_per_min = active_factor * (so.max_replica_count.max(1) as f32 / 8.0);
             let last_value = match t.kind.as_str() {
                 "kafka" => 2400.0,
@@ -169,7 +174,10 @@ mod tests {
     #[test]
     fn rows_without_permission_refused() {
         let state = AdminState::seeded();
-        assert!(matches!(rows(&state, &ctx(&[])).unwrap_err(), Error::Auth(_)));
+        assert!(matches!(
+            rows(&state, &ctx(&[])).unwrap_err(),
+            Error::Auth(_)
+        ));
     }
 
     #[test]

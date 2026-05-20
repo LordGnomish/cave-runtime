@@ -52,16 +52,20 @@ pub trait Strategy: Send + Sync {
     fn prepare_for_create(&self, ctx: &StrategyContext, obj: &mut serde_json::Value);
     /// Default updated-object fields against the old object.
     fn prepare_for_update(
-        &self, ctx: &StrategyContext,
-        new_obj: &mut serde_json::Value, old_obj: &serde_json::Value,
+        &self,
+        ctx: &StrategyContext,
+        new_obj: &mut serde_json::Value,
+        old_obj: &serde_json::Value,
     );
     /// Validate a brand-new object.
     fn validate(&self, ctx: &StrategyContext, obj: &serde_json::Value)
         -> Result<(), StrategyError>;
     /// Validate an updated object against its previous state.
     fn validate_update(
-        &self, ctx: &StrategyContext,
-        new_obj: &serde_json::Value, old_obj: &serde_json::Value,
+        &self,
+        ctx: &StrategyContext,
+        new_obj: &serde_json::Value,
+        old_obj: &serde_json::Value,
     ) -> Result<(), StrategyError>;
 }
 
@@ -73,26 +77,34 @@ pub struct DefaultStrategy {
 }
 
 impl Strategy for DefaultStrategy {
-    fn namespace_scoped(&self) -> bool { self.namespaced }
+    fn namespace_scoped(&self) -> bool {
+        self.namespaced
+    }
 
     fn prepare_for_create(&self, ctx: &StrategyContext, obj: &mut serde_json::Value) {
         if let Some(meta) = obj.get_mut("metadata").and_then(|m| m.as_object_mut()) {
-            meta.entry("creationTimestamp").or_insert_with(||
-                serde_json::Value::String(chrono::Utc::now().to_rfc3339()));
-            meta.insert("resourceVersion".into(), serde_json::Value::String("0".into()));
+            meta.entry("creationTimestamp")
+                .or_insert_with(|| serde_json::Value::String(chrono::Utc::now().to_rfc3339()));
+            meta.insert(
+                "resourceVersion".into(),
+                serde_json::Value::String("0".into()),
+            );
             // Stamp tenant annotation when missing.
-            let annotations = meta.entry("annotations").or_insert_with(||
-                serde_json::Value::Object(serde_json::Map::new()));
+            let annotations = meta
+                .entry("annotations")
+                .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()));
             if let Some(ann) = annotations.as_object_mut() {
                 ann.entry("cave.runtime/tenant-id".to_string())
-                   .or_insert_with(|| serde_json::Value::String(ctx.tenant_id.clone()));
+                    .or_insert_with(|| serde_json::Value::String(ctx.tenant_id.clone()));
             }
         }
     }
 
     fn prepare_for_update(
-        &self, _: &StrategyContext,
-        new_obj: &mut serde_json::Value, old_obj: &serde_json::Value,
+        &self,
+        _: &StrategyContext,
+        new_obj: &mut serde_json::Value,
+        old_obj: &serde_json::Value,
     ) {
         // creationTimestamp is immutable.
         if let (Some(new_meta), Some(old_meta)) = (
@@ -108,7 +120,11 @@ impl Strategy for DefaultStrategy {
         }
     }
 
-    fn validate(&self, ctx: &StrategyContext, obj: &serde_json::Value) -> Result<(), StrategyError> {
+    fn validate(
+        &self,
+        ctx: &StrategyContext,
+        obj: &serde_json::Value,
+    ) -> Result<(), StrategyError> {
         let Some(meta) = obj.get("metadata").and_then(|m| m.as_object()) else {
             return Err(StrategyError::Invalid("metadata missing".into()));
         };
@@ -119,8 +135,9 @@ impl Strategy for DefaultStrategy {
             return Err(StrategyError::Invalid("metadata.name required".into()));
         }
         if !is_dns1123_subdomain(name) {
-            return Err(StrategyError::Invalid(
-                format!("metadata.name {name} is not a valid DNS-1123 subdomain")));
+            return Err(StrategyError::Invalid(format!(
+                "metadata.name {name} is not a valid DNS-1123 subdomain"
+            )));
         }
         // Tenant annotation invariant.
         if let Some(ann) = meta.get("annotations").and_then(|a| a.as_object()) {
@@ -128,7 +145,8 @@ impl Strategy for DefaultStrategy {
                 if tid != ctx.tenant_id {
                     return Err(StrategyError::Forbidden(format!(
                         "tenant_id mismatch (object={}, request={})",
-                        tid, ctx.tenant_id)));
+                        tid, ctx.tenant_id
+                    )));
                 }
             }
         }
@@ -136,8 +154,10 @@ impl Strategy for DefaultStrategy {
     }
 
     fn validate_update(
-        &self, ctx: &StrategyContext,
-        new_obj: &serde_json::Value, old_obj: &serde_json::Value,
+        &self,
+        ctx: &StrategyContext,
+        new_obj: &serde_json::Value,
+        old_obj: &serde_json::Value,
     ) -> Result<(), StrategyError> {
         self.validate(ctx, new_obj)?;
         // Tenant annotation must not change between update versions.
@@ -146,7 +166,8 @@ impl Strategy for DefaultStrategy {
         if new_t != old_t {
             return Err(StrategyError::Forbidden(format!(
                 "tenant_id may not change on update (was={}, now={})",
-                old_t, new_t)));
+                old_t, new_t
+            )));
         }
         Ok(())
     }
@@ -154,25 +175,35 @@ impl Strategy for DefaultStrategy {
 
 fn tenant_of(o: &serde_json::Value) -> String {
     o.pointer("/metadata/annotations/cave.runtime~1tenant-id")
-        .and_then(|v| v.as_str()).unwrap_or("").to_string()
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string()
 }
 
 /// DNS 1123 subdomain: lowercase letters/digits, dots and hyphens, must
 /// start and end with alphanumeric. Mirrors `validation.IsDNS1123Subdomain`.
 pub fn is_dns1123_subdomain(s: &str) -> bool {
-    if s.is_empty() || s.len() > 253 { return false; }
+    if s.is_empty() || s.len() > 253 {
+        return false;
+    }
     let bytes = s.as_bytes();
     let alnum = |c: u8| c.is_ascii_lowercase() || c.is_ascii_digit();
-    if !alnum(bytes[0]) || !alnum(bytes[bytes.len() - 1]) { return false; }
+    if !alnum(bytes[0]) || !alnum(bytes[bytes.len() - 1]) {
+        return false;
+    }
     let mut prev_dot = false;
     for &c in bytes {
         if c == b'.' {
-            if prev_dot { return false; } // no consecutive dots
+            if prev_dot {
+                return false;
+            } // no consecutive dots
             prev_dot = true;
             continue;
         }
         prev_dot = false;
-        if !(alnum(c) || c == b'-') { return false; }
+        if !(alnum(c) || c == b'-') {
+            return false;
+        }
     }
     true
 }
@@ -195,19 +226,26 @@ pub enum ConsistentReadOutcome {
 }
 
 pub fn evaluate_consistent_read(
-    requested_rv: Option<&str>, cache_synced_rv: u64,
+    requested_rv: Option<&str>,
+    cache_synced_rv: u64,
 ) -> ConsistentReadOutcome {
     let Some(rv) = requested_rv else {
-        return ConsistentReadOutcome::ServeFromCache { at_rv: cache_synced_rv };
+        return ConsistentReadOutcome::ServeFromCache {
+            at_rv: cache_synced_rv,
+        };
     };
     if rv == "0" {
-        return ConsistentReadOutcome::ServeFromCache { at_rv: cache_synced_rv };
+        return ConsistentReadOutcome::ServeFromCache {
+            at_rv: cache_synced_rv,
+        };
     }
     let Ok(want): Result<u64, _> = rv.parse() else {
         return ConsistentReadOutcome::Invalid;
     };
     if cache_synced_rv >= want {
-        ConsistentReadOutcome::ServeFromCache { at_rv: cache_synced_rv }
+        ConsistentReadOutcome::ServeFromCache {
+            at_rv: cache_synced_rv,
+        }
     } else {
         ConsistentReadOutcome::FallThrough
     }
@@ -220,7 +258,10 @@ pub fn evaluate_consistent_read(
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WatchEventType {
-    Added, Modified, Deleted, Bookmark,
+    Added,
+    Modified,
+    Deleted,
+    Bookmark,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -239,14 +280,21 @@ pub struct ProgressNotifier {
 
 impl ProgressNotifier {
     pub fn new(interval: Duration) -> Self {
-        Self { interval, last_emit_rv: Mutex::new(0) }
+        Self {
+            interval,
+            last_emit_rv: Mutex::new(0),
+        }
     }
     /// Emit a bookmark IFF `cache_rv > last_emit_rv` and the watcher has been
     /// quiescent. Returns the emitted event when one is produced.
     pub fn maybe_bookmark(&self, cache_rv: u64, idle: bool) -> Option<WatchProgressEvent> {
-        if !idle { return None; }
+        if !idle {
+            return None;
+        }
         let mut last = self.last_emit_rv.lock().unwrap();
-        if cache_rv <= *last { return None; }
+        if cache_rv <= *last {
+            return None;
+        }
         *last = cache_rv;
         Some(WatchProgressEvent {
             kind: WatchEventType::Bookmark,
@@ -297,8 +345,16 @@ impl StreamingListBuilder {
             self.all[start..end].to_vec()
         };
         let remaining = (self.all.len() as i64) - end as i64;
-        let token = if end < self.all.len() { end.to_string() } else { String::new() };
-        ListChunk { items, continue_token: token, remaining_item_count: remaining.max(0) }
+        let token = if end < self.all.len() {
+            end.to_string()
+        } else {
+            String::new()
+        };
+        ListChunk {
+            items,
+            continue_token: token,
+            remaining_item_count: remaining.max(0),
+        }
     }
 }
 
@@ -313,10 +369,16 @@ pub struct TenantIndex {
 }
 
 impl TenantIndex {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
     pub fn upsert(&self, tenant: &str, name: &str, rv: u64) {
-        self.by_tenant.lock().unwrap()
-            .entry(tenant.into()).or_default().insert(name.into(), rv);
+        self.by_tenant
+            .lock()
+            .unwrap()
+            .entry(tenant.into())
+            .or_default()
+            .insert(name.into(), rv);
     }
     pub fn delete(&self, tenant: &str, name: &str) {
         if let Some(m) = self.by_tenant.lock().unwrap().get_mut(tenant) {
@@ -324,18 +386,29 @@ impl TenantIndex {
         }
     }
     pub fn list(&self, tenant: &str) -> Vec<(String, u64)> {
-        self.by_tenant.lock().unwrap()
-            .get(tenant).cloned().unwrap_or_default()
-            .into_iter().collect()
+        self.by_tenant
+            .lock()
+            .unwrap()
+            .get(tenant)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .collect()
     }
     pub fn count(&self, tenant: &str) -> usize {
-        self.by_tenant.lock().unwrap()
-            .get(tenant).map(|m| m.len()).unwrap_or(0)
+        self.by_tenant
+            .lock()
+            .unwrap()
+            .get(tenant)
+            .map(|m| m.len())
+            .unwrap_or(0)
     }
 }
 
 #[allow(dead_code)]
-fn unused_arc() -> Arc<()> { Arc::new(()) }
+fn unused_arc() -> Arc<()> {
+    Arc::new(())
+}
 
 #[cfg(test)]
 mod tests;

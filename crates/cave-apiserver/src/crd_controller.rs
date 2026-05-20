@@ -35,12 +35,17 @@ pub struct CustomResourceSubresources {
 }
 
 impl Default for CustomResourceSubresources {
-    fn default() -> Self { Self { status: false, scale: false } }
+    fn default() -> Self {
+        Self {
+            status: false,
+            scale: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CustomResourceDefinitionVersion {
-    pub name: String,            // e.g. "v1alpha1", "v1beta1", "v1"
+    pub name: String, // e.g. "v1alpha1", "v1beta1", "v1"
     pub served: bool,
     pub storage: bool,
     /// Per-version structural schema as opaque JSON. Empty Map for unset.
@@ -55,8 +60,8 @@ pub struct CustomResourceDefinition {
     pub name: String,
     pub group: String,
     pub kind: String,
-    pub plural: String,           // e.g. `widgets`
-    pub scope: String,            // "Namespaced" | "Cluster"
+    pub plural: String, // e.g. `widgets`
+    pub scope: String,  // "Namespaced" | "Cluster"
     pub conversion: ConversionStrategy,
     pub versions: Vec<CustomResourceDefinitionVersion>,
 }
@@ -97,7 +102,9 @@ pub struct CrdRegistry {
 
 impl CrdRegistry {
     pub fn new() -> Self {
-        Self { inner: Mutex::new(HashMap::new()) }
+        Self {
+            inner: Mutex::new(HashMap::new()),
+        }
     }
 
     /// Validate + persist a CRD. Mirrors upstream `establish.Controller.sync`
@@ -139,24 +146,39 @@ impl CrdRegistry {
             kind: crd.kind.clone(),
             plural: crd.plural.clone(),
             storage_version: storage[0].name.clone(),
-            served_versions: crd.versions.iter()
-                .filter(|v| v.served).map(|v| v.name.clone()).collect(),
+            served_versions: crd
+                .versions
+                .iter()
+                .filter(|v| v.served)
+                .map(|v| v.name.clone())
+                .collect(),
         };
         self.inner.lock().unwrap().insert(
-            CrdKey { tenant_id: crd.tenant_id.clone(), name: crd.name.clone() },
+            CrdKey {
+                tenant_id: crd.tenant_id.clone(),
+                name: crd.name.clone(),
+            },
             est.clone(),
         );
         Ok(est)
     }
 
     pub fn lookup(&self, tenant_id: &str, name: &str) -> Option<EstablishedCRD> {
-        self.inner.lock().unwrap()
-            .get(&CrdKey { tenant_id: tenant_id.into(), name: name.into() })
+        self.inner
+            .lock()
+            .unwrap()
+            .get(&CrdKey {
+                tenant_id: tenant_id.into(),
+                name: name.into(),
+            })
             .cloned()
     }
 
     pub fn list_for_tenant(&self, tenant_id: &str) -> Vec<EstablishedCRD> {
-        let mut out: Vec<EstablishedCRD> = self.inner.lock().unwrap()
+        let mut out: Vec<EstablishedCRD> = self
+            .inner
+            .lock()
+            .unwrap()
             .values()
             .filter(|c| c.tenant_id == tenant_id)
             .cloned()
@@ -166,14 +188,21 @@ impl CrdRegistry {
     }
 
     pub fn unregister(&self, tenant_id: &str, name: &str) -> bool {
-        self.inner.lock().unwrap()
-            .remove(&CrdKey { tenant_id: tenant_id.into(), name: name.into() })
+        self.inner
+            .lock()
+            .unwrap()
+            .remove(&CrdKey {
+                tenant_id: tenant_id.into(),
+                name: name.into(),
+            })
             .is_some()
     }
 }
 
 impl Default for CrdRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── AdmissionReview integration (deeper-005) ─────────────────────────────────
@@ -219,10 +248,14 @@ pub struct CrdAdmissionRequest {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WebhookVerdict {
     Allow,
-    Deny { reason: String },
+    Deny {
+        reason: String,
+    },
     /// The webhook call errored out; the chain decides what to do based
     /// on `failure_policy`.
-    Error { reason: String },
+    Error {
+        reason: String,
+    },
 }
 
 pub trait AdmissionWebhookClient: Send + Sync {
@@ -257,7 +290,10 @@ pub struct CrdAdmissionRegistry {
 
 impl CrdAdmissionRegistry {
     pub fn new(crds: CrdRegistry) -> Self {
-        Self { crds, webhooks: Mutex::new(HashMap::new()) }
+        Self {
+            crds,
+            webhooks: Mutex::new(HashMap::new()),
+        }
     }
 
     /// Attach a webhook spec to a previously-established CRD.
@@ -271,7 +307,12 @@ impl CrdAdmissionRegistry {
             return Err(CrdAdmissionError::UnknownCrd);
         }
         let key = (tenant_id.into(), crd_name.into());
-        self.webhooks.lock().unwrap().entry(key).or_default().push(spec);
+        self.webhooks
+            .lock()
+            .unwrap()
+            .entry(key)
+            .or_default()
+            .push(spec);
         Ok(())
     }
 
@@ -288,8 +329,13 @@ impl CrdAdmissionRegistry {
             return Err(CrdAdmissionError::UnknownCrd);
         }
         let key = (req.tenant_id.clone(), req.crd_name.clone());
-        let specs = self.webhooks.lock().unwrap()
-            .get(&key).cloned().unwrap_or_default();
+        let specs = self
+            .webhooks
+            .lock()
+            .unwrap()
+            .get(&key)
+            .cloned()
+            .unwrap_or_default();
         for spec in specs {
             // Dry-run gating per upstream:
             //   * SideEffects::Some  → reject dry-run requests.
@@ -297,10 +343,10 @@ impl CrdAdmissionRegistry {
             //   * NoneOnDryRun and None → allow dry-run.
             if req.dry_run {
                 match spec.side_effects {
-                    SideEffects::Some =>
-                        return Err(CrdAdmissionError::DryRunWithSideEffects),
-                    SideEffects::Unknown =>
-                        return Err(CrdAdmissionError::DryRunUnknownSideEffects),
+                    SideEffects::Some => return Err(CrdAdmissionError::DryRunWithSideEffects),
+                    SideEffects::Unknown => {
+                        return Err(CrdAdmissionError::DryRunUnknownSideEffects)
+                    }
                     _ => {}
                 }
             }
@@ -315,7 +361,8 @@ impl CrdAdmissionRegistry {
                 (WebhookVerdict::Allow, _) => continue,
                 (WebhookVerdict::Deny { reason }, _) => {
                     return Ok(CrdAdmissionOutcome::Deny {
-                        webhook: spec.name, reason,
+                        webhook: spec.name,
+                        reason,
                     });
                 }
                 (WebhookVerdict::Error { reason }, AdmissionFailurePolicy::Ignore) => {
@@ -324,7 +371,8 @@ impl CrdAdmissionRegistry {
                 }
                 (WebhookVerdict::Error { reason }, AdmissionFailurePolicy::Fail) => {
                     return Ok(CrdAdmissionOutcome::Deny {
-                        webhook: spec.name, reason,
+                        webhook: spec.name,
+                        reason,
                     });
                 }
             }
@@ -373,11 +421,15 @@ mod tests {
     fn test_establish_happy_path_picks_storage_version_and_lists_served() {
         let r = CrdRegistry::new();
         let crd = widget_crd("acme");
-        let est = r.establish(crd, /*webhook=*/ false).expect("must establish");
+        let est = r
+            .establish(crd, /*webhook=*/ false)
+            .expect("must establish");
         assert_eq!(est.storage_version, "v1");
         assert_eq!(est.served_versions, vec!["v1".to_string()]);
-        assert_eq!(est.tenant_id, "acme",
-            "tenant_id invariant: established CRD carries owning tenant_id");
+        assert_eq!(
+            est.tenant_id, "acme",
+            "tenant_id invariant: established CRD carries owning tenant_id"
+        );
         // Round-trip through registry.
         let back = r.lookup("acme", "widgets.acme.io").unwrap();
         assert_eq!(back, est);
@@ -390,8 +442,11 @@ mod tests {
         let r = CrdRegistry::new();
         let mut crd = widget_crd("acme");
         crd.versions.push(CustomResourceDefinitionVersion {
-            name: "v1beta1".into(), served: true, storage: true,
-            schema: empty_schema(), subresources: Default::default(),
+            name: "v1beta1".into(),
+            served: true,
+            storage: true,
+            schema: empty_schema(),
+            subresources: Default::default(),
         });
         let err = r.establish(crd, false).expect_err("must reject");
         assert_eq!(err, EstablishError::MultipleStorageVersions);
@@ -399,8 +454,11 @@ mod tests {
         let r2 = CrdRegistry::new();
         let ok = r2.establish(widget_crd("acme"), false);
         assert!(ok.is_ok());
-        assert_eq!(ok.unwrap().tenant_id, "acme",
-            "tenant_id invariant retained on the alternate registry");
+        assert_eq!(
+            ok.unwrap().tenant_id,
+            "acme",
+            "tenant_id invariant retained on the alternate registry"
+        );
     }
 
     /// Upstream parity: `TestCRD_NoStorageVersionRejected`
@@ -413,8 +471,10 @@ mod tests {
         let err = r.establish(crd, false).expect_err("must reject");
         assert_eq!(err, EstablishError::NoStorageVersion);
         // tenant_id invariant: nothing was inserted under acme.
-        assert!(r.list_for_tenant("acme").is_empty(),
-            "tenant_id invariant: failed establish leaves acme list empty");
+        assert!(
+            r.list_for_tenant("acme").is_empty(),
+            "tenant_id invariant: failed establish leaves acme list empty"
+        );
     }
 
     /// Upstream parity: `TestCRD_WebhookConversionRequiresEndpoint`
@@ -425,12 +485,18 @@ mod tests {
         let r = CrdRegistry::new();
         let mut crd = widget_crd("acme");
         crd.conversion = ConversionStrategy::Webhook;
-        let err = r.establish(crd.clone(), /*webhook=*/ false).expect_err("must reject");
+        let err = r
+            .establish(crd.clone(), /*webhook=*/ false)
+            .expect_err("must reject");
         assert_eq!(err, EstablishError::WebhookConversionWithoutEndpoint);
         // With endpoint provided, the same CRD establishes.
-        let est = r.establish(crd, /*webhook=*/ true).expect("must establish with endpoint");
-        assert_eq!(est.tenant_id, "acme",
-            "tenant_id invariant: established CRD remains under acme");
+        let est = r
+            .establish(crd, /*webhook=*/ true)
+            .expect("must establish with endpoint");
+        assert_eq!(
+            est.tenant_id, "acme",
+            "tenant_id invariant: established CRD remains under acme"
+        );
     }
 
     /// Upstream parity: `TestCRD_NoneStrategyAcceptsIdenticalSchemas`
@@ -442,15 +508,21 @@ mod tests {
         let r = CrdRegistry::new();
         let mut crd = widget_crd("acme");
         crd.versions.push(CustomResourceDefinitionVersion {
-            name: "v1beta1".into(), served: true, storage: false,
+            name: "v1beta1".into(),
+            served: true,
+            storage: false,
             schema: schema_with("changedField"),
             subresources: Default::default(),
         });
-        let err = r.establish(crd, false).expect_err("must reject divergent schemas");
+        let err = r
+            .establish(crd, false)
+            .expect_err("must reject divergent schemas");
         assert_eq!(err, EstablishError::NoneStrategyWithDivergentSchemas);
         // tenant_id invariant: no establishment side-effect.
-        assert!(r.lookup("acme", "widgets.acme.io").is_none(),
-            "tenant_id invariant: no acme entry persisted on rejection");
+        assert!(
+            r.lookup("acme", "widgets.acme.io").is_none(),
+            "tenant_id invariant: no acme entry persisted on rejection"
+        );
     }
 
     /// Upstream parity: `TestCRD_TenantIsolatedRegistration`
@@ -468,14 +540,20 @@ mod tests {
         let globex_list = r.list_for_tenant("globex");
         assert_eq!(acme_list.len(), 1);
         assert_eq!(globex_list.len(), 1);
-        assert!(acme_list.iter().all(|c| c.tenant_id == "acme"),
-            "tenant_id invariant: acme list scoped to acme");
-        assert!(globex_list.iter().all(|c| c.tenant_id == "globex"),
-            "tenant_id invariant: globex list scoped to globex");
+        assert!(
+            acme_list.iter().all(|c| c.tenant_id == "acme"),
+            "tenant_id invariant: acme list scoped to acme"
+        );
+        assert!(
+            globex_list.iter().all(|c| c.tenant_id == "globex"),
+            "tenant_id invariant: globex list scoped to globex"
+        );
         // Unregistering acme MUST NOT affect globex.
         assert!(r.unregister("acme", "widgets.acme.io"));
-        assert!(r.lookup("globex", "widgets.acme.io").is_some(),
-            "tenant_id invariant: globex's CRD survives acme unregister");
+        assert!(
+            r.lookup("globex", "widgets.acme.io").is_some(),
+            "tenant_id invariant: globex's CRD survives acme unregister"
+        );
     }
 
     /// Upstream parity: `TestCRD_SubresourcesPropagatedToEstablishedCRD`
@@ -485,7 +563,10 @@ mod tests {
     fn test_subresources_status_and_scale_round_trip() {
         let r = CrdRegistry::new();
         let mut crd = widget_crd("acme");
-        crd.versions[0].subresources = CustomResourceSubresources { status: true, scale: true };
+        crd.versions[0].subresources = CustomResourceSubresources {
+            status: true,
+            scale: true,
+        };
         let est = r.establish(crd.clone(), false).unwrap();
         assert_eq!(est.storage_version, "v1");
         // tenant_id invariant retained.
@@ -493,17 +574,24 @@ mod tests {
         // Smoke: an alternate scale=false variant under a different tenant
         // is independent.
         let mut crd2 = widget_crd("globex");
-        crd2.versions[0].subresources = CustomResourceSubresources { status: true, scale: false };
+        crd2.versions[0].subresources = CustomResourceSubresources {
+            status: true,
+            scale: false,
+        };
         let est2 = r.establish(crd2, false).unwrap();
-        assert_eq!(est2.tenant_id, "globex",
-            "tenant_id invariant: globex CRD distinct from acme");
+        assert_eq!(
+            est2.tenant_id, "globex",
+            "tenant_id invariant: globex CRD distinct from acme"
+        );
     }
 
     // ── AdmissionReview integration (deeper-005) ─────────────────────────────
 
     struct AllowWebhook(String);
     impl AdmissionWebhookClient for AllowWebhook {
-        fn name(&self) -> &str { &self.0 }
+        fn name(&self) -> &str {
+            &self.0
+        }
         fn review(&self, _req: &CrdAdmissionRequest) -> WebhookVerdict {
             WebhookVerdict::Allow
         }
@@ -511,17 +599,25 @@ mod tests {
 
     struct DenyWebhook(String, &'static str);
     impl AdmissionWebhookClient for DenyWebhook {
-        fn name(&self) -> &str { &self.0 }
+        fn name(&self) -> &str {
+            &self.0
+        }
         fn review(&self, _req: &CrdAdmissionRequest) -> WebhookVerdict {
-            WebhookVerdict::Deny { reason: self.1.into() }
+            WebhookVerdict::Deny {
+                reason: self.1.into(),
+            }
         }
     }
 
     struct ErrorWebhook(String, &'static str);
     impl AdmissionWebhookClient for ErrorWebhook {
-        fn name(&self) -> &str { &self.0 }
+        fn name(&self) -> &str {
+            &self.0
+        }
         fn review(&self, _req: &CrdAdmissionRequest) -> WebhookVerdict {
-            WebhookVerdict::Error { reason: self.1.into() }
+            WebhookVerdict::Error {
+                reason: self.1.into(),
+            }
         }
     }
 
@@ -556,10 +652,18 @@ mod tests {
     #[test]
     fn test_admission_all_webhooks_allow_admits_the_request() {
         let r = ar();
-        r.attach_webhook("acme", "widgets.acme.io",
-            spec("w1", AdmissionFailurePolicy::Fail, SideEffects::None)).unwrap();
-        r.attach_webhook("acme", "widgets.acme.io",
-            spec("w2", AdmissionFailurePolicy::Fail, SideEffects::None)).unwrap();
+        r.attach_webhook(
+            "acme",
+            "widgets.acme.io",
+            spec("w1", AdmissionFailurePolicy::Fail, SideEffects::None),
+        )
+        .unwrap();
+        r.attach_webhook(
+            "acme",
+            "widgets.acme.io",
+            spec("w2", AdmissionFailurePolicy::Fail, SideEffects::None),
+        )
+        .unwrap();
         let w1 = AllowWebhook("w1".into());
         let w2 = AllowWebhook("w2".into());
         let out = r.dispatch(&req("acme", false), &[&w1, &w2]).unwrap();
@@ -572,16 +676,42 @@ mod tests {
     #[test]
     fn test_admission_first_deny_short_circuits_chain() {
         let r = ar();
-        r.attach_webhook("acme", "widgets.acme.io",
-            spec("allow-first", AdmissionFailurePolicy::Fail, SideEffects::None)).unwrap();
-        r.attach_webhook("acme", "widgets.acme.io",
-            spec("strict-deny", AdmissionFailurePolicy::Fail, SideEffects::None)).unwrap();
-        r.attach_webhook("acme", "widgets.acme.io",
-            spec("never-runs", AdmissionFailurePolicy::Fail, SideEffects::None)).unwrap();
+        r.attach_webhook(
+            "acme",
+            "widgets.acme.io",
+            spec(
+                "allow-first",
+                AdmissionFailurePolicy::Fail,
+                SideEffects::None,
+            ),
+        )
+        .unwrap();
+        r.attach_webhook(
+            "acme",
+            "widgets.acme.io",
+            spec(
+                "strict-deny",
+                AdmissionFailurePolicy::Fail,
+                SideEffects::None,
+            ),
+        )
+        .unwrap();
+        r.attach_webhook(
+            "acme",
+            "widgets.acme.io",
+            spec(
+                "never-runs",
+                AdmissionFailurePolicy::Fail,
+                SideEffects::None,
+            ),
+        )
+        .unwrap();
         let allow = AllowWebhook("allow-first".into());
-        let deny  = DenyWebhook("strict-deny".into(), "schema invalid");
-        let last  = AllowWebhook("never-runs".into());
-        let out = r.dispatch(&req("acme", false), &[&allow, &deny, &last]).unwrap();
+        let deny = DenyWebhook("strict-deny".into(), "schema invalid");
+        let last = AllowWebhook("never-runs".into());
+        let out = r
+            .dispatch(&req("acme", false), &[&allow, &deny, &last])
+            .unwrap();
         match out {
             CrdAdmissionOutcome::Deny { webhook, reason } => {
                 assert_eq!(webhook, "strict-deny");
@@ -596,15 +726,32 @@ mod tests {
     #[test]
     fn test_admission_failure_policy_ignore_swallows_webhook_errors() {
         let r = ar();
-        r.attach_webhook("acme", "widgets.acme.io",
-            spec("flaky", AdmissionFailurePolicy::Ignore, SideEffects::None)).unwrap();
-        r.attach_webhook("acme", "widgets.acme.io",
-            spec("downstream", AdmissionFailurePolicy::Fail, SideEffects::None)).unwrap();
+        r.attach_webhook(
+            "acme",
+            "widgets.acme.io",
+            spec("flaky", AdmissionFailurePolicy::Ignore, SideEffects::None),
+        )
+        .unwrap();
+        r.attach_webhook(
+            "acme",
+            "widgets.acme.io",
+            spec(
+                "downstream",
+                AdmissionFailurePolicy::Fail,
+                SideEffects::None,
+            ),
+        )
+        .unwrap();
         let flaky = ErrorWebhook("flaky".into(), "503 transient");
         let downstream = AllowWebhook("downstream".into());
-        let out = r.dispatch(&req("acme", false), &[&flaky, &downstream]).unwrap();
-        assert_eq!(out, CrdAdmissionOutcome::Allow,
-            "failure_policy=Ignore lets the chain progress past the error");
+        let out = r
+            .dispatch(&req("acme", false), &[&flaky, &downstream])
+            .unwrap();
+        assert_eq!(
+            out,
+            CrdAdmissionOutcome::Allow,
+            "failure_policy=Ignore lets the chain progress past the error"
+        );
     }
 
     /// Upstream parity: `TestCRD_AdmissionFailurePolicyFail`
@@ -612,8 +759,12 @@ mod tests {
     #[test]
     fn test_admission_failure_policy_fail_treats_error_as_deny() {
         let r = ar();
-        r.attach_webhook("acme", "widgets.acme.io",
-            spec("strict", AdmissionFailurePolicy::Fail, SideEffects::None)).unwrap();
+        r.attach_webhook(
+            "acme",
+            "widgets.acme.io",
+            spec("strict", AdmissionFailurePolicy::Fail, SideEffects::None),
+        )
+        .unwrap();
         let strict = ErrorWebhook("strict".into(), "TLS handshake failed");
         let out = r.dispatch(&req("acme", false), &[&strict]).unwrap();
         match out {
@@ -631,15 +782,27 @@ mod tests {
     #[test]
     fn test_admission_dry_run_rejects_webhooks_with_side_effects() {
         let r = ar();
-        r.attach_webhook("acme", "widgets.acme.io",
-            spec("w-some", AdmissionFailurePolicy::Fail, SideEffects::Some)).unwrap();
+        r.attach_webhook(
+            "acme",
+            "widgets.acme.io",
+            spec("w-some", AdmissionFailurePolicy::Fail, SideEffects::Some),
+        )
+        .unwrap();
         let w = AllowWebhook("w-some".into());
         let err = r.dispatch(&req("acme", true), &[&w]).unwrap_err();
         assert_eq!(err, CrdAdmissionError::DryRunWithSideEffects);
         // Unknown side effects also reject under dry-run.
         let r2 = ar();
-        r2.attach_webhook("acme", "widgets.acme.io",
-            spec("w-unknown", AdmissionFailurePolicy::Fail, SideEffects::Unknown)).unwrap();
+        r2.attach_webhook(
+            "acme",
+            "widgets.acme.io",
+            spec(
+                "w-unknown",
+                AdmissionFailurePolicy::Fail,
+                SideEffects::Unknown,
+            ),
+        )
+        .unwrap();
         let err2 = r2.dispatch(&req("acme", true), &[&w]).unwrap_err();
         assert_eq!(err2, CrdAdmissionError::DryRunUnknownSideEffects);
     }
@@ -650,14 +813,21 @@ mod tests {
     #[test]
     fn test_admission_does_not_cross_tenant_boundaries() {
         let r = ar();
-        r.attach_webhook("acme", "widgets.acme.io",
-            spec("strict", AdmissionFailurePolicy::Fail, SideEffects::None)).unwrap();
+        r.attach_webhook(
+            "acme",
+            "widgets.acme.io",
+            spec("strict", AdmissionFailurePolicy::Fail, SideEffects::None),
+        )
+        .unwrap();
         let strict = DenyWebhook("strict".into(), "acme rule");
         // globex tries to admit a CR under the same name — but acme is
         // the only tenant with this CRD established here, so globex's
         // request fails with UnknownCrd (it never reaches acme's webhook).
         let err = r.dispatch(&req("globex", false), &[&strict]).unwrap_err();
-        assert_eq!(err, CrdAdmissionError::UnknownCrd,
-            "tenant_id invariant: globex's request never sees acme's CRD/webhook");
+        assert_eq!(
+            err,
+            CrdAdmissionError::UnknownCrd,
+            "tenant_id invariant: globex's request never sees acme's CRD/webhook"
+        );
     }
 }

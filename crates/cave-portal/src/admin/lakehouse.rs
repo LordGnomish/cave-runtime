@@ -10,7 +10,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, LakehouseSnapshot, LakehouseTable};
+use crate::admin::state::{AdminState, LakehouseSnapshot, LakehouseTable, scope};
 use crate::admin::types::Cite;
 use std::collections::BTreeMap;
 
@@ -31,10 +31,14 @@ pub fn list_tables(
     ctx: &RequestCtx,
 ) -> Result<Vec<LakehouseTable>, LakehouseViewError> {
     ctx.authorise(Permission::LakehouseRead)?;
-    Ok(scope(&state.lakehouse_tables.read().unwrap(), &ctx.tenant, |r| &r.tenant)
+    Ok(
+        scope(&state.lakehouse_tables.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
         .into_iter()
         .cloned()
-        .collect())
+        .collect(),
+    )
 }
 
 pub fn list_snapshots(
@@ -97,24 +101,29 @@ pub fn append_snapshot(
     };
     {
         let tables = state.lakehouse_tables.read().unwrap();
-        if !tables.iter().any(|t| {
-            t.tenant == ctx.tenant && t.namespace == namespace && t.name == table
-        }) {
+        if !tables
+            .iter()
+            .any(|t| t.tenant == ctx.tenant && t.namespace == namespace && t.name == table)
+        {
             return Err(LakehouseViewError::TableNotFound(
                 namespace.into(),
                 table.into(),
             ));
         }
     }
-    state.lakehouse_snapshots.write().unwrap().push(LakehouseSnapshot {
-        tenant: ctx.tenant.clone(),
-        namespace: namespace.into(),
-        table: table.into(),
-        snapshot_id,
-        committed_unix,
-        op: normalised,
-        added_files,
-    });
+    state
+        .lakehouse_snapshots
+        .write()
+        .unwrap()
+        .push(LakehouseSnapshot {
+            tenant: ctx.tenant.clone(),
+            namespace: namespace.into(),
+            table: table.into(),
+            snapshot_id,
+            committed_unix,
+            op: normalised,
+            added_files,
+        });
     if let Some(t) = state
         .lakehouse_tables
         .write()
@@ -147,9 +156,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LakehouseV
         .collect();
     let n_rows: Vec<Vec<String>> = totals
         .iter()
-        .map(|(ns, (files, size))| {
-            vec![ns.clone(), files.to_string(), format!("{} B", size)]
-        })
+        .map(|(ns, (files, size))| vec![ns.clone(), files.to_string(), format!("{} B", size)])
         .collect();
     let body = format!(
         r#"<section><h2 class="text-lg font-semibold mb-2">Tables ({n_t})</h2>{t_tbl}</section>
@@ -157,7 +164,15 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LakehouseV
         n_t = tables.len(),
         n_n = totals.len(),
         t_tbl = table(
-            &["namespace", "table", "fmt", "partitions", "files", "size", "snapshot"],
+            &[
+                "namespace",
+                "table",
+                "fmt",
+                "partitions",
+                "files",
+                "size",
+                "snapshot"
+            ],
             &t_rows,
         ),
         n_tbl = table(&["namespace", "files", "size"], &n_rows),
@@ -207,8 +222,13 @@ mod tests {
             "acme"
         );
         let s = AdminState::seeded();
-        let snaps = list_snapshots(&s, &ctx(&[Permission::LakehouseRead]), "warehouse", "orders")
-            .unwrap();
+        let snaps = list_snapshots(
+            &s,
+            &ctx(&[Permission::LakehouseRead]),
+            "warehouse",
+            "orders",
+        )
+        .unwrap();
         assert_eq!(snaps.len(), 2);
         assert!(snaps[0].committed_unix > snaps[1].committed_unix);
         assert_eq!(snaps[0].snapshot_id, 1001);
@@ -222,8 +242,8 @@ mod tests {
             "acme"
         );
         let s = AdminState::seeded();
-        let snaps = list_snapshots(&s, &ctx(&[Permission::LakehouseRead]), "secrets", "tokens")
-            .unwrap();
+        let snaps =
+            list_snapshots(&s, &ctx(&[Permission::LakehouseRead]), "secrets", "tokens").unwrap();
         assert!(snaps.is_empty());
     }
 
@@ -274,8 +294,7 @@ mod tests {
         );
         let s = AdminState::seeded();
         let c = ctx(&[Permission::LakehouseRead, Permission::LakehouseSnapshot]);
-        append_snapshot(&s, &c, "warehouse", "orders", 1010, 1_003_000, "Append", 8)
-            .unwrap();
+        append_snapshot(&s, &c, "warehouse", "orders", 1010, 1_003_000, "Append", 8).unwrap();
         let tables = list_tables(&s, &c).unwrap();
         let orders = tables.iter().find(|t| t.name == "orders").unwrap();
         assert_eq!(orders.current_snapshot_id, 1010);

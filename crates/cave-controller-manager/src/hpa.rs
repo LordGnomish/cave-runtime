@@ -134,12 +134,18 @@ pub fn apply_behavior(
     if desired == current {
         return Ok(desired);
     }
-    let dir = if desired > current { ScaleDirection::Up } else { ScaleDirection::Down };
+    let dir = if desired > current {
+        ScaleDirection::Up
+    } else {
+        ScaleDirection::Down
+    };
     let rules = match dir {
-        ScaleDirection::Up   => behavior.scale_up.as_ref(),
+        ScaleDirection::Up => behavior.scale_up.as_ref(),
         ScaleDirection::Down => behavior.scale_down.as_ref(),
     };
-    let Some(rules) = rules else { return Ok(desired); };
+    let Some(rules) = rules else {
+        return Ok(desired);
+    };
     if rules.select == SelectPolicy::Disabled {
         // Direction explicitly disabled — pin at current.
         return Ok(current);
@@ -147,7 +153,9 @@ pub fn apply_behavior(
     if rules.policies.is_empty() {
         return Ok(desired);
     }
-    let caps: Vec<u32> = rules.policies.iter()
+    let caps: Vec<u32> = rules
+        .policies
+        .iter()
         .map(|p| cap_for_policy(p, current))
         .collect();
     let chosen_cap = match rules.select {
@@ -156,7 +164,7 @@ pub fn apply_behavior(
         SelectPolicy::Disabled => return Ok(current),
     };
     let bounded = match dir {
-        ScaleDirection::Up   => current.saturating_add(chosen_cap).min(desired),
+        ScaleDirection::Up => current.saturating_add(chosen_cap).min(desired),
         ScaleDirection::Down => {
             let floor = current.saturating_sub(chosen_cap);
             floor.max(desired)
@@ -166,7 +174,10 @@ pub fn apply_behavior(
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::new("pkg/controller/podautoscaler/horizontal.go", "HorizontalController");
+const FILE_CITE: Cite = Cite::new(
+    "pkg/controller/podautoscaler/horizontal.go",
+    "HorizontalController",
+);
 
 #[cfg(test)]
 mod tests {
@@ -191,7 +202,10 @@ mod tests {
             "tenant-hpa-scale-up"
         );
         let s = hpa(1, 10, 50);
-        let st = HpaStatus { current_replicas: 4, current_cpu_utilization_pct: 100 };
+        let st = HpaStatus {
+            current_replicas: 4,
+            current_cpu_utilization_pct: 100,
+        };
         // desired = ceil(4 * 100 / 50) = 8
         assert_eq!(desired_replicas(&s, &st).unwrap(), 8);
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::Update(8));
@@ -205,7 +219,10 @@ mod tests {
             "tenant-hpa-scale-down"
         );
         let s = hpa(1, 10, 80);
-        let st = HpaStatus { current_replicas: 8, current_cpu_utilization_pct: 20 };
+        let st = HpaStatus {
+            current_replicas: 8,
+            current_cpu_utilization_pct: 20,
+        };
         // desired = ceil(8 * 20 / 80) = 2
         assert_eq!(desired_replicas(&s, &st).unwrap(), 2);
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::Update(2));
@@ -220,7 +237,10 @@ mod tests {
         );
         let _ = tenant;
         let s = hpa(1, 5, 50);
-        let st = HpaStatus { current_replicas: 5, current_cpu_utilization_pct: 200 };
+        let st = HpaStatus {
+            current_replicas: 5,
+            current_cpu_utilization_pct: 200,
+        };
         assert_eq!(desired_replicas(&s, &st).unwrap(), 5);
     }
 
@@ -233,7 +253,10 @@ mod tests {
         );
         let _ = tenant;
         let s = hpa(1, 5, 0);
-        let st = HpaStatus { current_replicas: 1, current_cpu_utilization_pct: 50 };
+        let st = HpaStatus {
+            current_replicas: 1,
+            current_cpu_utilization_pct: 50,
+        };
         assert!(desired_replicas(&s, &st).is_err());
     }
 
@@ -253,7 +276,10 @@ mod tests {
         let b = HpaBehavior {
             scale_up: Some(ScalingRules {
                 select: SelectPolicy::Min,
-                policies: vec![ScalingPolicy::Pods { value: 2, period_sec: 60 }],
+                policies: vec![ScalingPolicy::Pods {
+                    value: 2,
+                    period_sec: 60,
+                }],
                 stabilization_window_sec: 0,
             }),
             scale_down: None,
@@ -277,7 +303,10 @@ mod tests {
             scale_up: None,
             scale_down: Some(ScalingRules {
                 select: SelectPolicy::Min,
-                policies: vec![ScalingPolicy::Percent { value: 25, period_sec: 60 }],
+                policies: vec![ScalingPolicy::Percent {
+                    value: 25,
+                    period_sec: 60,
+                }],
                 stabilization_window_sec: 0,
             }),
         };
@@ -299,8 +328,14 @@ mod tests {
             scale_up: Some(ScalingRules {
                 select: SelectPolicy::Min,
                 policies: vec![
-                    ScalingPolicy::Pods { value: 5, period_sec: 60 },
-                    ScalingPolicy::Percent { value: 100, period_sec: 60 }, // 100% of 4 = 4
+                    ScalingPolicy::Pods {
+                        value: 5,
+                        period_sec: 60,
+                    },
+                    ScalingPolicy::Percent {
+                        value: 100,
+                        period_sec: 60,
+                    }, // 100% of 4 = 4
                 ],
                 stabilization_window_sec: 0,
             }),

@@ -489,7 +489,9 @@ impl RequestCtx {
             });
         }
         if !self.permissions.contains(&required) {
-            return Err(AuthError::MissingPermission { missing: required.name() });
+            return Err(AuthError::MissingPermission {
+                missing: required.name(),
+            });
         }
         Ok(())
     }
@@ -580,7 +582,12 @@ mod tests {
         );
         let ctx = RequestCtx::developer("tenant-perm-missing", &[Permission::EtcdRead]);
         let err = ctx.authorise(Permission::EtcdWatch).unwrap_err();
-        assert_eq!(err, AuthError::MissingPermission { missing: "etcd.kv.watch" });
+        assert_eq!(
+            err,
+            AuthError::MissingPermission {
+                missing: "etcd.kv.watch"
+            }
+        );
     }
 
     #[test]
@@ -592,9 +599,17 @@ mod tests {
         );
         let ctx = RequestCtx::developer(
             "tenant-perm-ok",
-            &[Permission::EtcdRead, Permission::EtcdWatch, Permission::CriRead],
+            &[
+                Permission::EtcdRead,
+                Permission::EtcdWatch,
+                Permission::CriRead,
+            ],
         );
-        for p in [Permission::EtcdRead, Permission::EtcdWatch, Permission::CriRead] {
+        for p in [
+            Permission::EtcdRead,
+            Permission::EtcdWatch,
+            Permission::CriRead,
+        ] {
             assert!(ctx.authorise(p).is_ok());
         }
     }
@@ -607,10 +622,7 @@ mod tests {
             Persona::from_roles(&["platform_admin"]),
             Persona::PlatformAdmin
         );
-        assert_eq!(
-            Persona::from_roles(&["tenant_admin"]),
-            Persona::TenantAdmin
-        );
+        assert_eq!(Persona::from_roles(&["tenant_admin"]), Persona::TenantAdmin);
         assert_eq!(Persona::from_roles::<&str>(&[]), Persona::Anonymous);
         assert_eq!(Persona::from_roles(&["unknown"]), Persona::Anonymous);
         // Multiple roles: platform wins over tenant.

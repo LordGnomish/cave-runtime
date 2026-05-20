@@ -29,9 +29,18 @@ fn outbox_routing_topic_key_and_headers() {
     assert_eq!(routed.topic, format!("outbox.{}.Order", TENANT));
     assert_eq!(routed.key, "order-7");
     assert_eq!(routed.headers.get("id").map(|s| s.as_str()), Some("evt-1"));
-    assert_eq!(routed.headers.get("eventType").map(|s| s.as_str()), Some("OrderCreated"));
-    assert_eq!(routed.headers.get("tenant_id").map(|s| s.as_str()), Some(TENANT));
-    assert_eq!(routed.value, serde_json::json!({ "amount_usd_cents": 9999 }));
+    assert_eq!(
+        routed.headers.get("eventType").map(|s| s.as_str()),
+        Some("OrderCreated")
+    );
+    assert_eq!(
+        routed.headers.get("tenant_id").map(|s| s.as_str()),
+        Some(TENANT)
+    );
+    assert_eq!(
+        routed.value,
+        serde_json::json!({ "amount_usd_cents": 9999 })
+    );
 }
 
 /// Cite: debezium `OutboxEventRouter::apply` — duplicate `id`
@@ -69,10 +78,22 @@ fn cross_tenant_outbox_entry_is_rejected() {
 fn outbox_entry_required_fields_are_enforced() {
     let mut r = OutboxEventRouter::new(TENANT, "outbox");
     for missing in [
-        OutboxEntry { id: "".into(), ..entry("x", "Order", "o-1") },
-        OutboxEntry { aggregate_type: "".into(), ..entry("evt", "Order", "o-1") },
-        OutboxEntry { aggregate_id: "".into(), ..entry("evt", "Order", "o-1") },
-        OutboxEntry { tenant_id: "".into(), ..entry("evt", "Order", "o-1") },
+        OutboxEntry {
+            id: "".into(),
+            ..entry("x", "Order", "o-1")
+        },
+        OutboxEntry {
+            aggregate_type: "".into(),
+            ..entry("evt", "Order", "o-1")
+        },
+        OutboxEntry {
+            aggregate_id: "".into(),
+            ..entry("evt", "Order", "o-1")
+        },
+        OutboxEntry {
+            tenant_id: "".into(),
+            ..entry("evt", "Order", "o-1")
+        },
     ] {
         assert!(r.route(&missing).is_err());
     }
@@ -86,8 +107,8 @@ fn multi_aggregate_routing_yields_distinct_topics() {
     let order_route = r.route(&entry("e-1", "Order", "o-1")).unwrap();
     let payment_route = r.route(&entry("e-2", "Payment", "p-1")).unwrap();
     let refund_route = r.route(&entry("e-3", "Refund", "r-1")).unwrap();
-    assert_eq!(order_route.topic,   format!("outbox.{}.Order", TENANT));
+    assert_eq!(order_route.topic, format!("outbox.{}.Order", TENANT));
     assert_eq!(payment_route.topic, format!("outbox.{}.Payment", TENANT));
-    assert_eq!(refund_route.topic,  format!("outbox.{}.Refund", TENANT));
+    assert_eq!(refund_route.topic, format!("outbox.{}.Refund", TENANT));
     assert_eq!(r.dedupe_size(), 3);
 }

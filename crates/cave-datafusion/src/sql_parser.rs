@@ -114,10 +114,7 @@ fn tokenize(s: &str) -> Result<Vec<Token>> {
             let next = bytes.get(i + 1).map(|b| *b as char);
             let two = matches!(
                 (c, next),
-                ('<', Some('='))
-                    | ('>', Some('='))
-                    | ('<', Some('>'))
-                    | ('!', Some('='))
+                ('<', Some('=')) | ('>', Some('=')) | ('<', Some('>')) | ('!', Some('='))
             );
             if two {
                 let op: String = format!("{}{}", c, next.unwrap());
@@ -171,7 +168,11 @@ impl Parser {
         if self.matches_ident(want) {
             Ok(())
         } else {
-            Err(Error::SqlParse(format!("expected {:?}, got {:?}", want, self.peek())))
+            Err(Error::SqlParse(format!(
+                "expected {:?}, got {:?}",
+                want,
+                self.peek()
+            )))
         }
     }
 
@@ -222,15 +223,20 @@ impl Parser {
         }
         if self.matches_ident("LIMIT") {
             if let Token::Number(n) = self.eat() {
-                stmt.limit = Some(n.parse().map_err(|_| Error::SqlParse(format!("LIMIT: {}", n)))?);
+                stmt.limit = Some(
+                    n.parse()
+                        .map_err(|_| Error::SqlParse(format!("LIMIT: {}", n)))?,
+                );
             } else {
                 return Err(Error::SqlParse("expected number after LIMIT".into()));
             }
         }
         if self.matches_ident("OFFSET") {
             if let Token::Number(n) = self.eat() {
-                stmt.offset =
-                    Some(n.parse().map_err(|_| Error::SqlParse(format!("OFFSET: {}", n)))?);
+                stmt.offset = Some(
+                    n.parse()
+                        .map_err(|_| Error::SqlParse(format!("OFFSET: {}", n)))?,
+                );
             } else {
                 return Err(Error::SqlParse("expected number after OFFSET".into()));
             }
@@ -308,7 +314,9 @@ impl Parser {
                     Err(Error::SqlParse(format!("bad number: {}", s)))
                 }
             }
-            Token::QuotedString(s) => Ok(LogicalExpr::Literal { value: Value::Utf8(s) }),
+            Token::QuotedString(s) => Ok(LogicalExpr::Literal {
+                value: Value::Utf8(s),
+            }),
             Token::Lparen => {
                 let e = self.parse_expr(0)?;
                 if !matches!(self.peek(), Token::Rparen) {
@@ -390,8 +398,14 @@ mod tests {
         // a OR b AND c => a OR (b AND c)
         let s = parse_sql("SELECT 1 FROM t WHERE a OR b AND c").unwrap();
         match s.where_clause.unwrap() {
-            LogicalExpr::BinaryOp { op: BinaryOp::Or, right, .. } => match *right {
-                LogicalExpr::BinaryOp { op: BinaryOp::And, .. } => {}
+            LogicalExpr::BinaryOp {
+                op: BinaryOp::Or,
+                right,
+                ..
+            } => match *right {
+                LogicalExpr::BinaryOp {
+                    op: BinaryOp::And, ..
+                } => {}
                 _ => panic!("expected AND inside OR"),
             },
             _ => panic!("expected OR top"),
@@ -409,7 +423,10 @@ mod tests {
         let s = parse_sql("SELECT a FROM t WHERE name = 'Alice'").unwrap();
         let where_e = s.where_clause.unwrap();
         if let LogicalExpr::BinaryOp { right, .. } = where_e {
-            if let LogicalExpr::Literal { value: Value::Utf8(s) } = *right {
+            if let LogicalExpr::Literal {
+                value: Value::Utf8(s),
+            } = *right
+            {
                 assert_eq!(s, "Alice");
                 return;
             }

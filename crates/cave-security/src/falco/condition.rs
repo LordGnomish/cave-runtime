@@ -43,9 +43,18 @@ pub fn tokenize(input: &str) -> Vec<Token> {
     while pos < chars.len() {
         match chars[pos] {
             ' ' | '\t' | '\n' | '\r' => pos += 1,
-            '(' => { tokens.push(Token::LParen); pos += 1; }
-            ')' => { tokens.push(Token::RParen); pos += 1; }
-            ',' => { tokens.push(Token::Comma); pos += 1; }
+            '(' => {
+                tokens.push(Token::LParen);
+                pos += 1;
+            }
+            ')' => {
+                tokens.push(Token::RParen);
+                pos += 1;
+            }
+            ',' => {
+                tokens.push(Token::Comma);
+                pos += 1;
+            }
             '\'' | '"' => {
                 let q = chars[pos];
                 pos += 1;
@@ -54,17 +63,24 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                     if chars[pos] == '\\' && pos + 1 < chars.len() {
                         pos += 1;
                         s.push(match chars[pos] {
-                            'n' => '\n', 't' => '\t', c => c,
+                            'n' => '\n',
+                            't' => '\t',
+                            c => c,
                         });
                     } else {
                         s.push(chars[pos]);
                     }
                     pos += 1;
                 }
-                if pos < chars.len() { pos += 1; } // closing quote
+                if pos < chars.len() {
+                    pos += 1;
+                } // closing quote
                 tokens.push(Token::StringLit(s));
             }
-            '=' => { tokens.push(Token::Eq); pos += 1; }
+            '=' => {
+                tokens.push(Token::Eq);
+                pos += 1;
+            }
             '!' => {
                 pos += 1;
                 if pos < chars.len() && chars[pos] == '=' {
@@ -273,32 +289,56 @@ impl Parser {
                 Some(Token::Eq) => {
                     self.advance();
                     let val = self.parse_rhs_value();
-                    return Expr::Compare { field: w, op: CompareOp::Eq, value: val };
+                    return Expr::Compare {
+                        field: w,
+                        op: CompareOp::Eq,
+                        value: val,
+                    };
                 }
                 Some(Token::Neq) => {
                     self.advance();
                     let val = self.parse_rhs_value();
-                    return Expr::Compare { field: w, op: CompareOp::Neq, value: val };
+                    return Expr::Compare {
+                        field: w,
+                        op: CompareOp::Neq,
+                        value: val,
+                    };
                 }
                 Some(Token::Lt) => {
                     self.advance();
                     let val = self.parse_rhs_value();
-                    return Expr::Compare { field: w, op: CompareOp::Lt, value: val };
+                    return Expr::Compare {
+                        field: w,
+                        op: CompareOp::Lt,
+                        value: val,
+                    };
                 }
                 Some(Token::Gt) => {
                     self.advance();
                     let val = self.parse_rhs_value();
-                    return Expr::Compare { field: w, op: CompareOp::Gt, value: val };
+                    return Expr::Compare {
+                        field: w,
+                        op: CompareOp::Gt,
+                        value: val,
+                    };
                 }
                 Some(Token::Lte) => {
                     self.advance();
                     let val = self.parse_rhs_value();
-                    return Expr::Compare { field: w, op: CompareOp::Lte, value: val };
+                    return Expr::Compare {
+                        field: w,
+                        op: CompareOp::Lte,
+                        value: val,
+                    };
                 }
                 Some(Token::Gte) => {
                     self.advance();
                     let val = self.parse_rhs_value();
-                    return Expr::Compare { field: w, op: CompareOp::Gte, value: val };
+                    return Expr::Compare {
+                        field: w,
+                        op: CompareOp::Gte,
+                        value: val,
+                    };
                 }
                 Some(Token::Word(op_word)) => {
                     let op_word = op_word.clone();
@@ -306,32 +346,56 @@ impl Parser {
                         "contains" => {
                             self.advance();
                             let val = self.parse_rhs_value();
-                            return Expr::Compare { field: w, op: CompareOp::Contains, value: val };
+                            return Expr::Compare {
+                                field: w,
+                                op: CompareOp::Contains,
+                                value: val,
+                            };
                         }
                         "icontains" => {
                             self.advance();
                             let val = self.parse_rhs_value();
-                            return Expr::Compare { field: w, op: CompareOp::Icontains, value: val };
+                            return Expr::Compare {
+                                field: w,
+                                op: CompareOp::Icontains,
+                                value: val,
+                            };
                         }
                         "startswith" => {
                             self.advance();
                             let val = self.parse_rhs_value();
-                            return Expr::Compare { field: w, op: CompareOp::Startswith, value: val };
+                            return Expr::Compare {
+                                field: w,
+                                op: CompareOp::Startswith,
+                                value: val,
+                            };
                         }
                         "endswith" => {
                             self.advance();
                             let val = self.parse_rhs_value();
-                            return Expr::Compare { field: w, op: CompareOp::Endswith, value: val };
+                            return Expr::Compare {
+                                field: w,
+                                op: CompareOp::Endswith,
+                                value: val,
+                            };
                         }
                         "pmatch" => {
                             self.advance();
                             let val = self.parse_rhs_value();
-                            return Expr::Compare { field: w, op: CompareOp::Pmatch, value: val };
+                            return Expr::Compare {
+                                field: w,
+                                op: CompareOp::Pmatch,
+                                value: val,
+                            };
                         }
                         "glob" => {
                             self.advance();
                             let val = self.parse_rhs_value();
-                            return Expr::Compare { field: w, op: CompareOp::Glob, value: val };
+                            return Expr::Compare {
+                                field: w,
+                                op: CompareOp::Glob,
+                                value: val,
+                            };
                         }
                         "in" => {
                             self.advance();
@@ -393,13 +457,25 @@ impl Parser {
                             values.push(n.to_string());
                         }
                     }
-                    _ => { self.advance(); }
+                    _ => {
+                        self.advance();
+                    }
                 }
             }
-            Expr::InList { field, negated, values, list_ref: None }
+            Expr::InList {
+                field,
+                negated,
+                values,
+                list_ref: None,
+            }
         } else if let Some(list_name) = self.consume_word() {
             // `in list_name` — named list reference
-            Expr::InList { field, negated, values: vec![], list_ref: Some(list_name) }
+            Expr::InList {
+                field,
+                negated,
+                values: vec![],
+                list_ref: Some(list_name),
+            }
         } else {
             Expr::Literal(false)
         }
@@ -423,8 +499,14 @@ impl Parser {
                 Value::Str(w)
             }
             // Falco uses unquoted `>` and `<` as string values for evt.dir
-            Some(Token::Gt) => { self.advance(); Value::Str(">".into()) }
-            Some(Token::Lt) => { self.advance(); Value::Str("<".into()) }
+            Some(Token::Gt) => {
+                self.advance();
+                Value::Str(">".into())
+            }
+            Some(Token::Lt) => {
+                self.advance();
+                Value::Str("<".into())
+            }
             _ => Value::Str(String::new()),
         }
     }
@@ -463,8 +545,17 @@ pub fn eval(expr: &Expr, ctx: &EvalContext<'_>) -> bool {
         Expr::And(l, r) => eval(l, ctx) && eval(r, ctx),
         Expr::Or(l, r) => eval(l, ctx) || eval(r, ctx),
         Expr::Not(e) => !eval(e, ctx),
-        Expr::InList { field, negated, values, list_ref } => {
-            let fv = ctx.fields.get(field.as_str()).map(String::as_str).unwrap_or("");
+        Expr::InList {
+            field,
+            negated,
+            values,
+            list_ref,
+        } => {
+            let fv = ctx
+                .fields
+                .get(field.as_str())
+                .map(String::as_str)
+                .unwrap_or("");
             let matched = if let Some(lref) = list_ref {
                 ctx.lists
                     .get(lref.as_str())
@@ -476,7 +567,11 @@ pub fn eval(expr: &Expr, ctx: &EvalContext<'_>) -> bool {
             if *negated { !matched } else { matched }
         }
         Expr::Compare { field, op, value } => {
-            let fv = ctx.fields.get(field.as_str()).map(String::as_str).unwrap_or("");
+            let fv = ctx
+                .fields
+                .get(field.as_str())
+                .map(String::as_str)
+                .unwrap_or("");
             match value {
                 Value::Num(n) => eval_numeric(fv, *n, op),
                 Value::Str(s) => eval_string(fv, s.as_str(), op),
@@ -573,11 +668,18 @@ mod tests {
         lists: &'a HashMap<String, Vec<String>>,
         macros: &'a HashMap<String, Expr>,
     ) -> EvalContext<'a> {
-        EvalContext { fields, lists, macros }
+        EvalContext {
+            fields,
+            lists,
+            macros,
+        }
     }
 
     fn fields(pairs: &[(&str, &str)]) -> HashMap<String, String> {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
     #[test]

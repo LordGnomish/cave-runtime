@@ -299,13 +299,9 @@ impl MemoryProvider for SqliteStore {
     fn get(&self, id: &str) -> crate::error::Result<Option<MemoryRecord>> {
         let conn = self.conn.lock();
         let mut stmt = conn
-            .prepare(
-                "SELECT id, scope, body, created_at FROM hermes_memory WHERE id = ?1",
-            )
+            .prepare("SELECT id, scope, body, created_at FROM hermes_memory WHERE id = ?1")
             .map_err(sql_err)?;
-        let mut rows = stmt
-            .query(rusqlite::params![id])
-            .map_err(sql_err)?;
+        let mut rows = stmt.query(rusqlite::params![id]).map_err(sql_err)?;
         if let Some(row) = rows.next().map_err(sql_err)? {
             Ok(Some(MemoryRecord {
                 id: row.get(0).map_err(sql_err)?,
@@ -458,7 +454,8 @@ mod tests {
     #[test]
     fn build_system_prompt_emits_fenced_block() {
         let s = InMemoryStore::new();
-        s.put(MemoryRecord::new("k1", "s", "remembered fact")).unwrap();
+        s.put(MemoryRecord::new("k1", "s", "remembered fact"))
+            .unwrap();
         let prompt = s.build_system_prompt("s").unwrap();
         assert!(prompt.contains("<memory-context>"));
         assert!(prompt.contains("remembered fact"));

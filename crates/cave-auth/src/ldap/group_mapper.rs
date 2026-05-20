@@ -67,13 +67,10 @@ impl GroupMapper {
     /// from `memberOf` are reduced to CN via
     /// [`extract_cn_from_dn`] — same trick Keycloak's
     /// `LDAPUtils.getMemberAttributeValue` does.
-    pub fn groups_of_user(
-        &self,
-        user_entry: &BTreeMap<String, Vec<String>>,
-    ) -> Vec<String> {
-        let key = user_entry.keys().find(|k| {
-            k.eq_ignore_ascii_case(&self.membership_attr)
-        });
+    pub fn groups_of_user(&self, user_entry: &BTreeMap<String, Vec<String>>) -> Vec<String> {
+        let key = user_entry
+            .keys()
+            .find(|k| k.eq_ignore_ascii_case(&self.membership_attr));
         let Some(key) = key else { return Vec::new() };
         let Some(dns) = user_entry.get(key) else {
             return Vec::new();
@@ -85,10 +82,7 @@ impl GroupMapper {
 
     /// Invert a group→members listing into a `user_dn → groups`
     /// map. Used in [`GroupMembershipModel::GroupMember`] mode.
-    pub fn invert_group_members(
-        &self,
-        groups: &[GroupEntry],
-    ) -> BTreeMap<String, Vec<String>> {
+    pub fn invert_group_members(&self, groups: &[GroupEntry]) -> BTreeMap<String, Vec<String>> {
         let mut out: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for g in groups {
             for member_dn in &g.members {
@@ -119,19 +113,17 @@ impl GroupEntry {
         dn: &str,
         attrs: &BTreeMap<String, Vec<String>>,
     ) -> Self {
-        let name_key = attrs.keys().find(|k| {
-            k.eq_ignore_ascii_case(&mapper.group_name_attr)
-        });
+        let name_key = attrs
+            .keys()
+            .find(|k| k.eq_ignore_ascii_case(&mapper.group_name_attr));
         let name = name_key
             .and_then(|k| attrs.get(k))
             .and_then(|v| v.first())
             .cloned()
-            .unwrap_or_else(|| {
-                extract_cn_from_dn(dn).unwrap_or_else(|| dn.to_owned())
-            });
-        let member_key = attrs.keys().find(|k| {
-            k.eq_ignore_ascii_case(&mapper.membership_attr)
-        });
+            .unwrap_or_else(|| extract_cn_from_dn(dn).unwrap_or_else(|| dn.to_owned()));
+        let member_key = attrs
+            .keys()
+            .find(|k| k.eq_ignore_ascii_case(&mapper.membership_attr));
         let members = member_key
             .and_then(|k| attrs.get(k).cloned())
             .unwrap_or_default();
@@ -186,10 +178,7 @@ mod tests {
             GroupEntry {
                 dn: "cn=engineers,ou=groups".into(),
                 name: "engineers".into(),
-                members: vec![
-                    "uid=jdoe,ou=people".into(),
-                    "uid=asmith,ou=people".into(),
-                ],
+                members: vec!["uid=jdoe,ou=people".into(), "uid=asmith,ou=people".into()],
             },
             GroupEntry {
                 dn: "cn=on-call,ou=groups".into(),
@@ -237,10 +226,7 @@ mod tests {
     #[test]
     fn member_of_attr_lookup_is_case_insensitive() {
         let m = GroupMapper::member_of_default();
-        let groups = m.groups_of_user(&entry(&[(
-            "MEMBEROF",
-            &["cn=engineers,ou=groups"],
-        )]));
+        let groups = m.groups_of_user(&entry(&[("MEMBEROF", &["cn=engineers,ou=groups"])]));
         assert_eq!(groups, vec!["engineers"]);
     }
 }

@@ -155,7 +155,12 @@ pub fn plan_rollout(
     let budget = spec.max_unavailable.saturating_sub(currently_unavailable);
     let roll_now: Vec<String> = stale.iter().take(budget as usize).cloned().collect();
     let remaining_budget = budget.saturating_sub(roll_now.len() as u32);
-    Ok(RollPlan { eligible_nodes: eligible, stale_nodes: stale, roll_now, remaining_budget })
+    Ok(RollPlan {
+        eligible_nodes: eligible,
+        stale_nodes: stale,
+        roll_now,
+        remaining_budget,
+    })
 }
 
 #[allow(dead_code)]
@@ -167,27 +172,52 @@ mod tests {
     use crate::test_ctx;
 
     fn taint(k: &str, v: Option<&str>, e: TaintEffect) -> Taint {
-        Taint { key: k.into(), value: v.map(|s| s.to_string()), effect: e }
+        Taint {
+            key: k.into(),
+            value: v.map(|s| s.to_string()),
+            effect: e,
+        }
     }
     fn tol_eq(k: &str, v: &str, e: Option<TaintEffect>) -> Toleration {
-        Toleration { key: Some(k.into()), operator: TolerationOp::Equal, value: Some(v.into()), effect: e }
+        Toleration {
+            key: Some(k.into()),
+            operator: TolerationOp::Equal,
+            value: Some(v.into()),
+            effect: e,
+        }
     }
     fn tol_exists(k: Option<&str>, e: Option<TaintEffect>) -> Toleration {
-        Toleration { key: k.map(|s| s.to_string()), operator: TolerationOp::Exists, value: None, effect: e }
+        Toleration {
+            key: k.map(|s| s.to_string()),
+            operator: TolerationOp::Exists,
+            value: None,
+            effect: e,
+        }
     }
     fn node(name: &str, labels: &[(&str, &str)], taints: Vec<Taint>, rev: Option<u64>) -> NodeView {
         NodeView {
             name: name.into(),
-            labels: labels.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            labels: labels
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
             taints,
             current_revision: rev,
         }
     }
-    fn ds(rev: u64, max_unavail: u32, sel: &[(&str, &str)], tols: Vec<Toleration>) -> DaemonSetSpec {
+    fn ds(
+        rev: u64,
+        max_unavail: u32,
+        sel: &[(&str, &str)],
+        tols: Vec<Toleration>,
+    ) -> DaemonSetSpec {
         DaemonSetSpec {
             name: "node-exporter".into(),
             tenant: TenantId::new("acme").expect("test fixture"),
-            node_selector: sel.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            node_selector: sel
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
             tolerations: tols,
             revision: rev,
             max_unavailable: max_unavail,
@@ -226,8 +256,15 @@ mod tests {
             "tenant-ds-tol-exists-any"
         );
         let universal = tol_exists(None, None);
-        for e in [TaintEffect::NoSchedule, TaintEffect::PreferNoSchedule, TaintEffect::NoExecute] {
-            assert!(toleration_tolerates_taint(&universal, &taint("anything", Some("x"), e)));
+        for e in [
+            TaintEffect::NoSchedule,
+            TaintEffect::PreferNoSchedule,
+            TaintEffect::NoExecute,
+        ] {
+            assert!(toleration_tolerates_taint(
+                &universal,
+                &taint("anything", Some("x"), e)
+            ));
         }
     }
 
@@ -261,7 +298,12 @@ mod tests {
             "nodeShouldRunDaemonPod",
             "tenant-ds-should-run"
         );
-        let s = ds(1, 1, &[("role", "edge")], vec![tol_exists(Some("dedicated"), Some(TaintEffect::NoSchedule))]);
+        let s = ds(
+            1,
+            1,
+            &[("role", "edge")],
+            vec![tol_exists(Some("dedicated"), Some(TaintEffect::NoSchedule))],
+        );
         let n_match = node(
             "edge-1",
             &[("role", "edge")],
@@ -282,11 +324,7 @@ mod tests {
 
     #[test]
     fn rollout_plan_caps_concurrent_rolls_at_max_unavailable() {
-        let (_cite, tenant) = test_ctx!(
-            "pkg/controller/daemon/update.go",
-            "rollingUpdate",
-            "acme"
-        );
+        let (_cite, tenant) = test_ctx!("pkg/controller/daemon/update.go", "rollingUpdate", "acme");
         let s = ds(2, 2, &[], vec![]);
         let nodes: Vec<NodeView> = (0..5)
             .map(|i| node(&format!("n{i}"), &[], vec![], Some(1))) // all stale
@@ -299,11 +337,7 @@ mod tests {
 
     #[test]
     fn rollout_plan_subtracts_currently_unavailable_from_budget() {
-        let (_cite, tenant) = test_ctx!(
-            "pkg/controller/daemon/update.go",
-            "rollingUpdate",
-            "acme"
-        );
+        let (_cite, tenant) = test_ctx!("pkg/controller/daemon/update.go", "rollingUpdate", "acme");
         let s = ds(2, 3, &[], vec![]);
         let nodes: Vec<NodeView> = (0..5)
             .map(|i| node(&format!("n{i}"), &[], vec![], Some(1)))
@@ -321,9 +355,9 @@ mod tests {
         );
         let s = ds(2, 5, &[("role", "edge")], vec![]);
         let nodes = vec![
-            node("edge-1", &[("role", "edge")], vec![], Some(1)),    // stale
-            node("edge-2", &[("role", "edge")], vec![], Some(2)),    // current
-            node("core-1", &[("role", "core")], vec![], Some(1)),    // wrong selector
+            node("edge-1", &[("role", "edge")], vec![], Some(1)), // stale
+            node("edge-2", &[("role", "edge")], vec![], Some(2)), // current
+            node("core-1", &[("role", "core")], vec![], Some(1)), // wrong selector
             node(
                 "edge-tainted",
                 &[("role", "edge")],
@@ -332,7 +366,10 @@ mod tests {
             ),
         ];
         let plan = plan_rollout(&s, &nodes, &tenant, 0).unwrap();
-        assert_eq!(plan.eligible_nodes, vec!["edge-1".to_string(), "edge-2".to_string()]);
+        assert_eq!(
+            plan.eligible_nodes,
+            vec!["edge-1".to_string(), "edge-2".to_string()]
+        );
         assert_eq!(plan.stale_nodes, vec!["edge-1".to_string()]);
     }
 

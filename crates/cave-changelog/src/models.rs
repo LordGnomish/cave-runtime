@@ -68,7 +68,10 @@ mod tests {
             id: Uuid::new_v4(),
             version: "1.2.3".to_string(),
             date: NaiveDate::from_ymd_opt(2026, 1, 15).unwrap(),
-            changes: vec![make_change(ChangeType::Fixed), make_change(ChangeType::Added)],
+            changes: vec![
+                make_change(ChangeType::Fixed),
+                make_change(ChangeType::Added),
+            ],
         };
         let json = serde_json::to_string(&entry).unwrap();
         let decoded: ChangelogEntry = serde_json::from_str(&json).unwrap();

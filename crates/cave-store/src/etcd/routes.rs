@@ -6,11 +6,11 @@
 //! Watch streaming uses SSE (Server-Sent Events).
 
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::sse::{Event, Sse},
     routing::post,
-    Json, Router,
 };
 use futures::stream;
 use serde::{Deserialize, Serialize};
@@ -19,12 +19,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio_stream::StreamExt;
 
-use crate::engine::{
-    Compare, CompareResult, CompareTarget, MvccEngine, TxnOp, TxnRequest,
-};
+use crate::StoreState;
+use crate::engine::{Compare, CompareResult, CompareTarget, MvccEngine, TxnOp, TxnRequest};
 use crate::etcd::auth::{AuthManager, PermissionEntry};
 use crate::etcd::cluster::ClusterManager;
-use crate::StoreState;
 
 fn err_json(code: i32, message: impl ToString) -> Json<serde_json::Value> {
     Json(serde_json::json!({
@@ -440,14 +438,18 @@ async fn lease_list(State(state): State<Arc<StoreState>>) -> Json<serde_json::Va
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
-async fn auth_enable(State(state): State<Arc<StoreState>>) -> (StatusCode, Json<serde_json::Value>) {
+async fn auth_enable(
+    State(state): State<Arc<StoreState>>,
+) -> (StatusCode, Json<serde_json::Value>) {
     match state.auth.enable().await {
         Ok(()) => (StatusCode::OK, Json(serde_json::json!({ "header": {} }))),
         Err(e) => (StatusCode::BAD_REQUEST, err_json(6, e.to_string())),
     }
 }
 
-async fn auth_disable(State(state): State<Arc<StoreState>>) -> (StatusCode, Json<serde_json::Value>) {
+async fn auth_disable(
+    State(state): State<Arc<StoreState>>,
+) -> (StatusCode, Json<serde_json::Value>) {
     match state.auth.disable().await {
         Ok(()) => (StatusCode::OK, Json(serde_json::json!({ "header": {} }))),
         Err(e) => (StatusCode::BAD_REQUEST, err_json(6, e.to_string())),

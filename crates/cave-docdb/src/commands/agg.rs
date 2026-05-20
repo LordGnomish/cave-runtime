@@ -22,7 +22,10 @@ pub async fn aggregate(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Docume
         .unwrap_or_else(|| {
             cmd_doc
                 .keys()
-                .find(|k| !k.starts_with('$') && !matches!(k.as_str(), "aggregate" | "pipeline" | "cursor"))
+                .find(|k| {
+                    !k.starts_with('$')
+                        && !matches!(k.as_str(), "aggregate" | "pipeline" | "cursor")
+                })
                 .cloned()
                 .unwrap_or_else(|| "collection".to_string())
         });
@@ -100,8 +103,11 @@ pub async fn aggregate(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Docume
                         if let Some(sort_obj) = stage_spec.as_object() {
                             results.sort_by(|a, b| {
                                 for (key, direction) in sort_obj {
-                                    let dir =
-                                        if let Some(d) = direction.as_i64() { d } else { 1 };
+                                    let dir = if let Some(d) = direction.as_i64() {
+                                        d
+                                    } else {
+                                        1
+                                    };
                                     let av = a.get(key);
                                     let bv = b.get(key);
                                     let cmp = compare_values(av, bv);
@@ -138,13 +144,7 @@ pub async fn aggregate(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Docume
 
     let first_batch: Vec<Value> = results
         .iter()
-        .map(|doc| {
-            Value::Object(
-                doc.iter()
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect(),
-            )
-        })
+        .map(|doc| Value::Object(doc.iter().map(|(k, v)| (k.clone(), v.clone())).collect()))
         .collect();
     cursor.insert("firstBatch".to_string(), Value::Array(first_batch));
 
@@ -199,7 +199,10 @@ fn group_stage(results: &[Document], group_spec: &serde_json::Map<String, Value>
                                     .sum();
                                 result.insert(field.clone(), Value::Number(sum.into()));
                             } else if op_field.as_i64() == Some(1) {
-                                result.insert(field.clone(), Value::Number((docs.len() as i64).into()));
+                                result.insert(
+                                    field.clone(),
+                                    Value::Number((docs.len() as i64).into()),
+                                );
                             }
                         }
                         "$count" => {
@@ -234,12 +237,21 @@ mod tests {
     #[tokio::test]
     async fn test_aggregate_match_stage() {
         let engine = Arc::new(Engine::new());
-        seed(&engine, "scores", "agg_db", json!([{"score": 80}, {"score": 90}, {"score": 70}])).await;
+        seed(
+            &engine,
+            "scores",
+            "agg_db",
+            json!([{"score": 80}, {"score": 90}, {"score": 70}]),
+        )
+        .await;
 
         let mut cmd = Document::new();
         cmd.insert("aggregate".to_string(), Value::String("scores".to_string()));
         cmd.insert("$db".to_string(), Value::String("agg_db".to_string()));
-        cmd.insert("pipeline".to_string(), json!([{"$match": {"score": {"$gte": 80}}}]));
+        cmd.insert(
+            "pipeline".to_string(),
+            json!([{"$match": {"score": {"$gte": 80}}}]),
+        );
 
         let resp = aggregate(&cmd, engine.clone()).await.unwrap();
         let cursor = resp.get("cursor").and_then(|v| v.as_object()).unwrap();
@@ -250,7 +262,13 @@ mod tests {
     #[tokio::test]
     async fn test_aggregate_limit_skip() {
         let engine = Arc::new(Engine::new());
-        seed(&engine, "nums", "agg_db2", json!([{"n": 1}, {"n": 2}, {"n": 3}, {"n": 4}])).await;
+        seed(
+            &engine,
+            "nums",
+            "agg_db2",
+            json!([{"n": 1}, {"n": 2}, {"n": 3}, {"n": 4}]),
+        )
+        .await;
 
         let mut cmd = Document::new();
         cmd.insert("aggregate".to_string(), Value::String("nums".to_string()));
@@ -275,7 +293,8 @@ mod tests {
                 {"dept": "eng", "amount": 200},
                 {"dept": "hr", "amount": 50}
             ]),
-        ).await;
+        )
+        .await;
 
         let mut cmd = Document::new();
         cmd.insert("aggregate".to_string(), Value::String("sales".to_string()));

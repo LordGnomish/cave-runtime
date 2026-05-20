@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-use crate::models::{CreateIncidentRequest, Incident, IncidentError, IncidentStatus, TimelineEntry};
+use crate::models::{
+    CreateIncidentRequest, Incident, IncidentError, IncidentStatus, TimelineEntry,
+};
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -54,7 +56,11 @@ pub fn acknowledge(incident: &mut Incident, user_id: Uuid) -> Result<(), Inciden
     }
 }
 
-pub fn resolve(incident: &mut Incident, user_id: Uuid, resolution: String) -> Result<(), IncidentError> {
+pub fn resolve(
+    incident: &mut Incident,
+    user_id: Uuid,
+    resolution: String,
+) -> Result<(), IncidentError> {
     match incident.status {
         IncidentStatus::Acknowledged => {
             incident.status = IncidentStatus::Resolved;
@@ -90,7 +96,9 @@ pub fn add_timeline_entry(incident: &mut Incident, event_type: &str, message: &s
 }
 
 pub fn time_to_acknowledge_secs(incident: &Incident) -> Option<i64> {
-    incident.acknowledged_at.map(|ack| (ack - incident.created_at).num_seconds())
+    incident
+        .acknowledged_at
+        .map(|ack| (ack - incident.created_at).num_seconds())
 }
 
 pub fn time_to_resolve_secs(incident: &Incident) -> Option<i64> {
@@ -158,7 +166,12 @@ mod tests {
         let mut incident = create_incident(make_request("API Down"));
         let user = Uuid::new_v4();
         acknowledge(&mut incident, user).unwrap();
-        resolve(&mut incident, user, "Fixed the DB connection pool".to_string()).unwrap();
+        resolve(
+            &mut incident,
+            user,
+            "Fixed the DB connection pool".to_string(),
+        )
+        .unwrap();
         assert_eq!(incident.status, IncidentStatus::Resolved);
     }
 

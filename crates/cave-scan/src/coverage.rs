@@ -163,7 +163,8 @@ mod tests {
 
     #[test]
     fn test_parse_lcov_multiple_files() {
-        let lcov = "TN:src/a.rs\nLF:50\nLH:40\nend_of_record\nTN:src/b.rs\nLF:100\nLH:80\nend_of_record\n";
+        let lcov =
+            "TN:src/a.rs\nLF:50\nLH:40\nend_of_record\nTN:src/b.rs\nLF:100\nLH:80\nend_of_record\n";
         let report = parse_lcov(lcov);
         assert_eq!(report.files.len(), 2);
         assert_eq!(report.total_lines, 150);
@@ -206,7 +207,8 @@ mod tests {
 
     #[test]
     fn test_parse_lcov_garbage_lines_ignored() {
-        let lcov = "DA:1,1\nBRDA:2,3,4,5\nFNDA:1,foo\nTN:src/clean.rs\nLF:10\nLH:7\nend_of_record\n";
+        let lcov =
+            "DA:1,1\nBRDA:2,3,4,5\nFNDA:1,foo\nTN:src/clean.rs\nLF:10\nLH:7\nend_of_record\n";
         let report = parse_lcov(lcov);
         assert_eq!(report.files.len(), 1);
         assert_eq!(report.total_lines, 10);

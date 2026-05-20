@@ -69,9 +69,7 @@ pub fn plan_node_actions(
     let mut out = Vec::with_capacity(nodes.len());
     for n in nodes {
         let action = match (&n.current_pod_hash, strategy.kind) {
-            (None, _) if strategy.kind == UpdateStrategyKind::OnDelete => {
-                NodeAction::CreatePod
-            }
+            (None, _) if strategy.kind == UpdateStrategyKind::OnDelete => NodeAction::CreatePod,
             (None, _) => NodeAction::CreatePod,
             (Some(h), UpdateStrategyKind::RollingUpdate) if h == desired_hash => NodeAction::Keep,
             (Some(_), UpdateStrategyKind::RollingUpdate) => {
@@ -91,10 +89,7 @@ pub fn plan_node_actions(
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::new(
-    "pkg/controller/daemon/update.go",
-    "rollingUpdate",
-);
+const FILE_CITE: Cite = Cite::new("pkg/controller/daemon/update.go", "rollingUpdate");
 
 #[cfg(test)]
 mod tests {
@@ -147,7 +142,10 @@ mod tests {
             nv("n3", Some("old"), true),
         ];
         let plan = plan_node_actions(&rolling(2), "new", &nodes).unwrap();
-        let deletes = plan.iter().filter(|(_, a)| *a == NodeAction::DeletePod).count();
+        let deletes = plan
+            .iter()
+            .filter(|(_, a)| *a == NodeAction::DeletePod)
+            .count();
         assert_eq!(deletes, 2);
     }
 

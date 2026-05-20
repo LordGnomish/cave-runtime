@@ -21,7 +21,7 @@ use crate::keycloak::{
     client::ClientStore,
     discovery::router as discovery_router,
     realm::RealmStore,
-    token_endpoint::{router as token_router, KeycloakTokenService},
+    token_endpoint::{KeycloakTokenService, router as token_router},
     user::UserStore,
 };
 

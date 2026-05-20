@@ -4,10 +4,10 @@
 
 use crate::models::*;
 use axum::{
+    Json, Router,
     extract::{Path, Query, State as AxumState},
     http::StatusCode,
     routing::{delete, get, post, put},
-    Json, Router,
 };
 use chrono::Utc;
 use serde::Deserialize;
@@ -113,14 +113,23 @@ pub fn create_router(state: Arc<OnCallStore>) -> Router {
         .route("/api/oncall/schedules", get(list_schedules))
         .route("/api/oncall/schedules", post(create_schedule))
         .route("/api/oncall/schedules/{id}", get(get_schedule))
-        .route("/api/oncall/schedules/{id}/calendar", get(schedule_calendar))
+        .route(
+            "/api/oncall/schedules/{id}/calendar",
+            get(schedule_calendar),
+        )
         .route("/api/oncall/schedules/{id}", delete(delete_schedule))
         // Rotations
-        .route("/api/oncall/schedules/{id}/rotations", post(create_rotation))
+        .route(
+            "/api/oncall/schedules/{id}/rotations",
+            post(create_rotation),
+        )
         .route("/api/oncall/schedules/{id}/rotations", get(list_rotations))
         .route("/api/oncall/rotations/{id}", delete(delete_rotation))
         // Overrides
-        .route("/api/oncall/schedules/{id}/overrides", post(create_override))
+        .route(
+            "/api/oncall/schedules/{id}/overrides",
+            post(create_override),
+        )
         .route("/api/oncall/schedules/{id}/overrides", get(list_overrides))
         .route("/api/oncall/overrides/{id}", delete(delete_override))
         // Escalation Policies
@@ -161,9 +170,7 @@ async fn health() -> Json<serde_json::Value> {
 }
 
 // Teams
-async fn list_teams(
-    AxumState(store): AxumState<Arc<OnCallStore>>,
-) -> Json<serde_json::Value> {
+async fn list_teams(AxumState(store): AxumState<Arc<OnCallStore>>) -> Json<serde_json::Value> {
     let teams: Vec<Team> = store.teams.read().await.values().cloned().collect();
     Json(serde_json::json!({ "teams": teams }))
 }
@@ -252,7 +259,9 @@ async fn team_current_oncall(
 
     let mut result = Vec::new();
     for schedule in schedules {
-        if let Some(assignment) = crate::engine::current_oncall(&schedule, &rotations, &overrides, Utc::now()) {
+        if let Some(assignment) =
+            crate::engine::current_oncall(&schedule, &rotations, &overrides, Utc::now())
+        {
             result.push(assignment);
         }
     }
@@ -285,7 +294,9 @@ async fn team_upcoming_shifts(
 
     let mut shifts = Vec::new();
     for schedule in schedules {
-        shifts.extend(crate::engine::upcoming_shifts(&schedule, &rotations, horizon));
+        shifts.extend(crate::engine::upcoming_shifts(
+            &schedule, &rotations, horizon,
+        ));
     }
 
     shifts.sort_by_key(|s| s.start);
@@ -293,9 +304,7 @@ async fn team_upcoming_shifts(
 }
 
 // Users
-async fn list_users(
-    AxumState(store): AxumState<Arc<OnCallStore>>,
-) -> Json<serde_json::Value> {
+async fn list_users(AxumState(store): AxumState<Arc<OnCallStore>>) -> Json<serde_json::Value> {
     let users: Vec<User> = store.users.read().await.values().cloned().collect();
     Json(serde_json::json!({ "users": users }))
 }
@@ -333,9 +342,7 @@ async fn get_user(
 }
 
 // Schedules
-async fn list_schedules(
-    AxumState(store): AxumState<Arc<OnCallStore>>,
-) -> Json<serde_json::Value> {
+async fn list_schedules(AxumState(store): AxumState<Arc<OnCallStore>>) -> Json<serde_json::Value> {
     let schedules: Vec<Schedule> = store.schedules.read().await.values().cloned().collect();
     Json(serde_json::json!({ "schedules": schedules }))
 }
@@ -354,11 +361,7 @@ async fn create_schedule(
         created_at: Utc::now(),
     };
     let id = schedule.id;
-    store
-        .schedules
-        .write()
-        .await
-        .insert(id, schedule.clone());
+    store.schedules.write().await.insert(id, schedule.clone());
     Json(serde_json::to_value(&schedule).unwrap_or_default())
 }
 
@@ -506,16 +509,8 @@ async fn delete_override(
 }
 
 // Escalation Policies
-async fn list_policies(
-    AxumState(store): AxumState<Arc<OnCallStore>>,
-) -> Json<serde_json::Value> {
-    let policies: Vec<EscalationPolicy> = store
-        .policies
-        .read()
-        .await
-        .values()
-        .cloned()
-        .collect();
+async fn list_policies(AxumState(store): AxumState<Arc<OnCallStore>>) -> Json<serde_json::Value> {
+    let policies: Vec<EscalationPolicy> = store.policies.read().await.values().cloned().collect();
     Json(serde_json::json!({ "policies": policies }))
 }
 
@@ -640,7 +635,9 @@ async fn ack_alert(
     alert.ack_at = Some(Utc::now());
     alert.ack_by = Some(req.user);
 
-    Ok(Json(serde_json::to_value(alert.clone()).unwrap_or_default()))
+    Ok(Json(
+        serde_json::to_value(alert.clone()).unwrap_or_default(),
+    ))
 }
 
 async fn resolve_alert(
@@ -655,7 +652,9 @@ async fn resolve_alert(
     alert.state = AlertState::Resolved;
     alert.resolved_at = Some(Utc::now());
 
-    Ok(Json(serde_json::to_value(alert.clone()).unwrap_or_default()))
+    Ok(Json(
+        serde_json::to_value(alert.clone()).unwrap_or_default(),
+    ))
 }
 
 async fn snooze_alert(
@@ -670,7 +669,9 @@ async fn snooze_alert(
 
     alert.state = AlertState::Silenced;
 
-    Ok(Json(serde_json::to_value(alert.clone()).unwrap_or_default()))
+    Ok(Json(
+        serde_json::to_value(alert.clone()).unwrap_or_default(),
+    ))
 }
 
 async fn escalate_alert(
@@ -684,13 +685,13 @@ async fn escalate_alert(
 
     alert.current_escalation_step = alert.current_escalation_step.saturating_add(1);
 
-    Ok(Json(serde_json::to_value(alert.clone()).unwrap_or_default()))
+    Ok(Json(
+        serde_json::to_value(alert.clone()).unwrap_or_default(),
+    ))
 }
 
 // Silences
-async fn list_silences(
-    AxumState(store): AxumState<Arc<OnCallStore>>,
-) -> Json<serde_json::Value> {
+async fn list_silences(AxumState(store): AxumState<Arc<OnCallStore>>) -> Json<serde_json::Value> {
     let silences: Vec<Silence> = store.silences.read().await.values().cloned().collect();
     Json(serde_json::json!({ "silences": silences }))
 }
@@ -730,7 +731,12 @@ async fn webhook_prometheus(
     Json(payload): Json<WebhookPayload>,
 ) -> StatusCode {
     let alerts = store.alerts.read().await;
-    if crate::engine::dedupe_fingerprint(&payload.fingerprint, &alerts.values().cloned().collect::<Vec<_>>()).is_some() {
+    if crate::engine::dedupe_fingerprint(
+        &payload.fingerprint,
+        &alerts.values().cloned().collect::<Vec<_>>(),
+    )
+    .is_some()
+    {
         return StatusCode::CONFLICT;
     }
     drop(alerts);
@@ -769,7 +775,12 @@ async fn webhook_generic(
     Json(payload): Json<WebhookPayload>,
 ) -> StatusCode {
     let alerts = store.alerts.read().await;
-    if crate::engine::dedupe_fingerprint(&payload.fingerprint, &alerts.values().cloned().collect::<Vec<_>>()).is_some() {
+    if crate::engine::dedupe_fingerprint(
+        &payload.fingerprint,
+        &alerts.values().cloned().collect::<Vec<_>>(),
+    )
+    .is_some()
+    {
         return StatusCode::CONFLICT;
     }
     drop(alerts);
@@ -804,17 +815,21 @@ async fn webhook_generic(
 }
 
 // Stats
-async fn stats(
-    AxumState(store): AxumState<Arc<OnCallStore>>,
-) -> Json<serde_json::Value> {
+async fn stats(AxumState(store): AxumState<Arc<OnCallStore>>) -> Json<serde_json::Value> {
     let alerts = store.alerts.read().await;
     let total_alerts = alerts.len() as u64;
-    let firing = alerts.iter().filter(|a| a.1.state == AlertState::Firing).count() as u64;
+    let firing = alerts
+        .iter()
+        .filter(|a| a.1.state == AlertState::Firing)
+        .count() as u64;
     let acknowledged = alerts
         .iter()
         .filter(|a| a.1.state == AlertState::Acknowledged)
         .count() as u64;
-    let resolved = alerts.iter().filter(|a| a.1.state == AlertState::Resolved).count() as u64;
+    let resolved = alerts
+        .iter()
+        .filter(|a| a.1.state == AlertState::Resolved)
+        .count() as u64;
 
     let teams_count = store.teams.read().await.len() as u64;
     let schedules_count = store.schedules.read().await.len() as u64;

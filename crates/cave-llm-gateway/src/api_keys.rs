@@ -62,11 +62,20 @@ pub struct ApiKeyStore {
 
 impl ApiKeyStore {
     pub fn new() -> Self {
-        Self { by_key: DashMap::new(), by_id: DashMap::new() }
+        Self {
+            by_key: DashMap::new(),
+            by_id: DashMap::new(),
+        }
     }
 
     /// Create a new API key. Returns the created key.
-    pub fn create(&self, name: &str, consumer: &str, scopes: Vec<Scope>, ttl_days: Option<u32>) -> ApiKey {
+    pub fn create(
+        &self,
+        name: &str,
+        consumer: &str,
+        scopes: Vec<Scope>,
+        ttl_days: Option<u32>,
+    ) -> ApiKey {
         let id = Uuid::new_v4().to_string();
         let key = format!("gw-{}", Uuid::new_v4().to_string().replace('-', ""));
         let now = chrono::Utc::now().timestamp();
@@ -92,11 +101,15 @@ impl ApiKeyStore {
 
     /// Validate an API key string and check required scope.
     pub fn validate(&self, key_str: &str, required_scope: &Scope) -> GatewayResult<ApiKey> {
-        let mut entry = self.by_key.get_mut(key_str)
+        let mut entry = self
+            .by_key
+            .get_mut(key_str)
             .ok_or_else(|| GatewayError::Unauthorized("invalid API key".into()))?;
 
         if !entry.is_valid() {
-            return Err(GatewayError::Unauthorized("API key expired or revoked".into()));
+            return Err(GatewayError::Unauthorized(
+                "API key expired or revoked".into(),
+            ));
         }
         if !entry.has_scope(required_scope) {
             return Err(GatewayError::Unauthorized("insufficient scope".into()));
@@ -112,28 +125,36 @@ impl ApiKeyStore {
     }
 
     pub fn revoke(&self, id: &str) -> GatewayResult<()> {
-        let key_str = self.by_id.get(id)
+        let key_str = self
+            .by_id
+            .get(id)
             .ok_or_else(|| GatewayError::NotFound(format!("API key {id}")))?
             .clone();
 
-        let mut entry = self.by_key.get_mut(key_str.as_str())
+        let mut entry = self
+            .by_key
+            .get_mut(key_str.as_str())
             .ok_or_else(|| GatewayError::NotFound(format!("API key {id}")))?;
         entry.revoked = true;
         Ok(())
     }
 
     pub fn list(&self) -> Vec<ApiKey> {
-        self.by_key.iter().map(|e| {
-            // Don't expose the raw key in list responses — mask it
-            let mut k = e.value().clone();
-            let masked_len = k.key.len().saturating_sub(4);
-            k.key = format!("{}...{}", &k.key[..4], &k.key[masked_len..]);
-            k
-        }).collect()
+        self.by_key
+            .iter()
+            .map(|e| {
+                // Don't expose the raw key in list responses — mask it
+                let mut k = e.value().clone();
+                let masked_len = k.key.len().saturating_sub(4);
+                k.key = format!("{}...{}", &k.key[..4], &k.key[masked_len..]);
+                k
+            })
+            .collect()
     }
 
     pub fn list_for_consumer(&self, consumer: &str) -> Vec<ApiKey> {
-        self.by_key.iter()
+        self.by_key
+            .iter()
             .filter(|e| e.value().consumer == consumer)
             .map(|e| e.value().clone())
             .collect()

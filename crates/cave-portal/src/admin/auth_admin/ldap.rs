@@ -5,9 +5,9 @@
 //! cave-auth surfaces. Visual port of
 //! `js/apps/admin-ui/src/user-federation/UserFederationLdapSettings.tsx`.
 
+use super::{AuthAdminError, render_admin_nav, require_platform};
 use crate::admin::permission::RequestCtx;
 use crate::admin::render::{escape, page_shell_full};
-use super::{render_admin_nav, require_platform, AuthAdminError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LdapProvider {

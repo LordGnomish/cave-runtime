@@ -111,7 +111,9 @@ impl TableMetadata {
         }
         validate_tenant_id(&self.tenant_id)?;
         if self.location.is_empty() {
-            return Err(IcebergError::TableMetadata("location must not be empty".into()));
+            return Err(IcebergError::TableMetadata(
+                "location must not be empty".into(),
+            ));
         }
         for s in &self.schemas {
             s.validate()?;
@@ -246,7 +248,13 @@ mod tests {
     #[test]
     fn add_snapshot_updates_current_and_last_seq() {
         let mut m = meta();
-        let s = Snapshot::new(1, 1, 1_700_000_000_000, "/lake/m.avro", SnapshotOperation::Append);
+        let s = Snapshot::new(
+            1,
+            1,
+            1_700_000_000_000,
+            "/lake/m.avro",
+            SnapshotOperation::Append,
+        );
         m.add_snapshot(s).unwrap();
         assert_eq!(m.current_snapshot_id, Some(1));
         assert_eq!(m.last_sequence_number, 1);
@@ -256,10 +264,22 @@ mod tests {
     #[test]
     fn add_snapshot_must_have_increasing_seq() {
         let mut m = meta();
-        let s1 = Snapshot::new(1, 5, 1_700_000_000_000, "/lake/m1.avro", SnapshotOperation::Append);
+        let s1 = Snapshot::new(
+            1,
+            5,
+            1_700_000_000_000,
+            "/lake/m1.avro",
+            SnapshotOperation::Append,
+        );
         m.add_snapshot(s1).unwrap();
         // next snapshot with seq 4 must fail
-        let s2 = Snapshot::new(2, 4, 1_700_000_000_001, "/lake/m2.avro", SnapshotOperation::Append);
+        let s2 = Snapshot::new(
+            2,
+            4,
+            1_700_000_000_001,
+            "/lake/m2.avro",
+            SnapshotOperation::Append,
+        );
         let e = m.add_snapshot(s2).unwrap_err().to_string();
         assert!(e.contains("sequence_number"));
     }
@@ -275,8 +295,8 @@ mod tests {
     #[test]
     fn add_snapshot_tenant_mismatch_err() {
         let mut m = meta().with_tenant("acme");
-        let s = Snapshot::new(1, 1, 1, "/lake/m.avro", SnapshotOperation::Append)
-            .with_tenant("burak");
+        let s =
+            Snapshot::new(1, 1, 1, "/lake/m.avro", SnapshotOperation::Append).with_tenant("burak");
         let e = m.add_snapshot(s).unwrap_err().to_string();
         assert!(e.contains("tenant"));
     }
@@ -363,7 +383,8 @@ mod tests {
     fn metadata_serde_round_trip() {
         let mut m = meta().with_tenant("acme");
         m.schemas[0].tenant_id = "acme".into();
-        let s = Snapshot::new(1, 1, 1, "/lake/m.avro", SnapshotOperation::Append).with_tenant("acme");
+        let s =
+            Snapshot::new(1, 1, 1, "/lake/m.avro", SnapshotOperation::Append).with_tenant("acme");
         m.add_snapshot(s).unwrap();
         let j = serde_json::to_string(&m).unwrap();
         let back: TableMetadata = serde_json::from_str(&j).unwrap();

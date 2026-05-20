@@ -6,15 +6,15 @@
 // link them back to the Go counterpart.
 
 use cave_scan::analyzer::{
-    binary::BinaryAnalyzer, language::CargoLockAnalyzer, language::NpmLockAnalyzer,
-    os::AlpineApkAnalyzer, os::DpkgStatusAnalyzer, Analyzer, AnalyzerRegistry, AnalyzerType,
+    Analyzer, AnalyzerRegistry, AnalyzerType, binary::BinaryAnalyzer, language::CargoLockAnalyzer,
+    language::NpmLockAnalyzer, os::AlpineApkAnalyzer, os::DpkgStatusAnalyzer,
 };
+use cave_scan::oci::layer::{LayerCompression, detect_layer_compression};
 use cave_scan::oci::manifest::{ImageManifest, MediaType};
-use cave_scan::oci::layer::{detect_layer_compression, LayerCompression};
-use cave_scan::report_agg::{aggregate, ScannerReport};
-use cave_scan::scanners::{ScanRequest, ScanTarget, Scanner};
+use cave_scan::report_agg::{ScannerReport, aggregate};
 use cave_scan::scanners::fs::FsScanner;
-use cave_scan::target::{detect_target, TargetKind};
+use cave_scan::scanners::{ScanRequest, ScanTarget, Scanner};
+use cave_scan::target::{TargetKind, detect_target};
 
 // ── Analyzer: Alpine APK installed DB ────────────────────────────────────────
 // Upstream test: pkg/fanal/analyzer/pkg/apk/apk_test.go::TestParseApkInfo
@@ -99,7 +99,8 @@ fn dpkg_status_skips_deinstalled() {
 // Upstream test: pkg/fanal/analyzer/pkg/dpkg/dpkg_test.go (Source with version)
 #[test]
 fn dpkg_status_parses_source_with_version() {
-    let input = "Package: libfoo\nStatus: install ok installed\nVersion: 1.0-1\nSource: foo (0.9)\n\n";
+    let input =
+        "Package: libfoo\nStatus: install ok installed\nVersion: 1.0-1\nSource: foo (0.9)\n\n";
     let pkgs = DpkgStatusAnalyzer.parse_status(input);
     assert_eq!(pkgs.len(), 1);
     assert_eq!(pkgs[0].source.as_deref(), Some("foo"));
@@ -186,7 +187,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "tokio"
 version = "1.38.0"
 "#;
-    let pkgs = CargoLockAnalyzer.parse_lock(lock).expect("valid Cargo.lock");
+    let pkgs = CargoLockAnalyzer
+        .parse_lock(lock)
+        .expect("valid Cargo.lock");
     assert_eq!(pkgs.len(), 2);
     assert_eq!(pkgs[0].name, "serde");
     assert_eq!(pkgs[0].version, "1.0.210");
@@ -338,10 +341,7 @@ fn target_detect_sbom_by_extension() {
 
 #[test]
 fn target_detect_image_reference_by_form() {
-    assert_eq!(
-        detect_target("alpine:3.20"),
-        TargetKind::ImageReference
-    );
+    assert_eq!(detect_target("alpine:3.20"), TargetKind::ImageReference);
     assert_eq!(
         detect_target("docker.io/library/nginx:1.27"),
         TargetKind::ImageReference
@@ -356,20 +356,15 @@ fn fs_scanner_finds_packages_in_temp_dir() {
     use std::io::Write;
     use std::path::PathBuf;
 
-    let tmp = std::env::temp_dir().join(format!(
-        "cave-scan-fs-test-{}",
-        uuid::Uuid::new_v4()
-    ));
+    let tmp = std::env::temp_dir().join(format!("cave-scan-fs-test-{}", uuid::Uuid::new_v4()));
     fs::create_dir_all(tmp.join("lib/apk/db")).unwrap();
     let mut f = fs::File::create(tmp.join("lib/apk/db/installed")).unwrap();
     f.write_all(b"P:hello\nV:1.0\n\n").unwrap();
 
     fs::create_dir_all(tmp.join("app")).unwrap();
     let mut g = fs::File::create(tmp.join("app/Cargo.lock")).unwrap();
-    g.write_all(
-        b"version = 3\n\n[[package]]\nname = \"world\"\nversion = \"2.0\"\n",
-    )
-    .unwrap();
+    g.write_all(b"version = 3\n\n[[package]]\nname = \"world\"\nversion = \"2.0\"\n")
+        .unwrap();
 
     let scanner = FsScanner::new();
     let req = ScanRequest {
@@ -380,8 +375,16 @@ fn fs_scanner_finds_packages_in_temp_dir() {
     fs::remove_dir_all(&tmp).ok();
 
     let names: Vec<_> = report.packages.iter().map(|p| p.name.as_str()).collect();
-    assert!(names.contains(&"hello"), "expected apk hello, got {:?}", names);
-    assert!(names.contains(&"world"), "expected cargo world, got {:?}", names);
+    assert!(
+        names.contains(&"hello"),
+        "expected apk hello, got {:?}",
+        names
+    );
+    assert!(
+        names.contains(&"world"),
+        "expected cargo world, got {:?}",
+        names
+    );
 }
 
 // ── Report aggregation ───────────────────────────────────────────────────────

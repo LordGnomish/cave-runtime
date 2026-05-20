@@ -40,7 +40,7 @@ pub use aws_sqs_scaler::AwsSqsScaler;
 pub use azure_eventhub_scaler::AzureEventHubScaler;
 pub use azure_servicebus_scaler::{AzureServiceBusEntity, AzureServiceBusScaler};
 pub use cpu_memory_scaler::{CpuScaler, MemoryScaler, ResourceMetricType};
-pub use cron_scaler::{validate_cron, CronScaler};
+pub use cron_scaler::{CronScaler, validate_cron};
 pub use datadog_scaler::DatadogScaler;
 pub use etcd_scaler::EtcdScaler;
 pub use gcp_pubsub_scaler::GcpPubSubScaler;
@@ -52,7 +52,7 @@ pub use prometheus_scaler::PrometheusScaler;
 pub use redis_scaler::{RedisDataType, RedisScaler};
 pub use scaledjob::{ScaledJob, ScalingStrategy};
 pub use scaledobject::ScaledObject;
-pub use scaler::{replicas_from_metric, Scaler, ScalerTrait, ScalingModifiers};
+pub use scaler::{Scaler, ScalerTrait, ScalingModifiers, replicas_from_metric};
 pub use scaling_modifiers::{ScalingModifiersEvaluator, Trigger};
 pub use trigger_authentication::{EnvTargetRef, SecretTargetRef, TriggerAuthentication};
 
@@ -248,7 +248,9 @@ mod tests {
             container_name: None,
         });
         let env: HashMap<String, String> =
-            [("API_ENDPOINT".to_string(), "https://api/".to_string())].into_iter().collect();
+            [("API_ENDPOINT".to_string(), "https://api/".to_string())]
+                .into_iter()
+                .collect();
         ta.resolve(&HashMap::new(), &env);
         assert_eq!(ta.parameter("endpoint"), Some("https://api/"));
     }

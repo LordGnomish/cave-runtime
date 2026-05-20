@@ -13,13 +13,15 @@ use crate::resp::Resp;
 // ── EVAL / EVALSHA ────────────────────────────────────────────────────────────
 
 pub fn cmd_eval(args: &[Vec<u8>], db: &mut Db, scripts: &ScriptStore) -> CacheResult<Resp> {
-    if args.len() < 3 { return Err(CacheError::wrong_arity("eval")); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity("eval"));
+    }
     let script = std::str::from_utf8(&args[1])
         .map_err(|_| CacheError::generic("ERR Script contains invalid UTF-8"))?
         .to_string();
-    let numkeys = args[2].iter().fold(0usize, |acc, &b| {
-        acc * 10 + (b - b'0') as usize
-    });
+    let numkeys = args[2]
+        .iter()
+        .fold(0usize, |acc, &b| acc * 10 + (b - b'0') as usize);
     let keys: Vec<Vec<u8>> = args[3..3 + numkeys.min(args.len() - 3)].to_vec();
     let argv: Vec<Vec<u8>> = if args.len() > 3 + numkeys {
         args[3 + numkeys..].to_vec()
@@ -30,11 +32,21 @@ pub fn cmd_eval(args: &[Vec<u8>], db: &mut Db, scripts: &ScriptStore) -> CacheRe
 }
 
 pub fn cmd_evalsha(args: &[Vec<u8>], db: &mut Db, scripts: &ScriptStore) -> CacheResult<Resp> {
-    if args.len() < 3 { return Err(CacheError::wrong_arity("evalsha")); }
-    let sha = std::str::from_utf8(&args[1]).map_err(|_| CacheError::NoScript)?.to_ascii_lowercase();
-    let script = scripts.scripts.get(&sha).ok_or(CacheError::NoScript)?.clone();
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity("evalsha"));
+    }
+    let sha = std::str::from_utf8(&args[1])
+        .map_err(|_| CacheError::NoScript)?
+        .to_ascii_lowercase();
+    let script = scripts
+        .scripts
+        .get(&sha)
+        .ok_or(CacheError::NoScript)?
+        .clone();
     let numkeys: usize = std::str::from_utf8(&args[2])
-        .ok().and_then(|s| s.parse().ok()).unwrap_or(0);
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
     let keys: Vec<Vec<u8>> = args[3..3 + numkeys.min(args.len() - 3)].to_vec();
     let argv: Vec<Vec<u8>> = if args.len() > 3 + numkeys {
         args[3 + numkeys..].to_vec()
@@ -55,7 +67,9 @@ pub fn cmd_eval_ro(args: &[Vec<u8>], db: &mut Db, scripts: &ScriptStore) -> Cach
 // ── SCRIPT ───────────────────────────────────────────────────────────────────
 
 pub fn cmd_script_load(args: &[Vec<u8>], store: &mut ScriptStore) -> CacheResult<Resp> {
-    if args.len() != 3 { return Err(CacheError::wrong_arity("script load")); }
+    if args.len() != 3 {
+        return Err(CacheError::wrong_arity("script load"));
+    }
     let script = std::str::from_utf8(&args[2])
         .map_err(|_| CacheError::generic("ERR Script contains invalid UTF-8"))?
         .to_string();
@@ -64,8 +78,11 @@ pub fn cmd_script_load(args: &[Vec<u8>], store: &mut ScriptStore) -> CacheResult
 }
 
 pub fn cmd_script_exists(args: &[Vec<u8>], store: &ScriptStore) -> CacheResult<Resp> {
-    if args.len() < 3 { return Err(CacheError::wrong_arity("script exists")); }
-    let results: Vec<Resp> = args[2..].iter()
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity("script exists"));
+    }
+    let results: Vec<Resp> = args[2..]
+        .iter()
         .map(|sha| {
             let sha_str = std::str::from_utf8(sha).unwrap_or("").to_ascii_lowercase();
             Resp::Integer(if store.exists(&sha_str) { 1 } else { 0 })
@@ -98,18 +115,31 @@ pub fn cmd_script_debug(_args: &[Vec<u8>]) -> CacheResult<Resp> {
 //   - redis.status_reply("OK")
 //   - redis.error_reply("ERR msg")
 
-fn evaluate_script(script: &str, keys: &[Vec<u8>], argv: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
+fn evaluate_script(
+    script: &str,
+    keys: &[Vec<u8>],
+    argv: &[Vec<u8>],
+    db: &mut Db,
+) -> CacheResult<Resp> {
     let script = script.trim();
 
     // Execute all lines, tracking the final return value
     let result = execute_lua_block(script, keys, argv, db);
     match result {
         Ok(v) => Ok(v),
-        Err(e) => Err(CacheError::generic(format!("ERR Error running script: {}", e))),
+        Err(e) => Err(CacheError::generic(format!(
+            "ERR Error running script: {}",
+            e
+        ))),
     }
 }
 
-fn execute_lua_block(script: &str, keys: &[Vec<u8>], argv: &[Vec<u8>], db: &mut Db) -> Result<Resp, String> {
+fn execute_lua_block(
+    script: &str,
+    keys: &[Vec<u8>],
+    argv: &[Vec<u8>],
+    db: &mut Db,
+) -> Result<Resp, String> {
     // Split into lines and execute
     let lines: Vec<&str> = script.lines().collect();
     let mut i = 0;
@@ -148,21 +178,32 @@ fn execute_lua_block(script: &str, keys: &[Vec<u8>], argv: &[Vec<u8>], db: &mut 
     Ok(Resp::nil())
 }
 
-fn evaluate_expr(expr: &str, keys: &[Vec<u8>], argv: &[Vec<u8>], db: &mut Db) -> Result<Resp, String> {
+fn evaluate_expr(
+    expr: &str,
+    keys: &[Vec<u8>],
+    argv: &[Vec<u8>],
+    db: &mut Db,
+) -> Result<Resp, String> {
     let expr = expr.trim().trim_end_matches(';');
 
     // KEYS[n]
     if expr.starts_with("KEYS[") && expr.ends_with(']') {
-        let idx: usize = expr[5..expr.len()-1].parse().map_err(|_| "invalid KEYS index".to_string())?;
-        return Ok(keys.get(idx - 1)
+        let idx: usize = expr[5..expr.len() - 1]
+            .parse()
+            .map_err(|_| "invalid KEYS index".to_string())?;
+        return Ok(keys
+            .get(idx - 1)
             .map(|k| Resp::BulkString(Some(k.clone())))
             .unwrap_or(Resp::nil()));
     }
 
     // ARGV[n]
     if expr.starts_with("ARGV[") && expr.ends_with(']') {
-        let idx: usize = expr[5..expr.len()-1].parse().map_err(|_| "invalid ARGV index".to_string())?;
-        return Ok(argv.get(idx - 1)
+        let idx: usize = expr[5..expr.len() - 1]
+            .parse()
+            .map_err(|_| "invalid ARGV index".to_string())?;
+        return Ok(argv
+            .get(idx - 1)
             .map(|a| Resp::BulkString(Some(a.clone())))
             .unwrap_or(Resp::nil()));
     }
@@ -187,14 +228,18 @@ fn evaluate_expr(expr: &str, keys: &[Vec<u8>], argv: &[Vec<u8>], db: &mut Db) ->
 
     // redis.status_reply("OK")
     if expr.starts_with("redis.status_reply(") {
-        let inner = expr.trim_start_matches("redis.status_reply(").trim_end_matches(')');
+        let inner = expr
+            .trim_start_matches("redis.status_reply(")
+            .trim_end_matches(')');
         let s = unquote_lua_string(inner);
         return Ok(Resp::SimpleString(s.into_bytes()));
     }
 
     // redis.error_reply("ERR ...")
     if expr.starts_with("redis.error_reply(") {
-        let inner = expr.trim_start_matches("redis.error_reply(").trim_end_matches(')');
+        let inner = expr
+            .trim_start_matches("redis.error_reply(")
+            .trim_end_matches(')');
         let s = unquote_lua_string(inner);
         return Err(s);
     }
@@ -210,7 +255,9 @@ fn evaluate_expr(expr: &str, keys: &[Vec<u8>], argv: &[Vec<u8>], db: &mut Db) ->
     }
 
     // String literal
-    if (expr.starts_with('"') && expr.ends_with('"')) || (expr.starts_with('\'') && expr.ends_with('\'')) {
+    if (expr.starts_with('"') && expr.ends_with('"'))
+        || (expr.starts_with('\'') && expr.ends_with('\''))
+    {
         let s = unquote_lua_string(expr);
         return Ok(Resp::BulkString(Some(s.into_bytes())));
     }
@@ -224,7 +271,7 @@ fn evaluate_expr(expr: &str, keys: &[Vec<u8>], argv: &[Vec<u8>], db: &mut Db) ->
 
     // Table literal {1, 2, 3} or {ok="OK"} or {err="ERR"}
     if expr.starts_with('{') && expr.ends_with('}') {
-        let inner = &expr[1..expr.len()-1].trim();
+        let inner = &expr[1..expr.len() - 1].trim();
         if inner.starts_with("ok=") || inner.starts_with("ok =") {
             let val = inner.trim_start_matches("ok=").trim_start_matches("ok =");
             return Ok(Resp::SimpleString(unquote_lua_string(val).into_bytes()));
@@ -234,7 +281,8 @@ fn evaluate_expr(expr: &str, keys: &[Vec<u8>], argv: &[Vec<u8>], db: &mut Db) ->
             return Err(unquote_lua_string(val));
         }
         // Array table
-        let items: Vec<Resp> = inner.split(',')
+        let items: Vec<Resp> = inner
+            .split(',')
             .filter_map(|s| evaluate_expr(s.trim(), keys, argv, db).ok())
             .collect();
         return Ok(Resp::Array(Some(items)));
@@ -253,7 +301,7 @@ fn parse_lua_call_args(args_str: &str, keys: &[Vec<u8>], argv: &[Vec<u8>]) -> Ve
 
         // KEYS[n]
         if part.starts_with("KEYS[") && part.ends_with(']') {
-            if let Ok(idx) = part[5..part.len()-1].parse::<usize>() {
+            if let Ok(idx) = part[5..part.len() - 1].parse::<usize>() {
                 if let Some(k) = keys.get(idx - 1) {
                     result.push(k.clone());
                     continue;
@@ -263,7 +311,7 @@ fn parse_lua_call_args(args_str: &str, keys: &[Vec<u8>], argv: &[Vec<u8>]) -> Ve
 
         // ARGV[n]
         if part.starts_with("ARGV[") && part.ends_with(']') {
-            if let Ok(idx) = part[5..part.len()-1].parse::<usize>() {
+            if let Ok(idx) = part[5..part.len() - 1].parse::<usize>() {
                 if let Some(a) = argv.get(idx - 1) {
                     result.push(a.clone());
                     continue;
@@ -272,7 +320,9 @@ fn parse_lua_call_args(args_str: &str, keys: &[Vec<u8>], argv: &[Vec<u8>]) -> Ve
         }
 
         // String literal
-        if (part.starts_with('"') && part.ends_with('"')) || (part.starts_with('\'') && part.ends_with('\'')) {
+        if (part.starts_with('"') && part.ends_with('"'))
+            || (part.starts_with('\'') && part.ends_with('\''))
+        {
             result.push(unquote_lua_string(part).into_bytes());
             continue;
         }
@@ -292,11 +342,16 @@ fn split_lua_args(s: &str) -> Vec<&str> {
 
     for (i, c) in s.char_indices() {
         if in_str {
-            if c == str_char { in_str = false; }
+            if c == str_char {
+                in_str = false;
+            }
             continue;
         }
         match c {
-            '"' | '\'' => { in_str = true; str_char = c; }
+            '"' | '\'' => {
+                in_str = true;
+                str_char = c;
+            }
             '(' | '[' | '{' => depth += 1,
             ')' | ']' | '}' => depth -= 1,
             ',' if depth == 0 => {
@@ -313,7 +368,7 @@ fn split_lua_args(s: &str) -> Vec<&str> {
 fn unquote_lua_string(s: &str) -> String {
     let s = s.trim();
     if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
-        s[1..s.len()-1].to_string()
+        s[1..s.len() - 1].to_string()
     } else {
         s.to_string()
     }
@@ -321,17 +376,19 @@ fn unquote_lua_string(s: &str) -> String {
 
 fn redis_call_impl(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
     if args.is_empty() {
-        return Err(CacheError::generic("ERR Please specify at least one argument for redis.call()"));
+        return Err(CacheError::generic(
+            "ERR Please specify at least one argument for redis.call()",
+        ));
     }
 
     // Dispatch to command handlers
-    use crate::commands::strings::*;
-    use crate::commands::keys::*;
+    use crate::commands::expiry::*;
     use crate::commands::hashes::*;
+    use crate::commands::keys::*;
     use crate::commands::lists::*;
     use crate::commands::sets::*;
     use crate::commands::sorted_sets::*;
-    use crate::commands::expiry::*;
+    use crate::commands::strings::*;
 
     let cmd = args[0].to_ascii_uppercase();
     match cmd.as_slice() {
@@ -370,7 +427,9 @@ fn redis_call_impl(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
         b"MSET" => cmd_mset(args, db),
         b"APPEND" => cmd_append(args, db),
         b"STRLEN" => cmd_strlen(args, db),
-        _ => Err(CacheError::generic(format!("ERR Unknown Redis command called from script: '{}'",
-            std::str::from_utf8(&cmd).unwrap_or("?")))),
+        _ => Err(CacheError::generic(format!(
+            "ERR Unknown Redis command called from script: '{}'",
+            std::str::from_utf8(&cmd).unwrap_or("?")
+        ))),
     }
 }

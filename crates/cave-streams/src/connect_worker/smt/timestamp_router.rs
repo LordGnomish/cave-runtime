@@ -39,9 +39,7 @@ pub struct TimestampRouter {
 impl TimestampRouter {
     pub fn from_config(cfg: &BTreeMap<String, String>) -> StreamsResult<Self> {
         let topic_format = cfg.get(TOPIC_FORMAT_KEY).cloned().ok_or_else(|| {
-            StreamsError::Internal(format!(
-                "TimestampRouter: '{TOPIC_FORMAT_KEY}' is required"
-            ))
+            StreamsError::Internal(format!("TimestampRouter: '{TOPIC_FORMAT_KEY}' is required"))
         })?;
         let ts_format_in = cfg
             .get(TIMESTAMP_FORMAT_KEY)
@@ -73,7 +71,9 @@ impl Smt for TimestampRouter {
     }
 
     fn apply(&self, mut r: RecordEnvelope) -> StreamsResult<Option<RecordEnvelope>> {
-        let ts_ms = r.timestamp_ms.unwrap_or_else(|| Utc::now().timestamp_millis());
+        let ts_ms = r
+            .timestamp_ms
+            .unwrap_or_else(|| Utc::now().timestamp_millis());
         let secs = ts_ms.div_euclid(1000);
         let nanos = (ts_ms.rem_euclid(1000) as u32) * 1_000_000;
         let dt = Utc

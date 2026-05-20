@@ -16,7 +16,7 @@ use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 
-use super::{ns, SamlError};
+use super::{SamlError, ns};
 
 /// Which SAML role this descriptor advertises.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -124,15 +124,22 @@ impl EntityDescriptor {
             let mut kd = BytesStart::new("md:KeyDescriptor");
             kd.push_attribute(("use", "signing"));
             w.write_event(Event::Start(kd)).map_err(io_err)?;
-            w.write_event(Event::Start(BytesStart::new("ds:KeyInfo"))).map_err(io_err)?;
-            w.write_event(Event::Start(BytesStart::new("ds:X509Data"))).map_err(io_err)?;
+            w.write_event(Event::Start(BytesStart::new("ds:KeyInfo")))
+                .map_err(io_err)?;
+            w.write_event(Event::Start(BytesStart::new("ds:X509Data")))
+                .map_err(io_err)?;
             w.write_event(Event::Start(BytesStart::new("ds:X509Certificate")))
                 .map_err(io_err)?;
-            w.write_event(Event::Text(BytesText::new(cert))).map_err(io_err)?;
-            w.write_event(Event::End(BytesEnd::new("ds:X509Certificate"))).map_err(io_err)?;
-            w.write_event(Event::End(BytesEnd::new("ds:X509Data"))).map_err(io_err)?;
-            w.write_event(Event::End(BytesEnd::new("ds:KeyInfo"))).map_err(io_err)?;
-            w.write_event(Event::End(BytesEnd::new("md:KeyDescriptor"))).map_err(io_err)?;
+            w.write_event(Event::Text(BytesText::new(cert)))
+                .map_err(io_err)?;
+            w.write_event(Event::End(BytesEnd::new("ds:X509Certificate")))
+                .map_err(io_err)?;
+            w.write_event(Event::End(BytesEnd::new("ds:X509Data")))
+                .map_err(io_err)?;
+            w.write_event(Event::End(BytesEnd::new("ds:KeyInfo")))
+                .map_err(io_err)?;
+            w.write_event(Event::End(BytesEnd::new("md:KeyDescriptor")))
+                .map_err(io_err)?;
         }
 
         if let Some(slo) = &self.slo_endpoint {
@@ -161,8 +168,10 @@ impl EntityDescriptor {
             w.write_event(Event::Empty(e)).map_err(io_err)?;
         }
 
-        w.write_event(Event::End(BytesEnd::new(inner_tag))).map_err(io_err)?;
-        w.write_event(Event::End(BytesEnd::new("md:EntityDescriptor"))).map_err(io_err)?;
+        w.write_event(Event::End(BytesEnd::new(inner_tag)))
+            .map_err(io_err)?;
+        w.write_event(Event::End(BytesEnd::new("md:EntityDescriptor")))
+            .map_err(io_err)?;
 
         Ok(buf.into_inner())
     }
@@ -342,16 +351,18 @@ mod tests {
         assert_eq!(parsed.entity_id, "https://idp.example");
         assert_eq!(parsed.role, EntityRole::Idp);
         assert_eq!(parsed.endpoints.len(), 2);
-        assert_eq!(parsed.signing_cert_b64.as_deref(), Some("BASE64CERTBYTES=="));
+        assert_eq!(
+            parsed.signing_cert_b64.as_deref(),
+            Some("BASE64CERTBYTES==")
+        );
     }
 
     #[test]
     fn sp_metadata_emits_index_and_default() {
-        let m = EntityDescriptor::new_sp("https://sp.example")
-            .add_endpoint(
-                "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
-                "https://sp.example/acs",
-            );
+        let m = EntityDescriptor::new_sp("https://sp.example").add_endpoint(
+            "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
+            "https://sp.example/acs",
+        );
         let bytes = m.to_xml().unwrap();
         let s = String::from_utf8(bytes.clone()).unwrap();
         assert!(s.contains("md:SPSSODescriptor"));
@@ -365,8 +376,10 @@ mod tests {
 
     #[test]
     fn slo_endpoint_round_trips() {
-        let m = EntityDescriptor::new_idp("https://idp")
-            .with_slo("urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect", "https://idp/slo");
+        let m = EntityDescriptor::new_idp("https://idp").with_slo(
+            "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+            "https://idp/slo",
+        );
         let bytes = m.to_xml().unwrap();
         let parsed = EntityDescriptor::from_xml(&bytes).unwrap();
         assert_eq!(parsed.slo_endpoint.unwrap().location, "https://idp/slo");

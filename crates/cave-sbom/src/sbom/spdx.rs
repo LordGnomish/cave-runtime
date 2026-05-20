@@ -283,7 +283,10 @@ mod tests {
     #[test]
     fn parse_spdx_json_document_namespace_as_serial() {
         let r = parse_json(SAMPLE_JSON_23.as_bytes()).unwrap();
-        assert_eq!(r.serial_number.as_deref(), Some("https://example.com/spdx/my-app"));
+        assert_eq!(
+            r.serial_number.as_deref(),
+            Some("https://example.com/spdx/my-app")
+        );
     }
 
     #[test]

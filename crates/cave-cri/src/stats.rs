@@ -149,11 +149,17 @@ pub fn cadvisor_descriptors() -> Vec<MetricDescriptor> {
         MetricDescriptor {
             name: "container_cpu_usage_seconds_total".into(),
             help: "Cumulative CPU time consumed by the container in seconds.".into(),
-            label_keys: vec!["id".into(), "name".into(), "image".into(), "namespace".into()],
+            label_keys: vec![
+                "id".into(),
+                "name".into(),
+                "image".into(),
+                "namespace".into(),
+            ],
         },
         MetricDescriptor {
             name: "container_memory_usage_bytes".into(),
-            help: "Current memory usage in bytes including all memory regardless of when accessed.".into(),
+            help: "Current memory usage in bytes including all memory regardless of when accessed."
+                .into(),
             label_keys: vec!["id".into(), "name".into(), "image".into()],
         },
         MetricDescriptor {
@@ -226,18 +232,30 @@ pub fn container_stats_linux(
             let dcpu_ns = cpu_now
                 .usage_core_nano_seconds
                 .saturating_sub(prev.usage_core_nano_seconds);
-            if dt_ns == 0 { 0 } else { (dcpu_ns * 1_000_000_000) / dt_ns }
+            if dt_ns == 0 {
+                0
+            } else {
+                (dcpu_ns * 1_000_000_000) / dt_ns
+            }
         }
         _ => 0,
     };
 
     Ok(ContainerStatsLinux {
         attributes: Some(ContainerAttributes::from(container)),
-        cpu: CpuUsage { usage_nano_cores: nano_cores, ..cpu_now },
+        cpu: CpuUsage {
+            usage_nano_cores: nano_cores,
+            ..cpu_now
+        },
         memory: MemoryUsage {
             timestamp: now,
             working_set_bytes: v2.memory_current.saturating_sub(v2.memory_swap_current / 2),
-            available_bytes: container.spec.resources.memory_limit.unwrap_or(0).saturating_sub(v2.memory_current),
+            available_bytes: container
+                .spec
+                .resources
+                .memory_limit
+                .unwrap_or(0)
+                .saturating_sub(v2.memory_current),
             usage_bytes: v2.memory_current,
             rss_bytes: v2.memory_current.saturating_sub(v2.memory_swap_current),
             page_faults: 0,
@@ -245,7 +263,9 @@ pub fn container_stats_linux(
         },
         writable_layer: FilesystemUsage {
             timestamp: now,
-            fs_id: FilesystemIdentifier { mountpoint: container.rootfs_path.display().to_string() },
+            fs_id: FilesystemIdentifier {
+                mountpoint: container.rootfs_path.display().to_string(),
+            },
             used_bytes: v2.io_write_bytes,
             inodes_used: 0,
         },
@@ -273,13 +293,20 @@ pub fn container_stats_windows(container: &Container) -> CriResult<WindowsContai
         memory: WindowsMemoryUsage {
             timestamp: now,
             working_set_bytes: v2.memory_current,
-            available_bytes: container.spec.resources.memory_limit.unwrap_or(0).saturating_sub(v2.memory_current),
+            available_bytes: container
+                .spec
+                .resources
+                .memory_limit
+                .unwrap_or(0)
+                .saturating_sub(v2.memory_current),
             commit_memory_bytes: v2.memory_current,
             page_faults: 0,
         },
         writable_layer: WindowsFilesystemUsage {
             timestamp: now,
-            fs_id: FilesystemIdentifier { mountpoint: container.rootfs_path.display().to_string() },
+            fs_id: FilesystemIdentifier {
+                mountpoint: container.rootfs_path.display().to_string(),
+            },
             used_bytes: v2.io_write_bytes,
         },
     })
@@ -304,7 +331,9 @@ pub fn filter_containers<'a>(
         .into_iter()
         .filter(|c| {
             if let Some(id) = filter.id {
-                if c.id != id { return false; }
+                if c.id != id {
+                    return false;
+                }
             }
             for (k, v) in &filter.label_selector {
                 if c.spec.labels.get(k) != Some(v) {
@@ -324,7 +353,9 @@ pub fn image_fs_info(image_root: &str, images: &[crate::models::OciImage]) -> Im
         timestamp: now,
         image_filesystems: vec![FilesystemUsage {
             timestamp: now,
-            fs_id: FilesystemIdentifier { mountpoint: image_root.to_string() },
+            fs_id: FilesystemIdentifier {
+                mountpoint: image_root.to_string(),
+            },
             used_bytes: total,
             inodes_used: images.len() as u64,
         }],
@@ -395,15 +426,21 @@ pub fn render_prometheus(metrics: &[Metric]) -> String {
     let mut current = "";
     for m in metrics {
         if m.name != current {
-            out.push_str(&format!("# TYPE {} {}\n", m.name, match m.metric_type {
-                MetricType::Counter => "counter",
-                MetricType::Gauge => "gauge",
-            }));
+            out.push_str(&format!(
+                "# TYPE {} {}\n",
+                m.name,
+                match m.metric_type {
+                    MetricType::Counter => "counter",
+                    MetricType::Gauge => "gauge",
+                }
+            ));
             current = &m.name;
         }
         out.push_str(&m.name);
         out.push('{');
-        let labels: Vec<String> = m.labels.iter()
+        let labels: Vec<String> = m
+            .labels
+            .iter()
             .map(|(k, v)| format!("{}=\"{}\"", k, v))
             .collect();
         out.push_str(&labels.join(","));
@@ -432,7 +469,9 @@ mod tests {
                     memory_limit: Some(1024 * 1024),
                     ..Default::default()
                 },
-                labels: [("env".to_string(), "prod".to_string())].into_iter().collect(),
+                labels: [("env".to_string(), "prod".to_string())]
+                    .into_iter()
+                    .collect(),
                 working_dir: None,
                 user: None,
                 hostname: None,
@@ -513,7 +552,10 @@ mod tests {
         let a = make_container();
         let b = make_container();
         let target_id = a.id;
-        let f = ContainerStatsFilter { id: Some(target_id), ..Default::default() };
+        let f = ContainerStatsFilter {
+            id: Some(target_id),
+            ..Default::default()
+        };
         let got = filter_containers([&a, &b], &f);
         assert_eq!(got.len(), 1);
         assert_eq!(got[0].id, target_id);
@@ -525,7 +567,9 @@ mod tests {
         a.spec.labels.insert("tier".into(), "frontend".into());
         let b = make_container();
         let f = ContainerStatsFilter {
-            label_selector: [("tier".to_string(), "frontend".to_string())].into_iter().collect(),
+            label_selector: [("tier".to_string(), "frontend".to_string())]
+                .into_iter()
+                .collect(),
             ..Default::default()
         };
         let got = filter_containers([&a, &b], &f);
@@ -547,19 +591,30 @@ mod tests {
     fn image_fs_info_aggregates_sizes() {
         let imgs = vec![
             OciImage {
-                reference: "a:1".into(), digest: "d".into(), layers: vec![],
-                config: ImageConfig::default(), size_bytes: 100, pulled_at: Utc::now(),
+                reference: "a:1".into(),
+                digest: "d".into(),
+                layers: vec![],
+                config: ImageConfig::default(),
+                size_bytes: 100,
+                pulled_at: Utc::now(),
             },
             OciImage {
-                reference: "b:1".into(), digest: "d".into(), layers: vec![],
-                config: ImageConfig::default(), size_bytes: 250, pulled_at: Utc::now(),
+                reference: "b:1".into(),
+                digest: "d".into(),
+                layers: vec![],
+                config: ImageConfig::default(),
+                size_bytes: 250,
+                pulled_at: Utc::now(),
             },
         ];
         let info = image_fs_info("/var/lib/cave/images", &imgs);
         assert_eq!(info.image_filesystems.len(), 1);
         assert_eq!(info.image_filesystems[0].used_bytes, 350);
         assert_eq!(info.image_filesystems[0].inodes_used, 2);
-        assert_eq!(info.image_filesystems[0].fs_id.mountpoint, "/var/lib/cave/images");
+        assert_eq!(
+            info.image_filesystems[0].fs_id.mountpoint,
+            "/var/lib/cave/images"
+        );
     }
 
     #[test]
@@ -677,8 +732,16 @@ mod tests {
     #[test]
     fn nano_cores_zero_when_no_dt() {
         // Compute path: dt_ns == 0 → nano_cores = 0
-        let prev = CpuUsage { timestamp: 1_000, usage_core_nano_seconds: 0, usage_nano_cores: 0 };
-        let now = CpuUsage { timestamp: 1_000, usage_core_nano_seconds: 100, usage_nano_cores: 0 };
+        let prev = CpuUsage {
+            timestamp: 1_000,
+            usage_core_nano_seconds: 0,
+            usage_nano_cores: 0,
+        };
+        let now = CpuUsage {
+            timestamp: 1_000,
+            usage_core_nano_seconds: 100,
+            usage_nano_cores: 0,
+        };
         // Re-implement the inline computation to lock the algorithm.
         let dt_ns = now.timestamp.saturating_sub(prev.timestamp) as u64;
         let nc = if dt_ns == 0 { 0 } else { 1 };

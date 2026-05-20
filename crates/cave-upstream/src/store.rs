@@ -32,7 +32,8 @@ impl UpstreamStore {
     }
 
     pub fn list_services(&self) -> Vec<UpstreamService> {
-        let mut services: Vec<UpstreamService> = self.services.read().unwrap().values().cloned().collect();
+        let mut services: Vec<UpstreamService> =
+            self.services.read().unwrap().values().cloned().collect();
         services.sort_by(|a, b| a.name.cmp(&b.name));
         services
     }
@@ -61,7 +62,11 @@ impl UpstreamStore {
         let latency_ms: u64 = rng.gen_range(10..500);
 
         let status = if operational {
-            if latency_ms > 400 { UpstreamStatus::Degraded } else { UpstreamStatus::Operational }
+            if latency_ms > 400 {
+                UpstreamStatus::Degraded
+            } else {
+                UpstreamStatus::Operational
+            }
         } else {
             UpstreamStatus::Incident
         };
@@ -118,7 +123,12 @@ impl UpstreamStore {
     // ── Alerts ────────────────────────────────────────────────────────────────
 
     pub fn get_alerts(&self, service_id: Uuid) -> Vec<UpstreamAlert> {
-        self.alerts.read().unwrap().get(&service_id).cloned().unwrap_or_default()
+        self.alerts
+            .read()
+            .unwrap()
+            .get(&service_id)
+            .cloned()
+            .unwrap_or_default()
     }
 
     pub fn add_alert(&self, service_id: Uuid, alert: UpstreamAlert) {
@@ -229,7 +239,9 @@ impl UpstreamStore {
                 vendor: Some("GitHub / Microsoft".to_string()),
                 version: Some("v3".to_string()),
                 status: UpstreamStatus::Operational,
-                health_check_url: Some("https://www.githubstatus.com/api/v2/status.json".to_string()),
+                health_check_url: Some(
+                    "https://www.githubstatus.com/api/v2/status.json".to_string(),
+                ),
                 docs_url: Some("https://docs.github.com/en/rest".to_string()),
                 license: Some("Proprietary".to_string()),
                 support_tier: SupportTier::Commercial,
@@ -292,7 +304,9 @@ impl UpstreamStore {
                 vendor: Some("PagerDuty".to_string()),
                 version: None,
                 status: UpstreamStatus::Operational,
-                health_check_url: Some("https://status.pagerduty.com/api/v2/status.json".to_string()),
+                health_check_url: Some(
+                    "https://status.pagerduty.com/api/v2/status.json".to_string(),
+                ),
                 docs_url: Some("https://developer.pagerduty.com/".to_string()),
                 license: Some("Proprietary".to_string()),
                 support_tier: SupportTier::Commercial,

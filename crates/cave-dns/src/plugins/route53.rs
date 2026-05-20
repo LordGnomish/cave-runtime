@@ -85,7 +85,11 @@ impl Plugin for Route53Plugin {
     async fn ready(&self) -> DnsResult<()> {
         match self.sync().await {
             Ok(store) => {
-                info!(records = store.len(), zones = self.config.zones.len(), "route53 plugin synced");
+                info!(
+                    records = store.len(),
+                    zones = self.config.zones.len(),
+                    "route53 plugin synced"
+                );
                 self.store.store(Arc::new(store));
             }
             Err(e) => {

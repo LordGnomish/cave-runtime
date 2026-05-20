@@ -116,9 +116,9 @@ impl ReplState {
                     self.messages.clear();
                     ReplEffect::Clear
                 }
-                "help" | "?" => ReplEffect::Banner(
-                    "/quit | /clear | /help | /tools | /conv".to_string(),
-                ),
+                "help" | "?" => {
+                    ReplEffect::Banner("/quit | /clear | /help | /tools | /conv".to_string())
+                }
                 "tools" => ReplEffect::Banner("(tools list shown by binary)".to_string()),
                 "conv" => ReplEffect::Banner(format!(
                     "conversation_id={} tenant_id={}",

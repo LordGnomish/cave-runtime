@@ -22,7 +22,12 @@ use cavectl::client::ApiClient;
 )]
 struct Cli {
     /// Runtime API server URL
-    #[arg(long, global = true, default_value = "http://localhost:3000", env = "CAVE_SERVER")]
+    #[arg(
+        long,
+        global = true,
+        default_value = "http://localhost:3000",
+        env = "CAVE_SERVER"
+    )]
     server: String,
 
     /// Output format
@@ -426,35 +431,80 @@ enum Commands {
         cmd: UpstreamCmd,
     },
     /// cave-admission CLI parity
-    Admission { #[command(subcommand)] cmd: AdmissionCmd },
+    Admission {
+        #[command(subcommand)]
+        cmd: AdmissionCmd,
+    },
     /// cave-cdc CLI parity
-    Cdc { #[command(subcommand)] cmd: CdcCmd },
+    Cdc {
+        #[command(subcommand)]
+        cmd: CdcCmd,
+    },
     /// cave-certs CLI parity
-    Certs { #[command(subcommand)] cmd: CertsCmd },
+    Certs {
+        #[command(subcommand)]
+        cmd: CertsCmd,
+    },
     /// cave-crm CLI parity
-    Crm { #[command(subcommand)] cmd: CrmCmd },
+    Crm {
+        #[command(subcommand)]
+        cmd: CrmCmd,
+    },
     /// cave-crossplane CLI parity
-    Crossplane { #[command(subcommand)] cmd: CrossplaneCmd },
+    Crossplane {
+        #[command(subcommand)]
+        cmd: CrossplaneCmd,
+    },
     /// cave-gitops-config CLI parity
-    GitopsConfig { #[command(subcommand)] cmd: GitopsCmd },
+    GitopsConfig {
+        #[command(subcommand)]
+        cmd: GitopsCmd,
+    },
     /// cave-karpenter CLI parity
-    Karpenter { #[command(subcommand)] cmd: KarpenterCmd },
+    Karpenter {
+        #[command(subcommand)]
+        cmd: KarpenterCmd,
+    },
     /// cave-kubevirt CLI parity
-    Kubevirt { #[command(subcommand)] cmd: KubevirtCmd },
+    Kubevirt {
+        #[command(subcommand)]
+        cmd: KubevirtCmd,
+    },
     /// cave-ledger CLI parity
-    Ledger { #[command(subcommand)] cmd: LedgerCmd },
+    Ledger {
+        #[command(subcommand)]
+        cmd: LedgerCmd,
+    },
     /// cave-oncall CLI parity
-    Oncall { #[command(subcommand)] cmd: OncallCmd },
+    Oncall {
+        #[command(subcommand)]
+        cmd: OncallCmd,
+    },
     /// cave-search CLI parity
-    Search { #[command(subcommand)] cmd: SearchCmd },
+    Search {
+        #[command(subcommand)]
+        cmd: SearchCmd,
+    },
     /// cave-spark-operator CLI parity
-    Spark { #[command(subcommand)] cmd: SparkCmd },
+    Spark {
+        #[command(subcommand)]
+        cmd: SparkCmd,
+    },
     /// cave-jupyter CLI parity
-    Jupyter { #[command(subcommand)] cmd: JupyterCmd },
+    Jupyter {
+        #[command(subcommand)]
+        cmd: JupyterCmd,
+    },
     /// cave-mlflow CLI parity
-    Mlflow { #[command(subcommand)] cmd: MlflowCmd },
+    Mlflow {
+        #[command(subcommand)]
+        cmd: MlflowCmd,
+    },
     /// cave-flux CLI parity
-    Flux { #[command(subcommand)] cmd: FluxCmd },
+    Flux {
+        #[command(subcommand)]
+        cmd: FluxCmd,
+    },
 }
 
 // ── Per-module subcommand enums ───────────────────────────────────────────────
@@ -508,13 +558,25 @@ enum ContainerScanCmd {
 }
 
 #[derive(Subcommand)]
-enum DashboardCmd { List, Get, Import }
+enum DashboardCmd {
+    List,
+    Get,
+    Import,
+}
 
 #[derive(Subcommand)]
-enum DeployCmd { List, Get, Rollback }
+enum DeployCmd {
+    List,
+    Get,
+    Rollback,
+}
 
 #[derive(Subcommand)]
-enum DnsCmd { Zones, Records, Query }
+enum DnsCmd {
+    Zones,
+    Records,
+    Query,
+}
 
 #[derive(Subcommand)]
 enum ErpCmd {
@@ -532,47 +594,114 @@ enum ErpCmd {
 }
 
 #[derive(Subcommand)]
-enum HaCmd { Status, Failovers, Trigger }
+enum HaCmd {
+    Status,
+    Failovers,
+    Trigger,
+}
 
 #[derive(Subcommand)]
-enum KnativeServiceCmd { Services, Revisions, Routes }
+enum KnativeServiceCmd {
+    Services,
+    Revisions,
+    Routes,
+}
 
 #[derive(Subcommand)]
-enum LlmGwCmd { Routes, Usage, Limits }
+enum LlmGwCmd {
+    Routes,
+    Usage,
+    Limits,
+}
 
 #[derive(Subcommand)]
-enum LogsCmd { Streams, Query, Sinks }
+enum LogsCmd {
+    Streams,
+    Query,
+    Sinks,
+}
 
 #[derive(Subcommand)]
-enum MetricsCmd { Series, Query, Scrapers }
+enum MetricsCmd {
+    Series,
+    Query,
+    Scrapers,
+}
 
 #[derive(Subcommand)]
-enum PipelinesCmd { List, Runs, Trigger }
+enum PipelinesCmd {
+    List,
+    Runs,
+    Trigger,
+}
 
 #[derive(Subcommand)]
-enum RdbmsEngineCmd { Query, Stats, Schemas }
+enum RdbmsEngineCmd {
+    Query,
+    Stats,
+    Schemas,
+}
 
 #[derive(Subcommand)]
-enum RolloutsCmd { Status, Promote, Abort }
+enum RolloutsCmd {
+    Status,
+    Promote,
+    Abort,
+}
 
 #[derive(Subcommand)]
-enum SecurityCmd { Events, Policies, Audit }
+enum SecurityCmd {
+    Events,
+    Policies,
+    Audit,
+}
 
 #[derive(Subcommand)]
-enum StoreCmd { Buckets, Objects, Policies }
+enum StoreCmd {
+    Buckets,
+    Objects,
+    Policies,
+}
 
 #[derive(Subcommand)]
-enum TraceCmd { Services, TraceId, Search }
+enum TraceCmd {
+    Services,
+    TraceId,
+    Search,
+}
 
 #[derive(Subcommand)]
-enum TrackerCmd { Issues, Create, Transition }
+enum TrackerCmd {
+    Issues,
+    Create,
+    Transition,
+}
 
 #[derive(Subcommand)]
-enum UpstreamCmd { List, Check, Bump }
+enum UpstreamCmd {
+    List,
+    Check,
+    Bump,
+}
 
-#[derive(Subcommand)] enum AdmissionCmd { Decisions, Policies, Audit }
-#[derive(Subcommand)] enum CdcCmd { Pipelines, Lag, Snapshot }
-#[derive(Subcommand)] enum CertsCmd { List, Issue, Renew }
+#[derive(Subcommand)]
+enum AdmissionCmd {
+    Decisions,
+    Policies,
+    Audit,
+}
+#[derive(Subcommand)]
+enum CdcCmd {
+    Pipelines,
+    Lag,
+    Snapshot,
+}
+#[derive(Subcommand)]
+enum CertsCmd {
+    List,
+    Issue,
+    Renew,
+}
 #[derive(Subcommand)]
 enum CrmCmd {
     Accounts,
@@ -641,13 +770,48 @@ enum FluxCmd {
     /// Notification provider + alert CRs.
     Notifications,
 }
-#[derive(Subcommand)] enum CrossplaneCmd { Claims, Compositions, Providers }
-#[derive(Subcommand)] enum GitopsCmd { Apps, Sync, Diff }
-#[derive(Subcommand)] enum KarpenterCmd { Nodepools, Nodeclaims, Drift }
-#[derive(Subcommand)] enum KubevirtCmd { Vms, Vmis, Migrate }
-#[derive(Subcommand)] enum LedgerCmd { Entries, Verify, Export }
-#[derive(Subcommand)] enum OncallCmd { Shifts, Rotations, Incidents }
-#[derive(Subcommand)] enum SearchCmd { Indexes, Query, Reindex }
+#[derive(Subcommand)]
+enum CrossplaneCmd {
+    Claims,
+    Compositions,
+    Providers,
+}
+#[derive(Subcommand)]
+enum GitopsCmd {
+    Apps,
+    Sync,
+    Diff,
+}
+#[derive(Subcommand)]
+enum KarpenterCmd {
+    Nodepools,
+    Nodeclaims,
+    Drift,
+}
+#[derive(Subcommand)]
+enum KubevirtCmd {
+    Vms,
+    Vmis,
+    Migrate,
+}
+#[derive(Subcommand)]
+enum LedgerCmd {
+    Entries,
+    Verify,
+    Export,
+}
+#[derive(Subcommand)]
+enum OncallCmd {
+    Shifts,
+    Rotations,
+    Incidents,
+}
+#[derive(Subcommand)]
+enum SearchCmd {
+    Indexes,
+    Query,
+    Reindex,
+}
 
 #[derive(Subcommand)]
 enum FlagsCmd {
@@ -1227,7 +1391,10 @@ enum VaultCmd {
     /// Read metadata (no secret value) for a path
     Meta { backend: String, path: String },
     /// Show recent audit entries
-    Audit { #[arg(long, default_value = "100")] limit: u32 },
+    Audit {
+        #[arg(long, default_value = "100")]
+        limit: u32,
+    },
     /// Seal/unseal status
     Status,
 }
@@ -1239,7 +1406,10 @@ enum MeshCmd {
     /// Inspect one AuthorizationPolicy
     Get { name: String },
     /// Show recent flow log entries
-    Flows { #[arg(long, default_value = "100")] limit: u32 },
+    Flows {
+        #[arg(long, default_value = "100")]
+        limit: u32,
+    },
     /// Show waypoint proxy status
     Waypoints,
     /// Show mTLS peer identity stats
@@ -1256,10 +1426,18 @@ enum KamajiCmd {
     TcpGet { name: String },
     /// Scale a TCP to N replicas
     #[command(name = "tcp-scale")]
-    TcpScale { name: String, #[arg(long)] replicas: u32 },
+    TcpScale {
+        name: String,
+        #[arg(long)]
+        replicas: u32,
+    },
     /// Show TCP version upgrade plan
     #[command(name = "tcp-upgrade-plan")]
-    TcpUpgradePlan { name: String, #[arg(long)] target_version: String },
+    TcpUpgradePlan {
+        name: String,
+        #[arg(long)]
+        target_version: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1269,7 +1447,10 @@ enum PermissionCmd {
     /// List role assignments
     Assignments,
     /// Check a single (principal, permission) decision
-    Check { principal: String, permission: String },
+    Check {
+        principal: String,
+        permission: String,
+    },
     /// List supported permission names
     Catalog,
 }
@@ -1293,7 +1474,11 @@ enum ClusterCmd {
     /// Show node list for a cluster
     Nodes { name: String },
     /// Trigger an upgrade plan
-    Upgrade { name: String, #[arg(long)] target_version: String },
+    Upgrade {
+        name: String,
+        #[arg(long)]
+        target_version: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1697,13 +1882,9 @@ enum ConnectConnectorCmd {
     /// List connectors in the cluster
     List,
     /// Get connector info + tasks
-    Get {
-        name: String,
-    },
+    Get { name: String },
     /// Get connector source offsets
-    Offsets {
-        name: String,
-    },
+    Offsets { name: String },
     /// Create a connector. Each `--config k=v` is a connector property.
     Create {
         /// Connector name
@@ -1714,39 +1895,23 @@ enum ConnectConnectorCmd {
         configs: Vec<String>,
     },
     /// Delete a connector + drop its task state.
-    Delete {
-        name: String,
-    },
+    Delete { name: String },
     /// Pause a connector — its tasks stop ticking.
-    Pause {
-        name: String,
-    },
+    Pause { name: String },
     /// Resume a paused connector.
-    Resume {
-        name: String,
-    },
+    Resume { name: String },
     /// Restart a connector + every task.
-    Restart {
-        name: String,
-    },
+    Restart { name: String },
 }
 
 #[derive(Subcommand)]
 enum ConnectTaskCmd {
     /// List tasks for one connector
-    List {
-        connector: String,
-    },
+    List { connector: String },
     /// Show one task's state + failure_trace
-    Status {
-        connector: String,
-        task: u32,
-    },
+    Status { connector: String, task: u32 },
     /// Restart one task (clears failure_trace)
-    Restart {
-        connector: String,
-        task: u32,
-    },
+    Restart { connector: String, task: u32 },
 }
 
 #[derive(Subcommand)]
@@ -2888,9 +3053,7 @@ async fn dispatch_connect(c: &ApiClient, cmd: ConnectCmd) -> Result<()> {
         },
         ConnectCmd::Connector { cmd } => match cmd {
             ConnectConnectorCmd::List => c.get("/connectors").await,
-            ConnectConnectorCmd::Get { name } => {
-                c.get(&format!("/connectors/{name}")).await
-            }
+            ConnectConnectorCmd::Get { name } => c.get(&format!("/connectors/{name}")).await,
             ConnectConnectorCmd::Offsets { name } => {
                 c.get(&format!("/connectors/{name}/offsets")).await
             }
@@ -2901,15 +3064,10 @@ async fn dispatch_connect(c: &ApiClient, cmd: ConnectCmd) -> Result<()> {
                         cfg_map.insert(k.trim().to_string(), json!(v.trim()));
                     }
                 }
-                c.post(
-                    "/connectors",
-                    json!({ "name": name, "config": cfg_map }),
-                )
-                .await
+                c.post("/connectors", json!({ "name": name, "config": cfg_map }))
+                    .await
             }
-            ConnectConnectorCmd::Delete { name } => {
-                c.delete(&format!("/connectors/{name}")).await
-            }
+            ConnectConnectorCmd::Delete { name } => c.delete(&format!("/connectors/{name}")).await,
             ConnectConnectorCmd::Pause { name } => {
                 c.put_bytes(&format!("/connectors/{name}/pause"), Vec::new())
                     .await
@@ -4681,7 +4839,7 @@ async fn resolve_content(content: Option<String>, file: Option<String>) -> Resul
 
 /// Base64-encode bytes using the standard alphabet (etcd v3 wire format).
 fn b64encode(bytes: &[u8]) -> String {
-    use base64::{engine::general_purpose::STANDARD, Engine};
+    use base64::{Engine, engine::general_purpose::STANDARD};
     STANDARD.encode(bytes)
 }
 
@@ -4732,7 +4890,9 @@ fn apiserver_resource_path(
         "sa" | "serviceaccount" | "serviceaccounts" => Some("serviceaccounts"),
         "ev" | "event" | "events" => Some("events"),
         "ep" | "endpoint" | "endpoints" => Some("endpoints"),
-        "pvc" | "persistentvolumeclaim" | "persistentvolumeclaims" => Some("persistentvolumeclaims"),
+        "pvc" | "persistentvolumeclaim" | "persistentvolumeclaims" => {
+            Some("persistentvolumeclaims")
+        }
         "quota" | "resourcequota" | "resourcequotas" => Some("resourcequotas"),
         "limits" | "limitrange" | "limitranges" => Some("limitranges"),
         _ => None,
@@ -4892,36 +5052,75 @@ mod artifacts_parse_tests {
     #[test]
     fn artifacts_health_parses() {
         let cli = parse(&["cavectl", "artifacts", "health"]);
-        assert!(matches!(cli.command, Commands::Artifacts { cmd: ArtifactsCmd::Health }));
+        assert!(matches!(
+            cli.command,
+            Commands::Artifacts {
+                cmd: ArtifactsCmd::Health
+            }
+        ));
     }
 
     #[test]
     fn artifacts_harbor_projects_parses() {
         let cli = parse(&["cavectl", "artifacts", "harbor", "projects"]);
         match cli.command {
-            Commands::Artifacts { cmd: ArtifactsCmd::Harbor { cmd: HarborCmd::Projects } } => {}
-            other => panic!("wrong variant: {other:?}", other = std::mem::discriminant(&other)),
+            Commands::Artifacts {
+                cmd:
+                    ArtifactsCmd::Harbor {
+                        cmd: HarborCmd::Projects,
+                    },
+            } => {}
+            other => panic!(
+                "wrong variant: {other:?}",
+                other = std::mem::discriminant(&other)
+            ),
         }
     }
 
     #[test]
     fn artifacts_harbor_project_create_requires_name() {
-        let cli = parse(&["cavectl", "artifacts", "harbor", "project-create", "--name", "alpha"]);
+        let cli = parse(&[
+            "cavectl",
+            "artifacts",
+            "harbor",
+            "project-create",
+            "--name",
+            "alpha",
+        ]);
         match cli.command {
-            Commands::Artifacts { cmd: ArtifactsCmd::Harbor { cmd: HarborCmd::ProjectCreate { name } } } => {
+            Commands::Artifacts {
+                cmd:
+                    ArtifactsCmd::Harbor {
+                        cmd: HarborCmd::ProjectCreate { name },
+                    },
+            } => {
                 assert_eq!(name, "alpha");
             }
             _ => panic!("wrong variant"),
         }
         // Missing --name must be a parse error.
-        assert!(Cli::try_parse_from(&["cavectl", "artifacts", "harbor", "project-create"]).is_err());
+        assert!(
+            Cli::try_parse_from(&["cavectl", "artifacts", "harbor", "project-create"]).is_err()
+        );
     }
 
     #[test]
     fn artifacts_harbor_scan_takes_digest() {
-        let cli = parse(&["cavectl", "artifacts", "harbor", "scan", "--digest", "sha256:abcd"]);
+        let cli = parse(&[
+            "cavectl",
+            "artifacts",
+            "harbor",
+            "scan",
+            "--digest",
+            "sha256:abcd",
+        ]);
         match cli.command {
-            Commands::Artifacts { cmd: ArtifactsCmd::Harbor { cmd: HarborCmd::Scan { digest } } } => {
+            Commands::Artifacts {
+                cmd:
+                    ArtifactsCmd::Harbor {
+                        cmd: HarborCmd::Scan { digest },
+                    },
+            } => {
                 assert_eq!(digest, "sha256:abcd");
             }
             _ => panic!("wrong variant"),
@@ -4930,9 +5129,23 @@ mod artifacts_parse_tests {
 
     #[test]
     fn artifacts_pulp_sync_requires_repository_and_remote() {
-        let cli = parse(&["cavectl", "artifacts", "pulp", "sync", "--repository", "r", "--remote", "u"]);
+        let cli = parse(&[
+            "cavectl",
+            "artifacts",
+            "pulp",
+            "sync",
+            "--repository",
+            "r",
+            "--remote",
+            "u",
+        ]);
         match cli.command {
-            Commands::Artifacts { cmd: ArtifactsCmd::Pulp { cmd: PulpCmd::Sync { repository, remote } } } => {
+            Commands::Artifacts {
+                cmd:
+                    ArtifactsCmd::Pulp {
+                        cmd: PulpCmd::Sync { repository, remote },
+                    },
+            } => {
                 assert_eq!(repository, "r");
                 assert_eq!(remote, "u");
             }
@@ -4942,9 +5155,27 @@ mod artifacts_parse_tests {
 
     #[test]
     fn artifacts_pulp_distribute_takes_base_path() {
-        let cli = parse(&["cavectl", "artifacts", "pulp", "distribute", "--publication", "p", "--base-path", "/x/y"]);
+        let cli = parse(&[
+            "cavectl",
+            "artifacts",
+            "pulp",
+            "distribute",
+            "--publication",
+            "p",
+            "--base-path",
+            "/x/y",
+        ]);
         match cli.command {
-            Commands::Artifacts { cmd: ArtifactsCmd::Pulp { cmd: PulpCmd::Distribute { publication, base_path } } } => {
+            Commands::Artifacts {
+                cmd:
+                    ArtifactsCmd::Pulp {
+                        cmd:
+                            PulpCmd::Distribute {
+                                publication,
+                                base_path,
+                            },
+                    },
+            } => {
                 assert_eq!(publication, "p");
                 assert_eq!(base_path, "/x/y");
             }
@@ -4954,9 +5185,21 @@ mod artifacts_parse_tests {
 
     #[test]
     fn artifacts_nexus_repo_create_defaults_to_raw() {
-        let cli = parse(&["cavectl", "artifacts", "nexus", "repo-create", "--name", "rel"]);
+        let cli = parse(&[
+            "cavectl",
+            "artifacts",
+            "nexus",
+            "repo-create",
+            "--name",
+            "rel",
+        ]);
         match cli.command {
-            Commands::Artifacts { cmd: ArtifactsCmd::Nexus { cmd: NexusCmd::RepoCreate { name, format_kind } } } => {
+            Commands::Artifacts {
+                cmd:
+                    ArtifactsCmd::Nexus {
+                        cmd: NexusCmd::RepoCreate { name, format_kind },
+                    },
+            } => {
                 assert_eq!(name, "rel");
                 assert_eq!(format_kind, "raw");
             }
@@ -4966,9 +5209,23 @@ mod artifacts_parse_tests {
 
     #[test]
     fn artifacts_nexus_repo_create_accepts_other_formats() {
-        let cli = parse(&["cavectl", "artifacts", "nexus", "repo-create", "--name", "mvn", "--repo-format", "maven2"]);
+        let cli = parse(&[
+            "cavectl",
+            "artifacts",
+            "nexus",
+            "repo-create",
+            "--name",
+            "mvn",
+            "--repo-format",
+            "maven2",
+        ]);
         match cli.command {
-            Commands::Artifacts { cmd: ArtifactsCmd::Nexus { cmd: NexusCmd::RepoCreate { format_kind, .. } } } => {
+            Commands::Artifacts {
+                cmd:
+                    ArtifactsCmd::Nexus {
+                        cmd: NexusCmd::RepoCreate { format_kind, .. },
+                    },
+            } => {
                 assert_eq!(format_kind, "maven2");
             }
             _ => panic!("wrong variant"),
@@ -4978,13 +5235,29 @@ mod artifacts_parse_tests {
     #[test]
     fn artifacts_nexus_upload_collects_three_args() {
         let cli = parse(&[
-            "cavectl", "artifacts", "nexus", "upload",
-            "--repository", "r",
-            "--path", "dir/f.bin",
-            "--file", "/tmp/f.bin",
+            "cavectl",
+            "artifacts",
+            "nexus",
+            "upload",
+            "--repository",
+            "r",
+            "--path",
+            "dir/f.bin",
+            "--file",
+            "/tmp/f.bin",
         ]);
         match cli.command {
-            Commands::Artifacts { cmd: ArtifactsCmd::Nexus { cmd: NexusCmd::Upload { repository, path, file } } } => {
+            Commands::Artifacts {
+                cmd:
+                    ArtifactsCmd::Nexus {
+                        cmd:
+                            NexusCmd::Upload {
+                                repository,
+                                path,
+                                file,
+                            },
+                    },
+            } => {
                 assert_eq!(repository, "r");
                 assert_eq!(path, "dir/f.bin");
                 assert_eq!(file, "/tmp/f.bin");
@@ -4997,7 +5270,12 @@ mod artifacts_parse_tests {
     fn artifacts_cosign_keypair_defaults_to_ecdsa() {
         let cli = parse(&["cavectl", "artifacts", "cosign", "keypair"]);
         match cli.command {
-            Commands::Artifacts { cmd: ArtifactsCmd::Cosign { cmd: CosignCmd::Keypair { alg } } } => {
+            Commands::Artifacts {
+                cmd:
+                    ArtifactsCmd::Cosign {
+                        cmd: CosignCmd::Keypair { alg },
+                    },
+            } => {
                 assert_eq!(alg, "ecdsa-p256");
             }
             _ => panic!("wrong variant"),
@@ -5006,9 +5284,21 @@ mod artifacts_parse_tests {
 
     #[test]
     fn artifacts_cosign_keypair_accepts_pqc_alg() {
-        let cli = parse(&["cavectl", "artifacts", "cosign", "keypair", "--alg", "ml-dsa-65"]);
+        let cli = parse(&[
+            "cavectl",
+            "artifacts",
+            "cosign",
+            "keypair",
+            "--alg",
+            "ml-dsa-65",
+        ]);
         match cli.command {
-            Commands::Artifacts { cmd: ArtifactsCmd::Cosign { cmd: CosignCmd::Keypair { alg } } } => {
+            Commands::Artifacts {
+                cmd:
+                    ArtifactsCmd::Cosign {
+                        cmd: CosignCmd::Keypair { alg },
+                    },
+            } => {
                 assert_eq!(alg, "ml-dsa-65");
             }
             _ => panic!("wrong variant"),
@@ -5018,13 +5308,29 @@ mod artifacts_parse_tests {
     #[test]
     fn artifacts_cosign_sign_collects_key_ref_digest() {
         let cli = parse(&[
-            "cavectl", "artifacts", "cosign", "sign",
-            "--key-id", "k1",
-            "--reference", "registry/img:tag",
-            "--digest", "sha256:abc",
+            "cavectl",
+            "artifacts",
+            "cosign",
+            "sign",
+            "--key-id",
+            "k1",
+            "--reference",
+            "registry/img:tag",
+            "--digest",
+            "sha256:abc",
         ]);
         match cli.command {
-            Commands::Artifacts { cmd: ArtifactsCmd::Cosign { cmd: CosignCmd::Sign { key_id, reference, digest } } } => {
+            Commands::Artifacts {
+                cmd:
+                    ArtifactsCmd::Cosign {
+                        cmd:
+                            CosignCmd::Sign {
+                                key_id,
+                                reference,
+                                digest,
+                            },
+                    },
+            } => {
                 assert_eq!(key_id, "k1");
                 assert_eq!(reference, "registry/img:tag");
                 assert_eq!(digest, "sha256:abc");
@@ -5038,14 +5344,23 @@ mod artifacts_parse_tests {
         let cli = parse(&["cavectl", "artifacts", "cosign", "counters"]);
         assert!(matches!(
             cli.command,
-            Commands::Artifacts { cmd: ArtifactsCmd::Cosign { cmd: CosignCmd::Counters } }
+            Commands::Artifacts {
+                cmd: ArtifactsCmd::Cosign {
+                    cmd: CosignCmd::Counters
+                }
+            }
         ));
     }
 
     #[test]
     fn registry_subcommand_still_works_for_back_compat() {
         let cli = parse(&["cavectl", "registry", "list"]);
-        assert!(matches!(cli.command, Commands::Registry { cmd: RegistryCmd::List }));
+        assert!(matches!(
+            cli.command,
+            Commands::Registry {
+                cmd: RegistryCmd::List
+            }
+        ));
     }
 }
 
@@ -5062,112 +5377,202 @@ mod batch4_parse_tests {
     #[test]
     fn auth_realms_parses() {
         let cli = parse(&["cavectl", "auth", "realms"]);
-        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::Realms }));
+        assert!(matches!(
+            cli.command,
+            Commands::Auth {
+                cmd: AuthCmd::Realms
+            }
+        ));
     }
 
     #[test]
     fn auth_clients_parses() {
         let cli = parse(&["cavectl", "auth", "clients"]);
-        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::Clients }));
+        assert!(matches!(
+            cli.command,
+            Commands::Auth {
+                cmd: AuthCmd::Clients
+            }
+        ));
     }
 
     #[test]
     fn auth_events_parses() {
         let cli = parse(&["cavectl", "auth", "events"]);
-        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::Events }));
+        assert!(matches!(
+            cli.command,
+            Commands::Auth {
+                cmd: AuthCmd::Events
+            }
+        ));
     }
 
     #[test]
     fn auth_saml_metadata_parses() {
         let cli = parse(&["cavectl", "auth", "saml-metadata"]);
-        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::SamlMetadata }));
+        assert!(matches!(
+            cli.command,
+            Commands::Auth {
+                cmd: AuthCmd::SamlMetadata
+            }
+        ));
     }
 
     #[test]
     fn auth_saml_verify_request_parses() {
         let cli = parse(&["cavectl", "auth", "saml-verify-request"]);
-        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::SamlVerifyRequest }));
+        assert!(matches!(
+            cli.command,
+            Commands::Auth {
+                cmd: AuthCmd::SamlVerifyRequest
+            }
+        ));
     }
 
     #[test]
     fn auth_saml_c14n_parses() {
         let cli = parse(&["cavectl", "auth", "saml-c14n"]);
-        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::SamlC14n }));
+        assert!(matches!(
+            cli.command,
+            Commands::Auth {
+                cmd: AuthCmd::SamlC14n
+            }
+        ));
     }
 
     // ── LDAP federation + Kerberos/SPNEGO sub-commands ───────────────────────
     #[test]
     fn auth_ldap_test_connection_parses() {
         let cli = parse(&["cavectl", "auth", "ldap-test-connection"]);
-        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::LdapTestConnection }));
+        assert!(matches!(
+            cli.command,
+            Commands::Auth {
+                cmd: AuthCmd::LdapTestConnection
+            }
+        ));
     }
 
     #[test]
     fn auth_ldap_sync_users_parses() {
         let cli = parse(&["cavectl", "auth", "ldap-sync-users"]);
-        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::LdapSyncUsers }));
+        assert!(matches!(
+            cli.command,
+            Commands::Auth {
+                cmd: AuthCmd::LdapSyncUsers
+            }
+        ));
     }
 
     #[test]
     fn auth_ldap_sync_groups_parses() {
         let cli = parse(&["cavectl", "auth", "ldap-sync-groups"]);
-        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::LdapSyncGroups }));
+        assert!(matches!(
+            cli.command,
+            Commands::Auth {
+                cmd: AuthCmd::LdapSyncGroups
+            }
+        ));
     }
 
     #[test]
     fn auth_kerberos_validate_keytab_parses() {
         let cli = parse(&["cavectl", "auth", "kerberos-validate-keytab"]);
-        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::KerberosValidateKeytab }));
+        assert!(matches!(
+            cli.command,
+            Commands::Auth {
+                cmd: AuthCmd::KerberosValidateKeytab
+            }
+        ));
     }
 
     #[test]
     fn auth_kerberos_test_spnego_parses() {
         let cli = parse(&["cavectl", "auth", "kerberos-test-spnego"]);
-        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::KerberosTestSpnego }));
+        assert!(matches!(
+            cli.command,
+            Commands::Auth {
+                cmd: AuthCmd::KerberosTestSpnego
+            }
+        ));
     }
 
     // ── Expanded container-scan subcommands ───────────────────────────────────
     #[test]
     fn container_scan_vulnerabilities_parses() {
         let cli = parse(&["cavectl", "container-scan", "vulnerabilities"]);
-        assert!(matches!(cli.command, Commands::ContainerScan { cmd: ContainerScanCmd::Vulnerabilities }));
+        assert!(matches!(
+            cli.command,
+            Commands::ContainerScan {
+                cmd: ContainerScanCmd::Vulnerabilities
+            }
+        ));
     }
 
     #[test]
     fn container_scan_images_parses() {
         let cli = parse(&["cavectl", "container-scan", "images"]);
-        assert!(matches!(cli.command, Commands::ContainerScan { cmd: ContainerScanCmd::Images }));
+        assert!(matches!(
+            cli.command,
+            Commands::ContainerScan {
+                cmd: ContainerScanCmd::Images
+            }
+        ));
     }
 
     #[test]
     fn container_scan_policies_parses() {
         let cli = parse(&["cavectl", "container-scan", "policies"]);
-        assert!(matches!(cli.command, Commands::ContainerScan { cmd: ContainerScanCmd::Policies }));
+        assert!(matches!(
+            cli.command,
+            Commands::ContainerScan {
+                cmd: ContainerScanCmd::Policies
+            }
+        ));
     }
 
     #[test]
     fn container_scan_history_parses() {
         let cli = parse(&["cavectl", "container-scan", "history"]);
-        assert!(matches!(cli.command, Commands::ContainerScan { cmd: ContainerScanCmd::History }));
+        assert!(matches!(
+            cli.command,
+            Commands::ContainerScan {
+                cmd: ContainerScanCmd::History
+            }
+        ));
     }
 
     #[test]
     fn container_scan_reports_parses() {
         let cli = parse(&["cavectl", "container-scan", "reports"]);
-        assert!(matches!(cli.command, Commands::ContainerScan { cmd: ContainerScanCmd::Reports }));
+        assert!(matches!(
+            cli.command,
+            Commands::ContainerScan {
+                cmd: ContainerScanCmd::Reports
+            }
+        ));
     }
 
     // ── Expanded erp subcommands ──────────────────────────────────────────────
     #[test]
     fn erp_inventory_parses() {
         let cli = parse(&["cavectl", "erp", "inventory"]);
-        assert!(matches!(cli.command, Commands::Erp { cmd: ErpCmd::Inventory }));
+        assert!(matches!(
+            cli.command,
+            Commands::Erp {
+                cmd: ErpCmd::Inventory
+            }
+        ));
     }
 
     #[test]
     fn erp_accounting_parses() {
         let cli = parse(&["cavectl", "erp", "accounting"]);
-        assert!(matches!(cli.command, Commands::Erp { cmd: ErpCmd::Accounting }));
+        assert!(matches!(
+            cli.command,
+            Commands::Erp {
+                cmd: ErpCmd::Accounting
+            }
+        ));
     }
 
     #[test]
@@ -5179,26 +5584,46 @@ mod batch4_parse_tests {
     #[test]
     fn erp_projects_parses() {
         let cli = parse(&["cavectl", "erp", "projects"]);
-        assert!(matches!(cli.command, Commands::Erp { cmd: ErpCmd::Projects }));
+        assert!(matches!(
+            cli.command,
+            Commands::Erp {
+                cmd: ErpCmd::Projects
+            }
+        ));
     }
 
     // ── Expanded crm subcommands ──────────────────────────────────────────────
     #[test]
     fn crm_activities_parses() {
         let cli = parse(&["cavectl", "crm", "activities"]);
-        assert!(matches!(cli.command, Commands::Crm { cmd: CrmCmd::Activities }));
+        assert!(matches!(
+            cli.command,
+            Commands::Crm {
+                cmd: CrmCmd::Activities
+            }
+        ));
     }
 
     #[test]
     fn crm_workflows_parses() {
         let cli = parse(&["cavectl", "crm", "workflows"]);
-        assert!(matches!(cli.command, Commands::Crm { cmd: CrmCmd::Workflows }));
+        assert!(matches!(
+            cli.command,
+            Commands::Crm {
+                cmd: CrmCmd::Workflows
+            }
+        ));
     }
 
     #[test]
     fn crm_reports_parses() {
         let cli = parse(&["cavectl", "crm", "reports"]);
-        assert!(matches!(cli.command, Commands::Crm { cmd: CrmCmd::Reports }));
+        assert!(matches!(
+            cli.command,
+            Commands::Crm {
+                cmd: CrmCmd::Reports
+            }
+        ));
     }
 
     // ── streams kraft subcommands ─────────────────────────────────────────────
@@ -5206,7 +5631,12 @@ mod batch4_parse_tests {
     fn streams_kraft_describe_quorum_parses() {
         let cli = parse(&["cavectl", "streams", "kraft", "describe-quorum"]);
         match cli.command {
-            Commands::Streams { cmd: StreamsCmd::Kraft { cmd: KraftCmd::DescribeQuorum } } => {}
+            Commands::Streams {
+                cmd:
+                    StreamsCmd::Kraft {
+                        cmd: KraftCmd::DescribeQuorum,
+                    },
+            } => {}
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
         }
     }
@@ -5215,7 +5645,12 @@ mod batch4_parse_tests {
     fn streams_kraft_voters_parses() {
         let cli = parse(&["cavectl", "streams", "kraft", "voters"]);
         match cli.command {
-            Commands::Streams { cmd: StreamsCmd::Kraft { cmd: KraftCmd::Voters } } => {}
+            Commands::Streams {
+                cmd:
+                    StreamsCmd::Kraft {
+                        cmd: KraftCmd::Voters,
+                    },
+            } => {}
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
         }
     }
@@ -5224,7 +5659,12 @@ mod batch4_parse_tests {
     fn streams_kraft_leader_parses() {
         let cli = parse(&["cavectl", "streams", "kraft", "leader"]);
         match cli.command {
-            Commands::Streams { cmd: StreamsCmd::Kraft { cmd: KraftCmd::Leader } } => {}
+            Commands::Streams {
+                cmd:
+                    StreamsCmd::Kraft {
+                        cmd: KraftCmd::Leader,
+                    },
+            } => {}
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
         }
     }
@@ -5233,7 +5673,12 @@ mod batch4_parse_tests {
     fn streams_kraft_snapshot_parses() {
         let cli = parse(&["cavectl", "streams", "kraft", "snapshot"]);
         match cli.command {
-            Commands::Streams { cmd: StreamsCmd::Kraft { cmd: KraftCmd::Snapshot } } => {}
+            Commands::Streams {
+                cmd:
+                    StreamsCmd::Kraft {
+                        cmd: KraftCmd::Snapshot,
+                    },
+            } => {}
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
         }
     }
@@ -5246,7 +5691,10 @@ mod batch4_parse_tests {
             Commands::Streams {
                 cmd:
                     StreamsCmd::Connect {
-                        cmd: ConnectCmd::Worker { cmd: ConnectWorkerCmd::List },
+                        cmd:
+                            ConnectCmd::Worker {
+                                cmd: ConnectWorkerCmd::List,
+                            },
                     },
             } => {}
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
@@ -5262,9 +5710,10 @@ mod batch4_parse_tests {
             Commands::Streams {
                 cmd:
                     StreamsCmd::Connect {
-                        cmd: ConnectCmd::Worker {
-                            cmd: ConnectWorkerCmd::Status { id },
-                        },
+                        cmd:
+                            ConnectCmd::Worker {
+                                cmd: ConnectWorkerCmd::Status { id },
+                            },
                     },
             } => assert_eq!(id, "worker-1"),
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
@@ -5278,7 +5727,10 @@ mod batch4_parse_tests {
             Commands::Streams {
                 cmd:
                     StreamsCmd::Connect {
-                        cmd: ConnectCmd::Connector { cmd: ConnectConnectorCmd::List },
+                        cmd:
+                            ConnectCmd::Connector {
+                                cmd: ConnectConnectorCmd::List,
+                            },
                     },
             } => {}
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
@@ -5287,16 +5739,15 @@ mod batch4_parse_tests {
 
     #[test]
     fn streams_connect_connector_get_parses() {
-        let cli = parse(&[
-            "cavectl", "streams", "connect", "connector", "get", "jdbc",
-        ]);
+        let cli = parse(&["cavectl", "streams", "connect", "connector", "get", "jdbc"]);
         match cli.command {
             Commands::Streams {
                 cmd:
                     StreamsCmd::Connect {
-                        cmd: ConnectCmd::Connector {
-                            cmd: ConnectConnectorCmd::Get { name },
-                        },
+                        cmd:
+                            ConnectCmd::Connector {
+                                cmd: ConnectConnectorCmd::Get { name },
+                            },
                     },
             } => assert_eq!(name, "jdbc"),
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
@@ -5306,15 +5757,21 @@ mod batch4_parse_tests {
     #[test]
     fn streams_connect_connector_offsets_parses() {
         let cli = parse(&[
-            "cavectl", "streams", "connect", "connector", "offsets", "jdbc",
+            "cavectl",
+            "streams",
+            "connect",
+            "connector",
+            "offsets",
+            "jdbc",
         ]);
         match cli.command {
             Commands::Streams {
                 cmd:
                     StreamsCmd::Connect {
-                        cmd: ConnectCmd::Connector {
-                            cmd: ConnectConnectorCmd::Offsets { name },
-                        },
+                        cmd:
+                            ConnectCmd::Connector {
+                                cmd: ConnectConnectorCmd::Offsets { name },
+                            },
                     },
             } => assert_eq!(name, "jdbc"),
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
@@ -5341,9 +5798,10 @@ mod batch4_parse_tests {
             Commands::Streams {
                 cmd:
                     StreamsCmd::Connect {
-                        cmd: ConnectCmd::Connector {
-                            cmd: ConnectConnectorCmd::Create { name, configs },
-                        },
+                        cmd:
+                            ConnectCmd::Connector {
+                                cmd: ConnectConnectorCmd::Create { name, configs },
+                            },
                     },
             } => {
                 assert_eq!(name, "jdbc");
@@ -5357,15 +5815,21 @@ mod batch4_parse_tests {
     #[test]
     fn streams_connect_connector_delete_parses() {
         let cli = parse(&[
-            "cavectl", "streams", "connect", "connector", "delete", "jdbc",
+            "cavectl",
+            "streams",
+            "connect",
+            "connector",
+            "delete",
+            "jdbc",
         ]);
         match cli.command {
             Commands::Streams {
                 cmd:
                     StreamsCmd::Connect {
-                        cmd: ConnectCmd::Connector {
-                            cmd: ConnectConnectorCmd::Delete { name },
-                        },
+                        cmd:
+                            ConnectCmd::Connector {
+                                cmd: ConnectConnectorCmd::Delete { name },
+                            },
                     },
             } => assert_eq!(name, "jdbc"),
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
@@ -5375,15 +5839,21 @@ mod batch4_parse_tests {
     #[test]
     fn streams_connect_connector_pause_parses() {
         let cli = parse(&[
-            "cavectl", "streams", "connect", "connector", "pause", "jdbc",
+            "cavectl",
+            "streams",
+            "connect",
+            "connector",
+            "pause",
+            "jdbc",
         ]);
         match cli.command {
             Commands::Streams {
                 cmd:
                     StreamsCmd::Connect {
-                        cmd: ConnectCmd::Connector {
-                            cmd: ConnectConnectorCmd::Pause { name },
-                        },
+                        cmd:
+                            ConnectCmd::Connector {
+                                cmd: ConnectConnectorCmd::Pause { name },
+                            },
                     },
             } => assert_eq!(name, "jdbc"),
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
@@ -5393,15 +5863,21 @@ mod batch4_parse_tests {
     #[test]
     fn streams_connect_connector_resume_parses() {
         let cli = parse(&[
-            "cavectl", "streams", "connect", "connector", "resume", "jdbc",
+            "cavectl",
+            "streams",
+            "connect",
+            "connector",
+            "resume",
+            "jdbc",
         ]);
         match cli.command {
             Commands::Streams {
                 cmd:
                     StreamsCmd::Connect {
-                        cmd: ConnectCmd::Connector {
-                            cmd: ConnectConnectorCmd::Resume { name },
-                        },
+                        cmd:
+                            ConnectCmd::Connector {
+                                cmd: ConnectConnectorCmd::Resume { name },
+                            },
                     },
             } => assert_eq!(name, "jdbc"),
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
@@ -5411,15 +5887,21 @@ mod batch4_parse_tests {
     #[test]
     fn streams_connect_connector_restart_parses() {
         let cli = parse(&[
-            "cavectl", "streams", "connect", "connector", "restart", "jdbc",
+            "cavectl",
+            "streams",
+            "connect",
+            "connector",
+            "restart",
+            "jdbc",
         ]);
         match cli.command {
             Commands::Streams {
                 cmd:
                     StreamsCmd::Connect {
-                        cmd: ConnectCmd::Connector {
-                            cmd: ConnectConnectorCmd::Restart { name },
-                        },
+                        cmd:
+                            ConnectCmd::Connector {
+                                cmd: ConnectConnectorCmd::Restart { name },
+                            },
                     },
             } => assert_eq!(name, "jdbc"),
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
@@ -5428,16 +5910,15 @@ mod batch4_parse_tests {
 
     #[test]
     fn streams_connect_task_list_parses() {
-        let cli = parse(&[
-            "cavectl", "streams", "connect", "task", "list", "jdbc",
-        ]);
+        let cli = parse(&["cavectl", "streams", "connect", "task", "list", "jdbc"]);
         match cli.command {
             Commands::Streams {
                 cmd:
                     StreamsCmd::Connect {
-                        cmd: ConnectCmd::Task {
-                            cmd: ConnectTaskCmd::List { connector },
-                        },
+                        cmd:
+                            ConnectCmd::Task {
+                                cmd: ConnectTaskCmd::List { connector },
+                            },
                     },
             } => assert_eq!(connector, "jdbc"),
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
@@ -5453,9 +5934,10 @@ mod batch4_parse_tests {
             Commands::Streams {
                 cmd:
                     StreamsCmd::Connect {
-                        cmd: ConnectCmd::Task {
-                            cmd: ConnectTaskCmd::Status { connector, task },
-                        },
+                        cmd:
+                            ConnectCmd::Task {
+                                cmd: ConnectTaskCmd::Status { connector, task },
+                            },
                     },
             } => {
                 assert_eq!(connector, "jdbc");
@@ -5474,9 +5956,10 @@ mod batch4_parse_tests {
             Commands::Streams {
                 cmd:
                     StreamsCmd::Connect {
-                        cmd: ConnectCmd::Task {
-                            cmd: ConnectTaskCmd::Restart { connector, task },
-                        },
+                        cmd:
+                            ConnectCmd::Task {
+                                cmd: ConnectTaskCmd::Restart { connector, task },
+                            },
                     },
             } => {
                 assert_eq!(connector, "jdbc");
@@ -5503,22 +5986,14 @@ mod batch4_parse_tests {
     #[test]
     fn streams_connect_yaml_format_applies() {
         let cli = parse(&[
-            "cavectl",
-            "--format",
-            "yaml",
-            "streams",
-            "connect",
-            "worker",
-            "list",
+            "cavectl", "--format", "yaml", "streams", "connect", "worker", "list",
         ]);
         assert!(matches!(cli.format, Format::Yaml));
     }
 
     #[test]
     fn streams_connect_table_default_format() {
-        let cli = parse(&[
-            "cavectl", "streams", "connect", "task", "list", "jdbc",
-        ]);
+        let cli = parse(&["cavectl", "streams", "connect", "task", "list", "jdbc"]);
         assert!(matches!(cli.format, Format::Table));
     }
 
@@ -5526,55 +6001,100 @@ mod batch4_parse_tests {
     #[test]
     fn spark_applications_parses() {
         let cli = parse(&["cavectl", "spark", "applications"]);
-        assert!(matches!(cli.command, Commands::Spark { cmd: SparkCmd::Applications }));
+        assert!(matches!(
+            cli.command,
+            Commands::Spark {
+                cmd: SparkCmd::Applications
+            }
+        ));
     }
 
     #[test]
     fn spark_scheduled_parses() {
         let cli = parse(&["cavectl", "spark", "scheduled"]);
-        assert!(matches!(cli.command, Commands::Spark { cmd: SparkCmd::Scheduled }));
+        assert!(matches!(
+            cli.command,
+            Commands::Spark {
+                cmd: SparkCmd::Scheduled
+            }
+        ));
     }
 
     #[test]
     fn jupyter_servers_parses() {
         let cli = parse(&["cavectl", "jupyter", "servers"]);
-        assert!(matches!(cli.command, Commands::Jupyter { cmd: JupyterCmd::Servers }));
+        assert!(matches!(
+            cli.command,
+            Commands::Jupyter {
+                cmd: JupyterCmd::Servers
+            }
+        ));
     }
 
     #[test]
     fn jupyter_kernels_parses() {
         let cli = parse(&["cavectl", "jupyter", "kernels"]);
-        assert!(matches!(cli.command, Commands::Jupyter { cmd: JupyterCmd::Kernels }));
+        assert!(matches!(
+            cli.command,
+            Commands::Jupyter {
+                cmd: JupyterCmd::Kernels
+            }
+        ));
     }
 
     #[test]
     fn mlflow_experiments_parses() {
         let cli = parse(&["cavectl", "mlflow", "experiments"]);
-        assert!(matches!(cli.command, Commands::Mlflow { cmd: MlflowCmd::Experiments }));
+        assert!(matches!(
+            cli.command,
+            Commands::Mlflow {
+                cmd: MlflowCmd::Experiments
+            }
+        ));
     }
 
     #[test]
     fn mlflow_models_parses() {
         let cli = parse(&["cavectl", "mlflow", "models"]);
-        assert!(matches!(cli.command, Commands::Mlflow { cmd: MlflowCmd::Models }));
+        assert!(matches!(
+            cli.command,
+            Commands::Mlflow {
+                cmd: MlflowCmd::Models
+            }
+        ));
     }
 
     #[test]
     fn flux_helmreleases_parses() {
         let cli = parse(&["cavectl", "flux", "helm-releases"]);
-        assert!(matches!(cli.command, Commands::Flux { cmd: FluxCmd::HelmReleases }));
+        assert!(matches!(
+            cli.command,
+            Commands::Flux {
+                cmd: FluxCmd::HelmReleases
+            }
+        ));
     }
 
     #[test]
     fn flux_kustomizations_parses() {
         let cli = parse(&["cavectl", "flux", "kustomizations"]);
-        assert!(matches!(cli.command, Commands::Flux { cmd: FluxCmd::Kustomizations }));
+        assert!(matches!(
+            cli.command,
+            Commands::Flux {
+                cmd: FluxCmd::Kustomizations
+            }
+        ));
     }
 
     #[test]
     fn flux_sources_parses() {
         let cli = parse(&["cavectl", "flux", "sources"]);
-        assert!(matches!(cli.command, Commands::Flux { cmd: FluxCmd::Sources }));
+        assert!(matches!(
+            cli.command,
+            Commands::Flux {
+                cmd: FluxCmd::Sources
+            }
+        ));
     }
 
     // ── 2026-05-15 polish — `cavectl portal audit` ────────────────
@@ -5583,7 +6103,9 @@ mod batch4_parse_tests {
     fn portal_audit_parses_without_tenant_flag() {
         let cli = parse(&["cavectl", "portal", "audit"]);
         match cli.command {
-            Commands::Portal { cmd: PortalCmd::Audit { tenant } } => {
+            Commands::Portal {
+                cmd: PortalCmd::Audit { tenant },
+            } => {
                 // env-default may be present; only assert variant.
                 let _ = tenant;
             }
@@ -5595,7 +6117,9 @@ mod batch4_parse_tests {
     fn portal_audit_accepts_explicit_tenant_flag() {
         let cli = parse(&["cavectl", "portal", "audit", "--tenant", "acme"]);
         match cli.command {
-            Commands::Portal { cmd: PortalCmd::Audit { tenant } } => {
+            Commands::Portal {
+                cmd: PortalCmd::Audit { tenant },
+            } => {
                 assert_eq!(tenant.as_deref(), Some("acme"));
             }
             _ => panic!("wrong variant"),
@@ -5605,7 +6129,12 @@ mod batch4_parse_tests {
     #[test]
     fn portal_status_still_parses_after_audit_was_added() {
         let cli = parse(&["cavectl", "portal", "status"]);
-        assert!(matches!(cli.command, Commands::Portal { cmd: PortalCmd::Status }));
+        assert!(matches!(
+            cli.command,
+            Commands::Portal {
+                cmd: PortalCmd::Status
+            }
+        ));
     }
 
     // ── 2026-05-15 Trivy scan subcommands ────────────────────────
@@ -5614,7 +6143,14 @@ mod batch4_parse_tests {
     fn scan_image_parses_with_defaults() {
         let cli = parse(&["cavectl", "scan", "image", "alpine:3.20"]);
         match cli.command {
-            Commands::Scan { cmd: ScanCmd::Image { target, report_format, severity } } => {
+            Commands::Scan {
+                cmd:
+                    ScanCmd::Image {
+                        target,
+                        report_format,
+                        severity,
+                    },
+            } => {
                 assert_eq!(target, "alpine:3.20");
                 assert_eq!(report_format, "table");
                 assert_eq!(severity, "MEDIUM");
@@ -5626,10 +6162,17 @@ mod batch4_parse_tests {
     #[test]
     fn scan_image_accepts_sarif_format() {
         let cli = parse(&[
-            "cavectl", "scan", "image", "alpine:3.20", "--report-format", "sarif",
+            "cavectl",
+            "scan",
+            "image",
+            "alpine:3.20",
+            "--report-format",
+            "sarif",
         ]);
         match cli.command {
-            Commands::Scan { cmd: ScanCmd::Image { report_format, .. } } => {
+            Commands::Scan {
+                cmd: ScanCmd::Image { report_format, .. },
+            } => {
                 assert_eq!(report_format, "sarif")
             }
             _ => panic!("wrong variant"),
@@ -5638,11 +6181,11 @@ mod batch4_parse_tests {
 
     #[test]
     fn scan_image_accepts_severity_override() {
-        let cli = parse(&[
-            "cavectl", "scan", "image", "img", "--severity", "CRITICAL",
-        ]);
+        let cli = parse(&["cavectl", "scan", "image", "img", "--severity", "CRITICAL"]);
         match cli.command {
-            Commands::Scan { cmd: ScanCmd::Image { severity, .. } } => {
+            Commands::Scan {
+                cmd: ScanCmd::Image { severity, .. },
+            } => {
                 assert_eq!(severity, "CRITICAL")
             }
             _ => panic!("wrong variant"),
@@ -5653,7 +6196,13 @@ mod batch4_parse_tests {
     fn scan_fs_parses_path() {
         let cli = parse(&["cavectl", "scan", "fs", "/tmp/proj"]);
         match cli.command {
-            Commands::Scan { cmd: ScanCmd::Fs { path, report_format } } => {
+            Commands::Scan {
+                cmd:
+                    ScanCmd::Fs {
+                        path,
+                        report_format,
+                    },
+            } => {
                 assert_eq!(path.to_string_lossy(), "/tmp/proj");
                 assert_eq!(report_format, "table");
             }
@@ -5666,7 +6215,9 @@ mod batch4_parse_tests {
         let cli = parse(&["cavectl", "scan", "config", "infra/"]);
         assert!(matches!(
             cli.command,
-            Commands::Scan { cmd: ScanCmd::Config { .. } }
+            Commands::Scan {
+                cmd: ScanCmd::Config { .. }
+            }
         ));
     }
 
@@ -5675,7 +6226,9 @@ mod batch4_parse_tests {
         let cli = parse(&["cavectl", "scan", "secret", "."]);
         assert!(matches!(
             cli.command,
-            Commands::Scan { cmd: ScanCmd::Secret { .. } }
+            Commands::Scan {
+                cmd: ScanCmd::Secret { .. }
+            }
         ));
     }
 
@@ -5684,7 +6237,9 @@ mod batch4_parse_tests {
         let cli = parse(&["cavectl", "scan", "license", "."]);
         assert!(matches!(
             cli.command,
-            Commands::Scan { cmd: ScanCmd::License { .. } }
+            Commands::Scan {
+                cmd: ScanCmd::License { .. }
+            }
         ));
     }
 
@@ -5692,7 +6247,9 @@ mod batch4_parse_tests {
     fn scan_sbom_cyclonedx_default() {
         let cli = parse(&["cavectl", "scan", "sbom", "alpine:3.20"]);
         match cli.command {
-            Commands::Scan { cmd: ScanCmd::Sbom { report_format, .. } } => {
+            Commands::Scan {
+                cmd: ScanCmd::Sbom { report_format, .. },
+            } => {
                 assert_eq!(report_format, "cyclonedx")
             }
             _ => panic!("wrong variant"),
@@ -5702,10 +6259,17 @@ mod batch4_parse_tests {
     #[test]
     fn scan_sbom_spdx_override() {
         let cli = parse(&[
-            "cavectl", "scan", "sbom", "alpine:3.20", "--report-format", "spdx",
+            "cavectl",
+            "scan",
+            "sbom",
+            "alpine:3.20",
+            "--report-format",
+            "spdx",
         ]);
         match cli.command {
-            Commands::Scan { cmd: ScanCmd::Sbom { report_format, .. } } => {
+            Commands::Scan {
+                cmd: ScanCmd::Sbom { report_format, .. },
+            } => {
                 assert_eq!(report_format, "spdx")
             }
             _ => panic!("wrong variant"),
@@ -5714,22 +6278,19 @@ mod batch4_parse_tests {
 
     #[test]
     fn scan_start_still_parses_after_trivy_added() {
-        let cli = parse(&[
-            "cavectl", "scan", "start", "--repo", "github.com/x/y",
-        ]);
+        let cli = parse(&["cavectl", "scan", "start", "--repo", "github.com/x/y"]);
         assert!(matches!(
             cli.command,
-            Commands::Scan { cmd: ScanCmd::Start { .. } }
+            Commands::Scan {
+                cmd: ScanCmd::Start { .. }
+            }
         ));
     }
 
     #[test]
     fn scan_list_still_parses_after_trivy_added() {
         let cli = parse(&["cavectl", "scan", "list"]);
-        assert!(matches!(
-            cli.command,
-            Commands::Scan { cmd: ScanCmd::List }
-        ));
+        assert!(matches!(cli.command, Commands::Scan { cmd: ScanCmd::List }));
     }
 
     #[test]
@@ -5737,7 +6298,9 @@ mod batch4_parse_tests {
         let cli = parse(&["cavectl", "scan", "results", "abc-1"]);
         assert!(matches!(
             cli.command,
-            Commands::Scan { cmd: ScanCmd::Results { .. } }
+            Commands::Scan {
+                cmd: ScanCmd::Results { .. }
+            }
         ));
     }
 }
@@ -5755,7 +6318,9 @@ mod sbom_parse_tests {
     fn sbom_ingest_parses_with_file_arg() {
         let cli = parse(&["cavectl", "sbom", "ingest", "--file", "bom.json"]);
         match cli.command {
-            Commands::Sbom { cmd: SbomCmd::Ingest { file, project_uuid } } => {
+            Commands::Sbom {
+                cmd: SbomCmd::Ingest { file, project_uuid },
+            } => {
                 assert_eq!(file, "bom.json");
                 assert!(project_uuid.is_none());
             }
@@ -5766,11 +6331,18 @@ mod sbom_parse_tests {
     #[test]
     fn sbom_ingest_accepts_project_uuid_override() {
         let cli = parse(&[
-            "cavectl", "sbom", "ingest",
-            "--file", "bom.json", "--project-uuid", "uu-123"
+            "cavectl",
+            "sbom",
+            "ingest",
+            "--file",
+            "bom.json",
+            "--project-uuid",
+            "uu-123",
         ]);
         match cli.command {
-            Commands::Sbom { cmd: SbomCmd::Ingest { project_uuid, .. } } => {
+            Commands::Sbom {
+                cmd: SbomCmd::Ingest { project_uuid, .. },
+            } => {
                 assert_eq!(project_uuid.as_deref(), Some("uu-123"));
             }
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
@@ -5781,7 +6353,9 @@ mod sbom_parse_tests {
     fn sbom_component_list_default_pagination() {
         let cli = parse(&["cavectl", "sbom", "component", "list"]);
         match cli.command {
-            Commands::Sbom { cmd: SbomCmd::Component(SbomComponentCmd::List { page, page_size }) } => {
+            Commands::Sbom {
+                cmd: SbomCmd::Component(SbomComponentCmd::List { page, page_size }),
+            } => {
                 assert_eq!(page, 1);
                 assert_eq!(page_size, 50);
             }
@@ -5793,7 +6367,9 @@ mod sbom_parse_tests {
     fn sbom_component_get_takes_uuid() {
         let cli = parse(&["cavectl", "sbom", "component", "get", "uu-abc"]);
         match cli.command {
-            Commands::Sbom { cmd: SbomCmd::Component(SbomComponentCmd::Get { uuid }) } => {
+            Commands::Sbom {
+                cmd: SbomCmd::Component(SbomComponentCmd::Get { uuid }),
+            } => {
                 assert_eq!(uuid, "uu-abc");
             }
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
@@ -5802,9 +6378,13 @@ mod sbom_parse_tests {
 
     #[test]
     fn sbom_project_create_requires_name() {
-        let cli = parse(&["cavectl", "sbom", "project", "create", "--name", "p", "--ver", "1.0"]);
+        let cli = parse(&[
+            "cavectl", "sbom", "project", "create", "--name", "p", "--ver", "1.0",
+        ]);
         match cli.command {
-            Commands::Sbom { cmd: SbomCmd::Project(SbomProjectCmd::Create { name, version }) } => {
+            Commands::Sbom {
+                cmd: SbomCmd::Project(SbomProjectCmd::Create { name, version }),
+            } => {
                 assert_eq!(name, "p");
                 assert_eq!(version.as_deref(), Some("1.0"));
             }
@@ -5814,9 +6394,20 @@ mod sbom_parse_tests {
 
     #[test]
     fn sbom_project_list_paginates() {
-        let cli = parse(&["cavectl", "sbom", "project", "list", "--page", "3", "--page-size", "25"]);
+        let cli = parse(&[
+            "cavectl",
+            "sbom",
+            "project",
+            "list",
+            "--page",
+            "3",
+            "--page-size",
+            "25",
+        ]);
         match cli.command {
-            Commands::Sbom { cmd: SbomCmd::Project(SbomProjectCmd::List { page, page_size }) } => {
+            Commands::Sbom {
+                cmd: SbomCmd::Project(SbomProjectCmd::List { page, page_size }),
+            } => {
                 assert_eq!(page, 3);
                 assert_eq!(page_size, 25);
             }
@@ -5828,7 +6419,9 @@ mod sbom_parse_tests {
     fn sbom_vuln_get_takes_cve_id() {
         let cli = parse(&["cavectl", "sbom", "vuln", "get", "CVE-2024-12345"]);
         match cli.command {
-            Commands::Sbom { cmd: SbomCmd::Vuln(SbomVulnCmd::Get { id }) } => {
+            Commands::Sbom {
+                cmd: SbomCmd::Vuln(SbomVulnCmd::Get { id }),
+            } => {
                 assert_eq!(id, "CVE-2024-12345");
             }
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
@@ -5837,9 +6430,13 @@ mod sbom_parse_tests {
 
     #[test]
     fn sbom_vuln_analyze_requires_state() {
-        let cli = parse(&["cavectl", "sbom", "vuln", "analyze", "CVE-1", "--state", "RESOLVED"]);
+        let cli = parse(&[
+            "cavectl", "sbom", "vuln", "analyze", "CVE-1", "--state", "RESOLVED",
+        ]);
         match cli.command {
-            Commands::Sbom { cmd: SbomCmd::Vuln(SbomVulnCmd::Analyze { id, state }) } => {
+            Commands::Sbom {
+                cmd: SbomCmd::Vuln(SbomVulnCmd::Analyze { id, state }),
+            } => {
                 assert_eq!(id, "CVE-1");
                 assert_eq!(state, "RESOLVED");
             }
@@ -5850,13 +6447,23 @@ mod sbom_parse_tests {
     #[test]
     fn sbom_policy_list_parses() {
         let cli = parse(&["cavectl", "sbom", "policy", "list"]);
-        assert!(matches!(cli.command, Commands::Sbom { cmd: SbomCmd::Policy(SbomPolicyCmd::List) }));
+        assert!(matches!(
+            cli.command,
+            Commands::Sbom {
+                cmd: SbomCmd::Policy(SbomPolicyCmd::List)
+            }
+        ));
     }
 
     #[test]
     fn sbom_portfolio_parses() {
         let cli = parse(&["cavectl", "sbom", "portfolio"]);
-        assert!(matches!(cli.command, Commands::Sbom { cmd: SbomCmd::Portfolio }));
+        assert!(matches!(
+            cli.command,
+            Commands::Sbom {
+                cmd: SbomCmd::Portfolio
+            }
+        ));
     }
 
     #[test]
@@ -5879,7 +6486,9 @@ mod vulns_parse_tests {
     fn legacy_scan_target_parses() {
         let cli = parse(&["cavectl", "vulns", "scan", "--target", "alpine:3"]);
         match cli.command {
-            Commands::Vulns { cmd: VulnsCmd::Scan { target } } => assert_eq!(target, "alpine:3"),
+            Commands::Vulns {
+                cmd: VulnsCmd::Scan { target },
+            } => assert_eq!(target, "alpine:3"),
             _ => panic!("wrong variant"),
         }
     }
@@ -5887,20 +6496,37 @@ mod vulns_parse_tests {
     #[test]
     fn vulns_health_parses() {
         let cli = parse(&["cavectl", "vulns", "health"]);
-        assert!(matches!(cli.command, Commands::Vulns { cmd: VulnsCmd::Health }));
+        assert!(matches!(
+            cli.command,
+            Commands::Vulns {
+                cmd: VulnsCmd::Health
+            }
+        ));
     }
 
     #[test]
     fn vulns_scan_types_parses() {
         let cli = parse(&["cavectl", "vulns", "scan-types"]);
-        assert!(matches!(cli.command, Commands::Vulns { cmd: VulnsCmd::ScanTypes }));
+        assert!(matches!(
+            cli.command,
+            Commands::Vulns {
+                cmd: VulnsCmd::ScanTypes
+            }
+        ));
     }
 
     #[test]
     fn vulns_finding_list_with_pagination_parses() {
-        let cli = parse(&["cavectl", "vulns", "finding", "list", "--limit", "50", "--offset", "10"]);
+        let cli = parse(&[
+            "cavectl", "vulns", "finding", "list", "--limit", "50", "--offset", "10",
+        ]);
         match cli.command {
-            Commands::Vulns { cmd: VulnsCmd::Finding { cmd: VulnsFindingCmd::List { limit, offset } } } => {
+            Commands::Vulns {
+                cmd:
+                    VulnsCmd::Finding {
+                        cmd: VulnsFindingCmd::List { limit, offset },
+                    },
+            } => {
                 assert_eq!(limit, 50);
                 assert_eq!(offset, 10);
             }
@@ -5912,7 +6538,12 @@ mod vulns_parse_tests {
     fn vulns_finding_list_uses_defaults() {
         let cli = parse(&["cavectl", "vulns", "finding", "list"]);
         match cli.command {
-            Commands::Vulns { cmd: VulnsCmd::Finding { cmd: VulnsFindingCmd::List { limit, offset } } } => {
+            Commands::Vulns {
+                cmd:
+                    VulnsCmd::Finding {
+                        cmd: VulnsFindingCmd::List { limit, offset },
+                    },
+            } => {
                 assert_eq!(limit, 100);
                 assert_eq!(offset, 0);
             }
@@ -5924,7 +6555,12 @@ mod vulns_parse_tests {
     fn vulns_finding_get_requires_id() {
         let cli = parse(&["cavectl", "vulns", "finding", "get", "abc-123"]);
         match cli.command {
-            Commands::Vulns { cmd: VulnsCmd::Finding { cmd: VulnsFindingCmd::Get { id } } } => {
+            Commands::Vulns {
+                cmd:
+                    VulnsCmd::Finding {
+                        cmd: VulnsFindingCmd::Get { id },
+                    },
+            } => {
                 assert_eq!(id, "abc-123");
             }
             _ => panic!("wrong variant"),
@@ -5936,7 +6572,12 @@ mod vulns_parse_tests {
     fn vulns_finding_create_with_json() {
         let cli = parse(&["cavectl", "vulns", "finding", "create", "--json", "{}"]);
         match cli.command {
-            Commands::Vulns { cmd: VulnsCmd::Finding { cmd: VulnsFindingCmd::Create { json } } } => {
+            Commands::Vulns {
+                cmd:
+                    VulnsCmd::Finding {
+                        cmd: VulnsFindingCmd::Create { json },
+                    },
+            } => {
                 assert_eq!(json, "{}");
             }
             _ => panic!("wrong variant"),
@@ -5945,23 +6586,53 @@ mod vulns_parse_tests {
 
     #[test]
     fn vulns_import_scan_requires_scan_type_and_file() {
-        let cli = parse(&["cavectl", "vulns", "import-scan", "--scan-type", "SARIF", "--file", "out.sarif"]);
+        let cli = parse(&[
+            "cavectl",
+            "vulns",
+            "import-scan",
+            "--scan-type",
+            "SARIF",
+            "--file",
+            "out.sarif",
+        ]);
         match cli.command {
-            Commands::Vulns { cmd: VulnsCmd::ImportScan { scan_type, file, dedup } } => {
+            Commands::Vulns {
+                cmd:
+                    VulnsCmd::ImportScan {
+                        scan_type,
+                        file,
+                        dedup,
+                    },
+            } => {
                 assert_eq!(scan_type, "SARIF");
                 assert_eq!(file, "out.sarif");
                 assert!(dedup.is_none());
             }
             _ => panic!("wrong variant"),
         }
-        assert!(Cli::try_parse_from(&["cavectl", "vulns", "import-scan", "--scan-type", "SARIF"]).is_err());
+        assert!(
+            Cli::try_parse_from(&["cavectl", "vulns", "import-scan", "--scan-type", "SARIF"])
+                .is_err()
+        );
     }
 
     #[test]
     fn vulns_import_scan_accepts_dedup_override() {
-        let cli = parse(&["cavectl", "vulns", "import-scan", "--scan-type", "Bandit Scan", "--file", "b.json", "--dedup", "legacy"]);
+        let cli = parse(&[
+            "cavectl",
+            "vulns",
+            "import-scan",
+            "--scan-type",
+            "Bandit Scan",
+            "--file",
+            "b.json",
+            "--dedup",
+            "legacy",
+        ]);
         match cli.command {
-            Commands::Vulns { cmd: VulnsCmd::ImportScan { dedup, .. } } => assert_eq!(dedup, Some("legacy".into())),
+            Commands::Vulns {
+                cmd: VulnsCmd::ImportScan { dedup, .. },
+            } => assert_eq!(dedup, Some("legacy".into())),
             _ => panic!("wrong variant"),
         }
     }
@@ -5969,20 +6640,42 @@ mod vulns_parse_tests {
     #[test]
     fn vulns_engagement_list_parses() {
         let cli = parse(&["cavectl", "vulns", "engagement", "list"]);
-        assert!(matches!(cli.command, Commands::Vulns { cmd: VulnsCmd::Engagement { cmd: VulnsEngagementCmd::List } }));
+        assert!(matches!(
+            cli.command,
+            Commands::Vulns {
+                cmd: VulnsCmd::Engagement {
+                    cmd: VulnsEngagementCmd::List
+                }
+            }
+        ));
     }
 
     #[test]
     fn vulns_product_list_parses() {
         let cli = parse(&["cavectl", "vulns", "product", "list"]);
-        assert!(matches!(cli.command, Commands::Vulns { cmd: VulnsCmd::Product { cmd: VulnsProductCmd::List } }));
+        assert!(matches!(
+            cli.command,
+            Commands::Vulns {
+                cmd: VulnsCmd::Product {
+                    cmd: VulnsProductCmd::List
+                }
+            }
+        ));
     }
 
     #[test]
     fn vulns_product_types_list_parses() {
         let cli = parse(&["cavectl", "vulns", "product", "types", "list"]);
         match cli.command {
-            Commands::Vulns { cmd: VulnsCmd::Product { cmd: VulnsProductCmd::Types { cmd: VulnsProductTypeCmd::List } } } => {}
+            Commands::Vulns {
+                cmd:
+                    VulnsCmd::Product {
+                        cmd:
+                            VulnsProductCmd::Types {
+                                cmd: VulnsProductTypeCmd::List,
+                            },
+                    },
+            } => {}
             _ => panic!("wrong variant"),
         }
     }
@@ -5990,26 +6683,52 @@ mod vulns_parse_tests {
     #[test]
     fn vulns_risk_accept_list_parses() {
         let cli = parse(&["cavectl", "vulns", "risk-accept", "list"]);
-        assert!(matches!(cli.command, Commands::Vulns { cmd: VulnsCmd::RiskAccept { cmd: VulnsRiskAcceptCmd::List } }));
+        assert!(matches!(
+            cli.command,
+            Commands::Vulns {
+                cmd: VulnsCmd::RiskAccept {
+                    cmd: VulnsRiskAcceptCmd::List
+                }
+            }
+        ));
     }
 
     #[test]
     fn vulns_sla_rollup_parses() {
         let cli = parse(&["cavectl", "vulns", "sla", "rollup"]);
-        assert!(matches!(cli.command, Commands::Vulns { cmd: VulnsCmd::Sla { cmd: VulnsSlaCmd::Rollup } }));
+        assert!(matches!(
+            cli.command,
+            Commands::Vulns {
+                cmd: VulnsCmd::Sla {
+                    cmd: VulnsSlaCmd::Rollup
+                }
+            }
+        ));
     }
 
     #[test]
     fn vulns_report_executive_parses() {
         let cli = parse(&["cavectl", "vulns", "report", "executive"]);
-        assert!(matches!(cli.command, Commands::Vulns { cmd: VulnsCmd::Report { cmd: VulnsReportCmd::Executive } }));
+        assert!(matches!(
+            cli.command,
+            Commands::Vulns {
+                cmd: VulnsCmd::Report {
+                    cmd: VulnsReportCmd::Executive
+                }
+            }
+        ));
     }
 
     #[test]
     fn vulns_report_executive_html_default_out() {
         let cli = parse(&["cavectl", "vulns", "report", "executive-html"]);
         match cli.command {
-            Commands::Vulns { cmd: VulnsCmd::Report { cmd: VulnsReportCmd::ExecutiveHtml { out } } } => {
+            Commands::Vulns {
+                cmd:
+                    VulnsCmd::Report {
+                        cmd: VulnsReportCmd::ExecutiveHtml { out },
+                    },
+            } => {
                 assert_eq!(out, "vulns-executive.html");
             }
             _ => panic!("wrong variant"),

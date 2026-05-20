@@ -11,8 +11,8 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, MutexGuard};
 
-use crate::webauthn::cose::CoseKey;
 use crate::webauthn::WebAuthnError;
+use crate::webauthn::cose::CoseKey;
 
 /// Stored credential record.
 ///
@@ -45,11 +45,7 @@ pub trait CredentialStore: Send + Sync {
     fn put(&self, cred: StoredCredential) -> Result<(), WebAuthnError>;
     fn get(&self, credential_id: &[u8]) -> Result<Option<StoredCredential>, WebAuthnError>;
     fn list_by_user(&self, user_handle: &[u8]) -> Result<Vec<StoredCredential>, WebAuthnError>;
-    fn update_sign_count(
-        &self,
-        credential_id: &[u8],
-        new_count: u32,
-    ) -> Result<(), WebAuthnError>;
+    fn update_sign_count(&self, credential_id: &[u8], new_count: u32) -> Result<(), WebAuthnError>;
     fn delete(&self, credential_id: &[u8]) -> Result<(), WebAuthnError>;
 }
 
@@ -90,11 +86,7 @@ impl CredentialStore for InMemoryCredentialStore {
             .collect())
     }
 
-    fn update_sign_count(
-        &self,
-        credential_id: &[u8],
-        new_count: u32,
-    ) -> Result<(), WebAuthnError> {
+    fn update_sign_count(&self, credential_id: &[u8], new_count: u32) -> Result<(), WebAuthnError> {
         let mut g = self.lock()?;
         let entry = g
             .get_mut(credential_id)

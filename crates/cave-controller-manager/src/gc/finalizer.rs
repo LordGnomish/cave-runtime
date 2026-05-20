@@ -25,10 +25,7 @@ pub enum FinalizerOp {
 
 /// Decide which finalizer to add when a DELETE arrives. The behavior in
 /// `pkg/registry/garbagecollector/operations.go::DeletionFinalizersForGarbageCollection`.
-pub fn add_for_propagation(
-    propagation: &str,
-    existing: &[String],
-) -> FinalizerOp {
+pub fn add_for_propagation(propagation: &str, existing: &[String]) -> FinalizerOp {
     match propagation {
         "Foreground" => {
             if existing.iter().any(|f| f == FINALIZER_FOREGROUND_DELETION) {
@@ -50,11 +47,7 @@ pub fn add_for_propagation(
 
 /// Remove the finalizer indicated by the propagation flow once the
 /// associated work has been observed-complete.
-pub fn remove_when_complete(
-    propagation: &str,
-    blocked: bool,
-    existing: &[String],
-) -> FinalizerOp {
+pub fn remove_when_complete(propagation: &str, blocked: bool, existing: &[String]) -> FinalizerOp {
     if blocked {
         return FinalizerOp::NoOp;
     }
@@ -72,14 +65,15 @@ pub fn remove_when_complete(
 
 /// Filter a finalizer list to remove the named finalizer (single-pass).
 pub fn strip(finalizers: &[String], name: &str) -> Vec<String> {
-    finalizers.iter().filter(|f| f.as_str() != name).cloned().collect()
+    finalizers
+        .iter()
+        .filter(|f| f.as_str() != name)
+        .cloned()
+        .collect()
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::new(
-    "pkg/controller/garbagecollector/finalizer.go",
-    "Finalizers",
-);
+const FILE_CITE: Cite = Cite::new("pkg/controller/garbagecollector/finalizer.go", "Finalizers");
 
 #[cfg(test)]
 mod tests {
@@ -120,7 +114,10 @@ mod tests {
             "tenant-gc-fin-add-dup"
         );
         let existing = vec![FINALIZER_FOREGROUND_DELETION.to_string()];
-        assert_eq!(add_for_propagation("Foreground", &existing), FinalizerOp::NoOp);
+        assert_eq!(
+            add_for_propagation("Foreground", &existing),
+            FinalizerOp::NoOp
+        );
     }
 
     #[test]

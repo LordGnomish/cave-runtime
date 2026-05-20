@@ -107,7 +107,9 @@ pub struct DiskEncryptionSet {
 
 impl DiskEncryptionSet {
     pub fn validate(&self) -> Result<(), CloudError> {
-        if !self.key_vault_uri.starts_with("https://") || !self.key_vault_uri.contains(".vault.azure.net") {
+        if !self.key_vault_uri.starts_with("https://")
+            || !self.key_vault_uri.contains(".vault.azure.net")
+        {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Azure,
                 reason: format!(
@@ -222,8 +224,7 @@ impl AzureFilesShare {
 
 // ─── AGIC Ingress Class ──────────────────────────────────────────────────────
 
-pub const AGIC_INGRESS_CONTROLLER_ANNOTATION: &str =
-    "kubernetes.io/ingress.class";
+pub const AGIC_INGRESS_CONTROLLER_ANNOTATION: &str = "kubernetes.io/ingress.class";
 pub const AGIC_DEFAULT_CLASS: &str = "azure/application-gateway";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -400,32 +401,57 @@ mod tests {
 
     #[test]
     fn availability_set_default_values_validate() {
-        let _ = ctx("acme", "pkg/provider/azure_availabilityset.go", "AvailabilitySet");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_availabilityset.go",
+            "AvailabilitySet",
+        );
         let s = AvailabilitySet::new("as", "rg", "westeurope");
         assert!(s.validate().is_ok());
     }
 
     #[test]
     fn availability_set_update_domain_outside_1_20_is_rejected() {
-        let _ = ctx("acme", "pkg/provider/azure_availabilityset.go", "AvailabilitySet");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_availabilityset.go",
+            "AvailabilitySet",
+        );
         let mut s = AvailabilitySet::new("as", "rg", "westeurope");
         s.platform_update_domain_count = 0;
-        assert!(matches!(s.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            s.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         s.platform_update_domain_count = 21;
-        assert!(matches!(s.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            s.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn availability_set_fault_domain_outside_1_3_is_rejected() {
-        let _ = ctx("acme", "pkg/provider/azure_availabilityset.go", "AvailabilitySet");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_availabilityset.go",
+            "AvailabilitySet",
+        );
         let mut s = AvailabilitySet::new("as", "rg", "westeurope");
         s.platform_fault_domain_count = 4;
-        assert!(matches!(s.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            s.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn availability_set_add_vm_caps_at_two_hundred() {
-        let _ = ctx("acme", "pkg/provider/azure_availabilityset.go", "AvailabilitySet");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_availabilityset.go",
+            "AvailabilitySet",
+        );
         let mut s = AvailabilitySet::new("as", "rg", "westeurope");
         for i in 0..AvailabilitySet::MAX_VMS {
             s.add_vm(&format!("vm-{i}")).unwrap();
@@ -436,7 +462,11 @@ mod tests {
 
     #[test]
     fn availability_set_rejects_duplicate_vm() {
-        let _ = ctx("acme", "pkg/provider/azure_availabilityset.go", "AvailabilitySet");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_availabilityset.go",
+            "AvailabilitySet",
+        );
         let mut s = AvailabilitySet::new("as", "rg", "westeurope");
         s.add_vm("vm-1").unwrap();
         let err = s.add_vm("vm-1").unwrap_err();
@@ -458,32 +488,57 @@ mod tests {
 
     #[test]
     fn disk_encryption_set_validates_minimum_config() {
-        let _ = ctx("acme", "pkg/provider/azure_disk_encryption.go", "DiskEncryptionSet");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_disk_encryption.go",
+            "DiskEncryptionSet",
+        );
         assert!(des("d1").validate().is_ok());
     }
 
     #[test]
     fn disk_encryption_set_rejects_non_kv_uri() {
-        let _ = ctx("acme", "pkg/provider/azure_disk_encryption.go", "DiskEncryptionSet");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_disk_encryption.go",
+            "DiskEncryptionSet",
+        );
         let mut d = des("d1");
         d.key_vault_uri = "https://example.com".into();
-        assert!(matches!(d.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            d.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn disk_encryption_set_rejects_http_uri() {
-        let _ = ctx("acme", "pkg/provider/azure_disk_encryption.go", "DiskEncryptionSet");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_disk_encryption.go",
+            "DiskEncryptionSet",
+        );
         let mut d = des("d1");
         d.key_vault_uri = "http://kv-acme.vault.azure.net".into();
-        assert!(matches!(d.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            d.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn disk_encryption_set_requires_key_name() {
-        let _ = ctx("acme", "pkg/provider/azure_disk_encryption.go", "DiskEncryptionSet");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_disk_encryption.go",
+            "DiskEncryptionSet",
+        );
         let mut d = des("d1");
         d.key_name.clear();
-        assert!(matches!(d.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            d.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     // ─── DiskSnapshot ────────────────────────────────────────────────────────
@@ -502,7 +557,10 @@ mod tests {
         let _ = ctx("acme", "pkg/provider/azure_managed_disk.go", "Snapshot");
         let mut s = DiskSnapshot::pending("s", "d", 100);
         s.finish().unwrap();
-        assert!(matches!(s.finish().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            s.finish().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -529,21 +587,32 @@ mod tests {
     fn azure_files_validates_quota_range() {
         let _ = ctx("acme", "pkg/provider/azure_files.go", "FileShare");
         assert!(matches!(
-            afs(FilesProtocol::Smb, AccessTier::Hot, 0).validate().unwrap_err(),
+            afs(FilesProtocol::Smb, AccessTier::Hot, 0)
+                .validate()
+                .unwrap_err(),
             CloudError::InvalidConfig { .. }
         ));
         assert!(matches!(
-            afs(FilesProtocol::Smb, AccessTier::Hot, 200_000).validate().unwrap_err(),
+            afs(FilesProtocol::Smb, AccessTier::Hot, 200_000)
+                .validate()
+                .unwrap_err(),
             CloudError::InvalidConfig { .. }
         ));
-        assert!(afs(FilesProtocol::Smb, AccessTier::Hot, 100).validate().is_ok());
+        assert!(
+            afs(FilesProtocol::Smb, AccessTier::Hot, 100)
+                .validate()
+                .is_ok()
+        );
     }
 
     #[test]
     fn azure_files_nfs_requires_premium_tier() {
         let _ = ctx("acme", "pkg/provider/azure_files.go", "FileShare");
         let bad = afs(FilesProtocol::Nfs, AccessTier::Hot, 100);
-        assert!(matches!(bad.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            bad.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         let good = afs(FilesProtocol::Nfs, AccessTier::Premium, 100);
         assert!(good.validate().is_ok());
     }
@@ -563,7 +632,10 @@ mod tests {
     fn agic_default_constants_match_upstream() {
         let _ = ctx("acme", "pkg/provider/azure_app_gateway.go", "IngressClass");
         assert_eq!(AGIC_DEFAULT_CLASS, "azure/application-gateway");
-        assert_eq!(AGIC_INGRESS_CONTROLLER_ANNOTATION, "kubernetes.io/ingress.class");
+        assert_eq!(
+            AGIC_INGRESS_CONTROLLER_ANNOTATION,
+            "kubernetes.io/ingress.class"
+        );
     }
 
     #[test]
@@ -577,7 +649,10 @@ mod tests {
         let _ = ctx("acme", "pkg/provider/azure_app_gateway.go", "IngressClass");
         let mut c = agic();
         c.app_gateway_id = "agw".into();
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -585,7 +660,10 @@ mod tests {
         let _ = ctx("acme", "pkg/provider/azure_app_gateway.go", "IngressClass");
         let mut c = agic();
         c.controller = "custom".into();
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         c.controller = "example.com/custom".into();
         assert!(c.validate().is_ok());
     }
@@ -594,7 +672,11 @@ mod tests {
 
     #[test]
     fn private_cluster_disabled_skips_validation() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "PrivateCluster");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "PrivateCluster",
+        );
         let p = PrivateClusterConfig {
             enable_private_cluster: false,
             private_dns_zone: PrivateDnsZoneMode::System,
@@ -605,29 +687,47 @@ mod tests {
 
     #[test]
     fn private_cluster_custom_zone_must_be_arm_id() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "PrivateCluster");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "PrivateCluster",
+        );
         let p = PrivateClusterConfig {
             enable_private_cluster: true,
             private_dns_zone: PrivateDnsZoneMode::Custom("my-zone".into()),
             enable_public_fqdn: false,
         };
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn private_cluster_none_zone_cannot_combine_with_public_fqdn() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "PrivateCluster");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "PrivateCluster",
+        );
         let p = PrivateClusterConfig {
             enable_private_cluster: true,
             private_dns_zone: PrivateDnsZoneMode::None,
             enable_public_fqdn: true,
         };
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn private_cluster_system_zone_validates() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "PrivateCluster");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "PrivateCluster",
+        );
         let p = PrivateClusterConfig {
             enable_private_cluster: true,
             private_dns_zone: PrivateDnsZoneMode::System,
@@ -648,32 +748,57 @@ mod tests {
 
     #[test]
     fn aad_managed_profile_with_guid_validates() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "AADProfile");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "AADProfile",
+        );
         assert!(aad().validate().is_ok());
     }
 
     #[test]
     fn aad_legacy_unmanaged_is_rejected() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "AADProfile");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "AADProfile",
+        );
         let mut a = aad();
         a.managed = false;
-        assert!(matches!(a.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            a.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn aad_admin_group_must_be_guid() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "AADProfile");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "AADProfile",
+        );
         let mut a = aad();
         a.admin_group_object_ids = vec!["not-a-guid".into()];
-        assert!(matches!(a.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            a.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn aad_tenant_id_must_be_non_empty() {
-        let _ = ctx("acme", "pkg/provider/azure_managedclusters.go", "AADProfile");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "AADProfile",
+        );
         let mut a = aad();
         a.tenant_id.clear();
-        assert!(matches!(a.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            a.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     // ─── VNet peering ────────────────────────────────────────────────────────
@@ -700,7 +825,10 @@ mod tests {
         let _ = ctx("acme", "pkg/provider/azure_vnet_peering.go", "VnetPeering");
         let mut p = peering();
         p.remote_vnet = p.source_vnet.clone();
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -709,7 +837,10 @@ mod tests {
         let mut p = peering();
         p.allow_gateway_transit = true;
         p.use_remote_gateways = true;
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     // ─── zone_count ──────────────────────────────────────────────────────────
@@ -717,7 +848,11 @@ mod tests {
     #[test]
     fn zone_count_dedupes_repeated_entries() {
         let _ = ctx("acme", "pkg/provider/azure_zones.go", "AvailabilityZone");
-        let zs = vec![AvailabilityZone::Zone1, AvailabilityZone::Zone1, AvailabilityZone::Zone2];
+        let zs = vec![
+            AvailabilityZone::Zone1,
+            AvailabilityZone::Zone1,
+            AvailabilityZone::Zone2,
+        ];
         assert_eq!(zone_count(&zs), 2);
     }
 

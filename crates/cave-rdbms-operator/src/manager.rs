@@ -16,10 +16,7 @@ pub fn slow_queries(stats: &[QueryStat], threshold_ms: f64) -> Vec<&QueryStat> {
 
 /// Return tables whose bloat ratio exceeds `min_ratio` (0.0–1.0).
 pub fn bloated_tables(stats: &[TableStat], min_ratio: f64) -> Vec<&TableStat> {
-    stats
-        .iter()
-        .filter(|t| t.bloat_ratio > min_ratio)
-        .collect()
+    stats.iter().filter(|t| t.bloat_ratio > min_ratio).collect()
 }
 
 /// Return the most recent size record per database that exceeds `threshold_bytes`.
@@ -36,8 +33,7 @@ pub fn size_alert_records(sizes: &[DbSizeRecord], threshold_bytes: u64) -> Vec<&
 pub fn replication_healthy(status: &ReplicationStatus) -> bool {
     const MAX_LAG_BYTES: u64 = 100 * 1024 * 1024; // 100 MiB
     const MAX_LAG_SECS: f64 = 30.0;
-    status.replication_lag_bytes < MAX_LAG_BYTES
-        && status.replication_lag_seconds < MAX_LAG_SECS
+    status.replication_lag_bytes < MAX_LAG_BYTES && status.replication_lag_seconds < MAX_LAG_SECS
 }
 
 /// Summarise pool utilisation as a percentage of max capacity.

@@ -19,17 +19,25 @@ use std::collections::HashMap;
 #[derive(Debug, Default)]
 pub struct Dns01Solver {
     pub tenant_id: String,
-    records: HashMap<String, String>,  // dns name → TXT value
+    records: HashMap<String, String>, // dns name → TXT value
 }
 
 impl Dns01Solver {
     pub fn new(tenant_id: impl Into<String>) -> Self {
-        Self { tenant_id: tenant_id.into(), records: HashMap::new() }
+        Self {
+            tenant_id: tenant_id.into(),
+            records: HashMap::new(),
+        }
     }
 
     /// Cite: RFC 8555 §8.4 — publish a TXT record at
     /// `_acme-challenge.<domain>` with the base64url(SHA-256(keyAuth)).
-    pub fn present(&mut self, domain: &str, challenge: &Challenge, jwk: &Jwk) -> Result<String, String> {
+    pub fn present(
+        &mut self,
+        domain: &str,
+        challenge: &Challenge,
+        jwk: &Jwk,
+    ) -> Result<String, String> {
         if challenge.kind != ChallengeType::Dns01 {
             return Err(format!("DNS-01 solver received {:?}", challenge.kind));
         }
@@ -51,8 +59,12 @@ impl Dns01Solver {
         self.records.get(record_name)
     }
 
-    pub fn len(&self) -> usize { self.records.len() }
-    pub fn is_empty(&self) -> bool { self.records.is_empty() }
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
 }
 
 /// In-memory HTTP-01 solver. Tracks `(token → keyAuth)` mounted under
@@ -60,12 +72,15 @@ impl Dns01Solver {
 #[derive(Debug, Default)]
 pub struct Http01Solver {
     pub tenant_id: String,
-    resources: HashMap<String, String>,  // resource path → body
+    resources: HashMap<String, String>, // resource path → body
 }
 
 impl Http01Solver {
     pub fn new(tenant_id: impl Into<String>) -> Self {
-        Self { tenant_id: tenant_id.into(), resources: HashMap::new() }
+        Self {
+            tenant_id: tenant_id.into(),
+            resources: HashMap::new(),
+        }
     }
 
     /// Cite: RFC 8555 §8.3 — publish keyAuth at the well-known path on
@@ -93,5 +108,7 @@ impl Http01Solver {
         self.resources.get(request_path)
     }
 
-    pub fn len(&self) -> usize { self.resources.len() }
+    pub fn len(&self) -> usize {
+        self.resources.len()
+    }
 }

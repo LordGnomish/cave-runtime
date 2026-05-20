@@ -14,8 +14,7 @@ use tokio::sync::RwLock;
 
 use crate::storage::TraceStore;
 use crate::types::{
-    build_histogram, LatencyHistogram, Span, SpanStatus, TagValue, Trace, TraceId,
-    TraceSearchQuery,
+    LatencyHistogram, Span, SpanStatus, TagValue, Trace, TraceId, TraceSearchQuery, build_histogram,
 };
 
 // ─── Latency breakdown ─────────────────────────────────────────────────────
@@ -41,7 +40,10 @@ pub fn latency_breakdown(spans: &[Span]) -> Vec<LatencyBreakdown> {
 
     for span in spans {
         let key = (span.service_name.clone(), span.operation_name.clone());
-        groups.entry(key.clone()).or_default().push(span.duration_ns);
+        groups
+            .entry(key.clone())
+            .or_default()
+            .push(span.duration_ns);
         if span.has_error() {
             *errors.entry(key).or_insert(0) += 1;
         }
@@ -57,7 +59,9 @@ pub fn latency_breakdown(spans: &[Span]) -> Vec<LatencyBreakdown> {
             let mean_ns = if count > 0 { sum / count } else { 0 };
 
             let pct = |p: f64| -> f64 {
-                if durations.is_empty() { return 0.0; }
+                if durations.is_empty() {
+                    return 0.0;
+                }
                 let idx = ((p / 100.0) * (durations.len() - 1) as f64).round() as usize;
                 durations[idx.min(durations.len() - 1)] as f64 / 1_000_000.0
             };
@@ -67,7 +71,11 @@ pub fn latency_breakdown(spans: &[Span]) -> Vec<LatencyBreakdown> {
                 operation: key.1,
                 call_count: count,
                 error_count: err_count,
-                error_rate: if count > 0 { err_count as f64 / count as f64 } else { 0.0 },
+                error_rate: if count > 0 {
+                    err_count as f64 / count as f64
+                } else {
+                    0.0
+                },
                 p50_ms: pct(50.0),
                 p95_ms: pct(95.0),
                 p99_ms: pct(99.0),
@@ -114,8 +122,16 @@ pub fn detect_bottlenecks(spans: &[Span]) -> Vec<Bottleneck> {
             operation: key.1,
             total_duration_ns: total_ns,
             call_count: count,
-            avg_ms: if count > 0 { total_ns as f64 / count as f64 / 1_000_000.0 } else { 0.0 },
-            fraction_of_total: if grand_total > 0 { total_ns as f64 / grand_total as f64 } else { 0.0 },
+            avg_ms: if count > 0 {
+                total_ns as f64 / count as f64 / 1_000_000.0
+            } else {
+                0.0
+            },
+            fraction_of_total: if grand_total > 0 {
+                total_ns as f64 / grand_total as f64
+            } else {
+                0.0
+            },
         })
         .collect();
 
@@ -141,14 +157,16 @@ pub fn error_propagation_analysis(traces: &[Trace]) -> Vec<ErrorChain> {
     let mut root_causes: HashMap<(String, String), (HashSet<String>, usize)> = HashMap::new();
 
     for trace in traces {
-        let span_map: HashMap<u64, &Span> =
-            trace.spans.iter().map(|s| (s.span_id, s)).collect();
+        let span_map: HashMap<u64, &Span> = trace.spans.iter().map(|s| (s.span_id, s)).collect();
 
         // Find error spans that have no error parent → root cause
         for span in &trace.spans {
-            if !span.has_error() { continue; }
+            if !span.has_error() {
+                continue;
+            }
 
-            let parent_is_error = span.parent_span_id
+            let parent_is_error = span
+                .parent_span_id
                 .and_then(|pid| span_map.get(&pid))
                 .map(|p| p.has_error())
                 .unwrap_or(false);
@@ -200,7 +218,10 @@ pub fn detect_anomalous_spans(spans: &[Span], threshold_sigma: f64) -> Vec<Anoma
     let mut groups: HashMap<(String, String), Vec<f64>> = HashMap::new();
     for span in spans {
         let key = (span.service_name.clone(), span.operation_name.clone());
-        groups.entry(key).or_default().push(span.duration_ns as f64 / 1_000_000.0);
+        groups
+            .entry(key)
+            .or_default()
+            .push(span.duration_ns as f64 / 1_000_000.0);
     }
 
     // Compute mean + std per group
@@ -218,7 +239,9 @@ pub fn detect_anomalous_spans(spans: &[Span], threshold_sigma: f64) -> Vec<Anoma
     for span in spans {
         let key = (span.service_name.clone(), span.operation_name.clone());
         if let Some(&(mean, std)) = stats.get(&key) {
-            if std < 0.001 { continue; } // no variance, skip
+            if std < 0.001 {
+                continue;
+            } // no variance, skip
             let dur_ms = span.duration_ns as f64 / 1_000_000.0;
             let z = (dur_ms - mean) / std;
             if z > threshold_sigma {
@@ -236,7 +259,11 @@ pub fn detect_anomalous_spans(spans: &[Span], threshold_sigma: f64) -> Vec<Anoma
         }
     }
 
-    anomalies.sort_by(|a, b| b.z_score.partial_cmp(&a.z_score).unwrap_or(std::cmp::Ordering::Equal));
+    anomalies.sort_by(|a, b| {
+        b.z_score
+            .partial_cmp(&a.z_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     anomalies
 }
 
@@ -260,7 +287,10 @@ pub fn service_metrics(spans: &[Span], window_secs: f64) -> Vec<ServiceMetrics> 
     let mut errs: HashMap<String, u64> = HashMap::new();
 
     for span in spans {
-        groups.entry(span.service_name.clone()).or_default().push(span.duration_ns);
+        groups
+            .entry(span.service_name.clone())
+            .or_default()
+            .push(span.duration_ns);
         if span.has_error() {
             *errs.entry(span.service_name.clone()).or_insert(0) += 1;
         }
@@ -274,16 +304,30 @@ pub fn service_metrics(spans: &[Span], window_secs: f64) -> Vec<ServiceMetrics> 
             let err_count = *errs.get(&svc).unwrap_or(&0);
 
             let pct = |p: f64| -> f64 {
-                if durs.is_empty() { return 0.0; }
+                if durs.is_empty() {
+                    return 0.0;
+                }
                 let idx = ((p / 100.0) * (durs.len() - 1) as f64).round() as usize;
                 durs[idx.min(durs.len() - 1)] as f64 / 1_000_000.0
             };
 
             ServiceMetrics {
                 service: svc,
-                request_rate: if window_secs > 0.0 { count as f64 / window_secs } else { 0.0 },
-                error_rate: if window_secs > 0.0 { err_count as f64 / window_secs } else { 0.0 },
-                error_fraction: if count > 0 { err_count as f64 / count as f64 } else { 0.0 },
+                request_rate: if window_secs > 0.0 {
+                    count as f64 / window_secs
+                } else {
+                    0.0
+                },
+                error_rate: if window_secs > 0.0 {
+                    err_count as f64 / window_secs
+                } else {
+                    0.0
+                },
+                error_fraction: if count > 0 {
+                    err_count as f64 / count as f64
+                } else {
+                    0.0
+                },
                 p50_ms: pct(50.0),
                 p95_ms: pct(95.0),
                 p99_ms: pct(99.0),
@@ -311,7 +355,11 @@ mod tests {
             start_time_unix_nano: 0,
             end_time_unix_nano: dur_ns,
             duration_ns: dur_ns,
-            status: if error { SpanStatus::Error } else { SpanStatus::Ok },
+            status: if error {
+                SpanStatus::Error
+            } else {
+                SpanStatus::Ok
+            },
             kind: SpanKind::Server,
             tags: HashMap::new(),
             events: vec![],
@@ -381,6 +429,6 @@ mod tests {
         let metrics = service_metrics(&spans, 1.0);
         let api = metrics.iter().find(|m| m.service == "api").unwrap();
         assert_eq!(api.total_spans, 3);
-        assert!((api.error_fraction - 1.0/3.0).abs() < 0.01);
+        assert!((api.error_fraction - 1.0 / 3.0).abs() < 0.01);
     }
 }

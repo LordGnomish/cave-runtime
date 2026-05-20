@@ -7,7 +7,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, RolloutStatus};
+use crate::admin::state::{AdminState, RolloutStatus, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -16,10 +16,18 @@ pub enum RolloutsViewError {
     Auth(#[from] crate::admin::permission::AuthError),
 }
 
-pub fn list_records(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<RolloutStatus>, RolloutsViewError> {
+pub fn list_records(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<RolloutStatus>, RolloutsViewError> {
     ctx.authorise(Permission::RolloutsRead)?;
-    let mut rows: Vec<RolloutStatus> = scope(&state.rollout_statuses.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter().cloned().collect();
+    let mut rows: Vec<RolloutStatus> =
+        scope(&state.rollout_statuses.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| b.traffic_pct.cmp(&a.traffic_pct).then(a.name.cmp(&b.name)));
     Ok(rows)
 }
@@ -34,7 +42,9 @@ pub struct RolloutSummary {
 }
 
 pub fn rollout_summary(rows: &[RolloutStatus]) -> RolloutSummary {
-    if rows.is_empty() { return RolloutSummary::default(); }
+    if rows.is_empty() {
+        return RolloutSummary::default();
+    }
     let total = rows.len() as u32;
     let mut healthy = 0;
     let mut progressing = 0;
@@ -49,7 +59,13 @@ pub fn rollout_summary(rows: &[RolloutStatus]) -> RolloutSummary {
         }
         traffic_total += r.traffic_pct;
     }
-    RolloutSummary { total, healthy, progressing, degraded, avg_traffic_pct: traffic_total / total }
+    RolloutSummary {
+        total,
+        healthy,
+        progressing,
+        degraded,
+        avg_traffic_pct: traffic_total / total,
+    }
 }
 
 pub fn by_strategy<'a>(rows: &'a [RolloutStatus], strategy: &str) -> Vec<&'a RolloutStatus> {
@@ -59,9 +75,17 @@ pub fn by_strategy<'a>(rows: &'a [RolloutStatus], strategy: &str) -> Vec<&'a Rol
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, RolloutsViewError> {
     let rows = list_records(state, ctx)?;
     let summary = rollout_summary(&rows);
-    let table_rows: Vec<Vec<String>> = rows.iter().map(|r| vec![
-        escape(&r.name), r.strategy.into(), format!("{}%", r.traffic_pct), r.state.into(),
-    ]).collect();
+    let table_rows: Vec<Vec<String>> = rows
+        .iter()
+        .map(|r| {
+            vec![
+                escape(&r.name),
+                r.strategy.into(),
+                format!("{}%", r.traffic_pct),
+                r.state.into(),
+            ]
+        })
+        .collect();
     let body = format!(
         r#"<section>
   <p class="text-sm text-gray-600 mb-3">Argo Rollouts (cave-rollouts). Upstream: <a class="text-blue-700 underline" href="https://argo-rollouts.readthedocs.io/en/stable/dashboard/">argo-rollouts.readthedocs.io</a>.</p>
@@ -81,23 +105,35 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, RolloutsVi
         degraded = summary.degraded,
         tbl = table(&["name", "strategy", "traffic", "state"], &table_rows),
     );
-    Ok(page_shell_full(ctx, "/admin/rollouts", &format!("rollouts · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/rollouts",
+        &format!("rollouts · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::backstage("plugins/rollouts/src/components/StatusList.tsx", "StatusList");
+const FILE_CITE: Cite = Cite::backstage(
+    "plugins/rollouts/src/components/StatusList.tsx",
+    "StatusList",
+);
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::portal_test_ctx;
-    fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
+    fn ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer("acme", perms)
+    }
 
     #[test]
     fn list_filters_to_owner_and_sorts_by_traffic_desc() {
         let r = list_records(&AdminState::seeded(), &ctx(&[Permission::RolloutsRead])).unwrap();
         assert_eq!(r.len(), 2);
-        for w in r.windows(2) { assert!(w[0].traffic_pct >= w[1].traffic_pct); }
+        for w in r.windows(2) {
+            assert!(w[0].traffic_pct >= w[1].traffic_pct);
+        }
     }
 
     #[test]
@@ -110,7 +146,11 @@ mod tests {
         let r = list_records(&AdminState::seeded(), &ctx(&[Permission::RolloutsRead])).unwrap();
         let s = rollout_summary(&r);
         assert_eq!(s.total, r.len() as u32);
-        let expected_avg = if r.is_empty() { 0 } else { r.iter().map(|x| x.traffic_pct).sum::<u32>() / r.len() as u32 };
+        let expected_avg = if r.is_empty() {
+            0
+        } else {
+            r.iter().map(|x| x.traffic_pct).sum::<u32>() / r.len() as u32
+        };
         assert_eq!(s.avg_traffic_pct, expected_avg);
     }
 

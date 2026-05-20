@@ -26,7 +26,9 @@
 //!   maps them to an [`Allow`]/[`Deny`] verdict plus an optional L7
 //!   redirect port (mirrors upstream `MapStateEntry`).
 
-use crate::cilium::identity::{LabelSet, ID_HEALTH, ID_HOST, ID_INIT, ID_REMOTE_NODE, ID_UNMANAGED, ID_WORLD};
+use crate::cilium::identity::{
+    LabelSet, ID_HEALTH, ID_HOST, ID_INIT, ID_REMOTE_NODE, ID_UNMANAGED, ID_WORLD,
+};
 use crate::cilium::types::{Cite, TenantId};
 use ipnet::IpNet;
 use serde::{Deserialize, Serialize};
@@ -118,7 +120,11 @@ impl EndpointSelector {
 
     /// True if this selector matches the given label set.
     pub fn matches(&self, labels: &LabelSet) -> bool {
-        let map: HashMap<&str, &str> = labels.pairs.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+        let map: HashMap<&str, &str> = labels
+            .pairs
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect();
         for (k, v) in &self.match_labels {
             match map.get(k.as_str()) {
                 Some(have) if *have == v.as_str() => {}
@@ -167,7 +173,10 @@ pub struct CidrRule {
 
 impl CidrRule {
     pub fn new(cidr: impl Into<String>) -> Self {
-        Self { cidr: cidr.into(), except: Vec::new() }
+        Self {
+            cidr: cidr.into(),
+            except: Vec::new(),
+        }
     }
     pub fn with_except<I, S>(mut self, except: I) -> Self
     where
@@ -179,7 +188,8 @@ impl CidrRule {
     }
     /// True if `ip` falls inside `cidr` and *not* inside any `except` block.
     pub fn contains(&self, ip: IpAddr) -> Result<bool, PolicyError> {
-        let net = IpNet::from_str(&self.cidr).map_err(|_| PolicyError::BadCidr(self.cidr.clone()))?;
+        let net =
+            IpNet::from_str(&self.cidr).map_err(|_| PolicyError::BadCidr(self.cidr.clone()))?;
         if !net.contains(&ip) {
             return Ok(false);
         }
@@ -374,11 +384,22 @@ impl PolicyMap {
     pub fn allow(&mut self, key: PolicyKey, l7: Option<u16>) {
         self.entries.insert(
             key,
-            PolicyEntry { verdict: Verdict::Allow, l7_redirect_port: l7, audit: false },
+            PolicyEntry {
+                verdict: Verdict::Allow,
+                l7_redirect_port: l7,
+                audit: false,
+            },
         );
     }
     pub fn deny(&mut self, key: PolicyKey) {
-        self.entries.insert(key, PolicyEntry { verdict: Verdict::Deny, l7_redirect_port: None, audit: false });
+        self.entries.insert(
+            key,
+            PolicyEntry {
+                verdict: Verdict::Deny,
+                l7_redirect_port: None,
+                audit: false,
+            },
+        );
     }
     /// Look up the verdict for a wire packet. Mirrors the kernel-side
     /// `policy_can_access` walk: explicit deny > explicit allow with port
@@ -386,31 +407,46 @@ impl PolicyMap {
     pub fn lookup(&self, peer: u32, port: u16, proto: L4Protocol, dir: Direction) -> PolicyEntry {
         // 1. Exact match on (peer, port, proto, dir).
         if let Some(&entry) = self.entries.get(&PolicyKey {
-            peer_identity: peer, port, protocol: proto, direction: dir,
+            peer_identity: peer,
+            port,
+            protocol: proto,
+            direction: dir,
         }) {
             return entry;
         }
         // 2. Allow on (peer, port=0, exact-proto).
         if let Some(&entry) = self.entries.get(&PolicyKey {
-            peer_identity: peer, port: 0, protocol: proto, direction: dir,
+            peer_identity: peer,
+            port: 0,
+            protocol: proto,
+            direction: dir,
         }) {
             return entry;
         }
         // 3. Allow on (peer, port, Any-proto).
         if let Some(&entry) = self.entries.get(&PolicyKey {
-            peer_identity: peer, port, protocol: L4Protocol::Any, direction: dir,
+            peer_identity: peer,
+            port,
+            protocol: L4Protocol::Any,
+            direction: dir,
         }) {
             return entry;
         }
         // 4. Allow on (peer, any-port, Any-proto).
         if let Some(&entry) = self.entries.get(&PolicyKey {
-            peer_identity: peer, port: 0, protocol: L4Protocol::Any, direction: dir,
+            peer_identity: peer,
+            port: 0,
+            protocol: L4Protocol::Any,
+            direction: dir,
         }) {
             return entry;
         }
         // 5. World fallback for non-cluster peers.
         if let Some(&entry) = self.entries.get(&PolicyKey {
-            peer_identity: ID_ALL, port: 0, protocol: L4Protocol::Any, direction: dir,
+            peer_identity: ID_ALL,
+            port: 0,
+            protocol: L4Protocol::Any,
+            direction: dir,
         }) {
             return entry;
         }
@@ -420,7 +456,11 @@ impl PolicyMap {
             Direction::Egress => self.egress_enforced,
         };
         PolicyEntry {
-            verdict: if enforced { Verdict::Deny } else { Verdict::Allow },
+            verdict: if enforced {
+                Verdict::Deny
+            } else {
+                Verdict::Allow
+            },
             l7_redirect_port: None,
             audit: false,
         }
@@ -514,7 +554,9 @@ pub fn distill(
 
     for rule in &repo.rules {
         if &rule.tenant != tenant {
-            return Err(PolicyError::TenantDenied { tenant: tenant.clone() });
+            return Err(PolicyError::TenantDenied {
+                tenant: tenant.clone(),
+            });
         }
         if !rule.applies_to(endpoint_labels) {
             continue;
@@ -551,7 +593,12 @@ fn distill_egress(rule: &EgressRule, map: &mut PolicyMap, resolver: &dyn Identit
 fn collect_peers_ingress(rule: &IngressRule, resolver: &dyn IdentityResolver) -> Vec<u32> {
     let mut peers = Vec::new();
     expand_entities(&rule.from_entities, resolver, &mut peers);
-    expand_endpoint_selectors(&rule.from_endpoints, &rule.from_requires, resolver, &mut peers);
+    expand_endpoint_selectors(
+        &rule.from_endpoints,
+        &rule.from_requires,
+        resolver,
+        &mut peers,
+    );
     if !rule.from_cidr.is_empty() {
         // CIDR rules contribute world by default — the actual IP filter
         // happens at lookup time. We model this by emitting the world id
@@ -630,7 +677,12 @@ fn write_port_entries(
     if to_ports.is_empty() && icmps.is_empty() {
         // L3-only allow → (peer, port=0, Any).
         for &peer in peers {
-            let key = PolicyKey { peer_identity: peer, port: 0, protocol: L4Protocol::Any, direction: dir };
+            let key = PolicyKey {
+                peer_identity: peer,
+                port: 0,
+                protocol: L4Protocol::Any,
+                direction: dir,
+            };
             map.allow(key, None);
         }
         return;
@@ -638,7 +690,12 @@ fn write_port_entries(
     for pr in to_ports {
         if pr.ports.is_empty() {
             for &peer in peers {
-                let key = PolicyKey { peer_identity: peer, port: 0, protocol: L4Protocol::Any, direction: dir };
+                let key = PolicyKey {
+                    peer_identity: peer,
+                    port: 0,
+                    protocol: L4Protocol::Any,
+                    direction: dir,
+                };
                 map.allow(key, pr.l7_redirect_port);
             }
             continue;
@@ -646,7 +703,10 @@ fn write_port_entries(
         for pp in &pr.ports {
             for &peer in peers {
                 let key = PolicyKey {
-                    peer_identity: peer, port: pp.port, protocol: pp.protocol, direction: dir,
+                    peer_identity: peer,
+                    port: pp.port,
+                    protocol: pp.protocol,
+                    direction: dir,
                 };
                 map.allow(key, pr.l7_redirect_port);
             }
@@ -683,7 +743,10 @@ mod tests {
 
     fn endpoint_sel(pairs: &[(&str, &str)]) -> EndpointSelector {
         EndpointSelector {
-            match_labels: pairs.iter().map(|(k, v)| ((*k).into(), (*v).into())).collect(),
+            match_labels: pairs
+                .iter()
+                .map(|(k, v)| ((*k).into(), (*v).into()))
+                .collect(),
             match_expressions: Vec::new(),
         }
     }
@@ -692,73 +755,121 @@ mod tests {
 
     #[test]
     fn entity_world_resolves_to_id_world() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/entity.go", "EntityWorld", "tenant-pol-ent-world");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/entity.go",
+            "EntityWorld",
+            "tenant-pol-ent-world"
+        );
         assert_eq!(Entity::World.to_identity(), Some(ID_WORLD));
     }
 
     #[test]
     fn entity_host_resolves_to_id_host() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/entity.go", "EntityHost", "tenant-pol-ent-host");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/entity.go",
+            "EntityHost",
+            "tenant-pol-ent-host"
+        );
         assert_eq!(Entity::Host.to_identity(), Some(ID_HOST));
     }
 
     #[test]
     fn entity_kube_apiserver_resolves_to_id_7() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/entity.go", "EntityKubeAPIServer", "tenant-pol-ent-kas");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/entity.go",
+            "EntityKubeAPIServer",
+            "tenant-pol-ent-kas"
+        );
         assert_eq!(Entity::KubeApiServer.to_identity(), Some(ID_KUBE_APISERVER));
     }
 
     #[test]
     fn entity_ingress_resolves_to_id_8() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/entity.go", "EntityIngress", "tenant-pol-ent-ing");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/entity.go",
+            "EntityIngress",
+            "tenant-pol-ent-ing"
+        );
         assert_eq!(Entity::Ingress.to_identity(), Some(ID_INGRESS));
     }
 
     #[test]
     fn entity_remote_node_resolves_to_id_remote_node() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/entity.go", "EntityRemoteNode", "tenant-pol-ent-rn");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/entity.go",
+            "EntityRemoteNode",
+            "tenant-pol-ent-rn"
+        );
         assert_eq!(Entity::RemoteNode.to_identity(), Some(ID_REMOTE_NODE));
     }
 
     #[test]
     fn entity_health_resolves_to_id_health() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/entity.go", "EntityHealth", "tenant-pol-ent-hlth");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/entity.go",
+            "EntityHealth",
+            "tenant-pol-ent-hlth"
+        );
         assert_eq!(Entity::Health.to_identity(), Some(ID_HEALTH));
     }
 
     #[test]
     fn entity_init_resolves_to_id_init() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/entity.go", "EntityInit", "tenant-pol-ent-init");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/entity.go",
+            "EntityInit",
+            "tenant-pol-ent-init"
+        );
         assert_eq!(Entity::Init.to_identity(), Some(ID_INIT));
     }
 
     #[test]
     fn entity_unmanaged_resolves_to_id_unmanaged() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/entity.go", "EntityUnmanaged", "tenant-pol-ent-unm");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/entity.go",
+            "EntityUnmanaged",
+            "tenant-pol-ent-unm"
+        );
         assert_eq!(Entity::Unmanaged.to_identity(), Some(ID_UNMANAGED));
     }
 
     #[test]
     fn entity_world_ipv4_resolves_to_id_9() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/entity.go", "EntityWorldIPv4", "tenant-pol-ent-w4");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/entity.go",
+            "EntityWorldIPv4",
+            "tenant-pol-ent-w4"
+        );
         assert_eq!(Entity::WorldIPv4.to_identity(), Some(ID_WORLD_IPV4));
     }
 
     #[test]
     fn entity_world_ipv6_resolves_to_id_10() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/entity.go", "EntityWorldIPv6", "tenant-pol-ent-w6");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/entity.go",
+            "EntityWorldIPv6",
+            "tenant-pol-ent-w6"
+        );
         assert_eq!(Entity::WorldIPv6.to_identity(), Some(ID_WORLD_IPV6));
     }
 
     #[test]
     fn entity_all_resolves_to_id_zero() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/entity.go", "EntityAll", "tenant-pol-ent-all");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/entity.go",
+            "EntityAll",
+            "tenant-pol-ent-all"
+        );
         assert_eq!(Entity::All.to_identity(), Some(ID_ALL));
     }
 
     #[test]
     fn entity_cluster_has_no_single_identity() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/entity.go", "EntityCluster", "tenant-pol-ent-cl");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/entity.go",
+            "EntityCluster",
+            "tenant-pol-ent-cl"
+        );
         assert_eq!(Entity::Cluster.to_identity(), None);
     }
 
@@ -766,28 +877,44 @@ mod tests {
 
     #[test]
     fn endpoint_selector_match_labels_exact() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/selector.go", "EndpointSelector.Matches", "tenant-pol-sel-exact");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/selector.go",
+            "EndpointSelector.Matches",
+            "tenant-pol-sel-exact"
+        );
         let sel = endpoint_sel(&[("app", "web")]);
         assert!(sel.matches(&ls(&[("app", "web")])));
     }
 
     #[test]
     fn endpoint_selector_match_labels_subset_match() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/selector.go", "EndpointSelector.Matches", "tenant-pol-sel-sub");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/selector.go",
+            "EndpointSelector.Matches",
+            "tenant-pol-sel-sub"
+        );
         let sel = endpoint_sel(&[("app", "web")]);
         assert!(sel.matches(&ls(&[("app", "web"), ("env", "prod")])));
     }
 
     #[test]
     fn endpoint_selector_match_labels_mismatch() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/selector.go", "EndpointSelector.Matches", "tenant-pol-sel-mm");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/selector.go",
+            "EndpointSelector.Matches",
+            "tenant-pol-sel-mm"
+        );
         let sel = endpoint_sel(&[("app", "web")]);
         assert!(!sel.matches(&ls(&[("app", "api")])));
     }
 
     #[test]
     fn endpoint_selector_empty_matches_all() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/selector.go", "EndpointSelector.Matches", "tenant-pol-sel-empty");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/selector.go",
+            "EndpointSelector.Matches",
+            "tenant-pol-sel-empty"
+        );
         let sel = EndpointSelector::empty();
         assert!(sel.matches(&ls(&[("app", "web")])));
         assert!(sel.matches(&ls(&[])));
@@ -795,11 +922,17 @@ mod tests {
 
     #[test]
     fn endpoint_selector_in_expression() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/selector.go", "MatchExpression(In)", "tenant-pol-sel-in");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/selector.go",
+            "MatchExpression(In)",
+            "tenant-pol-sel-in"
+        );
         let sel = EndpointSelector {
             match_labels: HashMap::new(),
             match_expressions: vec![MatchExpression {
-                key: "env".into(), op: SelectorOp::In, values: vec!["prod".into(), "stage".into()],
+                key: "env".into(),
+                op: SelectorOp::In,
+                values: vec!["prod".into(), "stage".into()],
             }],
         };
         assert!(sel.matches(&ls(&[("env", "prod")])));
@@ -809,11 +942,17 @@ mod tests {
 
     #[test]
     fn endpoint_selector_notin_expression() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/selector.go", "MatchExpression(NotIn)", "tenant-pol-sel-notin");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/selector.go",
+            "MatchExpression(NotIn)",
+            "tenant-pol-sel-notin"
+        );
         let sel = EndpointSelector {
             match_labels: HashMap::new(),
             match_expressions: vec![MatchExpression {
-                key: "tier".into(), op: SelectorOp::NotIn, values: vec!["test".into()],
+                key: "tier".into(),
+                op: SelectorOp::NotIn,
+                values: vec!["test".into()],
             }],
         };
         assert!(sel.matches(&ls(&[("tier", "prod")])));
@@ -824,10 +963,18 @@ mod tests {
 
     #[test]
     fn endpoint_selector_exists_expression() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/selector.go", "MatchExpression(Exists)", "tenant-pol-sel-ex");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/selector.go",
+            "MatchExpression(Exists)",
+            "tenant-pol-sel-ex"
+        );
         let sel = EndpointSelector {
             match_labels: HashMap::new(),
-            match_expressions: vec![MatchExpression { key: "k".into(), op: SelectorOp::Exists, values: vec![] }],
+            match_expressions: vec![MatchExpression {
+                key: "k".into(),
+                op: SelectorOp::Exists,
+                values: vec![],
+            }],
         };
         assert!(sel.matches(&ls(&[("k", "anything")])));
         assert!(!sel.matches(&ls(&[("other", "v")])));
@@ -835,10 +982,18 @@ mod tests {
 
     #[test]
     fn endpoint_selector_doesnotexist_expression() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/selector.go", "MatchExpression(DoesNotExist)", "tenant-pol-sel-nx");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/selector.go",
+            "MatchExpression(DoesNotExist)",
+            "tenant-pol-sel-nx"
+        );
         let sel = EndpointSelector {
             match_labels: HashMap::new(),
-            match_expressions: vec![MatchExpression { key: "k".into(), op: SelectorOp::DoesNotExist, values: vec![] }],
+            match_expressions: vec![MatchExpression {
+                key: "k".into(),
+                op: SelectorOp::DoesNotExist,
+                values: vec![],
+            }],
         };
         assert!(sel.matches(&ls(&[])));
         assert!(!sel.matches(&ls(&[("k", "v")])));
@@ -846,11 +1001,17 @@ mod tests {
 
     #[test]
     fn endpoint_selector_combines_match_labels_and_expressions() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/selector.go", "EndpointSelector.Matches", "tenant-pol-sel-comb");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/selector.go",
+            "EndpointSelector.Matches",
+            "tenant-pol-sel-comb"
+        );
         let sel = EndpointSelector {
             match_labels: HashMap::from([("app".into(), "web".into())]),
             match_expressions: vec![MatchExpression {
-                key: "env".into(), op: SelectorOp::In, values: vec!["prod".into()],
+                key: "env".into(),
+                op: SelectorOp::In,
+                values: vec!["prod".into()],
             }],
         };
         assert!(sel.matches(&ls(&[("app", "web"), ("env", "prod")])));
@@ -869,14 +1030,19 @@ mod tests {
 
     #[test]
     fn cidr_rule_contains_ipv4_out_of_range() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/cidr.go", "CIDRRule", "tenant-pol-cidr-out");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/policy/api/cidr.go", "CIDRRule", "tenant-pol-cidr-out");
         let r = CidrRule::new("10.0.0.0/8");
         assert!(!r.contains(IpAddr::V4(Ipv4Addr::new(11, 0, 0, 1))).unwrap());
     }
 
     #[test]
     fn cidr_rule_except_blocks_subnet() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/cidr.go", "CIDRRule.Except", "tenant-pol-cidr-ex");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/cidr.go",
+            "CIDRRule.Except",
+            "tenant-pol-cidr-ex"
+        );
         let r = CidrRule::new("10.0.0.0/8").with_except(["10.10.0.0/16"]);
         assert!(r.contains(IpAddr::V4(Ipv4Addr::new(10, 1, 0, 1))).unwrap());
         assert!(!r.contains(IpAddr::V4(Ipv4Addr::new(10, 10, 0, 1))).unwrap());
@@ -884,15 +1050,25 @@ mod tests {
 
     #[test]
     fn cidr_rule_invalid_returns_error() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/cidr.go", "CIDRRule.Validate", "tenant-pol-cidr-bad");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/cidr.go",
+            "CIDRRule.Validate",
+            "tenant-pol-cidr-bad"
+        );
         let r = CidrRule::new("not-a-cidr");
-        let err = r.contains(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1))).unwrap_err();
+        let err = r
+            .contains(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)))
+            .unwrap_err();
         assert_eq!(err, PolicyError::BadCidr("not-a-cidr".into()));
     }
 
     #[test]
     fn cidr_rule_ipv6_in_range() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/cidr.go", "CIDRRule.IPv6", "tenant-pol-cidr-v6");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/cidr.go",
+            "CIDRRule.IPv6",
+            "tenant-pol-cidr-v6"
+        );
         let r = CidrRule::new("2001:db8::/32");
         let ip: IpAddr = "2001:db8::1".parse().unwrap();
         assert!(r.contains(ip).unwrap());
@@ -911,14 +1087,19 @@ mod tests {
 
     #[test]
     fn l4_proto_specific_only_covers_self() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/ports.go", "Protocol", "tenant-pol-l4-self");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/policy/api/ports.go", "Protocol", "tenant-pol-l4-self");
         assert!(L4Protocol::TCP.covers(L4Protocol::TCP));
         assert!(!L4Protocol::TCP.covers(L4Protocol::UDP));
     }
 
     #[test]
     fn port_protocol_zero_port_means_any_port() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/ports.go", "PortProtocol", "tenant-pol-pp-zero");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/ports.go",
+            "PortProtocol",
+            "tenant-pol-pp-zero"
+        );
         let pp = PortProtocol::new(0, L4Protocol::TCP);
         assert!(pp.covers(80, L4Protocol::TCP));
         assert!(pp.covers(443, L4Protocol::TCP));
@@ -927,7 +1108,11 @@ mod tests {
 
     #[test]
     fn port_protocol_specific_port_covers_only_that_port() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/ports.go", "PortProtocol", "tenant-pol-pp-spec");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/ports.go",
+            "PortProtocol",
+            "tenant-pol-pp-spec"
+        );
         let pp = PortProtocol::new(80, L4Protocol::TCP);
         assert!(pp.covers(80, L4Protocol::TCP));
         assert!(!pp.covers(443, L4Protocol::TCP));
@@ -937,23 +1122,44 @@ mod tests {
 
     #[test]
     fn icmp_rule_v4_matches_correct_type() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/icmp.go", "ICMPField.Match", "tenant-pol-icmp-v4");
-        let r = IcmpRule { family: IcmpFamily::V4, icmp_type: 8 /* echo request */ };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/icmp.go",
+            "ICMPField.Match",
+            "tenant-pol-icmp-v4"
+        );
+        let r = IcmpRule {
+            family: IcmpFamily::V4,
+            icmp_type: 8, /* echo request */
+        };
         assert!(r.matches(IcmpFamily::V4, 8));
         assert!(!r.matches(IcmpFamily::V4, 0));
     }
 
     #[test]
     fn icmp_rule_v6_matches_correct_type() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/icmp.go", "ICMPField.Match", "tenant-pol-icmp-v6");
-        let r = IcmpRule { family: IcmpFamily::V6, icmp_type: 128 };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/icmp.go",
+            "ICMPField.Match",
+            "tenant-pol-icmp-v6"
+        );
+        let r = IcmpRule {
+            family: IcmpFamily::V6,
+            icmp_type: 128,
+        };
         assert!(r.matches(IcmpFamily::V6, 128));
     }
 
     #[test]
     fn icmp_rule_family_mismatch_does_not_match() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/icmp.go", "ICMPField.Match", "tenant-pol-icmp-fam");
-        let r = IcmpRule { family: IcmpFamily::V4, icmp_type: 8 };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/icmp.go",
+            "ICMPField.Match",
+            "tenant-pol-icmp-fam"
+        );
+        let r = IcmpRule {
+            family: IcmpFamily::V4,
+            icmp_type: 8,
+        };
         assert!(!r.matches(IcmpFamily::V6, 8));
     }
 
@@ -961,9 +1167,17 @@ mod tests {
 
     #[test]
     fn repository_add_and_remove() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/repository.go", "PolicyRepository", "tenant-pol-repo");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/repository.go",
+            "PolicyRepository",
+            "tenant-pol-repo"
+        );
         let mut repo = PolicyRepository::new();
-        let rule = Rule::new("allow-all", TenantId::new("tenant-pol-repo").expect("test fixture"), EndpointSelector::empty());
+        let rule = Rule::new(
+            "allow-all",
+            TenantId::new("tenant-pol-repo").expect("test fixture"),
+            EndpointSelector::empty(),
+        );
         repo.add(rule);
         assert_eq!(repo.len(), 1);
         assert!(repo.remove("allow-all"));
@@ -972,7 +1186,11 @@ mod tests {
 
     #[test]
     fn repository_remove_unknown_returns_false() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/repository.go", "PolicyRepository.Remove", "tenant-pol-rmunk");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/repository.go",
+            "PolicyRepository.Remove",
+            "tenant-pol-rmunk"
+        );
         let mut repo = PolicyRepository::new();
         assert!(!repo.remove("nope"));
     }
@@ -981,17 +1199,33 @@ mod tests {
 
     #[test]
     fn policy_map_exact_lookup_returns_allow() {
-        let (_c, _t) = cilium_test_ctx!("pkg/maps/policymap/policymap.go", "PolicyMap.Lookup", "tenant-pol-pm-allow");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/maps/policymap/policymap.go",
+            "PolicyMap.Lookup",
+            "tenant-pol-pm-allow"
+        );
         let mut pm = PolicyMap::new();
         pm.ingress_enforced = true;
-        pm.allow(PolicyKey { peer_identity: 256, port: 80, protocol: L4Protocol::TCP, direction: Direction::Ingress }, None);
+        pm.allow(
+            PolicyKey {
+                peer_identity: 256,
+                port: 80,
+                protocol: L4Protocol::TCP,
+                direction: Direction::Ingress,
+            },
+            None,
+        );
         let v = pm.lookup(256, 80, L4Protocol::TCP, Direction::Ingress);
         assert_eq!(v.verdict, Verdict::Allow);
     }
 
     #[test]
     fn policy_map_default_deny_when_enforced() {
-        let (_c, _t) = cilium_test_ctx!("pkg/maps/policymap/policymap.go", "PolicyMap.Lookup", "tenant-pol-pm-deny");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/maps/policymap/policymap.go",
+            "PolicyMap.Lookup",
+            "tenant-pol-pm-deny"
+        );
         let mut pm = PolicyMap::new();
         pm.ingress_enforced = true;
         let v = pm.lookup(256, 80, L4Protocol::TCP, Direction::Ingress);
@@ -1000,7 +1234,11 @@ mod tests {
 
     #[test]
     fn policy_map_default_allow_when_not_enforced() {
-        let (_c, _t) = cilium_test_ctx!("pkg/maps/policymap/policymap.go", "PolicyMap.Lookup", "tenant-pol-pm-noenf");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/maps/policymap/policymap.go",
+            "PolicyMap.Lookup",
+            "tenant-pol-pm-noenf"
+        );
         let pm = PolicyMap::new();
         let v = pm.lookup(256, 80, L4Protocol::TCP, Direction::Ingress);
         assert_eq!(v.verdict, Verdict::Allow);
@@ -1008,42 +1246,102 @@ mod tests {
 
     #[test]
     fn policy_map_wildcard_port_matches_specific_request() {
-        let (_c, _t) = cilium_test_ctx!("pkg/maps/policymap/policymap.go", "PolicyMap.WildcardPort", "tenant-pol-pm-wcp");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/maps/policymap/policymap.go",
+            "PolicyMap.WildcardPort",
+            "tenant-pol-pm-wcp"
+        );
         let mut pm = PolicyMap::new();
         pm.ingress_enforced = true;
-        pm.allow(PolicyKey { peer_identity: 256, port: 0, protocol: L4Protocol::TCP, direction: Direction::Ingress }, None);
+        pm.allow(
+            PolicyKey {
+                peer_identity: 256,
+                port: 0,
+                protocol: L4Protocol::TCP,
+                direction: Direction::Ingress,
+            },
+            None,
+        );
         let v = pm.lookup(256, 8080, L4Protocol::TCP, Direction::Ingress);
         assert_eq!(v.verdict, Verdict::Allow);
     }
 
     #[test]
     fn policy_map_any_proto_wildcard_covers_tcp_and_udp() {
-        let (_c, _t) = cilium_test_ctx!("pkg/maps/policymap/policymap.go", "PolicyMap.WildcardProto", "tenant-pol-pm-wcproto");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/maps/policymap/policymap.go",
+            "PolicyMap.WildcardProto",
+            "tenant-pol-pm-wcproto"
+        );
         let mut pm = PolicyMap::new();
         pm.ingress_enforced = true;
-        pm.allow(PolicyKey { peer_identity: 256, port: 0, protocol: L4Protocol::Any, direction: Direction::Ingress }, None);
-        assert_eq!(pm.lookup(256, 80, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Allow);
-        assert_eq!(pm.lookup(256, 53, L4Protocol::UDP, Direction::Ingress).verdict, Verdict::Allow);
+        pm.allow(
+            PolicyKey {
+                peer_identity: 256,
+                port: 0,
+                protocol: L4Protocol::Any,
+                direction: Direction::Ingress,
+            },
+            None,
+        );
+        assert_eq!(
+            pm.lookup(256, 80, L4Protocol::TCP, Direction::Ingress)
+                .verdict,
+            Verdict::Allow
+        );
+        assert_eq!(
+            pm.lookup(256, 53, L4Protocol::UDP, Direction::Ingress)
+                .verdict,
+            Verdict::Allow
+        );
     }
 
     #[test]
     fn policy_map_l7_redirect_port_returned_on_lookup() {
-        let (_c, _t) = cilium_test_ctx!("pkg/maps/policymap/policymap.go", "MapStateEntry.proxyPort", "tenant-pol-pm-l7");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/maps/policymap/policymap.go",
+            "MapStateEntry.proxyPort",
+            "tenant-pol-pm-l7"
+        );
         let mut pm = PolicyMap::new();
         pm.ingress_enforced = true;
-        pm.allow(PolicyKey { peer_identity: 256, port: 80, protocol: L4Protocol::TCP, direction: Direction::Ingress }, Some(15001));
+        pm.allow(
+            PolicyKey {
+                peer_identity: 256,
+                port: 80,
+                protocol: L4Protocol::TCP,
+                direction: Direction::Ingress,
+            },
+            Some(15001),
+        );
         let v = pm.lookup(256, 80, L4Protocol::TCP, Direction::Ingress);
         assert_eq!(v.l7_redirect_port, Some(15001));
     }
 
     #[test]
     fn policy_map_id_all_fallback_allow() {
-        let (_c, _t) = cilium_test_ctx!("pkg/maps/policymap/policymap.go", "PolicyMap.WildcardIdentity", "tenant-pol-pm-all");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/maps/policymap/policymap.go",
+            "PolicyMap.WildcardIdentity",
+            "tenant-pol-pm-all"
+        );
         let mut pm = PolicyMap::new();
         pm.ingress_enforced = true;
-        pm.allow(PolicyKey { peer_identity: ID_ALL, port: 0, protocol: L4Protocol::Any, direction: Direction::Ingress }, None);
+        pm.allow(
+            PolicyKey {
+                peer_identity: ID_ALL,
+                port: 0,
+                protocol: L4Protocol::Any,
+                direction: Direction::Ingress,
+            },
+            None,
+        );
         // Any peer should be allowed via the all-fallback.
-        assert_eq!(pm.lookup(999, 80, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Allow);
+        assert_eq!(
+            pm.lookup(999, 80, L4Protocol::TCP, Direction::Ingress)
+                .verdict,
+            Verdict::Allow
+        );
     }
 
     // ── Distillery ───────────────────────────────────────────────────────────
@@ -1058,10 +1356,21 @@ mod tests {
 
     #[test]
     fn distill_no_rules_no_enforcement_default_allow() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/distillery.go", "distillPolicy", "tenant-pol-dist-empty");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/distillery.go",
+            "distillPolicy",
+            "tenant-pol-dist-empty"
+        );
         let repo = PolicyRepository::new();
         let resolver = InMemoryIdentityResolver::new();
-        let map = distill(&repo, &tenant, &ls(&[("app", "web")]), PolicyEnforcementMode::Default, &resolver).unwrap();
+        let map = distill(
+            &repo,
+            &tenant,
+            &ls(&[("app", "web")]),
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap();
         assert!(!map.ingress_enforced);
         assert!(!map.egress_enforced);
         let v = map.lookup(256, 80, L4Protocol::TCP, Direction::Ingress);
@@ -1070,7 +1379,11 @@ mod tests {
 
     #[test]
     fn distill_ingress_rule_enables_default_deny() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/distillery.go", "distillPolicy.IngressEnforced", "tenant-pol-dist-deny");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/distillery.go",
+            "distillPolicy.IngressEnforced",
+            "tenant-pol-dist-deny"
+        );
         let mut repo = PolicyRepository::new();
         let mut rule = Rule::new("r1", tenant.clone(), endpoint_sel(&[("app", "web")]));
         rule.ingress.push(IngressRule {
@@ -1079,99 +1392,203 @@ mod tests {
         });
         repo.add(rule);
         let resolver = make_resolver(&[(MIN_LOCAL_IDENTITY, &[("app", "client")])]);
-        let map = distill(&repo, &tenant, &ls(&[("app", "web")]), PolicyEnforcementMode::Default, &resolver).unwrap();
+        let map = distill(
+            &repo,
+            &tenant,
+            &ls(&[("app", "web")]),
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap();
         assert!(map.ingress_enforced);
         // client is allowed.
-        assert_eq!(map.lookup(MIN_LOCAL_IDENTITY, 80, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Allow);
+        assert_eq!(
+            map.lookup(MIN_LOCAL_IDENTITY, 80, L4Protocol::TCP, Direction::Ingress)
+                .verdict,
+            Verdict::Allow
+        );
         // unknown peer is denied.
-        assert_eq!(map.lookup(999, 80, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Deny);
+        assert_eq!(
+            map.lookup(999, 80, L4Protocol::TCP, Direction::Ingress)
+                .verdict,
+            Verdict::Deny
+        );
     }
 
     #[test]
     fn distill_ingress_from_entity_world_creates_world_entry() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/distillery.go", "distillPolicy.FromEntities", "tenant-pol-dist-world");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/distillery.go",
+            "distillPolicy.FromEntities",
+            "tenant-pol-dist-world"
+        );
         let mut repo = PolicyRepository::new();
-        let mut rule = Rule::new("allow-world", tenant.clone(), endpoint_sel(&[("app", "ingest")]));
+        let mut rule = Rule::new(
+            "allow-world",
+            tenant.clone(),
+            endpoint_sel(&[("app", "ingest")]),
+        );
         rule.ingress.push(IngressRule {
             from_entities: vec![Entity::World],
-            to_ports: vec![PortRule { ports: vec![PortProtocol::new(443, L4Protocol::TCP)], l7_redirect_port: None }],
+            to_ports: vec![PortRule {
+                ports: vec![PortProtocol::new(443, L4Protocol::TCP)],
+                l7_redirect_port: None,
+            }],
             ..Default::default()
         });
         repo.add(rule);
         let resolver = InMemoryIdentityResolver::new();
-        let map = distill(&repo, &tenant, &ls(&[("app", "ingest")]), PolicyEnforcementMode::Default, &resolver).unwrap();
+        let map = distill(
+            &repo,
+            &tenant,
+            &ls(&[("app", "ingest")]),
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap();
         let v = map.lookup(ID_WORLD, 443, L4Protocol::TCP, Direction::Ingress);
         assert_eq!(v.verdict, Verdict::Allow);
         // Other ports remain denied.
-        assert_eq!(map.lookup(ID_WORLD, 80, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Deny);
+        assert_eq!(
+            map.lookup(ID_WORLD, 80, L4Protocol::TCP, Direction::Ingress)
+                .verdict,
+            Verdict::Deny
+        );
     }
 
     #[test]
     fn distill_ingress_from_cidr_emits_world_peer() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/distillery.go", "distillPolicy.FromCIDR", "tenant-pol-dist-cidr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/distillery.go",
+            "distillPolicy.FromCIDR",
+            "tenant-pol-dist-cidr"
+        );
         let mut repo = PolicyRepository::new();
-        let mut rule = Rule::new("from-cidr", tenant.clone(), endpoint_sel(&[("app", "edge")]));
+        let mut rule = Rule::new(
+            "from-cidr",
+            tenant.clone(),
+            endpoint_sel(&[("app", "edge")]),
+        );
         rule.ingress.push(IngressRule {
             from_cidr: vec![CidrRule::new("198.51.100.0/24")],
-            to_ports: vec![PortRule { ports: vec![PortProtocol::new(443, L4Protocol::TCP)], l7_redirect_port: None }],
+            to_ports: vec![PortRule {
+                ports: vec![PortProtocol::new(443, L4Protocol::TCP)],
+                l7_redirect_port: None,
+            }],
             ..Default::default()
         });
         repo.add(rule);
         let resolver = InMemoryIdentityResolver::new();
-        let map = distill(&repo, &tenant, &ls(&[("app", "edge")]), PolicyEnforcementMode::Default, &resolver).unwrap();
-        assert_eq!(map.lookup(ID_WORLD, 443, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Allow);
+        let map = distill(
+            &repo,
+            &tenant,
+            &ls(&[("app", "edge")]),
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap();
+        assert_eq!(
+            map.lookup(ID_WORLD, 443, L4Protocol::TCP, Direction::Ingress)
+                .verdict,
+            Verdict::Allow
+        );
     }
 
     #[test]
     fn distill_egress_to_endpoint_creates_egress_allow() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/distillery.go", "distillPolicy.Egress", "tenant-pol-dist-eg");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/distillery.go",
+            "distillPolicy.Egress",
+            "tenant-pol-dist-eg"
+        );
         let mut repo = PolicyRepository::new();
         let mut rule = Rule::new("eg-to-db", tenant.clone(), endpoint_sel(&[("app", "api")]));
         rule.egress.push(EgressRule {
             to_endpoints: vec![endpoint_sel(&[("app", "db")])],
-            to_ports: vec![PortRule { ports: vec![PortProtocol::new(5432, L4Protocol::TCP)], l7_redirect_port: None }],
+            to_ports: vec![PortRule {
+                ports: vec![PortProtocol::new(5432, L4Protocol::TCP)],
+                l7_redirect_port: None,
+            }],
             ..Default::default()
         });
         repo.add(rule);
         let resolver = make_resolver(&[(MIN_LOCAL_IDENTITY + 7, &[("app", "db")])]);
-        let map = distill(&repo, &tenant, &ls(&[("app", "api")]), PolicyEnforcementMode::Default, &resolver).unwrap();
+        let map = distill(
+            &repo,
+            &tenant,
+            &ls(&[("app", "api")]),
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap();
         assert!(map.egress_enforced);
         assert_eq!(
-            map.lookup(MIN_LOCAL_IDENTITY + 7, 5432, L4Protocol::TCP, Direction::Egress).verdict,
+            map.lookup(
+                MIN_LOCAL_IDENTITY + 7,
+                5432,
+                L4Protocol::TCP,
+                Direction::Egress
+            )
+            .verdict,
             Verdict::Allow
         );
     }
 
     #[test]
     fn distill_endpoint_selector_no_match_skips_rule() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/distillery.go", "distillPolicy.SkipNonMatching", "tenant-pol-dist-skip");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/distillery.go",
+            "distillPolicy.SkipNonMatching",
+            "tenant-pol-dist-skip"
+        );
         let mut repo = PolicyRepository::new();
-        let mut rule = Rule::new("for-other-app", tenant.clone(), endpoint_sel(&[("app", "other")]));
+        let mut rule = Rule::new(
+            "for-other-app",
+            tenant.clone(),
+            endpoint_sel(&[("app", "other")]),
+        );
         rule.ingress.push(IngressRule {
             from_endpoints: vec![endpoint_sel(&[("app", "client")])],
             ..Default::default()
         });
         repo.add(rule);
         let resolver = make_resolver(&[(MIN_LOCAL_IDENTITY, &[("app", "client")])]);
-        let map = distill(&repo, &tenant, &ls(&[("app", "web")]), PolicyEnforcementMode::Default, &resolver).unwrap();
+        let map = distill(
+            &repo,
+            &tenant,
+            &ls(&[("app", "web")]),
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap();
         assert!(!map.ingress_enforced);
         assert!(map.entries.is_empty());
     }
 
     #[test]
     fn distill_combines_multiple_rules_for_same_endpoint() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/distillery.go", "distillPolicy.Combine", "tenant-pol-dist-comb");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/distillery.go",
+            "distillPolicy.Combine",
+            "tenant-pol-dist-comb"
+        );
         let mut repo = PolicyRepository::new();
         let mut r1 = Rule::new("r1", tenant.clone(), endpoint_sel(&[("app", "web")]));
         r1.ingress.push(IngressRule {
             from_endpoints: vec![endpoint_sel(&[("app", "client")])],
-            to_ports: vec![PortRule { ports: vec![PortProtocol::new(80, L4Protocol::TCP)], l7_redirect_port: None }],
+            to_ports: vec![PortRule {
+                ports: vec![PortProtocol::new(80, L4Protocol::TCP)],
+                l7_redirect_port: None,
+            }],
             ..Default::default()
         });
         let mut r2 = Rule::new("r2", tenant.clone(), endpoint_sel(&[("app", "web")]));
         r2.ingress.push(IngressRule {
             from_endpoints: vec![endpoint_sel(&[("app", "metrics")])],
-            to_ports: vec![PortRule { ports: vec![PortProtocol::new(9090, L4Protocol::TCP)], l7_redirect_port: None }],
+            to_ports: vec![PortRule {
+                ports: vec![PortProtocol::new(9090, L4Protocol::TCP)],
+                l7_redirect_port: None,
+            }],
             ..Default::default()
         });
         repo.add(r1);
@@ -1180,16 +1597,49 @@ mod tests {
             (MIN_LOCAL_IDENTITY, &[("app", "client")]),
             (MIN_LOCAL_IDENTITY + 1, &[("app", "metrics")]),
         ]);
-        let map = distill(&repo, &tenant, &ls(&[("app", "web")]), PolicyEnforcementMode::Default, &resolver).unwrap();
-        assert_eq!(map.lookup(MIN_LOCAL_IDENTITY, 80, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Allow);
-        assert_eq!(map.lookup(MIN_LOCAL_IDENTITY + 1, 9090, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Allow);
+        let map = distill(
+            &repo,
+            &tenant,
+            &ls(&[("app", "web")]),
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap();
+        assert_eq!(
+            map.lookup(MIN_LOCAL_IDENTITY, 80, L4Protocol::TCP, Direction::Ingress)
+                .verdict,
+            Verdict::Allow
+        );
+        assert_eq!(
+            map.lookup(
+                MIN_LOCAL_IDENTITY + 1,
+                9090,
+                L4Protocol::TCP,
+                Direction::Ingress
+            )
+            .verdict,
+            Verdict::Allow
+        );
         // Cross-port denied.
-        assert_eq!(map.lookup(MIN_LOCAL_IDENTITY, 9090, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Deny);
+        assert_eq!(
+            map.lookup(
+                MIN_LOCAL_IDENTITY,
+                9090,
+                L4Protocol::TCP,
+                Direction::Ingress
+            )
+            .verdict,
+            Verdict::Deny
+        );
     }
 
     #[test]
     fn distill_l7_redirect_port_propagates_to_map() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/distillery.go", "distillPolicy.L7", "tenant-pol-dist-l7");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/distillery.go",
+            "distillPolicy.L7",
+            "tenant-pol-dist-l7"
+        );
         let mut repo = PolicyRepository::new();
         let mut rule = Rule::new("l7", tenant.clone(), endpoint_sel(&[("app", "web")]));
         rule.ingress.push(IngressRule {
@@ -1202,7 +1652,14 @@ mod tests {
         });
         repo.add(rule);
         let resolver = make_resolver(&[(MIN_LOCAL_IDENTITY, &[("app", "client")])]);
-        let map = distill(&repo, &tenant, &ls(&[("app", "web")]), PolicyEnforcementMode::Default, &resolver).unwrap();
+        let map = distill(
+            &repo,
+            &tenant,
+            &ls(&[("app", "web")]),
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap();
         let v = map.lookup(MIN_LOCAL_IDENTITY, 80, L4Protocol::TCP, Direction::Ingress);
         assert_eq!(v.verdict, Verdict::Allow);
         assert_eq!(v.l7_redirect_port, Some(10042));
@@ -1211,17 +1668,32 @@ mod tests {
     #[test]
     fn distill_rejects_cross_tenant_rule() {
         let other = TenantId::new("tenant-pol-dist-other").expect("test fixture");
-        let (_c, mine) = cilium_test_ctx!("pkg/policy/distillery.go", "distillPolicy.TenantIsolation", "tenant-pol-dist-mine");
+        let (_c, mine) = cilium_test_ctx!(
+            "pkg/policy/distillery.go",
+            "distillPolicy.TenantIsolation",
+            "tenant-pol-dist-mine"
+        );
         let mut repo = PolicyRepository::new();
         repo.add(Rule::new("foreign", other, EndpointSelector::empty()));
         let resolver = InMemoryIdentityResolver::new();
-        let err = distill(&repo, &mine, &ls(&[("app", "x")]), PolicyEnforcementMode::Default, &resolver).unwrap_err();
+        let err = distill(
+            &repo,
+            &mine,
+            &ls(&[("app", "x")]),
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap_err();
         assert!(matches!(err, PolicyError::TenantDenied { .. }));
     }
 
     #[test]
     fn distill_rule_with_no_ports_is_l3_only_allow() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/distillery.go", "distillPolicy.L3Only", "tenant-pol-dist-l3");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/distillery.go",
+            "distillPolicy.L3Only",
+            "tenant-pol-dist-l3"
+        );
         let mut repo = PolicyRepository::new();
         let mut rule = Rule::new("l3-only", tenant.clone(), endpoint_sel(&[("app", "web")]));
         rule.ingress.push(IngressRule {
@@ -1230,17 +1702,45 @@ mod tests {
         });
         repo.add(rule);
         let resolver = make_resolver(&[(MIN_LOCAL_IDENTITY, &[("app", "client")])]);
-        let map = distill(&repo, &tenant, &ls(&[("app", "web")]), PolicyEnforcementMode::Default, &resolver).unwrap();
+        let map = distill(
+            &repo,
+            &tenant,
+            &ls(&[("app", "web")]),
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap();
         // Any port is allowed for the client.
-        assert_eq!(map.lookup(MIN_LOCAL_IDENTITY, 80, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Allow);
-        assert_eq!(map.lookup(MIN_LOCAL_IDENTITY, 9999, L4Protocol::UDP, Direction::Ingress).verdict, Verdict::Allow);
+        assert_eq!(
+            map.lookup(MIN_LOCAL_IDENTITY, 80, L4Protocol::TCP, Direction::Ingress)
+                .verdict,
+            Verdict::Allow
+        );
+        assert_eq!(
+            map.lookup(
+                MIN_LOCAL_IDENTITY,
+                9999,
+                L4Protocol::UDP,
+                Direction::Ingress
+            )
+            .verdict,
+            Verdict::Allow
+        );
     }
 
     #[test]
     fn distill_entity_cluster_expands_to_known_identities() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/distillery.go", "distillPolicy.EntityCluster", "tenant-pol-dist-cl");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/distillery.go",
+            "distillPolicy.EntityCluster",
+            "tenant-pol-dist-cl"
+        );
         let mut repo = PolicyRepository::new();
-        let mut rule = Rule::new("from-cluster", tenant.clone(), endpoint_sel(&[("app", "web")]));
+        let mut rule = Rule::new(
+            "from-cluster",
+            tenant.clone(),
+            endpoint_sel(&[("app", "web")]),
+        );
         rule.ingress.push(IngressRule {
             from_entities: vec![Entity::Cluster],
             ..Default::default()
@@ -1250,17 +1750,45 @@ mod tests {
             (MIN_LOCAL_IDENTITY, &[("app", "a")]),
             (MIN_LOCAL_IDENTITY + 1, &[("app", "b")]),
         ]);
-        let map = distill(&repo, &tenant, &ls(&[("app", "web")]), PolicyEnforcementMode::Default, &resolver).unwrap();
+        let map = distill(
+            &repo,
+            &tenant,
+            &ls(&[("app", "web")]),
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap();
         assert!(map.ingress_enforced);
-        assert_eq!(map.lookup(MIN_LOCAL_IDENTITY, 80, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Allow);
-        assert_eq!(map.lookup(MIN_LOCAL_IDENTITY + 1, 80, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Allow);
+        assert_eq!(
+            map.lookup(MIN_LOCAL_IDENTITY, 80, L4Protocol::TCP, Direction::Ingress)
+                .verdict,
+            Verdict::Allow
+        );
+        assert_eq!(
+            map.lookup(
+                MIN_LOCAL_IDENTITY + 1,
+                80,
+                L4Protocol::TCP,
+                Direction::Ingress
+            )
+            .verdict,
+            Verdict::Allow
+        );
         // World remains denied (Cluster ≠ World).
-        assert_eq!(map.lookup(ID_WORLD, 80, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Deny);
+        assert_eq!(
+            map.lookup(ID_WORLD, 80, L4Protocol::TCP, Direction::Ingress)
+                .verdict,
+            Verdict::Deny
+        );
     }
 
     #[test]
     fn distill_from_requires_filters_peers() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/distillery.go", "distillPolicy.FromRequires", "tenant-pol-dist-req");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/distillery.go",
+            "distillPolicy.FromRequires",
+            "tenant-pol-dist-req"
+        );
         let mut repo = PolicyRepository::new();
         let mut rule = Rule::new("strict", tenant.clone(), endpoint_sel(&[("app", "web")]));
         rule.ingress.push(IngressRule {
@@ -1273,82 +1801,191 @@ mod tests {
             (MIN_LOCAL_IDENTITY, &[("app", "client"), ("env", "prod")]),
             (MIN_LOCAL_IDENTITY + 1, &[("app", "client"), ("env", "dev")]),
         ]);
-        let map = distill(&repo, &tenant, &ls(&[("app", "web")]), PolicyEnforcementMode::Default, &resolver).unwrap();
-        assert_eq!(map.lookup(MIN_LOCAL_IDENTITY, 80, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Allow);
-        assert_eq!(map.lookup(MIN_LOCAL_IDENTITY + 1, 80, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Deny);
+        let map = distill(
+            &repo,
+            &tenant,
+            &ls(&[("app", "web")]),
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap();
+        assert_eq!(
+            map.lookup(MIN_LOCAL_IDENTITY, 80, L4Protocol::TCP, Direction::Ingress)
+                .verdict,
+            Verdict::Allow
+        );
+        assert_eq!(
+            map.lookup(
+                MIN_LOCAL_IDENTITY + 1,
+                80,
+                L4Protocol::TCP,
+                Direction::Ingress
+            )
+            .verdict,
+            Verdict::Deny
+        );
     }
 
     #[test]
     fn distill_icmp_rule_emits_icmp_entry() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/distillery.go", "distillPolicy.ICMP", "tenant-pol-dist-icmp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/distillery.go",
+            "distillPolicy.ICMP",
+            "tenant-pol-dist-icmp"
+        );
         let mut repo = PolicyRepository::new();
-        let mut rule = Rule::new("ping-allowed", tenant.clone(), endpoint_sel(&[("app", "web")]));
+        let mut rule = Rule::new(
+            "ping-allowed",
+            tenant.clone(),
+            endpoint_sel(&[("app", "web")]),
+        );
         rule.ingress.push(IngressRule {
             from_endpoints: vec![endpoint_sel(&[("app", "client")])],
-            icmps: vec![IcmpRule { family: IcmpFamily::V4, icmp_type: 8 }],
+            icmps: vec![IcmpRule {
+                family: IcmpFamily::V4,
+                icmp_type: 8,
+            }],
             ..Default::default()
         });
         repo.add(rule);
         let resolver = make_resolver(&[(MIN_LOCAL_IDENTITY, &[("app", "client")])]);
-        let map = distill(&repo, &tenant, &ls(&[("app", "web")]), PolicyEnforcementMode::Default, &resolver).unwrap();
+        let map = distill(
+            &repo,
+            &tenant,
+            &ls(&[("app", "web")]),
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap();
         // ICMP type 8 → key { port=8, proto=ICMP }.
         let v = map.lookup(MIN_LOCAL_IDENTITY, 8, L4Protocol::ICMP, Direction::Ingress);
         assert_eq!(v.verdict, Verdict::Allow);
         // Other ICMP type denied.
         assert_eq!(
-            map.lookup(MIN_LOCAL_IDENTITY, 0, L4Protocol::ICMP, Direction::Ingress).verdict,
+            map.lookup(MIN_LOCAL_IDENTITY, 0, L4Protocol::ICMP, Direction::Ingress)
+                .verdict,
             Verdict::Deny
         );
     }
 
     #[test]
     fn distill_enforcement_always_default_denies_everything() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/policy.go", "PolicyEnforcement.Always", "tenant-pol-dist-always");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/policy.go",
+            "PolicyEnforcement.Always",
+            "tenant-pol-dist-always"
+        );
         let repo = PolicyRepository::new();
         let resolver = InMemoryIdentityResolver::new();
-        let map = distill(&repo, &tenant, &ls(&[("app", "web")]), PolicyEnforcementMode::Always, &resolver).unwrap();
+        let map = distill(
+            &repo,
+            &tenant,
+            &ls(&[("app", "web")]),
+            PolicyEnforcementMode::Always,
+            &resolver,
+        )
+        .unwrap();
         assert!(map.ingress_enforced);
         assert!(map.egress_enforced);
-        assert_eq!(map.lookup(123, 80, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Deny);
-        assert_eq!(map.lookup(123, 80, L4Protocol::TCP, Direction::Egress).verdict, Verdict::Deny);
+        assert_eq!(
+            map.lookup(123, 80, L4Protocol::TCP, Direction::Ingress)
+                .verdict,
+            Verdict::Deny
+        );
+        assert_eq!(
+            map.lookup(123, 80, L4Protocol::TCP, Direction::Egress)
+                .verdict,
+            Verdict::Deny
+        );
     }
 
     #[test]
     fn distill_enforcement_never_allows_everything_no_entries() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/policy.go", "PolicyEnforcement.Never", "tenant-pol-dist-never");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/policy.go",
+            "PolicyEnforcement.Never",
+            "tenant-pol-dist-never"
+        );
         let mut repo = PolicyRepository::new();
         let mut rule = Rule::new("ignored", tenant.clone(), EndpointSelector::empty());
-        rule.ingress.push(IngressRule { from_entities: vec![Entity::Host], ..Default::default() });
+        rule.ingress.push(IngressRule {
+            from_entities: vec![Entity::Host],
+            ..Default::default()
+        });
         repo.add(rule);
         let resolver = InMemoryIdentityResolver::new();
-        let map = distill(&repo, &tenant, &ls(&[("app", "web")]), PolicyEnforcementMode::Never, &resolver).unwrap();
+        let map = distill(
+            &repo,
+            &tenant,
+            &ls(&[("app", "web")]),
+            PolicyEnforcementMode::Never,
+            &resolver,
+        )
+        .unwrap();
         assert!(!map.ingress_enforced);
         assert!(!map.egress_enforced);
         assert!(map.entries.is_empty());
-        assert_eq!(map.lookup(99, 80, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Allow);
+        assert_eq!(
+            map.lookup(99, 80, L4Protocol::TCP, Direction::Ingress)
+                .verdict,
+            Verdict::Allow
+        );
     }
 
     #[test]
     fn distill_endpoint_with_two_directions_enforces_both() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/distillery.go", "distillPolicy.BothDirections", "tenant-pol-dist-both");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/distillery.go",
+            "distillPolicy.BothDirections",
+            "tenant-pol-dist-both"
+        );
         let mut repo = PolicyRepository::new();
         let mut rule = Rule::new("both", tenant.clone(), endpoint_sel(&[("app", "api")]));
-        rule.ingress.push(IngressRule { from_entities: vec![Entity::Host], ..Default::default() });
-        rule.egress.push(EgressRule { to_entities: vec![Entity::World], ..Default::default() });
+        rule.ingress.push(IngressRule {
+            from_entities: vec![Entity::Host],
+            ..Default::default()
+        });
+        rule.egress.push(EgressRule {
+            to_entities: vec![Entity::World],
+            ..Default::default()
+        });
         repo.add(rule);
         let resolver = InMemoryIdentityResolver::new();
-        let map = distill(&repo, &tenant, &ls(&[("app", "api")]), PolicyEnforcementMode::Default, &resolver).unwrap();
+        let map = distill(
+            &repo,
+            &tenant,
+            &ls(&[("app", "api")]),
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap();
         assert!(map.ingress_enforced);
         assert!(map.egress_enforced);
-        assert_eq!(map.lookup(ID_HOST, 0, L4Protocol::Any, Direction::Ingress).verdict, Verdict::Allow);
-        assert_eq!(map.lookup(ID_WORLD, 0, L4Protocol::Any, Direction::Egress).verdict, Verdict::Allow);
+        assert_eq!(
+            map.lookup(ID_HOST, 0, L4Protocol::Any, Direction::Ingress)
+                .verdict,
+            Verdict::Allow
+        );
+        assert_eq!(
+            map.lookup(ID_WORLD, 0, L4Protocol::Any, Direction::Egress)
+                .verdict,
+            Verdict::Allow
+        );
         // Reverse directions are still denied.
-        assert_eq!(map.lookup(ID_HOST, 0, L4Protocol::Any, Direction::Egress).verdict, Verdict::Deny);
+        assert_eq!(
+            map.lookup(ID_HOST, 0, L4Protocol::Any, Direction::Egress)
+                .verdict,
+            Verdict::Deny
+        );
     }
 
     #[test]
     fn distill_rule_with_multiple_port_protos_emits_each_entry() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/distillery.go", "distillPolicy.MultiPort", "tenant-pol-dist-mp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/distillery.go",
+            "distillPolicy.MultiPort",
+            "tenant-pol-dist-mp"
+        );
         let mut repo = PolicyRepository::new();
         let mut rule = Rule::new("dual", tenant.clone(), endpoint_sel(&[("app", "x")]));
         rule.ingress.push(IngressRule {
@@ -1364,26 +2001,68 @@ mod tests {
         });
         repo.add(rule);
         let resolver = make_resolver(&[(MIN_LOCAL_IDENTITY, &[("app", "y")])]);
-        let map = distill(&repo, &tenant, &ls(&[("app", "x")]), PolicyEnforcementMode::Default, &resolver).unwrap();
-        assert_eq!(map.lookup(MIN_LOCAL_IDENTITY, 80, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Allow);
-        assert_eq!(map.lookup(MIN_LOCAL_IDENTITY, 53, L4Protocol::UDP, Direction::Ingress).verdict, Verdict::Allow);
+        let map = distill(
+            &repo,
+            &tenant,
+            &ls(&[("app", "x")]),
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap();
+        assert_eq!(
+            map.lookup(MIN_LOCAL_IDENTITY, 80, L4Protocol::TCP, Direction::Ingress)
+                .verdict,
+            Verdict::Allow
+        );
+        assert_eq!(
+            map.lookup(MIN_LOCAL_IDENTITY, 53, L4Protocol::UDP, Direction::Ingress)
+                .verdict,
+            Verdict::Allow
+        );
         // 80/UDP is denied (different proto).
-        assert_eq!(map.lookup(MIN_LOCAL_IDENTITY, 80, L4Protocol::UDP, Direction::Ingress).verdict, Verdict::Deny);
+        assert_eq!(
+            map.lookup(MIN_LOCAL_IDENTITY, 80, L4Protocol::UDP, Direction::Ingress)
+                .verdict,
+            Verdict::Deny
+        );
     }
 
     #[test]
     fn distill_to_ports_empty_block_means_any_port() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/distillery.go", "distillPolicy.EmptyToPorts", "tenant-pol-dist-empports");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/distillery.go",
+            "distillPolicy.EmptyToPorts",
+            "tenant-pol-dist-empports"
+        );
         let mut repo = PolicyRepository::new();
         let mut rule = Rule::new("any-port", tenant.clone(), endpoint_sel(&[("app", "x")]));
         rule.ingress.push(IngressRule {
             from_endpoints: vec![endpoint_sel(&[("app", "y")])],
-            to_ports: vec![PortRule { ports: vec![], l7_redirect_port: None }],
+            to_ports: vec![PortRule {
+                ports: vec![],
+                l7_redirect_port: None,
+            }],
             ..Default::default()
         });
         repo.add(rule);
         let resolver = make_resolver(&[(MIN_LOCAL_IDENTITY, &[("app", "y")])]);
-        let map = distill(&repo, &tenant, &ls(&[("app", "x")]), PolicyEnforcementMode::Default, &resolver).unwrap();
-        assert_eq!(map.lookup(MIN_LOCAL_IDENTITY, 1234, L4Protocol::TCP, Direction::Ingress).verdict, Verdict::Allow);
+        let map = distill(
+            &repo,
+            &tenant,
+            &ls(&[("app", "x")]),
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap();
+        assert_eq!(
+            map.lookup(
+                MIN_LOCAL_IDENTITY,
+                1234,
+                L4Protocol::TCP,
+                Direction::Ingress
+            )
+            .verdict,
+            Verdict::Allow
+        );
     }
 }

@@ -5,21 +5,20 @@
 //!
 //! Upstream: <https://dependencytrack.org/docs/glossary/#components>
 
+use super::SbomViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, SbomComponent};
-use super::SbomViewError;
+use crate::admin::state::{AdminState, SbomComponent, scope};
 
 pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<SbomComponent>, SbomViewError> {
     ctx.authorise(Permission::SbomRead)?;
-    let mut rows: Vec<SbomComponent> = scope(
-        &state.sbom_components.read().unwrap(),
-        &ctx.tenant,
-        |r| &r.tenant,
-    )
-    .into_iter()
-    .cloned()
-    .collect();
+    let mut rows: Vec<SbomComponent> =
+        scope(&state.sbom_components.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| a.package.cmp(&b.package).then(a.version.cmp(&b.version)));
     Ok(rows)
 }
@@ -28,12 +27,14 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SbomViewEr
     let rows = list(state, ctx)?;
     let table_rows: Vec<Vec<String>> = rows
         .iter()
-        .map(|r| vec![
-            escape(&r.package),
-            escape(&r.version),
-            escape(&r.license),
-            escape(&r.image),
-        ])
+        .map(|r| {
+            vec![
+                escape(&r.package),
+                escape(&r.version),
+                escape(&r.license),
+                escape(&r.image),
+            ]
+        })
         .collect();
     let body = format!(
         r#"<section>
@@ -55,13 +56,18 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SbomViewEr
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
+    fn ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer("acme", perms)
+    }
 
     #[test]
     fn list_is_sorted_by_package_then_version() {
         let r = list(&AdminState::seeded(), &ctx(&[Permission::SbomRead])).unwrap();
         for w in r.windows(2) {
-            assert!((w[0].package.as_str(), w[0].version.as_str()) <= (w[1].package.as_str(), w[1].version.as_str()));
+            assert!(
+                (w[0].package.as_str(), w[0].version.as_str())
+                    <= (w[1].package.as_str(), w[1].version.as_str())
+            );
         }
     }
 

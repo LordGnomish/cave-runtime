@@ -101,7 +101,10 @@ impl LlmProvider for OpenAiProvider {
             .json(req)
             .send()
             .await
-            .map_err(|e| GatewayError::ProviderUnavailable { provider: self.config.name.clone(), reason: e.to_string() })?;
+            .map_err(|e| GatewayError::ProviderUnavailable {
+                provider: self.config.name.clone(),
+                reason: e.to_string(),
+            })?;
 
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
@@ -109,16 +112,24 @@ impl LlmProvider for OpenAiProvider {
             return Err(GatewayError::UpstreamError { status, body });
         }
 
-        resp.json::<ChatCompletionResponse>().await.map_err(|e| GatewayError::ProviderUnavailable {
-            provider: self.config.name.clone(),
-            reason: format!("deserialize: {e}"),
-        })
+        resp.json::<ChatCompletionResponse>()
+            .await
+            .map_err(|e| GatewayError::ProviderUnavailable {
+                provider: self.config.name.clone(),
+                reason: format!("deserialize: {e}"),
+            })
     }
 
     async fn health_check(&self) -> bool {
         let url = format!("{}/v1/models", self.config.base_url);
         let api_key = self.config.api_key.as_deref().unwrap_or("");
-        self.client.get(&url).bearer_auth(api_key).send().await.map(|r| r.status().is_success()).unwrap_or(false)
+        self.client
+            .get(&url)
+            .bearer_auth(api_key)
+            .send()
+            .await
+            .map(|r| r.status().is_success())
+            .unwrap_or(false)
     }
 }
 
@@ -139,21 +150,27 @@ impl AnthropicProvider {
     }
 
     fn to_anthropic_request(&self, req: &ChatCompletionRequest) -> serde_json::Value {
-        let system = req.messages.iter()
+        let system = req
+            .messages
+            .iter()
             .find(|m| m.role == crate::openai::Role::System)
             .and_then(|m| m.content.as_text())
             .map(|s| s.to_string());
 
-        let messages: Vec<serde_json::Value> = req.messages.iter()
+        let messages: Vec<serde_json::Value> = req
+            .messages
+            .iter()
             .filter(|m| m.role != crate::openai::Role::System)
-            .map(|m| serde_json::json!({
-                "role": match m.role {
-                    crate::openai::Role::User => "user",
-                    crate::openai::Role::Assistant => "assistant",
-                    _ => "user",
-                },
-                "content": m.content.as_text().unwrap_or(""),
-            }))
+            .map(|m| {
+                serde_json::json!({
+                    "role": match m.role {
+                        crate::openai::Role::User => "user",
+                        crate::openai::Role::Assistant => "assistant",
+                        _ => "user",
+                    },
+                    "content": m.content.as_text().unwrap_or(""),
+                })
+            })
             .collect();
 
         let mut body = serde_json::json!({
@@ -171,8 +188,13 @@ impl AnthropicProvider {
         body
     }
 
-    fn from_anthropic_response(&self, val: serde_json::Value, model: &str) -> GatewayResult<ChatCompletionResponse> {
-        let content = val["content"].as_array()
+    fn from_anthropic_response(
+        &self,
+        val: serde_json::Value,
+        model: &str,
+    ) -> GatewayResult<ChatCompletionResponse> {
+        let content = val["content"]
+            .as_array()
             .and_then(|arr| arr.first())
             .and_then(|c| c["text"].as_str())
             .unwrap_or("")
@@ -181,7 +203,11 @@ impl AnthropicProvider {
         let input_tokens = val["usage"]["input_tokens"].as_u64().unwrap_or(0) as u32;
         let output_tokens = val["usage"]["output_tokens"].as_u64().unwrap_or(0) as u32;
 
-        Ok(ChatCompletionResponse::simple(model, content, Usage::new(input_tokens, output_tokens)))
+        Ok(ChatCompletionResponse::simple(
+            model,
+            content,
+            Usage::new(input_tokens, output_tokens),
+        ))
     }
 }
 
@@ -215,7 +241,10 @@ impl LlmProvider for AnthropicProvider {
             .json(&body)
             .send()
             .await
-            .map_err(|e| GatewayError::ProviderUnavailable { provider: self.config.name.clone(), reason: e.to_string() })?;
+            .map_err(|e| GatewayError::ProviderUnavailable {
+                provider: self.config.name.clone(),
+                reason: e.to_string(),
+            })?;
 
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
@@ -223,10 +252,13 @@ impl LlmProvider for AnthropicProvider {
             return Err(GatewayError::UpstreamError { status, body });
         }
 
-        let val: serde_json::Value = resp.json().await.map_err(|e| GatewayError::ProviderUnavailable {
-            provider: self.config.name.clone(),
-            reason: format!("deserialize: {e}"),
-        })?;
+        let val: serde_json::Value =
+            resp.json()
+                .await
+                .map_err(|e| GatewayError::ProviderUnavailable {
+                    provider: self.config.name.clone(),
+                    reason: format!("deserialize: {e}"),
+                })?;
 
         self.from_anthropic_response(val, &model)
     }
@@ -261,20 +293,24 @@ impl LlmProvider for LocalProvider {
     }
 
     fn supported_models(&self) -> Vec<String> {
-        vec!["llama3".into(), "mistral".into(), "phi3".into(), "gemma".into()]
+        vec![
+            "llama3".into(),
+            "mistral".into(),
+            "phi3".into(),
+            "gemma".into(),
+        ]
     }
 
     async fn complete(&self, req: &ChatCompletionRequest) -> GatewayResult<ChatCompletionResponse> {
         // Assumes OpenAI-compatible endpoint (e.g., Ollama, vLLM, LM Studio)
         let url = format!("{}/v1/chat/completions", self.config.base_url);
 
-        let resp = self
-            .client
-            .post(&url)
-            .json(req)
-            .send()
-            .await
-            .map_err(|e| GatewayError::ProviderUnavailable { provider: self.config.name.clone(), reason: e.to_string() })?;
+        let resp = self.client.post(&url).json(req).send().await.map_err(|e| {
+            GatewayError::ProviderUnavailable {
+                provider: self.config.name.clone(),
+                reason: e.to_string(),
+            }
+        })?;
 
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
@@ -282,15 +318,22 @@ impl LlmProvider for LocalProvider {
             return Err(GatewayError::UpstreamError { status, body });
         }
 
-        resp.json::<ChatCompletionResponse>().await.map_err(|e| GatewayError::ProviderUnavailable {
-            provider: self.config.name.clone(),
-            reason: format!("deserialize: {e}"),
-        })
+        resp.json::<ChatCompletionResponse>()
+            .await
+            .map_err(|e| GatewayError::ProviderUnavailable {
+                provider: self.config.name.clone(),
+                reason: format!("deserialize: {e}"),
+            })
     }
 
     async fn health_check(&self) -> bool {
         let url = format!("{}/v1/models", self.config.base_url);
-        self.client.get(&url).send().await.map(|r| r.status().is_success()).unwrap_or(false)
+        self.client
+            .get(&url)
+            .send()
+            .await
+            .map(|r| r.status().is_success())
+            .unwrap_or(false)
     }
 }
 
@@ -302,7 +345,10 @@ pub struct MockProvider {
 
 impl MockProvider {
     pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into(), models: vec!["mock-model".into()] }
+        Self {
+            name: name.into(),
+            models: vec!["mock-model".into()],
+        }
     }
 }
 
@@ -315,9 +361,18 @@ impl LlmProvider for MockProvider {
         self.models.clone()
     }
     async fn complete(&self, req: &ChatCompletionRequest) -> GatewayResult<ChatCompletionResponse> {
-        let last = req.messages.last().and_then(|m| m.content.as_text()).unwrap_or("").to_string();
+        let last = req
+            .messages
+            .last()
+            .and_then(|m| m.content.as_text())
+            .unwrap_or("")
+            .to_string();
         let reply = format!("Mock response to: {last}");
-        Ok(ChatCompletionResponse::simple(&req.model, reply, Usage::new(10, 20)))
+        Ok(ChatCompletionResponse::simple(
+            &req.model,
+            reply,
+            Usage::new(10, 20),
+        ))
     }
     async fn health_check(&self) -> bool {
         true
@@ -332,7 +387,9 @@ pub struct ProviderRegistry {
 
 impl ProviderRegistry {
     pub fn new() -> Self {
-        Self { providers: DashMap::new() }
+        Self {
+            providers: DashMap::new(),
+        }
     }
 
     pub fn register(&self, provider: Arc<dyn LlmProvider>) {
@@ -381,13 +438,32 @@ mod tests {
         let req = ChatCompletionRequest {
             model: "mock-model".into(),
             messages: vec![ChatMessage::user("hello")],
-            temperature: None, top_p: None, max_tokens: None, stream: None,
-            stop: None, presence_penalty: None, frequency_penalty: None,
-            n: None, user: None, tools: None, tool_choice: None,
-            response_format: None, seed: None, logprobs: None,
+            temperature: None,
+            top_p: None,
+            max_tokens: None,
+            stream: None,
+            stop: None,
+            presence_penalty: None,
+            frequency_penalty: None,
+            n: None,
+            user: None,
+            tools: None,
+            tool_choice: None,
+            response_format: None,
+            seed: None,
+            logprobs: None,
         };
         let resp = p.complete(&req).await.unwrap();
-        assert!(resp.choices[0].message.as_ref().unwrap().content.as_text().unwrap().contains("Mock response"));
+        assert!(
+            resp.choices[0]
+                .message
+                .as_ref()
+                .unwrap()
+                .content
+                .as_text()
+                .unwrap()
+                .contains("Mock response")
+        );
     }
 
     #[test]

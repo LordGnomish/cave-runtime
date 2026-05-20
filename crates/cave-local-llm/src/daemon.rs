@@ -12,8 +12,8 @@ use tokio::time::sleep;
 use tracing::{error, info, warn};
 
 use crate::draft::{
-    build_ollama_prompt, draft_filename, parse_ollama_response, Draft, DraftFrontmatter,
-    DraftStatus,
+    Draft, DraftFrontmatter, DraftStatus, build_ollama_prompt, draft_filename,
+    parse_ollama_response,
 };
 use crate::metrics::DaemonMetrics;
 use crate::ollama::{GenerateRequest, OllamaClient};
@@ -33,7 +33,10 @@ pub enum DaemonError {
     #[error("git: {0}")]
     Git(String),
     #[error("ollama unreachable after {budget_secs}s: {last_error}")]
-    OllamaUnreachable { budget_secs: u64, last_error: String },
+    OllamaUnreachable {
+        budget_secs: u64,
+        last_error: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -71,7 +74,12 @@ impl SecondaryRepoConfig {
         let root: PathBuf = workspace_root.into();
         let queue_path = root.join("queue").join(queue_file);
         let branch = default_weekly_branch(Utc::now().iso_week());
-        Self { workspace_root: root, queue_path, branch, weight }
+        Self {
+            workspace_root: root,
+            queue_path,
+            branch,
+            weight,
+        }
     }
 }
 
@@ -97,10 +105,10 @@ impl DaemonConfig {
     pub fn new(workspace_root: impl Into<PathBuf>) -> Self {
         let root: PathBuf = workspace_root.into();
         let stop = root.join(".cave-daemon.stop");
-        let ollama_url = std::env::var("OLLAMA_URL")
-            .unwrap_or_else(|_| "http://localhost:11434".into());
-        let ollama_model = std::env::var("OLLAMA_MODEL")
-            .unwrap_or_else(|_| crate::ollama::DEFAULT_MODEL.into());
+        let ollama_url =
+            std::env::var("OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".into());
+        let ollama_model =
+            std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| crate::ollama::DEFAULT_MODEL.into());
         let target_branch = std::env::var("CAVE_DAEMON_BRANCH")
             .unwrap_or_else(|_| default_weekly_branch(Utc::now().iso_week()));
 
@@ -162,7 +170,11 @@ impl Daemon<SystemDiskChecker> {
                 weight: sec.weight,
             });
         }
-        Self { scheduler: sched, config, metrics }
+        Self {
+            scheduler: sched,
+            config,
+            metrics,
+        }
     }
 }
 
@@ -172,16 +184,19 @@ impl<D: DiskFreeChecker> Daemon<D> {
         config: DaemonConfig,
         metrics: DaemonMetrics,
     ) -> Self {
-        Self { scheduler, config, metrics }
+        Self {
+            scheduler,
+            config,
+            metrics,
+        }
     }
 
     /// Runs the daemon until a SIGTERM signal is received or the stop-signal
     /// file appears.
     pub async fn run(self) -> Result<(), DaemonError> {
         #[cfg(unix)]
-        let mut sigterm =
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-                .map_err(DaemonError::Io)?;
+        let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .map_err(DaemonError::Io)?;
 
         // Wait for Ollama to be reachable before we start ticking.
         // If the server is still down after the budget expires, exit so launchd
@@ -202,8 +217,16 @@ impl<D: DiskFreeChecker> Daemon<D> {
             .chain(self.scheduler.secondaries().iter().map(|s| &s.queue))
         {
             if let Ok(items) = store.list() {
-                for item in items.into_iter().filter(|i| i.status == crate::queue::QueueStatus::InProgress) {
-                    let _ = store.update_item(&item.id, crate::queue::QueueStatus::Pending, item.attempts, item.last_error.clone());
+                for item in items
+                    .into_iter()
+                    .filter(|i| i.status == crate::queue::QueueStatus::InProgress)
+                {
+                    let _ = store.update_item(
+                        &item.id,
+                        crate::queue::QueueStatus::Pending,
+                        item.attempts,
+                        item.last_error.clone(),
+                    );
                 }
             }
         }
@@ -257,11 +280,13 @@ impl<D: DiskFreeChecker> Daemon<D> {
             "processing item"
         );
 
-        self.metrics.queue_items_by_status.set_pending(
-            self.scheduler.queue().count_status(&QueueStatus::Pending)? as i64,
-        );
+        self.metrics
+            .queue_items_by_status
+            .set_pending(self.scheduler.queue().count_status(&QueueStatus::Pending)? as i64);
         self.metrics.queue_items_by_status.set_in_progress(
-            self.scheduler.queue().count_status(&QueueStatus::InProgress)? as i64,
+            self.scheduler
+                .queue()
+                .count_status(&QueueStatus::InProgress)? as i64,
         );
 
         let start = std::time::Instant::now();
@@ -288,7 +313,8 @@ impl<D: DiskFreeChecker> Daemon<D> {
                     attempts = item.attempts,
                     "draft failed — escalating"
                 );
-                self.scheduler.mark_failed(&item, format!("{kind}: {msg}"))?;
+                self.scheduler
+                    .mark_failed(&item, format!("{kind}: {msg}"))?;
                 self.metrics
                     .tier2_escalations_total
                     .inc_crate_kind(&item.crate_name, &kind.to_string());
@@ -300,19 +326,13 @@ impl<D: DiskFreeChecker> Daemon<D> {
 
     /// Generates draft via Ollama, writes it, runs tests, commits on target branch.
     /// Returns `Ok(branch_name)` on success or `Err((kind, message))` on failure.
-    async fn process_item(
-        &self,
-        item: &QueueItem,
-    ) -> Result<String, (ErrorKind, String)> {
+    async fn process_item(&self, item: &QueueItem) -> Result<String, (ErrorKind, String)> {
         // Effective repo root and branch for this task.
         let repo_root = item
             .repo_path
             .as_deref()
             .unwrap_or(&self.config.workspace_root);
-        let branch = item
-            .branch
-            .as_deref()
-            .unwrap_or(&self.config.target_branch);
+        let branch = item.branch.as_deref().unwrap_or(&self.config.target_branch);
 
         let local_fn = item.upstream_fn.to_lowercase();
 
@@ -417,7 +437,10 @@ impl<D: DiskFreeChecker> Daemon<D> {
         match tokio::time::timeout(self.config.cargo_test_timeout, child.wait()).await {
             Err(_) => {
                 let _ = child.kill().await;
-                Err((ErrorKind::Timeout, format!("cargo test -p {crate_name} timed out")))
+                Err((
+                    ErrorKind::Timeout,
+                    format!("cargo test -p {crate_name} timed out"),
+                ))
             }
             Ok(Err(e)) => Err((ErrorKind::CompileFail, e.to_string())),
             Ok(Ok(status)) => {
@@ -429,7 +452,10 @@ impl<D: DiskFreeChecker> Daemon<D> {
                     } else {
                         ErrorKind::TestFail
                     };
-                    Err((kind, format!("cargo test -p {crate_name} exited {:?}", status.code())))
+                    Err((
+                        kind,
+                        format!("cargo test -p {crate_name} exited {:?}", status.code()),
+                    ))
                 }
             }
         }
@@ -562,7 +588,9 @@ impl<D: DiskFreeChecker> Daemon<D> {
         if out.status.success() {
             Ok(())
         } else {
-            Err(DaemonError::Git(String::from_utf8_lossy(&out.stderr).trim().to_string()))
+            Err(DaemonError::Git(
+                String::from_utf8_lossy(&out.stderr).trim().to_string(),
+            ))
         }
     }
 
@@ -582,7 +610,9 @@ impl<D: DiskFreeChecker> Daemon<D> {
         if out.status.success() {
             Ok(())
         } else {
-            Err(DaemonError::Git(String::from_utf8_lossy(&out.stderr).trim().to_string()))
+            Err(DaemonError::Git(
+                String::from_utf8_lossy(&out.stderr).trim().to_string(),
+            ))
         }
     }
 }

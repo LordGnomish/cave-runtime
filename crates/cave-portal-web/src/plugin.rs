@@ -154,7 +154,10 @@ impl PluginRegistry {
     pub fn nav_grouped(&self) -> Vec<(String, Vec<NavEntry>)> {
         let mut groups: std::collections::BTreeMap<String, Vec<NavEntry>> = Default::default();
         for entry in &self.nav {
-            groups.entry(entry.group.clone()).or_default().push(entry.clone());
+            groups
+                .entry(entry.group.clone())
+                .or_default()
+                .push(entry.clone());
         }
         for entries in groups.values_mut() {
             entries.sort_by_key(|e| (e.order, e.label.clone()));
@@ -278,7 +281,11 @@ mod tests {
 
     #[test]
     fn registry_install_records_plugin_name() {
-        let plugin = DummyPlugin { name: "demo", pages: vec![], nav: vec![] };
+        let plugin = DummyPlugin {
+            name: "demo",
+            pages: vec![],
+            nav: vec![],
+        };
         let mut r = PluginRegistry::new();
         r.install(&plugin);
         assert_eq!(r.plugins(), &["demo".to_string()]);
@@ -344,8 +351,16 @@ mod tests {
 
     #[test]
     fn registry_install_chain_multiple_plugins() {
-        let p1 = DummyPlugin { name: "p1", pages: vec![dummy_page("a", "/a")], nav: vec![] };
-        let p2 = DummyPlugin { name: "p2", pages: vec![dummy_page("b", "/b")], nav: vec![] };
+        let p1 = DummyPlugin {
+            name: "p1",
+            pages: vec![dummy_page("a", "/a")],
+            nav: vec![],
+        };
+        let p2 = DummyPlugin {
+            name: "p2",
+            pages: vec![dummy_page("b", "/b")],
+            nav: vec![],
+        };
         let mut r = PluginRegistry::new();
         r.install(&p1).install(&p2);
         assert_eq!(r.plugins(), &["p1".to_string(), "p2".to_string()]);

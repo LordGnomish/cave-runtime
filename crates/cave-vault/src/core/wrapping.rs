@@ -23,13 +23,23 @@ pub struct WrapStore {
 }
 
 impl WrapStore {
-    pub fn wrap(&mut self, data: Value, ttl_secs: i64, creation_path: &str) -> VaultResult<WrapInfo> {
+    pub fn wrap(
+        &mut self,
+        data: Value,
+        ttl_secs: i64,
+        creation_path: &str,
+    ) -> VaultResult<WrapInfo> {
         let rng = SystemRandom::new();
         let mut token_bytes = vec![0u8; 16];
-        rng.fill(&mut token_bytes).map_err(|_| VaultError::Crypto("rng failure".into()))?;
-        let token = format!("hvs.{}", base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&token_bytes));
+        rng.fill(&mut token_bytes)
+            .map_err(|_| VaultError::Crypto("rng failure".into()))?;
+        let token = format!(
+            "hvs.{}",
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&token_bytes)
+        );
         let mut acc_bytes = vec![0u8; 8];
-        rng.fill(&mut acc_bytes).map_err(|_| VaultError::Crypto("rng failure".into()))?;
+        rng.fill(&mut acc_bytes)
+            .map_err(|_| VaultError::Crypto("rng failure".into()))?;
         let accessor = hex::encode(&acc_bytes);
         let creation_time = Utc::now();
 
@@ -42,14 +52,17 @@ impl WrapStore {
             wrapped_accessor: accessor.clone(),
         };
 
-        self.tokens.insert(token.clone(), WrappedResponse {
-            token,
-            accessor,
-            ttl: ttl_secs,
-            creation_time,
-            creation_path: creation_path.to_string(),
-            data,
-        });
+        self.tokens.insert(
+            token.clone(),
+            WrappedResponse {
+                token,
+                accessor,
+                ttl: ttl_secs,
+                creation_time,
+                creation_path: creation_path.to_string(),
+                data,
+            },
+        );
 
         Ok(info)
     }

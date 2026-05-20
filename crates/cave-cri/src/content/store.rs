@@ -86,12 +86,7 @@ pub trait ContentStore: Send + Sync {
     /// Returns the set of digests referenced by the named lease. The
     /// content store doesn't own leases; this is a convenience used
     /// by `delete`.
-    fn label_blob(
-        &self,
-        digest: &Digest,
-        key: String,
-        value: String,
-    ) -> Result<(), StoreError>;
+    fn label_blob(&self, digest: &Digest, key: String, value: String) -> Result<(), StoreError>;
 }
 
 /// Filesystem-backed content store. Blobs live at
@@ -196,7 +191,9 @@ impl LocalStore {
                             .modified()
                             .ok()
                             .and_then(|t| {
-                                t.duration_since(std::time::UNIX_EPOCH).ok().map(|d| d.as_secs() as i64)
+                                t.duration_since(std::time::UNIX_EPOCH)
+                                    .ok()
+                                    .map(|d| d.as_secs() as i64)
                             })
                             .unwrap_or(0),
                     },
@@ -208,11 +205,7 @@ impl LocalStore {
 
     /// Begin a streaming ingest. Returns a writer that the caller
     /// pushes bytes through.
-    pub fn writer(
-        &self,
-        reference: String,
-        expected: Digest,
-    ) -> Result<Writer, StoreError> {
+    pub fn writer(&self, reference: String, expected: Digest) -> Result<Writer, StoreError> {
         {
             let mut active = self.active.write().unwrap();
             if active.contains_key(&reference) {
@@ -323,12 +316,7 @@ impl ContentStore for LocalStore {
         self.index.read().unwrap().values().map(|i| i.size).sum()
     }
 
-    fn label_blob(
-        &self,
-        digest: &Digest,
-        key: String,
-        value: String,
-    ) -> Result<(), StoreError> {
+    fn label_blob(&self, digest: &Digest, key: String, value: String) -> Result<(), StoreError> {
         let mut idx = self.index.write().unwrap();
         let info = idx
             .get_mut(digest)
@@ -412,14 +400,20 @@ mod tests {
         let d = put(&store, b"to be deleted");
         store.delete(&d).unwrap();
         assert!(!store.exists(&d));
-        assert!(matches!(store.info(&d).unwrap_err(), StoreError::NotFound(_)));
+        assert!(matches!(
+            store.info(&d).unwrap_err(),
+            StoreError::NotFound(_)
+        ));
     }
 
     #[test]
     fn delete_unknown_blob_errors() {
         let (_dir, store) = tempstore();
         let d = Digest::compute(DigestAlgorithm::Sha256, b"missing");
-        assert!(matches!(store.delete(&d).unwrap_err(), StoreError::NotFound(_)));
+        assert!(matches!(
+            store.delete(&d).unwrap_err(),
+            StoreError::NotFound(_)
+        ));
     }
 
     #[test]
@@ -458,7 +452,11 @@ mod tests {
         let (_dir, store) = tempstore();
         let d = put(&store, b"labeled");
         store
-            .label_blob(&d, "containerd.io/gc.ref.content.config".into(), d.to_string())
+            .label_blob(
+                &d,
+                "containerd.io/gc.ref.content.config".into(),
+                d.to_string(),
+            )
             .unwrap();
         let info = store.info(&d).unwrap();
         assert_eq!(

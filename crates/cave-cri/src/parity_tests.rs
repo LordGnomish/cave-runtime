@@ -113,7 +113,10 @@ fn test_container_create() {
     assert_eq!(got.spec.name, "nginx");
     assert_eq!(got.spec.image, "nginx:1.21");
     assert_eq!(got.status, ContainerStatus::Created);
-    assert!(got.started_at.is_none(), "Created container has no start_time");
+    assert!(
+        got.started_at.is_none(),
+        "Created container has no start_time"
+    );
     assert_eq!(store.count(), 1);
 }
 
@@ -216,7 +219,9 @@ fn test_container_lifecycle() {
     assert_eq!(store.get(&id).unwrap().status, ContainerStatus::Stopped);
 
     // delete
-    let removed = store.remove(&id).expect("delete returns the removed container");
+    let removed = store
+        .remove(&id)
+        .expect("delete returns the removed container");
     assert_eq!(removed.id, id);
     assert!(store.get(&id).is_none());
     assert_eq!(store.count(), 0);
@@ -233,7 +238,9 @@ fn test_image_pull() {
     let img = make_image("docker.io/library/alpine:3.18");
     store.insert(img);
 
-    let got = store.get("docker.io/library/alpine:3.18").expect("pulled image retrievable");
+    let got = store
+        .get("docker.io/library/alpine:3.18")
+        .expect("pulled image retrievable");
     assert!(!got.digest.is_empty(), "image must carry a digest");
 
     let parsed = ImageReference::parse(&got.reference);
@@ -274,7 +281,10 @@ fn test_sandbox_run() {
     assert_eq!(got.spec.name, "test-pod");
     assert_eq!(got.spec.namespace, "default");
     assert_eq!(got.state, SandboxState::Ready);
-    assert!(got.network_ip.is_some(), "Ready sandbox must have a network IP");
+    assert!(
+        got.network_ip.is_some(),
+        "Ready sandbox must have a network IP"
+    );
     assert_eq!(store.count(), 1);
 }
 
@@ -366,5 +376,8 @@ fn test_network_attach() {
     assert_eq!(status.ip_address.as_deref(), Some("10.244.0.2"));
     assert_eq!(status.gateway.as_deref(), Some("10.244.0.1"));
     assert_eq!(status.interface.as_deref(), Some("eth0"));
-    assert!(status.attached, "post-attach status must report attached=true");
+    assert!(
+        status.attached,
+        "post-attach status must report attached=true"
+    );
 }

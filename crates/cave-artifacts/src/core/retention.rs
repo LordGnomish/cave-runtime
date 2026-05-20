@@ -62,14 +62,22 @@ impl RetentionPolicy {
     /// Returns `Keep` when every rule agrees, `Delete` if any rule says so.
     ///
     /// `now` is injected so unit tests can pin time deterministically.
-    pub fn evaluate(&self, artifact: &Artifact, all: &[Artifact], now: DateTime<Utc>) -> RetentionAction {
+    pub fn evaluate(
+        &self,
+        artifact: &Artifact,
+        all: &[Artifact],
+        now: DateTime<Utc>,
+    ) -> RetentionAction {
         if self.rules.is_empty() {
             // Empty policy = keep everything (matches Pulp default of
             // `retain_repo_versions = None`).
             return RetentionAction::Keep;
         }
         for rule in &self.rules {
-            if matches!(self.eval_rule(rule, artifact, all, now), RetentionAction::Delete) {
+            if matches!(
+                self.eval_rule(rule, artifact, all, now),
+                RetentionAction::Delete
+            ) {
                 return RetentionAction::Delete;
             }
         }
@@ -87,11 +95,8 @@ impl RetentionPolicy {
             RetentionRule::KeepLastN { n } => {
                 let mut sorted: Vec<&Artifact> = all.iter().collect();
                 sorted.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-                let keep_set: std::collections::HashSet<&str> = sorted
-                    .iter()
-                    .take(*n)
-                    .map(|a| a.digest.as_str())
-                    .collect();
+                let keep_set: std::collections::HashSet<&str> =
+                    sorted.iter().take(*n).map(|a| a.digest.as_str()).collect();
                 if keep_set.contains(artifact.digest.as_str()) {
                     RetentionAction::Keep
                 } else {
@@ -156,7 +161,10 @@ mod tests {
     fn empty_policy_keeps_everything() {
         let p = RetentionPolicy::new("noop");
         let a = artifact_at("sha256:1", at(2024, 1, 1));
-        assert_eq!(p.evaluate(&a, &[a.clone()], at(2026, 5, 17)), RetentionAction::Keep);
+        assert_eq!(
+            p.evaluate(&a, &[a.clone()], at(2026, 5, 17)),
+            RetentionAction::Keep
+        );
     }
 
     #[test]
@@ -174,27 +182,44 @@ mod tests {
 
     #[test]
     fn delete_older_than_days_uses_now() {
-        let p = RetentionPolicy::new("90d").with_rule(RetentionRule::DeleteOlderThanDays { days: 90 });
+        let p =
+            RetentionPolicy::new("90d").with_rule(RetentionRule::DeleteOlderThanDays { days: 90 });
         let old = artifact_at("sha256:1", at(2024, 1, 1));
         let new = artifact_at("sha256:2", at(2026, 5, 1));
         let now = at(2026, 5, 17);
-        assert_eq!(p.evaluate(&old, &[old.clone(), new.clone()], now), RetentionAction::Delete);
-        assert_eq!(p.evaluate(&new, &[old.clone(), new.clone()], now), RetentionAction::Keep);
+        assert_eq!(
+            p.evaluate(&old, &[old.clone(), new.clone()], now),
+            RetentionAction::Delete
+        );
+        assert_eq!(
+            p.evaluate(&new, &[old.clone(), new.clone()], now),
+            RetentionAction::Keep
+        );
     }
 
     #[test]
     fn keep_tagged_with_glob() {
-        let p = RetentionPolicy::new("keep_release")
-            .with_rule(RetentionRule::KeepTagged { tags: vec!["v*".into(), "stable".into()] });
+        let p = RetentionPolicy::new("keep_release").with_rule(RetentionRule::KeepTagged {
+            tags: vec!["v*".into(), "stable".into()],
+        });
         let mut a = artifact_at("sha256:1", at(2024, 1, 1));
         a.tags.push(Tag::new("v1.2.0", "sha256:1"));
-        assert_eq!(p.evaluate(&a, &[a.clone()], at(2024, 6, 1)), RetentionAction::Keep);
+        assert_eq!(
+            p.evaluate(&a, &[a.clone()], at(2024, 6, 1)),
+            RetentionAction::Keep
+        );
         let mut b = artifact_at("sha256:2", at(2024, 1, 1));
         b.tags.push(Tag::new("nightly", "sha256:2"));
-        assert_eq!(p.evaluate(&b, &[b.clone()], at(2024, 6, 1)), RetentionAction::Delete);
+        assert_eq!(
+            p.evaluate(&b, &[b.clone()], at(2024, 6, 1)),
+            RetentionAction::Delete
+        );
         let mut c = artifact_at("sha256:3", at(2024, 1, 1));
         c.tags.push(Tag::new("stable", "sha256:3"));
-        assert_eq!(p.evaluate(&c, &[c.clone()], at(2024, 6, 1)), RetentionAction::Keep);
+        assert_eq!(
+            p.evaluate(&c, &[c.clone()], at(2024, 6, 1)),
+            RetentionAction::Keep
+        );
     }
 
     #[test]
@@ -206,8 +231,14 @@ mod tests {
         signed.tags.push(tag);
         let unsigned = artifact_at("sha256:2", at(2024, 1, 1));
         let now = at(2024, 6, 1);
-        assert_eq!(p.evaluate(&signed, &[signed.clone(), unsigned.clone()], now), RetentionAction::Keep);
-        assert_eq!(p.evaluate(&unsigned, &[signed.clone(), unsigned.clone()], now), RetentionAction::Delete);
+        assert_eq!(
+            p.evaluate(&signed, &[signed.clone(), unsigned.clone()], now),
+            RetentionAction::Keep
+        );
+        assert_eq!(
+            p.evaluate(&unsigned, &[signed.clone(), unsigned.clone()], now),
+            RetentionAction::Delete
+        );
     }
 
     #[test]
@@ -218,6 +249,9 @@ mod tests {
         // Newest of 1, but 90 days old → second rule deletes.
         let old_only = artifact_at("sha256:1", at(2024, 1, 1));
         let now = at(2024, 6, 1);
-        assert_eq!(p.evaluate(&old_only, &[old_only.clone()], now), RetentionAction::Delete);
+        assert_eq!(
+            p.evaluate(&old_only, &[old_only.clone()], now),
+            RetentionAction::Delete
+        );
     }
 }

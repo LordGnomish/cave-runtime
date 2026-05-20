@@ -77,7 +77,9 @@ impl Konnectivity {
             args.push(format!("--agent-identifiers=ipv4={}", self.agent_id));
         }
         if let Some(token) = &self.agent_token {
-            args.push(format!("--service-account-token-path=/var/run/secrets/{token}"));
+            args.push(format!(
+                "--service-account-token-path=/var/run/secrets/{token}"
+            ));
         }
         args
     }
@@ -99,8 +101,9 @@ mod tests {
         let mut k = Konnectivity::new(KonnectivityMode::Grpc);
         k.agent_id = "10.0.0.5".into();
         let args = k.agent_manifest_args();
-        assert!(args
-            .iter()
-            .any(|a| a.contains("--agent-identifiers=ipv4=10.0.0.5")));
+        assert!(
+            args.iter()
+                .any(|a| a.contains("--agent-identifiers=ipv4=10.0.0.5"))
+        );
     }
 }

@@ -53,7 +53,9 @@ pub trait Sampler: Send + Sync {
 pub struct AlwaysOn;
 
 impl Sampler for AlwaysOn {
-    fn name(&self) -> &'static str { "AlwaysOn" }
+    fn name(&self) -> &'static str {
+        "AlwaysOn"
+    }
     fn should_sample(
         &self,
         _parent_context: Option<&SpanContext>,
@@ -76,7 +78,9 @@ impl Sampler for AlwaysOn {
 pub struct AlwaysOff;
 
 impl Sampler for AlwaysOff {
-    fn name(&self) -> &'static str { "AlwaysOff" }
+    fn name(&self) -> &'static str {
+        "AlwaysOff"
+    }
     fn should_sample(
         &self,
         _parent_context: Option<&SpanContext>,
@@ -116,14 +120,20 @@ impl TraceIdRatioBased {
     }
 
     pub fn ratio(&self) -> f64 {
-        if self.threshold == 0 { 0.0 }
-        else if self.threshold == u64::MAX { 1.0 }
-        else { self.threshold as f64 / u64::MAX as f64 }
+        if self.threshold == 0 {
+            0.0
+        } else if self.threshold == u64::MAX {
+            1.0
+        } else {
+            self.threshold as f64 / u64::MAX as f64
+        }
     }
 }
 
 impl Sampler for TraceIdRatioBased {
-    fn name(&self) -> &'static str { "TraceIdRatioBased" }
+    fn name(&self) -> &'static str {
+        "TraceIdRatioBased"
+    }
     fn should_sample(
         &self,
         _parent_context: Option<&SpanContext>,
@@ -147,7 +157,11 @@ impl Sampler for TraceIdRatioBased {
                 SamplingDecision::Drop
             },
             attributes: Attributes::new(),
-            trace_flags: if sampled { SpanContext::FLAG_SAMPLED } else { 0 },
+            trace_flags: if sampled {
+                SpanContext::FLAG_SAMPLED
+            } else {
+                0
+            },
         }
     }
 }
@@ -178,7 +192,9 @@ impl ParentBased {
 }
 
 impl Sampler for ParentBased {
-    fn name(&self) -> &'static str { "ParentBased" }
+    fn name(&self) -> &'static str {
+        "ParentBased"
+    }
     fn should_sample(
         &self,
         parent_context: Option<&SpanContext>,
@@ -188,7 +204,9 @@ impl Sampler for ParentBased {
         attributes: &Attributes,
     ) -> SamplingResult {
         match parent_context {
-            None => self.root.should_sample(None, trace_id, name, kind, attributes),
+            None => self
+                .root
+                .should_sample(None, trace_id, name, kind, attributes),
             Some(ctx) => {
                 let s = match (ctx.is_remote, ctx.is_sampled()) {
                     (true, true) => &self.remote_parent_sampled,
@@ -263,7 +281,9 @@ mod tests {
     use chrono::Utc;
     use std::collections::HashMap;
 
-    fn empty_attrs() -> Attributes { Attributes::new() }
+    fn empty_attrs() -> Attributes {
+        Attributes::new()
+    }
 
     fn span(name: &str) -> SpanData {
         let now = Utc::now();
@@ -345,17 +365,21 @@ mod tests {
         for i in 0..1000u64 {
             let tid: TraceId = (i as u128) << 64;
             let r = s.should_sample(None, tid, "x", SpanKind::Internal, &empty_attrs());
-            if r.decision == SamplingDecision::RecordAndSample { sampled += 1; }
+            if r.decision == SamplingDecision::RecordAndSample {
+                sampled += 1;
+            }
         }
         // First 500 IDs (upper64 = 0..499) all under 50% of u64::MAX → all sampled.
         assert_eq!(sampled, 1000);
 
         // Now flip: use upper64 in the top half → none sampled.
         let mut sampled2 = 0;
-        for i in (u64::MAX/2 + 1)..(u64::MAX/2 + 1001) {
+        for i in (u64::MAX / 2 + 1)..(u64::MAX / 2 + 1001) {
             let tid: TraceId = (i as u128) << 64;
             let r = s.should_sample(None, tid, "x", SpanKind::Internal, &empty_attrs());
-            if r.decision == SamplingDecision::RecordAndSample { sampled2 += 1; }
+            if r.decision == SamplingDecision::RecordAndSample {
+                sampled2 += 1;
+            }
         }
         assert_eq!(sampled2, 0);
     }
@@ -416,7 +440,8 @@ mod tests {
     #[test]
     fn test_tail_attr_equal_policy() {
         let mut s = span("x");
-        s.attributes.insert("priority".into(), AttrValue::String("high".into()));
+        s.attributes
+            .insert("priority".into(), AttrValue::String("high".into()));
         let t = TailSampler::new(vec![Box::new(AttrEqualPolicy {
             key: "priority".into(),
             value: "high".into(),
@@ -428,8 +453,8 @@ mod tests {
     fn test_tail_disjunction_of_policies() {
         let s = span("x");
         let t = TailSampler::new(vec![
-            Box::new(ErrorPolicy),                         // false: status Unset
-            Box::new(LatencyPolicy { threshold_ms: 50 }),  // true: 100ms >= 50ms
+            Box::new(ErrorPolicy),                        // false: status Unset
+            Box::new(LatencyPolicy { threshold_ms: 50 }), // true: 100ms >= 50ms
         ]);
         assert!(t.should_keep(&s));
     }

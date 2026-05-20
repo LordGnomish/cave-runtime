@@ -14,7 +14,8 @@ use std::sync::Arc;
 
 fn vap(name: &str, tenant: &str) -> ValidatingAdmissionPolicy {
     let mut meta = ObjectMeta::new(name, "");
-    meta.annotations.insert("cave.runtime/tenant-id".into(), tenant.into());
+    meta.annotations
+        .insert("cave.runtime/tenant-id".into(), tenant.into());
     ValidatingAdmissionPolicy {
         api_version: "admissionregistration.k8s.io/v1".into(),
         kind: "ValidatingAdmissionPolicy".into(),
@@ -25,7 +26,8 @@ fn vap(name: &str, tenant: &str) -> ValidatingAdmissionPolicy {
 
 fn binding(name: &str, tenant: &str, policy: &str) -> ValidatingAdmissionPolicyBinding {
     let mut meta = ObjectMeta::new(name, "");
-    meta.annotations.insert("cave.runtime/tenant-id".into(), tenant.into());
+    meta.annotations
+        .insert("cave.runtime/tenant-id".into(), tenant.into());
     ValidatingAdmissionPolicyBinding {
         api_version: "admissionregistration.k8s.io/v1".into(),
         kind: "ValidatingAdmissionPolicyBinding".into(),
@@ -41,14 +43,22 @@ fn req(op: Operation, ns: &str, tenant: &str) -> AdmissionRequest {
     let mut meta = ObjectMeta::new("cm1", ns);
     meta.labels.insert("env".into(), "prod".into());
     let cm = Resource::ConfigMap(ConfigMap {
-        api_version: "v1".into(), kind: "ConfigMap".into(),
-        metadata: meta, data: HashMap::new(),
+        api_version: "v1".into(),
+        kind: "ConfigMap".into(),
+        metadata: meta,
+        data: HashMap::new(),
     });
     AdmissionRequest {
-        uid: "uid".into(), tenant_id: tenant.into(), namespace: ns.into(),
-        kind: "ConfigMap".into(), name: "cm1".into(), operation: op,
-        object: Some(cm), old_object: None,
-        user: "alice".into(), dry_run: false,
+        uid: "uid".into(),
+        tenant_id: tenant.into(),
+        namespace: ns.into(),
+        kind: "ConfigMap".into(),
+        name: "cm1".into(),
+        operation: op,
+        object: Some(cm),
+        old_object: None,
+        user: "alice".into(),
+        dry_run: false,
     }
 }
 
@@ -83,14 +93,19 @@ fn failure_policy_default_is_fail() {
                           "resource_version":1,"creation_timestamp":"2026-01-01T00:00:00Z",
                           "labels":{},"annotations":{},"owner_references":[],"finalizers":[],
                           "deletion_timestamp":null},
-              "spec":{}}"#).unwrap();
+              "spec":{}}"#,
+    )
+    .unwrap();
     assert_eq!(p.spec.failure_policy, FailurePolicyType::Fail);
 }
 
 #[test]
 fn parameter_not_found_default_is_deny() {
     let pr: ParamRef = serde_json::from_str("{}").unwrap();
-    assert_eq!(pr.parameter_not_found_action, ParameterNotFoundActionType::Deny);
+    assert_eq!(
+        pr.parameter_not_found_action,
+        ParameterNotFoundActionType::Deny
+    );
 }
 
 #[test]
@@ -122,7 +137,10 @@ fn store_put_and_get_policy() {
 fn store_tenant_isolation_get() {
     let s = VapStore::new();
     s.put_policy(vap("p1", "acme"));
-    assert!(s.get_policy("globex", "p1").is_none(), "tenant isolation invariant");
+    assert!(
+        s.get_policy("globex", "p1").is_none(),
+        "tenant isolation invariant"
+    );
 }
 
 #[test]
@@ -183,17 +201,27 @@ fn store_pairs_does_not_cross_tenants_even_when_names_match() {
     let s = VapStore::new();
     s.put_policy(vap("p1", "acme"));
     s.put_binding(binding("b1", "globex", "p1"));
-    assert!(s.pairs_for_tenant("acme").is_empty(),
-        "binding in globex must NOT see policy in acme");
-    assert!(s.pairs_for_tenant("globex").is_empty(),
-        "binding in globex must NOT cross to acme's policy");
+    assert!(
+        s.pairs_for_tenant("acme").is_empty(),
+        "binding in globex must NOT see policy in acme"
+    );
+    assert!(
+        s.pairs_for_tenant("globex").is_empty(),
+        "binding in globex must NOT cross to acme's policy"
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Resource matching — upstream `TestMatcher_Matches` and friends.
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn input_for(op: Operation, group: &str, version: &str, resource: &str, ns: &str) -> MatchInput<'static> {
+fn input_for(
+    op: Operation,
+    group: &str,
+    version: &str,
+    resource: &str,
+    ns: &str,
+) -> MatchInput<'static> {
     static EMPTY: std::sync::OnceLock<HashMap<String, String>> = std::sync::OnceLock::new();
     let empty = EMPTY.get_or_init(HashMap::new);
     MatchInput {
@@ -251,7 +279,7 @@ fn rule_matches_filters_by_resource() {
         scope: ScopeType::All,
     };
     let i_pod = input_for(Operation::Create, "", "v1", "pods", "default");
-    let i_cm  = input_for(Operation::Create, "", "v1", "configmaps", "default");
+    let i_cm = input_for(Operation::Create, "", "v1", "configmaps", "default");
     assert!(rule_matches(&rule, &i_pod));
     assert!(!rule_matches(&rule, &i_cm));
 }
@@ -259,34 +287,58 @@ fn rule_matches_filters_by_resource() {
 #[test]
 fn rule_matches_scope_namespaced() {
     let rule = RuleWithOperations {
-        operations: vec!["*".into()], api_groups: vec!["*".into()],
-        api_versions: vec!["*".into()], resources: vec!["*".into()],
+        operations: vec!["*".into()],
+        api_groups: vec!["*".into()],
+        api_versions: vec!["*".into()],
+        resources: vec!["*".into()],
         scope: ScopeType::Namespaced,
     };
-    assert!(rule_matches(&rule, &input_for(Operation::Create, "", "v1", "pods", "default")));
-    assert!(!rule_matches(&rule, &input_for(Operation::Create, "", "v1", "nodes", "")));
+    assert!(rule_matches(
+        &rule,
+        &input_for(Operation::Create, "", "v1", "pods", "default")
+    ));
+    assert!(!rule_matches(
+        &rule,
+        &input_for(Operation::Create, "", "v1", "nodes", "")
+    ));
 }
 
 #[test]
 fn rule_matches_scope_cluster() {
     let rule = RuleWithOperations {
-        operations: vec!["*".into()], api_groups: vec!["*".into()],
-        api_versions: vec!["*".into()], resources: vec!["*".into()],
+        operations: vec!["*".into()],
+        api_groups: vec!["*".into()],
+        api_versions: vec!["*".into()],
+        resources: vec!["*".into()],
         scope: ScopeType::Cluster,
     };
-    assert!(!rule_matches(&rule, &input_for(Operation::Create, "", "v1", "pods", "default")));
-    assert!(rule_matches(&rule, &input_for(Operation::Create, "", "v1", "nodes", "")));
+    assert!(!rule_matches(
+        &rule,
+        &input_for(Operation::Create, "", "v1", "pods", "default")
+    ));
+    assert!(rule_matches(
+        &rule,
+        &input_for(Operation::Create, "", "v1", "nodes", "")
+    ));
 }
 
 #[test]
 fn rule_matches_scope_all() {
     let rule = RuleWithOperations {
-        operations: vec!["*".into()], api_groups: vec!["*".into()],
-        api_versions: vec!["*".into()], resources: vec!["*".into()],
+        operations: vec!["*".into()],
+        api_groups: vec!["*".into()],
+        api_versions: vec!["*".into()],
+        resources: vec!["*".into()],
         scope: ScopeType::All,
     };
-    assert!(rule_matches(&rule, &input_for(Operation::Create, "", "v1", "pods", "default")));
-    assert!(rule_matches(&rule, &input_for(Operation::Create, "", "v1", "nodes", "")));
+    assert!(rule_matches(
+        &rule,
+        &input_for(Operation::Create, "", "v1", "pods", "default")
+    ));
+    assert!(rule_matches(
+        &rule,
+        &input_for(Operation::Create, "", "v1", "nodes", "")
+    ));
 }
 
 #[test]
@@ -299,7 +351,10 @@ fn rule_empty_groups_matches_anything_when_unset() {
         resources: vec![],
         scope: ScopeType::All,
     };
-    assert!(rule_matches(&rule, &input_for(Operation::Create, "anything", "v1", "anything", "ns")));
+    assert!(rule_matches(
+        &rule,
+        &input_for(Operation::Create, "anything", "v1", "anything", "ns")
+    ));
 }
 
 #[test]
@@ -338,7 +393,8 @@ fn label_selector_in_operator() {
     let sel = LabelSelector {
         match_labels: HashMap::new(),
         match_expressions: vec![LabelSelectorRequirement {
-            key: "tier".into(), operator: "In".into(),
+            key: "tier".into(),
+            operator: "In".into(),
             values: vec!["frontend".into(), "backend".into()],
         }],
     };
@@ -354,7 +410,8 @@ fn label_selector_notin_operator() {
     let sel = LabelSelector {
         match_labels: HashMap::new(),
         match_expressions: vec![LabelSelectorRequirement {
-            key: "tier".into(), operator: "NotIn".into(),
+            key: "tier".into(),
+            operator: "NotIn".into(),
             values: vec!["cache".into()],
         }],
     };
@@ -370,7 +427,9 @@ fn label_selector_exists_operator() {
     let sel = LabelSelector {
         match_labels: HashMap::new(),
         match_expressions: vec![LabelSelectorRequirement {
-            key: "team".into(), operator: "Exists".into(), values: vec![],
+            key: "team".into(),
+            operator: "Exists".into(),
+            values: vec![],
         }],
     };
     let mut labs = HashMap::new();
@@ -385,7 +444,9 @@ fn label_selector_does_not_exist_operator() {
     let sel = LabelSelector {
         match_labels: HashMap::new(),
         match_expressions: vec![LabelSelectorRequirement {
-            key: "team".into(), operator: "DoesNotExist".into(), values: vec![],
+            key: "team".into(),
+            operator: "DoesNotExist".into(),
+            values: vec![],
         }],
     };
     let labs = HashMap::new();
@@ -400,7 +461,9 @@ fn label_selector_unknown_operator_never_matches() {
     let sel = LabelSelector {
         match_labels: HashMap::new(),
         match_expressions: vec![LabelSelectorRequirement {
-            key: "k".into(), operator: "Bogus".into(), values: vec![],
+            key: "k".into(),
+            operator: "Bogus".into(),
+            values: vec![],
         }],
     };
     assert!(!label_selector_matches(&sel, &HashMap::new()));
@@ -411,28 +474,43 @@ fn match_resources_excludes_take_priority() {
     let mr = MatchResources {
         resource_rules: vec![NamedRuleWithOperations {
             rule: RuleWithOperations {
-                operations: vec!["*".into()], api_groups: vec!["*".into()],
-                api_versions: vec!["*".into()], resources: vec!["*".into()],
+                operations: vec!["*".into()],
+                api_groups: vec!["*".into()],
+                api_versions: vec!["*".into()],
+                resources: vec!["*".into()],
                 scope: ScopeType::All,
-            }, resource_names: vec![],
+            },
+            resource_names: vec![],
         }],
         exclude_resource_rules: vec![NamedRuleWithOperations {
             rule: RuleWithOperations {
-                operations: vec!["*".into()], api_groups: vec!["*".into()],
-                api_versions: vec!["*".into()], resources: vec!["secrets".into()],
+                operations: vec!["*".into()],
+                api_groups: vec!["*".into()],
+                api_versions: vec!["*".into()],
+                resources: vec!["secrets".into()],
                 scope: ScopeType::All,
-            }, resource_names: vec![],
+            },
+            resource_names: vec![],
         }],
         ..Default::default()
     };
-    assert!(match_resources_matches(&mr, &input_for(Operation::Create, "", "v1", "pods", "ns")));
-    assert!(!match_resources_matches(&mr, &input_for(Operation::Create, "", "v1", "secrets", "ns")));
+    assert!(match_resources_matches(
+        &mr,
+        &input_for(Operation::Create, "", "v1", "pods", "ns")
+    ));
+    assert!(!match_resources_matches(
+        &mr,
+        &input_for(Operation::Create, "", "v1", "secrets", "ns")
+    ));
 }
 
 #[test]
 fn match_resources_empty_rules_matches_anything() {
     let mr = MatchResources::default();
-    assert!(match_resources_matches(&mr, &input_for(Operation::Create, "", "v1", "pods", "ns")));
+    assert!(match_resources_matches(
+        &mr,
+        &input_for(Operation::Create, "", "v1", "pods", "ns")
+    ));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -442,9 +520,16 @@ fn match_resources_empty_rules_matches_anything() {
 #[test]
 fn param_resolver_named_lookup() {
     let r = InMemoryParamResolver::new();
-    let kind = ParamKind { api_version: "v1".into(), kind: "ConfigMap".into() };
+    let kind = ParamKind {
+        api_version: "v1".into(),
+        kind: "ConfigMap".into(),
+    };
     r.insert("acme", &kind, "default", "p1", serde_json::json!({"x": 1}));
-    let pr = ParamRef { name: "p1".into(), namespace: "default".into(), ..Default::default() };
+    let pr = ParamRef {
+        name: "p1".into(),
+        namespace: "default".into(),
+        ..Default::default()
+    };
     let v = r.resolve("acme", &kind, &pr).unwrap();
     assert_eq!(v.len(), 1);
     assert_eq!(v[0]["x"], serde_json::json!(1));
@@ -453,30 +538,54 @@ fn param_resolver_named_lookup() {
 #[test]
 fn param_resolver_named_not_found() {
     let r = InMemoryParamResolver::new();
-    let kind = ParamKind { api_version: "v1".into(), kind: "ConfigMap".into() };
-    let pr = ParamRef { name: "missing".into(), namespace: "default".into(), ..Default::default() };
-    assert_eq!(r.resolve("acme", &kind, &pr), Err(ParamResolveError::NotFound));
+    let kind = ParamKind {
+        api_version: "v1".into(),
+        kind: "ConfigMap".into(),
+    };
+    let pr = ParamRef {
+        name: "missing".into(),
+        namespace: "default".into(),
+        ..Default::default()
+    };
+    assert_eq!(
+        r.resolve("acme", &kind, &pr),
+        Err(ParamResolveError::NotFound)
+    );
 }
 
 #[test]
 fn param_resolver_tenant_isolation() {
     let r = InMemoryParamResolver::new();
-    let kind = ParamKind { api_version: "v1".into(), kind: "ConfigMap".into() };
+    let kind = ParamKind {
+        api_version: "v1".into(),
+        kind: "ConfigMap".into(),
+    };
     r.insert("acme", &kind, "default", "p1", serde_json::json!({}));
-    let pr = ParamRef { name: "p1".into(), namespace: "default".into(), ..Default::default() };
-    assert_eq!(r.resolve("globex", &kind, &pr), Err(ParamResolveError::NotFound),
-        "cross-tenant param lookup must fail (cave-runtime invariant)");
+    let pr = ParamRef {
+        name: "p1".into(),
+        namespace: "default".into(),
+        ..Default::default()
+    };
+    assert_eq!(
+        r.resolve("globex", &kind, &pr),
+        Err(ParamResolveError::NotFound),
+        "cross-tenant param lookup must fail (cave-runtime invariant)"
+    );
 }
 
 #[test]
 fn param_resolver_selector_lists_all_in_scope() {
     let r = InMemoryParamResolver::new();
-    let kind = ParamKind { api_version: "v1".into(), kind: "ConfigMap".into() };
+    let kind = ParamKind {
+        api_version: "v1".into(),
+        kind: "ConfigMap".into(),
+    };
     r.insert("acme", &kind, "default", "a", serde_json::json!({}));
     r.insert("acme", &kind, "default", "b", serde_json::json!({}));
-    r.insert("acme", &kind, "other",   "c", serde_json::json!({}));
+    r.insert("acme", &kind, "other", "c", serde_json::json!({}));
     let pr = ParamRef {
-        name: "".into(), namespace: "default".into(),
+        name: "".into(),
+        namespace: "default".into(),
         selector: Some(LabelSelector::default()),
         ..Default::default()
     };
@@ -491,20 +600,27 @@ fn param_resolver_selector_lists_all_in_scope() {
 #[test]
 fn fixed_evaluator_returns_known() {
     let e = FixedEvaluator::new().with("true_expr", CelValue::Bool(true));
-    assert_eq!(e.evaluate("true_expr", &CelActivation::default()).unwrap(), CelValue::Bool(true));
+    assert_eq!(
+        e.evaluate("true_expr", &CelActivation::default()).unwrap(),
+        CelValue::Bool(true)
+    );
 }
 
 #[test]
 fn fixed_evaluator_unknown_is_compile_error() {
     let e = FixedEvaluator::new();
-    matches!(e.evaluate("nope", &CelActivation::default()),
-             Err(CelError::Compile(_)));
+    matches!(
+        e.evaluate("nope", &CelActivation::default()),
+        Err(CelError::Compile(_))
+    );
 }
 
 #[test]
 fn panic_evaluator_returns_compile_error() {
     let e = PanicEvaluator;
-    let err = e.evaluate("anything", &CelActivation::default()).unwrap_err();
+    let err = e
+        .evaluate("anything", &CelActivation::default())
+        .unwrap_err();
     assert!(matches!(err, CelError::Compile(msg) if msg.contains("CEL evaluator not yet ported")));
 }
 
@@ -522,13 +638,21 @@ fn dispatch_allow_when_validation_passes() {
     let ev = FixedEvaluator::new().with("true", CelValue::Bool(true));
     let d = dispatcher_with_eval(ev);
     let mut p = vap("p", "acme");
-    p.spec.validations.push(Validation { expression: "true".into(), ..Default::default() });
+    p.spec.validations.push(Validation {
+        expression: "true".into(),
+        ..Default::default()
+    });
     let b = binding("b", "acme", "p");
     let r = req(Operation::Create, "default", "acme");
     let i = MatchInput {
-        group: "", version: "v1", resource: "configmaps", name: "cm1",
-        namespace: "default", operation: &Operation::Create,
-        object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
+        group: "",
+        version: "v1",
+        resource: "configmaps",
+        name: "cm1",
+        namespace: "default",
+        operation: &Operation::Create,
+        object_labels: &HashMap::new(),
+        namespace_labels: &HashMap::new(),
     };
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
     assert_eq!(out, vec![DispatchOutcome::Allow]);
@@ -540,19 +664,31 @@ fn dispatch_deny_when_validation_fails() {
     let d = dispatcher_with_eval(ev);
     let mut p = vap("p", "acme");
     p.spec.validations.push(Validation {
-        expression: "expr".into(), message: "nope".into(),
-        reason: "Forbidden".into(), ..Default::default()
+        expression: "expr".into(),
+        message: "nope".into(),
+        reason: "Forbidden".into(),
+        ..Default::default()
     });
     let b = binding("b", "acme", "p");
     let r = req(Operation::Create, "default", "acme");
     let i = MatchInput {
-        group: "", version: "v1", resource: "configmaps", name: "cm1",
-        namespace: "default", operation: &Operation::Create,
-        object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
+        group: "",
+        version: "v1",
+        resource: "configmaps",
+        name: "cm1",
+        namespace: "default",
+        operation: &Operation::Create,
+        object_labels: &HashMap::new(),
+        namespace_labels: &HashMap::new(),
     };
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
-    assert_eq!(out, vec![DispatchOutcome::Deny {
-        message: "nope".into(), reason: "Forbidden".into() }]);
+    assert_eq!(
+        out,
+        vec![DispatchOutcome::Deny {
+            message: "nope".into(),
+            reason: "Forbidden".into()
+        }]
+    );
 }
 
 #[test]
@@ -561,14 +697,21 @@ fn dispatch_deny_uses_expression_when_message_empty() {
     let d = dispatcher_with_eval(ev);
     let mut p = vap("p", "acme");
     p.spec.validations.push(Validation {
-        expression: "x > 0".into(), message: "".into(), ..Default::default()
+        expression: "x > 0".into(),
+        message: "".into(),
+        ..Default::default()
     });
     let b = binding("b", "acme", "p");
     let r = req(Operation::Create, "default", "acme");
     let i = MatchInput {
-        group: "", version: "v1", resource: "configmaps", name: "cm1",
-        namespace: "default", operation: &Operation::Create,
-        object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
+        group: "",
+        version: "v1",
+        resource: "configmaps",
+        name: "cm1",
+        namespace: "default",
+        operation: &Operation::Create,
+        object_labels: &HashMap::new(),
+        namespace_labels: &HashMap::new(),
     };
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
     match &out[0] {
@@ -582,14 +725,22 @@ fn dispatch_failure_policy_fail_on_compile_error() {
     let ev = FixedEvaluator::new().with_err("bad", CelError::Compile("syntax".into()));
     let d = dispatcher_with_eval(ev);
     let mut p = vap("p", "acme");
-    p.spec.validations.push(Validation { expression: "bad".into(), ..Default::default() });
+    p.spec.validations.push(Validation {
+        expression: "bad".into(),
+        ..Default::default()
+    });
     p.spec.failure_policy = FailurePolicyType::Fail;
     let b = binding("b", "acme", "p");
     let r = req(Operation::Create, "default", "acme");
     let i = MatchInput {
-        group: "", version: "v1", resource: "configmaps", name: "cm1",
-        namespace: "default", operation: &Operation::Create,
-        object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
+        group: "",
+        version: "v1",
+        resource: "configmaps",
+        name: "cm1",
+        namespace: "default",
+        operation: &Operation::Create,
+        object_labels: &HashMap::new(),
+        namespace_labels: &HashMap::new(),
     };
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
     assert!(matches!(out[0], DispatchOutcome::Error(_)));
@@ -600,14 +751,22 @@ fn dispatch_failure_policy_ignore_swallows_error() {
     let ev = FixedEvaluator::new().with_err("bad", CelError::Compile("syntax".into()));
     let d = dispatcher_with_eval(ev);
     let mut p = vap("p", "acme");
-    p.spec.validations.push(Validation { expression: "bad".into(), ..Default::default() });
+    p.spec.validations.push(Validation {
+        expression: "bad".into(),
+        ..Default::default()
+    });
     p.spec.failure_policy = FailurePolicyType::Ignore;
     let b = binding("b", "acme", "p");
     let r = req(Operation::Create, "default", "acme");
     let i = MatchInput {
-        group: "", version: "v1", resource: "configmaps", name: "cm1",
-        namespace: "default", operation: &Operation::Create,
-        object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
+        group: "",
+        version: "v1",
+        resource: "configmaps",
+        name: "cm1",
+        namespace: "default",
+        operation: &Operation::Create,
+        object_labels: &HashMap::new(),
+        namespace_labels: &HashMap::new(),
     };
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
     assert_eq!(out, vec![DispatchOutcome::SilencedError]);
@@ -619,15 +778,22 @@ fn dispatch_validation_action_warn() {
     let d = dispatcher_with_eval(ev);
     let mut p = vap("p", "acme");
     p.spec.validations.push(Validation {
-        expression: "expr".into(), message: "warning!".into(), ..Default::default()
+        expression: "expr".into(),
+        message: "warning!".into(),
+        ..Default::default()
     });
     let mut b = binding("b", "acme", "p");
     b.spec.validation_actions = vec![ValidationAction::Warn];
     let r = req(Operation::Create, "default", "acme");
     let i = MatchInput {
-        group: "", version: "v1", resource: "configmaps", name: "cm1",
-        namespace: "default", operation: &Operation::Create,
-        object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
+        group: "",
+        version: "v1",
+        resource: "configmaps",
+        name: "cm1",
+        namespace: "default",
+        operation: &Operation::Create,
+        object_labels: &HashMap::new(),
+        namespace_labels: &HashMap::new(),
     };
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
     assert_eq!(out, vec![DispatchOutcome::Warn("warning!".into())]);
@@ -639,15 +805,22 @@ fn dispatch_validation_action_deny_explicit() {
     let d = dispatcher_with_eval(ev);
     let mut p = vap("p", "acme");
     p.spec.validations.push(Validation {
-        expression: "expr".into(), message: "no".into(), ..Default::default()
+        expression: "expr".into(),
+        message: "no".into(),
+        ..Default::default()
     });
     let mut b = binding("b", "acme", "p");
     b.spec.validation_actions = vec![ValidationAction::Deny];
     let r = req(Operation::Create, "default", "acme");
     let i = MatchInput {
-        group: "", version: "v1", resource: "configmaps", name: "cm1",
-        namespace: "default", operation: &Operation::Create,
-        object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
+        group: "",
+        version: "v1",
+        resource: "configmaps",
+        name: "cm1",
+        namespace: "default",
+        operation: &Operation::Create,
+        object_labels: &HashMap::new(),
+        namespace_labels: &HashMap::new(),
     };
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
     assert_eq!(out.len(), 1);
@@ -660,15 +833,22 @@ fn dispatch_validation_action_warn_and_deny() {
     let d = dispatcher_with_eval(ev);
     let mut p = vap("p", "acme");
     p.spec.validations.push(Validation {
-        expression: "expr".into(), message: "msg".into(), ..Default::default()
+        expression: "expr".into(),
+        message: "msg".into(),
+        ..Default::default()
     });
     let mut b = binding("b", "acme", "p");
     b.spec.validation_actions = vec![ValidationAction::Warn, ValidationAction::Deny];
     let r = req(Operation::Create, "default", "acme");
     let i = MatchInput {
-        group: "", version: "v1", resource: "configmaps", name: "cm1",
-        namespace: "default", operation: &Operation::Create,
-        object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
+        group: "",
+        version: "v1",
+        resource: "configmaps",
+        name: "cm1",
+        namespace: "default",
+        operation: &Operation::Create,
+        object_labels: &HashMap::new(),
+        namespace_labels: &HashMap::new(),
     };
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
     assert_eq!(out.len(), 2);
@@ -680,20 +860,30 @@ fn dispatch_validation_action_warn_and_deny() {
 fn dispatch_param_not_found_with_deny_action_denies() {
     let d = Dispatcher::new(
         Arc::new(FixedEvaluator::new()),
-        Arc::new(InMemoryParamResolver::new()));
+        Arc::new(InMemoryParamResolver::new()),
+    );
     let mut p = vap("p", "acme");
-    p.spec.param_kind = Some(ParamKind { api_version: "v1".into(), kind: "ConfigMap".into() });
+    p.spec.param_kind = Some(ParamKind {
+        api_version: "v1".into(),
+        kind: "ConfigMap".into(),
+    });
     let mut b = binding("b", "acme", "p");
     b.spec.param_ref = Some(ParamRef {
-        name: "missing".into(), namespace: "default".into(),
+        name: "missing".into(),
+        namespace: "default".into(),
         parameter_not_found_action: ParameterNotFoundActionType::Deny,
         ..Default::default()
     });
     let r = req(Operation::Create, "default", "acme");
     let i = MatchInput {
-        group: "", version: "v1", resource: "configmaps", name: "cm1",
-        namespace: "default", operation: &Operation::Create,
-        object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
+        group: "",
+        version: "v1",
+        resource: "configmaps",
+        name: "cm1",
+        namespace: "default",
+        operation: &Operation::Create,
+        object_labels: &HashMap::new(),
+        namespace_labels: &HashMap::new(),
     };
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
     assert!(matches!(out[0], DispatchOutcome::Deny { .. }));
@@ -704,19 +894,31 @@ fn dispatch_param_not_found_with_allow_action_proceeds() {
     let ev = FixedEvaluator::new().with("expr", CelValue::Bool(true));
     let d = Dispatcher::new(Arc::new(ev), Arc::new(InMemoryParamResolver::new()));
     let mut p = vap("p", "acme");
-    p.spec.param_kind = Some(ParamKind { api_version: "v1".into(), kind: "ConfigMap".into() });
-    p.spec.validations.push(Validation { expression: "expr".into(), ..Default::default() });
+    p.spec.param_kind = Some(ParamKind {
+        api_version: "v1".into(),
+        kind: "ConfigMap".into(),
+    });
+    p.spec.validations.push(Validation {
+        expression: "expr".into(),
+        ..Default::default()
+    });
     let mut b = binding("b", "acme", "p");
     b.spec.param_ref = Some(ParamRef {
-        name: "missing".into(), namespace: "default".into(),
+        name: "missing".into(),
+        namespace: "default".into(),
         parameter_not_found_action: ParameterNotFoundActionType::Allow,
         ..Default::default()
     });
     let r = req(Operation::Create, "default", "acme");
     let i = MatchInput {
-        group: "", version: "v1", resource: "configmaps", name: "cm1",
-        namespace: "default", operation: &Operation::Create,
-        object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
+        group: "",
+        version: "v1",
+        resource: "configmaps",
+        name: "cm1",
+        namespace: "default",
+        operation: &Operation::Create,
+        object_labels: &HashMap::new(),
+        namespace_labels: &HashMap::new(),
     };
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
     assert_eq!(out, vec![DispatchOutcome::Allow]);
@@ -730,20 +932,31 @@ fn dispatch_match_constraints_filter_skips_dispatch() {
     p.spec.match_constraints = Some(MatchResources {
         resource_rules: vec![NamedRuleWithOperations {
             rule: RuleWithOperations {
-                operations: vec!["*".into()], api_groups: vec!["*".into()],
-                api_versions: vec!["*".into()], resources: vec!["pods".into()],
+                operations: vec!["*".into()],
+                api_groups: vec!["*".into()],
+                api_versions: vec!["*".into()],
+                resources: vec!["pods".into()],
                 scope: ScopeType::All,
-            }, resource_names: vec![],
+            },
+            resource_names: vec![],
         }],
         ..Default::default()
     });
-    p.spec.validations.push(Validation { expression: "expr".into(), ..Default::default() });
+    p.spec.validations.push(Validation {
+        expression: "expr".into(),
+        ..Default::default()
+    });
     let b = binding("b", "acme", "p");
     let r = req(Operation::Create, "default", "acme");
     let i = MatchInput {
-        group: "", version: "v1", resource: "configmaps", name: "cm1",
-        namespace: "default", operation: &Operation::Create,
-        object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
+        group: "",
+        version: "v1",
+        resource: "configmaps",
+        name: "cm1",
+        namespace: "default",
+        operation: &Operation::Create,
+        object_labels: &HashMap::new(),
+        namespace_labels: &HashMap::new(),
     };
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
     assert!(out.is_empty(), "non-matching constraint must skip");
@@ -757,15 +970,24 @@ fn dispatch_match_condition_false_skips() {
     let d = dispatcher_with_eval(ev);
     let mut p = vap("p", "acme");
     p.spec.match_conditions.push(MatchCondition {
-        name: "skip".into(), expression: "cond".into(),
+        name: "skip".into(),
+        expression: "cond".into(),
     });
-    p.spec.validations.push(Validation { expression: "v".into(), ..Default::default() });
+    p.spec.validations.push(Validation {
+        expression: "v".into(),
+        ..Default::default()
+    });
     let b = binding("b", "acme", "p");
     let r = req(Operation::Create, "default", "acme");
     let i = MatchInput {
-        group: "", version: "v1", resource: "configmaps", name: "cm1",
-        namespace: "default", operation: &Operation::Create,
-        object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
+        group: "",
+        version: "v1",
+        resource: "configmaps",
+        name: "cm1",
+        namespace: "default",
+        operation: &Operation::Create,
+        object_labels: &HashMap::new(),
+        namespace_labels: &HashMap::new(),
     };
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
     assert!(out.is_empty(), "matchCondition=false must skip validation");
@@ -777,15 +999,21 @@ fn dispatch_match_condition_error_with_fail_policy_errors() {
     let d = dispatcher_with_eval(ev);
     let mut p = vap("p", "acme");
     p.spec.match_conditions.push(MatchCondition {
-        name: "n".into(), expression: "cond".into(),
+        name: "n".into(),
+        expression: "cond".into(),
     });
     p.spec.failure_policy = FailurePolicyType::Fail;
     let b = binding("b", "acme", "p");
     let r = req(Operation::Create, "default", "acme");
     let i = MatchInput {
-        group: "", version: "v1", resource: "configmaps", name: "cm1",
-        namespace: "default", operation: &Operation::Create,
-        object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
+        group: "",
+        version: "v1",
+        resource: "configmaps",
+        name: "cm1",
+        namespace: "default",
+        operation: &Operation::Create,
+        object_labels: &HashMap::new(),
+        namespace_labels: &HashMap::new(),
     };
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
     assert!(matches!(out[0], DispatchOutcome::Error(_)));
@@ -797,15 +1025,21 @@ fn dispatch_match_condition_error_with_ignore_policy_silenced() {
     let d = dispatcher_with_eval(ev);
     let mut p = vap("p", "acme");
     p.spec.match_conditions.push(MatchCondition {
-        name: "n".into(), expression: "cond".into(),
+        name: "n".into(),
+        expression: "cond".into(),
     });
     p.spec.failure_policy = FailurePolicyType::Ignore;
     let b = binding("b", "acme", "p");
     let r = req(Operation::Create, "default", "acme");
     let i = MatchInput {
-        group: "", version: "v1", resource: "configmaps", name: "cm1",
-        namespace: "default", operation: &Operation::Create,
-        object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
+        group: "",
+        version: "v1",
+        resource: "configmaps",
+        name: "cm1",
+        namespace: "default",
+        operation: &Operation::Create,
+        object_labels: &HashMap::new(),
+        namespace_labels: &HashMap::new(),
     };
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
     assert_eq!(out, vec![DispatchOutcome::SilencedError]);
@@ -816,14 +1050,22 @@ fn dispatch_non_bool_validation_yields_fail() {
     let ev = FixedEvaluator::new().with("v", CelValue::Int(42));
     let d = dispatcher_with_eval(ev);
     let mut p = vap("p", "acme");
-    p.spec.validations.push(Validation { expression: "v".into(), ..Default::default() });
+    p.spec.validations.push(Validation {
+        expression: "v".into(),
+        ..Default::default()
+    });
     p.spec.failure_policy = FailurePolicyType::Fail;
     let b = binding("b", "acme", "p");
     let r = req(Operation::Create, "default", "acme");
     let i = MatchInput {
-        group: "", version: "v1", resource: "configmaps", name: "cm1",
-        namespace: "default", operation: &Operation::Create,
-        object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
+        group: "",
+        version: "v1",
+        resource: "configmaps",
+        name: "cm1",
+        namespace: "default",
+        operation: &Operation::Create,
+        object_labels: &HashMap::new(),
+        namespace_labels: &HashMap::new(),
     };
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
     assert!(matches!(out[0], DispatchOutcome::Error(_)));
@@ -836,17 +1078,28 @@ fn dispatch_audit_only_action_produces_no_outcome() {
     let ev = FixedEvaluator::new().with("v", CelValue::Bool(false));
     let d = dispatcher_with_eval(ev);
     let mut p = vap("p", "acme");
-    p.spec.validations.push(Validation { expression: "v".into(), ..Default::default() });
+    p.spec.validations.push(Validation {
+        expression: "v".into(),
+        ..Default::default()
+    });
     let mut b = binding("b", "acme", "p");
     b.spec.validation_actions = vec![ValidationAction::Audit];
     let r = req(Operation::Create, "default", "acme");
     let i = MatchInput {
-        group: "", version: "v1", resource: "configmaps", name: "cm1",
-        namespace: "default", operation: &Operation::Create,
-        object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
+        group: "",
+        version: "v1",
+        resource: "configmaps",
+        name: "cm1",
+        namespace: "default",
+        operation: &Operation::Create,
+        object_labels: &HashMap::new(),
+        namespace_labels: &HashMap::new(),
     };
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
-    assert!(out.is_empty(), "audit-only currently drops; M4 will surface");
+    assert!(
+        out.is_empty(),
+        "audit-only currently drops; M4 will surface"
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -857,7 +1110,10 @@ fn dispatch_audit_only_action_produces_no_outcome() {
 #[test]
 fn plugin_allows_when_no_policies_for_tenant() {
     let store = Arc::new(VapStore::new());
-    let d = Dispatcher::new(Arc::new(PanicEvaluator), Arc::new(InMemoryParamResolver::new()));
+    let d = Dispatcher::new(
+        Arc::new(PanicEvaluator),
+        Arc::new(InMemoryParamResolver::new()),
+    );
     let p = VapPlugin::new(store, d);
     let r = req(Operation::Create, "default", "acme");
     let resp = p.validate(&r);
@@ -870,13 +1126,16 @@ fn plugin_denies_via_failed_validation() {
     let store = Arc::new(VapStore::new());
     let mut policy = vap("p", "acme");
     policy.spec.validations.push(Validation {
-        expression: "v".into(), message: "boom".into(), ..Default::default()
+        expression: "v".into(),
+        message: "boom".into(),
+        ..Default::default()
     });
     store.put_policy(policy);
     store.put_binding(binding("b", "acme", "p"));
     let d = Dispatcher::new(
         Arc::new(FixedEvaluator::new().with("v", CelValue::Bool(false))),
-        Arc::new(InMemoryParamResolver::new()));
+        Arc::new(InMemoryParamResolver::new()),
+    );
     let plug = VapPlugin::new(store, d);
     let r = req(Operation::Create, "default", "acme");
     let resp = plug.validate(&r);
@@ -891,7 +1150,9 @@ fn plugin_warning_only_still_allows() {
     let store = Arc::new(VapStore::new());
     let mut policy = vap("p", "acme");
     policy.spec.validations.push(Validation {
-        expression: "v".into(), message: "careful".into(), ..Default::default()
+        expression: "v".into(),
+        message: "careful".into(),
+        ..Default::default()
     });
     store.put_policy(policy);
     let mut b = binding("b", "acme", "p");
@@ -899,7 +1160,8 @@ fn plugin_warning_only_still_allows() {
     store.put_binding(b);
     let d = Dispatcher::new(
         Arc::new(FixedEvaluator::new().with("v", CelValue::Bool(false))),
-        Arc::new(InMemoryParamResolver::new()));
+        Arc::new(InMemoryParamResolver::new()),
+    );
     let plug = VapPlugin::new(store, d);
     let r = req(Operation::Create, "default", "acme");
     let resp = plug.validate(&r);
@@ -912,11 +1174,16 @@ fn plugin_does_not_apply_other_tenant_policies() {
     let store = Arc::new(VapStore::new());
     let mut policy = vap("p", "globex");
     policy.spec.validations.push(Validation {
-        expression: "v".into(), message: "should not run".into(), ..Default::default()
+        expression: "v".into(),
+        message: "should not run".into(),
+        ..Default::default()
     });
     store.put_policy(policy);
     store.put_binding(binding("b", "globex", "p"));
-    let d = Dispatcher::new(Arc::new(PanicEvaluator), Arc::new(InMemoryParamResolver::new()));
+    let d = Dispatcher::new(
+        Arc::new(PanicEvaluator),
+        Arc::new(InMemoryParamResolver::new()),
+    );
     let plug = VapPlugin::new(store, d);
     let r = req(Operation::Create, "default", "acme");
     let resp = plug.validate(&r);
@@ -926,7 +1193,10 @@ fn plugin_does_not_apply_other_tenant_policies() {
 #[test]
 fn plugin_integrates_with_admission_chain() {
     let store = Arc::new(VapStore::new());
-    let d = Dispatcher::new(Arc::new(PanicEvaluator), Arc::new(InMemoryParamResolver::new()));
+    let d = Dispatcher::new(
+        Arc::new(PanicEvaluator),
+        Arc::new(InMemoryParamResolver::new()),
+    );
     let plug = VapPlugin::new(store, d);
     let chain = AdmissionChain::new().with_validating(Arc::new(plug));
     let r = req(Operation::Create, "default", "acme");
@@ -940,84 +1210,100 @@ fn plugin_integrates_with_admission_chain() {
 // `apiserver/pkg/admission/plugin/policy/validating/*_integration_test.go`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[cfg(feature = "live-integration")] // TODO(KEP-3488 M1.5): port cel-go evaluator
+#[test]
+#[cfg(feature = "live-integration")] // TODO(KEP-3488 M1.5): port cel-go evaluator
 fn cel_self_dot_metadata_name_present() {
     // Upstream: `validating_test.go::TestValidate_Self_MetadataName`
     let _e: Box<dyn CelEvaluator> = Box::new(PanicEvaluator);
     // pending: requires real CEL — expression `object.metadata.name == 'allowed'`
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_has_macro_on_optional_field() {
     // pending: requires real CEL — `has(object.spec.foo)`
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_string_lib_starts_with() {
     // pending: requires real CEL — `object.metadata.name.startsWith('foo-')`
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_string_lib_ends_with() {
     // pending: requires real CEL — `object.metadata.name.endsWith('-bar')`
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_quantity_compare_milli() {
     // pending: requires real CEL+quantity lib — `quantity('100m') < quantity('1')`
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_url_parse_lib() {
     // pending: requires real CEL+url lib — `url('https://x').getHost() == 'x'`
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_regex_match() {
     // pending: requires real CEL — `'foo123'.matches('^foo[0-9]+$')`
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_authz_check_kind_resource() {
     // pending: requires authorizer activation — `authorizer.group('').resource('pods').check('list').allowed()`
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_message_expression_overrides_message() {
     // pending: requires CEL — messageExpression returns string overriding `message`
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_variable_reference_other_variable() {
     // pending: requires CEL — `variables.x` reference inside another variable
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_param_array_index() {
     // pending: requires CEL — `params[0].x == 1` after multi-param resolution
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_namespace_object_labels() {
     // pending: requires CEL — `namespaceObject.metadata.labels['team']`
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_old_object_diff() {
     // pending: requires CEL — `oldObject.spec.replicas != object.spec.replicas`
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_audit_annotation_emission() {
     // pending: M4 hand-off — auditAnnotation produces an audit field on the response
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_message_too_long_truncates() {
     // pending: requires CEL — message longer than 12kB is truncated to 12kB
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_runtime_cost_budget_exceeded_is_error() {
     // pending: requires CEL+cost budget — runtime cost > 1e6 yields an error
 }

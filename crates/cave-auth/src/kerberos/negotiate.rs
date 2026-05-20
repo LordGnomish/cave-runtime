@@ -7,11 +7,11 @@
 //! `Authorization: Negotiate <base64 GSS token>`. This module
 //! produces the challenge string + decodes the request header.
 
-use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
 
+use super::KerberosError;
 use super::gssapi::InitialContextToken;
 use super::spnego::NegTokenInit;
-use super::KerberosError;
 
 /// HTTP-side handler. Stateless — the caller decides what to do
 /// when [`decode_request`] returns `Ok`.
@@ -153,7 +153,7 @@ impl DecodedNegotiate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kerberos::gssapi::{wrap_initial_context_token, OID_KRB5, OID_SPNEGO};
+    use crate::kerberos::gssapi::{OID_KRB5, OID_SPNEGO, wrap_initial_context_token};
     use crate::kerberos::spnego::build_neg_token_init;
 
     fn encode_challenge(token: &[u8]) -> String {
@@ -182,7 +182,10 @@ mod tests {
         let h = NegotiateHandler::new();
         let header = encode_challenge(&[0xde, 0xad, 0xbe, 0xef]);
         let decoded = h.decode_request(&header).unwrap();
-        assert_eq!(decoded.mech_token.as_deref(), Some(&[0xde, 0xad, 0xbe, 0xef][..]));
+        assert_eq!(
+            decoded.mech_token.as_deref(),
+            Some(&[0xde, 0xad, 0xbe, 0xef][..])
+        );
         assert!(decoded.has_known_mech());
     }
 

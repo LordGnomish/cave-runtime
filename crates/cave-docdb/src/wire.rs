@@ -45,7 +45,11 @@ impl OpMsg {
 
 const OPCODE: i32 = 2013;
 
-pub fn encode_op_msg(reply: &OpMsg, request_id: i32, response_to: i32) -> Result<Vec<u8>, WireError> {
+pub fn encode_op_msg(
+    reply: &OpMsg,
+    request_id: i32,
+    response_to: i32,
+) -> Result<Vec<u8>, WireError> {
     let mut payload = Vec::new();
 
     // Encode flag bits
@@ -56,8 +60,8 @@ pub fn encode_op_msg(reply: &OpMsg, request_id: i32, response_to: i32) -> Result
         match section {
             Section::Body(doc) => {
                 payload.push(0x00); // Section kind: body
-                let encoded = bson::encode_doc(doc)
-                    .map_err(|e| WireError::BsonError(e.to_string()))?;
+                let encoded =
+                    bson::encode_doc(doc).map_err(|e| WireError::BsonError(e.to_string()))?;
                 payload.extend_from_slice(&encoded);
             }
             Section::DocumentSequence(seq_name, docs) => {
@@ -67,8 +71,8 @@ pub fn encode_op_msg(reply: &OpMsg, request_id: i32, response_to: i32) -> Result
                 seq_data.push(0);
                 let mut docs_payload = Vec::new();
                 for doc in docs {
-                    let encoded = bson::encode_doc(doc)
-                        .map_err(|e| WireError::BsonError(e.to_string()))?;
+                    let encoded =
+                        bson::encode_doc(doc).map_err(|e| WireError::BsonError(e.to_string()))?;
                     docs_payload.extend_from_slice(&encoded);
                 }
                 let seq_len = (4 + seq_data.len() + docs_payload.len()) as u32;
@@ -110,12 +114,7 @@ pub fn decode_op_msg(bytes: &[u8]) -> Result<(i32, OpMsg), WireError> {
         return Err(WireError::WireError(format!("invalid opcode: {}", opcode)));
     }
 
-    let flag_bits = u32::from_le_bytes([
-        bytes[16],
-        bytes[17],
-        bytes[18],
-        bytes[19],
-    ]);
+    let flag_bits = u32::from_le_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]);
 
     let mut sections = Vec::new();
     let mut pos = 20;
@@ -130,10 +129,10 @@ pub fn decode_op_msg(bytes: &[u8]) -> Result<(i32, OpMsg), WireError> {
 
         if section_type == 0 {
             // Body section: document
-            let doc = bson::decode_doc(&bytes[pos..])
-                .map_err(|e| WireError::BsonError(e.to_string()))?;
-            let encoded = bson::encode_doc(&doc)
-                .map_err(|e| WireError::BsonError(e.to_string()))?;
+            let doc =
+                bson::decode_doc(&bytes[pos..]).map_err(|e| WireError::BsonError(e.to_string()))?;
+            let encoded =
+                bson::encode_doc(&doc).map_err(|e| WireError::BsonError(e.to_string()))?;
             let consumed = encoded.len();
             sections.push(Section::Body(doc));
             pos += consumed;
@@ -142,12 +141,9 @@ pub fn decode_op_msg(bytes: &[u8]) -> Result<(i32, OpMsg), WireError> {
             if pos + 4 > message_length {
                 break;
             }
-            let _seq_size = u32::from_le_bytes([
-                bytes[pos],
-                bytes[pos + 1],
-                bytes[pos + 2],
-                bytes[pos + 3],
-            ]) as usize;
+            let _seq_size =
+                u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]])
+                    as usize;
             pos += 4;
 
             let (seq_name, consumed) = read_cstring(&bytes[pos..])?;
@@ -160,8 +156,8 @@ pub fn decode_op_msg(bytes: &[u8]) -> Result<(i32, OpMsg), WireError> {
                 }
                 let doc = bson::decode_doc(&bytes[pos..])
                     .map_err(|e| WireError::BsonError(e.to_string()))?;
-                let encoded = bson::encode_doc(&doc)
-                    .map_err(|e| WireError::BsonError(e.to_string()))?;
+                let encoded =
+                    bson::encode_doc(&doc).map_err(|e| WireError::BsonError(e.to_string()))?;
                 let consumed = encoded.len();
                 docs.push(doc);
                 pos += consumed;
@@ -227,7 +223,10 @@ mod tests {
         assert!(encoded.len() > 16);
         // Verify body is decoded correctly
         let body = decoded.body().expect("should have body section");
-        assert_eq!(body.get("command"), Some(&Value::String("find".to_string())));
+        assert_eq!(
+            body.get("command"),
+            Some(&Value::String("find".to_string()))
+        );
     }
 
     #[test]

@@ -25,12 +25,7 @@ use std::{
     process::Command,
 };
 
-use axum::{
-    extract::Query,
-    response::Html,
-    routing::get,
-    Json, Router,
-};
+use axum::{Json, Router, extract::Query, response::Html, routing::get};
 use chrono::{DateTime, Duration, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -133,7 +128,9 @@ pub async fn api_by_module() -> Json<serde_json::Value> {
         })
         .collect();
     rows.sort_by(|a, b| {
-        b["loc_added"].as_u64().unwrap_or(0)
+        b["loc_added"]
+            .as_u64()
+            .unwrap_or(0)
             .cmp(&a["loc_added"].as_u64().unwrap_or(0))
     });
     Json(json!({ "rows": rows }))
@@ -420,7 +417,9 @@ CAVE_END
         // Even if we provide no commits at all the response must contain
         // exactly N day rows so the chart axis is continuous.
         // SAFETY: guarded by WORKSPACE_ROOT_TEST_GUARD.
-        unsafe { std::env::set_var("CAVE_WORKSPACE_ROOT", "/__no_such_dir_for_test__"); }
+        unsafe {
+            std::env::set_var("CAVE_WORKSPACE_ROOT", "/__no_such_dir_for_test__");
+        }
         let resp = api_timeseries(Query(TimeseriesQuery { days: 5 })).await;
         let v: serde_json::Value = serde_json::to_value(&resp.0).unwrap();
         assert_eq!(v["series"].as_array().unwrap().len(), 5);
@@ -432,7 +431,9 @@ CAVE_END
             .lock()
             .unwrap_or_else(|p| p.into_inner());
         // SAFETY: guarded by WORKSPACE_ROOT_TEST_GUARD.
-        unsafe { std::env::set_var("CAVE_WORKSPACE_ROOT", "/__no_such_dir_for_test__"); }
+        unsafe {
+            std::env::set_var("CAVE_WORKSPACE_ROOT", "/__no_such_dir_for_test__");
+        }
         let resp = api_authors().await;
         let v: serde_json::Value = serde_json::to_value(&resp.0).unwrap();
         for b in &["qwen", "sonnet", "opus", "other"] {

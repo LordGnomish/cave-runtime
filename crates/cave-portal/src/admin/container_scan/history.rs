@@ -7,12 +7,15 @@
 //!
 //! Upstream: <https://aquasecurity.github.io/trivy>
 
+use super::ContainerScanViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{AdminState, ContainerScanResult};
-use super::ContainerScanViewError;
 
-pub fn list_history(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<ContainerScanResult>, ContainerScanViewError> {
+pub fn list_history(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<ContainerScanResult>, ContainerScanViewError> {
     let mut rows = super::vulnerabilities::list_vulnerable_sorted(state, ctx)?;
     rows.sort_by(|a, b| b.scanned_at_unix.cmp(&a.scanned_at_unix));
     Ok(rows)
@@ -66,7 +69,11 @@ mod tests {
 
     #[test]
     fn history_sorted_newest_first() {
-        let rows = list_history(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
+        let rows = list_history(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
         for w in rows.windows(2) {
             assert!(w[0].scanned_at_unix >= w[1].scanned_at_unix);
         }
@@ -74,7 +81,11 @@ mod tests {
 
     #[test]
     fn oldest_unix_matches_min() {
-        let rows = list_history(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
+        let rows = list_history(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
         let oldest = oldest_unix(&rows);
         let expected = rows.iter().map(|r| r.scanned_at_unix).min();
         assert_eq!(oldest, expected);
@@ -87,14 +98,26 @@ mod tests {
 
     #[test]
     fn history_count_matches_seeded_scans() {
-        let scans = super::super::vulnerabilities::list_vulnerable_sorted(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
-        let rows = list_history(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
+        let scans = super::super::vulnerabilities::list_vulnerable_sorted(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
+        let rows = list_history(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
         assert_eq!(rows.len(), scans.len());
     }
 
     #[test]
     fn render_includes_history_count() {
-        let html = render(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
+        let html = render(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
         assert!(html.contains("Scan History ("));
     }
 }

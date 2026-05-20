@@ -59,15 +59,22 @@ pub struct Session {
 impl Session {
     pub fn new(lease_id: i64, ttl_secs: i64) -> Self {
         Self {
-            lease_id, ttl_secs,
+            lease_id,
+            ttl_secs,
             done: Mutex::new(false),
             expire_hooks: Mutex::new(Vec::new()),
         }
     }
 
-    pub fn lease_id(&self) -> i64 { self.lease_id }
-    pub fn ttl_secs(&self) -> i64 { self.ttl_secs }
-    pub fn is_done(&self) -> bool { *self.done.lock().unwrap() }
+    pub fn lease_id(&self) -> i64 {
+        self.lease_id
+    }
+    pub fn ttl_secs(&self) -> i64 {
+        self.ttl_secs
+    }
+    pub fn is_done(&self) -> bool {
+        *self.done.lock().unwrap()
+    }
 
     /// Register a hook to run when [`Self::done`] is called.
     pub fn on_expire(&self, hook: impl Fn(i64) + Send + Sync + 'static) {
@@ -77,12 +84,16 @@ impl Session {
     /// End the session — fires every registered hook in registration order.
     pub fn done(&self) -> Result<(), SessionError> {
         let mut d = self.done.lock().unwrap();
-        if *d { return Err(SessionError::SessionDone); }
+        if *d {
+            return Err(SessionError::SessionDone);
+        }
         *d = true;
         let hooks = std::mem::take(&mut *self.expire_hooks.lock().unwrap());
         let id = self.lease_id;
         drop(d);
-        for h in hooks { h(id); }
+        for h in hooks {
+            h(id);
+        }
         Ok(())
     }
 }
@@ -105,14 +116,19 @@ struct BarrierState {
 
 impl Barrier {
     pub fn new(target: usize) -> Self {
-        Self { target, state: Mutex::new(BarrierState::default()) }
+        Self {
+            target,
+            state: Mutex::new(BarrierState::default()),
+        }
     }
 
     /// Place the barrier in the held state.  Returns `BarrierAlreadyHeld`
     /// if it's already held.  Mirrors etcd's `Barrier.Hold`.
     pub fn hold(&self) -> Result<(), SessionError> {
         let mut s = self.state.lock().unwrap();
-        if s.held { return Err(SessionError::BarrierAlreadyHeld); }
+        if s.held {
+            return Err(SessionError::BarrierAlreadyHeld);
+        }
         s.held = true;
         Ok(())
     }
@@ -120,7 +136,9 @@ impl Barrier {
     /// Release the barrier — every queued/future `wait()` returns Ok.
     pub fn release(&self) -> Result<(), SessionError> {
         let mut s = self.state.lock().unwrap();
-        if !s.held { return Err(SessionError::BarrierNotHeld); }
+        if !s.held {
+            return Err(SessionError::BarrierNotHeld);
+        }
         s.held = false;
         Ok(())
     }
@@ -137,8 +155,12 @@ impl Barrier {
         false
     }
 
-    pub fn waiters(&self) -> usize { self.state.lock().unwrap().waiters }
-    pub fn is_held(&self) -> bool { self.state.lock().unwrap().held }
+    pub fn waiters(&self) -> usize {
+        self.state.lock().unwrap().waiters
+    }
+    pub fn is_held(&self) -> bool {
+        self.state.lock().unwrap().held
+    }
 }
 
 // ── PriorityQueue ────────────────────────────────────────────────────────
@@ -159,7 +181,12 @@ pub struct PriorityQueue {
 }
 
 impl PriorityQueue {
-    pub fn new() -> Self { Self { next: AtomicU64::new(0), inner: Mutex::new(BTreeMap::new()) } }
+    pub fn new() -> Self {
+        Self {
+            next: AtomicU64::new(0),
+            inner: Mutex::new(BTreeMap::new()),
+        }
+    }
 
     pub fn enqueue(&self, priority: u64, value: Vec<u8>) -> u64 {
         let seq = self.next.fetch_add(1, Ordering::SeqCst);
@@ -171,21 +198,38 @@ impl PriorityQueue {
         let mut q = self.inner.lock().unwrap();
         let key = q.keys().next().cloned().ok_or(SessionError::QueueEmpty)?;
         let value = q.remove(&key).unwrap();
-        Ok(PqItem { priority: key.0, enqueued_at: key.1, value })
-    }
-
-    pub fn peek(&self) -> Option<PqItem> {
-        self.inner.lock().unwrap().iter().next().map(|((p, e), v)| PqItem {
-            priority: *p, enqueued_at: *e, value: v.clone(),
+        Ok(PqItem {
+            priority: key.0,
+            enqueued_at: key.1,
+            value,
         })
     }
 
-    pub fn len(&self) -> usize { self.inner.lock().unwrap().len() }
-    pub fn is_empty(&self) -> bool { self.len() == 0 }
+    pub fn peek(&self) -> Option<PqItem> {
+        self.inner
+            .lock()
+            .unwrap()
+            .iter()
+            .next()
+            .map(|((p, e), v)| PqItem {
+                priority: *p,
+                enqueued_at: *e,
+                value: v.clone(),
+            })
+    }
+
+    pub fn len(&self) -> usize {
+        self.inner.lock().unwrap().len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl Default for PriorityQueue {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── STM ──────────────────────────────────────────────────────────────────
@@ -221,7 +265,10 @@ impl StmStore {
 
     pub fn put_unchecked(&self, key: &str, value: Vec<u8>) {
         let mut s = self.state.lock().unwrap();
-        let entry = s.entry(key.to_string()).or_insert(VersionedValue { value: vec![], version: 0 });
+        let entry = s.entry(key.to_string()).or_insert(VersionedValue {
+            value: vec![],
+            version: 0,
+        });
         entry.value = value;
         entry.version += 1;
     }
@@ -232,15 +279,25 @@ impl StmStore {
 
     /// Open a new transaction.
     pub fn begin(&self) -> StmTxn<'_> {
-        StmTxn { store: self, reads: HashMap::new(), writes: HashMap::new() }
+        StmTxn {
+            store: self,
+            reads: HashMap::new(),
+            writes: HashMap::new(),
+        }
     }
 
-    pub fn commits(&self) -> u64 { self.commits.load(Ordering::SeqCst) }
-    pub fn conflicts(&self) -> u64 { self.conflicts.load(Ordering::SeqCst) }
+    pub fn commits(&self) -> u64 {
+        self.commits.load(Ordering::SeqCst)
+    }
+    pub fn conflicts(&self) -> u64 {
+        self.conflicts.load(Ordering::SeqCst)
+    }
 }
 
 impl Default for StmStore {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// One in-flight STM transaction.
@@ -253,7 +310,9 @@ pub struct StmTxn<'a> {
 impl StmTxn<'_> {
     /// Read a key — caches the version so commit can detect changes.
     pub fn get(&mut self, key: &str) -> Option<Vec<u8>> {
-        if let Some(buf) = self.writes.get(key) { return Some(buf.clone()); }
+        if let Some(buf) = self.writes.get(key) {
+            return Some(buf.clone());
+        }
         let s = self.store.state.lock().unwrap();
         let entry = s.get(key)?;
         let v = entry.value.clone();
@@ -282,7 +341,10 @@ impl StmTxn<'_> {
         }
         // Apply writes atomically.
         for (k, v) in self.writes.iter() {
-            let entry = s.entry(k.clone()).or_insert(VersionedValue { value: vec![], version: 0 });
+            let entry = s.entry(k.clone()).or_insert(VersionedValue {
+                value: vec![],
+                version: 0,
+            });
             entry.value = v.clone();
             entry.version += 1;
         }
@@ -293,8 +355,12 @@ impl StmTxn<'_> {
     /// Abort without committing.
     pub fn abort(self) {}
 
-    pub fn reads(&self) -> &HashMap<String, u64> { &self.reads }
-    pub fn writes(&self) -> &HashMap<String, Vec<u8>> { &self.writes }
+    pub fn reads(&self) -> &HashMap<String, u64> {
+        &self.reads
+    }
+    pub fn writes(&self) -> &HashMap<String, Vec<u8>> {
+        &self.writes
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -304,8 +370,8 @@ impl StmTxn<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicUsize;
+    use std::sync::Arc;
 
     // ── Session ───────────────────────────────────────────────────────
 
@@ -386,7 +452,7 @@ mod tests {
         let b = Barrier::new(3);
         assert!(!b.wait()); // 1
         assert!(!b.wait()); // 2
-        assert!(b.wait());  // 3 — trips
+        assert!(b.wait()); // 3 — trips
     }
 
     #[test]
@@ -400,7 +466,9 @@ mod tests {
     #[test]
     fn test_barrier_waiters_counter() {
         let b = Barrier::new(10);
-        for _ in 0..3 { b.wait(); }
+        for _ in 0..3 {
+            b.wait();
+        }
         assert_eq!(b.waiters(), 3);
     }
 
@@ -536,7 +604,10 @@ mod tests {
     fn test_stm_commit_counter() {
         // cite: stm.go metrics: stm_commit_total
         let s = StmStore::new();
-        for _ in 0..3 { let t = s.begin(); t.commit().unwrap(); }
+        for _ in 0..3 {
+            let t = s.begin();
+            t.commit().unwrap();
+        }
         assert_eq!(s.commits(), 3);
     }
 

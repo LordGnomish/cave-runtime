@@ -21,7 +21,7 @@ pub mod manifest;
 pub mod types;
 
 pub use calculator::{FsResolver, ParityCalculator};
-pub use discover::{discover_workspace, DiscoveredReport};
+pub use discover::{DiscoveredReport, discover_workspace};
 pub use manifest::ParityManifest;
 pub use types::{GapItem, GapKind, ParityMetric, ParityReport};
 

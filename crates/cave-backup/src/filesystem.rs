@@ -75,8 +75,7 @@ mod tests {
     #[test]
     fn complete_fs_backup_sets_completed() {
         let backup_id = Uuid::new_v4();
-        let mut job =
-            create_fs_backup_job(backup_id, FsBackupMethod::Kopia, "ns", "pod", "vol");
+        let mut job = create_fs_backup_job(backup_id, FsBackupMethod::Kopia, "ns", "pod", "vol");
         complete_fs_backup(&mut job, "snap-abc123".into(), 2048);
         assert_eq!(job.phase, BackupPhase::Completed);
         assert_eq!(job.snapshot_id.as_deref(), Some("snap-abc123"));

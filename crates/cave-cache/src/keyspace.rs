@@ -35,7 +35,9 @@ pub async fn keyspace_notification_task(
                 let should_notify = flags.all
                     || match event_type.as_str() {
                         "set" | "get" | "del" | "expire" | "rename" | "lpush" | "rpush"
-                        | "lpop" | "rpop" | "incr" | "decr" | "append" | "getset" => flags.generic || flags.string || flags.list,
+                        | "lpop" | "rpop" | "incr" | "decr" | "append" | "getset" => {
+                            flags.generic || flags.string || flags.list
+                        }
                         "expired" => flags.expired,
                         "evicted" => flags.evicted,
                         _ => flags.generic,
@@ -49,7 +51,11 @@ pub async fn keyspace_notification_task(
 
                 // Keyspace channel: __keyspace@{db}__:{key}
                 if flags.keyspace || flags.all {
-                    let channel = format!("__keyspace@{}__:{}", event.db, String::from_utf8_lossy(&event.key));
+                    let channel = format!(
+                        "__keyspace@{}__:{}",
+                        event.db,
+                        String::from_utf8_lossy(&event.key)
+                    );
                     registry.publish(channel.as_bytes(), event.event.as_bytes());
                 }
 

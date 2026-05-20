@@ -2,14 +2,17 @@
 // Copyright 2026 Cave Runtime contributors
 //! Integration tests for cave-secrets public surface.
 
-use cave_secrets::detector::{builtin_detectors, scan, shannon_entropy, Severity};
+use cave_secrets::detector::{Severity, builtin_detectors, scan, shannon_entropy};
 
 #[test]
 fn integration_scan_aws_then_filter_by_severity() {
     let dets = builtin_detectors();
     let content = "AWS_KEY=AKIAIOSFODNN7EXAMPLE";
     let findings = scan(content, "creds.env", &dets);
-    let crit: Vec<_> = findings.iter().filter(|f| f.severity == Severity::Critical).collect();
+    let crit: Vec<_> = findings
+        .iter()
+        .filter(|f| f.severity == Severity::Critical)
+        .collect();
     assert!(!crit.is_empty());
 }
 
@@ -69,7 +72,10 @@ fn integration_finding_line_numbers_one_indexed() {
     let dets = builtin_detectors();
     let content = "x\ny\nAKIAIOSFODNN7EXAMPLE\n";
     let findings = scan(content, "f.env", &dets);
-    let aws = findings.iter().find(|f| f.detector == "aws-access-key").unwrap();
+    let aws = findings
+        .iter()
+        .find(|f| f.detector == "aws-access-key")
+        .unwrap();
     assert_eq!(aws.line, 3);
 }
 
@@ -78,7 +84,10 @@ fn integration_redaction_keeps_short_lines_intact() {
     // Input shorter than 20 chars should not be redacted with ellipsis.
     let dets = builtin_detectors();
     let findings = scan("-----BEGIN RSA PRIVATE KEY-----", "id_rsa", &dets);
-    let pk = findings.iter().find(|f| f.detector == "private-key").unwrap();
+    let pk = findings
+        .iter()
+        .find(|f| f.detector == "private-key")
+        .unwrap();
     // 31 chars => above threshold, will be redacted; ensure ellipsis exists.
     assert!(pk.matched.contains("...") || pk.matched.len() <= 20);
 }
@@ -87,7 +96,8 @@ fn integration_redaction_keeps_short_lines_intact() {
 fn integration_entropy_detector_does_not_double_fire_on_clean_long_lines() {
     let dets = builtin_detectors();
     // Long but clearly-readable English text — should not fire entropy detector.
-    let content = "this is a normal long sentence that should not trigger the entropy heuristic at all";
+    let content =
+        "this is a normal long sentence that should not trigger the entropy heuristic at all";
     let findings = scan(content, "doc.txt", &dets);
     assert!(findings.iter().all(|f| f.detector != "high-entropy"));
 }

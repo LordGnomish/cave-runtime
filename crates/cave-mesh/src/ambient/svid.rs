@@ -21,7 +21,10 @@ pub enum SvidError {
     #[error("SPIFFE ID {0} must follow `spiffe://<td>/ns/<ns>/sa/<sa>`")]
     BadShape(String),
     #[error("CSR principal {csr_principal} does not match enrolment principal {enrol_principal}")]
-    PrincipalMismatch { csr_principal: String, enrol_principal: String },
+    PrincipalMismatch {
+        csr_principal: String,
+        enrol_principal: String,
+    },
     #[error("tenant {tenant} not authorised to enrol {principal}")]
     TenantDenied { tenant: TenantId, principal: String },
     #[error("requested TTL {requested_secs}s exceeds issuer max {max_secs}s")]
@@ -38,7 +41,9 @@ pub struct SpiffeId {
 
 impl SpiffeId {
     pub fn parse(s: &str) -> Result<Self, SvidError> {
-        let rest = s.strip_prefix("spiffe://").ok_or_else(|| SvidError::BadScheme(s.into()))?;
+        let rest = s
+            .strip_prefix("spiffe://")
+            .ok_or_else(|| SvidError::BadScheme(s.into()))?;
         let mut parts = rest.splitn(2, '/');
         let trust_domain = parts.next().unwrap_or("");
         if trust_domain.is_empty() {
@@ -195,11 +200,7 @@ mod tests {
 
     #[test]
     fn issues_svid_for_matching_principal_and_ttl() {
-        let (_cite, _t) = ambient_test_ctx!(
-            "security/pkg/pki/ca/ca.go",
-            "IstioCA.Sign",
-            "acme"
-        );
+        let (_cite, _t) = ambient_test_ctx!("security/pkg/pki/ca/ca.go", "IstioCA.Sign", "acme");
         let now = Utc::now();
         let svid = issuer("acme")
             .issue(
@@ -219,11 +220,7 @@ mod tests {
 
     #[test]
     fn principal_mismatch_blocks_issuance() {
-        let (_cite, _t) = ambient_test_ctx!(
-            "security/pkg/pki/ca/ca.go",
-            "verifyPrincipal",
-            "acme"
-        );
+        let (_cite, _t) = ambient_test_ctx!("security/pkg/pki/ca/ca.go", "verifyPrincipal", "acme");
         let err = issuer("acme")
             .issue(
                 &EnrolRequest {
@@ -260,11 +257,7 @@ mod tests {
 
     #[test]
     fn ttl_above_issuer_max_is_clamped_to_error() {
-        let (_cite, _t) = ambient_test_ctx!(
-            "security/pkg/pki/ca/ca.go",
-            "IstioCA.Sign",
-            "acme"
-        );
+        let (_cite, _t) = ambient_test_ctx!("security/pkg/pki/ca/ca.go", "IstioCA.Sign", "acme");
         let err = issuer("acme")
             .issue(
                 &EnrolRequest {

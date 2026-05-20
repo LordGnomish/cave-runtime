@@ -7,14 +7,14 @@
 //! (bsonspec.org). All tests run against the in-memory engine — no mongod
 //! required.
 
-use cave_docdb::bson::{decode_doc, encode_doc, Document};
+use cave_docdb::bson::{Document, decode_doc, encode_doc};
 use cave_docdb::cursor::{Cursor, CursorStore};
 use cave_docdb::engine::Engine;
 use cave_docdb::index::Index;
 use cave_docdb::projection::apply_projection;
 use cave_docdb::query::{matches_query, matches_value};
 use cave_docdb::update::apply_update;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -54,7 +54,10 @@ fn bson_round_trip_int32() {
 fn bson_round_trip_int64_large_value() {
     let original = doc(&[("big", json!(10_000_000_000_i64))]);
     let decoded = decode_doc(&encode_doc(&original).unwrap()).unwrap();
-    assert_eq!(decoded.get("big").and_then(|v| v.as_i64()), Some(10_000_000_000_i64));
+    assert_eq!(
+        decoded.get("big").and_then(|v| v.as_i64()),
+        Some(10_000_000_000_i64)
+    );
 }
 
 #[test]
@@ -129,8 +132,14 @@ fn query_eq_operator() {
 #[test]
 fn query_ne_operator() {
     let d = doc(&[("status", json!("active"))]);
-    assert!(matches_query(&d, &doc(&[("status", op("$ne", json!("inactive")))])));
-    assert!(!matches_query(&d, &doc(&[("status", op("$ne", json!("active")))])));
+    assert!(matches_query(
+        &d,
+        &doc(&[("status", op("$ne", json!("inactive")))])
+    ));
+    assert!(!matches_query(
+        &d,
+        &doc(&[("status", op("$ne", json!("active")))])
+    ));
 }
 
 #[test]
@@ -187,30 +196,21 @@ fn query_regex_operator() {
 #[test]
 fn query_and_operator_all_must_match() {
     let d = doc(&[("age", json!(25)), ("status", json!("active"))]);
-    let q = doc(&[(
-        "$and",
-        json!([{"age": 25}, {"status": "active"}]),
-    )]);
+    let q = doc(&[("$and", json!([{"age": 25}, {"status": "active"}]))]);
     assert!(matches_query(&d, &q));
 }
 
 #[test]
 fn query_and_short_circuits_on_mismatch() {
     let d = doc(&[("age", json!(25)), ("status", json!("active"))]);
-    let q = doc(&[(
-        "$and",
-        json!([{"age": 25}, {"status": "banned"}]),
-    )]);
+    let q = doc(&[("$and", json!([{"age": 25}, {"status": "banned"}]))]);
     assert!(!matches_query(&d, &q));
 }
 
 #[test]
 fn query_or_operator_any_match() {
     let d = doc(&[("status", json!("active"))]);
-    let q = doc(&[(
-        "$or",
-        json!([{"status": "banned"}, {"status": "active"}]),
-    )]);
+    let q = doc(&[("$or", json!([{"status": "banned"}, {"status": "active"}]))]);
     assert!(matches_query(&d, &q));
 }
 
@@ -296,7 +296,11 @@ fn update_add_to_set_avoids_duplicates() {
 #[test]
 fn update_rename_moves_field() {
     let mut d = doc(&[("_id", json!("1")), ("old_name", json!("v"))]);
-    apply_update(&mut d, &doc(&[("$rename", json!({"old_name": "new_name"}))])).unwrap();
+    apply_update(
+        &mut d,
+        &doc(&[("$rename", json!({"old_name": "new_name"}))]),
+    )
+    .unwrap();
     assert!(!d.contains_key("old_name"));
     assert_eq!(d.get("new_name"), Some(&json!("v")));
 }
@@ -362,7 +366,10 @@ async fn engine_create_database_and_collection() {
     let engine = Engine::new();
     let db = engine.get_or_create_database("app").await;
     let col = db.get_or_create_collection("users").await;
-    let _ = col.insert_one(doc(&[("name", json!("alice"))])).await.unwrap();
+    let _ = col
+        .insert_one(doc(&[("name", json!("alice"))]))
+        .await
+        .unwrap();
     let stats = col.stats().await.unwrap();
     assert_eq!(stats.document_count, 1);
 }
@@ -407,10 +414,16 @@ async fn collection_auto_assigns_id_when_missing() {
         .await
         .get_or_create_collection("c")
         .await;
-    let id = col.insert_one(doc(&[("name", json!("no-id"))])).await.unwrap();
+    let id = col
+        .insert_one(doc(&[("name", json!("no-id"))]))
+        .await
+        .unwrap();
     assert!(!id.is_empty());
     let found = col.find(None).await.unwrap();
-    assert_eq!(found[0].get("_id").and_then(|v| v.as_str()), Some(id.as_str()));
+    assert_eq!(
+        found[0].get("_id").and_then(|v| v.as_str()),
+        Some(id.as_str())
+    );
 }
 
 #[tokio::test]
@@ -440,8 +453,12 @@ async fn collection_find_with_filter() {
         .await
         .get_or_create_collection("c")
         .await;
-    col.insert_one(doc(&[("status", json!("active"))])).await.unwrap();
-    col.insert_one(doc(&[("status", json!("inactive"))])).await.unwrap();
+    col.insert_one(doc(&[("status", json!("active"))]))
+        .await
+        .unwrap();
+    col.insert_one(doc(&[("status", json!("inactive"))]))
+        .await
+        .unwrap();
     let active = col
         .find(Some(&doc(&[("status", json!("active"))])))
         .await
@@ -472,7 +489,9 @@ async fn collection_update_many_with_set() {
         .get_or_create_collection("c")
         .await;
     for _ in 0..3 {
-        col.insert_one(doc(&[("status", json!("pending"))])).await.unwrap();
+        col.insert_one(doc(&[("status", json!("pending"))]))
+            .await
+            .unwrap();
     }
     let updated = col
         .update_many(None, &doc(&[("$set", json!({"status": "done"}))]))
@@ -535,7 +554,9 @@ async fn collection_drop_clears_data_and_indexes() {
     col.insert_one(doc(&[("a", json!(1))])).await.unwrap();
     let mut keys = BTreeMap::new();
     keys.insert("a".into(), 1);
-    col.add_index(Index::new("idx_a".into(), keys, false)).await.unwrap();
+    col.add_index(Index::new("idx_a".into(), keys, false))
+        .await
+        .unwrap();
     col.drop().await.unwrap();
     let stats = col.stats().await.unwrap();
     assert_eq!(stats.document_count, 0);
@@ -585,9 +606,7 @@ async fn database_drop_clears_all_collections() {
 
 #[tokio::test]
 async fn cursor_batches_documents() {
-    let docs: Vec<Document> = (0..10)
-        .map(|i| doc(&[("n", json!(i))]))
-        .collect();
+    let docs: Vec<Document> = (0..10).map(|i| doc(&[("n", json!(i))])).collect();
     let mut cur = Cursor::new(1, "ns".into(), docs, 3);
     let b1 = cur.next_batch();
     assert_eq!(b1.len(), 3);
@@ -604,7 +623,9 @@ async fn cursor_batches_documents() {
 #[tokio::test]
 async fn cursor_store_create_get_kill() {
     let store = CursorStore::new();
-    let id = store.create("ns".into(), vec![doc(&[("a", json!(1))])], 10).await;
+    let id = store
+        .create("ns".into(), vec![doc(&[("a", json!(1))])], 10)
+        .await;
     let len = store.get_mut(id, |c| c.documents.len()).await;
     assert_eq!(len, Some(1));
     assert!(store.kill(id).await);

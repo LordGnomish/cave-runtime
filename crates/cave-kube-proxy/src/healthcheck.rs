@@ -39,7 +39,8 @@ impl HealthCheckServer {
     /// services no longer present are dropped from the table.
     pub fn sync_services(&mut self, new_services: HashMap<ServicePortName, u16>) {
         self.services = new_services;
-        self.endpoint_counts.retain(|svc, _| self.services.contains_key(svc));
+        self.endpoint_counts
+            .retain(|svc, _| self.services.contains_key(svc));
     }
 
     /// Cite: `pkg/proxy/healthcheck/service_health.go:274`

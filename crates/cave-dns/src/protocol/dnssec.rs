@@ -12,11 +12,7 @@ use crate::error::{DnsError, DnsResult};
 
 /// Verify that the RRSIG record in `rrsig` correctly covers `rrset` using
 /// the DNSKEY records supplied.
-pub fn validate_rrset(
-    _rrset: &[Record],
-    rrsig: &Record,
-    _dnskeys: &[Record],
-) -> DnsResult<()> {
+pub fn validate_rrset(_rrset: &[Record], rrsig: &Record, _dnskeys: &[Record]) -> DnsResult<()> {
     if rrsig.record_type() != RecordType::RRSIG {
         return Err(DnsError::Dnssec("expected RRSIG record".into()));
     }
@@ -73,14 +69,17 @@ impl DnssecConfig {
 /// Check whether the message's DNSSEC OK bit requests DNSSEC records.
 #[inline]
 pub fn dnssec_requested(msg: &hickory_proto::op::Message) -> bool {
-    msg.extensions().as_ref().map(|e| e.dnssec_ok()).unwrap_or(false)
+    msg.extensions()
+        .as_ref()
+        .map(|e| e.dnssec_ok())
+        .unwrap_or(false)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hickory_proto::rr::{DNSClass, Name, RData, Record, RecordType};
     use hickory_proto::rr::rdata::A;
+    use hickory_proto::rr::{DNSClass, Name, RData, Record, RecordType};
     use std::net::Ipv4Addr;
 
     fn dummy_a_record() -> Record {

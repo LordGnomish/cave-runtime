@@ -20,7 +20,10 @@ pub struct Target {
 
 impl Target {
     pub fn new(address: impl Into<String>) -> Self {
-        Self { address: address.into(), labels: HashMap::new() }
+        Self {
+            address: address.into(),
+            labels: HashMap::new(),
+        }
     }
 
     pub fn with_label(mut self, k: impl Into<String>, v: impl Into<String>) -> Self {
@@ -45,7 +48,9 @@ pub fn parse_hetzner_servers(json: &str, scrape_port: u16) -> Vec<Target> {
         let (id, after_id) = read_number(bytes, pos + 5);
         i = after_id;
         if let Some(id_v) = id {
-            server.labels.insert("__meta_hetzner_server_id".into(), id_v.to_string());
+            server
+                .labels
+                .insert("__meta_hetzner_server_id".into(), id_v.to_string());
         }
         // name
         if let Some(n) = read_string_after_key(bytes, i, b"\"name\":") {
@@ -53,12 +58,16 @@ pub fn parse_hetzner_servers(json: &str, scrape_port: u16) -> Vec<Target> {
         }
         // status
         if let Some(s) = read_string_after_key(bytes, i, b"\"status\":") {
-            server.labels.insert("__meta_hetzner_server_status".into(), s);
+            server
+                .labels
+                .insert("__meta_hetzner_server_status".into(), s);
         }
         // ipv4 ip
         if let Some(ip) = read_string_after_key(bytes, i, b"\"ip\":") {
             server.address = format!("{}:{}", ip, scrape_port);
-            server.labels.insert("__meta_hetzner_public_ipv4".into(), ip);
+            server
+                .labels
+                .insert("__meta_hetzner_public_ipv4".into(), ip);
         }
         // datacenter name (search a window for the inner name)
         if let Some(dc) = read_string_after_key(bytes, i, b"\"datacenter\":") {
@@ -129,7 +138,13 @@ fn find_subslice(hay: &[u8], from: usize, needle: &[u8]) -> Option<usize> {
 }
 
 fn skip_whitespace(hay: &[u8], mut i: usize) -> usize {
-    while i < hay.len() && (hay[i] == b' ' || hay[i] == b'\t' || hay[i] == b'\n' || hay[i] == b'\r' || hay[i] == b':') {
+    while i < hay.len()
+        && (hay[i] == b' '
+            || hay[i] == b'\t'
+            || hay[i] == b'\n'
+            || hay[i] == b'\r'
+            || hay[i] == b':')
+    {
         i += 1;
     }
     i
@@ -150,7 +165,9 @@ fn read_string_after_key(hay: &[u8], from: usize, key: &[u8]) -> Option<String> 
             i += 1;
         }
     }
-    if i > hay.len() { return None; }
+    if i > hay.len() {
+        return None;
+    }
     Some(String::from_utf8_lossy(&hay[start..i]).to_string())
 }
 
@@ -189,10 +206,34 @@ mod tests {
             "public_net":{"ipv4":{"ip":"203.0.113.5"}},
             "datacenter":"hel1-dc2"}]}"#;
         let ts = parse_hetzner_servers(body, 9100);
-        assert_eq!(ts[0].labels.get("__meta_hetzner_server_id").map(String::as_str), Some("7"));
-        assert_eq!(ts[0].labels.get("__meta_hetzner_server_name").map(String::as_str), Some("db-1"));
-        assert_eq!(ts[0].labels.get("__meta_hetzner_server_status").map(String::as_str), Some("running"));
-        assert_eq!(ts[0].labels.get("__meta_hetzner_datacenter").map(String::as_str), Some("hel1-dc2"));
+        assert_eq!(
+            ts[0]
+                .labels
+                .get("__meta_hetzner_server_id")
+                .map(String::as_str),
+            Some("7")
+        );
+        assert_eq!(
+            ts[0]
+                .labels
+                .get("__meta_hetzner_server_name")
+                .map(String::as_str),
+            Some("db-1")
+        );
+        assert_eq!(
+            ts[0]
+                .labels
+                .get("__meta_hetzner_server_status")
+                .map(String::as_str),
+            Some("running")
+        );
+        assert_eq!(
+            ts[0]
+                .labels
+                .get("__meta_hetzner_datacenter")
+                .map(String::as_str),
+            Some("hel1-dc2")
+        );
     }
 
     #[test]
@@ -222,8 +263,14 @@ mod tests {
         let ts = parse_azure_vms(body, 9100);
         assert_eq!(ts.len(), 1);
         assert_eq!(ts[0].address, "10.20.30.40:9100");
-        assert_eq!(ts[0].labels.get("__meta_azure_region").map(String::as_str), Some("westeurope"));
-        assert_eq!(ts[0].labels.get("__meta_azure_vm_size").map(String::as_str), Some("Standard_D2s_v5"));
+        assert_eq!(
+            ts[0].labels.get("__meta_azure_region").map(String::as_str),
+            Some("westeurope")
+        );
+        assert_eq!(
+            ts[0].labels.get("__meta_azure_vm_size").map(String::as_str),
+            Some("Standard_D2s_v5")
+        );
     }
 
     #[test]

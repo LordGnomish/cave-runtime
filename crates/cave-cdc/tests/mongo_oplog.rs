@@ -13,8 +13,10 @@ const TENANT: &str = "tenant-acme-prod";
 #[test]
 fn oplog_op_byte_codes_round_trip() {
     for (s, op) in [
-        ("i", OplogOp::Insert),  ("u", OplogOp::Update),
-        ("d", OplogOp::Delete),  ("c", OplogOp::Command),
+        ("i", OplogOp::Insert),
+        ("u", OplogOp::Update),
+        ("d", OplogOp::Delete),
+        ("c", OplogOp::Command),
         ("n", OplogOp::Noop),
     ] {
         let parsed = OplogOp::from_str(s).unwrap();

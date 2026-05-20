@@ -5,11 +5,11 @@
 //! upstream: https://github.com/keycloak/keycloak/blob/v22.0.0/services/src/main/java/org/keycloak/services/resources/admin/UsersResource.java
 
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::{StatusCode, header},
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -180,12 +180,24 @@ impl UserStore {
         let user = store
             .get_mut(&(realm_id.to_string(), id))
             .ok_or("not_found")?;
-        if let Some(v) = req.email { user.email = Some(v); }
-        if let Some(v) = req.email_verified { user.email_verified = v; }
-        if let Some(v) = req.first_name { user.first_name = Some(v); }
-        if let Some(v) = req.last_name { user.last_name = Some(v); }
-        if let Some(v) = req.enabled { user.enabled = v; }
-        if let Some(v) = req.attributes { user.attributes = v; }
+        if let Some(v) = req.email {
+            user.email = Some(v);
+        }
+        if let Some(v) = req.email_verified {
+            user.email_verified = v;
+        }
+        if let Some(v) = req.first_name {
+            user.first_name = Some(v);
+        }
+        if let Some(v) = req.last_name {
+            user.last_name = Some(v);
+        }
+        if let Some(v) = req.enabled {
+            user.enabled = v;
+        }
+        if let Some(v) = req.attributes {
+            user.attributes = v;
+        }
         Ok(user.clone())
     }
 
@@ -222,7 +234,11 @@ pub async fn create_user(
     Json(req): Json<CreateUserRequest>,
 ) -> impl IntoResponse {
     if state.realms.get(&realm).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"realm not found"}))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"realm not found"})),
+        )
+            .into_response();
     }
     match state.users.create(&realm, req).await {
         Ok(u) => {
@@ -249,7 +265,11 @@ pub async fn list_users(
     Query(q): Query<SearchQuery>,
 ) -> impl IntoResponse {
     if state.realms.get(&realm).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"realm not found"}))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"realm not found"})),
+        )
+            .into_response();
     }
     let users = state.users.list(&realm, q.search.as_deref()).await;
     (StatusCode::OK, Json(users)).into_response()
@@ -260,11 +280,19 @@ pub async fn get_user(
     Path((realm, id)): Path<(String, Uuid)>,
 ) -> impl IntoResponse {
     if state.realms.get(&realm).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"realm not found"}))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"realm not found"})),
+        )
+            .into_response();
     }
     match state.users.get(&realm, id).await {
         Some(u) => (StatusCode::OK, Json(serde_json::to_value(u).unwrap())).into_response(),
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"user not found"}))).into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"user not found"})),
+        )
+            .into_response(),
     }
 }
 
@@ -274,11 +302,19 @@ pub async fn update_user(
     Json(req): Json<UpdateUserRequest>,
 ) -> impl IntoResponse {
     if state.realms.get(&realm).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"realm not found"}))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"realm not found"})),
+        )
+            .into_response();
     }
     match state.users.update(&realm, id, req).await {
         Ok(_) => StatusCode::NO_CONTENT.into_response(),
-        Err("not_found") => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"user not found"}))).into_response(),
+        Err("not_found") => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"user not found"})),
+        )
+            .into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 }
@@ -288,12 +324,20 @@ pub async fn delete_user(
     Path((realm, id)): Path<(String, Uuid)>,
 ) -> impl IntoResponse {
     if state.realms.get(&realm).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"realm not found"}))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"realm not found"})),
+        )
+            .into_response();
     }
     if state.users.delete(&realm, id).await {
         StatusCode::NO_CONTENT.into_response()
     } else {
-        (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"user not found"}))).into_response()
+        (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"user not found"})),
+        )
+            .into_response()
     }
 }
 
@@ -302,8 +346,14 @@ pub async fn delete_user(
 pub fn router(users: UserStore, realms: RealmStore) -> Router {
     let state = UserAppState { users, realms };
     Router::new()
-        .route("/admin/realms/{realm}/users", post(create_user).get(list_users))
-        .route("/admin/realms/{realm}/users/{id}", get(get_user).put(update_user).delete(delete_user))
+        .route(
+            "/admin/realms/{realm}/users",
+            post(create_user).get(list_users),
+        )
+        .route(
+            "/admin/realms/{realm}/users/{id}",
+            get(get_user).put(update_user).delete(delete_user),
+        )
         .with_state(state)
 }
 
@@ -337,7 +387,9 @@ mod tests {
     }
 
     async fn body_json(resp: axum::response::Response) -> Value {
-        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         serde_json::from_slice(&bytes).unwrap_or(Value::Null)
     }
 
@@ -378,10 +430,31 @@ mod tests {
         let app = router(users, realms);
         let payload = user_payload("bob");
 
-        let r1 = app.clone().oneshot(Request::builder().method("POST").uri("/admin/realms/testrealm/users").header("content-type", "application/json").body(Body::from(payload.clone())).unwrap()).await.unwrap();
+        let r1 = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/admin/realms/testrealm/users")
+                    .header("content-type", "application/json")
+                    .body(Body::from(payload.clone()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(r1.status(), StatusCode::CREATED);
 
-        let r2 = app.oneshot(Request::builder().method("POST").uri("/admin/realms/testrealm/users").header("content-type", "application/json").body(Body::from(payload)).unwrap()).await.unwrap();
+        let r2 = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/admin/realms/testrealm/users")
+                    .header("content-type", "application/json")
+                    .body(Body::from(payload))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(r2.status(), StatusCode::CONFLICT);
     }
 
@@ -389,10 +462,32 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_by_id() {
         let (realms, users) = setup().await;
-        let user = users.create("testrealm", CreateUserRequest { username: "charlie".to_string(), email: None, email_verified: None, first_name: None, last_name: None, enabled: None, attributes: None, password: None }).await.unwrap();
+        let user = users
+            .create(
+                "testrealm",
+                CreateUserRequest {
+                    username: "charlie".to_string(),
+                    email: None,
+                    email_verified: None,
+                    first_name: None,
+                    last_name: None,
+                    enabled: None,
+                    attributes: None,
+                    password: None,
+                },
+            )
+            .await
+            .unwrap();
         let resp = router(users, realms)
-            .oneshot(Request::builder().method("GET").uri(format!("/admin/realms/testrealm/users/{}", user.id)).body(Body::empty()).unwrap())
-            .await.unwrap();
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(format!("/admin/realms/testrealm/users/{}", user.id))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let body = body_json(resp).await;
         assert_eq!(body["username"], "charlie");
@@ -403,14 +498,49 @@ mod tests {
     async fn test_get_user_cross_realm_denied() {
         let realms = RealmStore::new();
         for r in &["realm-a", "realm-b"] {
-            realms.create(RealmRequest { id: r.to_string(), display_name: None, enabled: None, ssl_required: None, registration_allowed: None, login_with_email_allowed: None, duplicate_emails_allowed: None, access_token_lifespan: None, sso_session_idle_timeout: None }).await.unwrap();
+            realms
+                .create(RealmRequest {
+                    id: r.to_string(),
+                    display_name: None,
+                    enabled: None,
+                    ssl_required: None,
+                    registration_allowed: None,
+                    login_with_email_allowed: None,
+                    duplicate_emails_allowed: None,
+                    access_token_lifespan: None,
+                    sso_session_idle_timeout: None,
+                })
+                .await
+                .unwrap();
         }
         let users = UserStore::new();
-        let user = users.create("realm-a", CreateUserRequest { username: "xuser".to_string(), email: None, email_verified: None, first_name: None, last_name: None, enabled: None, attributes: None, password: None }).await.unwrap();
+        let user = users
+            .create(
+                "realm-a",
+                CreateUserRequest {
+                    username: "xuser".to_string(),
+                    email: None,
+                    email_verified: None,
+                    first_name: None,
+                    last_name: None,
+                    enabled: None,
+                    attributes: None,
+                    password: None,
+                },
+            )
+            .await
+            .unwrap();
 
         let resp = router(users, realms)
-            .oneshot(Request::builder().method("GET").uri(format!("/admin/realms/realm-b/users/{}", user.id)).body(Body::empty()).unwrap())
-            .await.unwrap();
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(format!("/admin/realms/realm-b/users/{}", user.id))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
@@ -418,11 +548,36 @@ mod tests {
     #[tokio::test]
     async fn test_update_user_email() {
         let (realms, users) = setup().await;
-        let user = users.create("testrealm", CreateUserRequest { username: "dave".to_string(), email: Some("old@example.com".to_string()), email_verified: None, first_name: None, last_name: None, enabled: None, attributes: None, password: None }).await.unwrap();
+        let user = users
+            .create(
+                "testrealm",
+                CreateUserRequest {
+                    username: "dave".to_string(),
+                    email: Some("old@example.com".to_string()),
+                    email_verified: None,
+                    first_name: None,
+                    last_name: None,
+                    enabled: None,
+                    attributes: None,
+                    password: None,
+                },
+            )
+            .await
+            .unwrap();
 
         let put_resp = router(users.clone(), realms.clone())
-            .oneshot(Request::builder().method("PUT").uri(format!("/admin/realms/testrealm/users/{}", user.id)).header("content-type", "application/json").body(Body::from(serde_json::json!({"email":"new@example.com"}).to_string())).unwrap())
-            .await.unwrap();
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri(format!("/admin/realms/testrealm/users/{}", user.id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        serde_json::json!({"email":"new@example.com"}).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(put_resp.status(), StatusCode::NO_CONTENT);
         let updated = users.get("testrealm", user.id).await.unwrap();
         assert_eq!(updated.email.as_deref(), Some("new@example.com"));
@@ -432,11 +587,33 @@ mod tests {
     #[tokio::test]
     async fn test_delete_user() {
         let (realms, users) = setup().await;
-        let user = users.create("testrealm", CreateUserRequest { username: "eve".to_string(), email: None, email_verified: None, first_name: None, last_name: None, enabled: None, attributes: None, password: None }).await.unwrap();
+        let user = users
+            .create(
+                "testrealm",
+                CreateUserRequest {
+                    username: "eve".to_string(),
+                    email: None,
+                    email_verified: None,
+                    first_name: None,
+                    last_name: None,
+                    enabled: None,
+                    attributes: None,
+                    password: None,
+                },
+            )
+            .await
+            .unwrap();
 
         let del_resp = router(users.clone(), realms.clone())
-            .oneshot(Request::builder().method("DELETE").uri(format!("/admin/realms/testrealm/users/{}", user.id)).body(Body::empty()).unwrap())
-            .await.unwrap();
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri(format!("/admin/realms/testrealm/users/{}", user.id))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(del_resp.status(), StatusCode::NO_CONTENT);
         assert!(users.get("testrealm", user.id).await.is_none());
     }
@@ -450,17 +627,42 @@ mod tests {
             ("johanna", "johanna@acme.com"),
             ("alice", "alice@acme.com"),
         ] {
-            users.create("testrealm", CreateUserRequest { username: name.to_string(), email: Some(email.to_string()), email_verified: None, first_name: None, last_name: None, enabled: None, attributes: None, password: None }).await.unwrap();
+            users
+                .create(
+                    "testrealm",
+                    CreateUserRequest {
+                        username: name.to_string(),
+                        email: Some(email.to_string()),
+                        email_verified: None,
+                        first_name: None,
+                        last_name: None,
+                        enabled: None,
+                        attributes: None,
+                        password: None,
+                    },
+                )
+                .await
+                .unwrap();
         }
 
         let resp = router(users, realms)
-            .oneshot(Request::builder().method("GET").uri("/admin/realms/testrealm/users?search=joh").body(Body::empty()).unwrap())
-            .await.unwrap();
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/admin/realms/testrealm/users?search=joh")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let body = body_json(resp).await;
         let arr = body.as_array().unwrap();
         assert_eq!(arr.len(), 2);
-        let names: Vec<&str> = arr.iter().map(|u| u["username"].as_str().unwrap()).collect();
+        let names: Vec<&str> = arr
+            .iter()
+            .map(|u| u["username"].as_str().unwrap())
+            .collect();
         assert!(names.contains(&"john"));
         assert!(names.contains(&"johanna"));
         assert!(!names.contains(&"alice"));
@@ -470,13 +672,65 @@ mod tests {
     #[tokio::test]
     async fn test_search_users_by_email() {
         let (realms, users) = setup().await;
-        users.create("testrealm", CreateUserRequest { username: "user1".to_string(), email: Some("user1@example.com".to_string()), email_verified: None, first_name: None, last_name: None, enabled: None, attributes: None, password: None }).await.unwrap();
-        users.create("testrealm", CreateUserRequest { username: "user2".to_string(), email: Some("user2@example.com".to_string()), email_verified: None, first_name: None, last_name: None, enabled: None, attributes: None, password: None }).await.unwrap();
-        users.create("testrealm", CreateUserRequest { username: "user3".to_string(), email: Some("user3@other.org".to_string()), email_verified: None, first_name: None, last_name: None, enabled: None, attributes: None, password: None }).await.unwrap();
+        users
+            .create(
+                "testrealm",
+                CreateUserRequest {
+                    username: "user1".to_string(),
+                    email: Some("user1@example.com".to_string()),
+                    email_verified: None,
+                    first_name: None,
+                    last_name: None,
+                    enabled: None,
+                    attributes: None,
+                    password: None,
+                },
+            )
+            .await
+            .unwrap();
+        users
+            .create(
+                "testrealm",
+                CreateUserRequest {
+                    username: "user2".to_string(),
+                    email: Some("user2@example.com".to_string()),
+                    email_verified: None,
+                    first_name: None,
+                    last_name: None,
+                    enabled: None,
+                    attributes: None,
+                    password: None,
+                },
+            )
+            .await
+            .unwrap();
+        users
+            .create(
+                "testrealm",
+                CreateUserRequest {
+                    username: "user3".to_string(),
+                    email: Some("user3@other.org".to_string()),
+                    email_verified: None,
+                    first_name: None,
+                    last_name: None,
+                    enabled: None,
+                    attributes: None,
+                    password: None,
+                },
+            )
+            .await
+            .unwrap();
 
         let resp = router(users, realms)
-            .oneshot(Request::builder().method("GET").uri("/admin/realms/testrealm/users?search=@example").body(Body::empty()).unwrap())
-            .await.unwrap();
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/admin/realms/testrealm/users?search=@example")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let body = body_json(resp).await;
         assert_eq!(body.as_array().unwrap().len(), 2);
@@ -487,12 +741,34 @@ mod tests {
     async fn test_search_users_empty_query() {
         let (realms, users) = setup().await;
         for name in &["u1", "u2", "u3"] {
-            users.create("testrealm", CreateUserRequest { username: name.to_string(), email: None, email_verified: None, first_name: None, last_name: None, enabled: None, attributes: None, password: None }).await.unwrap();
+            users
+                .create(
+                    "testrealm",
+                    CreateUserRequest {
+                        username: name.to_string(),
+                        email: None,
+                        email_verified: None,
+                        first_name: None,
+                        last_name: None,
+                        enabled: None,
+                        attributes: None,
+                        password: None,
+                    },
+                )
+                .await
+                .unwrap();
         }
 
         let resp = router(users, realms)
-            .oneshot(Request::builder().method("GET").uri("/admin/realms/testrealm/users?search=").body(Body::empty()).unwrap())
-            .await.unwrap();
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/admin/realms/testrealm/users?search=")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let body = body_json(resp).await;
         assert_eq!(body.as_array().unwrap().len(), 3);

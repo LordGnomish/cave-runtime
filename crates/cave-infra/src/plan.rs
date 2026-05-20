@@ -103,11 +103,15 @@ pub fn generate_plan(desired: &[ResourceSpec], store: &ResourceStore) -> InfraRe
                     resource_kind: spec.kind.as_str(),
                     resource_name: spec.name.clone(),
                     reason: "new resource".into(),
-                    diff: spec.properties.iter().map(|(k, v)| FieldDiff {
-                        field: k.clone(),
-                        before: None,
-                        after: Some(v.clone()),
-                    }).collect(),
+                    diff: spec
+                        .properties
+                        .iter()
+                        .map(|(k, v)| FieldDiff {
+                            field: k.clone(),
+                            before: None,
+                            after: Some(v.clone()),
+                        })
+                        .collect(),
                 });
             }
             Ok(current) => {
@@ -134,7 +138,8 @@ pub fn generate_plan(desired: &[ResourceSpec], store: &ResourceStore) -> InfraRe
     }
 
     // Check what needs to be deleted (in store but not in desired)
-    let desired_keys: std::collections::HashSet<String> = desired.iter()
+    let desired_keys: std::collections::HashSet<String> = desired
+        .iter()
         .map(|s| format!("{}/{}", s.kind.as_str(), s.name))
         .collect();
     for state in store.list() {
@@ -144,11 +149,16 @@ pub fn generate_plan(desired: &[ResourceSpec], store: &ResourceStore) -> InfraRe
                 resource_kind: state.spec.kind.as_str(),
                 resource_name: state.spec.name.clone(),
                 reason: "not in desired state".into(),
-                diff: state.spec.properties.iter().map(|(k, v)| FieldDiff {
-                    field: k.clone(),
-                    before: Some(v.clone()),
-                    after: None,
-                }).collect(),
+                diff: state
+                    .spec
+                    .properties
+                    .iter()
+                    .map(|(k, v)| FieldDiff {
+                        field: k.clone(),
+                        before: Some(v.clone()),
+                        after: None,
+                    })
+                    .collect(),
             });
         }
     }

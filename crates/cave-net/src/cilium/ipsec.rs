@@ -103,8 +103,12 @@ pub struct IpsecStore {
 impl IpsecStore {
     pub fn new(tenant: TenantId, mode: IpsecMode, node_ip: IpAddr) -> Self {
         Self {
-            tenant, mode, node_ip,
-            next_spi: 1, sas: HashMap::new(), sps: Vec::new(),
+            tenant,
+            mode,
+            node_ip,
+            next_spi: 1,
+            sas: HashMap::new(),
+            sps: Vec::new(),
             grace_period: 300,
         }
     }
@@ -121,7 +125,15 @@ impl IpsecStore {
     ) -> Result<u32, IpsecError> {
         let spi = self.next_spi;
         self.next_spi += 1;
-        let sa = SecurityAssociation { spi, src, dst, algorithm, key, created: now, lifetime_seconds };
+        let sa = SecurityAssociation {
+            spi,
+            src,
+            dst,
+            algorithm,
+            key,
+            created: now,
+            lifetime_seconds,
+        };
         self.sas.insert(spi, sa);
         Ok(spi)
     }
@@ -138,9 +150,18 @@ impl IpsecStore {
         if self.sas.contains_key(&spi) {
             return Err(IpsecError::SpiCollision(spi));
         }
-        self.sas.insert(spi, SecurityAssociation {
-            spi, src, dst, algorithm, key, created: now, lifetime_seconds: None,
-        });
+        self.sas.insert(
+            spi,
+            SecurityAssociation {
+                spi,
+                src,
+                dst,
+                algorithm,
+                key,
+                created: now,
+                lifetime_seconds: None,
+            },
+        );
         if spi >= self.next_spi {
             self.next_spi = spi + 1;
         }
@@ -185,8 +206,10 @@ impl IpsecStore {
     // ── Security policies ───────────────────────────────────────────────────
 
     pub fn add_policy(&mut self, policy: SecurityPolicy) -> Result<(), IpsecError> {
-        IpNet::from_str(&policy.src_cidr).map_err(|_| IpsecError::BadCidr(policy.src_cidr.clone()))?;
-        IpNet::from_str(&policy.dst_cidr).map_err(|_| IpsecError::BadCidr(policy.dst_cidr.clone()))?;
+        IpNet::from_str(&policy.src_cidr)
+            .map_err(|_| IpsecError::BadCidr(policy.src_cidr.clone()))?;
+        IpNet::from_str(&policy.dst_cidr)
+            .map_err(|_| IpsecError::BadCidr(policy.dst_cidr.clone()))?;
         self.sps.push(policy);
         // Sort descending by priority; first-match wins.
         self.sps.sort_by(|a, b| b.priority.cmp(&a.priority));
@@ -197,8 +220,10 @@ impl IpsecStore {
     /// no policy matches (mirrors upstream "no rule → clear-text").
     pub fn resolve(&self, src: IpAddr, dst: IpAddr) -> Result<SpAction, IpsecError> {
         for sp in &self.sps {
-            let s = IpNet::from_str(&sp.src_cidr).map_err(|_| IpsecError::BadCidr(sp.src_cidr.clone()))?;
-            let d = IpNet::from_str(&sp.dst_cidr).map_err(|_| IpsecError::BadCidr(sp.dst_cidr.clone()))?;
+            let s = IpNet::from_str(&sp.src_cidr)
+                .map_err(|_| IpsecError::BadCidr(sp.src_cidr.clone()))?;
+            let d = IpNet::from_str(&sp.dst_cidr)
+                .map_err(|_| IpsecError::BadCidr(sp.dst_cidr.clone()))?;
             if s.contains(&src) && d.contains(&dst) {
                 return Ok(sp.action);
             }
@@ -238,28 +263,78 @@ mod tests {
 
     #[test]
     fn ipsec_install_sa_assigns_monotonic_spi() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "AddSPI", "tenant-ipsec-mono");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "AddSPI", "tenant-ipsec-mono");
         let mut s = make_store(tenant);
-        let a = s.install_sa(ip(10, 0, 0, 1), ip(10, 0, 0, 2), IpsecAlgorithm::AesGcm256, vec![0; 32], 100, None).unwrap();
-        let b = s.install_sa(ip(10, 0, 0, 1), ip(10, 0, 0, 3), IpsecAlgorithm::AesGcm256, vec![0; 32], 100, None).unwrap();
+        let a = s
+            .install_sa(
+                ip(10, 0, 0, 1),
+                ip(10, 0, 0, 2),
+                IpsecAlgorithm::AesGcm256,
+                vec![0; 32],
+                100,
+                None,
+            )
+            .unwrap();
+        let b = s
+            .install_sa(
+                ip(10, 0, 0, 1),
+                ip(10, 0, 0, 3),
+                IpsecAlgorithm::AesGcm256,
+                vec![0; 32],
+                100,
+                None,
+            )
+            .unwrap();
         assert_eq!(a, 1);
         assert_eq!(b, 2);
     }
 
     #[test]
     fn ipsec_install_sa_with_explicit_spi_rejects_collision() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "AddSPI.Collision", "tenant-ipsec-coll");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/ipsec_linux.go",
+            "AddSPI.Collision",
+            "tenant-ipsec-coll"
+        );
         let mut s = make_store(tenant);
-        s.install_sa_with_spi(42, ip(10, 0, 0, 1), ip(10, 0, 0, 2), IpsecAlgorithm::AesGcm256, vec![0; 32], 100).unwrap();
-        let err = s.install_sa_with_spi(42, ip(10, 0, 0, 1), ip(10, 0, 0, 3), IpsecAlgorithm::AesGcm256, vec![0; 32], 100).unwrap_err();
+        s.install_sa_with_spi(
+            42,
+            ip(10, 0, 0, 1),
+            ip(10, 0, 0, 2),
+            IpsecAlgorithm::AesGcm256,
+            vec![0; 32],
+            100,
+        )
+        .unwrap();
+        let err = s
+            .install_sa_with_spi(
+                42,
+                ip(10, 0, 0, 1),
+                ip(10, 0, 0, 3),
+                IpsecAlgorithm::AesGcm256,
+                vec![0; 32],
+                100,
+            )
+            .unwrap_err();
         assert_eq!(err, IpsecError::SpiCollision(42));
     }
 
     #[test]
     fn ipsec_lookup_sa_round_trip() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "GetSPI", "tenant-ipsec-lk");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "GetSPI", "tenant-ipsec-lk");
         let mut s = make_store(tenant);
-        let spi = s.install_sa(ip(10, 0, 0, 1), ip(10, 0, 0, 2), IpsecAlgorithm::AesGcm256, vec![0xAB; 32], 100, None).unwrap();
+        let spi = s
+            .install_sa(
+                ip(10, 0, 0, 1),
+                ip(10, 0, 0, 2),
+                IpsecAlgorithm::AesGcm256,
+                vec![0xAB; 32],
+                100,
+                None,
+            )
+            .unwrap();
         let sa = s.lookup_sa(spi).unwrap();
         assert_eq!(sa.dst, ip(10, 0, 0, 2));
         assert_eq!(sa.algorithm, IpsecAlgorithm::AesGcm256);
@@ -268,26 +343,49 @@ mod tests {
 
     #[test]
     fn ipsec_remove_sa_drops_entry() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "DelSPI", "tenant-ipsec-rm");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "DelSPI", "tenant-ipsec-rm");
         let mut s = make_store(tenant);
-        let spi = s.install_sa(ip(10, 0, 0, 1), ip(10, 0, 0, 2), IpsecAlgorithm::AesGcm256, vec![0; 32], 100, None).unwrap();
+        let spi = s
+            .install_sa(
+                ip(10, 0, 0, 1),
+                ip(10, 0, 0, 2),
+                IpsecAlgorithm::AesGcm256,
+                vec![0; 32],
+                100,
+                None,
+            )
+            .unwrap();
         assert!(s.remove_sa(spi));
         assert!(s.lookup_sa(spi).is_none());
     }
 
     #[test]
     fn ipsec_remove_unknown_sa_returns_false() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "DelSPI.NotFound", "tenant-ipsec-rmnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/ipsec_linux.go",
+            "DelSPI.NotFound",
+            "tenant-ipsec-rmnf"
+        );
         let mut s = make_store(tenant);
         assert!(!s.remove_sa(999));
     }
 
     #[test]
     fn ipsec_sa_count_tracks_installs() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "Count", "tenant-ipsec-cnt");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "Count", "tenant-ipsec-cnt");
         let mut s = make_store(tenant);
         for _ in 0..5 {
-            s.install_sa(ip(10, 0, 0, 1), ip(10, 0, 0, 2), IpsecAlgorithm::AesGcm256, vec![0; 32], 100, None).unwrap();
+            s.install_sa(
+                ip(10, 0, 0, 1),
+                ip(10, 0, 0, 2),
+                IpsecAlgorithm::AesGcm256,
+                vec![0; 32],
+                100,
+                None,
+            )
+            .unwrap();
         }
         assert_eq!(s.sa_count(), 5);
     }
@@ -296,10 +394,22 @@ mod tests {
 
     #[test]
     fn ipsec_rotate_sa_assigns_new_spi() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "RotateSPI", "tenant-ipsec-rot");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "RotateSPI", "tenant-ipsec-rot");
         let mut s = make_store(tenant);
-        let old = s.install_sa(ip(10, 0, 0, 1), ip(10, 0, 0, 2), IpsecAlgorithm::AesGcm256, vec![0xAA; 32], 100, None).unwrap();
-        let new = s.rotate_sa(old, IpsecAlgorithm::AesGcm256, vec![0xBB; 32], 200).unwrap();
+        let old = s
+            .install_sa(
+                ip(10, 0, 0, 1),
+                ip(10, 0, 0, 2),
+                IpsecAlgorithm::AesGcm256,
+                vec![0xAA; 32],
+                100,
+                None,
+            )
+            .unwrap();
+        let new = s
+            .rotate_sa(old, IpsecAlgorithm::AesGcm256, vec![0xBB; 32], 200)
+            .unwrap();
         assert_ne!(new, old);
         // Old SA still present until grace period expires.
         assert!(s.lookup_sa(old).is_some());
@@ -307,9 +417,19 @@ mod tests {
 
     #[test]
     fn ipsec_gc_expired_removes_sa_past_lifetime() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "GC.Expired", "tenant-ipsec-gc");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "GC.Expired", "tenant-ipsec-gc");
         let mut s = make_store(tenant);
-        let spi = s.install_sa(ip(10, 0, 0, 1), ip(10, 0, 0, 2), IpsecAlgorithm::AesGcm256, vec![0; 32], 100, Some(60)).unwrap();
+        let spi = s
+            .install_sa(
+                ip(10, 0, 0, 1),
+                ip(10, 0, 0, 2),
+                IpsecAlgorithm::AesGcm256,
+                vec![0; 32],
+                100,
+                Some(60),
+            )
+            .unwrap();
         assert_eq!(s.gc_expired(150), 0);
         assert_eq!(s.gc_expired(200), 1);
         assert!(s.lookup_sa(spi).is_none());
@@ -319,7 +439,11 @@ mod tests {
 
     #[test]
     fn ipsec_resolve_no_policies_defaults_to_bypass() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "ResolvePolicy.Default", "tenant-ipsec-def");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/ipsec_linux.go",
+            "ResolvePolicy.Default",
+            "tenant-ipsec-def"
+        );
         let s = make_store(tenant);
         let v = s.resolve(ip(10, 0, 0, 1), ip(10, 0, 0, 2)).unwrap();
         assert_eq!(v, SpAction::Bypass);
@@ -327,81 +451,136 @@ mod tests {
 
     #[test]
     fn ipsec_resolve_encrypt_action_returns_spi() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "ResolvePolicy.Encrypt", "tenant-ipsec-enc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/ipsec_linux.go",
+            "ResolvePolicy.Encrypt",
+            "tenant-ipsec-enc"
+        );
         let mut s = make_store(tenant);
         s.add_policy(SecurityPolicy {
-            name: "node-to-node".into(), priority: 100,
-            src_cidr: "10.0.0.0/24".into(), dst_cidr: "10.0.0.0/24".into(),
+            name: "node-to-node".into(),
+            priority: 100,
+            src_cidr: "10.0.0.0/24".into(),
+            dst_cidr: "10.0.0.0/24".into(),
             action: SpAction::Encrypt(42),
-        }).unwrap();
-        assert_eq!(s.resolve(ip(10, 0, 0, 1), ip(10, 0, 0, 2)).unwrap(), SpAction::Encrypt(42));
+        })
+        .unwrap();
+        assert_eq!(
+            s.resolve(ip(10, 0, 0, 1), ip(10, 0, 0, 2)).unwrap(),
+            SpAction::Encrypt(42)
+        );
     }
 
     #[test]
     fn ipsec_resolve_drop_action() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "ResolvePolicy.Drop", "tenant-ipsec-drop");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/ipsec_linux.go",
+            "ResolvePolicy.Drop",
+            "tenant-ipsec-drop"
+        );
         let mut s = make_store(tenant);
         s.add_policy(SecurityPolicy {
-            name: "deny".into(), priority: 100,
-            src_cidr: "10.0.0.0/24".into(), dst_cidr: "0.0.0.0/0".into(),
+            name: "deny".into(),
+            priority: 100,
+            src_cidr: "10.0.0.0/24".into(),
+            dst_cidr: "0.0.0.0/0".into(),
             action: SpAction::Drop,
-        }).unwrap();
-        assert_eq!(s.resolve(ip(10, 0, 0, 1), ip(8, 8, 8, 8)).unwrap(), SpAction::Drop);
+        })
+        .unwrap();
+        assert_eq!(
+            s.resolve(ip(10, 0, 0, 1), ip(8, 8, 8, 8)).unwrap(),
+            SpAction::Drop
+        );
     }
 
     #[test]
     fn ipsec_resolve_higher_priority_policy_wins() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "ResolvePolicy.Priority", "tenant-ipsec-pri");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/ipsec_linux.go",
+            "ResolvePolicy.Priority",
+            "tenant-ipsec-pri"
+        );
         let mut s = make_store(tenant);
         s.add_policy(SecurityPolicy {
-            name: "low".into(), priority: 10,
-            src_cidr: "10.0.0.0/8".into(), dst_cidr: "0.0.0.0/0".into(),
+            name: "low".into(),
+            priority: 10,
+            src_cidr: "10.0.0.0/8".into(),
+            dst_cidr: "0.0.0.0/0".into(),
             action: SpAction::Bypass,
-        }).unwrap();
+        })
+        .unwrap();
         s.add_policy(SecurityPolicy {
-            name: "high".into(), priority: 100,
-            src_cidr: "10.0.0.0/8".into(), dst_cidr: "0.0.0.0/0".into(),
+            name: "high".into(),
+            priority: 100,
+            src_cidr: "10.0.0.0/8".into(),
+            dst_cidr: "0.0.0.0/0".into(),
             action: SpAction::Encrypt(7),
-        }).unwrap();
-        assert_eq!(s.resolve(ip(10, 0, 0, 1), ip(8, 8, 8, 8)).unwrap(), SpAction::Encrypt(7));
+        })
+        .unwrap();
+        assert_eq!(
+            s.resolve(ip(10, 0, 0, 1), ip(8, 8, 8, 8)).unwrap(),
+            SpAction::Encrypt(7)
+        );
     }
 
     #[test]
     fn ipsec_resolve_no_match_falls_through_to_bypass() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "ResolvePolicy.NoMatch", "tenant-ipsec-nomatch");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/ipsec_linux.go",
+            "ResolvePolicy.NoMatch",
+            "tenant-ipsec-nomatch"
+        );
         let mut s = make_store(tenant);
         s.add_policy(SecurityPolicy {
-            name: "scoped".into(), priority: 100,
-            src_cidr: "10.0.0.0/24".into(), dst_cidr: "10.0.0.0/24".into(),
+            name: "scoped".into(),
+            priority: 100,
+            src_cidr: "10.0.0.0/24".into(),
+            dst_cidr: "10.0.0.0/24".into(),
             action: SpAction::Encrypt(1),
-        }).unwrap();
-        assert_eq!(s.resolve(ip(192, 168, 0, 1), ip(8, 8, 8, 8)).unwrap(), SpAction::Bypass);
+        })
+        .unwrap();
+        assert_eq!(
+            s.resolve(ip(192, 168, 0, 1), ip(8, 8, 8, 8)).unwrap(),
+            SpAction::Bypass
+        );
     }
 
     // ── SP add/remove ────────────────────────────────────────────────────────
 
     #[test]
     fn ipsec_remove_policy_drops_rule() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "DelPolicy", "tenant-ipsec-prm");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "DelPolicy", "tenant-ipsec-prm");
         let mut s = make_store(tenant);
         s.add_policy(SecurityPolicy {
-            name: "p".into(), priority: 100,
-            src_cidr: "10.0.0.0/8".into(), dst_cidr: "10.0.0.0/8".into(),
+            name: "p".into(),
+            priority: 100,
+            src_cidr: "10.0.0.0/8".into(),
+            dst_cidr: "10.0.0.0/8".into(),
             action: SpAction::Encrypt(1),
-        }).unwrap();
+        })
+        .unwrap();
         assert!(s.remove_policy("p"));
         assert_eq!(s.policy_count(), 0);
     }
 
     #[test]
     fn ipsec_add_policy_with_bad_cidr_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "AddPolicy.Validate", "tenant-ipsec-pbad");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/ipsec/ipsec_linux.go",
+            "AddPolicy.Validate",
+            "tenant-ipsec-pbad"
+        );
         let mut s = make_store(tenant);
-        let err = s.add_policy(SecurityPolicy {
-            name: "p".into(), priority: 100,
-            src_cidr: "not-a-cidr".into(), dst_cidr: "10.0.0.0/8".into(),
-            action: SpAction::Bypass,
-        }).unwrap_err();
+        let err = s
+            .add_policy(SecurityPolicy {
+                name: "p".into(),
+                priority: 100,
+                src_cidr: "not-a-cidr".into(),
+                dst_cidr: "10.0.0.0/8".into(),
+                action: SpAction::Bypass,
+            })
+            .unwrap_err();
         assert_eq!(err, IpsecError::BadCidr("not-a-cidr".into()));
     }
 
@@ -409,7 +588,8 @@ mod tests {
 
     #[test]
     fn ipsec_per_pod_mode_records_mode() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "Mode.PerPod", "tenant-ipsec-pp");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "Mode.PerPod", "tenant-ipsec-pp");
         let s = IpsecStore::new(tenant, IpsecMode::PerPod, ip(10, 0, 0, 1));
         assert_eq!(s.mode, IpsecMode::PerPod);
     }
@@ -418,9 +598,13 @@ mod tests {
     fn ipsec_round_trip_serde_for_sa_and_sp() {
         let (_c, _t) = cilium_test_ctx!("pkg/ipsec/ipsec_linux.go", "Serde", "tenant-ipsec-serde");
         let sa = SecurityAssociation {
-            spi: 1, src: ip(10, 0, 0, 1), dst: ip(10, 0, 0, 2),
-            algorithm: IpsecAlgorithm::AesGcm256, key: vec![1, 2, 3],
-            created: 100, lifetime_seconds: Some(60),
+            spi: 1,
+            src: ip(10, 0, 0, 1),
+            dst: ip(10, 0, 0, 2),
+            algorithm: IpsecAlgorithm::AesGcm256,
+            key: vec![1, 2, 3],
+            created: 100,
+            lifetime_seconds: Some(60),
         };
         let json = serde_json::to_string(&sa).unwrap();
         let back: SecurityAssociation = serde_json::from_str(&json).unwrap();

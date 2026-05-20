@@ -3,8 +3,8 @@
 //! cave-certs — Certificate + Issuer CRD tests pinned to cert-manager v1.20.2.
 
 use cave_certs::crds::{
-    renewal_due_at, CertificateSpec, CertificateStatus, IssuerConfig, IssuerRef, IssuerSpec,
-    PrivateKeyAlgorithm,
+    CertificateSpec, CertificateStatus, IssuerConfig, IssuerRef, IssuerSpec, PrivateKeyAlgorithm,
+    renewal_due_at,
 };
 use chrono::{Duration, Utc};
 
@@ -65,13 +65,17 @@ fn certificate_spec_validation_rejects_invalid_combinations() {
 fn issuer_spec_validation_per_variant() {
     let ca = IssuerSpec {
         tenant_id: TENANT.into(),
-        config: IssuerConfig::Ca { secret_name: "ca-tls".into() },
+        config: IssuerConfig::Ca {
+            secret_name: "ca-tls".into(),
+        },
     };
     assert!(ca.validate().is_ok());
 
     let bad_ca = IssuerSpec {
         tenant_id: TENANT.into(),
-        config: IssuerConfig::Ca { secret_name: "".into() },
+        config: IssuerConfig::Ca {
+            secret_name: "".into(),
+        },
     };
     assert!(bad_ca.validate().is_err());
 
@@ -120,11 +124,15 @@ fn renewal_due_at_returns_correct_window_open() {
 
     let now = Utc::now();
     status.not_before = Some(now - Duration::days(60));
-    status.not_after  = Some(now + Duration::days(30));
+    status.not_after = Some(now + Duration::days(30));
     let due = renewal_due_at(&s, &status).unwrap();
     // notAfter is now+30d; renewBefore is 30d ⇒ due == now (give or take ms).
     let delta = (due - now).num_seconds().abs();
-    assert!(delta < 5, "due should be ~now ± 5s, got {} seconds off", delta);
+    assert!(
+        delta < 5,
+        "due should be ~now ± 5s, got {} seconds off",
+        delta
+    );
 }
 
 /// Cite: cert-manager IssuerRef — `kind` is one of `Issuer` /

@@ -70,7 +70,10 @@ fn validate_policy_name(name: &str) -> Result<(), AdvancedVaultError> {
 }
 
 impl Policy {
-    pub fn new(name: impl Into<String>, tenant: impl Into<String>) -> Result<Self, AdvancedVaultError> {
+    pub fn new(
+        name: impl Into<String>,
+        tenant: impl Into<String>,
+    ) -> Result<Self, AdvancedVaultError> {
         let name = name.into();
         validate_policy_name(&name)?;
         Ok(Self {
@@ -170,12 +173,17 @@ impl PolicyStore {
     }
 
     pub fn find(&self, tenant: &str, name: &str) -> Option<&Policy> {
-        self.policies.iter().find(|p| p.tenant == tenant && p.name == name)
+        self.policies
+            .iter()
+            .find(|p| p.tenant == tenant && p.name == name)
     }
 
     pub fn list(&self, tenant: &str) -> Vec<&Policy> {
-        let mut out: Vec<&Policy> =
-            self.policies.iter().filter(|p| p.tenant == tenant).collect();
+        let mut out: Vec<&Policy> = self
+            .policies
+            .iter()
+            .filter(|p| p.tenant == tenant)
+            .collect();
         out.sort_by(|a, b| a.name.cmp(&b.name));
         out
     }
@@ -387,7 +395,9 @@ mod tests {
     #[test]
     fn add_rule_deny_mixed_rejected() {
         let mut p = Policy::new("p", "acme").unwrap();
-        let err = p.add_rule(rule("kv/*", &[Capability::Deny, Capability::Read])).unwrap_err();
+        let err = p
+            .add_rule(rule("kv/*", &[Capability::Deny, Capability::Read]))
+            .unwrap_err();
         assert_eq!(err, AdvancedVaultError::DenyMixed);
     }
 
@@ -407,7 +417,8 @@ mod tests {
     #[test]
     fn permits_grants_when_capability_listed() {
         let mut p = Policy::new("p", "acme").unwrap();
-        p.add_rule(rule("kv/*", &[Capability::Read, Capability::List])).unwrap();
+        p.add_rule(rule("kv/*", &[Capability::Read, Capability::List]))
+            .unwrap();
         assert!(p.permits("kv/secret", Capability::Read));
         assert!(p.permits("kv/secret", Capability::List));
         assert!(!p.permits("kv/secret", Capability::Update));
@@ -426,7 +437,8 @@ mod tests {
     fn permits_deny_overrides() {
         let mut p = Policy::new("p", "acme").unwrap();
         p.add_rule(rule("kv/*", &[Capability::Read])).unwrap();
-        p.add_rule(rule("kv/danger/*", &[Capability::Deny])).unwrap();
+        p.add_rule(rule("kv/danger/*", &[Capability::Deny]))
+            .unwrap();
         assert!(p.permits("kv/safe", Capability::Read));
         assert!(!p.permits("kv/danger/x", Capability::Read));
     }
@@ -463,7 +475,11 @@ mod tests {
         p2.add_rule(rule("kv/*", &[Capability::Sudo])).unwrap();
         s.upsert(ViewPersona::Admin, p2).unwrap();
         assert_eq!(s.count(), 1);
-        assert!(s.find("acme", "p").unwrap().permits("kv/x", Capability::Update));
+        assert!(
+            s.find("acme", "p")
+                .unwrap()
+                .permits("kv/x", Capability::Update)
+        );
     }
 
     #[test]
@@ -476,7 +492,8 @@ mod tests {
     #[test]
     fn store_delete_succeeds() {
         let mut s = PolicyStore::new();
-        s.upsert(ViewPersona::Admin, Policy::new("p", "acme").unwrap()).unwrap();
+        s.upsert(ViewPersona::Admin, Policy::new("p", "acme").unwrap())
+            .unwrap();
         s.delete(ViewPersona::Admin, "acme", "p").unwrap();
         assert_eq!(s.count(), 0);
     }
@@ -485,7 +502,8 @@ mod tests {
     fn store_list_sorted() {
         let mut s = PolicyStore::new();
         for n in ["zeta", "alpha", "mu"] {
-            s.upsert(ViewPersona::Admin, Policy::new(n, "acme").unwrap()).unwrap();
+            s.upsert(ViewPersona::Admin, Policy::new(n, "acme").unwrap())
+                .unwrap();
         }
         let names: Vec<&str> = s.list("acme").iter().map(|p| p.name.as_str()).collect();
         assert_eq!(names, vec!["alpha", "mu", "zeta"]);

@@ -37,17 +37,34 @@ impl GatewayPlugin for CorsPlugin {
 
         let allowed_methods: String = config["methods"]
             .as_array()
-            .map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", "))
-            .unwrap_or_else(|| "GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS, TRACE, CONNECT".to_string());
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
+            .unwrap_or_else(|| {
+                "GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS, TRACE, CONNECT".to_string()
+            });
 
         let allowed_headers: String = config["headers"]
             .as_array()
-            .map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", "))
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
             .unwrap_or_default();
 
         let exposed_headers: String = config["exposed_headers"]
             .as_array()
-            .map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", "))
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
             .unwrap_or_default();
 
         let max_age: String = config["max_age"].as_u64().unwrap_or(0).to_string();
@@ -61,28 +78,34 @@ impl GatewayPlugin for CorsPlugin {
             "*".to_string()
         };
 
-        ctx.response_headers.insert("Access-Control-Allow-Origin".to_string(), cors_origin);
+        ctx.response_headers
+            .insert("Access-Control-Allow-Origin".to_string(), cors_origin);
         if credentials {
-            ctx.response_headers.insert("Access-Control-Allow-Credentials".to_string(), "true".to_string());
+            ctx.response_headers.insert(
+                "Access-Control-Allow-Credentials".to_string(),
+                "true".to_string(),
+            );
         }
         if !exposed_headers.is_empty() {
-            ctx.response_headers.insert("Access-Control-Expose-Headers".to_string(), exposed_headers);
+            ctx.response_headers
+                .insert("Access-Control-Expose-Headers".to_string(), exposed_headers);
         }
 
         if is_preflight {
-            ctx.response_headers.insert("Access-Control-Allow-Methods".to_string(), allowed_methods);
+            ctx.response_headers
+                .insert("Access-Control-Allow-Methods".to_string(), allowed_methods);
             if !allowed_headers.is_empty() {
-                ctx.response_headers.insert("Access-Control-Allow-Headers".to_string(), allowed_headers);
+                ctx.response_headers
+                    .insert("Access-Control-Allow-Headers".to_string(), allowed_headers);
             }
             if max_age != "0" {
-                ctx.response_headers.insert("Access-Control-Max-Age".to_string(), max_age);
+                ctx.response_headers
+                    .insert("Access-Control-Max-Age".to_string(), max_age);
             }
 
             let preflight_status = config["preflight_continue"].as_bool().unwrap_or(false);
             if !preflight_status {
-                return PluginResult::Halt(
-                    (StatusCode::NO_CONTENT, "").into_response(),
-                );
+                return PluginResult::Halt((StatusCode::NO_CONTENT, "").into_response());
             }
         }
 

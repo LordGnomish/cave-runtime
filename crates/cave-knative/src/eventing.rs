@@ -68,7 +68,9 @@ impl EventingSource {
     }
 
     pub fn add_ce_override(&mut self, key: &str, value: &str) {
-        self.spec.ce_overrides.insert(key.to_string(), value.to_string());
+        self.spec
+            .ce_overrides
+            .insert(key.to_string(), value.to_string());
     }
 }
 
@@ -121,7 +123,10 @@ impl Channel {
 
     /// Distribute an event to every subscriber. Returns the URIs that should receive it.
     pub fn fanout(&self) -> Vec<String> {
-        self.subscribers.iter().map(|s| s.subscriber_uri.clone()).collect()
+        self.subscribers
+            .iter()
+            .map(|s| s.subscriber_uri.clone())
+            .collect()
     }
 }
 

@@ -65,7 +65,9 @@ pub enum OsFamily {
 
 /// Detect OS from `/etc/os-release` content.
 pub fn detect_os(os_release: &str) -> OsInfo {
-    let id = extract_value(os_release, "ID").unwrap_or_default().to_lowercase();
+    let id = extract_value(os_release, "ID")
+        .unwrap_or_default()
+        .to_lowercase();
     let name = extract_value(os_release, "PRETTY_NAME")
         .or_else(|| extract_value(os_release, "NAME"))
         .unwrap_or_default();
@@ -82,7 +84,11 @@ pub fn detect_os(os_release: &str) -> OsInfo {
         _ => OsFamily::Unknown,
     };
 
-    OsInfo { family, name: name.trim_matches('"').to_string(), version: version.trim_matches('"').to_string() }
+    OsInfo {
+        family,
+        name: name.trim_matches('"').to_string(),
+        version: version.trim_matches('"').to_string(),
+    }
 }
 
 fn extract_value<'a>(content: &'a str, key: &str) -> Option<String> {
@@ -253,7 +259,9 @@ pub fn parse_rpm_query_output(content: &str) -> Vec<OsPackage> {
     let mut packages = Vec::new();
     for line in content.lines() {
         let line = line.trim();
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
         let parts: Vec<&str> = line.split('|').collect();
         if parts.len() >= 2 {
             packages.push(OsPackage {
@@ -343,7 +351,8 @@ Architecture: amd64
 
     #[test]
     fn detect_debian_os() {
-        let os_release = "ID=debian\nVERSION_ID=\"12\"\nPRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\n";
+        let os_release =
+            "ID=debian\nVERSION_ID=\"12\"\nPRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\n";
         let os = detect_os(os_release);
         assert_eq!(os.family, OsFamily::Debian);
         assert_eq!(os.version, "12");

@@ -56,16 +56,16 @@ impl ProfileSelector {
             Self::Name(name) => match name.as_str() {
                 "local" => Ok(DeploymentProfile::local()),
                 "hetzner-dev" => Ok(DeploymentProfile::new(Environment::Dev, Provider::Hetzner)),
-                "hetzner-staging" => {
-                    Ok(DeploymentProfile::new(Environment::Staging, Provider::Hetzner))
-                }
-                "hetzner-prod" => {
-                    Ok(DeploymentProfile::new(Environment::Prod, Provider::Hetzner))
-                }
+                "hetzner-staging" => Ok(DeploymentProfile::new(
+                    Environment::Staging,
+                    Provider::Hetzner,
+                )),
+                "hetzner-prod" => Ok(DeploymentProfile::new(Environment::Prod, Provider::Hetzner)),
                 "azure-dev" => Ok(DeploymentProfile::new(Environment::Dev, Provider::Azure)),
-                "azure-staging" => {
-                    Ok(DeploymentProfile::new(Environment::Staging, Provider::Azure))
-                }
+                "azure-staging" => Ok(DeploymentProfile::new(
+                    Environment::Staging,
+                    Provider::Azure,
+                )),
                 "azure-prod" => Ok(DeploymentProfile::new(Environment::Prod, Provider::Azure)),
                 other => Err(crate::CaveError::Config(format!(
                     "Unknown profile: {other}. Valid profiles: local, hetzner-dev, hetzner-staging, hetzner-prod, azure-dev, azure-staging, azure-prod"
@@ -230,9 +230,8 @@ impl CaveConfig {
         let contents = std::fs::read_to_string(path).map_err(|e| {
             crate::CaveError::Config(format!("Failed to read config {}: {e}", path.display()))
         })?;
-        let mut config: Self = serde_yaml::from_str(&contents).map_err(|e| {
-            crate::CaveError::Config(format!("Failed to parse config: {e}"))
-        })?;
+        let mut config: Self = serde_yaml::from_str(&contents)
+            .map_err(|e| crate::CaveError::Config(format!("Failed to parse config: {e}")))?;
 
         // Environment variable overrides (CAVE_ prefix)
         if let Ok(port) = std::env::var("CAVE_PORT") {

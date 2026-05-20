@@ -223,10 +223,7 @@ impl std::fmt::Display for Term {
                 write!(f, "{{{}}}", s.join(", "))
             }
             Term::Object(kvs) => {
-                let s: Vec<_> = kvs
-                    .iter()
-                    .map(|(k, v)| format!("{k}: {v}"))
-                    .collect();
+                let s: Vec<_> = kvs.iter().map(|(k, v)| format!("{k}: {v}")).collect();
                 write!(f, "{{{}}}", s.join(", "))
             }
             Term::Ref(base, args) => {

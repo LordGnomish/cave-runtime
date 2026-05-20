@@ -85,11 +85,17 @@ impl PageRequest {
     }
 
     pub fn param(&self, key: &str) -> Option<&str> {
-        self.params.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+        self.params
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
     }
 
     pub fn query_value(&self, key: &str) -> Option<&str> {
-        self.query.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+        self.query
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
     }
 }
 
@@ -103,15 +109,27 @@ pub struct PageResponse {
 
 impl PageResponse {
     pub fn ok(title: impl Into<String>, body: impl Into<String>) -> Self {
-        Self { status: 200, title: title.into(), body: body.into() }
+        Self {
+            status: 200,
+            title: title.into(),
+            body: body.into(),
+        }
     }
 
     pub fn not_found(title: impl Into<String>) -> Self {
-        Self { status: 404, title: title.into(), body: String::new() }
+        Self {
+            status: 404,
+            title: title.into(),
+            body: String::new(),
+        }
     }
 
     pub fn forbidden(title: impl Into<String>) -> Self {
-        Self { status: 403, title: title.into(), body: String::new() }
+        Self {
+            status: 403,
+            title: title.into(),
+            body: String::new(),
+        }
     }
 }
 
@@ -232,7 +250,11 @@ impl PageBuilder {
         });
         Page {
             id: self.id,
-            title: if self.title.is_empty() { "Untitled".into() } else { self.title },
+            title: if self.title.is_empty() {
+                "Untitled".into()
+            } else {
+                self.title
+            },
             icon: self.icon,
             path: self.path,
             scope: self.scope,

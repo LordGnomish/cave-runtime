@@ -10,12 +10,12 @@
 //! Arquillian integration tests assert on. They run against the
 //! library API, not against the existing in-module unit tests.
 
-use cave_auth::saml::name_id::{NameId, NameIdPolicy};
+use cave_auth::saml::NameIdFormat;
 use cave_auth::saml::assertion::{AssertionConditions, AuthnContextClass};
 use cave_auth::saml::bindings::{
-    http_artifact, http_post, http_redirect, BINDING_ARTIFACT, BINDING_POST, BINDING_REDIRECT,
+    BINDING_ARTIFACT, BINDING_POST, BINDING_REDIRECT, http_artifact, http_post, http_redirect,
 };
-use cave_auth::saml::NameIdFormat;
+use cave_auth::saml::name_id::{NameId, NameIdPolicy};
 use chrono::{Duration, Utc};
 
 /// Scenario 1 (ports `SAMLBindingsTest::testHttpRedirectRoundtrip`):
@@ -109,9 +109,18 @@ fn scenario_name_id_policy_wire_shape() {
 /// any drift breaks every SP integration.
 #[test]
 fn scenario_binding_urns_match_spec() {
-    assert_eq!(BINDING_REDIRECT, "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect");
-    assert_eq!(BINDING_POST, "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST");
-    assert_eq!(BINDING_ARTIFACT, "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact");
+    assert_eq!(
+        BINDING_REDIRECT,
+        "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+    );
+    assert_eq!(
+        BINDING_POST,
+        "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+    );
+    assert_eq!(
+        BINDING_ARTIFACT,
+        "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact"
+    );
 }
 
 /// Scenario 8 (ports `NameIDTest::testMatchesByQualifier`):
@@ -120,9 +129,7 @@ fn scenario_binding_urns_match_spec() {
 /// same rule.
 #[test]
 fn scenario_name_id_matching_honors_qualifiers() {
-    let a = NameId::new("u", NameIdFormat::Persistent)
-        .with_name_qualifier("idp-A");
-    let b = NameId::new("u", NameIdFormat::Persistent)
-        .with_name_qualifier("idp-B");
+    let a = NameId::new("u", NameIdFormat::Persistent).with_name_qualifier("idp-A");
+    let b = NameId::new("u", NameIdFormat::Persistent).with_name_qualifier("idp-B");
     assert!(!a.matches(&b), "different NameQualifier must NOT match");
 }

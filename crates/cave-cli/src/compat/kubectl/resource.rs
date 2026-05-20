@@ -6,7 +6,7 @@
 //! maps these to canonical pluralised names so the routed path looks
 //! like `/api/compat/kubectl/v1/namespaces/<ns>/<resource>`.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 pub fn canonical(r: &str) -> Result<String> {
     let lower = r.to_lowercase();

@@ -71,7 +71,9 @@ impl std::fmt::Display for KmsV2Error {
 impl std::error::Error for KmsV2Error {}
 
 impl From<KmsError> for KmsV2Error {
-    fn from(e: KmsError) -> Self { Self::Provider(e) }
+    fn from(e: KmsError) -> Self {
+        Self::Provider(e)
+    }
 }
 
 // ── Envelope codec ────────────────────────────────────────────────────────
@@ -100,11 +102,19 @@ pub fn encode_envelope(
     wrapped_dek: &[u8],
     ciphertext: &[u8],
 ) -> Result<Vec<u8>, KmsV2Error> {
-    if kek_id.len() > u8::MAX as usize { return Err(KmsV2Error::LengthOverflow); }
-    if wrapped_dek.len() > u16::MAX as usize { return Err(KmsV2Error::LengthOverflow); }
-    if ciphertext.len() > u32::MAX as usize { return Err(KmsV2Error::LengthOverflow); }
+    if kek_id.len() > u8::MAX as usize {
+        return Err(KmsV2Error::LengthOverflow);
+    }
+    if wrapped_dek.len() > u16::MAX as usize {
+        return Err(KmsV2Error::LengthOverflow);
+    }
+    if ciphertext.len() > u32::MAX as usize {
+        return Err(KmsV2Error::LengthOverflow);
+    }
 
-    let mut out = Vec::with_capacity(2 + 1 + 1 + kek_id.len() + NONCE_LEN + 2 + wrapped_dek.len() + 4 + ciphertext.len());
+    let mut out = Vec::with_capacity(
+        2 + 1 + 1 + kek_id.len() + NONCE_LEN + 2 + wrapped_dek.len() + 4 + ciphertext.len(),
+    );
     out.extend_from_slice(&KMSV2_MAGIC);
     out.push(KMSV2_VERSION);
     out.push(kek_id.len() as u8);
@@ -119,13 +129,22 @@ pub fn encode_envelope(
 
 /// Parse a binary envelope into an [`EnvelopeView`].  Borrows from `buf`.
 pub fn decode_envelope(buf: &[u8]) -> Result<EnvelopeView<'_>, KmsV2Error> {
-    if buf.len() < 2 + 1 + 1 { return Err(KmsV2Error::Truncated); }
-    if buf[0..2] != KMSV2_MAGIC { return Err(KmsV2Error::BadMagic); }
-    if buf[2] != KMSV2_VERSION { return Err(KmsV2Error::UnsupportedVersion(buf[2])); }
+    if buf.len() < 2 + 1 + 1 {
+        return Err(KmsV2Error::Truncated);
+    }
+    if buf[0..2] != KMSV2_MAGIC {
+        return Err(KmsV2Error::BadMagic);
+    }
+    if buf[2] != KMSV2_VERSION {
+        return Err(KmsV2Error::UnsupportedVersion(buf[2]));
+    }
 
     let mut p = 3usize;
-    let kek_id_len = buf[p] as usize; p += 1;
-    if p + kek_id_len + NONCE_LEN + 2 > buf.len() { return Err(KmsV2Error::Truncated); }
+    let kek_id_len = buf[p] as usize;
+    p += 1;
+    if p + kek_id_len + NONCE_LEN + 2 > buf.len() {
+        return Err(KmsV2Error::Truncated);
+    }
     let kek_id = std::str::from_utf8(&buf[p..p + kek_id_len])
         .map_err(|_| KmsV2Error::BadMagic)?
         .to_string();
@@ -136,16 +155,25 @@ pub fn decode_envelope(buf: &[u8]) -> Result<EnvelopeView<'_>, KmsV2Error> {
 
     let wrapped_len = u16::from_be_bytes(buf[p..p + 2].try_into().unwrap()) as usize;
     p += 2;
-    if p + wrapped_len + 4 > buf.len() { return Err(KmsV2Error::Truncated); }
+    if p + wrapped_len + 4 > buf.len() {
+        return Err(KmsV2Error::Truncated);
+    }
     let wrapped_dek = &buf[p..p + wrapped_len];
     p += wrapped_len;
 
     let ct_len = u32::from_be_bytes(buf[p..p + 4].try_into().unwrap()) as usize;
     p += 4;
-    if p + ct_len > buf.len() { return Err(KmsV2Error::Truncated); }
+    if p + ct_len > buf.len() {
+        return Err(KmsV2Error::Truncated);
+    }
     let ciphertext = &buf[p..p + ct_len];
 
-    Ok(EnvelopeView { kek_id, nonce, wrapped_dek, ciphertext })
+    Ok(EnvelopeView {
+        kek_id,
+        nonce,
+        wrapped_dek,
+        ciphertext,
+    })
 }
 
 // ── DEK cache ─────────────────────────────────────────────────────────────
@@ -168,7 +196,11 @@ struct DekCacheInner {
 
 impl DekCache {
     pub fn new(capacity: usize, ttl: Duration) -> Self {
-        Self { capacity, ttl, inner: Mutex::new(DekCacheInner::default()) }
+        Self {
+            capacity,
+            ttl,
+            inner: Mutex::new(DekCacheInner::default()),
+        }
     }
 
     pub fn get(&self, wrapped: &[u8]) -> Option<[u8; DEK_LEN]> {
@@ -194,10 +226,18 @@ impl DekCache {
         e.entries.insert(wrapped, (dek, Instant::now()));
     }
 
-    pub fn len(&self) -> usize { self.inner.lock().unwrap().entries.len() }
-    pub fn is_empty(&self) -> bool { self.len() == 0 }
-    pub fn hits(&self) -> u64 { self.inner.lock().unwrap().hits }
-    pub fn misses(&self) -> u64 { self.inner.lock().unwrap().misses }
+    pub fn len(&self) -> usize {
+        self.inner.lock().unwrap().entries.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+    pub fn hits(&self) -> u64 {
+        self.inner.lock().unwrap().hits
+    }
+    pub fn misses(&self) -> u64 {
+        self.inner.lock().unwrap().misses
+    }
     pub fn clear(&self) {
         let mut e = self.inner.lock().unwrap();
         e.entries.clear();
@@ -232,7 +272,12 @@ fn mac(dek: &[u8; DEK_LEN], nonce: &[u8; NONCE_LEN], aad: &[u8], ct: &[u8]) -> [
     let mut tag = [0u8; TAG_LEN];
     for (i, slot) in tag.iter_mut().enumerate() {
         let mut h: u64 = 0x9e3779b97f4a7c15 ^ (i as u64).wrapping_mul(0x100000001b3);
-        for &b in dek.iter().chain(nonce.iter()).chain(aad.iter()).chain(ct.iter()) {
+        for &b in dek
+            .iter()
+            .chain(nonce.iter())
+            .chain(aad.iter())
+            .chain(ct.iter())
+        {
             h = h.wrapping_mul(0x100000001b3).wrapping_add(b as u64);
         }
         *slot = (h ^ h.rotate_right(31)) as u8;
@@ -263,14 +308,25 @@ pub fn aead_open(
     envelope: &[u8],
     aad: &[u8],
 ) -> Option<Vec<u8>> {
-    if envelope.len() < TAG_LEN { return None; }
+    if envelope.len() < TAG_LEN {
+        return None;
+    }
     let split = envelope.len() - TAG_LEN;
     let (ct, tag) = (&envelope[..split], &envelope[split..]);
     let want = mac(dek, nonce, aad, ct);
     let mut diff: u8 = 0;
-    for (a, b) in tag.iter().zip(want.iter()) { diff |= a ^ b; }
-    if diff != 0 { return None; }
-    Some(ct.iter().enumerate().map(|(i, &b)| b ^ keystream_byte(dek, nonce, i)).collect())
+    for (a, b) in tag.iter().zip(want.iter()) {
+        diff |= a ^ b;
+    }
+    if diff != 0 {
+        return None;
+    }
+    Some(
+        ct.iter()
+            .enumerate()
+            .map(|(i, &b)| b ^ keystream_byte(dek, nonce, i))
+            .collect(),
+    )
 }
 
 // ── Provider-level wrappers (DEK derivation + cache integration) ──────────
@@ -279,7 +335,9 @@ fn derive_dek(seed: u64) -> [u8; DEK_LEN] {
     let mut dek = [0u8; DEK_LEN];
     let mut s: u64 = 0x1234_5678_9abc_def0 ^ seed;
     for byte in &mut dek {
-        s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        s = s
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         *byte = (s >> 56) as u8;
     }
     dek
@@ -294,7 +352,9 @@ pub fn reset_nonce_for_test(seed: u64) {
 }
 
 fn next_nonce() -> [u8; NONCE_LEN] {
-    let n = NONCE_SEQ.fetch_add(1, std::sync::atomic::Ordering::SeqCst).wrapping_add(1);
+    let n = NONCE_SEQ
+        .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+        .wrapping_add(1);
     let mut nonce = [0u8; NONCE_LEN];
     nonce[..8].copy_from_slice(&n.to_be_bytes());
     nonce
@@ -329,15 +389,18 @@ pub fn decrypt(
     let dek = if let Some(dek) = cache.get(view.wrapped_dek) {
         dek
     } else {
-        let raw = kms.unwrap_dek(&view.kek_id, view.wrapped_dek)
+        let raw = kms
+            .unwrap_dek(&view.kek_id, view.wrapped_dek)
             .map_err(|e| match e {
                 KmsError::UnknownKekId(id) => KmsV2Error::UnknownKekId(id),
                 other => KmsV2Error::Provider(other),
             })?;
         if raw.len() != DEK_LEN {
-            return Err(KmsV2Error::Provider(KmsError::Decrypt(
-                format!("unwrapped DEK length {} != {}", raw.len(), DEK_LEN),
-            )));
+            return Err(KmsV2Error::Provider(KmsError::Decrypt(format!(
+                "unwrapped DEK length {} != {}",
+                raw.len(),
+                DEK_LEN
+            ))));
         }
         let mut dek = [0u8; DEK_LEN];
         dek.copy_from_slice(&raw);
@@ -368,13 +431,17 @@ mod tests {
     use super::*;
     use crate::kms::InMemoryKmsProvider;
 
-    fn fixed_kek(byte: u8) -> [u8; 32] { [byte; 32] }
+    fn fixed_kek(byte: u8) -> [u8; 32] {
+        [byte; 32]
+    }
 
     fn provider() -> InMemoryKmsProvider {
         InMemoryKmsProvider::new("k1", fixed_kek(0xAA))
     }
 
-    fn cache() -> DekCache { DekCache::new(64, Duration::from_secs(60)) }
+    fn cache() -> DekCache {
+        DekCache::new(64, Duration::from_secs(60))
+    }
 
     // ── Envelope codec ────────────────────────────────────────────────
 
@@ -403,7 +470,10 @@ mod tests {
         let env = encode_envelope("k1", &[0; NONCE_LEN], &[3; 4], &[4; 8]).unwrap();
         let mut tampered = env.clone();
         tampered[0] = 0;
-        assert_eq!(decode_envelope(&tampered).unwrap_err(), KmsV2Error::BadMagic);
+        assert_eq!(
+            decode_envelope(&tampered).unwrap_err(),
+            KmsV2Error::BadMagic
+        );
     }
 
     #[test]
@@ -412,7 +482,10 @@ mod tests {
         let env = encode_envelope("k1", &[0; NONCE_LEN], &[3; 4], &[4; 8]).unwrap();
         let mut tampered = env.clone();
         tampered[2] = 0xFF;
-        assert_eq!(decode_envelope(&tampered).unwrap_err(), KmsV2Error::UnsupportedVersion(0xFF));
+        assert_eq!(
+            decode_envelope(&tampered).unwrap_err(),
+            KmsV2Error::UnsupportedVersion(0xFF)
+        );
     }
 
     #[test]
@@ -486,7 +559,10 @@ mod tests {
         let dek = [0x33; DEK_LEN];
         let nonce = [0x11u8; NONCE_LEN];
         let sealed = aead_seal(&dek, &nonce, b"hello", b"tenantA");
-        assert_eq!(aead_open(&dek, &nonce, &sealed, b"tenantA").unwrap(), b"hello");
+        assert_eq!(
+            aead_open(&dek, &nonce, &sealed, b"tenantA").unwrap(),
+            b"hello"
+        );
     }
 
     #[test]
@@ -597,7 +673,10 @@ mod tests {
         // Clear the cache so we actually hit the provider during decrypt.
         let other_cache = DekCache::new(64, Duration::from_secs(60));
         let err = decrypt(&other, &other_cache, &ct, b"aad").unwrap_err();
-        match err { KmsV2Error::UnknownKekId(id) => assert_eq!(id, "k1"), other => panic!("{other:?}") }
+        match err {
+            KmsV2Error::UnknownKekId(id) => assert_eq!(id, "k1"),
+            other => panic!("{other:?}"),
+        }
     }
 
     #[test]

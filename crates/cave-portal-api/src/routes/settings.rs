@@ -60,7 +60,9 @@ pub struct SettingsStore {
 
 impl Default for SettingsStore {
     fn default() -> Self {
-        Self { inner: Mutex::new(HashMap::new()) }
+        Self {
+            inner: Mutex::new(HashMap::new()),
+        }
     }
 }
 
@@ -124,8 +126,7 @@ impl SettingsStore {
         if admin_only {
             Guard::admin_only().authorize(principal, None)?;
         } else {
-            Guard::tenant_only(Some("settings:write"))
-                .authorize(principal, Some(&req.tenant))?;
+            Guard::tenant_only(Some("settings:write")).authorize(principal, Some(&req.tenant))?;
         }
         if req.value.len() > MAX_VALUE_SIZE {
             return Err(SettingsError::TooLarge(req.value.len(), MAX_VALUE_SIZE));
@@ -151,8 +152,7 @@ impl SettingsStore {
         if admin_only {
             Guard::admin_only().authorize(principal, None)?;
         } else {
-            Guard::tenant_only(Some("settings:write"))
-                .authorize(principal, Some(tenant))?;
+            Guard::tenant_only(Some("settings:write")).authorize(principal, Some(tenant))?;
         }
         self.inner
             .lock()
@@ -176,70 +176,109 @@ mod tests {
         Principal::new("a", Persona::Admin).with_role("settings:write")
     }
     fn dev(t: &str) -> Principal {
-        Principal::new("d", Persona::Tenant).with_tenant(t).with_role("settings:write")
+        Principal::new("d", Persona::Tenant)
+            .with_tenant(t)
+            .with_role("settings:write")
     }
     fn dev_no_role(t: &str) -> Principal {
         Principal::new("d", Persona::Tenant).with_tenant(t)
     }
-    fn op() -> Principal { Principal::new("o", Persona::Operator) }
+    fn op() -> Principal {
+        Principal::new("o", Persona::Operator)
+    }
 
     fn put_req(t: &str, k: &str, v: &str) -> PutSettingRequest {
-        PutSettingRequest { tenant: t.into(), key: k.into(), value: v.into() }
+        PutSettingRequest {
+            tenant: t.into(),
+            key: k.into(),
+            value: v.into(),
+        }
     }
 
     #[test]
     fn put_anonymous_denied() {
         let s = SettingsStore::new();
-        let err = s.put(None, put_req("acme", "ui.theme", "dark")).unwrap_err();
+        let err = s
+            .put(None, put_req("acme", "ui.theme", "dark"))
+            .unwrap_err();
         assert!(matches!(err, SettingsError::Guard(GuardError::Anonymous)));
     }
 
     #[test]
     fn put_dev_can_set_normal_key() {
         let s = SettingsStore::new();
-        let v = s.put(Some(&dev("acme")), put_req("acme", "ui.theme", "dark")).unwrap();
+        let v = s
+            .put(Some(&dev("acme")), put_req("acme", "ui.theme", "dark"))
+            .unwrap();
         assert_eq!(v.value, "dark");
     }
 
     #[test]
     fn put_dev_cannot_set_admin_only_key() {
         let s = SettingsStore::new();
-        let err = s.put(Some(&dev("acme")), put_req("acme", "billing.plan", "enterprise")).unwrap_err();
-        assert!(matches!(err, SettingsError::Guard(GuardError::PersonaForbidden { .. })));
+        let err = s
+            .put(
+                Some(&dev("acme")),
+                put_req("acme", "billing.plan", "enterprise"),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            SettingsError::Guard(GuardError::PersonaForbidden { .. })
+        ));
     }
 
     #[test]
     fn put_admin_can_set_admin_only_key() {
         let s = SettingsStore::new();
-        let v = s.put(Some(&admin()), put_req("acme", "billing.plan", "enterprise")).unwrap();
+        let v = s
+            .put(
+                Some(&admin()),
+                put_req("acme", "billing.plan", "enterprise"),
+            )
+            .unwrap();
         assert_eq!(v.value, "enterprise");
     }
 
     #[test]
     fn put_dev_cross_tenant_denied() {
         let s = SettingsStore::new();
-        let err = s.put(Some(&dev("globex")), put_req("acme", "ui.theme", "x")).unwrap_err();
-        assert!(matches!(err, SettingsError::Guard(GuardError::TenantMismatch { .. })));
+        let err = s
+            .put(Some(&dev("globex")), put_req("acme", "ui.theme", "x"))
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            SettingsError::Guard(GuardError::TenantMismatch { .. })
+        ));
     }
 
     #[test]
     fn put_dev_no_role_denied() {
         let s = SettingsStore::new();
-        let err = s.put(Some(&dev_no_role("acme")), put_req("acme", "ui.theme", "x")).unwrap_err();
-        assert!(matches!(err, SettingsError::Guard(GuardError::MissingRole(_))));
+        let err = s
+            .put(Some(&dev_no_role("acme")), put_req("acme", "ui.theme", "x"))
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            SettingsError::Guard(GuardError::MissingRole(_))
+        ));
     }
 
     #[test]
     fn put_invalid_key_empty() {
         let s = SettingsStore::new();
-        let err = s.put(Some(&dev("acme")), put_req("acme", "", "v")).unwrap_err();
+        let err = s
+            .put(Some(&dev("acme")), put_req("acme", "", "v"))
+            .unwrap_err();
         assert!(matches!(err, SettingsError::InvalidKey(_)));
     }
 
     #[test]
     fn put_invalid_key_bad_char() {
         let s = SettingsStore::new();
-        let err = s.put(Some(&dev("acme")), put_req("acme", "k k", "v")).unwrap_err();
+        let err = s
+            .put(Some(&dev("acme")), put_req("acme", "k k", "v"))
+            .unwrap_err();
         assert!(matches!(err, SettingsError::InvalidKey(_)));
     }
 
@@ -247,7 +286,9 @@ mod tests {
     fn put_invalid_key_too_long() {
         let s = SettingsStore::new();
         let k = "a".repeat(129);
-        let err = s.put(Some(&dev("acme")), put_req("acme", &k, "v")).unwrap_err();
+        let err = s
+            .put(Some(&dev("acme")), put_req("acme", &k, "v"))
+            .unwrap_err();
         assert!(matches!(err, SettingsError::InvalidKey(_)));
     }
 
@@ -255,15 +296,19 @@ mod tests {
     fn put_too_large_rejected() {
         let s = SettingsStore::new();
         let v = "x".repeat(MAX_VALUE_SIZE + 1);
-        let err = s.put(Some(&dev("acme")), put_req("acme", "k", &v)).unwrap_err();
+        let err = s
+            .put(Some(&dev("acme")), put_req("acme", "k", &v))
+            .unwrap_err();
         assert!(matches!(err, SettingsError::TooLarge(_, _)));
     }
 
     #[test]
     fn put_overwrite_replaces_value() {
         let s = SettingsStore::new();
-        s.put(Some(&dev("acme")), put_req("acme", "k", "v1")).unwrap();
-        s.put(Some(&dev("acme")), put_req("acme", "k", "v2")).unwrap();
+        s.put(Some(&dev("acme")), put_req("acme", "k", "v1"))
+            .unwrap();
+        s.put(Some(&dev("acme")), put_req("acme", "k", "v2"))
+            .unwrap();
         let v = s.get(Some(&dev("acme")), "acme", "k").unwrap();
         assert_eq!(v.value, "v2");
     }
@@ -271,7 +316,8 @@ mod tests {
     #[test]
     fn get_returns_setting() {
         let s = SettingsStore::new();
-        s.put(Some(&dev("acme")), put_req("acme", "k", "v")).unwrap();
+        s.put(Some(&dev("acme")), put_req("acme", "k", "v"))
+            .unwrap();
         let v = s.get(Some(&dev("acme")), "acme", "k").unwrap();
         assert_eq!(v.value, "v");
     }
@@ -286,7 +332,8 @@ mod tests {
     #[test]
     fn get_operator_can_read_any_tenant() {
         let s = SettingsStore::new();
-        s.put(Some(&dev("acme")), put_req("acme", "k", "v")).unwrap();
+        s.put(Some(&dev("acme")), put_req("acme", "k", "v"))
+            .unwrap();
         let v = s.get(Some(&op()), "acme", "k").unwrap();
         assert_eq!(v.value, "v");
     }
@@ -294,8 +341,10 @@ mod tests {
     #[test]
     fn list_filters_by_tenant() {
         let s = SettingsStore::new();
-        s.put(Some(&dev("acme")), put_req("acme", "k1", "v")).unwrap();
-        s.put(Some(&dev("globex")), put_req("globex", "k2", "v")).unwrap();
+        s.put(Some(&dev("acme")), put_req("acme", "k1", "v"))
+            .unwrap();
+        s.put(Some(&dev("globex")), put_req("globex", "k2", "v"))
+            .unwrap();
         let acme = s.list(Some(&dev("acme")), "acme").unwrap();
         assert_eq!(acme.len(), 1);
         assert_eq!(acme[0].key, "k1");
@@ -307,14 +356,20 @@ mod tests {
         for k in ["zeta", "alpha", "mu"] {
             s.put(Some(&dev("acme")), put_req("acme", k, "v")).unwrap();
         }
-        let keys: Vec<String> = s.list(Some(&dev("acme")), "acme").unwrap().into_iter().map(|s| s.key).collect();
+        let keys: Vec<String> = s
+            .list(Some(&dev("acme")), "acme")
+            .unwrap()
+            .into_iter()
+            .map(|s| s.key)
+            .collect();
         assert_eq!(keys, vec!["alpha", "mu", "zeta"]);
     }
 
     #[test]
     fn delete_dev_normal_key() {
         let s = SettingsStore::new();
-        s.put(Some(&dev("acme")), put_req("acme", "ui.theme", "x")).unwrap();
+        s.put(Some(&dev("acme")), put_req("acme", "ui.theme", "x"))
+            .unwrap();
         s.delete(Some(&dev("acme")), "acme", "ui.theme").unwrap();
         assert!(s.get(Some(&dev("acme")), "acme", "ui.theme").is_err());
     }
@@ -322,15 +377,22 @@ mod tests {
     #[test]
     fn delete_dev_admin_only_denied() {
         let s = SettingsStore::new();
-        s.put(Some(&admin()), put_req("acme", "billing.plan", "free")).unwrap();
-        let err = s.delete(Some(&dev("acme")), "acme", "billing.plan").unwrap_err();
-        assert!(matches!(err, SettingsError::Guard(GuardError::PersonaForbidden { .. })));
+        s.put(Some(&admin()), put_req("acme", "billing.plan", "free"))
+            .unwrap();
+        let err = s
+            .delete(Some(&dev("acme")), "acme", "billing.plan")
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            SettingsError::Guard(GuardError::PersonaForbidden { .. })
+        ));
     }
 
     #[test]
     fn delete_admin_admin_only_ok() {
         let s = SettingsStore::new();
-        s.put(Some(&admin()), put_req("acme", "billing.plan", "free")).unwrap();
+        s.put(Some(&admin()), put_req("acme", "billing.plan", "free"))
+            .unwrap();
         s.delete(Some(&admin()), "acme", "billing.plan").unwrap();
     }
 

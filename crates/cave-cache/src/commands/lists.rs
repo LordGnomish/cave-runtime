@@ -11,7 +11,7 @@ use tokio::sync::mpsc;
 use crate::db::{BlockedPop, Db};
 use crate::error::{CacheError, CacheResult};
 use crate::resp::Resp;
-use crate::types::{bytes_to_i64, normalize_index, Entry, Value};
+use crate::types::{Entry, Value, bytes_to_i64, normalize_index};
 
 // ── LPUSH / RPUSH / LPUSHX / RPUSHX ─────────────────────────────────────────
 
@@ -32,8 +32,14 @@ pub fn cmd_rpushx(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 }
 
 fn push_impl(args: &[Vec<u8>], db: &mut Db, left: bool, nx: bool) -> CacheResult<Resp> {
-    let cmd = if left { if nx { "lpushx" } else { "lpush" } } else { if nx { "rpushx" } else { "rpush" } };
-    if args.len() < 3 { return Err(CacheError::wrong_arity(cmd)); }
+    let cmd = if left {
+        if nx { "lpushx" } else { "lpush" }
+    } else {
+        if nx { "rpushx" } else { "rpush" }
+    };
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity(cmd));
+    }
 
     let key = args[1].clone();
 
@@ -45,8 +51,11 @@ fn push_impl(args: &[Vec<u8>], db: &mut Db, left: bool, nx: bool) -> CacheResult
         Some(entry) => {
             if let Value::List(list) = &mut entry.value {
                 for val in &args[2..] {
-                    if left { list.push_front(val.clone()); }
-                    else { list.push_back(val.clone()); }
+                    if left {
+                        list.push_front(val.clone());
+                    } else {
+                        list.push_back(val.clone());
+                    }
                 }
                 let len = list.len() as i64;
                 Ok(Resp::Integer(len))
@@ -57,8 +66,11 @@ fn push_impl(args: &[Vec<u8>], db: &mut Db, left: bool, nx: bool) -> CacheResult
         None => {
             let mut list = VecDeque::new();
             for val in &args[2..] {
-                if left { list.push_front(val.clone()); }
-                else { list.push_back(val.clone()); }
+                if left {
+                    list.push_front(val.clone());
+                } else {
+                    list.push_back(val.clone());
+                }
             }
             let len = list.len() as i64;
             db.insert(key, Entry::new(Value::List(list)));
@@ -79,7 +91,9 @@ pub fn cmd_rpop(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 
 fn pop_impl(args: &[Vec<u8>], db: &mut Db, left: bool) -> CacheResult<Resp> {
     let cmd = if left { "lpop" } else { "rpop" };
-    if args.len() < 2 || args.len() > 3 { return Err(CacheError::wrong_arity(cmd)); }
+    if args.len() < 2 || args.len() > 3 {
+        return Err(CacheError::wrong_arity(cmd));
+    }
 
     let count: Option<usize> = if args.len() == 3 {
         Some(bytes_to_i64(&args[2]).ok_or(CacheError::NotInteger)? as usize)
@@ -95,7 +109,11 @@ fn pop_impl(args: &[Vec<u8>], db: &mut Db, left: bool) -> CacheResult<Resp> {
                 if let Some(n) = count {
                     let mut results = Vec::new();
                     for _ in 0..n {
-                        let v = if left { list.pop_front() } else { list.pop_back() };
+                        let v = if left {
+                            list.pop_front()
+                        } else {
+                            list.pop_back()
+                        };
                         match v {
                             Some(v) => results.push(Resp::BulkString(Some(v))),
                             None => break,
@@ -106,9 +124,15 @@ fn pop_impl(args: &[Vec<u8>], db: &mut Db, left: bool) -> CacheResult<Resp> {
                     }
                     Ok(Resp::Array(Some(results)))
                 } else {
-                    let v = if left { list.pop_front() } else { list.pop_back() };
+                    let v = if left {
+                        list.pop_front()
+                    } else {
+                        list.pop_back()
+                    };
                     let is_empty = list.is_empty();
-                    if is_empty { db.remove(key); }
+                    if is_empty {
+                        db.remove(key);
+                    }
                     Ok(v.map(|v| Resp::BulkString(Some(v))).unwrap_or(Resp::nil()))
                 }
             } else {
@@ -128,7 +152,9 @@ fn pop_impl(args: &[Vec<u8>], db: &mut Db, left: bool) -> CacheResult<Resp> {
 // ── LLEN ─────────────────────────────────────────────────────────────────────
 
 pub fn cmd_llen(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 2 { return Err(CacheError::wrong_arity("llen")); }
+    if args.len() != 2 {
+        return Err(CacheError::wrong_arity("llen"));
+    }
     match db.get_typed(&args[1], "list")? {
         Some(e) => match &e.value {
             Value::List(l) => Ok(Resp::Integer(l.len() as i64)),
@@ -141,7 +167,9 @@ pub fn cmd_llen(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 // ── LRANGE ───────────────────────────────────────────────────────────────────
 
 pub fn cmd_lrange(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 4 { return Err(CacheError::wrong_arity("lrange")); }
+    if args.len() != 4 {
+        return Err(CacheError::wrong_arity("lrange"));
+    }
     let start = bytes_to_i64(&args[2]).ok_or(CacheError::NotInteger)?;
     let stop = bytes_to_i64(&args[3]).ok_or(CacheError::NotInteger)?;
 
@@ -172,7 +200,9 @@ pub fn cmd_lrange(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 // ── LINDEX ───────────────────────────────────────────────────────────────────
 
 pub fn cmd_lindex(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 3 { return Err(CacheError::wrong_arity("lindex")); }
+    if args.len() != 3 {
+        return Err(CacheError::wrong_arity("lindex"));
+    }
     let index = bytes_to_i64(&args[2]).ok_or(CacheError::NotInteger)?;
 
     match db.get_typed(&args[1], "list")? {
@@ -183,7 +213,9 @@ pub fn cmd_lindex(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
                 if idx >= list.len() {
                     return Ok(Resp::nil());
                 }
-                Ok(Resp::BulkString(list.get(idx).cloned().map(Some).unwrap_or(None)))
+                Ok(Resp::BulkString(
+                    list.get(idx).cloned().map(Some).unwrap_or(None),
+                ))
             }
             _ => unreachable!(),
         },
@@ -194,7 +226,9 @@ pub fn cmd_lindex(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 // ── LSET ─────────────────────────────────────────────────────────────────────
 
 pub fn cmd_lset(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 4 { return Err(CacheError::wrong_arity("lset")); }
+    if args.len() != 4 {
+        return Err(CacheError::wrong_arity("lset"));
+    }
     let index = bytes_to_i64(&args[2]).ok_or(CacheError::NotInteger)?;
     let value = args[3].clone();
 
@@ -218,7 +252,9 @@ pub fn cmd_lset(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 // ── LINSERT ──────────────────────────────────────────────────────────────────
 
 pub fn cmd_linsert(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 5 { return Err(CacheError::wrong_arity("linsert")); }
+    if args.len() != 5 {
+        return Err(CacheError::wrong_arity("linsert"));
+    }
     let before = match args[2].to_ascii_uppercase().as_slice() {
         b"BEFORE" => true,
         b"AFTER" => false,
@@ -249,7 +285,9 @@ pub fn cmd_linsert(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 // ── LREM ─────────────────────────────────────────────────────────────────────
 
 pub fn cmd_lrem(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 4 { return Err(CacheError::wrong_arity("lrem")); }
+    if args.len() != 4 {
+        return Err(CacheError::wrong_arity("lrem"));
+    }
     let count = bytes_to_i64(&args[2]).ok_or(CacheError::NotInteger)?;
     let element = &args[3];
 
@@ -287,7 +325,9 @@ pub fn cmd_lrem(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
                     removed = 0; // placeholder — actually retained is what's left
                 }
                 let is_empty = list.is_empty();
-                if is_empty { db.remove(&args[1]); }
+                if is_empty {
+                    db.remove(&args[1]);
+                }
                 Ok(Resp::Integer(removed))
             }
             _ => unreachable!(),
@@ -299,7 +339,9 @@ pub fn cmd_lrem(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 // ── LTRIM ────────────────────────────────────────────────────────────────────
 
 pub fn cmd_ltrim(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 4 { return Err(CacheError::wrong_arity("ltrim")); }
+    if args.len() != 4 {
+        return Err(CacheError::wrong_arity("ltrim"));
+    }
     let start = bytes_to_i64(&args[2]).ok_or(CacheError::NotInteger)?;
     let stop = bytes_to_i64(&args[3]).ok_or(CacheError::NotInteger)?;
 
@@ -313,10 +355,17 @@ pub fn cmd_ltrim(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
                 if start > stop || start >= list.len() {
                     list.clear();
                 } else {
-                    let trimmed: VecDeque<Vec<u8>> = list.iter().skip(start).take(stop - start + 1).cloned().collect();
+                    let trimmed: VecDeque<Vec<u8>> = list
+                        .iter()
+                        .skip(start)
+                        .take(stop - start + 1)
+                        .cloned()
+                        .collect();
                     *list = trimmed;
                 }
-                if list.is_empty() { db.remove(&args[1]); }
+                if list.is_empty() {
+                    db.remove(&args[1]);
+                }
                 Ok(Resp::ok())
             }
             _ => unreachable!(),
@@ -328,7 +377,9 @@ pub fn cmd_ltrim(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 // ── LPOS ─────────────────────────────────────────────────────────────────────
 
 pub fn cmd_lpos(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 3 { return Err(CacheError::wrong_arity("lpos")); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity("lpos"));
+    }
     let element = &args[2];
     let mut rank: i64 = 1;
     let mut count: Option<usize> = None;
@@ -337,9 +388,18 @@ pub fn cmd_lpos(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
     let mut i = 3;
     while i < args.len() {
         match args[i].to_ascii_uppercase().as_slice() {
-            b"RANK" => { i += 1; rank = bytes_to_i64(&args[i]).ok_or(CacheError::NotInteger)?; }
-            b"COUNT" => { i += 1; count = Some(bytes_to_i64(&args[i]).ok_or(CacheError::NotInteger)? as usize); }
-            b"MAXLEN" => { i += 1; maxlen = bytes_to_i64(&args[i]).ok_or(CacheError::NotInteger)? as usize; }
+            b"RANK" => {
+                i += 1;
+                rank = bytes_to_i64(&args[i]).ok_or(CacheError::NotInteger)?;
+            }
+            b"COUNT" => {
+                i += 1;
+                count = Some(bytes_to_i64(&args[i]).ok_or(CacheError::NotInteger)? as usize);
+            }
+            b"MAXLEN" => {
+                i += 1;
+                maxlen = bytes_to_i64(&args[i]).ok_or(CacheError::NotInteger)? as usize;
+            }
             _ => return Err(CacheError::Syntax),
         }
         i += 1;
@@ -348,7 +408,11 @@ pub fn cmd_lpos(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
     match db.get_typed(&args[1], "list")? {
         Some(e) => match &e.value {
             Value::List(list) => {
-                let len = if maxlen == 0 { list.len() } else { maxlen.min(list.len()) };
+                let len = if maxlen == 0 {
+                    list.len()
+                } else {
+                    maxlen.min(list.len())
+                };
                 let mut positions = Vec::new();
                 let mut match_count = 0i64;
 
@@ -364,7 +428,9 @@ pub fn cmd_lpos(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
                         if match_count.abs() >= rank.abs() {
                             positions.push(idx as i64);
                             if let Some(c) = count {
-                                if positions.len() >= c { break; }
+                                if positions.len() >= c {
+                                    break;
+                                }
                             } else {
                                 break;
                             }
@@ -373,21 +439,32 @@ pub fn cmd_lpos(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
                 }
 
                 if count.is_some() {
-                    Ok(Resp::Array(Some(positions.into_iter().map(Resp::Integer).collect())))
+                    Ok(Resp::Array(Some(
+                        positions.into_iter().map(Resp::Integer).collect(),
+                    )))
                 } else {
-                    Ok(positions.first().map(|&p| Resp::Integer(p)).unwrap_or(Resp::nil()))
+                    Ok(positions
+                        .first()
+                        .map(|&p| Resp::Integer(p))
+                        .unwrap_or(Resp::nil()))
                 }
             }
             _ => unreachable!(),
         },
-        None => Ok(if count.is_some() { Resp::Array(Some(vec![])) } else { Resp::nil() }),
+        None => Ok(if count.is_some() {
+            Resp::Array(Some(vec![]))
+        } else {
+            Resp::nil()
+        }),
     }
 }
 
 // ── LMOVE ────────────────────────────────────────────────────────────────────
 
 pub fn cmd_lmove(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() != 5 { return Err(CacheError::wrong_arity("lmove")); }
+    if args.len() != 5 {
+        return Err(CacheError::wrong_arity("lmove"));
+    }
     let src = args[1].clone();
     let dst = args[2].clone();
     let from_left = match args[3].to_ascii_uppercase().as_slice() {
@@ -405,10 +482,16 @@ pub fn cmd_lmove(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
     let element = match db.get_typed_mut(&src, "list")? {
         Some(entry) => match &mut entry.value {
             Value::List(list) => {
-                let v = if from_left { list.pop_front() } else { list.pop_back() };
+                let v = if from_left {
+                    list.pop_front()
+                } else {
+                    list.pop_back()
+                };
                 let is_empty = list.is_empty();
                 let v = v.ok_or(CacheError::Empty)?;
-                if is_empty { db.remove(&src); }
+                if is_empty {
+                    db.remove(&src);
+                }
                 v
             }
             _ => unreachable!(),
@@ -420,15 +503,21 @@ pub fn cmd_lmove(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
     match db.get_typed_mut(&dst, "list")? {
         Some(entry) => match &mut entry.value {
             Value::List(list) => {
-                if to_left { list.push_front(element.clone()); }
-                else { list.push_back(element.clone()); }
+                if to_left {
+                    list.push_front(element.clone());
+                } else {
+                    list.push_back(element.clone());
+                }
             }
             _ => return Err(CacheError::WrongType),
         },
         None => {
             let mut list = VecDeque::new();
-            if to_left { list.push_front(element.clone()); }
-            else { list.push_back(element.clone()); }
+            if to_left {
+                list.push_front(element.clone());
+            } else {
+                list.push_back(element.clone());
+            }
             db.insert(dst, Entry::new(Value::List(list)));
         }
     }
@@ -463,7 +552,9 @@ async fn blpop_impl(
     timeout: f64,
 ) -> CacheResult<Option<(Vec<u8>, Vec<u8>)>> {
     let cmd = if left { "blpop" } else { "brpop" };
-    if args.len() < 3 { return Err(CacheError::wrong_arity(cmd)); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity(cmd));
+    }
 
     let keys = &args[1..args.len() - 1];
 
@@ -472,10 +563,16 @@ async fn blpop_impl(
         match db.get_typed_mut(key, "list")? {
             Some(entry) => match &mut entry.value {
                 Value::List(list) => {
-                    let v = if left { list.pop_front() } else { list.pop_back() };
+                    let v = if left {
+                        list.pop_front()
+                    } else {
+                        list.pop_back()
+                    };
                     if let Some(v) = v {
                         let is_empty = list.is_empty();
-                        if is_empty { db.remove(key); }
+                        if is_empty {
+                            db.remove(key);
+                        }
                         return Ok(Some((key.clone(), v)));
                     }
                 }
@@ -492,9 +589,15 @@ async fn blpop_impl(
 
 /// Synchronous (non-blocking) try-pop for BLPOP/BRPOP used inside execute_db_command.
 /// Returns Some((key, value)) if an element was immediately available, None otherwise.
-pub fn blpop_impl_sync(args: &[Vec<u8>], db: &mut Db, left: bool) -> CacheResult<Option<(Vec<u8>, Vec<u8>)>> {
+pub fn blpop_impl_sync(
+    args: &[Vec<u8>],
+    db: &mut Db,
+    left: bool,
+) -> CacheResult<Option<(Vec<u8>, Vec<u8>)>> {
     let cmd = if left { "blpop" } else { "brpop" };
-    if args.len() < 3 { return Err(CacheError::wrong_arity(cmd)); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity(cmd));
+    }
 
     // Keys are all args except the last (timeout)
     let keys = &args[1..args.len() - 1];
@@ -502,10 +605,16 @@ pub fn blpop_impl_sync(args: &[Vec<u8>], db: &mut Db, left: bool) -> CacheResult
         match db.get_typed_mut(key, "list")? {
             Some(entry) => match &mut entry.value {
                 Value::List(list) => {
-                    let v = if left { list.pop_front() } else { list.pop_back() };
+                    let v = if left {
+                        list.pop_front()
+                    } else {
+                        list.pop_back()
+                    };
                     if let Some(v) = v {
                         let is_empty = list.is_empty();
-                        if is_empty { db.remove(key); }
+                        if is_empty {
+                            db.remove(key);
+                        }
                         return Ok(Some((key.clone(), v)));
                     }
                 }
@@ -518,12 +627,20 @@ pub fn blpop_impl_sync(args: &[Vec<u8>], db: &mut Db, left: bool) -> CacheResult
 }
 
 /// Register blocking waiters for BLPOP/BRPOP.
-pub fn register_blocked_pop(db: &mut Db, keys: &[Vec<u8>], tx: mpsc::Sender<(Vec<u8>, Vec<u8>)>, from_right: bool) {
+pub fn register_blocked_pop(
+    db: &mut Db,
+    keys: &[Vec<u8>],
+    tx: mpsc::Sender<(Vec<u8>, Vec<u8>)>,
+    from_right: bool,
+) {
     for key in keys {
         db.blocked_pops
             .entry(key.clone())
             .or_default()
-            .push(BlockedPop { tx: tx.clone(), from_right });
+            .push(BlockedPop {
+                tx: tx.clone(),
+                from_right,
+            });
     }
 }
 
@@ -546,7 +663,11 @@ pub fn wake_blocked(db: &mut Db, key: &[u8]) -> usize {
     // Try to pop the value
     if let Some(entry) = db.keys.get_mut(key) {
         if let Value::List(list) = &mut entry.value {
-            let v = if waiter.from_right { list.pop_back() } else { list.pop_front() };
+            let v = if waiter.from_right {
+                list.pop_back()
+            } else {
+                list.pop_front()
+            };
             if let Some(v) = v {
                 if list.is_empty() {
                     db.keys.remove(key);

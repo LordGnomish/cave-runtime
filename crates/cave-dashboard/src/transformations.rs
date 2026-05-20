@@ -35,14 +35,26 @@ pub struct DataField {
 
 impl DataFrame {
     pub fn new(name: &str) -> Self {
-        Self { name: name.to_string(), fields: Vec::new(), labels: BTreeMap::new() }
+        Self {
+            name: name.to_string(),
+            fields: Vec::new(),
+            labels: BTreeMap::new(),
+        }
     }
     pub fn with_field(mut self, name: &str, values: Vec<f64>) -> Self {
-        self.fields.push(DataField { name: name.to_string(), values, labels: BTreeMap::new() });
+        self.fields.push(DataField {
+            name: name.to_string(),
+            values,
+            labels: BTreeMap::new(),
+        });
         self
     }
     pub fn row_count(&self) -> usize {
-        self.fields.iter().map(|f| f.values.len()).min().unwrap_or(0)
+        self.fields
+            .iter()
+            .map(|f| f.values.len())
+            .min()
+            .unwrap_or(0)
     }
 }
 
@@ -55,7 +67,10 @@ pub enum FilterRule {
     /// Keep only rows where `field` is between [min, max].
     ValueBetween { field: String, min: f64, max: f64 },
     /// Drop rows where `label_key` is missing or does not equal `label_value`.
-    EqualLabel { label_key: String, label_value: String },
+    EqualLabel {
+        label_key: String,
+        label_value: String,
+    },
 }
 
 pub fn filter(frames: &[DataFrame], rule: &FilterRule) -> Vec<DataFrame> {
@@ -67,7 +82,9 @@ pub fn filter(frames: &[DataFrame], rule: &FilterRule) -> Vec<DataFrame> {
                     Some(f) => f,
                     None => continue,
                 };
-                (0..f.values.len()).filter(|i| !f.values[*i].is_nan()).collect()
+                (0..f.values.len())
+                    .filter(|i| !f.values[*i].is_nan())
+                    .collect()
             }
             FilterRule::ValueBetween { field, min, max } => {
                 let f = match frame.fields.iter().find(|f| f.name == *field) {
@@ -78,7 +95,10 @@ pub fn filter(frames: &[DataFrame], rule: &FilterRule) -> Vec<DataFrame> {
                     .filter(|i| f.values[*i] >= *min && f.values[*i] <= *max)
                     .collect()
             }
-            FilterRule::EqualLabel { label_key, label_value } => {
+            FilterRule::EqualLabel {
+                label_key,
+                label_value,
+            } => {
                 if frame.labels.get(label_key).map(String::as_str) != Some(label_value.as_str()) {
                     continue;
                 }
@@ -90,7 +110,10 @@ pub fn filter(frames: &[DataFrame], rule: &FilterRule) -> Vec<DataFrame> {
         for f in &frame.fields {
             new_frame.fields.push(DataField {
                 name: f.name.clone(),
-                values: keep.iter().filter_map(|i| f.values.get(*i).copied()).collect(),
+                values: keep
+                    .iter()
+                    .filter_map(|i| f.values.get(*i).copied())
+                    .collect(),
                 labels: f.labels.clone(),
             });
         }
@@ -273,7 +296,14 @@ mod tests {
     #[test]
     fn filter_value_between_keeps_in_range() {
         let frames = vec![frame_with("a", &[("v", vec![1.0, 5.0, 10.0])])];
-        let out = filter(&frames, &FilterRule::ValueBetween { field: "v".into(), min: 2.0, max: 9.0 });
+        let out = filter(
+            &frames,
+            &FilterRule::ValueBetween {
+                field: "v".into(),
+                min: 2.0,
+                max: 9.0,
+            },
+        );
         assert_eq!(out[0].fields[0].values, vec![5.0]);
     }
 
@@ -282,10 +312,13 @@ mod tests {
         let mut f = frame_with("a", &[("v", vec![1.0, 2.0])]);
         f.labels.insert("env".into(), "prod".into());
         let frames = vec![f];
-        let out = filter(&frames, &FilterRule::EqualLabel {
-            label_key: "env".into(),
-            label_value: "staging".into(),
-        });
+        let out = filter(
+            &frames,
+            &FilterRule::EqualLabel {
+                label_key: "env".into(),
+                label_value: "staging".into(),
+            },
+        );
         assert!(out.is_empty());
     }
 
@@ -317,8 +350,14 @@ mod tests {
         let frames = vec![frame_with("a", &[("v", vec![5.0, 1.0, 3.0, 8.0])])];
         assert_eq!(reduce(&frames, Reducer::Min)[0].fields[0].values, vec![1.0]);
         assert_eq!(reduce(&frames, Reducer::Max)[0].fields[0].values, vec![8.0]);
-        assert_eq!(reduce(&frames, Reducer::Last)[0].fields[0].values, vec![8.0]);
-        assert_eq!(reduce(&frames, Reducer::Count)[0].fields[0].values, vec![4.0]);
+        assert_eq!(
+            reduce(&frames, Reducer::Last)[0].fields[0].values,
+            vec![8.0]
+        );
+        assert_eq!(
+            reduce(&frames, Reducer::Count)[0].fields[0].values,
+            vec![4.0]
+        );
     }
 
     #[test]
@@ -360,11 +399,17 @@ mod tests {
 
     #[test]
     fn rename_starts_with_replaces_prefix() {
-        let frames = vec![frame_with("f", &[("metric_cpu", vec![1.0]), ("metric_mem", vec![2.0])])];
-        let out = rename(&frames, &RenameRule {
-            starts_with: "metric_".into(),
-            replacement: "m_".into(),
-        });
+        let frames = vec![frame_with(
+            "f",
+            &[("metric_cpu", vec![1.0]), ("metric_mem", vec![2.0])],
+        )];
+        let out = rename(
+            &frames,
+            &RenameRule {
+                starts_with: "metric_".into(),
+                replacement: "m_".into(),
+            },
+        );
         let names: Vec<&str> = out[0].fields.iter().map(|f| f.name.as_str()).collect();
         assert_eq!(names, vec!["m_cpu", "m_mem"]);
     }
@@ -372,10 +417,13 @@ mod tests {
     #[test]
     fn rename_passes_through_non_matching_fields() {
         let frames = vec![frame_with("f", &[("other", vec![1.0])])];
-        let out = rename(&frames, &RenameRule {
-            starts_with: "metric_".into(),
-            replacement: "m_".into(),
-        });
+        let out = rename(
+            &frames,
+            &RenameRule {
+                starts_with: "metric_".into(),
+                replacement: "m_".into(),
+            },
+        );
         assert_eq!(out[0].fields[0].name, "other");
     }
 
@@ -383,10 +431,10 @@ mod tests {
 
     #[test]
     fn sort_by_ascending() {
-        let frames = vec![frame_with("f", &[
-            ("v", vec![3.0, 1.0, 2.0]),
-            ("k", vec![10.0, 20.0, 30.0]),
-        ])];
+        let frames = vec![frame_with(
+            "f",
+            &[("v", vec![3.0, 1.0, 2.0]), ("k", vec![10.0, 20.0, 30.0])],
+        )];
         let out = sort_by(&frames, "v", false);
         assert_eq!(out[0].fields[0].values, vec![1.0, 2.0, 3.0]);
         assert_eq!(out[0].fields[1].values, vec![20.0, 30.0, 10.0]);

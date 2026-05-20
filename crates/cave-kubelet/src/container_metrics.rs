@@ -144,7 +144,9 @@ pub fn parse_io_line(line: &str) -> Result<IoStat, MetricsError> {
     let mut io = IoStat::default();
     let mut parts = line.split_whitespace();
     // First token is the device id; skip.
-    parts.next().ok_or_else(|| MetricsError::MalformedLine(line.into()))?;
+    parts
+        .next()
+        .ok_or_else(|| MetricsError::MalformedLine(line.into()))?;
     for kv in parts {
         let mut split = kv.splitn(2, '=');
         let k = split
@@ -198,7 +200,10 @@ impl ContainerMetricsAggregator {
             .get_mut(&pod_uid)
             .ok_or(MetricsError::UnknownPod(pod_uid))?;
         // Replace existing record for the same container_id; otherwise append.
-        if let Some(existing) = entry.iter_mut().find(|c| c.container_id == stats.container_id) {
+        if let Some(existing) = entry
+            .iter_mut()
+            .find(|c| c.container_id == stats.container_id)
+        {
             *existing = stats;
         } else {
             entry.push(stats);
@@ -242,7 +247,8 @@ mod tests {
 
     #[test]
     fn parse_cpu_stat_full_block() {
-        let blob = "usage_usec 1000\nuser_usec 700\nsystem_usec 300\nnr_throttled 5\nthrottled_usec 100\n";
+        let blob =
+            "usage_usec 1000\nuser_usec 700\nsystem_usec 300\nnr_throttled 5\nthrottled_usec 100\n";
         let s = parse_cpu_stat(blob).unwrap();
         assert_eq!(s.usage_usec, 1000);
         assert_eq!(s.user_usec, 700);
@@ -304,7 +310,10 @@ mod tests {
             container_id: "c1".into(),
             ..Default::default()
         };
-        assert!(matches!(a.record(pod, stats), Err(MetricsError::UnknownPod(_))));
+        assert!(matches!(
+            a.record(pod, stats),
+            Err(MetricsError::UnknownPod(_))
+        ));
     }
 
     #[test]

@@ -164,7 +164,11 @@ impl GrafanaPlugin {
 
     pub fn add(&mut self, d: DashboardDef) -> Result<(), GrafanaError> {
         d.validate()?;
-        if let Some(idx) = self.dashboards.iter().position(|x| x.id == d.id && x.tenant == d.tenant) {
+        if let Some(idx) = self
+            .dashboards
+            .iter()
+            .position(|x| x.id == d.id && x.tenant == d.tenant)
+        {
             self.dashboards[idx] = d;
         } else {
             self.dashboards.push(d);
@@ -173,11 +177,17 @@ impl GrafanaPlugin {
     }
 
     pub fn find(&self, tenant: &str, id: &str) -> Option<&DashboardDef> {
-        self.dashboards.iter().find(|d| d.tenant == tenant && d.id == id)
+        self.dashboards
+            .iter()
+            .find(|d| d.tenant == tenant && d.id == id)
     }
 
     pub fn list_for_tenant(&self, tenant: &str) -> Vec<&DashboardDef> {
-        let mut out: Vec<&DashboardDef> = self.dashboards.iter().filter(|d| d.tenant == tenant).collect();
+        let mut out: Vec<&DashboardDef> = self
+            .dashboards
+            .iter()
+            .filter(|d| d.tenant == tenant)
+            .collect();
         out.sort_by(|a, b| a.title.cmp(&b.title));
         out
     }

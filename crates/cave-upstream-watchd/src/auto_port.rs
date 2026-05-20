@@ -44,8 +44,8 @@
 //!   state file. The portal `/admin/upstream` panel reads this.
 
 use crate::auto_port_gate::{CharterBaseline, CharterGate, VerifyResult};
-use crate::event::{read_events, GapEvent};
-use crate::prompt::{build_prompt, PortContext};
+use crate::event::{GapEvent, read_events};
+use crate::prompt::{PortContext, build_prompt};
 use crate::task_queue::{TaskId, TaskOutput, TaskQueue, TaskQueueError, TaskStatus};
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use serde::{Deserialize, Serialize};
@@ -153,10 +153,7 @@ impl Default for DispatcherConfig {
 /// trait so tests can inject deterministic answers without touching
 /// disk.
 pub trait ContextResolver: Send + Sync {
-    fn resolve(
-        &self,
-        event: &GapEvent,
-    ) -> Result<(PortContext, CharterBaseline), AutoPortError>;
+    fn resolve(&self, event: &GapEvent) -> Result<(PortContext, CharterBaseline), AutoPortError>;
 }
 
 /// Default resolver — reads the live `parity-index.json` +
@@ -174,10 +171,7 @@ pub struct WorkspaceContextResolver {
 }
 
 impl ContextResolver for WorkspaceContextResolver {
-    fn resolve(
-        &self,
-        event: &GapEvent,
-    ) -> Result<(PortContext, CharterBaseline), AutoPortError> {
+    fn resolve(&self, event: &GapEvent) -> Result<(PortContext, CharterBaseline), AutoPortError> {
         let crate_name = event.cave_module.clone();
         let fill_before = (self.ratio_reader)(&crate_name).unwrap_or(0.0);
         let stubs_before = (self.stub_counter)();
@@ -264,9 +258,7 @@ impl AutoPortDispatcher {
             return Ok(summary);
         }
         let events = read_events(&self.events_path).map_err(|e| {
-            AutoPortError::TaskQueue(TaskQueueError::Http(format!(
-                "read_events: {e}"
-            )))
+            AutoPortError::TaskQueue(TaskQueueError::Http(format!("read_events: {e}")))
         })?;
         summary.considered = events.len();
 
@@ -274,7 +266,12 @@ impl AutoPortDispatcher {
         let mut state = self.state.lock().await;
         let mut in_flight: usize = state
             .values()
-            .filter(|r| matches!(r.status, AutoPortStatus::Dispatched | AutoPortStatus::Running))
+            .filter(|r| {
+                matches!(
+                    r.status,
+                    AutoPortStatus::Dispatched | AutoPortStatus::Running
+                )
+            })
             .count();
 
         let now = Utc::now();
@@ -283,7 +280,9 @@ impl AutoPortDispatcher {
                 // Already-merged or already-dispatched stays as-is
                 // unless it's a charter_fail past the cooldown.
                 match existing.status {
-                    AutoPortStatus::Merged | AutoPortStatus::Dispatched | AutoPortStatus::Running => {
+                    AutoPortStatus::Merged
+                    | AutoPortStatus::Dispatched
+                    | AutoPortStatus::Running => {
                         summary.already_dispatched += 1;
                         continue;
                     }
@@ -353,10 +352,7 @@ impl AutoPortDispatcher {
             reason: None,
             baseline,
         };
-        write_audit(
-            &self.audit_path,
-            &AuditEntry::dispatched(&record),
-        )?;
+        write_audit(&self.audit_path, &AuditEntry::dispatched(&record))?;
         Ok(record)
     }
 
@@ -369,7 +365,12 @@ impl AutoPortDispatcher {
         let now = Utc::now();
         let pending_ids: Vec<String> = state
             .values()
-            .filter(|r| matches!(r.status, AutoPortStatus::Dispatched | AutoPortStatus::Running))
+            .filter(|r| {
+                matches!(
+                    r.status,
+                    AutoPortStatus::Dispatched | AutoPortStatus::Running
+                )
+            })
             .map(|r| r.event_id.clone())
             .collect();
         summary.considered = pending_ids.len();
@@ -413,10 +414,7 @@ impl AutoPortDispatcher {
                         r.commit_sha = Some(commit_sha.clone());
                         r.charter_report = Some(report.clone());
                         r.last_checked_at = now;
-                        write_audit(
-                            &self.audit_path,
-                            &AuditEntry::verified(r, &report),
-                        )?;
+                        write_audit(&self.audit_path, &AuditEntry::verified(r, &report))?;
                     }
                 }
                 TaskStatus::Failed { reason } => {
@@ -425,10 +423,7 @@ impl AutoPortDispatcher {
                         r.status = AutoPortStatus::BackendFail;
                         r.reason = Some(reason.clone());
                         r.last_checked_at = now;
-                        write_audit(
-                            &self.audit_path,
-                            &AuditEntry::backend_fail(r, &reason),
-                        )?;
+                        write_audit(&self.audit_path, &AuditEntry::backend_fail(r, &reason))?;
                     }
                 }
             }
@@ -594,14 +589,14 @@ pub fn read_audit(path: &Path) -> Result<Vec<AuditEntry>, AutoPortError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::changelog::Changelog;
     use crate::auto_port_gate::CharterV2Gate;
+    use crate::changelog::Changelog;
     use crate::diff::Severity;
     use crate::event::{GapEventSink, JsonlSink};
     use crate::task_queue::DryRunTaskQueue;
     use async_trait::async_trait;
-    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
     fn ts(offset_min: i64) -> DateTime<Utc> {
         Utc::now() - ChronoDuration::minutes(60) + ChronoDuration::minutes(offset_min)
@@ -636,7 +631,10 @@ mod tests {
 
     struct StaticResolver;
     impl ContextResolver for StaticResolver {
-        fn resolve(&self, event: &GapEvent) -> Result<(PortContext, CharterBaseline), AutoPortError> {
+        fn resolve(
+            &self,
+            event: &GapEvent,
+        ) -> Result<(PortContext, CharterBaseline), AutoPortError> {
             let crate_name = event.cave_module.clone();
             Ok((
                 PortContext {
@@ -672,7 +670,12 @@ mod tests {
     }
     #[async_trait]
     impl TaskQueue for ScriptedQueue {
-        async fn submit(&self, _: &str, _: &str, _: HashMap<String, String>) -> Result<TaskId, TaskQueueError> {
+        async fn submit(
+            &self,
+            _: &str,
+            _: &str,
+            _: HashMap<String, String>,
+        ) -> Result<TaskId, TaskQueueError> {
             let n = self.submitted.fetch_add(1, Ordering::SeqCst);
             Ok(TaskId::new(format!("scripted-{n:04}")))
         }
@@ -698,7 +701,11 @@ mod tests {
     }
     #[async_trait]
     impl CharterGate for ScriptedGate {
-        async fn verify(&self, baseline: &CharterBaseline, sha: &str) -> Result<VerifyResult, crate::auto_port_gate::GateError> {
+        async fn verify(
+            &self,
+            baseline: &CharterBaseline,
+            sha: &str,
+        ) -> Result<VerifyResult, crate::auto_port_gate::GateError> {
             let pass = self.will_pass.load(Ordering::SeqCst);
             Ok(VerifyResult {
                 crate_name: baseline.crate_name.clone(),
@@ -706,17 +713,28 @@ mod tests {
                 tests_pass: pass,
                 cargo_check_pass: pass,
                 fill_ratio_before: baseline.fill_ratio_before,
-                fill_ratio_after: if pass { baseline.fill_ratio_before + 0.1 } else { baseline.fill_ratio_before },
+                fill_ratio_after: if pass {
+                    baseline.fill_ratio_before + 0.1
+                } else {
+                    baseline.fill_ratio_before
+                },
                 parity_ratio_delta: if pass { 0.1 } else { 0.0 },
                 stub_count_before: 0,
                 stub_count_after: 0,
                 no_new_stubs: pass,
                 no_breaking_change: pass,
                 overall_pass: pass,
-                notes: if pass { vec![] } else { vec!["ratio did not rise".into()] },
+                notes: if pass {
+                    vec![]
+                } else {
+                    vec!["ratio did not rise".into()]
+                },
                 tdd_compliance: None,
             })
-            .and_then(|r| { let _ = self.crate_name; Ok(r) })
+            .and_then(|r| {
+                let _ = self.crate_name;
+                Ok(r)
+            })
         }
     }
 
@@ -745,7 +763,10 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let events = vec![sample_event("a", "cave-x"), sample_event("b", "cave-y")];
         let q = Arc::new(DryRunTaskQueue::new(dir.path().join("dry.jsonl")));
-        let g = Arc::new(ScriptedGate { will_pass: Arc::new(AtomicBool::new(true)), crate_name: "" });
+        let g = Arc::new(ScriptedGate {
+            will_pass: Arc::new(AtomicBool::new(true)),
+            crate_name: "",
+        });
         let d = dispatcher(&dir, &events, q, g);
         let s1 = d.scan_and_dispatch().await.unwrap();
         assert_eq!(s1.dispatched, 2);
@@ -761,13 +782,20 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let events = vec![sample_event("a", "cave-x")];
         let q = Arc::new(DryRunTaskQueue::new(dir.path().join("dry.jsonl")));
-        let g = Arc::new(ScriptedGate { will_pass: Arc::new(AtomicBool::new(true)), crate_name: "" });
+        let g = Arc::new(ScriptedGate {
+            will_pass: Arc::new(AtomicBool::new(true)),
+            crate_name: "",
+        });
         let d = dispatcher(&dir, &events, q, g);
-        unsafe { std::env::set_var("CAVE_AUTOPORT_DISABLE", "1"); }
+        unsafe {
+            std::env::set_var("CAVE_AUTOPORT_DISABLE", "1");
+        }
         let s = d.scan_and_dispatch().await.unwrap();
         assert_eq!(s.dispatched, 0);
         assert_eq!(s.skipped_disabled, 1);
-        unsafe { std::env::remove_var("CAVE_AUTOPORT_DISABLE"); }
+        unsafe {
+            std::env::remove_var("CAVE_AUTOPORT_DISABLE");
+        }
     }
 
     #[tokio::test]
@@ -781,7 +809,10 @@ mod tests {
             sample_event("e", "cave-5"),
         ];
         let q = Arc::new(DryRunTaskQueue::new(dir.path().join("dry.jsonl")));
-        let g = Arc::new(ScriptedGate { will_pass: Arc::new(AtomicBool::new(true)), crate_name: "" });
+        let g = Arc::new(ScriptedGate {
+            will_pass: Arc::new(AtomicBool::new(true)),
+            crate_name: "",
+        });
         let mut cfg = DispatcherConfig::default();
         cfg.max_concurrent = 2;
         let d = AutoPortDispatcher::new(
@@ -804,9 +835,15 @@ mod tests {
         let events = vec![sample_event("a", "cave-x")];
         let q = Arc::new(ScriptedQueue::new(
             "scripted",
-            vec![TaskStatus::Completed { commit_sha: "abc".into(), branch: "b".into() }],
+            vec![TaskStatus::Completed {
+                commit_sha: "abc".into(),
+                branch: "b".into(),
+            }],
         ));
-        let g = Arc::new(ScriptedGate { will_pass: Arc::new(AtomicBool::new(false)), crate_name: "cave-x" });
+        let g = Arc::new(ScriptedGate {
+            will_pass: Arc::new(AtomicBool::new(false)),
+            crate_name: "cave-x",
+        });
         let d = dispatcher(&dir, &events, q.clone(), g);
         d.scan_and_dispatch().await.unwrap();
         d.verify_completed().await.unwrap();
@@ -826,9 +863,15 @@ mod tests {
         let events = vec![sample_event("a", "cave-x")];
         let q = Arc::new(ScriptedQueue::new(
             "scripted",
-            vec![TaskStatus::Completed { commit_sha: "abc".into(), branch: "b".into() }],
+            vec![TaskStatus::Completed {
+                commit_sha: "abc".into(),
+                branch: "b".into(),
+            }],
         ));
-        let g = Arc::new(ScriptedGate { will_pass: Arc::new(AtomicBool::new(true)), crate_name: "cave-x" });
+        let g = Arc::new(ScriptedGate {
+            will_pass: Arc::new(AtomicBool::new(true)),
+            crate_name: "cave-x",
+        });
         let d = dispatcher(&dir, &events, q, g);
         d.scan_and_dispatch().await.unwrap();
         let s = d.verify_completed().await.unwrap();
@@ -844,9 +887,14 @@ mod tests {
         let events = vec![sample_event("a", "cave-x")];
         let q = Arc::new(ScriptedQueue::new(
             "scripted",
-            vec![TaskStatus::Failed { reason: "compile error".into() }],
+            vec![TaskStatus::Failed {
+                reason: "compile error".into(),
+            }],
         ));
-        let g = Arc::new(ScriptedGate { will_pass: Arc::new(AtomicBool::new(true)), crate_name: "cave-x" });
+        let g = Arc::new(ScriptedGate {
+            will_pass: Arc::new(AtomicBool::new(true)),
+            crate_name: "cave-x",
+        });
         let d = dispatcher(&dir, &events, q, g);
         d.scan_and_dispatch().await.unwrap();
         let s = d.verify_completed().await.unwrap();
@@ -861,7 +909,10 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let events = vec![sample_event("a", "cave-x")];
         let q = Arc::new(ScriptedQueue::new("scripted", vec![TaskStatus::Running]));
-        let g = Arc::new(ScriptedGate { will_pass: Arc::new(AtomicBool::new(true)), crate_name: "cave-x" });
+        let g = Arc::new(ScriptedGate {
+            will_pass: Arc::new(AtomicBool::new(true)),
+            crate_name: "cave-x",
+        });
         let d = dispatcher(&dir, &events, q, g);
         d.scan_and_dispatch().await.unwrap();
         let s = d.verify_completed().await.unwrap();
@@ -877,7 +928,10 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let events = vec![sample_event("a", "cave-x")];
         let q = Arc::new(DryRunTaskQueue::new(dir.path().join("dry.jsonl")));
-        let g = Arc::new(ScriptedGate { will_pass: Arc::new(AtomicBool::new(true)), crate_name: "" });
+        let g = Arc::new(ScriptedGate {
+            will_pass: Arc::new(AtomicBool::new(true)),
+            crate_name: "",
+        });
         {
             let d = dispatcher(&dir, &events, q.clone(), g.clone());
             d.scan_and_dispatch().await.unwrap();
@@ -896,9 +950,15 @@ mod tests {
         let events = vec![sample_event("a", "cave-x")];
         let q = Arc::new(ScriptedQueue::new(
             "scripted",
-            vec![TaskStatus::Completed { commit_sha: "abc".into(), branch: "b".into() }],
+            vec![TaskStatus::Completed {
+                commit_sha: "abc".into(),
+                branch: "b".into(),
+            }],
         ));
-        let g = Arc::new(ScriptedGate { will_pass: Arc::new(AtomicBool::new(true)), crate_name: "cave-x" });
+        let g = Arc::new(ScriptedGate {
+            will_pass: Arc::new(AtomicBool::new(true)),
+            crate_name: "cave-x",
+        });
         let d = dispatcher(&dir, &events, q, g);
         d.scan_and_dispatch().await.unwrap();
         d.verify_completed().await.unwrap();
@@ -915,7 +975,10 @@ mod tests {
         let e1 = sample_event("a", "cave-x");
         let e2 = sample_event("b", "cave-x");
         let q = Arc::new(DryRunTaskQueue::new(dir.path().join("dry.jsonl")));
-        let g = Arc::new(ScriptedGate { will_pass: Arc::new(AtomicBool::new(true)), crate_name: "" });
+        let g = Arc::new(ScriptedGate {
+            will_pass: Arc::new(AtomicBool::new(true)),
+            crate_name: "",
+        });
         let d = dispatcher(&dir, &[e1.clone(), e2.clone()], q, g);
         d.scan_and_dispatch().await.unwrap();
         let latest = d.latest_for_module("cave-x").await.unwrap();

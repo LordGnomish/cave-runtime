@@ -19,10 +19,7 @@ use uuid::Uuid;
 #[serde(tag = "kind")]
 pub enum PullEvent {
     /// Pull was registered. `image_ref` is the user-facing reference.
-    Started {
-        pull_id: Uuid,
-        image_ref: String,
-    },
+    Started { pull_id: Uuid, image_ref: String },
     /// Manifest fetched and parsed; we now know the total work.
     ManifestFetched {
         pull_id: Uuid,
@@ -42,10 +39,7 @@ pub enum PullEvent {
         downloaded_bytes: u64,
     },
     /// One layer is fully downloaded and verified.
-    LayerComplete {
-        pull_id: Uuid,
-        digest: String,
-    },
+    LayerComplete { pull_id: Uuid, digest: String },
     /// All layers finished and the image is registered locally.
     Completed {
         pull_id: Uuid,
@@ -99,7 +93,9 @@ pub enum PullStatus {
 
 impl PullState {
     pub fn fraction(&self) -> f64 {
-        if self.total_bytes == 0 { 0.0 } else {
+        if self.total_bytes == 0 {
+            0.0
+        } else {
             self.downloaded_bytes as f64 / self.total_bytes as f64
         }
     }
@@ -138,7 +134,10 @@ impl PullProgressTracker {
             updated_at: now,
         };
         self.state.write().unwrap().insert(pull_id, state);
-        self.record(PullEvent::Started { pull_id, image_ref: image_ref.to_string() });
+        self.record(PullEvent::Started {
+            pull_id,
+            image_ref: image_ref.to_string(),
+        });
         pull_id
     }
 
@@ -149,7 +148,11 @@ impl PullProgressTracker {
             s.status = PullStatus::InProgress;
             s.updated_at = Utc::now();
         }
-        self.record(PullEvent::ManifestFetched { pull_id, layer_count, total_bytes });
+        self.record(PullEvent::ManifestFetched {
+            pull_id,
+            layer_count,
+            total_bytes,
+        });
     }
 
     pub fn layer_started(&self, pull_id: Uuid, digest: &str, total_bytes: u64) {
@@ -183,7 +186,10 @@ impl PullProgressTracker {
             s.layers_complete = s.layers_complete.saturating_add(1);
             s.updated_at = Utc::now();
         }
-        self.record(PullEvent::LayerComplete { pull_id, digest: digest.to_string() });
+        self.record(PullEvent::LayerComplete {
+            pull_id,
+            digest: digest.to_string(),
+        });
     }
 
     pub fn completed(&self, pull_id: Uuid, image_ref: &str) {
@@ -193,7 +199,13 @@ impl PullProgressTracker {
             s.downloaded_bytes = s.total_bytes;
             s.updated_at = Utc::now();
         }
-        let total = self.state.read().unwrap().get(&pull_id).map(|s| s.total_bytes).unwrap_or(0);
+        let total = self
+            .state
+            .read()
+            .unwrap()
+            .get(&pull_id)
+            .map(|s| s.total_bytes)
+            .unwrap_or(0);
         self.record(PullEvent::Completed {
             pull_id,
             image_ref: image_ref.to_string(),
@@ -218,7 +230,12 @@ impl PullProgressTracker {
     }
 
     pub fn events(&self, pull_id: Uuid) -> Vec<PullEvent> {
-        self.events.read().unwrap().get(&pull_id).cloned().unwrap_or_default()
+        self.events
+            .read()
+            .unwrap()
+            .get(&pull_id)
+            .cloned()
+            .unwrap_or_default()
     }
 
     pub fn list(&self) -> Vec<PullState> {
@@ -227,7 +244,12 @@ impl PullProgressTracker {
 
     fn record(&self, event: PullEvent) {
         let id = event.pull_id();
-        self.events.write().unwrap().entry(id).or_default().push(event);
+        self.events
+            .write()
+            .unwrap()
+            .entry(id)
+            .or_default()
+            .push(event);
     }
 }
 
@@ -241,13 +263,39 @@ mod tests {
     fn pull_id_returns_consistent_uuid() {
         let id = Uuid::new_v4();
         for e in [
-            PullEvent::Started { pull_id: id, image_ref: "x".into() },
-            PullEvent::ManifestFetched { pull_id: id, layer_count: 1, total_bytes: 10 },
-            PullEvent::LayerStarted { pull_id: id, digest: "d".into(), total_bytes: 5 },
-            PullEvent::LayerProgress { pull_id: id, digest: "d".into(), downloaded_bytes: 3 },
-            PullEvent::LayerComplete { pull_id: id, digest: "d".into() },
-            PullEvent::Completed { pull_id: id, image_ref: "x".into(), total_bytes: 10 },
-            PullEvent::Failed { pull_id: id, image_ref: "x".into(), reason: "r".into() },
+            PullEvent::Started {
+                pull_id: id,
+                image_ref: "x".into(),
+            },
+            PullEvent::ManifestFetched {
+                pull_id: id,
+                layer_count: 1,
+                total_bytes: 10,
+            },
+            PullEvent::LayerStarted {
+                pull_id: id,
+                digest: "d".into(),
+                total_bytes: 5,
+            },
+            PullEvent::LayerProgress {
+                pull_id: id,
+                digest: "d".into(),
+                downloaded_bytes: 3,
+            },
+            PullEvent::LayerComplete {
+                pull_id: id,
+                digest: "d".into(),
+            },
+            PullEvent::Completed {
+                pull_id: id,
+                image_ref: "x".into(),
+                total_bytes: 10,
+            },
+            PullEvent::Failed {
+                pull_id: id,
+                image_ref: "x".into(),
+                reason: "r".into(),
+            },
         ] {
             assert_eq!(e.pull_id(), id);
         }

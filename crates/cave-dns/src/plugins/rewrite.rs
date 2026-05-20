@@ -28,10 +28,9 @@ impl RewritePlugin {
             .into_iter()
             .map(|rule| {
                 let regex = if matches!(rule.match_type, MatchType::Regex) {
-                    Some(
-                        Regex::new(&rule.from)
-                            .map_err(|e| DnsError::Config(format!("rewrite regex {}: {e}", rule.from)))?,
-                    )
+                    Some(Regex::new(&rule.from).map_err(|e| {
+                        DnsError::Config(format!("rewrite regex {}: {e}", rule.from))
+                    })?)
                 } else {
                     None
                 };

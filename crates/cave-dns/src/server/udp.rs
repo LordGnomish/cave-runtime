@@ -10,16 +10,14 @@ use tracing::{debug, warn};
 use crate::{
     error::{DnsError, DnsResult},
     plugins::{Plugin, PluginChain, Protocol, QueryContext},
-    protocol::message::{edns_payload_size, encode_message, make_error_response, parse_message, truncate_to_udp},
+    protocol::message::{
+        edns_payload_size, encode_message, make_error_response, parse_message, truncate_to_udp,
+    },
 };
 use hickory_proto::op::ResponseCode;
 
 pub async fn serve(addr: String, plugins: Arc<PluginChain>) -> DnsResult<()> {
-    let socket = Arc::new(
-        UdpSocket::bind(&addr)
-            .await
-            .map_err(|e| DnsError::Io(e))?,
-    );
+    let socket = Arc::new(UdpSocket::bind(&addr).await.map_err(|e| DnsError::Io(e))?);
     tracing::info!(addr = %addr, "UDP DNS server listening");
 
     let mut buf = vec![0u8; 4096];

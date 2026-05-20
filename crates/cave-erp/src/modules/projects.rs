@@ -3,11 +3,11 @@
 use crate::models::*;
 use crate::store::ErpStore;
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -106,19 +106,22 @@ async fn complete_project(
         proj.state = ProjectState::Completed;
         (StatusCode::OK, Json(proj.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(Project {
-            id: Uuid::nil(),
-            name: String::new(),
-            code: String::new(),
-            customer_id: None,
-            manager_id: Uuid::nil(),
-            state: ProjectState::Active,
-            start: Utc::now(),
-            end: None,
-            budget: 0.0,
-            currency: String::new(),
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(Project {
+                id: Uuid::nil(),
+                name: String::new(),
+                code: String::new(),
+                customer_id: None,
+                manager_id: Uuid::nil(),
+                state: ProjectState::Active,
+                start: Utc::now(),
+                end: None,
+                budget: 0.0,
+                currency: String::new(),
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -159,19 +162,22 @@ async fn move_task_state(
         task.state = req.state;
         (StatusCode::OK, Json(task.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(Task {
-            id: Uuid::nil(),
-            project_id: Uuid::nil(),
-            title: String::new(),
-            description: None,
-            assignee_id: None,
-            priority: TaskPriority::Medium,
-            state: TaskState::Todo,
-            estimated_hours: 0.0,
-            spent_hours: 0.0,
-            deadline: None,
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(Task {
+                id: Uuid::nil(),
+                project_id: Uuid::nil(),
+                title: String::new(),
+                description: None,
+                assignee_id: None,
+                priority: TaskPriority::Medium,
+                state: TaskState::Todo,
+                estimated_hours: 0.0,
+                spent_hours: 0.0,
+                deadline: None,
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -206,14 +212,17 @@ async fn achieve_milestone(
         ms.state = MilestoneState::Achieved;
         (StatusCode::OK, Json(ms.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(Milestone {
-            id: Uuid::nil(),
-            project_id: Uuid::nil(),
-            name: String::new(),
-            due_date: Utc::now(),
-            state: MilestoneState::Upcoming,
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(Milestone {
+                id: Uuid::nil(),
+                project_id: Uuid::nil(),
+                name: String::new(),
+                due_date: Utc::now(),
+                state: MilestoneState::Upcoming,
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -236,7 +245,11 @@ async fn create_time_entry(
     let entry_hours = entry.hours;
     let entry_id = entry.id;
 
-    store.time_entries.write().await.insert(entry_id, entry.clone());
+    store
+        .time_entries
+        .write()
+        .await
+        .insert(entry_id, entry.clone());
 
     // Update task spent_hours if task_id exists
     if let Some(task_id) = task_id {
@@ -289,27 +302,18 @@ async fn get_project_summary(
     }
 
     let milestones = store.milestones.read().await;
-    summary.milestones_count = milestones
-        .values()
-        .filter(|m| m.project_id == id)
-        .count();
+    summary.milestones_count = milestones.values().filter(|m| m.project_id == id).count();
 
     Json(summary)
 }
 
 pub fn create_router(state: Arc<ErpStore>) -> Router {
     Router::new()
-        .route(
-            "/api/erp/projects",
-            post(create_project).get(list_projects),
-        )
+        .route("/api/erp/projects", post(create_project).get(list_projects))
         .route("/api/erp/projects/{id}/complete", post(complete_project))
         .route("/api/erp/projects/{id}/summary", get(get_project_summary))
         .route("/api/erp/tasks", post(create_task).get(list_tasks))
-        .route(
-            "/api/erp/tasks/{id}/move-state",
-            post(move_task_state),
-        )
+        .route("/api/erp/tasks/{id}/move-state", post(move_task_state))
         .route(
             "/api/erp/milestones",
             post(create_milestone).get(list_milestones),

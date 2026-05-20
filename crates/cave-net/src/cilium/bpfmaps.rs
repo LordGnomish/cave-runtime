@@ -49,7 +49,10 @@ pub struct HashMapBpf<K: Eq + Hash + Clone, V: Clone> {
 
 impl<K: Eq + Hash + Clone + Ord, V: Clone> HashMapBpf<K, V> {
     pub fn new(capacity: usize) -> Self {
-        Self { capacity, inner: HashMap::new() }
+        Self {
+            capacity,
+            inner: HashMap::new(),
+        }
     }
     pub fn insert(&mut self, k: K, v: V) -> Result<(), MapError> {
         if self.inner.contains_key(&k) {
@@ -79,7 +82,11 @@ impl<K: Eq + Hash + Clone + Ord, V: Clone> HashMapBpf<K, V> {
     }
     /// Iter sorted by key for deterministic dumps.
     pub fn iter_sorted(&self) -> Vec<(K, V)> {
-        let mut v: Vec<_> = self.inner.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+        let mut v: Vec<_> = self
+            .inner
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
         v.sort_by(|a, b| a.0.cmp(&b.0));
         v
     }
@@ -97,7 +104,11 @@ pub struct LruMap<K: Eq + Hash + Clone, V: Clone> {
 
 impl<K: Eq + Hash + Clone, V: Clone> LruMap<K, V> {
     pub fn new(capacity: usize) -> Self {
-        Self { capacity, inner: HashMap::new(), order: VecDeque::new() }
+        Self {
+            capacity,
+            inner: HashMap::new(),
+            order: VecDeque::new(),
+        }
     }
     pub fn insert(&mut self, k: K, v: V) -> Option<(K, V)> {
         let mut evicted = None;
@@ -146,14 +157,21 @@ pub struct ArrayMap<V: Clone + Default> {
 
 impl<V: Clone + Default> ArrayMap<V> {
     pub fn new(capacity: usize) -> Self {
-        Self { inner: vec![V::default(); capacity] }
+        Self {
+            inner: vec![V::default(); capacity],
+        }
     }
     pub fn lookup(&self, idx: u32) -> Result<&V, MapError> {
-        self.inner.get(idx as usize).ok_or(MapError::OutOfBounds(idx, self.inner.len()))
+        self.inner
+            .get(idx as usize)
+            .ok_or(MapError::OutOfBounds(idx, self.inner.len()))
     }
     pub fn write(&mut self, idx: u32, v: V) -> Result<(), MapError> {
         let cap = self.inner.len();
-        let slot = self.inner.get_mut(idx as usize).ok_or(MapError::OutOfBounds(idx, cap))?;
+        let slot = self
+            .inner
+            .get_mut(idx as usize)
+            .ok_or(MapError::OutOfBounds(idx, cap))?;
         *slot = v;
         Ok(())
     }
@@ -172,7 +190,9 @@ pub struct LpmTrie<V: Clone> {
 
 impl<V: Clone> Default for LpmTrie<V> {
     fn default() -> Self {
-        Self { entries: BTreeMap::new() }
+        Self {
+            entries: BTreeMap::new(),
+        }
     }
 }
 
@@ -279,7 +299,8 @@ mod tests {
 
     #[test]
     fn bpfmap_hash_remove_drops_key() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/maps.h", "bpf_map_delete_elem", "tenant-bpf-hashrm");
+        let (_c, _t) =
+            cilium_test_ctx!("bpf/lib/maps.h", "bpf_map_delete_elem", "tenant-bpf-hashrm");
         let mut m: HashMapBpf<u32, u32> = HashMapBpf::new(4);
         m.insert(1, 100).unwrap();
         assert!(m.remove(&1));
@@ -288,7 +309,11 @@ mod tests {
 
     #[test]
     fn bpfmap_hash_full_returns_error_on_new_insert() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/maps.h", "BPF_MAP_TYPE_HASH.MapFull", "tenant-bpf-hashfull");
+        let (_c, _t) = cilium_test_ctx!(
+            "bpf/lib/maps.h",
+            "BPF_MAP_TYPE_HASH.MapFull",
+            "tenant-bpf-hashfull"
+        );
         let mut m: HashMapBpf<u32, u32> = HashMapBpf::new(2);
         m.insert(1, 1).unwrap();
         m.insert(2, 2).unwrap();
@@ -298,7 +323,11 @@ mod tests {
 
     #[test]
     fn bpfmap_hash_overwrite_existing_key_does_not_count_against_capacity() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/maps.h", "BPF_MAP_TYPE_HASH.Update", "tenant-bpf-hashov");
+        let (_c, _t) = cilium_test_ctx!(
+            "bpf/lib/maps.h",
+            "BPF_MAP_TYPE_HASH.Update",
+            "tenant-bpf-hashov"
+        );
         let mut m: HashMapBpf<u32, u32> = HashMapBpf::new(2);
         m.insert(1, 1).unwrap();
         m.insert(1, 100).unwrap();
@@ -332,7 +361,8 @@ mod tests {
 
     #[test]
     fn bpfmap_lru_insert_evicts_oldest_on_overflow() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/maps.h", "BPF_MAP_TYPE_LRU_HASH", "tenant-bpf-lru");
+        let (_c, _t) =
+            cilium_test_ctx!("bpf/lib/maps.h", "BPF_MAP_TYPE_LRU_HASH", "tenant-bpf-lru");
         let mut m: LruMap<u32, u32> = LruMap::new(2);
         m.insert(1, 1);
         m.insert(2, 2);
@@ -343,7 +373,11 @@ mod tests {
 
     #[test]
     fn bpfmap_lru_lookup_promotes_entry() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/maps.h", "BPF_MAP_TYPE_LRU_HASH.Lookup", "tenant-bpf-lrup");
+        let (_c, _t) = cilium_test_ctx!(
+            "bpf/lib/maps.h",
+            "BPF_MAP_TYPE_LRU_HASH.Lookup",
+            "tenant-bpf-lrup"
+        );
         let mut m: LruMap<u32, u32> = LruMap::new(2);
         m.insert(1, 1);
         m.insert(2, 2);
@@ -356,7 +390,11 @@ mod tests {
 
     #[test]
     fn bpfmap_lru_oldest_returns_front_of_order() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/maps.h", "BPF_MAP_TYPE_LRU_HASH.Oldest", "tenant-bpf-lruo");
+        let (_c, _t) = cilium_test_ctx!(
+            "bpf/lib/maps.h",
+            "BPF_MAP_TYPE_LRU_HASH.Oldest",
+            "tenant-bpf-lruo"
+        );
         let mut m: LruMap<u32, u32> = LruMap::new(4);
         m.insert(10, 1);
         m.insert(20, 2);
@@ -375,7 +413,11 @@ mod tests {
 
     #[test]
     fn bpfmap_array_out_of_bounds_returns_error() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/maps.h", "BPF_MAP_TYPE_ARRAY.Bounds", "tenant-bpf-arr-oob");
+        let (_c, _t) = cilium_test_ctx!(
+            "bpf/lib/maps.h",
+            "BPF_MAP_TYPE_ARRAY.Bounds",
+            "tenant-bpf-arr-oob"
+        );
         let a: ArrayMap<u32> = ArrayMap::new(4);
         let err = a.lookup(99).unwrap_err();
         assert_eq!(err, MapError::OutOfBounds(99, 4));
@@ -383,7 +425,11 @@ mod tests {
 
     #[test]
     fn bpfmap_array_capacity_matches_constructor() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/maps.h", "BPF_MAP_TYPE_ARRAY.Capacity", "tenant-bpf-arr-cap");
+        let (_c, _t) = cilium_test_ctx!(
+            "bpf/lib/maps.h",
+            "BPF_MAP_TYPE_ARRAY.Capacity",
+            "tenant-bpf-arr-cap"
+        );
         let a: ArrayMap<u8> = ArrayMap::new(64);
         assert_eq!(a.capacity(), 64);
     }
@@ -392,7 +438,8 @@ mod tests {
 
     #[test]
     fn bpfmap_lpm_returns_longest_matching_prefix() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/maps.h", "BPF_MAP_TYPE_LPM_TRIE", "tenant-bpf-lpm");
+        let (_c, _t) =
+            cilium_test_ctx!("bpf/lib/maps.h", "BPF_MAP_TYPE_LPM_TRIE", "tenant-bpf-lpm");
         let mut t: LpmTrie<u32> = LpmTrie::new();
         t.insert("10.0.0.0/8", 1).unwrap();
         t.insert("10.10.0.0/16", 2).unwrap();
@@ -405,7 +452,11 @@ mod tests {
 
     #[test]
     fn bpfmap_lpm_invalid_cidr_rejected_on_insert() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/maps.h", "BPF_MAP_TYPE_LPM_TRIE.Validate", "tenant-bpf-lpm-bad");
+        let (_c, _t) = cilium_test_ctx!(
+            "bpf/lib/maps.h",
+            "BPF_MAP_TYPE_LPM_TRIE.Validate",
+            "tenant-bpf-lpm-bad"
+        );
         let mut t: LpmTrie<u32> = LpmTrie::new();
         let err = t.insert("not-a-cidr", 1).unwrap_err();
         assert_eq!(err, MapError::BadCidr("not-a-cidr".into()));
@@ -413,7 +464,11 @@ mod tests {
 
     #[test]
     fn bpfmap_lpm_v6_prefix_match() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/maps.h", "BPF_MAP_TYPE_LPM_TRIE.IPv6", "tenant-bpf-lpm-v6");
+        let (_c, _t) = cilium_test_ctx!(
+            "bpf/lib/maps.h",
+            "BPF_MAP_TYPE_LPM_TRIE.IPv6",
+            "tenant-bpf-lpm-v6"
+        );
         let mut t: LpmTrie<u32> = LpmTrie::new();
         t.insert("2001:db8::/32", 100).unwrap();
         t.insert("2001:db8:abcd::/48", 200).unwrap();
@@ -423,7 +478,11 @@ mod tests {
 
     #[test]
     fn bpfmap_lpm_remove_drops_entry() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/maps.h", "BPF_MAP_TYPE_LPM_TRIE.Remove", "tenant-bpf-lpm-rm");
+        let (_c, _t) = cilium_test_ctx!(
+            "bpf/lib/maps.h",
+            "BPF_MAP_TYPE_LPM_TRIE.Remove",
+            "tenant-bpf-lpm-rm"
+        );
         let mut t: LpmTrie<u32> = LpmTrie::new();
         t.insert("10.0.0.0/8", 1).unwrap();
         assert!(t.remove("10.0.0.0/8"));
@@ -442,14 +501,27 @@ mod tests {
         assert_eq!(MapId::CtAny.upstream_path(), "bpf/cilium_ct_any4.h");
         assert_eq!(MapId::Nat.upstream_path(), "bpf/cilium_snat_v4_external.h");
         assert_eq!(MapId::Lb.upstream_path(), "bpf/cilium_lb4_services.h");
-        assert_eq!(MapId::LbBackends.upstream_path(), "bpf/cilium_lb4_backends.h");
+        assert_eq!(
+            MapId::LbBackends.upstream_path(),
+            "bpf/cilium_lb4_backends.h"
+        );
         assert_eq!(MapId::Lxc.upstream_path(), "bpf/cilium_lxc.h");
     }
 
     #[test]
     fn bpfmap_id_round_trips_serde() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/maps/maps.go", "MapID.Serde", "tenant-bpf-id-serde");
-        for id in [MapId::Endpoints, MapId::Ipcache, MapId::Policy, MapId::CtTcp, MapId::Lb] {
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/datapath/maps/maps.go",
+            "MapID.Serde",
+            "tenant-bpf-id-serde"
+        );
+        for id in [
+            MapId::Endpoints,
+            MapId::Ipcache,
+            MapId::Policy,
+            MapId::CtTcp,
+            MapId::Lb,
+        ] {
             let s = serde_json::to_string(&id).unwrap();
             let back: MapId = serde_json::from_str(&s).unwrap();
             assert_eq!(back, id);

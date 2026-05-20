@@ -183,14 +183,10 @@ impl ToolRegistry {
     /// and env-var gates, then dispatches the handler. Always returns a
     /// `ToolResult` so the LLM gets a structured response; internal errors
     /// get folded into `ok=false`.
-    pub fn invoke(
-        &self,
-        name: &str,
-        args: &serde_json::Value,
-    ) -> crate::error::Result<ToolResult> {
-        let entry = self
-            .get(name)
-            .ok_or_else(|| HermesError::ToolNotFound { name: name.to_string() })?;
+    pub fn invoke(&self, name: &str, args: &serde_json::Value) -> crate::error::Result<ToolResult> {
+        let entry = self.get(name).ok_or_else(|| HermesError::ToolNotFound {
+            name: name.to_string(),
+        })?;
         if let Some(check) = &entry.check_fn
             && let Err(reason) = (check)()
         {
@@ -245,9 +241,7 @@ mod tests {
             "core",
             "echo the input back",
             serde_json::json!({"type": "object"}),
-            Arc::new(|args: &serde_json::Value| {
-                Ok(ToolResult::ok(args.to_string()))
-            }),
+            Arc::new(|args: &serde_json::Value| Ok(ToolResult::ok(args.to_string()))),
         )
     }
 
@@ -270,9 +264,7 @@ mod tests {
     #[test]
     fn check_fn_rejection_surfaces() {
         let mut r = ToolRegistry::new();
-        r.register(
-            echo_entry().with_check(Arc::new(|| Err("not allowed".into()))),
-        );
+        r.register(echo_entry().with_check(Arc::new(|| Err("not allowed".into()))));
         let err = r.invoke("echo", &serde_json::Value::Null).unwrap_err();
         match err {
             HermesError::ToolFailed { reason, .. } => assert_eq!(reason, "not allowed"),
@@ -325,7 +317,10 @@ mod tests {
         );
         let prev = r.register(v2);
         assert!(prev.is_some());
-        assert_eq!(r.invoke("echo", &serde_json::Value::Null).unwrap().output, "v2");
+        assert_eq!(
+            r.invoke("echo", &serde_json::Value::Null).unwrap().output,
+            "v2"
+        );
     }
 
     #[test]

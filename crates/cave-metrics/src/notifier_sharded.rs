@@ -22,7 +22,11 @@ pub struct Notification {
 
 impl Notification {
     pub fn new(alertname: &str, fp: u64, state: &str) -> Self {
-        Self { alertname: alertname.to_string(), fingerprint: fp, state: state.to_string() }
+        Self {
+            alertname: alertname.to_string(),
+            fingerprint: fp,
+            state: state.to_string(),
+        }
     }
 }
 
@@ -71,7 +75,8 @@ impl PeerQueue {
     }
 
     pub fn try_send_one<F>(&mut self, mut send_fn: F) -> Option<Notification>
-    where F: FnMut(&str, &Notification) -> Result<(), ()>,
+    where
+        F: FnMut(&str, &Notification) -> Result<(), ()>,
     {
         if self.tokens == 0 {
             return None;
@@ -100,7 +105,12 @@ pub struct ShardedNotifier {
 }
 
 impl ShardedNotifier {
-    pub fn new() -> Self { Self { peers: Vec::new(), cursor: 0 } }
+    pub fn new() -> Self {
+        Self {
+            peers: Vec::new(),
+            cursor: 0,
+        }
+    }
 
     pub fn add_peer(&mut self, peer: PeerQueue) {
         self.peers.push(peer);
@@ -128,7 +138,8 @@ impl ShardedNotifier {
     /// one notification. Returns the total number of notifications that
     /// actually shipped this pass.
     pub fn drain_round<F>(&mut self, mut send_fn: F) -> usize
-    where F: FnMut(&str, &Notification) -> Result<(), ()>,
+    where
+        F: FnMut(&str, &Notification) -> Result<(), ()>,
     {
         if self.peers.is_empty() {
             return 0;
@@ -151,7 +162,9 @@ impl ShardedNotifier {
 }
 
 impl Default for ShardedNotifier {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]

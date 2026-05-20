@@ -203,8 +203,16 @@ mod tests {
     #[test]
     fn schema_builder_succeeds_for_unique_ids() {
         let schema = Schema::builder()
-            .with_field(NestedField::required(1, "id", Type::Primitive(PrimitiveType::Long)))
-            .with_field(NestedField::optional(2, "name", Type::Primitive(PrimitiveType::String)))
+            .with_field(NestedField::required(
+                1,
+                "id",
+                Type::Primitive(PrimitiveType::Long),
+            ))
+            .with_field(NestedField::optional(
+                2,
+                "name",
+                Type::Primitive(PrimitiveType::String),
+            ))
             .identifier_field_ids(vec![1])
             .build()
             .unwrap();
@@ -216,8 +224,16 @@ mod tests {
     #[test]
     fn schema_builder_rejects_duplicate_ids() {
         let r = Schema::builder()
-            .with_field(NestedField::required(1, "id", Type::Primitive(PrimitiveType::Long)))
-            .with_field(NestedField::required(1, "x", Type::Primitive(PrimitiveType::Long)))
+            .with_field(NestedField::required(
+                1,
+                "id",
+                Type::Primitive(PrimitiveType::Long),
+            ))
+            .with_field(NestedField::required(
+                1,
+                "x",
+                Type::Primitive(PrimitiveType::Long),
+            ))
             .build();
         assert!(matches!(r, Err(Error::InvalidSchema(_))));
     }
@@ -225,7 +241,11 @@ mod tests {
     #[test]
     fn schema_validate_requires_identifier_to_be_required() {
         let r = Schema::builder()
-            .with_field(NestedField::optional(1, "id", Type::Primitive(PrimitiveType::Long)))
+            .with_field(NestedField::optional(
+                1,
+                "id",
+                Type::Primitive(PrimitiveType::Long),
+            ))
             .identifier_field_ids(vec![1])
             .build();
         assert!(matches!(r, Err(Error::InvalidSchema(_))));
@@ -234,7 +254,11 @@ mod tests {
     #[test]
     fn schema_validate_rejects_missing_identifier() {
         let r = Schema::builder()
-            .with_field(NestedField::required(1, "id", Type::Primitive(PrimitiveType::Long)))
+            .with_field(NestedField::required(
+                1,
+                "id",
+                Type::Primitive(PrimitiveType::Long),
+            ))
             .identifier_field_ids(vec![99])
             .build();
         assert!(matches!(r, Err(Error::InvalidSchema(_))));
@@ -242,7 +266,10 @@ mod tests {
 
     #[test]
     fn primitive_types_round_trip_json() {
-        let p = PrimitiveType::Decimal { precision: 10, scale: 2 };
+        let p = PrimitiveType::Decimal {
+            precision: 10,
+            scale: 2,
+        };
         let j = serde_json::to_string(&p).unwrap();
         let back: PrimitiveType = serde_json::from_str(&j).unwrap();
         assert_eq!(p, back);

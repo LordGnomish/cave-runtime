@@ -130,7 +130,8 @@ pub enum XdsError {
 impl NpdsSnapshot {
     pub fn new(tenant: TenantId, endpoint_id: u64) -> Self {
         Self {
-            tenant, endpoint_id,
+            tenant,
+            endpoint_id,
             listeners: Vec::new(),
             clusters: Vec::new(),
             route_configs: Vec::new(),
@@ -171,7 +172,10 @@ impl NpdsSnapshot {
                 for f in &fc.filters {
                     if let NetworkFilter::HttpConnectionManager { route_config } = f {
                         if !self.route_configs.iter().any(|r| &r.name == route_config) {
-                            return Err(XdsError::DanglingRouteConfig(l.name.clone(), route_config.clone()));
+                            return Err(XdsError::DanglingRouteConfig(
+                                l.name.clone(),
+                                route_config.clone(),
+                            ));
                         }
                     }
                     if let NetworkFilter::TcpProxy { cluster } = f {
@@ -186,7 +190,10 @@ impl NpdsSnapshot {
             for vh in &r.virtual_hosts {
                 for rt in &vh.routes {
                     if !self.clusters.iter().any(|c| c.name == rt.cluster) {
-                        return Err(XdsError::DanglingCluster(r.name.clone(), rt.cluster.clone()));
+                        return Err(XdsError::DanglingCluster(
+                            r.name.clone(),
+                            rt.cluster.clone(),
+                        ));
                     }
                 }
             }
@@ -210,11 +217,16 @@ mod tests {
 
     fn make_listener(name: &str, port: u16, route_config: &str) -> Listener {
         Listener {
-            name: name.into(), address: ip(127, 0, 0, 1), port, protocol: L4ProtocolXds::Tcp,
+            name: name.into(),
+            address: ip(127, 0, 0, 1),
+            port,
+            protocol: L4ProtocolXds::Tcp,
             filter_chains: vec![FilterChain {
                 name: format!("{name}-fc"),
                 server_names: vec![],
-                filters: vec![NetworkFilter::HttpConnectionManager { route_config: route_config.into() }],
+                filters: vec![NetworkFilter::HttpConnectionManager {
+                    route_config: route_config.into(),
+                }],
                 tls_context: None,
             }],
         }
@@ -224,7 +236,11 @@ mod tests {
         Cluster {
             name: name.into(),
             lb_policy: ClusterLbPolicy::RoundRobin,
-            endpoints: vec![ClusterEndpoint { address: ip(10, 0, 1, 1), port: 8080, weight: 1 }],
+            endpoints: vec![ClusterEndpoint {
+                address: ip(10, 0, 1, 1),
+                port: 8080,
+                weight: 1,
+            }],
         }
     }
 
@@ -234,7 +250,11 @@ mod tests {
             virtual_hosts: vec![VirtualHost {
                 name: "default".into(),
                 domains: vec!["*".into()],
-                routes: vec![RouteRule { match_prefix: Some("/".into()), match_path: None, cluster: cluster.into() }],
+                routes: vec![RouteRule {
+                    match_prefix: Some("/".into()),
+                    match_path: None,
+                    cluster: cluster.into(),
+                }],
             }],
         }
     }
@@ -243,7 +263,11 @@ mod tests {
 
     #[test]
     fn xds_add_listener_succeeds() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/envoy/listener.go", "AddListener", "tenant-xds-addl");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/envoy/listener.go",
+            "AddListener",
+            "tenant-xds-addl"
+        );
         let mut s = NpdsSnapshot::new(tenant, 1);
         s.add_listener(make_listener("l1", 10001, "rc1")).unwrap();
         assert_eq!(s.listeners.len(), 1);
@@ -251,16 +275,26 @@ mod tests {
 
     #[test]
     fn xds_duplicate_listener_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/envoy/listener.go", "AddListener.Duplicate", "tenant-xds-dupl");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/envoy/listener.go",
+            "AddListener.Duplicate",
+            "tenant-xds-dupl"
+        );
         let mut s = NpdsSnapshot::new(tenant, 1);
         s.add_listener(make_listener("l1", 10001, "rc1")).unwrap();
-        let err = s.add_listener(make_listener("l1", 10002, "rc1")).unwrap_err();
+        let err = s
+            .add_listener(make_listener("l1", 10002, "rc1"))
+            .unwrap_err();
         assert_eq!(err, XdsError::DuplicateListener("l1".into()));
     }
 
     #[test]
     fn xds_add_cluster_succeeds() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/envoy/cluster.go", "AddCluster", "tenant-xds-addc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/envoy/cluster.go",
+            "AddCluster",
+            "tenant-xds-addc"
+        );
         let mut s = NpdsSnapshot::new(tenant, 1);
         s.add_cluster(make_cluster("c1")).unwrap();
         assert_eq!(s.clusters.len(), 1);
@@ -268,7 +302,11 @@ mod tests {
 
     #[test]
     fn xds_duplicate_cluster_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/envoy/cluster.go", "AddCluster.Duplicate", "tenant-xds-dupc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/envoy/cluster.go",
+            "AddCluster.Duplicate",
+            "tenant-xds-dupc"
+        );
         let mut s = NpdsSnapshot::new(tenant, 1);
         s.add_cluster(make_cluster("c1")).unwrap();
         let err = s.add_cluster(make_cluster("c1")).unwrap_err();
@@ -277,7 +315,11 @@ mod tests {
 
     #[test]
     fn xds_route_config_upserts_on_repeat_add() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/envoy/route.go", "UpsertRouteConfig", "tenant-xds-rcup");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/envoy/route.go",
+            "UpsertRouteConfig",
+            "tenant-xds-rcup"
+        );
         let mut s = NpdsSnapshot::new(tenant, 1);
         s.add_route_config(make_route_config("rc1", "c1"));
         let mut updated = make_route_config("rc1", "c2");
@@ -301,29 +343,48 @@ mod tests {
 
     #[test]
     fn xds_validate_rejects_listener_referencing_unknown_route_config() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/envoy/xds.go", "Validate.DanglingRC", "tenant-xds-drc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/envoy/xds.go",
+            "Validate.DanglingRC",
+            "tenant-xds-drc"
+        );
         let mut s = NpdsSnapshot::new(tenant, 1);
         s.add_cluster(make_cluster("c1")).unwrap();
-        s.add_listener(make_listener("l1", 10001, "rc-missing")).unwrap();
+        s.add_listener(make_listener("l1", 10001, "rc-missing"))
+            .unwrap();
         let err = s.validate().unwrap_err();
-        assert_eq!(err, XdsError::DanglingRouteConfig("l1".into(), "rc-missing".into()));
+        assert_eq!(
+            err,
+            XdsError::DanglingRouteConfig("l1".into(), "rc-missing".into())
+        );
     }
 
     #[test]
     fn xds_validate_rejects_route_referencing_unknown_cluster() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/envoy/xds.go", "Validate.DanglingCluster", "tenant-xds-dc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/envoy/xds.go",
+            "Validate.DanglingCluster",
+            "tenant-xds-dc"
+        );
         let mut s = NpdsSnapshot::new(tenant, 1);
         s.add_route_config(make_route_config("rc1", "c-missing"));
         s.add_listener(make_listener("l1", 10001, "rc1")).unwrap();
         let err = s.validate().unwrap_err();
-        assert_eq!(err, XdsError::DanglingCluster("rc1".into(), "c-missing".into()));
+        assert_eq!(
+            err,
+            XdsError::DanglingCluster("rc1".into(), "c-missing".into())
+        );
     }
 
     // ── Filter chains ────────────────────────────────────────────────────────
 
     #[test]
     fn xds_filter_chain_with_sni_records_server_names() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/envoy/listener.go", "FilterChain.SNI", "tenant-xds-sni");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/envoy/listener.go",
+            "FilterChain.SNI",
+            "tenant-xds-sni"
+        );
         let mut s = NpdsSnapshot::new(tenant, 1);
         let mut l = make_listener("l1", 10001, "rc1");
         l.filter_chains[0].server_names = vec!["api.example.com".into()];
@@ -333,17 +394,28 @@ mod tests {
             sds_secret: Some("default/api-cert".into()),
         });
         s.add_listener(l).unwrap();
-        assert_eq!(s.listeners[0].filter_chains[0].server_names, vec!["api.example.com".to_string()]);
+        assert_eq!(
+            s.listeners[0].filter_chains[0].server_names,
+            vec!["api.example.com".to_string()]
+        );
     }
 
     #[test]
     fn xds_listener_with_kafka_filter() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/envoy/kafka.go", "KafkaFilter", "tenant-xds-kafka");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/envoy/kafka.go",
+            "KafkaFilter",
+            "tenant-xds-kafka"
+        );
         let mut s = NpdsSnapshot::new(tenant, 1);
         let l = Listener {
-            name: "kafka-l".into(), address: ip(127, 0, 0, 1), port: 9092, protocol: L4ProtocolXds::Tcp,
+            name: "kafka-l".into(),
+            address: ip(127, 0, 0, 1),
+            port: 9092,
+            protocol: L4ProtocolXds::Tcp,
             filter_chains: vec![FilterChain {
-                name: "kafka-fc".into(), server_names: vec![],
+                name: "kafka-fc".into(),
+                server_names: vec![],
                 filters: vec![NetworkFilter::Kafka { rules: 3 }],
                 tls_context: None,
             }],
@@ -357,26 +429,40 @@ mod tests {
 
     #[test]
     fn xds_listener_with_tcp_proxy_filter_validates_cluster() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/envoy/listener.go", "TcpProxy", "tenant-xds-tcp");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/proxy/envoy/listener.go", "TcpProxy", "tenant-xds-tcp");
         let mut s = NpdsSnapshot::new(tenant, 1);
         let l = Listener {
-            name: "tcp-l".into(), address: ip(127, 0, 0, 1), port: 5432, protocol: L4ProtocolXds::Tcp,
+            name: "tcp-l".into(),
+            address: ip(127, 0, 0, 1),
+            port: 5432,
+            protocol: L4ProtocolXds::Tcp,
             filter_chains: vec![FilterChain {
-                name: "tcp-fc".into(), server_names: vec![],
-                filters: vec![NetworkFilter::TcpProxy { cluster: "missing".into() }],
+                name: "tcp-fc".into(),
+                server_names: vec![],
+                filters: vec![NetworkFilter::TcpProxy {
+                    cluster: "missing".into(),
+                }],
                 tls_context: None,
             }],
         };
         s.add_listener(l).unwrap();
         let err = s.validate().unwrap_err();
-        assert_eq!(err, XdsError::DanglingCluster("tcp-l".into(), "missing".into()));
+        assert_eq!(
+            err,
+            XdsError::DanglingCluster("tcp-l".into(), "missing".into())
+        );
     }
 
     // ── LB policy ────────────────────────────────────────────────────────────
 
     #[test]
     fn xds_cluster_with_maglev_lb_policy() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/envoy/cluster.go", "Cluster.LbPolicy.Maglev", "tenant-xds-mg");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/envoy/cluster.go",
+            "Cluster.LbPolicy.Maglev",
+            "tenant-xds-mg"
+        );
         let mut s = NpdsSnapshot::new(tenant, 1);
         let mut c = make_cluster("c1");
         c.lb_policy = ClusterLbPolicy::Maglev;
@@ -386,12 +472,24 @@ mod tests {
 
     #[test]
     fn xds_cluster_endpoints_carry_weight() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/envoy/endpoint.go", "ClusterEndpoint.Weight", "tenant-xds-wt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/envoy/endpoint.go",
+            "ClusterEndpoint.Weight",
+            "tenant-xds-wt"
+        );
         let mut s = NpdsSnapshot::new(tenant, 1);
         let mut c = make_cluster("c1");
         c.endpoints = vec![
-            ClusterEndpoint { address: ip(10, 0, 1, 1), port: 80, weight: 9 },
-            ClusterEndpoint { address: ip(10, 0, 1, 2), port: 80, weight: 1 },
+            ClusterEndpoint {
+                address: ip(10, 0, 1, 1),
+                port: 80,
+                weight: 9,
+            },
+            ClusterEndpoint {
+                address: ip(10, 0, 1, 2),
+                port: 80,
+                weight: 1,
+            },
         ];
         s.add_cluster(c).unwrap();
         assert_eq!(s.clusters[0].endpoints[0].weight, 9);
@@ -399,7 +497,11 @@ mod tests {
 
     #[test]
     fn xds_cluster_lb_policy_serializes() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/envoy/cluster.go", "ClusterLbPolicy.Serde", "tenant-xds-lbserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/envoy/cluster.go",
+            "ClusterLbPolicy.Serde",
+            "tenant-xds-lbserde"
+        );
         for p in [
             ClusterLbPolicy::RoundRobin,
             ClusterLbPolicy::LeastRequest,
@@ -417,7 +519,11 @@ mod tests {
 
     #[test]
     fn xds_npds_snapshot_round_trips_serde() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/envoy/xds/np_resources.go", "Snapshot", "tenant-xds-serde");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/envoy/xds/np_resources.go",
+            "Snapshot",
+            "tenant-xds-serde"
+        );
         let mut s = NpdsSnapshot::new(tenant, 7);
         s.add_cluster(make_cluster("c1")).unwrap();
         s.add_route_config(make_route_config("rc1", "c1"));
@@ -431,7 +537,11 @@ mod tests {
 
     #[test]
     fn xds_route_config_with_multiple_virtual_hosts() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/envoy/route.go", "RouteConfig.MultipleVH", "tenant-xds-mvh");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/envoy/route.go",
+            "RouteConfig.MultipleVH",
+            "tenant-xds-mvh"
+        );
         let mut s = NpdsSnapshot::new(tenant, 1);
         s.add_cluster(make_cluster("c-api")).unwrap();
         s.add_cluster(make_cluster("c-www")).unwrap();
@@ -439,12 +549,22 @@ mod tests {
             name: "rc1".into(),
             virtual_hosts: vec![
                 VirtualHost {
-                    name: "api".into(), domains: vec!["api.example.com".into()],
-                    routes: vec![RouteRule { match_prefix: Some("/".into()), match_path: None, cluster: "c-api".into() }],
+                    name: "api".into(),
+                    domains: vec!["api.example.com".into()],
+                    routes: vec![RouteRule {
+                        match_prefix: Some("/".into()),
+                        match_path: None,
+                        cluster: "c-api".into(),
+                    }],
                 },
                 VirtualHost {
-                    name: "www".into(), domains: vec!["www.example.com".into()],
-                    routes: vec![RouteRule { match_prefix: Some("/".into()), match_path: None, cluster: "c-www".into() }],
+                    name: "www".into(),
+                    domains: vec!["www.example.com".into()],
+                    routes: vec![RouteRule {
+                        match_prefix: Some("/".into()),
+                        match_path: None,
+                        cluster: "c-www".into(),
+                    }],
                 },
             ],
         };
@@ -456,8 +576,16 @@ mod tests {
 
     #[test]
     fn xds_route_rule_with_exact_path() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/envoy/route.go", "RouteRule.ExactPath", "tenant-xds-exact");
-        let r = RouteRule { match_prefix: None, match_path: Some("/health".into()), cluster: "c-health".into() };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/envoy/route.go",
+            "RouteRule.ExactPath",
+            "tenant-xds-exact"
+        );
+        let r = RouteRule {
+            match_prefix: None,
+            match_path: Some("/health".into()),
+            cluster: "c-health".into(),
+        };
         let json = serde_json::to_string(&r).unwrap();
         let back: RouteRule = serde_json::from_str(&json).unwrap();
         assert_eq!(back, r);
@@ -465,9 +593,14 @@ mod tests {
 
     #[test]
     fn xds_filter_chain_tls_context_with_sds() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/envoy/listener.go", "TlsContext.SDS", "tenant-xds-sds");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/envoy/listener.go",
+            "TlsContext.SDS",
+            "tenant-xds-sds"
+        );
         let tls = TlsContext {
-            sni: None, trust_domain: "spiffe://cluster.local".into(),
+            sni: None,
+            trust_domain: "spiffe://cluster.local".into(),
             sds_secret: Some("default/api-cert".into()),
         };
         let json = serde_json::to_string(&tls).unwrap();

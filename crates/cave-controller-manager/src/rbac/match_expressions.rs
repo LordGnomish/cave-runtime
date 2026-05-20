@@ -96,10 +96,7 @@ impl CombinedSelector {
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::new(
-    "pkg/apis/meta/v1/helpers.go",
-    "LabelSelectorAsSelector",
-);
+const FILE_CITE: Cite = Cite::new("pkg/apis/meta/v1/helpers.go", "LabelSelectorAsSelector");
 
 #[cfg(test)]
 mod tests {
@@ -107,7 +104,10 @@ mod tests {
     use crate::test_ctx;
 
     fn lbl(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
     fn expr(key: &str, op: MatchOp, vals: &[&str]) -> LabelMatchExpression {
         LabelMatchExpression {

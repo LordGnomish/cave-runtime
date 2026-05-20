@@ -5,7 +5,10 @@
 use crate::types::SqlValue;
 
 pub fn count(values: &[SqlValue]) -> i64 {
-    values.iter().filter(|v| !matches!(v, SqlValue::Null)).count() as i64
+    values
+        .iter()
+        .filter(|v| !matches!(v, SqlValue::Null))
+        .count() as i64
 }
 
 pub fn count_all(len: usize) -> i64 {

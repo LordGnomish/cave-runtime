@@ -62,18 +62,29 @@ impl ReadinessGateController {
         let n = name.into();
         let key = format!("{ns}/{n}");
         self.states.entry(key).or_insert(GateState {
-            pod_namespace: ns, pod_name: n,
+            pod_namespace: ns,
+            pod_name: n,
             status: GateStatus::Pending,
             last_update_ns: now_ns,
             message: "endpoint regeneration pending".into(),
         });
     }
 
-    pub fn set_ready(&mut self, namespace: &str, name: &str, now_ns: u64) -> Result<(), ReadinessError> {
+    pub fn set_ready(
+        &mut self,
+        namespace: &str,
+        name: &str,
+        now_ns: u64,
+    ) -> Result<(), ReadinessError> {
         let key = format!("{namespace}/{name}");
-        let s = self.states.get_mut(&key).ok_or_else(|| ReadinessError::NotRegistered(namespace.to_string(), name.to_string()))?;
+        let s = self.states.get_mut(&key).ok_or_else(|| {
+            ReadinessError::NotRegistered(namespace.to_string(), name.to_string())
+        })?;
         if matches!(s.status, GateStatus::Failed) {
-            return Err(ReadinessError::BadTransition { from: GateStatus::Failed, to: GateStatus::Ready });
+            return Err(ReadinessError::BadTransition {
+                from: GateStatus::Failed,
+                to: GateStatus::Ready,
+            });
         }
         s.status = GateStatus::Ready;
         s.last_update_ns = now_ns;
@@ -81,9 +92,17 @@ impl ReadinessGateController {
         Ok(())
     }
 
-    pub fn set_failed(&mut self, namespace: &str, name: &str, now_ns: u64, reason: impl Into<String>) -> Result<(), ReadinessError> {
+    pub fn set_failed(
+        &mut self,
+        namespace: &str,
+        name: &str,
+        now_ns: u64,
+        reason: impl Into<String>,
+    ) -> Result<(), ReadinessError> {
         let key = format!("{namespace}/{name}");
-        let s = self.states.get_mut(&key).ok_or_else(|| ReadinessError::NotRegistered(namespace.to_string(), name.to_string()))?;
+        let s = self.states.get_mut(&key).ok_or_else(|| {
+            ReadinessError::NotRegistered(namespace.to_string(), name.to_string())
+        })?;
         s.status = GateStatus::Failed;
         s.last_update_ns = now_ns;
         s.message = reason.into();
@@ -92,7 +111,9 @@ impl ReadinessGateController {
 
     pub fn remove(&mut self, namespace: &str, name: &str) -> Result<(), ReadinessError> {
         let key = format!("{namespace}/{name}");
-        self.states.remove(&key).ok_or_else(|| ReadinessError::NotRegistered(namespace.to_string(), name.to_string()))?;
+        self.states.remove(&key).ok_or_else(|| {
+            ReadinessError::NotRegistered(namespace.to_string(), name.to_string())
+        })?;
         Ok(())
     }
 
@@ -106,7 +127,10 @@ impl ReadinessGateController {
     }
 
     pub fn ready_count(&self) -> usize {
-        self.states.values().filter(|s| matches!(s.status, GateStatus::Ready)).count()
+        self.states
+            .values()
+            .filter(|s| matches!(s.status, GateStatus::Ready))
+            .count()
     }
 }
 
@@ -124,15 +148,23 @@ mod tests {
 
     #[test]
     fn register_starts_pending() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "Register", "tenant-rg-r");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "Register", "tenant-rg-r");
         let mut c = ctrl(tenant);
         c.register("default", "p1", 100);
-        assert_eq!(c.status("default", "p1").unwrap().status, GateStatus::Pending);
+        assert_eq!(
+            c.status("default", "p1").unwrap().status,
+            GateStatus::Pending
+        );
     }
 
     #[test]
     fn register_idempotent() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "Register.Idempotent", "tenant-rg-ri");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/podreadinessgate.go",
+            "Register.Idempotent",
+            "tenant-rg-ri"
+        );
         let mut c = ctrl(tenant);
         c.register("default", "p1", 100);
         c.register("default", "p1", 200);
@@ -141,7 +173,8 @@ mod tests {
 
     #[test]
     fn set_ready_advances_state() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "SetReady", "tenant-rg-sr");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "SetReady", "tenant-rg-sr");
         let mut c = ctrl(tenant);
         c.register("default", "p1", 100);
         c.set_ready("default", "p1", 200).unwrap();
@@ -150,10 +183,12 @@ mod tests {
 
     #[test]
     fn set_failed_advances_to_failed() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "SetFailed", "tenant-rg-sf");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "SetFailed", "tenant-rg-sf");
         let mut c = ctrl(tenant);
         c.register("default", "p1", 100);
-        c.set_failed("default", "p1", 200, "verifier rejected").unwrap();
+        c.set_failed("default", "p1", 200, "verifier rejected")
+            .unwrap();
         let s = c.status("default", "p1").unwrap();
         assert_eq!(s.status, GateStatus::Failed);
         assert_eq!(s.message, "verifier rejected");
@@ -161,7 +196,11 @@ mod tests {
 
     #[test]
     fn set_ready_after_failed_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "SetReady.AfterFailed", "tenant-rg-srf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/podreadinessgate.go",
+            "SetReady.AfterFailed",
+            "tenant-rg-srf"
+        );
         let mut c = ctrl(tenant);
         c.register("default", "p1", 100);
         c.set_failed("default", "p1", 200, "x").unwrap();
@@ -171,7 +210,11 @@ mod tests {
 
     #[test]
     fn set_ready_unknown_returns_not_registered() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "SetReady.NotRegistered", "tenant-rg-snr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/podreadinessgate.go",
+            "SetReady.NotRegistered",
+            "tenant-rg-snr"
+        );
         let mut c = ctrl(tenant);
         let err = c.set_ready("default", "p1", 100).unwrap_err();
         assert!(matches!(err, ReadinessError::NotRegistered(_, _)));
@@ -179,7 +222,11 @@ mod tests {
 
     #[test]
     fn set_failed_unknown_returns_not_registered() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "SetFailed.NotRegistered", "tenant-rg-sfnr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/podreadinessgate.go",
+            "SetFailed.NotRegistered",
+            "tenant-rg-sfnr"
+        );
         let mut c = ctrl(tenant);
         let err = c.set_failed("default", "p1", 100, "x").unwrap_err();
         assert!(matches!(err, ReadinessError::NotRegistered(_, _)));
@@ -187,7 +234,8 @@ mod tests {
 
     #[test]
     fn remove_drops_state() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "Remove", "tenant-rg-rm");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "Remove", "tenant-rg-rm");
         let mut c = ctrl(tenant);
         c.register("default", "p1", 100);
         c.remove("default", "p1").unwrap();
@@ -196,7 +244,11 @@ mod tests {
 
     #[test]
     fn remove_unknown_returns_not_registered() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "Remove.NotRegistered", "tenant-rg-rmnr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/podreadinessgate.go",
+            "Remove.NotRegistered",
+            "tenant-rg-rmnr"
+        );
         let mut c = ctrl(tenant);
         let err = c.remove("default", "p1").unwrap_err();
         assert!(matches!(err, ReadinessError::NotRegistered(_, _)));
@@ -204,7 +256,11 @@ mod tests {
 
     #[test]
     fn status_unknown_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "Status.NotFound", "tenant-rg-snf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/podreadinessgate.go",
+            "Status.NotFound",
+            "tenant-rg-snf"
+        );
         let c = ctrl(tenant);
         assert!(c.status("default", "p1").is_none());
     }
@@ -221,7 +277,8 @@ mod tests {
 
     #[test]
     fn ready_count_only_counts_ready() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "ReadyCount", "tenant-rg-rc");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "ReadyCount", "tenant-rg-rc");
         let mut c = ctrl(tenant);
         for i in 0..3u8 {
             c.register("default", &format!("p-{i}"), 100);
@@ -233,23 +290,38 @@ mod tests {
 
     #[test]
     fn condition_name_matches_upstream() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "ConditionName", "tenant-rg-cn");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/podreadinessgate.go",
+            "ConditionName",
+            "tenant-rg-cn"
+        );
         let c = ctrl(tenant);
         assert_eq!(c.condition_name, "network.cilium.io/cilium-agent-pod-ready");
     }
 
     #[test]
     fn set_ready_records_message() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "SetReady.Message", "tenant-rg-srm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/podreadinessgate.go",
+            "SetReady.Message",
+            "tenant-rg-srm"
+        );
         let mut c = ctrl(tenant);
         c.register("default", "p1", 100);
         c.set_ready("default", "p1", 200).unwrap();
-        assert_eq!(c.status("default", "p1").unwrap().message, "endpoint programmed");
+        assert_eq!(
+            c.status("default", "p1").unwrap().message,
+            "endpoint programmed"
+        );
     }
 
     #[test]
     fn set_ready_updates_timestamp() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "SetReady.Timestamp", "tenant-rg-srt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/podreadinessgate.go",
+            "SetReady.Timestamp",
+            "tenant-rg-srt"
+        );
         let mut c = ctrl(tenant);
         c.register("default", "p1", 100);
         c.set_ready("default", "p1", 999).unwrap();
@@ -258,9 +330,14 @@ mod tests {
 
     #[test]
     fn gate_state_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "State.Serde", "tenant-rg-sserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/podreadinessgate.go",
+            "State.Serde",
+            "tenant-rg-sserde"
+        );
         let s = GateState {
-            pod_namespace: "default".into(), pod_name: "p1".into(),
+            pod_namespace: "default".into(),
+            pod_name: "p1".into(),
             status: GateStatus::Ready,
             last_update_ns: 100,
             message: "ok".into(),
@@ -272,7 +349,11 @@ mod tests {
 
     #[test]
     fn gate_status_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/podreadinessgate.go", "Status.Serde", "tenant-rg-stserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/podreadinessgate.go",
+            "Status.Serde",
+            "tenant-rg-stserde"
+        );
         for st in [GateStatus::Pending, GateStatus::Ready, GateStatus::Failed] {
             let s = serde_json::to_string(&st).unwrap();
             let back: GateStatus = serde_json::from_str(&s).unwrap();

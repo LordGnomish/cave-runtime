@@ -23,7 +23,8 @@ pub trait Catalog: Send + Sync {
 
     async fn create_namespace(&self, ns: &Namespace) -> Result<()>;
     async fn drop_namespace(&self, ident: &NamespaceIdent) -> Result<()>;
-    async fn list_namespaces(&self, parent: Option<&NamespaceIdent>) -> Result<Vec<NamespaceIdent>>;
+    async fn list_namespaces(&self, parent: Option<&NamespaceIdent>)
+    -> Result<Vec<NamespaceIdent>>;
     async fn namespace_exists(&self, ident: &NamespaceIdent) -> Result<bool>;
 
     // ── table operations ─────────────────────────────────────────────────────

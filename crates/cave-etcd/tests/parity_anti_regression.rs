@@ -19,11 +19,16 @@ fn parity_is_strict_one_zero_zero_zero() {
 
     eprintln!(
         "cave-etcd parity: file={}/{} fn={}/{} test={}/{} surface={}/{} stubs={} overall={:.3}",
-        report.file_parity.matched, report.file_parity.total,
-        report.function_parity.matched, report.function_parity.total,
-        report.test_parity.matched, report.test_parity.total,
-        report.surface_parity.matched, report.surface_parity.total,
-        report.stubs_detected, report.overall,
+        report.file_parity.matched,
+        report.file_parity.total,
+        report.function_parity.matched,
+        report.function_parity.total,
+        report.test_parity.matched,
+        report.test_parity.total,
+        report.surface_parity.matched,
+        report.surface_parity.total,
+        report.stubs_detected,
+        report.overall,
     );
     for g in &report.gaps {
         eprintln!("  gap: {:?} {} -> {:?}", g.kind, g.upstream, g.local);

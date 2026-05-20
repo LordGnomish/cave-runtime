@@ -41,11 +41,11 @@
 use crate::models::*;
 use crate::store::CrmStore;
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -150,10 +150,7 @@ async fn create_workspace(
     (StatusCode::CREATED, Json(ws))
 }
 
-async fn list_people(
-    State(s): State<Arc<CrmStore>>,
-    Path(ws_id): Path<Uuid>,
-) -> impl IntoResponse {
+async fn list_people(State(s): State<Arc<CrmStore>>, Path(ws_id): Path<Uuid>) -> impl IntoResponse {
     let v: Vec<Person> = s
         .people
         .read()
@@ -254,10 +251,7 @@ async fn lose_opportunity(
     (StatusCode::OK, Json(serde_json::to_value(o).unwrap()))
 }
 
-async fn list_leads(
-    State(s): State<Arc<CrmStore>>,
-    Path(ws_id): Path<Uuid>,
-) -> impl IntoResponse {
+async fn list_leads(State(s): State<Arc<CrmStore>>, Path(ws_id): Path<Uuid>) -> impl IntoResponse {
     let v: Vec<Lead> = s
         .leads
         .read()
@@ -324,10 +318,7 @@ async fn list_pipeline_steps(
     Json(v)
 }
 
-async fn list_notes(
-    State(s): State<Arc<CrmStore>>,
-    Path(ws_id): Path<Uuid>,
-) -> impl IntoResponse {
+async fn list_notes(State(s): State<Arc<CrmStore>>, Path(ws_id): Path<Uuid>) -> impl IntoResponse {
     let v: Vec<Note> = s
         .notes
         .read()
@@ -353,10 +344,7 @@ async fn create_note(
     (StatusCode::CREATED, Json(n))
 }
 
-async fn list_tasks(
-    State(s): State<Arc<CrmStore>>,
-    Path(ws_id): Path<Uuid>,
-) -> impl IntoResponse {
+async fn list_tasks(State(s): State<Arc<CrmStore>>, Path(ws_id): Path<Uuid>) -> impl IntoResponse {
     let v: Vec<Task> = s
         .tasks
         .read()
@@ -427,10 +415,7 @@ async fn create_calendar_event(
     (StatusCode::CREATED, Json(e))
 }
 
-async fn list_views(
-    State(s): State<Arc<CrmStore>>,
-    Path(ws_id): Path<Uuid>,
-) -> impl IntoResponse {
+async fn list_views(State(s): State<Arc<CrmStore>>, Path(ws_id): Path<Uuid>) -> impl IntoResponse {
     let v: Vec<View> = s
         .views
         .read()
@@ -539,7 +524,10 @@ async fn graphql_schema(
         .collect();
     let sdl = crate::graphql_schema::render_workspace_schema(&objs, &fields);
     (
-        [(axum::http::header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; charset=utf-8",
+        )],
         sdl,
     )
 }
@@ -547,9 +535,18 @@ async fn graphql_schema(
 pub fn create_router(state: Arc<CrmStore>) -> Router {
     Router::new()
         .route("/api/crm/health", get(health))
-        .route("/api/crm/workspaces", get(list_workspaces).post(create_workspace))
-        .route("/api/crm/{workspace_id}/people", get(list_people).post(create_person))
-        .route("/api/crm/{workspace_id}/companies", get(list_companies).post(create_company))
+        .route(
+            "/api/crm/workspaces",
+            get(list_workspaces).post(create_workspace),
+        )
+        .route(
+            "/api/crm/{workspace_id}/people",
+            get(list_people).post(create_person),
+        )
+        .route(
+            "/api/crm/{workspace_id}/companies",
+            get(list_companies).post(create_company),
+        )
         .route(
             "/api/crm/{workspace_id}/opportunities",
             get(list_opportunities).post(create_opportunity),
@@ -562,7 +559,10 @@ pub fn create_router(state: Arc<CrmStore>) -> Router {
             "/api/crm/{workspace_id}/opportunities/{id}/lose",
             post(lose_opportunity),
         )
-        .route("/api/crm/{workspace_id}/leads", get(list_leads).post(create_lead))
+        .route(
+            "/api/crm/{workspace_id}/leads",
+            get(list_leads).post(create_lead),
+        )
         .route(
             "/api/crm/{workspace_id}/leads/{id}/convert",
             post(convert_lead),
@@ -571,8 +571,14 @@ pub fn create_router(state: Arc<CrmStore>) -> Router {
             "/api/crm/{workspace_id}/pipeline-steps",
             get(list_pipeline_steps),
         )
-        .route("/api/crm/{workspace_id}/notes", get(list_notes).post(create_note))
-        .route("/api/crm/{workspace_id}/tasks", get(list_tasks).post(create_task))
+        .route(
+            "/api/crm/{workspace_id}/notes",
+            get(list_notes).post(create_note),
+        )
+        .route(
+            "/api/crm/{workspace_id}/tasks",
+            get(list_tasks).post(create_task),
+        )
         .route(
             "/api/crm/{workspace_id}/tasks/{id}/complete",
             post(complete_task),
@@ -581,7 +587,10 @@ pub fn create_router(state: Arc<CrmStore>) -> Router {
             "/api/crm/{workspace_id}/calendar-events",
             get(list_calendar_events).post(create_calendar_event),
         )
-        .route("/api/crm/{workspace_id}/views", get(list_views).post(create_view))
+        .route(
+            "/api/crm/{workspace_id}/views",
+            get(list_views).post(create_view),
+        )
         .route(
             "/api/crm/{workspace_id}/object-metadata",
             get(list_object_metadata),
@@ -591,6 +600,9 @@ pub fn create_router(state: Arc<CrmStore>) -> Router {
             get(list_field_metadata).post(create_field_metadata),
         )
         .route("/api/crm/{workspace_id}/indexes", get(list_indexes))
-        .route("/api/crm/{workspace_id}/graphql-schema", get(graphql_schema))
+        .route(
+            "/api/crm/{workspace_id}/graphql-schema",
+            get(graphql_schema),
+        )
         .with_state(state)
 }

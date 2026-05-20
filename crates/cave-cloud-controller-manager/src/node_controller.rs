@@ -94,7 +94,10 @@ pub struct NodeAddress {
 
 impl NodeAddress {
     pub fn new(kind: NodeAddressType, address: impl Into<String>) -> Self {
-        Self { kind, address: address.into() }
+        Self {
+            kind,
+            address: address.into(),
+        }
     }
 }
 
@@ -264,7 +267,10 @@ pub fn label_drift(node: &NodeView, facts: &CloudFacts) -> u32 {
 pub fn canonicalize_addresses(input: &[NodeAddress]) -> Vec<NodeAddress> {
     let mut seen: Vec<NodeAddress> = Vec::with_capacity(input.len());
     for a in input {
-        if !seen.iter().any(|s| s.kind == a.kind && s.address == a.address) {
+        if !seen
+            .iter()
+            .any(|s| s.kind == a.kind && s.address == a.address)
+        {
             seen.push(a.clone());
         }
     }
@@ -287,12 +293,20 @@ pub fn address_diff(
     let have = canonicalize_addresses(node);
     let added: Vec<_> = want
         .iter()
-        .filter(|w| !have.iter().any(|h| h.kind == w.kind && h.address == w.address))
+        .filter(|w| {
+            !have
+                .iter()
+                .any(|h| h.kind == w.kind && h.address == w.address)
+        })
         .cloned()
         .collect();
     let removed: Vec<_> = have
         .iter()
-        .filter(|h| !want.iter().any(|w| w.kind == h.kind && w.address == h.address))
+        .filter(|h| {
+            !want
+                .iter()
+                .any(|w| w.kind == h.kind && w.address == h.address)
+        })
         .cloned()
         .collect();
     (added, removed)
@@ -301,9 +315,14 @@ pub fn address_diff(
 /// Pick the kubelet-preferred address — first match in canonical order.
 /// Mirrors `getNodeAddressesFromNodeIP` selection logic.
 pub fn preferred_address(addrs: &[NodeAddress]) -> Option<&NodeAddress> {
-    canonicalize_addresses(addrs).into_iter().next().and_then(|first| {
-        addrs.iter().find(|a| a.kind == first.kind && a.address == first.address)
-    })
+    canonicalize_addresses(addrs)
+        .into_iter()
+        .next()
+        .and_then(|first| {
+            addrs
+                .iter()
+                .find(|a| a.kind == first.kind && a.address == first.address)
+        })
 }
 
 // ─── Taint helpers ───────────────────────────────────────────────────────────
@@ -452,7 +471,10 @@ mod tests {
         );
         let n = fresh_node("worker-1");
         assert!(!is_initialised(&n));
-        assert_eq!(reconcile(&n, &facts(), &tenant).unwrap(), Reconcile::Annotate(4));
+        assert_eq!(
+            reconcile(&n, &facts(), &tenant).unwrap(),
+            Reconcile::Annotate(4)
+        );
     }
 
     #[test]
@@ -510,7 +532,10 @@ mod tests {
         assert_eq!(LABEL_REGION, "topology.kubernetes.io/region");
         assert_eq!(LABEL_INSTANCE_TYPE, "node.kubernetes.io/instance-type");
         assert_eq!(LABEL_HOSTNAME, "kubernetes.io/hostname");
-        assert_eq!(INITIALIZER_TAINT_KEY, "node.cloudprovider.kubernetes.io/uninitialized");
+        assert_eq!(
+            INITIALIZER_TAINT_KEY,
+            "node.cloudprovider.kubernetes.io/uninitialized"
+        );
     }
 
     // ─── Provider-id parsing ─────────────────────────────────────────────────
@@ -609,7 +634,9 @@ mod tests {
             "NodeAddressType",
             "tenant-node-addr-prec"
         );
-        assert!(NodeAddressType::InternalIP.precedence() < NodeAddressType::ExternalIP.precedence());
+        assert!(
+            NodeAddressType::InternalIP.precedence() < NodeAddressType::ExternalIP.precedence()
+        );
         assert!(NodeAddressType::ExternalIP.precedence() < NodeAddressType::Hostname.precedence());
     }
 
@@ -658,7 +685,10 @@ mod tests {
             "tenant-node-addr-host"
         );
         let addrs = vec![NodeAddress::new(NodeAddressType::Hostname, "h.example.com")];
-        assert_eq!(preferred_address(&addrs).unwrap().kind, NodeAddressType::Hostname);
+        assert_eq!(
+            preferred_address(&addrs).unwrap().kind,
+            NodeAddressType::Hostname
+        );
     }
 
     #[test]
@@ -835,10 +865,16 @@ mod tests {
             "TaintNodeShutdown",
             "tenant-node-taint-keys"
         );
-        assert_eq!(SHUTDOWN_TAINT_KEY, "node.cloudprovider.kubernetes.io/shutdown");
+        assert_eq!(
+            SHUTDOWN_TAINT_KEY,
+            "node.cloudprovider.kubernetes.io/shutdown"
+        );
         assert_eq!(UNREACHABLE_TAINT_KEY, "node.kubernetes.io/unreachable");
         assert_eq!(NOT_READY_TAINT_KEY, "node.kubernetes.io/not-ready");
-        assert_eq!(OUT_OF_SERVICE_TAINT_KEY, "node.kubernetes.io/out-of-service");
+        assert_eq!(
+            OUT_OF_SERVICE_TAINT_KEY,
+            "node.kubernetes.io/out-of-service"
+        );
     }
 
     // ─── Taint reconciliation ────────────────────────────────────────────────
@@ -1023,7 +1059,10 @@ mod tests {
             "tenant-node-hs-term"
         );
         let n = NodeView::fresh("n");
-        assert_eq!(handle_shutdown(&n, InstanceState::Terminated).unwrap(), Reconcile::Delete(1));
+        assert_eq!(
+            handle_shutdown(&n, InstanceState::Terminated).unwrap(),
+            Reconcile::Delete(1)
+        );
     }
 
     #[test]
@@ -1034,7 +1073,10 @@ mod tests {
             "tenant-node-hs-nf"
         );
         let n = NodeView::fresh("n");
-        assert_eq!(handle_shutdown(&n, InstanceState::NotFound).unwrap(), Reconcile::Delete(1));
+        assert_eq!(
+            handle_shutdown(&n, InstanceState::NotFound).unwrap(),
+            Reconcile::Delete(1)
+        );
     }
 
     #[test]
@@ -1045,9 +1087,18 @@ mod tests {
             "tenant-node-hs-noop"
         );
         let n = NodeView::fresh("n");
-        assert_eq!(handle_shutdown(&n, InstanceState::Running).unwrap(), Reconcile::NoOp);
-        assert_eq!(handle_shutdown(&n, InstanceState::Shutdown).unwrap(), Reconcile::NoOp);
-        assert_eq!(handle_shutdown(&n, InstanceState::Unreachable).unwrap(), Reconcile::NoOp);
+        assert_eq!(
+            handle_shutdown(&n, InstanceState::Running).unwrap(),
+            Reconcile::NoOp
+        );
+        assert_eq!(
+            handle_shutdown(&n, InstanceState::Shutdown).unwrap(),
+            Reconcile::NoOp
+        );
+        assert_eq!(
+            handle_shutdown(&n, InstanceState::Unreachable).unwrap(),
+            Reconcile::NoOp
+        );
     }
 
     // ─── NodeView::fresh ─────────────────────────────────────────────────────

@@ -78,7 +78,10 @@ fn segment_plus_matches_only_single_segment() {
         ..Default::default()
     };
     assert!(r.matches("secret/data/single"));
-    assert!(!r.matches("secret/data/nested/deeper"), "+ is single-segment");
+    assert!(
+        !r.matches("secret/data/nested/deeper"),
+        "+ is single-segment"
+    );
     assert!(!r.matches("other/path"), "non-prefix paths reject");
 }
 
@@ -89,14 +92,24 @@ fn longest_prefix_wins_among_overlapping_rules() {
     let p = Policy {
         name: "tiered".into(),
         rules: vec![
-            PolicyRule { path: "secret/*".into(), capabilities: vec![Capability::Read] , ..Default::default() },
-            PolicyRule { path: "secret/admin/*".into(), capabilities: vec![Capability::Read, Capability::Update] , ..Default::default() },
+            PolicyRule {
+                path: "secret/*".into(),
+                capabilities: vec![Capability::Read],
+                ..Default::default()
+            },
+            PolicyRule {
+                path: "secret/admin/*".into(),
+                capabilities: vec![Capability::Read, Capability::Update],
+                ..Default::default()
+            },
         ],
         raw: String::new(),
     };
     assert!(p.allows("secret/admin/key", &Capability::Update));
-    assert!(!p.allows("secret/peon/key", &Capability::Update),
-        "shorter rule does not grant update");
+    assert!(
+        !p.allows("secret/peon/key", &Capability::Update),
+        "shorter rule does not grant update"
+    );
 }
 
 /// Cite: openbao `vault/policy.go` deny semantics — a `deny` capability on
@@ -112,8 +125,10 @@ fn deny_capability_blocks_otherwise_allowed_actions() {
         }],
         raw: String::new(),
     };
-    assert!(!p.allows("secret/locked", &Capability::Read),
-        "explicit deny wins even when read is also listed");
+    assert!(
+        !p.allows("secret/locked", &Capability::Read),
+        "explicit deny wins even when read is also listed"
+    );
 }
 
 /// Cite: openbao `vault/policy_store.go:411` (GetPolicy) + the `root`
@@ -129,8 +144,10 @@ fn root_policy_grants_everything_default_policy_grants_self_service() {
     let default = vec!["default".to_string()];
     assert!(store.check(&default, "auth/token/lookup-self", &Capability::Read));
     assert!(store.check(&default, "sys/tools/random/8", &Capability::Update));
-    assert!(!store.check(&default, "secret/data/foo", &Capability::Read),
-        "default does NOT grant arbitrary secret reads");
+    assert!(
+        !store.check(&default, "secret/data/foo", &Capability::Read),
+        "default does NOT grant arbitrary secret reads"
+    );
 }
 
 /// Cite: openbao `vault/policy_store.go:603` (DeletePolicy) — deleting the

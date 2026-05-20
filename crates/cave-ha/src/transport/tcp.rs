@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use serde_json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 use tracing::{debug, info, warn};
 
 use crate::error::{HaError, HaResult};
@@ -61,12 +61,13 @@ impl TcpTransport {
                 return Ok(tx.clone());
             }
         }
-        let addr = self.peers.get(&to).ok_or_else(|| {
-            HaError::Transport(format!("no address for node {to}"))
-        })?;
-        let stream = TcpStream::connect(addr).await.map_err(|e| {
-            HaError::Transport(format!("connect to {addr}: {e}"))
-        })?;
+        let addr = self
+            .peers
+            .get(&to)
+            .ok_or_else(|| HaError::Transport(format!("no address for node {to}")))?;
+        let stream = TcpStream::connect(addr)
+            .await
+            .map_err(|e| HaError::Transport(format!("connect to {addr}: {e}")))?;
         let (tx, rx) = mpsc::unbounded_channel::<Vec<u8>>();
         tokio::spawn(write_loop(stream, rx));
         conns.insert(to, tx.clone());
@@ -81,7 +82,8 @@ impl Transport for TcpTransport {
         let frame = encode_frame(&payload);
         match self.get_or_connect(to).await {
             Ok(tx) => {
-                tx.send(frame).map_err(|_| HaError::Transport("connection closed".into()))?;
+                tx.send(frame)
+                    .map_err(|_| HaError::Transport("connection closed".into()))?;
             }
             Err(e) => {
                 debug!(from = self.from, to, "send failed: {e}");
@@ -106,15 +108,13 @@ fn encode_frame(payload: &[u8]) -> Vec<u8> {
 }
 
 fn simple_checksum(data: &[u8]) -> u32 {
-    data.iter().fold(0u32, |acc, &b| acc.wrapping_mul(31).wrapping_add(b as u32))
+    data.iter()
+        .fold(0u32, |acc, &b| acc.wrapping_mul(31).wrapping_add(b as u32))
 }
 
 // ── Async IO loops ────────────────────────────────────────────────────────
 
-async fn accept_loop(
-    listener: TcpListener,
-    msg_tx: mpsc::UnboundedSender<(NodeId, RaftMessage)>,
-) {
+async fn accept_loop(listener: TcpListener, msg_tx: mpsc::UnboundedSender<(NodeId, RaftMessage)>) {
     loop {
         match listener.accept().await {
             Ok((stream, addr)) => {
@@ -127,10 +127,7 @@ async fn accept_loop(
     }
 }
 
-async fn read_loop(
-    mut stream: TcpStream,
-    msg_tx: mpsc::UnboundedSender<(NodeId, RaftMessage)>,
-) {
+async fn read_loop(mut stream: TcpStream, msg_tx: mpsc::UnboundedSender<(NodeId, RaftMessage)>) {
     loop {
         // Read frame header: [u32 len][u32 csum].
         let mut header = [0u8; 8];
@@ -168,10 +165,7 @@ async fn read_loop(
     }
 }
 
-async fn write_loop(
-    mut stream: TcpStream,
-    mut rx: mpsc::UnboundedReceiver<Vec<u8>>,
-) {
+async fn write_loop(mut stream: TcpStream, mut rx: mpsc::UnboundedReceiver<Vec<u8>>) {
     while let Some(frame) = rx.recv().await {
         if stream.write_all(&frame).await.is_err() {
             break;

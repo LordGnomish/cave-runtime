@@ -129,35 +129,73 @@ mod tests {
     fn verify_happy_path() {
         let raw = fixture("webauthn.create", b"abc", "https://login.cave.dev");
         let cd = parse(&raw).unwrap();
-        verify(&cd, ClientDataType::Create, b"abc", "https://login.cave.dev").unwrap();
+        verify(
+            &cd,
+            ClientDataType::Create,
+            b"abc",
+            "https://login.cave.dev",
+        )
+        .unwrap();
     }
 
     #[test]
     fn verify_type_mismatch() {
         let raw = fixture("webauthn.get", b"abc", "https://login.cave.dev");
         let cd = parse(&raw).unwrap();
-        assert!(verify(&cd, ClientDataType::Create, b"abc", "https://login.cave.dev").is_err());
+        assert!(
+            verify(
+                &cd,
+                ClientDataType::Create,
+                b"abc",
+                "https://login.cave.dev"
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn verify_challenge_mismatch() {
         let raw = fixture("webauthn.create", b"abc", "https://login.cave.dev");
         let cd = parse(&raw).unwrap();
-        assert!(verify(&cd, ClientDataType::Create, b"xyz", "https://login.cave.dev").is_err());
+        assert!(
+            verify(
+                &cd,
+                ClientDataType::Create,
+                b"xyz",
+                "https://login.cave.dev"
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn verify_origin_mismatch() {
         let raw = fixture("webauthn.create", b"abc", "https://evil.example");
         let cd = parse(&raw).unwrap();
-        assert!(verify(&cd, ClientDataType::Create, b"abc", "https://login.cave.dev").is_err());
+        assert!(
+            verify(
+                &cd,
+                ClientDataType::Create,
+                b"abc",
+                "https://login.cave.dev"
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn verify_cross_origin_rejected() {
         let raw = br#"{"type":"webauthn.create","challenge":"YWJj","origin":"https://login.cave.dev","crossOrigin":true}"#;
         let cd = parse(raw).unwrap();
-        assert!(verify(&cd, ClientDataType::Create, b"abc", "https://login.cave.dev").is_err());
+        assert!(
+            verify(
+                &cd,
+                ClientDataType::Create,
+                b"abc",
+                "https://login.cave.dev"
+            )
+            .is_err()
+        );
     }
 
     #[test]

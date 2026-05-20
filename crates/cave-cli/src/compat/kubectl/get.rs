@@ -5,7 +5,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::compat::kubectl::output::{parse as parse_output, KubectlOutput};
+use crate::compat::kubectl::output::{KubectlOutput, parse as parse_output};
 use crate::compat::kubectl::resource::ns_path;
 use crate::native::{HttpVerb, PreparedRequest};
 
@@ -101,10 +101,7 @@ mod tests {
         let mut a = args("pods");
         a.namespace = Some("kube-system".into());
         let (r, _) = prepare(&a).unwrap();
-        assert_eq!(
-            r.path,
-            "/api/compat/kubectl/v1/namespaces/kube-system/pods"
-        );
+        assert_eq!(r.path, "/api/compat/kubectl/v1/namespaces/kube-system/pods");
     }
 
     #[test]
@@ -212,9 +209,10 @@ mod tests {
         a.output = Some("yaml".into());
         let (r, o) = prepare(&a).unwrap();
         assert_eq!(o, KubectlOutput::Yaml);
-        assert!(r
-            .path
-            .starts_with("/api/compat/kubectl/v1/namespaces/prod/pods?"));
+        assert!(
+            r.path
+                .starts_with("/api/compat/kubectl/v1/namespaces/prod/pods?")
+        );
         assert!(r.path.contains("labelSelector=tier%3Dweb"));
         assert!(r.path.contains("watch=true"));
     }

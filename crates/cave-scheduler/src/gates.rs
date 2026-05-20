@@ -23,12 +23,19 @@ pub type SchedulingGate = String;
 pub struct SchedulingGates;
 
 impl PreEnqueuePlugin for SchedulingGates {
-    fn name(&self) -> &str { "SchedulingGates" }
+    fn name(&self) -> &str {
+        "SchedulingGates"
+    }
     fn pre_enqueue(&self, pod: &Pod) -> Status {
         if pod.spec.scheduling_gates.is_empty() {
             return Status::success("SchedulingGates");
         }
-        let names: Vec<&str> = pod.spec.scheduling_gates.iter().map(String::as_str).collect();
+        let names: Vec<&str> = pod
+            .spec
+            .scheduling_gates
+            .iter()
+            .map(String::as_str)
+            .collect();
         Status::pending(
             "SchedulingGates",
             format!("waiting on scheduling gates: [{}]", names.join(", ")),
@@ -50,7 +57,9 @@ mod tests {
     #[test]
     fn single_gate_blocks_with_pending() {
         let mut p = Pod::new("t", "ns", "p");
-        p.spec.scheduling_gates.push("acme.com/awaiting-quota".into());
+        p.spec
+            .scheduling_gates
+            .push("acme.com/awaiting-quota".into());
         let s = SchedulingGates.pre_enqueue(&p);
         assert!(s.is_pending());
         assert!(s.reasons[0].contains("acme.com/awaiting-quota"));

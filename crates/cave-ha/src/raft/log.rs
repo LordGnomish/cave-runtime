@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-use serde::{Deserialize, Serialize};
 use crate::error::{HaError, HaResult};
 use crate::raft::types::{EntryType, LogIndex, MembershipConfig, Term};
+use serde::{Deserialize, Serialize};
 
 /// A single Raft log entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -16,16 +16,31 @@ pub struct LogEntry {
 
 impl LogEntry {
     pub fn new_normal(index: LogIndex, term: Term, data: Vec<u8>) -> Self {
-        Self { index, term, entry_type: EntryType::Normal, data }
+        Self {
+            index,
+            term,
+            entry_type: EntryType::Normal,
+            data,
+        }
     }
 
     pub fn new_barrier(index: LogIndex, term: Term) -> Self {
-        Self { index, term, entry_type: EntryType::Barrier, data: vec![] }
+        Self {
+            index,
+            term,
+            entry_type: EntryType::Barrier,
+            data: vec![],
+        }
     }
 
     pub fn new_membership(index: LogIndex, term: Term, cfg: &MembershipConfig) -> HaResult<Self> {
         let data = serde_json::to_vec(cfg)?;
-        Ok(Self { index, term, entry_type: EntryType::MembershipChange, data })
+        Ok(Self {
+            index,
+            term,
+            entry_type: EntryType::MembershipChange,
+            data,
+        })
     }
 
     pub fn decode_membership(&self) -> HaResult<MembershipConfig> {
@@ -83,7 +98,10 @@ impl MemLog {
         }
         let offset = (index - self.first_index()) as usize;
         self.entries.get(offset).ok_or_else(|| {
-            HaError::Raft(format!("entry {index} not found (last={})", self.last_index()))
+            HaError::Raft(format!(
+                "entry {index} not found (last={})",
+                self.last_index()
+            ))
         })
     }
 
@@ -153,12 +171,20 @@ impl MemLog {
     }
 
     /// Snapshot boundary info.
-    pub fn snapshot_index(&self) -> LogIndex { self.snapshot_index }
-    pub fn snapshot_term(&self) -> Term { self.snapshot_term }
+    pub fn snapshot_index(&self) -> LogIndex {
+        self.snapshot_index
+    }
+    pub fn snapshot_term(&self) -> Term {
+        self.snapshot_term
+    }
 
     /// Number of entries above the snapshot.
-    pub fn len(&self) -> usize { self.entries.len() }
-    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
 
     /// Find the most recent membership config entry (scanning backwards).
     pub fn last_membership(&self) -> Option<MembershipConfig> {

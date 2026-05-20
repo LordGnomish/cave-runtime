@@ -83,7 +83,11 @@ pub struct ServiceBackend {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SockLbDecision {
     /// Rewrite the syscall args to (backend_ip, backend_port).
-    Rewrite { backend_ip: IpAddr, backend_port: u16, revnat_id: u32 },
+    Rewrite {
+        backend_ip: IpAddr,
+        backend_port: u16,
+        revnat_id: u32,
+    },
     /// Pass-through: not a service IP or source not eligible.
     Passthrough,
 }
@@ -111,7 +115,10 @@ pub struct SockLbConfig {
 
 impl Default for SockLbConfig {
     fn default() -> Self {
-        Self { host_ns_only: false, track_terminating: true }
+        Self {
+            host_ns_only: false,
+            track_terminating: true,
+        }
     }
 }
 
@@ -132,7 +139,8 @@ pub struct SockLbManager {
 impl SockLbManager {
     pub fn new(tenant: TenantId, config: SockLbConfig) -> Self {
         Self {
-            tenant, config,
+            tenant,
+            config,
             cgroups: HashMap::new(),
             services: HashMap::new(),
             revnat_index: HashMap::new(),
@@ -142,7 +150,11 @@ impl SockLbManager {
 
     /// Attach the SocketLB programs to a cgroup root. Mirrors
     /// `pkg/socketlb/socketlb.go::Attach`.
-    pub fn attach(&mut self, cgroup_root: impl Into<String>, hooks: Vec<CgroupHook>) -> Result<(), SockLbError> {
+    pub fn attach(
+        &mut self,
+        cgroup_root: impl Into<String>,
+        hooks: Vec<CgroupHook>,
+    ) -> Result<(), SockLbError> {
         let root = cgroup_root.into();
         if self.cgroups.contains_key(&root) {
             return Err(SockLbError::AlreadyAttached(root));
@@ -152,7 +164,9 @@ impl SockLbManager {
     }
 
     pub fn detach(&mut self, cgroup_root: &str) -> Result<(), SockLbError> {
-        self.cgroups.remove(cgroup_root).ok_or_else(|| SockLbError::NotAttached(cgroup_root.to_string()))?;
+        self.cgroups
+            .remove(cgroup_root)
+            .ok_or_else(|| SockLbError::NotAttached(cgroup_root.to_string()))?;
         Ok(())
     }
 
@@ -165,10 +179,17 @@ impl SockLbManager {
     }
 
     /// Register a service frontend. Returns the assigned `revnat_id`.
-    pub fn register_service(&mut self, frontend: ServiceFrontend, backends: Vec<ServiceBackend>) -> Result<u32, SockLbError> {
+    pub fn register_service(
+        &mut self,
+        frontend: ServiceFrontend,
+        backends: Vec<ServiceBackend>,
+    ) -> Result<u32, SockLbError> {
         let key = (frontend.cluster_ip, frontend.port, frontend.protocol);
         if self.services.contains_key(&key) {
-            return Err(SockLbError::DuplicateFrontend { ip: frontend.cluster_ip, port: frontend.port });
+            return Err(SockLbError::DuplicateFrontend {
+                ip: frontend.cluster_ip,
+                port: frontend.port,
+            });
         }
         let revnat = self.next_revnat;
         self.next_revnat += 1;
@@ -217,7 +238,9 @@ impl SockLbManager {
             return SockLbDecision::Passthrough;
         }
         let chosen = candidates[(flow_hash as usize) % candidates.len()];
-        let revnat = self.revnat_index.iter()
+        let revnat = self
+            .revnat_index
+            .iter()
             .find(|(_, v)| **v == key)
             .map(|(k, _)| *k)
             .unwrap_or(0);
@@ -233,7 +256,9 @@ impl SockLbManager {
     /// app sees the right peer name. Mirrors
     /// `bpf/bpf_sock.c::cil_sock4_recvmsg`.
     pub fn on_recvmsg(&self, revnat_id: u32) -> Option<(IpAddr, u16)> {
-        self.revnat_index.get(&revnat_id).map(|(ip, port, _)| (*ip, *port))
+        self.revnat_index
+            .get(&revnat_id)
+            .map(|(ip, port, _)| (*ip, *port))
     }
 }
 
@@ -255,13 +280,25 @@ mod tests {
     }
 
     fn frontend() -> ServiceFrontend {
-        ServiceFrontend { cluster_ip: ip(10, 96, 0, 1), port: 80, protocol: 6 }
+        ServiceFrontend {
+            cluster_ip: ip(10, 96, 0, 1),
+            port: 80,
+            protocol: 6,
+        }
     }
 
     fn backends() -> Vec<ServiceBackend> {
         vec![
-            ServiceBackend { backend_id: 1, backend_ip: ip(10, 0, 1, 1), backend_port: 8080 },
-            ServiceBackend { backend_id: 2, backend_ip: ip(10, 0, 1, 2), backend_port: 8080 },
+            ServiceBackend {
+                backend_id: 1,
+                backend_ip: ip(10, 0, 1, 1),
+                backend_port: 8080,
+            },
+            ServiceBackend {
+                backend_id: 2,
+                backend_ip: ip(10, 0, 1, 2),
+                backend_port: 8080,
+            },
         ]
     }
 
@@ -276,7 +313,10 @@ mod tests {
         assert_eq!(CgroupHook::UdpSendmsg6.name(), "BPF_CGROUP_UDP6_SENDMSG");
         assert_eq!(CgroupHook::UdpRecvmsg4.name(), "BPF_CGROUP_UDP4_RECVMSG");
         assert_eq!(CgroupHook::UdpRecvmsg6.name(), "BPF_CGROUP_UDP6_RECVMSG");
-        assert_eq!(CgroupHook::InetGetpeername4.name(), "BPF_CGROUP_INET4_GETPEERNAME");
+        assert_eq!(
+            CgroupHook::InetGetpeername4.name(),
+            "BPF_CGROUP_INET4_GETPEERNAME"
+        );
     }
 
     // ── Attach / detach ──────────────────────────────────────────────────────
@@ -285,16 +325,24 @@ mod tests {
     fn sock_lb_attach_records_cgroup_root() {
         let (_c, tenant) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "Attach", "tenant-sl-att");
         let mut m = mgr(tenant);
-        m.attach("/sys/fs/cgroup", vec![CgroupHook::InetConnect4]).unwrap();
+        m.attach("/sys/fs/cgroup", vec![CgroupHook::InetConnect4])
+            .unwrap();
         assert_eq!(m.attached_cgroups().len(), 1);
     }
 
     #[test]
     fn sock_lb_attach_duplicate_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "Attach.Duplicate", "tenant-sl-attdup");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/socketlb/socketlb.go",
+            "Attach.Duplicate",
+            "tenant-sl-attdup"
+        );
         let mut m = mgr(tenant);
-        m.attach("/sys/fs/cgroup", vec![CgroupHook::InetConnect4]).unwrap();
-        let err = m.attach("/sys/fs/cgroup", vec![CgroupHook::InetConnect4]).unwrap_err();
+        m.attach("/sys/fs/cgroup", vec![CgroupHook::InetConnect4])
+            .unwrap();
+        let err = m
+            .attach("/sys/fs/cgroup", vec![CgroupHook::InetConnect4])
+            .unwrap_err();
         assert!(matches!(err, SockLbError::AlreadyAttached(_)));
     }
 
@@ -302,14 +350,19 @@ mod tests {
     fn sock_lb_detach_drops_cgroup() {
         let (_c, tenant) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "Detach", "tenant-sl-det");
         let mut m = mgr(tenant);
-        m.attach("/sys/fs/cgroup", vec![CgroupHook::InetConnect4]).unwrap();
+        m.attach("/sys/fs/cgroup", vec![CgroupHook::InetConnect4])
+            .unwrap();
         m.detach("/sys/fs/cgroup").unwrap();
         assert_eq!(m.attached_cgroups().len(), 0);
     }
 
     #[test]
     fn sock_lb_detach_unknown_returns_not_attached() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "Detach.NotAttached", "tenant-sl-detnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/socketlb/socketlb.go",
+            "Detach.NotAttached",
+            "tenant-sl-detnf"
+        );
         let mut m = mgr(tenant);
         let err = m.detach("/sys/fs/cgroup").unwrap_err();
         assert!(matches!(err, SockLbError::NotAttached(_)));
@@ -317,7 +370,8 @@ mod tests {
 
     #[test]
     fn sock_lb_hooks_for_returns_attached_set() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "HooksFor", "tenant-sl-hooks");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/socketlb/socketlb.go", "HooksFor", "tenant-sl-hooks");
         let mut m = mgr(tenant);
         let hooks = vec![CgroupHook::InetConnect4, CgroupHook::UdpSendmsg4];
         m.attach("/sys/fs/cgroup", hooks.clone()).unwrap();
@@ -328,7 +382,11 @@ mod tests {
 
     #[test]
     fn sock_lb_register_service_assigns_revnat_id() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "RegisterService", "tenant-sl-reg");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/socketlb/socketlb.go",
+            "RegisterService",
+            "tenant-sl-reg"
+        );
         let mut m = mgr(tenant);
         let id = m.register_service(frontend(), backends()).unwrap();
         assert_eq!(id, 1);
@@ -337,7 +395,11 @@ mod tests {
 
     #[test]
     fn sock_lb_register_service_duplicate_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "RegisterService.Duplicate", "tenant-sl-regdup");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/socketlb/socketlb.go",
+            "RegisterService.Duplicate",
+            "tenant-sl-regdup"
+        );
         let mut m = mgr(tenant);
         m.register_service(frontend(), backends()).unwrap();
         let err = m.register_service(frontend(), backends()).unwrap_err();
@@ -346,7 +408,11 @@ mod tests {
 
     #[test]
     fn sock_lb_deregister_service_drops_revnat_index() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "DeregisterService", "tenant-sl-dereg");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/socketlb/socketlb.go",
+            "DeregisterService",
+            "tenant-sl-dereg"
+        );
         let mut m = mgr(tenant);
         let id = m.register_service(frontend(), backends()).unwrap();
         assert!(m.deregister_service(&frontend()));
@@ -355,14 +421,22 @@ mod tests {
 
     #[test]
     fn sock_lb_deregister_unknown_returns_false() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "DeregisterService.Unknown", "tenant-sl-deregunk");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/socketlb/socketlb.go",
+            "DeregisterService.Unknown",
+            "tenant-sl-deregunk"
+        );
         let mut m = mgr(tenant);
         assert!(!m.deregister_service(&frontend()));
     }
 
     #[test]
     fn sock_lb_revnat_id_monotonic_across_services() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "RegisterService.Monotonic", "tenant-sl-mono");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/socketlb/socketlb.go",
+            "RegisterService.Monotonic",
+            "tenant-sl-mono"
+        );
         let mut m = mgr(tenant);
         let id1 = m.register_service(frontend(), backends()).unwrap();
         let mut f2 = frontend();
@@ -375,7 +449,11 @@ mod tests {
 
     #[test]
     fn sock_lb_connect_to_known_service_rewrites() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/bpf_sock.c", "cil_sock4_connect.Rewrite", "tenant-sl-conn");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/bpf_sock.c",
+            "cil_sock4_connect.Rewrite",
+            "tenant-sl-conn"
+        );
         let mut m = mgr(tenant);
         m.register_service(frontend(), backends()).unwrap();
         let d = m.on_connect(ip(10, 96, 0, 1), 80, 6, false, 0);
@@ -389,7 +467,11 @@ mod tests {
 
     #[test]
     fn sock_lb_connect_to_unknown_destination_passes_through() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/bpf_sock.c", "cil_sock4_connect.Passthrough", "tenant-sl-connpt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/bpf_sock.c",
+            "cil_sock4_connect.Passthrough",
+            "tenant-sl-connpt"
+        );
         let m = mgr(tenant);
         let d = m.on_connect(ip(8, 8, 8, 8), 53, 17, false, 0);
         assert_eq!(d, SockLbDecision::Passthrough);
@@ -397,7 +479,11 @@ mod tests {
 
     #[test]
     fn sock_lb_connect_with_no_backends_returns_passthrough() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/bpf_sock.c", "cil_sock4_connect.EmptyBackends", "tenant-sl-connemp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/bpf_sock.c",
+            "cil_sock4_connect.EmptyBackends",
+            "tenant-sl-connemp"
+        );
         let mut m = mgr(tenant);
         m.register_service(frontend(), vec![]).unwrap();
         let d = m.on_connect(ip(10, 96, 0, 1), 80, 6, false, 0);
@@ -406,12 +492,18 @@ mod tests {
 
     #[test]
     fn sock_lb_connect_uses_flow_hash_for_backend_selection() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/bpf_sock.c", "cil_sock4_connect.HashSelect", "tenant-sl-connhash");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/bpf_sock.c",
+            "cil_sock4_connect.HashSelect",
+            "tenant-sl-connhash"
+        );
         let mut m = mgr(tenant);
         m.register_service(frontend(), backends()).unwrap();
         let mut hits = std::collections::HashSet::new();
         for h in 0..32u64 {
-            if let SockLbDecision::Rewrite { backend_ip, .. } = m.on_connect(ip(10, 96, 0, 1), 80, 6, false, h) {
+            if let SockLbDecision::Rewrite { backend_ip, .. } =
+                m.on_connect(ip(10, 96, 0, 1), 80, 6, false, h)
+            {
                 hits.insert(backend_ip);
             }
         }
@@ -420,8 +512,18 @@ mod tests {
 
     #[test]
     fn sock_lb_host_ns_only_skips_non_host_source() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "HostnsOnly.Skip", "tenant-sl-hnsskip");
-        let mut m = SockLbManager::new(tenant, SockLbConfig { host_ns_only: true, track_terminating: true });
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/socketlb/socketlb.go",
+            "HostnsOnly.Skip",
+            "tenant-sl-hnsskip"
+        );
+        let mut m = SockLbManager::new(
+            tenant,
+            SockLbConfig {
+                host_ns_only: true,
+                track_terminating: true,
+            },
+        );
         m.register_service(frontend(), backends()).unwrap();
         let d = m.on_connect(ip(10, 96, 0, 1), 80, 6, false, 0);
         assert_eq!(d, SockLbDecision::Passthrough);
@@ -429,8 +531,18 @@ mod tests {
 
     #[test]
     fn sock_lb_host_ns_only_rewrites_host_source() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "HostnsOnly.Rewrite", "tenant-sl-hnsrw");
-        let mut m = SockLbManager::new(tenant, SockLbConfig { host_ns_only: true, track_terminating: true });
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/socketlb/socketlb.go",
+            "HostnsOnly.Rewrite",
+            "tenant-sl-hnsrw"
+        );
+        let mut m = SockLbManager::new(
+            tenant,
+            SockLbConfig {
+                host_ns_only: true,
+                track_terminating: true,
+            },
+        );
         m.register_service(frontend(), backends()).unwrap();
         let d = m.on_connect(ip(10, 96, 0, 1), 80, 6, true, 0);
         assert!(matches!(d, SockLbDecision::Rewrite { .. }));
@@ -438,7 +550,11 @@ mod tests {
 
     #[test]
     fn sock_lb_default_config_rewrites_pod_source() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "Default.PodSource", "tenant-sl-podsrc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/socketlb/socketlb.go",
+            "Default.PodSource",
+            "tenant-sl-podsrc"
+        );
         let mut m = mgr(tenant);
         m.register_service(frontend(), backends()).unwrap();
         let d = m.on_connect(ip(10, 96, 0, 1), 80, 6, false, 0);
@@ -447,7 +563,11 @@ mod tests {
 
     #[test]
     fn sock_lb_connect_returns_revnat_id_for_chosen_backend() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/bpf_sock.c", "cil_sock4_connect.RevnatId", "tenant-sl-rnid");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/bpf_sock.c",
+            "cil_sock4_connect.RevnatId",
+            "tenant-sl-rnid"
+        );
         let mut m = mgr(tenant);
         let id = m.register_service(frontend(), backends()).unwrap();
         let d = m.on_connect(ip(10, 96, 0, 1), 80, 6, false, 0);
@@ -461,7 +581,8 @@ mod tests {
 
     #[test]
     fn sock_lb_recvmsg_returns_original_frontend() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/bpf_sock.c", "cil_sock4_recvmsg", "tenant-sl-recv");
+        let (_c, tenant) =
+            cilium_test_ctx!("bpf/bpf_sock.c", "cil_sock4_recvmsg", "tenant-sl-recv");
         let mut m = mgr(tenant);
         let id = m.register_service(frontend(), backends()).unwrap();
         let (orig_ip, orig_port) = m.on_recvmsg(id).unwrap();
@@ -471,7 +592,11 @@ mod tests {
 
     #[test]
     fn sock_lb_recvmsg_unknown_revnat_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/bpf_sock.c", "cil_sock4_recvmsg.Unknown", "tenant-sl-recvnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/bpf_sock.c",
+            "cil_sock4_recvmsg.Unknown",
+            "tenant-sl-recvnf"
+        );
         let m = mgr(tenant);
         assert!(m.on_recvmsg(99).is_none());
     }
@@ -480,10 +605,16 @@ mod tests {
 
     #[test]
     fn sock_lb_distinct_proto_makes_distinct_frontend() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "RegisterService.MultiProto", "tenant-sl-mp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/socketlb/socketlb.go",
+            "RegisterService.MultiProto",
+            "tenant-sl-mp"
+        );
         let mut m = mgr(tenant);
-        let mut tcp = frontend(); tcp.protocol = 6;
-        let mut udp = frontend(); udp.protocol = 17;
+        let mut tcp = frontend();
+        tcp.protocol = 6;
+        let mut udp = frontend();
+        udp.protocol = 17;
         m.register_service(tcp, backends()).unwrap();
         m.register_service(udp, backends()).unwrap();
         assert_eq!(m.service_count(), 2);
@@ -496,10 +627,14 @@ mod tests {
         let (_c, tenant) = cilium_test_ctx!("bpf/bpf_sock.c", "cil_sock6_connect", "tenant-sl-v6");
         let mut m = mgr(tenant);
         let f = ServiceFrontend {
-            cluster_ip: "fd00:96::1".parse().unwrap(), port: 80, protocol: 6,
+            cluster_ip: "fd00:96::1".parse().unwrap(),
+            port: 80,
+            protocol: 6,
         };
         let b = vec![ServiceBackend {
-            backend_id: 1, backend_ip: "fd00:1::5".parse().unwrap(), backend_port: 8080,
+            backend_id: 1,
+            backend_ip: "fd00:1::5".parse().unwrap(),
+            backend_port: 8080,
         }];
         m.register_service(f.clone(), b).unwrap();
         let d = m.on_connect(f.cluster_ip, 80, 6, false, 0);
@@ -510,10 +645,17 @@ mod tests {
 
     #[test]
     fn sock_lb_cgroup_hook_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "CgroupHook.Serde", "tenant-sl-serde-h");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/socketlb/socketlb.go",
+            "CgroupHook.Serde",
+            "tenant-sl-serde-h"
+        );
         for h in [
-            CgroupHook::InetConnect4, CgroupHook::InetConnect6,
-            CgroupHook::UdpSendmsg4, CgroupHook::UdpRecvmsg4, CgroupHook::InetGetpeername4,
+            CgroupHook::InetConnect4,
+            CgroupHook::InetConnect6,
+            CgroupHook::UdpSendmsg4,
+            CgroupHook::UdpRecvmsg4,
+            CgroupHook::InetGetpeername4,
         ] {
             let s = serde_json::to_string(&h).unwrap();
             let back: CgroupHook = serde_json::from_str(&s).unwrap();
@@ -523,9 +665,15 @@ mod tests {
 
     #[test]
     fn sock_lb_decision_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "Decision.Serde", "tenant-sl-serde-d");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/socketlb/socketlb.go",
+            "Decision.Serde",
+            "tenant-sl-serde-d"
+        );
         let d = SockLbDecision::Rewrite {
-            backend_ip: ip(10, 0, 1, 1), backend_port: 8080, revnat_id: 1,
+            backend_ip: ip(10, 0, 1, 1),
+            backend_port: 8080,
+            revnat_id: 1,
         };
         let s = serde_json::to_string(&d).unwrap();
         let back: SockLbDecision = serde_json::from_str(&s).unwrap();
@@ -534,7 +682,11 @@ mod tests {
 
     #[test]
     fn sock_lb_frontend_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "Frontend.Serde", "tenant-sl-serde-f");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/socketlb/socketlb.go",
+            "Frontend.Serde",
+            "tenant-sl-serde-f"
+        );
         let f = frontend();
         let s = serde_json::to_string(&f).unwrap();
         let back: ServiceFrontend = serde_json::from_str(&s).unwrap();
@@ -543,8 +695,15 @@ mod tests {
 
     #[test]
     fn sock_lb_config_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "Config.Serde", "tenant-sl-serde-c");
-        let c = SockLbConfig { host_ns_only: true, track_terminating: false };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/socketlb/socketlb.go",
+            "Config.Serde",
+            "tenant-sl-serde-c"
+        );
+        let c = SockLbConfig {
+            host_ns_only: true,
+            track_terminating: false,
+        };
         let s = serde_json::to_string(&c).unwrap();
         let back: SockLbConfig = serde_json::from_str(&s).unwrap();
         assert_eq!(back, c);
@@ -554,7 +713,11 @@ mod tests {
 
     #[test]
     fn sock_lb_connect_passthrough_when_proto_mismatch() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/bpf_sock.c", "cil_sock4_connect.ProtoMismatch", "tenant-sl-pm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/bpf_sock.c",
+            "cil_sock4_connect.ProtoMismatch",
+            "tenant-sl-pm"
+        );
         let mut m = mgr(tenant);
         m.register_service(frontend(), backends()).unwrap();
         // Frontend is TCP (6); request is UDP (17).
@@ -564,7 +727,11 @@ mod tests {
 
     #[test]
     fn sock_lb_connect_passthrough_when_port_mismatch() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/bpf_sock.c", "cil_sock4_connect.PortMismatch", "tenant-sl-pmp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/bpf_sock.c",
+            "cil_sock4_connect.PortMismatch",
+            "tenant-sl-pmp"
+        );
         let mut m = mgr(tenant);
         m.register_service(frontend(), backends()).unwrap();
         let d = m.on_connect(ip(10, 96, 0, 1), 8080, 6, false, 0);
@@ -573,10 +740,13 @@ mod tests {
 
     #[test]
     fn sock_lb_attached_cgroups_count_tracks_attaches() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/socketlb/socketlb.go", "AttachedCount", "tenant-sl-cnt");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/socketlb/socketlb.go", "AttachedCount", "tenant-sl-cnt");
         let mut m = mgr(tenant);
-        m.attach("/sys/fs/cgroup/a", vec![CgroupHook::InetConnect4]).unwrap();
-        m.attach("/sys/fs/cgroup/b", vec![CgroupHook::InetConnect4]).unwrap();
+        m.attach("/sys/fs/cgroup/a", vec![CgroupHook::InetConnect4])
+            .unwrap();
+        m.attach("/sys/fs/cgroup/b", vec![CgroupHook::InetConnect4])
+            .unwrap();
         assert_eq!(m.attached_cgroups().len(), 2);
     }
 }

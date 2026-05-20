@@ -28,7 +28,9 @@ const RAFT_LEADER_REDIRECT_CAP: Duration = Duration::from_secs(2);
 fn raft_backoff_delay(attempt: u8) -> Duration {
     // 100ms, 200ms, 400ms, 800ms, ... capped at 2s.
     let factor = 1u32 << attempt.min(6);
-    let raw = RAFT_LEADER_REDIRECT_BASE.checked_mul(factor).unwrap_or(RAFT_LEADER_REDIRECT_CAP);
+    let raw = RAFT_LEADER_REDIRECT_BASE
+        .checked_mul(factor)
+        .unwrap_or(RAFT_LEADER_REDIRECT_CAP);
     raw.min(RAFT_LEADER_REDIRECT_CAP)
 }
 
@@ -88,7 +90,12 @@ impl ApiClient {
                     );
                 }
                 _ => {
-                    eprintln!("{} HTTP {}: {}", "✗".red().bold(), status.as_u16(), body.trim());
+                    eprintln!(
+                        "{} HTTP {}: {}",
+                        "✗".red().bold(),
+                        status.as_u16(),
+                        body.trim()
+                    );
                 }
             }
             return Ok(());
@@ -117,13 +124,9 @@ impl ApiClient {
     }
 
     pub async fn post(&self, path: &str, body: Value) -> Result<()> {
-        let resp = self.send_with_leader_redirect(
-            Method::POST,
-            path,
-            Some(body),
-            None::<Vec<u8>>,
-        )
-        .await?;
+        let resp = self
+            .send_with_leader_redirect(Method::POST, path, Some(body), None::<Vec<u8>>)
+            .await?;
         self.finish(resp).await
     }
 
@@ -196,7 +199,10 @@ impl ApiClient {
 
     fn print(&self, value: &Value) {
         match &self.format {
-            Format::Json => println!("{}", serde_json::to_string_pretty(value).unwrap_or_default()),
+            Format::Json => println!(
+                "{}",
+                serde_json::to_string_pretty(value).unwrap_or_default()
+            ),
             Format::Yaml => println!("{}", serde_yaml::to_string(value).unwrap_or_default()),
             Format::Table => println!("{}", render_table(value)),
         }
@@ -374,18 +380,22 @@ mod tests {
         let leader = MockServer::start_async().await;
         let leader_url = leader.base_url();
 
-        let _f = follower.mock_async(|when, then| {
-            when.method(POST).path("/api/etcd/v3/kv/put");
-            then.status(503)
-                .header("location", &leader_url)
-                .body("not leader");
-        }).await;
-        let leader_mock = leader.mock_async(|when, then| {
-            when.method(POST).path("/api/etcd/v3/kv/put");
-            then.status(200)
-                .header("content-type", "application/json")
-                .body(r#"{"header":{"revision":7}}"#);
-        }).await;
+        let _f = follower
+            .mock_async(|when, then| {
+                when.method(POST).path("/api/etcd/v3/kv/put");
+                then.status(503)
+                    .header("location", &leader_url)
+                    .body("not leader");
+            })
+            .await;
+        let leader_mock = leader
+            .mock_async(|when, then| {
+                when.method(POST).path("/api/etcd/v3/kv/put");
+                then.status(200)
+                    .header("content-type", "application/json")
+                    .body(r#"{"header":{"revision":7}}"#);
+            })
+            .await;
 
         let c = ApiClient::new(follower.base_url(), None, Format::Json);
         let body = serde_json::json!({"key": "x", "value": "y"});
@@ -400,12 +410,14 @@ mod tests {
         // surfaces the final 503 instead of looping forever.
         let server = MockServer::start_async().await;
         let self_url = server.base_url();
-        let mock = server.mock_async(|when, then| {
-            when.method(POST).path("/p");
-            then.status(503)
-                .header("location", &self_url)
-                .body("still not leader");
-        }).await;
+        let mock = server
+            .mock_async(|when, then| {
+                when.method(POST).path("/p");
+                then.status(503)
+                    .header("location", &self_url)
+                    .body("still not leader");
+            })
+            .await;
 
         let c = ApiClient::new(server.base_url(), None, Format::Json);
         // post() consumes the 503 and prints — but we want to assert
@@ -421,10 +433,12 @@ mod tests {
     #[tokio::test]
     async fn cavectl_post_does_not_retry_on_non_503() {
         let server = MockServer::start_async().await;
-        let mock = server.mock_async(|when, then| {
-            when.method(POST).path("/p");
-            then.status(500).body("boom");
-        }).await;
+        let mock = server
+            .mock_async(|when, then| {
+                when.method(POST).path("/p");
+                then.status(500).body("boom");
+            })
+            .await;
         let c = ApiClient::new(server.base_url(), None, Format::Json);
         c.post("/p", serde_json::json!({})).await.unwrap();
         // No retry on 500.
@@ -434,10 +448,12 @@ mod tests {
     #[tokio::test]
     async fn cavectl_post_does_not_retry_on_503_without_location() {
         let server = MockServer::start_async().await;
-        let mock = server.mock_async(|when, then| {
-            when.method(POST).path("/p");
-            then.status(503).body("not leader; leader_url=unknown");
-        }).await;
+        let mock = server
+            .mock_async(|when, then| {
+                when.method(POST).path("/p");
+                then.status(503).body("not leader; leader_url=unknown");
+            })
+            .await;
         let c = ApiClient::new(server.base_url(), None, Format::Json);
         c.post("/p", serde_json::json!({})).await.unwrap();
         // Without a Location header there's nowhere to retry to.

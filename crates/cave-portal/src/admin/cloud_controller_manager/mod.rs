@@ -32,10 +32,7 @@ pub enum CloudControllerViewError {
     Auth(#[from] crate::admin::permission::AuthError),
 }
 
-pub fn render(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, CloudControllerViewError> {
+pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, CloudControllerViewError> {
     ctx.authorise(Permission::CloudControllerRead)?;
     let nodes_html = node_controller::render_section(state, ctx)?;
     let routes_html = route_controller::render_section(state, ctx)?;
@@ -95,8 +92,18 @@ mod tests {
 
     #[test]
     fn render_includes_all_five_tabs() {
-        let html = render(&AdminState::seeded(), &ctx(&[Permission::CloudControllerRead])).unwrap();
-        for anchor in ["#ccm-nodes", "#ccm-routes", "#ccm-services", "#ccm-volumes", "#ccm-meta"] {
+        let html = render(
+            &AdminState::seeded(),
+            &ctx(&[Permission::CloudControllerRead]),
+        )
+        .unwrap();
+        for anchor in [
+            "#ccm-nodes",
+            "#ccm-routes",
+            "#ccm-services",
+            "#ccm-volumes",
+            "#ccm-meta",
+        ] {
             assert!(html.contains(anchor));
         }
     }

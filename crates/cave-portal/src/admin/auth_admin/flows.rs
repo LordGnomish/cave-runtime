@@ -5,9 +5,9 @@
 //! Calls A5's `admin_flows` endpoints. Visual port of
 //! `js/apps/admin-ui/src/authentication/AuthenticationSection.tsx`.
 
+use super::{AuthAdminError, render_admin_nav, require_platform};
 use crate::admin::permission::RequestCtx;
 use crate::admin::render::{escape, page_shell_full};
-use super::{render_admin_nav, require_platform, AuthAdminError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowDef {
@@ -48,12 +48,30 @@ pub fn builtin_flows() -> Vec<FlowDef> {
             description: "Browser based authentication".into(),
             built_in: true,
             executions: vec![
-                FlowExecution { provider: "auth-cookie".into(), requirement: ExecRequirement::Alternative },
-                FlowExecution { provider: "auth-spnego".into(), requirement: ExecRequirement::Disabled },
-                FlowExecution { provider: "identity-provider-redirector".into(), requirement: ExecRequirement::Alternative },
-                FlowExecution { provider: "forms (Username Password Form)".into(), requirement: ExecRequirement::Required },
-                FlowExecution { provider: "WebAuthn Authenticator".into(), requirement: ExecRequirement::Conditional },
-                FlowExecution { provider: "OTP Form".into(), requirement: ExecRequirement::Conditional },
+                FlowExecution {
+                    provider: "auth-cookie".into(),
+                    requirement: ExecRequirement::Alternative,
+                },
+                FlowExecution {
+                    provider: "auth-spnego".into(),
+                    requirement: ExecRequirement::Disabled,
+                },
+                FlowExecution {
+                    provider: "identity-provider-redirector".into(),
+                    requirement: ExecRequirement::Alternative,
+                },
+                FlowExecution {
+                    provider: "forms (Username Password Form)".into(),
+                    requirement: ExecRequirement::Required,
+                },
+                FlowExecution {
+                    provider: "WebAuthn Authenticator".into(),
+                    requirement: ExecRequirement::Conditional,
+                },
+                FlowExecution {
+                    provider: "OTP Form".into(),
+                    requirement: ExecRequirement::Conditional,
+                },
             ],
         },
         FlowDef {
@@ -61,9 +79,18 @@ pub fn builtin_flows() -> Vec<FlowDef> {
             description: "OpenID Connect Resource Owner Password Credentials grant".into(),
             built_in: true,
             executions: vec![
-                FlowExecution { provider: "direct-grant-validate-username".into(), requirement: ExecRequirement::Required },
-                FlowExecution { provider: "direct-grant-validate-password".into(), requirement: ExecRequirement::Required },
-                FlowExecution { provider: "direct-grant-validate-otp".into(), requirement: ExecRequirement::Conditional },
+                FlowExecution {
+                    provider: "direct-grant-validate-username".into(),
+                    requirement: ExecRequirement::Required,
+                },
+                FlowExecution {
+                    provider: "direct-grant-validate-password".into(),
+                    requirement: ExecRequirement::Required,
+                },
+                FlowExecution {
+                    provider: "direct-grant-validate-otp".into(),
+                    requirement: ExecRequirement::Conditional,
+                },
             ],
         },
         FlowDef {
@@ -71,8 +98,14 @@ pub fn builtin_flows() -> Vec<FlowDef> {
             description: "Federated user first login".into(),
             built_in: true,
             executions: vec![
-                FlowExecution { provider: "review profile".into(), requirement: ExecRequirement::Required },
-                FlowExecution { provider: "create-unique-user-config / link-existing".into(), requirement: ExecRequirement::Required },
+                FlowExecution {
+                    provider: "review profile".into(),
+                    requirement: ExecRequirement::Required,
+                },
+                FlowExecution {
+                    provider: "create-unique-user-config / link-existing".into(),
+                    requirement: ExecRequirement::Required,
+                },
             ],
         },
         FlowDef {
@@ -80,8 +113,14 @@ pub fn builtin_flows() -> Vec<FlowDef> {
             description: "Passkey-only authentication".into(),
             built_in: false,
             executions: vec![
-                FlowExecution { provider: "Username Form".into(), requirement: ExecRequirement::Required },
-                FlowExecution { provider: "WebAuthn Authenticator (Passwordless)".into(), requirement: ExecRequirement::Required },
+                FlowExecution {
+                    provider: "Username Form".into(),
+                    requirement: ExecRequirement::Required,
+                },
+                FlowExecution {
+                    provider: "WebAuthn Authenticator (Passwordless)".into(),
+                    requirement: ExecRequirement::Required,
+                },
             ],
         },
     ]

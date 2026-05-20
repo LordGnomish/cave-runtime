@@ -26,6 +26,6 @@ mod tests;
 
 pub use error::NexusError;
 pub use models::*;
-pub use routes::{router, NexusState};
+pub use routes::{NexusState, router};
 
 pub const MODULE_NAME: &str = "nexus";

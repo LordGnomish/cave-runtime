@@ -8,10 +8,10 @@
 //!
 //! Upstream: <https://docs.erpnext.com/docs/v15/user/manual/en/accounts>
 
+use super::ErpViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
-use super::ErpViewError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LedgerRow {
@@ -87,7 +87,11 @@ mod tests {
     fn ledger_counts_invoices_per_bucket() {
         let rows = ledger(&AdminState::seeded(), &ctx(&[Permission::ErpRead])).unwrap();
         let total: usize = rows.iter().map(|r| r.invoice_count).sum();
-        let invoices = super::super::invoices::list_invoices(&AdminState::seeded(), &ctx(&[Permission::ErpRead])).unwrap();
+        let invoices = super::super::invoices::list_invoices(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ErpRead]),
+        )
+        .unwrap();
         assert_eq!(total, invoices.len());
     }
 
@@ -95,7 +99,11 @@ mod tests {
     fn ar_excludes_paid_bucket() {
         let rows = ledger(&AdminState::seeded(), &ctx(&[Permission::ErpRead])).unwrap();
         let ar = ar_total_cents(&rows);
-        let paid_total: u64 = rows.iter().filter(|r| r.bucket == "Paid").map(|r| r.total_cents).sum();
+        let paid_total: u64 = rows
+            .iter()
+            .filter(|r| r.bucket == "Paid")
+            .map(|r| r.total_cents)
+            .sum();
         let grand_total: u64 = rows.iter().map(|r| r.total_cents).sum();
         assert_eq!(ar, grand_total - paid_total);
     }

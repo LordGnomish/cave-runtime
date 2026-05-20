@@ -104,12 +104,7 @@ impl GitInspector for ShellGitInspector {
         // `git log --reverse --pretty=format:'%H%x00%s' base..branch`
         // %x00 = literal NUL separator so subjects with `|` survive.
         let range = format!("{}..{}", base, branch);
-        let log = self.run(&[
-            "log",
-            "--reverse",
-            "--pretty=format:%H%x00%s",
-            &range,
-        ])?;
+        let log = self.run(&["log", "--reverse", "--pretty=format:%H%x00%s", &range])?;
 
         let mut commits = Vec::new();
         for line in log.lines() {
@@ -135,7 +130,11 @@ impl GitInspector for ShellGitInspector {
             ])?;
             let files = parse_name_status(&names);
 
-            commits.push(CommitInfo { sha, subject, files });
+            commits.push(CommitInfo {
+                sha,
+                subject,
+                files,
+            });
         }
         Ok(commits)
     }

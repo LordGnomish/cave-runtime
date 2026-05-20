@@ -147,17 +147,11 @@ impl Filter {
         match self {
             Filter::Equal { attr, value } => entry
                 .get(attr)
-                .map(|vs| {
-                    vs.iter()
-                        .any(|v| v.eq_ignore_ascii_case(value))
-                })
+                .map(|vs| vs.iter().any(|v| v.eq_ignore_ascii_case(value)))
                 .unwrap_or(false),
             Filter::Approx { attr, value } => entry
                 .get(attr)
-                .map(|vs| {
-                    vs.iter()
-                        .any(|v| v.eq_ignore_ascii_case(value))
-                })
+                .map(|vs| vs.iter().any(|v| v.eq_ignore_ascii_case(value)))
                 .unwrap_or(false),
             Filter::Gte { attr, value } => entry
                 .get(attr)
@@ -228,9 +222,7 @@ fn unescape_value(v: &str) -> Result<String, LdapError> {
     while i < bytes.len() {
         if bytes[i] == b'\\' {
             if i + 2 >= bytes.len() {
-                return Err(LdapError::FilterParse(
-                    "dangling backslash escape".into(),
-                ));
+                return Err(LdapError::FilterParse("dangling backslash escape".into()));
             }
             let hi = hex_nibble(bytes[i + 1])?;
             let lo = hex_nibble(bytes[i + 2])?;
@@ -285,9 +277,9 @@ impl<'a> Parser<'a> {
     }
     fn parse_filter(&mut self) -> Result<Filter, LdapError> {
         self.consume('(')?;
-        let head = self.peek().ok_or_else(|| {
-            LdapError::FilterParse("empty parenthesis group".into())
-        })?;
+        let head = self
+            .peek()
+            .ok_or_else(|| LdapError::FilterParse("empty parenthesis group".into()))?;
         let f = match head {
             '&' => {
                 self.pos += 1;
@@ -335,9 +327,9 @@ impl<'a> Parser<'a> {
             return Err(LdapError::FilterParse("missing attribute".into()));
         }
         // operator
-        let op = self.peek().ok_or_else(|| {
-            LdapError::FilterParse("missing operator".into())
-        })?;
+        let op = self
+            .peek()
+            .ok_or_else(|| LdapError::FilterParse("missing operator".into()))?;
         let op_kind = match op {
             '=' => {
                 self.pos += 1;
@@ -361,7 +353,7 @@ impl<'a> Parser<'a> {
             other => {
                 return Err(LdapError::FilterParse(format!(
                     "unknown operator '{other}'"
-                )))
+                )));
             }
         };
         // value runs to next `)`
@@ -525,10 +517,7 @@ mod tests {
                 value: "jdoe".into(),
             },
         ]);
-        assert_eq!(
-            f.to_rfc4515(),
-            "(&(objectClass=person)(uid=jdoe))"
-        );
+        assert_eq!(f.to_rfc4515(), "(&(objectClass=person)(uid=jdoe))");
     }
 
     #[test]
@@ -548,9 +537,7 @@ mod tests {
 
     #[test]
     fn present_filter_renders_with_asterisk() {
-        let f = Filter::Present {
-            attr: "cn".into(),
-        };
+        let f = Filter::Present { attr: "cn".into() };
         assert_eq!(f.to_rfc4515(), "(cn=*)");
     }
 
@@ -591,9 +578,7 @@ mod tests {
     fn parse_present_filter() {
         assert_eq!(
             Filter::parse("(cn=*)").unwrap(),
-            Filter::Present {
-                attr: "cn".into()
-            }
+            Filter::Present { attr: "cn".into() }
         );
     }
 
@@ -671,10 +656,7 @@ mod tests {
     fn matches_evaluates_and() {
         let mut e = std::collections::BTreeMap::new();
         e.insert("uid".to_string(), vec!["jdoe".to_string()]);
-        e.insert(
-            "objectClass".to_string(),
-            vec!["person".to_string()],
-        );
+        e.insert("objectClass".to_string(), vec!["person".to_string()]);
         let f = Filter::And(vec![
             Filter::Equal {
                 attr: "objectClass".into(),
@@ -730,9 +712,7 @@ mod tests {
     #[test]
     fn query_builder_single_filter_unwraps() {
         let q = LdapQueryBuilder::new("dc=example,dc=com")
-            .add_filter(Filter::Present {
-                attr: "uid".into(),
-            })
+            .add_filter(Filter::Present { attr: "uid".into() })
             .build();
         assert!(matches!(q.filter, Filter::Present { .. }));
     }

@@ -23,9 +23,17 @@ pub enum PhysicalPlan {
     /// In-memory scan — `rows` already materialized.
     InMemoryScan { rows: Vec<Row>, schema: SchemaRef },
     /// Filter rows by predicate.
-    Filter { predicate: PhysicalExpr, input: Box<PhysicalPlan>, schema: SchemaRef },
+    Filter {
+        predicate: PhysicalExpr,
+        input: Box<PhysicalPlan>,
+        schema: SchemaRef,
+    },
     /// Project to a new column list (selection + computed columns).
-    Projection { expressions: Vec<PhysicalExpr>, input: Box<PhysicalPlan>, schema: SchemaRef },
+    Projection {
+        expressions: Vec<PhysicalExpr>,
+        input: Box<PhysicalPlan>,
+        schema: SchemaRef,
+    },
     /// GROUP BY + aggregate. Each aggregate is `(kind, column_index)`.
     Aggregate {
         group_by: Vec<PhysicalExpr>,
@@ -33,12 +41,25 @@ pub enum PhysicalPlan {
         input: Box<PhysicalPlan>,
         schema: SchemaRef,
     },
-    Sort { keys: Vec<SortPhysical>, input: Box<PhysicalPlan>, schema: SchemaRef },
-    Limit { skip: usize, fetch: Option<usize>, input: Box<PhysicalPlan>, schema: SchemaRef },
+    Sort {
+        keys: Vec<SortPhysical>,
+        input: Box<PhysicalPlan>,
+        schema: SchemaRef,
+    },
+    Limit {
+        skip: usize,
+        fetch: Option<usize>,
+        input: Box<PhysicalPlan>,
+        schema: SchemaRef,
+    },
     /// Cross join (nested-loop). Used as both the cross-product
     /// fallback and as the start of a hash join after the build side
     /// has been keyed.
-    CrossJoin { left: Box<PhysicalPlan>, right: Box<PhysicalPlan>, schema: SchemaRef },
+    CrossJoin {
+        left: Box<PhysicalPlan>,
+        right: Box<PhysicalPlan>,
+        schema: SchemaRef,
+    },
     /// Hash inner-join — naive HashMap on a single key index per side.
     HashJoin {
         left: Box<PhysicalPlan>,
@@ -80,7 +101,9 @@ impl ExecutionPlan for PhysicalPlan {
         match self {
             Self::InMemoryScan { rows, .. } => Ok(rows.clone()),
 
-            Self::Filter { predicate, input, .. } => {
+            Self::Filter {
+                predicate, input, ..
+            } => {
                 let rows = input.execute()?;
                 let mut out = Vec::new();
                 for r in rows {
@@ -92,7 +115,9 @@ impl ExecutionPlan for PhysicalPlan {
                 Ok(out)
             }
 
-            Self::Projection { expressions, input, .. } => {
+            Self::Projection {
+                expressions, input, ..
+            } => {
                 let rows = input.execute()?;
                 let mut out = Vec::with_capacity(rows.len());
                 for r in rows {
@@ -132,7 +157,9 @@ impl ExecutionPlan for PhysicalPlan {
                 Ok(rows)
             }
 
-            Self::Limit { skip, fetch, input, .. } => {
+            Self::Limit {
+                skip, fetch, input, ..
+            } => {
                 let rows = input.execute()?;
                 let it = rows.into_iter().skip(*skip);
                 Ok(match fetch {
@@ -141,7 +168,12 @@ impl ExecutionPlan for PhysicalPlan {
                 })
             }
 
-            Self::Aggregate { group_by, aggr, input, .. } => exec_aggregate(group_by, aggr, input.execute()?),
+            Self::Aggregate {
+                group_by,
+                aggr,
+                input,
+                ..
+            } => exec_aggregate(group_by, aggr, input.execute()?),
 
             Self::CrossJoin { left, right, .. } => {
                 let l = left.execute()?;
@@ -157,7 +189,13 @@ impl ExecutionPlan for PhysicalPlan {
                 Ok(out)
             }
 
-            Self::HashJoin { left, right, left_key, right_key, .. } => {
+            Self::HashJoin {
+                left,
+                right,
+                left_key,
+                right_key,
+                ..
+            } => {
                 let l = left.execute()?;
                 let r = right.execute()?;
                 // Build phase — hash right side by key.
@@ -332,12 +370,17 @@ mod tests {
 
     #[test]
     fn filter_drops_non_matching_rows() {
-        let scan = PhysicalPlan::InMemoryScan { rows: rows_ab(), schema: schema_ab() };
+        let scan = PhysicalPlan::InMemoryScan {
+            rows: rows_ab(),
+            schema: schema_ab(),
+        };
         let f = PhysicalPlan::Filter {
             predicate: PhysicalExpr::Binary {
                 op: BinaryPhysicalOp::Gt,
                 left: Box::new(PhysicalExpr::Column { index: 0 }),
-                right: Box::new(PhysicalExpr::Literal { value: Value::Int64(1) }),
+                right: Box::new(PhysicalExpr::Literal {
+                    value: Value::Int64(1),
+                }),
             },
             input: Box::new(scan),
             schema: schema_ab(),
@@ -348,14 +391,19 @@ mod tests {
 
     #[test]
     fn projection_emits_computed_columns() {
-        let scan = PhysicalPlan::InMemoryScan { rows: rows_ab(), schema: schema_ab() };
+        let scan = PhysicalPlan::InMemoryScan {
+            rows: rows_ab(),
+            schema: schema_ab(),
+        };
         let p = PhysicalPlan::Projection {
             expressions: vec![
                 PhysicalExpr::Column { index: 0 },
                 PhysicalExpr::Binary {
                     op: BinaryPhysicalOp::Multiply,
                     left: Box::new(PhysicalExpr::Column { index: 0 }),
-                    right: Box::new(PhysicalExpr::Literal { value: Value::Int64(10) }),
+                    right: Box::new(PhysicalExpr::Literal {
+                        value: Value::Int64(10),
+                    }),
                 },
             ],
             input: Box::new(scan),
@@ -369,7 +417,10 @@ mod tests {
 
     #[test]
     fn sort_orders_asc_by_default_with_null_first() {
-        let scan = PhysicalPlan::InMemoryScan { rows: rows_ab(), schema: schema_ab() };
+        let scan = PhysicalPlan::InMemoryScan {
+            rows: rows_ab(),
+            schema: schema_ab(),
+        };
         let s = PhysicalPlan::Sort {
             keys: vec![SortPhysical {
                 expr: PhysicalExpr::Column { index: 1 },
@@ -385,7 +436,10 @@ mod tests {
 
     #[test]
     fn limit_skips_and_fetches() {
-        let scan = PhysicalPlan::InMemoryScan { rows: rows_ab(), schema: schema_ab() };
+        let scan = PhysicalPlan::InMemoryScan {
+            rows: rows_ab(),
+            schema: schema_ab(),
+        };
         let l = PhysicalPlan::Limit {
             skip: 1,
             fetch: Some(1),
@@ -408,7 +462,10 @@ mod tests {
             Field::new("g", DataType::Utf8, false),
             Field::new("v", DataType::Int64, false),
         ]));
-        let scan = PhysicalPlan::InMemoryScan { rows, schema: schema.clone() };
+        let scan = PhysicalPlan::InMemoryScan {
+            rows,
+            schema: schema.clone(),
+        };
         let agg = PhysicalPlan::Aggregate {
             group_by: vec![PhysicalExpr::Column { index: 0 }],
             aggr: vec![
@@ -430,7 +487,10 @@ mod tests {
     #[test]
     fn cross_join_emits_cartesian_product() {
         let l = PhysicalPlan::InMemoryScan {
-            rows: vec![Row::new(vec![Value::Int64(1)]), Row::new(vec![Value::Int64(2)])],
+            rows: vec![
+                Row::new(vec![Value::Int64(1)]),
+                Row::new(vec![Value::Int64(2)]),
+            ],
             schema: Arc::new(TableSchema::new(vec![Field::new(
                 "l",
                 DataType::Int64,

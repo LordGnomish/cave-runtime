@@ -37,7 +37,11 @@ pub struct RemoteCluster {
 }
 
 impl RemoteCluster {
-    pub fn new(name: impl Into<String>, network: impl Into<String>, trust_domain: impl Into<String>) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        network: impl Into<String>,
+        trust_domain: impl Into<String>,
+    ) -> Self {
         Self {
             name: name.into(),
             network: network.into(),
@@ -168,7 +172,10 @@ impl MultiClusterRegistry {
 
     pub fn register_cluster(&self, cluster: RemoteCluster) {
         info!(cluster = %cluster.name, network = %cluster.network, "Remote cluster registered");
-        self.clusters.write().unwrap().insert(cluster.name.clone(), cluster);
+        self.clusters
+            .write()
+            .unwrap()
+            .insert(cluster.name.clone(), cluster);
     }
 
     pub fn update_cluster_status(&self, cluster_name: &str, status: RemoteClusterStatus) {
@@ -215,7 +222,10 @@ impl MultiClusterRegistry {
         let mut map = self.services.write().unwrap();
         let entry = map.entry(cluster).or_default();
         // Upsert by name/namespace
-        if let Some(existing) = entry.iter_mut().find(|s| s.name == svc.name && s.namespace == svc.namespace) {
+        if let Some(existing) = entry
+            .iter_mut()
+            .find(|s| s.name == svc.name && s.namespace == svc.namespace)
+        {
             *existing = svc;
         } else {
             entry.push(svc);
@@ -237,15 +247,19 @@ impl MultiClusterRegistry {
         map.values()
             .flatten()
             .filter(|s| {
-                s.export_to.is_empty()
-                    || s.export_to.iter().any(|t| t == "*" || t == &local)
+                s.export_to.is_empty() || s.export_to.iter().any(|t| t == "*" || t == &local)
             })
             .cloned()
             .collect()
     }
 
     pub fn services_from_cluster(&self, cluster: &str) -> Vec<CrossClusterService> {
-        self.services.read().unwrap().get(cluster).cloned().unwrap_or_default()
+        self.services
+            .read()
+            .unwrap()
+            .get(cluster)
+            .cloned()
+            .unwrap_or_default()
     }
 
     // ─── Trust federation CRUD ───────────────────────────────

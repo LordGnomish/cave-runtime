@@ -32,7 +32,9 @@ impl Default for ServiceRegistry {
 
 impl ServiceRegistry {
     pub fn new() -> Self {
-        Self { inner: Arc::new(RwLock::new(HashMap::new())) }
+        Self {
+            inner: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 
     fn svc_key(namespace: &str, name: &str) -> String {
@@ -45,11 +47,17 @@ impl ServiceRegistry {
         let mut map = self.inner.write().unwrap();
         let record = map.entry(key.clone()).or_insert_with(|| {
             info!(service = %key, "Service registered");
-            ServiceRecord { meta: meta.clone(), endpoints: vec![] }
+            ServiceRecord {
+                meta: meta.clone(),
+                endpoints: vec![],
+            }
         });
         let addr = endpoint.address.clone();
         let port = endpoint.port;
-        if let Some(e) = record.endpoints.iter_mut().find(|e| e.address == addr && e.port == port)
+        if let Some(e) = record
+            .endpoints
+            .iter_mut()
+            .find(|e| e.address == addr && e.port == port)
         {
             *e = endpoint;
         } else {
@@ -63,7 +71,9 @@ impl ServiceRegistry {
         let key = Self::svc_key(namespace, service_name);
         let mut map = self.inner.write().unwrap();
         if let Some(record) = map.get_mut(&key) {
-            record.endpoints.retain(|e| !(e.address == addr && e.port == port));
+            record
+                .endpoints
+                .retain(|e| !(e.address == addr && e.port == port));
             debug!(service = %key, addr = %addr, "Endpoint deregistered");
         }
     }
@@ -80,8 +90,10 @@ impl ServiceRegistry {
         let key = Self::svc_key(namespace, service_name);
         let mut map = self.inner.write().unwrap();
         if let Some(record) = map.get_mut(&key) {
-            if let Some(e) =
-                record.endpoints.iter_mut().find(|e| e.address == addr && e.port == port)
+            if let Some(e) = record
+                .endpoints
+                .iter_mut()
+                .find(|e| e.address == addr && e.port == port)
             {
                 e.health = status;
                 e.last_checked = chrono::Utc::now();
@@ -109,16 +121,15 @@ impl ServiceRegistry {
     }
 
     /// Resolve endpoints in a specific locality (for locality-aware LB).
-    pub fn resolve_locality(
-        &self,
-        service_name: &str,
-        locality: &Locality,
-    ) -> Vec<Endpoint> {
+    pub fn resolve_locality(&self, service_name: &str, locality: &Locality) -> Vec<Endpoint> {
         let all = self.resolve(service_name);
         let in_region: Vec<_> = all
             .iter()
             .filter(|e| {
-                e.locality.as_ref().map(|l| l.region == locality.region).unwrap_or(false)
+                e.locality
+                    .as_ref()
+                    .map(|l| l.region == locality.region)
+                    .unwrap_or(false)
             })
             .cloned()
             .collect();
@@ -144,13 +155,14 @@ impl ServiceRegistry {
                 .endpoints
                 .iter()
                 .filter(|e| {
-                    if healthy_only
-                        && e.health == HealthStatus::Unhealthy
-                    {
+                    if healthy_only && e.health == HealthStatus::Unhealthy {
                         return false;
                     }
                     if let Some(sel) = subset_labels {
-                        if !sel.iter().all(|(k, v)| e.labels.get(k).map(|vv| vv == v).unwrap_or(false)) {
+                        if !sel
+                            .iter()
+                            .all(|(k, v)| e.labels.get(k).map(|vv| vv == v).unwrap_or(false))
+                        {
                             return false;
                         }
                     }

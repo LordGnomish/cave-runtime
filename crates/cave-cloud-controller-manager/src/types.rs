@@ -29,7 +29,12 @@ pub struct Cite {
 
 impl Cite {
     pub const fn k8s(path: &'static str, symbol: &'static str) -> Self {
-        Self { repo: "kubernetes/kubernetes", path, symbol, version: UPSTREAM_VERSION }
+        Self {
+            repo: "kubernetes/kubernetes",
+            path,
+            symbol,
+            version: UPSTREAM_VERSION,
+        }
     }
     pub const fn ext(
         repo: &'static str,
@@ -37,16 +42,28 @@ impl Cite {
         symbol: &'static str,
         version: &'static str,
     ) -> Self {
-        Self { repo, path, symbol, version }
+        Self {
+            repo,
+            path,
+            symbol,
+            version,
+        }
     }
     pub fn url(&self) -> String {
-        format!("https://github.com/{}/blob/{}/{}", self.repo, self.version, self.path)
+        format!(
+            "https://github.com/{}/blob/{}/{}",
+            self.repo, self.version, self.path
+        )
     }
 }
 
 impl fmt::Display for Cite {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}::{}::{} @ {}", self.repo, self.path, self.symbol, self.version)
+        write!(
+            f,
+            "{}::{}::{} @ {}",
+            self.repo, self.path, self.symbol, self.version
+        )
     }
 }
 
@@ -93,11 +110,21 @@ pub enum Reconcile {
 #[derive(Debug, thiserror::Error)]
 pub enum CloudError {
     #[error("invalid cloud config for {provider}: {reason}")]
-    InvalidConfig { provider: ProviderName, reason: String },
+    InvalidConfig {
+        provider: ProviderName,
+        reason: String,
+    },
     #[error("tenant {tenant} not authorized for {kind}/{name}")]
-    TenantDenied { tenant: TenantId, kind: &'static str, name: String },
+    TenantDenied {
+        tenant: TenantId,
+        kind: &'static str,
+        name: String,
+    },
     #[error("provider {provider} returned upstream error: {reason}")]
-    Upstream { provider: ProviderName, reason: String },
+    Upstream {
+        provider: ProviderName,
+        reason: String,
+    },
     #[error("not yet implemented: {0}")]
     Unimplemented(&'static str),
 }
@@ -111,7 +138,8 @@ macro_rules! test_ctx {
     // k8s upstream
     ($path:expr, $symbol:expr, $tenant:expr) => {{
         let cite = $crate::types::Cite::k8s($path, $symbol);
-        let tenant = $crate::types::TenantId::new($tenant).expect("test fixture: tenant id must be DNS-1123");
+        let tenant = $crate::types::TenantId::new($tenant)
+            .expect("test fixture: tenant id must be DNS-1123");
         assert_eq!(cite.version, $crate::types::UPSTREAM_VERSION);
         assert!(!tenant.as_str().is_empty(), "tenant_id must not be empty");
         (cite, tenant)
@@ -119,9 +147,13 @@ macro_rules! test_ctx {
     // out-of-tree provider
     (ext: $repo:expr, $version:expr, $path:expr, $symbol:expr, $tenant:expr) => {{
         let cite = $crate::types::Cite::ext($repo, $path, $symbol, $version);
-        let tenant = $crate::types::TenantId::new($tenant).expect("test fixture: tenant id must be DNS-1123");
+        let tenant = $crate::types::TenantId::new($tenant)
+            .expect("test fixture: tenant id must be DNS-1123");
         assert!(!tenant.as_str().is_empty(), "tenant_id must not be empty");
-        assert!(cite.version.starts_with('v'), "version must look like a tag");
+        assert!(
+            cite.version.starts_with('v'),
+            "version must look like a tag"
+        );
         (cite, tenant)
     }};
 }

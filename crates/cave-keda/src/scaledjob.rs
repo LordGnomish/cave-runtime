@@ -64,7 +64,10 @@ impl ScaledJob {
     /// Record a job's terminal outcome. Trims the history to the configured limit.
     pub fn record_outcome(&mut self, job_id: &str, success: bool) {
         let (vec, limit_field) = if success {
-            (&mut self.successful_jobs, self.successful_jobs_history_limit)
+            (
+                &mut self.successful_jobs,
+                self.successful_jobs_history_limit,
+            )
         } else {
             (&mut self.failed_jobs, self.failed_jobs_history_limit)
         };

@@ -79,10 +79,7 @@ pub fn list_entries(
     }
     ctx.authorise(Permission::AuditRead)?;
     let entries = store.list();
-    Ok(entries
-        .into_iter()
-        .filter(|e| filter.matches(e))
-        .collect())
+    Ok(entries.into_iter().filter(|e| filter.matches(e)).collect())
 }
 
 /// Export the matching rows as CSV. Header row is always emitted so
@@ -155,7 +152,12 @@ pub fn render(
             &table_rows
         ),
     );
-    Ok(page_shell_full(ctx, "/admin/audit", &format!("audit · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/audit",
+        &format!("audit · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
 }
 
 fn action_summary(rows: &[AuditEntry]) -> Vec<(String, usize)> {

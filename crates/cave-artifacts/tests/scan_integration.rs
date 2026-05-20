@@ -8,10 +8,10 @@
 //! storage layer holds the blob; the adapter scans it; the ScanSink
 //! aggregates the normalised findings.
 
-use cave_artifacts::core::{Severity, VulnerabilitySource};
-use cave_artifacts::harbor::storage::{compute_digest, RegistryStorage};
-use cave_artifacts::integrations::trivy::{CaveScanAdapter, ScanSink, Scanner};
 use bytes::Bytes;
+use cave_artifacts::core::{Severity, VulnerabilitySource};
+use cave_artifacts::harbor::storage::{RegistryStorage, compute_digest};
+use cave_artifacts::integrations::trivy::{CaveScanAdapter, ScanSink, Scanner};
 use cave_scan::models::{FindingSeverity, RuleType, ScanRule};
 use uuid::Uuid;
 
@@ -45,7 +45,9 @@ async fn push_artifact_then_scan_records_normalised_vulnerabilities() {
     let payload =
         Bytes::from(b"# config\nendpoint=api.example.com\npassword=hunter2\ndebug=true\n".to_vec());
     let digest = compute_digest(&payload);
-    storage.store_blob(digest.clone(), payload.clone(), "library/sample").await;
+    storage
+        .store_blob(digest.clone(), payload.clone(), "library/sample")
+        .await;
 
     // 2. Hand the blob bytes to the cave-scan-backed adapter.
     let scanner = CaveScanAdapter::new(rules());
@@ -61,12 +63,19 @@ async fn push_artifact_then_scan_records_normalised_vulnerabilities() {
     let sink = ScanSink::new();
     sink.record(&digest, vulns.clone());
     assert_eq!(sink.count(), vulns.len());
-    assert!(sink.count_blocking() >= 1, "critical finding should be blocking");
+    assert!(
+        sink.count_blocking() >= 1,
+        "critical finding should be blocking"
+    );
 
     // 4. Findings round-trip through core::Vulnerability shape.
     let stored = sink.findings_for(&digest);
     assert!(stored.iter().any(|v| v.severity == Severity::Critical));
-    assert!(stored.iter().all(|v| v.source == VulnerabilitySource::Native));
+    assert!(
+        stored
+            .iter()
+            .all(|v| v.source == VulnerabilitySource::Native)
+    );
     assert!(stored.iter().any(|v| v.id.contains("hardcoded-password")));
 }
 
@@ -75,11 +84,16 @@ async fn scan_against_clean_payload_finds_nothing() {
     let storage = RegistryStorage::default();
     let payload = Bytes::from(b"clean configuration with no secrets".to_vec());
     let digest = compute_digest(&payload);
-    storage.store_blob(digest.clone(), payload.clone(), "library/clean").await;
+    storage
+        .store_blob(digest.clone(), payload.clone(), "library/clean")
+        .await;
 
     let scanner = CaveScanAdapter::new(rules());
     let vulns = scanner.scan(&digest, &payload).unwrap();
-    assert!(vulns.is_empty(), "clean payload should yield no findings, got {vulns:?}");
+    assert!(
+        vulns.is_empty(),
+        "clean payload should yield no findings, got {vulns:?}"
+    );
 }
 
 #[tokio::test]

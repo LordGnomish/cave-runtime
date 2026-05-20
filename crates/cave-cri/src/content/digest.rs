@@ -172,7 +172,11 @@ mod tests {
     fn parse_rejects_short_hex() {
         let s = "sha256:abc";
         match Digest::parse(s).unwrap_err() {
-            DigestError::HexLength { actual: 3, expected: 64, .. } => {}
+            DigestError::HexLength {
+                actual: 3,
+                expected: 64,
+                ..
+            } => {}
             e => panic!("unexpected error {e:?}"),
         }
     }

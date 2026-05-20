@@ -8,10 +8,10 @@
 //!
 //! Upstream: <https://twenty.com/docs>
 
+use super::CrmViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
-use super::CrmViewError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkflowRow {
@@ -21,7 +21,10 @@ pub struct WorkflowRow {
     pub matching_accounts: usize,
 }
 
-pub fn list_workflows(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<WorkflowRow>, CrmViewError> {
+pub fn list_workflows(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<WorkflowRow>, CrmViewError> {
     let contacts = super::contacts::list_contacts(state, ctx)?;
     let n_enterprise = contacts.iter().filter(|a| a.plan == "Enterprise").count();
     let n_pro = contacts.iter().filter(|a| a.plan == "Pro").count();
@@ -73,7 +76,12 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, CrmViewErr
         n = rows.len(),
         tbl = table(&["workflow_id", "trigger", "action", "match"], &table_rows),
     );
-    Ok(page_shell_full(ctx, "/admin/crm/workflows", &format!("crm/workflows · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/crm/workflows",
+        &format!("crm/workflows · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
 }
 
 #[cfg(test)]
@@ -91,7 +99,11 @@ mod tests {
 
     #[test]
     fn matching_accounts_sum_to_contact_count() {
-        let contacts = super::super::contacts::list_contacts(&AdminState::seeded(), &ctx(&[Permission::CrmRead])).unwrap();
+        let contacts = super::super::contacts::list_contacts(
+            &AdminState::seeded(),
+            &ctx(&[Permission::CrmRead]),
+        )
+        .unwrap();
         let rows = list_workflows(&AdminState::seeded(), &ctx(&[Permission::CrmRead])).unwrap();
         let total: usize = rows.iter().map(|w| w.matching_accounts).sum();
         assert_eq!(total, contacts.len());

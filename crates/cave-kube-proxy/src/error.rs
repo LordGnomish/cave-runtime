@@ -24,6 +24,8 @@ pub enum KubeProxyError {
     #[error("invalid CIDR '{0}': {1}")]
     InvalidCidr(String, String),
 
-    #[error("cross-tenant access denied: store tenant '{store}' does not match request tenant '{req}'")]
+    #[error(
+        "cross-tenant access denied: store tenant '{store}' does not match request tenant '{req}'"
+    )]
     CrossTenantDenied { store: String, req: String },
 }

@@ -2,16 +2,16 @@
 // Copyright 2026 Cave Runtime contributors
 //! /api/v1/query and /api/v1/query_range handlers.
 
+use crate::model::QueryResult;
+use crate::promql::parse;
+use crate::state::MetricsState;
 use axum::{
-    extract::{Query, State},
     Json,
+    extract::{Query, State},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use crate::model::QueryResult;
-use crate::promql::parse;
-use crate::state::MetricsState;
 
 // ─── Request / response types ────────────────────────────────────────────────
 
@@ -55,7 +55,13 @@ pub struct ApiResponse<T: Serialize> {
 
 impl<T: Serialize> ApiResponse<T> {
     pub fn success(data: T) -> Self {
-        Self { status: "success".into(), data, error: None, error_type: None, warnings: None }
+        Self {
+            status: "success".into(),
+            data,
+            error: None,
+            error_type: None,
+            warnings: None,
+        }
     }
 }
 
@@ -114,7 +120,10 @@ pub async fn range_query(
     match state.engine.eval_range(&ast, start_ms, end_ms, step_ms) {
         Ok(steps) => {
             // Group by series fingerprint across steps
-            let mut series_map: std::collections::HashMap<u64, (crate::model::Labels, Vec<[serde_json::Value; 2]>)> = HashMap::new();
+            let mut series_map: std::collections::HashMap<
+                u64,
+                (crate::model::Labels, Vec<[serde_json::Value; 2]>),
+            > = HashMap::new();
             for (ts_ms, result) in steps {
                 if let QueryResult::InstantVector(iv) = result {
                     for (labels, val) in iv {
@@ -128,12 +137,15 @@ pub async fn range_query(
                 }
             }
 
-            let result_vec: Vec<serde_json::Value> = series_map.into_values().map(|(labels, values)| {
-                serde_json::json!({
-                    "metric": labels.0,
-                    "values": values,
+            let result_vec: Vec<serde_json::Value> = series_map
+                .into_values()
+                .map(|(labels, values)| {
+                    serde_json::json!({
+                        "metric": labels.0,
+                        "values": values,
+                    })
                 })
-            }).collect();
+                .collect();
 
             Json(serde_json::json!({
                 "status": "success",
@@ -165,21 +177,30 @@ fn query_result_to_json(result: QueryResult, ts_ms: i64) -> serde_json::Value {
             "result": [ts_ms as f64 / 1000.0, s],
         }),
         QueryResult::InstantVector(iv) => {
-            let result: Vec<serde_json::Value> = iv.into_iter().map(|(labels, val)| {
-                serde_json::json!({
-                    "metric": labels.0,
-                    "value": [ts_ms as f64 / 1000.0, val.to_string()],
+            let result: Vec<serde_json::Value> = iv
+                .into_iter()
+                .map(|(labels, val)| {
+                    serde_json::json!({
+                        "metric": labels.0,
+                        "value": [ts_ms as f64 / 1000.0, val.to_string()],
+                    })
                 })
-            }).collect();
+                .collect();
             serde_json::json!({ "resultType": "vector", "result": result })
         }
         QueryResult::RangeVector(rv) => {
-            let result: Vec<serde_json::Value> = rv.into_iter().map(|(labels, samps)| {
-                let values: Vec<serde_json::Value> = samps.iter().map(|s| {
-                    serde_json::json!([s.timestamp_ms as f64 / 1000.0, s.value.to_string()])
-                }).collect();
-                serde_json::json!({ "metric": labels.0, "values": values })
-            }).collect();
+            let result: Vec<serde_json::Value> = rv
+                .into_iter()
+                .map(|(labels, samps)| {
+                    let values: Vec<serde_json::Value> = samps
+                        .iter()
+                        .map(|s| {
+                            serde_json::json!([s.timestamp_ms as f64 / 1000.0, s.value.to_string()])
+                        })
+                        .collect();
+                    serde_json::json!({ "metric": labels.0, "values": values })
+                })
+                .collect();
             serde_json::json!({ "resultType": "matrix", "result": result })
         }
     }
@@ -222,7 +243,7 @@ fn parse_prometheus_duration(s: &str) -> Option<i64> {
                 'd' => n * 86_400_000,
                 'w' => n * 604_800_000,
                 'y' => n * 31_536_000_000,
-                _   => return None,
+                _ => return None,
             };
             total_ms += ms;
         }

@@ -16,9 +16,7 @@ use crate::{
 use hickory_proto::op::ResponseCode;
 
 pub async fn serve(addr: String, plugins: Arc<PluginChain>) -> DnsResult<()> {
-    let listener = TcpListener::bind(&addr)
-        .await
-        .map_err(DnsError::Io)?;
+    let listener = TcpListener::bind(&addr).await.map_err(DnsError::Io)?;
     tracing::info!(addr = %addr, "TCP DNS server listening");
 
     loop {

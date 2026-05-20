@@ -58,7 +58,12 @@ pub struct IdentityGc {
 
 impl IdentityGc {
     pub fn new(tenant: TenantId, min_identity: u32, grace_seconds: u64) -> Self {
-        Self { tenant, min_identity, grace_seconds, refcounts: HashMap::new() }
+        Self {
+            tenant,
+            min_identity,
+            grace_seconds,
+            refcounts: HashMap::new(),
+        }
     }
 
     pub fn add_reference(&mut self, identity: u32, now_ns: u64) -> Result<(), OperatorError> {
@@ -66,7 +71,9 @@ impl IdentityGc {
             return Err(OperatorError::ReservedIdentity(identity));
         }
         let entry = self.refcounts.entry(identity).or_insert(IdentityRefCount {
-            identity, references: 0, last_observed_ns: now_ns,
+            identity,
+            references: 0,
+            last_observed_ns: now_ns,
         });
         entry.references += 1;
         entry.last_observed_ns = now_ns;
@@ -87,15 +94,24 @@ impl IdentityGc {
     }
 
     pub fn ref_count(&self, identity: u32) -> u32 {
-        self.refcounts.get(&identity).map(|e| e.references).unwrap_or(0)
+        self.refcounts
+            .get(&identity)
+            .map(|e| e.references)
+            .unwrap_or(0)
     }
 
     /// Run a sweep: delete identities with `references == 0` and
     /// `last_observed + grace_seconds * 1e9 ≤ now_ns`.
     pub fn sweep(&mut self, now_ns: u64) -> IdentityGcReport {
         let grace_ns = self.grace_seconds * 1_000_000_000;
-        let mut report = IdentityGcReport { scanned: 0, deleted: 0, retained: 0 };
-        let stale: Vec<u32> = self.refcounts.iter()
+        let mut report = IdentityGcReport {
+            scanned: 0,
+            deleted: 0,
+            retained: 0,
+        };
+        let stale: Vec<u32> = self
+            .refcounts
+            .iter()
             .filter(|(_, e)| {
                 report.scanned += 1;
                 if e.references > 0 {
@@ -158,7 +174,8 @@ pub struct CesManager {
 impl CesManager {
     pub fn new(tenant: TenantId, max_size: usize) -> Self {
         Self {
-            tenant, max_size,
+            tenant,
+            max_size,
             slices: BTreeMap::new(),
             endpoint_to_ces: HashMap::new(),
             next_id: 1,
@@ -190,14 +207,19 @@ impl CesManager {
         // Make a new CES.
         let name = format!("ces-{}", self.next_id);
         self.next_id += 1;
-        let s = CiliumEndpointSlice { name: name.clone(), endpoints: vec![ep] };
+        let s = CiliumEndpointSlice {
+            name: name.clone(),
+            endpoints: vec![ep],
+        };
         self.slices.insert(name.clone(), s);
         self.endpoint_to_ces.insert(key, name.clone());
         name
     }
 
     pub fn remove(&mut self, ep_key: &str) -> Result<(), OperatorError> {
-        let ces_name = self.endpoint_to_ces.remove(ep_key)
+        let ces_name = self
+            .endpoint_to_ces
+            .remove(ep_key)
             .ok_or_else(|| OperatorError::CiliumEndpointNotFound(ep_key.to_string()))?;
         let drop_ces = if let Some(s) = self.slices.get_mut(&ces_name) {
             s.endpoints.retain(|e| e.key() != ep_key);
@@ -243,7 +265,11 @@ impl StaleCrCleanup {
     /// Compute the set of CR names to delete: every CR in `crs` whose
     /// associated pod key is *not* in `live_pods`. Mirrors
     /// `pkg/operator/pkg/ciliumendpoint/cleanup.go::ReconcileEndpoints`.
-    pub fn stale_endpoints<'a>(&self, crs: &'a [(String, String)], live_pods: &HashSet<String>) -> Vec<&'a str> {
+    pub fn stale_endpoints<'a>(
+        &self,
+        crs: &'a [(String, String)],
+        live_pods: &HashSet<String>,
+    ) -> Vec<&'a str> {
         crs.iter()
             .filter(|(_, pod_key)| !live_pods.contains(pod_key))
             .map(|(cr_name, _)| cr_name.as_str())
@@ -261,8 +287,10 @@ mod tests {
 
     fn endpoint(ns: &str, name: &str, identity: u32) -> CiliumEndpoint {
         CiliumEndpoint {
-            name: name.into(), namespace: ns.into(),
-            identity, pod_name: name.into(),
+            name: name.into(),
+            namespace: ns.into(),
+            identity,
+            pod_name: name.into(),
         }
     }
 
@@ -270,7 +298,11 @@ mod tests {
 
     #[test]
     fn idgc_add_reference_increments_count() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/identitygc/identitygc.go", "AddRef", "tenant-op-add");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/identitygc/identitygc.go",
+            "AddRef",
+            "tenant-op-add"
+        );
         let mut gc = IdentityGc::new(tenant, 256, 60);
         gc.add_reference(256, 100).unwrap();
         gc.add_reference(256, 100).unwrap();
@@ -279,7 +311,11 @@ mod tests {
 
     #[test]
     fn idgc_release_reference_decrements_count() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/identitygc/identitygc.go", "ReleaseRef", "tenant-op-rel");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/identitygc/identitygc.go",
+            "ReleaseRef",
+            "tenant-op-rel"
+        );
         let mut gc = IdentityGc::new(tenant, 256, 60);
         gc.add_reference(256, 100).unwrap();
         gc.add_reference(256, 100).unwrap();
@@ -289,7 +325,11 @@ mod tests {
 
     #[test]
     fn idgc_release_below_zero_clamps_to_zero() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/identitygc/identitygc.go", "Release.Clamp", "tenant-op-clamp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/identitygc/identitygc.go",
+            "Release.Clamp",
+            "tenant-op-clamp"
+        );
         let mut gc = IdentityGc::new(tenant, 256, 60);
         gc.add_reference(256, 100).unwrap();
         gc.release_reference(256, 100).unwrap();
@@ -299,7 +339,11 @@ mod tests {
 
     #[test]
     fn idgc_reserved_identity_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/identitygc/identitygc.go", "AddRef.Reserved", "tenant-op-res");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/identitygc/identitygc.go",
+            "AddRef.Reserved",
+            "tenant-op-res"
+        );
         let mut gc = IdentityGc::new(tenant, 256, 60);
         let err = gc.add_reference(1 /* reserved:host */, 100).unwrap_err();
         assert_eq!(err, OperatorError::ReservedIdentity(1));
@@ -307,7 +351,11 @@ mod tests {
 
     #[test]
     fn idgc_sweep_deletes_unreferenced_after_grace() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/identitygc/identitygc.go", "Sweep", "tenant-op-sweep");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/identitygc/identitygc.go",
+            "Sweep",
+            "tenant-op-sweep"
+        );
         let mut gc = IdentityGc::new(tenant, 256, 60);
         gc.add_reference(256, 0).unwrap();
         gc.release_reference(256, 0).unwrap();
@@ -318,7 +366,11 @@ mod tests {
 
     #[test]
     fn idgc_sweep_keeps_referenced() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/identitygc/identitygc.go", "Sweep.KeepRef", "tenant-op-skp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/identitygc/identitygc.go",
+            "Sweep.KeepRef",
+            "tenant-op-skp"
+        );
         let mut gc = IdentityGc::new(tenant, 256, 60);
         gc.add_reference(256, 0).unwrap();
         let report = gc.sweep(60_000_000_000 + 1);
@@ -328,7 +380,11 @@ mod tests {
 
     #[test]
     fn idgc_sweep_keeps_recently_unreferenced_within_grace() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/identitygc/identitygc.go", "Sweep.WithinGrace", "tenant-op-grace");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/identitygc/identitygc.go",
+            "Sweep.WithinGrace",
+            "tenant-op-grace"
+        );
         let mut gc = IdentityGc::new(tenant, 256, 60);
         gc.add_reference(256, 0).unwrap();
         gc.release_reference(256, 0).unwrap();
@@ -339,7 +395,11 @@ mod tests {
 
     #[test]
     fn idgc_sweep_report_counts_all_categories() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/identitygc/identitygc.go", "Sweep.Report", "tenant-op-rep");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/identitygc/identitygc.go",
+            "Sweep.Report",
+            "tenant-op-rep"
+        );
         let mut gc = IdentityGc::new(tenant, 256, 60);
         gc.add_reference(256, 0).unwrap();
         gc.add_reference(257, 0).unwrap();
@@ -352,7 +412,11 @@ mod tests {
 
     #[test]
     fn idgc_release_reserved_returns_error() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/identitygc/identitygc.go", "Release.Reserved", "tenant-op-relres");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/identitygc/identitygc.go",
+            "Release.Reserved",
+            "tenant-op-relres"
+        );
         let mut gc = IdentityGc::new(tenant, 256, 60);
         let err = gc.release_reference(1, 100).unwrap_err();
         assert_eq!(err, OperatorError::ReservedIdentity(1));
@@ -362,7 +426,11 @@ mod tests {
 
     #[test]
     fn ces_first_endpoint_creates_first_ces() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/pkg/ciliumendpointslice/manager.go", "Upsert.First", "tenant-op-c1");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/pkg/ciliumendpointslice/manager.go",
+            "Upsert.First",
+            "tenant-op-c1"
+        );
         let mut m = CesManager::new(tenant, 100);
         let n = m.upsert(endpoint("ns", "p1", 256));
         assert_eq!(n, "ces-1");
@@ -371,7 +439,11 @@ mod tests {
 
     #[test]
     fn ces_packs_multiple_endpoints_into_one_slice() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/pkg/ciliumendpointslice/manager.go", "Upsert.Pack", "tenant-op-pack");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/pkg/ciliumendpointslice/manager.go",
+            "Upsert.Pack",
+            "tenant-op-pack"
+        );
         let mut m = CesManager::new(tenant, 100);
         for i in 0..50u32 {
             m.upsert(endpoint("ns", &format!("p{i}"), 256 + i));
@@ -381,7 +453,11 @@ mod tests {
 
     #[test]
     fn ces_creates_new_slice_when_full() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/pkg/ciliumendpointslice/manager.go", "Upsert.NewSlice", "tenant-op-new");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/pkg/ciliumendpointslice/manager.go",
+            "Upsert.NewSlice",
+            "tenant-op-new"
+        );
         let mut m = CesManager::new(tenant, 3);
         for i in 0..7u32 {
             m.upsert(endpoint("ns", &format!("p{i}"), 256 + i));
@@ -391,7 +467,11 @@ mod tests {
 
     #[test]
     fn ces_remove_drops_endpoint_and_collapses_empty_slice() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/pkg/ciliumendpointslice/manager.go", "Remove", "tenant-op-rmep");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/pkg/ciliumendpointslice/manager.go",
+            "Remove",
+            "tenant-op-rmep"
+        );
         let mut m = CesManager::new(tenant, 100);
         m.upsert(endpoint("ns", "p1", 256));
         m.remove("ns/p1").unwrap();
@@ -401,7 +481,11 @@ mod tests {
 
     #[test]
     fn ces_remove_unknown_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/pkg/ciliumendpointslice/manager.go", "Remove.NotFound", "tenant-op-rmnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/pkg/ciliumendpointslice/manager.go",
+            "Remove.NotFound",
+            "tenant-op-rmnf"
+        );
         let mut m = CesManager::new(tenant, 100);
         let err = m.remove("ns/ghost").unwrap_err();
         assert!(matches!(err, OperatorError::CiliumEndpointNotFound(_)));
@@ -409,7 +493,11 @@ mod tests {
 
     #[test]
     fn ces_upsert_replaces_existing_endpoint_in_place() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/pkg/ciliumendpointslice/manager.go", "Upsert.Replace", "tenant-op-upr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/pkg/ciliumendpointslice/manager.go",
+            "Upsert.Replace",
+            "tenant-op-upr"
+        );
         let mut m = CesManager::new(tenant, 100);
         m.upsert(endpoint("ns", "p1", 256));
         m.upsert(endpoint("ns", "p1", 999));
@@ -421,7 +509,11 @@ mod tests {
 
     #[test]
     fn ces_lookup_for_endpoint_returns_owning_ces() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/pkg/ciliumendpointslice/manager.go", "Lookup", "tenant-op-lk");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/pkg/ciliumendpointslice/manager.go",
+            "Lookup",
+            "tenant-op-lk"
+        );
         let mut m = CesManager::new(tenant, 100);
         let n = m.upsert(endpoint("ns", "p1", 256));
         assert_eq!(m.ces_for_endpoint("ns/p1"), Some(n.as_str()));
@@ -429,14 +521,22 @@ mod tests {
 
     #[test]
     fn ces_lookup_unknown_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/pkg/ciliumendpointslice/manager.go", "Lookup.NotFound", "tenant-op-lknf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/pkg/ciliumendpointslice/manager.go",
+            "Lookup.NotFound",
+            "tenant-op-lknf"
+        );
         let m = CesManager::new(tenant, 100);
         assert!(m.ces_for_endpoint("ns/ghost").is_none());
     }
 
     #[test]
     fn ces_max_size_respected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/pkg/ciliumendpointslice/manager.go", "MaxSize", "tenant-op-max");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/pkg/ciliumendpointslice/manager.go",
+            "MaxSize",
+            "tenant-op-max"
+        );
         let mut m = CesManager::new(tenant, 5);
         for i in 0..10u32 {
             m.upsert(endpoint("ns", &format!("p{i}"), 256 + i));
@@ -448,7 +548,11 @@ mod tests {
 
     #[test]
     fn ces_endpoint_count_tracks_upserts() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/pkg/ciliumendpointslice/manager.go", "Count", "tenant-op-cnt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/pkg/ciliumendpointslice/manager.go",
+            "Count",
+            "tenant-op-cnt"
+        );
         let mut m = CesManager::new(tenant, 100);
         for i in 0..15u32 {
             m.upsert(endpoint("ns", &format!("p{i}"), 256 + i));
@@ -458,7 +562,11 @@ mod tests {
 
     #[test]
     fn ces_remove_some_keeps_slice_alive() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/pkg/ciliumendpointslice/manager.go", "Remove.PartialSlice", "tenant-op-prt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/pkg/ciliumendpointslice/manager.go",
+            "Remove.PartialSlice",
+            "tenant-op-prt"
+        );
         let mut m = CesManager::new(tenant, 100);
         for i in 0..3u32 {
             m.upsert(endpoint("ns", &format!("p{i}"), 256 + i));
@@ -472,7 +580,11 @@ mod tests {
 
     #[test]
     fn stale_cleanup_returns_crs_without_live_pod() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/pkg/ciliumendpoint/cleanup.go", "Stale.Detect", "tenant-op-stale");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/pkg/ciliumendpoint/cleanup.go",
+            "Stale.Detect",
+            "tenant-op-stale"
+        );
         let s = StaleCrCleanup::new(tenant);
         let crs = vec![
             ("cep-a".into(), "ns/p1".into()),
@@ -488,7 +600,11 @@ mod tests {
 
     #[test]
     fn stale_cleanup_empty_input_returns_empty() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/pkg/ciliumendpoint/cleanup.go", "Stale.Empty", "tenant-op-empt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/pkg/ciliumendpoint/cleanup.go",
+            "Stale.Empty",
+            "tenant-op-empt"
+        );
         let s = StaleCrCleanup::new(tenant);
         let stale = s.stale_endpoints(&[], &HashSet::new());
         assert!(stale.is_empty());
@@ -496,7 +612,11 @@ mod tests {
 
     #[test]
     fn stale_cleanup_all_live_returns_empty() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/pkg/ciliumendpoint/cleanup.go", "Stale.AllLive", "tenant-op-all");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/pkg/ciliumendpoint/cleanup.go",
+            "Stale.AllLive",
+            "tenant-op-all"
+        );
         let s = StaleCrCleanup::new(tenant);
         let crs = vec![
             ("cep-a".into(), "ns/p1".into()),
@@ -511,7 +631,11 @@ mod tests {
 
     #[test]
     fn stale_cleanup_all_stale_returns_all() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/operator/pkg/ciliumendpoint/cleanup.go", "Stale.AllStale", "tenant-op-allstl");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/operator/pkg/ciliumendpoint/cleanup.go",
+            "Stale.AllStale",
+            "tenant-op-allstl"
+        );
         let s = StaleCrCleanup::new(tenant);
         let crs = vec![
             ("cep-a".into(), "ns/p1".into()),
@@ -525,8 +649,16 @@ mod tests {
 
     #[test]
     fn idgc_report_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/operator/identitygc/identitygc.go", "Report.Serde", "tenant-op-rserde");
-        let r = IdentityGcReport { scanned: 100, deleted: 5, retained: 95 };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/operator/identitygc/identitygc.go",
+            "Report.Serde",
+            "tenant-op-rserde"
+        );
+        let r = IdentityGcReport {
+            scanned: 100,
+            deleted: 5,
+            retained: 95,
+        };
         let s = serde_json::to_string(&r).unwrap();
         let back: IdentityGcReport = serde_json::from_str(&s).unwrap();
         assert_eq!(back, r);
@@ -534,7 +666,11 @@ mod tests {
 
     #[test]
     fn ces_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/operator/pkg/ciliumendpointslice/manager.go", "Slice.Serde", "tenant-op-cserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/operator/pkg/ciliumendpointslice/manager.go",
+            "Slice.Serde",
+            "tenant-op-cserde"
+        );
         let ces = CiliumEndpointSlice {
             name: "ces-1".into(),
             endpoints: vec![endpoint("ns", "p1", 256)],
@@ -546,7 +682,11 @@ mod tests {
 
     #[test]
     fn cilium_endpoint_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/operator/pkg/ciliumendpoint/types.go", "CEP.Serde", "tenant-op-eserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/operator/pkg/ciliumendpoint/types.go",
+            "CEP.Serde",
+            "tenant-op-eserde"
+        );
         let e = endpoint("ns", "p1", 256);
         let s = serde_json::to_string(&e).unwrap();
         let back: CiliumEndpoint = serde_json::from_str(&s).unwrap();

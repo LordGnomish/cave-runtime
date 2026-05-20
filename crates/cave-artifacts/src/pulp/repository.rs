@@ -15,20 +15,26 @@ pub fn create_repository(name: &str, content_type: ContentType) -> Repository {
 }
 
 /// Update mutable repository fields.
-pub fn update_repository(repo: &mut Repository, name: Option<String>, description: Option<String>, retain_versions: Option<u32>) {
-    if let Some(n) = name { repo.name = n; }
-    if let Some(d) = description { repo.description = Some(d); }
-    if let Some(v) = retain_versions { repo.retain_repo_versions = Some(v); }
+pub fn update_repository(
+    repo: &mut Repository,
+    name: Option<String>,
+    description: Option<String>,
+    retain_versions: Option<u32>,
+) {
+    if let Some(n) = name {
+        repo.name = n;
+    }
+    if let Some(d) = description {
+        repo.description = Some(d);
+    }
+    if let Some(v) = retain_versions {
+        repo.retain_repo_versions = Some(v);
+    }
     repo.pulp_last_updated = chrono::Utc::now();
 }
 
 /// Initiate an async sync task for the repository.
-pub fn enqueue_sync(
-    repo: &Repository,
-    remote: &Remote,
-    mirror: bool,
-    queue: &TaskQueue,
-) -> Task {
+pub fn enqueue_sync(repo: &Repository, remote: &Remote, mirror: bool, queue: &TaskQueue) -> Task {
     let task_name = format!(
         "pulp_{}.tasks.synchronize",
         repo.content_type.plugin_name().trim_start_matches("pulp_")
@@ -45,11 +51,7 @@ pub fn enqueue_sync(
 }
 
 /// Add content to a repository (creating a new version).
-pub fn add_content(
-    repo: &Repository,
-    content_hrefs: &[String],
-    queue: &TaskQueue,
-) -> Task {
+pub fn add_content(repo: &Repository, content_hrefs: &[String], queue: &TaskQueue) -> Task {
     let task = queue.enqueue("pulp.tasks.repository.add_content");
     tracing::info!(
         repo = %repo.name,
@@ -61,11 +63,7 @@ pub fn add_content(
 }
 
 /// Remove content from a repository (creating a new version).
-pub fn remove_content(
-    repo: &Repository,
-    content_hrefs: &[String],
-    queue: &TaskQueue,
-) -> Task {
+pub fn remove_content(repo: &Repository, content_hrefs: &[String], queue: &TaskQueue) -> Task {
     let task = queue.enqueue("pulp.tasks.repository.remove_content");
     tracing::info!(
         repo = %repo.name,
@@ -77,10 +75,7 @@ pub fn remove_content(
 }
 
 /// Delete a specific repository version.
-pub fn delete_version(
-    version: &RepositoryVersion,
-    queue: &TaskQueue,
-) -> Task {
+pub fn delete_version(version: &RepositoryVersion, queue: &TaskQueue) -> Task {
     let task = queue.enqueue("pulp.tasks.repository_version.delete");
     tracing::info!(
         version = version.number,
@@ -110,10 +105,7 @@ pub fn repair_version(
 
 /// Given a list of versions and the retain_repo_versions limit,
 /// return the hrefs of versions to be pruned.
-pub fn versions_to_prune(
-    versions: &[RepositoryVersion],
-    retain: u32,
-) -> Vec<String> {
+pub fn versions_to_prune(versions: &[RepositoryVersion], retain: u32) -> Vec<String> {
     if retain == 0 {
         return vec![];
     }
@@ -145,7 +137,12 @@ mod tests {
     #[test]
     fn update_repository_fields() {
         let mut repo = create_repository("old-name", ContentType::File);
-        update_repository(&mut repo, Some("new-name".to_string()), Some("desc".to_string()), Some(5));
+        update_repository(
+            &mut repo,
+            Some("new-name".to_string()),
+            Some("desc".to_string()),
+            Some(5),
+        );
         assert_eq!(repo.name, "new-name");
         assert_eq!(repo.description, Some("desc".to_string()));
         assert_eq!(repo.retain_repo_versions, Some(5));
@@ -154,7 +151,11 @@ mod tests {
     #[test]
     fn enqueue_sync_task() {
         let repo = create_repository("pypi-mirror", ContentType::Python);
-        let remote = Remote::new("pypi-upstream", "https://pypi.org/simple/", ContentType::Python);
+        let remote = Remote::new(
+            "pypi-upstream",
+            "https://pypi.org/simple/",
+            ContentType::Python,
+        );
         let queue = TaskQueue::new();
         let task = enqueue_sync(&repo, &remote, false, &queue);
         assert_eq!(task.state, TaskState::Waiting);
@@ -170,7 +171,8 @@ mod tests {
         let to_prune = versions_to_prune(&versions, 5);
         assert_eq!(to_prune.len(), 5);
         // Should prune oldest first
-        let pruned_numbers: Vec<u64> = to_prune.iter()
+        let pruned_numbers: Vec<u64> = to_prune
+            .iter()
             .filter_map(|href| {
                 // Extract number from href for test validation
                 // In real code would query by href

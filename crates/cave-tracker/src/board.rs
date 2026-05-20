@@ -10,10 +10,26 @@ pub fn default_scrum_board(project_id: Uuid, project_name: &str) -> Board {
         name: format!("{} Scrum Board", project_name),
         board_type: BoardType::Scrum,
         columns: vec![
-            BoardColumn { name: "To Do".to_string(), statuses: vec!["To Do".to_string()], wip_limit: None },
-            BoardColumn { name: "In Progress".to_string(), statuses: vec!["In Progress".to_string()], wip_limit: Some(5) },
-            BoardColumn { name: "In Review".to_string(), statuses: vec!["In Review".to_string()], wip_limit: Some(3) },
-            BoardColumn { name: "Done".to_string(), statuses: vec!["Done".to_string()], wip_limit: None },
+            BoardColumn {
+                name: "To Do".to_string(),
+                statuses: vec!["To Do".to_string()],
+                wip_limit: None,
+            },
+            BoardColumn {
+                name: "In Progress".to_string(),
+                statuses: vec!["In Progress".to_string()],
+                wip_limit: Some(5),
+            },
+            BoardColumn {
+                name: "In Review".to_string(),
+                statuses: vec!["In Review".to_string()],
+                wip_limit: Some(3),
+            },
+            BoardColumn {
+                name: "Done".to_string(),
+                statuses: vec!["Done".to_string()],
+                wip_limit: None,
+            },
         ],
         backlog_enabled: true,
         current_sprint_id: None,
@@ -28,9 +44,21 @@ pub fn default_kanban_board(project_id: Uuid, project_name: &str) -> Board {
         name: format!("{} Kanban Board", project_name),
         board_type: BoardType::Kanban,
         columns: vec![
-            BoardColumn { name: "To Do".to_string(), statuses: vec!["To Do".to_string()], wip_limit: None },
-            BoardColumn { name: "In Progress".to_string(), statuses: vec!["In Progress".to_string()], wip_limit: Some(10) },
-            BoardColumn { name: "Done".to_string(), statuses: vec!["Done".to_string()], wip_limit: None },
+            BoardColumn {
+                name: "To Do".to_string(),
+                statuses: vec!["To Do".to_string()],
+                wip_limit: None,
+            },
+            BoardColumn {
+                name: "In Progress".to_string(),
+                statuses: vec!["In Progress".to_string()],
+                wip_limit: Some(10),
+            },
+            BoardColumn {
+                name: "Done".to_string(),
+                statuses: vec!["Done".to_string()],
+                wip_limit: None,
+            },
         ],
         backlog_enabled: false,
         current_sprint_id: None,
@@ -40,13 +68,18 @@ pub fn default_kanban_board(project_id: Uuid, project_name: &str) -> Board {
 
 /// Get board view: each column with its issues.
 pub fn board_view<'a>(board: &Board, issues: &[&'a Issue]) -> Vec<(String, Vec<&'a Issue>)> {
-    board.columns.iter().map(|col| {
-        let col_issues: Vec<&Issue> = issues.iter()
-            .filter(|i| col.statuses.contains(&i.status))
-            .copied()
-            .collect();
-        (col.name.clone(), col_issues)
-    }).collect()
+    board
+        .columns
+        .iter()
+        .map(|col| {
+            let col_issues: Vec<&Issue> = issues
+                .iter()
+                .filter(|i| col.statuses.contains(&i.status))
+                .copied()
+                .collect();
+            (col.name.clone(), col_issues)
+        })
+        .collect()
 }
 
 /// Check WIP limit violations for a column.
@@ -54,9 +87,15 @@ pub fn check_wip_violations(board: &Board, issues: &[&Issue]) -> Vec<String> {
     let mut violations = Vec::new();
     for col in &board.columns {
         if let Some(limit) = col.wip_limit {
-            let count = issues.iter().filter(|i| col.statuses.contains(&i.status)).count();
+            let count = issues
+                .iter()
+                .filter(|i| col.statuses.contains(&i.status))
+                .count();
             if count > limit as usize {
-                violations.push(format!("Column '{}': {} issues exceed WIP limit of {}", col.name, count, limit));
+                violations.push(format!(
+                    "Column '{}': {} issues exceed WIP limit of {}",
+                    col.name, count, limit
+                ));
             }
         }
     }

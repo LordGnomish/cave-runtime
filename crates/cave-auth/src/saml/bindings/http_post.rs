@@ -9,8 +9,8 @@
 //! mandates standard base64 (RFC 4648 §4), no DEFLATE,
 //! line-breaks-permitted in transport.
 
-use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD as B64;
 
 use crate::saml::SamlError;
 
@@ -25,7 +25,10 @@ pub fn encode(xml: &[u8]) -> String {
 pub fn decode(encoded: &str) -> Result<Vec<u8>, SamlError> {
     // Strip whitespace first — base64 itself rejects bare
     // whitespace, but the SAML wire format permits line-wrapping.
-    let cleaned: String = encoded.chars().filter(|c| !c.is_ascii_whitespace()).collect();
+    let cleaned: String = encoded
+        .chars()
+        .filter(|c| !c.is_ascii_whitespace())
+        .collect();
     B64.decode(cleaned.as_bytes())
         .map_err(|err| SamlError::Binding(format!("base64: {err}")))
 }
@@ -131,8 +134,7 @@ mod tests {
 
     #[test]
     fn auto_submit_form_omits_relay_state_when_none() {
-        let form =
-            auto_submit_form("https://sp.example.com/acs", "SAMLResponse", "B64=", None);
+        let form = auto_submit_form("https://sp.example.com/acs", "SAMLResponse", "B64=", None);
         assert!(!form.contains("RelayState"));
     }
 

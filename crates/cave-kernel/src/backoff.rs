@@ -92,7 +92,10 @@ mod tests {
 
     #[test]
     fn linear_grows_by_one_step_each_retry() {
-        let b = Backoff::Linear { base: Duration::from_millis(100), cap: Duration::from_secs(10) };
+        let b = Backoff::Linear {
+            base: Duration::from_millis(100),
+            cap: Duration::from_secs(10),
+        };
         assert_eq!(b.delay_for(0), Duration::from_millis(100));
         assert_eq!(b.delay_for(1), Duration::from_millis(200));
         assert_eq!(b.delay_for(2), Duration::from_millis(300));
@@ -100,7 +103,10 @@ mod tests {
 
     #[test]
     fn linear_caps_at_max() {
-        let b = Backoff::Linear { base: Duration::from_secs(1), cap: Duration::from_secs(3) };
+        let b = Backoff::Linear {
+            base: Duration::from_secs(1),
+            cap: Duration::from_secs(3),
+        };
         assert_eq!(b.delay_for(0), Duration::from_secs(1));
         assert_eq!(b.delay_for(1), Duration::from_secs(2));
         assert_eq!(b.delay_for(2), Duration::from_secs(3));
@@ -109,7 +115,10 @@ mod tests {
 
     #[test]
     fn exponential_doubles_each_step() {
-        let b = Backoff::Exponential { base: Duration::from_millis(50), cap: Duration::from_secs(10) };
+        let b = Backoff::Exponential {
+            base: Duration::from_millis(50),
+            cap: Duration::from_secs(10),
+        };
         assert_eq!(b.delay_for(0), Duration::from_millis(50));
         assert_eq!(b.delay_for(1), Duration::from_millis(100));
         assert_eq!(b.delay_for(2), Duration::from_millis(200));
@@ -118,14 +127,20 @@ mod tests {
 
     #[test]
     fn exponential_caps_at_max() {
-        let b = Backoff::Exponential { base: Duration::from_secs(1), cap: Duration::from_secs(8) };
+        let b = Backoff::Exponential {
+            base: Duration::from_secs(1),
+            cap: Duration::from_secs(8),
+        };
         assert_eq!(b.delay_for(3), Duration::from_secs(8));
         assert_eq!(b.delay_for(20), Duration::from_secs(8));
     }
 
     #[test]
     fn exponential_saturates_on_huge_n() {
-        let b = Backoff::Exponential { base: Duration::from_millis(1), cap: Duration::from_secs(60) };
+        let b = Backoff::Exponential {
+            base: Duration::from_millis(1),
+            cap: Duration::from_secs(60),
+        };
         // n=63 would overflow u32 multiplier — must saturate to cap.
         assert_eq!(b.delay_for(63), Duration::from_secs(60));
         assert_eq!(b.delay_for(u32::MAX), Duration::from_secs(60));
@@ -133,25 +148,34 @@ mod tests {
 
     #[test]
     fn fibonacci_grows_at_phi_ratio() {
-        let b = Backoff::Fibonacci { base: Duration::from_millis(100), cap: Duration::from_secs(60) };
+        let b = Backoff::Fibonacci {
+            base: Duration::from_millis(100),
+            cap: Duration::from_secs(60),
+        };
         // F(1)=1, F(2)=1, F(3)=2, F(4)=3, F(5)=5
-        assert_eq!(b.delay_for(0), Duration::from_millis(100));   // base * F(1)=1
-        assert_eq!(b.delay_for(1), Duration::from_millis(100));   // base * F(2)=1
-        assert_eq!(b.delay_for(2), Duration::from_millis(200));   // base * F(3)=2
-        assert_eq!(b.delay_for(3), Duration::from_millis(300));   // base * F(4)=3
-        assert_eq!(b.delay_for(4), Duration::from_millis(500));   // base * F(5)=5
+        assert_eq!(b.delay_for(0), Duration::from_millis(100)); // base * F(1)=1
+        assert_eq!(b.delay_for(1), Duration::from_millis(100)); // base * F(2)=1
+        assert_eq!(b.delay_for(2), Duration::from_millis(200)); // base * F(3)=2
+        assert_eq!(b.delay_for(3), Duration::from_millis(300)); // base * F(4)=3
+        assert_eq!(b.delay_for(4), Duration::from_millis(500)); // base * F(5)=5
     }
 
     #[test]
     fn fibonacci_caps_at_max() {
-        let b = Backoff::Fibonacci { base: Duration::from_secs(1), cap: Duration::from_secs(10) };
+        let b = Backoff::Fibonacci {
+            base: Duration::from_secs(1),
+            cap: Duration::from_secs(10),
+        };
         // F(11) = 89, base*89 > cap → cap
         assert_eq!(b.delay_for(10), Duration::from_secs(10));
     }
 
     #[test]
     fn schedule_emits_n_delays() {
-        let b = Backoff::Linear { base: Duration::from_millis(10), cap: Duration::from_secs(1) };
+        let b = Backoff::Linear {
+            base: Duration::from_millis(10),
+            cap: Duration::from_secs(1),
+        };
         let s = b.schedule(5);
         assert_eq!(s.len(), 5);
         assert_eq!(s[0], Duration::from_millis(10));
@@ -160,7 +184,11 @@ mod tests {
 
     #[test]
     fn schedule_zero_returns_empty() {
-        assert!(Backoff::Constant(Duration::from_millis(1)).schedule(0).is_empty());
+        assert!(
+            Backoff::Constant(Duration::from_millis(1))
+                .schedule(0)
+                .is_empty()
+        );
     }
 
     #[test]

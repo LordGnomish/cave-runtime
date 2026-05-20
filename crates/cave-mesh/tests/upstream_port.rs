@@ -107,8 +107,13 @@ fn upstream_hbone_baggage_tolerates_whitespace_and_properties() {
 /// invoking ztunnel's tenant.
 #[test]
 fn upstream_hbone_authorise_refuses_when_baggage_tenant_mismatches() {
-    let req =
-        parse_request(&headers("CONNECT", "10.0.0.42:8080", "/", Some("tenant=acme"))).unwrap();
+    let req = parse_request(&headers(
+        "CONNECT",
+        "10.0.0.42:8080",
+        "/",
+        Some("tenant=acme"),
+    ))
+    .unwrap();
     let err = authorise(&req, &tenant("attacker")).unwrap_err();
     assert!(matches!(err, HboneError::TenantDenied { .. }));
 }

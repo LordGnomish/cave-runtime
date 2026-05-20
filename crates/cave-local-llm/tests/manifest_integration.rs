@@ -2,8 +2,8 @@
 // Copyright 2026 Cave Runtime contributors
 //! Integration tests for the manifest reader using real fixture files.
 
-use cave_local_llm::manifest::{find_missing_functions, parse_manifest_file};
 use cave_kernel::parity::ParityManifest;
+use cave_local_llm::manifest::{find_missing_functions, parse_manifest_file};
 use std::path::{Path, PathBuf};
 
 fn fixture_dir() -> PathBuf {
@@ -12,8 +12,7 @@ fn fixture_dir() -> PathBuf {
 
 fn load_test_manifest() -> ParityManifest {
     let path = fixture_dir().join("test_manifest.toml");
-    parse_manifest_file(&path)
-        .unwrap_or_else(|e| panic!("failed to parse test_manifest.toml: {e}"))
+    parse_manifest_file(&path).unwrap_or_else(|e| panic!("failed to parse test_manifest.toml: {e}"))
 }
 
 #[test]
@@ -46,7 +45,10 @@ fn test_manifest_has_two_function_mappings() {
 fn test_manifest_has_no_surface_or_file_mappings() {
     let m = load_test_manifest();
     assert!(m.files.is_empty(), "fixture has no [[files]] mappings");
-    assert!(m.surfaces.is_empty(), "fixture has no [[surfaces]] mappings");
+    assert!(
+        m.surfaces.is_empty(),
+        "fixture has no [[surfaces]] mappings"
+    );
     assert!(m.tests.is_empty(), "fixture has no [[tests]] mappings");
 }
 
@@ -56,7 +58,11 @@ fn test_find_missing_detects_exactly_one_absent_function() {
     let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let missing = find_missing_functions(&manifest, crate_root);
 
-    assert_eq!(missing.len(), 1, "only missing_fn should be absent; got: {missing:?}");
+    assert_eq!(
+        missing.len(),
+        1,
+        "only missing_fn should be absent; got: {missing:?}"
+    );
     assert_eq!(missing[0].local_name, "missing_fn");
     assert_eq!(missing[0].upstream_name, "MissingFunction");
 }
@@ -81,7 +87,10 @@ file          = "fixtures/sample_source.rs"
     let manifest: ParityManifest = toml::from_str(toml_str).unwrap();
     let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let missing = find_missing_functions(&manifest, crate_root);
-    assert!(missing.is_empty(), "existing_fn is present — should not be missing");
+    assert!(
+        missing.is_empty(),
+        "existing_fn is present — should not be missing"
+    );
 }
 
 #[test]

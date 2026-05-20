@@ -67,18 +67,38 @@ impl AuditBackend {
         if self.backend_type != AuditBackendType::Syslog {
             return None;
         }
-        let facility = self.options.get("facility")
-            .map(String::as_str).unwrap_or("LOCAL0");
-        let tag = self.options.get("tag")
-            .map(String::as_str).unwrap_or("vault");
+        let facility = self
+            .options
+            .get("facility")
+            .map(String::as_str)
+            .unwrap_or("LOCAL0");
+        let tag = self
+            .options
+            .get("tag")
+            .map(String::as_str)
+            .unwrap_or("vault");
         // openbao maps facility×severity to the standard syslog priority
         // (facility * 8 + severity). LOCAL0 = 16, INFO severity = 6 ⇒ 134.
         let pri = match facility {
-            "KERN"   =>  6, "USER"   => 14, "MAIL"   => 22, "DAEMON" => 30,
-            "AUTH"   => 38, "LPR"    => 54, "NEWS"   => 62, "UUCP"   => 70,
-            "CRON"   => 78, "AUTHPRIV" => 86, "FTP" => 94, "LOCAL0" => 134,
-            "LOCAL1" => 142, "LOCAL2" => 150, "LOCAL3" => 158, "LOCAL4" => 166,
-            "LOCAL5" => 174, "LOCAL6" => 182, "LOCAL7" => 190,
+            "KERN" => 6,
+            "USER" => 14,
+            "MAIL" => 22,
+            "DAEMON" => 30,
+            "AUTH" => 38,
+            "LPR" => 54,
+            "NEWS" => 62,
+            "UUCP" => 70,
+            "CRON" => 78,
+            "AUTHPRIV" => 86,
+            "FTP" => 94,
+            "LOCAL0" => 134,
+            "LOCAL1" => 142,
+            "LOCAL2" => 150,
+            "LOCAL3" => 158,
+            "LOCAL4" => 166,
+            "LOCAL5" => 174,
+            "LOCAL6" => 182,
+            "LOCAL7" => 190,
             _ => 134,
         };
         Some(format!("<{}> {}: {}", pri, tag, json))
@@ -150,7 +170,9 @@ impl AuditLogger {
                         std::fs::create_dir_all(parent)?;
                     }
                     let mut f = std::fs::OpenOptions::new()
-                        .create(true).append(true).open(&path)?;
+                        .create(true)
+                        .append(true)
+                        .open(&path)?;
                     writeln!(f, "{}", json)?;
                 }
                 Ok(json.to_string())
@@ -201,10 +223,13 @@ impl AuditLogger {
     }
 
     pub fn recent_entries(&self, limit: usize) -> Vec<AuditEntry> {
-        self.log_buffer.lock().map(|buf| {
-            let start = buf.len().saturating_sub(limit);
-            buf[start..].to_vec()
-        }).unwrap_or_default()
+        self.log_buffer
+            .lock()
+            .map(|buf| {
+                let start = buf.len().saturating_sub(limit);
+                buf[start..].to_vec()
+            })
+            .unwrap_or_default()
     }
 }
 

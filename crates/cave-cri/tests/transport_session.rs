@@ -9,8 +9,8 @@
 //! channel-byte demuxer.
 
 use cave_cri::transport::{
-    ws_decode, ws_encode, ChannelDemux, ExecSession, SpdyFrame,
-    CHANNEL_ERROR, CHANNEL_RESIZE, CHANNEL_STDERR, CHANNEL_STDIN, CHANNEL_STDOUT,
+    ws_decode, ws_encode, ChannelDemux, ExecSession, SpdyFrame, CHANNEL_ERROR, CHANNEL_RESIZE,
+    CHANNEL_STDERR, CHANNEL_STDIN, CHANNEL_STDOUT,
 };
 
 const TENANT: &str = "tenant-acme-prod";
@@ -52,10 +52,16 @@ fn spdy_fin_frame_sets_flag_and_zero_payload() {
 /// must error rather than silently producing a partial frame.
 #[test]
 fn spdy_frame_decode_rejects_truncated_input() {
-    assert!(SpdyFrame::decode(&[0u8; 4]).is_err(), "truncated header rejected");
+    assert!(
+        SpdyFrame::decode(&[0u8; 4]).is_err(),
+        "truncated header rejected"
+    );
     let mut frame = SpdyFrame::data(7, CHANNEL_STDOUT, b"abcd".to_vec()).encode();
     frame.truncate(frame.len() - 1);
-    assert!(SpdyFrame::decode(&frame).is_err(), "truncated payload rejected");
+    assert!(
+        SpdyFrame::decode(&frame).is_err(),
+        "truncated payload rejected"
+    );
 }
 
 /// Cite: control frames (high bit of stream-id == 1) — cave's data path
@@ -65,7 +71,10 @@ fn spdy_frame_decode_rejects_truncated_input() {
 fn spdy_decode_rejects_control_frames() {
     let mut bytes = SpdyFrame::data(1, CHANNEL_STDOUT, b"x".to_vec()).encode();
     bytes[0] |= 0x80;
-    assert!(SpdyFrame::decode(&bytes).is_err(), "control frame must be rejected");
+    assert!(
+        SpdyFrame::decode(&bytes).is_err(),
+        "control frame must be rejected"
+    );
 }
 
 /// Cite: `apimachinery/pkg/util/httpstream/wsstream/conn.go` v1.36.0 —
@@ -115,11 +124,19 @@ fn exec_session_enforces_tenant_and_channel_directionality() {
     let s = ExecSession::new(TENANT, "container-abc", "session-xyz");
 
     // OK: client pushes stdin
-    s.push_from_client(TENANT, SpdyFrame::data(11, CHANNEL_STDIN, b"echo hi\n".to_vec())).unwrap();
+    s.push_from_client(
+        TENANT,
+        SpdyFrame::data(11, CHANNEL_STDIN, b"echo hi\n".to_vec()),
+    )
+    .unwrap();
     assert_eq!(s.buffered(CHANNEL_STDIN), b"echo hi\n");
 
     // OK: client pushes resize
-    s.push_from_client(TENANT, SpdyFrame::data(12, CHANNEL_RESIZE, br#"{"Width":80,"Height":24}"#.to_vec())).unwrap();
+    s.push_from_client(
+        TENANT,
+        SpdyFrame::data(12, CHANNEL_RESIZE, br#"{"Width":80,"Height":24}"#.to_vec()),
+    )
+    .unwrap();
     assert_eq!(s.buffered(CHANNEL_RESIZE), br#"{"Width":80,"Height":24}"#);
 
     // ERR: client tries to push stdout (runtime-only direction)
@@ -127,14 +144,18 @@ fn exec_session_enforces_tenant_and_channel_directionality() {
     assert!(bad.is_err(), "client must not push to stdout");
 
     // ERR: cross-tenant
-    let bad = s.push_from_client("tenant-other",
-        SpdyFrame::data(14, CHANNEL_STDIN, b"x".to_vec()));
+    let bad = s.push_from_client(
+        "tenant-other",
+        SpdyFrame::data(14, CHANNEL_STDIN, b"x".to_vec()),
+    );
     assert!(bad.is_err(), "cross-tenant push denied");
 
     // OK: runtime emits to stdout/stderr/error
     let f = s.emit_to_client(CHANNEL_STDOUT, b"hi\n".to_vec()).unwrap();
     assert_eq!(f.channel, CHANNEL_STDOUT);
-    assert!(s.emit_to_client(CHANNEL_ERROR, br#"{"status":"Success"}"#.to_vec()).is_ok());
+    assert!(s
+        .emit_to_client(CHANNEL_ERROR, br#"{"status":"Success"}"#.to_vec())
+        .is_ok());
 
     // ERR: runtime can't emit on stdin
     assert!(s.emit_to_client(CHANNEL_STDIN, b"nope".to_vec()).is_err());
@@ -142,11 +163,16 @@ fn exec_session_enforces_tenant_and_channel_directionality() {
     // FIN frame on the stdin channel marks it closed even though it carries no payload.
     let fin = SpdyFrame::fin(99, CHANNEL_STDIN);
     s.push_from_client(TENANT, fin).unwrap();
-    assert!(s.channel_closed(CHANNEL_STDIN), "FIN on stdin closes channel");
+    assert!(
+        s.channel_closed(CHANNEL_STDIN),
+        "FIN on stdin closes channel"
+    );
 
     // After session close, neither push nor emit are allowed.
     s.close();
     assert!(s.is_closed());
-    assert!(s.push_from_client(TENANT, SpdyFrame::data(15, CHANNEL_STDIN, b"x".to_vec())).is_err());
+    assert!(s
+        .push_from_client(TENANT, SpdyFrame::data(15, CHANNEL_STDIN, b"x".to_vec()))
+        .is_err());
     assert!(s.emit_to_client(CHANNEL_STDOUT, b"x".to_vec()).is_err());
 }

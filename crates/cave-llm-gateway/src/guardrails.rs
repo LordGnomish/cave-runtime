@@ -45,7 +45,9 @@ pub struct GuardrailEngine {
 
 impl GuardrailEngine {
     pub fn new() -> Self {
-        let e = Self { rules: DashMap::new() };
+        let e = Self {
+            rules: DashMap::new(),
+        };
         e.load_defaults();
         e
     }
@@ -84,7 +86,9 @@ impl GuardrailEngine {
         let mut warnings = Vec::new();
 
         // Gather all message text
-        let full_text: String = req.messages.iter()
+        let full_text: String = req
+            .messages
+            .iter()
             .filter_map(|m| m.content.as_text())
             .collect::<Vec<_>>()
             .join("\n");
@@ -131,7 +135,9 @@ impl GuardrailEngine {
     pub fn check_output(&self, resp: &ChatCompletionResponse) -> GatewayResult<Vec<String>> {
         let mut warnings = Vec::new();
 
-        let output_text: String = resp.choices.iter()
+        let output_text: String = resp
+            .choices
+            .iter()
             .filter_map(|c| c.message.as_ref())
             .filter_map(|m| m.content.as_text())
             .collect::<Vec<_>>()
@@ -186,10 +192,20 @@ mod tests {
         ChatCompletionRequest {
             model: "gpt-4o".into(),
             messages: vec![ChatMessage::user(text)],
-            temperature: None, top_p: None, max_tokens: None, stream: None,
-            stop: None, presence_penalty: None, frequency_penalty: None,
-            n: None, user: None, tools: None, tool_choice: None,
-            response_format: None, seed: None, logprobs: None,
+            temperature: None,
+            top_p: None,
+            max_tokens: None,
+            stream: None,
+            stop: None,
+            presence_penalty: None,
+            frequency_penalty: None,
+            n: None,
+            user: None,
+            tools: None,
+            tool_choice: None,
+            response_format: None,
+            seed: None,
+            logprobs: None,
         }
     }
 
@@ -214,7 +230,9 @@ mod tests {
             id: "no-badword".into(),
             name: "Block badword".into(),
             enabled: true,
-            rule_type: RuleType::BlockedKeywords { keywords: vec!["badword".into()] },
+            rule_type: RuleType::BlockedKeywords {
+                keywords: vec!["badword".into()],
+            },
             action: GuardrailAction::Block,
         });
         let result = engine.check_input(&make_req("this contains badword here"));
@@ -228,10 +246,16 @@ mod tests {
             id: "no-secret".into(),
             name: "No secrets in output".into(),
             enabled: true,
-            rule_type: RuleType::OutputFilter { keywords: vec!["secret".into()] },
+            rule_type: RuleType::OutputFilter {
+                keywords: vec!["secret".into()],
+            },
             action: GuardrailAction::Block,
         });
-        let resp = ChatCompletionResponse::simple("gpt-4o", "Here is the secret key".into(), Usage::new(5, 5));
+        let resp = ChatCompletionResponse::simple(
+            "gpt-4o",
+            "Here is the secret key".into(),
+            Usage::new(5, 5),
+        );
         let result = engine.check_output(&resp);
         assert!(result.is_err());
     }
@@ -243,9 +267,15 @@ mod tests {
             id: "disabled-kw".into(),
             name: "Disabled".into(),
             enabled: false,
-            rule_type: RuleType::BlockedKeywords { keywords: vec!["anything".into()] },
+            rule_type: RuleType::BlockedKeywords {
+                keywords: vec!["anything".into()],
+            },
             action: GuardrailAction::Block,
         });
-        assert!(engine.check_input(&make_req("this contains anything")).is_ok());
+        assert!(
+            engine
+                .check_input(&make_req("this contains anything"))
+                .is_ok()
+        );
     }
 }

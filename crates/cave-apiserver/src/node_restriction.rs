@@ -24,8 +24,7 @@
 //! whose tenant differs from the node's tenant as plain non-node users.
 
 use crate::admission::{
-    AdmissionRequest, AdmissionResponse, MutatingWebhook, Operation,
-    ValidatingWebhook,
+    AdmissionRequest, AdmissionResponse, MutatingWebhook, Operation, ValidatingWebhook,
 };
 use std::collections::HashSet;
 
@@ -88,7 +87,9 @@ impl NodeRestriction {
 }
 
 impl ValidatingWebhook for NodeRestriction {
-    fn name(&self) -> &str { "NodeRestriction" }
+    fn name(&self) -> &str {
+        "NodeRestriction"
+    }
     fn validate(&self, req: &AdmissionRequest) -> AdmissionResponse {
         let Some(node_name) = node_name_from_user(&req.user) else {
             return AdmissionResponse::allow(req);
@@ -96,11 +97,18 @@ impl ValidatingWebhook for NodeRestriction {
         let refs = self.refs.references_for(node_name);
         match req.kind.as_str() {
             "Node" => {
-                if matches!(req.operation, Operation::Create | Operation::Update | Operation::Delete) {
+                if matches!(
+                    req.operation,
+                    Operation::Create | Operation::Update | Operation::Delete
+                ) {
                     if req.name != node_name {
-                        return Self::deny(req,
-                            format!("node {} cannot {:?} other node {}",
-                                    node_name, req.operation, req.name));
+                        return Self::deny(
+                            req,
+                            format!(
+                                "node {} cannot {:?} other node {}",
+                                node_name, req.operation, req.name
+                            ),
+                        );
                     }
                 }
                 AdmissionResponse::allow(req)
@@ -109,10 +117,17 @@ impl ValidatingWebhook for NodeRestriction {
                 // We can't read spec.nodeName from a generic Resource model
                 // here; the reference list is authoritative.
                 if matches!(req.operation, Operation::Create | Operation::Update) {
-                    if !refs.pods.contains(&(req.namespace.clone(), req.name.clone())) {
-                        return Self::deny(req,
-                            format!("node {} cannot {:?} pod {}/{}",
-                                    node_name, req.operation, req.namespace, req.name));
+                    if !refs
+                        .pods
+                        .contains(&(req.namespace.clone(), req.name.clone()))
+                    {
+                        return Self::deny(
+                            req,
+                            format!(
+                                "node {} cannot {:?} pod {}/{}",
+                                node_name, req.operation, req.namespace, req.name
+                            ),
+                        );
                     }
                 }
                 AdmissionResponse::allow(req)
@@ -120,45 +135,78 @@ impl ValidatingWebhook for NodeRestriction {
             "Secret" => {
                 // Only Get/List: validating phase doesn't see Get; but on
                 // Create/Update by node user we deny.
-                if matches!(req.operation, Operation::Create | Operation::Update | Operation::Delete) {
-                    return Self::deny(req,
-                        format!("node {} cannot mutate secrets", node_name));
+                if matches!(
+                    req.operation,
+                    Operation::Create | Operation::Update | Operation::Delete
+                ) {
+                    return Self::deny(req, format!("node {} cannot mutate secrets", node_name));
                 }
-                if !refs.secrets.contains(&(req.namespace.clone(), req.name.clone())) {
-                    return Self::deny(req,
-                        format!("node {} cannot access secret {}/{}",
-                                node_name, req.namespace, req.name));
+                if !refs
+                    .secrets
+                    .contains(&(req.namespace.clone(), req.name.clone()))
+                {
+                    return Self::deny(
+                        req,
+                        format!(
+                            "node {} cannot access secret {}/{}",
+                            node_name, req.namespace, req.name
+                        ),
+                    );
                 }
                 AdmissionResponse::allow(req)
             }
             "ConfigMap" => {
-                if matches!(req.operation, Operation::Create | Operation::Update | Operation::Delete) {
-                    return Self::deny(req,
-                        format!("node {} cannot mutate configmaps", node_name));
+                if matches!(
+                    req.operation,
+                    Operation::Create | Operation::Update | Operation::Delete
+                ) {
+                    return Self::deny(req, format!("node {} cannot mutate configmaps", node_name));
                 }
-                if !refs.configmaps.contains(&(req.namespace.clone(), req.name.clone())) {
-                    return Self::deny(req,
-                        format!("node {} cannot access configmap {}/{}",
-                                node_name, req.namespace, req.name));
+                if !refs
+                    .configmaps
+                    .contains(&(req.namespace.clone(), req.name.clone()))
+                {
+                    return Self::deny(
+                        req,
+                        format!(
+                            "node {} cannot access configmap {}/{}",
+                            node_name, req.namespace, req.name
+                        ),
+                    );
                 }
                 AdmissionResponse::allow(req)
             }
             "Lease" => {
                 // kube-node-lease ns + own-name only
                 if req.namespace != "kube-node-lease" {
-                    return Self::deny(req,
-                        format!("node {} can only mutate Leases in kube-node-lease", node_name));
+                    return Self::deny(
+                        req,
+                        format!(
+                            "node {} can only mutate Leases in kube-node-lease",
+                            node_name
+                        ),
+                    );
                 }
                 if req.name != node_name {
-                    return Self::deny(req,
-                        format!("node {} cannot mutate other node's lease {}", node_name, req.name));
+                    return Self::deny(
+                        req,
+                        format!(
+                            "node {} cannot mutate other node's lease {}",
+                            node_name, req.name
+                        ),
+                    );
                 }
                 AdmissionResponse::allow(req)
             }
             "CSINode" => {
                 if req.name != node_name {
-                    return Self::deny(req,
-                        format!("node {} cannot mutate other CSINode {}", node_name, req.name));
+                    return Self::deny(
+                        req,
+                        format!(
+                            "node {} cannot mutate other CSINode {}",
+                            node_name, req.name
+                        ),
+                    );
                 }
                 AdmissionResponse::allow(req)
             }
@@ -170,7 +218,9 @@ impl ValidatingWebhook for NodeRestriction {
 /// Mutating no-op so NodeRestriction can also slot into the mutating chain
 /// (upstream registers it for both phases and emits no patches).
 impl MutatingWebhook for NodeRestriction {
-    fn name(&self) -> &str { "NodeRestriction.Mutating" }
+    fn name(&self) -> &str {
+        "NodeRestriction.Mutating"
+    }
     fn admit(&self, req: &mut AdmissionRequest) -> AdmissionResponse {
         // Mutation gate: validating-phase does the heavy lifting; here we just
         // mirror the deny path for Create/Update on the same kinds.

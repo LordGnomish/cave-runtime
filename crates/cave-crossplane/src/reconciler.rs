@@ -2,11 +2,11 @@
 // Copyright 2026 Cave Runtime contributors
 //! Reconcile queue for resource reconciliation.
 
-use std::collections::VecDeque;
-use std::sync::Arc;
 use crate::error::{CrossplaneError, CrossplaneResult};
 use crate::models::{ReconcileItem, ReconcileStatus};
 use chrono::Utc;
+use std::collections::VecDeque;
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -46,9 +46,9 @@ impl ReconcileQueue {
     /// Dequeue the next pending item, marking it as Running.
     pub async fn dequeue(&self) -> Option<ReconcileItem> {
         let mut queue = self.inner.lock().await;
-        let pos = queue.iter().position(|i| {
-            matches!(i.status, ReconcileStatus::Pending)
-        })?;
+        let pos = queue
+            .iter()
+            .position(|i| matches!(i.status, ReconcileStatus::Pending))?;
         let mut item = queue.remove(pos)?;
         item.status = ReconcileStatus::Running;
         item.updated_at = Utc::now();

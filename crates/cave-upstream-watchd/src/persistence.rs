@@ -175,11 +175,7 @@ mod tests {
         let leftover: Vec<_> = std::fs::read_dir(dir.path())
             .unwrap()
             .filter_map(Result::ok)
-            .filter(|e| {
-                e.file_name()
-                    .to_string_lossy()
-                    .starts_with(".state.json")
-            })
+            .filter(|e| e.file_name().to_string_lossy().starts_with(".state.json"))
             .collect();
         assert!(leftover.is_empty());
     }

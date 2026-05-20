@@ -162,13 +162,7 @@ pub fn parse_otlp_json(body: &[u8], tenant_id: &str) -> Result<Vec<Span>> {
 
         for ss in scope_spans_iter {
             for span in ss.spans.unwrap_or_default() {
-                match convert_span(
-                    span,
-                    &service_name,
-                    &resource_attrs,
-                    &log_labels,
-                    tenant_id,
-                ) {
+                match convert_span(span, &service_name, &resource_attrs, &log_labels, tenant_id) {
                     Ok(s) => out.push(s),
                     Err(e) => tracing::warn!("OTLP span parse error: {}", e),
                 }
@@ -187,7 +181,7 @@ fn convert_span(
     tenant_id: &str,
 ) -> Result<Span> {
     let trace_id = crate::types::parse_trace_id(&s.trace_id)?;
-    let span_id  = crate::types::parse_span_id(&s.span_id)?;
+    let span_id = crate::types::parse_span_id(&s.span_id)?;
 
     let parent_span_id = s
         .parent_span_id
@@ -197,11 +191,21 @@ fn convert_span(
         .transpose()?;
 
     let start_ns = parse_nano_ts(&s.start_time_unix_nano);
-    let end_ns   = parse_nano_ts(&s.end_time_unix_nano);
+    let end_ns = parse_nano_ts(&s.end_time_unix_nano);
 
-    let tags = s.attributes.as_deref().map(parse_attributes).unwrap_or_default();
-    let events = s.events.unwrap_or_default().into_iter().map(parse_event).collect();
-    let links = s.links
+    let tags = s
+        .attributes
+        .as_deref()
+        .map(parse_attributes)
+        .unwrap_or_default();
+    let events = s
+        .events
+        .unwrap_or_default()
+        .into_iter()
+        .map(parse_event)
+        .collect();
+    let links = s
+        .links
         .unwrap_or_default()
         .into_iter()
         .map(parse_link)
@@ -255,19 +259,31 @@ fn parse_nano_ts(v: &Option<serde_json::Value>) -> u64 {
 fn parse_attributes(kvs: &[KeyValue]) -> HashMap<String, TagValue> {
     kvs.iter()
         .filter_map(|kv| {
-            kv.value.as_ref().map(|v| (kv.key.clone(), any_value_to_tag(v)))
+            kv.value
+                .as_ref()
+                .map(|v| (kv.key.clone(), any_value_to_tag(v)))
         })
         .collect()
 }
 
 fn any_value_to_tag(v: &AnyValue) -> TagValue {
-    if let Some(s) = &v.string_value { return TagValue::String(s.clone()); }
-    if let Some(b) = v.bool_value    { return TagValue::Bool(b); }
-    if let Some(d) = v.double_value  { return TagValue::Float(d); }
+    if let Some(s) = &v.string_value {
+        return TagValue::String(s.clone());
+    }
+    if let Some(b) = v.bool_value {
+        return TagValue::Bool(b);
+    }
+    if let Some(d) = v.double_value {
+        return TagValue::Float(d);
+    }
     if let Some(n) = &v.int_value {
-        if let Some(i) = n.as_i64() { return TagValue::Int(i); }
+        if let Some(i) = n.as_i64() {
+            return TagValue::Int(i);
+        }
         if let Some(s) = n.as_str() {
-            if let Ok(i) = s.parse::<i64>() { return TagValue::Int(i); }
+            if let Ok(i) = s.parse::<i64>() {
+                return TagValue::Int(i);
+            }
         }
     }
     if let Some(bs) = &v.bytes_value {
@@ -278,7 +294,10 @@ fn any_value_to_tag(v: &AnyValue) -> TagValue {
     }
     if let Some(arr) = &v.array_value {
         let elems = arr.values.as_deref().unwrap_or(&[]);
-        let s: Vec<String> = elems.iter().map(|av| any_value_to_tag(av).display()).collect();
+        let s: Vec<String> = elems
+            .iter()
+            .map(|av| any_value_to_tag(av).display())
+            .collect();
         return TagValue::String(format!("[{}]", s.join(",")));
     }
     TagValue::String(String::new())
@@ -288,7 +307,11 @@ fn parse_event(e: OtlpEvent) -> SpanEvent {
     SpanEvent {
         time_unix_nano: parse_nano_ts(&e.time_unix_nano),
         name: e.name,
-        attributes: e.attributes.as_deref().map(parse_attributes).unwrap_or_default(),
+        attributes: e
+            .attributes
+            .as_deref()
+            .map(parse_attributes)
+            .unwrap_or_default(),
     }
 }
 
@@ -297,7 +320,11 @@ fn parse_link(l: OtlpLink) -> Result<SpanLink> {
         trace_id: crate::types::parse_trace_id(&l.trace_id)?,
         span_id: crate::types::parse_span_id(&l.span_id)?,
         trace_state: l.trace_state.unwrap_or_default(),
-        attributes: l.attributes.as_deref().map(parse_attributes).unwrap_or_default(),
+        attributes: l
+            .attributes
+            .as_deref()
+            .map(parse_attributes)
+            .unwrap_or_default(),
     })
 }
 
@@ -394,7 +421,10 @@ mod tests {
     fn parse_otlp_json_tag_types() {
         let spans = parse_otlp_json(OTLP_JSON.as_bytes(), "default").unwrap();
         let span = &spans[0];
-        assert_eq!(span.tags.get("http.method"), Some(&TagValue::String("GET".into())));
+        assert_eq!(
+            span.tags.get("http.method"),
+            Some(&TagValue::String("GET".into()))
+        );
         assert_eq!(span.tags.get("http.status_code"), Some(&TagValue::Int(200)));
     }
 

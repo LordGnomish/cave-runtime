@@ -20,16 +20,14 @@
 //! the test still asserts the same observable property.
 
 use cave_scheduler::framework::{
-    ClusterSnapshot, Code, FilterPlugin, MAX_NODE_SCORE, NodeAffinitySpec,
-    NodeSelectorOp, NodeSelectorRequirement, NodeSelectorTerm, Pod, ScorePlugin,
+    ClusterSnapshot, Code, FilterPlugin, NodeAffinitySpec, NodeSelectorOp, NodeSelectorRequirement,
+    NodeSelectorTerm, Pod, ScorePlugin, MAX_NODE_SCORE,
 };
-use cave_scheduler::models::{
-    Node, NodeStatus, ResourceCapacity, Taint, TaintEffect, Toleration,
-};
+use cave_scheduler::models::{Node, NodeStatus, ResourceCapacity, Taint, TaintEffect, Toleration};
 use cave_scheduler::plugins::{
-    IMAGE_LOCALITY_MAX_THRESHOLD_PER_CONTAINER, IMAGE_LOCALITY_MIN_THRESHOLD, ImageLocality,
-    ImageStateSummary, NodeAffinity, NodeImageStates, NodeName, NodeUnschedulable, Resources,
-    TaintToleration,
+    ImageLocality, ImageStateSummary, NodeAffinity, NodeImageStates, NodeName, NodeUnschedulable,
+    Resources, TaintToleration, IMAGE_LOCALITY_MAX_THRESHOLD_PER_CONTAINER,
+    IMAGE_LOCALITY_MIN_THRESHOLD,
 };
 use chrono::Utc;
 use std::collections::HashMap;
@@ -98,10 +96,7 @@ fn upstream_image_locality_40mb_one_of_ten_below_threshold() {
     pod.spec.container_images = vec!["debian:12".into()];
     let mut il = ImageLocality::new();
     il.total_nodes = 10;
-    il.update_node_images(
-        "a",
-        image_states(&[("debian:12", 40 * 1024 * 1024, 1)]),
-    );
+    il.update_node_images("a", image_states(&[("debian:12", 40 * 1024 * 1024, 1)]));
     let score = il.score(&pod, &make_node("a"), &empty_snap(vec![]));
     // Below the min threshold after spread scaling → clamped to 0.
     assert_eq!(score, 0, "expected 0, got {score}");
@@ -116,10 +111,7 @@ fn upstream_image_locality_250mb_single_node_linear() {
     pod.spec.container_images = vec!["fluentd:1.16".into()];
     let mut il = ImageLocality::new();
     il.total_nodes = 1;
-    il.update_node_images(
-        "a",
-        image_states(&[("fluentd:1.16", 250 * 1024 * 1024, 1)]),
-    );
+    il.update_node_images("a", image_states(&[("fluentd:1.16", 250 * 1024 * 1024, 1)]));
     let score = il.score(&pod, &make_node("a"), &empty_snap(vec![]));
     assert!(
         score > 0 && score < MAX_NODE_SCORE,
@@ -137,10 +129,7 @@ fn upstream_image_locality_2000mb_single_node_saturates() {
     pod.spec.container_images = vec!["postgres:16".into()];
     let mut il = ImageLocality::new();
     il.total_nodes = 1;
-    il.update_node_images(
-        "a",
-        image_states(&[("postgres:16", 2000 * 1024 * 1024, 1)]),
-    );
+    il.update_node_images("a", image_states(&[("postgres:16", 2000 * 1024 * 1024, 1)]));
     let score = il.score(&pod, &make_node("a"), &empty_snap(vec![]));
     assert_eq!(score, MAX_NODE_SCORE);
 }
@@ -152,10 +141,7 @@ fn upstream_image_locality_no_images_in_pod() {
     let pod = Pod::new("t", "ns", "p"); // no container_images set
     let mut il = ImageLocality::new();
     il.total_nodes = 5;
-    il.update_node_images(
-        "a",
-        image_states(&[("anything:1", 500 * 1024 * 1024, 5)]),
-    );
+    il.update_node_images("a", image_states(&[("anything:1", 500 * 1024 * 1024, 5)]));
     assert_eq!(il.score(&pod, &make_node("a"), &empty_snap(vec![])), 0);
 }
 
@@ -220,11 +206,9 @@ fn upstream_taint_toleration_exists_operator_tolerates_any_value() {
         value: None,
         effect: Some(TaintEffect::NoSchedule),
     });
-    assert!(
-        TaintToleration
-            .filter(&pod, &node, &empty_snap(vec![]))
-            .is_success()
-    );
+    assert!(TaintToleration
+        .filter(&pod, &node, &empty_snap(vec![]))
+        .is_success());
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -284,11 +268,9 @@ fn upstream_node_unschedulable_cordoned_with_toleration_passes() {
         value: None,
         effect: None,
     });
-    assert!(
-        NodeUnschedulable
-            .filter(&pod, &node, &empty_snap(vec![]))
-            .is_success()
-    );
+    assert!(NodeUnschedulable
+        .filter(&pod, &node, &empty_snap(vec![]))
+        .is_success());
 }
 
 // ────────────────────────────────────────────────────────────────────────────

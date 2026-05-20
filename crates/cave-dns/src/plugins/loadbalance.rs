@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
 /// Loadbalance plugin — round-robin shuffle of A/AAAA answer records.
-use std::sync::{atomic::{AtomicUsize, Ordering}, Arc};
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 
 use async_trait::async_trait;
 use dashmap::DashMap;

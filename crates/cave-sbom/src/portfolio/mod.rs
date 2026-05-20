@@ -36,13 +36,19 @@ impl ProjectRisk {
         components: &[ComponentRecord],
         vulns: &[VulnIntel],
     ) -> Self {
-        let mut out = ProjectRisk { project_uuid, ..Default::default() };
+        let mut out = ProjectRisk {
+            project_uuid,
+            ..Default::default()
+        };
         let mut vulnerable_set: HashSet<Uuid> = HashSet::new();
         // Pre-index vulns by lowercase component-name for O(1) lookup.
         let mut by_name: HashMap<String, Vec<&VulnIntel>> = HashMap::new();
         for v in vulns {
             for a in &v.affected {
-                by_name.entry(a.name.to_ascii_lowercase()).or_default().push(v);
+                by_name
+                    .entry(a.name.to_ascii_lowercase())
+                    .or_default()
+                    .push(v);
             }
         }
         for c in components.iter().filter(|c| c.project_uuid == project_uuid) {
@@ -92,11 +98,17 @@ impl PortfolioSnapshot {
             .iter()
             .map(|p| ProjectRisk::compute(*p, components, vulns))
             .collect();
-        Self { taken_at: now, per_project }
+        Self {
+            taken_at: now,
+            per_project,
+        }
     }
 
     pub fn total_vulnerable(&self) -> u32 {
-        self.per_project.iter().map(|p| p.vulnerable_components).sum()
+        self.per_project
+            .iter()
+            .map(|p| p.vulnerable_components)
+            .sum()
     }
 
     pub fn total_critical(&self) -> u32 {
@@ -107,7 +119,10 @@ impl PortfolioSnapshot {
 /// Trend buckets — given a chronological series of snapshots, return the
 /// (timestamp, vulnerable_component_count) pairs.
 pub fn vulnerable_trend(series: &[PortfolioSnapshot]) -> Vec<(DateTime<Utc>, u32)> {
-    series.iter().map(|s| (s.taken_at, s.total_vulnerable())).collect()
+    series
+        .iter()
+        .map(|s| (s.taken_at, s.total_vulnerable()))
+        .collect()
 }
 
 #[cfg(test)]
@@ -163,7 +178,11 @@ mod tests {
     #[test]
     fn project_risk_buckets_by_severity() {
         let p = Uuid::new_v4();
-        let recs = vec![mk_comp(p, "openssl"), mk_comp(p, "lodash"), mk_comp(p, "safe")];
+        let recs = vec![
+            mk_comp(p, "openssl"),
+            mk_comp(p, "lodash"),
+            mk_comp(p, "safe"),
+        ];
         let vulns = vec![
             mk_vuln("openssl", Severity::Critical),
             mk_vuln("lodash", Severity::High),
@@ -191,7 +210,10 @@ mod tests {
         let p1 = Uuid::new_v4();
         let p2 = Uuid::new_v4();
         let recs = vec![mk_comp(p1, "openssl"), mk_comp(p2, "lodash")];
-        let vulns = vec![mk_vuln("openssl", Severity::Critical), mk_vuln("lodash", Severity::High)];
+        let vulns = vec![
+            mk_vuln("openssl", Severity::Critical),
+            mk_vuln("lodash", Severity::High),
+        ];
         let r1 = ProjectRisk::compute(p1, &recs, &vulns);
         assert_eq!(r1.total_components, 1);
         assert_eq!(r1.critical, 1);
@@ -203,7 +225,10 @@ mod tests {
         let p1 = Uuid::new_v4();
         let p2 = Uuid::new_v4();
         let recs = vec![mk_comp(p1, "openssl"), mk_comp(p2, "lodash")];
-        let vulns = vec![mk_vuln("openssl", Severity::Critical), mk_vuln("lodash", Severity::High)];
+        let vulns = vec![
+            mk_vuln("openssl", Severity::Critical),
+            mk_vuln("lodash", Severity::High),
+        ];
         let s = PortfolioSnapshot::take(&[p1, p2], &recs, &vulns, Utc::now());
         assert_eq!(s.total_vulnerable(), 2);
         assert_eq!(s.total_critical(), 1);
@@ -212,7 +237,10 @@ mod tests {
     #[test]
     fn vulnerable_trend_pairs_timestamps_to_counts() {
         let now = Utc::now();
-        let s1 = PortfolioSnapshot { taken_at: now - Duration::days(7), per_project: vec![] };
+        let s1 = PortfolioSnapshot {
+            taken_at: now - Duration::days(7),
+            per_project: vec![],
+        };
         let s2 = PortfolioSnapshot {
             taken_at: now,
             per_project: vec![ProjectRisk {

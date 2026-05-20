@@ -24,13 +24,19 @@ fn gf_mul(mut a: u8, mut b: u8) -> u8 {
 }
 
 fn gf_div(a: u8, b: u8) -> u8 {
-    if b == 0 { panic!("division by zero in GF(256)"); }
-    if a == 0 { return 0; }
+    if b == 0 {
+        panic!("division by zero in GF(256)");
+    }
+    if a == 0 {
+        return 0;
+    }
     gf_mul(a, gf_inv(b))
 }
 
 fn gf_inv(a: u8) -> u8 {
-    if a == 0 { return 0; }
+    if a == 0 {
+        return 0;
+    }
     let mut r: u8 = 1;
     let mut base = a;
     let mut exp: u8 = 254;
@@ -47,7 +53,9 @@ fn gf_inv(a: u8) -> u8 {
 /// Split `secret` bytes into `n` shares of which any `k` can reconstruct.
 pub fn split_secret(secret: &[u8], n: u8, k: u8) -> VaultResult<Vec<Vec<u8>>> {
     if k < 2 || k > n {
-        return Err(VaultError::InvalidRequest("invalid share parameters".into()));
+        return Err(VaultError::InvalidRequest(
+            "invalid share parameters".into(),
+        ));
     }
     let rng = SystemRandom::new();
     let mut shares: Vec<Vec<u8>> = (1..=n).map(|i| vec![i]).collect();
@@ -55,13 +63,14 @@ pub fn split_secret(secret: &[u8], n: u8, k: u8) -> VaultResult<Vec<Vec<u8>>> {
     for &secret_byte in secret {
         let mut coeffs = vec![secret_byte];
         let mut rand_bytes = vec![0u8; (k - 1) as usize];
-        rng.fill(&mut rand_bytes).map_err(|_| VaultError::Crypto("rng failure".into()))?;
+        rng.fill(&mut rand_bytes)
+            .map_err(|_| VaultError::Crypto("rng failure".into()))?;
         coeffs.extend_from_slice(&rand_bytes);
 
         for (i, share) in shares.iter_mut().enumerate() {
             let x = (i + 1) as u8;
             let mut y = coeffs[coeffs.len() - 1];
-            for &c in coeffs[..coeffs.len()-1].iter().rev() {
+            for &c in coeffs[..coeffs.len() - 1].iter().rev() {
                 y = gf_mul(y, x) ^ c;
             }
             share.push(y);
@@ -77,7 +86,9 @@ pub fn combine_shares(shares: &[Vec<u8>]) -> VaultResult<Vec<u8>> {
     }
     let secret_len = shares[0].len() - 1;
     if shares.iter().any(|s| s.len() - 1 != secret_len) {
-        return Err(VaultError::InvalidRequest("shares have inconsistent length".into()));
+        return Err(VaultError::InvalidRequest(
+            "shares have inconsistent length".into(),
+        ));
     }
     let xs: Vec<u8> = shares.iter().map(|s| s[0]).collect();
     let mut secret = Vec::with_capacity(secret_len);
@@ -156,15 +167,19 @@ impl SealState {
         Self::validate_threshold(shares, threshold)?;
         let rng = SystemRandom::new();
         let mut master_key = vec![0u8; 32];
-        rng.fill(&mut master_key).map_err(|_| VaultError::Crypto("rng failure".into()))?;
+        rng.fill(&mut master_key)
+            .map_err(|_| VaultError::Crypto("rng failure".into()))?;
 
         let share_bytes = split_secret(&master_key, shares, threshold)?;
         let hex_shares: Vec<String> = share_bytes.iter().map(|s| hex::encode(s)).collect();
 
         let mut root_token_bytes = vec![0u8; 16];
-        rng.fill(&mut root_token_bytes).map_err(|_| VaultError::Crypto("rng failure".into()))?;
-        let root_token = format!("hvs.{}", base64::engine::general_purpose::URL_SAFE_NO_PAD
-            .encode(&root_token_bytes));
+        rng.fill(&mut root_token_bytes)
+            .map_err(|_| VaultError::Crypto("rng failure".into()))?;
+        let root_token = format!(
+            "hvs.{}",
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&root_token_bytes)
+        );
 
         self.initialized = true;
         self.threshold = threshold;
@@ -266,13 +281,13 @@ impl AutoSealType {
     /// Cite: openbao `vault/seal_autoseal.go:104` (BarrierType).
     pub fn barrier_type(&self) -> &'static str {
         match self {
-            Self::Transit       => "transit",
+            Self::Transit => "transit",
             Self::AzureKeyVault => "azurekeyvault",
-            Self::AwsKms        => "awskms",
-            Self::GcpCkms       => "gcpckms",
-            Self::OciKms        => "ocikms",
-            Self::Pkcs11        => "pkcs11",
-            Self::Shamir        => "shamir",
+            Self::AwsKms => "awskms",
+            Self::GcpCkms => "gcpckms",
+            Self::OciKms => "ocikms",
+            Self::Pkcs11 => "pkcs11",
+            Self::Shamir => "shamir",
         }
     }
 
@@ -362,7 +377,8 @@ mod tests {
         let shares = split_secret(secret, 5, 3).unwrap();
         assert_eq!(shares.len(), 5);
 
-        let reconstructed = combine_shares(&[shares[0].clone(), shares[2].clone(), shares[4].clone()]).unwrap();
+        let reconstructed =
+            combine_shares(&[shares[0].clone(), shares[2].clone(), shares[4].clone()]).unwrap();
         assert_eq!(reconstructed, secret);
     }
 

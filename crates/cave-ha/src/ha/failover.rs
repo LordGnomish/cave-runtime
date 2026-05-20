@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 use tracing::{info, warn};
 
 use crate::error::HaResult;
@@ -120,11 +120,7 @@ impl FailoverManager {
             if current_leader != self.last_leader {
                 // Leadership changed.
                 if let Some(new_leader) = current_leader {
-                    info!(
-                        new_leader,
-                        term = status.term,
-                        "new leader elected"
-                    );
+                    info!(new_leader, term = status.term, "new leader elected");
                     let _ = self.event_tx.send(FailoverEvent::LeaderElected {
                         new_leader,
                         term: status.term,
@@ -138,7 +134,8 @@ impl FailoverManager {
             let elapsed = self.last_leader_seen.elapsed();
             if elapsed > self.config.leader_loss_timeout {
                 // Check if we already triggered a failover recently.
-                let can_failover = self.last_failover
+                let can_failover = self
+                    .last_failover
                     .map(|t| t.elapsed() > self.config.failover_backoff)
                     .unwrap_or(true);
                 if can_failover {
@@ -179,7 +176,9 @@ impl FailoverManager {
             return Ok(()); // Not the leader.
         }
         let health = self.health.read().await;
-        let candidates: Vec<NodeId> = status.membership.voters
+        let candidates: Vec<NodeId> = status
+            .membership
+            .voters
             .iter()
             .filter(|&&id| id != self.local_id)
             .copied()

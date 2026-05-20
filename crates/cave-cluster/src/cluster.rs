@@ -75,10 +75,7 @@ pub struct Cluster {
 impl Cluster {
     pub fn new(spec: ClusterSpec, created_by: String) -> Self {
         let id = Uuid::new_v4();
-        let api_endpoint = format!(
-            "https://{}.cave-cluster.internal:6443",
-            spec.name
-        );
+        let api_endpoint = format!("https://{}.cave-cluster.internal:6443", spec.name);
         Self {
             id,
             spec,
@@ -208,11 +205,7 @@ impl ClusterStore {
         Ok(())
     }
 
-    pub fn upgrade(
-        &self,
-        name: &str,
-        target_version: &str,
-    ) -> ClusterResult<Cluster> {
+    pub fn upgrade(&self, name: &str, target_version: &str) -> ClusterResult<Cluster> {
         let mut cluster = self
             .clusters
             .get_mut(name)
@@ -302,7 +295,10 @@ mod tests {
     fn duplicate_cluster_fails() {
         let s = store();
         s.create(create_req("dup"), "alice").unwrap();
-        assert!(matches!(s.create(create_req("dup"), "bob"), Err(ClusterError::AlreadyExists(_))));
+        assert!(matches!(
+            s.create(create_req("dup"), "bob"),
+            Err(ClusterError::AlreadyExists(_))
+        ));
     }
 
     #[test]

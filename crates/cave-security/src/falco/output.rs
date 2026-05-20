@@ -94,7 +94,7 @@ pub fn format_alert_text(alert: &Alert) -> String {
     format!(
         "{} [{}] {} — {}",
         alert.timestamp.format("%Y-%m-%dT%H:%M:%SZ"),
-        alert.priority,   // uses Display → "WARNING", "CRITICAL", etc.
+        alert.priority, // uses Display → "WARNING", "CRITICAL", etc.
         alert.rule_name,
         alert.output,
     )

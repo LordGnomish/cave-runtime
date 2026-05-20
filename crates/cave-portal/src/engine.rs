@@ -73,7 +73,12 @@ mod tests {
     #[test]
     fn test_search_by_tag_found() {
         let services = vec![
-            make_service("svc-a", "platform", ServiceTier::Tier1, vec!["critical", "payments"]),
+            make_service(
+                "svc-a",
+                "platform",
+                ServiceTier::Tier1,
+                vec!["critical", "payments"],
+            ),
             make_service("svc-b", "data", ServiceTier::Tier2, vec!["analytics"]),
         ];
         let found = search_by_tag(&services, "payments");
@@ -83,9 +88,12 @@ mod tests {
 
     #[test]
     fn test_search_by_tag_not_found() {
-        let services = vec![
-            make_service("svc-a", "platform", ServiceTier::Tier1, vec!["critical"]),
-        ];
+        let services = vec![make_service(
+            "svc-a",
+            "platform",
+            ServiceTier::Tier1,
+            vec!["critical"],
+        )];
         let found = search_by_tag(&services, "nonexistent");
         assert!(found.is_empty());
     }

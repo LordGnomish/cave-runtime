@@ -79,7 +79,11 @@ pub fn parse(bytes: &[u8]) -> Result<(Vulnerability, Vec<Advisory>)> {
     let sev_str = r
         .affected
         .iter()
-        .find_map(|a| a.database_specific.as_ref().and_then(|d| d.severity.clone()))
+        .find_map(|a| {
+            a.database_specific
+                .as_ref()
+                .and_then(|d| d.severity.clone())
+        })
         .unwrap_or_else(|| {
             r.severity
                 .iter()

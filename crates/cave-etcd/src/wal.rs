@@ -90,10 +90,7 @@ pub enum WalError {
 pub enum WalRecord {
     /// Cluster identity — written once at WAL creation, mirrors etcd's
     /// `metadataType` record.
-    Metadata {
-        cluster_id: u64,
-        node_id: u64,
-    },
+    Metadata { cluster_id: u64, node_id: u64 },
     /// Per-mutation entry — bulk of the log. Index is monotonically
     /// increasing across the entire lifetime of the WAL.
     Entry(EntryRecord),
@@ -183,8 +180,7 @@ impl Wal {
         // Replay to discover state. We also truncate any trailing
         // partial record so subsequent appends land at a clean
         // boundary.
-        let (last_entry_index, record_count, valid_end) =
-            scan_for_valid_end(&path)?;
+        let (last_entry_index, record_count, valid_end) = scan_for_valid_end(&path)?;
         if valid_end < file.metadata()?.len() {
             file.set_len(valid_end)?;
         }
@@ -427,9 +423,7 @@ pub fn replay_into_store(wal: &Wal, store: &crate::store::KvStore) {
 }
 
 fn apply_op(store: &crate::store::KvStore, op: &WalOp) {
-    use crate::models::{
-        CompactionRequest, DeleteRangeRequest, LeaseGrantRequest, PutRequest,
-    };
+    use crate::models::{CompactionRequest, DeleteRangeRequest, LeaseGrantRequest, PutRequest};
     match op {
         WalOp::Put { key, value, lease } => {
             let req = PutRequest {
@@ -565,8 +559,17 @@ mod tests {
         w.append_entry(3, put("k", "v")).unwrap();
         let recs = w.replay().unwrap();
         assert_eq!(recs.len(), 3);
-        assert!(matches!(&recs[0], WalRecord::Metadata { cluster_id: 42, .. }));
-        assert!(matches!(&recs[1], WalRecord::State { commit_index: 100, .. }));
+        assert!(matches!(
+            &recs[0],
+            WalRecord::Metadata { cluster_id: 42, .. }
+        ));
+        assert!(matches!(
+            &recs[1],
+            WalRecord::State {
+                commit_index: 100,
+                ..
+            }
+        ));
         assert!(matches!(&recs[2], WalRecord::Entry(_)));
     }
 
@@ -650,7 +653,8 @@ mod tests {
         })
         .unwrap();
         for i in 1..=5 {
-            w.append_entry(1, put(&format!("k{i}"), &format!("v{i}"))).unwrap();
+            w.append_entry(1, put(&format!("k{i}"), &format!("v{i}")))
+                .unwrap();
         }
         w.truncate_through(3).unwrap();
         let recs = w.replay().unwrap();
@@ -733,13 +737,20 @@ mod tests {
             },
         )
         .unwrap();
-        w.append_entry(1, WalOp::LeaseRevoke { lease_id: 9001 }).unwrap();
+        w.append_entry(1, WalOp::LeaseRevoke { lease_id: 9001 })
+            .unwrap();
         w.append_entry(1, WalOp::Compact { revision: 42 }).unwrap();
         let recs = w.replay().unwrap();
         assert_eq!(recs.len(), 3);
         match &recs[0] {
             WalRecord::Entry(e) => {
-                assert!(matches!(&e.op, WalOp::LeaseGrant { lease_id: 9001, ttl_seconds: 60 }));
+                assert!(matches!(
+                    &e.op,
+                    WalOp::LeaseGrant {
+                        lease_id: 9001,
+                        ttl_seconds: 60
+                    }
+                ));
             }
             _ => panic!(),
         }
@@ -776,7 +787,11 @@ mod tests {
         let dir = tempdir().unwrap();
         let mut w = Wal::open(dir.path()).unwrap();
         assert_eq!(w.record_count(), 0);
-        w.append(&WalRecord::Metadata { cluster_id: 1, node_id: 1 }).unwrap();
+        w.append(&WalRecord::Metadata {
+            cluster_id: 1,
+            node_id: 1,
+        })
+        .unwrap();
         assert_eq!(w.record_count(), 1);
         w.append_entry(1, put("a", "1")).unwrap();
         assert_eq!(w.record_count(), 2);

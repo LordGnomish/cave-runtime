@@ -22,7 +22,7 @@
 //! The actual TLS handshake / connection accept loop lives in
 //! [`crate::server`]; this module is the configuration surface only.
 
-use rustls_pemfile::{certs, pkcs8_private_keys, rsa_private_keys, ec_private_keys};
+use rustls_pemfile::{certs, ec_private_keys, pkcs8_private_keys, rsa_private_keys};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -267,28 +267,40 @@ mod tests {
         let mut cfg = TlsListenerConfig::new("crt", "key");
         cfg.plain_port = Some(6380);
         cfg.tls_port = 6380;
-        assert!(matches!(cfg.validate().unwrap_err(), TlsConfigError::PortConflict { .. }));
+        assert!(matches!(
+            cfg.validate().unwrap_err(),
+            TlsConfigError::PortConflict { .. }
+        ));
     }
 
     #[test]
     fn config_rejects_unknown_alpn() {
         let mut cfg = TlsListenerConfig::new("crt", "key");
         cfg.alpn_protocols = vec!["resp99".into()];
-        assert!(matches!(cfg.validate().unwrap_err(), TlsConfigError::UnsupportedAlpn(_)));
+        assert!(matches!(
+            cfg.validate().unwrap_err(),
+            TlsConfigError::UnsupportedAlpn(_)
+        ));
     }
 
     #[test]
     fn config_rejects_unknown_tls_version() {
         let mut cfg = TlsListenerConfig::new("crt", "key");
         cfg.allowed_protocols = vec!["TLSv1.0".into()];
-        assert!(matches!(cfg.validate().unwrap_err(), TlsConfigError::Invalid(_)));
+        assert!(matches!(
+            cfg.validate().unwrap_err(),
+            TlsConfigError::Invalid(_)
+        ));
     }
 
     #[test]
     fn config_requires_ca_when_client_auth_enabled() {
         let mut cfg = TlsListenerConfig::new("crt", "key");
         cfg.client_auth = ClientAuth::Required;
-        assert!(matches!(cfg.validate().unwrap_err(), TlsConfigError::Invalid(_)));
+        assert!(matches!(
+            cfg.validate().unwrap_err(),
+            TlsConfigError::Invalid(_)
+        ));
     }
 
     #[test]
@@ -313,7 +325,10 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let p = dir.path().join("empty.pem");
         std::fs::write(&p, b"").unwrap();
-        assert!(matches!(load_cert_chain(&p).unwrap_err(), TlsConfigError::EmptyCertChain(_)));
+        assert!(matches!(
+            load_cert_chain(&p).unwrap_err(),
+            TlsConfigError::EmptyCertChain(_)
+        ));
     }
 
     #[test]
@@ -322,15 +337,25 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let p = dir.path().join("nocert.pem");
         std::fs::write(&p, b"# just a comment, no PEM blocks at all\n").unwrap();
-        assert!(matches!(load_cert_chain(&p).unwrap_err(), TlsConfigError::EmptyCertChain(_)));
+        assert!(matches!(
+            load_cert_chain(&p).unwrap_err(),
+            TlsConfigError::EmptyCertChain(_)
+        ));
     }
 
     #[test]
     fn load_private_key_rejects_no_key_block() {
         let dir = TempDir::new().unwrap();
         let p = dir.path().join("no-key.pem");
-        std::fs::write(&p, b"-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n").unwrap();
-        assert!(matches!(load_private_key(&p).unwrap_err(), TlsConfigError::NoPrivateKey(_)));
+        std::fs::write(
+            &p,
+            b"-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n",
+        )
+        .unwrap();
+        assert!(matches!(
+            load_private_key(&p).unwrap_err(),
+            TlsConfigError::NoPrivateKey(_)
+        ));
     }
 
     #[test]
@@ -351,7 +376,10 @@ mod tests {
         let (cert, key) = write_self_signed(&dir);
         let mut cfg = TlsListenerConfig::new(cert, key);
         cfg.alpn_protocols = vec!["bogus".into()];
-        assert!(matches!(cfg.load().unwrap_err(), TlsConfigError::UnsupportedAlpn(_)));
+        assert!(matches!(
+            cfg.load().unwrap_err(),
+            TlsConfigError::UnsupportedAlpn(_)
+        ));
     }
 
     #[test]

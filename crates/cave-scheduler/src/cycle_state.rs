@@ -60,7 +60,9 @@ impl CycleState {
 
     /// Read a clone of the value at `key`, downcast to `T`.
     pub fn read<T: Any + Send + Sync + Clone>(&self, key: &str) -> Option<T> {
-        self.data().get(key).and_then(|slot| slot.downcast_ref::<T>().cloned())
+        self.data()
+            .get(key)
+            .and_then(|slot| slot.downcast_ref::<T>().cloned())
     }
 
     /// Apply a closure to a mutable reference to the value at `key`.
@@ -85,19 +87,33 @@ impl CycleState {
     /// Mark a Filter plugin as skipped for the rest of the cycle. The
     /// framework consults this list before invoking each Filter plugin.
     pub fn mark_filter_skipped(&self, plugin: impl Into<String>) {
-        self.skip_filter_plugins.lock().expect("poisoned").push(plugin.into());
+        self.skip_filter_plugins
+            .lock()
+            .expect("poisoned")
+            .push(plugin.into());
     }
 
     pub fn should_skip_filter(&self, plugin: &str) -> bool {
-        self.skip_filter_plugins.lock().expect("poisoned").iter().any(|p| p == plugin)
+        self.skip_filter_plugins
+            .lock()
+            .expect("poisoned")
+            .iter()
+            .any(|p| p == plugin)
     }
 
     pub fn mark_score_skipped(&self, plugin: impl Into<String>) {
-        self.skip_score_plugins.lock().expect("poisoned").push(plugin.into());
+        self.skip_score_plugins
+            .lock()
+            .expect("poisoned")
+            .push(plugin.into());
     }
 
     pub fn should_skip_score(&self, plugin: &str) -> bool {
-        self.skip_score_plugins.lock().expect("poisoned").iter().any(|p| p == plugin)
+        self.skip_score_plugins
+            .lock()
+            .expect("poisoned")
+            .iter()
+            .any(|p| p == plugin)
     }
 }
 
@@ -127,9 +143,21 @@ mod tests {
     #[test]
     fn write_and_read_round_trip() {
         let s = CycleState::new();
-        s.write("foo", PreFilterPodInfo { cpu: 500, mem: 1024 });
+        s.write(
+            "foo",
+            PreFilterPodInfo {
+                cpu: 500,
+                mem: 1024,
+            },
+        );
         let got: PreFilterPodInfo = s.read("foo").unwrap();
-        assert_eq!(got, PreFilterPodInfo { cpu: 500, mem: 1024 });
+        assert_eq!(
+            got,
+            PreFilterPodInfo {
+                cpu: 500,
+                mem: 1024
+            }
+        );
     }
 
     #[test]
@@ -242,7 +270,9 @@ mod tests {
             entries: std::collections::HashMap<String, i64>,
         }
         let s = CycleState::new();
-        let mut cache = ScoreCache { entries: HashMap::new() };
+        let mut cache = ScoreCache {
+            entries: HashMap::new(),
+        };
         cache.entries.insert("nodeA".into(), 42);
         s.write("noderesources/scoreCache", cache.clone());
         let got: ScoreCache = s.read("noderesources/scoreCache").unwrap();

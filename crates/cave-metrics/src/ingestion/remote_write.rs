@@ -3,11 +3,11 @@
 //! Prometheus remote_write protocol: protobuf + Snappy compression.
 //! Compatible with Prometheus remote_write 1.0 and 2.0.
 
-use prost::Message;
-use snap::raw::{Decoder, Encoder};
+use super::IngestedBatch;
 use crate::error::{MetricsError, Result};
 use crate::model::{Labels, Sample, TimeSeries};
-use super::IngestedBatch;
+use prost::Message;
+use snap::raw::{Decoder, Encoder};
 
 // ─── Protobuf types (inline, no separate .proto file needed) ────────────────
 
@@ -111,9 +111,9 @@ pub struct LabelMatcher {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, prost::Enumeration)]
 #[repr(i32)]
 pub enum MatchType {
-    Eq  = 0,
+    Eq = 0,
     Neq = 1,
-    Re  = 2,
+    Re = 2,
     Nre = 3,
 }
 
@@ -134,13 +134,15 @@ pub struct QueryResult {
 /// Encode a WriteRequest as snappy-compressed protobuf bytes.
 pub fn encode_write_request(req: &WriteRequest) -> Result<Vec<u8>> {
     let proto_bytes = req.encode_to_vec();
-    Encoder::new().compress_vec(&proto_bytes)
+    Encoder::new()
+        .compress_vec(&proto_bytes)
         .map_err(|e| MetricsError::Ingestion(format!("snappy encode: {}", e)))
 }
 
 /// Decode a snappy-compressed protobuf WriteRequest.
 pub fn decode_write_request(body: &[u8]) -> Result<WriteRequest> {
-    let raw = Decoder::new().decompress_vec(body)
+    let raw = Decoder::new()
+        .decompress_vec(body)
         .map_err(|e| MetricsError::Ingestion(format!("snappy decode: {}", e)))?;
     WriteRequest::decode(raw.as_slice())
         .map_err(|e| MetricsError::Ingestion(format!("protobuf decode: {}", e)))
@@ -148,23 +150,45 @@ pub fn decode_write_request(body: &[u8]) -> Result<WriteRequest> {
 
 /// Convert a WriteRequest into our internal TimeSeries representation.
 pub fn write_request_to_batch(req: WriteRequest) -> IngestedBatch {
-    req.timeseries.into_iter().map(|pts| {
-        let labels = Labels::from_pairs(pts.labels.into_iter().map(|l| (l.name, l.value)));
-        let samples = pts.samples.into_iter().map(|s| Sample::new(s.timestamp, s.value)).collect();
-        TimeSeries { labels, samples }
-    }).collect()
+    req.timeseries
+        .into_iter()
+        .map(|pts| {
+            let labels = Labels::from_pairs(pts.labels.into_iter().map(|l| (l.name, l.value)));
+            let samples = pts
+                .samples
+                .into_iter()
+                .map(|s| Sample::new(s.timestamp, s.value))
+                .collect();
+            TimeSeries { labels, samples }
+        })
+        .collect()
 }
 
 /// Convert internal TimeSeries into a WriteRequest.
 pub fn batch_to_write_request(batch: IngestedBatch) -> WriteRequest {
     WriteRequest {
-        timeseries: batch.into_iter().map(|ts| {
-            ProtoTimeSeries {
-                labels: ts.labels.iter().map(|(k, v)| ProtoLabel { name: k.to_string(), value: v.to_string() }).collect(),
-                samples: ts.samples.into_iter().map(|s| ProtoSample { value: s.value, timestamp: s.timestamp_ms }).collect(),
+        timeseries: batch
+            .into_iter()
+            .map(|ts| ProtoTimeSeries {
+                labels: ts
+                    .labels
+                    .iter()
+                    .map(|(k, v)| ProtoLabel {
+                        name: k.to_string(),
+                        value: v.to_string(),
+                    })
+                    .collect(),
+                samples: ts
+                    .samples
+                    .into_iter()
+                    .map(|s| ProtoSample {
+                        value: s.value,
+                        timestamp: s.timestamp_ms,
+                    })
+                    .collect(),
                 exemplars: vec![],
-            }
-        }).collect(),
+            })
+            .collect(),
         metadata: vec![],
     }
 }
@@ -178,10 +202,19 @@ mod tests {
         let req = WriteRequest {
             timeseries: vec![ProtoTimeSeries {
                 labels: vec![
-                    ProtoLabel { name: "__name__".into(), value: "cpu_usage".into() },
-                    ProtoLabel { name: "job".into(), value: "test".into() },
+                    ProtoLabel {
+                        name: "__name__".into(),
+                        value: "cpu_usage".into(),
+                    },
+                    ProtoLabel {
+                        name: "job".into(),
+                        value: "test".into(),
+                    },
                 ],
-                samples: vec![ProtoSample { value: 0.75, timestamp: 1_700_000_000_000 }],
+                samples: vec![ProtoSample {
+                    value: 0.75,
+                    timestamp: 1_700_000_000_000,
+                }],
                 exemplars: vec![],
             }],
             metadata: vec![],

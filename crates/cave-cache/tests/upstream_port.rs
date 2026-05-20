@@ -106,10 +106,7 @@ fn upstream_list_rpush_lrange_preserves_insertion_order() {
     let mut db = Db::new();
     cmd_rpush(&args(&["rpush", "l", "a", "b", "c"]), &mut db).unwrap();
     let r = cmd_lrange(&args(&["lrange", "l", "0", "-1"]), &mut db).unwrap();
-    assert_eq!(
-        r,
-        Resp::array(vec![bulk("a"), bulk("b"), bulk("c")])
-    );
+    assert_eq!(r, Resp::array(vec![bulk("a"), bulk("b"), bulk("c")]));
 }
 
 /// Upstream: list.tcl / `LPUSH prepends elements`.
@@ -292,9 +289,18 @@ fn upstream_zset_zscore_returns_score_or_nil() {
 fn upstream_zset_zrank_returns_zero_indexed_position() {
     let mut db = Db::new();
     cmd_zadd(&args(&["zadd", "z", "1", "a", "2", "b", "3", "c"]), &mut db).unwrap();
-    assert_eq!(cmd_zrank(&args(&["zrank", "z", "a"]), &mut db).unwrap(), Resp::int(0));
-    assert_eq!(cmd_zrank(&args(&["zrank", "z", "b"]), &mut db).unwrap(), Resp::int(1));
-    assert_eq!(cmd_zrank(&args(&["zrank", "z", "c"]), &mut db).unwrap(), Resp::int(2));
+    assert_eq!(
+        cmd_zrank(&args(&["zrank", "z", "a"]), &mut db).unwrap(),
+        Resp::int(0)
+    );
+    assert_eq!(
+        cmd_zrank(&args(&["zrank", "z", "b"]), &mut db).unwrap(),
+        Resp::int(1)
+    );
+    assert_eq!(
+        cmd_zrank(&args(&["zrank", "z", "c"]), &mut db).unwrap(),
+        Resp::int(2)
+    );
     // Missing member → nil.
     let r = cmd_zrank(&args(&["zrank", "z", "missing"]), &mut db).unwrap();
     assert!(r.is_nil());
@@ -307,7 +313,10 @@ fn upstream_zset_zrem_removes_and_decrements_cardinality() {
     cmd_zadd(&args(&["zadd", "z", "1", "a", "2", "b"]), &mut db).unwrap();
     let r = cmd_zrem(&args(&["zrem", "z", "a", "nope"]), &mut db).unwrap();
     assert_eq!(r, Resp::int(1));
-    assert_eq!(cmd_zcard(&args(&["zcard", "z"]), &mut db).unwrap(), Resp::int(1));
+    assert_eq!(
+        cmd_zcard(&args(&["zcard", "z"]), &mut db).unwrap(),
+        Resp::int(1)
+    );
 }
 
 // ────────────────────────────────────────────────────────────────────────────

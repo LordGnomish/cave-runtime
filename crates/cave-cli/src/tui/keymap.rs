@@ -131,7 +131,10 @@ mod tests {
 
     #[test]
     fn j_moves_down() {
-        assert_eq!(default_keymap(Mode::Normal, Key::Char('j')), KeyAction::Move(1));
+        assert_eq!(
+            default_keymap(Mode::Normal, Key::Char('j')),
+            KeyAction::Move(1)
+        );
     }
 
     #[test]
@@ -190,7 +193,10 @@ mod tests {
 
     #[test]
     fn q_quits() {
-        assert_eq!(default_keymap(Mode::Normal, Key::Char('q')), KeyAction::Quit);
+        assert_eq!(
+            default_keymap(Mode::Normal, Key::Char('q')),
+            KeyAction::Quit
+        );
     }
 
     #[test]

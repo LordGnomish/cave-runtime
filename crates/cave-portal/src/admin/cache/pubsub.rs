@@ -53,13 +53,7 @@ pub(super) fn render_section(
     let rows = list_channels(state, ctx)?;
     let table_rows: Vec<Vec<String>> = rows
         .iter()
-        .map(|c| {
-            vec![
-                c.name.clone(),
-                c.kind.into(),
-                c.subscribers.to_string(),
-            ]
-        })
+        .map(|c| vec![c.name.clone(), c.kind.into(), c.subscribers.to_string()])
         .collect();
     Ok(format!(
         r#"<section id="cache-pubsub" class="mt-6">

@@ -65,8 +65,7 @@ impl ParsedSchema {
     /// message-as-JSON projections — both serialise to the same shape via
     /// the Confluent Avro/Proto-to-JSON converters.
     pub fn parse_json(schema: &str) -> Result<Self, String> {
-        let v: serde_json::Value =
-            serde_json::from_str(schema).map_err(|e| e.to_string())?;
+        let v: serde_json::Value = serde_json::from_str(schema).map_err(|e| e.to_string())?;
         let props = v
             .get("properties")
             .or_else(|| v.get("fields"))
@@ -110,12 +109,10 @@ pub fn check_compatibility(
     let new = ParsedSchema::parse_json(new_raw)?;
     Ok(match level {
         CompatibilityLevel::None => CompatibilityCheck::ok(),
-        CompatibilityLevel::Backward
-        | CompatibilityLevel::BackwardTransitive => {
+        CompatibilityLevel::Backward | CompatibilityLevel::BackwardTransitive => {
             check_backward(&existing, &new)
         }
-        CompatibilityLevel::Forward
-        | CompatibilityLevel::ForwardTransitive => {
+        CompatibilityLevel::Forward | CompatibilityLevel::ForwardTransitive => {
             check_forward(&existing, &new)
         }
         CompatibilityLevel::Full | CompatibilityLevel::FullTransitive => {
@@ -141,9 +138,7 @@ fn check_backward(existing: &ParsedSchema, new: &ParsedSchema) -> CompatibilityC
             None => {
                 let f = &existing.fields[name];
                 if !f.has_default {
-                    reasons.push(format!(
-                        "BACKWARD: removed required field {name:?}"
-                    ));
+                    reasons.push(format!("BACKWARD: removed required field {name:?}"));
                 }
             }
             Some(nf) => {
@@ -183,9 +178,7 @@ fn check_forward(existing: &ParsedSchema, new: &ParsedSchema) -> CompatibilityCh
         match existing.fields.get(name) {
             None => {
                 if !nf.has_default {
-                    reasons.push(format!(
-                        "FORWARD: new required field {name:?} (no default)"
-                    ));
+                    reasons.push(format!("FORWARD: new required field {name:?} (no default)"));
                 }
             }
             Some(ef) => {
@@ -259,10 +252,7 @@ mod tests {
         // cite: confluent-schema-registry 7.x BACKWARD (no default → reject)
         let tenant_id = "ev-002";
         let v1 = schema(tenant_id, r#"{"a":{"type":"string"}}"#);
-        let v2 = schema(
-            tenant_id,
-            r#"{"a":{"type":"string"}, "b":{"type":"int"}}"#,
-        );
+        let v2 = schema(tenant_id, r#"{"a":{"type":"string"}, "b":{"type":"int"}}"#);
         let r = check_compatibility(CompatibilityLevel::Backward, &v1, &v2).unwrap();
         assert!(!r.compatible);
         assert!(r.reasons.iter().any(|s| s.contains("BACKWARD")));
@@ -285,10 +275,7 @@ mod tests {
     fn test_evolution_backward_remove_required_rejected() {
         // cite: confluent-schema-registry 7.x BACKWARD (remove required → reject)
         let tenant_id = "ev-004";
-        let v1 = schema(
-            tenant_id,
-            r#"{"a":{"type":"string"}, "b":{"type":"int"}}"#,
-        );
+        let v1 = schema(tenant_id, r#"{"a":{"type":"string"}, "b":{"type":"int"}}"#);
         let v2 = schema(tenant_id, r#"{"a":{"type":"string"}}"#);
         let r = check_compatibility(CompatibilityLevel::Backward, &v1, &v2).unwrap();
         assert!(!r.compatible);
@@ -310,10 +297,7 @@ mod tests {
         // cite: confluent-schema-registry 7.x FORWARD (new required → reject)
         let tenant_id = "ev-006";
         let v1 = schema(tenant_id, r#"{"a":{"type":"string"}}"#);
-        let v2 = schema(
-            tenant_id,
-            r#"{"a":{"type":"string"}, "b":{"type":"int"}}"#,
-        );
+        let v2 = schema(tenant_id, r#"{"a":{"type":"string"}, "b":{"type":"int"}}"#);
         let r = check_compatibility(CompatibilityLevel::Forward, &v1, &v2).unwrap();
         assert!(!r.compatible);
     }

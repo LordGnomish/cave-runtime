@@ -23,7 +23,7 @@ use crate::physical_expr::{BinaryPhysicalOp, PhysicalExpr};
 use crate::physical_plan::{ExecutionPlan, PhysicalPlan, SortPhysical};
 use crate::row::{Row, Value};
 use crate::schema::SchemaRef;
-use crate::sql_parser::{parse_sql, SelectStatement};
+use crate::sql_parser::{SelectStatement, parse_sql};
 use std::sync::Arc;
 
 #[derive(Default)]
@@ -66,9 +66,7 @@ impl SessionContext {
         rows: Vec<Row>,
     ) -> Result<()> {
         let t = MemTable::new(schema, rows)?;
-        self.catalog
-            .register_table(name, Arc::new(t))
-            .await
+        self.catalog.register_table(name, Arc::new(t)).await
     }
 
     /// Build a DataFrame off a registered table.
@@ -190,16 +188,22 @@ impl SessionContext {
     fn lower<'a>(
         &'a self,
         plan: &'a LogicalPlan,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<PhysicalPlan>> + Send + 'a>> {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<PhysicalPlan>> + Send + 'a>>
+    {
         Box::pin(self.lower_inner(plan))
     }
 
     async fn lower_inner(&self, plan: &LogicalPlan) -> Result<PhysicalPlan> {
         match plan {
-            LogicalPlan::TableScan { table_name, schema, .. } => {
+            LogicalPlan::TableScan {
+                table_name, schema, ..
+            } => {
                 let p = self.catalog.table(table_name).await?;
                 let rows = p.scan().await?;
-                Ok(PhysicalPlan::InMemoryScan { rows, schema: schema.clone() })
+                Ok(PhysicalPlan::InMemoryScan {
+                    rows,
+                    schema: schema.clone(),
+                })
             }
             LogicalPlan::Filter { predicate, input } => {
                 let in_schema = schema_of(input.as_ref());
@@ -253,7 +257,11 @@ impl SessionContext {
                     schema: in_schema,
                 })
             }
-            LogicalPlan::Aggregate { group_by, aggr, input } => {
+            LogicalPlan::Aggregate {
+                group_by,
+                aggr,
+                input,
+            } => {
                 let in_schema = schema_of(input.as_ref());
                 let phys_group: Vec<PhysicalExpr> = group_by
                     .iter()
@@ -266,10 +274,7 @@ impl SessionContext {
                             let k = self.functions.lookup_aggregate(name).ok_or_else(|| {
                                 Error::Plan(format!("unknown aggregate: {}", name))
                             })?;
-                            let arg = args
-                                .first()
-                                .cloned()
-                                .unwrap_or(LogicalExpr::lit(1));
+                            let arg = args.first().cloned().unwrap_or(LogicalExpr::lit(1));
                             Ok((k, self.lower_expr(&arg, &in_schema)?))
                         }
                         _ => Err(Error::Plan("expected aggregate function".into())),
@@ -283,7 +288,12 @@ impl SessionContext {
                     schema: in_schema,
                 })
             }
-            LogicalPlan::Join { kind: _, on, left, right } => {
+            LogicalPlan::Join {
+                kind: _,
+                on,
+                left,
+                right,
+            } => {
                 let left_schema = schema_of(left.as_ref());
                 let right_schema = schema_of(right.as_ref());
                 let l = Box::new(self.lower(left).await?);
@@ -321,7 +331,9 @@ impl SessionContext {
                     .ok_or_else(|| Error::Schema(format!("column not found: {}", name)))?;
                 Ok(PhysicalExpr::Column { index: idx })
             }
-            LogicalExpr::Literal { value } => Ok(PhysicalExpr::Literal { value: value.clone() }),
+            LogicalExpr::Literal { value } => Ok(PhysicalExpr::Literal {
+                value: value.clone(),
+            }),
             LogicalExpr::BinaryOp { op, left, right } => Ok(PhysicalExpr::Binary {
                 op: match op {
                     crate::logical_expr::BinaryOp::Plus => BinaryPhysicalOp::Plus,

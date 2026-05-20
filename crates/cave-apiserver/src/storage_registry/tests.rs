@@ -7,7 +7,11 @@ use super::*;
 use serde_json::json;
 
 fn ctx(tenant: &str) -> StrategyContext {
-    StrategyContext { user: "alice".into(), tenant_id: tenant.into(), namespace: "default".into() }
+    StrategyContext {
+        user: "alice".into(),
+        tenant_id: tenant.into(),
+        namespace: "default".into(),
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -36,7 +40,10 @@ fn strategy_prepare_for_create_inserts_tenant_annotation() {
     let s = DefaultStrategy { namespaced: true };
     let mut o = json!({"metadata": {"name": "p1"}});
     s.prepare_for_create(&ctx("acme"), &mut o);
-    assert_eq!(o["metadata"]["annotations"]["cave.runtime/tenant-id"], "acme");
+    assert_eq!(
+        o["metadata"]["annotations"]["cave.runtime/tenant-id"],
+        "acme"
+    );
 }
 
 #[test]
@@ -45,8 +52,10 @@ fn strategy_prepare_for_create_preserves_existing_tenant() {
     let mut o = json!({"metadata": {"name": "p1",
         "annotations": {"cave.runtime/tenant-id": "globex"}}});
     s.prepare_for_create(&ctx("acme"), &mut o);
-    assert_eq!(o["metadata"]["annotations"]["cave.runtime/tenant-id"], "globex",
-        "existing tenant annotation preserved (validate will catch mismatch)");
+    assert_eq!(
+        o["metadata"]["annotations"]["cave.runtime/tenant-id"], "globex",
+        "existing tenant annotation preserved (validate will catch mismatch)"
+    );
 }
 
 #[test]
@@ -92,7 +101,10 @@ fn strategy_validate_rejects_cross_tenant_annotation() {
     let s = DefaultStrategy { namespaced: true };
     let o = json!({"metadata": {"name": "p1",
         "annotations": {"cave.runtime/tenant-id": "globex"}}});
-    matches!(s.validate(&ctx("acme"), &o), Err(StrategyError::Forbidden(_)));
+    matches!(
+        s.validate(&ctx("acme"), &o),
+        Err(StrategyError::Forbidden(_))
+    );
 }
 
 #[test]
@@ -102,7 +114,10 @@ fn strategy_validate_update_rejects_tenant_change() {
         "annotations": {"cave.runtime/tenant-id": "acme"}}});
     let new = json!({"metadata": {"name": "p1",
         "annotations": {"cave.runtime/tenant-id": "globex"}}});
-    matches!(s.validate_update(&ctx("globex"), &new, &old), Err(StrategyError::Forbidden(_)));
+    matches!(
+        s.validate_update(&ctx("globex"), &new, &old),
+        Err(StrategyError::Forbidden(_))
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -164,32 +179,42 @@ fn ccr_no_rv_serves_from_cache() {
 
 #[test]
 fn ccr_zero_rv_serves_from_cache() {
-    assert_eq!(evaluate_consistent_read(Some("0"), 100),
-               ConsistentReadOutcome::ServeFromCache { at_rv: 100 });
+    assert_eq!(
+        evaluate_consistent_read(Some("0"), 100),
+        ConsistentReadOutcome::ServeFromCache { at_rv: 100 }
+    );
 }
 
 #[test]
 fn ccr_below_cache_serves_from_cache() {
-    assert_eq!(evaluate_consistent_read(Some("50"), 100),
-               ConsistentReadOutcome::ServeFromCache { at_rv: 100 });
+    assert_eq!(
+        evaluate_consistent_read(Some("50"), 100),
+        ConsistentReadOutcome::ServeFromCache { at_rv: 100 }
+    );
 }
 
 #[test]
 fn ccr_at_cache_serves_from_cache() {
-    assert_eq!(evaluate_consistent_read(Some("100"), 100),
-               ConsistentReadOutcome::ServeFromCache { at_rv: 100 });
+    assert_eq!(
+        evaluate_consistent_read(Some("100"), 100),
+        ConsistentReadOutcome::ServeFromCache { at_rv: 100 }
+    );
 }
 
 #[test]
 fn ccr_above_cache_falls_through() {
-    assert_eq!(evaluate_consistent_read(Some("200"), 100),
-               ConsistentReadOutcome::FallThrough);
+    assert_eq!(
+        evaluate_consistent_read(Some("200"), 100),
+        ConsistentReadOutcome::FallThrough
+    );
 }
 
 #[test]
 fn ccr_invalid_rv_returns_invalid() {
-    assert_eq!(evaluate_consistent_read(Some("not-a-number"), 100),
-               ConsistentReadOutcome::Invalid);
+    assert_eq!(
+        evaluate_consistent_read(Some("not-a-number"), 100),
+        ConsistentReadOutcome::Invalid
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -214,8 +239,10 @@ fn progress_busy_does_not_emit() {
 fn progress_does_not_emit_when_no_progress_made() {
     let p = ProgressNotifier::new(Duration::from_secs(10));
     let _ = p.maybe_bookmark(123, true);
-    assert!(p.maybe_bookmark(123, true).is_none(),
-        "bookmarks must not repeat at same RV");
+    assert!(
+        p.maybe_bookmark(123, true).is_none(),
+        "bookmarks must not repeat at same RV"
+    );
 }
 
 #[test]
@@ -307,8 +334,10 @@ fn tenant_index_list_is_sorted_by_name() {
     idx.upsert("acme", "a", 2);
     idx.upsert("acme", "m", 3);
     let list = idx.list("acme");
-    assert_eq!(list.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>(),
-               vec!["a".to_string(), "m".into(), "z".into()]);
+    assert_eq!(
+        list.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>(),
+        vec!["a".to_string(), "m".into(), "z".into()]
+    );
 }
 
 #[test]
@@ -341,22 +370,26 @@ fn tenant_index_upsert_overwrites_rv() {
 // `#[ignore]` — gated on real etcd / hyper streaming wire
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn etcd_consistent_read_round_trip() {
     // pending: requires real etcd v3 client to drive consistent-read fall-through
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn streaming_list_chunked_transfer_encoding() {
     // pending: requires hyper streaming response with `Transfer-Encoding: chunked`
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn watch_progress_periodic_emit_via_timer() {
     // pending: requires real-time scheduler — assert bookmark every 10s
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn streaming_list_resumes_after_disconnect() {
     // pending: requires watch cache + RV continuity check
 }

@@ -71,7 +71,9 @@ pub struct IpMasqMap {
 }
 
 impl IpMasqMap {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
     pub fn update(&mut self, cidr: &str) -> Result<(), IpMasqError> {
         let p = IpNet::from_str(cidr).map_err(|_| IpMasqError::InvalidCidr(cidr.to_string()))?;
         self.entries.insert(p.to_string());
@@ -81,9 +83,15 @@ impl IpMasqMap {
         let p = IpNet::from_str(cidr).map_err(|_| IpMasqError::InvalidCidr(cidr.to_string()))?;
         Ok(self.entries.remove(&p.to_string()))
     }
-    pub fn dump(&self) -> Vec<String> { self.entries.iter().cloned().collect() }
-    pub fn len(&self) -> usize { self.entries.len() }
-    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+    pub fn dump(&self) -> Vec<String> {
+        self.entries.iter().cloned().collect()
+    }
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
 }
 
 #[allow(dead_code)]
@@ -96,13 +104,21 @@ mod tests {
 
     #[test]
     fn default_cidrs_count_matches_upstream() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ipmasq/ipmasq.go", "DefaultCIDRs.Count", "tenant-imm-cnt");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ipmasq/ipmasq.go",
+            "DefaultCIDRs.Count",
+            "tenant-imm-cnt"
+        );
         assert_eq!(default_non_masq_cidrs().len(), 11);
     }
 
     #[test]
     fn default_cidrs_include_rfc1918() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ipmasq/ipmasq.go", "DefaultCIDRs.RFC1918", "tenant-imm-rfc");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ipmasq/ipmasq.go",
+            "DefaultCIDRs.RFC1918",
+            "tenant-imm-rfc"
+        );
         let list = default_non_masq_cidrs();
         for c in ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"] {
             assert!(list.contains(&c), "missing {}", c);
@@ -111,7 +127,11 @@ mod tests {
 
     #[test]
     fn default_cidrs_include_carrier_grade_nat() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ipmasq/ipmasq.go", "DefaultCIDRs.CGNAT", "tenant-imm-cg");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ipmasq/ipmasq.go",
+            "DefaultCIDRs.CGNAT",
+            "tenant-imm-cg"
+        );
         let list = default_non_masq_cidrs();
         // RFC 6598
         assert!(list.contains(&"100.64.0.0/10"));
@@ -186,7 +206,10 @@ mod tests {
         m.update("10.0.0.0/8").unwrap();
         let d = m.dump();
         // BTreeSet → sorted lexicographically
-        assert_eq!(d, vec!["10.0.0.0/8".to_string(), "192.168.0.0/16".to_string()]);
+        assert_eq!(
+            d,
+            vec!["10.0.0.0/8".to_string(), "192.168.0.0/16".to_string()]
+        );
     }
 
     #[test]
@@ -201,7 +224,9 @@ mod tests {
     #[test]
     fn ipmasq_error_renders_with_inputs() {
         let (_c, _t) = cilium_test_ctx!("pkg/ipmasq/ipmasq.go", "Error.Display", "tenant-imm-err");
-        let e = IpMasqError::TenantDenied { tenant: TenantId::new("t").expect("test fixture") };
+        let e = IpMasqError::TenantDenied {
+            tenant: TenantId::new("t").expect("test fixture"),
+        };
         assert!(format!("{}", e).contains("ipmasq"));
         let e = IpMasqError::InvalidCidr("x".into());
         assert!(format!("{}", e).contains("invalid CIDR"));

@@ -2,9 +2,9 @@
 // Copyright 2026 Cave Runtime contributors
 //! /api/v1/targets and /api/v1/targets/metadata
 
-use axum::{extract::State, Json};
-use std::sync::Arc;
 use crate::state::MetricsState;
+use axum::{Json, extract::State};
+use std::sync::Arc;
 
 pub async fn list_targets(State(state): State<Arc<MetricsState>>) -> Json<serde_json::Value> {
     let targets = state.scrape_manager.targets();

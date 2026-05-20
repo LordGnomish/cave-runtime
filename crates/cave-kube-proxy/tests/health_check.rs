@@ -30,7 +30,7 @@ fn sync_services_replaces_full_table_and_drops_stale() {
     assert_eq!(hc.assigned_port(&svc("a")), Some(32_000));
 
     let mut second = HashMap::new();
-    second.insert(svc("a"), 32_000);  // 'b' dropped
+    second.insert(svc("a"), 32_000); // 'b' dropped
     hc.sync_services(second);
     assert_eq!(hc.tracked_count(), 1);
     assert!(hc.assigned_port(&svc("b")).is_none(), "stale entry purged");

@@ -87,7 +87,10 @@ mod tests {
     impl FrameCodec<Vec<u8>> for U8Echo {
         fn encode(&mut self, frame: Vec<u8>, buf: &mut BytesMut) -> Result<(), FrameError> {
             if frame.len() > u8::MAX as usize {
-                return Err(FrameError::Limit { actual: frame.len(), max: u8::MAX as usize });
+                return Err(FrameError::Limit {
+                    actual: frame.len(),
+                    max: u8::MAX as usize,
+                });
             }
             buf.extend_from_slice(&[frame.len() as u8]);
             buf.extend_from_slice(&frame);
@@ -153,7 +156,10 @@ mod tests {
         let mut buf = BytesMut::new();
         let big = vec![0u8; 300];
         match codec.encode(big, &mut buf) {
-            Err(FrameError::Limit { actual: 300, max: 255 }) => {}
+            Err(FrameError::Limit {
+                actual: 300,
+                max: 255,
+            }) => {}
             other => panic!("expected Limit error, got {:?}", other),
         }
     }

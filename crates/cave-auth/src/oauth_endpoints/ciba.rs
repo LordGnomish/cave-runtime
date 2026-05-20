@@ -15,11 +15,11 @@
 //! (`login_hint` or `id_token_hint`) instead of issuing a user_code.
 
 use axum::{
+    Json, Router,
     extract::{Form, Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::post,
-    Json, Router,
 };
 use chrono::Utc;
 use serde::Deserialize;
@@ -47,19 +47,39 @@ pub async fn ciba_auth(
     Form(form): Form<CibaInitForm>,
 ) -> impl IntoResponse {
     if state.realms.get(&realm).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"invalid_request"}))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"invalid_request"})),
+        )
+            .into_response();
     }
-    if state.clients.get_by_client_id(&realm, &form.client_id).await.is_none() {
-        return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"invalid_client"}))).into_response();
+    if state
+        .clients
+        .get_by_client_id(&realm, &form.client_id)
+        .await
+        .is_none()
+    {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error":"invalid_client"})),
+        )
+            .into_response();
     }
-    if form.login_hint.is_none() && form.id_token_hint.is_none() && form.login_hint_token.is_none() {
+    if form.login_hint.is_none() && form.id_token_hint.is_none() && form.login_hint_token.is_none()
+    {
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"missing_user_code","error_description":"one of login_hint / id_token_hint / login_hint_token required"}))).into_response();
     }
     // Resolve user from login_hint.
     let user_sub = if let Some(hint) = form.login_hint.as_deref() {
         match state.users.get_by_username(&realm, hint).await {
             Some(u) => u.id.to_string(),
-            None => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"unknown_user_id"}))).into_response(),
+            None => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({"error":"unknown_user_id"})),
+                )
+                    .into_response();
+            }
         }
     } else {
         // For id_token_hint / login_hint_token we'd decode JWT; MVP treats hints as opaque.
@@ -68,23 +88,30 @@ pub async fn ciba_auth(
 
     let auth_req_id = Uuid::new_v4().to_string();
     let now = Utc::now().timestamp();
-    state.ciba.put(CibaRequest {
-        auth_req_id: auth_req_id.clone(),
-        realm: realm.clone(),
-        client_id: form.client_id,
-        user_sub,
-        scope: form.scope.unwrap_or_else(|| "openid".into()),
-        exp_unix: now + CIBA_TTL,
-        interval: DEFAULT_INTERVAL,
-        status: CibaStatus::Pending,
-        last_poll_unix: 0,
-    }).await;
+    state
+        .ciba
+        .put(CibaRequest {
+            auth_req_id: auth_req_id.clone(),
+            realm: realm.clone(),
+            client_id: form.client_id,
+            user_sub,
+            scope: form.scope.unwrap_or_else(|| "openid".into()),
+            exp_unix: now + CIBA_TTL,
+            interval: DEFAULT_INTERVAL,
+            status: CibaStatus::Pending,
+            last_poll_unix: 0,
+        })
+        .await;
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "auth_req_id": auth_req_id,
-        "expires_in": CIBA_TTL,
-        "interval": DEFAULT_INTERVAL,
-    }))).into_response()
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "auth_req_id": auth_req_id,
+            "expires_in": CIBA_TTL,
+            "interval": DEFAULT_INTERVAL,
+        })),
+    )
+        .into_response()
 }
 
 #[derive(Debug, Deserialize)]
@@ -100,12 +127,26 @@ pub async fn ciba_approve(
 ) -> impl IntoResponse {
     let mut req = match state.ciba.get(&form.auth_req_id).await {
         Some(r) => r,
-        None => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"unknown auth_req_id"}))).into_response(),
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error":"unknown auth_req_id"})),
+            )
+                .into_response();
+        }
     };
     if req.realm != realm {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"realm_mismatch"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"realm_mismatch"})),
+        )
+            .into_response();
     }
-    req.status = if form.approve.unwrap_or(true) { CibaStatus::Approved } else { CibaStatus::Denied };
+    req.status = if form.approve.unwrap_or(true) {
+        CibaStatus::Approved
+    } else {
+        CibaStatus::Denied
+    };
     state.ciba.update(req).await;
     (StatusCode::OK, Json(serde_json::json!({"status":"ok"}))).into_response()
 }
@@ -123,32 +164,66 @@ pub async fn ciba_token(
     Form(form): Form<CibaTokenForm>,
 ) -> impl IntoResponse {
     if form.grant_type != "urn:openid:params:grant-type:ciba" {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"unsupported_grant_type"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"unsupported_grant_type"})),
+        )
+            .into_response();
     }
     let mut req = match state.ciba.get(&form.auth_req_id).await {
         Some(r) => r,
-        None => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"invalid_grant"}))).into_response(),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error":"invalid_grant"})),
+            )
+                .into_response();
+        }
     };
     if req.realm != realm || req.client_id != form.client_id {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"invalid_grant"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"invalid_grant"})),
+        )
+            .into_response();
     }
     let now = Utc::now().timestamp();
     if now > req.exp_unix {
         req.status = CibaStatus::Expired;
         state.ciba.update(req).await;
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"expired_token"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"expired_token"})),
+        )
+            .into_response();
     }
     if req.last_poll_unix > 0 && (now - req.last_poll_unix) < req.interval {
         req.last_poll_unix = now;
         state.ciba.update(req).await;
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"slow_down"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"slow_down"})),
+        )
+            .into_response();
     }
     req.last_poll_unix = now;
     state.ciba.update(req.clone()).await;
     match req.status {
-        CibaStatus::Pending => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"authorization_pending"}))).into_response(),
-        CibaStatus::Denied => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"access_denied"}))).into_response(),
-        CibaStatus::Expired => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"expired_token"}))).into_response(),
+        CibaStatus::Pending => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"authorization_pending"})),
+        )
+            .into_response(),
+        CibaStatus::Denied => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"access_denied"})),
+        )
+            .into_response(),
+        CibaStatus::Expired => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"expired_token"})),
+        )
+            .into_response(),
         CibaStatus::Approved => {
             let body = serde_json::json!({
                 "access_token": format!("ciba.{}.{}", req.auth_req_id, req.user_sub),
@@ -163,9 +238,18 @@ pub async fn ciba_token(
 
 pub fn router(state: OAuthEndpointsState) -> Router {
     Router::new()
-        .route("/realms/{realm}/protocol/openid-connect/ext/ciba/auth", post(ciba_auth))
-        .route("/realms/{realm}/protocol/openid-connect/ext/ciba/approve", post(ciba_approve))
-        .route("/realms/{realm}/protocol/openid-connect/token/ciba", post(ciba_token))
+        .route(
+            "/realms/{realm}/protocol/openid-connect/ext/ciba/auth",
+            post(ciba_auth),
+        )
+        .route(
+            "/realms/{realm}/protocol/openid-connect/ext/ciba/approve",
+            post(ciba_approve),
+        )
+        .route(
+            "/realms/{realm}/protocol/openid-connect/token/ciba",
+            post(ciba_token),
+        )
         .with_state(state)
 }
 
@@ -183,18 +267,64 @@ mod tests {
 
     async fn setup() -> (Router, OAuthEndpointsState) {
         let realms = RealmStore::new();
-        realms.create(RealmRequest { id: "r".into(), display_name: None, enabled: None, ssl_required: None, registration_allowed: None, login_with_email_allowed: None, duplicate_emails_allowed: None, access_token_lifespan: None, sso_session_idle_timeout: None }).await.unwrap();
+        realms
+            .create(RealmRequest {
+                id: "r".into(),
+                display_name: None,
+                enabled: None,
+                ssl_required: None,
+                registration_allowed: None,
+                login_with_email_allowed: None,
+                duplicate_emails_allowed: None,
+                access_token_lifespan: None,
+                sso_session_idle_timeout: None,
+            })
+            .await
+            .unwrap();
         let users = UserStore::new();
-        users.create("r", CreateUserRequest { username: "carol".into(), email: None, email_verified: None, first_name: None, last_name: None, enabled: Some(true), attributes: None, password: Some("pw".into()) }).await.unwrap();
+        users
+            .create(
+                "r",
+                CreateUserRequest {
+                    username: "carol".into(),
+                    email: None,
+                    email_verified: None,
+                    first_name: None,
+                    last_name: None,
+                    enabled: Some(true),
+                    attributes: None,
+                    password: Some("pw".into()),
+                },
+            )
+            .await
+            .unwrap();
         let clients = ClientStore::new();
-        clients.create("r", CreateClientRequest { client_id: "back".into(), name: None, description: None, enabled: Some(true), public_client: Some(false), secret: Some("s".into()), redirect_uris: None, web_origins: None, protocol: None }).await.unwrap();
+        clients
+            .create(
+                "r",
+                CreateClientRequest {
+                    client_id: "back".into(),
+                    name: None,
+                    description: None,
+                    enabled: Some(true),
+                    public_client: Some(false),
+                    secret: Some("s".into()),
+                    redirect_uris: None,
+                    web_origins: None,
+                    protocol: None,
+                },
+            )
+            .await
+            .unwrap();
         let state = OAuthEndpointsState::new(realms, clients, users);
         let app = router(state.clone());
         (app, state)
     }
 
     async fn body(resp: axum::response::Response) -> Value {
-        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         serde_json::from_slice(&bytes).unwrap_or(Value::Null)
     }
 
@@ -202,9 +332,17 @@ mod tests {
     #[tokio::test]
     async fn ciba_initiate_returns_auth_req_id() {
         let (app, _) = setup().await;
-        let resp = app.oneshot(Request::builder().method("POST").uri("/realms/r/protocol/openid-connect/ext/ciba/auth")
-            .header("content-type", "application/x-www-form-urlencoded")
-            .body(Body::from("client_id=back&login_hint=carol&scope=openid")).unwrap()).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/r/protocol/openid-connect/ext/ciba/auth")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from("client_id=back&login_hint=carol&scope=openid"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let b = body(resp).await;
         assert!(b["auth_req_id"].is_string());
@@ -214,9 +352,17 @@ mod tests {
     #[tokio::test]
     async fn ciba_missing_hint_rejected() {
         let (app, _) = setup().await;
-        let resp = app.oneshot(Request::builder().method("POST").uri("/realms/r/protocol/openid-connect/ext/ciba/auth")
-            .header("content-type", "application/x-www-form-urlencoded")
-            .body(Body::from("client_id=back&scope=openid")).unwrap()).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/r/protocol/openid-connect/ext/ciba/auth")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from("client_id=back&scope=openid"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
         assert_eq!(body(resp).await["error"], "missing_user_code");
     }
@@ -225,9 +371,17 @@ mod tests {
     #[tokio::test]
     async fn ciba_unknown_user_rejected() {
         let (app, _) = setup().await;
-        let resp = app.oneshot(Request::builder().method("POST").uri("/realms/r/protocol/openid-connect/ext/ciba/auth")
-            .header("content-type", "application/x-www-form-urlencoded")
-            .body(Body::from("client_id=back&login_hint=ghost")).unwrap()).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/r/protocol/openid-connect/ext/ciba/auth")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from("client_id=back&login_hint=ghost"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(body(resp).await["error"], "unknown_user_id");
     }
 
@@ -235,12 +389,20 @@ mod tests {
     #[tokio::test]
     async fn poll_pending_returns_authorization_pending() {
         let (_, state) = setup().await;
-        state.ciba.put(CibaRequest {
-            auth_req_id: "rq1".into(), realm: "r".into(), client_id: "back".into(),
-            user_sub: "s".into(), scope: "openid".into(),
-            exp_unix: Utc::now().timestamp() + 600, interval: 0,
-            status: CibaStatus::Pending, last_poll_unix: 0,
-        }).await;
+        state
+            .ciba
+            .put(CibaRequest {
+                auth_req_id: "rq1".into(),
+                realm: "r".into(),
+                client_id: "back".into(),
+                user_sub: "s".into(),
+                scope: "openid".into(),
+                exp_unix: Utc::now().timestamp() + 600,
+                interval: 0,
+                status: CibaStatus::Pending,
+                last_poll_unix: 0,
+            })
+            .await;
         let app = router(state);
         let resp = app.oneshot(Request::builder().method("POST").uri("/realms/r/protocol/openid-connect/token/ciba")
             .header("content-type", "application/x-www-form-urlencoded")
@@ -252,17 +414,34 @@ mod tests {
     #[tokio::test]
     async fn approve_then_poll_returns_token() {
         let (_, state) = setup().await;
-        state.ciba.put(CibaRequest {
-            auth_req_id: "rq2".into(), realm: "r".into(), client_id: "back".into(),
-            user_sub: "user-sub-2".into(), scope: "openid".into(),
-            exp_unix: Utc::now().timestamp() + 600, interval: 0,
-            status: CibaStatus::Pending, last_poll_unix: 0,
-        }).await;
+        state
+            .ciba
+            .put(CibaRequest {
+                auth_req_id: "rq2".into(),
+                realm: "r".into(),
+                client_id: "back".into(),
+                user_sub: "user-sub-2".into(),
+                scope: "openid".into(),
+                exp_unix: Utc::now().timestamp() + 600,
+                interval: 0,
+                status: CibaStatus::Pending,
+                last_poll_unix: 0,
+            })
+            .await;
         let app = router(state);
         // Approve.
-        let resp = app.clone().oneshot(Request::builder().method("POST").uri("/realms/r/protocol/openid-connect/ext/ciba/approve")
-            .header("content-type", "application/x-www-form-urlencoded")
-            .body(Body::from("auth_req_id=rq2&approve=true")).unwrap()).await.unwrap();
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/r/protocol/openid-connect/ext/ciba/approve")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from("auth_req_id=rq2&approve=true"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let resp = app.oneshot(Request::builder().method("POST").uri("/realms/r/protocol/openid-connect/token/ciba")
             .header("content-type", "application/x-www-form-urlencoded")
@@ -276,16 +455,33 @@ mod tests {
     #[tokio::test]
     async fn denied_returns_access_denied() {
         let (_, state) = setup().await;
-        state.ciba.put(CibaRequest {
-            auth_req_id: "rq3".into(), realm: "r".into(), client_id: "back".into(),
-            user_sub: "s".into(), scope: "openid".into(),
-            exp_unix: Utc::now().timestamp() + 600, interval: 0,
-            status: CibaStatus::Pending, last_poll_unix: 0,
-        }).await;
+        state
+            .ciba
+            .put(CibaRequest {
+                auth_req_id: "rq3".into(),
+                realm: "r".into(),
+                client_id: "back".into(),
+                user_sub: "s".into(),
+                scope: "openid".into(),
+                exp_unix: Utc::now().timestamp() + 600,
+                interval: 0,
+                status: CibaStatus::Pending,
+                last_poll_unix: 0,
+            })
+            .await;
         let app = router(state);
-        let resp = app.clone().oneshot(Request::builder().method("POST").uri("/realms/r/protocol/openid-connect/ext/ciba/approve")
-            .header("content-type", "application/x-www-form-urlencoded")
-            .body(Body::from("auth_req_id=rq3&approve=false")).unwrap()).await.unwrap();
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/r/protocol/openid-connect/ext/ciba/approve")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from("auth_req_id=rq3&approve=false"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let resp = app.oneshot(Request::builder().method("POST").uri("/realms/r/protocol/openid-connect/token/ciba")
             .header("content-type", "application/x-www-form-urlencoded")
@@ -297,12 +493,20 @@ mod tests {
     #[tokio::test]
     async fn expired_returns_expired_token() {
         let (_, state) = setup().await;
-        state.ciba.put(CibaRequest {
-            auth_req_id: "rq4".into(), realm: "r".into(), client_id: "back".into(),
-            user_sub: "s".into(), scope: "openid".into(),
-            exp_unix: Utc::now().timestamp() - 1, interval: 0,
-            status: CibaStatus::Pending, last_poll_unix: 0,
-        }).await;
+        state
+            .ciba
+            .put(CibaRequest {
+                auth_req_id: "rq4".into(),
+                realm: "r".into(),
+                client_id: "back".into(),
+                user_sub: "s".into(),
+                scope: "openid".into(),
+                exp_unix: Utc::now().timestamp() - 1,
+                interval: 0,
+                status: CibaStatus::Pending,
+                last_poll_unix: 0,
+            })
+            .await;
         let app = router(state);
         let resp = app.oneshot(Request::builder().method("POST").uri("/realms/r/protocol/openid-connect/token/ciba")
             .header("content-type", "application/x-www-form-urlencoded")

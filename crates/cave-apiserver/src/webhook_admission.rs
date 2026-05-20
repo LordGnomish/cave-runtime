@@ -29,8 +29,7 @@
 //! Cluster-scoped admission configs are rejected by `validate_config_scope`.
 
 use crate::admission::{
-    AdmissionRequest, AdmissionResponse, JsonPatch, MutatingWebhook,
-    Operation, ValidatingWebhook,
+    AdmissionRequest, AdmissionResponse, JsonPatch, MutatingWebhook, Operation, ValidatingWebhook,
 };
 use crate::resources::ObjectMeta;
 use serde::{Deserialize, Serialize};
@@ -50,7 +49,9 @@ pub enum FailurePolicyType {
 }
 
 impl Default for FailurePolicyType {
-    fn default() -> Self { FailurePolicyType::Fail }
+    fn default() -> Self {
+        FailurePolicyType::Fail
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -63,7 +64,9 @@ pub enum SideEffectClass {
 }
 
 impl Default for SideEffectClass {
-    fn default() -> Self { SideEffectClass::Unknown }
+    fn default() -> Self {
+        SideEffectClass::Unknown
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -74,7 +77,9 @@ pub enum ReinvocationPolicyType {
 }
 
 impl Default for ReinvocationPolicyType {
-    fn default() -> Self { ReinvocationPolicyType::Never }
+    fn default() -> Self {
+        ReinvocationPolicyType::Never
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -87,11 +92,15 @@ pub enum MatchPolicyType {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub enum ScopeType {
-    All, Cluster, Namespaced,
+    All,
+    Cluster,
+    Namespaced,
 }
 
 impl Default for ScopeType {
-    fn default() -> Self { ScopeType::All }
+    fn default() -> Self {
+        ScopeType::All
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -203,7 +212,9 @@ pub struct ValidatingWebhookSpec {
     pub match_conditions: Vec<MatchCondition>,
 }
 
-fn default_timeout_seconds() -> i32 { 10 }
+fn default_timeout_seconds() -> i32 {
+    10
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MutatingWebhookConfiguration {
@@ -275,18 +286,28 @@ pub fn validate_mutating_webhook(w: &MutatingWebhookSpec) -> Result<(), WebhookV
     if !(1..=30).contains(&w.timeout_seconds) {
         return Err(WebhookValidationError::BadTimeout);
     }
-    if !w.admission_review_versions.iter().any(|v| v == "v1" || v == "v1beta1") {
+    if !w
+        .admission_review_versions
+        .iter()
+        .any(|v| v == "v1" || v == "v1beta1")
+    {
         return Err(WebhookValidationError::NoSupportedReviewVersion);
     }
     Ok(())
 }
 
-pub fn validate_validating_webhook(w: &ValidatingWebhookSpec) -> Result<(), WebhookValidationError> {
+pub fn validate_validating_webhook(
+    w: &ValidatingWebhookSpec,
+) -> Result<(), WebhookValidationError> {
     validate_client_config(&w.client_config)?;
     if !(1..=30).contains(&w.timeout_seconds) {
         return Err(WebhookValidationError::BadTimeout);
     }
-    if !w.admission_review_versions.iter().any(|v| v == "v1" || v == "v1beta1") {
+    if !w
+        .admission_review_versions
+        .iter()
+        .any(|v| v == "v1" || v == "v1beta1")
+    {
         return Err(WebhookValidationError::NoSupportedReviewVersion);
     }
     Ok(())
@@ -297,13 +318,21 @@ pub fn validate_validating_webhook(w: &ValidatingWebhookSpec) -> Result<(), Webh
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn op_matches(rule: &str, op: &Operation) -> bool {
-    if rule == "*" { return true; }
-    matches!((rule, op),
-        ("CREATE", Operation::Create) | ("UPDATE", Operation::Update)
-            | ("DELETE", Operation::Delete) | ("CONNECT", Operation::Connect))
+    if rule == "*" {
+        return true;
+    }
+    matches!(
+        (rule, op),
+        ("CREATE", Operation::Create)
+            | ("UPDATE", Operation::Update)
+            | ("DELETE", Operation::Delete)
+            | ("CONNECT", Operation::Connect)
+    )
 }
 
-fn glob_or_eq(rule: &str, val: &str) -> bool { rule == "*" || rule == val }
+fn glob_or_eq(rule: &str, val: &str) -> bool {
+    rule == "*" || rule == val
+}
 
 pub struct MatchInput<'a> {
     pub group: &'a str,
@@ -316,7 +345,9 @@ pub struct MatchInput<'a> {
 }
 
 pub fn rule_matches(r: &RuleWithOperations, input: &MatchInput) -> bool {
-    if !r.operations.iter().any(|o| op_matches(o, input.operation)) { return false; }
+    if !r.operations.iter().any(|o| op_matches(o, input.operation)) {
+        return false;
+    }
     if !r.api_groups.is_empty() && !r.api_groups.iter().any(|g| glob_or_eq(g, input.group)) {
         return false;
     }
@@ -335,17 +366,39 @@ pub fn rule_matches(r: &RuleWithOperations, input: &MatchInput) -> bool {
 
 pub fn label_selector_matches(sel: &LabelSelector, labels: &HashMap<String, String>) -> bool {
     for (k, v) in &sel.match_labels {
-        if labels.get(k) != Some(v) { return false; }
+        if labels.get(k) != Some(v) {
+            return false;
+        }
     }
     for req in &sel.match_expressions {
         let present = labels.contains_key(&req.key);
         let val = labels.get(&req.key);
         match req.operator.as_str() {
-            "In" => { let Some(v) = val else { return false; };
-                      if !req.values.contains(v) { return false; } }
-            "NotIn" => { if let Some(v) = val { if req.values.contains(v) { return false; } } }
-            "Exists" => { if !present { return false; } }
-            "DoesNotExist" => { if present { return false; } }
+            "In" => {
+                let Some(v) = val else {
+                    return false;
+                };
+                if !req.values.contains(v) {
+                    return false;
+                }
+            }
+            "NotIn" => {
+                if let Some(v) = val {
+                    if req.values.contains(v) {
+                        return false;
+                    }
+                }
+            }
+            "Exists" => {
+                if !present {
+                    return false;
+                }
+            }
+            "DoesNotExist" => {
+                if present {
+                    return false;
+                }
+            }
             _ => return false,
         }
     }
@@ -372,23 +425,33 @@ pub struct ParsedCaBundle {
 }
 
 pub fn parse_ca_bundle(bundle: &[u8]) -> Result<ParsedCaBundle, CaBundleError> {
-    if bundle.is_empty() { return Err(CaBundleError::Empty); }
+    if bundle.is_empty() {
+        return Err(CaBundleError::Empty);
+    }
     let s = std::str::from_utf8(bundle).map_err(|_| CaBundleError::NotPem)?;
     let mut count = 0usize;
     let mut cursor = s;
     loop {
-        let Some(begin) = cursor.find("-----BEGIN ") else { break; };
+        let Some(begin) = cursor.find("-----BEGIN ") else {
+            break;
+        };
         let after_begin = &cursor[begin + 11..];
-        let Some(eol) = after_begin.find("-----") else { return Err(CaBundleError::NotPem); };
+        let Some(eol) = after_begin.find("-----") else {
+            return Err(CaBundleError::NotPem);
+        };
         let kind = &after_begin[..eol];
-        if kind != "CERTIFICATE" { return Err(CaBundleError::WrongPemKind); }
+        if kind != "CERTIFICATE" {
+            return Err(CaBundleError::WrongPemKind);
+        }
         let Some(end) = after_begin.find("-----END CERTIFICATE-----") else {
             return Err(CaBundleError::NotPem);
         };
         cursor = &after_begin[end + 25..];
         count += 1;
     }
-    if count == 0 { return Err(CaBundleError::NotPem); }
+    if count == 0 {
+        return Err(CaBundleError::NotPem);
+    }
     Ok(ParsedCaBundle { cert_count: count })
 }
 
@@ -422,8 +485,11 @@ pub enum WebhookCallError {
 
 pub trait WebhookClient: Send + Sync {
     fn invoke(
-        &self, hook_name: &str, client_config: &WebhookClientConfig,
-        timeout: Duration, req: &AdmissionRequest,
+        &self,
+        hook_name: &str,
+        client_config: &WebhookClientConfig,
+        timeout: Duration,
+        req: &AdmissionRequest,
     ) -> Result<WebhookCallResult, WebhookCallError>;
 }
 
@@ -435,27 +501,48 @@ pub struct FakeWebhookClient {
 
 impl FakeWebhookClient {
     pub fn new() -> Self {
-        Self { answers: RwLock::new(HashMap::new()), calls: RwLock::new(vec![]) }
+        Self {
+            answers: RwLock::new(HashMap::new()),
+            calls: RwLock::new(vec![]),
+        }
     }
     pub fn answer(&self, name: &str, result: Result<WebhookCallResult, WebhookCallError>) {
-        self.answers.write().unwrap().insert(name.to_string(), result);
+        self.answers
+            .write()
+            .unwrap()
+            .insert(name.to_string(), result);
     }
     pub fn call_count(&self, name: &str) -> usize {
-        self.calls.read().unwrap().iter().filter(|(n, _)| n == name).count()
+        self.calls
+            .read()
+            .unwrap()
+            .iter()
+            .filter(|(n, _)| n == name)
+            .count()
     }
-    pub fn total_calls(&self) -> usize { self.calls.read().unwrap().len() }
+    pub fn total_calls(&self) -> usize {
+        self.calls.read().unwrap().len()
+    }
 }
 
 impl Default for FakeWebhookClient {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl WebhookClient for FakeWebhookClient {
     fn invoke(
-        &self, hook_name: &str, _: &WebhookClientConfig, _: Duration,
+        &self,
+        hook_name: &str,
+        _: &WebhookClientConfig,
+        _: Duration,
         req: &AdmissionRequest,
     ) -> Result<WebhookCallResult, WebhookCallError> {
-        self.calls.write().unwrap().push((hook_name.to_string(), req.clone()));
+        self.calls
+            .write()
+            .unwrap()
+            .push((hook_name.to_string(), req.clone()));
         let answers = self.answers.read().unwrap();
         match answers.get(hook_name) {
             Some(Ok(r)) => Ok(r.clone()),
@@ -477,7 +564,11 @@ impl WebhookClient for FakeWebhookClient {
 pub struct PanicWebhookClient;
 impl WebhookClient for PanicWebhookClient {
     fn invoke(
-        &self, _: &str, _: &WebhookClientConfig, _: Duration, _: &AdmissionRequest,
+        &self,
+        _: &str,
+        _: &WebhookClientConfig,
+        _: Duration,
+        _: &AdmissionRequest,
     ) -> Result<WebhookCallResult, WebhookCallError> {
         Err(WebhookCallError::DialFailed)
     }
@@ -496,7 +587,10 @@ pub struct MutatingDispatcher {
 
 impl MutatingDispatcher {
     pub fn new(client: Arc<dyn WebhookClient>) -> Self {
-        Self { client, configs: RwLock::new(vec![]) }
+        Self {
+            client,
+            configs: RwLock::new(vec![]),
+        }
     }
 
     pub fn upsert(&self, c: MutatingWebhookConfiguration) {
@@ -506,7 +600,9 @@ impl MutatingDispatcher {
     }
 
     pub fn dispatch(
-        &self, req: &mut AdmissionRequest, input: &MatchInput,
+        &self,
+        req: &mut AdmissionRequest,
+        input: &MatchInput,
     ) -> Result<Vec<JsonPatch>, WebhookCallError> {
         let configs = self.configs.read().unwrap().clone();
         let mut accumulated_patches = Vec::new();
@@ -517,13 +613,16 @@ impl MutatingDispatcher {
             // Tenant scope: configs are global in upstream but our deployment
             // ties tenant_id to metadata annotation. Skip mismatch.
             if let Some(t) = cfg.metadata.annotations.get("cave.runtime/tenant-id") {
-                if t != &req.tenant_id { continue; }
+                if t != &req.tenant_id {
+                    continue;
+                }
             }
             for w in cfg.webhooks.iter() {
                 if !webhook_matches(&w.rules, &w.namespace_selector, &w.object_selector, input) {
                     continue;
                 }
-                if let Err(e) = self.invoke_one_mut(w, req, &mut accumulated_patches, &mut warnings) {
+                if let Err(e) = self.invoke_one_mut(w, req, &mut accumulated_patches, &mut warnings)
+                {
                     match w.failure_policy {
                         FailurePolicyType::Ignore => continue,
                         FailurePolicyType::Fail => return Err(e),
@@ -535,16 +634,25 @@ impl MutatingDispatcher {
         // Reinvocation pass — IfNeeded webhooks see the post-mutation object.
         for cfg in configs.iter() {
             if let Some(t) = cfg.metadata.annotations.get("cave.runtime/tenant-id") {
-                if t != &req.tenant_id { continue; }
+                if t != &req.tenant_id {
+                    continue;
+                }
             }
             for w in cfg.webhooks.iter() {
-                if w.reinvocation_policy != ReinvocationPolicyType::IfNeeded { continue; }
-                if !applied.contains(&w.name) { continue; }
+                if w.reinvocation_policy != ReinvocationPolicyType::IfNeeded {
+                    continue;
+                }
+                if !applied.contains(&w.name) {
+                    continue;
+                }
                 if !webhook_matches(&w.rules, &w.namespace_selector, &w.object_selector, input) {
                     continue;
                 }
-                if let Err(e) = self.invoke_one_mut(w, req, &mut accumulated_patches, &mut warnings) {
-                    if w.failure_policy == FailurePolicyType::Fail { return Err(e); }
+                if let Err(e) = self.invoke_one_mut(w, req, &mut accumulated_patches, &mut warnings)
+                {
+                    if w.failure_policy == FailurePolicyType::Fail {
+                        return Err(e);
+                    }
                 }
             }
         }
@@ -552,15 +660,25 @@ impl MutatingDispatcher {
     }
 
     fn invoke_one_mut(
-        &self, w: &MutatingWebhookSpec, req: &mut AdmissionRequest,
-        patches: &mut Vec<JsonPatch>, _warnings: &mut Vec<String>,
+        &self,
+        w: &MutatingWebhookSpec,
+        req: &mut AdmissionRequest,
+        patches: &mut Vec<JsonPatch>,
+        _warnings: &mut Vec<String>,
     ) -> Result<(), WebhookCallError> {
         let timeout = Duration::from_secs(w.timeout_seconds.max(1) as u64);
         // Side-effects gate (upstream `sideeffects.go`).
-        if req.dry_run && !matches!(w.side_effects, SideEffectClass::None | SideEffectClass::NoneOnDryRun) {
+        if req.dry_run
+            && !matches!(
+                w.side_effects,
+                SideEffectClass::None | SideEffectClass::NoneOnDryRun
+            )
+        {
             return Err(WebhookCallError::Malformed);
         }
-        let res = self.client.invoke(&w.name, &w.client_config, timeout, req)?;
+        let res = self
+            .client
+            .invoke(&w.name, &w.client_config, timeout, req)?;
         if !res.allowed {
             return Err(WebhookCallError::HttpStatus(res.status_code));
         }
@@ -589,7 +707,10 @@ pub struct ValidatingDispatcher {
 
 impl ValidatingDispatcher {
     pub fn new(client: Arc<dyn WebhookClient>) -> Self {
-        Self { client, configs: RwLock::new(vec![]) }
+        Self {
+            client,
+            configs: RwLock::new(vec![]),
+        }
     }
 
     pub fn upsert(&self, c: ValidatingWebhookConfiguration) {
@@ -599,13 +720,17 @@ impl ValidatingDispatcher {
     }
 
     pub fn dispatch(
-        &self, req: &AdmissionRequest, input: &MatchInput,
+        &self,
+        req: &AdmissionRequest,
+        input: &MatchInput,
     ) -> Result<Vec<String>, (String, u16)> {
         let configs = self.configs.read().unwrap().clone();
         let mut warnings = Vec::new();
         for cfg in configs.iter() {
             if let Some(t) = cfg.metadata.annotations.get("cave.runtime/tenant-id") {
-                if t != &req.tenant_id { continue; }
+                if t != &req.tenant_id {
+                    continue;
+                }
             }
             for w in cfg.webhooks.iter() {
                 if !webhook_matches(&w.rules, &w.namespace_selector, &w.object_selector, input) {
@@ -616,7 +741,9 @@ impl ValidatingDispatcher {
                 match res {
                     Ok(r) => {
                         warnings.extend(r.warnings.clone());
-                        if !r.allowed { return Err((r.message, r.status_code)); }
+                        if !r.allowed {
+                            return Err((r.message, r.status_code));
+                        }
                     }
                     Err(_) => {
                         if w.failure_policy == FailurePolicyType::Fail {
@@ -632,17 +759,22 @@ impl ValidatingDispatcher {
 
 fn webhook_matches(
     rules: &[RuleWithOperations],
-    ns_sel: &Option<LabelSelector>, obj_sel: &Option<LabelSelector>,
+    ns_sel: &Option<LabelSelector>,
+    obj_sel: &Option<LabelSelector>,
     input: &MatchInput,
 ) -> bool {
     if !rules.is_empty() && !rules.iter().any(|r| rule_matches(r, input)) {
         return false;
     }
     if let Some(s) = ns_sel {
-        if !label_selector_matches(s, input.namespace_labels) { return false; }
+        if !label_selector_matches(s, input.namespace_labels) {
+            return false;
+        }
     }
     if let Some(s) = obj_sel {
-        if !label_selector_matches(s, input.object_labels) { return false; }
+        if !label_selector_matches(s, input.object_labels) {
+            return false;
+        }
     }
     true
 }
@@ -657,16 +789,22 @@ pub struct MutatingDispatcherAdapter {
 }
 
 impl MutatingWebhook for MutatingDispatcherAdapter {
-    fn name(&self) -> &str { "webhook-mutating" }
+    fn name(&self) -> &str {
+        "webhook-mutating"
+    }
     fn admit(&self, req: &mut AdmissionRequest) -> AdmissionResponse {
         let resource = req.kind.to_lowercase();
         let namespace = req.namespace.clone();
         let operation = req.operation.clone();
         let empty = HashMap::new();
         let input = MatchInput {
-            group: "", version: "v1", resource: &resource,
-            namespace: &namespace, operation: &operation,
-            object_labels: &empty, namespace_labels: &empty,
+            group: "",
+            version: "v1",
+            resource: &resource,
+            namespace: &namespace,
+            operation: &operation,
+            object_labels: &empty,
+            namespace_labels: &empty,
         };
         match self.dispatcher.dispatch(req, &input) {
             Ok(patches) => {
@@ -674,7 +812,9 @@ impl MutatingWebhook for MutatingDispatcherAdapter {
                 r.patches = patches;
                 r
             }
-            Err(e) => AdmissionResponse::deny(req, 500, format!("mutating webhook chain failed: {e}")),
+            Err(e) => {
+                AdmissionResponse::deny(req, 500, format!("mutating webhook chain failed: {e}"))
+            }
         }
     }
 }
@@ -684,15 +824,21 @@ pub struct ValidatingDispatcherAdapter {
 }
 
 impl ValidatingWebhook for ValidatingDispatcherAdapter {
-    fn name(&self) -> &str { "webhook-validating" }
+    fn name(&self) -> &str {
+        "webhook-validating"
+    }
     fn validate(&self, req: &AdmissionRequest) -> AdmissionResponse {
         let group = "";
         let version = "v1";
         let resource = req.kind.to_lowercase();
         let input = MatchInput {
-            group, version, resource: &resource,
-            namespace: &req.namespace, operation: &req.operation,
-            object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
+            group,
+            version,
+            resource: &resource,
+            namespace: &req.namespace,
+            operation: &req.operation,
+            object_labels: &HashMap::new(),
+            namespace_labels: &HashMap::new(),
         };
         match self.dispatcher.dispatch(req, &input) {
             Ok(warnings) => {

@@ -167,7 +167,9 @@ impl FederationRegistry {
 
     pub fn enroll_network(&self, network: MeshNetwork) -> Result<(), MeshError> {
         if network.name.is_empty() {
-            return Err(MeshError::InvalidConfig("network name must not be empty".into()));
+            return Err(MeshError::InvalidConfig(
+                "network name must not be empty".into(),
+            ));
         }
         let mut g = self.inner.write().expect("poisoned");
         g.networks.insert(network.name.clone(), network);
@@ -195,10 +197,14 @@ impl FederationRegistry {
 
     pub fn upsert_gateway(&self, gw: EastWestGateway) -> Result<(), MeshError> {
         if gw.network.is_empty() {
-            return Err(MeshError::InvalidConfig("gateway network must not be empty".into()));
+            return Err(MeshError::InvalidConfig(
+                "gateway network must not be empty".into(),
+            ));
         }
         if gw.address.is_empty() {
-            return Err(MeshError::InvalidConfig("gateway address must not be empty".into()));
+            return Err(MeshError::InvalidConfig(
+                "gateway address must not be empty".into(),
+            ));
         }
         let mut g = self.inner.write().expect("poisoned");
         if !g.networks.contains_key(&gw.network) {
@@ -235,10 +241,14 @@ impl FederationRegistry {
 
     pub fn publish_endpoint(&self, ep: NetworkEndpoint) -> Result<(), MeshError> {
         if ep.service.is_empty() {
-            return Err(MeshError::InvalidConfig("endpoint service must not be empty".into()));
+            return Err(MeshError::InvalidConfig(
+                "endpoint service must not be empty".into(),
+            ));
         }
         if ep.network.is_empty() {
-            return Err(MeshError::InvalidConfig("endpoint network must not be empty".into()));
+            return Err(MeshError::InvalidConfig(
+                "endpoint network must not be empty".into(),
+            ));
         }
         let mut g = self.inner.write().expect("poisoned");
         if !g.networks.contains_key(&ep.network) {
@@ -283,11 +293,12 @@ impl FederationRegistry {
 
     pub fn upsert_trust_bundle(&self, bundle: TrustBundle) -> Result<(), MeshError> {
         if bundle.trust_domain.is_empty() {
-            return Err(MeshError::InvalidConfig("trust domain must not be empty".into()));
+            return Err(MeshError::InvalidConfig(
+                "trust domain must not be empty".into(),
+            ));
         }
         let mut g = self.inner.write().expect("poisoned");
-        g.trust_bundles
-            .insert(bundle.trust_domain.clone(), bundle);
+        g.trust_bundles.insert(bundle.trust_domain.clone(), bundle);
         Ok(())
     }
 
@@ -514,7 +525,8 @@ mod tests {
     #[test]
     fn upsert_trust_bundle_round_trips() {
         let r = FederationRegistry::new();
-        r.upsert_trust_bundle(TrustBundle::new("example.com")).unwrap();
+        r.upsert_trust_bundle(TrustBundle::new("example.com"))
+            .unwrap();
         let b = r.trust_bundle("example.com").unwrap();
         assert_eq!(b.generation, 0);
     }
@@ -578,7 +590,8 @@ mod tests {
         enroll(&r, "n1");
         r.upsert_gateway(ew_gw("n1", "10.1.0.1", true)).unwrap();
         r.publish_endpoint(endpoint("svc", "n1", "a")).unwrap();
-        r.upsert_trust_bundle(TrustBundle::new("example.com")).unwrap();
+        r.upsert_trust_bundle(TrustBundle::new("example.com"))
+            .unwrap();
         let snap = r.snapshot();
         assert_eq!(snap.networks.len(), 1);
         assert_eq!(snap.gateways.len(), 1);

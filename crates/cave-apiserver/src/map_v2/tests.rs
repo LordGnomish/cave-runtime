@@ -5,16 +5,15 @@
 use super::*;
 use crate::admission::{AdmissionRequest, Operation};
 use crate::resources::{ConfigMap, ObjectMeta, Resource};
-use crate::vap_advanced::{
-    FixedEvaluator, InMemoryParamResolver, ParamKind, ParamRef,
-};
+use crate::vap_advanced::{FixedEvaluator, InMemoryParamResolver, ParamKind, ParamRef};
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
 
 fn map(name: &str, tenant: &str) -> MutatingAdmissionPolicy {
     let mut meta = ObjectMeta::new(name, "");
-    meta.annotations.insert("cave.runtime/tenant-id".into(), tenant.into());
+    meta.annotations
+        .insert("cave.runtime/tenant-id".into(), tenant.into());
     MutatingAdmissionPolicy {
         api_version: "admissionregistration.k8s.io/v1alpha1".into(),
         kind: "MutatingAdmissionPolicy".into(),
@@ -25,7 +24,8 @@ fn map(name: &str, tenant: &str) -> MutatingAdmissionPolicy {
 
 fn binding(name: &str, tenant: &str, policy: &str) -> MutatingAdmissionPolicyBinding {
     let mut meta = ObjectMeta::new(name, "");
-    meta.annotations.insert("cave.runtime/tenant-id".into(), tenant.into());
+    meta.annotations
+        .insert("cave.runtime/tenant-id".into(), tenant.into());
     MutatingAdmissionPolicyBinding {
         api_version: "admissionregistration.k8s.io/v1alpha1".into(),
         kind: "MutatingAdmissionPolicyBinding".into(),
@@ -39,22 +39,34 @@ fn binding(name: &str, tenant: &str, policy: &str) -> MutatingAdmissionPolicyBin
 
 fn req(op: Operation, ns: &str, tenant: &str) -> AdmissionRequest {
     AdmissionRequest {
-        uid: "uid".into(), tenant_id: tenant.into(),
-        namespace: ns.into(), kind: "ConfigMap".into(), name: "cm".into(),
+        uid: "uid".into(),
+        tenant_id: tenant.into(),
+        namespace: ns.into(),
+        kind: "ConfigMap".into(),
+        name: "cm".into(),
         operation: op,
         object: Some(Resource::ConfigMap(ConfigMap {
-            api_version: "v1".into(), kind: "ConfigMap".into(),
-            metadata: ObjectMeta::new("cm", ns), data: HashMap::new(),
+            api_version: "v1".into(),
+            kind: "ConfigMap".into(),
+            metadata: ObjectMeta::new("cm", ns),
+            data: HashMap::new(),
         })),
-        old_object: None, user: "alice".into(), dry_run: false,
+        old_object: None,
+        user: "alice".into(),
+        dry_run: false,
     }
 }
 
-fn input<'a>(op: &'a Operation, ns: &'a str, empty: &'a HashMap<String,String>) -> MatchInput<'a> {
+fn input<'a>(op: &'a Operation, ns: &'a str, empty: &'a HashMap<String, String>) -> MatchInput<'a> {
     MatchInput {
-        group: "", version: "v1", resource: "configmaps", name: "cm",
-        namespace: ns, operation: op,
-        object_labels: empty, namespace_labels: empty,
+        group: "",
+        version: "v1",
+        resource: "configmaps",
+        name: "cm",
+        namespace: ns,
+        operation: op,
+        object_labels: empty,
+        namespace_labels: empty,
     }
 }
 
@@ -174,7 +186,8 @@ fn invariant_blocks_remove_on_tenant_id() {
     let ops = vec![JsonPatchOpRecord {
         op: JsonPatchOp::Remove,
         path: TENANT_ANNOTATION_PATH.into(),
-        value: None, from: None,
+        value: None,
+        from: None,
     }];
     assert!(enforce_tenant_invariant(ops).is_err());
 }
@@ -227,7 +240,9 @@ fn dispatcher_with(ev: FixedEvaluator) -> MapDispatcher {
 fn json_patch_mut(expr: &str) -> Mutation {
     Mutation {
         patch_type: PatchType::JSONPatch,
-        json_patch: Some(JSONPatchExpression { expression: expr.into() }),
+        json_patch: Some(JSONPatchExpression {
+            expression: expr.into(),
+        }),
         apply_configuration: None,
     }
 }
@@ -236,14 +251,18 @@ fn apply_cfg_mut(expr: &str) -> Mutation {
     Mutation {
         patch_type: PatchType::ApplyConfiguration,
         json_patch: None,
-        apply_configuration: Some(ApplyConfigurationExpression { expression: expr.into() }),
+        apply_configuration: Some(ApplyConfigurationExpression {
+            expression: expr.into(),
+        }),
     }
 }
 
 #[test]
 fn dispatch_emits_json_patch_ops() {
-    let ev = FixedEvaluator::new().with("expr",
-        CelValue::String(r#"[{"op":"add","path":"/metadata/labels/x","value":"y"}]"#.into()));
+    let ev = FixedEvaluator::new().with(
+        "expr",
+        CelValue::String(r#"[{"op":"add","path":"/metadata/labels/x","value":"y"}]"#.into()),
+    );
     let d = dispatcher_with(ev);
     let mut p = map("p", "acme");
     p.spec.mutations.push(json_patch_mut("expr"));
@@ -263,8 +282,10 @@ fn dispatch_emits_json_patch_ops() {
 
 #[test]
 fn dispatch_apply_config_emits_leaf_patches() {
-    let ev = FixedEvaluator::new().with("apply",
-        CelValue::String(r#"{"metadata":{"labels":{"foo":"bar"}}}"#.into()));
+    let ev = FixedEvaluator::new().with(
+        "apply",
+        CelValue::String(r#"{"metadata":{"labels":{"foo":"bar"}}}"#.into()),
+    );
     let d = dispatcher_with(ev);
     let mut p = map("p", "acme");
     p.spec.mutations.push(apply_cfg_mut("apply"));
@@ -285,10 +306,16 @@ fn dispatch_apply_config_emits_leaf_patches() {
 
 #[test]
 fn dispatch_blocks_tenant_mutation() {
-    let ev = FixedEvaluator::new().with("expr",
-        CelValue::String(format!(
-            r#"[{{"op":"replace","path":"{}","value":"globex"}}]"#,
-            TENANT_ANNOTATION_PATH).into()));
+    let ev = FixedEvaluator::new().with(
+        "expr",
+        CelValue::String(
+            format!(
+                r#"[{{"op":"replace","path":"{}","value":"globex"}}]"#,
+                TENANT_ANNOTATION_PATH
+            )
+            .into(),
+        ),
+    );
     let d = dispatcher_with(ev);
     let mut p = map("p", "acme");
     p.spec.mutations.push(json_patch_mut("expr"));
@@ -298,8 +325,10 @@ fn dispatch_blocks_tenant_mutation() {
     let op = Operation::Create;
     let i = input(&op, "ns", &empty);
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
-    assert!(matches!(out, MutationOutcome::Error(_)),
-        "tenant-id mutation must flip to Error, got {out:?}");
+    assert!(
+        matches!(out, MutationOutcome::Error(_)),
+        "tenant-id mutation must flip to Error, got {out:?}"
+    );
 }
 
 #[test]
@@ -308,20 +337,23 @@ fn dispatch_match_condition_false_skips() {
     let d = dispatcher_with(ev);
     let mut p = map("p", "acme");
     p.spec.match_conditions.push(MatchCondition {
-        name: "n".into(), expression: "cond".into(),
+        name: "n".into(),
+        expression: "cond".into(),
     });
     let b = binding("b", "acme", "p");
     let r = req(Operation::Create, "ns", "acme");
     let empty = HashMap::new();
     let op = Operation::Create;
     let i = input(&op, "ns", &empty);
-    assert_eq!(d.dispatch_one("acme", &p, &b, &r, &i), MutationOutcome::Skipped);
+    assert_eq!(
+        d.dispatch_one("acme", &p, &b, &r, &i),
+        MutationOutcome::Skipped
+    );
 }
 
 #[test]
 fn dispatch_failure_policy_fail_on_cel_error() {
-    let ev = FixedEvaluator::new().with_err("expr",
-        CelError::Compile("syntax".into()));
+    let ev = FixedEvaluator::new().with_err("expr", CelError::Compile("syntax".into()));
     let d = dispatcher_with(ev);
     let mut p = map("p", "acme");
     p.spec.failure_policy = FailurePolicyType::Fail;
@@ -337,8 +369,7 @@ fn dispatch_failure_policy_fail_on_cel_error() {
 
 #[test]
 fn dispatch_failure_policy_ignore_silences_cel_error() {
-    let ev = FixedEvaluator::new().with_err("expr",
-        CelError::Compile("syntax".into()));
+    let ev = FixedEvaluator::new().with_err("expr", CelError::Compile("syntax".into()));
     let d = dispatcher_with(ev);
     let mut p = map("p", "acme");
     p.spec.failure_policy = FailurePolicyType::Ignore;
@@ -348,14 +379,15 @@ fn dispatch_failure_policy_ignore_silences_cel_error() {
     let empty = HashMap::new();
     let op = Operation::Create;
     let i = input(&op, "ns", &empty);
-    assert_eq!(d.dispatch_one("acme", &p, &b, &r, &i),
-               MutationOutcome::SilencedError);
+    assert_eq!(
+        d.dispatch_one("acme", &p, &b, &r, &i),
+        MutationOutcome::SilencedError
+    );
 }
 
 #[test]
 fn dispatch_malformed_patch_json_fails() {
-    let ev = FixedEvaluator::new().with("expr",
-        CelValue::String("not-json".into()));
+    let ev = FixedEvaluator::new().with("expr", CelValue::String("not-json".into()));
     let d = dispatcher_with(ev);
     let mut p = map("p", "acme");
     p.spec.mutations.push(json_patch_mut("expr"));
@@ -364,8 +396,10 @@ fn dispatch_malformed_patch_json_fails() {
     let empty = HashMap::new();
     let op = Operation::Create;
     let i = input(&op, "ns", &empty);
-    assert!(matches!(d.dispatch_one("acme", &p, &b, &r, &i),
-                     MutationOutcome::Error(_)));
+    assert!(matches!(
+        d.dispatch_one("acme", &p, &b, &r, &i),
+        MutationOutcome::Error(_)
+    ));
 }
 
 #[test]
@@ -380,8 +414,10 @@ fn dispatch_non_string_cel_return_fails() {
     let empty = HashMap::new();
     let op = Operation::Create;
     let i = input(&op, "ns", &empty);
-    assert!(matches!(d.dispatch_one("acme", &p, &b, &r, &i),
-                     MutationOutcome::Error(_)));
+    assert!(matches!(
+        d.dispatch_one("acme", &p, &b, &r, &i),
+        MutationOutcome::Error(_)
+    ));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -393,8 +429,12 @@ fn plugin_allows_with_empty_store() {
     let store = Arc::new(MapStore::new());
     let d = MapDispatcher::new(
         Arc::new(FixedEvaluator::new()),
-        Arc::new(InMemoryParamResolver::new()));
-    let p = MapPlugin { store, dispatcher: d };
+        Arc::new(InMemoryParamResolver::new()),
+    );
+    let p = MapPlugin {
+        store,
+        dispatcher: d,
+    };
     let mut r = req(Operation::Create, "ns", "acme");
     let resp = p.admit(&mut r);
     assert!(resp.allowed);
@@ -403,15 +443,20 @@ fn plugin_allows_with_empty_store() {
 
 #[test]
 fn plugin_emits_patches_from_policy() {
-    let ev = FixedEvaluator::new().with("expr",
-        CelValue::String(r#"[{"op":"add","path":"/x","value":1}]"#.into()));
+    let ev = FixedEvaluator::new().with(
+        "expr",
+        CelValue::String(r#"[{"op":"add","path":"/x","value":1}]"#.into()),
+    );
     let store = Arc::new(MapStore::new());
     let mut policy = map("p", "acme");
     policy.spec.mutations.push(json_patch_mut("expr"));
     store.put_policy(policy);
     store.put_binding(binding("b", "acme", "p"));
     let d = MapDispatcher::new(Arc::new(ev), Arc::new(InMemoryParamResolver::new()));
-    let plug = MapPlugin { store, dispatcher: d };
+    let plug = MapPlugin {
+        store,
+        dispatcher: d,
+    };
     let mut r = req(Operation::Create, "ns", "acme");
     let resp = plug.admit(&mut r);
     assert!(resp.allowed);
@@ -421,34 +466,51 @@ fn plugin_emits_patches_from_policy() {
 
 #[test]
 fn plugin_does_not_apply_other_tenant() {
-    let ev = FixedEvaluator::new().with("expr",
-        CelValue::String(r#"[{"op":"add","path":"/x","value":1}]"#.into()));
+    let ev = FixedEvaluator::new().with(
+        "expr",
+        CelValue::String(r#"[{"op":"add","path":"/x","value":1}]"#.into()),
+    );
     let store = Arc::new(MapStore::new());
     let mut policy = map("p", "globex");
     policy.spec.mutations.push(json_patch_mut("expr"));
     store.put_policy(policy);
     store.put_binding(binding("b", "globex", "p"));
     let d = MapDispatcher::new(Arc::new(ev), Arc::new(InMemoryParamResolver::new()));
-    let plug = MapPlugin { store, dispatcher: d };
+    let plug = MapPlugin {
+        store,
+        dispatcher: d,
+    };
     let mut r = req(Operation::Create, "ns", "acme");
     let resp = plug.admit(&mut r);
     assert!(resp.allowed);
-    assert!(resp.patches.is_empty(), "globex policy must not run on acme request");
+    assert!(
+        resp.patches.is_empty(),
+        "globex policy must not run on acme request"
+    );
 }
 
 #[test]
 fn plugin_denies_on_tenant_violation_attempt() {
-    let ev = FixedEvaluator::new().with("expr",
-        CelValue::String(format!(
-            r#"[{{"op":"replace","path":"{}","value":"globex"}}]"#,
-            TENANT_ANNOTATION_PATH).into()));
+    let ev = FixedEvaluator::new().with(
+        "expr",
+        CelValue::String(
+            format!(
+                r#"[{{"op":"replace","path":"{}","value":"globex"}}]"#,
+                TENANT_ANNOTATION_PATH
+            )
+            .into(),
+        ),
+    );
     let store = Arc::new(MapStore::new());
     let mut policy = map("p", "acme");
     policy.spec.mutations.push(json_patch_mut("expr"));
     store.put_policy(policy);
     store.put_binding(binding("b", "acme", "p"));
     let d = MapDispatcher::new(Arc::new(ev), Arc::new(InMemoryParamResolver::new()));
-    let plug = MapPlugin { store, dispatcher: d };
+    let plug = MapPlugin {
+        store,
+        dispatcher: d,
+    };
     let mut r = req(Operation::Create, "ns", "acme");
     let resp = plug.admit(&mut r);
     assert!(!resp.allowed);
@@ -478,24 +540,30 @@ fn mapb_type_roundtrip() {
 
 #[test]
 fn reinvocation_default_is_never() {
-    assert_eq!(ReinvocationPolicyType::default(), ReinvocationPolicyType::Never);
+    assert_eq!(
+        ReinvocationPolicyType::default(),
+        ReinvocationPolicyType::Never
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // `#[ignore]` — gated on real CEL.
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_returns_typed_jsonpatch_array() {
     // pending: requires CEL with `JSONPatch.parse` library
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn cel_apply_configuration_with_object_construction() {
     // pending: requires CEL Object/Map construction
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn reinvocation_if_needed_runs_twice() {
     // pending: requires plugin-level reinvocation pass with object identity tracking
 }

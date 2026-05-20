@@ -12,11 +12,11 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use axum::{
+    Router,
     extract::Query,
     http::StatusCode,
     response::{IntoResponse, Json},
     routing::get,
-    Router,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -66,8 +66,8 @@ pub fn parse_jsonl(input: &str) -> Result<Vec<ContributionRow>, String> {
         if line.is_empty() {
             continue;
         }
-        let parsed: ContributionRow = serde_json::from_str(line)
-            .map_err(|e| format!("line {}: {}", lineno + 1, e))?;
+        let parsed: ContributionRow =
+            serde_json::from_str(line).map_err(|e| format!("line {}: {}", lineno + 1, e))?;
         out.push(parsed);
     }
     Ok(out)
@@ -101,7 +101,10 @@ pub fn aggregate(rows: &[ContributionRow]) -> Vec<WorkerAggregate> {
     out
 }
 
-pub fn build_response(rows: Vec<ContributionRow>, since: Option<DateTime<Utc>>) -> ContributionsResponse {
+pub fn build_response(
+    rows: Vec<ContributionRow>,
+    since: Option<DateTime<Utc>>,
+) -> ContributionsResponse {
     let filtered: Vec<ContributionRow> = rows
         .into_iter()
         .filter(|r| match since {
@@ -125,11 +128,7 @@ pub async fn handler(Query(q): Query<ContributionsQuery>) -> impl IntoResponse {
     let raw = match std::fs::read_to_string(&path) {
         Ok(s) => s,
         Err(_) => {
-            return (
-                StatusCode::OK,
-                Json(build_response(vec![], q.since)),
-            )
-                .into_response();
+            return (StatusCode::OK, Json(build_response(vec![], q.since))).into_response();
         }
     };
     let rows = match parse_jsonl(&raw) {
@@ -148,7 +147,7 @@ pub fn router() -> Router {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::body::{to_bytes, Body};
+    use axum::body::{Body, to_bytes};
     use axum::http::Request;
     use chrono::TimeZone;
     use std::sync::Mutex;
@@ -265,7 +264,10 @@ mod tests {
             std::env::set_var(key, "/tmp/some-contrib-fixture.jsonl");
         }
         let p = jsonl_path();
-        assert_eq!(p, std::path::PathBuf::from("/tmp/some-contrib-fixture.jsonl"));
+        assert_eq!(
+            p,
+            std::path::PathBuf::from("/tmp/some-contrib-fixture.jsonl")
+        );
         unsafe {
             match prev {
                 Some(v) => std::env::set_var(key, v),

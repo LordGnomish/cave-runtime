@@ -42,11 +42,7 @@ impl Publisher for LocalPublisher {
     /// Copy `docs_path/*` into `output_dir/namespace/kind/name/`.
     ///
     /// Upstream: publish(entity, directory) in local.ts
-    async fn publish(
-        &self,
-        entity: &EntityName,
-        docs_path: &Path,
-    ) -> Result<(), TechDocsError> {
+    async fn publish(&self, entity: &EntityName, docs_path: &Path) -> Result<(), TechDocsError> {
         let dest = self.entity_dir(entity);
         tokio::fs::create_dir_all(&dest).await?;
         copy_dir_recursive(docs_path, &dest).await?;
@@ -141,13 +137,22 @@ mod tests {
 
         // Create a source docs directory with one file
         let src = TempDir::new().unwrap();
-        tokio::fs::write(src.path().join("index.html"), b"<html/>").await.unwrap();
+        tokio::fs::write(src.path().join("index.html"), b"<html/>")
+            .await
+            .unwrap();
 
         let entity = test_entity();
         publisher.publish(&entity, src.path()).await.unwrap();
 
-        let dest = tmp.path().join("default").join("Component").join("my-service");
-        assert!(dest.exists(), "entity docs directory must exist after publish");
+        let dest = tmp
+            .path()
+            .join("default")
+            .join("Component")
+            .join("my-service");
+        assert!(
+            dest.exists(),
+            "entity docs directory must exist after publish"
+        );
     }
 
     /// has_docs() returns false for a non-existent entity.
@@ -160,7 +165,10 @@ mod tests {
         let entity = test_entity();
 
         let result = publisher.has_docs(&entity).await.unwrap();
-        assert!(!result, "has_docs must be false when no docs have been published");
+        assert!(
+            !result,
+            "has_docs must be false when no docs have been published"
+        );
     }
 
     /// has_docs() returns true after publish().
@@ -172,7 +180,9 @@ mod tests {
         let publisher = LocalPublisher::new(tmp.path());
 
         let src = TempDir::new().unwrap();
-        tokio::fs::write(src.path().join("index.html"), b"<html/>").await.unwrap();
+        tokio::fs::write(src.path().join("index.html"), b"<html/>")
+            .await
+            .unwrap();
 
         let entity = test_entity();
         publisher.publish(&entity, src.path()).await.unwrap();
@@ -276,14 +286,24 @@ mod tests {
         let publisher = LocalPublisher::new(tmp.path());
 
         let src = TempDir::new().unwrap();
-        tokio::fs::write(src.path().join("index.html"), b"index").await.unwrap();
-        tokio::fs::write(src.path().join("api.html"), b"api").await.unwrap();
-        tokio::fs::write(src.path().join("style.css"), b"body{}").await.unwrap();
+        tokio::fs::write(src.path().join("index.html"), b"index")
+            .await
+            .unwrap();
+        tokio::fs::write(src.path().join("api.html"), b"api")
+            .await
+            .unwrap();
+        tokio::fs::write(src.path().join("style.css"), b"body{}")
+            .await
+            .unwrap();
 
         let entity = test_entity();
         publisher.publish(&entity, src.path()).await.unwrap();
 
-        let dest = tmp.path().join("default").join("Component").join("my-service");
+        let dest = tmp
+            .path()
+            .join("default")
+            .join("Component")
+            .join("my-service");
         assert!(dest.join("index.html").exists());
         assert!(dest.join("api.html").exists());
         assert!(dest.join("style.css").exists());

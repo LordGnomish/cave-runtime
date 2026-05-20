@@ -237,10 +237,7 @@ mod tests {
                 producer_epoch: 0,
                 coordinator_epoch: 1,
                 result: TxnMarkerResult::Commit,
-                partitions: vec![
-                    (topic(tenant_id, "a"), 0),
-                    (topic(tenant_id, "b"), 0),
-                ],
+                partitions: vec![(topic(tenant_id, "a"), 0), (topic(tenant_id, "b"), 0)],
             }],
         };
         let resp = store.apply(&req);
@@ -325,7 +322,10 @@ mod tests {
                 .unwrap();
         }
         let list = store.list_markers(&topic(tenant_id, "t"), 0);
-        assert_eq!(list.iter().map(|m| m.producer_id).collect::<Vec<_>>(), vec![10, 20, 30]);
+        assert_eq!(
+            list.iter().map(|m| m.producer_id).collect::<Vec<_>>(),
+            vec![10, 20, 30]
+        );
     }
 
     #[test]

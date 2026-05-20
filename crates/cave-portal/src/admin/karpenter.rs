@@ -9,7 +9,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, NodePool};
+use crate::admin::state::{AdminState, NodePool, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -23,11 +23,9 @@ pub fn list_records(
     ctx: &RequestCtx,
 ) -> Result<Vec<NodePool>, KarpenterViewError> {
     ctx.authorise(Permission::KarpenterRead)?;
-    let mut rows: Vec<NodePool> = scope(
-        &state.node_pools.read().unwrap(),
-        &ctx.tenant,
-        |r| &r.tenant,
-    )
+    let mut rows: Vec<NodePool> = scope(&state.node_pools.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
     .into_iter()
     .cloned()
     .collect();
@@ -53,7 +51,10 @@ pub const NEAR_CAP_THRESHOLD: f64 = 0.8;
 /// Filter pools to those at or above [`NEAR_CAP_THRESHOLD`] — the
 /// dashboard's "needs attention" list.
 pub fn near_cap(pools: &[NodePool]) -> Vec<&NodePool> {
-    pools.iter().filter(|p| utilisation(p) >= NEAR_CAP_THRESHOLD).collect()
+    pools
+        .iter()
+        .filter(|p| utilisation(p) >= NEAR_CAP_THRESHOLD)
+        .collect()
 }
 
 /// Aggregate metrics for the header card.
@@ -122,8 +123,10 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, KarpenterV
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite =
-    Cite::backstage("plugins/karpenter/src/components/NodePoolsList.tsx", "NodePoolsList");
+const FILE_CITE: Cite = Cite::backstage(
+    "plugins/karpenter/src/components/NodePoolsList.tsx",
+    "NodePoolsList",
+);
 
 #[cfg(test)]
 mod tests {
@@ -182,11 +185,29 @@ mod tests {
     fn utilisation_caps_at_one_and_handles_zero_max() {
         use cave_kernel::ns::TenantId;
         let t = TenantId::new("t").unwrap();
-        let full = NodePool { tenant: t.clone(), name: "f".into(), instance_class: "m5.large".into(), max_nodes: 4, active_nodes: 4 };
+        let full = NodePool {
+            tenant: t.clone(),
+            name: "f".into(),
+            instance_class: "m5.large".into(),
+            max_nodes: 4,
+            active_nodes: 4,
+        };
         assert!((utilisation(&full) - 1.0).abs() < 1e-9);
-        let over = NodePool { tenant: t.clone(), name: "o".into(), instance_class: "m5.large".into(), max_nodes: 4, active_nodes: 10 };
+        let over = NodePool {
+            tenant: t.clone(),
+            name: "o".into(),
+            instance_class: "m5.large".into(),
+            max_nodes: 4,
+            active_nodes: 10,
+        };
         assert!((utilisation(&over) - 1.0).abs() < 1e-9);
-        let zero = NodePool { tenant: t.clone(), name: "z".into(), instance_class: "m5.large".into(), max_nodes: 0, active_nodes: 0 };
+        let zero = NodePool {
+            tenant: t.clone(),
+            name: "z".into(),
+            instance_class: "m5.large".into(),
+            max_nodes: 0,
+            active_nodes: 0,
+        };
         assert!((utilisation(&zero) - 1.0).abs() < 1e-9);
     }
 
@@ -195,8 +216,20 @@ mod tests {
         use cave_kernel::ns::TenantId;
         let t = TenantId::new("t").unwrap();
         let pools = vec![
-            NodePool { tenant: t.clone(), name: "a".into(), instance_class: "m5.large".into(), max_nodes: 10, active_nodes: 9 },
-            NodePool { tenant: t.clone(), name: "b".into(), instance_class: "m5.large".into(), max_nodes: 10, active_nodes: 3 },
+            NodePool {
+                tenant: t.clone(),
+                name: "a".into(),
+                instance_class: "m5.large".into(),
+                max_nodes: 10,
+                active_nodes: 9,
+            },
+            NodePool {
+                tenant: t.clone(),
+                name: "b".into(),
+                instance_class: "m5.large".into(),
+                max_nodes: 10,
+                active_nodes: 3,
+            },
         ];
         let hot = near_cap(&pools);
         assert_eq!(hot.len(), 1);
@@ -205,7 +238,8 @@ mod tests {
 
     #[test]
     fn pool_summary_aggregates_totals() {
-        let pools = list_records(&AdminState::seeded(), &ctx(&[Permission::KarpenterRead])).unwrap();
+        let pools =
+            list_records(&AdminState::seeded(), &ctx(&[Permission::KarpenterRead])).unwrap();
         let s = pool_summary(&pools);
         assert_eq!(s.pools, pools.len() as u32);
         let expected: u32 = pools.iter().map(|p| p.active_nodes).sum();

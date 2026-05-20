@@ -9,7 +9,12 @@ use serde_json::Value;
 pub struct ResponseTransformerPlugin;
 
 fn kv_split(s: &str) -> Option<(&str, &str)> {
-    s.splitn(2, ':').collect::<Vec<_>>().as_slice().try_into().ok().map(|[k, v]: &[&str; 2]| (*k, *v))
+    s.splitn(2, ':')
+        .collect::<Vec<_>>()
+        .as_slice()
+        .try_into()
+        .ok()
+        .map(|[k, v]: &[&str; 2]| (*k, *v))
 }
 
 #[async_trait]
@@ -45,7 +50,8 @@ impl GatewayPlugin for ResponseTransformerPlugin {
                 if let Some(s) = v.as_str() {
                     if let Some((k, val)) = kv_split(s) {
                         if ctx.response_headers.contains_key(&k.to_lowercase()) {
-                            ctx.response_headers.insert(k.to_lowercase(), val.to_string());
+                            ctx.response_headers
+                                .insert(k.to_lowercase(), val.to_string());
                         }
                     }
                 }
@@ -56,7 +62,9 @@ impl GatewayPlugin for ResponseTransformerPlugin {
             for v in arr {
                 if let Some(s) = v.as_str() {
                     if let Some((k, val)) = kv_split(s) {
-                        ctx.response_headers.entry(k.to_lowercase()).or_insert_with(|| val.to_string());
+                        ctx.response_headers
+                            .entry(k.to_lowercase())
+                            .or_insert_with(|| val.to_string());
                     }
                 }
             }
@@ -68,14 +76,17 @@ impl GatewayPlugin for ResponseTransformerPlugin {
             if let Some(obj) = json_body.as_object_mut() {
                 if let Some(arr) = config["remove"]["body"].as_array() {
                     for v in arr {
-                        if let Some(k) = v.as_str() { obj.remove(k); }
+                        if let Some(k) = v.as_str() {
+                            obj.remove(k);
+                        }
                     }
                 }
                 if let Some(arr) = config["add"]["body"].as_array() {
                     for v in arr {
                         if let Some(s) = v.as_str() {
                             if let Some((k, val)) = kv_split(s) {
-                                obj.entry(k).or_insert_with(|| Value::String(val.to_string()));
+                                obj.entry(k)
+                                    .or_insert_with(|| Value::String(val.to_string()));
                             }
                         }
                     }

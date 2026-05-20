@@ -14,7 +14,7 @@
 //!   cave_mesh_faults_injected_total{service}
 
 use prometheus_client::{
-    encoding::{text::encode, EncodeLabelSet},
+    encoding::{EncodeLabelSet, text::encode},
     metrics::{counter::Counter, family::Family, gauge::Gauge},
     registry::Registry,
 };
@@ -137,32 +137,44 @@ impl MeshMetrics {
             self.bytes_total.get_or_create(&labels).inc_by(bytes);
         }
         if duration_ms > 0 {
-            self.request_duration_ms_total.get_or_create(&labels).inc_by(duration_ms);
+            self.request_duration_ms_total
+                .get_or_create(&labels)
+                .inc_by(duration_ms);
         }
     }
 
     pub fn inc_connections(&self, service: &str) {
-        let lbl = ServiceLabels { service: service.to_string() };
+        let lbl = ServiceLabels {
+            service: service.to_string(),
+        };
         self.active_connections.get_or_create(&lbl).inc();
     }
 
     pub fn dec_connections(&self, service: &str) {
-        let lbl = ServiceLabels { service: service.to_string() };
+        let lbl = ServiceLabels {
+            service: service.to_string(),
+        };
         self.active_connections.get_or_create(&lbl).dec();
     }
 
     pub fn record_circuit_trip(&self, service: &str) {
-        let lbl = ServiceLabels { service: service.to_string() };
+        let lbl = ServiceLabels {
+            service: service.to_string(),
+        };
         self.circuit_trips_total.get_or_create(&lbl).inc();
     }
 
     pub fn record_rate_limited(&self, service: &str) {
-        let lbl = ServiceLabels { service: service.to_string() };
+        let lbl = ServiceLabels {
+            service: service.to_string(),
+        };
         self.rate_limited_total.get_or_create(&lbl).inc();
     }
 
     pub fn record_fault_injected(&self, service: &str) {
-        let lbl = ServiceLabels { service: service.to_string() };
+        let lbl = ServiceLabels {
+            service: service.to_string(),
+        };
         self.faults_injected_total.get_or_create(&lbl).inc();
     }
 

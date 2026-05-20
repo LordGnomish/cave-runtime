@@ -124,7 +124,11 @@ mod tests {
 
     #[test]
     fn ipv6_cluster_alloc_base_is_f00d() {
-        let (_c, _t) = cilium_test_ctx!("pkg/defaults/defaults.go", "IPv6ClusterAlloc", "tenant-def-cl");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/defaults/defaults.go",
+            "IPv6ClusterAlloc",
+            "tenant-def-cl"
+        );
         assert_eq!(IPV6_CLUSTER_ALLOC_CIDR_BASE, "f00d::");
     }
 
@@ -137,7 +141,11 @@ mod tests {
 
     #[test]
     fn align_checker_name_matches_upstream() {
-        let (_c, _t) = cilium_test_ctx!("pkg/defaults/defaults.go", "AlignCheckerName", "tenant-def-ac");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/defaults/defaults.go",
+            "AlignCheckerName",
+            "tenant-def-ac"
+        );
         assert_eq!(ALIGN_CHECKER_NAME, "bpf_alignchecker.o");
     }
 
@@ -192,7 +200,8 @@ mod tests {
 
     #[test]
     fn policy_deny_default_is_none() {
-        let (_c, _t) = cilium_test_ctx!("pkg/defaults/defaults.go", "DenyResponse", "tenant-def-dn");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/defaults/defaults.go", "DenyResponse", "tenant-def-dn");
         assert_eq!(POLICY_DENY_RESPONSE, "none");
     }
 

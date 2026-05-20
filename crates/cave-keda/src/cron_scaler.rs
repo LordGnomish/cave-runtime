@@ -85,9 +85,7 @@ pub fn validate_cron(expr: &str) -> Result<(), String> {
                     return Err(format!("field {i}: range {a}-{b} out of bounds"));
                 }
             } else {
-                let v: u32 = chunk
-                    .parse()
-                    .map_err(|_| format!("field {i}: '{chunk}'"))?;
+                let v: u32 = chunk.parse().map_err(|_| format!("field {i}: '{chunk}'"))?;
                 let (min, max) = ranges[i];
                 if v < min || v > max {
                     return Err(format!("field {i}: value {v} out of bounds"));

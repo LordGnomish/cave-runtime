@@ -36,7 +36,11 @@ impl TopicRouter {
         server: impl Into<String>,
         policy: RoutingPolicy,
     ) -> Self {
-        Self { tenant_id: tenant_id.into(), server: server.into(), policy }
+        Self {
+            tenant_id: tenant_id.into(),
+            server: server.into(),
+            policy,
+        }
     }
 
     /// Build the destination topic name. Cite: debezium
@@ -47,12 +51,13 @@ impl TopicRouter {
         validate_segment(schema, "schema")?;
         validate_segment(table, "table")?;
         Ok(match self.policy {
-            RoutingPolicy::SchemaTable     => format!("{}.{}.{}.{}",
-                self.tenant_id, self.server, schema, table),
-            RoutingPolicy::OutboxAggregate => format!("{}.{}.{}",
-                self.tenant_id, self.server, schema), // schema = aggregate_type
-            RoutingPolicy::SingleTopic     => format!("{}.{}",
-                self.tenant_id, self.server),
+            RoutingPolicy::SchemaTable => {
+                format!("{}.{}.{}.{}", self.tenant_id, self.server, schema, table)
+            }
+            RoutingPolicy::OutboxAggregate => {
+                format!("{}.{}.{}", self.tenant_id, self.server, schema)
+            } // schema = aggregate_type
+            RoutingPolicy::SingleTopic => format!("{}.{}", self.tenant_id, self.server),
         })
     }
 
@@ -60,10 +65,18 @@ impl TopicRouter {
     /// the partition for a given key. Default = stable hash mod
     /// `partition_count`.
     pub fn partition_for(&self, key: &[u8], partition_count: i32) -> i32 {
-        if partition_count <= 0 { return 0; }
+        if partition_count <= 0 {
+            return 0;
+        }
         let mut h: u64 = 1469598103934665603;
-        for b in self.tenant_id.as_bytes() { h ^= *b as u64; h = h.wrapping_mul(1099511628211); }
-        for b in key { h ^= *b as u64; h = h.wrapping_mul(1099511628211); }
+        for b in self.tenant_id.as_bytes() {
+            h ^= *b as u64;
+            h = h.wrapping_mul(1099511628211);
+        }
+        for b in key {
+            h ^= *b as u64;
+            h = h.wrapping_mul(1099511628211);
+        }
         ((h % partition_count as u64) as i64) as i32
     }
 
@@ -84,7 +97,10 @@ impl TopicRouter {
 
 fn validate_segment(s: &str, label: &str) -> CdcResult<()> {
     if s.is_empty() {
-        return Err(CdcError::InvalidConfig(format!("{} must be non-empty", label)));
+        return Err(CdcError::InvalidConfig(format!(
+            "{} must be non-empty",
+            label
+        )));
     }
     if s.contains('.') || s.contains(' ') {
         return Err(CdcError::InvalidConfig(format!(

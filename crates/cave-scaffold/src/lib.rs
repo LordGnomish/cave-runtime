@@ -6,9 +6,9 @@
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;
-pub mod routes;
-pub mod models;
 pub mod engine;
+pub mod models;
+pub mod routes;
 
 use axum::Router;
 

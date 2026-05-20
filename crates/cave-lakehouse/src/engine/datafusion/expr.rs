@@ -125,31 +125,19 @@ fn eval_binary(l: &Value, op: BinaryOp, r: &Value) -> DfResult<Value> {
         }
         BinaryOp::And => {
             let lb = l.as_bool().ok_or_else(|| {
-                DataFusionError::TypeMismatch(format!(
-                    "AND expects bool, got {}",
-                    l.type_name()
-                ))
+                DataFusionError::TypeMismatch(format!("AND expects bool, got {}", l.type_name()))
             })?;
             let rb = r.as_bool().ok_or_else(|| {
-                DataFusionError::TypeMismatch(format!(
-                    "AND expects bool, got {}",
-                    r.type_name()
-                ))
+                DataFusionError::TypeMismatch(format!("AND expects bool, got {}", r.type_name()))
             })?;
             Ok(Value::Bool(lb && rb))
         }
         BinaryOp::Or => {
             let lb = l.as_bool().ok_or_else(|| {
-                DataFusionError::TypeMismatch(format!(
-                    "OR expects bool, got {}",
-                    l.type_name()
-                ))
+                DataFusionError::TypeMismatch(format!("OR expects bool, got {}", l.type_name()))
             })?;
             let rb = r.as_bool().ok_or_else(|| {
-                DataFusionError::TypeMismatch(format!(
-                    "OR expects bool, got {}",
-                    r.type_name()
-                ))
+                DataFusionError::TypeMismatch(format!("OR expects bool, got {}", r.type_name()))
             })?;
             Ok(Value::Bool(lb || rb))
         }
@@ -226,7 +214,13 @@ mod tests {
     #[test]
     fn fluent_eq() {
         let e = Expr::col("a").eq(Expr::lit(Value::Int64(1)));
-        assert!(matches!(e, Expr::Binary { op: BinaryOp::Eq, .. }));
+        assert!(matches!(
+            e,
+            Expr::Binary {
+                op: BinaryOp::Eq,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -296,11 +290,8 @@ mod tests {
 
     #[test]
     fn eval_eq_string() {
-        let b = RecordBatch::new(
-            vec!["name".into()],
-            vec![vec![Value::Utf8("alice".into())]],
-        )
-        .unwrap();
+        let b =
+            RecordBatch::new(vec!["name".into()], vec![vec![Value::Utf8("alice".into())]]).unwrap();
         let e = Expr::col("name").eq(Expr::lit(Value::Utf8("alice".into())));
         assert_eq!(e.evaluate(&b, &b.rows[0]).unwrap(), Value::Bool(true));
     }

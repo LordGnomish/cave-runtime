@@ -453,7 +453,9 @@ pub struct ClientQuery {
 
 impl Default for ClientQuery {
     fn default() -> Self {
-        Self { inline_segment_constraints: true }
+        Self {
+            inline_segment_constraints: true,
+        }
     }
 }
 

@@ -30,7 +30,12 @@ pub fn list_services(
         if w.pod_name.is_empty() {
             continue;
         }
-        let key = w.pod_name.split('-').next().unwrap_or(&w.pod_name).to_string();
+        let key = w
+            .pod_name
+            .split('-')
+            .next()
+            .unwrap_or(&w.pod_name)
+            .to_string();
         *endpoints.entry(key).or_insert(0) += 1;
     }
     Ok(endpoints
@@ -52,7 +57,9 @@ pub fn list_services(
 }
 
 pub fn ingress_count(rows: &[ServiceRow]) -> usize {
-    rows.iter().filter(|s| s.service_type == "LoadBalancer").count()
+    rows.iter()
+        .filter(|s| s.service_type == "LoadBalancer")
+        .count()
 }
 
 pub(super) fn render_section(

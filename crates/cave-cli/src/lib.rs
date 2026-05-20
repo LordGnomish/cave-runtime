@@ -81,8 +81,8 @@ pub use audit::{AuditEntry, AuditFilter, AuditQuery, InMemoryAuditLog};
 /// store implementations, and REPL components.
 pub use chat::{
     ChatMessage, ChatRole, Conversation, ConversationKind, ConversationStore,
-    InMemoryConversationStore, ReplCommand, ReplEffect, ReplState, StreamChunk, ToolCall,
-    ToolMode, ToolResult,
+    InMemoryConversationStore, ReplCommand, ReplEffect, ReplState, StreamChunk, ToolCall, ToolMode,
+    ToolResult,
 };
 
 /// Re-exports the environment backend traits and in-memory implementation.

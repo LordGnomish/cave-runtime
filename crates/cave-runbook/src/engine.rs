@@ -47,10 +47,7 @@ pub fn create_execution(
 }
 
 /// Simulate executing a step (in production this would actually run the command/request/etc).
-pub fn simulate_step(
-    step: &Step,
-    parameters: &HashMap<String, serde_json::Value>,
-) -> StepResult {
+pub fn simulate_step(step: &Step, parameters: &HashMap<String, serde_json::Value>) -> StepResult {
     let now = Utc::now();
     let (status, output, error) = match &step.step_type {
         StepType::Shell { command, .. } => {

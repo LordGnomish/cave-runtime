@@ -33,7 +33,10 @@ pub enum LaunchOutcome {
 /// Drive a NodeClaim from `nil` → `Provisioned` by asking the provider
 /// to allocate an instance. Idempotent: returns [`LaunchOutcome::AlreadyLaunched`]
 /// if `status.provider_id` is already populated.
-pub fn launch<P: CloudProvider>(claim: &mut NodeClaim, provider: &P) -> ProviderResult<LaunchOutcome> {
+pub fn launch<P: CloudProvider>(
+    claim: &mut NodeClaim,
+    provider: &P,
+) -> ProviderResult<LaunchOutcome> {
     if let Some(status) = claim.status.as_ref()
         && status.provider_id.is_some()
     {

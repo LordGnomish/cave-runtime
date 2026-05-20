@@ -44,7 +44,9 @@ impl User {
     }
 
     pub fn full_name(&self) -> String {
-        format!("{} {}", self.first_name, self.last_name).trim().to_string()
+        format!("{} {}", self.first_name, self.last_name)
+            .trim()
+            .to_string()
     }
 
     pub fn mark_logged_in(&mut self) {

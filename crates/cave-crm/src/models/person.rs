@@ -30,7 +30,11 @@ pub struct Person {
 }
 
 impl Person {
-    pub fn new(workspace_id: Uuid, first_name: impl Into<String>, last_name: impl Into<String>) -> Self {
+    pub fn new(
+        workspace_id: Uuid,
+        first_name: impl Into<String>,
+        last_name: impl Into<String>,
+    ) -> Self {
         let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
@@ -52,7 +56,9 @@ impl Person {
     }
 
     pub fn display_name(&self) -> String {
-        format!("{} {}", self.first_name, self.last_name).trim().to_string()
+        format!("{} {}", self.first_name, self.last_name)
+            .trim()
+            .to_string()
     }
 }
 

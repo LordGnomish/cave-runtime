@@ -17,11 +17,11 @@
 
 use crate::store::SharedStore;
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, post, put},
-    Json, Router,
 };
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
@@ -107,7 +107,11 @@ pub struct PolicyStep {
 
 impl PolicyStep {
     pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into(), enabled: true, config: serde_json::Value::Null }
+        Self {
+            name: name.into(),
+            enabled: true,
+            config: serde_json::Value::Null,
+        }
     }
 }
 
@@ -408,11 +412,16 @@ impl GraviteeStore {
         app.updated_at = app.created_at;
         if matches!(
             app.kind,
-            ApplicationType::WebApp | ApplicationType::Browser | ApplicationType::Native | ApplicationType::BackendToBackend
+            ApplicationType::WebApp
+                | ApplicationType::Browser
+                | ApplicationType::Native
+                | ApplicationType::BackendToBackend
         ) {
             // OAuth2 client credentials shape (Gravitee parity).
-            app.client_id.get_or_insert_with(|| Uuid::new_v4().simple().to_string());
-            app.client_secret.get_or_insert_with(|| Uuid::new_v4().simple().to_string());
+            app.client_id
+                .get_or_insert_with(|| Uuid::new_v4().simple().to_string());
+            app.client_secret
+                .get_or_insert_with(|| Uuid::new_v4().simple().to_string());
         }
         self.applications.insert(app.id, app.clone());
         app
@@ -469,7 +478,11 @@ impl GraviteeStore {
 
         let now = Utc::now();
         let auto = plan.validation_auto || matches!(plan.security, PlanSecurityType::KeyLess);
-        let status = if auto { SubscriptionStatus::Accepted } else { SubscriptionStatus::Pending };
+        let status = if auto {
+            SubscriptionStatus::Accepted
+        } else {
+            SubscriptionStatus::Pending
+        };
         let api_key = if auto && matches!(plan.security, PlanSecurityType::ApiKey) {
             Some(format!("gv-{}", Uuid::new_v4().simple()))
         } else {
@@ -560,7 +573,11 @@ impl GraviteeStore {
         Ok(entry.clone())
     }
 
-    pub fn reject_subscription(&self, id: &Uuid, reason: String) -> Result<Subscription, GraviteeError> {
+    pub fn reject_subscription(
+        &self,
+        id: &Uuid,
+        reason: String,
+    ) -> Result<Subscription, GraviteeError> {
         let mut entry = self
             .subscriptions
             .get_mut(id)
@@ -639,7 +656,10 @@ impl GraviteeStore {
     /// (future) API-level policies. Closed/Paused subscriptions return None.
     pub fn effective_policy_chain(&self, sub_id: &Uuid) -> Option<PolicyChain> {
         let sub = self.get_subscription(sub_id)?;
-        if !matches!(sub.status, SubscriptionStatus::Accepted | SubscriptionStatus::Resumed) {
+        if !matches!(
+            sub.status,
+            SubscriptionStatus::Accepted | SubscriptionStatus::Resumed
+        ) {
             return None;
         }
         Some(self.plans.get(&sub.plan_id)?.policies.clone())
@@ -675,7 +695,11 @@ impl IntoResponse for GraviteeError {
                 StatusCode::CONFLICT
             }
         };
-        (status, Json(serde_json::json!({ "error": self.to_string() }))).into_response()
+        (
+            status,
+            Json(serde_json::json!({ "error": self.to_string() })),
+        )
+            .into_response()
     }
 }
 
@@ -690,36 +714,96 @@ struct GraviteeRouterState {
 }
 
 pub fn router(kong: SharedStore) -> Router {
-    let state = GraviteeRouterState { grav: GraviteeStore::new(), _kong: kong };
+    let state = GraviteeRouterState {
+        grav: GraviteeStore::new(),
+        _kong: kong,
+    };
 
     Router::new()
         // APIs
-        .route("/api/gateway/gravitee/apis", get(list_apis).post(create_api))
-        .route("/api/gateway/gravitee/apis/{id}", get(get_api).delete(delete_api))
-        .route("/api/gateway/gravitee/apis/{id}/_publish", post(publish_api))
-        .route("/api/gateway/gravitee/apis/{id}/_unpublish", post(unpublish_api))
-        .route("/api/gateway/gravitee/apis/{id}/_deprecate", post(deprecate_api))
-        .route("/api/gateway/gravitee/apis/{id}/plans", get(list_plans_for_api).post(create_plan))
+        .route(
+            "/api/gateway/gravitee/apis",
+            get(list_apis).post(create_api),
+        )
+        .route(
+            "/api/gateway/gravitee/apis/{id}",
+            get(get_api).delete(delete_api),
+        )
+        .route(
+            "/api/gateway/gravitee/apis/{id}/_publish",
+            post(publish_api),
+        )
+        .route(
+            "/api/gateway/gravitee/apis/{id}/_unpublish",
+            post(unpublish_api),
+        )
+        .route(
+            "/api/gateway/gravitee/apis/{id}/_deprecate",
+            post(deprecate_api),
+        )
+        .route(
+            "/api/gateway/gravitee/apis/{id}/plans",
+            get(list_plans_for_api).post(create_plan),
+        )
         // Plans
         .route("/api/gateway/gravitee/plans", get(list_plans))
-        .route("/api/gateway/gravitee/plans/{id}", get(get_plan).delete(delete_plan))
-        .route("/api/gateway/gravitee/plans/{id}/_publish", post(publish_plan))
+        .route(
+            "/api/gateway/gravitee/plans/{id}",
+            get(get_plan).delete(delete_plan),
+        )
+        .route(
+            "/api/gateway/gravitee/plans/{id}/_publish",
+            post(publish_plan),
+        )
         .route("/api/gateway/gravitee/plans/{id}/_close", post(close_plan))
         // Applications
-        .route("/api/gateway/gravitee/applications", get(list_applications).post(create_application))
-        .route("/api/gateway/gravitee/applications/{id}", get(get_application).delete(delete_application))
-        .route("/api/gateway/gravitee/applications/{id}/subscriptions", get(list_subs_for_app).post(subscribe))
+        .route(
+            "/api/gateway/gravitee/applications",
+            get(list_applications).post(create_application),
+        )
+        .route(
+            "/api/gateway/gravitee/applications/{id}",
+            get(get_application).delete(delete_application),
+        )
+        .route(
+            "/api/gateway/gravitee/applications/{id}/subscriptions",
+            get(list_subs_for_app).post(subscribe),
+        )
         // Subscriptions
-        .route("/api/gateway/gravitee/subscriptions", get(list_subscriptions))
-        .route("/api/gateway/gravitee/subscriptions/{id}", get(get_subscription))
-        .route("/api/gateway/gravitee/subscriptions/{id}/_accept", post(accept_subscription))
-        .route("/api/gateway/gravitee/subscriptions/{id}/_reject", post(reject_subscription))
-        .route("/api/gateway/gravitee/subscriptions/{id}/_close", put(close_subscription))
-        .route("/api/gateway/gravitee/subscriptions/{id}/_pause", post(pause_subscription))
-        .route("/api/gateway/gravitee/subscriptions/{id}/_resume", post(resume_subscription))
+        .route(
+            "/api/gateway/gravitee/subscriptions",
+            get(list_subscriptions),
+        )
+        .route(
+            "/api/gateway/gravitee/subscriptions/{id}",
+            get(get_subscription),
+        )
+        .route(
+            "/api/gateway/gravitee/subscriptions/{id}/_accept",
+            post(accept_subscription),
+        )
+        .route(
+            "/api/gateway/gravitee/subscriptions/{id}/_reject",
+            post(reject_subscription),
+        )
+        .route(
+            "/api/gateway/gravitee/subscriptions/{id}/_close",
+            put(close_subscription),
+        )
+        .route(
+            "/api/gateway/gravitee/subscriptions/{id}/_pause",
+            post(pause_subscription),
+        )
+        .route(
+            "/api/gateway/gravitee/subscriptions/{id}/_resume",
+            post(resume_subscription),
+        )
         // Portal — read-only consumer view of Published APIs
         .route("/api/gateway/gravitee/portal/apis", get(portal_apis))
-        .route("/api/gateway/gravitee/portal/apis/{id}", get(portal_api_detail))
+        .route(
+            "/api/gateway/gravitee/portal/apis/{id}",
+            get(portal_api_detail),
+        )
         .with_state(state)
 }
 
@@ -753,7 +837,12 @@ async fn create_api(
     State(s): State<GraviteeRouterState>,
     Json(body): Json<CreateApiBody>,
 ) -> (StatusCode, Json<ApiDef>) {
-    let mut api = ApiDef::new(body.name, body.version, body.context_path, body.upstream_url);
+    let mut api = ApiDef::new(
+        body.name,
+        body.version,
+        body.context_path,
+        body.upstream_url,
+    );
     api.description = body.description;
     api.paths = body.paths;
     api.visibility = body.visibility;
@@ -769,7 +858,10 @@ async fn get_api(State(s): State<GraviteeRouterState>, Path(id): Path<Uuid>) -> 
     }
 }
 
-async fn delete_api(State(s): State<GraviteeRouterState>, Path(id): Path<Uuid>) -> impl IntoResponse {
+async fn delete_api(
+    State(s): State<GraviteeRouterState>,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
     if s.grav.delete_api(&id) {
         StatusCode::NO_CONTENT.into_response()
     } else {
@@ -777,21 +869,30 @@ async fn delete_api(State(s): State<GraviteeRouterState>, Path(id): Path<Uuid>) 
     }
 }
 
-async fn publish_api(State(s): State<GraviteeRouterState>, Path(id): Path<Uuid>) -> impl IntoResponse {
+async fn publish_api(
+    State(s): State<GraviteeRouterState>,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
     match s.grav.publish_api(&id) {
         Some(api) => (StatusCode::OK, Json(api)).into_response(),
         None => GraviteeError::ApiNotFound(id).into_response(),
     }
 }
 
-async fn unpublish_api(State(s): State<GraviteeRouterState>, Path(id): Path<Uuid>) -> impl IntoResponse {
+async fn unpublish_api(
+    State(s): State<GraviteeRouterState>,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
     match s.grav.unpublish_api(&id) {
         Some(api) => (StatusCode::OK, Json(api)).into_response(),
         None => GraviteeError::ApiNotFound(id).into_response(),
     }
 }
 
-async fn deprecate_api(State(s): State<GraviteeRouterState>, Path(id): Path<Uuid>) -> impl IntoResponse {
+async fn deprecate_api(
+    State(s): State<GraviteeRouterState>,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
     match s.grav.deprecate_api(&id) {
         Some(api) => (StatusCode::OK, Json(api)).into_response(),
         None => GraviteeError::ApiNotFound(id).into_response(),
@@ -860,24 +961,34 @@ async fn get_plan(State(s): State<GraviteeRouterState>, Path(id): Path<Uuid>) ->
     }
 }
 
-async fn delete_plan(State(s): State<GraviteeRouterState>, Path(id): Path<Uuid>) -> impl IntoResponse {
+async fn delete_plan(
+    State(s): State<GraviteeRouterState>,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
     if s.grav.delete_plan(&id) {
         StatusCode::NO_CONTENT.into_response()
     } else if s.grav.get_plan(&id).is_some() {
-        GraviteeError::InvalidStateTransition("plan has active subscriptions".into()).into_response()
+        GraviteeError::InvalidStateTransition("plan has active subscriptions".into())
+            .into_response()
     } else {
         GraviteeError::PlanNotFound(id).into_response()
     }
 }
 
-async fn publish_plan(State(s): State<GraviteeRouterState>, Path(id): Path<Uuid>) -> impl IntoResponse {
+async fn publish_plan(
+    State(s): State<GraviteeRouterState>,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
     match s.grav.publish_plan(&id) {
         Some(p) => (StatusCode::OK, Json(p)).into_response(),
         None => GraviteeError::PlanNotFound(id).into_response(),
     }
 }
 
-async fn close_plan(State(s): State<GraviteeRouterState>, Path(id): Path<Uuid>) -> impl IntoResponse {
+async fn close_plan(
+    State(s): State<GraviteeRouterState>,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
     match s.grav.close_plan(&id) {
         Some(p) => (StatusCode::OK, Json(p)).into_response(),
         None => GraviteeError::PlanNotFound(id).into_response(),
@@ -1147,7 +1258,12 @@ mod tests {
     fn list_apis_returns_all_created() {
         let s = GraviteeStore::default();
         for i in 0..3 {
-            let api = ApiDef::new(format!("api-{i}"), "1.0".into(), format!("/a{i}"), "http://x".into());
+            let api = ApiDef::new(
+                format!("api-{i}"),
+                "1.0".into(),
+                format!("/a{i}"),
+                "http://x".into(),
+            );
             s.create_api(api);
         }
         assert_eq!(s.list_apis().len(), 3);
@@ -1174,7 +1290,10 @@ mod tests {
         let s = GraviteeStore::default();
         let api = fixture_api(&s);
         let pub_api = s.publish_api(&api.id).unwrap();
-        assert!(matches!(pub_api.lifecycle_state, ApiLifecycleState::Published));
+        assert!(matches!(
+            pub_api.lifecycle_state,
+            ApiLifecycleState::Published
+        ));
         assert!(pub_api.published_at.is_some());
     }
 
@@ -1185,7 +1304,10 @@ mod tests {
         let api = fixture_api(&s);
         s.publish_api(&api.id);
         let unp = s.unpublish_api(&api.id).unwrap();
-        assert!(matches!(unp.lifecycle_state, ApiLifecycleState::Unpublished));
+        assert!(matches!(
+            unp.lifecycle_state,
+            ApiLifecycleState::Unpublished
+        ));
         assert!(s.get_api(&api.id).is_some());
     }
 
@@ -1271,7 +1393,10 @@ mod tests {
         s.publish_plan(&plan.id);
         let app = fixture_app(&s);
         s.subscribe(app.id, plan.id).unwrap();
-        assert!(!s.delete_plan(&plan.id), "plan deletion blocked by active sub");
+        assert!(
+            !s.delete_plan(&plan.id),
+            "plan deletion blocked by active sub"
+        );
     }
 
     // 12
@@ -1424,7 +1549,10 @@ mod tests {
         let sub = s.subscribe(app.id, plan.id).unwrap();
         let accepted = s.accept_subscription(&sub.id).unwrap();
         assert!(matches!(accepted.status, SubscriptionStatus::Accepted));
-        assert!(accepted.api_key.is_some(), "api-key plan mints key on accept");
+        assert!(
+            accepted.api_key.is_some(),
+            "api-key plan mints key on accept"
+        );
     }
 
     // 22
@@ -1578,7 +1706,10 @@ mod tests {
             status: PlanStatus::Staging,
             order: 0,
             policies: PolicyChain {
-                request: vec![PolicyStep::new("rate-limiting"), PolicyStep::new("key-auth")],
+                request: vec![
+                    PolicyStep::new("rate-limiting"),
+                    PolicyStep::new("key-auth"),
+                ],
                 response: vec![PolicyStep::new("response-transformer")],
             },
             characteristics: vec![],
@@ -1598,7 +1729,10 @@ mod tests {
         assert_eq!(chain.response.len(), 1);
 
         s.close_subscription(&sub.id).unwrap();
-        assert!(s.effective_policy_chain(&sub.id).is_none(), "closed sub yields no chain");
+        assert!(
+            s.effective_policy_chain(&sub.id).is_none(),
+            "closed sub yields no chain"
+        );
     }
 
     // 30
@@ -1610,11 +1744,21 @@ mod tests {
         a.visibility = Visibility::Private;
         s.create_api(a);
         // public but unpublished
-        let mut b = ApiDef::new("pub-draft".into(), "1.0".into(), "/d".into(), "http://x".into());
+        let mut b = ApiDef::new(
+            "pub-draft".into(),
+            "1.0".into(),
+            "/d".into(),
+            "http://x".into(),
+        );
         b.visibility = Visibility::Public;
         s.create_api(b);
         // public + published — only this one is portal-visible
-        let mut c = ApiDef::new("pub-live".into(), "1.0".into(), "/l".into(), "http://x".into());
+        let mut c = ApiDef::new(
+            "pub-live".into(),
+            "1.0".into(),
+            "/l".into(),
+            "http://x".into(),
+        );
         c.visibility = Visibility::Public;
         let c = s.create_api(c);
         s.publish_api(&c.id);
@@ -1634,7 +1778,11 @@ mod tests {
     // 31
     #[test]
     fn policy_step_default_disabled_until_set() {
-        let raw = PolicyStep { name: "x".into(), enabled: false, config: serde_json::Value::Null };
+        let raw = PolicyStep {
+            name: "x".into(),
+            enabled: false,
+            config: serde_json::Value::Null,
+        };
         assert!(!raw.enabled);
         let on = PolicyStep::new("y");
         assert!(on.enabled);

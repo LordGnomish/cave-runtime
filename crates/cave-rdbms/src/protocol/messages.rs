@@ -47,7 +47,10 @@ impl FrontendMessage {
             b'E' => parse_execute_message(body),
             b'S' => Ok(FrontendMessage::Sync),
             b'X' => Ok(FrontendMessage::Terminate),
-            _ => Err(format!("unknown frontend message type: {}", msg_type as char)),
+            _ => Err(format!(
+                "unknown frontend message type: {}",
+                msg_type as char
+            )),
         }
     }
 }
@@ -385,7 +388,11 @@ mod tests {
         body.extend_from_slice(&0i16.to_be_bytes());
         let msg = FrontendMessage::parse_from_bytes(b'P', &body).unwrap();
         match msg {
-            FrontendMessage::Parse { name, query, param_types } => {
+            FrontendMessage::Parse {
+                name,
+                query,
+                param_types,
+            } => {
                 assert_eq!(name, "stmt1");
                 assert_eq!(query, "SELECT 1");
                 assert!(param_types.is_empty());
@@ -405,7 +412,12 @@ mod tests {
         body.extend_from_slice(&0i16.to_be_bytes()); // result_format_count
         let msg = FrontendMessage::parse_from_bytes(b'B', &body).unwrap();
         match msg {
-            FrontendMessage::Bind { portal, statement, params, result_format } => {
+            FrontendMessage::Bind {
+                portal,
+                statement,
+                params,
+                result_format,
+            } => {
                 assert_eq!(portal, "portal1");
                 assert_eq!(statement, "stmt1");
                 assert!(params.is_empty());
@@ -507,7 +519,9 @@ mod tests {
 
     #[test]
     fn test_serialize_command_complete() {
-        let msg = BackendMessage::CommandComplete { tag: "SELECT 3".to_string() };
+        let msg = BackendMessage::CommandComplete {
+            tag: "SELECT 3".to_string(),
+        };
         let buf = msg.serialize().unwrap();
         assert_eq!(buf[0], b'C');
         let tag_bytes = &buf[5..buf.len() - 1]; // exclude trailing \0

@@ -19,7 +19,12 @@ pub enum CronError {
     #[error("expected 5 fields separated by whitespace, got {0}")]
     WrongFieldCount(usize),
     #[error("field `{field}` value `{token}` out of range {min}..={max}")]
-    OutOfRange { field: &'static str, token: String, min: u32, max: u32 },
+    OutOfRange {
+        field: &'static str,
+        token: String,
+        min: u32,
+        max: u32,
+    },
     #[error("field `{field}` value `{token}` is not parseable")]
     Unparsable { field: &'static str, token: String },
     #[error("step value must be > 0 in `{0}`")]
@@ -28,11 +33,11 @@ pub enum CronError {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CronExpression {
-    pub minute: Vec<u32>,      // 0..60
-    pub hour: Vec<u32>,        // 0..24
+    pub minute: Vec<u32>,       // 0..60
+    pub hour: Vec<u32>,         // 0..24
     pub day_of_month: Vec<u32>, // 1..32
-    pub month: Vec<u32>,       // 1..13
-    pub day_of_week: Vec<u32>, // 0..7
+    pub month: Vec<u32>,        // 1..13
+    pub day_of_week: Vec<u32>,  // 0..7
 }
 
 impl CronExpression {
@@ -80,7 +85,14 @@ impl CronExpression {
     pub fn next_after(&self, from: DateTime<Utc>) -> Option<DateTime<Utc>> {
         // Truncate to minute, then advance one minute and step until match.
         let truncated = Utc
-            .with_ymd_and_hms(from.year(), from.month(), from.day(), from.hour(), from.minute(), 0)
+            .with_ymd_and_hms(
+                from.year(),
+                from.month(),
+                from.day(),
+                from.hour(),
+                from.minute(),
+                0,
+            )
             .single()?;
         let mut cursor = truncated + Duration::minutes(1);
         // Cap the search at 4 years to bound the worst case.
@@ -106,7 +118,10 @@ fn expand_field(
         // Step form: `range/step` or `*/step`
         let (range_part, step) = match part.split_once('/') {
             Some((r, s)) => {
-                let s: u32 = s.parse().map_err(|_| CronError::Unparsable { field, token: token.into() })?;
+                let s: u32 = s.parse().map_err(|_| CronError::Unparsable {
+                    field,
+                    token: token.into(),
+                })?;
                 if s == 0 {
                     return Err(CronError::BadStep(token.into()));
                 }
@@ -117,17 +132,29 @@ fn expand_field(
         let (lo, hi) = if range_part == "*" {
             (min, max)
         } else if let Some((a, b)) = range_part.split_once('-') {
-            let a: u32 = a.parse().map_err(|_| CronError::Unparsable { field, token: token.into() })?;
-            let b: u32 = b.parse().map_err(|_| CronError::Unparsable { field, token: token.into() })?;
+            let a: u32 = a.parse().map_err(|_| CronError::Unparsable {
+                field,
+                token: token.into(),
+            })?;
+            let b: u32 = b.parse().map_err(|_| CronError::Unparsable {
+                field,
+                token: token.into(),
+            })?;
             (a, b)
         } else {
-            let n: u32 = range_part
-                .parse()
-                .map_err(|_| CronError::Unparsable { field, token: token.into() })?;
+            let n: u32 = range_part.parse().map_err(|_| CronError::Unparsable {
+                field,
+                token: token.into(),
+            })?;
             (n, n)
         };
         if lo < min || hi > max || lo > hi {
-            return Err(CronError::OutOfRange { field, token: token.into(), min, max });
+            return Err(CronError::OutOfRange {
+                field,
+                token: token.into(),
+                min,
+                max,
+            });
         }
         let mut v = lo;
         while v <= hi {
@@ -165,8 +192,13 @@ pub struct CronJobStatus {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CronAction {
     NoOp,
-    Launch { name: String },
-    Replace { delete: Vec<String>, then_launch: String },
+    Launch {
+        name: String,
+    },
+    Replace {
+        delete: Vec<String>,
+        then_launch: String,
+    },
 }
 
 /// Decide what to do at instant `now`. Mirrors `syncCronJob` upstream.
@@ -192,7 +224,9 @@ pub fn decide(
     })?;
     // Has a scheduled instant elapsed since `last_schedule_time` (or the start
     // of this minute, whichever is older)?
-    let from = status.last_schedule_time.unwrap_or(now - Duration::minutes(1));
+    let from = status
+        .last_schedule_time
+        .unwrap_or(now - Duration::minutes(1));
     let next = match expr.next_after(from) {
         Some(t) => t,
         None => return Ok(CronAction::NoOp),
@@ -349,9 +383,15 @@ mod tests {
             concurrency: ConcurrencyPolicy::Forbid,
             suspended: false,
         };
-        let status = CronJobStatus { active_job_names: vec!["report-old".into()], ..Default::default() };
+        let status = CronJobStatus {
+            active_job_names: vec!["report-old".into()],
+            ..Default::default()
+        };
         // Now is one minute past midnight to ensure a fire is due.
-        assert_eq!(decide(&spec, &status, dt(2026, 4, 26, 0, 1), &tenant).unwrap(), CronAction::NoOp);
+        assert_eq!(
+            decide(&spec, &status, dt(2026, 4, 26, 0, 1), &tenant).unwrap(),
+            CronAction::NoOp
+        );
     }
 
     #[test]
@@ -368,10 +408,16 @@ mod tests {
             concurrency: ConcurrencyPolicy::Replace,
             suspended: false,
         };
-        let status = CronJobStatus { active_job_names: vec!["a".into(), "b".into()], ..Default::default() };
+        let status = CronJobStatus {
+            active_job_names: vec!["a".into(), "b".into()],
+            ..Default::default()
+        };
         let action = decide(&spec, &status, dt(2026, 4, 26, 0, 1), &tenant).unwrap();
         match action {
-            CronAction::Replace { delete, then_launch } => {
+            CronAction::Replace {
+                delete,
+                then_launch,
+            } => {
                 assert_eq!(delete, vec!["a".to_string(), "b".to_string()]);
                 assert!(then_launch.starts_with("report-"));
             }
@@ -394,7 +440,10 @@ mod tests {
             suspended: true,
         };
         let status = CronJobStatus::default();
-        assert_eq!(decide(&spec, &status, dt(2026, 4, 26, 0, 1), &tenant).unwrap(), CronAction::NoOp);
+        assert_eq!(
+            decide(&spec, &status, dt(2026, 4, 26, 0, 1), &tenant).unwrap(),
+            CronAction::NoOp
+        );
     }
 
     #[test]
@@ -411,7 +460,13 @@ mod tests {
             concurrency: ConcurrencyPolicy::Allow,
             suspended: false,
         };
-        let err = decide(&spec, &CronJobStatus::default(), dt(2026, 4, 26, 0, 1), &attacker).unwrap_err();
+        let err = decide(
+            &spec,
+            &CronJobStatus::default(),
+            dt(2026, 4, 26, 0, 1),
+            &attacker,
+        )
+        .unwrap_err();
         assert!(matches!(err, ControllerError::TenantDenied { .. }));
     }
 }

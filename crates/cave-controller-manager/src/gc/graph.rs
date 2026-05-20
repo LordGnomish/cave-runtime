@@ -73,8 +73,10 @@ impl DependencyGraph {
     /// their own `add_object` call).
     pub fn add_object(&mut self, id: ObjectId, owners: Vec<OwnerReference>) {
         // Compute owner UID set for index maintenance.
-        let owner_uids: Vec<ObjectId> =
-            owners.iter().map(|o| ObjectId::new(o.uid.clone())).collect();
+        let owner_uids: Vec<ObjectId> = owners
+            .iter()
+            .map(|o| ObjectId::new(o.uid.clone()))
+            .collect();
 
         // First, scrub stale dependent entries if this node existed before.
         if let Some(prev) = self.nodes.get(&id).cloned() {
@@ -113,7 +115,9 @@ impl DependencyGraph {
     /// owner lists are *not* mutated (caller decides whether to orphan or
     /// transitively delete them — see `cascade.rs`).
     pub fn remove_object(&mut self, id: &ObjectId) {
-        let Some(node) = self.nodes.remove(id) else { return };
+        let Some(node) = self.nodes.remove(id) else {
+            return;
+        };
         for owner in &node.owners {
             let oid = ObjectId::new(owner.uid.clone());
             if let Some(parent) = self.nodes.get_mut(&oid) {
@@ -147,8 +151,11 @@ impl DependencyGraph {
         self.nodes
             .get(id)
             .map(|n| {
-                let mut v: Vec<_> =
-                    n.owners.iter().map(|o| ObjectId::new(o.uid.clone())).collect();
+                let mut v: Vec<_> = n
+                    .owners
+                    .iter()
+                    .map(|o| ObjectId::new(o.uid.clone()))
+                    .collect();
                 v.sort();
                 v
             })

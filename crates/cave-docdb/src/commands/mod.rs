@@ -2,17 +2,17 @@
 // Copyright 2026 Cave Runtime contributors
 //! MongoDB command dispatcher.
 
-pub mod hello;
-pub mod db;
-pub mod crud;
-pub mod agg;
-pub mod index;
-pub mod cursor;
 pub mod admin;
+pub mod agg;
+pub mod crud;
+pub mod cursor;
+pub mod db;
+pub mod hello;
+pub mod index;
 
 use crate::bson::Document;
-use crate::engine::Engine;
 use crate::cursor::CursorStore;
+use crate::engine::Engine;
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -56,4 +56,3 @@ pub async fn dispatch(
         }
     }
 }
-

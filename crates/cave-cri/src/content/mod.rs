@@ -36,7 +36,5 @@ pub mod store;
 pub mod writer;
 
 pub use digest::{Digest, DigestAlgorithm, DigestError};
-pub use store::{
-    ContentInfo, ContentStore, LocalStore, ReaderAtSize, StoreError,
-};
+pub use store::{ContentInfo, ContentStore, LocalStore, ReaderAtSize, StoreError};
 pub use writer::{Writer, WriterError};

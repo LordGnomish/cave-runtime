@@ -17,34 +17,33 @@
 use std::sync::Arc;
 
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    analyzer,
+    TraceState, analyzer,
     dependency::{build_dependency_graph, to_jaeger_dependencies},
     multi_tenant::tenant_from_headers,
     query::QueryEngine,
-    spm::{to_jaeger_metrics, MetricsResponse, SpmRegistry},
-    types::{format_span_id, format_trace_id, parse_trace_id, Span, SpanStatus, Trace, TraceId},
-    TraceState,
+    spm::{MetricsResponse, SpmRegistry, to_jaeger_metrics},
+    types::{Span, SpanStatus, Trace, TraceId, format_span_id, format_trace_id, parse_trace_id},
 };
 
 pub fn create_router(state: Arc<TraceState>) -> Router {
     Router::new()
-        .route("/api/traces",                            get(search_traces))
-        .route("/api/traces/{trace_id}",                  get(get_trace))
-        .route("/api/services",                          get(get_services))
-        .route("/api/services/{service}/operations",      get(get_operations))
-        .route("/api/dependencies",                      get(get_dependencies))
-        .route("/api/metrics/calls",                     get(metrics_calls))
-        .route("/api/metrics/errors",                    get(metrics_errors))
-        .route("/api/metrics/minstep",                   get(metrics_minstep))
+        .route("/api/traces", get(search_traces))
+        .route("/api/traces/{trace_id}", get(get_trace))
+        .route("/api/services", get(get_services))
+        .route("/api/services/{service}/operations", get(get_operations))
+        .route("/api/dependencies", get(get_dependencies))
+        .route("/api/metrics/calls", get(metrics_calls))
+        .route("/api/metrics/errors", get(metrics_errors))
+        .route("/api/metrics/minstep", get(metrics_minstep))
         .with_state(state)
 }
 
@@ -61,7 +60,13 @@ struct JaegerResponse<T: Serialize> {
 
 impl<T: Serialize> JaegerResponse<T> {
     fn ok(data: T, total: usize, limit: usize, offset: usize) -> Json<Self> {
-        Json(JaegerResponse { data, total, limit, offset, errors: None })
+        Json(JaegerResponse {
+            data,
+            total,
+            limit,
+            offset,
+            errors: None,
+        })
     }
 }
 
@@ -75,8 +80,8 @@ struct JaegerSpan {
     operation_name: String,
     references: Vec<JaegerRef>,
     flags: i32,
-    start_time: i64,   // epoch µs
-    duration: i64,     // µs
+    start_time: i64, // epoch µs
+    duration: i64,   // µs
     tags: Vec<JaegerTagWire>,
     logs: Vec<JaegerLog>,
     process_id: String,
@@ -140,22 +145,26 @@ fn span_to_jaeger(span: &Span) -> JaegerSpan {
         }))
         .collect();
 
-    let tags: Vec<JaegerTagWire> = span.tags.iter()
-        .map(|(k, v)| tag_wire(k, v))
+    let tags: Vec<JaegerTagWire> = span.tags.iter().map(|(k, v)| tag_wire(k, v)).collect();
+
+    let logs: Vec<JaegerLog> = span
+        .events
+        .iter()
+        .map(|e| JaegerLog {
+            timestamp: (e.time_unix_nano / 1000) as i64,
+            fields: std::iter::once(JaegerTagWire {
+                key: "event".into(),
+                tag_type: "string".into(),
+                value: serde_json::Value::String(e.name.clone()),
+            })
+            .chain(e.attributes.iter().map(|(k, v)| tag_wire(k, v)))
+            .collect(),
+        })
         .collect();
 
-    let logs: Vec<JaegerLog> = span.events.iter().map(|e| JaegerLog {
-        timestamp: (e.time_unix_nano / 1000) as i64,
-        fields: std::iter::once(JaegerTagWire {
-            key: "event".into(),
-            tag_type: "string".into(),
-            value: serde_json::Value::String(e.name.clone()),
-        })
-        .chain(e.attributes.iter().map(|(k, v)| tag_wire(k, v)))
-        .collect(),
-    }).collect();
-
-    let process_tags: Vec<JaegerTagWire> = span.resource_attributes.iter()
+    let process_tags: Vec<JaegerTagWire> = span
+        .resource_attributes
+        .iter()
         .map(|(k, v)| tag_wire(k, v))
         .collect();
 
@@ -182,24 +191,31 @@ fn tag_wire(key: &str, value: &crate::types::TagValue) -> JaegerTagWire {
     use crate::types::TagValue;
     let (tag_type, json_val) = match value {
         TagValue::String(s) => ("string", serde_json::Value::String(s.clone())),
-        TagValue::Bool(b)   => ("bool",   serde_json::Value::Bool(*b)),
-        TagValue::Int(i)    => ("int64",  serde_json::json!(*i)),
-        TagValue::Float(f)  => ("float64",serde_json::json!(*f)),
-        TagValue::Binary(b) => ("binary", serde_json::Value::String(
-            b.iter().map(|x| format!("{:02x}", x)).collect()
-        )),
+        TagValue::Bool(b) => ("bool", serde_json::Value::Bool(*b)),
+        TagValue::Int(i) => ("int64", serde_json::json!(*i)),
+        TagValue::Float(f) => ("float64", serde_json::json!(*f)),
+        TagValue::Binary(b) => (
+            "binary",
+            serde_json::Value::String(b.iter().map(|x| format!("{:02x}", x)).collect()),
+        ),
     };
-    JaegerTagWire { key: key.to_owned(), tag_type: tag_type.into(), value: json_val }
+    JaegerTagWire {
+        key: key.to_owned(),
+        tag_type: tag_type.into(),
+        value: json_val,
+    }
 }
 
 fn trace_to_jaeger(trace: &Trace) -> JaegerTrace {
     let spans: Vec<JaegerSpan> = trace.spans.iter().map(span_to_jaeger).collect();
-    let processes: std::collections::HashMap<String, JaegerProcess> =
-        std::iter::once(("p1".to_owned(), JaegerProcess {
+    let processes: std::collections::HashMap<String, JaegerProcess> = std::iter::once((
+        "p1".to_owned(),
+        JaegerProcess {
             service_name: trace.root_service_name.clone(),
             tags: vec![],
-        }))
-        .collect();
+        },
+    ))
+    .collect();
 
     JaegerTrace {
         trace_id: format_trace_id(trace.trace_id),
@@ -239,13 +255,13 @@ async fn get_trace(
 struct SearchQuery {
     service: Option<String>,
     operation: Option<String>,
-    tags: Option<String>,          // "key=value key2=value2"
+    tags: Option<String>, // "key=value key2=value2"
     #[serde(rename = "start")]
-    start_time_us: Option<i64>,    // epoch µs
+    start_time_us: Option<i64>, // epoch µs
     #[serde(rename = "end")]
     end_time_us: Option<i64>,
     #[serde(rename = "minDuration")]
-    min_duration: Option<String>,  // "1.5ms" | "500us" | "2s"
+    min_duration: Option<String>, // "1.5ms" | "500us" | "2s"
     #[serde(rename = "maxDuration")]
     max_duration: Option<String>,
     limit: Option<usize>,
@@ -258,7 +274,9 @@ async fn search_traces(
 ) -> Response {
     let tenant_id = tenant_from_headers(&headers);
 
-    let tag_map = params.tags.as_deref()
+    let tag_map = params
+        .tags
+        .as_deref()
         .map(parse_tag_query)
         .unwrap_or_default();
 
@@ -266,9 +284,13 @@ async fn search_traces(
         tenant_id: Some(tenant_id),
         service: params.service,
         operation: params.operation,
-        tags: if tag_map.is_empty() { None } else { Some(tag_map) },
+        tags: if tag_map.is_empty() {
+            None
+        } else {
+            Some(tag_map)
+        },
         start_time_ns: params.start_time_us.map(|t| (t.max(0) as u64) * 1000),
-        end_time_ns:   params.end_time_us.map(|t| (t.max(0) as u64) * 1000),
+        end_time_ns: params.end_time_us.map(|t| (t.max(0) as u64) * 1000),
         min_duration_ns: params.min_duration.as_deref().and_then(parse_duration_str),
         max_duration_ns: params.max_duration.as_deref().and_then(parse_duration_str),
         limit: params.limit.or(Some(20)),
@@ -313,10 +335,7 @@ fn parse_duration_str(s: &str) -> Option<u64> {
 
 // ─── GET /api/services ────────────────────────────────────────────────────
 
-async fn get_services(
-    State(state): State<Arc<TraceState>>,
-    headers: HeaderMap,
-) -> Response {
+async fn get_services(State(state): State<Arc<TraceState>>, headers: HeaderMap) -> Response {
     let tenant_id = tenant_from_headers(&headers);
     let engine = QueryEngine::new(state.store.clone());
     let services = engine.list_services(Some(&tenant_id)).await;
@@ -335,9 +354,10 @@ async fn get_operations(
     let ops = engine.list_operations(&service, Some(&tenant_id)).await;
 
     // Jaeger UI expects `[{name, spanKind}]`
-    let wire: Vec<serde_json::Value> = ops.iter().map(|op| {
-        serde_json::json!({ "name": op, "spanKind": "" })
-    }).collect();
+    let wire: Vec<serde_json::Value> = ops
+        .iter()
+        .map(|op| serde_json::json!({ "name": op, "spanKind": "" }))
+        .collect();
 
     JaegerResponse::ok(wire, ops.len(), ops.len(), 0).into_response()
 }
@@ -347,7 +367,7 @@ async fn get_operations(
 #[derive(Deserialize)]
 struct DepsQuery {
     #[serde(rename = "endTs")]
-    end_ts: Option<i64>,  // epoch ms
+    end_ts: Option<i64>, // epoch ms
     #[serde(rename = "lookback")]
     lookback: Option<i64>, // ms
 }
@@ -366,16 +386,21 @@ async fn get_dependencies(
     };
 
     let engine = QueryEngine::new(state.store.clone());
-    let deps = engine.service_dependencies(start_ns, end_ns, Some(&tenant_id)).await;
+    let deps = engine
+        .service_dependencies(start_ns, end_ns, Some(&tenant_id))
+        .await;
 
     // Convert to Jaeger format
-    let jaeger_deps: Vec<serde_json::Value> = deps.iter().map(|d| {
-        serde_json::json!({
-            "parent": d.parent,
-            "child":  d.child,
-            "callCount": d.call_count,
+    let jaeger_deps: Vec<serde_json::Value> = deps
+        .iter()
+        .map(|d| {
+            serde_json::json!({
+                "parent": d.parent,
+                "child":  d.child,
+                "callCount": d.call_count,
+            })
         })
-    }).collect();
+        .collect();
 
     JaegerResponse::ok(jaeger_deps.clone(), jaeger_deps.len(), jaeger_deps.len(), 0).into_response()
 }
@@ -404,7 +429,8 @@ async fn metrics_calls(
     headers: HeaderMap,
 ) -> Response {
     let snap = state.spm_registry.snapshot();
-    let filtered: Vec<_> = snap.iter()
+    let filtered: Vec<_> = snap
+        .iter()
         .filter(|m| params.service.as_deref().map_or(true, |s| m.service == s))
         .cloned()
         .collect();
@@ -417,7 +443,8 @@ async fn metrics_errors(
     headers: HeaderMap,
 ) -> Response {
     let snap = state.spm_registry.snapshot();
-    let filtered: Vec<_> = snap.iter()
+    let filtered: Vec<_> = snap
+        .iter()
         .filter(|m| params.service.as_deref().map_or(true, |s| m.service == s))
         .cloned()
         .collect();

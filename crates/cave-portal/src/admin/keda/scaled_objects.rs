@@ -14,7 +14,7 @@ use crate::admin::keda::types::{
 };
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
+use crate::admin::state::{AdminState, scope};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum Error {
@@ -32,14 +32,14 @@ pub enum Error {
 
 pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<KedaScaledObjectDetail>, Error> {
     ctx.authorise(Permission::KedaScaledObjectRead)?;
-    Ok(
-        scope(&state.keda_scaled_object_details.read().unwrap(), &ctx.tenant, |r| {
-            &r.tenant
-        })
-        .into_iter()
-        .cloned()
-        .collect(),
+    Ok(scope(
+        &state.keda_scaled_object_details.read().unwrap(),
+        &ctx.tenant,
+        |r| &r.tenant,
     )
+    .into_iter()
+    .cloned()
+    .collect())
 }
 
 pub fn get(
@@ -137,7 +137,9 @@ fn validate(so: &KedaScaledObjectDetail) -> Result<(), Error> {
         return Err(Error::Invalid("namespace cannot be empty".into()));
     }
     if so.scale_target_ref.kind.is_empty() || so.scale_target_ref.name.is_empty() {
-        return Err(Error::Invalid("scaleTargetRef.kind + .name required".into()));
+        return Err(Error::Invalid(
+            "scaleTargetRef.kind + .name required".into(),
+        ));
     }
     if so.min_replica_count > so.max_replica_count {
         return Err(Error::Invalid(format!(
@@ -177,15 +179,15 @@ pub fn render_list(state: &AdminState, ctx: &RequestCtx) -> Result<String, Error
             vec![
                 s.namespace.clone(),
                 s.name.clone(),
-                format!(
-                    "{}/{}",
-                    s.scale_target_ref.kind, s.scale_target_ref.name
-                ),
+                format!("{}/{}", s.scale_target_ref.kind, s.scale_target_ref.name),
                 format!("{}/{}", s.min_replica_count, s.max_replica_count),
                 s.idle_replica_count
                     .map(|i| i.to_string())
                     .unwrap_or_else(|| "—".into()),
-                s.status.last_active_time.map(|t| t.to_string()).unwrap_or_else(|| "—".into()),
+                s.status
+                    .last_active_time
+                    .map(|t| t.to_string())
+                    .unwrap_or_else(|| "—".into()),
                 s.triggers.len().to_string(),
                 s.status.health.overall.clone(),
                 if is_paused(s) { "yes" } else { "no" }.into(),
@@ -331,7 +333,12 @@ pub fn render_new_form(_state: &AdminState, ctx: &RequestCtx) -> Result<String, 
         scaler_options = scaler_options,
         n_scalers = scalers::all().len(),
     );
-    Ok(page_shell_full(ctx, "/admin/keda/scaledobjects", "keda · new scaledobject", &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/keda/scaledobjects",
+        "keda · new scaledobject",
+        &body,
+    ))
 }
 
 pub fn render_edit_yaml(
@@ -413,7 +420,10 @@ fn render_annotations(items: &[(String, String)]) -> String {
     if items.is_empty() {
         return "<p class=\"text-sm text-gray-500\">—</p>".into();
     }
-    let rows: Vec<Vec<String>> = items.iter().map(|(k, v)| vec![k.clone(), v.clone()]).collect();
+    let rows: Vec<Vec<String>> = items
+        .iter()
+        .map(|(k, v)| vec![k.clone(), v.clone()])
+        .collect();
     table(&["key", "value"], &rows)
 }
 
@@ -504,7 +514,10 @@ fn render_status(s: &KedaScaledObjectStatus) -> String {
   <dt class="text-gray-500">activeTriggers</dt><dd>{active}</dd>
   <dt class="text-gray-500">reason</dt><dd>{reason}</dd>
 </dl>"#,
-        lat = s.last_active_time.map(|t| t.to_string()).unwrap_or_else(|| "—".into()),
+        lat = s
+            .last_active_time
+            .map(|t| t.to_string())
+            .unwrap_or_else(|| "—".into()),
         orc = s.original_replica_count,
         h_status = render_health_pill(&s.health),
         h_msg = escape(&s.health.message),
@@ -533,7 +546,10 @@ fn render_health_pill(h: &KedaHealth) -> String {
 fn to_yaml(so: &KedaScaledObjectDetail) -> String {
     let mut out = String::new();
     out.push_str("apiVersion: keda.sh/v1alpha1\nkind: ScaledObject\nmetadata:\n");
-    out.push_str(&format!("  namespace: {}\n  name: {}\n", so.namespace, so.name));
+    out.push_str(&format!(
+        "  namespace: {}\n  name: {}\n",
+        so.namespace, so.name
+    ));
     if !so.annotations.is_empty() {
         out.push_str("  annotations:\n");
         for (k, v) in &so.annotations {
@@ -553,7 +569,10 @@ fn to_yaml(so: &KedaScaledObjectDetail) -> String {
     if let Some(idle) = so.idle_replica_count {
         out.push_str(&format!("  idleReplicaCount: {}\n", idle));
     }
-    out.push_str(&format!("  pollingInterval: {}\n", so.polling_interval_secs));
+    out.push_str(&format!(
+        "  pollingInterval: {}\n",
+        so.polling_interval_secs
+    ));
     out.push_str(&format!("  cooldownPeriod: {}\n", so.cooldown_period_secs));
     if so.initial_cooldown_period_secs != 0 {
         out.push_str(&format!(
@@ -736,7 +755,10 @@ mod tests {
     #[test]
     fn create_rejects_duplicate() {
         let state = AdminState::empty();
-        let c = ctx(&[Permission::KedaScaledObjectWrite, Permission::KedaScaledObjectRead]);
+        let c = ctx(&[
+            Permission::KedaScaledObjectWrite,
+            Permission::KedaScaledObjectRead,
+        ]);
         create(&state, &c, minimal_so("dupe")).unwrap();
         let err = create(&state, &c, minimal_so("dupe")).unwrap_err();
         assert!(matches!(err, Error::AlreadyExists { .. }));
@@ -786,8 +808,19 @@ mod tests {
         let state = AdminState::seeded();
         let html = render_new_form(&state, &ctx(&[Permission::KedaScaledObjectWrite])).unwrap();
         // Spot-check a handful from each category.
-        for kind in ["kafka", "prometheus", "azure-eventhub", "gcp-pubsub", "cron", "cpu"] {
-            assert!(html.contains(&format!(r#"value="{}""#, kind)), "missing option `{}`", kind);
+        for kind in [
+            "kafka",
+            "prometheus",
+            "azure-eventhub",
+            "gcp-pubsub",
+            "cron",
+            "cpu",
+        ] {
+            assert!(
+                html.contains(&format!(r#"value="{}""#, kind)),
+                "missing option `{}`",
+                kind
+            );
         }
     }
 

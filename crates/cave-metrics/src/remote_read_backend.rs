@@ -41,16 +41,32 @@ pub struct LabelMatcher {
 
 impl LabelMatcher {
     pub fn eq(name: &str, value: &str) -> Self {
-        Self { kind: MatcherKind::Equal, name: name.to_string(), value: value.to_string() }
+        Self {
+            kind: MatcherKind::Equal,
+            name: name.to_string(),
+            value: value.to_string(),
+        }
     }
     pub fn ne(name: &str, value: &str) -> Self {
-        Self { kind: MatcherKind::NotEqual, name: name.to_string(), value: value.to_string() }
+        Self {
+            kind: MatcherKind::NotEqual,
+            name: name.to_string(),
+            value: value.to_string(),
+        }
     }
     pub fn re(name: &str, value: &str) -> Self {
-        Self { kind: MatcherKind::RegexMatch, name: name.to_string(), value: value.to_string() }
+        Self {
+            kind: MatcherKind::RegexMatch,
+            name: name.to_string(),
+            value: value.to_string(),
+        }
     }
     pub fn rne(name: &str, value: &str) -> Self {
-        Self { kind: MatcherKind::RegexNoMatch, name: name.to_string(), value: value.to_string() }
+        Self {
+            kind: MatcherKind::RegexNoMatch,
+            name: name.to_string(),
+            value: value.to_string(),
+        }
     }
 
     pub fn matches(&self, labels: &BTreeMap<String, String>) -> bool {
@@ -85,17 +101,23 @@ pub struct MemoryReadBackend {
 }
 
 impl MemoryReadBackend {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn add_series(&mut self, labels: BTreeMap<String, String>, samples: Vec<Sample>) {
         self.series.push(SeriesSamples { labels, samples });
     }
 
-    pub fn series_count(&self) -> usize { self.series.len() }
+    pub fn series_count(&self) -> usize {
+        self.series.len()
+    }
 }
 
 impl RemoteReadBackend for MemoryReadBackend {
-    fn name(&self) -> &'static str { "memory" }
+    fn name(&self) -> &'static str {
+        "memory"
+    }
     fn read(&self, q: &ReadQuery) -> Vec<SeriesSamples> {
         let mut out = Vec::new();
         for s in &self.series {
@@ -107,7 +129,10 @@ impl RemoteReadBackend for MemoryReadBackend {
                     .cloned()
                     .collect();
                 if !samples.is_empty() {
-                    out.push(SeriesSamples { labels: s.labels.clone(), samples });
+                    out.push(SeriesSamples {
+                        labels: s.labels.clone(),
+                        samples,
+                    });
                 }
             }
         }
@@ -174,10 +199,18 @@ mod tests {
     use super::*;
 
     fn labels(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
-    fn s(ts: i64, v: f64) -> Sample { Sample { timestamp_ms: ts, value: v } }
+    fn s(ts: i64, v: f64) -> Sample {
+        Sample {
+            timestamp_ms: ts,
+            value: v,
+        }
+    }
 
     fn backend_with_demo() -> MemoryReadBackend {
         let mut b = MemoryReadBackend::new();
@@ -230,7 +263,10 @@ mod tests {
         let q = ReadQuery {
             start_ms: 1_500,
             end_ms: 2_500,
-            matchers: vec![LabelMatcher::eq("__name__", "up"), LabelMatcher::eq("job", "api")],
+            matchers: vec![
+                LabelMatcher::eq("__name__", "up"),
+                LabelMatcher::eq("job", "api"),
+            ],
         };
         let res = b.read(&q);
         assert_eq!(res.len(), 1);

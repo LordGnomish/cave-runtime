@@ -157,7 +157,8 @@ impl TaskRuntime for SourceRuntime {
         let records = self.task.poll()?;
         let n = records.len() as u64;
         for r in records {
-            self.last_offsets.insert(r.source_partition, r.source_offset);
+            self.last_offsets
+                .insert(r.source_partition, r.source_offset);
         }
         self.emitted += n;
         Ok(n)

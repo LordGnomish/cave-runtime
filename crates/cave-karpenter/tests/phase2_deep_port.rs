@@ -10,14 +10,14 @@
 //! The whole file is RED before the matching `src/` modules land.
 
 use cave_karpenter::batcher::{Batcher, PodSpec};
-use cave_karpenter::binpack::{binpack, BinpackResult, InstanceType};
+use cave_karpenter::binpack::{BinpackResult, InstanceType, binpack};
 use cave_karpenter::disruption::{
-    consolidation_candidates, drift_candidates, expiration_candidates, Decision, DisruptionReason,
+    Decision, DisruptionReason, consolidation_candidates, drift_candidates, expiration_candidates,
 };
 use cave_karpenter::models::{
     Budget, Disruption, NodeClaim, NodeClass, NodePool, Requirement, RequirementOperator, Taint,
 };
-use cave_karpenter::nodeclaim_lifecycle::{drain, launch, terminate, LaunchOutcome};
+use cave_karpenter::nodeclaim_lifecycle::{LaunchOutcome, drain, launch, terminate};
 use cave_karpenter::provider::{
     AzureNodeClassSpec, CloudProvider, HetznerNodeClassSpec, ProviderResult, StaticProvider,
 };

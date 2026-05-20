@@ -9,10 +9,9 @@ use crate::broker::Broker;
 use crate::compression::Codec;
 use crate::error::{StreamsError, StreamsResult};
 use crate::protocol::{
-    self, ApiKey, RequestHeader,
-    build_api_versions_response, encode_string, encode_array, frame_response,
-    CreateTopicsRequest, FetchRequest, MetadataRequest, ProduceRequest, ProduceResponse,
-    ProduceTopicResponse, ProducePartitionResponse,
+    self, ApiKey, CreateTopicsRequest, FetchRequest, MetadataRequest, ProducePartitionResponse,
+    ProduceRequest, ProduceResponse, ProduceTopicResponse, RequestHeader,
+    build_api_versions_response, encode_array, encode_string, frame_response,
 };
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::sync::Arc;
@@ -80,10 +79,7 @@ async fn handle_connection(mut stream: TcpStream, broker: Arc<Broker>) -> std::i
     Ok(())
 }
 
-async fn dispatch_request(
-    buf: &mut Bytes,
-    broker: &Arc<Broker>,
-) -> StreamsResult<Bytes> {
+async fn dispatch_request(buf: &mut Bytes, broker: &Arc<Broker>) -> StreamsResult<Bytes> {
     let header = RequestHeader::decode(buf)?;
     let correlation_id = header.correlation_id;
 
@@ -221,7 +217,10 @@ fn handle_produce(buf: &mut Bytes, broker: &Broker, version: i16) -> StreamsResu
         });
     }
 
-    let resp = ProduceResponse { responses, throttle_time_ms: 0 };
+    let resp = ProduceResponse {
+        responses,
+        throttle_time_ms: 0,
+    };
     let mut b = BytesMut::new();
     resp.encode(&mut b);
     Ok(b.freeze())
@@ -247,7 +246,9 @@ fn handle_fetch(buf: &mut Bytes, broker: &Broker, version: i16) -> StreamsResult
                 part.partition_max_bytes,
             ) {
                 Ok(batches) => {
-                    let hw = broker.log_end_offset(&topic.name, part.partition).unwrap_or(0);
+                    let hw = broker
+                        .log_end_offset(&topic.name, part.partition)
+                        .unwrap_or(0);
                     let mut data = BytesMut::new();
                     for batch in batches {
                         data.put_slice(&batch.data);
@@ -412,14 +413,24 @@ fn handle_join_group(buf: &mut Bytes, broker: &Broker) -> StreamsResult<Bytes> {
     let protocols = protocol::decode_array(buf, |b| {
         let name = protocol::decode_string(b)?;
         let meta_len = b.get_i32();
-        let meta = if meta_len > 0 { b.copy_to_bytes(meta_len as usize).to_vec() } else { vec![] };
+        let meta = if meta_len > 0 {
+            b.copy_to_bytes(meta_len as usize).to_vec()
+        } else {
+            vec![]
+        };
         Ok((name, meta))
     })?;
 
     let protocols_map: std::collections::HashMap<String, Vec<u8>> = protocols.into_iter().collect();
     let result = broker.groups.join_group(
-        group_id, Some(member_id), "client".into(), "/127.0.0.1".into(),
-        session_timeout, rebalance_timeout, protocol_type, protocols_map,
+        group_id,
+        Some(member_id),
+        "client".into(),
+        "/127.0.0.1".into(),
+        session_timeout,
+        rebalance_timeout,
+        protocol_type,
+        protocols_map,
     )?;
 
     let mut b = BytesMut::new();
@@ -449,11 +460,17 @@ fn handle_sync_group(buf: &mut Bytes, broker: &Broker) -> StreamsResult<Bytes> {
     let assignments = protocol::decode_array(buf, |b| {
         let mid = protocol::decode_string(b)?;
         let assign_len = b.get_i32();
-        let assign = if assign_len > 0 { b.copy_to_bytes(assign_len as usize).to_vec() } else { vec![] };
+        let assign = if assign_len > 0 {
+            b.copy_to_bytes(assign_len as usize).to_vec()
+        } else {
+            vec![]
+        };
         Ok((mid, assign))
     })?;
     let assign_map: std::collections::HashMap<String, Vec<u8>> = assignments.into_iter().collect();
-    let assignment = broker.groups.sync_group(&group_id, generation_id, &member_id, assign_map)?;
+    let assignment = broker
+        .groups
+        .sync_group(&group_id, generation_id, &member_id, assign_map)?;
     let mut b = BytesMut::new();
     b.put_i32(0);
     b.put_i16(0);
@@ -466,7 +483,9 @@ fn handle_heartbeat(buf: &mut Bytes, broker: &Broker) -> StreamsResult<Bytes> {
     let group_id = protocol::decode_string(buf)?;
     let generation_id = buf.get_i32();
     let member_id = protocol::decode_string(buf)?;
-    let error_code = broker.groups.heartbeat(&group_id, generation_id, &member_id)?;
+    let error_code = broker
+        .groups
+        .heartbeat(&group_id, generation_id, &member_id)?;
     let mut b = BytesMut::new();
     b.put_i32(0);
     b.put_i16(error_code);
@@ -564,11 +583,12 @@ fn handle_init_producer_id(buf: &mut Bytes, broker: &Broker) -> StreamsResult<By
     let _producer_id = buf.get_i64();
     let _producer_epoch = buf.get_i16();
 
-    let (pid, epoch) = broker.transactions.init_producer(
-        transactional_id,
-        txn_timeout_ms,
-        || broker.allocate_producer_id(),
-    )?;
+    let (pid, epoch) =
+        broker
+            .transactions
+            .init_producer(transactional_id, txn_timeout_ms, || {
+                broker.allocate_producer_id()
+            })?;
     let mut b = BytesMut::new();
     b.put_i32(0);
     b.put_i16(0);
@@ -597,10 +617,11 @@ fn handle_delete_records(buf: &mut Bytes, broker: &Broker) -> StreamsResult<Byte
         b.put_i32(partitions.len() as i32);
         for (partition, before_offset) in partitions {
             b.put_i32(partition);
-            let (error_code, low_watermark) = match broker.delete_records(&name, partition, before_offset) {
-                Ok(lso) => (0i16, lso),
-                Err(e) => (e.kafka_error_code(), -1),
-            };
+            let (error_code, low_watermark) =
+                match broker.delete_records(&name, partition, before_offset) {
+                    Ok(lso) => (0i16, lso),
+                    Err(e) => (e.kafka_error_code(), -1),
+                };
             b.put_i64(low_watermark);
             b.put_i16(error_code);
         }

@@ -38,9 +38,9 @@ pub fn node_should_run(spec: &DaemonSetSpec, node: &NodeView) -> bool {
     if !node.schedulable {
         return false;
     }
-    spec.node_selector.iter().all(|(k, v)| {
-        node.labels.iter().any(|(nk, nv)| nk == k && nv == v)
-    })
+    spec.node_selector
+        .iter()
+        .all(|(k, v)| node.labels.iter().any(|(nk, nv)| nk == k && nv == v))
 }
 
 /// Mirrors `manage` in `pkg/controller/daemon/daemon_controller.go`.
@@ -101,12 +101,18 @@ pub struct Toleration {
 /// `apimachinery/pkg/api/v1/helper/helpers.go::Toleration::ToleratesTaint`.
 pub fn tolerates(toleration: &Toleration, taint: &Taint) -> bool {
     if let Some(eff) = toleration.effect {
-        if eff != taint.effect { return false; }
+        if eff != taint.effect {
+            return false;
+        }
     }
     match toleration.operator {
         TolerationOperator::Exists => {
             // empty key matches all keys
-            toleration.key.as_deref().map(|k| k == taint.key).unwrap_or(true)
+            toleration
+                .key
+                .as_deref()
+                .map(|k| k == taint.key)
+                .unwrap_or(true)
         }
         TolerationOperator::Equal => {
             toleration.key.as_deref() == Some(taint.key.as_str())
@@ -119,7 +125,8 @@ pub fn tolerates(toleration: &Toleration, taint: &Taint) -> bool {
 /// on the node. Mirrors
 /// `apimachinery/pkg/api/v1/helper/helpers.go::FindMatchingUntoleratedTaint`.
 pub fn tolerates_all(taints: &[Taint], tolerations: &[Toleration]) -> bool {
-    taints.iter()
+    taints
+        .iter()
         .filter(|t| matches!(t.effect, TaintEffect::NoSchedule | TaintEffect::NoExecute))
         .all(|t| tolerations.iter().any(|tol| tolerates(tol, t)))
 }
@@ -138,7 +145,8 @@ pub fn rolling_update(
     nodes: &[DaemonNodeView],
     max_unavailable: u32,
 ) -> Result<Reconcile, ControllerError> {
-    let outdated: Vec<&DaemonNodeView> = nodes.iter()
+    let outdated: Vec<&DaemonNodeView> = nodes
+        .iter()
         .filter(|n| n.running_ds_pod && !n.at_current_revision)
         .collect();
     if outdated.is_empty() {
@@ -149,7 +157,10 @@ pub fn rolling_update(
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::new("pkg/controller/daemon/daemon_controller.go", "DaemonSetsController");
+const FILE_CITE: Cite = Cite::new(
+    "pkg/controller/daemon/daemon_controller.go",
+    "DaemonSetsController",
+);
 
 #[cfg(test)]
 mod tests {
@@ -170,7 +181,10 @@ mod tests {
     fn node(name: &str, labels: &[(&str, &str)], schedulable: bool, has_pod: bool) -> NodeView {
         NodeView {
             name: name.into(),
-            labels: labels.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            labels: labels
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
             schedulable,
             running_ds_pod: has_pod,
         }
@@ -184,13 +198,13 @@ mod tests {
             "tenant-ds-no-selector"
         );
         let s = ds(vec![]);
-        let nodes = vec![
-            node("a", &[], true, false),
-            node("b", &[], false, false),
-        ];
+        let nodes = vec![node("a", &[], true, false), node("b", &[], false, false)];
         assert!(node_should_run(&s, &nodes[0]));
         assert!(!node_should_run(&s, &nodes[1]));
-        assert_eq!(reconcile(&s, &nodes, &tenant).unwrap(), Reconcile::Create(1));
+        assert_eq!(
+            reconcile(&s, &nodes, &tenant).unwrap(),
+            Reconcile::Create(1)
+        );
     }
 
     #[test]
@@ -205,7 +219,10 @@ mod tests {
             node("edge-1", &[("role", "edge")], true, false),
             node("core-1", &[("role", "core")], true, false),
         ];
-        assert_eq!(reconcile(&s, &nodes, &tenant).unwrap(), Reconcile::Create(1));
+        assert_eq!(
+            reconcile(&s, &nodes, &tenant).unwrap(),
+            Reconcile::Create(1)
+        );
     }
 
     #[test]
@@ -217,7 +234,10 @@ mod tests {
         );
         let s = ds(vec![("role", "edge")]);
         let nodes = vec![node("former-edge", &[("role", "core")], true, true)];
-        assert_eq!(reconcile(&s, &nodes, &tenant).unwrap(), Reconcile::Delete(1));
+        assert_eq!(
+            reconcile(&s, &nodes, &tenant).unwrap(),
+            Reconcile::Delete(1)
+        );
     }
 
     #[test]
@@ -235,7 +255,11 @@ mod tests {
     // ── Deeper coverage (deeper-001) ─────────────────────────────────────────
 
     fn taint(key: &str, value: Option<&str>, effect: TaintEffect) -> Taint {
-        Taint { key: key.into(), value: value.map(String::from), effect }
+        Taint {
+            key: key.into(),
+            value: value.map(String::from),
+            effect,
+        }
     }
 
     /// Upstream parity: `TestToleration_ExistsMatchesAnyValue`
@@ -255,7 +279,11 @@ mod tests {
             value: None,
             effect: Some(TaintEffect::NoSchedule),
         };
-        let t = taint("node-role.kubernetes.io/control-plane", None, TaintEffect::NoSchedule);
+        let t = taint(
+            "node-role.kubernetes.io/control-plane",
+            None,
+            TaintEffect::NoSchedule,
+        );
         assert!(tolerates(&tol, &t));
     }
 
@@ -303,8 +331,10 @@ mod tests {
             value: Some("gpu".into()),
             effect: Some(TaintEffect::NoSchedule),
         }];
-        assert!(!tolerates_all(&taints, &tols),
-            "missing toleration for `disk` blocks the match");
+        assert!(
+            !tolerates_all(&taints, &tols),
+            "missing toleration for `disk` blocks the match"
+        );
     }
 
     /// Upstream parity: `TestTolerations_PreferNoScheduleIsAdvisory`
@@ -321,8 +351,10 @@ mod tests {
         let taints = vec![taint("nice-to-have", None, TaintEffect::PreferNoSchedule)];
         // No tolerations at all.
         let tols: Vec<Toleration> = vec![];
-        assert!(tolerates_all(&taints, &tols),
-            "PreferNoSchedule is advisory only, never a hard match failure");
+        assert!(
+            tolerates_all(&taints, &tols),
+            "PreferNoSchedule is advisory only, never a hard match failure"
+        );
     }
 
     /// Upstream parity: `TestDaemonRollingUpdate_RespectsMaxUnavailable`
@@ -337,13 +369,28 @@ mod tests {
         );
         let _ = tenant;
         let nodes = vec![
-            DaemonNodeView { name: "a".into(), at_current_revision: false, running_ds_pod: true },
-            DaemonNodeView { name: "b".into(), at_current_revision: false, running_ds_pod: true },
-            DaemonNodeView { name: "c".into(), at_current_revision: false, running_ds_pod: true },
+            DaemonNodeView {
+                name: "a".into(),
+                at_current_revision: false,
+                running_ds_pod: true,
+            },
+            DaemonNodeView {
+                name: "b".into(),
+                at_current_revision: false,
+                running_ds_pod: true,
+            },
+            DaemonNodeView {
+                name: "c".into(),
+                at_current_revision: false,
+                running_ds_pod: true,
+            },
         ];
         let dec = rolling_update(&nodes, 2).unwrap();
-        assert_eq!(dec, Reconcile::Update(2),
-            "at most max_unavailable=2 outdated pods updated per pass");
+        assert_eq!(
+            dec,
+            Reconcile::Update(2),
+            "at most max_unavailable=2 outdated pods updated per pass"
+        );
     }
 
     /// Upstream parity: `TestDaemonRollingUpdate_NoOpAtCurrentRevision`
@@ -358,8 +405,16 @@ mod tests {
         );
         let _ = tenant;
         let nodes = vec![
-            DaemonNodeView { name: "a".into(), at_current_revision: true, running_ds_pod: true },
-            DaemonNodeView { name: "b".into(), at_current_revision: true, running_ds_pod: true },
+            DaemonNodeView {
+                name: "a".into(),
+                at_current_revision: true,
+                running_ds_pod: true,
+            },
+            DaemonNodeView {
+                name: "b".into(),
+                at_current_revision: true,
+                running_ds_pod: true,
+            },
         ];
         let dec = rolling_update(&nodes, 2).unwrap();
         assert_eq!(dec, Reconcile::NoOp);

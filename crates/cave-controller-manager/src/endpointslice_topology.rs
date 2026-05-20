@@ -100,8 +100,7 @@ pub fn compute_hints(
             continue;
         }
         // proportional rounding
-        let share =
-            ((z.cpu_milli as u128) * (total_ready as u128) / total_cpu as u128) as u32;
+        let share = ((z.cpu_milli as u128) * (total_ready as u128) / total_cpu as u128) as u32;
         per_zone_target.insert(z.name.clone(), share);
         allocated += share;
     }
@@ -187,10 +186,17 @@ mod tests {
     use crate::test_ctx;
 
     fn ep(addr: &str, zone: &str) -> ReadyEndpoint {
-        ReadyEndpoint { address: addr.into(), zone: zone.into(), ready: true }
+        ReadyEndpoint {
+            address: addr.into(),
+            zone: zone.into(),
+            ready: true,
+        }
     }
     fn zinfo(name: &str, cpu: u64) -> ZoneInfo {
-        ZoneInfo { name: name.into(), cpu_milli: cpu }
+        ZoneInfo {
+            name: name.into(),
+            cpu_milli: cpu,
+        }
     }
 
     #[test]
@@ -200,7 +206,9 @@ mod tests {
             "AddHints",
             "tenant-est-single-zone"
         );
-        let eps: Vec<_> = (0..15).map(|i| ep(&format!("p{i}"), "us-east-1a")).collect();
+        let eps: Vec<_> = (0..15)
+            .map(|i| ep(&format!("p{i}"), "us-east-1a"))
+            .collect();
         let zones = vec![zinfo("us-east-1a", 10_000)];
         match compute_hints(&eps, &zones, MIN_ENDPOINTS_PER_ZONE) {
             TopologyDecision::Disabled(_) => {}
@@ -264,10 +272,14 @@ mod tests {
         let dec = compute_hints(&eps, &zones, 5);
         match dec {
             TopologyDecision::Engaged(hints) => {
-                let z1_hinted =
-                    hints.iter().filter(|h| h.for_zones == vec!["z1".to_string()]).count();
-                let z2_hinted =
-                    hints.iter().filter(|h| h.for_zones == vec!["z2".to_string()]).count();
+                let z1_hinted = hints
+                    .iter()
+                    .filter(|h| h.for_zones == vec!["z1".to_string()])
+                    .count();
+                let z2_hinted = hints
+                    .iter()
+                    .filter(|h| h.for_zones == vec!["z2".to_string()])
+                    .count();
                 // z1 should be hinted by ~75% of endpoints.
                 assert!(z1_hinted >= 14);
                 assert!(z2_hinted <= 6);

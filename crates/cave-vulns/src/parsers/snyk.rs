@@ -46,13 +46,24 @@ struct SnVuln {
 }
 
 impl ScanParser for SnykParser {
-    fn scan_type(&self) -> &'static str { "Snyk Scan" }
+    fn scan_type(&self) -> &'static str {
+        "Snyk Scan"
+    }
     fn dedupe_fields(&self) -> &'static [&'static str] {
-        &["vuln_id_from_tool", "file_path", "component_name", "component_version"]
+        &[
+            "vuln_id_from_tool",
+            "file_path",
+            "component_name",
+            "component_version",
+        ]
     }
     fn parse(&self, data: &[u8]) -> Result<Vec<Finding>, ParserError> {
         // Snyk reports may be a single object OR a list (multi-module).
-        let trimmed = data.iter().position(|b| !b.is_ascii_whitespace()).map(|i| data[i]).unwrap_or(b'{');
+        let trimmed = data
+            .iter()
+            .position(|b| !b.is_ascii_whitespace())
+            .map(|i| data[i])
+            .unwrap_or(b'{');
         let reports: Vec<Report> = if trimmed == b'[' {
             serde_json::from_slice::<Vec<Report>>(data)?
         } else {
@@ -64,7 +75,9 @@ impl ScanParser for SnykParser {
                 let mut sev = FindingSeverity::parse(&v.severity).unwrap_or(FindingSeverity::Info);
                 if let Some(s) = v.cvss_score {
                     let promoted = severity_from_score(s);
-                    if promoted.weight() > sev.weight() { sev = promoted; }
+                    if promoted.weight() > sev.weight() {
+                        sev = promoted;
+                    }
                 }
                 let mut f = Finding::new(v.title, sev);
                 f.vuln_id_from_tool = Some(v.id.clone());
@@ -74,7 +87,10 @@ impl ScanParser for SnykParser {
                 f.component_version = v.version;
                 f.description = v.description.unwrap_or_default();
                 if let Some(cves) = v.identifiers.get("CVE").and_then(|c| c.as_array()) {
-                    let cve_list: Vec<String> = cves.iter().filter_map(|c| c.as_str().map(String::from)).collect();
+                    let cve_list: Vec<String> = cves
+                        .iter()
+                        .filter_map(|c| c.as_str().map(String::from))
+                        .collect();
                     if let Some(c) = cve_list.first() {
                         f.cve = Some(c.clone());
                     }
@@ -82,7 +98,11 @@ impl ScanParser for SnykParser {
                 }
                 if let Some(cwes) = v.identifiers.get("CWE").and_then(|c| c.as_array()) {
                     if let Some(first) = cwes.iter().filter_map(|c| c.as_str()).next() {
-                        if let Some(n) = first.to_ascii_uppercase().strip_prefix("CWE-").and_then(|s| s.parse().ok()) {
+                        if let Some(n) = first
+                            .to_ascii_uppercase()
+                            .strip_prefix("CWE-")
+                            .and_then(|s| s.parse().ok())
+                        {
                             f.cwe = Some(n);
                         }
                     }

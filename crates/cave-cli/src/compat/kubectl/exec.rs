@@ -2,7 +2,7 @@
 // Copyright 2026 Cave Runtime contributors
 //! `cavectl kubectl exec …`
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Args;
 
 use crate::native::{HttpVerb, PreparedRequest};

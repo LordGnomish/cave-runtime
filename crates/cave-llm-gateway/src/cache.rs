@@ -19,7 +19,11 @@ pub struct CacheConfig {
 
 impl Default for CacheConfig {
     fn default() -> Self {
-        Self { enabled: true, ttl_secs: 3600, max_entries: 10_000 }
+        Self {
+            enabled: true,
+            ttl_secs: 3600,
+            max_entries: 10_000,
+        }
     }
 }
 
@@ -88,7 +92,8 @@ impl PromptCache {
             if entry.is_expired() {
                 drop(entry);
                 self.store.remove(&key);
-                self.misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                self.misses
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 return None;
             }
             entry.hits += 1;
@@ -96,7 +101,8 @@ impl PromptCache {
             return Some(entry.response.clone());
         }
 
-        self.misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.misses
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         None
     }
 
@@ -118,7 +124,15 @@ impl PromptCache {
         } else {
             Duration::from_secs(self.config.ttl_secs)
         };
-        self.store.insert(key, CacheEntry { response: resp, inserted_at: Instant::now(), ttl, hits: 0 });
+        self.store.insert(
+            key,
+            CacheEntry {
+                response: resp,
+                inserted_at: Instant::now(),
+                ttl,
+                hits: 0,
+            },
+        );
     }
 
     pub fn invalidate(&self, req: &ChatCompletionRequest) -> bool {
@@ -138,7 +152,11 @@ impl PromptCache {
             entries: self.store.len(),
             hits,
             misses,
-            hit_rate: if total == 0 { 0.0 } else { hits as f64 / total as f64 },
+            hit_rate: if total == 0 {
+                0.0
+            } else {
+                hits as f64 / total as f64
+            },
         }
     }
 }
@@ -168,9 +186,18 @@ mod tests {
             messages: vec![ChatMessage::user(text)],
             temperature: Some(0.0),
             seed: Some(42),
-            top_p: None, max_tokens: None, stream: None, stop: None,
-            presence_penalty: None, frequency_penalty: None, n: None,
-            user: None, tools: None, tool_choice: None, response_format: None, logprobs: None,
+            top_p: None,
+            max_tokens: None,
+            stream: None,
+            stop: None,
+            presence_penalty: None,
+            frequency_penalty: None,
+            n: None,
+            user: None,
+            tools: None,
+            tool_choice: None,
+            response_format: None,
+            logprobs: None,
         }
     }
 
@@ -196,7 +223,11 @@ mod tests {
 
     #[test]
     fn disabled_cache_never_hits() {
-        let cache = PromptCache::new(CacheConfig { enabled: false, ttl_secs: 3600, max_entries: 1000 });
+        let cache = PromptCache::new(CacheConfig {
+            enabled: false,
+            ttl_secs: 3600,
+            max_entries: 1000,
+        });
         let req = make_req("hi");
         let resp = ChatCompletionResponse::simple("gpt-4o", "hello".into(), Usage::new(5, 2));
         cache.insert(&req, resp);

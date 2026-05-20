@@ -27,7 +27,9 @@ pub struct ScalarFunction {
 
 impl std::fmt::Debug for ScalarFunction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ScalarFunction").field("name", &self.name).finish()
+        f.debug_struct("ScalarFunction")
+            .field("name", &self.name)
+            .finish()
     }
 }
 
@@ -92,8 +94,13 @@ impl FunctionRegistry {
 
     fn install_default_scalars(&mut self) {
         let mut register = |name: &str, fun: ScalarFn| {
-            self.scalars
-                .insert(name.to_string(), ScalarFunction { name: name.to_string(), fun });
+            self.scalars.insert(
+                name.to_string(),
+                ScalarFunction {
+                    name: name.to_string(),
+                    fun,
+                },
+            );
         };
 
         register(
@@ -270,7 +277,10 @@ mod tests {
         let r = FunctionRegistry::new();
         let f = r.lookup_scalar("abs").unwrap();
         assert_eq!((f.fun)(&[Value::Int64(-5)]).unwrap(), Value::Int64(5));
-        assert_eq!((f.fun)(&[Value::Float64(-1.5)]).unwrap(), Value::Float64(1.5));
+        assert_eq!(
+            (f.fun)(&[Value::Float64(-1.5)]).unwrap(),
+            Value::Float64(1.5)
+        );
         assert_eq!((f.fun)(&[Value::Null]).unwrap(), Value::Null);
     }
 
@@ -290,7 +300,13 @@ mod tests {
         let least = r.lookup_scalar("least").unwrap();
         let greatest = r.lookup_scalar("greatest").unwrap();
         assert_eq!(
-            (least.fun)(&[Value::Int64(3), Value::Null, Value::Int64(1), Value::Int64(2)]).unwrap(),
+            (least.fun)(&[
+                Value::Int64(3),
+                Value::Null,
+                Value::Int64(1),
+                Value::Int64(2)
+            ])
+            .unwrap(),
             Value::Int64(1),
         );
         assert_eq!(
@@ -303,7 +319,10 @@ mod tests {
     fn length_counts_chars() {
         let r = FunctionRegistry::new();
         let f = r.lookup_scalar("length").unwrap();
-        assert_eq!((f.fun)(&[Value::Utf8("abc".into())]).unwrap(), Value::Int64(3));
+        assert_eq!(
+            (f.fun)(&[Value::Utf8("abc".into())]).unwrap(),
+            Value::Int64(3)
+        );
     }
 
     #[test]
@@ -311,7 +330,12 @@ mod tests {
         let r = FunctionRegistry::new();
         let f = r.lookup_scalar("concat").unwrap();
         assert_eq!(
-            (f.fun)(&[Value::Utf8("a".into()), Value::Null, Value::Utf8("b".into())]).unwrap(),
+            (f.fun)(&[
+                Value::Utf8("a".into()),
+                Value::Null,
+                Value::Utf8("b".into())
+            ])
+            .unwrap(),
             Value::Utf8("ab".to_string()),
         );
     }

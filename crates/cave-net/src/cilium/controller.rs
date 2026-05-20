@@ -68,18 +68,24 @@ pub struct ControllerManager {
 
 impl ControllerManager {
     pub fn new(tenant: TenantId) -> Self {
-        Self { tenant, controllers: BTreeMap::new() }
+        Self {
+            tenant,
+            controllers: BTreeMap::new(),
+        }
     }
 
     pub fn register(&mut self, name: &str, params: ControllerParams) {
-        self.controllers.insert(name.to_string(), (params, ControllerStatus::default()));
+        self.controllers
+            .insert(name.to_string(), (params, ControllerStatus::default()));
     }
 
     pub fn unregister(&mut self, name: &str) -> bool {
         self.controllers.remove(name).is_some()
     }
 
-    pub fn list(&self) -> Vec<&String> { self.controllers.keys().collect() }
+    pub fn list(&self) -> Vec<&String> {
+        self.controllers.keys().collect()
+    }
 
     pub fn status(&self, name: &str) -> Option<&ControllerStatus> {
         self.controllers.get(name).map(|(_, s)| s)
@@ -88,7 +94,9 @@ impl ControllerManager {
     /// Record a single run outcome. Returns the new consecutive_failures
     /// count, or `MaxErrors` if the controller has hit its threshold.
     pub fn record(&mut self, name: &str, outcome: RunOutcome) -> Result<u32, ControllerError> {
-        let (params, status) = self.controllers.get_mut(name)
+        let (params, status) = self
+            .controllers
+            .get_mut(name)
             .ok_or_else(|| ControllerError::NotFound(name.to_string()))?;
         match outcome {
             RunOutcome::Success => {
@@ -109,8 +117,12 @@ impl ControllerManager {
         }
     }
 
-    pub fn len(&self) -> usize { self.controllers.len() }
-    pub fn is_empty(&self) -> bool { self.controllers.is_empty() }
+    pub fn len(&self) -> usize {
+        self.controllers.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.controllers.is_empty()
+    }
 }
 
 #[allow(dead_code)]
@@ -123,7 +135,11 @@ mod tests {
 
     #[test]
     fn default_params_match_upstream_defaults() {
-        let (_c, _t) = cilium_test_ctx!("pkg/controller/controller.go", "Params.Default", "tenant-ct-pd");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/controller/controller.go",
+            "Params.Default",
+            "tenant-ct-pd"
+        );
         let p = ControllerParams::default();
         assert_eq!(p.run_interval, Duration::from_secs(60));
         assert_eq!(p.max_consecutive_errors, 5);
@@ -131,7 +147,11 @@ mod tests {
 
     #[test]
     fn register_then_status_returns_zeroed() {
-        let (_c, t) = cilium_test_ctx!("pkg/controller/controller.go", "Status.Init", "tenant-ct-si");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/controller/controller.go",
+            "Status.Init",
+            "tenant-ct-si"
+        );
         let mut mgr = ControllerManager::new(t);
         mgr.register("conntrack-gc", ControllerParams::default());
         let s = mgr.status("conntrack-gc").unwrap();
@@ -142,18 +162,29 @@ mod tests {
 
     #[test]
     fn record_success_increments_success_count() {
-        let (_c, t) = cilium_test_ctx!("pkg/controller/controller.go", "Record.Success", "tenant-ct-rs");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/controller/controller.go",
+            "Record.Success",
+            "tenant-ct-rs"
+        );
         let mut mgr = ControllerManager::new(t);
         mgr.register("c1", ControllerParams::default());
         let r = mgr.record("c1", RunOutcome::Success).unwrap();
         assert_eq!(r, 0);
         assert_eq!(mgr.status("c1").unwrap().success_count, 1);
-        assert_eq!(mgr.status("c1").unwrap().last_outcome, Some(RunOutcome::Success));
+        assert_eq!(
+            mgr.status("c1").unwrap().last_outcome,
+            Some(RunOutcome::Success)
+        );
     }
 
     #[test]
     fn record_failure_increments_failure_count() {
-        let (_c, t) = cilium_test_ctx!("pkg/controller/controller.go", "Record.Failure", "tenant-ct-rf");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/controller/controller.go",
+            "Record.Failure",
+            "tenant-ct-rf"
+        );
         let mut mgr = ControllerManager::new(t);
         mgr.register("c1", ControllerParams::default());
         let r = mgr.record("c1", RunOutcome::Failure).unwrap();
@@ -164,7 +195,11 @@ mod tests {
 
     #[test]
     fn success_resets_consecutive_failures() {
-        let (_c, t) = cilium_test_ctx!("pkg/controller/controller.go", "Reset.OnSuccess", "tenant-ct-rcs");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/controller/controller.go",
+            "Reset.OnSuccess",
+            "tenant-ct-rcs"
+        );
         let mut mgr = ControllerManager::new(t);
         mgr.register("c1", ControllerParams::default());
         mgr.record("c1", RunOutcome::Failure).unwrap();
@@ -187,7 +222,8 @@ mod tests {
 
     #[test]
     fn unregister_removes_controller() {
-        let (_c, t) = cilium_test_ctx!("pkg/controller/controller.go", "Unregister", "tenant-ct-un");
+        let (_c, t) =
+            cilium_test_ctx!("pkg/controller/controller.go", "Unregister", "tenant-ct-un");
         let mut mgr = ControllerManager::new(t);
         mgr.register("c1", ControllerParams::default());
         assert!(mgr.unregister("c1"));
@@ -196,7 +232,11 @@ mod tests {
 
     #[test]
     fn record_unknown_controller_errors() {
-        let (_c, t) = cilium_test_ctx!("pkg/controller/controller.go", "Record.Unknown", "tenant-ct-ru");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/controller/controller.go",
+            "Record.Unknown",
+            "tenant-ct-ru"
+        );
         let mut mgr = ControllerManager::new(t);
         let e = mgr.record("ghost", RunOutcome::Success).unwrap_err();
         assert_eq!(e, ControllerError::NotFound("ghost".into()));

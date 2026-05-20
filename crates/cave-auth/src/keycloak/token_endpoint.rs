@@ -5,11 +5,11 @@
 //! upstream: https://github.com/keycloak/keycloak/blob/v22.0.0/services/src/main/java/org/keycloak/services/resources/RealmsResource.java
 
 use axum::{
+    Json, Router,
     extract::{Form, Path, State},
     http::{HeaderMap, StatusCode, header},
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
 use chrono::Utc;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
@@ -19,16 +19,12 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::keycloak::{
-    client::ClientStore,
-    realm::RealmStore,
-    user::UserStore,
-};
+use crate::keycloak::{client::ClientStore, realm::RealmStore, user::UserStore};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SIGNING_SECRET: &[u8] = b"cave-keycloak-dev-secret-change-in-production";
-const ACCESS_TOKEN_TTL: i64 = 300;   // seconds
+const ACCESS_TOKEN_TTL: i64 = 300; // seconds
 const REFRESH_TOKEN_TTL: i64 = 1800; // seconds
 
 // ─── Token response ──────────────────────────────────────────────────────────
@@ -111,7 +107,9 @@ struct OidcSessionStore {
 }
 
 impl OidcSessionStore {
-    fn new() -> Self { Self::default() }
+    fn new() -> Self {
+        Self::default()
+    }
 
     async fn insert(&self, session_state: String, entry: SessionEntry) {
         self.inner.write().await.insert(session_state, entry);
@@ -150,7 +148,9 @@ impl KeycloakTokenService {
         format!("http://localhost:8080/realms/{realm}")
     }
 
-    fn sign_access_token(claims: &AccessTokenClaims) -> Result<String, jsonwebtoken::errors::Error> {
+    fn sign_access_token(
+        claims: &AccessTokenClaims,
+    ) -> Result<String, jsonwebtoken::errors::Error> {
         encode(
             &Header::new(Algorithm::HS256),
             claims,
@@ -158,7 +158,9 @@ impl KeycloakTokenService {
         )
     }
 
-    fn sign_refresh_token(claims: &RefreshTokenClaims) -> Result<String, jsonwebtoken::errors::Error> {
+    fn sign_refresh_token(
+        claims: &RefreshTokenClaims,
+    ) -> Result<String, jsonwebtoken::errors::Error> {
         encode(
             &Header::new(Algorithm::HS256),
             claims,
@@ -243,7 +245,11 @@ impl KeycloakTokenService {
         if self.realms.get(realm).await.is_none() {
             return Err("realm_not_found");
         }
-        let user = self.users.get_by_username(realm, username).await.ok_or("invalid_credentials")?;
+        let user = self
+            .users
+            .get_by_username(realm, username)
+            .await
+            .ok_or("invalid_credentials")?;
         if !self.users.verify_password(realm, user.id, password).await {
             return Err("invalid_credentials");
         }
@@ -260,15 +266,20 @@ impl KeycloakTokenService {
             &session_state,
         )?;
 
-        self.sessions.insert(session_state.clone(), SessionEntry {
-            realm: realm.to_string(),
-            sub: user.id.to_string(),
-            username: username.to_string(),
-            email: user.email.clone(),
-            client_id: Some(client_id.to_string()),
-            scope: scope.to_string(),
-            exp: Utc::now().timestamp() + REFRESH_TOKEN_TTL,
-        }).await;
+        self.sessions
+            .insert(
+                session_state.clone(),
+                SessionEntry {
+                    realm: realm.to_string(),
+                    sub: user.id.to_string(),
+                    username: username.to_string(),
+                    email: user.email.clone(),
+                    client_id: Some(client_id.to_string()),
+                    scope: scope.to_string(),
+                    exp: Utc::now().timestamp() + REFRESH_TOKEN_TTL,
+                },
+            )
+            .await;
 
         Ok(TokenResponse {
             access_token: access,
@@ -290,7 +301,11 @@ impl KeycloakTokenService {
         if self.realms.get(realm).await.is_none() {
             return Err("realm_not_found");
         }
-        let client = self.clients.get_by_client_id(realm, client_id).await.ok_or("invalid_client")?;
+        let client = self
+            .clients
+            .get_by_client_id(realm, client_id)
+            .await
+            .ok_or("invalid_client")?;
         if client.public_client {
             return Err("public_client_not_allowed");
         }
@@ -330,10 +345,15 @@ impl KeycloakTokenService {
         if self.realms.get(realm).await.is_none() {
             return Err("realm_not_found");
         }
-        let claims = Self::decode_refresh_token_raw(refresh_token).ok_or("invalid_refresh_token")?;
+        let claims =
+            Self::decode_refresh_token_raw(refresh_token).ok_or("invalid_refresh_token")?;
 
         // Verify session still exists
-        let session = self.sessions.get(&claims.session_state).await.ok_or("session_not_found")?;
+        let session = self
+            .sessions
+            .get(&claims.session_state)
+            .await
+            .ok_or("session_not_found")?;
         if session.realm != realm {
             return Err("realm_mismatch");
         }
@@ -351,15 +371,20 @@ impl KeycloakTokenService {
 
         // Rotate session
         self.sessions.remove(&claims.session_state).await;
-        self.sessions.insert(new_session_state.clone(), SessionEntry {
-            realm: realm.to_string(),
-            sub: claims.sub,
-            username: session.username,
-            email: session.email,
-            client_id: session.client_id,
-            scope: session.scope.clone(),
-            exp: Utc::now().timestamp() + REFRESH_TOKEN_TTL,
-        }).await;
+        self.sessions
+            .insert(
+                new_session_state.clone(),
+                SessionEntry {
+                    realm: realm.to_string(),
+                    sub: claims.sub,
+                    username: session.username,
+                    email: session.email,
+                    client_id: session.client_id,
+                    scope: session.scope.clone(),
+                    exp: Utc::now().timestamp() + REFRESH_TOKEN_TTL,
+                },
+            )
+            .await;
 
         Ok(TokenResponse {
             access_token: access,
@@ -439,12 +464,14 @@ pub async fn token_endpoint(
             let username = form.username.unwrap_or_default();
             let password = form.password.unwrap_or_default();
             let client_id = form.client_id.unwrap_or_default();
-            svc.password_grant(&realm, &username, &password, &client_id).await
+            svc.password_grant(&realm, &username, &password, &client_id)
+                .await
         }
         "client_credentials" => {
             let client_id = form.client_id.unwrap_or_default();
             let client_secret = form.client_secret.unwrap_or_default();
-            svc.client_credentials_grant(&realm, &client_id, &client_secret).await
+            svc.client_credentials_grant(&realm, &client_id, &client_secret)
+                .await
         }
         "refresh_token" => {
             let rt = form.refresh_token.unwrap_or_default();
@@ -455,13 +482,25 @@ pub async fn token_endpoint(
 
     match result {
         Ok(tokens) => (StatusCode::OK, Json(serde_json::to_value(tokens).unwrap())).into_response(),
-        Err("realm_not_found") | Err("invalid_credentials") | Err("invalid_client") | Err("invalid_client_secret") | Err("public_client_not_allowed") => {
-            (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"unauthorized"}))).into_response()
-        }
-        Err("invalid_refresh_token") | Err("session_not_found") | Err("realm_mismatch") => {
-            (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"invalid_grant"}))).into_response()
-        }
-        Err(_) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"bad_request"}))).into_response(),
+        Err("realm_not_found")
+        | Err("invalid_credentials")
+        | Err("invalid_client")
+        | Err("invalid_client_secret")
+        | Err("public_client_not_allowed") => (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error":"unauthorized"})),
+        )
+            .into_response(),
+        Err("invalid_refresh_token") | Err("session_not_found") | Err("realm_mismatch") => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"invalid_grant"})),
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"bad_request"})),
+        )
+            .into_response(),
     }
 }
 
@@ -472,13 +511,23 @@ pub async fn userinfo_endpoint(
 ) -> impl IntoResponse {
     let auth = match headers.get(header::AUTHORIZATION) {
         Some(v) => v.to_str().unwrap_or("").to_string(),
-        None => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"missing token"}))).into_response(),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error":"missing token"})),
+            )
+                .into_response();
+        }
     };
 
     let token = if auth.starts_with("Bearer ") {
         &auth[7..]
     } else {
-        return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"invalid auth header"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error":"invalid auth header"})),
+        )
+            .into_response();
     };
 
     match KeycloakTokenService::decode_access_token(token) {
@@ -491,7 +540,11 @@ pub async fn userinfo_endpoint(
             });
             (StatusCode::OK, Json(body)).into_response()
         }
-        _ => (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"invalid token"}))).into_response(),
+        _ => (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error":"invalid token"})),
+        )
+            .into_response(),
     }
 }
 
@@ -510,11 +563,10 @@ pub async fn logout_endpoint(
     Form(form): Form<LogoutForm>,
 ) -> impl IntoResponse {
     let _ = realm;
-    let session = form.session_state
-        .or(form.refresh_token.as_ref().and_then(|rt| {
-            KeycloakTokenService::decode_access_token(rt)
-                .map(|c| c.session_state)
-        }));
+    let session = form.session_state.or(form
+        .refresh_token
+        .as_ref()
+        .and_then(|rt| KeycloakTokenService::decode_access_token(rt).map(|c| c.session_state)));
     if let Some(ss) = session {
         svc.logout(&ss).await;
     }
@@ -525,10 +577,22 @@ pub async fn logout_endpoint(
 
 pub fn router(svc: KeycloakTokenService) -> Router {
     Router::new()
-        .route("/realms/{realm}/protocol/openid-connect/token", post(token_endpoint))
-        .route("/realms/{realm}/protocol/openid-connect/userinfo", get(userinfo_endpoint))
-        .route("/realms/{realm}/protocol/openid-connect/token/introspect", post(introspect_endpoint))
-        .route("/realms/{realm}/protocol/openid-connect/logout", post(logout_endpoint))
+        .route(
+            "/realms/{realm}/protocol/openid-connect/token",
+            post(token_endpoint),
+        )
+        .route(
+            "/realms/{realm}/protocol/openid-connect/userinfo",
+            get(userinfo_endpoint),
+        )
+        .route(
+            "/realms/{realm}/protocol/openid-connect/token/introspect",
+            post(introspect_endpoint),
+        )
+        .route(
+            "/realms/{realm}/protocol/openid-connect/logout",
+            post(logout_endpoint),
+        )
         .with_state(svc)
 }
 
@@ -548,14 +612,74 @@ mod tests {
 
     async fn setup() -> (Router, KeycloakTokenService) {
         let realms = RealmStore::new();
-        realms.create(RealmRequest { id: "myrealm".to_string(), display_name: None, enabled: None, ssl_required: None, registration_allowed: None, login_with_email_allowed: None, duplicate_emails_allowed: None, access_token_lifespan: None, sso_session_idle_timeout: None }).await.unwrap();
+        realms
+            .create(RealmRequest {
+                id: "myrealm".to_string(),
+                display_name: None,
+                enabled: None,
+                ssl_required: None,
+                registration_allowed: None,
+                login_with_email_allowed: None,
+                duplicate_emails_allowed: None,
+                access_token_lifespan: None,
+                sso_session_idle_timeout: None,
+            })
+            .await
+            .unwrap();
 
         let users = UserStore::new();
-        users.create("myrealm", CreateUserRequest { username: "testuser".to_string(), email: Some("testuser@example.com".to_string()), email_verified: Some(true), first_name: None, last_name: None, enabled: Some(true), attributes: None, password: Some("correctpassword".to_string()) }).await.unwrap();
+        users
+            .create(
+                "myrealm",
+                CreateUserRequest {
+                    username: "testuser".to_string(),
+                    email: Some("testuser@example.com".to_string()),
+                    email_verified: Some(true),
+                    first_name: None,
+                    last_name: None,
+                    enabled: Some(true),
+                    attributes: None,
+                    password: Some("correctpassword".to_string()),
+                },
+            )
+            .await
+            .unwrap();
 
         let clients = ClientStore::new();
-        clients.create("myrealm", CreateClientRequest { client_id: "test-client".to_string(), name: None, description: None, enabled: Some(true), public_client: Some(false), secret: Some("client-secret".to_string()), redirect_uris: None, web_origins: None, protocol: None }).await.unwrap();
-        clients.create("myrealm", CreateClientRequest { client_id: "public-client".to_string(), name: None, description: None, enabled: Some(true), public_client: Some(true), secret: None, redirect_uris: None, web_origins: None, protocol: None }).await.unwrap();
+        clients
+            .create(
+                "myrealm",
+                CreateClientRequest {
+                    client_id: "test-client".to_string(),
+                    name: None,
+                    description: None,
+                    enabled: Some(true),
+                    public_client: Some(false),
+                    secret: Some("client-secret".to_string()),
+                    redirect_uris: None,
+                    web_origins: None,
+                    protocol: None,
+                },
+            )
+            .await
+            .unwrap();
+        clients
+            .create(
+                "myrealm",
+                CreateClientRequest {
+                    client_id: "public-client".to_string(),
+                    name: None,
+                    description: None,
+                    enabled: Some(true),
+                    public_client: Some(true),
+                    secret: None,
+                    redirect_uris: None,
+                    web_origins: None,
+                    protocol: None,
+                },
+            )
+            .await
+            .unwrap();
 
         let svc = KeycloakTokenService::new(realms, users, clients);
         let app = router(svc.clone());
@@ -563,12 +687,18 @@ mod tests {
     }
 
     async fn body_json(resp: axum::response::Response) -> Value {
-        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         serde_json::from_slice(&bytes).unwrap_or(Value::Null)
     }
 
     fn token_form(pairs: &[(&str, &str)]) -> String {
-        pairs.iter().map(|(k, v)| format!("{}={}", k, urlencoding(v))).collect::<Vec<_>>().join("&")
+        pairs
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, urlencoding(v)))
+            .collect::<Vec<_>>()
+            .join("&")
     }
 
     fn urlencoding(s: &str) -> String {
@@ -579,11 +709,22 @@ mod tests {
     #[tokio::test]
     async fn test_password_grant_success() {
         let (app, _) = setup().await;
-        let resp = app.oneshot(
-            Request::builder().method("POST").uri("/realms/myrealm/protocol/openid-connect/token")
-                .header("content-type", "application/x-www-form-urlencoded")
-                .body(Body::from(token_form(&[("grant_type","password"),("username","testuser"),("password","correctpassword"),("client_id","test-client")]))).unwrap()
-        ).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/myrealm/protocol/openid-connect/token")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from(token_form(&[
+                        ("grant_type", "password"),
+                        ("username", "testuser"),
+                        ("password", "correctpassword"),
+                        ("client_id", "test-client"),
+                    ])))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let body = body_json(resp).await;
         assert!(body["access_token"].is_string());
@@ -594,11 +735,22 @@ mod tests {
     #[tokio::test]
     async fn test_password_grant_wrong_password() {
         let (app, _) = setup().await;
-        let resp = app.oneshot(
-            Request::builder().method("POST").uri("/realms/myrealm/protocol/openid-connect/token")
-                .header("content-type", "application/x-www-form-urlencoded")
-                .body(Body::from(token_form(&[("grant_type","password"),("username","testuser"),("password","wrongpassword"),("client_id","test-client")]))).unwrap()
-        ).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/myrealm/protocol/openid-connect/token")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from(token_form(&[
+                        ("grant_type", "password"),
+                        ("username", "testuser"),
+                        ("password", "wrongpassword"),
+                        ("client_id", "test-client"),
+                    ])))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
@@ -606,11 +758,22 @@ mod tests {
     #[tokio::test]
     async fn test_password_grant_unknown_realm() {
         let (app, _) = setup().await;
-        let resp = app.oneshot(
-            Request::builder().method("POST").uri("/realms/unknownrealm/protocol/openid-connect/token")
-                .header("content-type", "application/x-www-form-urlencoded")
-                .body(Body::from(token_form(&[("grant_type","password"),("username","testuser"),("password","correctpassword"),("client_id","test-client")]))).unwrap()
-        ).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/unknownrealm/protocol/openid-connect/token")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from(token_form(&[
+                        ("grant_type", "password"),
+                        ("username", "testuser"),
+                        ("password", "correctpassword"),
+                        ("client_id", "test-client"),
+                    ])))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
@@ -618,11 +781,21 @@ mod tests {
     #[tokio::test]
     async fn test_client_credentials_success() {
         let (app, _) = setup().await;
-        let resp = app.oneshot(
-            Request::builder().method("POST").uri("/realms/myrealm/protocol/openid-connect/token")
-                .header("content-type", "application/x-www-form-urlencoded")
-                .body(Body::from(token_form(&[("grant_type","client_credentials"),("client_id","test-client"),("client_secret","client-secret")]))).unwrap()
-        ).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/myrealm/protocol/openid-connect/token")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from(token_form(&[
+                        ("grant_type", "client_credentials"),
+                        ("client_id", "test-client"),
+                        ("client_secret", "client-secret"),
+                    ])))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let body = body_json(resp).await;
         assert!(body["access_token"].is_string());
@@ -632,11 +805,21 @@ mod tests {
     #[tokio::test]
     async fn test_client_credentials_wrong_secret() {
         let (app, _) = setup().await;
-        let resp = app.oneshot(
-            Request::builder().method("POST").uri("/realms/myrealm/protocol/openid-connect/token")
-                .header("content-type", "application/x-www-form-urlencoded")
-                .body(Body::from(token_form(&[("grant_type","client_credentials"),("client_id","test-client"),("client_secret","wrong-secret")]))).unwrap()
-        ).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/myrealm/protocol/openid-connect/token")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from(token_form(&[
+                        ("grant_type", "client_credentials"),
+                        ("client_id", "test-client"),
+                        ("client_secret", "wrong-secret"),
+                    ])))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
@@ -644,11 +827,21 @@ mod tests {
     #[tokio::test]
     async fn test_client_credentials_public_client_denied() {
         let (app, _) = setup().await;
-        let resp = app.oneshot(
-            Request::builder().method("POST").uri("/realms/myrealm/protocol/openid-connect/token")
-                .header("content-type", "application/x-www-form-urlencoded")
-                .body(Body::from(token_form(&[("grant_type","client_credentials"),("client_id","public-client"),("client_secret","")]))).unwrap()
-        ).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/myrealm/protocol/openid-connect/token")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from(token_form(&[
+                        ("grant_type", "client_credentials"),
+                        ("client_id", "public-client"),
+                        ("client_secret", ""),
+                    ])))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
@@ -656,15 +849,27 @@ mod tests {
     #[tokio::test]
     async fn test_refresh_token_success() {
         let (_, svc) = setup().await;
-        let tokens = svc.password_grant("myrealm", "testuser", "correctpassword", "test-client").await.unwrap();
+        let tokens = svc
+            .password_grant("myrealm", "testuser", "correctpassword", "test-client")
+            .await
+            .unwrap();
         let refresh_token = tokens.refresh_token.unwrap();
 
         let app = router(svc);
-        let resp = app.oneshot(
-            Request::builder().method("POST").uri("/realms/myrealm/protocol/openid-connect/token")
-                .header("content-type", "application/x-www-form-urlencoded")
-                .body(Body::from(token_form(&[("grant_type","refresh_token"),("refresh_token",&refresh_token)]))).unwrap()
-        ).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/myrealm/protocol/openid-connect/token")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from(token_form(&[
+                        ("grant_type", "refresh_token"),
+                        ("refresh_token", &refresh_token),
+                    ])))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let body = body_json(resp).await;
         assert!(body["access_token"].is_string());
@@ -674,11 +879,20 @@ mod tests {
     #[tokio::test]
     async fn test_refresh_token_invalid() {
         let (app, _) = setup().await;
-        let resp = app.oneshot(
-            Request::builder().method("POST").uri("/realms/myrealm/protocol/openid-connect/token")
-                .header("content-type", "application/x-www-form-urlencoded")
-                .body(Body::from(token_form(&[("grant_type","refresh_token"),("refresh_token","totally.invalid.token")]))).unwrap()
-        ).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/myrealm/protocol/openid-connect/token")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from(token_form(&[
+                        ("grant_type", "refresh_token"),
+                        ("refresh_token", "totally.invalid.token"),
+                    ])))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 
@@ -686,15 +900,24 @@ mod tests {
     #[tokio::test]
     async fn test_introspect_active_token() {
         let (_, svc) = setup().await;
-        let tokens = svc.password_grant("myrealm", "testuser", "correctpassword", "test-client").await.unwrap();
+        let tokens = svc
+            .password_grant("myrealm", "testuser", "correctpassword", "test-client")
+            .await
+            .unwrap();
         let access_token = tokens.access_token;
 
         let app = router(svc);
-        let resp = app.oneshot(
-            Request::builder().method("POST").uri("/realms/myrealm/protocol/openid-connect/token/introspect")
-                .header("content-type", "application/x-www-form-urlencoded")
-                .body(Body::from(format!("token={access_token}"))).unwrap()
-        ).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/myrealm/protocol/openid-connect/token/introspect")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from(format!("token={access_token}")))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let body = body_json(resp).await;
         assert_eq!(body["active"], true);
@@ -704,11 +927,17 @@ mod tests {
     #[tokio::test]
     async fn test_introspect_invalid_token() {
         let (app, _) = setup().await;
-        let resp = app.oneshot(
-            Request::builder().method("POST").uri("/realms/myrealm/protocol/openid-connect/token/introspect")
-                .header("content-type", "application/x-www-form-urlencoded")
-                .body(Body::from("token=junk.junk.junk")).unwrap()
-        ).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/myrealm/protocol/openid-connect/token/introspect")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from("token=junk.junk.junk"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let body = body_json(resp).await;
         assert_eq!(body["active"], false);
@@ -718,14 +947,23 @@ mod tests {
     #[tokio::test]
     async fn test_userinfo_with_valid_token() {
         let (_, svc) = setup().await;
-        let tokens = svc.password_grant("myrealm", "testuser", "correctpassword", "test-client").await.unwrap();
+        let tokens = svc
+            .password_grant("myrealm", "testuser", "correctpassword", "test-client")
+            .await
+            .unwrap();
 
         let app = router(svc);
-        let resp = app.oneshot(
-            Request::builder().method("GET").uri("/realms/myrealm/protocol/openid-connect/userinfo")
-                .header("Authorization", format!("Bearer {}", tokens.access_token))
-                .body(Body::empty()).unwrap()
-        ).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/realms/myrealm/protocol/openid-connect/userinfo")
+                    .header("Authorization", format!("Bearer {}", tokens.access_token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let body = body_json(resp).await;
         assert!(body["sub"].is_string());
@@ -736,10 +974,16 @@ mod tests {
     #[tokio::test]
     async fn test_userinfo_missing_token() {
         let (app, _) = setup().await;
-        let resp = app.oneshot(
-            Request::builder().method("GET").uri("/realms/myrealm/protocol/openid-connect/userinfo")
-                .body(Body::empty()).unwrap()
-        ).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/realms/myrealm/protocol/openid-connect/userinfo")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
@@ -747,15 +991,24 @@ mod tests {
     #[tokio::test]
     async fn test_logout_clears_session() {
         let (_, svc) = setup().await;
-        let tokens = svc.password_grant("myrealm", "testuser", "correctpassword", "test-client").await.unwrap();
+        let tokens = svc
+            .password_grant("myrealm", "testuser", "correctpassword", "test-client")
+            .await
+            .unwrap();
         let session_state = tokens.session_state.unwrap();
 
         let app = router(svc);
-        let resp = app.oneshot(
-            Request::builder().method("POST").uri("/realms/myrealm/protocol/openid-connect/logout")
-                .header("content-type", "application/x-www-form-urlencoded")
-                .body(Body::from(format!("session_state={session_state}"))).unwrap()
-        ).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/myrealm/protocol/openid-connect/logout")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from(format!("session_state={session_state}")))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
     }
 
@@ -794,7 +1047,10 @@ mod tests {
         assert!(body.get("sub").is_none(), "sub leak on inactive: {body}");
         assert!(body.get("exp").is_none(), "exp leak on inactive");
         assert!(body.get("username").is_none(), "username leak on inactive");
-        assert!(body.get("client_id").is_none(), "client_id leak on inactive");
+        assert!(
+            body.get("client_id").is_none(),
+            "client_id leak on inactive"
+        );
         assert!(body.get("scope").is_none(), "scope leak on inactive");
     }
 
@@ -855,7 +1111,10 @@ mod tests {
             .await
             .unwrap();
         let body = body_json(resp).await;
-        assert_eq!(body["active"], false, "foreign-issuer token must be inactive: {body}");
+        assert_eq!(
+            body["active"], false,
+            "foreign-issuer token must be inactive: {body}"
+        );
     }
 
     // upstream: rfc7662 §2.2 — the `exp` claim, when present, MUST be a
@@ -876,7 +1135,10 @@ mod tests {
         // so exp shouldn't be more than a year in the future either.
         let one_year_secs: i64 = 366 * 86_400;
         let now_secs = chrono::Utc::now().timestamp();
-        assert!(exp - now_secs < one_year_secs, "exp={exp} too far in the future");
+        assert!(
+            exp - now_secs < one_year_secs,
+            "exp={exp} too far in the future"
+        );
     }
 
     // upstream: rfc7662 §2.1 — request without `token` parameter returns
@@ -919,7 +1181,10 @@ mod tests {
             .await
             .unwrap();
         let (_, body) = introspect_with(svc, &format!("token={}", tokens.access_token)).await;
-        assert!(body["scope"].is_string(), "scope must be string per RFC 7662 §2.2");
+        assert!(
+            body["scope"].is_string(),
+            "scope must be string per RFC 7662 §2.2"
+        );
     }
 
     // upstream: rfc7662 §2.2 — confidential clients MAY rotate access

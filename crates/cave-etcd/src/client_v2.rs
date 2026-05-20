@@ -43,8 +43,12 @@ impl AuthInterceptor {
         self
     }
 
-    pub fn header_name(&self) -> &str { &self.header_name }
-    pub fn token(&self) -> Option<String> { self.token.read().unwrap().clone() }
+    pub fn header_name(&self) -> &str {
+        &self.header_name
+    }
+    pub fn token(&self) -> Option<String> {
+        self.token.read().unwrap().clone()
+    }
     pub fn set_token(&self, t: impl Into<String>) {
         *self.token.write().unwrap() = Some(t.into());
     }
@@ -52,8 +56,12 @@ impl AuthInterceptor {
         *self.token.write().unwrap() = None;
     }
 
-    pub fn inject_count(&self) -> u64 { self.inject_count.load(Ordering::SeqCst) }
-    pub fn reauth_count(&self) -> u64 { self.reauth_count.load(Ordering::SeqCst) }
+    pub fn inject_count(&self) -> u64 {
+        self.inject_count.load(Ordering::SeqCst)
+    }
+    pub fn reauth_count(&self) -> u64 {
+        self.reauth_count.load(Ordering::SeqCst)
+    }
 
     /// Inject the active token into the supplied metadata bucket.
     /// Returns false if no token is available (caller should authenticate).
@@ -77,7 +85,9 @@ impl AuthInterceptor {
 }
 
 impl Default for AuthInterceptor {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── Retry classifier ─────────────────────────────────────────────────────
@@ -116,7 +126,9 @@ pub enum RetryDecision {
 /// Classify a gRPC code into a retry decision.  Mirrors
 /// `client/v3/retry_interceptor.go#isSafeRetryImmutableRPC`.
 pub fn classify_retry(code: RpcCode, attempt: u32, max_retries: u32) -> RetryDecision {
-    if attempt >= max_retries { return RetryDecision::Fail; }
+    if attempt >= max_retries {
+        return RetryDecision::Fail;
+    }
     match code {
         RpcCode::Ok => RetryDecision::Fail, // never called when Ok
         RpcCode::Unauthenticated => RetryDecision::Reauth,
@@ -172,13 +184,26 @@ impl KeepAliveScheduler {
         self
     }
 
-    pub fn pulse_fraction(&self) -> u32 { self.pulse_fraction }
-    pub fn pulses_fired(&self) -> u64 { self.pulses_fired.load(Ordering::SeqCst) }
+    pub fn pulse_fraction(&self) -> u32 {
+        self.pulse_fraction
+    }
+    pub fn pulses_fired(&self) -> u64 {
+        self.pulses_fired.load(Ordering::SeqCst)
+    }
 
     pub fn register(&self, lease_id: i64, ttl_secs: i64) {
         let mut g = self.inner.lock().unwrap();
-        let next = Instant::now() + Duration::from_secs((ttl_secs as u64).max(1) / self.pulse_fraction as u64);
-        g.insert(lease_id, LeaseHandle { lease_id, ttl_secs, next_heartbeat_at: next, heartbeats: 0 });
+        let next = Instant::now()
+            + Duration::from_secs((ttl_secs as u64).max(1) / self.pulse_fraction as u64);
+        g.insert(
+            lease_id,
+            LeaseHandle {
+                lease_id,
+                ttl_secs,
+                next_heartbeat_at: next,
+                heartbeats: 0,
+            },
+        );
     }
 
     pub fn deregister(&self, lease_id: i64) -> bool {
@@ -218,12 +243,18 @@ impl KeepAliveScheduler {
         }
     }
 
-    pub fn len(&self) -> usize { self.inner.lock().unwrap().len() }
-    pub fn is_empty(&self) -> bool { self.len() == 0 }
+    pub fn len(&self) -> usize {
+        self.inner.lock().unwrap().len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl Default for KeepAliveScheduler {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── Watch reconnect state machine ────────────────────────────────────────
@@ -266,10 +297,18 @@ impl WatchReconnect {
         }
     }
 
-    pub fn stage(&self) -> WatchReconnectStage { self.state.read().unwrap().stage.unwrap() }
-    pub fn last_revision(&self) -> u64 { self.state.read().unwrap().last_revision }
-    pub fn attempts(&self) -> u32 { self.state.read().unwrap().attempts }
-    pub fn progress_notify_interval(&self) -> Duration { self.progress_notify_interval }
+    pub fn stage(&self) -> WatchReconnectStage {
+        self.state.read().unwrap().stage.unwrap()
+    }
+    pub fn last_revision(&self) -> u64 {
+        self.state.read().unwrap().last_revision
+    }
+    pub fn attempts(&self) -> u32 {
+        self.state.read().unwrap().attempts
+    }
+    pub fn progress_notify_interval(&self) -> Duration {
+        self.progress_notify_interval
+    }
 
     pub fn set_progress_interval(&mut self, d: Duration) {
         self.progress_notify_interval = d;
@@ -326,7 +365,9 @@ impl WatchReconnect {
 }
 
 impl Default for WatchReconnect {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -390,49 +431,76 @@ mod tests {
     #[test]
     fn test_classify_retry_unauthenticated_reauth() {
         // cite: retry_interceptor.go (Unauthenticated ⇒ reauth)
-        assert_eq!(classify_retry(RpcCode::Unauthenticated, 0, 3), RetryDecision::Reauth);
+        assert_eq!(
+            classify_retry(RpcCode::Unauthenticated, 0, 3),
+            RetryDecision::Reauth
+        );
     }
 
     #[test]
     fn test_classify_retry_unavailable_elsewhere() {
         // cite: retry_interceptor.go (Unavailable ⇒ next endpoint)
-        assert_eq!(classify_retry(RpcCode::Unavailable, 0, 3), RetryDecision::RetryElsewhere);
+        assert_eq!(
+            classify_retry(RpcCode::Unavailable, 0, 3),
+            RetryDecision::RetryElsewhere
+        );
     }
 
     #[test]
     fn test_classify_retry_resource_exhausted_here() {
         // cite: retry_interceptor.go (back-off but stay)
-        assert_eq!(classify_retry(RpcCode::ResourceExhausted, 0, 3), RetryDecision::RetryHere);
+        assert_eq!(
+            classify_retry(RpcCode::ResourceExhausted, 0, 3),
+            RetryDecision::RetryHere
+        );
     }
 
     #[test]
     fn test_classify_retry_leader_changed_elsewhere() {
         // cite: retry_interceptor.go (NotLeader ⇒ next endpoint)
-        assert_eq!(classify_retry(RpcCode::LeaderChanged, 0, 3), RetryDecision::RetryElsewhere);
+        assert_eq!(
+            classify_retry(RpcCode::LeaderChanged, 0, 3),
+            RetryDecision::RetryElsewhere
+        );
     }
 
     #[test]
     fn test_classify_retry_no_leader_elsewhere() {
-        assert_eq!(classify_retry(RpcCode::NoLeader, 0, 3), RetryDecision::RetryElsewhere);
+        assert_eq!(
+            classify_retry(RpcCode::NoLeader, 0, 3),
+            RetryDecision::RetryElsewhere
+        );
     }
 
     #[test]
     fn test_classify_retry_permanent_codes_fail() {
         // cite: retry_interceptor.go (PermissionDenied / InvalidArg ⇒ no retry)
-        assert_eq!(classify_retry(RpcCode::PermissionDenied, 0, 3), RetryDecision::Fail);
-        assert_eq!(classify_retry(RpcCode::InvalidArgument, 0, 3), RetryDecision::Fail);
+        assert_eq!(
+            classify_retry(RpcCode::PermissionDenied, 0, 3),
+            RetryDecision::Fail
+        );
+        assert_eq!(
+            classify_retry(RpcCode::InvalidArgument, 0, 3),
+            RetryDecision::Fail
+        );
         assert_eq!(classify_retry(RpcCode::NotFound, 0, 3), RetryDecision::Fail);
     }
 
     #[test]
     fn test_classify_retry_budget_exceeded() {
         // cite: retry_interceptor.go MaxAttempts
-        assert_eq!(classify_retry(RpcCode::Unavailable, 5, 3), RetryDecision::Fail);
+        assert_eq!(
+            classify_retry(RpcCode::Unavailable, 5, 3),
+            RetryDecision::Fail
+        );
     }
 
     #[test]
     fn test_classify_retry_deadline_exceeded_elsewhere() {
-        assert_eq!(classify_retry(RpcCode::DeadlineExceeded, 0, 3), RetryDecision::RetryElsewhere);
+        assert_eq!(
+            classify_retry(RpcCode::DeadlineExceeded, 0, 3),
+            RetryDecision::RetryElsewhere
+        );
     }
 
     // ── KeepAliveScheduler ────────────────────────────────────────────

@@ -68,12 +68,18 @@ impl CommandItem {
 
     /// Same as [`nav`] but only visible to PlatformAdmin callers.
     pub fn nav_platform(label: &str, href: &str) -> Self {
-        Self { min_persona: Persona::PlatformAdmin, ..Self::nav(label, href) }
+        Self {
+            min_persona: Persona::PlatformAdmin,
+            ..Self::nav(label, href)
+        }
     }
 
     /// Same as [`action`] but only visible to PlatformAdmin callers.
     pub fn action_platform(label: &str, href: &str) -> Self {
-        Self { min_persona: Persona::PlatformAdmin, ..Self::action(label, href) }
+        Self {
+            min_persona: Persona::PlatformAdmin,
+            ..Self::action(label, href)
+        }
     }
 
     /// True iff a caller of `persona` is allowed to see this entry.
@@ -205,29 +211,48 @@ pub fn default_commands_for_persona(tenant_id: &str, persona: Persona) -> Vec<Co
     let t = tenant_id;
     let all = vec![
         // Platform-only surfaces — Charter compliance, ADR, upstream.
-        CommandItem::nav_platform("Go to Compliance", &format!("/admin/compliance?tenant_id={t}")),
-        CommandItem::nav_platform("Go to Upstream",   &format!("/admin/upstream?tenant_id={t}")),
+        CommandItem::nav_platform(
+            "Go to Compliance",
+            &format!("/admin/compliance?tenant_id={t}"),
+        ),
+        CommandItem::nav_platform("Go to Upstream", &format!("/admin/upstream?tenant_id={t}")),
         CommandItem::nav_platform("Go to ADR Browser", &format!("/admin/adr?tenant_id={t}")),
-        CommandItem::nav_platform("Go to Audit",      &format!("/admin/_audit?tenant_id={t}")),
-
+        CommandItem::nav_platform("Go to Audit", &format!("/admin/_audit?tenant_id={t}")),
         // Cluster surfaces — visible to PlatformAdmin only (Raft
         // snapshot exposes leader / term / log apply across tenants).
-        CommandItem::nav_platform("Go to Cluster Status", &format!("/admin/cluster/live?tenant_id={t}")),
-
+        CommandItem::nav_platform(
+            "Go to Cluster Status",
+            &format!("/admin/cluster/live?tenant_id={t}"),
+        ),
         // Tenant-scoped surfaces — visible to TenantAdmin and above.
-        CommandItem::nav("Go to KEDA",           &format!("/admin/keda?tenant_id={t}")),
-        CommandItem::nav("Go to Vault",          &format!("/admin/vault?tenant_id={t}")),
+        CommandItem::nav("Go to KEDA", &format!("/admin/keda?tenant_id={t}")),
+        CommandItem::nav("Go to Vault", &format!("/admin/vault?tenant_id={t}")),
         // 2026-05-14 consolidation: Kubelet + Scheduler land on K8s
         // Dashboard sub-tabs.
-        CommandItem::nav("Go to K8s Dashboard",  &format!("/admin/k8s-dashboard?tenant_id={t}")),
-        CommandItem::nav("K8s · Pods",           &format!("/admin/k8s-dashboard/pods?tenant_id={t}")),
-        CommandItem::nav("K8s · Nodes",          &format!("/admin/k8s-dashboard/nodes?tenant_id={t}")),
-        CommandItem::nav("K8s · Scheduler Queue", &format!("/admin/k8s-dashboard/scheduler/queue?tenant_id={t}")),
-        CommandItem::nav("Go to API Server",     &format!("/admin/apiserver?tenant_id={t}")),
-        CommandItem::nav("Go to etcd",           &format!("/admin/etcd?tenant_id={t}")),
-        CommandItem::nav("Go to Networking",     &format!("/admin/net?tenant_id={t}")),
-        CommandItem::action("Toggle dark mode",  "/api/portal/theme/toggle"),
-        CommandItem::action("Sign out",          "/api/auth/logout"),
+        CommandItem::nav(
+            "Go to K8s Dashboard",
+            &format!("/admin/k8s-dashboard?tenant_id={t}"),
+        ),
+        CommandItem::nav(
+            "K8s · Pods",
+            &format!("/admin/k8s-dashboard/pods?tenant_id={t}"),
+        ),
+        CommandItem::nav(
+            "K8s · Nodes",
+            &format!("/admin/k8s-dashboard/nodes?tenant_id={t}"),
+        ),
+        CommandItem::nav(
+            "K8s · Scheduler Queue",
+            &format!("/admin/k8s-dashboard/scheduler/queue?tenant_id={t}"),
+        ),
+        CommandItem::nav(
+            "Go to API Server",
+            &format!("/admin/apiserver?tenant_id={t}"),
+        ),
+        CommandItem::nav("Go to etcd", &format!("/admin/etcd?tenant_id={t}")),
+        CommandItem::nav("Go to Networking", &format!("/admin/net?tenant_id={t}")),
+        CommandItem::action("Toggle dark mode", "/api/portal/theme/toggle"),
+        CommandItem::action("Sign out", "/api/auth/logout"),
     ];
     all.into_iter().filter(|c| c.visible_to(persona)).collect()
 }
@@ -270,7 +295,11 @@ mod tests {
         let cs = default_commands("acme");
         for c in &cs {
             if c.href.contains("/admin/") {
-                assert!(c.href.contains("tenant_id=acme"), "missing tenant_id in {}", c.href);
+                assert!(
+                    c.href.contains("tenant_id=acme"),
+                    "missing tenant_id in {}",
+                    c.href
+                );
             }
         }
     }
@@ -376,6 +405,9 @@ mod tests {
     fn min_persona_omitted_from_json_when_anonymous() {
         let c = CommandItem::nav("X", "/x");
         let json = serde_json::to_string(&c).unwrap();
-        assert!(!json.contains("min_persona"), "default min_persona must skip in JSON: {json}");
+        assert!(
+            !json.contains("min_persona"),
+            "default min_persona must skip in JSON: {json}"
+        );
     }
 }

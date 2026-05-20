@@ -9,11 +9,7 @@ use crate::pulp::tasks::{Task, TaskQueue};
 // ─── Publication operations ──────────────────────────────────────────────────
 
 /// Enqueue a publish task for a repository version.
-pub fn enqueue_publish(
-    repo: &Repository,
-    version_href: &str,
-    queue: &TaskQueue,
-) -> Task {
+pub fn enqueue_publish(repo: &Repository, version_href: &str, queue: &TaskQueue) -> Task {
     let task_name = format!(
         "pulp_{}.tasks.publish",
         repo.content_type.plugin_name().trim_start_matches("pulp_")
@@ -31,10 +27,7 @@ pub fn enqueue_publish(
 // ─── Distribution URL routing ──────────────────────────────��──────────────────
 
 /// Resolve a content path under a distribution to a publication artifact.
-pub fn resolve_content_path(
-    distributions: &[Distribution],
-    path: &str,
-) -> Option<String> {
+pub fn resolve_content_path(distributions: &[Distribution], path: &str) -> Option<String> {
     for dist in distributions {
         let prefix = format!("/pulp/content/{}/", dist.base_path);
         if path.starts_with(&prefix) {
@@ -76,12 +69,21 @@ pub fn validate_distribution(
     }
 
     // base_path must be unique
-    if existing.iter().any(|d| d.base_path == dist.base_path && d.pulp_id != dist.pulp_id) {
-        errors.push(DistributionError::BasePathConflict { existing: dist.base_path.clone() });
+    if existing
+        .iter()
+        .any(|d| d.base_path == dist.base_path && d.pulp_id != dist.pulp_id)
+    {
+        errors.push(DistributionError::BasePathConflict {
+            existing: dist.base_path.clone(),
+        });
     }
 
     // Must have exactly one source
-    let sources = [dist.publication.is_some(), dist.repository.is_some(), dist.repository_version.is_some()];
+    let sources = [
+        dist.publication.is_some(),
+        dist.repository.is_some(),
+        dist.repository_version.is_some(),
+    ];
     let source_count = sources.iter().filter(|&&x| x).count();
     if source_count == 0 {
         errors.push(DistributionError::SourceMissing);
@@ -130,14 +132,22 @@ mod tests {
         let d1 = make_dist("dist1", "pypi/simple");
         let d2 = make_dist("dist2", "pypi/simple");
         let errors = validate_distribution(&d2, &[d1]);
-        assert!(errors.iter().any(|e| matches!(e, DistributionError::BasePathConflict { .. })));
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, DistributionError::BasePathConflict { .. }))
+        );
     }
 
     #[test]
     fn validate_distribution_invalid_base_path() {
         let d = make_dist("dist", "../traversal");
         let errors = validate_distribution(&d, &[]);
-        assert!(errors.iter().any(|e| matches!(e, DistributionError::InvalidBasePath(_))));
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, DistributionError::InvalidBasePath(_)))
+        );
     }
 
     #[test]
@@ -145,7 +155,11 @@ mod tests {
         let mut d = Distribution::new("dist", "path", ContentType::File);
         // No publication, repository, or repository_version set
         let errors = validate_distribution(&d, &[]);
-        assert!(errors.iter().any(|e| matches!(e, DistributionError::SourceMissing)));
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, DistributionError::SourceMissing))
+        );
     }
 
     #[test]

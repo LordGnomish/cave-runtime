@@ -4,7 +4,7 @@
 
 use super::{GatewayPlugin, PluginCtx, PluginResult};
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use uuid::Uuid;
 
 pub struct ZipkinPlugin;
@@ -38,31 +38,44 @@ impl GatewayPlugin for ZipkinPlugin {
             .unwrap_or_else(|| rand::random::<f64>() < sample_ratio);
 
         // Inject B3 headers into upstream request
-        ctx.headers.insert("x-b3-traceid".to_string(), trace_id.clone());
-        ctx.headers.insert("x-b3-spanid".to_string(), span_id.clone());
+        ctx.headers
+            .insert("x-b3-traceid".to_string(), trace_id.clone());
+        ctx.headers
+            .insert("x-b3-spanid".to_string(), span_id.clone());
         if let Some(pid) = parent_span_id {
             ctx.headers.insert("x-b3-parentspanid".to_string(), pid);
         }
-        ctx.headers.insert("x-b3-sampled".to_string(), if sampled { "1" } else { "0" }.to_string());
+        ctx.headers.insert(
+            "x-b3-sampled".to_string(),
+            if sampled { "1" } else { "0" }.to_string(),
+        );
 
         // Preserve for log phase
-        ctx.ctx.insert("zipkin_trace_id".to_string(), Value::String(trace_id));
-        ctx.ctx.insert("zipkin_span_id".to_string(), Value::String(span_id));
-        ctx.ctx.insert("zipkin_sampled".to_string(), Value::Bool(sampled));
-        ctx.ctx.insert("zipkin_start_ms".to_string(), Value::Number(
-            serde_json::Number::from(
+        ctx.ctx
+            .insert("zipkin_trace_id".to_string(), Value::String(trace_id));
+        ctx.ctx
+            .insert("zipkin_span_id".to_string(), Value::String(span_id));
+        ctx.ctx
+            .insert("zipkin_sampled".to_string(), Value::Bool(sampled));
+        ctx.ctx.insert(
+            "zipkin_start_ms".to_string(),
+            Value::Number(serde_json::Number::from(
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_millis() as u64,
-            ),
-        ));
+            )),
+        );
 
         PluginResult::Continue
     }
 
     async fn log(&self, ctx: &PluginCtx, config: &Value) {
-        let sampled = ctx.ctx.get("zipkin_sampled").and_then(|v| v.as_bool()).unwrap_or(false);
+        let sampled = ctx
+            .ctx
+            .get("zipkin_sampled")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         if !sampled {
             return;
         }
@@ -72,9 +85,21 @@ impl GatewayPlugin for ZipkinPlugin {
             None => return,
         };
 
-        let trace_id = ctx.ctx.get("zipkin_trace_id").and_then(|v| v.as_str()).unwrap_or("");
-        let span_id = ctx.ctx.get("zipkin_span_id").and_then(|v| v.as_str()).unwrap_or("");
-        let start_ms = ctx.ctx.get("zipkin_start_ms").and_then(|v| v.as_u64()).unwrap_or(0);
+        let trace_id = ctx
+            .ctx
+            .get("zipkin_trace_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let span_id = ctx
+            .ctx
+            .get("zipkin_span_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let start_ms = ctx
+            .ctx
+            .get("zipkin_start_ms")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
 
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

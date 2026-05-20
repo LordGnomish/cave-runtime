@@ -6,7 +6,7 @@
 //! many Jobs finish within the same window. Upstream jitters by up to
 //! `JitterFactor = 0.1` (10%) of the remaining TTL.
 
-use crate::gc_lite::ttl_after_finished::{TtlAction, FinishedJob, evaluate};
+use crate::gc_lite::ttl_after_finished::{FinishedJob, TtlAction, evaluate};
 use crate::types::Cite;
 
 pub const JITTER_FACTOR: f64 = 0.1;
@@ -68,7 +68,8 @@ mod tests {
             "tenant-ttl-jit-band"
         );
         for seed in 0..100u64 {
-            let TtlAction::RequeueAfter(jittered) = apply_jitter(TtlAction::RequeueAfter(1000), seed)
+            let TtlAction::RequeueAfter(jittered) =
+                apply_jitter(TtlAction::RequeueAfter(1000), seed)
             else {
                 panic!("expected RequeueAfter");
             };

@@ -88,14 +88,10 @@ impl HostsPlugin {
     }
 
     async fn reload(&self) -> DnsResult<()> {
-        let path = self
-            .config
-            .path
-            .as_deref()
-            .unwrap_or("/etc/hosts");
-        let content = tokio::fs::read_to_string(path).await.map_err(|e| {
-            DnsError::Plugin(format!("hosts: cannot read {path}: {e}"))
-        })?;
+        let path = self.config.path.as_deref().unwrap_or("/etc/hosts");
+        let content = tokio::fs::read_to_string(path)
+            .await
+            .map_err(|e| DnsError::Plugin(format!("hosts: cannot read {path}: {e}")))?;
 
         let mut data = Self::parse_content(&content, self.config.ttl);
 

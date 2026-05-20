@@ -19,10 +19,17 @@ pub struct AliasRegistry {
 
 impl AliasRegistry {
     pub fn new() -> Self {
-        let r = Self { aliases: DashMap::new() };
+        let r = Self {
+            aliases: DashMap::new(),
+        };
         // Register sensible defaults
         for (alias, provider, model) in default_aliases() {
-            r.register(ModelAlias { alias, provider, model, description: None });
+            r.register(ModelAlias {
+                alias,
+                provider,
+                model,
+                description: None,
+            });
         }
         r
     }
@@ -62,9 +69,21 @@ fn default_aliases() -> Vec<(String, String, String)> {
         ("gpt35".into(), "openai".into(), "gpt-3.5-turbo".into()),
         // Anthropic shorthand
         ("opus".into(), "anthropic".into(), "claude-opus-4-6".into()),
-        ("sonnet".into(), "anthropic".into(), "claude-sonnet-4-6".into()),
-        ("haiku".into(), "anthropic".into(), "claude-haiku-4-5-20251001".into()),
-        ("claude".into(), "anthropic".into(), "claude-sonnet-4-6".into()),
+        (
+            "sonnet".into(),
+            "anthropic".into(),
+            "claude-sonnet-4-6".into(),
+        ),
+        (
+            "haiku".into(),
+            "anthropic".into(),
+            "claude-haiku-4-5-20251001".into(),
+        ),
+        (
+            "claude".into(),
+            "anthropic".into(),
+            "claude-sonnet-4-6".into(),
+        ),
         // Local
         ("local".into(), "local".into(), "llama3".into()),
         ("llama".into(), "local".into(), "llama3".into()),

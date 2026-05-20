@@ -87,11 +87,19 @@ pub struct SortKey {
 
 impl SortKey {
     pub fn asc(expr: LogicalExpr) -> Self {
-        Self { expr, ascending: true, nulls_first: true }
+        Self {
+            expr,
+            ascending: true,
+            nulls_first: true,
+        }
     }
 
     pub fn desc(expr: LogicalExpr) -> Self {
-        Self { expr, ascending: false, nulls_first: false }
+        Self {
+            expr,
+            ascending: false,
+            nulls_first: false,
+        }
     }
 }
 
@@ -139,9 +147,7 @@ impl LogicalPlan {
             | Self::Sort { input, .. }
             | Self::Limit { input, .. } => 1 + input.depth(),
             Self::Join { left, right, .. } => 1 + left.depth().max(right.depth()),
-            Self::Union { inputs } => {
-                1 + inputs.iter().map(|i| i.depth()).max().unwrap_or(0)
-            }
+            Self::Union { inputs } => 1 + inputs.iter().map(|i| i.depth()).max().unwrap_or(0),
         }
     }
 }
@@ -153,7 +159,11 @@ mod tests {
     use std::sync::Arc;
 
     fn empty_schema() -> SchemaRef {
-        Arc::new(TableSchema::new(vec![Field::new("a", DataType::Int64, false)]))
+        Arc::new(TableSchema::new(vec![Field::new(
+            "a",
+            DataType::Int64,
+            false,
+        )]))
     }
 
     #[test]
@@ -214,7 +224,9 @@ mod tests {
             expressions: vec![LogicalExpr::col("a")],
             input: Box::new(s()),
         };
-        let u = LogicalPlan::Union { inputs: vec![s(), p] };
+        let u = LogicalPlan::Union {
+            inputs: vec![s(), p],
+        };
         assert_eq!(u.depth(), 3);
     }
 }

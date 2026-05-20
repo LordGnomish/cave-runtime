@@ -351,7 +351,9 @@ mod tests {
 
     #[test]
     fn method_roundtrip() {
-        for m in ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD", "CONNECT"] {
+        for m in [
+            "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD", "CONNECT",
+        ] {
             assert_eq!(HttpMethod::parse(m).as_str(), m);
         }
         // Custom method preserved.

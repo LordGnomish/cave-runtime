@@ -6,7 +6,7 @@
 //! render its "Runtime Progress" panel without each module wiring up a custom
 //! status endpoint. The values come from the workspace-level upstream tracker.
 
-use axum::{routing::get, Json, Router};
+use axum::{Json, Router, routing::get};
 use serde::Serialize;
 
 #[derive(Serialize)]

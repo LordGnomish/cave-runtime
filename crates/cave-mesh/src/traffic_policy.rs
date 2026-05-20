@@ -376,7 +376,10 @@ pub fn merge_for_port(policy: &TrafficPolicy, port: u16) -> EffectiveTrafficPoli
         .and_then(|p| p.outlier_detection.clone())
         .or_else(|| policy.outlier_detection.clone());
 
-    EffectiveTrafficPolicy { connection_pool, outlier_detection }
+    EffectiveTrafficPolicy {
+        connection_pool,
+        outlier_detection,
+    }
 }
 
 // ──────────────────────────────────────────────────────────────

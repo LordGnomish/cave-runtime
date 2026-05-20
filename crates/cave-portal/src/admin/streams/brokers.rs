@@ -9,10 +9,10 @@
 //!
 //! Upstream: <https://kafka.apache.org/documentation/#basic_ops_cluster_id>
 
+use super::StreamsViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
-use super::StreamsViewError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BrokerRow {
@@ -26,7 +26,10 @@ pub struct BrokerRow {
     pub status: &'static str,
 }
 
-pub fn list_brokers(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<BrokerRow>, StreamsViewError> {
+pub fn list_brokers(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<BrokerRow>, StreamsViewError> {
     let topics = super::topics::list_topics_sorted(state, ctx)?;
     let load: u64 = topics.iter().map(|t| t.partitions as u64).sum();
     // cave-streams ships one broker today — broker_id=1 on
@@ -93,9 +96,14 @@ mod tests {
 
     #[test]
     fn broker_load_matches_topic_partition_sum() {
-        let topics = super::super::topics::list_topics_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let topics = super::super::topics::list_topics_sorted(
+            &AdminState::seeded(),
+            &ctx(&[Permission::StreamsRead]),
+        )
+        .unwrap();
         let expected: u64 = topics.iter().map(|t| t.partitions as u64).sum();
-        let brokers = list_brokers(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let brokers =
+            list_brokers(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
         assert_eq!(brokers[0].partition_load, expected);
     }
 

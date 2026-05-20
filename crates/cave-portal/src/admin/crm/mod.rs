@@ -21,7 +21,7 @@ pub mod workflows;
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, CrmAccount};
+use crate::admin::state::{AdminState, CrmAccount, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -32,9 +32,12 @@ pub enum CrmViewError {
 
 pub fn list_records(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<CrmAccount>, CrmViewError> {
     ctx.authorise(Permission::CrmRead)?;
-    let mut rows: Vec<CrmAccount> =
-        scope(&state.crm_accounts.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-            .into_iter().cloned().collect();
+    let mut rows: Vec<CrmAccount> = scope(&state.crm_accounts.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
+    .into_iter()
+    .cloned()
+    .collect();
     rows.sort_by(|a, b| b.mrr_cents.cmp(&a.mrr_cents).then(a.name.cmp(&b.name)));
     Ok(rows)
 }
@@ -54,7 +57,11 @@ pub fn total_mrr_cents(rows: &[CrmAccount]) -> u64 {
     rows.iter().map(|r| r.mrr_cents).sum()
 }
 
-pub fn detail(state: &AdminState, ctx: &RequestCtx, id: &str) -> Result<Option<CrmAccount>, CrmViewError> {
+pub fn detail(
+    state: &AdminState,
+    ctx: &RequestCtx,
+    id: &str,
+) -> Result<Option<CrmAccount>, CrmViewError> {
     let rows = list_records(state, ctx)?;
     Ok(rows.into_iter().find(|r| r.id == id))
 }
@@ -67,9 +74,17 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, CrmViewErr
         r#"<span class="px-2 py-1 mr-2 rounded bg-gray-200 text-sm">{p} <strong>×{n}</strong></span>"#,
         p = escape(p), n = v.len()
     )).collect();
-    let table_rows: Vec<Vec<String>> = rows.iter().map(|r| vec![
-        escape(&r.id), escape(&r.name), r.plan.into(), format!("${}.{:02}", r.mrr_cents / 100, r.mrr_cents % 100),
-    ]).collect();
+    let table_rows: Vec<Vec<String>> = rows
+        .iter()
+        .map(|r| {
+            vec![
+                escape(&r.id),
+                escape(&r.name),
+                r.plan.into(),
+                format!("${}.{:02}", r.mrr_cents / 100, r.mrr_cents % 100),
+            ]
+        })
+        .collect();
     let body = format!(
         r#"<section>
   <p class="text-sm text-gray-600 mb-3">Twenty CRM parity (cave-crm). Upstream: <a class="text-blue-700 underline" href="https://twenty.com/">twenty.com</a>.</p>
@@ -87,30 +102,50 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, CrmViewErr
         chips = chips,
         tbl = table(&["id", "name", "plan", "MRR"], &table_rows),
     );
-    Ok(page_shell_full(ctx, "/admin/crm", &format!("crm · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/crm",
+        &format!("crm · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::backstage("plugins/crm/src/components/AccountsList.tsx", "AccountsList");
+const FILE_CITE: Cite = Cite::backstage(
+    "plugins/crm/src/components/AccountsList.tsx",
+    "AccountsList",
+);
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::portal_test_ctx;
-    fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
+    fn ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer("acme", perms)
+    }
 
     #[test]
     fn list_filters_to_owner_and_sorts_by_mrr_desc() {
-        let (_c, _t) = portal_test_ctx!("plugins/crm/src/components/AccountsList.tsx", "AccountsList", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/crm/src/components/AccountsList.tsx",
+            "AccountsList",
+            "acme"
+        );
         let r = list_records(&AdminState::seeded(), &ctx(&[Permission::CrmRead])).unwrap();
         assert_eq!(r.len(), 2);
         assert!(r.iter().all(|x| x.tenant.as_str() == "acme"));
-        for w in r.windows(2) { assert!(w[0].mrr_cents >= w[1].mrr_cents); }
+        for w in r.windows(2) {
+            assert!(w[0].mrr_cents >= w[1].mrr_cents);
+        }
     }
 
     #[test]
     fn list_refuses_without_perm() {
-        let (_c, _t) = portal_test_ctx!("plugins/permission-react/src/PermissionApi.ts", "authorize", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/permission-react/src/PermissionApi.ts",
+            "authorize",
+            "acme"
+        );
         assert!(list_records(&AdminState::seeded(), &ctx(&[])).is_err());
     }
 
@@ -134,9 +169,17 @@ mod tests {
         let s = AdminState::seeded();
         let r = list_records(&s, &ctx(&[Permission::CrmRead])).unwrap();
         if let Some(f) = r.first() {
-            assert!(detail(&s, &ctx(&[Permission::CrmRead]), &f.id).unwrap().is_some());
+            assert!(
+                detail(&s, &ctx(&[Permission::CrmRead]), &f.id)
+                    .unwrap()
+                    .is_some()
+            );
         }
-        assert!(detail(&s, &ctx(&[Permission::CrmRead]), "no-such").unwrap().is_none());
+        assert!(
+            detail(&s, &ctx(&[Permission::CrmRead]), "no-such")
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

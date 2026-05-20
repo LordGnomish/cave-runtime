@@ -49,10 +49,7 @@ pub enum Event {
     },
     /// One Raft log entry just applied. `command_kind` is a stable
     /// taxonomy string (`etcd.put`, `apiserver.upsert`, ...).
-    ApplyEntry {
-        index: u64,
-        command_kind: String,
-    },
+    ApplyEntry { index: u64, command_kind: String },
     /// cave-upstream-watchd noticed an upstream release that landed
     /// in a tracked repo and the cave-side has not bumped.
     GapOpened {
@@ -77,10 +74,7 @@ pub enum Event {
         op: String, // "read"/"list"/"write"/"delete"
     },
     /// Kubelet announced a node readiness flip.
-    NodeReady {
-        node: String,
-        ready: bool,
-    },
+    NodeReady { node: String, ready: bool },
     /// One pod's phase changed (Pending/Running/Succeeded/Failed/Unknown).
     PodPhaseChange {
         tenant: String,
@@ -123,9 +117,7 @@ impl Event {
     pub fn deliver_to(&self, ctx: &RequestCtx) -> bool {
         match self.tenant() {
             None => ctx.persona == Persona::PlatformAdmin,
-            Some(t) => {
-                ctx.persona == Persona::PlatformAdmin || ctx.tenant.as_str() == t
-            }
+            Some(t) => ctx.persona == Persona::PlatformAdmin || ctx.tenant.as_str() == t,
         }
     }
 
@@ -190,10 +182,7 @@ impl EventBus {
     /// that yields one Event per delivered message; events the ctx
     /// is not permitted to see are filtered out at the bus side so a
     /// rogue subscriber can't peek at a foreign tenant.
-    pub fn subscribe(
-        self: &Arc<Self>,
-        ctx: RequestCtx,
-    ) -> Result<EventSubscription, EventsError> {
+    pub fn subscribe(self: &Arc<Self>, ctx: RequestCtx) -> Result<EventSubscription, EventsError> {
         ctx.authorise(Permission::EventsSubscribe)?;
         Ok(EventSubscription {
             recv: self.sender.subscribe(),

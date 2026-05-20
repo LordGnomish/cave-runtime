@@ -11,9 +11,9 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
-use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
-use tokio::sync::{broadcast, RwLock};
+use std::sync::atomic::{AtomicI64, Ordering};
+use tokio::sync::{RwLock, broadcast};
 use tracing::{debug, info};
 
 /// A single version of a key in the MVCC store.
@@ -21,7 +21,7 @@ use tracing::{debug, info};
 pub struct KeyVersion {
     pub create_revision: i64,
     pub mod_revision: i64,
-    pub version: i64, // number of put ops (not counting deletes)
+    pub version: i64,           // number of put ops (not counting deletes)
     pub value: Option<Vec<u8>>, // None = tombstone (deleted)
     pub lease_id: i64,
 }
@@ -219,9 +219,11 @@ impl MvccEngine {
     async fn apply_compact(&self, compact_rev: i64) {
         let mut data = self.data.write().await;
         for versions in data.values_mut() {
-            versions.retain(|v| v.mod_revision >= compact_rev || {
-                // Keep the last version at or before compact_rev
-                false
+            versions.retain(|v| {
+                v.mod_revision >= compact_rev || {
+                    // Keep the last version at or before compact_rev
+                    false
+                }
             });
         }
         // Actually: keep the latest version at or before compact_rev + all versions after
@@ -316,20 +318,18 @@ impl MvccEngine {
             .await?;
 
         // Notify watches
-        self.notify_watches(
-            WatchEvent {
-                watch_id: 0,
-                revision: rev,
-                event_type: EventType::Put,
-                key: key.clone(),
-                value: Some(value),
-                prev_key: prev.clone(),
-                create_revision: kv.create_revision,
-                mod_revision: kv.mod_revision,
-                version: kv.version,
-                lease_id,
-            },
-        )
+        self.notify_watches(WatchEvent {
+            watch_id: 0,
+            revision: rev,
+            event_type: EventType::Put,
+            key: key.clone(),
+            value: Some(value),
+            prev_key: prev.clone(),
+            create_revision: kv.create_revision,
+            mod_revision: kv.mod_revision,
+            version: kv.version,
+            lease_id,
+        })
         .await;
 
         Ok(PutResponse {
@@ -382,8 +382,7 @@ impl MvccEngine {
     ) -> Vec<KvPair> {
         let mut result = Vec::new();
 
-        let iter: Box<dyn Iterator<Item = (&Vec<u8>, &Vec<KeyVersion>)>> = if range_end.is_empty()
-        {
+        let iter: Box<dyn Iterator<Item = (&Vec<u8>, &Vec<KeyVersion>)>> = if range_end.is_empty() {
             // Exact key match — use range with equal bounds
             Box::new(data.range(key.to_vec()..=key.to_vec()))
         } else if range_end == b"\x00" {
@@ -539,9 +538,7 @@ impl MvccEngine {
                     compare_values(actual, *expected, &cmp.result)
                 }
                 CompareTarget::Value(expected) => {
-                    let actual = kv
-                        .and_then(|v| v.value.as_deref())
-                        .unwrap_or(&[]);
+                    let actual = kv.and_then(|v| v.value.as_deref()).unwrap_or(&[]);
                     compare_values_bytes(actual, expected, &cmp.result)
                 }
                 CompareTarget::Lease(expected) => {
@@ -552,11 +549,7 @@ impl MvccEngine {
         });
         drop(data);
 
-        let ops = if success {
-            txn.success
-        } else {
-            txn.failure
-        };
+        let ops = if success { txn.success } else { txn.failure };
 
         let mut responses = Vec::new();
         for op in ops {
@@ -611,9 +604,7 @@ impl MvccEngine {
         }
 
         self.apply_compact(revision).await;
-        self.wal
-            .append(&WalEntry::KvCompact { revision })
-            .await?;
+        self.wal.append(&WalEntry::KvCompact { revision }).await?;
 
         Ok(CompactResponse {
             header: ResponseHeader {
@@ -686,7 +677,11 @@ impl MvccEngine {
 
     // ── Lease ──────────────────────────────────────────────────────────────────
 
-    pub async fn lease_grant(&self, ttl_secs: i64, lease_id: i64) -> StoreResult<LeaseGrantResponse> {
+    pub async fn lease_grant(
+        &self,
+        ttl_secs: i64,
+        lease_id: i64,
+    ) -> StoreResult<LeaseGrantResponse> {
         let id = if lease_id == 0 {
             // Generate random ID
             rand_lease_id()
@@ -732,15 +727,10 @@ impl MvccEngine {
             self.apply_delete(rev, key.clone()).await;
             let _ = self
                 .wal
-                .append(&WalEntry::KvDelete {
-                    revision: rev,
-                    key,
-                })
+                .append(&WalEntry::KvDelete { revision: rev, key })
                 .await;
         }
-        self.wal
-            .append(&WalEntry::LeaseRevoke { lease_id })
-            .await?;
+        self.wal.append(&WalEntry::LeaseRevoke { lease_id }).await?;
         Ok(LeaseRevokeResponse {
             header: ResponseHeader {
                 revision: self.current_revision(),
@@ -789,11 +779,7 @@ impl MvccEngine {
             id: lease_id,
             ttl: lease.ttl_secs,
             granted_ttl: lease.ttl_secs,
-            keys: if keys {
-                lease.keys.clone()
-            } else {
-                vec![]
-            },
+            keys: if keys { lease.keys.clone() } else { vec![] },
         })
     }
 
@@ -834,7 +820,9 @@ fn rand_lease_id() -> i64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    (t as i64).wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407)
+    (t as i64)
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407)
 }
 
 fn compare_values<T: Ord>(actual: T, expected: T, result: &CompareResult) -> bool {

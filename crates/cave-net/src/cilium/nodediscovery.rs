@@ -10,8 +10,8 @@
 //! We port the announce/withdraw cycle as a state machine. Wall-clock
 //! intervals match upstream defaults.
 
-use crate::cilium::types::{Cite, TenantId};
 use crate::cilium::node_mgr::{Node, NodeSource};
+use crate::cilium::types::{Cite, TenantId};
 use std::collections::BTreeMap;
 use std::time::Duration;
 
@@ -48,7 +48,13 @@ pub struct NodeDiscovery {
 
 impl NodeDiscovery {
     pub fn new(tenant: TenantId) -> Self {
-        Self { tenant, local: None, state: DiscoveryState::Bootstrapping, announces: 0, validations: 0 }
+        Self {
+            tenant,
+            local: None,
+            state: DiscoveryState::Bootstrapping,
+            announces: 0,
+            validations: 0,
+        }
     }
 
     pub fn set_local(&mut self, name: &str, ipv4: Option<String>, ipv6: Option<String>) {
@@ -56,7 +62,8 @@ impl NodeDiscovery {
             name: name.into(),
             cluster: "default".into(),
             source: NodeSource::Local,
-            ipv4, ipv6,
+            ipv4,
+            ipv6,
             labels: BTreeMap::new(),
             identity: 1, // host
         });
@@ -70,7 +77,9 @@ impl NodeDiscovery {
     }
 
     pub fn validate(&mut self) -> Result<DiscoveryState, DiscoveryError> {
-        if self.local.is_none() { return Err(DiscoveryError::NotInitialised); }
+        if self.local.is_none() {
+            return Err(DiscoveryError::NotInitialised);
+        }
         self.validations += 1;
         self.state = DiscoveryState::Validated;
         Ok(self.state)
@@ -91,14 +100,22 @@ mod tests {
 
     #[test]
     fn intervals_default_to_one_minute() {
-        let (_c, _t) = cilium_test_ctx!("pkg/nodediscovery/nodediscovery.go", "Intervals", "tenant-nd-iv");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/nodediscovery/nodediscovery.go",
+            "Intervals",
+            "tenant-nd-iv"
+        );
         assert_eq!(VALIDATE_INTERVAL, Duration::from_secs(60));
         assert_eq!(ANNOUNCE_INTERVAL, Duration::from_secs(60));
     }
 
     #[test]
     fn fresh_state_is_bootstrapping() {
-        let (_c, t) = cilium_test_ctx!("pkg/nodediscovery/nodediscovery.go", "State.Init", "tenant-nd-i");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/nodediscovery/nodediscovery.go",
+            "State.Init",
+            "tenant-nd-i"
+        );
         let nd = NodeDiscovery::new(t);
         assert_eq!(nd.state, DiscoveryState::Bootstrapping);
         assert!(nd.local.is_none());
@@ -106,7 +123,11 @@ mod tests {
 
     #[test]
     fn announce_without_local_node_errors() {
-        let (_c, t) = cilium_test_ctx!("pkg/nodediscovery/nodediscovery.go", "Announce.NoLocal", "tenant-nd-anl");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/nodediscovery/nodediscovery.go",
+            "Announce.NoLocal",
+            "tenant-nd-anl"
+        );
         let mut nd = NodeDiscovery::new(t);
         let e = nd.announce().unwrap_err();
         assert_eq!(e, DiscoveryError::NotInitialised);
@@ -114,7 +135,11 @@ mod tests {
 
     #[test]
     fn announce_after_set_local_advances_state() {
-        let (_c, t) = cilium_test_ctx!("pkg/nodediscovery/nodediscovery.go", "Announce.Ok", "tenant-nd-ao");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/nodediscovery/nodediscovery.go",
+            "Announce.Ok",
+            "tenant-nd-ao"
+        );
         let mut nd = NodeDiscovery::new(t);
         nd.set_local("host-a", Some("10.0.0.1".into()), None);
         let n = nd.announce().unwrap();
@@ -125,7 +150,11 @@ mod tests {
 
     #[test]
     fn validate_increments_counter() {
-        let (_c, t) = cilium_test_ctx!("pkg/nodediscovery/nodediscovery.go", "Validate", "tenant-nd-v");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/nodediscovery/nodediscovery.go",
+            "Validate",
+            "tenant-nd-v"
+        );
         let mut nd = NodeDiscovery::new(t);
         nd.set_local("a", Some("1.1.1.1".into()), None);
         nd.validate().unwrap();
@@ -136,7 +165,11 @@ mod tests {
 
     #[test]
     fn validate_without_local_errors() {
-        let (_c, t) = cilium_test_ctx!("pkg/nodediscovery/nodediscovery.go", "Validate.NoLocal", "tenant-nd-vnl");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/nodediscovery/nodediscovery.go",
+            "Validate.NoLocal",
+            "tenant-nd-vnl"
+        );
         let mut nd = NodeDiscovery::new(t);
         let e = nd.validate().unwrap_err();
         assert_eq!(e, DiscoveryError::NotInitialised);
@@ -144,7 +177,11 @@ mod tests {
 
     #[test]
     fn withdraw_moves_to_withdrawn_state() {
-        let (_c, t) = cilium_test_ctx!("pkg/nodediscovery/nodediscovery.go", "Withdraw", "tenant-nd-w");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/nodediscovery/nodediscovery.go",
+            "Withdraw",
+            "tenant-nd-w"
+        );
         let mut nd = NodeDiscovery::new(t);
         nd.set_local("a", Some("1.1.1.1".into()), None);
         nd.announce().unwrap();
@@ -154,7 +191,11 @@ mod tests {
 
     #[test]
     fn local_node_source_is_local() {
-        let (_c, t) = cilium_test_ctx!("pkg/nodediscovery/nodediscovery.go", "Local.Source", "tenant-nd-ls");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/nodediscovery/nodediscovery.go",
+            "Local.Source",
+            "tenant-nd-ls"
+        );
         let mut nd = NodeDiscovery::new(t);
         nd.set_local("a", Some("1.1.1.1".into()), None);
         assert_eq!(nd.local.as_ref().unwrap().source, NodeSource::Local);
@@ -162,7 +203,11 @@ mod tests {
 
     #[test]
     fn local_node_identity_is_host_identity() {
-        let (_c, t) = cilium_test_ctx!("pkg/nodediscovery/nodediscovery.go", "Local.Identity", "tenant-nd-li");
+        let (_c, t) = cilium_test_ctx!(
+            "pkg/nodediscovery/nodediscovery.go",
+            "Local.Identity",
+            "tenant-nd-li"
+        );
         let mut nd = NodeDiscovery::new(t);
         nd.set_local("a", Some("1.1.1.1".into()), None);
         assert_eq!(nd.local.as_ref().unwrap().identity, 1);

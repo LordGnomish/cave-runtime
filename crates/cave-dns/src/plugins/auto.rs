@@ -34,7 +34,10 @@ impl AutoPlugin {
         let mut mgr = ZoneManager::new();
 
         let mut entries = tokio::fs::read_dir(&dir).await.map_err(|e| {
-            DnsError::Zone(format!("auto: cannot read directory {}: {e}", dir.display()))
+            DnsError::Zone(format!(
+                "auto: cannot read directory {}: {e}",
+                dir.display()
+            ))
         })?;
 
         while let Ok(Some(entry)) = entries.next_entry().await {
@@ -42,10 +45,7 @@ impl AutoPlugin {
             if !path.is_file() {
                 continue;
             }
-            let name = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("");
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
             // Match template glob (simple *.zone check)
             if !glob_match(&self.config.template, name) {
                 continue;

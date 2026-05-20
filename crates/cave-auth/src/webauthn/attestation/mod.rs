@@ -10,8 +10,8 @@ pub mod tpm;
 
 use ciborium::value::Value;
 
-use super::cbor;
 use super::WebAuthnError;
+use super::cbor;
 
 /// Parsed attestationObject (W3C WebAuthn L2 §6.5).
 #[derive(Debug, Clone)]
@@ -73,7 +73,10 @@ mod tests {
     fn build_attestation(fmt: &str, auth_data: &[u8], stmt: Value) -> Vec<u8> {
         let m = Value::Map(vec![
             (Value::Text("fmt".into()), Value::Text(fmt.into())),
-            (Value::Text("authData".into()), Value::Bytes(auth_data.to_vec())),
+            (
+                Value::Text("authData".into()),
+                Value::Bytes(auth_data.to_vec()),
+            ),
             (Value::Text("attStmt".into()), stmt),
         ]);
         cbor::encode(&m).unwrap()

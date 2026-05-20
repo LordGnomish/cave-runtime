@@ -4,16 +4,16 @@
 //   src/main/java/org/dependencytrack/resources/v1/{ProjectResource,ComponentResource,BomResource,VulnerabilityResource,PolicyResource}.java
 //! Axum HTTP routes — Dependency-Track REST API v1 parity surface.
 
+use crate::State;
 use crate::components::{ComponentRecord, Project};
 use crate::models::VulnIntel;
 use crate::policy::Policy;
 use crate::sbom;
-use crate::State;
 use axum::{
+    Json, Router,
     extract::{Path, Query, State as AxumState},
     http::StatusCode,
     routing::{get, post},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -198,21 +198,27 @@ async fn upload_bom(
     let raw = base64::engine::general_purpose::STANDARD
         .decode(body.bom_b64.as_bytes())
         .map_err(|e| (StatusCode::BAD_REQUEST, format!("bad base64: {}", e)))?;
-    let fmt = sbom::detect_format(&raw)
-        .ok_or((StatusCode::UNSUPPORTED_MEDIA_TYPE, "unknown BOM format".into()))?;
+    let fmt = sbom::detect_format(&raw).ok_or((
+        StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        "unknown BOM format".into(),
+    ))?;
     let parsed = match fmt {
         sbom::BomFormat::CycloneDxJson => sbom::cyclonedx::parse_json(&raw)
             .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?,
         sbom::BomFormat::CycloneDxXml => sbom::cyclonedx::parse_xml(&raw)
             .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?,
-        sbom::BomFormat::SpdxJson => sbom::spdx::parse_json(&raw)
-            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?,
+        sbom::BomFormat::SpdxJson => {
+            sbom::spdx::parse_json(&raw).map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
+        }
         sbom::BomFormat::SpdxTagValue => sbom::spdx::parse_tag_value(&raw)
             .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?,
     };
     let project_uuid = body.project_uuid.unwrap_or_else(|| {
         let p = Project::new(
-            parsed.project_name.clone().unwrap_or_else(|| "imported".into()),
+            parsed
+                .project_name
+                .clone()
+                .unwrap_or_else(|| "imported".into()),
             parsed.project_version.clone(),
         );
         let uuid = p.uuid;
@@ -313,7 +319,7 @@ async fn portfolio_metrics(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::body::{to_bytes, Body};
+    use axum::body::{Body, to_bytes};
     use axum::http::Request;
     use tower::ServiceExt;
 

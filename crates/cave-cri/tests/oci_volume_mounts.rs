@@ -6,7 +6,9 @@
 //! (`generateContainerMounts`) + runc v1.4.2
 //! `libcontainer/specconv/spec_linux.go` (mount option mapping).
 
-use cave_cri::models::{ContainerSpec, Mount, MountPropagation, MountType, NetworkMode, ResourceLimits, RestartPolicy};
+use cave_cri::models::{
+    ContainerSpec, Mount, MountPropagation, MountType, NetworkMode, ResourceLimits, RestartPolicy,
+};
 use cave_cri::oci_spec::{apply_volume_mounts, generate};
 use std::path::PathBuf;
 
@@ -39,7 +41,11 @@ fn generate_includes_oci_default_mounts() {
     let spec = generate(&s, &PathBuf::from("/merged"), "ctr-001");
     let dests: Vec<&str> = spec.mounts.iter().map(|m| m.destination.as_str()).collect();
     for required in ["/proc", "/dev", "/dev/pts", "/sys"] {
-        assert!(dests.contains(&required), "default mount {} missing", required);
+        assert!(
+            dests.contains(&required),
+            "default mount {} missing",
+            required
+        );
     }
 }
 
@@ -74,17 +80,29 @@ fn apply_volume_mounts_translates_each_mount_type_correctly() {
     ];
     apply_volume_mounts(&mut spec, &user_mounts);
 
-    let bind = spec.mounts.iter().find(|m| m.destination == "/data").unwrap();
+    let bind = spec
+        .mounts
+        .iter()
+        .find(|m| m.destination == "/data")
+        .unwrap();
     assert_eq!(bind.mount_type, "bind");
     assert!(bind.options.contains(&"rbind".into()));
     assert!(!bind.options.contains(&"ro".into()));
 
-    let tmpfs = spec.mounts.iter().find(|m| m.destination == "/run/cache").unwrap();
+    let tmpfs = spec
+        .mounts
+        .iter()
+        .find(|m| m.destination == "/run/cache")
+        .unwrap();
     assert_eq!(tmpfs.mount_type, "tmpfs");
     assert!(tmpfs.options.contains(&"nosuid".into()));
     assert!(tmpfs.options.contains(&"noexec".into()));
 
-    let vol = spec.mounts.iter().find(|m| m.destination == "/etc/cfg").unwrap();
+    let vol = spec
+        .mounts
+        .iter()
+        .find(|m| m.destination == "/etc/cfg")
+        .unwrap();
     assert_eq!(vol.mount_type, "bind", "Volume → bind in OCI runtime spec");
     assert!(vol.options.contains(&"ro".into()), "read_only ⇒ ro");
 }
@@ -94,22 +112,41 @@ fn apply_volume_mounts_translates_each_mount_type_correctly() {
 #[test]
 fn propagation_mode_maps_to_correct_option_token() {
     let mut spec = generate(&base_spec(), &PathBuf::from("/merged"), "ctr-003");
-    apply_volume_mounts(&mut spec, &[
-        Mount {
-            source: "/host/a".into(), destination: "/a".into(), read_only: false,
-            mount_type: MountType::Bind, propagation: MountPropagation::Private,
-        },
-        Mount {
-            source: "/host/b".into(), destination: "/b".into(), read_only: false,
-            mount_type: MountType::Bind, propagation: MountPropagation::HostToContainer,
-        },
-        Mount {
-            source: "/host/c".into(), destination: "/c".into(), read_only: false,
-            mount_type: MountType::Bind, propagation: MountPropagation::Bidirectional,
-        },
-    ]);
+    apply_volume_mounts(
+        &mut spec,
+        &[
+            Mount {
+                source: "/host/a".into(),
+                destination: "/a".into(),
+                read_only: false,
+                mount_type: MountType::Bind,
+                propagation: MountPropagation::Private,
+            },
+            Mount {
+                source: "/host/b".into(),
+                destination: "/b".into(),
+                read_only: false,
+                mount_type: MountType::Bind,
+                propagation: MountPropagation::HostToContainer,
+            },
+            Mount {
+                source: "/host/c".into(),
+                destination: "/c".into(),
+                read_only: false,
+                mount_type: MountType::Bind,
+                propagation: MountPropagation::Bidirectional,
+            },
+        ],
+    );
 
-    let opts = |dest: &str| spec.mounts.iter().find(|m| m.destination == dest).unwrap().options.clone();
+    let opts = |dest: &str| {
+        spec.mounts
+            .iter()
+            .find(|m| m.destination == dest)
+            .unwrap()
+            .options
+            .clone()
+    };
     assert!(opts("/a").contains(&"rprivate".into()));
     assert!(opts("/b").contains(&"rslave".into()));
     assert!(opts("/c").contains(&"rshared".into()));
@@ -122,31 +159,49 @@ fn propagation_mode_maps_to_correct_option_token() {
 #[test]
 fn user_mount_replaces_existing_destination_idempotently() {
     let mut spec = generate(&base_spec(), &PathBuf::from("/merged"), "ctr-004");
-    let initial_dev_count = spec.mounts.iter().filter(|m| m.destination == "/dev").count();
+    let initial_dev_count = spec
+        .mounts
+        .iter()
+        .filter(|m| m.destination == "/dev")
+        .count();
     assert_eq!(initial_dev_count, 1);
 
-    apply_volume_mounts(&mut spec, &[Mount {
-        source: "/host/devshim".into(),
-        destination: "/dev".into(),
-        read_only: true,
-        mount_type: MountType::Bind,
-        propagation: MountPropagation::Private,
-    }]);
+    apply_volume_mounts(
+        &mut spec,
+        &[Mount {
+            source: "/host/devshim".into(),
+            destination: "/dev".into(),
+            read_only: true,
+            mount_type: MountType::Bind,
+            propagation: MountPropagation::Private,
+        }],
+    );
 
-    let after = spec.mounts.iter().filter(|m| m.destination == "/dev").collect::<Vec<_>>();
+    let after = spec
+        .mounts
+        .iter()
+        .filter(|m| m.destination == "/dev")
+        .collect::<Vec<_>>();
     assert_eq!(after.len(), 1, "destination kept unique");
     assert_eq!(after[0].source, "/host/devshim", "user mount wins");
     assert!(after[0].options.contains(&"ro".into()));
 
     // Apply twice — still exactly one entry.
-    apply_volume_mounts(&mut spec, &[Mount {
-        source: "/host/devshim2".into(),
-        destination: "/dev".into(),
-        read_only: false,
-        mount_type: MountType::Bind,
-        propagation: MountPropagation::Private,
-    }]);
-    let after = spec.mounts.iter().filter(|m| m.destination == "/dev").collect::<Vec<_>>();
+    apply_volume_mounts(
+        &mut spec,
+        &[Mount {
+            source: "/host/devshim2".into(),
+            destination: "/dev".into(),
+            read_only: false,
+            mount_type: MountType::Bind,
+            propagation: MountPropagation::Private,
+        }],
+    );
+    let after = spec
+        .mounts
+        .iter()
+        .filter(|m| m.destination == "/dev")
+        .collect::<Vec<_>>();
     assert_eq!(after.len(), 1);
     assert_eq!(after[0].source, "/host/devshim2");
 }

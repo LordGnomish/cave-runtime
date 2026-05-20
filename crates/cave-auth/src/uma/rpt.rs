@@ -278,7 +278,9 @@ mod tests {
             granted: grants(&[("rs1", "view"), ("rs2", "delete")]),
             denied: vec![],
         };
-        let rpt = issuer.issue(&t, "bob", &decision, false, Utc::now()).unwrap();
+        let rpt = issuer
+            .issue(&t, "bob", &decision, false, Utc::now())
+            .unwrap();
         assert_eq!(rpt.authorization.permissions.len(), 2);
     }
 }

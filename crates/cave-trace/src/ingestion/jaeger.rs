@@ -98,8 +98,8 @@ pub struct JaegerProcess {
 
 pub fn parse_jaeger_json(body: &[u8], tenant_id: &str) -> Result<Vec<Span>> {
     // Try envelope first, then bare batch
-    let envelope: JaegerBatchEnvelope = serde_json::from_slice(body)
-        .map_err(|e| TraceError::ParseError(e.to_string()))?;
+    let envelope: JaegerBatchEnvelope =
+        serde_json::from_slice(body).map_err(|e| TraceError::ParseError(e.to_string()))?;
 
     let mut out = Vec::new();
 
@@ -107,9 +107,13 @@ pub fn parse_jaeger_json(body: &[u8], tenant_id: &str) -> Result<Vec<Span>> {
         for trace in traces {
             let default_process = None::<&JaegerProcess>;
             for jspan in &trace.spans {
-                let process = jspan.process.as_ref()
+                let process = jspan
+                    .process
+                    .as_ref()
                     .or_else(|| {
-                        jspan.process_id.as_ref()
+                        jspan
+                            .process_id
+                            .as_ref()
                             .and_then(|pid| trace.processes.as_ref()?.get(pid))
                     })
                     .or(default_process);
@@ -139,19 +143,23 @@ fn convert_json_span(
     let trace_id = crate::types::parse_trace_id(&js.trace_id).ok()?;
     let span_id = crate::types::parse_span_id(&js.span_id).ok()?;
 
-    let parent_span_id = js.references.as_deref()
+    let parent_span_id = js
+        .references
+        .as_deref()
         .and_then(|refs| refs.iter().find(|r| r.ref_type == "CHILD_OF"))
         .and_then(|r| crate::types::parse_span_id(&r.span_id).ok());
 
     let start_ns = us_to_ns(js.start_time);
-    let dur_ns   = us_to_ns(js.duration);
-    let end_ns   = start_ns + dur_ns;
+    let dur_ns = us_to_ns(js.duration);
+    let end_ns = start_ns + dur_ns;
 
     let service_name = process
         .map(|p| normalise_service(&p.service_name))
         .unwrap_or_else(|| "unknown".into());
 
-    let mut tags: HashMap<String, TagValue> = js.tags.as_deref()
+    let mut tags: HashMap<String, TagValue> = js
+        .tags
+        .as_deref()
         .map(parse_jaeger_tags)
         .unwrap_or_default();
 
@@ -167,17 +175,26 @@ fn convert_json_span(
         .collect();
 
     // Derive status from tags
-    let status = if tags.get("error").map(|v| v.display() != "false").unwrap_or(false) {
+    let status = if tags
+        .get("error")
+        .map(|v| v.display() != "false")
+        .unwrap_or(false)
+    {
         SpanStatus::Error
     } else {
         SpanStatus::Ok
     };
 
-    let events: Vec<_> = js.logs.as_deref().unwrap_or(&[])
+    let events: Vec<_> = js
+        .logs
+        .as_deref()
+        .unwrap_or(&[])
         .iter()
         .map(|log| SpanEvent {
             time_unix_nano: us_to_ns(log.timestamp),
-            name: log.fields.iter()
+            name: log
+                .fields
+                .iter()
                 .find(|f| f.key == "event" || f.key == "message")
                 .map(|f| f.value.as_str().unwrap_or("").to_owned())
                 .unwrap_or_else(|| "log".into()),
@@ -207,28 +224,36 @@ fn convert_json_span(
 }
 
 fn parse_jaeger_tags(tags: &[JaegerTag]) -> HashMap<String, TagValue> {
-    tags.iter().map(|t| (t.key.clone(), jaeger_tag_to_value(t))).collect()
+    tags.iter()
+        .map(|t| (t.key.clone(), jaeger_tag_to_value(t)))
+        .collect()
 }
 
 fn jaeger_tag_to_value(t: &JaegerTag) -> TagValue {
     match t.tag_type.as_str() {
         "bool" => TagValue::Bool(t.value.as_bool().unwrap_or(false)),
         "int64" | "int" => TagValue::Int(
-            t.value.as_i64().or_else(|| t.value.as_str().and_then(|s| s.parse().ok())).unwrap_or(0)
+            t.value
+                .as_i64()
+                .or_else(|| t.value.as_str().and_then(|s| s.parse().ok()))
+                .unwrap_or(0),
         ),
         "float64" | "float" => TagValue::Float(t.value.as_f64().unwrap_or(0.0)),
         "binary" => {
             use base64::{Engine as _, engine::general_purpose::STANDARD};
             TagValue::Binary(
-                t.value.as_str()
+                t.value
+                    .as_str()
                     .and_then(|s| STANDARD.decode(s).ok())
-                    .unwrap_or_default()
+                    .unwrap_or_default(),
             )
         }
         _ => TagValue::String(
-            t.value.as_str().map(|s| s.to_owned())
+            t.value
+                .as_str()
+                .map(|s| s.to_owned())
                 .or_else(|| Some(t.value.to_string()))
-                .unwrap_or_default()
+                .unwrap_or_default(),
         ),
     }
 }
@@ -254,9 +279,13 @@ struct CompactReader<'a> {
 }
 
 impl<'a> CompactReader<'a> {
-    fn new(data: &'a [u8]) -> Self { CompactReader { data, pos: 0 } }
+    fn new(data: &'a [u8]) -> Self {
+        CompactReader { data, pos: 0 }
+    }
 
-    fn remaining(&self) -> usize { self.data.len().saturating_sub(self.pos) }
+    fn remaining(&self) -> usize {
+        self.data.len().saturating_sub(self.pos)
+    }
 
     fn read_byte(&mut self) -> Result<u8> {
         if self.pos >= self.data.len() {
@@ -269,7 +298,11 @@ impl<'a> CompactReader<'a> {
 
     fn read_bytes(&mut self, n: usize) -> Result<&'a [u8]> {
         if self.pos + n > self.data.len() {
-            return Err(TraceError::ThriftError(format!("need {} bytes, have {}", n, self.remaining())));
+            return Err(TraceError::ThriftError(format!(
+                "need {} bytes, have {}",
+                n,
+                self.remaining()
+            )));
         }
         let s = &self.data[self.pos..self.pos + n];
         self.pos += n;
@@ -283,7 +316,9 @@ impl<'a> CompactReader<'a> {
         loop {
             let b = self.read_byte()? as u64;
             result |= (b & 0x7F) << shift;
-            if b & 0x80 == 0 { break; }
+            if b & 0x80 == 0 {
+                break;
+            }
             shift += 7;
             if shift >= 64 {
                 return Err(TraceError::ThriftError("varint overflow".into()));
@@ -322,7 +357,9 @@ impl<'a> CompactReader<'a> {
     /// Read a field header. Returns `None` on stop byte. `last_field_id` is updated.
     fn read_field_header(&mut self, last_field_id: &mut i16) -> Result<Option<(i16, u8)>> {
         let byte = self.read_byte()?;
-        if byte == 0x00 { return Ok(None); } // stop
+        if byte == 0x00 {
+            return Ok(None);
+        } // stop
 
         let delta = (byte >> 4) as i16;
         let type_id = byte & 0x0F;
@@ -343,16 +380,29 @@ impl<'a> CompactReader<'a> {
     fn skip(&mut self, type_id: u8) -> Result<()> {
         match type_id {
             0x01 | 0x02 => {} // boolean stored in type nibble, no extra bytes
-            0x03 => { self.read_byte()?; }
-            0x04 | 0x05 => { self.read_uvarint()?; }
-            0x06 => { self.read_uvarint()?; }
-            0x07 => { self.read_bytes(8)?; }
-            0x08 => { let n = self.read_uvarint()? as usize; self.read_bytes(n)?; }
+            0x03 => {
+                self.read_byte()?;
+            }
+            0x04 | 0x05 => {
+                self.read_uvarint()?;
+            }
+            0x06 => {
+                self.read_uvarint()?;
+            }
+            0x07 => {
+                self.read_bytes(8)?;
+            }
+            0x08 => {
+                let n = self.read_uvarint()? as usize;
+                self.read_bytes(n)?;
+            }
             0x09 | 0x0A => {
                 let header = self.read_byte()?;
                 let size = self.read_uvarint()? as usize;
                 let elem_type = header & 0x0F;
-                for _ in 0..size { self.skip(elem_type)?; }
+                for _ in 0..size {
+                    self.skip(elem_type)?;
+                }
             }
             0x0B => {
                 let header = self.read_byte()?;
@@ -371,7 +421,12 @@ impl<'a> CompactReader<'a> {
                     self.skip(t)?;
                 }
             }
-            _ => return Err(TraceError::ThriftError(format!("unknown type: 0x{:02x}", type_id))),
+            _ => {
+                return Err(TraceError::ThriftError(format!(
+                    "unknown type: 0x{:02x}",
+                    type_id
+                )));
+            }
         }
         Ok(())
     }
@@ -382,7 +437,7 @@ impl<'a> CompactReader<'a> {
 #[derive(Debug, Default)]
 struct ThriftTag {
     key: String,
-    vtype: i32,  // 0=string 1=double 2=bool 3=long 4=binary
+    vtype: i32, // 0=string 1=double 2=bool 3=long 4=binary
     str_value: Option<String>,
     double_value: Option<f64>,
     bool_value: Option<bool>,
@@ -456,10 +511,12 @@ fn decode_tags(r: &mut CompactReader<'_>) -> Result<Vec<ThriftTag>> {
     } else {
         (header >> 4) as usize
     };
-    (0..size).map(|_| {
-        let t = decode_tag(r)?;
-        Ok(t)
-    }).collect()
+    (0..size)
+        .map(|_| {
+            let t = decode_tag(r)?;
+            Ok(t)
+        })
+        .collect()
 }
 
 fn decode_process(r: &mut CompactReader<'_>) -> Result<ThriftProcess> {
@@ -480,10 +537,10 @@ fn decode_span_ref(r: &mut CompactReader<'_>) -> Result<ThriftSpanRef> {
     let mut last = 0i16;
     while let Some((field_id, type_id)) = r.read_field_header(&mut last)? {
         match field_id {
-            1 => sr.trace_id_low  = r.read_i64()?,
+            1 => sr.trace_id_low = r.read_i64()?,
             2 => sr.trace_id_high = r.read_i64()?,
-            3 => sr.span_id       = r.read_i64()?,
-            4 => sr.ref_type      = r.read_i32()?,
+            3 => sr.span_id = r.read_i64()?,
+            4 => sr.ref_type = r.read_i32()?,
             _ => r.skip(type_id)?,
         }
     }
@@ -508,9 +565,9 @@ fn decode_span_struct(r: &mut CompactReader<'_>) -> Result<ThriftSpan> {
     let mut last = 0i16;
     while let Some((field_id, type_id)) = r.read_field_header(&mut last)? {
         match field_id {
-            1 => s.trace_id_low   = r.read_i64()?,
-            2 => s.trace_id_high  = r.read_i64()?,
-            3 => s.span_id        = r.read_i64()?,
+            1 => s.trace_id_low = r.read_i64()?,
+            2 => s.trace_id_high = r.read_i64()?,
+            3 => s.span_id = r.read_i64()?,
             4 => s.parent_span_id = r.read_i64()?,
             5 => s.operation_name = r.read_string()?,
             6 => {
@@ -525,10 +582,10 @@ fn decode_span_struct(r: &mut CompactReader<'_>) -> Result<ThriftSpan> {
                     s.references.push(decode_span_ref(r)?);
                 }
             }
-            7 => s.flags      = r.read_i32()?,
+            7 => s.flags = r.read_i32()?,
             8 => s.start_time = r.read_i64()?,
-            9 => s.duration   = r.read_i64()?,
-            10 => s.tags      = decode_tags(r)?,
+            9 => s.duration = r.read_i64()?,
+            10 => s.tags = decode_tags(r)?,
             11 => {
                 let header = r.read_byte()?;
                 let size = if (header >> 4) == 0xF {
@@ -581,7 +638,8 @@ pub fn parse_jaeger_thrift_compact(data: &[u8], tenant_id: &str) -> Result<Vec<S
     let proto_id = r.read_byte()?;
     if proto_id != 0x82 {
         return Err(TraceError::ThriftError(format!(
-            "expected compact protocol (0x82), got 0x{:02x}", proto_id
+            "expected compact protocol (0x82), got 0x{:02x}",
+            proto_id
         )));
     }
 
@@ -650,26 +708,26 @@ fn decode_binary_batch(data: &[u8]) -> Result<ThriftBatch> {
     }
     fn read_i16(data: &[u8], pos: &mut usize) -> Result<i16> {
         check_len(data, *pos, 2)?;
-        let v = i16::from_be_bytes([data[*pos], data[*pos+1]]);
+        let v = i16::from_be_bytes([data[*pos], data[*pos + 1]]);
         *pos += 2;
         Ok(v)
     }
     fn read_i32b(data: &[u8], pos: &mut usize) -> Result<i32> {
         check_len(data, *pos, 4)?;
-        let v = i32::from_be_bytes([data[*pos], data[*pos+1], data[*pos+2], data[*pos+3]]);
+        let v = i32::from_be_bytes([data[*pos], data[*pos + 1], data[*pos + 2], data[*pos + 3]]);
         *pos += 4;
         Ok(v)
     }
     fn read_i64b(data: &[u8], pos: &mut usize) -> Result<i64> {
         check_len(data, *pos, 8)?;
-        let v = i64::from_be_bytes(data[*pos..*pos+8].try_into().unwrap());
+        let v = i64::from_be_bytes(data[*pos..*pos + 8].try_into().unwrap());
         *pos += 8;
         Ok(v)
     }
     fn read_bytes_b(data: &[u8], pos: &mut usize) -> Result<Vec<u8>> {
         let len = read_i32b(data, pos)? as usize;
         check_len(data, *pos, len)?;
-        let v = data[*pos..*pos+len].to_vec();
+        let v = data[*pos..*pos + len].to_vec();
         *pos += len;
         Ok(v)
     }
@@ -686,18 +744,28 @@ fn decode_binary_batch(data: &[u8]) -> Result<ThriftBatch> {
     }
 
     loop {
-        if pos >= data.len() { break; }
-        let field_type = data[pos]; pos += 1;
-        if field_type == 0x00 { break; } // stop
+        if pos >= data.len() {
+            break;
+        }
+        let field_type = data[pos];
+        pos += 1;
+        if field_type == 0x00 {
+            break;
+        } // stop
         let field_id = read_i16(data, &mut pos)?;
 
         match field_id {
             1 if field_type == 0x0C => {
                 // Process struct
                 loop {
-                    if pos >= data.len() { break; }
-                    let ft = data[pos]; pos += 1;
-                    if ft == 0x00 { break; }
+                    if pos >= data.len() {
+                        break;
+                    }
+                    let ft = data[pos];
+                    pos += 1;
+                    if ft == 0x00 {
+                        break;
+                    }
                     let fid = read_i16(data, &mut pos)?;
                     match fid {
                         1 if ft == 0x0B => {
@@ -711,7 +779,9 @@ fn decode_binary_batch(data: &[u8]) -> Result<ThriftBatch> {
                     }
                 }
             }
-            _ => { break; }
+            _ => {
+                break;
+            }
         }
     }
 
@@ -720,69 +790,104 @@ fn decode_binary_batch(data: &[u8]) -> Result<ThriftBatch> {
 
 fn convert_thrift_batch(batch: &ThriftBatch, tenant_id: &str) -> Result<Vec<Span>> {
     let service_name = normalise_service(&batch.process.service_name);
-    let resource_attrs: HashMap<String, TagValue> = batch.process.tags.iter()
+    let resource_attrs: HashMap<String, TagValue> = batch
+        .process
+        .tags
+        .iter()
         .map(|t| (t.key.clone(), thrift_tag_to_value(t)))
         .collect();
-    let log_labels: HashMap<String, String> = resource_attrs.iter()
+    let log_labels: HashMap<String, String> = resource_attrs
+        .iter()
         .map(|(k, v)| (k.clone(), v.display()))
         .collect();
 
-    batch.spans.iter().map(|ts| {
-        let trace_id: TraceId =
-            ((ts.trace_id_high as u128) << 64) | (ts.trace_id_low as u128 & 0xFFFF_FFFF_FFFF_FFFF);
-        let span_id: SpanId = ts.span_id as u64;
-        let parent_span_id: Option<SpanId> =
-            if ts.parent_span_id == 0 { None } else { Some(ts.parent_span_id as u64) };
+    batch
+        .spans
+        .iter()
+        .map(|ts| {
+            let trace_id: TraceId = ((ts.trace_id_high as u128) << 64)
+                | (ts.trace_id_low as u128 & 0xFFFF_FFFF_FFFF_FFFF);
+            let span_id: SpanId = ts.span_id as u64;
+            let parent_span_id: Option<SpanId> = if ts.parent_span_id == 0 {
+                None
+            } else {
+                Some(ts.parent_span_id as u64)
+            };
 
-        let start_ns = us_to_ns(ts.start_time);
-        let dur_ns   = us_to_ns(ts.duration);
+            let start_ns = us_to_ns(ts.start_time);
+            let dur_ns = us_to_ns(ts.duration);
 
-        let tags: HashMap<String, TagValue> = ts.tags.iter()
-            .map(|t| (t.key.clone(), thrift_tag_to_value(t)))
-            .collect();
+            let tags: HashMap<String, TagValue> = ts
+                .tags
+                .iter()
+                .map(|t| (t.key.clone(), thrift_tag_to_value(t)))
+                .collect();
 
-        let status = if tags.get("error").map(|v| v.display() != "false").unwrap_or(false) {
-            SpanStatus::Error
-        } else { SpanStatus::Ok };
+            let status = if tags
+                .get("error")
+                .map(|v| v.display() != "false")
+                .unwrap_or(false)
+            {
+                SpanStatus::Error
+            } else {
+                SpanStatus::Ok
+            };
 
-        let events: Vec<SpanEvent> = ts.logs.iter().map(|log| {
-            SpanEvent {
-                time_unix_nano: us_to_ns(log.timestamp),
-                name: log.fields.iter().find(|f| f.key == "event").and_then(|f| f.str_value.clone()).unwrap_or_else(|| "log".into()),
-                attributes: log.fields.iter().map(|f| (f.key.clone(), thrift_tag_to_value(f))).collect(),
-            }
-        }).collect();
+            let events: Vec<SpanEvent> = ts
+                .logs
+                .iter()
+                .map(|log| SpanEvent {
+                    time_unix_nano: us_to_ns(log.timestamp),
+                    name: log
+                        .fields
+                        .iter()
+                        .find(|f| f.key == "event")
+                        .and_then(|f| f.str_value.clone())
+                        .unwrap_or_else(|| "log".into()),
+                    attributes: log
+                        .fields
+                        .iter()
+                        .map(|f| (f.key.clone(), thrift_tag_to_value(f)))
+                        .collect(),
+                })
+                .collect();
 
-        let links: Vec<SpanLink> = ts.references.iter().map(|r| {
-            let tid: TraceId = ((r.trace_id_high as u128) << 64) | (r.trace_id_low as u128 & 0xFFFF_FFFF_FFFF_FFFF);
-            SpanLink {
-                trace_id: tid,
-                span_id: r.span_id as u64,
-                trace_state: String::new(),
-                attributes: HashMap::new(),
-            }
-        }).collect();
+            let links: Vec<SpanLink> = ts
+                .references
+                .iter()
+                .map(|r| {
+                    let tid: TraceId = ((r.trace_id_high as u128) << 64)
+                        | (r.trace_id_low as u128 & 0xFFFF_FFFF_FFFF_FFFF);
+                    SpanLink {
+                        trace_id: tid,
+                        span_id: r.span_id as u64,
+                        trace_state: String::new(),
+                        attributes: HashMap::new(),
+                    }
+                })
+                .collect();
 
-        Ok(Span {
-            trace_id,
-            span_id,
-            parent_span_id,
-            operation_name: ts.operation_name.clone(),
-            service_name: service_name.clone(),
-            start_time_unix_nano: start_ns,
-            end_time_unix_nano: start_ns + dur_ns,
-            duration_ns: dur_ns,
-            status,
-            kind: SpanKind::Internal,
-            tags,
-            events,
-            links,
-            resource_attributes: resource_attrs.clone(),
-            tenant_id: tenant_id.to_owned(),
-            baggage: HashMap::new(),
-            log_labels: log_labels.clone(),
+            Ok(Span {
+                trace_id,
+                span_id,
+                parent_span_id,
+                operation_name: ts.operation_name.clone(),
+                service_name: service_name.clone(),
+                start_time_unix_nano: start_ns,
+                end_time_unix_nano: start_ns + dur_ns,
+                duration_ns: dur_ns,
+                status,
+                kind: SpanKind::Internal,
+                tags,
+                events,
+                links,
+                resource_attributes: resource_attrs.clone(),
+                tenant_id: tenant_id.to_owned(),
+                baggage: HashMap::new(),
+                log_labels: log_labels.clone(),
+            })
         })
-    }).collect()
+        .collect()
 }
 
 fn thrift_tag_to_value(t: &ThriftTag) -> TagValue {
@@ -795,7 +900,6 @@ fn thrift_tag_to_value(t: &ThriftTag) -> TagValue {
         _ => TagValue::String(String::new()),
     }
 }
-
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
@@ -835,7 +939,10 @@ mod tests {
         assert_eq!(s.service_name, "frontend");
         assert_eq!(s.operation_name, "HTTP GET");
         assert_eq!(s.duration_ns, 5_000_000); // 5000 µs → 5 ms
-        assert_eq!(s.tags.get("http.method"), Some(&TagValue::String("GET".into())));
+        assert_eq!(
+            s.tags.get("http.method"),
+            Some(&TagValue::String("GET".into()))
+        );
         assert_eq!(s.tags.get("http.status_code"), Some(&TagValue::Int(200)));
     }
 

@@ -2,17 +2,17 @@
 // Copyright 2026 Cave Runtime contributors
 //! Remote write/read, OTLP, StatsD, Graphite, InfluxDB ingestion handlers.
 
+use crate::ingestion::remote_read::{decode_read_request, encode_read_response, execute_read};
+use crate::ingestion::remote_write::{decode_write_request, write_request_to_batch};
+use crate::ingestion::{graphite, influx, otlp, statsd};
+use crate::state::MetricsState;
 use axum::{
+    Json,
     body::Bytes,
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
-    Json,
 };
 use std::sync::Arc;
-use crate::state::MetricsState;
-use crate::ingestion::{graphite, influx, otlp, statsd};
-use crate::ingestion::remote_write::{decode_write_request, write_request_to_batch};
-use crate::ingestion::remote_read::{decode_read_request, encode_read_response, execute_read};
 
 // ─── Prometheus remote_write ─────────────────────────────────────────────────
 
@@ -43,23 +43,19 @@ pub async fn remote_read(
     body: Bytes,
 ) -> (StatusCode, Bytes) {
     match decode_read_request(&body) {
-        Ok(req) => {
-            match execute_read(req, &state.tsdb) {
-                Ok(resp) => {
-                    match encode_read_response(&resp) {
-                        Ok(encoded) => (StatusCode::OK, Bytes::from(encoded)),
-                        Err(e) => {
-                            tracing::warn!("remote_read encode error: {}", e);
-                            (StatusCode::INTERNAL_SERVER_ERROR, Bytes::new())
-                        }
-                    }
-                }
+        Ok(req) => match execute_read(req, &state.tsdb) {
+            Ok(resp) => match encode_read_response(&resp) {
+                Ok(encoded) => (StatusCode::OK, Bytes::from(encoded)),
                 Err(e) => {
-                    tracing::warn!("remote_read execute error: {}", e);
+                    tracing::warn!("remote_read encode error: {}", e);
                     (StatusCode::INTERNAL_SERVER_ERROR, Bytes::new())
                 }
+            },
+            Err(e) => {
+                tracing::warn!("remote_read execute error: {}", e);
+                (StatusCode::INTERNAL_SERVER_ERROR, Bytes::new())
             }
-        }
+        },
         Err(e) => {
             tracing::warn!("remote_read decode error: {}", e);
             (StatusCode::BAD_REQUEST, Bytes::new())
@@ -74,13 +70,19 @@ pub async fn otlp_metrics(
     headers: HeaderMap,
     body: Bytes,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    let content_type = headers.get("content-type")
+    let content_type = headers
+        .get("content-type")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("application/json");
 
     let body_str = match std::str::from_utf8(&body) {
         Ok(s) => s,
-        Err(_) => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "invalid UTF-8" }))),
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": "invalid UTF-8" })),
+            );
+        }
     };
 
     match otlp::parse_json(body_str) {
@@ -92,17 +94,17 @@ pub async fn otlp_metrics(
         }
         Err(e) => {
             tracing::warn!("OTLP parse error: {}", e);
-            (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": e.to_string() })))
+            (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
         }
     }
 }
 
 // ─── StatsD ──────────────────────────────────────────────────────────────────
 
-pub async fn statsd_ingest(
-    State(state): State<Arc<MetricsState>>,
-    body: Bytes,
-) -> StatusCode {
+pub async fn statsd_ingest(State(state): State<Arc<MetricsState>>, body: Bytes) -> StatusCode {
     let input = match std::str::from_utf8(&body) {
         Ok(s) => s,
         Err(_) => return StatusCode::BAD_REQUEST,
@@ -115,10 +117,7 @@ pub async fn statsd_ingest(
 
 // ─── Graphite ────────────────────────────────────────────────────────────────
 
-pub async fn graphite_ingest(
-    State(state): State<Arc<MetricsState>>,
-    body: Bytes,
-) -> StatusCode {
+pub async fn graphite_ingest(State(state): State<Arc<MetricsState>>, body: Bytes) -> StatusCode {
     let input = match std::str::from_utf8(&body) {
         Ok(s) => s,
         Err(_) => return StatusCode::BAD_REQUEST,

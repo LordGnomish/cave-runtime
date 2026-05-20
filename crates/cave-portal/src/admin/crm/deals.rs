@@ -7,10 +7,10 @@
 //!
 //! Upstream: <https://twenty.com/docs>
 
+use super::CrmViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
-use super::CrmViewError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DealRow {
@@ -72,7 +72,12 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, CrmViewErr
         pipe_d = (pipeline as f64 / 100.0),
         tbl = table(&["deal_id", "account", "acv", "stage"], &table_rows),
     );
-    Ok(page_shell_full(ctx, "/admin/crm/deals", &format!("crm/deals · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/crm/deals",
+        &format!("crm/deals · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
 }
 
 #[cfg(test)]
@@ -84,14 +89,22 @@ mod tests {
 
     #[test]
     fn list_one_deal_per_contact() {
-        let contacts = super::super::contacts::list_contacts(&AdminState::seeded(), &ctx(&[Permission::CrmRead])).unwrap();
+        let contacts = super::super::contacts::list_contacts(
+            &AdminState::seeded(),
+            &ctx(&[Permission::CrmRead]),
+        )
+        .unwrap();
         let deals = list_deals(&AdminState::seeded(), &ctx(&[Permission::CrmRead])).unwrap();
         assert_eq!(deals.len(), contacts.len());
     }
 
     #[test]
     fn acv_is_12x_mrr() {
-        let contacts = super::super::contacts::list_contacts(&AdminState::seeded(), &ctx(&[Permission::CrmRead])).unwrap();
+        let contacts = super::super::contacts::list_contacts(
+            &AdminState::seeded(),
+            &ctx(&[Permission::CrmRead]),
+        )
+        .unwrap();
         let deals = list_deals(&AdminState::seeded(), &ctx(&[Permission::CrmRead])).unwrap();
         for (a, d) in contacts.iter().zip(deals.iter()) {
             assert_eq!(d.acv_cents, a.mrr_cents * 12);
@@ -102,7 +115,10 @@ mod tests {
     fn stage_derived_from_plan() {
         let deals = list_deals(&AdminState::seeded(), &ctx(&[Permission::CrmRead])).unwrap();
         for d in &deals {
-            assert!(matches!(d.stage, "Discovery" | "Proposal" | "Closed-Won" | "Unknown"));
+            assert!(matches!(
+                d.stage,
+                "Discovery" | "Proposal" | "Closed-Won" | "Unknown"
+            ));
         }
     }
 
@@ -110,7 +126,11 @@ mod tests {
     fn pipeline_total_excludes_closed_won() {
         let deals = list_deals(&AdminState::seeded(), &ctx(&[Permission::CrmRead])).unwrap();
         let pipe = pipeline_total(&deals);
-        let won: u64 = deals.iter().filter(|d| d.stage == "Closed-Won").map(|d| d.acv_cents).sum();
+        let won: u64 = deals
+            .iter()
+            .filter(|d| d.stage == "Closed-Won")
+            .map(|d| d.acv_cents)
+            .sum();
         let grand: u64 = deals.iter().map(|d| d.acv_cents).sum();
         assert_eq!(pipe, grand - won);
     }

@@ -51,7 +51,9 @@ fn xml_decode(s: &str) -> String {
 }
 
 impl ScanParser for ZapParser {
-    fn scan_type(&self) -> &'static str { "ZAP Scan" }
+    fn scan_type(&self) -> &'static str {
+        "ZAP Scan"
+    }
     fn dedupe_fields(&self) -> &'static [&'static str] {
         // Source: ZapParser.get_dedupe_fields, upstream parser.py:42
         &["title", "cwe", "severity"]
@@ -63,8 +65,14 @@ impl ScanParser for ZapParser {
             let alert = extract_tag(item, "alert").first().copied().unwrap_or("");
             let desc = extract_tag(item, "desc").first().copied().unwrap_or("");
             let solution = extract_tag(item, "solution").first().copied().unwrap_or("");
-            let reference = extract_tag(item, "reference").first().copied().unwrap_or("");
-            let riskcode = extract_tag(item, "riskcode").first().copied().unwrap_or("0");
+            let reference = extract_tag(item, "reference")
+                .first()
+                .copied()
+                .unwrap_or("");
+            let riskcode = extract_tag(item, "riskcode")
+                .first()
+                .copied()
+                .unwrap_or("0");
             let cweid = extract_tag(item, "cweid").first().copied().unwrap_or("");
             let pluginid = extract_tag(item, "pluginid").first().copied().unwrap_or("");
 
@@ -73,7 +81,9 @@ impl ScanParser for ZapParser {
             f.description = xml_decode(desc);
             f.mitigation = Some(xml_decode(solution)).filter(|s| !s.is_empty());
             f.references = Some(xml_decode(reference)).filter(|s| !s.is_empty());
-            if let Ok(n) = cweid.parse::<u32>() { f.cwe = Some(n); }
+            if let Ok(n) = cweid.parse::<u32>() {
+                f.cwe = Some(n);
+            }
             f.vuln_id_from_tool = Some(pluginid.into());
             f.dynamic_finding = true;
             f.static_finding = false;
@@ -165,7 +175,9 @@ mod tests {
 
     #[test]
     fn empty_xml_returns_empty() {
-        let out = ZapParser.parse(b"<OWASPZAPReport></OWASPZAPReport>").unwrap();
+        let out = ZapParser
+            .parse(b"<OWASPZAPReport></OWASPZAPReport>")
+            .unwrap();
         assert!(out.is_empty());
     }
 }

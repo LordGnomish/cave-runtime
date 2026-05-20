@@ -2,12 +2,12 @@
 // Copyright 2026 Cave Runtime contributors
 /// Ready plugin — HTTP /ready endpoint.
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     Arc,
+    atomic::{AtomicBool, Ordering},
 };
 
 use async_trait::async_trait;
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 use tracing::info;
 
 use crate::{
