@@ -64,7 +64,7 @@ fn gate_2_source_sha_present_and_matches_version() {
 }
 
 #[test]
-fn gate_3_fill_ratio_is_measured_and_at_least_0_40() {
+fn gate_3_fill_ratio_is_measured_and_at_least_floor() {
     let m = manifest_text();
     let raw = extract_after(&m, "\nfill_ratio ").or_else(|| extract_after(&m, "\nfill_ratio="));
     let ratio: f64 = raw
@@ -73,8 +73,8 @@ fn gate_3_fill_ratio_is_measured_and_at_least_0_40() {
         .parse()
         .expect("fill_ratio must parse as float");
     assert!(
-        ratio >= 0.40,
-        "cave-hermes MVP floor: fill_ratio must be >= 0.40 (got {}). \
+        ratio >= 0.95,
+        "cave-hermes parity-uplift floor: fill_ratio must be >= 0.95 (got {}). \
          Either improve coverage or document scope-cuts as [[skipped]].",
         ratio
     );

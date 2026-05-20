@@ -28,11 +28,14 @@
 
 #![forbid(unsafe_code)]
 
+pub mod embedding;
 pub mod error;
 pub mod gateway;
+pub mod llm_gateway_adapter;
 pub mod memory;
 pub mod planner;
 pub mod prompt;
+pub mod provider_tools;
 pub mod recall;
 pub mod router;
 pub mod session;
