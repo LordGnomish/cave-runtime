@@ -1,7 +1,7 @@
 # cave-apiserver — Kubernetes API server parity report
 
 Pinned upstream: **kubernetes/kubernetes @ v1.36.0** (`source_sha = "v1.36.0"`)
-Audit landed: 2026-05-12 · CEL evaluator MVP: 2026-05-12 · Charter v2 FINALIZE: 2026-05-18
+Audit landed: 2026-05-12 · CEL evaluator MVP: 2026-05-12 · Charter v2 FINALIZE: 2026-05-18 · K8s parity uplift Phase 2: 2026-05-19
 
 This document is the honest companion to `parity.manifest.toml`. The
 manifest proves *coverage*; this report describes *fidelity* — which
@@ -15,17 +15,17 @@ remains for follow-up sprints.
 | metric | value |
 |---|---|
 | upstream packages enumerated | 51 |
-| mapped | 26 |
+| mapped | 30 |
 | partial | 1 |
 | skipped (UI/CLI/orchestrator-internal) | 18 |
-| unmapped (acknowledged real port gaps) | **6** |
-| `fill_ratio` (mapped + skipped) / total | **0.8824** (measured) |
-| `honest_ratio` (mapped + ½·partial + skipped) / total | **0.8627** |
-| cave-apiserver `.rs` files | 58 |
-| SPDX AGPL-3.0-or-later coverage | **58/58 (100 %)** |
+| unmapped (acknowledged real port gaps) | **2** |
+| `fill_ratio` (mapped + partial + skipped) / total | **0.9608** (measured) |
+| `honest_ratio` (mapped + skipped) / total | **0.9412** |
+| cave-apiserver `.rs` files | 62 |
+| SPDX AGPL-3.0-or-later coverage | **62/62 (100 %)** |
 | `unimplemented!()` / `todo!()` / `panic!("not …")` | **0** |
 | `#[deprecated]` | **0** |
-| `#[test]` + `#[tokio::test]` | 1 061 |
+| `#[test]` + `#[tokio::test]` | 998 lib + 9 self-audit |
 | release build | clean |
 
 ---
@@ -41,9 +41,22 @@ remains for follow-up sprints.
 | 5 | No back-compat (`#[deprecated]`) | ✅ | grep count 0 |
 | 6 | Latest upstream pinned | ✅ | k8s v1.36.0 = current stable line |
 | 7 | 4-track full (Backend + Portal + cavectl + Obs) | ✅ | see "4-track green status" below |
-| 8 | Honest measured manifest | ✅ | `fill_ratio = 0.8824` from `mapped+skipped`/total enumeration, not audit-doc self-report |
+| 8 | Honest measured manifest | ✅ | `fill_ratio = 0.9608` from `(mapped+partial+skipped)/total` enumeration |
 
 All 8 gates: **PASS**.
+
+### 2026-05-19 K8s parity uplift — Phase 2 deep-port
+
+Four previously-unmapped subsystems landed as new modules:
+
+| upstream pkg | local file | classification | what changed |
+|---|---|---|---|
+| `pkg/apis/resource/ (DRA)` | `src/dra.rs` | mapped | ResourceClass/ResourceClaim/PodSchedulingContext types + `DraRegistry` lifecycle (create/get/list/delete classes; allocate/reserve_for/unreserve/deallocate claims with reservation gate) — feature-gated |
+| `staging/src/k8s.io/apiserver/plugin/pkg/audit/` | `src/audit_backends.rs` | mapped | Pluggable audit-backend registry — Log/Webhook/Buffered/Truncate + fan-out/flush/shutdown |
+| `staging/src/k8s.io/apiserver/pkg/endpoints/openapi/` | `src/openapi_v3.rs` | mapped | Live v3 doc synthesis: per-resource schemas with `x-kubernetes-group-version-kind`, list/item/create/delete paths, namespaced vs cluster scope |
+| `staging/src/k8s.io/apiserver/pkg/admission/initializer/` | `src/admission_initializer.rs` | mapped | `Wants{Authorizer,Informers,RestMapper,Client,FeatureGate}` markers + `PluginInitializer` builder + `drive()` dispatcher |
+
+Net effect: mapped 26→30 (+4), partial 1 unchanged, unmapped 6→2 (-4). `fill_ratio` 0.8824 → **0.9608**, `honest_ratio` 0.8627 → **0.9412**.
 
 ---
 
