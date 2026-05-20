@@ -65,7 +65,7 @@ fn gate_4_parity_ratio_source_manifest() {
 #[test]
 fn gate_5_fill_ratio_floor() {
     let r = extract_float(&read_manifest(), "fill_ratio").expect("fill_ratio required");
-    assert!(r >= 0.90, "fill_ratio = {} (need >= 0.90)", r);
+    assert!(r >= 0.95, "fill_ratio = {} (need >= 0.95)", r);
 }
 
 #[test]
@@ -116,7 +116,7 @@ fn gate_9_charter_v2_summary() {
     let r = extract_float(&m, "fill_ratio").unwrap_or(0.0);
     let total = extract_int(&m, "total").unwrap_or(0);
     let mapped = extract_int(&m, "mapped_count").unwrap_or(0);
-    assert!(r >= 0.90 && total > 0 && mapped > 0 && m.contains("source_sha"));
+    assert!(r >= 0.95 && total > 0 && mapped > 0 && m.contains("source_sha"));
 }
 
 fn scan_spdx(dir: &Path) -> (usize, usize) {

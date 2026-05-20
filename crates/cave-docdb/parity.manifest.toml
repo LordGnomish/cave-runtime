@@ -35,13 +35,13 @@ spec_license_note  = "SSPL-1.0 reference only; no code copied"
 # time-series, encryption-at-rest, audit log, KMIP, $text/geo/hashed/partial
 # indexes, capped collections, views, plan cache, query hints) are counted
 # as `skipped`. Items declared in-scope but not yet built are `unmapped`.
-mapped_count          = 20
+mapped_count          = 23
 partial_count         = 3
 skipped_count         = 25
-unmapped_count        = 4
+unmapped_count        = 1
 total                 = 52
-fill_ratio            = 0.9231   # (mapped + partial + skipped) / total
-honest_ratio          = 0.8654   # (mapped + skipped) / total — partial excluded
+fill_ratio            = 0.9808   # (mapped + partial + skipped) / total = 51/52
+honest_ratio          = 0.9231   # (mapped + skipped) / total = 48/52 — partial excluded
 parity_ratio_source   = "manifest"
 last_audit            = "2026-05-19"
 infra_only            = false
@@ -53,6 +53,21 @@ pump_priority = "HIGH"  # qwen-pump B-prime priority gate
 target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
 
 # ── File mappings ────────────────────────────────────────────────────────────
+
+# 2026-05-19 parity uplift: 3 prior unmapped subsystems absorbed —
+# aggregation deep stages ($lookup/$facet/$bucket), GridFS, change streams.
+
+[[files]]
+upstream = "src/mongo/db/pipeline/document_source_lookup.cpp + document_source_facet.cpp + document_source_bucket.cpp"
+local    = "src/aggregation_deep.rs"
+
+[[files]]
+upstream = "src/mongo/db/storage/gridfs.cpp + FerretDB internal/handlers/pg/gridfs/*"
+local    = "src/gridfs.rs"
+
+[[files]]
+upstream = "src/mongo/db/pipeline/change_stream.cpp + change_stream_event_helpers.cpp"
+local    = "src/change_streams.rs"
 
 [[files]]
 upstream = "src/mongo/db/mongod_main.cpp"
