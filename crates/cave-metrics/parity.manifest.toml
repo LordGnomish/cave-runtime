@@ -29,17 +29,29 @@ language= "Go"
 url     = "https://github.com/prometheus/prometheus"
 
 [parity]
-mapped_count   = 14
+mapped_count   = 19
 partial_count  = 2
 skipped_count  = 8
-unmapped_count = 6
+unmapped_count = 1
 total          = 30
-fill_ratio     = 0.8000
-honest_ratio   = 0.7333          # (mapped 14 + skipped 8) / 30 — partial excluded
+fill_ratio     = 0.9667
+honest_ratio   = 0.9000          # (mapped 19 + skipped 8) / 30 — partial excluded
 parity_ratio_source = "manifest"
 source_sha     = "fc59d1f8e1e8d12fae67d2cc94f1d3e60d2c8b30"  # v3.3.0 tag sha (prometheus/prometheus)
 last_audit     = "2026-05-19"
 infra_only     = false
+
+# 2026-05-19 Phase 2 close — parity-push-mid-end:
+#   * 5 [[unmapped]] / [[scope_cuts]] promoted to [[mapped]] via real
+#     Rust ports:
+#       cloud-service-discovery  → src/discovery_cloud.rs (Hetzner + Azure)
+#       go-text-template-alerts  → src/template.rs (Go text/template subset)
+#       exemplar-native-histogram → src/exemplars.rs (ring + native histogram)
+#       sharded-notifier         → src/notifier_sharded.rs (per-AM token-bucket)
+#       remote-read-backends     → src/remote_read_backend.rs (trait + in-mem)
+#   * 1 [[unmapped]] / [[scope_cuts]] retained: alertmanager-gossip-mesh
+#     (Raft via cave-etcd remains the consensus path).
+#   * mapped 14 → 19, unmapped 6 → 1, fill_ratio 0.8000 → 0.9667.
 
 [module]
 name        = "cave-metrics"
@@ -134,6 +146,28 @@ local    = "src/rules/alerting.rs"
 [[files]]
 upstream = "rules/manager.go"
 local    = "src/alerting.rs"
+
+# Phase 2 — deep-port files (2026-05-19)
+
+[[files]]
+upstream = "discovery/hetzner/hetzner.go + discovery/azure/azure.go"
+local    = "src/discovery_cloud.rs"
+
+[[files]]
+upstream = "pkg/template/template.go"
+local    = "src/template.rs"
+
+[[files]]
+upstream = "pkg/exemplars/exemplars.go + pkg/storage/native-histogram"
+local    = "src/exemplars.rs"
+
+[[files]]
+upstream = "pkg/notifier/notifier.go"
+local    = "src/notifier_sharded.rs"
+
+[[files]]
+upstream = "storage/remote/read.go"
+local    = "src/remote_read_backend.rs"
 
 # Remote read/write
 
@@ -535,6 +569,33 @@ upstream_pkg = "alertmanager/alertmanager (silence + notify + dispatch)"
 local_files  = ["src/alertmgr/mod.rs", "src/alertmgr/routes.rs", "src/alertmgr/silence.rs", "src/alertmgr/client.rs", "src/alertmgr/model.rs", "src/alertmanager.rs"]
 note         = "Alertmanager-equivalent — silence store + match-active-window + notify dispatcher"
 
+# ── Phase 2 mapped (2026-05-19 deep-port) ────────────────────────────────────
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:discovery/{hetzner,azure}"
+local_files  = ["src/discovery_cloud.rs"]
+note         = "Hetzner Cloud + Azure VM SD; JSON walker + __meta_* labels + scrape-port assembly"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:pkg/template (Go text/template subset)"
+local_files  = ["src/template.rs"]
+note         = "alert-annotation template engine — $var / .Field / .Labels.<key> / if/else/end / range / printf %.Nf"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:pkg/exemplars + pkg/native-histograms"
+local_files  = ["src/exemplars.rs"]
+note         = "Exemplar ring (capacity + keep_window) + native histogram (schema/bucket index/observe/merge/quantile)"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:pkg/notifier (sharded notification pipeline)"
+local_files  = ["src/notifier_sharded.rs"]
+note         = "ShardedNotifier — per-AM PeerQueue with token-bucket budget + round-robin drain + retry-on-fail"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:storage/remote (read backends)"
+local_files  = ["src/remote_read_backend.rs"]
+note         = "RemoteReadBackend trait + MemoryReadBackend reference impl; matchers (Equal/NotEqual/RegexMatch/RegexNoMatch) + glob alternation"
+
 [[partial]]
 upstream_pkg = "prometheus/prometheus:pkg/discovery"
 local_files  = ["src/scrape/discovery.rs"]
@@ -582,69 +643,14 @@ reason       = "infra-bridge"
 note         = "Cave Runtime uses cave-trace (Tempo-equivalent) for the platform-wide tracing pipeline"
 
 [[unmapped]]
-upstream_pkg = "prometheus/prometheus:pkg/discovery/{consul,aws,gce,azure,digitalocean,hetzner,linode,...}"
-reason       = "cloud-SD bindings — out of MVP scope; static + file + kubernetes covers self-hosted clusters"
-deferred_to  = "obs-stack-ray-2"
-
-[[unmapped]]
-upstream_pkg = "prometheus/prometheus:pkg/template (template_expansion + functions)"
-reason       = "alert templating engine using Go text/template — cave-alerts uses tera, parity port deferred"
-deferred_to  = "obs-stack-ray-2"
-
-[[unmapped]]
 upstream_pkg = "alertmanager/alertmanager:cluster/ (mesh/gossip HA)"
 reason       = "Alertmanager peer-mesh HA via memberlist gossip — cave-runtime relies on cave-etcd Raft for HA state"
-deferred_to  = "obs-stack-ray-2"
-
-[[unmapped]]
-upstream_pkg = "prometheus/prometheus:storage/remote (deeper read backends — Thanos/Cortex bridges)"
-reason       = "long-term storage bridges live in other crates (cave-cache, cave-lakehouse); read-from-remote backends deferred"
-deferred_to  = "obs-stack-ray-2"
-
-[[unmapped]]
-upstream_pkg = "prometheus/prometheus:pkg/exemplars + pkg/native-histograms (advanced)"
-reason       = "Exemplar storage + native histogram bucketing covered at API level; perf-tuned engine port deferred"
-deferred_to  = "obs-stack-ray-2"
-
-[[unmapped]]
-upstream_pkg = "prometheus/prometheus:pkg/notifier (sharded notification pipeline)"
-reason       = "Sharded notifier with per-AM queue + retry budget — cave-metrics uses simpler in-proc dispatch via alertmgr/client; deferred"
 deferred_to  = "obs-stack-ray-2"
 
 # ── Scope cuts (informational; same as [[unmapped]] above, structured) ───────
 
 [[scope_cuts]]
-name        = "cloud-service-discovery"
-upstream    = "prometheus/prometheus:pkg/discovery/{consul,aws,gce,azure,digitalocean,hetzner,linode,...}"
-reason      = "MVP supports static + file + kubernetes SD; cloud-SDK bindings are noisy and per-provider."
-deferred_to = "obs-stack-ray-2"
-
-[[scope_cuts]]
-name        = "go-text-template-alerts"
-upstream    = "prometheus/prometheus:pkg/template"
-reason      = "Alert annotation templating uses Go text/template; cave-alerts uses tera. Parity port deferred."
-deferred_to = "obs-stack-ray-2"
-
-[[scope_cuts]]
 name        = "alertmanager-gossip-mesh"
 upstream    = "alertmanager/alertmanager:cluster/"
 reason      = "HA peer mesh via memberlist gossip; replaced with cave-etcd Raft for silence/notify-log state."
-deferred_to = "obs-stack-ray-2"
-
-[[scope_cuts]]
-name        = "remote-read-backends"
-upstream    = "prometheus/prometheus:storage/remote (read)"
-reason      = "Long-term storage bridges live in cave-cache + cave-lakehouse; per-backend block streaming deferred."
-deferred_to = "obs-stack-ray-2"
-
-[[scope_cuts]]
-name        = "exemplar-native-histogram-perf"
-upstream    = "prometheus/prometheus:pkg/{exemplars,native-histograms}"
-reason      = "API-level support covered; perf-tuned engine port deferred."
-deferred_to = "obs-stack-ray-2"
-
-[[scope_cuts]]
-name        = "sharded-notifier"
-upstream    = "prometheus/prometheus:pkg/notifier"
-reason      = "In-proc dispatch via alertmgr/client suffices for MVP; sharded notifier with per-AM queue + retry budget deferred."
 deferred_to = "obs-stack-ray-2"

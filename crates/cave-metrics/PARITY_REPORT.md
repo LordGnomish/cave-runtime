@@ -4,7 +4,7 @@ Pinned upstream:
 
 * **prometheus/prometheus @ v3.3.0** · `source_sha = fc59d1f8e1e8d12fae67d2cc94f1d3e60d2c8b30`
 
-Inventory hand-curated: 2026-05-12 · Charter v2 FINALIZE: 2026-05-19
+Inventory hand-curated: 2026-05-12 · Charter v2 FINALIZE: 2026-05-19 · Phase 2 deep-port: 2026-05-19
 
 This document is the honest companion to `parity.manifest.toml`. The manifest
 proves *coverage*; this report describes *fidelity* — which upstream packages
@@ -18,17 +18,18 @@ are wire-faithful, which are semantic-only, and what is explicitly deferred to
 | metric | value |
 |---|---|
 | upstream subsystems enumerated | 30 |
-| mapped | 14 |
+| mapped | **19** (+5 vs Phase 1) |
 | partial | 2 |
 | skipped (alt-language toolchain / browser-UI / vendor-spec) | 8 |
-| unmapped (acknowledged real port gaps → `[[scope_cuts]]`) | **6** |
-| `fill_ratio` (mapped + partial + skipped) / total | **0.8000** (measured) |
-| `honest_ratio` (mapped + skipped) / total | **0.7333** |
+| unmapped (acknowledged real port gaps → `[[scope_cuts]]`) | **1** (alertmanager-gossip-mesh) |
+| `fill_ratio` (mapped + partial + skipped) / total | **0.9667** (measured) — was 0.8000 |
+| `honest_ratio` (mapped + skipped) / total | **0.9000** — was 0.7333 |
 | `parity_ratio_source` | `"manifest"` |
-| cave-metrics `.rs` files | 56 |
-| SPDX AGPL-3.0-or-later coverage | **56/56 (100 %)** |
+| cave-metrics `.rs` files | **61** (+5 Phase 2) |
+| SPDX AGPL-3.0-or-later coverage | **61/61 (100 %)** |
 | `todo!()` / `unimplemented!()` / `panic!("stub")` in `src/` | **0** |
 | new self-audit assertions (`tests/parity_self_audit.rs`) | **9** |
+| Phase 2 new tests | **+39 unit tests** (179 total, was ~140) |
 
 ---
 
@@ -43,7 +44,7 @@ are wire-faithful, which are semantic-only, and what is explicitly deferred to
 | 5 | No back-compat | ✅ | grep `deprecated\|legacy_shim` → 0 hits in src/ |
 | 6 | Latest upstream pinned | ✅ | Prometheus v3.3.0 = current stable major (v3 GA 2024-11; v3.3 patch series ongoing) |
 | 7 | 4-track full | ✅ | see "4-track green status" below |
-| 8 | Honest measured manifest | ✅ | `fill_ratio = 0.8000` from `(mapped 14 + partial 2 + skipped 8) / 30 = 24/30` enumeration |
+| 8 | Honest measured manifest | ✅ | `fill_ratio = 0.9667` from `(mapped 19 + partial 2 + skipped 8) / 30 = 29/30` enumeration |
 
 All 8 gates: **PASS**.
 
