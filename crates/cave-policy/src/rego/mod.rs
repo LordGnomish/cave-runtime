@@ -102,8 +102,8 @@ impl PolicyEngine {
         path: &[String],
         input: serde_json::Value,
     ) -> Option<serde_json::Value> {
-        let evaluator = self.evaluator(input);
-        let v = evaluator.query_path(path, Default::default());
+        let evaluator = self.evaluator(input.clone());
+        let v = evaluator.query_path(path, input);
         v.into_json()
     }
 

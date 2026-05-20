@@ -283,11 +283,18 @@ impl Parser {
 
         loop {
             match self.peek() {
-                Token::RBrace | Token::Eof => break,
+                // Bodies appear inside `{}` rule bodies, and also inside
+                // comprehension `[term | body]` / `{term | body}` /
+                // `(term | body)` constructs — so any closing bracket
+                // terminates the body, not just RBrace.
+                Token::RBrace | Token::RBracket | Token::RParen | Token::Eof => break,
                 Token::Semicolon | Token::Newline => {
                     self.advance();
                     self.skip_newlines();
-                    if matches!(self.peek(), Token::RBrace | Token::Eof) {
+                    if matches!(
+                        self.peek(),
+                        Token::RBrace | Token::RBracket | Token::RParen | Token::Eof
+                    ) {
                         break;
                     }
                 }
@@ -326,20 +333,40 @@ impl Parser {
                 self.parse_every_expr()?
             }
             _ => {
-                // Could be: term, term = term, term := term, or a call
+                // Could be: term, term = term, term := term,
+                // term <cmp> term, or a call.
                 let left = self.parse_term()?;
-                match self.peek() {
-                    Token::Unify => {
-                        self.advance();
-                        let right = self.parse_term()?;
-                        Expr::Unify(left, right)
+                let cmp_op = match self.peek() {
+                    Token::Eq => Some(CompareOp::Eq),
+                    Token::Ne => Some(CompareOp::Ne),
+                    Token::Lt => Some(CompareOp::Lt),
+                    Token::Le => Some(CompareOp::Le),
+                    Token::Gt => Some(CompareOp::Gt),
+                    Token::Ge => Some(CompareOp::Ge),
+                    _ => None,
+                };
+                if let Some(op) = cmp_op {
+                    self.advance();
+                    let right = self.parse_term()?;
+                    Expr::Compare {
+                        op,
+                        lhs: left,
+                        rhs: right,
                     }
-                    Token::Assign => {
-                        self.advance();
-                        let right = self.parse_term()?;
-                        Expr::Assign(left, right)
+                } else {
+                    match self.peek() {
+                        Token::Unify => {
+                            self.advance();
+                            let right = self.parse_term()?;
+                            Expr::Unify(left, right)
+                        }
+                        Token::Assign => {
+                            self.advance();
+                            let right = self.parse_term()?;
+                            Expr::Assign(left, right)
+                        }
+                        _ => Expr::Term(left),
                     }
-                    _ => Expr::Term(left),
                 }
             }
         };

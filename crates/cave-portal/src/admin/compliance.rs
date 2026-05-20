@@ -3585,11 +3585,14 @@ version = "7.2.0"
         ] {
             let e = m.get(name).unwrap_or_else(|| panic!("missing {name}"));
             assert_eq!(e.tier, "100", "{name} should be tier 100");
-            // Post-2026-05-12: measured ratios are strictly < 1.0 and > 0.7.
+            // Post-2026-05-12: measured ratios are > 0.7. Originally
+            // strictly < 1.0; the K8s parity uplift 2026-05-19 pushed
+            // cave-cri (and cave-cloud-controller-manager outside this
+            // list) to exactly 1.0, so the upper bound is inclusive.
             let r = e.parity_ratio.expect("measured ratio present");
             assert!(
-                (0.7..1.0).contains(&r),
-                "{name} ratio = {r}, expected 0.7..1.0 after measured audit"
+                (0.7..=1.0).contains(&r),
+                "{name} ratio = {r}, expected 0.7..=1.0 after measured audit"
             );
             assert_eq!(e.manifest_filled, Some(true));
         }
@@ -3597,9 +3600,12 @@ version = "7.2.0"
         assert_eq!(etcd.tier, "100");
         assert_eq!(etcd.manifest_filled, Some(true));
         let etcd_ratio = etcd.parity_ratio.expect("cave-etcd has a measured ratio");
+        // 2026-05-12 measured pass landed 0.9155; K8s parity uplift
+        // 2026-05-19 (+election_rpc/cindex/quota) lifted it to 0.9577.
+        // Assert the post-uplift band so future fills still fit.
         assert!(
-            (etcd_ratio - 0.9155).abs() < 1e-3,
-            "cave-etcd ratio = {etcd_ratio}, expected ~0.9155"
+            (0.9..=1.0).contains(&etcd_ratio),
+            "cave-etcd ratio = {etcd_ratio}, expected 0.9..=1.0 after 2026-05 uplifts"
         );
         let vault = m.get("cave-vault").unwrap();
         assert_eq!(vault.tier, "A");
@@ -3846,15 +3852,16 @@ priority = "P0"
             .find(|c| c.name == "cave-apiserver")
             .unwrap();
         // Post-2026-05-12 trajectory:
-        //   1.0  (wave3 self-report)
-        //   0.86 (measured audit pass: 26 mapped / 17 skipped / 7 unmapped of 50)
-        //   0.88 (CEL evaluator MVP landed: 27 mapped / 17 skipped / 6 unmapped of 50)
-        // Assert the ratio falls in the post-CEL-MVP band so future
+        //   1.0    (wave3 self-report)
+        //   0.86   (measured audit pass: 26 mapped / 17 skipped / 7 unmapped of 50)
+        //   0.88   (CEL evaluator MVP landed: 27 mapped / 17 skipped / 6 unmapped of 50)
+        //   0.9608 (K8s parity uplift 2026-05-19: +dra/audit_backends/openapi_v3/admission_initializer)
+        // Assert the ratio falls in the post-uplift band so future
         // unmapped-clearing sweeps still fit without test churn.
         let r = api.parity_ratio.expect("apiserver has a measured ratio");
         assert!(
-            (0.85..=0.95).contains(&r),
-            "cave-apiserver ratio = {r}, expected 0.85..=0.95 after measured audit + CEL MVP"
+            (0.85..=1.0).contains(&r),
+            "cave-apiserver ratio = {r}, expected 0.85..=1.0 after measured audit + uplift"
         );
         assert_eq!(api.audit_tier.as_deref(), Some("100"));
         let unknown = snap
@@ -4756,14 +4763,16 @@ priority = "P0"
         // floor on partial_count — i.e. the re-audit produced at least
         // this many [[partial]] blocks. Subsequent parallel-session
         // commits may add more (new [[mapped]] entries whose notes
-        // re-trigger the self-flag regex), but never fewer.
+        // re-trigger the self-flag regex). Floors can also drop to zero
+        // when a follow-up uplift promotes the partial entries to mapped
+        // (see the K8s parity uplift 2026-05-19, which cleared
+        // cave-controller-manager's [[partial]] blocks).
         let lower_bound = [
             ("cave-cache", 4),
             ("cave-cri", 3),
             ("cave-etcd", 2),
             ("cave-apiserver", 1),
             ("cave-mesh", 1),
-            ("cave-controller-manager", 1),
             ("cave-auth", 1),
         ];
         for (name, lower) in lower_bound {
@@ -4807,13 +4816,15 @@ priority = "P0"
         // the test only verifies that the 14 crates we audited have AT LEAST
         // the expected lower-bound partial_count — never less. Re-running the
         // script must be non-decreasing on these counts.
+        // Floors can drop to zero after a follow-up uplift promotes the
+        // partial entries to mapped — see K8s parity uplift 2026-05-19 for
+        // cave-controller-manager.
         let lower_bound = [
             ("cave-cache", 4),
             ("cave-cri", 3),
             ("cave-etcd", 2),
             ("cave-apiserver", 1),
             ("cave-mesh", 1),
-            ("cave-controller-manager", 1),
             ("cave-auth", 1),
         ];
         for (name, lower) in lower_bound {

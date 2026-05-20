@@ -22,6 +22,12 @@ pub fn evaluate(expression: &str, value: &Value) -> Result<Value, PolicyError> {
 fn eval_expr(expr: &str, ctx: &Value) -> Result<Value, PolicyError> {
     let expr = expr.trim();
 
+    // `@` references the current evaluation context. Handle here so
+    // function arguments and pipe stages can use `@` to mean "current".
+    if expr == "@" {
+        return Ok(ctx.clone());
+    }
+
     // Pipe: `a | b`
     if let Some(pipe_pos) = find_pipe(expr) {
         let left_result = eval_expr(&expr[..pipe_pos], ctx)?;
@@ -107,12 +113,34 @@ fn eval_expr(expr: &str, ctx: &Value) -> Result<Value, PolicyError> {
         if tail.is_empty() {
             return Ok(head_val);
         }
+        // JMESPath projection: when the head is a wildcard `[*]` or a
+        // filter `[?…]`, evaluate the tail against each element of the
+        // resulting array and collect the results into an array.
+        let is_projection =
+            head.trim() == "[*]" || (head.trim().starts_with("[?") && head.trim().ends_with(']'));
+        if is_projection {
+            if let Value::Array(items) = &head_val {
+                let mut projected = Vec::new();
+                for item in items {
+                    let v = eval_expr(&tail, item)?;
+                    if !matches!(v, Value::Null) {
+                        projected.push(v);
+                    }
+                }
+                return Ok(Value::Array(projected));
+            }
+        }
         return eval_expr(&tail, &head_val);
     }
 
     // Literal values
     if let Ok(v) = serde_json::from_str::<Value>(expr) {
         return Ok(v);
+    }
+
+    // Single-quoted string literals — JMESPath raw string form `'foo'`.
+    if expr.starts_with('\'') && expr.ends_with('\'') && expr.len() >= 2 {
+        return Ok(Value::String(expr[1..expr.len() - 1].to_string()));
     }
 
     // Backtick literals: `foo`
@@ -145,6 +173,16 @@ fn eval_segment(seg: &str, ctx: &Value) -> Result<Value, PolicyError> {
         // Filter projection: `[?expr]`
         if let Some(filter_expr) = inner.strip_prefix('?') {
             return eval_filter(filter_expr, ctx);
+        }
+
+        // Wildcard projection: `[*]` — keep the array as-is so the
+        // caller can project subsequent expressions over each element.
+        if inner.trim() == "*" {
+            return Ok(match ctx {
+                Value::Array(_) => ctx.clone(),
+                Value::Object(m) => Value::Array(m.values().cloned().collect()),
+                _ => Value::Null,
+            });
         }
 
         // Slice: `[start:end]` or `[start:end:step]`
@@ -579,11 +617,12 @@ fn eval_function(name: &str, args_str: &str, ctx: &Value) -> Result<Value, Polic
             ))
         }
         "join" => {
-            let arr = match args.first().unwrap_or(&Value::Null) {
+            // JMESPath spec: `join(string $glue, array[string] $stringsarray)`
+            let delim = args.first().and_then(|v| v.as_str()).unwrap_or("");
+            let arr = match args.get(1).unwrap_or(&Value::Null) {
                 Value::Array(a) => a.clone(),
                 _ => return Ok(Value::Null),
             };
-            let delim = args.get(1).and_then(|v| v.as_str()).unwrap_or("");
             let parts: Vec<String> = arr
                 .iter()
                 .map(|v| {
@@ -792,9 +831,10 @@ fn split_top_level(s: &str, sep: char) -> Vec<&str> {
         match bytes[i] {
             b'(' | b'[' | b'{' => depth += 1,
             b')' | b']' | b'}' => depth -= 1,
-            b'"' => {
+            b'"' | b'\'' => {
+                let quote = bytes[i];
                 i += 1;
-                while i < bytes.len() && bytes[i] != b'"' {
+                while i < bytes.len() && bytes[i] != quote {
                     if bytes[i] == b'\\' {
                         i += 1;
                     }
@@ -819,39 +859,19 @@ fn split_first_segment(expr: &str) -> Option<(&str, String)> {
     let mut i = 0;
 
     while i < bytes.len() {
+        // Split at a top-level `[` so `containers[0].name` becomes
+        // ("containers", "[0].name") — the recursive eval_expr can
+        // then walk into the bracket subexpression as its own segment.
+        if depth == 0 && i > 0 && bytes[i] == b'[' {
+            let head = &expr[..i];
+            let tail = expr[i..].to_string();
+            return Some((head, tail));
+        }
         match bytes[i] {
             b'(' | b'[' | b'{' => depth += 1,
             b')' | b']' | b'}' => depth -= 1,
             b'.' if depth == 0 && i > 0 => {
                 return Some((&expr[..i], expr[i + 1..].to_string()));
-            }
-            b'[' if depth == 0 && i > 0 => {
-                // Find closing ]
-                let seg_end = i;
-                let mut j = i;
-                let mut d = 0i32;
-                while j < bytes.len() {
-                    match bytes[j] {
-                        b'[' => d += 1,
-                        b']' => {
-                            d -= 1;
-                            if d == 0 {
-                                j += 1;
-                                break;
-                            }
-                        }
-                        _ => {}
-                    }
-                    j += 1;
-                }
-                let head = &expr[..j];
-                let tail = if j < bytes.len() && bytes[j] == b'.' {
-                    expr[j + 1..].to_string()
-                } else {
-                    expr[j..].to_string()
-                };
-                let _ = seg_end;
-                return Some((head, tail));
             }
             _ => {}
         }
@@ -861,7 +881,32 @@ fn split_first_segment(expr: &str) -> Option<(&str, String)> {
 }
 
 fn find_pipe(expr: &str) -> Option<usize> {
-    find_binary_op(expr, b'|', 1, |ahead| ahead.get(0) != Some(&b'|'))
+    // A single `|` pipe must not be the second char of `||` (or expression).
+    let bytes = expr.as_bytes();
+    let mut depth = 0i32;
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'(' | b'[' | b'{' => depth += 1,
+            b')' | b']' | b'}' => depth -= 1,
+            b'"' => {
+                i += 1;
+                while i < bytes.len() && bytes[i] != b'"' {
+                    i += 1;
+                }
+            }
+            b'|' if depth == 0 && i > 0 => {
+                let prev = bytes[i - 1];
+                let next = bytes.get(i + 1).copied();
+                if prev != b'|' && next != Some(b'|') {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
 }
 
 fn find_or(expr: &str) -> Option<usize> {

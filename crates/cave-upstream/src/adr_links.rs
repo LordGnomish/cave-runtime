@@ -66,9 +66,12 @@ pub const ADR_LINKS: &[(&str, &[&str])] = &[
     ),
     ("valkey-io/valkey", &["ADR-008"]),
     ("opensearch-project/OpenSearch", &[]),
-    ("qdrant/qdrant", &["ADR-009"]),
+    // qdrant/qdrant removed — referenced ADR-009 but never added to
+    // TRACKED_PROJECTS. Re-add this entry alongside the projects.rs entry
+    // once the vector-store upstream is formally tracked.
     // ── Multi-tenancy / scheduling ────────────────────────────────────────
-    ("loft-sh/vcluster", &["ADR-012", "ADR-MULTI-TENANT-001"]),
+    // loft-sh/vcluster intentionally NOT listed — Charter chose clastix/kamaji
+    // for multi-tenant control planes; see projects.rs DROPPED comment.
     ("kedacore/keda", &["ADR-033"]),
     ("knative/serving", &[]),
     // ── GitOps / pipelines / IaC ──────────────────────────────────────────

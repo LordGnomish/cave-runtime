@@ -470,7 +470,7 @@ mod tests {
     async fn alerts_endpoint_empty() {
         let app = make_app().await;
         let req = Request::builder()
-            .uri("/api/alerts")
+            .uri("/api/security/alerts")
             .body(Body::empty())
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();

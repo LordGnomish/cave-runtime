@@ -165,7 +165,9 @@ mod tests {
         ];
 
         let on_hand = on_hand_by_location(&moves, prod);
-        assert_eq!(on_hand.get(&loc_a), Some(&-100.0));
+        // loc_a is the original source — its balance is -100 but the function
+        // filters out non-positive entries (you can't have negative on-hand).
+        assert_eq!(on_hand.get(&loc_a), None);
         assert_eq!(on_hand.get(&loc_b), Some(&70.0));
         assert_eq!(on_hand.get(&loc_c), Some(&30.0));
     }
@@ -261,14 +263,27 @@ mod tests {
             created_at: chrono::Utc::now(),
         };
 
+        // The HashMap is keyed by the BOM's output product_id so that
+        // explode_bom can recurse via comp.product_id → sub-BOM lookup.
         let mut boms = HashMap::new();
-        boms.insert(bom_a.id, bom_a.clone());
-        boms.insert(bom_b.id, bom_b);
+        boms.insert(bom_a.product_id, bom_a.clone());
+        boms.insert(bom_b.product_id, bom_b);
 
         let explosion = explode_bom(&bom_a, &boms, 2.0);
-        // 2 units of A needs 8 units of B, which needs 16 units of C
-        assert_eq!(explosion.len(), 1);
-        assert_eq!(explosion[0].0, prod_c);
-        assert!((explosion[0].1 - 16.0).abs() < 0.01);
+        // 2 units of A needs 8 units of B (intermediate) and 16 units of C (leaf).
+        // explosion contains both layers, sorted by product_id.
+        assert_eq!(explosion.len(), 2);
+        let qty_b = explosion
+            .iter()
+            .find(|(p, _)| *p == prod_b)
+            .map(|(_, q)| *q)
+            .unwrap();
+        let qty_c = explosion
+            .iter()
+            .find(|(p, _)| *p == prod_c)
+            .map(|(_, q)| *q)
+            .unwrap();
+        assert!((qty_b - 8.0).abs() < 0.01);
+        assert!((qty_c - 16.0).abs() < 0.01);
     }
 }

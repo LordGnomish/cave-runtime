@@ -225,16 +225,32 @@ impl KyvernoEngine {
         &self,
         policy_name: &str,
         rule_name: &str,
-        _resource: &serde_json::Value,
+        resource: &serde_json::Value,
     ) -> bool {
+        let res_namespace = resource
+            .get("metadata")
+            .and_then(|m| m.get("namespace"))
+            .and_then(|v| v.as_str());
         for exc in self.exceptions.values() {
-            for entry in &exc.spec.exceptions {
-                if entry.policy_name == policy_name
+            let policy_matches = exc.spec.exceptions.iter().any(|entry| {
+                entry.policy_name == policy_name
                     && entry.rule_names.contains(&rule_name.to_string())
-                {
-                    return true;
-                }
+            });
+            if !policy_matches {
+                continue;
             }
+            // Only apply the exception when the resource is in scope of the
+            // exception's match_resources block. Without this check every
+            // resource targeted by the rule would inherit the exception.
+            if !matches_resources(
+                &exc.spec.match_resources,
+                resource,
+                res_namespace,
+                "CREATE",
+            ) {
+                continue;
+            }
+            return true;
         }
         false
     }

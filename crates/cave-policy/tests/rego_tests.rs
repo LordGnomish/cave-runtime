@@ -289,11 +289,15 @@ nums := [x | x := input.values[_]; x > 2]
 #[test]
 fn test_eval_ad_hoc_query() {
     let engine = PolicyEngine::new();
+    // Infix arithmetic (`1 + 1 = x`) isn't surfaced through the query parser;
+    // arithmetic is exposed via the call form (`plus`, `minus`, `mul`, …).
+    // Use unification to verify the ad-hoc query path round-trips bindings
+    // without panicking.
     let results = engine
-        .query_str("1 + 1 = x", serde_json::json!({}))
+        .query_str("x = 2", serde_json::json!({}))
         .unwrap();
-    // Should produce bindings with x = 2
-    assert!(!results.is_empty() || results.is_empty()); // Query runs without panic
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].get("x"), Some(&serde_json::json!(2)));
 }
 
 // ─── Built-in function tests ──────────────────────────────────────────────────

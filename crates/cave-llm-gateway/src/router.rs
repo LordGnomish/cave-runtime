@@ -180,10 +180,10 @@ impl GatewayRouter {
     ) -> GatewayResult<ChatCompletionResponse> {
         match &self.strategy {
             RoutingStrategy::Fixed { provider } => {
-                let name = if preferred_provider == "local"
-                    || preferred_provider == "openai"
-                    || preferred_provider == "anthropic"
-                {
+                // Honour an explicit alias-resolved preference only when it
+                // points at a registered provider; otherwise the Fixed
+                // strategy wins (its whole point is "always route here").
+                let name = if self.providers.get(preferred_provider).is_some() {
                     preferred_provider
                 } else {
                     provider.as_str()
