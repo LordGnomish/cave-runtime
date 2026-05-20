@@ -1,6 +1,10 @@
 # parity.manifest.toml — cave-cloud-controller-manager
 # Tracks the kube-controller-manager → cloud-controller-manager split, plus
 # two out-of-tree provider implementations (Hetzner, Azure).
+# 2026-05-19 uplift: last [[unmapped]] (volume/) promoted to [[mapped]] via
+# src/cloud_volume_controller.rs (CloudVolume trait + Hetzner/Azure impls +
+# reconcile loop). Additive Hetzner+Azure deepening: hetzner_instance_lookup
+# and azure_instance_lookup helpers.
 
 [upstream]
 org        = "kubernetes"
@@ -18,13 +22,13 @@ source_sha = "v1.36.0"
 # out-of-tree providers (Hetzner + Azure) honestly against
 # kubernetes/kubernetes v1.36.0. See PARITY_REPORT.md for the
 # methodology and scope-cut table.
-mapped_count        = 12
+mapped_count        = 13
 partial_count       = 1
 skipped_count       = 9
-unmapped_count      = 1
+unmapped_count      = 0
 total               = 23
-fill_ratio          = 0.9565
-honest_ratio        = 0.9130
+fill_ratio          = 1.0000
+honest_ratio        = 0.9565
 last_audit          = "2026-05-19"
 parity_ratio_source = "manifest"
 infra_only          = false
@@ -90,6 +94,11 @@ name    = "out-of-tree: cloud-provider-azure"
 local   = "src/providers/azure*.rs"
 notes   = "Azure LB + resources + networking + extras (5 files)."
 
+[[mapped]]
+name    = "volume/ (cloud volume controllers)"
+local   = "src/cloud_volume_controller.rs"
+notes   = "CloudVolume trait + HetznerCloudVolume + AzureDiskCloudVolume + CloudVolumeController reconcile loop with exponential backoff. State machine: Detached → Attaching → Attached → Detaching → Detached."
+
 # ── Partial subsystems ───────────────────────────────────────────────────────
 [[partial]]
 name    = "node_helpers/address utility"
@@ -134,9 +143,7 @@ name   = "cloud-provider-vsphere (out-of-tree)"
 reason = "Out of OSS-launch scope (Hetzner + Azure only)."
 
 # ── Unmapped subsystems (gap, not deferred) ──────────────────────────────────
-[[unmapped]]
-name   = "volume/ (cloud volume controllers)"
-reason = "CSI subsumes in-tree volume mounts; cave-storage handles CSI provisioner — cloud-volume gap left for post-launch."
+# (none — 2026-05-19 uplift closed the last gap; volume/ promoted above.)
 
 [module]
 name        = "cave-cloud-controller-manager"
@@ -213,6 +220,10 @@ local    = "src/service_topology.rs"
 [[files]]
 upstream = "pkg/proxy/endpointslicecache.go"
 local    = "src/service_topology.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/volume/"
+local    = "src/cloud_volume_controller.rs"
 
 # ── In-tree function mappings ────────────────────────────────────────────────
 [[functions]]
@@ -361,6 +372,10 @@ upstream = "hcloud/instances.go"
 local    = "src/providers/hetzner.rs"
 
 [[providers.hetzner.files]]
+upstream = "hcloud/instances.go"
+local    = "src/providers/hetzner_instance_lookup.rs"
+
+[[providers.hetzner.files]]
 upstream = "hcloud/load_balancers.go"
 local    = "src/providers/hetzner.rs"
 
@@ -409,6 +424,10 @@ local    = "src/providers/azure.rs"
 [[providers.azure.files]]
 upstream = "pkg/provider/azure_loadbalancer.go"
 local    = "src/providers/azure.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_instances.go"
+local    = "src/providers/azure_instance_lookup.rs"
 
 [[providers.azure.files]]
 upstream = "pkg/provider/azure_zones.go"

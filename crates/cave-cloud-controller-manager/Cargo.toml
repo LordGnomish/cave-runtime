@@ -16,3 +16,5 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 cave-kernel = { path = "../cave-kernel" }
 toml = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
