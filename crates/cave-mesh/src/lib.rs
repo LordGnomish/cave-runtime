@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! CAVE Service Mesh — full Istio-parity control plane.
+//! CAVE Service Mesh — **Ambient-only** Istio-parity control plane.
+//!
+//! Per Cave Runtime's no-backcompat mandate the sidecar data plane
+//! (Sidecar / EnvoyFilter / WorkloadGroup CRDs, xDS v3 LDS/RDS/CDS/EDS/SDS
+//! snapshot stream, Envoy WASM filter runtime) is intentionally absent.
+//! The mesh is driven through ztunnel (L4 mTLS) and waypoint (L7 routing)
+//! exclusively — see `src/ambient/`.
 //!
 //! Modules:
-//!   models       — all Istio-equivalent resource types
+//!   models       — Ambient-mode resource types (VS, DR, GW, SE, PA, RA, AP, …)
 //!   registry     — service discovery (endpoints, health, locality)
 //!   traffic      — VirtualService routing, fault injection, LB
 //!   circuit      — circuit breaker (Closed/Open/HalfOpen)
@@ -12,13 +18,12 @@
 //!   mtls         — PeerAuthentication, auto-mTLS, SPIFFE validation
 //!   metrics      — Prometheus automatic request metrics
 //!   observability — per-service latency histograms, golden signals
-//!   xds          — xDS v3 snapshot + delta (LDS/RDS/CDS/EDS/SDS)
 //!   spiffe       — SPIFFE/SVID identity, internal CA, cert rotation
 //!   telemetry    — Telemetry API (per-workload metrics/logs/tracing)
 //!   multicluster — cross-cluster discovery, federation, trust domain
-//!   sidecar      — Sidecar, EnvoyFilter, WorkloadGroup managers
+//!   ambient      — ztunnel + waypoint + HBONE + SVID + AuthZ + VS/DR
 //!   store        — persistence (cave-db) for all resource types
-//!   routes       — Axum admin REST API (~45 endpoints)
+//!   routes       — Axum admin REST API
 //!   error        — MeshError, MeshResult
 
 pub mod auth;
@@ -33,20 +38,16 @@ pub mod observability;
 pub mod rate_limit;
 pub mod registry;
 pub mod routes;
-pub mod sidecar;
 pub mod spiffe;
 pub mod store;
 pub mod telemetry;
 pub mod traffic;
 pub mod traffic_policy;
-pub mod xds;
-pub mod wasm_plugin;
 pub mod service_entry;
 pub mod jwks;
-pub mod wasm_runtime;
 
-/// Ambient-mode parity batch (ztunnel L4 mTLS, waypoint L7, AuthZ, VS/DR,
-/// SPIFFE SVID, telemetry). Pinned to istio/istio v1.29.2.
+/// Ambient-mode parity (ztunnel L4 mTLS, waypoint L7, AuthZ, VS/DR,
+/// SPIFFE SVID, telemetry). Pinned to istio/istio v1.30.0.
 pub mod ambient;
 
 // Public re-exports most frequently needed by callers.
@@ -60,11 +61,9 @@ pub use multicluster::MultiClusterRegistry;
 pub use observability::ObservabilityStore;
 pub use rate_limit::RateLimiter;
 pub use registry::ServiceRegistry;
-pub use sidecar::{EnvoyFilterManager, SidecarManager, WorkloadGroupManager};
 pub use spiffe::{CertRotationManager, InternalCa, TrustDomainRegistry};
 pub use telemetry::TelemetryManager;
 pub use traffic::TrafficManager;
-pub use xds::XdsManager;
 
 use axum::Router;
 use std::sync::{Arc, RwLock};
@@ -98,14 +97,8 @@ pub struct MeshState {
     pub mtls: Arc<MtlsManager>,
     pub auth: Arc<AuthEngine>,
 
-    // ── Extended resource managers ─────────────────────────
-    pub sidecar_mgr: Arc<SidecarManager>,
-    pub envoy_filter_mgr: Arc<EnvoyFilterManager>,
-    pub workload_group_mgr: Arc<WorkloadGroupManager>,
+    // ── Telemetry resource manager ─────────────────────────
     pub telemetry_mgr: Arc<TelemetryManager>,
-
-    // ── xDS control plane ──────────────────────────────────
-    pub xds: Arc<XdsManager>,
 
     // ── Multi-cluster federation ───────────────────────────
     pub multicluster: Arc<MultiClusterRegistry>,
@@ -132,11 +125,7 @@ impl MeshState {
             rate_limiter: Arc::new(RateLimiter::new()),
             mtls: Arc::new(MtlsManager::new()),
             auth: Arc::new(AuthEngine::new("cave-mesh-dev-secret")),
-            sidecar_mgr: Arc::new(SidecarManager::new()),
-            envoy_filter_mgr: Arc::new(EnvoyFilterManager::new()),
-            workload_group_mgr: Arc::new(WorkloadGroupManager::new()),
             telemetry_mgr: Arc::new(TelemetryManager::new()),
-            xds: Arc::new(XdsManager::new()),
             multicluster: Arc::new(MultiClusterRegistry::new("local")),
             metrics: Arc::new(MeshMetrics::new()),
             obs: Arc::new(ObservabilityStore::new()),
@@ -811,157 +800,11 @@ mod tests {
     }
 
     // ═══════════════════════════════════════════════════════
-    // 8 — Sidecar / EnvoyFilter / WorkloadGroup
+    // 8 — (removed) Sidecar / EnvoyFilter / WorkloadGroup
     // ═══════════════════════════════════════════════════════
-
-    fn make_sidecar(name: &str, ns: &str, selector: Option<HashMap<String, String>>) -> Sidecar {
-        Sidecar {
-            name: name.to_string(), namespace: ns.to_string(),
-            selector,
-            ingress: vec![], egress: vec![],
-            outbound_traffic_policy: OutboundTrafficPolicy::AllowAny,
-            created_at: Utc::now(), updated_at: Utc::now(),
-        }
-    }
-
-    #[test]
-    fn sidecar_effective_workload_specific() {
-        let mgr = SidecarManager::new();
-        mgr.upsert(make_sidecar("ns-wide", "ns", None));
-        mgr.upsert(make_sidecar("workload", "ns",
-            Some(simple_labels(&[("app", "frontend")]))));
-        let eff = mgr.effective_sidecar("ns",
-            &simple_labels(&[("app", "frontend")])).unwrap();
-        assert_eq!(eff.name, "workload");
-    }
-
-    #[test]
-    fn sidecar_namespace_fallback() {
-        let mgr = SidecarManager::new();
-        mgr.upsert(make_sidecar("ns-wide", "ns", None));
-        let eff = mgr.effective_sidecar("ns", &HashMap::new()).unwrap();
-        assert_eq!(eff.name, "ns-wide");
-    }
-
-    #[test]
-    fn sidecar_accessible_hosts_from_egress() {
-        let mgr = SidecarManager::new();
-        let sc = Sidecar {
-            name: "sc".to_string(), namespace: "ns".to_string(),
-            selector: None, ingress: vec![],
-            egress: vec![IstioEgressListener {
-                port: None, bind: None,
-                capture_mode: CaptureMode::Default,
-                hosts: vec!["ns/payments.svc.cluster.local".to_string()],
-            }],
-            outbound_traffic_policy: OutboundTrafficPolicy::AllowAny,
-            created_at: Utc::now(), updated_at: Utc::now(),
-        };
-        mgr.upsert(sc);
-        let hosts = mgr.accessible_hosts("ns", &HashMap::new());
-        assert!(hosts.iter().any(|h| h.contains("payments")));
-    }
-
-    #[test]
-    fn sidecar_default_all_hosts_when_none() {
-        let mgr = SidecarManager::new();
-        let hosts = mgr.accessible_hosts("ns", &HashMap::new());
-        assert_eq!(hosts, vec!["*/*".to_string()]);
-    }
-
-    #[test]
-    fn envoy_filter_priority_ordering() {
-        let mgr = EnvoyFilterManager::new();
-        let high = EnvoyFilter {
-            name: "high".to_string(), namespace: "ns".to_string(),
-            selector: None, priority: 1, config_patches: vec![],
-            created_at: Utc::now(), updated_at: Utc::now(),
-        };
-        let low = EnvoyFilter {
-            name: "low".to_string(), namespace: "ns".to_string(),
-            selector: None, priority: 100, config_patches: vec![],
-            created_at: Utc::now(), updated_at: Utc::now(),
-        };
-        mgr.upsert(low);
-        mgr.upsert(high);
-        let filters = mgr.list();
-        assert_eq!(filters[0].name, "high");
-    }
-
-    #[test]
-    fn envoy_filter_workload_selector() {
-        let mgr = EnvoyFilterManager::new();
-        let matched = EnvoyFilter {
-            name: "matched".to_string(), namespace: "ns".to_string(),
-            selector: Some(simple_labels(&[("app", "api")])),
-            priority: 0, config_patches: vec![],
-            created_at: Utc::now(), updated_at: Utc::now(),
-        };
-        let unmatched = EnvoyFilter {
-            name: "unmatched".to_string(), namespace: "ns".to_string(),
-            selector: Some(simple_labels(&[("app", "other")])),
-            priority: 0, config_patches: vec![],
-            created_at: Utc::now(), updated_at: Utc::now(),
-        };
-        mgr.upsert(matched);
-        mgr.upsert(unmatched);
-        let filters = mgr.filters_for_workload("ns", &simple_labels(&[("app", "api")]));
-        assert_eq!(filters.len(), 1);
-        assert_eq!(filters[0].name, "matched");
-    }
-
-    #[test]
-    fn envoy_filter_remove() {
-        let mgr = EnvoyFilterManager::new();
-        mgr.upsert(EnvoyFilter {
-            name: "ef".to_string(), namespace: "ns".to_string(),
-            selector: None, priority: 0, config_patches: vec![],
-            created_at: Utc::now(), updated_at: Utc::now(),
-        });
-        mgr.remove("ns", "ef");
-        assert!(mgr.list().is_empty());
-    }
-
-    #[test]
-    fn workload_group_entries_for_group() {
-        let mgr = WorkloadGroupManager::new();
-        let group = WorkloadGroup {
-            name: "vm-group".to_string(), namespace: "ns".to_string(),
-            selector: Some(simple_labels(&[("workload-type", "vm")])),
-            metadata: WorkloadGroupMetadata::default(),
-            template: WorkloadEntryTemplate {
-                address: None, labels: HashMap::new(),
-                service_account: None, network: None, locality: None,
-                weight: 100, ports: HashMap::new(),
-            },
-            probe: None,
-            created_at: Utc::now(), updated_at: Utc::now(),
-        };
-        mgr.upsert_group(group.clone());
-
-        let vm_entry = WorkloadEntry {
-            name: Some("vm-1".to_string()), namespace: Some("ns".to_string()),
-            address: "192.168.1.100".to_string(),
-            labels: simple_labels(&[("workload-type", "vm")]),
-            ports: HashMap::new(), service_account: None, network: None,
-            locality: None, weight: 100u32,
-            created_at: Some(Utc::now()), updated_at: Some(Utc::now()),
-        };
-        let other = WorkloadEntry {
-            name: Some("other-1".to_string()), namespace: Some("ns".to_string()),
-            address: "192.168.1.200".to_string(),
-            labels: simple_labels(&[("workload-type", "container")]),
-            ports: HashMap::new(), service_account: None, network: None,
-            locality: None, weight: 100u32,
-            created_at: Some(Utc::now()), updated_at: Some(Utc::now()),
-        };
-        mgr.upsert_entry(vm_entry);
-        mgr.upsert_entry(other);
-
-        let matched = mgr.entries_for_group(&group);
-        assert_eq!(matched.len(), 1);
-        assert_eq!(matched[0].address, "192.168.1.100");
-    }
+    // Sidecar legacy data plane is intentionally absent per Cave Runtime's
+    // no-backcompat Ambient-only mandate. See `src/ambient/` for ztunnel +
+    // waypoint coverage.
 
     // ═══════════════════════════════════════════════════════
     // 9 — Telemetry
@@ -1103,63 +946,11 @@ mod tests {
     }
 
     // ═══════════════════════════════════════════════════════
-    // 11 — xDS
+    // 11 — (removed) xDS
     // ═══════════════════════════════════════════════════════
-
-    #[test]
-    fn xds_set_and_get_snapshot() {
-        let xds_mgr = XdsManager::new();
-        let snap = xds::XdsSnapshot::empty();
-        xds_mgr.set_snapshot("_default", snap);
-        let got = xds_mgr.get_snapshot("_default");
-        assert!(got.is_some());
-    }
-
-    #[test]
-    fn xds_register_node() {
-        let xds_mgr = XdsManager::new();
-        let node = xds::NodeInfo {
-            id: "sidecar~10.0.0.1~pod.default~default.svc".to_string(),
-            cluster: "default".to_string(),
-            locality: None,
-            metadata: serde_json::Value::Null,
-            user_agent_name: None,
-            user_agent_version: None,
-        };
-        xds_mgr.register_node(node.clone());
-        let nodes = xds_mgr.list_nodes();
-        assert_eq!(nodes.len(), 1);
-        assert_eq!(nodes[0].id, node.id);
-    }
-
-    #[test]
-    fn xds_resource_type_url_roundtrip() {
-        use xds::XdsResourceType;
-        for rt in [
-            XdsResourceType::Lds, XdsResourceType::Rds,
-            XdsResourceType::Cds, XdsResourceType::Eds, XdsResourceType::Sds,
-        ] {
-            let url = rt.type_url();
-            let parsed = XdsResourceType::from_type_url(url).unwrap();
-            assert_eq!(parsed, rt);
-        }
-    }
-
-    #[test]
-    fn xds_validate_empty_snapshot() {
-        let snap = xds::XdsSnapshot::empty();
-        let errors = xds::XdsManager::validate_snapshot(&snap);
-        assert!(errors.is_empty());
-    }
-
-    #[test]
-    fn xds_delta_state_nonce() {
-        let xds_mgr = XdsManager::new();
-        let mut state = xds_mgr.get_or_create_delta_state("node-1", xds::XdsResourceType::Cds);
-        let nonce1 = state.new_nonce();
-        let nonce2 = state.new_nonce();
-        assert_ne!(nonce1, nonce2);
-    }
+    // Sidecar/Envoy xDS v3 snapshot stream is intentionally absent per
+    // Cave Runtime's no-backcompat Ambient-only mandate. Waypoint config
+    // for the ambient L7 tier lives in `src/ambient/waypoint.rs`.
 
     // ═══════════════════════════════════════════════════════
     // 12 — Observability store
@@ -1276,12 +1067,8 @@ mod tests {
     fn mesh_state_default_constructs() {
         let state = MeshState::new();
         assert_eq!(state.registry.list_services().len(), 0);
-        assert_eq!(state.sidecar_mgr.list().len(), 0);
-        assert_eq!(state.envoy_filter_mgr.list().len(), 0);
         assert_eq!(state.telemetry_mgr.list().len(), 0);
         assert_eq!(state.multicluster.list_clusters().len(), 0);
-        assert_eq!(state.xds.list_nodes().len(), 0);
-        assert_eq!(state.workload_group_mgr.list_groups().len(), 0);
     }
 
     #[test]
@@ -1309,168 +1096,10 @@ mod tests {
     }
 
     // ═══════════════════════════════════════════════════════
-    // 15 — Deep parity: xDS validation, delta, snapshot builder
+    // 15 — (removed) Deep parity: xDS validation, delta, snapshot builder
     // ═══════════════════════════════════════════════════════
-
-    #[test]
-    fn xds_validate_detects_missing_eds_endpoint() {
-        let mut snap = xds::XdsSnapshot::empty();
-        snap.clusters.insert(
-            "orders_svc".to_string(),
-            xds::XdsCluster {
-                name: "orders_svc".to_string(),
-                cluster_type: xds::XdsClusterType::Eds,
-                eds_cluster_config: Some(xds::XdsEdsClusterConfig {
-                    eds_config: xds::XdsConfigSource {
-                        resource_api_version: "V3".to_string(),
-                        api_type: xds::XdsApiType::Ads,
-                        cluster_name: None,
-                    },
-                    service_name: Some("orders.svc".to_string()),
-                }),
-                load_assignment: None,
-                connect_timeout_ms: 1_000,
-                lb_policy: xds::XdsLbPolicy::RoundRobin,
-                circuit_breakers: None,
-                outlier_detection: None,
-                http2_protocol_options: None,
-                transport_socket: None,
-                upstream_http_protocol_options: None,
-            },
-        );
-        let errors = xds::XdsManager::validate_snapshot(&snap);
-        assert_eq!(errors.len(), 1);
-        assert_eq!(errors[0].resource_type, xds::XdsResourceType::Cds);
-        assert!(errors[0].message.contains("orders.svc"));
-    }
-
-    #[test]
-    fn xds_delta_state_acknowledge_updates_versions() {
-        let mut state = xds::DeltaXdsState::default();
-        let nonce = state.new_nonce();
-        let mut acks = HashMap::new();
-        acks.insert("listener1".to_string(), "v1".to_string());
-        state.acknowledge(&nonce, acks);
-        assert_eq!(
-            state.acknowledged_versions.get("listener1"),
-            Some(&"v1".to_string())
-        );
-        // Nonce is consumed — replay should be a no-op
-        let mut acks2 = HashMap::new();
-        acks2.insert("listener2".to_string(), "v2".to_string());
-        state.acknowledge(&nonce, acks2);
-        assert!(!state.acknowledged_versions.contains_key("listener2"));
-    }
-
-    #[test]
-    fn xds_delta_state_subscription_wildcard_vs_explicit() {
-        let mut state = xds::DeltaXdsState::default();
-        // Empty subscribed set = wildcard
-        assert!(state.is_subscribed("anything"));
-        state.subscribed.insert("explicit-1".to_string());
-        assert!(state.is_subscribed("explicit-1"));
-        assert!(!state.is_subscribed("explicit-2"));
-    }
-
-    #[test]
-    fn xds_compute_delta_marks_resources_updated_after_snapshot_change() {
-        let mgr = XdsManager::new();
-        let mut snap = xds::XdsSnapshot::empty();
-        snap.clusters.insert("c1".to_string(), xds::XdsCluster {
-            name: "c1".to_string(),
-            cluster_type: xds::XdsClusterType::Static,
-            eds_cluster_config: None, load_assignment: None,
-            connect_timeout_ms: 1000, lb_policy: xds::XdsLbPolicy::RoundRobin,
-            circuit_breakers: None, outlier_detection: None, http2_protocol_options: None,
-            transport_socket: None, upstream_http_protocol_options: None,
-        });
-        mgr.set_snapshot("group1", snap);
-        // wildcard subscription
-        let delta = mgr.compute_delta("nodeA", xds::XdsResourceType::Cds, "group1");
-        assert_eq!(delta.updated_resources, vec!["c1"]);
-        assert!(delta.removed_resources.is_empty());
-    }
-
-    #[test]
-    fn xds_compute_delta_marks_removed_resources() {
-        let mgr = XdsManager::new();
-        let mut state = xds::DeltaXdsState::default();
-        // Already acknowledged a resource that no longer exists
-        state.acknowledged_versions.insert("c-old".to_string(), "v1".to_string());
-        mgr.update_delta_state("nodeA", xds::XdsResourceType::Cds, state);
-        mgr.set_snapshot("group1", xds::XdsSnapshot::empty());
-        let delta = mgr.compute_delta("nodeA", xds::XdsResourceType::Cds, "group1");
-        assert!(delta.removed_resources.contains(&"c-old".to_string()));
-    }
-
-    #[test]
-    fn xds_mark_ack_updates_sync_status() {
-        let mgr = XdsManager::new();
-        let node = xds::NodeInfo {
-            id: "node-1".to_string(), cluster: "c".to_string(),
-            locality: None, metadata: serde_json::Value::Null,
-            user_agent_name: None, user_agent_version: None,
-        };
-        mgr.register_node(node);
-        mgr.mark_ack("node-1", "v42");
-        let statuses = mgr.list_sync_status();
-        let me = statuses.iter().find(|s| s.node_id == "node-1").unwrap();
-        assert_eq!(me.last_ack_version, Some("v42".to_string()));
-        assert!(me.synced);
-    }
-
-    #[test]
-    fn xds_mark_nack_unmarks_synced() {
-        let mgr = XdsManager::new();
-        let node = xds::NodeInfo {
-            id: "node-2".to_string(), cluster: "c".to_string(),
-            locality: None, metadata: serde_json::Value::Null,
-            user_agent_name: None, user_agent_version: None,
-        };
-        mgr.register_node(node);
-        mgr.mark_ack("node-2", "v1");
-        mgr.mark_nack("node-2", "boom");
-        let s = mgr.list_sync_status().into_iter().find(|s| s.node_id == "node-2").unwrap();
-        assert!(!s.synced);
-    }
-
-    #[test]
-    fn xds_default_snapshot_returns_empty_when_unset() {
-        let mgr = XdsManager::new();
-        let snap = mgr.default_snapshot();
-        assert_eq!(snap.resource_count(), 0);
-    }
-
-    #[test]
-    fn xds_node_groups_lists_set_snapshots() {
-        let mgr = XdsManager::new();
-        mgr.set_snapshot("group-a", xds::XdsSnapshot::empty());
-        mgr.set_snapshot("group-b", xds::XdsSnapshot::empty());
-        let mut groups = mgr.node_groups();
-        groups.sort();
-        assert_eq!(groups, vec!["group-a", "group-b"]);
-    }
-
-    #[test]
-    fn xds_build_snapshot_from_resources_creates_clusters_and_routes() {
-        let dr = DestinationRule {
-            name: "dr".to_string(), namespace: "default".to_string(),
-            host: "payments.svc".to_string(),
-            traffic_policy: None, subsets: vec![], export_to: vec![],
-            created_at: Utc::now(), updated_at: Utc::now(),
-        };
-        let vs = make_vs("vs", "payments.svc", vec![HttpRoute {
-            name: None, match_rules: vec![],
-            route: vec![route_dest("payments.svc", 100)],
-            timeout_ms: None, retries: None, fault: None,
-            mirror: None, mirror_percentage: None, headers: None,
-            redirect: None, direct_response: None, rewrite: None, cors_policy: None,
-        }]);
-        let snap = xds::XdsManager::build_snapshot_from_resources(&[vs], &[dr], &[], &[]);
-        assert!(snap.clusters.contains_key("payments_svc"));
-        // route key uses namespace + host with dots replaced
-        assert!(snap.routes.keys().any(|k| k.contains("payments_svc")));
-    }
+    // Envoy xDS v3 surface is intentionally absent (no-backcompat
+    // Ambient-only mandate).
 
     // ═══════════════════════════════════════════════════════
     // 16 — Deep parity: Multi-cluster service discovery
@@ -1683,102 +1312,10 @@ mod tests {
     }
 
     // ═══════════════════════════════════════════════════════
-    // 18 — Deep parity: Sidecar / WorkloadGroup
+    // 18 — (removed) Deep parity: Sidecar / WorkloadGroup
     // ═══════════════════════════════════════════════════════
-
-    #[test]
-    fn sidecar_accessible_hosts_aggregates_all_egress() {
-        let mgr = SidecarManager::new();
-        let sc = Sidecar {
-            name: "sc".to_string(), namespace: "ns".to_string(),
-            selector: None, ingress: vec![],
-            egress: vec![
-                IstioEgressListener {
-                    port: None, bind: None,
-                    capture_mode: CaptureMode::Default,
-                    hosts: vec!["./payments.svc".to_string()],
-                },
-                IstioEgressListener {
-                    port: None, bind: None,
-                    capture_mode: CaptureMode::Default,
-                    hosts: vec!["./orders.svc".to_string(), "./catalog.svc".to_string()],
-                },
-            ],
-            outbound_traffic_policy: OutboundTrafficPolicy::AllowAny,
-            created_at: Utc::now(), updated_at: Utc::now(),
-        };
-        mgr.upsert(sc);
-        let hosts = mgr.accessible_hosts("ns", &HashMap::new());
-        assert_eq!(hosts.len(), 3);
-    }
-
-    #[test]
-    fn workload_group_get_and_remove() {
-        let mgr = WorkloadGroupManager::new();
-        let g = WorkloadGroup {
-            name: "g".to_string(), namespace: "ns".to_string(),
-            selector: None,
-            metadata: WorkloadGroupMetadata::default(),
-            template: WorkloadEntryTemplate {
-                address: None, labels: HashMap::new(),
-                service_account: None, network: None, locality: None,
-                weight: 100, ports: HashMap::new(),
-            },
-            probe: None,
-            created_at: Utc::now(), updated_at: Utc::now(),
-        };
-        mgr.upsert_group(g);
-        assert!(mgr.get_group("ns", "g").is_some());
-        mgr.remove_group("ns", "g");
-        assert!(mgr.get_group("ns", "g").is_none());
-    }
-
-    #[test]
-    fn workload_entry_get_and_remove() {
-        let mgr = WorkloadGroupManager::new();
-        let e = WorkloadEntry {
-            name: Some("vm-1".to_string()), namespace: Some("ns".to_string()),
-            address: "10.0.0.1".to_string(),
-            labels: HashMap::new(), ports: HashMap::new(),
-            service_account: None, network: None, locality: None, weight: 100u32,
-            created_at: Some(Utc::now()), updated_at: Some(Utc::now()),
-        };
-        mgr.upsert_entry(e);
-        assert!(mgr.get_entry("ns", "vm-1").is_some());
-        mgr.remove_entry("ns", "vm-1");
-        assert!(mgr.get_entry("ns", "vm-1").is_none());
-    }
-
-    #[test]
-    fn workload_group_snapshot_counts() {
-        let mgr = WorkloadGroupManager::new();
-        for i in 0..3 {
-            mgr.upsert_group(WorkloadGroup {
-                name: format!("g{i}"), namespace: "ns".to_string(),
-                selector: None,
-                metadata: WorkloadGroupMetadata::default(),
-                template: WorkloadEntryTemplate {
-                    address: None, labels: HashMap::new(),
-                    service_account: None, network: None, locality: None,
-                    weight: 100, ports: HashMap::new(),
-                },
-                probe: None,
-                created_at: Utc::now(), updated_at: Utc::now(),
-            });
-        }
-        for i in 0..2 {
-            mgr.upsert_entry(WorkloadEntry {
-                name: Some(format!("e{i}")), namespace: Some("ns".to_string()),
-                address: format!("10.0.0.{i}"),
-                labels: HashMap::new(), ports: HashMap::new(),
-                service_account: None, network: None, locality: None, weight: 100u32,
-                created_at: Some(Utc::now()), updated_at: Some(Utc::now()),
-            });
-        }
-        let snap = mgr.snapshot();
-        assert_eq!(snap.total_groups, 3);
-        assert_eq!(snap.total_entries, 2);
-    }
+    // Sidecar legacy + WorkloadGroup CRDs are intentionally absent
+    // (no-backcompat Ambient-only mandate).
 
     // ═══════════════════════════════════════════════════════
     // 19 — Deep parity: Traffic L7 matching
