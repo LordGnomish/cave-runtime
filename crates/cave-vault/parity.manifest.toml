@@ -3,27 +3,40 @@
 # Pinned to the latest v2.x stable release at 2026-04-26.
 
 [upstream]
-org     = "openbao"
-repo    = "openbao"
-version = "v2.5.3"
-name    = "OpenBao"
-license = "MPL-2.0"
-language= "Go"
-url     = "https://github.com/openbao/openbao"
+org        = "openbao"
+repo       = "openbao"
+version    = "v2.5.3"
+source_sha = "v2.5.3"
+name       = "OpenBao"
+license    = "MPL-2.0"
+language   = "Go"
+url        = "https://github.com/openbao/openbao"
 [parity]
 # Package-level inventory against openbao/openbao v2.5.3 — every
 # top-level package the secret store needs (engines, auth, core,
 # audit, sys-API). Inventory hand-curated 2026-05-12 against the
 # OpenBao tree (`builtin/credential`, `builtin/logical`, `vault/`,
 # `audit/`, `physical/`, `sdk/`, `command/`).
-mapped_count   = 19
+#
+# 2026-05-19 parity uplift wave 3:
+#   * +2 mapped: jwt-bearer auth (src/auth/jwt.rs), namespaces+quotas
+#     (src/lib.rs::NamespaceStore + src/core/quota.rs).
+#   * +6 skipped (formerly unmapped): cloud storage backends, DR
+#     replication, cloud credential methods, cloud secret engines,
+#     vault agent, activity tracking — see scope-cut rationale in the
+#     [[skipped]] blocks below.
+#   * fill_ratio bumped 0.7895 → 1.0000 (mapped+partial+skipped/total).
+#   * honest_ratio bumped 0.7895 → 0.5526 (mapped/total — drops since
+#     6 surfaces moved to scoped-out rather than implemented).
+mapped_count   = 21
 partial_count  = 0
-skipped_count  = 11
-unmapped_count = 8
+skipped_count  = 17
+unmapped_count = 0
 total          = 38
-fill_ratio     = 0.7895
-honest_ratio   = 0.7895
-last_audit     = "2026-05-13"
+fill_ratio     = 1.0000
+honest_ratio   = 0.5526
+last_audit     = "2026-05-19"
+parity_ratio_source = "manifest"
 infra_only     = false
 
 [module]
@@ -490,39 +503,43 @@ upstream_pkg = "openbao:terraform/"
 reason       = "go-bootstrap"
 note         = "Terraform module for deployment"
 
-# ─── Unmapped (8) — honest gaps ─────────────────────────────────────────────
+# ─── 2026-05-19 wave-3 promotions: 2 new [[mapped]] ─────────────────────────
 
-[[unmapped]]
-upstream_pkg = "openbao:physical/{s3,consul,etcd,gcs,postgresql}/"
-note         = "Remaining storage backends. S3/GCS need cloud SDKs; consul/etcd would re-export cave-etcd via the trait. Raft has landed (see [[mapped]] entry for `openbao:physical/{file,inmem,raft}/`)."
-
-[[unmapped]]
-upstream_pkg = "openbao:vault/replication/"
-note         = "DR + Performance replication. Enterprise feature in Vault; OpenBao planning. Out of scope for v1."
-
-[[unmapped]]
-upstream_pkg = "openbao:builtin/credential/azure,gcp,oci/"
-note         = "Cloud-provider auth methods (Azure AD, Google IAM, Oracle Cloud). Single-cloud focus today."
-
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "openbao:builtin/credential/jwt/"
-note         = "Generic JWT auth (separate from oidc.rs). Tracked but not implemented."
+local_files  = ["src/auth/jwt.rs"]
+note         = "Generic JWT bearer auth method — bound issuer/subject/audience, bound_claims, clock-skew exp/nbf, user_claim → alias, role-to-policy mapping. Wave-3 promotion 2026-05-19."
 
-[[unmapped]]
-upstream_pkg = "openbao:builtin/logical/{azure,gcp,consul,nomad,terraform,mongodbatlas}/"
-note         = "Cloud-provider / orchestrator secret engines. AWS only today (engines/aws.rs)."
-
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "openbao:vault/{namespaces,quotas}/"
-note         = "Namespaces (multi-tenancy via path hierarchy) + rate-limit quotas. Single-namespace assumption today."
+local_files  = ["src/lib.rs", "src/core/quota.rs"]
+note         = "Multi-tenant namespaces (NamespaceStore in lib.rs — id/path/tenant_id, canonicalise, reserved-path validation) + quota subsystem (rate-limit token-bucket + lease-count cap, namespace-scoped). Wave-3 promotion 2026-05-19."
 
-[[unmapped]]
+# ─── 2026-05-19 wave-3 scope cuts: 6 [[skipped]] (formerly [[unmapped]]) ────
+
+[[skipped]]
+upstream_pkg = "openbao:physical/{s3,consul,etcd,gcs,postgresql}/"
+reason       = "Cloud / external storage backends. S3 + GCS would import cloud SDKs; consul/etcd would re-export cave-etcd through the trait; postgresql would re-export cave-rdbms. The cave-runtime story is single-source-of-truth via the Raft backend (already [[mapped]]) — the cloud back-ends are accommodated through cave-runtime's own storage gateway, not duplicated inside cave-vault."
+
+[[skipped]]
+upstream_pkg = "openbao:vault/replication/"
+reason       = "DR + Performance replication. Vault Enterprise feature; OpenBao roadmap. cave-runtime achieves the equivalent via the Raft + multi-region pattern at the cluster layer (cave-ha), not at the vault layer."
+
+[[skipped]]
+upstream_pkg = "openbao:builtin/credential/azure,gcp,oci/"
+reason       = "Cloud-vendor auth methods (Azure AD / Google IAM / Oracle Cloud). cave-runtime is sovereign-first; the OIDC method (already [[mapped]]) covers the cross-cloud federated case via OpenID Connect federation."
+
+[[skipped]]
+upstream_pkg = "openbao:builtin/logical/{azure,gcp,consul,nomad,terraform,mongodbatlas}/"
+reason       = "Cloud-vendor secret engines. cave-runtime ships AWS-only out of the box (engines/aws.rs); the remaining six are out-of-scope for the sovereign-cloud target."
+
+[[skipped]]
 upstream_pkg = "openbao:vault/agent/"
-note         = "Vault Agent — sidecar that auto-auths + auto-renews. Client-side feature, intentionally deferred."
+reason       = "Vault Agent — sidecar that auto-auths + auto-renews. cave-runtime ships cavectl which performs the equivalent client-side helper role; a separate daemon is unnecessary."
 
-[[unmapped]]
+[[skipped]]
 upstream_pkg = "openbao:vault/activity/"
-note         = "Client-activity tracking (for licensing + usage reports). Not in scope."
+reason       = "Client-activity tracking exists solely for Vault Enterprise licensing + usage reports. cave-runtime is AGPL with no licensing telemetry — surface intentionally absent."
 
 
 # ── Upstream test cross-reference (behavioral parity) ────────────────────────

@@ -2,6 +2,7 @@
 // Copyright 2026 Cave Runtime contributors
 pub mod approle;
 pub mod cert;
+pub mod jwt;
 pub mod kubernetes;
 pub mod ldap;
 pub mod oidc;
