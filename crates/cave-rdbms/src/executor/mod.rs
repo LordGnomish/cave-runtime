@@ -11,7 +11,7 @@ pub mod select;
 pub mod update;
 pub mod values;
 
-pub use delete::execute_delete;
-pub use insert::execute_insert;
+pub use delete::{execute_delete, execute_delete_returning};
+pub use insert::{execute_insert, execute_insert_returning};
 pub use select::execute_select;
-pub use update::execute_update;
+pub use update::{execute_update, execute_update_returning};

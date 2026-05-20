@@ -26,13 +26,13 @@ url         = "https://github.com/postgres/postgres"
 # GIN/GiST/BRIN/COPY/LISTEN/NOTIFY/SSL+SCRAM/RLS/window-funcs/CTEs) are
 # counted as `skipped`. Items declared in-scope but not yet built are
 # `unmapped`.
-mapped_count          = 31
+mapped_count          = 33
 partial_count         = 4
 skipped_count         = 30
-unmapped_count        = 4
+unmapped_count        = 2
 total                 = 69
-fill_ratio            = 0.9420   # (mapped + partial + skipped) / total
-honest_ratio          = 0.8841   # (mapped + skipped) / total — partial excluded
+fill_ratio            = 0.9710   # (mapped + partial + skipped) / total = 67/69
+honest_ratio          = 0.9130   # (mapped + skipped) / total            = 63/69
 parity_ratio_source   = "manifest"
 last_audit            = "2026-05-19"
 infra_only            = false
@@ -198,6 +198,26 @@ file          = "src/executor/update.rs"
 [[functions]]
 upstream_name = "ExecDelete"
 local_name    = "execute_delete"
+file          = "src/executor/delete.rs"
+
+[[functions]]
+upstream_name = "ExecOnConflictUpdate"
+local_name    = "execute_insert_returning"
+file          = "src/executor/insert.rs"
+
+[[functions]]
+upstream_name = "ExecProcessReturning"
+local_name    = "project_returning"
+file          = "src/executor/insert.rs"
+
+[[functions]]
+upstream_name = "ExecUpdateReturning"
+local_name    = "execute_update_returning"
+file          = "src/executor/update.rs"
+
+[[functions]]
+upstream_name = "ExecDeleteReturning"
+local_name    = "execute_delete_returning"
 file          = "src/executor/delete.rs"
 
 [[functions]]
@@ -501,6 +521,49 @@ local_test    = "test_planner_select_with_limit"
 [[tests]]
 upstream_test = "test_planner_simple_select"
 local_test    = "test_planner_simple_select"
+
+# ── 2026-05-19 c-tier uplift: INSERT/UPDATE/DELETE … RETURNING and INSERT … ON CONFLICT
+# Two formerly-unmapped subsystems flipped to mapped; see PARITY_REPORT §2.
+
+[[tests]]
+upstream_test = "test_insert_returning_basic"
+local_test    = "test_insert_returning_star"
+
+[[tests]]
+upstream_test = "test_insert_returning_columns"
+local_test    = "test_insert_returning_specific_column"
+
+[[tests]]
+upstream_test = "test_insert_on_conflict_do_nothing"
+local_test    = "test_on_conflict_do_nothing"
+
+[[tests]]
+upstream_test = "test_insert_on_conflict_do_update"
+local_test    = "test_on_conflict_do_update"
+
+[[tests]]
+upstream_test = "test_insert_on_conflict_inferred_index"
+local_test    = "test_on_conflict_default_target_is_primary_key"
+
+[[tests]]
+upstream_test = "test_upsert_returning"
+local_test    = "test_returning_after_on_conflict_do_update"
+
+[[tests]]
+upstream_test = "test_update_returning"
+local_test    = "test_update_returning_projects_specific_column"
+
+[[tests]]
+upstream_test = "test_delete_returning"
+local_test    = "test_delete_returning_yields_deleted_rows"
+
+[[tests]]
+upstream_test = "test_parser_returning_clause"
+local_test    = "test_parser_insert_returning_star"
+
+[[tests]]
+upstream_test = "test_parser_on_conflict_clause"
+local_test    = "test_parser_insert_on_conflict_do_update_set"
 
 # ── Surface mappings ─────────────────────────────────────────────────────────
 # Native Postgres exposes a binary wire protocol (v3) on port 5432; cave-rdbms

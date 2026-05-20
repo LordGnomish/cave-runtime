@@ -72,6 +72,10 @@ pub enum Token {
     Rename,
     Any,
     All,
+    Returning,
+    Conflict,
+    Nothing,
+    Do,
 
     // Identifiers and literals
     Identifier(String),
@@ -417,6 +421,10 @@ impl Lexer {
             "RENAME" => Token::Rename,
             "ANY" => Token::Any,
             "ALL" => Token::All,
+            "RETURNING" => Token::Returning,
+            "CONFLICT" => Token::Conflict,
+            "NOTHING" => Token::Nothing,
+            "DO" => Token::Do,
             _ => Token::Identifier(s.to_string()),
         }
     }
