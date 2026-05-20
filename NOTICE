@@ -42,45 +42,46 @@ canonical machine-readable list lives in
 `crates/cave-upstream/src/projects.rs` and is exposed at runtime via
 `/api/portal/upstream`.
 
-Total upstreams: 99
+Total upstreams: 101
 
 AGPL-3.0:
-  - grafana/grafana
+  - grafana/grafana          (cave-dashboard; v11.5.0; formerly cave-grafana)
   - grafana/k6
-  - grafana/loki
-  - grafana/oncall
+  - grafana/loki             (cave-logs; v3.4.0; formerly cave-loki)
+  - grafana/oncall           (cave-oncall; v1.10.0)
   - grafana/pyroscope
   - grafana/tempo
   - gravitational/teleport
   - makeplane/plane
-  - trufflesecurity/trufflehog
-  - twentyhq/twenty
+  - trufflesecurity/trufflehog (cave-secrets; v3.85.0)
+  - twentyhq/twenty          (cave-crm; v2.6.0)
 
 Apache-2.0:
   - Apicurio/apicurio-registry
   - DependencyTrack/dependency-track
+  - FerretDB/FerretDB        (cave-docdb; MongoDB wire-protocol re-implementation)
   - Kong/kong
   - Unleash/unleash
   - apache/arrow-rs
-  - apache/datafusion
+  - apache/datafusion        (cave-datafusion; SQL engine MVP)
   - apache/hudi-rs
   - apache/iceberg
-  - apache/iceberg-rust
+  - apache/iceberg-rust      (cave-iceberg; read-side MVP)
   - apache/incubator-devlake
-  - apache/kafka
-  - apache/pulsar
+  - apache/kafka             (cave-streams; v4.2.0)
+  - apache/pulsar            (cave-streams; v4.2.0)
   - aquasecurity/trivy
   - argoproj/argo-cd
   - argoproj/argo-rollouts
   - argoproj/argo-workflows
-  - backstage/backstage
+  - backstage/backstage      (cave-portal; v1.50.3)
   - casbin/casbin
   - cert-manager/cert-manager
   - chaos-mesh/chaos-mesh
   - cilium/cilium
   - cilium/hubble
   - cilium/tetragon
-  - clastix/kamaji
+  - clastix/kamaji           (cave-kamaji; v1.0.0)
   - cloudnative-pg/cloudnative-pg
   - containerd/containerd
   - coredns/coredns
@@ -91,14 +92,14 @@ Apache-2.0:
   - etcd-io/etcd
   - external-secrets/external-secrets
   - falcosecurity/falco
-  - goharbor/harbor
-  - istio/istio
+  - goharbor/harbor          (cave-registry; v2.10)
+  - istio/istio              (cave-mesh; 1.30.0, ambient-only)
   - jaegertracing/jaeger
-  - kedacore/keda
-  - keycloak/keycloak
-  - knative/serving
+  - kedacore/keda            (cave-keda; v2.16.1)
+  - keycloak/keycloak        (cave-auth; v26.0.0)
+  - knative/serving          (cave-knative; v1.22.0)
   - kubernetes-sigs/cluster-api
-  - kubernetes-sigs/karpenter
+  - kubernetes-sigs/karpenter (cave-karpenter; v1.4.0)
   - kubernetes/cloud-provider
   - kubernetes/kubernetes
   - kubevirt/kubevirt
@@ -111,7 +112,7 @@ Apache-2.0:
   - opensearch-project/OpenSearch
   - permitio/opal
   - prometheus/alertmanager
-  - prometheus/prometheus
+  - prometheus/prometheus    (cave-metrics; v3.3.0)
   - sigstore/cosign
   - sigstore/policy-controller
   - sigstore/sigstore
@@ -120,7 +121,7 @@ Apache-2.0:
   - tektoncd/pipeline
   - thanos-io/thanos
   - vmware-tanzu/velero
-  - zaproxy/zaproxy
+  - zaproxy/zaproxy          (cave-dast; v2.14.0)
 
 BSD-3-Clause:
   - DefectDojo/django-DefectDojo
@@ -150,7 +151,10 @@ LGPL-3.0:
 
 GPL-2.0:
   - manticoresoftware/manticoresearch
-  - pulp/pulpcore
+  - pulp/pulpcore            (cave-artifacts; v3.49)
+
+EPL-1.0 (Eclipse Public License v1.0):
+  - sonatype/nexus-public    (cave-registry; v3.69 — secondary upstream alongside Harbor)
 
 GPL-3.0:
   - frappe/erpnext
