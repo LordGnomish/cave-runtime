@@ -2,6 +2,21 @@
 # Upstream: etcd v3.6.10  https://github.com/etcd-io/etcd
 # Bumped from v3.6.0 in feat/cave-etcd-deeper-002.
 #
+# 2026-05-19 UPLIFT — three unmapped→mapped via real-impl ports.
+#   * NEW src/election.rs — `v3election` RPC façade over the existing
+#     DistElection primitive (campaign / proclaim / leader / resign /
+#     observe / subscribe). Maps server/etcdserver/api/v3election/.
+#   * NEW src/quota.rs — `BackendQuota` (workspace db-size + per-tenant
+#     bytes/keys caps). Maps server/storage/quota/.
+#   * NEW src/cindex.rs — `ConsistentIndex` atomic helper with on-disk
+#     round-trip + FNV-1a hash. Maps server/etcdserver/cindex/.
+#   * Counts move: mapped 28→31, unmapped 6→3, partial 2 / skipped 35
+#     unchanged, total still 71. fill_ratio (mapped+partial+skipped)/
+#     total → 0.9577. honest_ratio (mapped+skipped)/total → 0.9296.
+#   * 3 new modules add ≥4 #[test] each (16+15+13) under the existing
+#     parity_self_audit gate. .rs file count 36→39.
+#   * `last_audit = "2026-05-19"` (carries over).
+#
 # 2026-05-18 FINALIZE — Charter v2 8-gate close-out.
 #   * Added `source_sha = "v3.6.10"` for reproducibility audits — pins
 #     the git tree-ish the manifest was enumerated against.
@@ -33,13 +48,13 @@ url        = "https://github.com/etcd-io/etcd"
 # measured value: every etcd v3.6.x top-level package was enumerated
 # and classified honestly. WAL was newly ported in this pass.
 # See docs/parity/cave-etcd-port-2026-05-12.md for methodology.
-mapped_count   = 28
+mapped_count   = 31
 partial_count  = 2
 skipped_count  = 35
-unmapped_count = 6
+unmapped_count = 3
 total          = 71
-fill_ratio     = 0.9155
-honest_ratio   = 0.8873
+fill_ratio     = 0.9577
+honest_ratio   = 0.9296
 last_audit     = "2026-05-19"
 infra_only     = false
 
@@ -106,6 +121,23 @@ local    = "src/store.rs"
 [[files]]
 upstream = "server/etcdserver/api/snap/snapshotter.go"
 local    = "src/store.rs"
+
+# 2026-05-19 uplift — three new ports.
+[[files]]
+upstream = "server/etcdserver/api/v3election/v3election.go"
+local    = "src/election.rs"
+
+[[files]]
+upstream = "server/etcdserver/api/v3election/v3election.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "server/storage/quota/quota.go"
+local    = "src/quota.rs"
+
+[[files]]
+upstream = "server/etcdserver/cindex/cindex.go"
+local    = "src/cindex.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────────
 # KV
@@ -897,7 +929,7 @@ local_path    = "/api/etcd/v3/cluster/joint/leave"
 # packages with non-trivial observable surface were counted; minor
 # helper sub-packages were folded into their parent.
 
-# ─── Mapped (30) ─────────────────────────────────────────────────────────────
+# ─── Mapped (31) ─────────────────────────────────────────────────────────────
 
 [[mapped]]
 upstream_pkg = "server/storage/wal/"
@@ -1012,6 +1044,22 @@ local_files  = ["src/routes.rs", "src/cluster_status.rs"]
 [[mapped]]
 upstream_pkg = "server/etcdserver/txn/"
 local_files  = ["src/routes.rs", "src/store.rs"]
+
+# 2026-05-19 uplift — promoted from [[unmapped]] via real-impl port.
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3election/"
+local_files  = ["src/election.rs", "src/concurrency.rs"]
+note         = "v3rpc election service façade — campaign/proclaim/leader/resign/observe over DistElection primitive. Per-name election table with broadcast leader-change channel."
+
+[[mapped]]
+upstream_pkg = "server/storage/quota/"
+local_files  = ["src/quota.rs"]
+note         = "BackendQuota — workspace db-size-bytes (2 GiB default) + per-tenant byte and key caps. NOSPACE/TenantBytes/TenantKeys decision variants mirror etcd's quota.Available ordering."
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/cindex/"
+local_files  = ["src/cindex.rs"]
+note         = "ConsistentIndex helper — atomic (index, term) pair with 16-byte big-endian on-disk format, unsafe_save/unsafe_load tx round-trip, FNV-1a hash for snapshot integrity."
 
 [[partial]]
 upstream_pkg = "server/etcdserver/api/v3alarm/"
@@ -1185,23 +1233,13 @@ upstream_pkg = "client/v3/yaml"
 reason       = "stdlib-analog"
 note         = "Rust uses serde directly"
 
-# ─── Unmapped (6) — real port gaps acknowledged ──────────────────────────────
+# ─── Unmapped (3) — real port gaps acknowledged ──────────────────────────────
+# 2026-05-19: v3election/, cindex/, storage/quota/ promoted to [[mapped]] —
+# see UPLIFT header. Remaining 3 are out-of-scope for the v3.6 single-node MVP.
 
 [[unmapped]]
 upstream_pkg = "server/storage/wal/walpb/"
 note         = "etcd's protobuf record wire format. cave-etcd's wal.rs uses JSON-framed records for forensic readability in the single-node MVP; the protobuf shape is a follow-up for multi-node Raft compatibility."
-
-[[unmapped]]
-upstream_pkg = "server/etcdserver/api/v3election/"
-note         = "Election RPC service. Equivalent primitive (campaign/resign) is available via concurrency.rs but not exposed as a top-level v3rpc endpoint yet."
-
-[[unmapped]]
-upstream_pkg = "server/etcdserver/cindex/"
-note         = "Consistent-index helper — coupled with raft, will land alongside Paket C."
-
-[[unmapped]]
-upstream_pkg = "server/storage/quota/"
-note         = "Standalone quota module; basic db-size-bytes alarm is in maintenance.rs but per-tenant quota enforcement is a gap."
 
 [[unmapped]]
 upstream_pkg = "etcdutl/"
