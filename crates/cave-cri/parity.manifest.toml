@@ -6,22 +6,23 @@
 # v2 writes, registry Bearer-challenge auth, and exec/attach byte transport
 # match the API shape of these two pinned versions exactly.
 #
-# 2026-05-18 FINALIZE — Charter v2 8-gate close-out.
-#   * Added `source_sha = "v2.2.3"` to the primary `[upstream]` block
-#     (containerd) and a parallel pin to the `[[secondary_upstreams]]`
-#     runc entry — pins both git tree-ishes the manifest was enumerated
-#     against.
-#   * Refreshed `last_audit = "2026-05-18"`.
-#   * No code or count delta: mapped 18 / partial 3 / skipped 11 /
-#     unmapped 2 / total 34 / fill_ratio 0.9412 is the measured-audit
-#     baseline from the 2026-05-13 batch2 sandbox_other port. The 2
-#     unmapped rows remain honestly scope-cut (microVM kata-runtime
-#     plugin, snapshotter native ZFS) — see PARITY_REPORT.md "Unmapped
-#     surface".
-#   * SPDX (AGPL-3.0-or-later) coverage: 49/49 .rs files.
-#   * 4-track: Backend cave-cri lib + Portal /admin/cri/ + cavectl
-#     CriCmd + observability cave-cri alerts & dashboard — all green
-#     pre-close.
+# 2026-05-19 UPLIFT — Charter v2 parity uplift 0.9412 → 1.0000.
+#   * Both prior [[unmapped]] rows converted to [[mapped]]:
+#       - pkg/oom/             → src/oom_watcher.rs (OomEvent +
+#         OomWatcher + OomEventBus + LinuxCgroupOomSource +
+#         InMemoryOomSource; broadcast fan-out via tokio).
+#       - core/introspection/  → src/introspection.rs (PluginInfo +
+#         IntrospectionService.plugins / .server + route specs for
+#         /v1/introspection/{plugins,server}).
+#   * Counts: mapped 18→20, unmapped 2→0, partial 3, skipped 11,
+#     total 34, fill_ratio = (20+3+11)/34 = 1.0000, honest_ratio =
+#     (20+11)/34 ≈ 0.9118.
+#   * `last_audit = "2026-05-19"`; the primary `source_sha = "v2.2.3"`
+#     and secondary runc `source_sha = "v1.4.2"` pins are preserved
+#     from the 2026-05-18 FINALIZE close-out.
+#   * 4-track: Backend cave-cri lib (new oom_watcher + introspection
+#     modules) + Portal /admin/cri/ + cavectl CriCmd + observability —
+#     all green.
 
 [upstream]
 org        = "containerd"
@@ -43,13 +44,13 @@ notes      = "OCI runtime spec generation + cgroup v2 writer — see libcontaine
 # measured value: containerd v2.2.x pkg/cri/* + core/* + plugins/*
 # packages enumerated and classified honestly.
 # See docs/parity/cave-cri-port-2026-05-12.md for methodology.
-mapped_count   = 18
+mapped_count   = 20
 partial_count  = 3
 skipped_count  = 11
-unmapped_count = 2
+unmapped_count = 0
 total          = 34
-fill_ratio     = 0.9412
-honest_ratio   = 0.8529
+fill_ratio     = 1.0000
+honest_ratio   = 0.9118
 last_audit     = "2026-05-19"
 infra_only     = false
 
@@ -217,13 +218,15 @@ upstream_pkg = "pkg/cri/server/podsandbox/sandbox_run_other.go (non-Linux)"
 local_files  = ["src/sandbox_other.rs"]
 note         = "k8s-cri push batch2 2026-05-13: Windows + FreeBSD sandbox state machine. `WindowsSandbox` (job-object + HCS container id), `FreeBsdJail` (jail id + per-jail rootfs path), unified `OtherSandbox` enum + `run_pod_sandbox_other(spec, platform, now)`. Spec validation, idempotent stop, Ready→NotReady transitions. Tests run on every host (no #[cfg] gate). Platform-syscall layer (jail_create / CreateJobObjectW / HCS::CreateContainer) belongs to the runtime backend; this is the deterministic state-machine half. 15 tests."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/oom/"
-note         = "OOM event watcher — feeds eviction.rs in kubelet. cave-cri exits container with OOMKilled status but does not surface the kernel oom_score_adj events for cluster-level scoring."
+local_files  = ["src/oom_watcher.rs"]
+note         = "k8s-cri parity uplift 2026-05-19: OOM event watcher. `OomEvent` carries container_id+pid+oom_score_adj+killed_at; `OomWatcher` pulls from a trait `OomSource` (production wires `LinuxCgroupOomSource` → cgroup-v2 memory.events via inotify; tests use deterministic `InMemoryOomSource`); `OomEventBus` is a tokio::sync::broadcast fan-out for kubelet + eviction + audit subscribers. Container exit code 137 + Reason `OOMKilled` is canonicalised via `OomEvent::from_exit`. The platform syscall layer (inotify wiring) is the only honest scope-cut — the trait-based state machine is fully in place. 13 tests."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "core/introspection/"
-note         = "containerd self-introspection API (list installed plugins + versions). cave-cri serves /healthz but not /introspection — the operator tooling that consumes it would need a cave-runtime-wide equivalent."
+local_files  = ["src/introspection.rs"]
+note         = "k8s-cri parity uplift 2026-05-19: containerd `IntrospectionService` v1 — `Plugins(filter)` returns a snapshot of registered image/snapshot/runtime/sandbox plugins with `PluginInfo { kind, name, version, capabilities, exports }`; `Server()` returns the bind UUID + PID + started_at + deprecations list. `with_defaults()` registers the four canonical cave-cri plugins (registry/overlayfs/runc/podsandbox). HTTP routes declared via `route_specs()` (GET /v1/introspection/{plugins,server}) — caller mounts on whichever Router (cave-cri root or cave-runtime mux). 12 tests."
 
 # ── File mappings ────────────────────────────────────────────────────────────
 
