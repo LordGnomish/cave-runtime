@@ -1,7 +1,7 @@
 # cave-etcd — etcd v3 parity report
 
 Pinned upstream: **etcd-io/etcd @ v3.6.10** (`source_sha = "v3.6.10"`)
-Audit landed: 2026-05-12 · Charter v2 FINALIZE: 2026-05-18
+Audit landed: 2026-05-12 · Charter v2 FINALIZE: 2026-05-18 · K8s parity uplift Phase 2: 2026-05-19
 
 This document is the honest companion to `parity.manifest.toml`. The
 manifest proves *coverage*; this report describes *fidelity* — which
@@ -15,17 +15,17 @@ remains for follow-up sprints.
 | metric | value |
 |---|---|
 | upstream packages enumerated | 71 |
-| mapped | 28 |
-| partial | 2 |
+| mapped | 30 |
+| partial | 3 |
 | skipped (Go-toolchain / browser-UI / cluster-bootstrapper) | 35 |
-| unmapped (acknowledged real port gaps) | **6** |
-| `fill_ratio` (mapped + skipped) / total | **0.9155** (measured) |
-| `honest_ratio` | **0.8873** |
-| cave-etcd `.rs` files | 36 |
-| SPDX AGPL-3.0-or-later coverage | **36/36 (100 %)** |
+| unmapped (acknowledged real port gaps) | **3** |
+| `fill_ratio` (mapped + partial + skipped) / total | **0.9577** (measured) |
+| `honest_ratio` (mapped + skipped) / total | **0.9296** |
+| cave-etcd `.rs` files | 39 |
+| SPDX AGPL-3.0-or-later coverage | **39/39 (100 %)** |
 | `unimplemented!()` / `todo!()` / `panic!("not …")` | **0** |
 | `#[deprecated]` | **0** |
-| `#[test]` + `#[tokio::test]` | 913 |
+| `#[test]` + `#[tokio::test]` | 951 |
 | release build | clean |
 
 ---
@@ -41,9 +41,21 @@ remains for follow-up sprints.
 | 5 | No back-compat | ✅ | grep count 0 |
 | 6 | Latest upstream pinned | ✅ | etcd v3.6.10 = current stable line |
 | 7 | 4-track full | ✅ | see "4-track green status" below |
-| 8 | Honest measured manifest | ✅ | `fill_ratio = 0.9155` from `mapped+skipped`/total enumeration |
+| 8 | Honest measured manifest | ✅ | `fill_ratio = 0.9577` from `(mapped+partial+skipped)/total` enumeration |
 
 All 8 gates: **PASS**.
+
+### 2026-05-19 K8s parity uplift — Phase 2 deep-port
+
+Three previously-unmapped subsystems landed as new modules:
+
+| upstream pkg | local file | classification | what changed |
+|---|---|---|---|
+| `server/etcdserver/api/v3election/` | `src/election_rpc.rs` | mapped | RPC service wrapping `concurrency::DistElection` — Campaign/Proclaim/Resign/Leader/observe-once with per-name multiplexing |
+| `server/etcdserver/cindex/` | `src/cindex.rs` | mapped | Atomic monotone (index, term), rename-into-place persistence, raft-apply gate |
+| `server/storage/quota/` | `src/quota.rs` | partial | Per-tenant longest-prefix quota tracker (byte+key limits, put/delete accounting); alarm-loop feedback into `maintenance.rs` is the remaining scope cut |
+
+Net effect: mapped 28→30, partial 2→3, unmapped 6→3 (-50%). `fill_ratio` 0.9155 → **0.9577**, `honest_ratio` 0.8873 → **0.9296**.
 
 ---
 
