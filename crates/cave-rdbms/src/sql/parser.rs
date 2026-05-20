@@ -338,11 +338,58 @@ impl Parser {
             self.expect(Token::RightParen)?;
             values.push(row);
         }
+        let on_conflict = if matches!(self.current(), Token::On) {
+            self.advance();
+            self.expect(Token::Conflict)?;
+            let target = if matches!(self.current(), Token::LeftParen) {
+                self.advance();
+                let mut cols = vec![self.parse_ident()?];
+                while matches!(self.current(), Token::Comma) {
+                    self.advance();
+                    cols.push(self.parse_ident()?);
+                }
+                self.expect(Token::RightParen)?;
+                Some(cols)
+            } else {
+                None
+            };
+            self.expect(Token::Do)?;
+            if matches!(self.current(), Token::Nothing) {
+                self.advance();
+                Some(OnConflictAction::DoNothing { target })
+            } else {
+                self.expect(Token::Update)?;
+                self.expect(Token::Set)?;
+                let mut assignments = vec![self.parse_assignment()?];
+                while matches!(self.current(), Token::Comma) {
+                    self.advance();
+                    assignments.push(self.parse_assignment()?);
+                }
+                Some(OnConflictAction::DoUpdate {
+                    target,
+                    assignments,
+                })
+            }
+        } else {
+            None
+        };
+        let returning = self.parse_returning_clause()?;
         Ok(Statement::Insert(InsertStmt {
             table,
             columns,
             values,
+            on_conflict,
+            returning,
         }))
+    }
+
+    fn parse_returning_clause(&mut self) -> Result<Option<Vec<SelectColumn>>, String> {
+        if matches!(self.current(), Token::Returning) {
+            self.advance();
+            Ok(Some(self.parse_select_columns()?))
+        } else {
+            Ok(None)
+        }
     }
 
     fn parse_update(&mut self) -> Result<Statement, String> {
@@ -360,10 +407,12 @@ impl Parser {
         } else {
             None
         };
+        let returning = self.parse_returning_clause()?;
         Ok(Statement::Update(UpdateStmt {
             table,
             assignments,
             where_clause,
+            returning,
         }))
     }
 
@@ -384,9 +433,11 @@ impl Parser {
         } else {
             None
         };
+        let returning = self.parse_returning_clause()?;
         Ok(Statement::Delete(DeleteStmt {
             table,
             where_clause,
+            returning,
         }))
     }
 
@@ -865,6 +916,115 @@ mod tests {
         let mut parser = Parser::new("DELETE FROM users WHERE id = 1");
         let ast = parser.parse().unwrap();
         assert!(matches!(ast.statement, Statement::Delete(_)));
+    }
+
+    #[test]
+    fn test_parser_insert_returning_star() {
+        let mut parser =
+            Parser::new("INSERT INTO users (id, name) VALUES (1, 'alice') RETURNING *");
+        let ast = parser.parse().unwrap();
+        let Statement::Insert(insert) = ast.statement else {
+            panic!("expected Insert");
+        };
+        assert!(insert.returning.is_some());
+        let cols = insert.returning.as_ref().unwrap();
+        assert_eq!(cols.len(), 1);
+        assert!(matches!(cols[0], SelectColumn::Star));
+    }
+
+    #[test]
+    fn test_parser_insert_returning_column_list() {
+        let mut parser =
+            Parser::new("INSERT INTO users (id) VALUES (1) RETURNING id, name");
+        let ast = parser.parse().unwrap();
+        let Statement::Insert(insert) = ast.statement else {
+            panic!("expected Insert");
+        };
+        let cols = insert.returning.unwrap();
+        assert_eq!(cols.len(), 2);
+    }
+
+    #[test]
+    fn test_parser_insert_on_conflict_do_nothing() {
+        let mut parser = Parser::new(
+            "INSERT INTO users (id) VALUES (1) ON CONFLICT (id) DO NOTHING",
+        );
+        let ast = parser.parse().unwrap();
+        let Statement::Insert(insert) = ast.statement else {
+            panic!("expected Insert");
+        };
+        assert!(matches!(
+            insert.on_conflict,
+            Some(OnConflictAction::DoNothing { target: Some(_) })
+        ));
+    }
+
+    #[test]
+    fn test_parser_insert_on_conflict_do_update_set() {
+        let mut parser = Parser::new(
+            "INSERT INTO users (id, name) VALUES (1, 'a') \
+             ON CONFLICT (id) DO UPDATE SET name = 'b'",
+        );
+        let ast = parser.parse().unwrap();
+        let Statement::Insert(insert) = ast.statement else {
+            panic!("expected Insert");
+        };
+        let Some(OnConflictAction::DoUpdate { target, assignments }) = insert.on_conflict
+        else {
+            panic!("expected DoUpdate");
+        };
+        assert_eq!(target.as_ref().map(|v| v.len()), Some(1));
+        assert_eq!(assignments.len(), 1);
+        assert_eq!(assignments[0].0, "name");
+    }
+
+    #[test]
+    fn test_parser_insert_on_conflict_default_target() {
+        let mut parser =
+            Parser::new("INSERT INTO users (id) VALUES (1) ON CONFLICT DO NOTHING");
+        let ast = parser.parse().unwrap();
+        let Statement::Insert(insert) = ast.statement else {
+            panic!("expected Insert");
+        };
+        assert!(matches!(
+            insert.on_conflict,
+            Some(OnConflictAction::DoNothing { target: None })
+        ));
+    }
+
+    #[test]
+    fn test_parser_update_returning() {
+        let mut parser =
+            Parser::new("UPDATE users SET name = 'bob' RETURNING id");
+        let ast = parser.parse().unwrap();
+        let Statement::Update(update) = ast.statement else {
+            panic!("expected Update");
+        };
+        assert!(update.returning.is_some());
+    }
+
+    #[test]
+    fn test_parser_delete_returning() {
+        let mut parser = Parser::new("DELETE FROM users RETURNING *");
+        let ast = parser.parse().unwrap();
+        let Statement::Delete(delete) = ast.statement else {
+            panic!("expected Delete");
+        };
+        assert!(delete.returning.is_some());
+    }
+
+    #[test]
+    fn test_parser_insert_on_conflict_then_returning() {
+        let mut parser = Parser::new(
+            "INSERT INTO users (id, name) VALUES (1, 'x') \
+             ON CONFLICT (id) DO UPDATE SET name = 'y' RETURNING id, name",
+        );
+        let ast = parser.parse().unwrap();
+        let Statement::Insert(insert) = ast.statement else {
+            panic!("expected Insert");
+        };
+        assert!(insert.on_conflict.is_some());
+        assert!(insert.returning.is_some());
     }
 
     #[test]

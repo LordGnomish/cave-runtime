@@ -27,12 +27,14 @@
 //!   already handles the equivalent at a higher layer.
 
 pub mod epoch;
+pub mod failover;
 pub mod gossip;
 pub mod migration;
 pub mod slots;
 pub mod state;
 
 pub use epoch::EpochCounter;
+pub use failover::{FailoverMode, FailoverPhase, FailoverState};
 pub use gossip::{GossipBus, GossipMessage, GossipMessageKind};
 pub use migration::{MigrationLedger, MigrationState, SlotMigration};
 pub use slots::{RedirectKind, SlotMap, SlotOwnership, SlotStats};

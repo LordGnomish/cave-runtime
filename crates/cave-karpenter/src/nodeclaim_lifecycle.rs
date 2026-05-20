@@ -68,16 +68,41 @@ pub fn launch<P: CloudProvider>(
     Ok(LaunchOutcome::Launched { provider_id })
 }
 
-/// Mark a NodeClaim as drained — in production this would cordon the
-/// node and evict pods one budget bucket at a time. The Cave port records
-/// the drain timestamp and returns; the actual pod-eviction loop is
-/// delegated to cave-kubelet's evict path.
+/// Mark a NodeClaim as drained.
 ///
-/// `grace_period` is honoured at the next reconcile pass — callers that
-/// need synchronous draining should await `grace_period` themselves.
+/// This is the *idempotent flip* used by [`terminate`] when the caller
+/// has no pod inventory — it simply records the drained bit. For the
+/// full PDB-respecting eviction loop, build a
+/// [`crate::drain::DrainPlan`] over the pods scheduled to this claim's
+/// node and drive [`DrainPlan::step`] to completion before calling
+/// [`drain_with_pods`].
 pub fn drain(claim: &mut NodeClaim, _grace_period: Duration) -> Result<(), ProviderError> {
     claim.drained = true;
     Ok(())
+}
+
+/// Drain by driving an in-crate [`DrainPlan`] over the supplied pod set.
+/// Returns the evicted pods on success. If any pod cannot be evicted
+/// because a PodDisruptionBudget would be violated, `drained` is left
+/// `false` and the caller is expected to retry.
+pub fn drain_with_pods(
+    claim: &mut NodeClaim,
+    pods: Vec<crate::drain::PodDescriptor>,
+    pdbs: Vec<crate::drain::PodDisruptionBudget>,
+    now: std::time::SystemTime,
+) -> Result<Vec<crate::drain::PodDescriptor>, ProviderError> {
+    let mut plan = crate::drain::DrainPlan::new(pods, pdbs);
+    let _ = plan.drive_to_completion(now, 4096);
+    match plan.status() {
+        crate::drain::DrainStatus::Complete => {
+            claim.drained = true;
+            Ok(plan.evicted_pods().to_vec())
+        }
+        crate::drain::DrainStatus::InProgress { .. } => Err(ProviderError::Unavailable(
+            "drain blocked by PodDisruptionBudget — retry after PDB allows eviction"
+                .to_string(),
+        )),
+    }
 }
 
 /// Terminate a NodeClaim — drain (if requested) then ask the provider to
@@ -158,5 +183,45 @@ mod tests {
         c.name = "n".into();
         terminate(&mut c, &StaticProvider::new(), false).unwrap();
         assert!(c.terminated);
+    }
+
+    #[test]
+    fn drain_with_pods_completes_when_no_pdb() {
+        use crate::drain::{PodDescriptor, PodOwnerKind};
+        let mut c = NodeClaim::default();
+        c.name = "n".into();
+        let pods = vec![PodDescriptor {
+            namespace: "default".into(),
+            name: "p".into(),
+            labels: vec![],
+            owner_kind: PodOwnerKind::Deployment,
+            grace_deadline: None,
+        }];
+        let evicted = drain_with_pods(&mut c, pods, vec![], SystemTime::now()).unwrap();
+        assert_eq!(evicted.len(), 1);
+        assert!(c.drained);
+    }
+
+    #[test]
+    fn drain_with_pods_errors_when_pdb_blocks() {
+        use crate::drain::{PodDescriptor, PodDisruptionBudget, PodOwnerKind};
+        let mut c = NodeClaim::default();
+        c.name = "n".into();
+        let pods = vec![PodDescriptor {
+            namespace: "default".into(),
+            name: "p".into(),
+            labels: vec![("app".into(), "x".into())],
+            owner_kind: PodOwnerKind::Deployment,
+            grace_deadline: None,
+        }];
+        let pdb = PodDisruptionBudget {
+            namespace: "default".into(),
+            name: "blocker".into(),
+            selector: vec![("app".into(), "x".into())],
+            min_available: 1,
+        };
+        let err = drain_with_pods(&mut c, pods, vec![pdb], SystemTime::now()).unwrap_err();
+        assert!(err.to_string().contains("PodDisruptionBudget"));
+        assert!(!c.drained);
     }
 }

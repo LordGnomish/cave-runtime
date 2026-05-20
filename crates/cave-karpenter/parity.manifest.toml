@@ -29,19 +29,23 @@ source_sha  = "v1.4.0"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.9474  # mapped / (mapped + partial + unmapped) = 18/19
-honest_ratio        = 0.8182  # mapped / total = 18/22 (skipped excluded from credit)
+fill_ratio          = 1.0000  # mapped / (mapped + partial + unmapped) = 19/19
+honest_ratio        = 0.8636  # mapped / total = 19/22 (skipped excluded from credit)
 last_audit          = "2026-05-19"
 infra_only          = false
-mapped_count        = 18
-partial_count       = 1
+mapped_count        = 19
+partial_count       = 0
 skipped_count       = 3
 unmapped_count      = 0
 total               = 22
 
 # fill_ratio derivation (Charter v2 honest measurement, subsystem-count basis):
-#   mapped (18) + partial (1) + unmapped (0) = 19 in-scope subsystems
-#   18 / 19 = 0.9474
+#   mapped (19) + partial (0) + unmapped (0) = 19 in-scope subsystems
+#   19 / 19 = 1.0000
+#
+# 2026-05-19 c-tier uplift — drain-controller promoted partial → mapped via
+# in-crate `src/drain.rs` (DrainPlan + PodDisruptionBudget arbitration);
+# the eviction loop no longer delegates to cave-kubelet's evict path.
 #
 # Supplementary LOC measurement (transparency):
 #   impl_lines               = ~860  (cave-karpenter src/, excl #[cfg(test)] + blanks/comments)
@@ -144,6 +148,15 @@ local    = "src/nodeclaim_lifecycle.rs"
 upstream = "pkg/cloudprovider/cloudprovider.go"
 local    = "src/provider/mod.rs"
 
+[[files]]
+# 2026-05-19 c-tier uplift — in-crate PDB-aware pod-eviction loop.
+upstream = "pkg/controllers/node/termination/terminator/terminator.go"
+local    = "src/drain.rs"
+
+[[files]]
+upstream = "pkg/controllers/node/termination/terminator/eviction.go"
+local    = "src/drain.rs"
+
 # ── Function mappings ───────────────────────────────────────────────────────
 
 [[functions]]
@@ -205,6 +218,22 @@ file          = "src/provider/mod.rs"
 upstream_name = "v1.NodePool.zz_generated.deepcopy.DeepCopy"
 local_name    = "NodePool::clone"
 file          = "src/models/mod.rs"
+
+# 2026-05-19 c-tier uplift — drain controller function mappings.
+[[functions]]
+upstream_name = "terminator.Terminator.Drain"
+local_name    = "DrainPlan::step"
+file          = "src/drain.rs"
+
+[[functions]]
+upstream_name = "eviction.Evictor.Evict"
+local_name    = "drain_with_pods"
+file          = "src/nodeclaim_lifecycle.rs"
+
+[[functions]]
+upstream_name = "eviction.PDB.Allows"
+local_name    = "PodDisruptionBudget::matches"
+file          = "src/drain.rs"
 
 # ── Mapped subsystems (Charter v2 [[mapped]] block) ─────────────────────────
 
@@ -334,14 +363,16 @@ name         = "cloud-provider-trait"
 upstream     = "pkg/cloudprovider/cloudprovider.go"
 note         = "CloudProvider trait (create/delete/exists) + StaticProvider in-memory impl + Hetzner/Azure NodeClass envelope structs."
 
-# ── Partial subsystems ──────────────────────────────────────────────────────
+# ── Mapped (promoted from partial in the 2026-05-19 c-tier uplift) ──────────
 
-[[partial]]
-upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/nodeclaim/lifecycle/drain"
-local_files  = ["src/nodeclaim_lifecycle.rs"]
+[[mapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/node/termination/terminator"
+local_files  = ["src/drain.rs", "src/nodeclaim_lifecycle.rs"]
 name         = "drain-controller"
-upstream     = "pkg/controllers/nodeclaim/lifecycle/drain.go"
-note         = "drain() flips claim.drained; pod-eviction with PDB respect is delegated to cave-kubelet."
+upstream     = "pkg/controllers/node/termination/terminator/{terminator,eviction}.go"
+note         = "In-crate DrainPlan + PodDisruptionBudget arbitration: DaemonSet pods skipped; PDB violations defer; grace-deadline force-evicts."
+
+# ── Partial subsystems (none after 2026-05-19 uplift) ────────────────────────
 
 # ── Skipped subsystems (intentional out-of-scope) ───────────────────────────
 

@@ -80,6 +80,19 @@ pub struct InsertStmt {
     pub table: String,
     pub columns: Option<Vec<String>>,
     pub values: Vec<Vec<Expr>>,
+    pub on_conflict: Option<OnConflictAction>,
+    pub returning: Option<Vec<SelectColumn>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum OnConflictAction {
+    DoNothing {
+        target: Option<Vec<String>>,
+    },
+    DoUpdate {
+        target: Option<Vec<String>>,
+        assignments: Vec<(String, Expr)>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -87,12 +100,14 @@ pub struct UpdateStmt {
     pub table: String,
     pub assignments: Vec<(String, Expr)>,
     pub where_clause: Option<Box<Expr>>,
+    pub returning: Option<Vec<SelectColumn>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DeleteStmt {
     pub table: String,
     pub where_clause: Option<Box<Expr>>,
+    pub returning: Option<Vec<SelectColumn>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

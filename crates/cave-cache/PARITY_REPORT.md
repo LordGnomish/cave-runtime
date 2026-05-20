@@ -38,20 +38,35 @@ expire,aof,rdb,acl,connection,eviction,modules}.c`).
 
 | Bucket   | Count | Examples                                                                            |
 |----------|------:|-------------------------------------------------------------------------------------|
-| Mapped   |    19 | server, networking (resp), db, expire (expiry), evict (eviction), aof, rdb, acl,    |
+| Mapped   |    21 | server, networking (resp), db, expire (expiry), evict (eviction), aof, rdb, acl,    |
 |          |       | scripting, cluster, t_string, t_list, t_hash, t_set, t_zset, t_stream, t_hll,       |
-|          |       | t_bitmap, t_geo                                                                     |
+|          |       | t_bitmap, t_geo, **CLUSTER FAILOVER takeover state machine**, **ACL log persistence** |
 | Partial  |     4 | replication (PSYNC2 framing, no diskless sync), cluster slot fan-out (single-node   |
 |          |       | resolver), scripting (no `EVALSHA` cache eviction policies), modules (load/init     |
 |          |       | hook only — no full Module API surface)                                              |
 | Skipped  |    13 | sentinel, RedisGears, RediSearch, RedisJSON, RedisTimeSeries, RedisBloom, RedisAI,  |
 |          |       | RedisGraph, monitor command, debug subsystem, latency profile, IO threads (libuv    |
 |          |       | path), TLS (deferred to cave-mesh proxy)                                             |
-| Unmapped |     2 | CLUSTER FAILOVER takeover state machine, ACL log persistence                         |
+| Unmapped |     0 |                                                                                     |
 | **Total**|  **38** | |
 
-- **fill_ratio  = (mapped + partial + skipped) / total = 36 / 38 = 0.9474**
-- **honest_ratio = (mapped + skipped) / total             = 32 / 38 = 0.8421**
+- **fill_ratio  = (mapped + partial + skipped) / total = 38 / 38 = 1.0000**
+- **honest_ratio = (mapped + skipped) / total             = 34 / 38 = 0.8947**
+
+### 2026-05-19 c-tier uplift
+
+`CLUSTER FAILOVER` takeover state machine and the persistent `ACL LOG`
+audit tail were promoted **unmapped → mapped**:
+
+- `src/cluster/failover.rs` — `FailoverState` covers all three operator
+  variants (graceful / `FORCE` / `TAKEOVER`), quorum-driven auth ACK
+  promotion, epoch bump on promotion, and timeout-driven failure with a
+  recorded reason.
+- `src/acl_log.rs` — `AclLog` keeps a capacity-bounded ring buffer with
+  optional on-disk JSONL backing. Append is persisted synchronously,
+  reload trims to capacity newest-first, `ACL LOG RESET` truncates both
+  the in-memory and the disk view. Escape/unescape round-trip handles
+  tabs and newlines in usernames / object identifiers.
 
 ## 8-gate close-out
 
@@ -61,8 +76,8 @@ expire,aof,rdb,acl,connection,eviction,modules}.c`).
 | 2 | `source_sha` pinned in manifest   | PASS   | `source_sha = "8.0.0"` (Valkey 8.0.0)     |
 | 3 | `last_audit = "2026-05-19"`       | PASS   | `[parity].last_audit`                     |
 | 4 | `parity_ratio_source = "manifest"`| PASS   | parity-index reads `fill_ratio` directly  |
-| 5 | `fill_ratio >= 0.90`              | PASS   | 0.9474                                    |
-| 6 | mapped + partial + skipped + unmapped == total | PASS | 19 + 4 + 13 + 2 = 38       |
+| 5 | `fill_ratio >= 0.90`              | PASS   | 1.0000 (≥0.95 ctier-uplift target met)   |
+| 6 | mapped + partial + skipped + unmapped == total | PASS | 21 + 4 + 13 + 0 = 38       |
 | 7 | No `unimplemented!()` / `todo!()` | PASS   | 0 stub macros under `src/`                |
 | 8 | `PARITY_REPORT.md` present        | PASS   | this file                                 |
 
@@ -77,9 +92,8 @@ expire,aof,rdb,acl,connection,eviction,modules}.c`).
 
 ## Next sweep (out of this close-out)
 
-- `CLUSTER FAILOVER` takeover state machine (so an operator can promote a
-  replica without restart) — most-requested missing cluster primitive
-- ACL log persistence (currently in-memory only)
-
-Both are tracked as `unmapped_count = 2` and will lift `honest_ratio`
-to ~0.8947 when landed.
+Both former unmapped items landed in the 2026-05-19 c-tier uplift.
+`unmapped_count = 0`; remaining gap to a true 1.0 honest_ratio is the
+four `partial` subsystems (PSYNC2 diskless, scripting `EVALSHA` cache,
+modules API beyond load/init, single-node cluster fan-out) — deferred
+to obs-stack-ray-2.
