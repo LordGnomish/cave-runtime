@@ -8,6 +8,7 @@
 pub mod age;
 pub mod coordinates;
 pub mod license;
+pub mod router;
 pub mod vuln;
 
 use crate::components::ComponentRecord;

@@ -7,6 +7,7 @@
 
 pub mod jira;
 pub mod mail;
+pub mod router;
 pub mod webhook;
 
 use crate::policy::PolicyViolation;
