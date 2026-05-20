@@ -74,8 +74,8 @@ fn parity_fill_ratio_is_measured_and_at_least_floor() {
     // engines + spider + auth + report, with fuzz/forced-user/websocket
     // honestly deferred. Honest exit gate per ZAP-DEEPPORT-2026-05-18.
     assert!(
-        ratio >= 0.65,
-        "cave-dast measured floor: fill_ratio must be >= 0.65 (got {})",
+        ratio >= 0.95,
+        "cave-dast parity-uplift floor: fill_ratio must be >= 0.95 (got {})",
         ratio
     );
     assert!(
@@ -100,13 +100,13 @@ fn parity_ratio_source_is_manifest() {
 }
 
 #[test]
-fn parity_last_audit_is_2026_05_18() {
+fn parity_last_audit_is_current() {
     let m = manifest_text();
     let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert_eq!(
         when.as_deref(),
-        Some("2026-05-18"),
-        "[parity] last_audit must reflect the 2026-05-18 Charter v2 close-out"
+        Some("2026-05-19"),
+        "[parity] last_audit must reflect the 2026-05-19 parity-uplift close-out"
     );
 }
 
