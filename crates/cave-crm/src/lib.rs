@@ -27,8 +27,12 @@ pub mod indexes;
 pub mod models;
 pub mod routes;
 pub mod store;
+pub mod webhook;
+pub mod workflow;
 
 pub use store::{ConvertedLead, CrmStore};
+pub use webhook::{WebhookBus, WebhookDelivery, WebhookOperation, WebhookSubscription};
+pub use workflow::{Workflow, WorkflowRun, WorkflowRunStatus, WorkflowStep, WorkflowStepType, WorkflowStore};
 
 pub type State = CrmStore;
 
