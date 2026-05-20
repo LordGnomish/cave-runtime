@@ -76,8 +76,8 @@ fn parity_fill_ratio_is_measured_and_at_least_0_65() {
         .parse()
         .expect("fill_ratio must parse as float");
     assert!(
-        ratio >= 0.65,
-        "cave-flags Charter v2 close-out floor: fill_ratio must be >= 0.65 \
+        ratio >= 0.95,
+        "cave-flags parity-uplift floor: fill_ratio must be >= 0.95 \
          (got {}). Either improve coverage or document scope-cuts as [[skipped]].",
         ratio
     );
@@ -114,13 +114,13 @@ fn parity_honest_ratio_is_present_and_le_fill_ratio() {
 }
 
 #[test]
-fn parity_last_audit_is_2026_05_18() {
+fn parity_last_audit_is_current() {
     let m = manifest_text();
     let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert_eq!(
         when.as_deref(),
-        Some("2026-05-18"),
-        "[parity] last_audit must reflect the 2026-05-18 Charter v2 close-out"
+        Some("2026-05-19"),
+        "[parity] last_audit must reflect the 2026-05-19 parity-uplift close-out"
     );
 }
 

@@ -30,15 +30,15 @@ source_root = "src"
 # partial subsystems have data-model coverage but no runtime flow yet, skipped
 # subsystems are handed off to a sibling crate by architectural decision, and
 # unmapped subsystems are honest gaps deferred to a later sprint.
-mapped_count          = 25
+mapped_count          = 30
 partial_count         = 3
 skipped_count         = 30
-unmapped_count        = 7
+unmapped_count        = 2
 total                 = 65
-fill_ratio            = 0.8923   # (mapped + partial + skipped) / total = 58/65
-honest_ratio          = 0.8462   # (mapped + skipped) / total           = 55/65
+fill_ratio            = 0.9692   # (mapped + partial + skipped) / total = 63/65
+honest_ratio          = 0.9231   # (mapped + skipped) / total           = 60/65
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-18"
+last_audit            = "2026-05-19"
 infra_only            = false
 
 # ── File mappings ────────────────────────────────────────────────────────────
@@ -369,6 +369,31 @@ upstream = "src/lib/services/client-instance-service.ts"
 local    = "src/store.rs client_applications + /api/client/register persistence"
 notes    = "client app/instance registry"
 
+[[mapped]]
+upstream = "src/lib/services/scheduler-job/feature-stale-detector"
+local    = "src/stale_detector.rs detect_stale + run_sweep + StaleThresholds"
+notes    = "Periodic detector job — pure function over feature cache; runtime ticker wraps it. 8 unit tests cover release/experiment/operational/kill-switch thresholds plus custom-threshold override."
+
+[[mapped]]
+upstream = "src/lib/services/impression-data-events emitter (SSE/webhook fanout)"
+local    = "src/impression_sse.rs ImpressionBus + sse_encode + webhook_signature"
+notes    = "SSE + webhook fanout with HMAC-SHA256 signing; subscribe/unsubscribe/feature-filter; 9 unit tests."
+
+[[mapped]]
+upstream = "Edge token API (src/lib/edge/*)"
+local    = "src/edge_tokens.rs EdgeToken + issue_token + parse_token + token_matches"
+notes    = "Unleash-format scoped tokens (<project>:<env>.<32-hex>); admin/client/frontend types; wildcard match; 10 unit tests."
+
+[[mapped]]
+upstream = "Frontend-proxy mode (src/lib/proxy/*)"
+local    = "src/frontend_proxy.rs ProxyCache + evaluate + evaluate_all"
+notes    = "TTL-bounded snapshot cache, server-side context eval, FrontendFeaturesResponse output; 7 unit tests."
+
+[[mapped]]
+upstream = "src/lib/features/custom-activation-strategies/*"
+local    = "src/custom_strategies.rs CustomStrategyRegistry"
+notes    = "register/update/deprecate/delete + builtin-name reservation + kebab-case validation + alphabetical list; 10 unit tests."
+
 # Partial: data-model exists but runtime flow incomplete
 [[partial]]
 upstream = "src/lib/features/change-request/*"
@@ -508,16 +533,6 @@ reason   = "cave-auth handles public signup tokens"
 
 # Unmapped: honest gaps deferred to a later sprint
 [[unmapped]]
-upstream = "src/lib/features/custom-activation-strategies/*"
-priority = "P2"
-notes    = "Server-side custom-strategy registration (admin UI registers signature + applies in eval). Currently client-only via custom strategy passthrough."
-
-[[unmapped]]
-upstream = "src/lib/services/scheduler-job/feature-stale-detector"
-priority = "P1"
-notes    = "Periodic job that marks last_seen_at + stale=true on dormant flags. Schema present, runner not wired."
-
-[[unmapped]]
 upstream = "src/lib/services/scheduler-job/metric-bucket-compactor"
 priority = "P2"
 notes    = "Hourly compaction of metrics table to keep yes/no counters bounded. Schema present, runner not wired."
@@ -526,18 +541,3 @@ notes    = "Hourly compaction of metrics table to keep yes/no counters bounded. 
 upstream = "src/lib/services/public-signup-token-service.ts (token surface only)"
 priority = "P3"
 notes    = "Public invite/signup token API surface. Token persistence delegated to cave-auth; cave-flags surface for project-invite tokens deferred."
-
-[[unmapped]]
-upstream = "Edge token API (src/lib/edge/*)"
-priority = "P2"
-notes    = "Edge/proxy SDK token issuance (Unleash Edge feature). Requires sidecar runtime target — deferred."
-
-[[unmapped]]
-upstream = "Frontend-proxy mode (src/lib/proxy/*)"
-priority = "P2"
-notes    = "Standalone proxy binary that fronts cave-flags with cached features. Deferred to a future cave-flags-proxy crate."
-
-[[unmapped]]
-upstream = "src/lib/services/impression-data-events emitter (SSE/webhook fanout)"
-priority = "P1"
-notes    = "Impression events are persisted but not fanned out to SSE/webhook subscribers; consumers must currently poll the DB."

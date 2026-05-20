@@ -24,6 +24,7 @@ pub mod git_walker;
 pub mod protect;
 pub mod report;
 pub mod rule;
+pub mod rule_pack;
 pub mod stopwords;
 
 pub use baseline::{Baseline, BaselineFile};
@@ -34,4 +35,5 @@ pub use finding::{Finding, redact};
 pub use protect::{ProtectOutcome, protect_staged_blobs, protect_staged_with};
 pub use report::{write_csv, write_json, write_junit, write_sarif};
 pub use rule::{Rule, builtin_rules};
+pub use rule_pack::{load_pack_str, merge_packs, RulePackError, RulePackSpec, RuleSpec};
 pub use stopwords::{default_stopwords, filter_with_stopwords};

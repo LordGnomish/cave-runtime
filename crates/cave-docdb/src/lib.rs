@@ -7,11 +7,20 @@
 //! in-memory Rust engine. Backs drivers (pymongo, mongo-rust-driver, Node
 //! mongoose, Java driver) without modification on port 27017.
 
+/// Aggregation deep stages — $lookup / $facet / $bucket.
+pub mod aggregation_deep;
+
 /// BSON serialization/deserialization utilities.
 pub mod bson;
 
+/// Change streams — oplog tail cursor.
+pub mod change_streams;
+
 /// Codec implementations for BSON types.
 pub mod codec;
+
+/// GridFS — chunked file storage.
+pub mod gridfs;
 
 /// MongoDB wire protocol command handlers.
 pub mod commands;

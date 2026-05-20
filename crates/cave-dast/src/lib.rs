@@ -26,6 +26,7 @@ pub mod auth;
 pub mod cli;
 pub mod context;
 pub mod engine;
+pub mod extension;
 pub mod http;
 pub mod models;
 pub mod pscan;

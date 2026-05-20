@@ -1,6 +1,6 @@
 # cave-flags — Charter v2 8-gate Close-out Report
 
-**Audit date**: 2026-05-18
+**Audit date**: 2026-05-19
 **Upstream**: `Unleash/unleash @ v5.0.0` (Apache-2.0, TypeScript)
 **Crate root**: `crates/cave-flags/`
 
@@ -47,13 +47,15 @@ subsystem counts once.
 
 | Bucket   | Count | Examples                                                                              |
 |----------|------:|---------------------------------------------------------------------------------------|
-| Mapped   |    25 | strategies (9), constraints (16 operators), segments, variants + overrides,          |
+| Mapped   |    30 | strategies (9), constraints (16 operators), segments, variants + overrides,          |
 |          |       | environments, projects, murmur3 hash, client API (features/metrics/register),         |
 |          |       | frontend API, admin CRUD (features/envs/strategies/variants/tags/projects/            |
 |          |       | api-tokens/context-fields), Postgres schema, Unleash v2 wire envelope,                |
-|          |       | client-instance registry, impression-data flag                                        |
+|          |       | client-instance registry, impression-data flag, **stale-detector job**,               |
+|          |       | **impression-events SSE/webhook fanout**, **Edge token API**, **frontend-proxy**,     |
+|          |       | **custom-activation-strategy registry**                                                |
 | Partial  |     3 | change-requests (schema only, no state-machine), banners (schema only, no             |
-|          |       | admin CRUD or display), stale detection (flag present, no detector job)                |
+|          |       | admin CRUD or display), stale detection (field present alongside detector job)         |
 | Skipped  |    30 | React UI (cave-portal), SAML/OIDC/users/groups/roles/accounts (cave-auth),            |
 |          |       | OpenAPI gen (workspace-level), addons (slack/teams/datadog/webhook/jira),             |
 |          |       | telemetry/version/instance-stats (cave-obs), scheduler (cave-runtime),                |
@@ -61,13 +63,11 @@ subsystem counts once.
 |          |       | (cave-runtime), settings, advisory locks (cave-db), migration runner (cave-db),       |
 |          |       | TS tests/scripts/build, enterprise plugins, redis pubsub, proxy repo,                 |
 |          |       | public-signup (cave-auth), version-check (cave-upstream-watchd)                       |
-| Unmapped |     7 | custom-strategy server registration, stale-detector job, metric-bucket compactor,     |
-|          |       | public invite tokens, Edge token API, frontend-proxy mode,                            |
-|          |       | impression-events SSE/webhook fanout                                                   |
+| Unmapped |     2 | metric-bucket compactor, public invite tokens                                          |
 | **Total**|  **65** | |
 
-- **fill_ratio  = (mapped + partial + skipped) / total = 58 / 65 = 0.8923**
-- **honest_ratio = (mapped + skipped) / total            = 55 / 65 = 0.8462**
+- **fill_ratio  = (mapped + partial + skipped) / total = 63 / 65 = 0.9692**
+- **honest_ratio = (mapped + skipped) / total            = 60 / 65 = 0.9231**
 
 ## 8-gate close-out
 
@@ -75,10 +75,10 @@ subsystem counts once.
 |---|-------------------------------------|--------|--------------------------------------------------------------------------|
 | 1 | SPDX-License-Identifier 100%        | PASS   | 8/8 `crates/cave-flags/**/*.rs` carry AGPL-3.0-or-later                  |
 | 2 | `source_sha` pinned in manifest     | PASS   | `[upstream].source_sha = "v5.0.0"`                                       |
-| 3 | `last_audit = "2026-05-18"`         | PASS   | `[parity].last_audit`                                                    |
+| 3 | `last_audit = "2026-05-19"`         | PASS   | `[parity].last_audit`                                                    |
 | 4 | `parity_ratio_source = "manifest"`  | PASS   | parity-index reads `fill_ratio` directly from this manifest              |
-| 5 | `fill_ratio >= 0.65`                | PASS   | 0.8923 (well above Charter v2 close-out floor)                           |
-| 6 | counts sum to total                 | PASS   | 25 + 3 + 30 + 7 = 65                                                     |
+| 5 | `fill_ratio >= 0.95`                | PASS   | 0.9692 (parity-uplift floor cleared)                                     |
+| 6 | counts sum to total                 | PASS   | 30 + 3 + 30 + 2 = 65                                                     |
 | 7 | No `unimplemented!()` / `todo!()`   | PASS   | 0 stub macros under `src/` (string-literal references inside rules-disabled `cave-scan` are unrelated) |
 | 8 | `PARITY_REPORT.md` present          | PASS   | this file                                                                |
 

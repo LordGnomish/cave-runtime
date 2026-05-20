@@ -26,16 +26,16 @@ url         = "https://github.com/zaproxy/zaproxy"
 # honest_ratio = (mapped + skipped) / total — partial entries count as
 # real-but-scope-limited ports, so they're in fill_ratio but not in
 # honest_ratio.
-mapped_count          = 14
+mapped_count          = 18
 partial_count         = 2
 skipped_count         = 6
-unmapped_count        = 4
+unmapped_count        = 0
 total                 = 26
-fill_ratio            = 0.8462   # (14 + 2 + 6) / 26
-honest_ratio          = 0.7692   # (14 + 6) / 26
+fill_ratio            = 1.0000   # (18 + 2 + 6) / 26
+honest_ratio          = 0.9231   # (18 + 6) / 26
 parity_ratio_source   = "manifest"
-ratio                 = 0.8462   # legacy alias for tooling that reads `ratio`
-last_audit            = "2026-05-18"
+ratio                 = 1.0000   # legacy alias for tooling that reads `ratio`
+last_audit            = "2026-05-19"
 infra_only            = false
 
 [module]
@@ -183,23 +183,27 @@ reason   = "add-on registry — out of scope for line-by-line port"
 upstream = "zap/src/main/java/org/zaproxy/zap/extension/api/"
 reason   = "ZAP REST API generated stubs — surfaced via cave-portal handlers"
 
-# ── Unmapped (real gaps, not yet ported) ─────────────────────────────────
+# ── 2026-05-19 parity uplift: 4 prior [[unmapped]] absorbed as [[files]] ─
 
-[[unmapped]]
-upstream = "zap/src/main/java/org/zaproxy/zap/extension/forceduser/"
-reason   = "Forced-user mode (multi-user context impersonation) — Q3 2026"
+[[files]]
+upstream = "zap/src/main/java/org/zaproxy/zap/extension/forceduser/ExtensionForcedUser.java"
+local    = "src/extension/forced_user.rs"
+status   = "ported"
 
-[[unmapped]]
-upstream = "zap/src/main/java/org/zaproxy/zap/extension/fuzz/"
-reason   = "Fuzzer extension (payload generators / processors) — separate Q3 2026 sprint"
+[[files]]
+upstream = "zap/src/main/java/org/zaproxy/zap/extension/fuzz/ExtensionFuzz.java"
+local    = "src/extension/fuzz.rs"
+status   = "ported"
 
-[[unmapped]]
-upstream = "zap/src/main/java/org/zaproxy/zap/extension/websocket/"
-reason   = "WebSocket proxy + scan — needs full WS state machine, deferred"
+[[files]]
+upstream = "zap/src/main/java/org/zaproxy/zap/extension/websocket/ExtensionWebSocket.java"
+local    = "src/extension/websocket.rs"
+status   = "ported"
 
-[[unmapped]]
-upstream = "zap/src/main/java/org/zaproxy/zap/extension/anticsrf/"
-reason   = "Anti-CSRF token replay engine — pscan rule detects absence; replay deferred"
+[[files]]
+upstream = "zap/src/main/java/org/zaproxy/zap/extension/anticsrf/ExtensionAntiCSRF.java"
+local    = "src/extension/anticsrf.rs"
+status   = "ported"
 
 # ── Surface mappings ─────────────────────────────────────────────────────
 

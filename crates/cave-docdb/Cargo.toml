@@ -28,6 +28,7 @@ bytes = "1"
 async-trait = "0.1"
 regex = "1"
 hex = "0.4"
+sha2 = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }
