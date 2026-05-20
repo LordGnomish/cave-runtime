@@ -961,14 +961,19 @@
     },
     "cave-logs": {
       "cave_src_loc": 7285,
-      "honest_ratio": 0.0,
-      "last_audit_disk": "2026-05-12",
+      "honest_ratio": 0.75,
+      "last_audit_disk": "2026-05-19",
       "manifest_filled": true,
+      "mapped_count": 12,
       "note": null,
-      "parity_ratio": 0.0,
+      "parity_ratio": 0.8333,
       "parity_ratio_source": "manifest",
+      "partial_count": 2,
+      "skipped_count": 6,
       "stubs": null,
       "tier": "C",
+      "total_count": 24,
+      "unmapped_count": 4,
       "upstream": "grafana/loki",
       "upstream_version": "v2.9.0"
     },
@@ -1684,7 +1689,7 @@
     "injected": 9,
     "new_filled": 86,
     "phantoms": 5,
-    "ratio_overrides": 38
+    "ratio_overrides": 39
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
