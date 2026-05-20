@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
 // Source: parosproxy/paros/network/HtmlParameter.java (URI handling)
-//! Minimal URL parser sufficient for ZAP's needs (scheme://host[:port]
-//! [/path][?query][#fragment]). We don't pull a heavy URL crate in
+//! Minimal URL parser sufficient for ZAP's needs (`scheme://host[:port][/path][?query][#fragment]`).
+//! We don't pull a heavy URL crate in
 //! because the scan engine only needs to split parts, normalize, and
 //! resolve relative refs — not full IRI support.
 

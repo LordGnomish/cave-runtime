@@ -329,7 +329,7 @@ where
 }
 
 /// Wrap a pre-encoded response body with the standard response framing:
-/// [INT32 total_length] [INT32 correlation_id] [body].
+/// `[INT32 total_length] [INT32 correlation_id] [body]`.
 pub fn frame_response(correlation_id: i32, body: Bytes) -> Bytes {
     let total_len = 4 + body.len(); // 4 bytes for correlation_id + body
     let mut out = BytesMut::with_capacity(4 + total_len);

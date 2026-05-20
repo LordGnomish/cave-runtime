@@ -3,7 +3,7 @@
 //! Lua scripting: EVAL, EVALSHA, SCRIPT LOAD/EXISTS/FLUSH/DEBUG.
 //!
 //! Implements a Redis-compatible Lua environment subset.
-//! Supports: KEYS[n], ARGV[n], redis.call(), redis.pcall(),
+//! Supports: `KEYS[n]`, `ARGV[n]`, redis.call(), redis.pcall(),
 //! redis.status_reply(), redis.error_reply(), redis.log(), redis.sha1hex().
 
 use crate::db::{Db, ScriptStore};

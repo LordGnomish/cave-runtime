@@ -91,7 +91,7 @@ impl Transform {
         }
     }
 
-    /// Apply truncate[W] to an i64: floor(v / W) * W.
+    /// Apply `truncate[W]` to an i64: floor(v / W) * W.
     pub fn apply_truncate_i64(self, v: i64) -> Option<i64> {
         match self {
             Self::Truncate(w) => {
@@ -102,7 +102,7 @@ impl Transform {
         }
     }
 
-    /// Apply truncate[W] to a string: take the first W bytes (UTF-8 safe
+    /// Apply `truncate[W]` to a string: take the first W bytes (UTF-8 safe
     /// at byte boundary — caller responsible for not splitting code points).
     pub fn apply_truncate_str<'a>(self, v: &'a str) -> Option<&'a str> {
         match self {
@@ -115,7 +115,7 @@ impl Transform {
         }
     }
 
-    /// Apply bucket[N] to an i64 using Iceberg's Murmur3_x86_32 spec
+    /// Apply `bucket[N]` to an i64 using Iceberg's Murmur3_x86_32 spec
     /// fallback — we use the truncated absolute remainder when
     /// Murmur isn't pulled in. The MVP exposes the protocol-level
     /// semantics (bucket index ∈ [0, N)) — exact-hash compatibility

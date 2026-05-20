@@ -9,7 +9,7 @@
 //!   the union is still a single rule (set-based, not multi-rule).
 //! * **Empty-match emit** — even with zero matching CRs, the parent's
 //!   `rules[]` should be reset to `[]` so stale rules don't linger.
-//! * **Stable ordering** — by api_groups[0], resources[0], verbs[0].
+//! * **Stable ordering** — by `api_groups[0]`, `resources[0]`, `verbs[0]`.
 
 use crate::rbac::cluster_role_aggregation::{ClusterRole, PolicyRule, aggregate_rules};
 use crate::types::Cite;
