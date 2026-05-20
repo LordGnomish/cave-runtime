@@ -6,11 +6,16 @@
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;
+pub mod ast_rules;
 pub mod coverage;
+pub mod cpd;
 pub mod engine;
 pub mod models;
+pub mod quality_gates;
 pub mod routes;
 pub mod rules;
+pub mod security_hotspots;
+pub mod semgrep;
 
 use axum::Router;
 
