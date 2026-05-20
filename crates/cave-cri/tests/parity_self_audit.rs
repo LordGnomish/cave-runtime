@@ -3,21 +3,22 @@
 //! Charter v2 self-audit — cave-cri's `parity.manifest.toml` must
 //! carry an honest measured `fill_ratio` against containerd v2.2.3
 //! (primary upstream) + opencontainers/runc v1.4.2 (secondary), a pinned
-//! `source_sha` for reproducibility, the 2026-05-18 FINALIZE audit date,
+//! `source_sha` for reproducibility, the 2026-05-19 UPLIFT audit date,
 //! and structurally consistent counts.
 //!
-//! Previous manifest carried measured `fill_ratio = 0.9412` (mapped 18 +
-//! partial 3 + skipped 11 + unmapped 2 = 34 packages, measured audit
-//! 2026-05-13 batch2 sandbox_other) but the `[upstream]` block was missing
-//! `source_sha` and `last_audit` lagged.
+//! 2026-05-19 UPLIFT: both prior [[unmapped]] rows converted to
+//! [[mapped]] — `pkg/oom/` → `src/oom_watcher.rs` and
+//! `core/introspection/` → `src/introspection.rs`. mapped 18→20,
+//! unmapped 2→0, fill_ratio 0.9412→1.0000, honest_ratio 0.8529→0.9118.
+//! Floors raised: FLOOR_FILL_RATIO 0.90→0.95, FLOOR_MAPPED 18→20.
 
 use std::fs;
 use std::path::PathBuf;
 
 const UPSTREAM_VERSION: &str = "v2.2.3";
-const FLOOR_FILL_RATIO: f64 = 0.90;
-const FLOOR_MAPPED: usize = 18;
-const FLOOR_RS_FILES: usize = 40;
+const FLOOR_FILL_RATIO: f64 = 0.95;
+const FLOOR_MAPPED: usize = 20;
+const FLOOR_RS_FILES: usize = 42;
 
 fn manifest_text() -> String {
     let p: PathBuf = [env!("CARGO_MANIFEST_DIR"), "parity.manifest.toml"]
