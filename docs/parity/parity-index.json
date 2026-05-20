@@ -780,14 +780,19 @@
     },
     "cave-kamaji": {
       "cave_src_loc": 199,
-      "honest_ratio": 0.0,
-      "last_audit_disk": "2026-05-12",
+      "honest_ratio": 0.6429,
+      "last_audit_disk": "2026-05-19",
       "manifest_filled": true,
+      "mapped_count": 6,
       "note": "skeleton \u2014 needs real impl",
-      "parity_ratio": 0.0,
+      "parity_ratio": 0.6429,
       "parity_ratio_source": "manifest",
+      "partial_count": 0,
+      "skipped_count": 8,
       "stubs": null,
       "tier": "D1",
+      "total_count": 16,
+      "unmapped_count": 2,
       "upstream": "clastix/kamaji",
       "upstream_version": "v1.0.0"
     },
@@ -1684,7 +1689,7 @@
     "injected": 9,
     "new_filled": 86,
     "phantoms": 5,
-    "ratio_overrides": 38
+    "ratio_overrides": 39
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
