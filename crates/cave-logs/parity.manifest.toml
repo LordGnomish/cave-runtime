@@ -33,13 +33,13 @@ language= "Go"
 url     = "https://github.com/grafana/loki"
 
 [parity]
-mapped_count   = 12
+mapped_count   = 15
 partial_count  = 2
 skipped_count  = 6
-unmapped_count = 4
+unmapped_count = 1
 total          = 24
-fill_ratio     = 0.8333
-honest_ratio   = 0.7500          # (mapped 12 + skipped 6) / 24 — partial excluded
+fill_ratio     = 0.9583
+honest_ratio   = 0.8750          # (mapped 15 + skipped 6) / 24 — partial excluded
 parity_ratio_source = "manifest"
 source_sha     = "5b9f6a7d3e2c1b8a4f6e9c5d7a2b8e1f3c9d6e4a"  # v3.4.0 tag sha (grafana/loki)
 last_audit     = "2026-05-19"
@@ -103,6 +103,20 @@ local    = "src/tail.rs"
 [[files]]
 upstream = "pkg/logproto/logproto.pb.go"
 local    = "src/models.rs"
+
+# Wave-2 close-out (2026-05-19) — 3 unmapped → mapped
+
+[[files]]
+upstream = "pkg/storage/stores/tsdb/index.go"
+local    = "src/tsdb_index.rs"
+
+[[files]]
+upstream = "pkg/storage/stores/shipper/uploads/table.go"
+local    = "src/shipper.rs"
+
+[[files]]
+upstream = "pkg/ingester-rf1/ingester.go"
+local    = "src/ingester_rf1.rs"
 
 # LogQL (logql package)
 
@@ -471,6 +485,21 @@ upstream_pkg = "grafana/loki:clients/pkg/logentry (fluentd forward) + vendor otl
 local_files  = ["src/ingest/fluentd.rs", "src/ingest/otlp.rs"]
 note         = "Fluentd forward (MessagePack) + OTLP Logs (HTTP/JSON)"
 
+[[mapped]]
+upstream_pkg = "grafana/loki:pkg/storage/stores/tsdb (TSDB-based index, post-v2.8)"
+local_files  = ["src/tsdb_index.rs"]
+note         = "TSDB-style series + postings + chunk-ref index (Wave-2 close-out 2026-05-19)"
+
+[[mapped]]
+upstream_pkg = "grafana/loki:pkg/storage/stores/shipper/{boltdb,tsdb}"
+local_files  = ["src/shipper.rs"]
+note         = "Shipper sync loop with BoltDB/TSDB variants — pending/uploaded/downloaded ledger + ObjectStore trait (Wave-2 close-out 2026-05-19)"
+
+[[mapped]]
+upstream_pkg = "grafana/loki:pkg/ingester-rf1 (replication factor 1 experimental)"
+local_files  = ["src/ingester_rf1.rs"]
+note         = "Segment lifecycle + size/age flush triggers + rf1 object-key naming (Wave-2 close-out 2026-05-19)"
+
 [[partial]]
 upstream_pkg = "grafana/loki:pkg/compactor (retention + dedupe)"
 local_files  = ["src/limits.rs"]
@@ -508,44 +537,11 @@ upstream_pkg = "grafana/loki:integration/ + tools/lambda-promtail/"
 reason       = "test-harness"
 
 [[unmapped]]
-upstream_pkg = "grafana/loki:pkg/storage/stores/tsdb (TSDB-based index, post-v2.8)"
-reason       = "TSDB index variants (boltdb-shipper / TSDB-shipper) — cave-logs MVP uses series-store; TSDB index port deferred"
-deferred_to  = "obs-stack-ray-2"
-
-[[unmapped]]
-upstream_pkg = "grafana/loki:pkg/storage/stores/shipper/{boltdb,tsdb}"
-reason       = "boltdb-shipper / tsdb-shipper background sync — deferred with TSDB index"
-deferred_to  = "obs-stack-ray-2"
-
-[[unmapped]]
-upstream_pkg = "grafana/loki:pkg/ingester-rf1 (replication factor 1 experimental)"
-reason       = "Loki 3.x experimental ingester variant — out of MVP scope"
-deferred_to  = "obs-stack-ray-2"
-
-[[unmapped]]
 upstream_pkg = "grafana/loki:pkg/queue (in-memory queue rebalancer)"
 reason       = "Cross-ingester queue rebalancer — single-process cave-logs uses tokio mpsc; port deferred for multi-node HA"
 deferred_to  = "obs-stack-ray-2"
 
 # ── Scope cuts (informational; mirror [[unmapped]] above) ────────────────────
-
-[[scope_cuts]]
-name        = "tsdb-index"
-upstream    = "grafana/loki:pkg/storage/stores/tsdb"
-reason      = "Loki v2.8+ TSDB-style index variant; cave-logs MVP uses series-store (Loki <2.8 default). TSDB index port deferred."
-deferred_to = "obs-stack-ray-2"
-
-[[scope_cuts]]
-name        = "shipper-variants"
-upstream    = "grafana/loki:pkg/storage/stores/shipper/{boltdb,tsdb}"
-reason      = "Background index sync to object storage; deferred with TSDB index."
-deferred_to = "obs-stack-ray-2"
-
-[[scope_cuts]]
-name        = "ingester-rf1"
-upstream    = "grafana/loki:pkg/ingester-rf1"
-reason      = "Experimental replication-factor-1 ingester (Loki 3.x); out of MVP scope."
-deferred_to = "obs-stack-ray-2"
 
 [[scope_cuts]]
 name        = "cross-querier-scheduler"

@@ -42,13 +42,16 @@
 pub mod chunk;
 pub mod index;
 pub mod ingest;
+pub mod ingester_rf1;
 pub mod limits;
 pub mod logql;
 pub mod models;
 pub mod multitenant;
 pub mod routes;
+pub mod shipper;
 pub mod store;
 pub mod tail;
+pub mod tsdb_index;
 
 pub use limits::LimitsRegistry;
 pub use routes::{AppState, router};
