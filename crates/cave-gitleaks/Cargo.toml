@@ -20,6 +20,8 @@ toml = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 git2 = { version = "0.19", default-features = false }
+flate2 = "1"
 
 [dev-dependencies]
 tempfile = "3"
+flate2 = "1"

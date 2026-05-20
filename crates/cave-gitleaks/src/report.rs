@@ -21,6 +21,105 @@ pub fn write_json<W: Write>(w: &mut W, findings: &[Finding]) -> std::io::Result<
     serde_json::to_writer_pretty(w, findings).map_err(std::io::Error::other)
 }
 
+/// Write findings as CSV with an upstream-compatible header row.
+/// Mirrors `report/csv.go` upstream (`v8.29.1`). Quotes are doubled
+/// inside fields per RFC 4180; fields with commas/newlines/quotes are
+/// quoted.
+pub fn write_csv<W: Write>(w: &mut W, findings: &[Finding]) -> std::io::Result<()> {
+    let header = [
+        "RuleID",
+        "Commit",
+        "File",
+        "StartLine",
+        "EndLine",
+        "StartColumn",
+        "EndColumn",
+        "Match",
+        "Secret",
+        "Description",
+        "Author",
+        "Email",
+        "Date",
+        "Tags",
+        "Fingerprint",
+    ];
+    writeln!(w, "{}", header.join(","))?;
+    for f in findings {
+        let row = [
+            csv_field(&f.rule_id),
+            csv_field(&f.commit),
+            csv_field(&f.file),
+            f.start_line.to_string(),
+            f.end_line.to_string(),
+            f.start_column.to_string(),
+            f.end_column.to_string(),
+            csv_field(&f.match_text),
+            csv_field(&f.secret),
+            csv_field(&f.description),
+            csv_field(&f.author),
+            csv_field(&f.email),
+            csv_field(&f.date),
+            csv_field(&f.tags.join("|")),
+            csv_field(&f.fingerprint),
+        ];
+        writeln!(w, "{}", row.join(","))?;
+    }
+    Ok(())
+}
+
+/// Write findings as JUnit XML. Each finding becomes one `<testcase>`
+/// containing a `<failure>` element. Mirrors `report/junit.go`
+/// (`v8.29.1`) — minimal envelope so CI runners can ingest gitleaks
+/// findings via their JUnit support.
+pub fn write_junit<W: Write>(w: &mut W, findings: &[Finding]) -> std::io::Result<()> {
+    writeln!(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>")?;
+    writeln!(
+        w,
+        "<testsuite name=\"cave-gitleaks\" tests=\"{}\" failures=\"{}\">",
+        findings.len(),
+        findings.len()
+    )?;
+    for f in findings {
+        writeln!(
+            w,
+            "  <testcase classname=\"{}\" name=\"{}:{}:{}\">",
+            xml_escape(&f.rule_id),
+            xml_escape(&f.file),
+            f.start_line,
+            f.start_column,
+        )?;
+        writeln!(
+            w,
+            "    <failure type=\"{}\" message=\"{}\">{}:{}</failure>",
+            xml_escape(&f.rule_id),
+            xml_escape(&f.description),
+            xml_escape(&f.file),
+            f.start_line,
+        )?;
+        writeln!(w, "  </testcase>")?;
+    }
+    writeln!(w, "</testsuite>")?;
+    Ok(())
+}
+
+/// CSV field quoting per RFC 4180.
+fn csv_field(s: &str) -> String {
+    if s.contains([',', '"', '\n', '\r']) {
+        format!("\"{}\"", s.replace('"', "\"\""))
+    } else {
+        s.to_string()
+    }
+}
+
+/// Minimal XML character escape for attributes + text bodies.
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
 /// Write findings as SARIF 2.1.0. In-scope subset:
 /// - `runs[0].tool.driver.name = "cave-gitleaks"`
 /// - `runs[0].tool.driver.semanticVersion`
