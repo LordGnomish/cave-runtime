@@ -373,7 +373,7 @@ mod tests {
         let id = series("acme", "cpu", &[]);
         s.record(Some(&op()), id.clone(), sample(1, 1.0)).unwrap();
         s.record(Some(&op()), id.clone(), sample(2, 2.0)).unwrap();
-        s.record(Some(&op()), id.clone(), sample(3, 3.0)).unwrap();
+        s.record(Some(&op()), id, sample(3, 3.0)).unwrap();
         let q = MetricQuery {
             tenant: "acme".into(),
             name: "cpu".into(),
@@ -388,7 +388,7 @@ mod tests {
         let s = MetricsStore::new();
         let id = series("acme", "cpu", &[]);
         s.record(Some(&op()), id.clone(), sample(1, 2.0)).unwrap();
-        s.record(Some(&op()), id.clone(), sample(2, 4.0)).unwrap();
+        s.record(Some(&op()), id, sample(2, 4.0)).unwrap();
         let q = MetricQuery {
             tenant: "acme".into(),
             name: "cpu".into(),

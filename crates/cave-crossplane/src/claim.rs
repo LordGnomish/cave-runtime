@@ -83,16 +83,16 @@ impl ClaimStore {
 
         let composite = CompositeResource {
             id: Uuid::new_v4(),
-            name: composite_name.clone(),
+            name: composite_name,
             namespace: None,
-            kind: composite_kind.clone(),
+            kind: composite_kind,
             api_version: format!("{}/v1", xrd.group),
             spec: req.spec.clone(),
             status: CompositeStatus::Creating,
             composition_ref: Some(composition.name.clone()),
             claim_ref: Some(ClaimRef {
                 namespace: req.namespace.clone(),
-                name: req.name.clone(),
+                name: req.name,
             }),
             synced_resources: rendered
                 .iter()

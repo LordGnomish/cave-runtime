@@ -224,7 +224,7 @@ impl PostFilterPlugin for Extender {
                     )
                 } else {
                     (
-                        PostFilterResult::nominate(curated.nominated_node_name.clone()),
+                        PostFilterResult::nominate(curated.nominated_node_name),
                         Status::success(&self.config.name),
                     )
                 }

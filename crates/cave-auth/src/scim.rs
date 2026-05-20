@@ -106,7 +106,7 @@ impl ScimUser {
     pub fn new(user_name: &str, email: Option<&str>) -> Self {
         let id = Uuid::new_v4().to_string();
         Self {
-            id: id.clone(),
+            id: id,
             schemas: vec![SCIM_SCHEMA_USER.to_string()],
             external_id: None,
             user_name: user_name.to_string(),
@@ -429,7 +429,7 @@ mod tests {
     #[tokio::test]
     async fn scim_update_user() {
         let svc = ScimService::new("https://cave.example.com");
-        let mut user = ScimUser::new("carol@example.com", None);
+        let user = ScimUser::new("carol@example.com", None);
         let created = svc.create_user(user.clone()).await.unwrap();
 
         let mut updated = created.clone();

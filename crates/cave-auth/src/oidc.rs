@@ -362,7 +362,7 @@ mod tests {
             scope: "openid".to_string(),
             state: "mystate".to_string(),
             nonce: None,
-            code_challenge: challenge.0.clone(),
+            code_challenge: challenge.0,
             code_challenge_method: "S256".to_string(),
         };
         let qs = req.to_query_string();

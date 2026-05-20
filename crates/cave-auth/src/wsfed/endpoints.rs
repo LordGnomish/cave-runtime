@@ -136,7 +136,7 @@ fn handle_signin(st: &WsFedState, realm: &str, rst: &PassiveRst) -> Response {
         assertion_xml: final_xml,
         created: now,
         expires: now + chrono::Duration::minutes(5),
-        applies_to: wtrealm.clone(),
+        applies_to: wtrealm,
     };
     let rstr_xml = match rstr.to_xml() {
         Ok(x) => x,

@@ -124,7 +124,7 @@ fn create_transit_key(name: &str, key_type: KeyType) -> VaultResult<TransitKey> 
         version: 1,
         key_bytes,
         creation_time: chrono::Utc::now(),
-        public_key: public_key.clone(),
+        public_key: public_key,
     };
     let mut versions = HashMap::new();
     versions.insert(1u64, version);
@@ -838,7 +838,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
         }))
         .route(&format!("/v1/{}/export/{{key_type}}/{{key_name}}/{{version}}", mount), get({
             let s = state.clone();
-            let mount = m.clone();
+            let mount = m;
             move |headers: HeaderMap, Path((kt, key_name, version)): Path<(String, String, String)>| {
                 let state = s.clone();
                 let mount = mount.clone();

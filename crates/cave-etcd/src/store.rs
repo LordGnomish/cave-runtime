@@ -339,7 +339,7 @@ impl KvStore {
         // multiplexers with their own prev_kv flag can decide what to forward.
         self.dispatch_event(WatchEvent {
             event_type: EventType::Put,
-            kv: kv.clone(),
+            kv: kv,
             prev_kv: prev_kv.clone(),
         });
 
@@ -1964,7 +1964,7 @@ impl KvStore {
             revision: meta.revision,
             total_bytes,
             sent_bytes: 0,
-            checksum: checksum.clone(),
+            checksum: checksum,
             chunks_sent: 0,
             completed: total_bytes == 0,
         };
@@ -4326,7 +4326,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(resp.kvs.len(), 3);
-        let keys: Vec<String> = resp.kvs.iter().map(|k| k.key_str().to_string()).collect();
+        let keys: Vec<String> = resp.kvs.iter().map(|k| k.key_str()).collect();
         assert!(keys.contains(&"/foo/a".to_string()));
         assert!(keys.contains(&"/foo/b".to_string()));
         assert!(keys.contains(&"/foo/c".to_string()));
@@ -5322,7 +5322,7 @@ mod tests {
         store.compact_v2(r1).unwrap();
         let resp = store
             .range(&RangeRequest {
-                key: key.clone(),
+                key: key,
                 range_end: None,
                 limit: None,
                 revision: Some(r1),
@@ -5359,7 +5359,7 @@ mod tests {
         // Reading at r1 (== compacted) is still permitted.
         let resp = store
             .range(&RangeRequest {
-                key: key.clone(),
+                key: key,
                 range_end: None,
                 limit: None,
                 revision: Some(r1),

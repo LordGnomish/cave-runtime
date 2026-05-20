@@ -158,7 +158,7 @@ pub enum StoreError {
 
 impl DashboardStore {
     pub fn new() -> Self {
-        let mut store = Self::default();
+        let store = Self::default();
         // Seed default org (id=1) and admin user
         {
             let mut inner = store.inner.write().unwrap();
@@ -968,7 +968,7 @@ impl DashboardStore {
             .ok_or_else(|| StoreError::NotFound(uid.to_string()))?;
         if let Some(group) = inner
             .rule_groups
-            .get_mut(&(rule.folder_uid.clone(), rule.rule_group.clone()))
+            .get_mut(&(rule.folder_uid.clone(), rule.rule_group))
         {
             group.retain(|u| u != uid);
         }

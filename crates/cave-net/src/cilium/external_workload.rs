@@ -90,10 +90,10 @@ impl ExternalWorkloadManager {
             });
         }
         if spec.ipv4.is_none() && spec.ipv6.is_none() {
-            return Err(ExternalWorkloadError::NoAddress(spec.name.clone()));
+            return Err(ExternalWorkloadError::NoAddress(spec.name));
         }
         if self.workloads.contains_key(&spec.name) {
-            return Err(ExternalWorkloadError::Duplicate(spec.name.clone()));
+            return Err(ExternalWorkloadError::Duplicate(spec.name));
         }
         if let Some(ip) = spec.ipv4 {
             self.by_ip.insert(ip, spec.name.clone());
@@ -298,7 +298,7 @@ mod tests {
         let mut m = mgr(tenant);
         let other = TenantId::new("tenant-ew-xt-other").expect("test fixture");
         let err = m
-            .register(spec("vm-1", other.clone(), Some(ip(192, 168, 1, 10))))
+            .register(spec("vm-1", other, Some(ip(192, 168, 1, 10))))
             .unwrap_err();
         assert!(matches!(err, ExternalWorkloadError::TenantDenied { .. }));
     }

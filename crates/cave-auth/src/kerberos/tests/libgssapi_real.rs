@@ -75,7 +75,7 @@ fn keytab_edge_multi_principal_distinct_realms() {
     let mut b = aes256_entry();
     b.principal.realm = "OTHER.REALM".into();
     b.principal.components = vec!["host".into(), "kdc.other.realm".into()];
-    let bytes = encode_test_keytab(&[a.clone(), b.clone()]);
+    let bytes = encode_test_keytab(&[a, b]);
     let parsed = parse_keytab(&bytes).unwrap();
     assert_eq!(parsed.len(), 2);
     assert_eq!(parsed[0].principal.realm, "EXAMPLE.COM");
@@ -89,7 +89,7 @@ fn keytab_edge_expired_key_entry_timestamp_round_trips() {
     // expiry policy. Use a 2001 timestamp.
     let mut entry = aes256_entry();
     entry.timestamp = 1_000_000_000;
-    let bytes = encode_test_keytab(&[entry.clone()]);
+    let bytes = encode_test_keytab(&[entry]);
     let parsed = parse_keytab(&bytes).unwrap();
     assert_eq!(parsed[0].timestamp, 1_000_000_000);
 }
@@ -291,7 +291,7 @@ fn negative_tampered_mic_initial_context_token_rejected() {
 fn negative_wrong_realm_principal_canonical_form() {
     let mut e = aes256_entry();
     e.principal.realm = "BAD.REALM".into();
-    let bytes = encode_test_keytab(&[e.clone()]);
+    let bytes = encode_test_keytab(&[e]);
     let parsed = parse_keytab(&bytes).unwrap();
     // Realm fidelity round-trip — when the caller checks against EXAMPLE.COM
     // this entry won't match.
@@ -307,7 +307,7 @@ fn negative_expired_ticket_timestamp_in_past() {
     // Caller-side policy: keytab entries older than 1 year are "expired".
     let mut e = aes256_entry();
     e.timestamp = 100_000_000; // 1973
-    let bytes = encode_test_keytab(&[e.clone()]);
+    let bytes = encode_test_keytab(&[e]);
     let parsed = parse_keytab(&bytes).unwrap();
     let now = 1_700_000_000u32;
     let one_year = 365 * 24 * 3600;
@@ -320,7 +320,7 @@ fn negative_expired_ticket_timestamp_in_past() {
 #[test]
 fn negative_wrong_service_name_keytab_lookup_returns_none() {
     let e = aes256_entry();
-    let bytes = encode_test_keytab(&[e.clone()]);
+    let bytes = encode_test_keytab(&[e]);
     let parsed = parse_keytab(&bytes).unwrap();
     let lookup = "HTTP/wrong-host.example.com@EXAMPLE.COM";
     let found = parsed.iter().find(|p| p.principal.to_canonical() == lookup);

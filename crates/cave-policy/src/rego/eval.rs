@@ -105,7 +105,7 @@ fn path_to_term(path: &[String]) -> Term {
     if path.is_empty() {
         return Term::Var("data".into());
     }
-    let mut base = Term::Var(path[0].clone());
+    let base = Term::Var(path[0].clone());
     let args: Vec<RefArg> = path[1..].iter().map(|s| RefArg::Field(s.clone())).collect();
     if args.is_empty() {
         base

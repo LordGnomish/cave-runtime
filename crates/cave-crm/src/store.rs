@@ -122,7 +122,7 @@ impl CrmStore {
     /// legacy `cave-erp/src/modules/crm.rs::convert_lead` behavior
     /// (now deprecated by ADR-145) on cave-crm's surface.
     pub async fn convert_lead(&self, lead_id: Uuid) -> Option<ConvertedLead> {
-        let mut leads = self.leads.write().await;
+        let leads = self.leads.write().await;
         let lead = leads.get(&lead_id)?.clone();
         if lead.status == LeadStatus::Converted {
             return None;

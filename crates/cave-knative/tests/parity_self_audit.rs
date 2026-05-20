@@ -235,7 +235,7 @@ fn assertion_9_serving_eventing_surface_intact() {
 
     // Autoscaler with KPA defaults
     let cfg = AutoscalerConfig::default();
-    let _autoscaler = Autoscaler::new("tenant-x", cfg.clone());
+    let _autoscaler = Autoscaler::new("tenant-x", cfg);
     // KPA + Stable + Panic + Disabled modes — at minimum two modes (stable/panic) must exist.
     let _mode_stable = AutoscalerMode::Stable;
     let _mode_panic = AutoscalerMode::Panic;

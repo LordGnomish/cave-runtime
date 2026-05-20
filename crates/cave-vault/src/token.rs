@@ -471,7 +471,7 @@ mod tests {
             ..Default::default()
         };
         let token = store.create(&params, None).unwrap();
-        let id = token.id.clone();
+        let id = token.id;
         assert!(store.revoke(&id));
         assert!(store.lookup(&id).is_none());
     }

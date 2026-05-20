@@ -326,7 +326,7 @@ mod tests {
         store.create_promise(p.clone());
         let updated = Promise {
             version: "2.0.0".to_string(),
-            ..p.clone()
+            ..p
         };
         store.update_promise("postgresql", updated);
         assert_eq!(store.get_promise("postgresql").unwrap().version, "2.0.0");
@@ -376,7 +376,7 @@ mod tests {
         let store = GitOpsStore::new();
         let req = make_request("postgresql");
         let run = make_pipeline_run(req.id);
-        store.add_pipeline_run(run.clone());
+        store.add_pipeline_run(run);
         let found = store.get_pipeline_run(req.id).unwrap();
         assert_eq!(found.resource_request_id, req.id);
     }

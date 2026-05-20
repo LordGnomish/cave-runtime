@@ -86,7 +86,7 @@ fn revoke_removes_token_and_accessor_lookup() {
     };
     let token = store.create(&params, None).unwrap();
     let id = token.id.clone();
-    let acc = token.accessor.clone();
+    let acc = token.accessor;
 
     assert!(store.revoke(&id));
     assert!(store.lookup(&id).is_none());

@@ -147,7 +147,7 @@ fn upstream_node_affinity_exists_operator_matches_any_value() {
 fn upstream_interpod_affinity_requires_peer_in_same_topology_domain() {
     let target = n_named("target", &[("zone", "us-east-1a")]);
     let other_zone = n_named("other", &[("zone", "us-east-1b")]);
-    let mut snap = snap(vec![target.clone(), other_zone.clone()]);
+    let mut snap = snap(vec![target.clone(), other_zone]);
 
     // A peer pod with label app=web on the OTHER zone — should NOT satisfy
     // affinity for `target` (different zone).

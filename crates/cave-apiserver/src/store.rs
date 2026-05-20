@@ -2477,7 +2477,7 @@ mod tests_generic_storage {
         // tenant_id invariant: tenant scoping is by namespace; pin to "acme".
         let r = cm("c", "acme");
         store.create(r.clone()).unwrap();
-        store.update(r.clone()).unwrap();
+        store.update(r).unwrap();
         store.delete("ConfigMap", "acme", "c").unwrap();
         let added = rx.try_recv().unwrap().expect("event");
         let modified = rx.try_recv().unwrap().expect("event");

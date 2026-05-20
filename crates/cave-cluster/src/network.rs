@@ -59,7 +59,7 @@ pub struct NetworkPolicyPort {
 
 /// Generate the default network policies for a new namespace.
 pub fn default_namespace_policies(namespace: &str) -> Vec<NetworkPolicy> {
-    let mut deny_all_ingress_labels: std::collections::HashMap<String, String> =
+    let deny_all_ingress_labels: std::collections::HashMap<String, String> =
         std::collections::HashMap::new();
     let deny_all = NetworkPolicy {
         name: format!("{namespace}-default-deny-ingress"),

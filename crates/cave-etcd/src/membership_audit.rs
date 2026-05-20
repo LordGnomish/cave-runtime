@@ -257,8 +257,8 @@ mod tests {
         log.record(log.new_event(
             MembershipAction::Add,
             2,
-            before.clone(),
-            after.clone(),
+            before,
+            after,
             None,
             Some("manual add".into()),
         ));

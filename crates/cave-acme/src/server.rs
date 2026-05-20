@@ -47,7 +47,7 @@ impl AcmeServer {
         }
         let acct = Account {
             id: Uuid::new_v4().to_string(),
-            tenant_id: tenant_id.clone(),
+            tenant_id: tenant_id,
             status: AccountStatus::Valid,
             contact,
             terms_of_service_agreed,

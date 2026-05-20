@@ -631,7 +631,7 @@ mod tests {
         let big: String = "X".repeat(50_000);
         store.put(&PutRequest {
             key: "/big".into(),
-            value: big.clone(),
+            value: big,
             lease: None,
             prev_kv: false,
         });

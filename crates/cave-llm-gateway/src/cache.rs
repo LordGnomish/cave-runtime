@@ -206,7 +206,7 @@ mod tests {
         let cache = PromptCache::new(CacheConfig::default());
         let req = make_req("hello");
         let resp = ChatCompletionResponse::simple("gpt-4o", "hi".into(), Usage::new(5, 2));
-        cache.insert(&req, resp.clone());
+        cache.insert(&req, resp);
         assert!(cache.get(&req).is_some());
         assert_eq!(cache.stats().hits, 1);
     }

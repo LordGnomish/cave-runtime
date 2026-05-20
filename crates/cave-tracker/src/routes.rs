@@ -548,7 +548,7 @@ async fn create_issue(
         id: issue_id,
         key: issue_key,
         project_id: req.project_id,
-        project_key: project.key.clone(),
+        project_key: project.key,
         issue_type: req.issue_type,
         summary: req.summary,
         description: req.description,

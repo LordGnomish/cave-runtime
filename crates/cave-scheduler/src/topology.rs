@@ -300,7 +300,7 @@ mod tests {
         let a = n("a", "z1");
         let b = n("b", "z2");
         let mut snap = ClusterSnapshot {
-            nodes: vec![a.clone(), b.clone()],
+            nodes: vec![a.clone(), b],
             pods_by_node: HashMap::new(),
         };
         snap.pods_by_node
@@ -378,7 +378,7 @@ mod tests {
         let a = n("a", "z1");
         let b = n("b", "z2");
         let mut snap = ClusterSnapshot {
-            nodes: vec![a.clone(), b.clone()],
+            nodes: vec![a.clone(), b],
             pods_by_node: HashMap::new(),
         };
         // Existing pods on z1: one with rev=1, one with rev=2. Selector
@@ -434,7 +434,7 @@ mod tests {
         a.labels.insert("gpu".into(), "true".into());
         let b = n("b", "z2"); // no gpu label
         let mut snap = ClusterSnapshot {
-            nodes: vec![a.clone(), b.clone()],
+            nodes: vec![a.clone(), b],
             pods_by_node: HashMap::new(),
         };
         snap.pods_by_node
@@ -531,7 +531,7 @@ mod tests {
             effect: crate::models::TaintEffect::NoSchedule,
         });
         let mut snap = ClusterSnapshot {
-            nodes: vec![a.clone(), b.clone()],
+            nodes: vec![a, b.clone()],
             pods_by_node: HashMap::new(),
         };
         snap.pods_by_node

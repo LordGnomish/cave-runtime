@@ -200,7 +200,7 @@ async fn test_container_lifecycle() {
 async fn test_image_pull() {
     let state = make_state();
     let img = dummy_image("nginx:1.25");
-    state.images.insert(img.clone());
+    state.images.insert(img);
     let got = state.images.get("nginx:1.25").unwrap();
     assert_eq!(got.reference, "nginx:1.25");
 }

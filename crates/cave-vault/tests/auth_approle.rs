@@ -22,7 +22,7 @@ fn secret_id(role_name: &str, ttl_secs: i64, num_uses: i64) -> (String, SecretId
     let acc = Uuid::new_v4().to_string();
     let entry = SecretIdEntry {
         secret_id: sid.clone(),
-        accessor: acc.clone(),
+        accessor: acc,
         created_at: Utc::now(),
         expires_at: if ttl_secs > 0 {
             Some(Utc::now() + Duration::seconds(ttl_secs))
@@ -77,7 +77,7 @@ fn delete_role_clears_secret_ids() {
         .insert(entry.accessor.clone(), entry.clone());
     store
         .secret_id_by_id
-        .insert(sid.clone(), ("ephemeral".into(), entry.accessor));
+        .insert(sid, ("ephemeral".into(), entry.accessor));
 
     store.roles.remove("ephemeral");
     store.secret_ids.remove("ephemeral");
@@ -134,7 +134,7 @@ fn login_decrements_uses_remaining_and_rejects_when_zero() {
         .secret_ids
         .entry("svc".into())
         .or_default()
-        .insert(acc.clone(), entry);
+        .insert(acc, entry);
 
     // simulate two successful logins then one rejected
     for _ in 0..2 {

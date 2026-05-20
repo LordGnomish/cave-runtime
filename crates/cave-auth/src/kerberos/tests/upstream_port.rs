@@ -81,7 +81,7 @@ fn key_tab_reader_test_magic_number_is_0x0502() {
 #[test]
 fn key_tab_reader_test_parses_aes256_entry() {
     let entry = aes256_entry();
-    let bytes = encode_test_keytab(&[entry.clone()]);
+    let bytes = encode_test_keytab(&[entry]);
     let parsed = parse_keytab(&bytes).unwrap();
     assert_eq!(parsed.len(), 1);
     assert_eq!(parsed[0].key.enctype, 18);
@@ -109,7 +109,7 @@ fn key_tab_reader_test_two_entries_preserved() {
     b.principal.components = vec!["host".into(), "node.example.com".into()];
     b.key.enctype = 17;
     b.key.contents = vec![0u8; 16];
-    let bytes = encode_test_keytab(&[a.clone(), b.clone()]);
+    let bytes = encode_test_keytab(&[a, b]);
     let parsed = parse_keytab(&bytes).unwrap();
     assert_eq!(parsed.len(), 2);
     assert_eq!(parsed[0].principal.components[0], "HTTP");

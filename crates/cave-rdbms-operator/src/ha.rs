@@ -117,7 +117,7 @@ impl HaController {
         let event = FailoverEvent {
             id: Uuid::new_v4().to_string(),
             primary_id: primary_id.to_string(),
-            new_primary_id: new_primary_id.clone(),
+            new_primary_id: new_primary_id,
             reason: reason.to_string(),
             timestamp: Utc::now(),
             duration_ms,

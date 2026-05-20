@@ -507,7 +507,7 @@ mod tests {
             .sync_group(SyncGroupRequest {
                 member_id: "w1".into(),
                 generation,
-                leader_assignment: Some(delta.clone()),
+                leader_assignment: Some(delta),
             })
             .unwrap();
         assert!(!leader_resp.final_set.is_empty());

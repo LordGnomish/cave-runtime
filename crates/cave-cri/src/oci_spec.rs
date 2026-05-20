@@ -83,7 +83,7 @@ impl OciCapabilities {
         Self {
             bounding: caps.clone(),
             effective: caps.clone(),
-            permitted: caps.clone(),
+            permitted: caps,
             ambient: vec![],
             inheritable: vec![],
         }
@@ -679,7 +679,7 @@ pub fn apply_security_context(spec: &mut OciSpec, sec: &crate::models::SecurityC
         spec.process.capabilities = OciCapabilities {
             bounding: cap_vec.clone(),
             effective: cap_vec.clone(),
-            permitted: cap_vec.clone(),
+            permitted: cap_vec,
             ambient: vec![],
             inheritable: vec![],
         };

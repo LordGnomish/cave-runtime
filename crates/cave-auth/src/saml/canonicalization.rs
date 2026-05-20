@@ -158,7 +158,7 @@ fn build_frame(
         .to_string();
     let elem_prefix = elem_name.split(':').next().unwrap_or("").to_string();
     let elem_local_prefix = if elem_name.contains(':') {
-        elem_prefix.clone()
+        elem_prefix
     } else {
         String::new()
     };
@@ -166,7 +166,7 @@ fn build_frame(
     let mut declared: Vec<NsDeclLocal> = Vec::new();
     let mut attrs_sorted: BTreeMap<String, String> = BTreeMap::new();
     let mut used_prefixes = std::collections::BTreeSet::new();
-    used_prefixes.insert(elem_local_prefix.clone());
+    used_prefixes.insert(elem_local_prefix);
 
     for a in e.attributes() {
         let a: Attribute = a.map_err(|err| SamlError::Parse(format!("c14n attr: {err}")))?;

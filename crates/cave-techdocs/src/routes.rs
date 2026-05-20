@@ -92,10 +92,10 @@ async fn metadata_entity(
     let uid = uuid::Uuid::new_v4().to_string();
     Json(EntityMetadata {
         api_version: "backstage.io/v1alpha1".to_string(),
-        kind: kind.clone(),
+        kind: kind,
         metadata: EntityMetadataInner {
-            namespace: namespace.clone(),
-            name: name.clone(),
+            namespace: namespace,
+            name: name,
             description: None,
             annotations: HashMap::new(),
             labels: HashMap::new(),

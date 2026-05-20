@@ -101,7 +101,7 @@ fn mysql_connector_validates_server_id_and_tenant() {
     bad.server_id = 1042;
     assert!(bad.validate().is_ok());
 
-    let mut empty_tenant = MySqlConnector::new("no-tenant", "", "shop", 1042);
+    let empty_tenant = MySqlConnector::new("no-tenant", "", "shop", 1042);
     assert!(empty_tenant.validate().is_err());
 
     let mut good = MySqlConnector::new(format!("{}-mysql", TENANT), TENANT, "shop", 1042);

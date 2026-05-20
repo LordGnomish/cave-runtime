@@ -172,7 +172,7 @@ pub fn create_router(state: Arc<CriState>) -> Router {
 async fn parity() -> Json<serde_json::Value> {
     match crate::calculate_parity() {
         Ok(report) => Json(serde_json::to_value(&report).unwrap_or_default()),
-        Err(e) => Json(serde_json::json!({ "error": e.to_string() })),
+        Err(e) => Json(serde_json::json!({ "error": e })),
     }
 }
 
@@ -1171,7 +1171,7 @@ mod tests {
             created_at: chrono::Utc::now(),
             network_ip: None,
         };
-        state.sandboxes.insert(sandbox.clone());
+        state.sandboxes.insert(sandbox);
         let got = state.sandboxes.get(&id).unwrap();
         assert_eq!(got.spec.name, "my-pod");
         state.sandboxes.remove(&id);

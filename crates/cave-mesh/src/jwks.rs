@@ -470,7 +470,7 @@ mod tests {
     #[test]
     fn transport_error_surfaces_to_caller() {
         let stub = Arc::new(StubTransport::new());
-        let cache = JwksCache::new(stub.clone(), Duration::from_secs(60));
+        let cache = JwksCache::new(stub, Duration::from_secs(60));
         cache.register_issuer("iss", "https://nowhere");
         assert!(matches!(cache.fetch("iss").unwrap_err(), MeshError::Jwt(_)));
     }

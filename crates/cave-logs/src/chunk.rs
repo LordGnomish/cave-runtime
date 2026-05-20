@@ -207,7 +207,7 @@ mod tests {
         let chunk = HeadChunk {
             stream_fp: 1,
             tenant: "t".into(),
-            entries: entries.clone(),
+            entries: entries,
             created_at: std::time::Instant::now(),
             uncompressed_size: 100,
         };
@@ -223,7 +223,7 @@ mod tests {
         let chunk = HeadChunk {
             stream_fp: 2,
             tenant: "t".into(),
-            entries: entries.clone(),
+            entries: entries,
             created_at: std::time::Instant::now(),
             uncompressed_size: 1000,
         };

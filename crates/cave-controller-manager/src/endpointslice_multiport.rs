@@ -143,8 +143,8 @@ mod tests {
         let ps_http = PortSet::new(vec![sp("http", 80)]);
         let ps_metrics = PortSet::new(vec![sp("metrics", 9090)]);
         let eps = vec![
-            ep("10.0.0.1", ps_http.clone(), AddressType::IPv4),
-            ep("10.0.0.2", ps_metrics.clone(), AddressType::IPv4),
+            ep("10.0.0.1", ps_http, AddressType::IPv4),
+            ep("10.0.0.2", ps_metrics, AddressType::IPv4),
         ];
         let buckets = bucket(&eps);
         assert_eq!(buckets.len(), 2);
@@ -160,7 +160,7 @@ mod tests {
         let ps = PortSet::new(vec![sp("http", 80)]);
         let eps = vec![
             ep("10.0.0.1", ps.clone(), AddressType::IPv4),
-            ep("fd00::1", ps.clone(), AddressType::IPv6),
+            ep("fd00::1", ps, AddressType::IPv6),
         ];
         let buckets = bucket(&eps);
         assert_eq!(buckets.len(), 2);

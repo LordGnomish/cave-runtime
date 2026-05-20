@@ -306,7 +306,7 @@ mod tests {
             &store,
             "data-r",
             PermType::Read,
-            dt(tenant_id, "data/").to_string(),
+            dt(tenant_id, "data/"),
             Some("\0".into()),
         )
         .unwrap();

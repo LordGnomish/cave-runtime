@@ -56,7 +56,7 @@ fn account_validation_rejects_bad_contact_and_missing_tos() {
         status: AccountStatus::Valid,
         contact: vec!["https://example.com/contact".into()],
         terms_of_service_agreed: true,
-        jwk: jwk.clone(),
+        jwk: jwk,
         eab: None,
         created_at: now,
     };

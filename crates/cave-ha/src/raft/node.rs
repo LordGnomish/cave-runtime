@@ -250,7 +250,7 @@ impl RaftNode {
 
         let node = Self {
             id,
-            config: config.clone(),
+            config: config,
             current_term: 0,
             voted_for: None,
             role: Role::Follower,

@@ -114,7 +114,7 @@ impl ReflexConsole {
         let id = format!("act-{:06}", self.actions.len() + 1);
         let requester = requester.into();
         let action = ActionRequest {
-            id: id.clone(),
+            id: id,
             tenant: tenant.into(),
             kind: kind.into(),
             summary: summary.into(),

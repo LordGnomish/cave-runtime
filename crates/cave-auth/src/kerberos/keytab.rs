@@ -329,7 +329,7 @@ mod tests {
     #[test]
     fn entry_carries_aes256_enctype() {
         let original = sample_entry();
-        let bytes = encode_test_keytab(&[original.clone()]);
+        let bytes = encode_test_keytab(&[original]);
         let parsed = parse_keytab(&bytes).unwrap();
         assert_eq!(parsed[0].key.enctype, 18);
         assert_eq!(parsed[0].key.contents.len(), 32);

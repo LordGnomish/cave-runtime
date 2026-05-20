@@ -377,7 +377,7 @@ pub fn router(state: Arc<VaultState>) -> Router {
         .merge(engines::ssh::router(state.clone(), "ssh"))
         .merge(engines::totp::router(state.clone(), "totp"))
         .merge(engines::cubbyhole::router(state.clone()))
-        .merge(engines::identity::router(state.clone()))
+        .merge(engines::identity::router(state))
 }
 
 pub const MODULE_NAME: &str = "vault";

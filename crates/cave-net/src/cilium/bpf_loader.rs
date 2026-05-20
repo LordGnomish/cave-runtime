@@ -114,7 +114,7 @@ impl BpfLoader {
             .insert(prog.section.clone(), verdict.clone());
         if !verdict.ok {
             return Err(LoaderError::VerifierRejected(
-                prog.section.clone(),
+                prog.section,
                 verdict.log,
             ));
         }

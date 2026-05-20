@@ -474,7 +474,7 @@ mod tests {
             .unwrap();
         let original = se.created_at;
         std::thread::sleep(std::time::Duration::from_millis(2));
-        let mut updated = se.clone();
+        let mut updated = se;
         updated.endpoints[0].address = "2.2.2.2".into();
         let saved = m.update(updated).unwrap();
         assert_eq!(saved.created_at, original);

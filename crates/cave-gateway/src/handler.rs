@@ -133,7 +133,7 @@ pub async fn proxy_handler(
         .chain(state.store.plugins_for_service(&service.id))
         .chain(state.store.plugins_for_route(&match_result.route_id))
         .filter(|p| p.enabled)
-        .map(|p| (p.name.clone(), p.config.clone()))
+        .map(|p| (p.name.clone(), p.config))
         .collect();
 
     // Run access phase

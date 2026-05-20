@@ -510,7 +510,7 @@ impl Parser {
         }
     }
 
-    fn parse_ref_suffix(&mut self, mut base: Term) -> Result<Term, PolicyError> {
+    fn parse_ref_suffix(&mut self, base: Term) -> Result<Term, PolicyError> {
         let mut args: Vec<RefArg> = Vec::new();
         let mut is_call = false;
 

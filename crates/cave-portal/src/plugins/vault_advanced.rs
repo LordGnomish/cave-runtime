@@ -453,7 +453,7 @@ mod tests {
     fn store_upsert_admin_only() {
         let mut s = PolicyStore::new();
         let p = Policy::new("p", "acme").unwrap();
-        let err = s.upsert(ViewPersona::Tenant, p.clone()).unwrap_err();
+        let err = s.upsert(ViewPersona::Tenant, p).unwrap_err();
         assert!(matches!(err, AdvancedVaultError::Forbidden(_)));
     }
 

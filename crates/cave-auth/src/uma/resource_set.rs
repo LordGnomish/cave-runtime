@@ -91,7 +91,7 @@ impl ResourceSetStore {
         {
             return Err(ResourceSetError::DuplicateName(
                 rs.name.clone(),
-                rs.resource_owner.clone(),
+                rs.resource_owner,
             ));
         }
         if rs.id.is_empty() {
@@ -214,7 +214,7 @@ mod tests {
         let rs = store.create(sample()).unwrap();
         let mut patched = rs.clone();
         patched.display_name = Some("renamed".into());
-        let out = store.update(&rs.id, patched.clone()).unwrap();
+        let out = store.update(&rs.id, patched).unwrap();
         assert_eq!(out.display_name.as_deref(), Some("renamed"));
     }
 

@@ -515,7 +515,7 @@ mod tests {
         let r = BTreeMap::new();
         let next = next_container_to_start(&[sc.clone()], &[main_c("m1")], &s, &r);
         assert_eq!(next, None);
-        let mut r2 = r.clone();
+        let mut r2 = r;
         r2.insert("s1".into(), true);
         let next2 = next_container_to_start(&[sc], &[main_c("m1")], &s, &r2);
         assert_eq!(next2, Some("m1".into()));

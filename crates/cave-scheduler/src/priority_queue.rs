@@ -245,7 +245,7 @@ mod tests {
         let d4 = q.mark_backoff(p.clone(), now);
         assert_eq!((d4 - now).num_seconds(), 8); // capped at max
         q.mark_unschedulable(p.clone(), now);
-        let d5 = q.mark_backoff(p.clone(), now);
+        let d5 = q.mark_backoff(p, now);
         assert_eq!((d5 - now).num_seconds(), 8); // still capped
     }
 

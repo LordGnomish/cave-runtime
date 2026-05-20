@@ -509,7 +509,7 @@ mod tests {
                 send_resolved: true,
             },
             &[],
-            &[a.clone()],
+            &[a],
         );
         match &n.transport {
             Transport::Http { url, headers, .. } => {
@@ -556,7 +556,7 @@ mod tests {
     #[test]
     fn test_render_all_skips_resolved_when_send_resolved_false() {
         let a = alert_named("X", AlertSeverity::Warning);
-        let mut resolved = a.clone();
+        let mut resolved = a;
         resolved.state = AlertState::Resolved;
         let receiver = Receiver::new("rcv").with_config(ReceiverConfig::Webhook(WebhookConfig {
             url: "http://x".into(),

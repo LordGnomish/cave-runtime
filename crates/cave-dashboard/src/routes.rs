@@ -352,7 +352,7 @@ async fn save_dashboard(
                 url: d.url.clone(),
                 status: "success".into(),
                 version: d.version,
-                slug: d.slug.clone(),
+                slug: d.slug,
             };
             (StatusCode::OK, Json(resp)).into_response()
         }

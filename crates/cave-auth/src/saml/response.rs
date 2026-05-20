@@ -624,7 +624,7 @@ mod tests {
             "https://idp.example",
             "https://sp.example/acs",
             Some("_req-1".to_string()),
-            a.clone(),
+            a,
         );
         let bytes = r.to_xml().unwrap();
         let parsed = Response::from_xml(&bytes).unwrap();

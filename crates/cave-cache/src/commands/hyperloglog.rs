@@ -299,7 +299,7 @@ fn murmur3_64(data: &[u8], seed: u64) -> u64 {
     }
 
     let tail = &data[blocks * 16..];
-    let mut k1: u64 = 0;
+    let k1: u64 = 0;
     let mut k2: u64 = 0;
 
     if tail.len() >= 8 {

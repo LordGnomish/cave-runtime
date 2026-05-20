@@ -222,7 +222,7 @@ impl KeycloakTokenService {
 
         let refresh_claims = RefreshTokenClaims {
             sub: sub.to_string(),
-            iss: iss.clone(),
+            iss: iss,
             exp: now + REFRESH_TOKEN_TTL,
             iat: now,
             typ: "Refresh".to_string(),

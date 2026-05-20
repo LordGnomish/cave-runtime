@@ -655,7 +655,7 @@ mod tests {
     #[test]
     fn test_frame_response() {
         let body = Bytes::from_static(b"payload");
-        let framed = frame_response(42, body.clone());
+        let framed = frame_response(42, body);
         // First 4 bytes = total_len = 4 (correlation) + 7 (payload) = 11
         assert_eq!(&framed[..4], &11i32.to_be_bytes());
         // Next 4 bytes = correlation_id = 42

@@ -159,7 +159,7 @@ impl StorageVersionRegistry {
             .storage_version(tenant_id, group, kind)
             .ok_or(StorageError::NoStorageVersionElected)?;
         let api_version = if group.is_empty() {
-            storage.clone()
+            storage
         } else {
             format!("{}/{}", group, storage)
         };

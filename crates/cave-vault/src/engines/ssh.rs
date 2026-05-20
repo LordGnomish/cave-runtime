@@ -155,7 +155,7 @@ pub async fn create_role(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.ssh_store.write().await;
-    let mut role = store
+    let role = store
         .roles
         .entry(role_name.clone())
         .or_insert_with(|| SshRole {
@@ -437,7 +437,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
         }))
         .route(&format!("/v1/{}/verify", mount), post({
             let s = state.clone();
-            let mount = m.clone();
+            let mount = m;
             move |headers: HeaderMap, Json(body): Json<VerifyOtpRequest>| {
                 let state = s.clone();
                 let mount = mount.clone();

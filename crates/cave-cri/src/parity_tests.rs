@@ -311,7 +311,7 @@ fn test_sandbox_status() {
 fn test_snapshot_prepare() {
     let store = SnapshotStore::new();
     let parent = make_snapshot("base", None);
-    store.insert(parent.clone());
+    store.insert(parent);
 
     let active = make_snapshot("workdir", Some("base"));
     let id = active.id;

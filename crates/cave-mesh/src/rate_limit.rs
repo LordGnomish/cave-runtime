@@ -146,7 +146,7 @@ impl RateLimiter {
         let rl = Self::new();
         let name = service.into();
         rl.upsert_policy(RateLimitPolicy {
-            name: name.clone(),
+            name: name,
             namespace: "default".to_string(),
             selector: None,
             rules: vec![crate::models::RateLimitRule {

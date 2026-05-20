@@ -127,7 +127,7 @@ mod tests {
         let labels = Labels::from_pairs([("__name__", "cpu"), ("job", "api")]);
         db.append(labels.clone(), Sample::new(1000, 0.5));
         db.append(labels.clone(), Sample::new(2000, 0.7));
-        db.append(labels.clone(), Sample::new(3000, 0.9));
+        db.append(labels, Sample::new(3000, 0.9));
 
         let result = db.select(&[LabelMatcher::equal("__name__", "cpu")], 0, 5000);
         assert_eq!(result.len(), 1);
@@ -190,7 +190,7 @@ mod tests {
         // retention window. Use an absolute wall-clock timestamp.
         let now_ms = chrono::Utc::now().timestamp_millis();
         db.append(labels.clone(), Sample::new(now_ms - 10, 1.0)); // recent
-        db.append(labels.clone(), Sample::new(now_ms + 10_000, 2.0)); // future (always stays)
+        db.append(labels, Sample::new(now_ms + 10_000, 2.0)); // future (always stays)
 
         db.enforce_retention();
         let result = db.select(&[LabelMatcher::equal("__name__", "x")], 0, i64::MAX);
@@ -256,13 +256,13 @@ mod tests {
         db.append(labels.clone(), Sample::new(0, 0.0));
         db.append(labels.clone(), Sample::new(10_000, 10.0));
         db.append(labels.clone(), Sample::new(20_000, 30.0));
-        db.append(labels.clone(), Sample::new(30_000, 60.0));
+        db.append(labels, Sample::new(30_000, 60.0));
 
         let labels2 = Labels::from_pairs([("__name__", "requests"), ("job", "web")]);
         db.append(labels2.clone(), Sample::new(0, 0.0));
         db.append(labels2.clone(), Sample::new(10_000, 5.0));
         db.append(labels2.clone(), Sample::new(20_000, 15.0));
-        db.append(labels2.clone(), Sample::new(30_000, 30.0));
+        db.append(labels2, Sample::new(30_000, 30.0));
         db
     }
 
@@ -298,7 +298,7 @@ mod tests {
         let db = Arc::new(Tsdb::default());
         let labels = Labels::from_pairs([("__name__", "counter")]);
         db.append(labels.clone(), Sample::new(0, 0.0));
-        db.append(labels.clone(), Sample::new(60_000, 60.0)); // rate should be ~1/s
+        db.append(labels, Sample::new(60_000, 60.0)); // rate should be ~1/s
 
         let engine = Engine::new(Arc::clone(&db));
         let ast = parse("rate(counter[2m])").unwrap();
@@ -391,7 +391,7 @@ mod tests {
     fn test_eval_all_math_functions() {
         let db = Arc::new(Tsdb::default());
         let labels = Labels::from_pairs([("__name__", "x")]);
-        db.append(labels.clone(), Sample::new(1000, 4.0));
+        db.append(labels, Sample::new(1000, 4.0));
         let engine = Engine::new(Arc::clone(&db));
 
         for (func, expected) in [
@@ -1089,7 +1089,7 @@ req_duration_sum 25.3
     fn parity_multitenant_enforce_filter_idempotent() {
         use crate::multitenant::{TENANT_LABEL, enforce_tenant_filter};
         let m1 = enforce_tenant_filter(vec![LabelMatcher::equal("__name__", "x")], "acme");
-        let m2 = enforce_tenant_filter(m1.clone(), "acme");
+        let m2 = enforce_tenant_filter(m1, "acme");
         let count = m2.iter().filter(|m| m.name == TENANT_LABEL).count();
         assert_eq!(count, 1);
     }
@@ -1151,7 +1151,7 @@ req_duration_sum 25.3
         for ts in (1000..=5000).step_by(1000) {
             db.append(labels.clone(), Sample::new(ts, 10.0));
         }
-        let engine = Engine::new(db.clone());
+        let engine = Engine::new(db);
         // for=2000ms (2s)
         let mut rule = AlertRule::new("HighErrors", "errors", 2000);
 
@@ -1170,8 +1170,8 @@ req_duration_sum 25.3
     fn parity_alert_rule_clears_active_when_expression_no_longer_matches() {
         let db = Arc::new(Tsdb::default());
         let labels = Labels::from_pairs([("__name__", "live")]);
-        db.append(labels.clone(), Sample::new(1000, 10.0));
-        let engine = Engine::new(db.clone());
+        db.append(labels, Sample::new(1000, 10.0));
+        let engine = Engine::new(db);
         let mut rule = AlertRule::new("Active", "live", 0);
         let alerts = rule.evaluate(&engine, 1000).unwrap();
         assert_eq!(alerts.len(), 1);

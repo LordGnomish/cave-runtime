@@ -43,7 +43,7 @@ impl Dns01Solver {
         }
         let record_name = challenge.dns01_record_name(domain);
         let value = challenge.dns01_record_value(jwk);
-        self.records.insert(record_name.clone(), value.clone());
+        self.records.insert(record_name.clone(), value);
         Ok(record_name)
     }
 

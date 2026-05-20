@@ -51,7 +51,7 @@ fn add_then_update_coalesces_to_single_pending_change() {
         ..s_v1.clone()
     };
     t.update(None, Some(s_v1.clone())).unwrap();
-    t.update(Some(s_v1.clone()), Some(s_v2.clone())).unwrap();
+    t.update(Some(s_v1.clone()), Some(s_v2)).unwrap();
 
     assert_eq!(t.pending_count(), 1, "Add+Update must coalesce");
     let change = t.pending_for(&s_v1.name).unwrap();
@@ -67,7 +67,7 @@ fn add_then_delete_cancels_pending_change() {
     let mut t = ServiceChangeTracker::new(TENANT);
     let s = svc("api", "10.0.0.1", 80);
     t.update(None, Some(s.clone())).unwrap();
-    t.update(Some(s.clone()), None).unwrap();
+    t.update(Some(s), None).unwrap();
     assert_eq!(t.pending_count(), 0, "Add+Delete is a no-op");
 }
 

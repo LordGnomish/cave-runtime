@@ -254,7 +254,7 @@ async fn list_repositories(
         .filter(|r| r.starts_with(&prefix) || r == &project_name)
         .map(|name| Repository {
             id: Uuid::new_v4(),
-            name: name.clone(),
+            name: name,
             project_id: Uuid::nil(),
             description: String::new(),
             artifact_count: 0,

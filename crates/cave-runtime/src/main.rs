@@ -387,7 +387,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(portal::router())
         // JWT auth middleware
         .layer(axum::middleware::from_fn(
-            |mut req: axum::extract::Request, next: axum::middleware::Next| async move {
+            |req: axum::extract::Request, next: axum::middleware::Next| async move {
                 let state = req
                     .extensions()
                     .get::<Arc<cave_auth::jwt_middleware::AuthState>>()

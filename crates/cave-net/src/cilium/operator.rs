@@ -198,7 +198,7 @@ impl CesManager {
         // Find an existing CES with capacity.
         for s in self.slices.values_mut() {
             if s.endpoints.len() < self.max_size {
-                s.endpoints.push(ep.clone());
+                s.endpoints.push(ep);
                 let name = s.name.clone();
                 self.endpoint_to_ces.insert(key, name.clone());
                 return name;

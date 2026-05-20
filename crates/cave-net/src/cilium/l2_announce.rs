@@ -192,7 +192,7 @@ impl L2Announcer {
     /// node, we cannot acquire. Otherwise we take it.
     pub fn try_acquire(&mut self, vip: IpAddr, iface: impl Into<String>, now_ns: u64) -> bool {
         let iface = iface.into();
-        let key = (vip, iface.clone());
+        let key = (vip, iface);
         let renewal_ns = self.renewal_seconds * 1_000_000_000;
         let current = self.leases.get(&key).cloned();
         let can_take = match current {

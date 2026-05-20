@@ -229,7 +229,7 @@ mod tests {
     #[test]
     fn renew_succeeds_for_current_leader_and_slides_expiry() {
         let mgr = LeaseManager::new();
-        let a = LeaderElector::default_for_replica(mgr.clone(), "a");
+        let a = LeaderElector::default_for_replica(mgr, "a");
         a.acquire(at(1_000_000));
         // 5s later — renew before lease ages.
         a.renew(at(1_000_005)).unwrap();

@@ -47,7 +47,7 @@ async fn get_silences(State(s): State<Arc<AlertmgrState>>) -> Json<Vec<Silence>>
 
 async fn create_silence(
     State(s): State<Arc<AlertmgrState>>,
-    Json(mut silence): Json<Silence>,
+    Json(silence): Json<Silence>,
 ) -> Json<serde_json::Value> {
     let id = s.silences.create(silence);
     Json(serde_json::json!({ "silenceID": id }))

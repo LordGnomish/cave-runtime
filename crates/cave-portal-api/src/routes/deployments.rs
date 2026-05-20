@@ -158,7 +158,7 @@ impl DeploymentStore {
             return Err(DeploymentsError::NoPriorRevision);
         }
         let prev = history[history.len() - 2].clone();
-        let mut rolled = prev.clone();
+        let mut rolled = prev;
         rolled.revision = history.last().unwrap().revision + 1;
         rolled.status = DeployStatus::RollingBack;
         history.push(rolled.clone());

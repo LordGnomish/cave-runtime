@@ -193,7 +193,7 @@ fn upstream_token_store_lookup_by_accessor() {
 fn upstream_token_store_revoke_removes_token_and_accessor() {
     let mut store = TokenStore::default();
     let root = store.create_root("hvs.revoke-test");
-    let acc = root.accessor.clone();
+    let acc = root.accessor;
     assert!(store.revoke("hvs.revoke-test"));
     assert!(store.lookup("hvs.revoke-test").is_none());
     assert!(store.lookup_by_accessor(&acc).is_none());

@@ -65,7 +65,7 @@ fn verify_single_image(
         return Ok(ImageVerificationResult {
             image: image_ref.to_string(),
             verified: true, // Not in scope of this rule
-            digest: parsed.digest.clone(),
+            digest: parsed.digest,
             error: None,
         });
     }
@@ -89,7 +89,7 @@ fn verify_single_image(
             return Ok(ImageVerificationResult {
                 image: image_ref.to_string(),
                 verified: false,
-                digest: parsed.digest.clone(),
+                digest: parsed.digest,
                 error: Some(format!(
                     "image '{}' signature verification not available (requires cosign/notary infrastructure)",
                     image_ref
@@ -111,7 +111,7 @@ fn verify_single_image(
     Ok(ImageVerificationResult {
         image: image_ref.to_string(),
         verified: true,
-        digest: parsed.digest.clone(),
+        digest: parsed.digest,
         error: None,
     })
 }

@@ -75,7 +75,7 @@ pub struct ErpStore {
 
 impl Default for ErpStore {
     fn default() -> Self {
-        let mut store = ErpStore {
+        let store = ErpStore {
             company: Arc::new(RwLock::new(HashMap::new())),
             currency: Arc::new(RwLock::new(HashMap::new())),
             employees: Arc::new(RwLock::new(HashMap::new())),
