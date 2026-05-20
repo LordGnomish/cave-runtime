@@ -811,14 +811,19 @@
     },
     "cave-keda": {
       "cave_src_loc": 1145,
-      "honest_ratio": 0.0,
-      "last_audit_disk": "2026-05-12",
+      "honest_ratio": 0.6537,
+      "last_audit_disk": "2026-05-19",
       "manifest_filled": true,
+      "mapped_count": 12,
       "note": null,
-      "parity_ratio": 0.0,
+      "parity_ratio": 0.6537,
       "parity_ratio_source": "manifest",
+      "partial_count": 0,
+      "skipped_count": 12,
       "stubs": null,
       "tier": "C",
+      "total_count": 24,
+      "unmapped_count": 0,
       "upstream": "kedacore/keda",
       "upstream_version": "v2.12.0"
     },
@@ -1679,7 +1684,7 @@
     "injected": 9,
     "new_filled": 86,
     "phantoms": 5,
-    "ratio_overrides": 37
+    "ratio_overrides": 38
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
