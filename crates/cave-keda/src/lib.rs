@@ -16,26 +16,44 @@
 //!   redis_scaler            — Redis list/stream length scaler
 //!   cpu_memory_scaler       — Resource metric (Utilization / AverageValue) scaler
 
+pub mod aws_sqs_scaler;
+pub mod azure_eventhub_scaler;
+pub mod azure_servicebus_scaler;
 pub mod cpu_memory_scaler;
 pub mod cron_scaler;
+pub mod datadog_scaler;
+pub mod etcd_scaler;
+pub mod gcp_pubsub_scaler;
+pub mod hibernation;
 pub mod http_scaler;
 pub mod kafka_scaler;
+pub mod nats_jetstream_scaler;
 pub mod prometheus_scaler;
 pub mod redis_scaler;
 pub mod scaledjob;
 pub mod scaledobject;
 pub mod scaler;
+pub mod scaling_modifiers;
 pub mod trigger_authentication;
 
+pub use aws_sqs_scaler::AwsSqsScaler;
+pub use azure_eventhub_scaler::AzureEventHubScaler;
+pub use azure_servicebus_scaler::{AzureServiceBusEntity, AzureServiceBusScaler};
 pub use cpu_memory_scaler::{CpuScaler, MemoryScaler, ResourceMetricType};
 pub use cron_scaler::{validate_cron, CronScaler};
+pub use datadog_scaler::DatadogScaler;
+pub use etcd_scaler::EtcdScaler;
+pub use gcp_pubsub_scaler::GcpPubSubScaler;
+pub use hibernation::{Hibernation, HibernationDecision, HibernationSchedule};
 pub use http_scaler::HttpScaler;
 pub use kafka_scaler::KafkaScaler;
+pub use nats_jetstream_scaler::NatsJetStreamScaler;
 pub use prometheus_scaler::PrometheusScaler;
 pub use redis_scaler::{RedisDataType, RedisScaler};
 pub use scaledjob::{ScaledJob, ScalingStrategy};
 pub use scaledobject::ScaledObject;
 pub use scaler::{replicas_from_metric, Scaler, ScalerTrait, ScalingModifiers};
+pub use scaling_modifiers::{ScalingModifiersEvaluator, Trigger};
 pub use trigger_authentication::{EnvTargetRef, SecretTargetRef, TriggerAuthentication};
 
 #[cfg(test)]
