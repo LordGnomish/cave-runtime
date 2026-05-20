@@ -24,6 +24,7 @@
 //! Both `pulp/` and `harbor/` import it via `crate::core::*`.
 
 pub mod artifact;
+pub mod gc;
 pub mod repository;
 pub mod retention;
 pub mod signature;
