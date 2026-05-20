@@ -406,14 +406,19 @@
     },
     "cave-dashboard": {
       "cave_src_loc": 8092,
-      "honest_ratio": 0.0,
-      "last_audit_disk": "2026-05-12",
+      "honest_ratio": 0.65,
+      "last_audit_disk": "2026-05-19",
       "manifest_filled": true,
+      "mapped_count": 8,
       "note": null,
-      "parity_ratio": 0.0,
+      "parity_ratio": 0.8,
       "parity_ratio_source": "manifest",
+      "partial_count": 3,
+      "skipped_count": 5,
       "stubs": null,
       "tier": "C",
+      "total_count": 20,
+      "unmapped_count": 4,
       "upstream": "grafana/grafana",
       "upstream_version": "v10.2.0"
     },
@@ -1689,7 +1694,7 @@
     "injected": 9,
     "new_filled": 86,
     "phantoms": 5,
-    "ratio_overrides": 39
+    "ratio_overrides": 40
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
