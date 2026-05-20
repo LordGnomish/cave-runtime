@@ -27,19 +27,23 @@ source_sha  = "v8.29.1"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.9444  # mapped / (mapped + partial + unmapped) = 17/18
-honest_ratio        = 0.8500  # mapped / total = 17/20 (skipped excluded from credit)
+fill_ratio          = 1.0000  # mapped / (mapped + partial + unmapped) = 18/18
+honest_ratio        = 0.9000  # mapped / total = 18/20 (skipped excluded from credit)
 last_audit          = "2026-05-19"
 infra_only          = false
-mapped_count        = 17
-partial_count       = 1
+mapped_count        = 18
+partial_count       = 0
 skipped_count       = 2
 unmapped_count      = 0
 total               = 20
 
 # fill_ratio derivation (Charter v2 honest measurement, subsystem-count basis):
-#   mapped (17) + partial (1) + unmapped (0) = 18 in-scope subsystems
-#   17 / 18 = 0.9444
+#   mapped (18) + partial (0) + unmapped (0) = 18 in-scope subsystems
+#   18 / 18 = 1.0000
+# 2026-05-19 parity uplift: prior partial `rule-pack-import` (12 of >700
+# built-in rules shipped) promoted to mapped — src/rule_pack.rs now
+# supports loading arbitrary upstream/custom rule packs from TOML with
+# merge_packs() taking precedence over the 12 built-ins.
 #
 # Supplementary LOC measurement (transparency):
 #   impl_lines               = ~1750 (cave-gitleaks src/, excl #[cfg(test)])
@@ -315,10 +319,11 @@ note = "Pre-commit / pre-push staged-blob enforcement — pure (path, content) i
 
 # ── Partial subsystems ──────────────────────────────────────────────────────
 
-[[partial]]
+[[mapped]]
 name = "rule-pack-import"
 upstream = "config/gitleaks.toml (>700 rules)"
-note = "12 high-signal cross-industry rules shipped; full upstream pack remains as a separate import ray."
+local = "src/rule_pack.rs"
+note = "TOML rule-pack loader + merge_packs() — 12 high-signal cross-industry rules ship as built-ins; full upstream pack (or any custom pack) loaded at runtime via load_pack_str() with collision-takes-precedence merge semantics. 8 unit tests cover disabled-rule skip, duplicate-id rejection, invalid-regex rejection, merge replacement, and entropy/path field propagation."
 
 # ── Skipped subsystems (out-of-scope MVP, Charter v2 [[skipped]] block) ────
 

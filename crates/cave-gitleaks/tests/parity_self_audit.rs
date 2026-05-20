@@ -68,8 +68,8 @@ fn gate_3_fill_ratio_is_measured_and_at_least_0_40() {
         .parse()
         .expect("fill_ratio must parse as float");
     assert!(
-        ratio >= 0.40,
-        "cave-gitleaks MVP floor: fill_ratio must be >= 0.40 (got {}). \
+        ratio >= 0.95,
+        "cave-gitleaks parity-uplift floor: fill_ratio must be >= 0.95 (got {}). \
          Either improve coverage or document scope-cuts as [[skipped]].",
         ratio
     );
