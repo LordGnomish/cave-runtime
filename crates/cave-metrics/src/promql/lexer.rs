@@ -26,22 +26,22 @@ pub enum Token {
     Slash,
     Percent,
     Caret,
-    Eq,       // ==
-    Ne,       // !=
-    Lt,       // <
-    Le,       // <=
-    Gt,       // >
-    Ge,       // >=
+    Eq, // ==
+    Ne, // !=
+    Lt, // <
+    Le, // <=
+    Gt, // >
+    Ge, // >=
     And,
     Or,
     Unless,
     Atan2,
 
     // Label matching
-    EqMatch,     // =
-    NeMatch,     // !=  (also Ne above for comparison)
-    ReMatch,     // =~
-    NreMatch,    // !~
+    EqMatch,  // =
+    NeMatch,  // !=  (also Ne above for comparison)
+    ReMatch,  // =~
+    NreMatch, // !~
 
     // Aggregation keywords
     By,
@@ -58,11 +58,20 @@ pub enum Token {
     At,            // @
 
     // Aggregation ops
-    Sum, Min, Max, Avg, Count, Stddev, Stdvar,
-    Topk, Bottomk, Quantile, CountValues, Group,
+    Sum,
+    Min,
+    Max,
+    Avg,
+    Count,
+    Stddev,
+    Stdvar,
+    Topk,
+    Bottomk,
+    Quantile,
+    CountValues,
+    Group,
 
     // Functions (ident enough; resolved by name)
-
     Eof,
 }
 
@@ -73,7 +82,10 @@ pub struct Lexer {
 
 impl Lexer {
     pub fn new(input: &str) -> Self {
-        Self { chars: input.chars().collect(), pos: 0 }
+        Self {
+            chars: input.chars().collect(),
+            pos: 0,
+        }
     }
 
     fn peek(&self) -> Option<char> {
@@ -106,17 +118,18 @@ impl Lexer {
         let mut s = String::new();
         loop {
             match self.advance() {
-                None | Some('\n')      => break,
+                None | Some('\n') => break,
                 Some(c) if c == delimiter => break,
-                Some('\\') => {
-                    match self.advance() {
-                        Some('n')  => s.push('\n'),
-                        Some('t')  => s.push('\t'),
-                        Some('\\') => s.push('\\'),
-                        Some(c)    => { s.push('\\'); s.push(c); }
-                        None       => break,
+                Some('\\') => match self.advance() {
+                    Some('n') => s.push('\n'),
+                    Some('t') => s.push('\t'),
+                    Some('\\') => s.push('\\'),
+                    Some(c) => {
+                        s.push('\\');
+                        s.push(c);
                     }
-                }
+                    None => break,
+                },
                 Some(c) => s.push(c),
             }
         }
@@ -173,13 +186,22 @@ impl Lexer {
         loop {
             self.skip_whitespace();
             match self.peek() {
-                None => { tokens.push(Token::Eof); break; }
-                Some('#') => { self.advance(); self.skip_line_comment(); }
+                None => {
+                    tokens.push(Token::Eof);
+                    break;
+                }
+                Some('#') => {
+                    self.advance();
+                    self.skip_line_comment();
+                }
                 Some('"') | Some('\'') | Some('`') => {
                     let d = self.advance().unwrap();
                     tokens.push(self.read_string(d));
                 }
-                Some(c) if c.is_ascii_digit() || (c == '.' && matches!(self.peek2(), Some(d) if d.is_ascii_digit())) => {
+                Some(c)
+                    if c.is_ascii_digit()
+                        || (c == '.' && matches!(self.peek2(), Some(d) if d.is_ascii_digit())) =>
+                {
                     self.advance();
                     tokens.push(self.read_number(c));
                 }
@@ -205,22 +227,42 @@ impl Lexer {
                         '@' => Token::At,
                         '-' => Token::Minus,
                         '=' => {
-                            if self.peek() == Some('=') { self.advance(); Token::Eq }
-                            else if self.peek() == Some('~') { self.advance(); Token::ReMatch }
-                            else { Token::EqMatch }
+                            if self.peek() == Some('=') {
+                                self.advance();
+                                Token::Eq
+                            } else if self.peek() == Some('~') {
+                                self.advance();
+                                Token::ReMatch
+                            } else {
+                                Token::EqMatch
+                            }
                         }
                         '!' => {
-                            if self.peek() == Some('=') { self.advance(); Token::Ne }
-                            else if self.peek() == Some('~') { self.advance(); Token::NreMatch }
-                            else { Token::Ne }
+                            if self.peek() == Some('=') {
+                                self.advance();
+                                Token::Ne
+                            } else if self.peek() == Some('~') {
+                                self.advance();
+                                Token::NreMatch
+                            } else {
+                                Token::Ne
+                            }
                         }
                         '<' => {
-                            if self.peek() == Some('=') { self.advance(); Token::Le }
-                            else { Token::Lt }
+                            if self.peek() == Some('=') {
+                                self.advance();
+                                Token::Le
+                            } else {
+                                Token::Lt
+                            }
                         }
                         '>' => {
-                            if self.peek() == Some('=') { self.advance(); Token::Ge }
-                            else { Token::Gt }
+                            if self.peek() == Some('=') {
+                                self.advance();
+                                Token::Ge
+                            } else {
+                                Token::Gt
+                            }
                         }
                         _ => continue,
                     };
@@ -236,45 +278,45 @@ fn parse_duration_suffix(base: f64, suffix: &str) -> Option<i64> {
     // Handle compound: "1h30m" is complex; we handle simple ones.
     let ms: f64 = match suffix {
         "ms" => base,
-        "s"  => base * 1_000.0,
-        "m"  => base * 60_000.0,
-        "h"  => base * 3_600_000.0,
-        "d"  => base * 86_400_000.0,
-        "w"  => base * 604_800_000.0,
-        "y"  => base * 31_536_000_000.0,
-        _    => return None,
+        "s" => base * 1_000.0,
+        "m" => base * 60_000.0,
+        "h" => base * 3_600_000.0,
+        "d" => base * 86_400_000.0,
+        "w" => base * 604_800_000.0,
+        "y" => base * 31_536_000_000.0,
+        _ => return None,
     };
     Some(ms as i64)
 }
 
 fn keyword_or_ident(s: String) -> Token {
     match s.as_str() {
-        "and"        => Token::And,
-        "or"         => Token::Or,
-        "unless"     => Token::Unless,
-        "atan2"      => Token::Atan2,
-        "by"         => Token::By,
-        "without"    => Token::Without,
-        "on"         => Token::On,
-        "ignoring"   => Token::Ignoring,
+        "and" => Token::And,
+        "or" => Token::Or,
+        "unless" => Token::Unless,
+        "atan2" => Token::Atan2,
+        "by" => Token::By,
+        "without" => Token::Without,
+        "on" => Token::On,
+        "ignoring" => Token::Ignoring,
         "group_left" => Token::GroupLeft,
-        "group_right"=> Token::GroupRight,
-        "offset"     => Token::Offset,
-        "bool"       => Token::Bool,
-        "sum"        => Token::Sum,
-        "min"        => Token::Min,
-        "max"        => Token::Max,
-        "avg"        => Token::Avg,
-        "count"      => Token::Count,
-        "stddev"     => Token::Stddev,
-        "stdvar"     => Token::Stdvar,
-        "topk"       => Token::Topk,
-        "bottomk"    => Token::Bottomk,
-        "quantile"   => Token::Quantile,
+        "group_right" => Token::GroupRight,
+        "offset" => Token::Offset,
+        "bool" => Token::Bool,
+        "sum" => Token::Sum,
+        "min" => Token::Min,
+        "max" => Token::Max,
+        "avg" => Token::Avg,
+        "count" => Token::Count,
+        "stddev" => Token::Stddev,
+        "stdvar" => Token::Stdvar,
+        "topk" => Token::Topk,
+        "bottomk" => Token::Bottomk,
+        "quantile" => Token::Quantile,
         "count_values" => Token::CountValues,
-        "group"      => Token::Group,
+        "group" => Token::Group,
         "Inf" | "inf" => Token::Number(f64::INFINITY),
         "NaN" | "nan" => Token::Number(f64::NAN),
-        _            => Token::Ident(s),
+        _ => Token::Ident(s),
     }
 }

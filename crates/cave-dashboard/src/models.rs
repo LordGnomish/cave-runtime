@@ -318,7 +318,14 @@ pub struct DataSource {
 }
 
 impl DataSource {
-    pub fn new(id: i64, org_id: i64, uid: &str, name: &str, ds_type: DataSourceType, url: &str) -> Self {
+    pub fn new(
+        id: i64,
+        org_id: i64,
+        uid: &str,
+        name: &str,
+        ds_type: DataSourceType,
+        url: &str,
+    ) -> Self {
         let now = Utc::now();
         Self {
             id,
@@ -942,7 +949,10 @@ impl Dashboard {
             time: TimeRange {
                 from: "now-6h".into(),
                 to: "now".into(),
-                raw: TimeRangeRaw { from: "now-6h".into(), to: "now".into() },
+                raw: TimeRangeRaw {
+                    from: "now-6h".into(),
+                    to: "now".into(),
+                },
             },
             timepicker: serde_json::json!({}),
             refresh: "".into(),

@@ -37,16 +37,18 @@ pub mod routes;
 #[cfg(test)]
 mod tests;
 
-use cave_certs::pqc::{HybridKeyPair, PqcError, MLDSA65_SIG_LEN};
+use cave_certs::pqc::{HybridKeyPair, MLDSA65_SIG_LEN, PqcError};
 use ed25519_dalek::VerifyingKey;
 use p256::ecdsa::signature::{Signer as _, Verifier as _};
-use p256::ecdsa::{Signature as P256Signature, SigningKey as P256SigningKey, VerifyingKey as P256VerifyingKey};
+use p256::ecdsa::{
+    Signature as P256Signature, SigningKey as P256SigningKey, VerifyingKey as P256VerifyingKey,
+};
 use p256::pkcs8::{DecodePublicKey, EncodePublicKey};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-pub use routes::{router, CosignState};
+pub use routes::{CosignState, router};
 
 pub const MODULE_NAME: &str = "cosign";
 
@@ -72,7 +74,9 @@ impl Alg {
     pub fn parse(s: &str) -> Option<Alg> {
         match s.to_ascii_lowercase().as_str() {
             "ecdsa-p256" | "ecdsa_p256" | "ecdsa" => Some(Alg::EcdsaP256),
-            "ml-dsa-65" | "ml_dsa_65" | "mldsa65" | "mldsa-65" | "pqc" | "hybrid" => Some(Alg::MlDsa65),
+            "ml-dsa-65" | "ml_dsa_65" | "mldsa65" | "mldsa-65" | "pqc" | "hybrid" => {
+                Some(Alg::MlDsa65)
+            }
             _ => None,
         }
     }
@@ -111,14 +115,8 @@ pub enum CosignError {
 /// In-memory keypair handle. Real deployments pluck the secret half from
 /// a KMS; the public half is what gets advertised.
 pub enum KeyPair {
-    EcdsaP256 {
-        id: String,
-        signing: P256SigningKey,
-    },
-    MlDsa65 {
-        id: String,
-        hybrid: HybridKeyPair,
-    },
+    EcdsaP256 { id: String, signing: P256SigningKey },
+    MlDsa65 { id: String, hybrid: HybridKeyPair },
 }
 
 impl KeyPair {
@@ -275,11 +273,7 @@ pub fn sign(key: &KeyPair, payload: &[u8]) -> Result<Signature, CosignError> {
 /// Verify `payload` against the signature using the public-key handle
 /// returned earlier from [`KeyPair::public_handle`]. Returns Ok on
 /// success, an error variant on any mismatch — never panics.
-pub fn verify(
-    key: &PublicKeyHandle,
-    payload: &[u8],
-    sig: &Signature,
-) -> Result<(), CosignError> {
+pub fn verify(key: &PublicKeyHandle, payload: &[u8], sig: &Signature) -> Result<(), CosignError> {
     if key.alg() != sig.alg() {
         return Err(CosignError::AlgorithmMismatch {
             sig_alg: sig.alg().as_str().into(),
@@ -326,14 +320,14 @@ pub fn verify(
 }
 
 fn base64_std(bytes: &[u8]) -> String {
-    use base64::engine::general_purpose::STANDARD;
     use base64::Engine as _;
+    use base64::engine::general_purpose::STANDARD;
     STANDARD.encode(bytes)
 }
 
 fn base64_decode(s: &str) -> Result<Vec<u8>, CosignError> {
-    use base64::engine::general_purpose::STANDARD;
     use base64::Engine as _;
+    use base64::engine::general_purpose::STANDARD;
     STANDARD
         .decode(s.trim())
         .map_err(|e| CosignError::MalformedKey(format!("base64: {e}")))

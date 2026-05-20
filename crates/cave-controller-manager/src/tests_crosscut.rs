@@ -34,12 +34,21 @@ fn deployment_paused_short_circuits_to_noop() {
         name: "web".into(),
         namespace: "default".into(),
         replicas: 5,
-        strategy: deployment::Strategy::RollingUpdate { max_surge: 1, max_unavailable: 0 },
+        strategy: deployment::Strategy::RollingUpdate {
+            max_surge: 1,
+            max_unavailable: 0,
+        },
         paused: true,
         progress_deadline_seconds: None,
     };
-    let status = deployment::DeploymentStatus { observed_replicas: 0, ..Default::default() };
-    assert_eq!(deployment::reconcile(&spec, &status, &t).unwrap(), Reconcile::NoOp);
+    let status = deployment::DeploymentStatus {
+        observed_replicas: 0,
+        ..Default::default()
+    };
+    assert_eq!(
+        deployment::reconcile(&spec, &status, &t).unwrap(),
+        Reconcile::NoOp
+    );
 }
 
 #[test]
@@ -53,12 +62,21 @@ fn deployment_scale_up_emits_create_decision() {
         name: "web".into(),
         namespace: "default".into(),
         replicas: 5,
-        strategy: deployment::Strategy::RollingUpdate { max_surge: 1, max_unavailable: 0 },
+        strategy: deployment::Strategy::RollingUpdate {
+            max_surge: 1,
+            max_unavailable: 0,
+        },
         paused: false,
         progress_deadline_seconds: None,
     };
-    let status = deployment::DeploymentStatus { observed_replicas: 2, ..Default::default() };
-    assert_eq!(deployment::reconcile(&spec, &status, &t).unwrap(), Reconcile::Create(3));
+    let status = deployment::DeploymentStatus {
+        observed_replicas: 2,
+        ..Default::default()
+    };
+    assert_eq!(
+        deployment::reconcile(&spec, &status, &t).unwrap(),
+        Reconcile::Create(3)
+    );
 }
 
 #[test]
@@ -76,8 +94,14 @@ fn deployment_scale_down_emits_delete_decision() {
         paused: false,
         progress_deadline_seconds: None,
     };
-    let status = deployment::DeploymentStatus { observed_replicas: 5, ..Default::default() };
-    assert_eq!(deployment::reconcile(&spec, &status, &t).unwrap(), Reconcile::Delete(3));
+    let status = deployment::DeploymentStatus {
+        observed_replicas: 5,
+        ..Default::default()
+    };
+    assert_eq!(
+        deployment::reconcile(&spec, &status, &t).unwrap(),
+        Reconcile::Delete(3)
+    );
 }
 
 #[test]
@@ -129,8 +153,14 @@ fn replicaset_reconcile_at_target_is_noop() {
         replicas: 4,
         selector: vec![("app".into(), "web".into())],
     };
-    let status = replicaset::ReplicaSetStatus { running_pods: 4, failed_pods: 0 };
-    assert_eq!(replicaset::reconcile(&spec, &status, &t).unwrap(), Reconcile::NoOp);
+    let status = replicaset::ReplicaSetStatus {
+        running_pods: 4,
+        failed_pods: 0,
+    };
+    assert_eq!(
+        replicaset::reconcile(&spec, &status, &t).unwrap(),
+        Reconcile::NoOp
+    );
 }
 
 #[test]
@@ -146,8 +176,14 @@ fn replicaset_under_replicated_creates() {
         replicas: 5,
         selector: vec![("app".into(), "web".into())],
     };
-    let status = replicaset::ReplicaSetStatus { running_pods: 1, failed_pods: 0 };
-    assert_eq!(replicaset::reconcile(&spec, &status, &t).unwrap(), Reconcile::Create(4));
+    let status = replicaset::ReplicaSetStatus {
+        running_pods: 1,
+        failed_pods: 0,
+    };
+    assert_eq!(
+        replicaset::reconcile(&spec, &status, &t).unwrap(),
+        Reconcile::Create(4)
+    );
 }
 
 #[test]
@@ -228,8 +264,14 @@ fn statefulset_ordered_policy_steps_one_pod_per_pass() {
         replicas: 5,
         policy: statefulset::PodManagementPolicy::OrderedReady,
     };
-    let status = statefulset::StatefulSetStatus { current_replicas: 2, ready_replicas: 2 };
-    assert_eq!(statefulset::reconcile(&spec, &status, &t).unwrap(), Reconcile::Create(1));
+    let status = statefulset::StatefulSetStatus {
+        current_replicas: 2,
+        ready_replicas: 2,
+    };
+    assert_eq!(
+        statefulset::reconcile(&spec, &status, &t).unwrap(),
+        Reconcile::Create(1)
+    );
 }
 
 #[test]
@@ -245,8 +287,14 @@ fn statefulset_parallel_policy_fans_out_in_one_pass() {
         replicas: 5,
         policy: statefulset::PodManagementPolicy::Parallel,
     };
-    let status = statefulset::StatefulSetStatus { current_replicas: 1, ready_replicas: 1 };
-    assert_eq!(statefulset::reconcile(&spec, &status, &t).unwrap(), Reconcile::Create(4));
+    let status = statefulset::StatefulSetStatus {
+        current_replicas: 1,
+        ready_replicas: 1,
+    };
+    assert_eq!(
+        statefulset::reconcile(&spec, &status, &t).unwrap(),
+        Reconcile::Create(4)
+    );
 }
 
 // ── DaemonSet ───────────────────────────────────────────────────────────────
@@ -348,7 +396,12 @@ fn job_is_complete_when_succeeded_meets_completions() {
         suspended: false,
         active_deadline_seconds: None,
     };
-    let status = job::JobStatus { active: 0, succeeded: 5, failed: 0, start_time: None };
+    let status = job::JobStatus {
+        active: 0,
+        succeeded: 5,
+        failed: 0,
+        start_time: None,
+    };
     assert!(job::is_complete(&spec, &status));
 }
 
@@ -368,7 +421,12 @@ fn job_past_backoff_when_failed_exceeds_limit() {
         suspended: false,
         active_deadline_seconds: None,
     };
-    let status = job::JobStatus { active: 0, succeeded: 0, failed: 4, start_time: None };
+    let status = job::JobStatus {
+        active: 0,
+        succeeded: 0,
+        failed: 4,
+        start_time: None,
+    };
     assert!(job::past_backoff(&spec, &status));
 }
 
@@ -388,8 +446,16 @@ fn job_suspended_with_active_pods_emits_delete() {
         suspended: true,
         active_deadline_seconds: None,
     };
-    let status = job::JobStatus { active: 2, succeeded: 0, failed: 0, start_time: None };
-    assert_eq!(job::reconcile(&spec, &status, &t).unwrap(), Reconcile::Delete(2));
+    let status = job::JobStatus {
+        active: 2,
+        succeeded: 0,
+        failed: 0,
+        start_time: None,
+    };
+    assert_eq!(
+        job::reconcile(&spec, &status, &t).unwrap(),
+        Reconcile::Delete(2)
+    );
 }
 
 #[test]
@@ -408,8 +474,16 @@ fn job_clamps_creates_to_parallelism_remaining() {
         suspended: false,
         active_deadline_seconds: None,
     };
-    let status = job::JobStatus { active: 1, succeeded: 0, failed: 0, start_time: None };
-    assert_eq!(job::reconcile(&spec, &status, &t).unwrap(), Reconcile::Create(2));
+    let status = job::JobStatus {
+        active: 1,
+        succeeded: 0,
+        failed: 0,
+        start_time: None,
+    };
+    assert_eq!(
+        job::reconcile(&spec, &status, &t).unwrap(),
+        Reconcile::Create(2)
+    );
 }
 
 // ── CronJob ─────────────────────────────────────────────────────────────────
@@ -429,7 +503,10 @@ fn cronjob_reconcile_emits_create_when_allow_and_no_active() {
         suspended: false,
     };
     let status = cronjob::CronJobStatus::default();
-    assert_eq!(cronjob::reconcile(&spec, &status, &t).unwrap(), Reconcile::Create(1));
+    assert_eq!(
+        cronjob::reconcile(&spec, &status, &t).unwrap(),
+        Reconcile::Create(1)
+    );
 }
 
 #[test]
@@ -447,7 +524,10 @@ fn cronjob_reconcile_suspended_is_noop() {
         suspended: true,
     };
     let status = cronjob::CronJobStatus::default();
-    assert_eq!(cronjob::reconcile(&spec, &status, &t).unwrap(), Reconcile::NoOp);
+    assert_eq!(
+        cronjob::reconcile(&spec, &status, &t).unwrap(),
+        Reconcile::NoOp
+    );
 }
 
 #[test]
@@ -464,8 +544,14 @@ fn cronjob_forbid_with_active_run_skips_new_fire() {
         concurrency: cronjob::ConcurrencyPolicy::Forbid,
         suspended: false,
     };
-    let status = cronjob::CronJobStatus { active_jobs: 1, last_schedule_time: None };
-    assert_eq!(cronjob::reconcile(&spec, &status, &t).unwrap(), Reconcile::NoOp);
+    let status = cronjob::CronJobStatus {
+        active_jobs: 1,
+        last_schedule_time: None,
+    };
+    assert_eq!(
+        cronjob::reconcile(&spec, &status, &t).unwrap(),
+        Reconcile::NoOp
+    );
 }
 
 #[test]
@@ -496,7 +582,10 @@ fn hpa_reconcile_inside_band_is_noop() {
         target_cpu_utilization_pct: 80,
     };
     // current_replicas=3, current=80, target=80 → desired=3 (no change)
-    let status = hpa::HpaStatus { current_replicas: 3, current_cpu_utilization_pct: 80 };
+    let status = hpa::HpaStatus {
+        current_replicas: 3,
+        current_cpu_utilization_pct: 80,
+    };
     assert_eq!(hpa::reconcile(&spec, &status, &t).unwrap(), Reconcile::NoOp);
 }
 
@@ -515,8 +604,14 @@ fn hpa_reconcile_above_target_scales_up_within_max() {
         target_cpu_utilization_pct: 50,
     };
     // current=4, util=100, target=50 → desired = ceil(4 * 100 / 50) = 8
-    let status = hpa::HpaStatus { current_replicas: 4, current_cpu_utilization_pct: 100 };
-    assert_eq!(hpa::reconcile(&spec, &status, &t).unwrap(), Reconcile::Update(8));
+    let status = hpa::HpaStatus {
+        current_replicas: 4,
+        current_cpu_utilization_pct: 100,
+    };
+    assert_eq!(
+        hpa::reconcile(&spec, &status, &t).unwrap(),
+        Reconcile::Update(8)
+    );
 }
 
 #[test]
@@ -533,7 +628,10 @@ fn hpa_target_zero_is_invalid_spec() {
         max_replicas: 10,
         target_cpu_utilization_pct: 0,
     };
-    let status = hpa::HpaStatus { current_replicas: 1, current_cpu_utilization_pct: 50 };
+    let status = hpa::HpaStatus {
+        current_replicas: 1,
+        current_cpu_utilization_pct: 50,
+    };
     assert!(hpa::desired_replicas(&spec, &status).is_err());
 }
 
@@ -589,7 +687,10 @@ fn pdb_admit_eviction_dry_run_always_allows() {
         expected_pods: 3,
         disruptions_allowed: 0,
     };
-    assert_eq!(pdb::admit_eviction(&status, true), pdb::EvictionDecision::Allow);
+    assert_eq!(
+        pdb::admit_eviction(&status, true),
+        pdb::EvictionDecision::Allow
+    );
 }
 
 // ── Manager loop / workqueue ─────────────────────────────────────────────────
@@ -603,7 +704,12 @@ fn manager_loop_workqueue_dedups_repeated_adds() {
     );
     use crate::deeper::manager::{ObjectKey, Workqueue};
     let mut q = Workqueue::new();
-    let k = ObjectKey::new(TenantId::new("acme").expect("test fixture"), "Deployment", "default", "web");
+    let k = ObjectKey::new(
+        TenantId::new("acme").expect("test fixture"),
+        "Deployment",
+        "default",
+        "web",
+    );
     q.add(k.clone());
     q.add(k.clone());
     q.add(k);
@@ -622,8 +728,18 @@ fn manager_loop_drops_cross_tenant_keys_at_drain() {
     };
     let owner = TenantId::new("acme").expect("test fixture");
     let mut src = EventSource::new();
-    src.push(Event::Add(ObjectKey::new(TenantId::new("evil").expect("test fixture"), "Deployment", "default", "x")));
-    src.push(Event::Add(ObjectKey::new(owner.clone(), "Deployment", "default", "y")));
+    src.push(Event::Add(ObjectKey::new(
+        TenantId::new("evil").expect("test fixture"),
+        "Deployment",
+        "default",
+        "x",
+    )));
+    src.push(Event::Add(ObjectKey::new(
+        owner.clone(),
+        "Deployment",
+        "default",
+        "y",
+    )));
     let mut q = Workqueue::new();
     src.drain_into(&mut q, &owner);
     let mut ctrl = SyncController::new(owner, ConstReconciler::new(Reconcile::NoOp));
@@ -643,8 +759,16 @@ fn admin_controllers_surface_includes_all_workload_kinds() {
         "tenant-cm-admin-controllers"
     );
     for must in [
-        "deployment", "replicaset", "statefulset", "daemonset", "job", "cronjob",
-        "hpa", "pdb", "endpointslice", "service",
+        "deployment",
+        "replicaset",
+        "statefulset",
+        "daemonset",
+        "job",
+        "cronjob",
+        "hpa",
+        "pdb",
+        "endpointslice",
+        "service",
     ] {
         assert!(crate::CONTROLLERS.contains(&must), "missing: {must}");
     }
@@ -658,9 +782,15 @@ fn admin_controllers_surface_includes_lifecycle_set() {
         "tenant-cm-admin-lifecycle"
     );
     for must in [
-        "garbage-collector", "podgc", "ttl-after-finished",
-        "node-lease", "node-lifecycle", "root-ca-publisher",
-        "serviceaccount", "csr-signer", "rbac-aggregation",
+        "garbage-collector",
+        "podgc",
+        "ttl-after-finished",
+        "node-lease",
+        "node-lifecycle",
+        "root-ca-publisher",
+        "serviceaccount",
+        "csr-signer",
+        "rbac-aggregation",
     ] {
         assert!(crate::CONTROLLERS.contains(&must), "missing: {must}");
     }
@@ -703,11 +833,7 @@ fn upstream_pkg_pins_to_canonical_path() {
 
 #[test]
 fn upstream_version_pinned_to_release() {
-    let (_c, _t) = test_ctx!(
-        "version.go",
-        "RELEASE",
-        "tenant-cm-pin-ver"
-    );
+    let (_c, _t) = test_ctx!("version.go", "RELEASE", "tenant-cm-pin-ver");
     assert!(crate::UPSTREAM_VERSION.starts_with('v'));
     assert!(crate::UPSTREAM_VERSION.split('.').count() >= 2);
 }

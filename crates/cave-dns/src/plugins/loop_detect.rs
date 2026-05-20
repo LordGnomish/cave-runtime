@@ -7,7 +7,10 @@ use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use dashmap::DashMap;
-use hickory_proto::{op::ResponseCode, rr::{Name, RecordType}};
+use hickory_proto::{
+    op::ResponseCode,
+    rr::{Name, RecordType},
+};
 use tracing::warn;
 
 use crate::{

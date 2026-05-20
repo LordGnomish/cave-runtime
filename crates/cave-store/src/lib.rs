@@ -87,10 +87,8 @@ impl StoreState {
 
     /// Create an in-memory store for testing (no WAL persistence).
     pub fn in_memory() -> Arc<Self> {
-        let data_dir = std::env::temp_dir().join(format!(
-            "cave-store-test-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let data_dir =
+            std::env::temp_dir().join(format!("cave-store-test-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&data_dir).unwrap();
         let wal = wal::WalWriter::open(&data_dir).unwrap();
         let wal_arc = Arc::new(wal::WalWriter::open(&data_dir).unwrap());

@@ -35,9 +35,9 @@ impl KubernetesPlugin {
     }
 
     async fn sync(&self) -> DnsResult<()> {
-        let client = Client::try_default().await.map_err(|e| {
-            DnsError::Kubernetes(format!("cannot connect to kube API: {e}"))
-        })?;
+        let client = Client::try_default()
+            .await
+            .map_err(|e| DnsError::Kubernetes(format!("cannot connect to kube API: {e}")))?;
 
         let mut store: RecordStore = HashMap::new();
 
@@ -67,16 +67,13 @@ impl KubernetesPlugin {
         let svc_api: Api<Service> = Api::namespaced(client.clone(), namespace);
         let ep_api: Api<Endpoints> = Api::namespaced(client.clone(), namespace);
 
-        let services = svc_api.list(&Default::default()).await.map_err(|e| {
-            DnsError::Kubernetes(format!("list services in {namespace}: {e}"))
-        })?;
+        let services = svc_api
+            .list(&Default::default())
+            .await
+            .map_err(|e| DnsError::Kubernetes(format!("list services in {namespace}: {e}")))?;
 
         for svc in services.items {
-            let svc_name = svc
-                .metadata
-                .name
-                .as_deref()
-                .unwrap_or("unknown");
+            let svc_name = svc.metadata.name.as_deref().unwrap_or("unknown");
             let dns_name = format!("{svc_name}.{namespace}.svc.{zone}");
             let fqdn: Name = match dns_name.parse() {
                 Ok(n) => n,
@@ -110,12 +107,8 @@ impl KubernetesPlugin {
                     if cluster_ip != "None" && !cluster_ip.is_empty() {
                         if let Ok(addr) = cluster_ip.parse::<IpAddr>() {
                             let rdata = match addr {
-                                IpAddr::V4(v4) => {
-                                    RData::A(hickory_proto::rr::rdata::A(v4))
-                                }
-                                IpAddr::V6(v6) => {
-                                    RData::AAAA(hickory_proto::rr::rdata::AAAA(v6))
-                                }
+                                IpAddr::V4(v4) => RData::A(hickory_proto::rr::rdata::A(v4)),
+                                IpAddr::V6(v6) => RData::AAAA(hickory_proto::rr::rdata::AAAA(v6)),
                             };
                             let rtype = if matches!(addr, IpAddr::V4(_)) {
                                 RecordType::A
@@ -128,10 +121,7 @@ impl KubernetesPlugin {
                             r.set_record_type(rtype);
                             r.set_dns_class(DNSClass::IN);
                             r.set_data(Some(rdata));
-                            store
-                                .entry((fqdn.clone(), rtype))
-                                .or_default()
-                                .push(r);
+                            store.entry((fqdn.clone(), rtype)).or_default().push(r);
                         }
                     }
                 }
@@ -158,10 +148,7 @@ impl KubernetesPlugin {
                                     r.set_record_type(rtype);
                                     r.set_dns_class(DNSClass::IN);
                                     r.set_data(Some(rdata));
-                                    store
-                                        .entry((fqdn.clone(), rtype))
-                                        .or_default()
-                                        .push(r);
+                                    store.entry((fqdn.clone(), rtype)).or_default().push(r);
                                 }
                             }
                         }

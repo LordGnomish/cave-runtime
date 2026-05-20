@@ -57,8 +57,14 @@ fn test_kv_put_overwrite() {
     let r2 = put(&store, "k", "second");
     let v2 = get(&store, "k").unwrap();
     assert_eq!(v2.value_str(), "second");
-    assert_eq!(v2.version, 2, "version must monotonically increment on overwrite");
-    assert_eq!(v2.create_revision, create_rev, "create_revision is stable across overwrites");
+    assert_eq!(
+        v2.version, 2,
+        "version must monotonically increment on overwrite"
+    );
+    assert_eq!(
+        v2.create_revision, create_rev,
+        "create_revision is stable across overwrites"
+    );
     assert!(r2.header.revision > r1.header.revision);
 }
 
@@ -105,7 +111,10 @@ fn test_kv_delete_range() {
         prev_kv: false,
     });
     assert_eq!(resp.deleted, 5);
-    assert!(get(&store, "/other").is_some(), "non-matching key untouched");
+    assert!(
+        get(&store, "/other").is_some(),
+        "non-matching key untouched"
+    );
     for i in 0..5 {
         assert!(get(&store, &format!("/p/{i}")).is_none());
     }
@@ -117,12 +126,14 @@ fn test_kv_delete_range() {
 #[test]
 fn test_kv_txn_too_many_ops() {
     let store = KvStore::new();
-    let put_op = || RequestOp::Put(PutRequest {
-        key: "k".into(),
-        value: "v".into(),
-        lease: None,
-        prev_kv: false,
-    });
+    let put_op = || {
+        RequestOp::Put(PutRequest {
+            key: "k".into(),
+            value: "v".into(),
+            lease: None,
+            prev_kv: false,
+        })
+    };
 
     // Reasonable count succeeds.
     let small = TxnRequest {
@@ -139,7 +150,9 @@ fn test_kv_txn_too_many_ops() {
         success: (0..(KvStore::MAX_TXN_OPS + 1)).map(|_| put_op()).collect(),
         failure: vec![],
     };
-    let err = store.txn_checked(&huge).expect_err("over-limit txn must error");
+    let err = store
+        .txn_checked(&huge)
+        .expect_err("over-limit txn must error");
     assert!(matches!(err, EtcdError::TooManyTxnOps { .. }));
 }
 
@@ -185,7 +198,10 @@ fn test_txn_atomicity() {
 
     // x must reflect ONLY the failure branch; y must NOT have been written.
     assert_eq!(get(&store, "x").unwrap().value_str(), "fail_branch");
-    assert!(get(&store, "y").is_none(), "success op leaked across compare failure");
+    assert!(
+        get(&store, "y").is_none(),
+        "success op leaked across compare failure"
+    );
 }
 
 // ── Watch ───────────────────────────────────────────────────────────────────
@@ -203,7 +219,10 @@ fn test_watch_from_current_revision() {
         prev_kv: false,
     });
     assert!(resp.created);
-    assert!(resp.events.is_empty(), "no historical replay when start_revision is None");
+    assert!(
+        resp.events.is_empty(),
+        "no historical replay when start_revision is None"
+    );
 
     let mut rx = store.subscribe();
     put(&store, "/w", "post_watch");
@@ -225,10 +244,18 @@ fn test_watch_cancel_synced() {
         prev_kv: false,
     });
     let id = resp.watch_id;
-    assert!(store.get_watch_config(id).is_some(), "config exists pre-cancel");
+    assert!(
+        store.get_watch_config(id).is_some(),
+        "config exists pre-cancel"
+    );
 
-    store.watch_cancel(id).expect("cancel must succeed on existing watch");
-    assert!(store.get_watch_config(id).is_none(), "config gone post-cancel");
+    store
+        .watch_cancel(id)
+        .expect("cancel must succeed on existing watch");
+    assert!(
+        store.get_watch_config(id).is_none(),
+        "config gone post-cancel"
+    );
 
     // Cancelling a non-existent / already-cancelled id surfaces WatchNotFound.
     let err = store.watch_cancel(id);
@@ -257,7 +284,9 @@ fn test_lease_revoke() {
     let store = KvStore::new();
     let granted = store.lease_grant(&LeaseGrantRequest { ttl: 30, id: None });
 
-    store.lease_revoke(granted.id).expect("revoke active lease ok");
+    store
+        .lease_revoke(granted.id)
+        .expect("revoke active lease ok");
     let after = store.lease_leases();
     assert!(after.leases.iter().all(|l| l.id != granted.id));
 
@@ -309,10 +338,14 @@ fn test_auth_user_add() {
 fn test_auth_role_add() {
     let store = KvStore::new();
     store
-        .role_add(&AuthRoleAddRequest { name: "admin".into() })
+        .role_add(&AuthRoleAddRequest {
+            name: "admin".into(),
+        })
         .expect("first add ok");
 
-    let dup = store.role_add(&AuthRoleAddRequest { name: "admin".into() });
+    let dup = store.role_add(&AuthRoleAddRequest {
+        name: "admin".into(),
+    });
     assert!(matches!(dup, Err(EtcdError::RoleAlreadyExists(_))));
 
     let listing = store.role_list();
@@ -363,8 +396,7 @@ fn test_auth_permission() {
         .check_auth_token(Some(&auth.token), b"/data/x", PermType::Read)
         .expect("read allowed within granted range");
     // Write is denied.
-    let denied = store
-        .check_auth_token(Some(&auth.token), b"/data/x", PermType::Write);
+    let denied = store.check_auth_token(Some(&auth.token), b"/data/x", PermType::Write);
     assert!(matches!(denied, Err(EtcdError::PermissionDenied)));
 
     store.auth_disable().unwrap();

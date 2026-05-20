@@ -6,7 +6,9 @@
 //! `core::audit::AuditLogger` which mirrors openbao's `AuditFormatter` with
 //! HMAC-based redaction of client_token and accessor.
 
-use cave_vault::core::audit::{AuditAuth, AuditBackend, AuditBackendType, AuditEntry, AuditLogger, AuditRequest};
+use cave_vault::core::audit::{
+    AuditAuth, AuditBackend, AuditBackendType, AuditEntry, AuditLogger, AuditRequest,
+};
 use std::collections::HashMap;
 
 fn dummy_logger() -> AuditLogger {
@@ -46,8 +48,10 @@ fn log_replaces_client_token_with_hmac() {
     let entries = logger.recent_entries(10);
     assert_eq!(entries.len(), 1);
     let auth = entries[0].auth.as_ref().unwrap();
-    assert_ne!(auth.client_token, "hvs.SECRET.PLAINTEXT",
-        "raw token MUST never reach the audit log");
+    assert_ne!(
+        auth.client_token, "hvs.SECRET.PLAINTEXT",
+        "raw token MUST never reach the audit log"
+    );
     assert_eq!(auth.client_token.len(), 64, "SHA-256 hex is 64 chars");
 }
 
@@ -90,22 +94,28 @@ fn audit_entry_round_trips_through_json() {
 #[test]
 fn audit_backends_can_be_enabled_and_disabled_independently() {
     let logger = dummy_logger();
-    logger.enable("file/", AuditBackend {
-        path: "file/".into(),
-        backend_type: AuditBackendType::File,
-        description: "primary".into(),
-        options: HashMap::new(),
-        local: false,
-        seal_wrap: false,
-    });
-    logger.enable("syslog/", AuditBackend {
-        path: "syslog/".into(),
-        backend_type: AuditBackendType::Syslog,
-        description: "secondary".into(),
-        options: HashMap::new(),
-        local: false,
-        seal_wrap: false,
-    });
+    logger.enable(
+        "file/",
+        AuditBackend {
+            path: "file/".into(),
+            backend_type: AuditBackendType::File,
+            description: "primary".into(),
+            options: HashMap::new(),
+            local: false,
+            seal_wrap: false,
+        },
+    );
+    logger.enable(
+        "syslog/",
+        AuditBackend {
+            path: "syslog/".into(),
+            backend_type: AuditBackendType::Syslog,
+            description: "secondary".into(),
+            options: HashMap::new(),
+            local: false,
+            seal_wrap: false,
+        },
+    );
     assert_eq!(logger.list_backends().len(), 2);
 
     assert!(logger.disable("file/"));

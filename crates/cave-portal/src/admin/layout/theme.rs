@@ -71,7 +71,11 @@ mod tests {
 
     #[test]
     fn as_str_round_trips_through_parse() {
-        for t in [ThemePreference::Dark, ThemePreference::Light, ThemePreference::System] {
+        for t in [
+            ThemePreference::Dark,
+            ThemePreference::Light,
+            ThemePreference::System,
+        ] {
             assert_eq!(ThemePreference::parse(t.as_str()), t);
         }
     }

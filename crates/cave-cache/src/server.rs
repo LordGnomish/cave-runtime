@@ -12,9 +12,9 @@ use tokio::sync::mpsc;
 use crate::commands::transactions::TransactionState;
 use crate::commands::*;
 use crate::config::Config;
-use crate::db::{PubSubMessage, PubSubKind, ServerState};
+use crate::db::{PubSubKind, PubSubMessage, ServerState};
 use crate::error::{CacheError, CacheResult};
-use crate::resp::{encode_resp, parse_command, write_resp, Reader, Resp};
+use crate::resp::{Reader, Resp, encode_resp, parse_command, write_resp};
 use crate::types::bytes_to_i64;
 
 // ── Connection state ──────────────────────────────────────────────────────────
@@ -105,8 +105,12 @@ pub async fn run(state: Arc<ServerState>) {
 
 async fn handle_connection(stream: TcpStream, state: Arc<ServerState>, peer_addr: String) {
     let client_id = state.next_client_id();
-    state.connected_clients.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    state.total_connections.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    state
+        .connected_clients
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    state
+        .total_connections
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
     let has_password = {
         let cfg = state.config.read().await;
@@ -145,7 +149,9 @@ async fn handle_connection(stream: TcpStream, state: Arc<ServerState>, peer_addr
         let args = match tokio::time::timeout(
             Duration::from_millis(100),
             parse_command(&mut reader),
-        ).await {
+        )
+        .await
+        {
             Ok(Ok(args)) => args,
             Ok(Err(CacheError::Protocol(msg))) if msg.contains("Connection closed") => break,
             Ok(Err(CacheError::Io)) => break,
@@ -160,7 +166,9 @@ async fn handle_connection(stream: TcpStream, state: Arc<ServerState>, peer_addr
             }
         };
 
-        state.total_commands.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        state
+            .total_commands
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         let response = dispatch(&args, &mut conn, &state).await;
 
@@ -185,7 +193,9 @@ async fn handle_connection(stream: TcpStream, state: Arc<ServerState>, peer_addr
     let mut registry = state.pubsub.write().await;
     registry.unsubscribe_all(client_id);
 
-    state.connected_clients.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+    state
+        .connected_clients
+        .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
 }
 
 // ── Command dispatch ──────────────────────────────────────────────────────────
@@ -204,8 +214,8 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
     // Pub/sub mode: only allow sub/unsub commands
     if conn.pubsub_mode {
         match cmd.as_slice() {
-            b"SUBSCRIBE" | b"UNSUBSCRIBE" | b"PSUBSCRIBE" | b"PUNSUBSCRIBE" |
-            b"SSUBSCRIBE" | b"SUNSUBSCRIBE" | b"PING" | b"RESET" | b"QUIT" => {}
+            b"SUBSCRIBE" | b"UNSUBSCRIBE" | b"PSUBSCRIBE" | b"PUNSUBSCRIBE" | b"SSUBSCRIBE"
+            | b"SUNSUBSCRIBE" | b"PING" | b"RESET" | b"QUIT" => {}
             _ => return Resp::error("ERR Command not allowed inside a subscriptions context"),
         }
     }
@@ -231,7 +241,10 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
         // ── Connection commands ───────────────────────────────────────────────
         b"PING" => server_cmds::cmd_ping(args).unwrap_or(Resp::error("ERR")),
         b"ECHO" => server_cmds::cmd_echo(args).unwrap_or_else(|e| Resp::from_error(&e)),
-        b"QUIT" => { /* caller will close */ Resp::ok() }
+        b"QUIT" => {
+            /* caller will close */
+            Resp::ok()
+        }
         b"RESET" => {
             conn.in_multi = false;
             conn.tx_state = None;
@@ -272,15 +285,13 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
             }
         }
 
-        b"HELLO" => {
-            match server_cmds::cmd_hello(args, conn.resp_version, conn.id) {
-                Ok((new_ver, resp)) => {
-                    conn.resp_version = new_ver;
-                    resp
-                }
-                Err(e) => Resp::from_error(&e),
+        b"HELLO" => match server_cmds::cmd_hello(args, conn.resp_version, conn.id) {
+            Ok((new_ver, resp)) => {
+                conn.resp_version = new_ver;
+                resp
             }
-        }
+            Err(e) => Resp::from_error(&e),
+        },
 
         b"SELECT" => {
             let num_dbs = state.dbs.len();
@@ -351,11 +362,12 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
             let tx = conn.tx_state.get_or_insert_with(TransactionState::new);
             for key in &args[1..] {
                 let version = db.keys.get(key.as_slice()).map(|e| e.version).unwrap_or(0);
-                tx.watched_keys.push(crate::commands::transactions::WatchedKey {
-                    key: key.clone(),
-                    version,
-                    db_index: conn.db_index,
-                });
+                tx.watched_keys
+                    .push(crate::commands::transactions::WatchedKey {
+                        key: key.clone(),
+                        version,
+                        db_index: conn.db_index,
+                    });
             }
             Resp::ok()
         }
@@ -441,7 +453,9 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
                 conn.psubscriptions.remove(pattern.as_slice());
                 registry.punsubscribe(conn.id, pattern);
             }
-            if conn.total_subscriptions() == 0 { conn.pubsub_mode = false; }
+            if conn.total_subscriptions() == 0 {
+                conn.pubsub_mode = false;
+            }
             let count = conn.total_subscriptions();
             pubsub::punsubscribe_response(patterns.first().map(|p| p.as_slice()), count)
         }
@@ -453,14 +467,24 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
             }
         }
         b"PUBSUB" => {
-            if args.len() < 2 { return Resp::error("ERR wrong number of arguments for 'pubsub' command"); }
+            if args.len() < 2 {
+                return Resp::error("ERR wrong number of arguments for 'pubsub' command");
+            }
             let registry = state.pubsub.read().await;
             match args[1].to_ascii_uppercase().as_slice() {
-                b"CHANNELS" => pubsub::cmd_pubsub_channels(args, &registry).unwrap_or(Resp::empty_array()),
-                b"NUMSUB" => pubsub::cmd_pubsub_numsub(args, &registry).unwrap_or(Resp::empty_array()),
+                b"CHANNELS" => {
+                    pubsub::cmd_pubsub_channels(args, &registry).unwrap_or(Resp::empty_array())
+                }
+                b"NUMSUB" => {
+                    pubsub::cmd_pubsub_numsub(args, &registry).unwrap_or(Resp::empty_array())
+                }
                 b"NUMPAT" => pubsub::cmd_pubsub_numpat(&registry).unwrap_or(Resp::Integer(0)),
-                b"SHARDCHANNELS" => pubsub::cmd_pubsub_shardchannels(args, &registry).unwrap_or(Resp::empty_array()),
-                b"SHARDNUMSUB" => pubsub::cmd_pubsub_shardnumsub(args, &registry).unwrap_or(Resp::empty_array()),
+                b"SHARDCHANNELS" => {
+                    pubsub::cmd_pubsub_shardchannels(args, &registry).unwrap_or(Resp::empty_array())
+                }
+                b"SHARDNUMSUB" => {
+                    pubsub::cmd_pubsub_shardnumsub(args, &registry).unwrap_or(Resp::empty_array())
+                }
                 _ => Resp::error("ERR unknown subcommand for 'pubsub'"),
             }
         }
@@ -487,11 +511,14 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
             }
         }
         b"SCRIPT" => {
-            if args.len() < 2 { return Resp::error("ERR wrong number of arguments for 'script' command"); }
+            if args.len() < 2 {
+                return Resp::error("ERR wrong number of arguments for 'script' command");
+            }
             match args[1].to_ascii_uppercase().as_slice() {
                 b"LOAD" => {
                     let mut scripts = state.scripts.write().await;
-                    scripting::cmd_script_load(args, &mut scripts).unwrap_or_else(|e| Resp::from_error(&e))
+                    scripting::cmd_script_load(args, &mut scripts)
+                        .unwrap_or_else(|e| Resp::from_error(&e))
                 }
                 b"EXISTS" => {
                     let scripts = state.scripts.read().await;
@@ -508,31 +535,45 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
 
         // ── Server commands ────────────────────────────────────────────────────
         b"INFO" => {
-            let section = args.get(1).and_then(|s| std::str::from_utf8(s).ok()).map(|s| s.to_ascii_lowercase());
+            let section = args
+                .get(1)
+                .and_then(|s| std::str::from_utf8(s).ok())
+                .map(|s| s.to_ascii_lowercase());
             let config = state.config.read().await;
             server_cmds::cmd_info_response(&state, section.as_deref(), &config)
         }
         b"CONFIG" => {
-            if args.len() < 2 { return Resp::error("ERR wrong number of arguments for 'config' command"); }
+            if args.len() < 2 {
+                return Resp::error("ERR wrong number of arguments for 'config' command");
+            }
             match args[1].to_ascii_uppercase().as_slice() {
                 b"GET" => {
                     let config = state.config.read().await;
-                    server_cmds::cmd_config_get(args, &config).unwrap_or_else(|e| Resp::from_error(&e))
+                    server_cmds::cmd_config_get(args, &config)
+                        .unwrap_or_else(|e| Resp::from_error(&e))
                 }
                 b"SET" => {
                     let mut config = state.config.write().await;
-                    server_cmds::cmd_config_set(args, &mut config).unwrap_or_else(|e| Resp::from_error(&e))
+                    server_cmds::cmd_config_set(args, &mut config)
+                        .unwrap_or_else(|e| Resp::from_error(&e))
                 }
                 b"RESETSTAT" => server_cmds::cmd_config_resetstat().unwrap_or(Resp::ok()),
-                b"REWRITE" => server_cmds::cmd_config_rewrite().unwrap_or_else(|e| Resp::from_error(&e)),
+                b"REWRITE" => {
+                    server_cmds::cmd_config_rewrite().unwrap_or_else(|e| Resp::from_error(&e))
+                }
                 _ => Resp::error("ERR unknown subcommand for 'config'"),
             }
         }
         b"SLOWLOG" => {
-            if args.len() < 2 { return Resp::error("ERR wrong number of arguments for 'slowlog' command"); }
+            if args.len() < 2 {
+                return Resp::error("ERR wrong number of arguments for 'slowlog' command");
+            }
             match args[1].to_ascii_uppercase().as_slice() {
                 b"GET" => {
-                    let count = args.get(2).and_then(|c| bytes_to_i64(c)).map(|c| c as usize);
+                    let count = args
+                        .get(2)
+                        .and_then(|c| bytes_to_i64(c))
+                        .map(|c| c as usize);
                     let log = state.slowlog.lock().await;
                     server_cmds::slowlog_get(&log, count)
                 }
@@ -549,18 +590,32 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
             }
         }
         b"CLIENT" => {
-            if args.len() < 2 { return Resp::error("ERR wrong number of arguments for 'client' command"); }
+            if args.len() < 2 {
+                return Resp::error("ERR wrong number of arguments for 'client' command");
+            }
             match args[1].to_ascii_uppercase().as_slice() {
                 b"ID" => server_cmds::cmd_client_id(conn.id),
                 b"GETNAME" => server_cmds::cmd_client_getname(&conn.name),
                 b"SETNAME" => {
-                    if args.len() != 3 { return Resp::error("ERR wrong number of arguments for 'client|setname'"); }
+                    if args.len() != 3 {
+                        return Resp::error("ERR wrong number of arguments for 'client|setname'");
+                    }
                     conn.name = Some(std::str::from_utf8(&args[2]).unwrap_or("").to_string());
                     Resp::ok()
                 }
-                b"INFO" => server_cmds::cmd_client_info(conn.id, &conn.name, conn.db_index, &conn.peer_addr),
+                b"INFO" => server_cmds::cmd_client_info(
+                    conn.id,
+                    &conn.name,
+                    conn.db_index,
+                    &conn.peer_addr,
+                ),
                 b"LIST" => {
-                    let info = server_cmds::cmd_client_info(conn.id, &conn.name, conn.db_index, &conn.peer_addr);
+                    let info = server_cmds::cmd_client_info(
+                        conn.id,
+                        &conn.name,
+                        conn.db_index,
+                        &conn.peer_addr,
+                    );
                     info
                 }
                 b"KILL" => Resp::Integer(0),
@@ -577,11 +632,13 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
                     Resp::BulkString(Some(b"prefixes".to_vec())),
                     Resp::Array(Some(vec![])),
                 ])),
-                b"HELP" => Resp::Array(Some(vec![
-                    Resp::BulkString(Some(b"CLIENT <subcommand> [<arg> [value] [opt] ...]".to_vec())),
-                ])),
-                _ => Resp::error(format!("ERR unknown subcommand '{}' for 'client'",
-                    std::str::from_utf8(&args[1]).unwrap_or("?"))),
+                b"HELP" => Resp::Array(Some(vec![Resp::BulkString(Some(
+                    b"CLIENT <subcommand> [<arg> [value] [opt] ...]".to_vec(),
+                ))])),
+                _ => Resp::error(format!(
+                    "ERR unknown subcommand '{}' for 'client'",
+                    std::str::from_utf8(&args[1]).unwrap_or("?")
+                )),
             }
         }
         b"COMMAND" => {
@@ -599,13 +656,19 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
         }
         b"CLUSTER" => {
             let cluster = &state.cluster;
-            if args.len() < 2 { return Resp::error("ERR wrong number of arguments for 'cluster' command"); }
+            if args.len() < 2 {
+                return Resp::error("ERR wrong number of arguments for 'cluster' command");
+            }
             match args[1].to_ascii_uppercase().as_slice() {
                 b"INFO" => {
-                    let pairs: Vec<Resp> = cluster.info().into_iter()
+                    let pairs: Vec<Resp> = cluster
+                        .info()
+                        .into_iter()
                         .map(|(k, v)| Resp::BulkString(Some(format!("{}:{}", k, v).into_bytes())))
                         .collect();
-                    let info_str = cluster.info().iter()
+                    let info_str = cluster
+                        .info()
+                        .iter()
                         .map(|(k, v)| format!("{}:{}", k, v))
                         .collect::<Vec<_>>()
                         .join("\r\n");
@@ -616,13 +679,15 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
                 b"SLOTS" => Resp::Array(Some(vec![])),
                 b"SHARDS" => Resp::Array(Some(vec![])),
                 b"KEYSLOT" => {
-                    if args.len() < 3 { return Resp::error("ERR wrong number of arguments"); }
+                    if args.len() < 3 {
+                        return Resp::error("ERR wrong number of arguments");
+                    }
                     let slot = crate::cluster::hash_slot(&args[2]);
                     Resp::Integer(slot as i64)
                 }
-                b"RESET" | b"FLUSHSLOTS" | b"ADDSLOTS" | b"DELSLOTS" | b"SETSLOT" |
-                b"REPLICATE" | b"FAILOVER" | b"FORGET" | b"MEET" | b"GETKEYSINSLOT" |
-                b"COUNTKEYSINSLOT" => Resp::ok(),
+                b"RESET" | b"FLUSHSLOTS" | b"ADDSLOTS" | b"DELSLOTS" | b"SETSLOT"
+                | b"REPLICATE" | b"FAILOVER" | b"FORGET" | b"MEET" | b"GETKEYSINSLOT"
+                | b"COUNTKEYSINSLOT" => Resp::ok(),
                 _ => Resp::error("ERR unknown subcommand for 'cluster'"),
             }
         }
@@ -630,9 +695,7 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
             let acl = state.acl.read().await;
             server_cmds::cmd_acl(args, &acl).unwrap_or_else(|e| Resp::from_error(&e))
         }
-        b"DEBUG" => {
-            server_cmds::cmd_debug(args).unwrap_or_else(|e| Resp::from_error(&e))
-        }
+        b"DEBUG" => server_cmds::cmd_debug(args).unwrap_or_else(|e| Resp::from_error(&e)),
         b"MEMORY" => {
             let db = state.dbs[conn.db_index].read().await;
             server_cmds::cmd_memory(args, &db).unwrap_or_else(|e| Resp::from_error(&e))
@@ -644,9 +707,7 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
         b"REPLICAOF" | b"SLAVEOF" => {
             server_cmds::cmd_replicaof(args).unwrap_or_else(|e| Resp::from_error(&e))
         }
-        b"LATENCY" => {
-            server_cmds::cmd_latency(args).unwrap_or_else(|e| Resp::from_error(&e))
-        }
+        b"LATENCY" => server_cmds::cmd_latency(args).unwrap_or_else(|e| Resp::from_error(&e)),
         b"SENTINEL" => Resp::error("ERR This instance has Sentinel capabilities disabled"),
         b"WAIT" => Resp::Integer(0),
         b"OBJECT" => {
@@ -658,21 +719,19 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
             state.flushall().await;
             Resp::ok()
         }
-        b"SWAPDB" => {
-            match server_cmds::cmd_swapdb(args) {
-                Ok((a, b)) => {
-                    if a < state.dbs.len() && b < state.dbs.len() && a != b {
-                        let mut db_a = state.dbs[a].write().await;
-                        let mut db_b = state.dbs[b].write().await;
-                        std::mem::swap(&mut *db_a, &mut *db_b);
-                        Resp::ok()
-                    } else {
-                        Resp::error("ERR invalid DB index")
-                    }
+        b"SWAPDB" => match server_cmds::cmd_swapdb(args) {
+            Ok((a, b)) => {
+                if a < state.dbs.len() && b < state.dbs.len() && a != b {
+                    let mut db_a = state.dbs[a].write().await;
+                    let mut db_b = state.dbs[b].write().await;
+                    std::mem::swap(&mut *db_a, &mut *db_b);
+                    Resp::ok()
+                } else {
+                    Resp::error("ERR invalid DB index")
                 }
-                Err(e) => Resp::from_error(&e),
             }
-        }
+            Err(e) => Resp::from_error(&e),
+        },
         b"MOVE" => {
             let dst_idx = if args.len() >= 3 {
                 bytes_to_i64(&args[2]).unwrap_or(0) as usize
@@ -686,18 +745,18 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
             if src_idx < dst_idx {
                 let mut src = state.dbs[src_idx].write().await;
                 let mut dst = state.dbs[dst_idx].write().await;
-                server_cmds::cmd_move_key(args, &mut src, &mut dst).unwrap_or_else(|e| Resp::from_error(&e))
+                server_cmds::cmd_move_key(args, &mut src, &mut dst)
+                    .unwrap_or_else(|e| Resp::from_error(&e))
             } else {
                 let mut dst = state.dbs[dst_idx].write().await;
                 let mut src = state.dbs[src_idx].write().await;
-                server_cmds::cmd_move_key(args, &mut src, &mut dst).unwrap_or_else(|e| Resp::from_error(&e))
+                server_cmds::cmd_move_key(args, &mut src, &mut dst)
+                    .unwrap_or_else(|e| Resp::from_error(&e))
             }
         }
 
         // ── All other commands: require DB access ─────────────────────────────
-        _ => {
-            execute_db_command(args, conn.db_index, state).await
-        }
+        _ => execute_db_command(args, conn.db_index, state).await,
     }
 }
 
@@ -707,7 +766,9 @@ async fn execute_db_command(args: &[Vec<u8>], db_index: usize, state: &Arc<Serve
 
     let cmd = args[0].to_ascii_uppercase();
     let mut db = state.dbs[db_index].write().await;
-    state.dirty.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    state
+        .dirty
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
     let result: CacheResult<Resp> = match cmd.as_slice() {
         // ── Strings ───────────────────────────────────────────────────────────
@@ -904,17 +965,16 @@ async fn execute_db_command(args: &[Vec<u8>], db_index: usize, state: &Arc<Serve
         b"WAIT" => keys::cmd_wait(args, &mut db),
 
         // ── Unknown ───────────────────────────────────────────────────────────
-        _ => {
-            Err(CacheError::generic(format!(
-                "ERR unknown command `{}`, with args beginning with: {}",
-                std::str::from_utf8(&args[0]).unwrap_or("?"),
-                args[1..].iter()
-                    .take(3)
-                    .map(|a| format!("`{}`", std::str::from_utf8(a).unwrap_or("?")))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )))
-        }
+        _ => Err(CacheError::generic(format!(
+            "ERR unknown command `{}`, with args beginning with: {}",
+            std::str::from_utf8(&args[0]).unwrap_or("?"),
+            args[1..]
+                .iter()
+                .take(3)
+                .map(|a| format!("`{}`", std::str::from_utf8(a).unwrap_or("?")))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ))),
     };
 
     match result {

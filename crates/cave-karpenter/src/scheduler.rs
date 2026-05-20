@@ -43,10 +43,15 @@ pub fn schedule_first_match(pools: &[NodePool], pod_reqs: &[(String, String)]) -
                 terminated: false,
                 drained: false,
             };
-            return ScheduleOutcome::Provisioned { pool: pool.name.clone(), claim };
+            return ScheduleOutcome::Provisioned {
+                pool: pool.name.clone(),
+                claim,
+            };
         }
     }
-    ScheduleOutcome::NoMatch { reason: "no NodePool satisfied pod requirements".to_string() }
+    ScheduleOutcome::NoMatch {
+        reason: "no NodePool satisfied pod requirements".to_string(),
+    }
 }
 
 fn pool_satisfies(pool: &NodePool, pod_reqs: &[(String, String)]) -> bool {
@@ -66,13 +71,19 @@ fn requirement_satisfies(reqs: &[Requirement], key: &str, value: &str) -> bool {
             RequirementOperator::Exists => return true,
             RequirementOperator::DoesNotExist => return false,
             RequirementOperator::Gt => {
-                if let (Ok(want), Ok(threshold)) = (value.parse::<i64>(), r.values.first().map(|s| s.parse::<i64>()).unwrap_or(Ok(0))) {
+                if let (Ok(want), Ok(threshold)) = (
+                    value.parse::<i64>(),
+                    r.values.first().map(|s| s.parse::<i64>()).unwrap_or(Ok(0)),
+                ) {
                     return want > threshold;
                 }
                 return false;
             }
             RequirementOperator::Lt => {
-                if let (Ok(want), Ok(threshold)) = (value.parse::<i64>(), r.values.first().map(|s| s.parse::<i64>()).unwrap_or(Ok(0))) {
+                if let (Ok(want), Ok(threshold)) = (
+                    value.parse::<i64>(),
+                    r.values.first().map(|s| s.parse::<i64>()).unwrap_or(Ok(0)),
+                ) {
                     return want < threshold;
                 }
                 return false;

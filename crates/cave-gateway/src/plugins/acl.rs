@@ -22,7 +22,11 @@ impl GatewayPlugin for AclPlugin {
             .ctx
             .get("consumer_groups")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
         let allow: Vec<&str> = config["allow"]
@@ -40,7 +44,13 @@ impl GatewayPlugin for AclPlugin {
             for group in &consumer_groups {
                 if deny.contains(&group.as_str()) {
                     return PluginResult::Halt(
-                        (StatusCode::FORBIDDEN, axum::Json(serde_json::json!({"message": "You cannot consume this service"}))).into_response(),
+                        (
+                            StatusCode::FORBIDDEN,
+                            axum::Json(
+                                serde_json::json!({"message": "You cannot consume this service"}),
+                            ),
+                        )
+                            .into_response(),
                     );
                 }
             }
@@ -51,7 +61,13 @@ impl GatewayPlugin for AclPlugin {
             let permitted = consumer_groups.iter().any(|g| allow.contains(&g.as_str()));
             if !permitted {
                 return PluginResult::Halt(
-                    (StatusCode::FORBIDDEN, axum::Json(serde_json::json!({"message": "You cannot consume this service"}))).into_response(),
+                    (
+                        StatusCode::FORBIDDEN,
+                        axum::Json(
+                            serde_json::json!({"message": "You cannot consume this service"}),
+                        ),
+                    )
+                        .into_response(),
                 );
             }
         }
@@ -68,10 +84,21 @@ mod tests {
     use std::collections::HashMap;
 
     fn ctx_with_groups(groups: Vec<&str>) -> PluginCtx {
-        let mut ctx = PluginCtx::new("GET".into(), "/".into(), HashMap::new(), Bytes::new(), "1.2.3.4".into());
+        let mut ctx = PluginCtx::new(
+            "GET".into(),
+            "/".into(),
+            HashMap::new(),
+            Bytes::new(),
+            "1.2.3.4".into(),
+        );
         ctx.ctx.insert(
             "consumer_groups".to_string(),
-            Value::Array(groups.into_iter().map(|g| Value::String(g.to_string())).collect()),
+            Value::Array(
+                groups
+                    .into_iter()
+                    .map(|g| Value::String(g.to_string()))
+                    .collect(),
+            ),
         );
         ctx
     }
@@ -81,7 +108,10 @@ mod tests {
         let plugin = AclPlugin;
         let mut ctx = ctx_with_groups(vec!["admin", "users"]);
         let config = json!({"allow": ["admin"]});
-        assert!(matches!(plugin.access(&mut ctx, &config).await, PluginResult::Continue));
+        assert!(matches!(
+            plugin.access(&mut ctx, &config).await,
+            PluginResult::Continue
+        ));
     }
 
     #[tokio::test]
@@ -89,7 +119,10 @@ mod tests {
         let plugin = AclPlugin;
         let mut ctx = ctx_with_groups(vec!["guests"]);
         let config = json!({"allow": ["admin"]});
-        assert!(matches!(plugin.access(&mut ctx, &config).await, PluginResult::Halt(_)));
+        assert!(matches!(
+            plugin.access(&mut ctx, &config).await,
+            PluginResult::Halt(_)
+        ));
     }
 
     #[tokio::test]
@@ -97,6 +130,9 @@ mod tests {
         let plugin = AclPlugin;
         let mut ctx = ctx_with_groups(vec!["banned"]);
         let config = json!({"deny": ["banned"]});
-        assert!(matches!(plugin.access(&mut ctx, &config).await, PluginResult::Halt(_)));
+        assert!(matches!(
+            plugin.access(&mut ctx, &config).await,
+            PluginResult::Halt(_)
+        ));
     }
 }

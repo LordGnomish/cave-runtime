@@ -7,10 +7,10 @@
 //!
 //! Upstream: <https://docs.erpnext.com/docs/v15/user/manual/en/stock>
 
+use super::ErpViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
-use super::ErpViewError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StockRow {
@@ -82,15 +82,24 @@ mod tests {
 
     #[test]
     fn list_groups_by_customer() {
-        let invoices = super::super::invoices::list_invoices(&AdminState::seeded(), &ctx(&[Permission::ErpRead])).unwrap();
+        let invoices = super::super::invoices::list_invoices(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ErpRead]),
+        )
+        .unwrap();
         let rows = list_stock(&AdminState::seeded(), &ctx(&[Permission::ErpRead])).unwrap();
-        let customers: std::collections::HashSet<_> = invoices.iter().map(|i| i.customer.clone()).collect();
+        let customers: std::collections::HashSet<_> =
+            invoices.iter().map(|i| i.customer.clone()).collect();
         assert_eq!(rows.len(), customers.len());
     }
 
     #[test]
     fn list_revenue_matches_invoice_amounts() {
-        let invoices = super::super::invoices::list_invoices(&AdminState::seeded(), &ctx(&[Permission::ErpRead])).unwrap();
+        let invoices = super::super::invoices::list_invoices(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ErpRead]),
+        )
+        .unwrap();
         let rows = list_stock(&AdminState::seeded(), &ctx(&[Permission::ErpRead])).unwrap();
         let invoice_total: u64 = invoices.iter().map(|i| i.amount_cents).sum();
         let stock_total: u64 = rows.iter().map(|r| r.revenue_cents).sum();

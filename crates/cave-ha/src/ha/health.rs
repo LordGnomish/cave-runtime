@@ -45,11 +45,21 @@ impl NodeHealth {
     /// Recompute composite score.
     pub fn compute_score(&mut self) {
         let mut score = 100u8;
-        if !self.disk_ok { score = score.saturating_sub(50); }
-        if !self.memory_ok { score = score.saturating_sub(20); }
-        if !self.cpu_ok { score = score.saturating_sub(10); }
-        if self.replication_lag > 1000 { score = score.saturating_sub(10); }
-        if self.leader_rtt_ms > 100 { score = score.saturating_sub(5); }
+        if !self.disk_ok {
+            score = score.saturating_sub(50);
+        }
+        if !self.memory_ok {
+            score = score.saturating_sub(20);
+        }
+        if !self.cpu_ok {
+            score = score.saturating_sub(10);
+        }
+        if self.replication_lag > 1000 {
+            score = score.saturating_sub(10);
+        }
+        if self.leader_rtt_ms > 100 {
+            score = score.saturating_sub(5);
+        }
         self.score = score;
     }
 
@@ -83,19 +93,22 @@ impl HealthRegistry {
 
     /// Select the healthiest node from a candidate set.
     /// Returns the node with the highest score; ties broken by node ID.
-    pub fn best_candidate<'a>(&self, candidates: impl Iterator<Item = &'a NodeId>) -> Option<NodeId> {
+    pub fn best_candidate<'a>(
+        &self,
+        candidates: impl Iterator<Item = &'a NodeId>,
+    ) -> Option<NodeId> {
         candidates
             .filter_map(|id| self.nodes.get(id))
             .filter(|h| h.is_healthy())
             .max_by_key(|h| (h.score, std::cmp::Reverse(h.node_id)))
             .map(|h| h.node_id)
-
     }
 
     /// Returns true if we have quorum of healthy nodes.
     pub fn has_healthy_quorum(&self, voters: &std::collections::BTreeSet<NodeId>) -> bool {
         let quorum = voters.len() / 2 + 1;
-        let healthy = voters.iter()
+        let healthy = voters
+            .iter()
             .filter(|id| self.nodes.get(id).map(|h| h.is_healthy()).unwrap_or(false))
             .count();
         healthy >= quorum
@@ -109,7 +122,9 @@ impl HealthRegistry {
 }
 
 impl Default for HealthRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// System health probe — checks local disk, memory, CPU.
@@ -144,4 +159,3 @@ impl SystemProbe {
         true
     }
 }
-

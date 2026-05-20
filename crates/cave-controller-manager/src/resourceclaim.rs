@@ -197,10 +197,12 @@ pub fn evaluate(
     // (4) Allocation present — reconcile the reservedFor[] list
     //     against the live pod set.
     let live: Vec<&PodView> = pods.iter().filter(|p| !p.deleted).collect();
-    let reserved: std::collections::HashSet<&str> =
-        claim.reserved_for.iter().map(|c| c.pod_uid.as_str()).collect();
-    let live_uids: std::collections::HashSet<&str> =
-        live.iter().map(|p| p.uid.as_str()).collect();
+    let reserved: std::collections::HashSet<&str> = claim
+        .reserved_for
+        .iter()
+        .map(|c| c.pod_uid.as_str())
+        .collect();
+    let live_uids: std::collections::HashSet<&str> = live.iter().map(|p| p.uid.as_str()).collect();
 
     // 4a. Live pods missing from reservedFor.
     let missing: Vec<String> = live
@@ -282,7 +284,9 @@ pub fn apply_reservation_diff(
         .collect();
     for uid in add {
         if !out.iter().any(|c| &c.pod_uid == uid) {
-            out.push(ConsumerRef { pod_uid: uid.clone() });
+            out.push(ConsumerRef {
+                pod_uid: uid.clone(),
+            });
         }
     }
     out
@@ -531,7 +535,9 @@ mod tests {
             node: "node1".into(),
             devices: vec!["gpu-0".into()],
         });
-        claim.reserved_for = vec![ConsumerRef { pod_uid: "p1".into() }];
+        claim.reserved_for = vec![ConsumerRef {
+            pod_uid: "p1".into(),
+        }];
         // Pod is gone entirely (no entry in `pods`).
         let action = evaluate(&claim, &[], None);
         assert_eq!(
@@ -554,7 +560,9 @@ mod tests {
             node: "node1".into(),
             devices: vec!["gpu-0".into()],
         });
-        claim.reserved_for = vec![ConsumerRef { pod_uid: "p1".into() }];
+        claim.reserved_for = vec![ConsumerRef {
+            pod_uid: "p1".into(),
+        }];
         // Pod present but marked deleted.
         let pods = [pod("p1", Some("node1"), true)];
         let action = evaluate(&claim, &pods, None);
@@ -578,7 +586,9 @@ mod tests {
             node: "node1".into(),
             devices: vec!["gpu-0".into()],
         });
-        claim.reserved_for = vec![ConsumerRef { pod_uid: "p1".into() }];
+        claim.reserved_for = vec![ConsumerRef {
+            pod_uid: "p1".into(),
+        }];
         let pods = [pod("p1", Some("node1"), false)];
         let action = evaluate(&claim, &pods, None);
         assert_eq!(action, ClaimAction::NoOp);
@@ -596,7 +606,9 @@ mod tests {
             node: "node1".into(),
             devices: vec!["gpu-0".into()],
         });
-        claim.reserved_for = vec![ConsumerRef { pod_uid: "p1".into() }];
+        claim.reserved_for = vec![ConsumerRef {
+            pod_uid: "p1".into(),
+        }];
         claim.deletion_timestamp_set = true;
         let action = evaluate(&claim, &[], None);
         assert_eq!(action, ClaimAction::AwaitConsumerDrain);
@@ -656,8 +668,12 @@ mod tests {
             "rc-16"
         );
         let current = [
-            ConsumerRef { pod_uid: "p1".into() },
-            ConsumerRef { pod_uid: "p2".into() },
+            ConsumerRef {
+                pod_uid: "p1".into(),
+            },
+            ConsumerRef {
+                pod_uid: "p2".into(),
+            },
         ];
         let added = ["p2".to_string(), "p3".to_string()];
         let removed = ["p1".to_string()];
@@ -704,8 +720,7 @@ mod tests {
         match evaluate(&claim, &pods, Some(&candidate)) {
             ClaimAction::AddReservation { pod_uids } => {
                 assert_eq!(pod_uids, vec!["p1".to_string()]);
-                claim.reserved_for =
-                    apply_reservation_diff(&claim.reserved_for, &pod_uids, &[]);
+                claim.reserved_for = apply_reservation_diff(&claim.reserved_for, &pod_uids, &[]);
             }
             other => panic!("expected AddReservation, got {other:?}"),
         }
@@ -750,7 +765,10 @@ mod tests {
             "rc-outcome"
         );
         assert_eq!(reconcile_outcome(&ClaimAction::NoOp), Reconcile::NoOp);
-        assert_eq!(reconcile_outcome(&ClaimAction::AddFinalizer), Reconcile::Update(1));
+        assert_eq!(
+            reconcile_outcome(&ClaimAction::AddFinalizer),
+            Reconcile::Update(1)
+        );
         assert_eq!(
             reconcile_outcome(&ClaimAction::AwaitImmediateCandidate),
             Reconcile::Requeue
@@ -864,7 +882,10 @@ mod tests {
             "ResourceClaimFinalizer",
             "rc-finalizer-name"
         );
-        assert_eq!(FINALIZER_PROTECTION, "resource.kubernetes.io/delete-protection");
+        assert_eq!(
+            FINALIZER_PROTECTION,
+            "resource.kubernetes.io/delete-protection"
+        );
     }
 
     #[test]

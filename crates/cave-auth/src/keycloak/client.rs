@@ -5,11 +5,11 @@
 //! upstream: https://github.com/keycloak/keycloak/blob/v22.0.0/services/src/main/java/org/keycloak/services/resources/admin/ClientsResource.java
 
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -120,7 +120,11 @@ impl ClientStore {
 
     /// Get by UUID — only within the given realm (cross-realm isolation).
     pub async fn get(&self, realm_id: &str, id: Uuid) -> Option<KeycloakClient> {
-        self.inner.read().await.get(&(realm_id.to_string(), id)).cloned()
+        self.inner
+            .read()
+            .await
+            .get(&(realm_id.to_string(), id))
+            .cloned()
     }
 
     pub async fn update(
@@ -133,13 +137,27 @@ impl ClientStore {
         let client = store
             .get_mut(&(realm_id.to_string(), id))
             .ok_or("not_found")?;
-        if let Some(v) = req.name { client.name = Some(v); }
-        if let Some(v) = req.description { client.description = Some(v); }
-        if let Some(v) = req.enabled { client.enabled = v; }
-        if let Some(v) = req.public_client { client.public_client = v; }
-        if let Some(v) = req.secret { client.secret = Some(v); }
-        if let Some(v) = req.redirect_uris { client.redirect_uris = v; }
-        if let Some(v) = req.web_origins { client.web_origins = v; }
+        if let Some(v) = req.name {
+            client.name = Some(v);
+        }
+        if let Some(v) = req.description {
+            client.description = Some(v);
+        }
+        if let Some(v) = req.enabled {
+            client.enabled = v;
+        }
+        if let Some(v) = req.public_client {
+            client.public_client = v;
+        }
+        if let Some(v) = req.secret {
+            client.secret = Some(v);
+        }
+        if let Some(v) = req.redirect_uris {
+            client.redirect_uris = v;
+        }
+        if let Some(v) = req.web_origins {
+            client.web_origins = v;
+        }
         Ok(client.clone())
     }
 
@@ -152,7 +170,11 @@ impl ClientStore {
     }
 
     /// Look up a client by client_id string within a realm.
-    pub async fn get_by_client_id(&self, realm_id: &str, client_id: &str) -> Option<KeycloakClient> {
+    pub async fn get_by_client_id(
+        &self,
+        realm_id: &str,
+        client_id: &str,
+    ) -> Option<KeycloakClient> {
         self.inner
             .read()
             .await
@@ -177,11 +199,19 @@ pub async fn create_client(
 ) -> impl IntoResponse {
     // Realm must exist
     if state.realms.get(&realm).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"realm not found"}))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"realm not found"})),
+        )
+            .into_response();
     }
     match state.clients.create(&realm, req).await {
         Ok(c) => (StatusCode::CREATED, Json(serde_json::to_value(c).unwrap())).into_response(),
-        Err("client_id_exists") => (StatusCode::CONFLICT, Json(serde_json::json!({"error":"client_id already exists in realm"}))).into_response(),
+        Err("client_id_exists") => (
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({"error":"client_id already exists in realm"})),
+        )
+            .into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 }
@@ -191,7 +221,11 @@ pub async fn list_clients(
     Path(realm): Path<String>,
 ) -> impl IntoResponse {
     if state.realms.get(&realm).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"realm not found"}))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"realm not found"})),
+        )
+            .into_response();
     }
     let clients = state.clients.list_in_realm(&realm).await;
     (StatusCode::OK, Json(clients)).into_response()
@@ -202,11 +236,19 @@ pub async fn get_client(
     Path((realm, id)): Path<(String, Uuid)>,
 ) -> impl IntoResponse {
     if state.realms.get(&realm).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"realm not found"}))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"realm not found"})),
+        )
+            .into_response();
     }
     match state.clients.get(&realm, id).await {
         Some(c) => (StatusCode::OK, Json(serde_json::to_value(c).unwrap())).into_response(),
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"client not found"}))).into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"client not found"})),
+        )
+            .into_response(),
     }
 }
 
@@ -216,11 +258,19 @@ pub async fn update_client(
     Json(req): Json<UpdateClientRequest>,
 ) -> impl IntoResponse {
     if state.realms.get(&realm).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"realm not found"}))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"realm not found"})),
+        )
+            .into_response();
     }
     match state.clients.update(&realm, id, req).await {
         Ok(_) => StatusCode::NO_CONTENT.into_response(),
-        Err("not_found") => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"client not found"}))).into_response(),
+        Err("not_found") => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"client not found"})),
+        )
+            .into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 }
@@ -230,12 +280,20 @@ pub async fn delete_client(
     Path((realm, id)): Path<(String, Uuid)>,
 ) -> impl IntoResponse {
     if state.realms.get(&realm).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"realm not found"}))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"realm not found"})),
+        )
+            .into_response();
     }
     if state.clients.delete(&realm, id).await {
         StatusCode::NO_CONTENT.into_response()
     } else {
-        (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"client not found"}))).into_response()
+        (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"client not found"})),
+        )
+            .into_response()
     }
 }
 
@@ -244,8 +302,14 @@ pub async fn delete_client(
 pub fn router(clients: ClientStore, realms: RealmStore) -> Router {
     let state = ClientAppState { clients, realms };
     Router::new()
-        .route("/admin/realms/{realm}/clients", post(create_client).get(list_clients))
-        .route("/admin/realms/{realm}/clients/{id}", get(get_client).put(update_client).delete(delete_client))
+        .route(
+            "/admin/realms/{realm}/clients",
+            post(create_client).get(list_clients),
+        )
+        .route(
+            "/admin/realms/{realm}/clients/{id}",
+            get(get_client).put(update_client).delete(delete_client),
+        )
         .with_state(state)
 }
 
@@ -281,7 +345,9 @@ mod tests {
     }
 
     async fn body_json(resp: axum::response::Response) -> Value {
-        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         serde_json::from_slice(&bytes).unwrap_or(Value::Null)
     }
 
@@ -407,11 +473,37 @@ mod tests {
     async fn test_get_client_cross_realm_denied() {
         let realms = RealmStore::new();
         for r in &["realm-a", "realm-b"] {
-            realms.create(RealmRequest { id: r.to_string(), display_name: None, enabled: None, ssl_required: None, registration_allowed: None, login_with_email_allowed: None, duplicate_emails_allowed: None, access_token_lifespan: None, sso_session_idle_timeout: None }).await.unwrap();
+            realms
+                .create(RealmRequest {
+                    id: r.to_string(),
+                    display_name: None,
+                    enabled: None,
+                    ssl_required: None,
+                    registration_allowed: None,
+                    login_with_email_allowed: None,
+                    duplicate_emails_allowed: None,
+                    access_token_lifespan: None,
+                    sso_session_idle_timeout: None,
+                })
+                .await
+                .unwrap();
         }
         let clients = ClientStore::new();
         let client = clients
-            .create("realm-a", CreateClientRequest { client_id: "realm-a-client".to_string(), name: None, description: None, enabled: None, public_client: None, secret: None, redirect_uris: None, web_origins: None, protocol: None })
+            .create(
+                "realm-a",
+                CreateClientRequest {
+                    client_id: "realm-a-client".to_string(),
+                    name: None,
+                    description: None,
+                    enabled: None,
+                    public_client: None,
+                    secret: None,
+                    redirect_uris: None,
+                    web_origins: None,
+                    protocol: None,
+                },
+            )
             .await
             .unwrap();
 
@@ -434,7 +526,20 @@ mod tests {
     async fn test_update_client() {
         let (_, realms, clients) = setup().await;
         let client = clients
-            .create("testrealm", CreateClientRequest { client_id: "updateable".to_string(), name: None, description: None, enabled: None, public_client: None, secret: None, redirect_uris: None, web_origins: None, protocol: None })
+            .create(
+                "testrealm",
+                CreateClientRequest {
+                    client_id: "updateable".to_string(),
+                    name: None,
+                    description: None,
+                    enabled: None,
+                    public_client: None,
+                    secret: None,
+                    redirect_uris: None,
+                    web_origins: None,
+                    protocol: None,
+                },
+            )
             .await
             .unwrap();
 
@@ -444,7 +549,9 @@ mod tests {
                     .method("PUT")
                     .uri(format!("/admin/realms/testrealm/clients/{}", client.id))
                     .header("content-type", "application/json")
-                    .body(Body::from(serde_json::json!({"name":"Updated Name"}).to_string()))
+                    .body(Body::from(
+                        serde_json::json!({"name":"Updated Name"}).to_string(),
+                    ))
                     .unwrap(),
             )
             .await
@@ -459,7 +566,20 @@ mod tests {
     async fn test_delete_client() {
         let (_, realms, clients) = setup().await;
         let client = clients
-            .create("testrealm", CreateClientRequest { client_id: "bye".to_string(), name: None, description: None, enabled: None, public_client: None, secret: None, redirect_uris: None, web_origins: None, protocol: None })
+            .create(
+                "testrealm",
+                CreateClientRequest {
+                    client_id: "bye".to_string(),
+                    name: None,
+                    description: None,
+                    enabled: None,
+                    public_client: None,
+                    secret: None,
+                    redirect_uris: None,
+                    web_origins: None,
+                    protocol: None,
+                },
+            )
             .await
             .unwrap();
 
@@ -482,7 +602,23 @@ mod tests {
     async fn test_list_clients_in_realm() {
         let (_, realms, clients) = setup().await;
         for name in &["c1", "c2", "c3"] {
-            clients.create("testrealm", CreateClientRequest { client_id: name.to_string(), name: None, description: None, enabled: None, public_client: None, secret: None, redirect_uris: None, web_origins: None, protocol: None }).await.unwrap();
+            clients
+                .create(
+                    "testrealm",
+                    CreateClientRequest {
+                        client_id: name.to_string(),
+                        name: None,
+                        description: None,
+                        enabled: None,
+                        public_client: None,
+                        secret: None,
+                        redirect_uris: None,
+                        web_origins: None,
+                        protocol: None,
+                    },
+                )
+                .await
+                .unwrap();
         }
 
         let resp = router(clients, realms)

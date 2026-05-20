@@ -85,19 +85,22 @@ impl ClusterStatusTracker {
     /// Register a new member with default `Unknown` health.
     pub fn register(&self, member_id: u64, name: impl Into<String>, is_learner: bool) {
         let mut inner = self.inner.write().unwrap();
-        inner.members.entry(member_id).or_insert_with(|| MemberStatus {
-            member_id,
-            name: name.into(),
-            revision: 0,
-            db_size: 0,
-            db_size_in_use: 0,
-            leader: 0,
-            raft_term: 0,
-            is_learner,
-            health: MemberHealth::Unknown,
-            last_heartbeat_age_secs: None,
-            version: "0.0.0".into(),
-        });
+        inner
+            .members
+            .entry(member_id)
+            .or_insert_with(|| MemberStatus {
+                member_id,
+                name: name.into(),
+                revision: 0,
+                db_size: 0,
+                db_size_in_use: 0,
+                leader: 0,
+                raft_term: 0,
+                is_learner,
+                health: MemberHealth::Unknown,
+                last_heartbeat_age_secs: None,
+                version: "0.0.0".into(),
+            });
     }
 
     /// Heartbeat report from a member.  Updates revision/db_size and
@@ -108,7 +111,11 @@ impl ClusterStatusTracker {
         inner.last_heartbeat.insert(id, Instant::now());
         inner.members.insert(
             id,
-            MemberStatus { health: MemberHealth::Healthy, last_heartbeat_age_secs: Some(0), ..status },
+            MemberStatus {
+                health: MemberHealth::Healthy,
+                last_heartbeat_age_secs: Some(0),
+                ..status
+            },
         );
     }
 
@@ -137,23 +144,46 @@ impl ClusterStatusTracker {
         for (id, member) in inner.members.iter_mut() {
             let h = heartbeats.get(id);
             match h {
-                None => { member.health = MemberHealth::Unknown; member.last_heartbeat_age_secs = None; unknown += 1; }
+                None => {
+                    member.health = MemberHealth::Unknown;
+                    member.last_heartbeat_age_secs = None;
+                    unknown += 1;
+                }
                 Some(&t) => {
                     let age = now.duration_since(t);
                     member.last_heartbeat_age_secs = Some(age.as_secs());
-                    if age <= timeout / 2 { member.health = MemberHealth::Healthy; healthy += 1; }
-                    else if age <= timeout { member.health = MemberHealth::Stale; stale += 1; }
-                    else { member.health = MemberHealth::Unhealthy; unhealthy += 1; }
+                    if age <= timeout / 2 {
+                        member.health = MemberHealth::Healthy;
+                        healthy += 1;
+                    } else if age <= timeout {
+                        member.health = MemberHealth::Stale;
+                        stale += 1;
+                    } else {
+                        member.health = MemberHealth::Unhealthy;
+                        unhealthy += 1;
+                    }
                 }
             }
         }
 
-        ClusterHealth { healthy, stale, unhealthy, unknown, total: inner.members.len() }
+        ClusterHealth {
+            healthy,
+            stale,
+            unhealthy,
+            unknown,
+            total: inner.members.len(),
+        }
     }
 
     /// Snapshot every registered member's status.
     pub fn member_statuses(&self) -> Vec<MemberStatus> {
-        self.inner.read().unwrap().members.values().cloned().collect()
+        self.inner
+            .read()
+            .unwrap()
+            .members
+            .values()
+            .cloned()
+            .collect()
     }
 
     pub fn member(&self, id: u64) -> Option<MemberStatus> {
@@ -163,21 +193,45 @@ impl ClusterStatusTracker {
     /// Largest `db_size` reported across the cluster.  Used by the
     /// quota-defrag trigger.
     pub fn max_db_size(&self) -> u64 {
-        self.inner.read().unwrap().members.values().map(|m| m.db_size).max().unwrap_or(0)
+        self.inner
+            .read()
+            .unwrap()
+            .members
+            .values()
+            .map(|m| m.db_size)
+            .max()
+            .unwrap_or(0)
     }
 
     /// Member count broken out by learner / voter.
     pub fn voter_count(&self) -> usize {
-        self.inner.read().unwrap().members.values().filter(|m| !m.is_learner).count()
+        self.inner
+            .read()
+            .unwrap()
+            .members
+            .values()
+            .filter(|m| !m.is_learner)
+            .count()
     }
 
     pub fn learner_count(&self) -> usize {
-        self.inner.read().unwrap().members.values().filter(|m| m.is_learner).count()
+        self.inner
+            .read()
+            .unwrap()
+            .members
+            .values()
+            .filter(|m| m.is_learner)
+            .count()
     }
 
     /// True when at least `(n/2)+1` voters are alive.
     pub fn has_quorum(&self) -> bool {
-        let alive = self.inner.read().unwrap().members.values()
+        let alive = self
+            .inner
+            .read()
+            .unwrap()
+            .members
+            .values()
             .filter(|m| !m.is_learner && m.health.is_alive())
             .count();
         let voters = self.voter_count();
@@ -231,7 +285,11 @@ pub struct DefragQuota {
 
 impl Default for DefragQuota {
     fn default() -> Self {
-        Self { quota_bytes: 2 * 1024 * 1024 * 1024, threshold: 0.8, fragmentation_threshold: 0.5 }
+        Self {
+            quota_bytes: 2 * 1024 * 1024 * 1024,
+            threshold: 0.8,
+            fragmentation_threshold: 0.5,
+        }
     }
 }
 
@@ -251,7 +309,9 @@ pub fn defrag_decision(quota: &DefragQuota, status: &MemberStatus) -> DefragDeci
 }
 
 /// Force-trigger variant — admin override.
-pub fn defrag_force() -> DefragDecision { DefragDecision::Trigger(DefragTrigger::ManualOverride) }
+pub fn defrag_force() -> DefragDecision {
+    DefragDecision::Trigger(DefragTrigger::ManualOverride)
+}
 
 // ── Downgrade state machine ───────────────────────────────────────────────
 
@@ -313,7 +373,9 @@ struct DowngradeInner {
 }
 
 impl DowngradeState {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Process a downgrade request and update internal state.
     pub fn apply(
@@ -325,7 +387,10 @@ impl DowngradeState {
             DowngradeAction::Validate => {
                 Self::check_target(cluster_version, &req.version)?;
                 let inner = self.inner.read().unwrap();
-                Ok(DowngradeResponse { version: req.version.clone(), enabled: inner.enabled })
+                Ok(DowngradeResponse {
+                    version: req.version.clone(),
+                    enabled: inner.enabled,
+                })
             }
             DowngradeAction::Enable => {
                 Self::check_target(cluster_version, &req.version)?;
@@ -337,14 +402,22 @@ impl DowngradeState {
                 }
                 inner.target_version = Some(req.version.clone());
                 inner.enabled = true;
-                Ok(DowngradeResponse { version: req.version.clone(), enabled: true })
+                Ok(DowngradeResponse {
+                    version: req.version.clone(),
+                    enabled: true,
+                })
             }
             DowngradeAction::Cancel => {
                 let mut inner = self.inner.write().unwrap();
-                if !inner.enabled { return Err(DowngradeError::NotInProgress); }
+                if !inner.enabled {
+                    return Err(DowngradeError::NotInProgress);
+                }
                 inner.enabled = false;
                 let v = inner.target_version.take().unwrap_or_default();
-                Ok(DowngradeResponse { version: v, enabled: false })
+                Ok(DowngradeResponse {
+                    version: v,
+                    enabled: false,
+                })
             }
         }
     }
@@ -358,10 +431,14 @@ impl DowngradeState {
     }
 
     fn check_target(cluster: &str, target: &str) -> Result<(), DowngradeError> {
-        let (cmaj, cmin) = parse_minor(cluster).ok_or_else(|| DowngradeError::InvalidVersion(cluster.to_string()))?;
-        let (tmaj, tmin) = parse_minor(target).ok_or_else(|| DowngradeError::InvalidVersion(target.to_string()))?;
+        let (cmaj, cmin) = parse_minor(cluster)
+            .ok_or_else(|| DowngradeError::InvalidVersion(cluster.to_string()))?;
+        let (tmaj, tmin) = parse_minor(target)
+            .ok_or_else(|| DowngradeError::InvalidVersion(target.to_string()))?;
         // Only one minor version backward is allowed (etcd's policy).
-        if tmaj != cmaj { return Err(DowngradeError::InvalidVersion(target.to_string())); }
+        if tmaj != cmaj {
+            return Err(DowngradeError::InvalidVersion(target.to_string()));
+        }
         if tmin + 1 != cmin {
             return Err(DowngradeError::InvalidVersion(format!(
                 "{target} is not exactly one minor version below {cluster}"
@@ -388,10 +465,17 @@ mod tests {
 
     fn st(id: u64, db: u64, in_use: u64) -> MemberStatus {
         MemberStatus {
-            member_id: id, name: format!("m{id}"), revision: 0,
-            db_size: db, db_size_in_use: in_use, leader: 0, raft_term: 1,
-            is_learner: false, health: MemberHealth::Unknown,
-            last_heartbeat_age_secs: None, version: "3.6".into(),
+            member_id: id,
+            name: format!("m{id}"),
+            revision: 0,
+            db_size: db,
+            db_size_in_use: in_use,
+            leader: 0,
+            raft_term: 1,
+            is_learner: false,
+            health: MemberHealth::Unknown,
+            last_heartbeat_age_secs: None,
+            version: "3.6".into(),
         }
     }
 
@@ -412,7 +496,10 @@ mod tests {
         // cite: etcdctl endpoint health (heartbeat ⇒ healthy)
         let t = ClusterStatusTracker::new(Duration::from_secs(5));
         t.register(1, "m1", false);
-        t.heartbeat(MemberStatus { health: MemberHealth::Unknown, ..st(1, 100, 80) });
+        t.heartbeat(MemberStatus {
+            health: MemberHealth::Unknown,
+            ..st(1, 100, 80)
+        });
         assert_eq!(t.member(1).unwrap().health, MemberHealth::Healthy);
     }
 
@@ -483,7 +570,9 @@ mod tests {
     fn test_quorum_with_two_of_three_alive() {
         // cite: etcd quorum = (n/2)+1
         let t = ClusterStatusTracker::new(Duration::from_secs(60));
-        for i in 1..=3 { t.register(i, format!("m{i}"), false); }
+        for i in 1..=3 {
+            t.register(i, format!("m{i}"), false);
+        }
         // heartbeats for 1 and 2 only
         t.heartbeat(st(1, 0, 0));
         t.heartbeat(st(2, 0, 0));
@@ -495,7 +584,9 @@ mod tests {
     fn test_quorum_lost_with_one_of_three_alive() {
         // cite: etcd quorum-loss
         let t = ClusterStatusTracker::new(Duration::from_secs(60));
-        for i in 1..=3 { t.register(i, format!("m{i}"), false); }
+        for i in 1..=3 {
+            t.register(i, format!("m{i}"), false);
+        }
         t.heartbeat(st(1, 0, 0));
         t.refresh();
         assert!(!t.has_quorum());
@@ -505,7 +596,9 @@ mod tests {
     fn test_member_statuses_snapshot_size() {
         // cite: etcdctl endpoint status (one entry per member)
         let t = ClusterStatusTracker::new(Duration::from_secs(5));
-        for i in 1..=4 { t.register(i, format!("m{i}"), i == 4); }
+        for i in 1..=4 {
+            t.register(i, format!("m{i}"), i == 4);
+        }
         assert_eq!(t.member_statuses().len(), 4);
     }
 
@@ -522,15 +615,26 @@ mod tests {
     #[test]
     fn test_defrag_quota_threshold_triggers() {
         // cite: maintenance.go (quota-based defrag)
-        let q = DefragQuota { quota_bytes: 100, threshold: 0.8, fragmentation_threshold: 0.5 };
+        let q = DefragQuota {
+            quota_bytes: 100,
+            threshold: 0.8,
+            fragmentation_threshold: 0.5,
+        };
         let s = st(1, 90, 80);
-        assert_eq!(defrag_decision(&q, &s), DefragDecision::Trigger(DefragTrigger::QuotaThreshold));
+        assert_eq!(
+            defrag_decision(&q, &s),
+            DefragDecision::Trigger(DefragTrigger::QuotaThreshold)
+        );
     }
 
     #[test]
     fn test_defrag_quota_under_threshold_skips() {
         // cite: maintenance.go (no defrag below quota)
-        let q = DefragQuota { quota_bytes: 100, threshold: 0.8, fragmentation_threshold: 0.0 };
+        let q = DefragQuota {
+            quota_bytes: 100,
+            threshold: 0.8,
+            fragmentation_threshold: 0.0,
+        };
         let s = st(1, 50, 50);
         assert_eq!(defrag_decision(&q, &s), DefragDecision::Skip);
     }
@@ -538,15 +642,26 @@ mod tests {
     #[test]
     fn test_defrag_fragmentation_triggers() {
         // cite: bbolt fragmentation (in_use << total)
-        let q = DefragQuota { quota_bytes: 1_000_000, threshold: 0.99, fragmentation_threshold: 0.5 };
+        let q = DefragQuota {
+            quota_bytes: 1_000_000,
+            threshold: 0.99,
+            fragmentation_threshold: 0.5,
+        };
         let s = st(1, 1000, 200);
-        assert_eq!(defrag_decision(&q, &s), DefragDecision::Trigger(DefragTrigger::Fragmented));
+        assert_eq!(
+            defrag_decision(&q, &s),
+            DefragDecision::Trigger(DefragTrigger::Fragmented)
+        );
     }
 
     #[test]
     fn test_defrag_fragmentation_under_threshold_skips() {
         // cite: bbolt (in_use ≥ threshold ⇒ no defrag)
-        let q = DefragQuota { quota_bytes: 1_000_000, threshold: 0.99, fragmentation_threshold: 0.5 };
+        let q = DefragQuota {
+            quota_bytes: 1_000_000,
+            threshold: 0.99,
+            fragmentation_threshold: 0.5,
+        };
         let s = st(1, 1000, 800);
         assert_eq!(defrag_decision(&q, &s), DefragDecision::Skip);
     }
@@ -554,7 +669,10 @@ mod tests {
     #[test]
     fn test_defrag_force_triggers() {
         // cite: etcdctl defrag --force
-        assert_eq!(defrag_force(), DefragDecision::Trigger(DefragTrigger::ManualOverride));
+        assert_eq!(
+            defrag_force(),
+            DefragDecision::Trigger(DefragTrigger::ManualOverride)
+        );
     }
 
     #[test]
@@ -571,7 +689,15 @@ mod tests {
     fn test_downgrade_validate_one_minor_back() {
         // cite: rpc.proto DowngradeAction.Validate (one-minor-down policy)
         let d = DowngradeState::new();
-        let r = d.apply("3.6", &DowngradeRequest { action: DowngradeAction::Validate, version: "3.5".into() }).unwrap();
+        let r = d
+            .apply(
+                "3.6",
+                &DowngradeRequest {
+                    action: DowngradeAction::Validate,
+                    version: "3.5".into(),
+                },
+            )
+            .unwrap();
         assert_eq!(r.version, "3.5");
         assert!(!r.enabled);
     }
@@ -580,7 +706,13 @@ mod tests {
     fn test_downgrade_validate_two_minors_back_rejected() {
         // cite: rpc.proto Downgrade (only one-minor-down allowed)
         let d = DowngradeState::new();
-        let r = d.apply("3.6", &DowngradeRequest { action: DowngradeAction::Validate, version: "3.4".into() });
+        let r = d.apply(
+            "3.6",
+            &DowngradeRequest {
+                action: DowngradeAction::Validate,
+                version: "3.4".into(),
+            },
+        );
         assert!(matches!(r.unwrap_err(), DowngradeError::InvalidVersion(_)));
     }
 
@@ -588,7 +720,13 @@ mod tests {
     fn test_downgrade_validate_major_change_rejected() {
         // cite: rpc.proto Downgrade (no major version change)
         let d = DowngradeState::new();
-        let r = d.apply("3.6", &DowngradeRequest { action: DowngradeAction::Validate, version: "2.5".into() });
+        let r = d.apply(
+            "3.6",
+            &DowngradeRequest {
+                action: DowngradeAction::Validate,
+                version: "2.5".into(),
+            },
+        );
         assert!(matches!(r.unwrap_err(), DowngradeError::InvalidVersion(_)));
     }
 
@@ -596,7 +734,14 @@ mod tests {
     fn test_downgrade_enable_persists() {
         // cite: rpc.proto Downgrade.Enable (state recorded)
         let d = DowngradeState::new();
-        d.apply("3.6", &DowngradeRequest { action: DowngradeAction::Enable, version: "3.5".into() }).unwrap();
+        d.apply(
+            "3.6",
+            &DowngradeRequest {
+                action: DowngradeAction::Enable,
+                version: "3.5".into(),
+            },
+        )
+        .unwrap();
         assert!(d.enabled());
         assert_eq!(d.target().as_deref(), Some("3.5"));
     }
@@ -605,17 +750,47 @@ mod tests {
     fn test_downgrade_enable_after_other_target_errors() {
         // cite: rpc.proto Downgrade (one downgrade at a time)
         let d = DowngradeState::new();
-        d.apply("3.6", &DowngradeRequest { action: DowngradeAction::Enable, version: "3.5".into() }).unwrap();
-        let r = d.apply("3.6", &DowngradeRequest { action: DowngradeAction::Enable, version: "3.4".into() });
-        assert!(matches!(r.unwrap_err(), DowngradeError::InvalidVersion(_) | DowngradeError::AlreadyInProgress(_)));
+        d.apply(
+            "3.6",
+            &DowngradeRequest {
+                action: DowngradeAction::Enable,
+                version: "3.5".into(),
+            },
+        )
+        .unwrap();
+        let r = d.apply(
+            "3.6",
+            &DowngradeRequest {
+                action: DowngradeAction::Enable,
+                version: "3.4".into(),
+            },
+        );
+        assert!(matches!(
+            r.unwrap_err(),
+            DowngradeError::InvalidVersion(_) | DowngradeError::AlreadyInProgress(_)
+        ));
     }
 
     #[test]
     fn test_downgrade_cancel_clears_state() {
         // cite: rpc.proto Downgrade.Cancel
         let d = DowngradeState::new();
-        d.apply("3.6", &DowngradeRequest { action: DowngradeAction::Enable, version: "3.5".into() }).unwrap();
-        d.apply("3.6", &DowngradeRequest { action: DowngradeAction::Cancel, version: "".into() }).unwrap();
+        d.apply(
+            "3.6",
+            &DowngradeRequest {
+                action: DowngradeAction::Enable,
+                version: "3.5".into(),
+            },
+        )
+        .unwrap();
+        d.apply(
+            "3.6",
+            &DowngradeRequest {
+                action: DowngradeAction::Cancel,
+                version: "".into(),
+            },
+        )
+        .unwrap();
         assert!(!d.enabled());
         assert!(d.target().is_none());
     }
@@ -624,7 +799,13 @@ mod tests {
     fn test_downgrade_cancel_when_idle_errors() {
         // cite: rpc.proto Downgrade.Cancel (no-op cancel ⇒ error)
         let d = DowngradeState::new();
-        let r = d.apply("3.6", &DowngradeRequest { action: DowngradeAction::Cancel, version: "".into() });
+        let r = d.apply(
+            "3.6",
+            &DowngradeRequest {
+                action: DowngradeAction::Cancel,
+                version: "".into(),
+            },
+        );
         assert!(matches!(r.unwrap_err(), DowngradeError::NotInProgress));
     }
 
@@ -632,7 +813,14 @@ mod tests {
     fn test_downgrade_validate_does_not_persist_state() {
         // cite: rpc.proto Downgrade.Validate (read-only)
         let d = DowngradeState::new();
-        d.apply("3.6", &DowngradeRequest { action: DowngradeAction::Validate, version: "3.5".into() }).unwrap();
+        d.apply(
+            "3.6",
+            &DowngradeRequest {
+                action: DowngradeAction::Validate,
+                version: "3.5".into(),
+            },
+        )
+        .unwrap();
         assert!(!d.enabled());
         assert!(d.target().is_none());
     }
@@ -641,7 +829,13 @@ mod tests {
     fn test_downgrade_invalid_cluster_version() {
         // cite: rpc.proto (cluster version must be parseable)
         let d = DowngradeState::new();
-        let r = d.apply("not-a-version", &DowngradeRequest { action: DowngradeAction::Validate, version: "3.5".into() });
+        let r = d.apply(
+            "not-a-version",
+            &DowngradeRequest {
+                action: DowngradeAction::Validate,
+                version: "3.5".into(),
+            },
+        );
         assert!(matches!(r.unwrap_err(), DowngradeError::InvalidVersion(_)));
     }
 
@@ -649,7 +843,13 @@ mod tests {
     fn test_downgrade_invalid_target_version() {
         // cite: rpc.proto (target version must be parseable)
         let d = DowngradeState::new();
-        let r = d.apply("3.6", &DowngradeRequest { action: DowngradeAction::Validate, version: "garbage".into() });
+        let r = d.apply(
+            "3.6",
+            &DowngradeRequest {
+                action: DowngradeAction::Validate,
+                version: "garbage".into(),
+            },
+        );
         assert!(matches!(r.unwrap_err(), DowngradeError::InvalidVersion(_)));
     }
 }

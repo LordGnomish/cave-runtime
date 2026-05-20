@@ -12,7 +12,7 @@ pub fn evaluate_policy(findings: &[Finding], floor: Option<Severity>) -> ScanVer
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{FindingCategory, Confidence};
+    use crate::models::{Confidence, FindingCategory};
     use uuid::Uuid;
 
     fn make_finding(severity: Severity) -> Finding {

@@ -33,8 +33,12 @@ fn next() -> u128 {
         // xorshift64 stretched to 128 by XOR-mixing two halves
         let mut hi = (x >> 64) as u64;
         let mut lo = x as u64;
-        hi ^= hi << 13; hi ^= hi >> 7; hi ^= hi << 17;
-        lo ^= lo << 15; lo ^= lo >> 19; lo ^= lo << 23;
+        hi ^= hi << 13;
+        hi ^= hi >> 7;
+        hi ^= hi << 17;
+        lo ^= lo << 15;
+        lo ^= lo >> 19;
+        lo ^= lo << 23;
         let next = ((hi as u128) << 64) | (lo as u128);
         x = if next == 0 { 1 } else { next };
         s.set(x);
@@ -59,12 +63,16 @@ mod tests {
 
     #[test]
     fn test_trace_ids_are_nonzero() {
-        for _ in 0..200 { assert_ne!(new_trace_id(), 0); }
+        for _ in 0..200 {
+            assert_ne!(new_trace_id(), 0);
+        }
     }
 
     #[test]
     fn test_span_ids_are_nonzero() {
-        for _ in 0..200 { assert_ne!(new_span_id(), 0); }
+        for _ in 0..200 {
+            assert_ne!(new_span_id(), 0);
+        }
     }
 
     #[test]

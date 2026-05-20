@@ -37,13 +37,13 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use axum::{
-    extract::FromRequestParts,
-    http::{header, request::Parts, StatusCode},
-    response::{IntoResponse, Response},
     Json,
+    extract::FromRequestParts,
+    http::{StatusCode, header, request::Parts},
+    response::{IntoResponse, Response},
 };
 use cave_core::types::{CaveRole, TokenType};
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 use serde_json::json;
 use tower::{Layer, Service};
 use tracing::{debug, warn};
@@ -221,10 +221,7 @@ pub struct AuthService<S> {
 
 impl<S> Service<axum::extract::Request> for AuthService<S>
 where
-    S: Service<axum::extract::Request, Response = Response>
-        + Clone
-        + Send
-        + 'static,
+    S: Service<axum::extract::Request, Response = Response> + Clone + Send + 'static,
     S::Future: Send + 'static,
     S::Error: Send + 'static,
 {
@@ -272,10 +269,7 @@ where
 
 /// `token` is extracted before the async boundary so we never hold `&Request`
 /// across an `.await` (Body is !Sync → &Request is !Send).
-async fn process_auth(
-    state: &AuthState,
-    token: Option<String>,
-) -> Result<AuthContext, Response> {
+async fn process_auth(state: &AuthState, token: Option<String>) -> Result<AuthContext, Response> {
     let token = token.ok_or_else(|| {
         (
             StatusCode::UNAUTHORIZED,
@@ -296,18 +290,14 @@ async fn process_auth(
 }
 
 async fn validate_jwt(state: &AuthState, token: &str) -> Result<AuthContext, Response> {
-    let jwks = state
-        .jwks_cache
-        .get_keys()
-        .await
-        .map_err(|e| {
-            warn!(error = %e, "JWKS unavailable");
-            (
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(json!({ "error": "Authentication service unavailable" })),
-            )
-                .into_response()
-        })?;
+    let jwks = state.jwks_cache.get_keys().await.map_err(|e| {
+        warn!(error = %e, "JWKS unavailable");
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({ "error": "Authentication service unavailable" })),
+        )
+            .into_response()
+    })?;
 
     let mut validation = Validation::new(Algorithm::RS256);
     validation.set_audience(&[&state.audience]);
@@ -317,7 +307,9 @@ async fn validate_jwt(state: &AuthState, token: &str) -> Result<AuthContext, Res
     let ctx = try_decode_jwt(token, &jwks.keys, &validation);
     if let Some(ctx) = ctx {
         debug!(cave_uid = %ctx.cave_uid, "JWT authenticated");
-        state.audit.log(AuditEvent::auth_success(ctx.cave_uid, "jwt_validate"));
+        state
+            .audit
+            .log(AuditEvent::auth_success(ctx.cave_uid, "jwt_validate"));
         return Ok(ctx);
     }
 
@@ -325,12 +317,16 @@ async fn validate_jwt(state: &AuthState, token: &str) -> Result<AuthContext, Res
     if let Ok(fresh) = state.jwks_cache.refresh().await {
         if let Some(ctx) = try_decode_jwt(token, &fresh.keys, &validation) {
             debug!(cave_uid = %ctx.cave_uid, "JWT authenticated after JWKS refresh");
-            state.audit.log(AuditEvent::auth_success(ctx.cave_uid, "jwt_validate"));
+            state
+                .audit
+                .log(AuditEvent::auth_success(ctx.cave_uid, "jwt_validate"));
             return Ok(ctx);
         }
     }
 
-    state.audit.log(AuditEvent::auth_failure("jwt_validate", "invalid_token"));
+    state
+        .audit
+        .log(AuditEvent::auth_failure("jwt_validate", "invalid_token"));
     Err((
         StatusCode::UNAUTHORIZED,
         Json(json!({ "error": "Invalid or expired token" })),
@@ -462,10 +458,7 @@ where
 {
     type Rejection = (StatusCode, Json<serde_json::Value>);
 
-    async fn from_request_parts(
-        parts: &mut Parts,
-        _state: &S,
-    ) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         parts
             .extensions
             .get::<AuthContext>()

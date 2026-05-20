@@ -95,7 +95,12 @@ mod tests {
     use super::*;
     use crate::models::ComponentType;
 
-    fn make_component(id: &str, deps: Vec<&str>, license: Option<&str>, ct: ComponentType) -> Component {
+    fn make_component(
+        id: &str,
+        deps: Vec<&str>,
+        license: Option<&str>,
+        ct: ComponentType,
+    ) -> Component {
         Component {
             id: id.to_string(),
             name: id.to_string(),
@@ -116,7 +121,10 @@ mod tests {
         ];
         let tree = build_dependency_tree(&comps, "a");
         assert_eq!(tree.root, "a");
-        assert_eq!(tree.adjacency.get("a").unwrap(), &vec!["b".to_string(), "c".to_string()]);
+        assert_eq!(
+            tree.adjacency.get("a").unwrap(),
+            &vec!["b".to_string(), "c".to_string()]
+        );
         assert_eq!(tree.adjacency.get("b").unwrap(), &Vec::<String>::new());
     }
 

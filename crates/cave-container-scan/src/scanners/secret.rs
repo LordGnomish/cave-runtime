@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
 use crate::engine::{ScanError, Scanner};
-use crate::models::{Finding, FindingCategory, Confidence, ScanKind, ScanRequest, ScanTarget, Severity};
+use crate::models::{
+    Confidence, Finding, FindingCategory, ScanKind, ScanRequest, ScanTarget, Severity,
+};
 use async_trait::async_trait;
 use regex::Regex;
 
@@ -91,7 +93,9 @@ fn is_base64_like(s: &str) -> bool {
         (c >= 'A' && c <= 'Z')
             || (c >= 'a' && c <= 'z')
             || (c >= '0' && c <= '9')
-            || c == '+' || c == '/' || c == '='
+            || c == '+'
+            || c == '/'
+            || c == '='
     })
 }
 
@@ -127,7 +131,9 @@ impl Scanner for SecretScanner {
                 let findings = self.detect_secrets(&content);
                 Ok(findings)
             }
-            _ => Err(ScanError::InvalidRequest("Expected Content target".to_string())),
+            _ => Err(ScanError::InvalidRequest(
+                "Expected Content target".to_string(),
+            )),
         }
     }
 }

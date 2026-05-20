@@ -58,7 +58,7 @@ impl RebalanceMode {
             other => {
                 return Err(StreamsError::Internal(format!(
                     "WorkerCoordinator: unknown subprotocol '{other}'"
-                )))
+                )));
             }
         })
     }
@@ -187,10 +187,7 @@ impl WorkerCoordinator {
 
     /// Process a JoinGroup request — the worker tells us its
     /// supported modes + the connectors+tasks it expects to run.
-    pub fn join_group(
-        &mut self,
-        req: JoinGroupRequest,
-    ) -> StreamsResult<JoinGroupResponse> {
+    pub fn join_group(&mut self, req: JoinGroupRequest) -> StreamsResult<JoinGroupResponse> {
         if req.supported_modes.is_empty() {
             return Err(StreamsError::Internal(
                 "JoinGroup: supported_modes must be non-empty".into(),
@@ -249,10 +246,7 @@ impl WorkerCoordinator {
     ///
     /// `scheduled_delay_used_ms` lets the caller honour the
     /// incremental delay budget.
-    pub fn compute_assignment(
-        &mut self,
-        scheduled_delay_used_ms: u64,
-    ) -> ConnectAssignmentDelta {
+    pub fn compute_assignment(&mut self, scheduled_delay_used_ms: u64) -> ConnectAssignmentDelta {
         let members = self.herder.members().to_vec();
         let desired: BTreeSet<AssignmentUnit> = self
             .desired_per_member
@@ -261,7 +255,8 @@ impl WorkerCoordinator {
             .collect();
         let delta = match self.mode {
             RebalanceMode::Incremental => {
-                self.assignor.assign(&members, &desired, scheduled_delay_used_ms)
+                self.assignor
+                    .assign(&members, &desired, scheduled_delay_used_ms)
             }
             RebalanceMode::Eager => {
                 // Eager → revoke everything + reassign. Seed the
@@ -272,7 +267,8 @@ impl WorkerCoordinator {
                     empty.insert(m.clone(), PreviousAssignment::default());
                 }
                 self.assignor.seed_previous(empty);
-                self.assignor.assign(&members, &desired, scheduled_delay_used_ms)
+                self.assignor
+                    .assign(&members, &desired, scheduled_delay_used_ms)
             }
         };
         self.state = CoordinatorState::AwaitingSync;
@@ -295,10 +291,7 @@ impl WorkerCoordinator {
     /// Process a SyncGroup. The leader's call includes the
     /// assignment; the leader's view is what the follower receives.
     /// Followers' calls receive whatever the leader earlier published.
-    pub fn sync_group(
-        &mut self,
-        req: SyncGroupRequest,
-    ) -> StreamsResult<SyncGroupResponse> {
+    pub fn sync_group(&mut self, req: SyncGroupRequest) -> StreamsResult<SyncGroupResponse> {
         let leader = self
             .herder
             .leader()
@@ -345,11 +338,7 @@ impl WorkerCoordinator {
     }
 
     /// Heartbeat — record latest tick + return current generation.
-    pub fn heartbeat(
-        &mut self,
-        member: &MemberId,
-        generation: u64,
-    ) -> StreamsResult<u64> {
+    pub fn heartbeat(&mut self, member: &MemberId, generation: u64) -> StreamsResult<u64> {
         let cur = self
             .herder
             .heartbeat(member.as_str(), generation)
@@ -499,8 +488,18 @@ mod tests {
     #[test]
     fn leader_sync_group_publishes_assignment_to_followers() {
         let mut c = WorkerCoordinator::new();
-        join(&mut c, "w1", &[RebalanceMode::Incremental], vec![unit("c", 0)]);
-        join(&mut c, "w2", &[RebalanceMode::Incremental], vec![unit("c", 1)]);
+        join(
+            &mut c,
+            "w1",
+            &[RebalanceMode::Incremental],
+            vec![unit("c", 0)],
+        );
+        join(
+            &mut c,
+            "w2",
+            &[RebalanceMode::Incremental],
+            vec![unit("c", 1)],
+        );
         let delta = c.compute_assignment(0);
         let generation = c.generation();
         // Leader is w1 (lowest id).
@@ -607,7 +606,12 @@ mod tests {
     #[test]
     fn eager_mode_revokes_everything_on_rebalance() {
         let mut c = WorkerCoordinator::new();
-        join(&mut c, "w1", &[RebalanceMode::Eager], vec![unit("c", 0), unit("c", 1)]);
+        join(
+            &mut c,
+            "w1",
+            &[RebalanceMode::Eager],
+            vec![unit("c", 0), unit("c", 1)],
+        );
         let d1 = c.compute_assignment(0);
         let w1 = &d1.per_worker[&MemberId::from("w1")];
         // First gen: every unit is assigned (no previous), revoked empty.
@@ -624,10 +628,7 @@ mod tests {
     #[test]
     fn subprotocol_strings_match_upstream() {
         assert_eq!(RebalanceMode::Eager.as_subprotocol(), "default");
-        assert_eq!(
-            RebalanceMode::Incremental.as_subprotocol(),
-            "sessioned"
-        );
+        assert_eq!(RebalanceMode::Incremental.as_subprotocol(), "sessioned");
         assert_eq!(
             RebalanceMode::parse("sessioned").unwrap(),
             RebalanceMode::Incremental

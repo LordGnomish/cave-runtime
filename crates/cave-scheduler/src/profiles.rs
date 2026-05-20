@@ -23,7 +23,10 @@ pub struct ProfileRegistry {
 
 impl ProfileRegistry {
     pub fn new(default_profile: &str) -> Self {
-        Self { profiles: HashMap::new(), default_profile: default_profile.into() }
+        Self {
+            profiles: HashMap::new(),
+            default_profile: default_profile.into(),
+        }
     }
 
     pub fn register(&mut self, profile: Profile) {
@@ -36,7 +39,9 @@ impl ProfileRegistry {
         v
     }
 
-    pub fn get(&self, name: &str) -> Option<&Profile> { self.profiles.get(name) }
+    pub fn get(&self, name: &str) -> Option<&Profile> {
+        self.profiles.get(name)
+    }
 
     /// Look up the profile a pod should use (its spec.schedulerName, or the default).
     pub fn for_pod(&self, pod: &Pod) -> Result<&Profile, Status> {
@@ -45,8 +50,9 @@ impl ProfileRegistry {
         } else {
             &pod.spec.scheduler_name
         };
-        self.profiles.get(want)
-            .ok_or_else(|| Status::unschedulable("ProfileRegistry", format!("no profile named {}", want)))
+        self.profiles.get(want).ok_or_else(|| {
+            Status::unschedulable("ProfileRegistry", format!("no profile named {}", want))
+        })
     }
 }
 
@@ -60,22 +66,46 @@ mod tests {
 
     struct AlwaysOk;
     impl FilterPlugin for AlwaysOk {
-        fn name(&self) -> &str { "AlwaysOk" }
-        fn filter(&self, _: &Pod, _: &Node, _: &ClusterSnapshot) -> Status { Status::success("AlwaysOk") }
+        fn name(&self) -> &str {
+            "AlwaysOk"
+        }
+        fn filter(&self, _: &Pod, _: &Node, _: &ClusterSnapshot) -> Status {
+            Status::success("AlwaysOk")
+        }
     }
     struct Five;
     impl ScorePlugin for Five {
-        fn name(&self) -> &str { "Five" }
-        fn score(&self, _: &Pod, _: &Node, _: &ClusterSnapshot) -> i64 { 5 }
+        fn name(&self) -> &str {
+            "Five"
+        }
+        fn score(&self, _: &Pod, _: &Node, _: &ClusterSnapshot) -> i64 {
+            5
+        }
     }
 
     fn ready(name: &str) -> Node {
-        Node { name: name.into(), uid: Uuid::new_v4(), status: NodeStatus::Ready,
-            capacity: ResourceCapacity { cpu_millicores: 1000, memory_bytes: 1, pods: 10, ephemeral_storage_bytes: 0 },
-            allocatable: ResourceCapacity { cpu_millicores: 1000, memory_bytes: 1, pods: 10, ephemeral_storage_bytes: 0 },
+        Node {
+            name: name.into(),
+            uid: Uuid::new_v4(),
+            status: NodeStatus::Ready,
+            capacity: ResourceCapacity {
+                cpu_millicores: 1000,
+                memory_bytes: 1,
+                pods: 10,
+                ephemeral_storage_bytes: 0,
+            },
+            allocatable: ResourceCapacity {
+                cpu_millicores: 1000,
+                memory_bytes: 1,
+                pods: 10,
+                ephemeral_storage_bytes: 0,
+            },
             allocated: ResourceCapacity::default(),
-            labels: std::collections::HashMap::new(), taints: vec![], conditions: vec![],
-            registered_at: Utc::now(), last_heartbeat: Utc::now(),
+            labels: std::collections::HashMap::new(),
+            taints: vec![],
+            conditions: vec![],
+            registered_at: Utc::now(),
+            last_heartbeat: Utc::now(),
         }
     }
 
@@ -84,7 +114,9 @@ mod tests {
         let mut reg = ProfileRegistry::new("default-scheduler");
         reg.register(Profile {
             name: "default-scheduler".into(),
-            framework: Framework::new().with_filter(Box::new(AlwaysOk)).with_score(Box::new(Five)),
+            framework: Framework::new()
+                .with_filter(Box::new(AlwaysOk))
+                .with_score(Box::new(Five)),
         });
         let pod = Pod::new("t", "ns", "p");
         let prof = reg.for_pod(&pod).expect("default lookup");
@@ -94,8 +126,14 @@ mod tests {
     #[test]
     fn explicit_scheduler_name_routes_to_that_profile() {
         let mut reg = ProfileRegistry::new("default-scheduler");
-        reg.register(Profile { name: "default-scheduler".into(), framework: Framework::new() });
-        reg.register(Profile { name: "ml-scheduler".into(), framework: Framework::new().with_filter(Box::new(AlwaysOk)) });
+        reg.register(Profile {
+            name: "default-scheduler".into(),
+            framework: Framework::new(),
+        });
+        reg.register(Profile {
+            name: "ml-scheduler".into(),
+            framework: Framework::new().with_filter(Box::new(AlwaysOk)),
+        });
 
         let mut pod = Pod::new("t", "ns", "p");
         pod.spec.scheduler_name = "ml-scheduler".into();
@@ -109,7 +147,10 @@ mod tests {
         let reg = ProfileRegistry::new("default-scheduler");
         let mut pod = Pod::new("t", "ns", "p");
         pod.spec.scheduler_name = "ghost".into();
-        let err = match reg.for_pod(&pod) { Ok(_) => panic!("expected error"), Err(e) => e };
+        let err = match reg.for_pod(&pod) {
+            Ok(_) => panic!("expected error"),
+            Err(e) => e,
+        };
         assert_eq!(err.plugin, "ProfileRegistry");
     }
 
@@ -118,11 +159,23 @@ mod tests {
     #[test]
     fn registered_profile_count_round_trip() {
         let mut reg = ProfileRegistry::new("p1");
-        reg.register(Profile { name: "p1".into(), framework: Framework::new() });
-        reg.register(Profile { name: "p2".into(), framework: Framework::new() });
-        reg.register(Profile { name: "p3".into(), framework: Framework::new() });
+        reg.register(Profile {
+            name: "p1".into(),
+            framework: Framework::new(),
+        });
+        reg.register(Profile {
+            name: "p2".into(),
+            framework: Framework::new(),
+        });
+        reg.register(Profile {
+            name: "p3".into(),
+            framework: Framework::new(),
+        });
         let names = reg.names();
-        assert_eq!(names, vec!["p1".to_string(), "p2".to_string(), "p3".to_string()]);
+        assert_eq!(
+            names,
+            vec!["p1".to_string(), "p2".to_string(), "p3".to_string()]
+        );
     }
 
     #[test]
@@ -132,7 +185,10 @@ mod tests {
             name: "default-scheduler".into(),
             framework: Framework::new().with_filter(Box::new(AlwaysOk)),
         });
-        reg.register(Profile { name: "ml".into(), framework: Framework::new() });
+        reg.register(Profile {
+            name: "ml".into(),
+            framework: Framework::new(),
+        });
         let pod = Pod::new("t", "ns", "p");
         let prof = reg.for_pod(&pod).unwrap();
         assert_eq!(prof.name, "default-scheduler");
@@ -141,10 +197,15 @@ mod tests {
     #[test]
     fn pod_routed_to_named_profile() {
         let mut reg = ProfileRegistry::new("default-scheduler");
-        reg.register(Profile { name: "default-scheduler".into(), framework: Framework::new() });
+        reg.register(Profile {
+            name: "default-scheduler".into(),
+            framework: Framework::new(),
+        });
         reg.register(Profile {
             name: "batch".into(),
-            framework: Framework::new().with_filter(Box::new(AlwaysOk)).with_score(Box::new(Five)),
+            framework: Framework::new()
+                .with_filter(Box::new(AlwaysOk))
+                .with_score(Box::new(Five)),
         });
         let mut pod = Pod::new("t", "ns", "p");
         pod.spec.scheduler_name = "batch".into();
@@ -175,7 +236,9 @@ mod tests {
 
         struct WrapBind(std::sync::Arc<DefaultBinder>);
         impl crate::extension_points::BindPlugin for WrapBind {
-            fn name(&self) -> &str { "DefaultBinder" }
+            fn name(&self) -> &str {
+                "DefaultBinder"
+            }
             fn bind(&self, p: &Pod, n: &str, s: &CycleState) -> Status {
                 self.0.bind(p, n, s)
             }
@@ -183,7 +246,9 @@ mod tests {
 
         struct WrapPostBind(std::sync::Arc<PostBindLogger>);
         impl crate::extension_points::PostBindPlugin for WrapPostBind {
-            fn name(&self) -> &str { "PostBindLogger" }
+            fn name(&self) -> &str {
+                "PostBindLogger"
+            }
             fn post_bind(&self, p: &Pod, n: &str, s: &CycleState) {
                 self.0.post_bind(p, n, s);
             }
@@ -235,8 +300,10 @@ mod tests {
             framework: Framework::new().with_queue_sort(Box::new(PrioritySort)),
         });
         let prof = reg.get("default").unwrap();
-        let mut a = Pod::new("t", "ns", "a"); a.spec.priority = 100;
-        let mut b = Pod::new("t", "ns", "b"); b.spec.priority = 50;
+        let mut a = Pod::new("t", "ns", "a");
+        a.spec.priority = 100;
+        let mut b = Pod::new("t", "ns", "b");
+        b.spec.priority = 50;
         assert_eq!(prof.framework.queue_sort(&a, &b), std::cmp::Ordering::Less);
     }
 
@@ -245,7 +312,9 @@ mod tests {
         use crate::bind::DefaultBinder;
         struct WrapBind(std::sync::Arc<DefaultBinder>);
         impl crate::extension_points::BindPlugin for WrapBind {
-            fn name(&self) -> &str { "DefaultBinder" }
+            fn name(&self) -> &str {
+                "DefaultBinder"
+            }
             fn bind(&self, p: &Pod, n: &str, s: &crate::cycle_state::CycleState) -> Status {
                 self.0.bind(p, n, s)
             }
@@ -262,11 +331,28 @@ mod tests {
             framework: Framework::new().with_bind(Box::new(WrapBind(bind_b.clone()))),
         });
         let cs = crate::cycle_state::CycleState::new();
-        let pod_a = { let mut p = Pod::new("t", "ns", "p"); p.spec.scheduler_name = "a".into(); p };
-        let pod_b = { let mut p = Pod::new("t", "ns", "q"); p.spec.scheduler_name = "b".into(); p };
-        reg.for_pod(&pod_a).unwrap().framework.run_bind(&pod_a, "n", &cs);
-        reg.for_pod(&pod_b).unwrap().framework.run_bind(&pod_b, "n", &cs);
-        reg.for_pod(&pod_b).unwrap().framework.run_bind(&pod_b, "n", &cs);
+        let pod_a = {
+            let mut p = Pod::new("t", "ns", "p");
+            p.spec.scheduler_name = "a".into();
+            p
+        };
+        let pod_b = {
+            let mut p = Pod::new("t", "ns", "q");
+            p.spec.scheduler_name = "b".into();
+            p
+        };
+        reg.for_pod(&pod_a)
+            .unwrap()
+            .framework
+            .run_bind(&pod_a, "n", &cs);
+        reg.for_pod(&pod_b)
+            .unwrap()
+            .framework
+            .run_bind(&pod_b, "n", &cs);
+        reg.for_pod(&pod_b)
+            .unwrap()
+            .framework
+            .run_bind(&pod_b, "n", &cs);
         assert_eq!(bind_a.count(), 1);
         assert_eq!(bind_b.count(), 2);
     }
@@ -276,17 +362,32 @@ mod tests {
         let mut reg = ProfileRegistry::new("p1");
         reg.register(Profile {
             name: "p1".into(),
-            framework: Framework::new().with_score(Box::new(Five)).with_weight("Five", 1),
+            framework: Framework::new()
+                .with_score(Box::new(Five))
+                .with_weight("Five", 1),
         });
         reg.register(Profile {
             name: "p2".into(),
-            framework: Framework::new().with_score(Box::new(Five)).with_weight("Five", 10),
+            framework: Framework::new()
+                .with_score(Box::new(Five))
+                .with_weight("Five", 10),
         });
 
-        let snap = ClusterSnapshot { nodes: vec![ready("a")], pods_by_node: std::collections::HashMap::new() };
+        let snap = ClusterSnapshot {
+            nodes: vec![ready("a")],
+            pods_by_node: std::collections::HashMap::new(),
+        };
         let pod = Pod::new("t", "ns", "p");
-        let s1 = reg.get("p1").unwrap().framework.run_scores(&pod, &["a".into()], &snap)["a"];
-        let s2 = reg.get("p2").unwrap().framework.run_scores(&pod, &["a".into()], &snap)["a"];
+        let s1 = reg
+            .get("p1")
+            .unwrap()
+            .framework
+            .run_scores(&pod, &["a".into()], &snap)["a"];
+        let s2 = reg
+            .get("p2")
+            .unwrap()
+            .framework
+            .run_scores(&pod, &["a".into()], &snap)["a"];
         assert_eq!(s1, 5);
         assert_eq!(s2, 50);
         assert!(s2 <= MAX_NODE_SCORE * 10);

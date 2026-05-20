@@ -3,7 +3,11 @@
 //! HTTP routes for cave-lint.
 
 use crate::LintState;
-use axum::{extract::State, routing::{get, post}, Json, Router};
+use axum::{
+    Json, Router,
+    extract::State,
+    routing::{get, post},
+};
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -29,7 +33,13 @@ async fn check(
 }
 
 async fn list_rules(State(state): State<Arc<LintState>>) -> Json<Vec<String>> {
-    Json(state.rules.iter().map(|r| format!("{}: {}", r.id, r.description)).collect())
+    Json(
+        state
+            .rules
+            .iter()
+            .map(|r| format!("{}: {}", r.id, r.description))
+            .collect(),
+    )
 }
 
 async fn health() -> Json<serde_json::Value> {

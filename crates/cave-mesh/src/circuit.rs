@@ -56,8 +56,13 @@ impl Default for BreakerConfig {
 
 #[derive(Debug, Clone)]
 enum BreakerState {
-    Closed { consecutive_errors: u32 },
-    Open { opened_at: Instant, ejection_duration: Duration },
+    Closed {
+        consecutive_errors: u32,
+    },
+    Open {
+        opened_at: Instant,
+        ejection_duration: Duration,
+    },
     HalfOpen,
 }
 
@@ -70,7 +75,13 @@ struct BreakerEntry {
 
 impl BreakerEntry {
     fn new(config: BreakerConfig) -> Self {
-        Self { state: BreakerState::Closed { consecutive_errors: 0 }, config, reopen_count: 0 }
+        Self {
+            state: BreakerState::Closed {
+                consecutive_errors: 0,
+            },
+            config,
+            reopen_count: 0,
+        }
     }
 }
 
@@ -91,7 +102,9 @@ impl Default for CircuitBreaker {
 
 impl CircuitBreaker {
     pub fn new() -> Self {
-        Self { entries: Arc::new(RwLock::new(HashMap::new())) }
+        Self {
+            entries: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 
     fn make_key(host: &str, subset: Option<&str>) -> String {
@@ -121,7 +134,10 @@ impl CircuitBreaker {
         let (to_half_open, result) = match &entry.state {
             BreakerState::Closed { .. } => (false, false),
             BreakerState::HalfOpen => (false, false),
-            BreakerState::Open { opened_at, ejection_duration } => {
+            BreakerState::Open {
+                opened_at,
+                ejection_duration,
+            } => {
                 if opened_at.elapsed() >= *ejection_duration {
                     (true, false)
                 } else {
@@ -145,12 +161,16 @@ impl CircuitBreaker {
             .or_insert_with(|| BreakerEntry::new(BreakerConfig::default()));
 
         match entry.state {
-            BreakerState::Closed { ref mut consecutive_errors } => {
+            BreakerState::Closed {
+                ref mut consecutive_errors,
+            } => {
                 *consecutive_errors = 0;
             }
             BreakerState::HalfOpen => {
                 info!(breaker = %key, "Circuit breaker → Closed (probe succeeded)");
-                entry.state = BreakerState::Closed { consecutive_errors: 0 };
+                entry.state = BreakerState::Closed {
+                    consecutive_errors: 0,
+                };
                 entry.reopen_count = 0;
             }
             BreakerState::Open { .. } => {}
@@ -227,7 +247,10 @@ impl CircuitBreaker {
                     BreakerState::Closed { consecutive_errors } => {
                         format!("closed (errors: {consecutive_errors})")
                     }
-                    BreakerState::Open { opened_at, ejection_duration } => {
+                    BreakerState::Open {
+                        opened_at,
+                        ejection_duration,
+                    } => {
                         let remaining = ejection_duration
                             .checked_sub(opened_at.elapsed())
                             .unwrap_or_default();

@@ -95,11 +95,7 @@ fn lfu_increment(freq: u8) -> u8 {
     }
     let r: f64 = rand::random();
     let p = 1.0 / ((freq as f64 - 0.0) * 10.0 + 1.0);
-    if r < p {
-        freq + 1
-    } else {
-        freq
-    }
+    if r < p { freq + 1 } else { freq }
 }
 
 // ── ZSet ─────────────────────────────────────────────────────────────────────
@@ -122,7 +118,10 @@ impl ZSet {
     pub fn add(&mut self, member: Vec<u8>, score: f64) -> bool {
         if let Some(&old_score) = self.scores.get(&member) {
             // Remove old position
-            self.ordered.remove(&ZKey { score: old_score, member: member.clone() });
+            self.ordered.remove(&ZKey {
+                score: old_score,
+                member: member.clone(),
+            });
             self.scores.insert(member.clone(), score);
             self.ordered.insert(ZKey { score, member }, ());
             false
@@ -135,7 +134,10 @@ impl ZSet {
 
     pub fn remove(&mut self, member: &[u8]) -> bool {
         if let Some(score) = self.scores.remove(member) {
-            self.ordered.remove(&ZKey { score, member: member.to_vec() });
+            self.ordered.remove(&ZKey {
+                score,
+                member: member.to_vec(),
+            });
             true
         } else {
             false
@@ -157,7 +159,10 @@ impl ZSet {
     /// Rank (0-based) of member by ascending score.
     pub fn rank(&self, member: &[u8]) -> Option<usize> {
         let score = self.scores.get(member)?;
-        let key = ZKey { score: *score, member: member.to_vec() };
+        let key = ZKey {
+            score: *score,
+            member: member.to_vec(),
+        };
         let rank = self.ordered.range(..=key).count() - 1;
         Some(rank)
     }
@@ -165,15 +170,24 @@ impl ZSet {
     /// Rank (0-based) of member by descending score.
     pub fn rev_rank(&self, member: &[u8]) -> Option<usize> {
         let score = self.scores.get(member)?;
-        let key = ZKey { score: *score, member: member.to_vec() };
+        let key = ZKey {
+            score: *score,
+            member: member.to_vec(),
+        };
         let rank = self.ordered.range(key..).count() - 1;
         Some(rank)
     }
 
     /// Entries in score range [min, max], optionally with lex bounds within the same score.
     pub fn range_by_score(&self, min: f64, max: f64) -> Vec<(Vec<u8>, f64)> {
-        let lo = ZKey { score: min, member: vec![] };
-        let hi = ZKey { score: max, member: vec![255u8; 64] };
+        let lo = ZKey {
+            score: min,
+            member: vec![],
+        };
+        let hi = ZKey {
+            score: max,
+            member: vec![255u8; 64],
+        };
         self.ordered
             .range(lo..=hi)
             .map(|(k, _)| (k.member.clone(), k.score))
@@ -245,7 +259,10 @@ impl ZSet {
     }
 
     pub fn count_by_lex(&self, min: &LexBound, max: &LexBound) -> usize {
-        self.ordered.keys().filter(|k| lex_in_range(&k.member, min, max)).count()
+        self.ordered
+            .keys()
+            .filter(|k| lex_in_range(&k.member, min, max))
+            .count()
     }
 
     pub fn incr_score(&mut self, member: Vec<u8>, delta: f64) -> f64 {
@@ -276,8 +293,16 @@ impl PartialOrd for ZKey {
 
 impl Ord for ZKey {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        let sa = if self.score.is_nan() { f64::NEG_INFINITY } else { self.score };
-        let sb = if other.score.is_nan() { f64::NEG_INFINITY } else { other.score };
+        let sa = if self.score.is_nan() {
+            f64::NEG_INFINITY
+        } else {
+            self.score
+        };
+        let sb = if other.score.is_nan() {
+            f64::NEG_INFINITY
+        } else {
+            other.score
+        };
         sa.partial_cmp(&sb)
             .unwrap_or(std::cmp::Ordering::Equal)
             .then_with(|| self.member.cmp(&other.member))
@@ -412,7 +437,9 @@ pub struct StreamId {
 }
 
 impl StreamId {
-    pub fn zero() -> Self { StreamId { ms: 0, seq: 0 } }
+    pub fn zero() -> Self {
+        StreamId { ms: 0, seq: 0 }
+    }
 
     pub fn parse(s: &[u8]) -> Option<Self> {
         let s = std::str::from_utf8(s).ok()?;
@@ -425,7 +452,11 @@ impl StreamId {
         }
         if let Some(pos) = s.find('-') {
             let ms: u64 = s[..pos].parse().ok()?;
-            let seq: u64 = if s[pos + 1..] == *"*" { 0 } else { s[pos + 1..].parse().ok()? };
+            let seq: u64 = if s[pos + 1..] == *"*" {
+                0
+            } else {
+                s[pos + 1..].parse().ok()?
+            };
             Some(StreamId { ms, seq })
         } else {
             let ms: u64 = s.parse().ok()?;
@@ -498,8 +529,12 @@ pub fn i64_to_bytes(n: i64) -> Vec<u8> {
 }
 
 pub fn f64_to_bytes(f: f64) -> Vec<u8> {
-    if f == f64::NEG_INFINITY { return b"-inf".to_vec(); }
-    if f == f64::INFINITY { return b"inf".to_vec(); }
+    if f == f64::NEG_INFINITY {
+        return b"-inf".to_vec();
+    }
+    if f == f64::INFINITY {
+        return b"inf".to_vec();
+    }
     // Use minimal representation
     let s = format!("{}", f);
     s.into_bytes()

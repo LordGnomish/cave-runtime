@@ -38,9 +38,15 @@ pub struct InMemoryProcessor {
 }
 
 impl InMemoryProcessor {
-    pub fn new() -> Self { Default::default() }
-    pub fn collected(&self) -> Vec<SpanData> { self.inner.lock().clone() }
-    pub fn count(&self) -> usize { self.inner.lock().len() }
+    pub fn new() -> Self {
+        Default::default()
+    }
+    pub fn collected(&self) -> Vec<SpanData> {
+        self.inner.lock().clone()
+    }
+    pub fn count(&self) -> usize {
+        self.inner.lock().len()
+    }
 }
 
 impl SpanProcessor for InMemoryProcessor {
@@ -64,10 +70,15 @@ struct TracerProviderInner {
 }
 
 impl TracerProvider {
-    pub fn builder() -> TracerProviderBuilder { TracerProviderBuilder::default() }
+    pub fn builder() -> TracerProviderBuilder {
+        TracerProviderBuilder::default()
+    }
 
     pub fn tracer(&self, scope: impl Into<String>) -> Tracer {
-        Tracer { provider: self.clone(), scope: scope.into() }
+        Tracer {
+            provider: self.clone(),
+            scope: scope.into(),
+        }
     }
 
     pub fn set_tenant(&self, tenant: impl Into<String>) {
@@ -89,16 +100,20 @@ pub struct TracerProviderBuilder {
 
 impl TracerProviderBuilder {
     pub fn with_sampler(mut self, s: Arc<dyn Sampler>) -> Self {
-        self.sampler = Some(s); self
+        self.sampler = Some(s);
+        self
     }
     pub fn with_processor(mut self, p: Arc<dyn SpanProcessor>) -> Self {
-        self.processors.push(p); self
+        self.processors.push(p);
+        self
     }
     pub fn with_resource(mut self, k: impl Into<String>, v: impl Into<String>) -> Self {
-        self.resource.insert(k.into(), v.into()); self
+        self.resource.insert(k.into(), v.into());
+        self
     }
     pub fn with_tenant(mut self, t: impl Into<String>) -> Self {
-        self.tenant = Some(t.into()); self
+        self.tenant = Some(t.into());
+        self
     }
     pub fn build(self) -> TracerProvider {
         TracerProvider {
@@ -145,11 +160,18 @@ pub struct SpanBuilder {
 }
 
 impl SpanBuilder {
-    pub fn with_kind(mut self, k: SpanKind) -> Self { self.kind = k; self }
-    pub fn with_attribute<V: Into<AttrValue>>(mut self, k: impl Into<String>, v: V) -> Self {
-        self.attributes.insert(k.into(), v.into()); self
+    pub fn with_kind(mut self, k: SpanKind) -> Self {
+        self.kind = k;
+        self
     }
-    pub fn with_link(mut self, l: Link) -> Self { self.links.push(l); self }
+    pub fn with_attribute<V: Into<AttrValue>>(mut self, k: impl Into<String>, v: V) -> Self {
+        self.attributes.insert(k.into(), v.into());
+        self
+    }
+    pub fn with_link(mut self, l: Link) -> Self {
+        self.links.push(l);
+        self
+    }
 
     /// Start a span with no parent (root).
     pub fn start(self) -> Span {
@@ -162,7 +184,8 @@ impl SpanBuilder {
         let span_id = new_span_id();
 
         let sampler = &self.tracer.provider.inner.sampler;
-        let result = sampler.should_sample(parent, trace_id, &self.name, self.kind, &self.attributes);
+        let result =
+            sampler.should_sample(parent, trace_id, &self.name, self.kind, &self.attributes);
 
         let context = SpanContext {
             trace_id,
@@ -183,7 +206,8 @@ impl SpanBuilder {
             data: Some(SpanData {
                 name: self.name,
                 context,
-                parent_span_id: parent.and_then(|p| if p.is_valid() { Some(p.span_id) } else { None }),
+                parent_span_id: parent
+                    .and_then(|p| if p.is_valid() { Some(p.span_id) } else { None }),
                 kind: self.kind,
                 start_time: Utc::now(),
                 end_time: Utc::now(), // overwritten in end()
@@ -212,20 +236,31 @@ pub struct Span {
 
 impl Span {
     pub fn context(&self) -> SpanContext {
-        self.data.as_ref().map(|d| d.context).unwrap_or_else(SpanContext::invalid)
+        self.data
+            .as_ref()
+            .map(|d| d.context)
+            .unwrap_or_else(SpanContext::invalid)
     }
-    pub fn is_recording(&self) -> bool { self.recording }
-    pub fn is_sampled(&self) -> bool { self.sampled }
+    pub fn is_recording(&self) -> bool {
+        self.recording
+    }
+    pub fn is_sampled(&self) -> bool {
+        self.sampled
+    }
 
     pub fn set_attribute<V: Into<AttrValue>>(&mut self, k: impl Into<String>, v: V) {
-        if !self.recording { return; }
+        if !self.recording {
+            return;
+        }
         if let Some(d) = &mut self.data {
             d.attributes.insert(k.into(), v.into());
         }
     }
 
     pub fn add_event(&mut self, name: impl Into<String>, attributes: Attributes) {
-        if !self.recording { return; }
+        if !self.recording {
+            return;
+        }
         if let Some(d) = &mut self.data {
             d.events.push(Event {
                 name: name.into(),
@@ -236,7 +271,9 @@ impl Span {
     }
 
     pub fn set_status(&mut self, status: Status) {
-        if !self.recording { return; }
+        if !self.recording {
+            return;
+        }
         if let Some(d) = &mut self.data {
             // OTel: never demote Ok back to Unset; never overwrite Error from non-Error
             match (&d.status, &status) {
@@ -274,7 +311,9 @@ impl Drop for Span {
     fn drop(&mut self) {
         // If the user forgot to call end(), still flush so spans aren't lost.
         if let Some(mut d) = self.data.take() {
-            if !self.recording { return; }
+            if !self.recording {
+                return;
+            }
             d.end_time = Utc::now();
             d.instrumentation_scope = self.tracer.scope.clone();
             d.tenant_id = self.tracer.provider.current_tenant();
@@ -312,7 +351,10 @@ mod tests {
         let p = Arc::new(InMemoryProcessor::new());
         let tp = provider(p.clone());
         let tr = tp.tracer("scope-x");
-        tr.span_builder("rpc").with_kind(SpanKind::Server).start().end();
+        tr.span_builder("rpc")
+            .with_kind(SpanKind::Server)
+            .start()
+            .end();
         let s = &p.collected()[0];
         assert_eq!(s.instrumentation_scope, "scope-x");
         assert_eq!(s.kind, SpanKind::Server);
@@ -328,7 +370,10 @@ mod tests {
         span.set_attribute("user", "alice");
         span.end();
         let d = &p.collected()[0];
-        assert_eq!(d.attributes.get("user"), Some(&AttrValue::String("alice".into())));
+        assert_eq!(
+            d.attributes.get("user"),
+            Some(&AttrValue::String("alice".into()))
+        );
         assert_eq!(d.attributes.get("http.status"), Some(&AttrValue::Int(200)));
     }
 
@@ -411,8 +456,11 @@ mod tests {
         let p = Arc::new(InMemoryProcessor::new());
         let tp = provider(p.clone());
         let tr = tp.tracer("s");
-        let parent_ctx = SpanContext::new(0xdeadbeef_cafe_babe_dead_beef_cafe_babe, 0xfeedface, true);
-        let child = tr.span_builder("child").start_with_parent(Some(&parent_ctx));
+        let parent_ctx =
+            SpanContext::new(0xdeadbeef_cafe_babe_dead_beef_cafe_babe, 0xfeedface, true);
+        let child = tr
+            .span_builder("child")
+            .start_with_parent(Some(&parent_ctx));
         let cctx = child.context();
         child.end();
         assert_eq!(cctx.trace_id, parent_ctx.trace_id);
@@ -430,7 +478,10 @@ mod tests {
             .build();
         let mut parent = SpanContext::new(0xaa, 0xbb, false);
         parent.is_remote = true;
-        let span = tp.tracer("s").span_builder("c").start_with_parent(Some(&parent));
+        let span = tp
+            .tracer("s")
+            .span_builder("c")
+            .start_with_parent(Some(&parent));
         assert!(!span.is_sampled());
         span.end();
         assert_eq!(p.count(), 0);
@@ -460,7 +511,10 @@ mod tests {
         tp.tracer("s").span_builder("op").start().end();
         let d = &p.collected()[0];
         assert_eq!(d.resource.get("service.name"), Some(&"api".to_string()));
-        assert_eq!(d.resource.get("service.version"), Some(&"1.2.3".to_string()));
+        assert_eq!(
+            d.resource.get("service.version"),
+            Some(&"1.2.3".to_string())
+        );
     }
 
     #[test]
@@ -470,7 +524,10 @@ mod tests {
         let tr = tp.tracer("s");
         let linked = SpanContext::new(0x1122, 0x3344, true);
         tr.span_builder("op")
-            .with_link(Link { context: linked, attributes: Attributes::new() })
+            .with_link(Link {
+                context: linked,
+                attributes: Attributes::new(),
+            })
             .start()
             .end();
         let d = &p.collected()[0];

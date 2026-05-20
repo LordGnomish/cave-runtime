@@ -20,11 +20,11 @@ The CAVE platform uses PostgreSQL because certain workloads inherently demand re
 
 CAVE runs PostgreSQL in two distinct environments, each with different operational characteristics:
 
-1. **Hetzner (Self-Hosted via CloudNativePG).** For deployments on Hetzner bare-metal or cloud servers, PostgreSQL runs as a Kubernetes-native cluster using the CloudNativePG operator. This approach gives CAVE complete control over version lifecycle, resource allocation, and backup strategy. CloudNativePG is a CNCF Sandbox project, meaning it has no single vendor dependency and benefits from community stewardship.
+1. **Hetzner (Self-Hosted via CloudNativePG).** For deployments on the sovereign profile bare-metal or cloud servers, PostgreSQL runs as a Kubernetes-native cluster using the CloudNativePG operator. This approach gives CAVE complete control over version lifecycle, resource allocation, and backup strategy. CloudNativePG is a CNCF Sandbox project, meaning it has no single vendor dependency and benefits from community stewardship.
 
 2. **Azure (Managed Service via Azure Database for PostgreSQL Flexible Server).** For deployments on Azure, PostgreSQL is provisioned as Microsoft's managed service. This eliminates operator maintenance and leverages Azure's native backup, replication, and monitoring integrations. It's the recommended PostgreSQL offering for Azure workloads.
 
-Both implementations present the same PostgreSQL interface to applications, but differ in operational concerns (backup strategies, failover behavior, cost models). To shield applications from this difference, **Crossplane v2 provides a unified abstraction: the `Database` custom resource.** A developer creates one Database resource; a Composition Function examines the cluster's infrastructure profile and provisions either CloudNativePG (Hetzner) or Azure PostgreSQL Flexible Server (Azure), with identical parameters. This approach avoids duplication and keeps operational knowledge centralized.
+Both implementations present the same PostgreSQL interface to applications, but differ in operational concerns (backup strategies, failover behavior, cost models). To shield applications from this difference, **Crossplane v2 provides a unified abstraction: the `Database` custom resource.** A developer creates one Database resource; a Composition Function examines the cluster's infrastructure profile and provisions either CloudNativePG (sovereign) or Azure PostgreSQL Flexible Server (Azure), with identical parameters. This approach avoids duplication and keeps operational knowledge centralized.
 
 ### Key Architecture Decision
 
@@ -34,7 +34,7 @@ The selection of CloudNativePG and Azure PostgreSQL Flexible Server, along with 
 
 The One Prompt reference implementation demonstrates these common workflows:
 
-- **Developer Creates a Database.** A developer in tenant namespace `tenant-acme-staging` creates a Database resource requesting a `large` instance with `standard` performance. The Composition Function detects the namespace is on a Hetzner profile and creates a CloudNativePG cluster with 4-core CPU, 8 GB RAM, and 3K IOPS. Credentials are automatically rotated every 30 days via External Secrets Operator (ESO) and OpenBao.
+- **Developer Creates a Database.** A developer in tenant namespace `tenant-acme-staging` creates a Database resource requesting a `large` instance with `standard` performance. The Composition Function detects the namespace is on a sovereign-cloud profile and creates a CloudNativePG cluster with 4-core CPU, 8 GB RAM, and 3K IOPS. Credentials are automatically rotated every 30 days via External Secrets Operator (ESO) and OpenBao.
 
 - **Automatic IOPS Resize.** Monitoring shows the database is consistently hitting IOPS throttling. An operator modifies the Database resource, changing performanceProfile from `standard` to `high`, which triggers a CloudNativePG PVCResize. The storage expands without downtime; Primary and replicas resize in sequence.
 
@@ -52,7 +52,7 @@ ADR-047 documents the decision to adopt CloudNativePG for self-hosted environmen
 
 The CAVE platform must support PostgreSQL across two distinct infrastructure profiles without introducing vendor lock-in or operational silos. The chosen database solution must satisfy these requirements:
 
-**Multi-Infrastructure Support.** PostgreSQL must run on both Hetzner bare-metal infrastructure (where CAVE manages Kubernetes clusters directly) and Azure (where CAVE leverages Azure Kubernetes Service). A single codebase and runbook must document both paths without diverging into separate operational procedures.
+**Multi-Infrastructure Support.** PostgreSQL must run on both sovereign bare-metal infrastructure (where CAVE manages Kubernetes clusters directly) and Azure (where CAVE leverages Azure Kubernetes Service). A single codebase and runbook must document both paths without diverging into separate operational procedures.
 
 **High Availability with Automatic Failover.** Single-node databases are unacceptable. The database must tolerate the loss of one node without user-visible downtime or data loss. For self-hosted, this means leader election and replica failover. For Azure, this means managed zone-redundant HA.
 
@@ -60,9 +60,9 @@ The CAVE platform must support PostgreSQL across two distinct infrastructure pro
 
 **Multi-Tenant Isolation.** Logical isolation between tenants must not rely solely on application-layer enforcement. PostgreSQL should support schema-per-tenant or role-based row-level security. Cross-tenant data leakage must be architecturally difficult, not just operationally discouraged.
 
-**Kubernetes-Native Provisioning (Hetzner).** For self-hosted environments, the database must be provisioned declaratively via Kubernetes CRDs. A developer should not SSH into a server or run imperative scripts. This allows GitOps workflows and enables Crossplane to manage database lifecycle.
+**Kubernetes-Native Provisioning (sovereign).** For self-hosted environments, the database must be provisioned declaratively via Kubernetes CRDs. A developer should not SSH into a server or run imperative scripts. This allows GitOps workflows and enables Crossplane to manage database lifecycle.
 
-**Declarative Provisioning via Crossplane.** Both Hetzner and Azure deployments must be manageable through Crossplane v2, without branching the deployment logic. The platform operator should define a single Database XRD that composes to the correct implementation based on the deployment context.
+**Declarative Provisioning via Crossplane.** Both sovereign cloud and hyperscaler deployments must be manageable through Crossplane v2, without branching the deployment logic. The platform operator should define a single Database XRD that composes to the correct implementation based on the deployment context.
 
 **Data Classification and Regulatory Compliance.** CAVE must support data residency rules (GDPR: data must remain in EU) and data classification (confidential vs. public). The database solution must integrate with these policies, ideally enforcing them at the infrastructure level.
 
@@ -87,7 +87,7 @@ The CAVE platform must support PostgreSQL across two distinct infrastructure pro
 - Pricing model: pay-per-hour for compute, storage overages
 
 **Crossplane v2 Abstraction:** Both implementations are hidden behind a single Database XRD (Custom Resource Definition). A Composition Function examines the target namespace's infrastructure profile (derived from a label or namespace selector) and routes the Database resource to either:
-- CloudNativePG Cluster resource (Hetzner)
+- CloudNativePG Cluster resource (sovereign)
 - Azure PostgreSQL Flexible Server managed resource (Azure)
 
 This approach allows developers to use identical Database manifests across both environments. Operational differences (e.g., backup retention, failover behavior) are mapped through Composition Parameters, ensuring consistency.
@@ -161,7 +161,7 @@ Six alternative database systems were seriously evaluated. Each was rejected for
 - **Not 100% Wire-Compatible.** While CockroachDB speaks the PostgreSQL protocol, it is NOT a PostgreSQL dialect. Subtle incompatibilities exist: certain FOREIGN KEY patterns, some aggregate functions, and specific transaction isolation semantics differ. Application teams will face unexpected surprises porting code.
 - **Resource Overhead is Significant.** Distributed consensus (Raft) and geographic replication require more CPU and memory per node compared to PostgreSQL. For CAVE's workload profile (many small databases serving mid-market tenants, not massive scale), this overhead is wasteful. CAVE is paying for horizontal scaling it doesn't use.
 - **Operational Complexity is High.** CockroachDB's distributed nature means more failure modes: node failures, network partitions, clock skew. Troubleshooting is harder. CloudNativePG's 3-node failover is operationally simpler.
-- **CAVE Already Solves Multi-Region at Infrastructure Level.** CAVE's Hetzner deployments span multiple data centers; Azure deployments use availability zones. The database does NOT need to solve multi-region HA; infrastructure provides it. CockroachDB's multi-region strength is a feature CAVE doesn't need, purchased at the cost of complexity.
+- **CAVE Already Solves Multi-Region at Infrastructure Level.** CAVE's sovereign-cloud deployments span multiple data centers; Azure deployments use availability zones. The database does NOT need to solve multi-region HA; infrastructure provides it. CockroachDB's multi-region strength is a feature CAVE doesn't need, purchased at the cost of complexity.
 
 **Why NOT Selected:** CockroachDB is ideal for applications that truly need distributed SQL (e.g., financial systems with global consistency requirements). CAVE's workloads are regionally scoped (GDPR, data residency). A simpler database (PostgreSQL) with regional HA is better fit.
 
@@ -201,7 +201,7 @@ Six alternative database systems were seriously evaluated. Each was rejected for
 
 #### 7. Managed-Only Approach (Skip Self-Hosted)
 
-**Profile.** Use Azure Database for PostgreSQL Flexible Server everywhere, even for Hetzner deployments. Hetzner would provision Azure subscriptions on behalf of tenants, reducing operational burden.
+**Profile.** Use Azure Database for PostgreSQL Flexible Server everywhere, even for sovereign-cloud deployments. Hetzner would provision Azure subscriptions on behalf of tenants, reducing operational burden.
 
 **Strengths:**
 - Single operational surface: all databases managed by Microsoft
@@ -209,8 +209,8 @@ Six alternative database systems were seriously evaluated. Each was rejected for
 - Simplified runbook: no CloudNativePG operator to manage
 
 **Rejection Rationale:**
-- **Violates CAVE's Zero-Vendor-Lock-In Principle.** CAVE's architecture (ADR-001) explicitly rejects single-vendor dependency. Relying on Azure for all databases, even for Hetzner deployments, concentrates risk and limits future infrastructure optionality.
-- **Hetzner Customers Expect Self-Hosting.** Hetzner is selected because it offers customer control and data sovereignty. Using Azure from Hetzner contradicts this value proposition. Customers deploying on Hetzner expect their data to stay in Hetzner infrastructure.
+- **Violates CAVE's Zero-Vendor-Lock-In Principle.** CAVE's architecture (ADR-001) explicitly rejects single-vendor dependency. Relying on Azure for all databases, even for sovereign-cloud deployments, concentrates risk and limits future infrastructure optionality.
+- **Sovereign-cloud customers Expect Self-Hosting.** the sovereign profile is selected because it offers customer control and data sovereignty. Using Azure from the sovereign profile contradicts this value proposition. Customers deploying on the sovereign profile expect their data to stay in sovereign-cloud infrastructure.
 - **Proves Portability.** CAVE must demonstrate that the platform is genuinely portable. If the database only works on Azure, CAVE's portability claims are hollow. Supporting self-hosted CloudNativePG proves that the platform is not Azure-dependent.
 - **Cost Model Mismatch.** Managed services charge for idle time and have minimum fees. Self-hosted allows closer resource matching to actual usage, important for cost-sensitive deployments.
 
@@ -346,7 +346,7 @@ Azure PostgreSQL Flexible Server is a managed service, so CAVE has a dependency 
 - Credentials and configurations are portable
 - The only migration cost is the one-time data transfer and application reconfiguration
 
-If Azure made unacceptable pricing changes, CAVE could migrate databases to self-hosted CloudNativePG on Hetzner within weeks. The lock-in is operational, not technical.
+If Azure made unacceptable pricing changes, CAVE could migrate databases to self-hosted CloudNativePG on the sovereign profile within weeks. The lock-in is operational, not technical.
 
 ### 10.4.3 PostgreSQL Core (Upstream)
 
@@ -385,7 +385,7 @@ CAVE will track PostgreSQL releases but will NOT immediately adopt new versions.
 **Database XR Implications.**
 As Crossplane matures, CAVE's Database XR will:
 - Migrate to Composition Functions (if not already) for more flexible provider routing
-- Leverage MRAP to avoid loading unneeded providers (dev-hetzner doesn't load Azure CRDs; dev-azure doesn't load CloudNativePG CRDs)
+- Leverage MRAP to avoid loading unneeded providers (dev-sovereign doesn't load Azure CRDs; dev-azure doesn't load CloudNativePG CRDs)
 - Integrate with Crossplane's secret management for credential rotation (complementing ESO)
 
 **Risk Assessment: LOW.**
@@ -399,7 +399,7 @@ As Crossplane matures, CAVE's Database XR will:
 
 ### 10.5.1 Hetzner Architecture (CloudNativePG)
 
-The Hetzner deployment model runs PostgreSQL as a Kubernetes-native cluster, with automated failover, built-in connection pooling, and external backup to MinIO (S3-compatible object storage).
+The sovereign-cloud deployments model runs PostgreSQL as a Kubernetes-native cluster, with automated failover, built-in connection pooling, and external backup to MinIO (S3-compatible object storage).
 
 **Topology Overview.**
 
@@ -494,7 +494,7 @@ The Hetzner deployment model runs PostgreSQL as a Kubernetes-native cluster, wit
 - **PITR Window.** With continuous WAL archiving, you can recover to any second within the last 7 days (configurable). Base backups are retained for 7 days; older WAL is deleted if not needed for PITR.
 
 **MinIO Backup Target.**
-- S3-compatible object storage running on Hetzner or as managed service
+- S3-compatible object storage running on the sovereign profile or as managed service
 - Stores compressed WAL files and base backup manifests
 - Supports lifecycle policies (e.g., delete objects older than 30 days) to control costs
 - Data is encrypted at rest using MinIO's KMS integration
@@ -644,7 +644,7 @@ The Azure deployment model uses Azure's managed PostgreSQL service, eliminating 
 
 ### 10.5.3 Crossplane Abstraction: Unified Database XR
 
-Crossplane's core role is to hide the differences between Hetzner and Azure deployments, allowing developers to request databases with a single resource definition.
+Crossplane's core role is to hide the differences between sovereign cloud and hyperscaler deployments, allowing developers to request databases with a single resource definition.
 
 **XRD (Composite Resource Definition).**
 
@@ -697,9 +697,9 @@ status:
   - `confidential`: mandatory encryption-at-rest, 30-day backup retention, audit logging enabled
 
 - **performanceProfile.** Determines IOPS and connection limits:
-  - `standard`: 3K IOPS (Hetzner), Burstable SKU (Azure), 100 concurrent connections
-  - `high`: 10K IOPS (Hetzner), GP SKU (Azure), 300 concurrent connections
-  - `extreme`: 30K IOPS (Hetzner), MO SKU (Azure), 1000 concurrent connections
+  - `standard`: 3K IOPS (sovereign), Burstable SKU (Azure), 100 concurrent connections
+  - `high`: 10K IOPS (sovereign), GP SKU (Azure), 300 concurrent connections
+  - `extreme`: 30K IOPS (sovereign), MO SKU (Azure), 1000 concurrent connections
 
 - **dataResidency.** Enforces geographic placement (ADR-113):
   - `eu`: data must remain in EU regions (GDPR compliance). For Hetzner, restricted to EU data centers. For Azure, restricted to Europe regions.
@@ -779,7 +779,7 @@ In reality, the logic is more sophisticated: it handles data residency restricti
 
 **Example: Developer Creates a Database.**
 
-A developer in namespace `tenant-acme-prod` (running on Hetzner) creates:
+A developer in namespace `tenant-acme-prod` (running on the sovereign profile) creates:
 
 ```yaml
 apiVersion: cave.dev/v1alpha1
@@ -798,7 +798,7 @@ spec:
 
 Within seconds:
 1. The Crossplane controller detects the Database resource
-2. The Composition Function identifies the namespace is on Hetzner (via a label or namespace selector)
+2. The Composition Function identifies the namespace is on the sovereign profile (via a label or namespace selector)
 3. The function creates a CloudNativePG Cluster resource:
    - 3 instances, PostgreSQL 17
    - 4 CPU, 8 GB RAM per instance
@@ -839,7 +839,7 @@ The application connects to `billing-db-rw.tenant-acme-prod:5432` (read-write en
 
 **Advantages of This Abstraction.**
 
-1. **Developer doesn't care about provider.** Identical YAML works on Hetzner or Azure.
+1. **Developer doesn't care about provider.** Identical YAML works on sovereign cloud or hyperscaler.
 2. **Operational knowledge is centralized.** All backup, HA, and credential policies are defined in one Composition Function.
 3. **Easy to audit and audit.** A single Composition Function source is the source of truth for how databases are provisioned.
 4. **Testable.** Composition Functions can be unit-tested before rollout.
@@ -852,7 +852,7 @@ This section walks through real-world workflows that developers and operators en
 
 ### 10.6.1 Developer Creates a Database via Crossplane XR
 
-A developer on tenant `acme-corp` (running in the Hetzner environment) needs a new billing database to track customer invoices. The database must be classified as confidential because it contains financial data. Here's how the provisioning flow unfolds.
+A developer on tenant `acme-corp` (running in the sovereign-cloud environments) needs a new billing database to track customer invoices. The database must be classified as confidential because it contains financial data. Here's how the provisioning flow unfolds.
 
 The developer prepares a Database manifest:
 
@@ -1836,11 +1836,11 @@ The restore test takes about 3 minutes. If it succeeds, the attestation is logge
 
 ### 10.6.8 Database Migration During Portability Drill
 
-Once a year, CAVE runs a portability drill (ADR-006) to ensure that no vendor lock-in exists. For databases, this means migrating from Hetzner (CloudNativePG) to Azure (PostgreSQL Flexible Server), or vice versa, and verifying that the application can connect to the migrated database without code changes.
+Once a year, CAVE runs a portability drill (ADR-006) to ensure that no vendor lock-in exists. For databases, this means migrating from the sovereign profile (CloudNativePG) to Azure (PostgreSQL Flexible Server), or vice versa, and verifying that the application can connect to the migrated database without code changes.
 
 **Drill Scenario.**
 
-The billing-db database currently runs on Hetzner. The drill's goal is to export the data, import it to Azure, and verify the application can connect.
+The billing-db database currently runs on the sovereign profile. The drill's goal is to export the data, import it to Azure, and verify the application can connect.
 
 **Step 1: Prepare Azure Target.** A temporary Azure PostgreSQL Flexible Server is provisioned with the same schema version and performance profile:
 
@@ -1863,10 +1863,10 @@ spec:
 
 Within 3 minutes, the Azure database is ready to receive data.
 
-**Step 2: Export Data from Hetzner.** Using pg_dump (logical backup):
+**Step 2: Export Data from the sovereign profile.** Using pg_dump (logical backup):
 
 ```bash
-# On Hetzner database
+# On the sovereign profile database
 pg_dump \
   -h billing-db-rw.tenant-acme-prod \
   -U superuser \
@@ -1884,7 +1884,7 @@ pg_dump \
 Alternatively, using logical replication (faster for large databases):
 
 ```sql
--- On Hetzner database
+-- On the sovereign profile database
 CREATE PUBLICATION billing_db_migration FOR ALL TABLES;
 SELECT * FROM pg_publication;
 ```
@@ -1916,7 +1916,7 @@ pg_restore \
 
 The `--single-transaction` flag ensures that if the restore fails partway, the entire import rolls back (no partial state).
 
-**Step 4: Verify Data Integrity.** A set of SQL integrity checks are run on both the source (Hetzner) and target (Azure):
+**Step 4: Verify Data Integrity.** A set of SQL integrity checks are run on both the source (sovereign) and target (Azure):
 
 ```sql
 -- Check row counts
@@ -1965,7 +1965,7 @@ spec:
 
 The application starts and performs a health check. If the health check passes (which includes a test query to the database), the connectivity is verified.
 
-**Step 6: Reverse Migration (Optional).** To prove that the reverse direction also works, the drill can then migrate back from Azure to Hetzner using the same steps.
+**Step 6: Reverse Migration (Optional).** To prove that the reverse direction also works, the drill can then migrate back from Azure to the sovereign profile using the same steps.
 
 **Step 7: Report and Archive.** The drill results are documented:
 
@@ -2094,9 +2094,9 @@ cave-ctl xr edit db billing-db --namespace tenant-acme-prod
 cave-ctl xr delete db billing-db --namespace tenant-acme-prod
 ```
 
-### 10.7.2 CloudNativePG Cluster (Hetzner)
+### 10.7.2 CloudNativePG Cluster (sovereign)
 
-When a Database XR is provisioned on Hetzner, the Composition Function creates a CloudNativePG Cluster CR. Here's the annotated manifest:
+When a Database XR is provisioned on the sovereign profile, the Composition Function creates a CloudNativePG Cluster CR. Here's the annotated manifest:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -2925,7 +2925,7 @@ spec:
     spec:
       forProvider:
         verifyBackup: true
-        backupType: "barman"  # Barman backups on Hetzner
+        backupType: "barman"  # Barman backups on the sovereign profile
   resourceSelector:
     matchLabels:
       backup-strategy: barman
@@ -3063,7 +3063,7 @@ CAVE's PostgreSQL layer satisfies compliance frameworks by design. This table ma
 | **Access control** | SOC 2 CC6.1, ISO 27001 A.9.2, GDPR Art. 32 | RBAC per tenant namespace; Kubernetes RBAC prevents cross-tenant access. Database RBAC via PostgreSQL roles (one role per tenant). Row-Level Security (RLS) enforces row-level access control. Credentials are rotated every 30 days (ESO). |
 | **Backup & recovery** | SOC 2 A1.2, ISO 27001 A.12.3, GDPR Art. 32 | Automated continuous backups (Barman). Weekly automated restore tests verify backups are usable (section 10.6.7). RPO per profile (5 min for prod). RTO <15 minutes for prod. |
 | **Audit logging** | SOC 2 CC7.2, ISO 27001 A.12.4, GDPR Art. 30 | pgaudit extension logs DDL/DML per user. Logs forwarded to Sovereign Ledger. Connection/disconnection logging enabled. All Crossplane operations logged as SelfHealed attestations. |
-| **Data residency** | GDPR Art. 44-49, NIS2 Art. 13 | dataResidency field in XR enforced by OPA. Hetzner/Azure deployment location is restricted per tenant. Backups are stored in the same region. |
+| **Data residency** | GDPR Art. 44-49, NIS2 Art. 13 | dataResidency field in XR enforced by OPA. sovereign / hyperscaler deployment location is restricted per tenant. Backups are stored in the same region. |
 | **Data classification** | ISO 27001 A.8.2, GDPR Art. 9 | Mandatory classification label (ADR-102) on all Database XRs. Classification drives encryption/audit/RLS policies. |
 | **Change management** | SOC 2 CC8.1, ISO 27001 A.12.1, GDPR Art. 32 | All schema changes via Flyway migrations (version-controlled in Git). CI validates forward/rollback migrations before deployment. Canary deployment strategy limits blast radius. |
 | **Vulnerability management** | SOC 2 CC7.1, ISO 27001 A.12.6 | Trivy container image scanning for CloudNativePG images. Azure patches PostgreSQL engine automatically. Security updates are applied within SLA. |

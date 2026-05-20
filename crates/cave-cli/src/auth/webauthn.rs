@@ -37,7 +37,10 @@ pub enum ParseError {
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::MissingSubcommand => write!(f, "expected one of: register-options, verify-attestation, assert-options, verify-assertion"),
+            Self::MissingSubcommand => write!(
+                f,
+                "expected one of: register-options, verify-attestation, assert-options, verify-assertion"
+            ),
             Self::UnknownSubcommand(s) => write!(f, "unknown subcommand {s:?}"),
             Self::MissingFlag(flag) => write!(f, "missing required --{flag}"),
         }

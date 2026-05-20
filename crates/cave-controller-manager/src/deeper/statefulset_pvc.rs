@@ -115,10 +115,11 @@ impl StatefulSetWorld {
                 name: self.name.clone(),
             });
         }
-        self.assert_contiguous().map_err(|e| ControllerError::InvalidSpec {
-            kind: "StatefulSet",
-            reason: e.to_string(),
-        })?;
+        self.assert_contiguous()
+            .map_err(|e| ControllerError::InvalidSpec {
+                kind: "StatefulSet",
+                reason: e.to_string(),
+            })?;
         if self.deletion_pending {
             // Cascade: highest ordinal that still has a pod.
             for s in self.slots.iter().rev() {
@@ -128,14 +129,22 @@ impl StatefulSetWorld {
             }
             return Ok(Step::NoOp);
         }
-        let live = self.slots.iter().filter(|s| s.pod_phase != PodPhase::Gone).count() as u32;
+        let live = self
+            .slots
+            .iter()
+            .filter(|s| s.pod_phase != PodPhase::Gone)
+            .count() as u32;
         // Scale up: create the next ordinal.
         if live < self.desired_replicas {
             // Find first ordinal that is missing or Gone.
             for ord in 0..self.desired_replicas {
                 let slot = self.slots.iter().find(|s| s.ordinal == ord);
                 match slot {
-                    None | Some(PodSlot { pod_phase: PodPhase::Gone, .. }) => {
+                    None
+                    | Some(PodSlot {
+                        pod_phase: PodPhase::Gone,
+                        ..
+                    }) => {
                         return Ok(Step::CreateOrdinal(ord));
                     }
                     Some(s) if !matches!(s.pvc_phase, PvcPhase::Bound { .. }) => {
@@ -227,7 +236,13 @@ mod tests {
     }
 
     fn bound(o: u32) -> PodSlot {
-        PodSlot { ordinal: o, pod_phase: PodPhase::Running, pvc_phase: PvcPhase::Bound { pv_id: format!("pv-{o}") } }
+        PodSlot {
+            ordinal: o,
+            pod_phase: PodPhase::Running,
+            pvc_phase: PvcPhase::Bound {
+                pv_id: format!("pv-{o}"),
+            },
+        }
     }
 
     #[test]
@@ -292,7 +307,13 @@ mod tests {
         let mut w = world(1).with_retention(PvcRetentionPolicy::Delete);
         w.slots = vec![
             bound(0),
-            PodSlot { ordinal: 1, pod_phase: PodPhase::Gone, pvc_phase: PvcPhase::Bound { pv_id: "pv-1".into() } },
+            PodSlot {
+                ordinal: 1,
+                pod_phase: PodPhase::Gone,
+                pvc_phase: PvcPhase::Bound {
+                    pv_id: "pv-1".into(),
+                },
+            },
         ];
         // Set has one live (ord 0) which equals desired; PVC at ord 1 must be reclaimed.
         assert_eq!(w.next_step(&tenant).unwrap(), Step::ReclaimPvc(1));
@@ -308,7 +329,13 @@ mod tests {
         let mut w = world(1); // default Retain
         w.slots = vec![
             bound(0),
-            PodSlot { ordinal: 1, pod_phase: PodPhase::Gone, pvc_phase: PvcPhase::Bound { pv_id: "pv-1".into() } },
+            PodSlot {
+                ordinal: 1,
+                pod_phase: PodPhase::Gone,
+                pvc_phase: PvcPhase::Bound {
+                    pv_id: "pv-1".into(),
+                },
+            },
         ];
         assert_eq!(w.next_step(&tenant).unwrap(), Step::NoOp);
     }
@@ -368,7 +395,9 @@ mod tests {
         // Pass 2: PVC still Pending → AwaitBind
         assert_eq!(w.next_step(&tenant).unwrap(), Step::AwaitBind(0));
         // Simulate bind
-        w.slots[0].pvc_phase = PvcPhase::Bound { pv_id: "pv-0".into() };
+        w.slots[0].pvc_phase = PvcPhase::Bound {
+            pv_id: "pv-0".into(),
+        };
         w.slots[0].pod_phase = PodPhase::Running;
         // Pass 3: create ord 1
         assert_eq!(w.next_step(&tenant).unwrap(), Step::CreateOrdinal(1));

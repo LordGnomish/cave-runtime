@@ -22,10 +22,10 @@ use tracing::{info, warn};
 use cave_upstream_watchd::{
     changelog::parse_release_body,
     diff::compare_pin_against_latest,
-    event::{read_events, GapEvent, GapEventSink, JsonlSink},
+    event::{GapEvent, GapEventSink, JsonlSink, read_events},
     persistence::WatchState,
     poller::{GitHubClient, PollOutcome},
-    tracked::{load_from_workspace, TrackedProject},
+    tracked::{TrackedProject, load_from_workspace},
 };
 
 #[derive(Parser, Debug)]
@@ -171,12 +171,19 @@ async fn main() -> anyhow::Result<()> {
             let events_path = events.unwrap_or(default_events);
             let state_path = state.unwrap_or(default_state);
             let audit_path = audit.unwrap_or(default_audit);
-            run_dispatch(&root, &events_path, &state_path, &audit_path, &backend, scan_only).await
+            run_dispatch(
+                &root,
+                &events_path,
+                &state_path,
+                &audit_path,
+                &backend,
+                scan_only,
+            )
+            .await
         }
         Cmd::DumpDispatched { state } => {
-            let p = state.unwrap_or_else(|| {
-                cave_upstream_watchd::AutoPortDispatcher::default_paths().1
-            });
+            let p = state
+                .unwrap_or_else(|| cave_upstream_watchd::AutoPortDispatcher::default_paths().1);
             let text = std::fs::read_to_string(&p).unwrap_or_default();
             let records: Vec<cave_upstream_watchd::DispatchedRecord> = text
                 .lines()
@@ -257,9 +264,7 @@ async fn run_dispatch(
             Arc::new(q)
         }
         other => {
-            anyhow::bail!(
-                "unknown backend '{other}' — pick dryrun | pump | opus | claude-cli"
-            );
+            anyhow::bail!("unknown backend '{other}' — pick dryrun | pump | opus | claude-cli");
         }
     };
 
@@ -350,11 +355,7 @@ async fn run_poll(
 
     info!(
         new_releases,
-        not_modified,
-        no_release,
-        rate_limited,
-        errors,
-        "tick complete"
+        not_modified, no_release, rate_limited, errors, "tick complete"
     );
     println!(
         "watchd tick: new={} not_modified={} no_release={} rate_limited={} errors={}",
@@ -390,10 +391,8 @@ pub async fn poll_one(
             last_modified,
             ..
         } => {
-            let diff = compare_pin_against_latest(
-                project.current_pin.as_deref(),
-                &release.tag_name,
-            );
+            let diff =
+                compare_pin_against_latest(project.current_pin.as_deref(), &release.tag_name);
             state.upsert(&project.github_repo, |e| {
                 e.last_poll = Some(now);
                 e.last_known_tag = Some(release.tag_name.clone());

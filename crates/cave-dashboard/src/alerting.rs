@@ -29,7 +29,9 @@ pub fn eval_threshold(value: f64, eval_type: &str, params: &[f64]) -> bool {
         "lt" => params.first().map_or(false, |&t| value < t),
         "gte" => params.first().map_or(false, |&t| value >= t),
         "lte" => params.first().map_or(false, |&t| value <= t),
-        "eq" => params.first().map_or(false, |&t| (value - t).abs() < f64::EPSILON),
+        "eq" => params
+            .first()
+            .map_or(false, |&t| (value - t).abs() < f64::EPSILON),
         "within_range" => {
             if params.len() >= 2 {
                 value >= params[0] && value <= params[1]
@@ -112,7 +114,10 @@ pub fn evaluate_alert_conditions(
 
     for (i, cond) in conditions.iter().enumerate() {
         let ref_id = cond.query.params.first().map(|s| s.as_str()).unwrap_or("A");
-        let values = series_values.get(ref_id).map(|v| v.as_slice()).unwrap_or(&[]);
+        let values = series_values
+            .get(ref_id)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[]);
 
         let reduced = apply_reducer(&cond.reducer.reducer_type, values);
         let firing = match reduced {
@@ -132,7 +137,11 @@ pub fn evaluate_alert_conditions(
         }
     }
 
-    if overall { AlertState::Firing } else { AlertState::Normal }
+    if overall {
+        AlertState::Firing
+    } else {
+        AlertState::Normal
+    }
 }
 
 // ─── Alert Rule Evaluator (Unified Alerting) ──────────────────────────────────
@@ -152,10 +161,22 @@ pub fn evaluate_alert_rule(rule: &AlertRule, data: &HashMap<String, Vec<f64>>) -
         if let Some(conditions) = model.model.get("conditions").and_then(|c| c.as_array()) {
             let mut legacy_conditions = Vec::new();
             for cond in conditions {
-                let evaluator = cond.get("evaluator").and_then(|e| serde_json::from_value::<AlertEvaluator>(e.clone()).ok()).unwrap_or_default();
-                let reducer = cond.get("reducer").and_then(|r| serde_json::from_value::<AlertReducer>(r.clone()).ok()).unwrap_or_default();
-                let operator = cond.get("operator").and_then(|o| serde_json::from_value::<AlertOperator>(o.clone()).ok()).unwrap_or_default();
-                let query = cond.get("query").and_then(|q| serde_json::from_value::<AlertConditionQuery>(q.clone()).ok()).unwrap_or_default();
+                let evaluator = cond
+                    .get("evaluator")
+                    .and_then(|e| serde_json::from_value::<AlertEvaluator>(e.clone()).ok())
+                    .unwrap_or_default();
+                let reducer = cond
+                    .get("reducer")
+                    .and_then(|r| serde_json::from_value::<AlertReducer>(r.clone()).ok())
+                    .unwrap_or_default();
+                let operator = cond
+                    .get("operator")
+                    .and_then(|o| serde_json::from_value::<AlertOperator>(o.clone()).ok())
+                    .unwrap_or_default();
+                let query = cond
+                    .get("query")
+                    .and_then(|q| serde_json::from_value::<AlertConditionQuery>(q.clone()).ok())
+                    .unwrap_or_default();
                 legacy_conditions.push(AlertCondition {
                     condition_type: "query".into(),
                     query,
@@ -200,10 +221,7 @@ pub fn evaluate_alert_rule(rule: &AlertRule, data: &HashMap<String, Vec<f64>>) -
 // ─── Silence matching ─────────────────────────────────────────────────────────
 
 /// Check whether an alert instance is silenced by any active silence.
-pub fn is_silenced(
-    alert_labels: &HashMap<String, String>,
-    silences: &[Silence],
-) -> bool {
+pub fn is_silenced(alert_labels: &HashMap<String, String>, silences: &[Silence]) -> bool {
     let now = Utc::now();
     for silence in silences {
         if silence.starts_at > now || silence.ends_at < now {
@@ -223,7 +241,9 @@ fn matches_silence(labels: &HashMap<String, String>, matchers: &[SilenceMatcher]
     for m in matchers {
         let label_val = labels.get(&m.name).map(|s| s.as_str()).unwrap_or("");
         let matches = if m.is_regex {
-            regex::Regex::new(&m.value).map(|re| re.is_match(label_val)).unwrap_or(false)
+            regex::Regex::new(&m.value)
+                .map(|re| re.is_match(label_val))
+                .unwrap_or(false)
         } else if m.is_equal {
             label_val == m.value
         } else {
@@ -239,10 +259,7 @@ fn matches_silence(labels: &HashMap<String, String>, matchers: &[SilenceMatcher]
 // ─── Notification routing ─────────────────────────────────────────────────────
 
 /// Walk the notification policy tree to find the receiver for a set of labels.
-pub fn route_alert(
-    policy: &NotificationPolicy,
-    labels: &HashMap<String, String>,
-) -> String {
+pub fn route_alert(policy: &NotificationPolicy, labels: &HashMap<String, String>) -> String {
     // Try sub-routes first
     for route in &policy.routes {
         if route_matches(route, labels) {
@@ -262,7 +279,9 @@ fn route_matches(policy: &NotificationPolicy, labels: &HashMap<String, String>) 
     for matcher in &policy.matchers {
         let label_val = labels.get(&matcher.name).map(|s| s.as_str()).unwrap_or("");
         let matches = if matcher.is_regex {
-            regex::Regex::new(&matcher.value).map(|re| re.is_match(label_val)).unwrap_or(false)
+            regex::Regex::new(&matcher.value)
+                .map(|re| re.is_match(label_val))
+                .unwrap_or(false)
         } else if matcher.is_equal {
             label_val == matcher.value
         } else {
@@ -288,26 +307,36 @@ pub fn build_alert_groups(
     for inst in instances {
         let key: Vec<(String, String)> = if group_by.iter().any(|g| g == "...") {
             // Group by all labels
-            let mut kv: Vec<_> = inst.labels.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+            let mut kv: Vec<_> = inst
+                .labels
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
             kv.sort();
             kv
         } else {
-            group_by.iter()
+            group_by
+                .iter()
                 .filter_map(|g| inst.labels.get(g).map(|v| (g.clone(), v.clone())))
                 .collect()
         };
         groups.entry(key).or_default().push(inst);
     }
 
-    groups.into_iter().map(|(key, alerts)| {
-        let labels: HashMap<String, String> = key.into_iter().collect();
-        let receiver_name = route_alert(policy, &labels);
-        AlertGroup {
-            labels,
-            receiver: AlertReceiver { name: receiver_name },
-            alerts,
-        }
-    }).collect()
+    groups
+        .into_iter()
+        .map(|(key, alerts)| {
+            let labels: HashMap<String, String> = key.into_iter().collect();
+            let receiver_name = route_alert(policy, &labels);
+            AlertGroup {
+                labels,
+                receiver: AlertReceiver {
+                    name: receiver_name,
+                },
+                alerts,
+            }
+        })
+        .collect()
 }
 
 // ─── Mute timing check ────────────────────────────────────────────────────────
@@ -330,7 +359,11 @@ fn interval_matches(interval: &TimeInterval, now: &DateTime<Utc>) -> bool {
     if !interval.weekdays.is_empty() {
         let wd = now.weekday().to_string().to_lowercase();
         let day_abbr = &wd[..3];
-        if !interval.weekdays.iter().any(|w| w.to_lowercase().starts_with(day_abbr)) {
+        if !interval
+            .weekdays
+            .iter()
+            .any(|w| w.to_lowercase().starts_with(day_abbr))
+        {
             return false;
         }
     }
@@ -372,9 +405,10 @@ fn interval_matches(interval: &TimeInterval, now: &DateTime<Utc>) -> bool {
     // Check time ranges (minutes since midnight)
     if !interval.times.is_empty() {
         let minutes_now = now.hour() as i32 * 60 + now.minute() as i32;
-        let in_range = interval.times.iter().any(|t| {
-            minutes_now >= t.start_minute && minutes_now <= t.end_minute
-        });
+        let in_range = interval
+            .times
+            .iter()
+            .any(|t| minutes_now >= t.start_minute && minutes_now <= t.end_minute);
         if !in_range {
             return false;
         }

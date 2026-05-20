@@ -15,10 +15,7 @@ use crate::trivy::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    path::Path,
-};
+use std::{collections::HashMap, path::Path};
 
 // ---------------------------------------------------------------------------
 // Scan target / options
@@ -63,7 +60,9 @@ pub struct ScanOptions {
     pub output_format: Option<crate::trivy::output::OutputFormat>,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 // ---------------------------------------------------------------------------
 // Scan result types
@@ -172,11 +171,7 @@ impl<'a> Scanner<'a> {
     // -----------------------------------------------------------------------
 
     /// Scan a local directory for packages, secrets, and misconfigurations.
-    pub fn scan_filesystem(
-        &self,
-        path: &Path,
-        opts: &ScanOptions,
-    ) -> ScanResult {
+    pub fn scan_filesystem(&self, path: &Path, opts: &ScanOptions) -> ScanResult {
         let ignore = opts
             .ignore_content
             .as_deref()
@@ -223,11 +218,7 @@ impl<'a> Scanner<'a> {
     // -----------------------------------------------------------------------
 
     /// Scan config content (Dockerfile, K8s YAML, Terraform) for misconfigs.
-    pub fn scan_config(
-        &self,
-        file_path: &str,
-        content: &str,
-    ) -> ScanResult {
+    pub fn scan_config(&self, file_path: &str, content: &str) -> ScanResult {
         let misconfigs = if file_path.ends_with("Dockerfile") || file_path.contains("dockerfile") {
             misconfig::scan_dockerfile(content, file_path)
         } else if file_path.ends_with(".yaml") || file_path.ends_with(".yml") {
@@ -288,24 +279,39 @@ impl<'a> Scanner<'a> {
     }
 
     fn walk_for_manifests(&self, dir: &Path, pkgs: &mut Vec<LangPackage>) {
-        let Ok(entries) = std::fs::read_dir(dir) else { return; };
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
                 // Skip common non-source directories
-                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
-                if !matches!(name, ".git" | "node_modules" | "target" | ".cache" | "vendor") {
+                let name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or_default();
+                if !matches!(
+                    name,
+                    ".git" | "node_modules" | "target" | ".cache" | "vendor"
+                ) {
                     self.walk_for_manifests(&path, pkgs);
                 }
             } else {
-                let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+                let file_name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or_default();
                 let path_str = path.to_string_lossy().to_string();
                 if let Some(_eco) = lang_pkg::detect_manifest_type(file_name) {
                     if let Ok(content) = std::fs::read_to_string(&path) {
                         let found: Vec<LangPackage> = match file_name {
                             "go.sum" => lang_pkg::parse_go_sum(&content, &path_str),
-                            "package-lock.json" => lang_pkg::parse_package_lock_json(&content, &path_str),
-                            "requirements.txt" => lang_pkg::parse_requirements_txt(&content, &path_str),
+                            "package-lock.json" => {
+                                lang_pkg::parse_package_lock_json(&content, &path_str)
+                            }
+                            "requirements.txt" => {
+                                lang_pkg::parse_requirements_txt(&content, &path_str)
+                            }
                             "pom.xml" => lang_pkg::parse_pom_xml(&content, &path_str),
                             "Cargo.lock" => lang_pkg::parse_cargo_lock(&content, &path_str),
                             "composer.lock" => lang_pkg::parse_composer_lock(&content, &path_str),
@@ -331,9 +337,13 @@ impl<'a> Scanner<'a> {
             let eco = format!("os/{}", pkg.package_manager);
             let vulns = self.vuln_db.lookup_package(&eco, &pkg.name);
             for vuln in vulns {
-                if ignore.is_ignored(&vuln.cve_id) { continue; }
+                if ignore.is_ignored(&vuln.cve_id) {
+                    continue;
+                }
                 if let Some(min) = min_severity {
-                    if vuln.severity < min { continue; }
+                    if vuln.severity < min {
+                        continue;
+                    }
                 }
                 findings.push(VulnFinding {
                     cve_id: vuln.cve_id.clone(),
@@ -349,11 +359,17 @@ impl<'a> Scanner<'a> {
         }
 
         for pkg in lang_pkgs {
-            let vulns = self.vuln_db.lookup_package(&pkg.ecosystem.to_string(), &pkg.name);
+            let vulns = self
+                .vuln_db
+                .lookup_package(&pkg.ecosystem.to_string(), &pkg.name);
             for vuln in vulns {
-                if ignore.is_ignored(&vuln.cve_id) { continue; }
+                if ignore.is_ignored(&vuln.cve_id) {
+                    continue;
+                }
                 if let Some(min) = min_severity {
-                    if vuln.severity < min { continue; }
+                    if vuln.severity < min {
+                        continue;
+                    }
                 }
                 findings.push(VulnFinding {
                     cve_id: vuln.cve_id.clone(),
@@ -382,12 +398,19 @@ impl<'a> Scanner<'a> {
     }
 
     fn walk_for_secrets(&self, dir: &Path, findings: &mut Vec<SecretFinding>, depth: usize) {
-        if depth > 10 { return; }
-        let Ok(entries) = std::fs::read_dir(dir) else { return; };
+        if depth > 10 {
+            return;
+        }
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+                let name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or_default();
                 if !matches!(name, ".git" | "node_modules" | "target" | ".cache") {
                     self.walk_for_secrets(&path, findings, depth + 1);
                 }
@@ -411,17 +434,27 @@ impl<'a> Scanner<'a> {
     }
 
     fn walk_for_misconfigs(&self, dir: &Path, findings: &mut Vec<MisconfigFinding>, depth: usize) {
-        if depth > 8 { return; }
-        let Ok(entries) = std::fs::read_dir(dir) else { return; };
+        if depth > 8 {
+            return;
+        }
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+                let name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or_default();
                 if !matches!(name, ".git" | "node_modules" | "target") {
                     self.walk_for_misconfigs(&path, findings, depth + 1);
                 }
             } else {
-                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+                let name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or_default();
                 let path_str = path.to_string_lossy().to_string();
                 if let Ok(content) = std::fs::read_to_string(&path) {
                     if name == "Dockerfile" || name.starts_with("Dockerfile.") {
@@ -452,11 +485,31 @@ impl<'a> Scanner<'a> {
 }
 
 fn should_scan_for_secrets(path: &Path) -> bool {
-    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
-    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or_default();
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or_default();
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or_default();
 
     // Skip binary-heavy extensions
-    if matches!(ext, "png" | "jpg" | "jpeg" | "gif" | "pdf" | "zip" | "tar" | "gz" | "bin" | "exe" | "so" | "dylib") {
+    if matches!(
+        ext,
+        "png"
+            | "jpg"
+            | "jpeg"
+            | "gif"
+            | "pdf"
+            | "zip"
+            | "tar"
+            | "gz"
+            | "bin"
+            | "exe"
+            | "so"
+            | "dylib"
+    ) {
         return false;
     }
     // Skip large compiled artifacts
@@ -464,11 +517,38 @@ fn should_scan_for_secrets(path: &Path) -> bool {
         return false;
     }
     // Always scan common secret-bearing files
-    if matches!(name, ".env" | ".envrc" | "credentials" | "config" | "secrets") {
+    if matches!(
+        name,
+        ".env" | ".envrc" | "credentials" | "config" | "secrets"
+    ) {
         return true;
     }
     // Scan text-like files by extension
-    matches!(ext, "yaml" | "yml" | "json" | "toml" | "env" | "conf" | "config" | "txt" | "sh" | "py" | "rb" | "js" | "ts" | "go" | "rs" | "java" | "xml" | "properties" | "ini" | "cfg" | "tf" | "tfvars")
+    matches!(
+        ext,
+        "yaml"
+            | "yml"
+            | "json"
+            | "toml"
+            | "env"
+            | "conf"
+            | "config"
+            | "txt"
+            | "sh"
+            | "py"
+            | "rb"
+            | "js"
+            | "ts"
+            | "go"
+            | "rs"
+            | "java"
+            | "xml"
+            | "properties"
+            | "ini"
+            | "cfg"
+            | "tf"
+            | "tfvars"
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -523,7 +603,10 @@ spec:
         let db = VulnDb::default();
         let scanner = Scanner::new(&db);
         let dir = std::env::temp_dir();
-        let opts = ScanOptions { generate_sbom: false, ..Default::default() };
+        let opts = ScanOptions {
+            generate_sbom: false,
+            ..Default::default()
+        };
         let result = scanner.scan_filesystem(&dir, &opts);
         // Should not panic; may have 0 or more findings depending on /tmp
         assert_eq!(result.scan_type.to_string(), "filesystem");

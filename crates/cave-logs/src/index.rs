@@ -11,9 +11,9 @@
 //!   1. Fast label name/value enumeration without scanning all streams.
 //!   2. Bloom-filter-based skip of chunks that cannot contain a substring.
 
-use std::collections::{HashMap, HashSet};
-use parking_lot::RwLock;
 use bloomfilter::Bloom;
+use parking_lot::RwLock;
+use std::collections::{HashMap, HashSet};
 
 use crate::models::{Labels, TenantId, TimestampNs};
 
@@ -26,7 +26,10 @@ pub struct StreamKey {
 
 impl StreamKey {
     pub fn new(tenant: impl Into<TenantId>, fp: u64) -> Self {
-        Self { tenant: tenant.into(), fp }
+        Self {
+            tenant: tenant.into(),
+            fp,
+        }
     }
 }
 
@@ -58,7 +61,14 @@ impl ChunkMeta {
         for line in lines {
             bloom.set(*line);
         }
-        Self { stream_key, min_ts, max_ts, num_entries, compressed_size, bloom }
+        Self {
+            stream_key,
+            min_ts,
+            max_ts,
+            num_entries,
+            compressed_size,
+            bloom,
+        }
     }
 
     /// Returns `false` if the chunk definitely does not contain `needle`.
@@ -114,9 +124,14 @@ impl LabelIndex {
     pub fn index_stream(&self, tenant: &str, fp: u64, labels: &Labels) {
         let key = StreamKey::new(tenant, fp);
         let mut idx = self.inner.write();
-        idx.stream_labels.entry(fp).or_insert_with(|| (labels.clone(), tenant.to_owned()));
+        idx.stream_labels
+            .entry(fp)
+            .or_insert_with(|| (labels.clone(), tenant.to_owned()));
         for (name, value) in labels.iter() {
-            idx.by_name.entry(name.clone()).or_default().insert(key.clone());
+            idx.by_name
+                .entry(name.clone())
+                .or_default()
+                .insert(key.clone());
             idx.by_value
                 .entry((name.clone(), value.clone()))
                 .or_default()
@@ -132,11 +147,15 @@ impl LabelIndex {
         for (name, value) in labels.iter() {
             if let Some(set) = idx.by_name.get_mut(name) {
                 set.remove(&key);
-                if set.is_empty() { idx.by_name.remove(name); }
+                if set.is_empty() {
+                    idx.by_name.remove(name);
+                }
             }
             if let Some(set) = idx.by_value.get_mut(&(name.clone(), value.clone())) {
                 set.remove(&key);
-                if set.is_empty() { idx.by_value.remove(&(name.clone(), value.clone())); }
+                if set.is_empty() {
+                    idx.by_value.remove(&(name.clone(), value.clone()));
+                }
             }
         }
     }
@@ -245,11 +264,16 @@ impl LabelIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
     use crate::models::Labels;
+    use std::collections::HashMap;
 
     fn make_labels(pairs: &[(&str, &str)]) -> Labels {
-        Labels::new(pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect())
+        Labels::new(
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        )
     }
 
     #[test]
@@ -285,7 +309,11 @@ mod tests {
     #[test]
     fn bloom_filter_might_contain() {
         let key = StreamKey::new("t", 1);
-        let lines = vec!["error: connection refused", "warn: timeout on request", "info: started"];
+        let lines = vec![
+            "error: connection refused",
+            "warn: timeout on request",
+            "info: started",
+        ];
         let refs: Vec<&str> = lines.iter().copied().collect();
         let meta = ChunkMeta::new(key, 0, 1000, 3, 100, &refs);
 

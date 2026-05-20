@@ -133,7 +133,10 @@ fn extract_rust_fence(text: &str, heading: &str) -> String {
 
     let Some(fence_start) = after.find("```rust") else {
         // Fallback: text between heading and next ## (or end)
-        let end = after[1..].find("\n## ").map(|i| i + 1).unwrap_or(after.len());
+        let end = after[1..]
+            .find("\n## ")
+            .map(|i| i + 1)
+            .unwrap_or(after.len());
         return after[..end].trim().to_string();
     };
 
@@ -173,7 +176,10 @@ mod tests {
     #[test]
     fn test_draft_render_starts_with_frontmatter() {
         let rendered = sample_draft().render();
-        assert!(rendered.starts_with("---\n"), "must start with YAML frontmatter fence");
+        assert!(
+            rendered.starts_with("---\n"),
+            "must start with YAML frontmatter fence"
+        );
         assert!(rendered.contains("crate: cave-secrets"));
         assert!(rendered.contains("status: draft"));
         assert!(rendered.contains("tier: 1"));

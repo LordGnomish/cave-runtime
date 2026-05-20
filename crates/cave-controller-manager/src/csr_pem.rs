@@ -29,15 +29,19 @@ pub fn parse_pem(input: &str) -> Result<PemBlock, ControllerError> {
     let begin_marker = "-----BEGIN ";
     let end_marker = "-----END ";
     let close = "-----";
-    let begin_idx = input.find(begin_marker).ok_or_else(|| ControllerError::InvalidSpec {
-        kind: "PEM",
-        reason: "missing BEGIN marker".into(),
-    })?;
+    let begin_idx = input
+        .find(begin_marker)
+        .ok_or_else(|| ControllerError::InvalidSpec {
+            kind: "PEM",
+            reason: "missing BEGIN marker".into(),
+        })?;
     let after_begin = &input[begin_idx + begin_marker.len()..];
-    let kind_end = after_begin.find(close).ok_or_else(|| ControllerError::InvalidSpec {
-        kind: "PEM",
-        reason: "malformed BEGIN marker".into(),
-    })?;
+    let kind_end = after_begin
+        .find(close)
+        .ok_or_else(|| ControllerError::InvalidSpec {
+            kind: "PEM",
+            reason: "malformed BEGIN marker".into(),
+        })?;
     let kind = after_begin[..kind_end].trim().to_string();
     if kind.is_empty() {
         return Err(ControllerError::InvalidSpec {
@@ -48,29 +52,35 @@ pub fn parse_pem(input: &str) -> Result<PemBlock, ControllerError> {
     let body_start = begin_idx + begin_marker.len() + kind_end + close.len();
     let body_search = &input[body_start..];
     let end_marker_full = format!("{end_marker}{kind}{close}");
-    let end_idx = body_search.find(&end_marker_full).ok_or_else(|| ControllerError::InvalidSpec {
-        kind: "PEM",
-        reason: "missing matching END marker".into(),
-    })?;
+    let end_idx =
+        body_search
+            .find(&end_marker_full)
+            .ok_or_else(|| ControllerError::InvalidSpec {
+                kind: "PEM",
+                reason: "missing matching END marker".into(),
+            })?;
     let raw_body = &body_search[..end_idx];
     // Strip whitespace; valid base64 chars: A-Z, a-z, 0-9, +, /, =.
-    let body: String = raw_body
-        .chars()
-         .filter(|c| !c.is_whitespace())
-         .collect();
+    let body: String = raw_body.chars().filter(|c| !c.is_whitespace()).collect();
     if body.is_empty() {
         return Err(ControllerError::InvalidSpec {
             kind: "PEM",
             reason: "empty PEM body".into(),
         });
     }
-    if !body.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '/' | '=')) {
+    if !body
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '/' | '='))
+    {
         return Err(ControllerError::InvalidSpec {
             kind: "PEM",
             reason: "PEM body contains non-base64 characters".into(),
         });
     }
-    Ok(PemBlock { kind, b64_body: body })
+    Ok(PemBlock {
+        kind,
+        b64_body: body,
+    })
 }
 
 /// Citation for the source Go function this Rust code mirrors.
@@ -92,7 +102,8 @@ mod tests {
             "parseCSR",
             "tenant-pem-ok"
         );
-        let pem = "-----BEGIN CERTIFICATE REQUEST-----\nABCDEFGH\n-----END CERTIFICATE REQUEST-----";
+        let pem =
+            "-----BEGIN CERTIFICATE REQUEST-----\nABCDEFGH\n-----END CERTIFICATE REQUEST-----";
         let b = parse_pem(pem).unwrap();
         assert_eq!(b.kind, KIND_CERTIFICATE_REQUEST);
         assert_eq!(b.b64_body, "ABCDEFGH");
@@ -171,7 +182,8 @@ mod tests {
             "parseCSR",
             "tenant-pem-strip-ws"
         );
-        let pem = "-----BEGIN CERTIFICATE REQUEST-----\nA B C D\nE F\n-----END CERTIFICATE REQUEST-----";
+        let pem =
+            "-----BEGIN CERTIFICATE REQUEST-----\nA B C D\nE F\n-----END CERTIFICATE REQUEST-----";
         let b = parse_pem(pem).unwrap();
         assert_eq!(b.b64_body, "ABCDEF");
     }

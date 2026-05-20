@@ -79,9 +79,7 @@ impl CachePlugin {
     }
 
     fn put(&self, key: CacheKey, records: Vec<Record>, ttl: u32, negative: bool) {
-        let ttl = ttl
-            .min(self.config.max_ttl)
-            .max(self.config.min_ttl);
+        let ttl = ttl.min(self.config.max_ttl).max(self.config.min_ttl);
         if ttl == 0 && !negative {
             return; // do not cache zero-TTL records
         }
@@ -209,7 +207,11 @@ mod tests {
         );
         plugin.put(
             key.clone(),
-            vec![make_a_record("www.example.com.", 300, Ipv4Addr::new(1, 2, 3, 4))],
+            vec![make_a_record(
+                "www.example.com.",
+                300,
+                Ipv4Addr::new(1, 2, 3, 4),
+            )],
             300,
             false,
         );
@@ -231,7 +233,11 @@ mod tests {
         // Insert with TTL=0 → should not cache
         plugin.put(
             key.clone(),
-            vec![make_a_record("expired.example.com.", 0, Ipv4Addr::new(1, 2, 3, 4))],
+            vec![make_a_record(
+                "expired.example.com.",
+                0,
+                Ipv4Addr::new(1, 2, 3, 4),
+            )],
             0,
             false,
         );

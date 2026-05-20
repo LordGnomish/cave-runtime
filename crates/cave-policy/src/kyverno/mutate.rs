@@ -53,7 +53,8 @@ pub fn mutate_rule(
                 &op.path,
                 op.value.as_ref(),
                 op.from.as_deref(),
-            ).map_err(|e| PolicyError::Mutation(e))?;
+            )
+            .map_err(|e| PolicyError::Mutation(e))?;
             patches.push(serde_json::to_value(op).unwrap_or_default());
         }
     }
@@ -108,7 +109,9 @@ fn mutate_foreach(
         if let Some(patches_str) = &foreach.patches_json6902 {
             let substituted_str = super::jmespath::substitute_variables(patches_str, context)?;
             let ops: Vec<crate::models::JsonPatchOp> = serde_yaml::from_str(&substituted_str)
-                .or_else(|_| serde_json::from_str::<Vec<crate::models::JsonPatchOp>>(&substituted_str))
+                .or_else(|_| {
+                    serde_json::from_str::<Vec<crate::models::JsonPatchOp>>(&substituted_str)
+                })
                 .map_err(|e| PolicyError::Mutation(format!("invalid patchesJson6902: {e}")))?;
             for op in &ops {
                 apply_json_patch(
@@ -117,7 +120,8 @@ fn mutate_foreach(
                     &op.path,
                     op.value.as_ref(),
                     op.from.as_deref(),
-                ).map_err(|e| PolicyError::Mutation(e))?;
+                )
+                .map_err(|e| PolicyError::Mutation(e))?;
                 patches.push(serde_json::to_value(op).unwrap_or_default());
             }
         }

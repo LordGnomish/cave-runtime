@@ -43,8 +43,8 @@ the runtime. Concrete model surface mirrors v1: `VirtualMachine`,
 
 Provider notes:
 
-- **Hetzner profile** (sovereign): VMs land on bare-metal nodes via the
-  Hetzner provider in cave-cloud-controller-manager. KVM/QEMU on
+- **sovereign-cloud profile** (sovereign): VMs land on bare-metal nodes via the
+  sovereign-cloud provider in cave-cloud-controller-manager. KVM/QEMU on
   Linux 6.x; SR-IOV available where the hardware supports it.
 - **Azure profile**: VMs are scheduled onto AKS nodes that have nested
   virtualisation enabled (Dv5/Ev5 v-series); KubeVirt itself runs in
@@ -86,7 +86,7 @@ Provider notes:
 - [parity.manifest.toml](../../crates/cave-kubevirt/parity.manifest.toml)
 - Upstream: <https://github.com/kubevirt/kubevirt> (v1.8.2, released
   2026-04-20)
-- ADR-001 — Hetzner sovereign infrastructure
+- ADR-001 — sovereign infrastructure
 - ADR-002 — Azure enterprise infrastructure
 - ADR-145 — Karpenter node autoscaling (companion ADR; both expand the
   workload surface beyond stateless containers)

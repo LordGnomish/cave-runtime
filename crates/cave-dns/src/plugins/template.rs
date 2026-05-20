@@ -43,15 +43,14 @@ impl TemplatePlugin {
             .map(|rule| {
                 let regex = Regex::new(&rule.match_regex)
                     .map_err(|e| DnsError::Config(format!("template regex: {e}")))?;
-                let qtype = if rule.qtype.is_empty() || rule.qtype == "ANY" {
-                    None
-                } else {
-                    Some(
-                        rule.qtype
-                            .parse::<RecordType>()
-                            .map_err(|_| DnsError::Config(format!("unknown type: {}", rule.qtype)))?,
-                    )
-                };
+                let qtype =
+                    if rule.qtype.is_empty() || rule.qtype == "ANY" {
+                        None
+                    } else {
+                        Some(rule.qtype.parse::<RecordType>().map_err(|_| {
+                            DnsError::Config(format!("unknown type: {}", rule.qtype))
+                        })?)
+                    };
                 Ok(CompiledTemplate { rule, regex, qtype })
             })
             .collect::<DnsResult<Vec<_>>>()?;
@@ -109,9 +108,9 @@ impl Plugin for TemplatePlugin {
                     r.set_ttl(300);
                     r.set_record_type(RecordType::TXT);
                     r.set_dns_class(DNSClass::IN);
-                    r.set_data(Some(RData::TXT(
-                        hickory_proto::rr::rdata::TXT::new(vec![rdata_str]),
-                    )));
+                    r.set_data(Some(RData::TXT(hickory_proto::rr::rdata::TXT::new(vec![
+                        rdata_str,
+                    ]))));
                     ctx.response.add_answer(r);
                 }
 

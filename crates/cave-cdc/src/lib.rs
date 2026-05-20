@@ -35,6 +35,6 @@ pub use postgres::{PostgresConnector, ReplicationSlotConfig, WalEvent, WalEventK
 pub use routing::{RoutingPolicy, TopicRouter};
 pub use schema::{Compatibility, Schema, SchemaFormat, SchemaRegistry};
 pub use snapshot::{SnapshotMode, SnapshotProgress};
-pub use streams_sink::{StreamsSink, ProduceResult};
+pub use streams_sink::{ProduceResult, StreamsSink};
 
 pub const MODULE_NAME: &str = "cdc";

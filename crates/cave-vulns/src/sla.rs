@@ -53,7 +53,10 @@ impl Default for SlaConfiguration {
 
 impl SlaConfiguration {
     pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into(), ..Self::default() }
+        Self {
+            name: name.into(),
+            ..Self::default()
+        }
     }
 
     /// Window in days for a severity. `None` for Info or when the
@@ -72,7 +75,8 @@ impl SlaConfiguration {
     /// Absolute SLA deadline anchored to `f.date` (DefectDojo's
     /// `sla_start_date` falls back to `date`). Source: dojo/models.py:2453.
     pub fn deadline(&self, f: &Finding) -> Option<DateTime<Utc>> {
-        self.days_for(f.severity).map(|d| f.date + Duration::days(d))
+        self.days_for(f.severity)
+            .map(|d| f.date + Duration::days(d))
     }
 
     /// Days until SLA breach. Negative = already breached.
@@ -92,7 +96,7 @@ impl SlaConfiguration {
 pub struct SlaReport {
     pub total: usize,
     pub breached: usize,
-    pub breaching_soon: usize, // ≤ 7 days
+    pub breaching_soon: usize,                             // ≤ 7 days
     pub by_severity: Vec<(FindingSeverity, usize, usize)>, // (sev, total, breached)
 }
 
@@ -112,7 +116,10 @@ pub fn rollup(cfg: &SlaConfiguration, findings: &[Finding], now: DateTime<Utc>) 
             continue;
         }
         total += 1;
-        let bucket = buckets.iter_mut().find(|(s, _, _)| *s == f.severity).unwrap();
+        let bucket = buckets
+            .iter_mut()
+            .find(|(s, _, _)| *s == f.severity)
+            .unwrap();
         bucket.1 += 1;
         if cfg.is_breached(f, now) {
             breached += 1;
@@ -123,7 +130,12 @@ pub fn rollup(cfg: &SlaConfiguration, findings: &[Finding], now: DateTime<Utc>) 
             }
         }
     }
-    SlaReport { total, breached, breaching_soon, by_severity: buckets }
+    SlaReport {
+        total,
+        breached,
+        breaching_soon,
+        by_severity: buckets,
+    }
 }
 
 #[cfg(test)]
@@ -199,7 +211,11 @@ mod tests {
         let r = rollup(&cfg, &findings, Utc::now());
         assert_eq!(r.total, 3); // 4 findings, 1 inactive
         assert_eq!(r.breached, 1); // only the critical
-        let crit_bucket = r.by_severity.iter().find(|b| b.0 == FindingSeverity::Critical).unwrap();
+        let crit_bucket = r
+            .by_severity
+            .iter()
+            .find(|b| b.0 == FindingSeverity::Critical)
+            .unwrap();
         assert_eq!(crit_bucket.1, 1);
         assert_eq!(crit_bucket.2, 1);
     }

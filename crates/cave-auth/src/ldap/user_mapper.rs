@@ -84,11 +84,7 @@ impl UserAttributeMapper {
 
     /// Apply this mapper to a search entry (attribute name →
     /// list of values).
-    pub fn map_entry(
-        &self,
-        dn: &str,
-        attrs: &BTreeMap<String, Vec<String>>,
-    ) -> LdapUser {
+    pub fn map_entry(&self, dn: &str, attrs: &BTreeMap<String, Vec<String>>) -> LdapUser {
         let mut user = LdapUser {
             dn: dn.to_owned(),
             ..Default::default()
@@ -117,10 +113,7 @@ impl UserAttributeMapper {
                 "groups" => {
                     user.groups = values
                         .iter()
-                        .map(|dn| {
-                            extract_cn_from_dn(dn)
-                                .unwrap_or_else(|| dn.clone())
-                        })
+                        .map(|dn| extract_cn_from_dn(dn).unwrap_or_else(|| dn.clone()))
                         .collect();
                 }
                 other => {
@@ -257,25 +250,20 @@ mod tests {
     #[test]
     fn extract_cn_from_dn_handles_canonical_form() {
         assert_eq!(
-            extract_cn_from_dn("cn=engineers,ou=groups,dc=example,dc=com")
-                .as_deref(),
+            extract_cn_from_dn("cn=engineers,ou=groups,dc=example,dc=com").as_deref(),
             Some("engineers")
         );
     }
 
     #[test]
     fn extract_cn_from_dn_returns_none_for_non_cn_head() {
-        assert!(extract_cn_from_dn(
-            "ou=groups,dc=example,dc=com"
-        )
-        .is_none());
+        assert!(extract_cn_from_dn("ou=groups,dc=example,dc=com").is_none());
     }
 
     #[test]
     fn extract_cn_from_dn_is_case_insensitive_on_head() {
         assert_eq!(
-            extract_cn_from_dn("CN=engineers,ou=groups,dc=example,dc=com")
-                .as_deref(),
+            extract_cn_from_dn("CN=engineers,ou=groups,dc=example,dc=com").as_deref(),
             Some("engineers")
         );
     }

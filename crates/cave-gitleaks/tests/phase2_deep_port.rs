@@ -5,14 +5,14 @@
 //! reporters, decoders (base64 + gzip), stopwords, Extend/UseDefault
 //! resolver.
 
+use cave_gitleaks::Detector;
 use cave_gitleaks::baseline::{Baseline, BaselineFile};
 use cave_gitleaks::config::Config;
-use cave_gitleaks::decoders::{detect_with_decoders, DecoderChain};
+use cave_gitleaks::decoders::{DecoderChain, detect_with_decoders};
 use cave_gitleaks::finding::Finding;
-use cave_gitleaks::protect::{protect_staged_blobs, ProtectOutcome};
+use cave_gitleaks::protect::{ProtectOutcome, protect_staged_blobs};
 use cave_gitleaks::report::{write_csv, write_junit};
 use cave_gitleaks::stopwords::filter_with_stopwords;
-use cave_gitleaks::Detector;
 
 fn finding(rule: &str, file: &str, line: usize) -> Finding {
     Finding {
@@ -186,7 +186,8 @@ fn baseline_handles_empty_file() {
 
 #[test]
 fn protect_returns_clean_when_no_secrets_in_staged_text() {
-    let outcome = protect_staged_blobs(&[(String::from("src/main.rs"), String::from("println!()"))]);
+    let outcome =
+        protect_staged_blobs(&[(String::from("src/main.rs"), String::from("println!()"))]);
     assert!(matches!(outcome, ProtectOutcome::Clean));
 }
 
@@ -240,8 +241,7 @@ fn extend_without_use_default_omits_builtins() {
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 fn base64_encode(bytes: &[u8]) -> String {
-    const TABLE: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::new();
     let mut i = 0;
     while i + 3 <= bytes.len() {
@@ -269,8 +269,8 @@ fn base64_encode(bytes: &[u8]) -> String {
 }
 
 fn gzip_compress(input: &[u8]) -> Vec<u8> {
-    use flate2::write::GzEncoder;
     use flate2::Compression;
+    use flate2::write::GzEncoder;
     use std::io::Write;
     let mut e = GzEncoder::new(Vec::new(), Compression::default());
     e.write_all(input).unwrap();

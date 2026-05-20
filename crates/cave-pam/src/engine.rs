@@ -20,14 +20,16 @@ pub fn is_request_valid(request: &AccessRequest) -> bool {
 
 /// Count active sessions for a user
 pub fn active_session_count(sessions: &[PamSession], user_id: &uuid::Uuid) -> usize {
-    sessions.iter()
+    sessions
+        .iter()
         .filter(|s| &s.user_id == user_id && s.status == SessionStatus::Active)
         .count()
 }
 
 /// Filter sessions requiring approval
 pub fn pending_sessions(sessions: &[PamSession]) -> Vec<&PamSession> {
-    sessions.iter()
+    sessions
+        .iter()
         .filter(|s| s.status == SessionStatus::PendingApproval)
         .collect()
 }
@@ -41,8 +43,8 @@ pub fn is_recorded(session: &PamSession) -> bool {
 mod tests {
     use super::*;
     use crate::models::{AccessTarget, SessionType, TargetType};
-    use uuid::Uuid;
     use chrono::{Duration, Utc};
+    use uuid::Uuid;
 
     fn make_session(
         user_id: Uuid,

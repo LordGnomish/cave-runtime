@@ -2,11 +2,11 @@
 // Copyright 2026 Cave Runtime contributors
 //! In-process silence store.
 
-use std::collections::HashMap;
-use parking_lot::RwLock;
-use uuid::Uuid;
-use crate::model::Labels;
 use super::model::{Silence, SilenceMatcher, SilenceStatus};
+use crate::model::Labels;
+use parking_lot::RwLock;
+use std::collections::HashMap;
+use uuid::Uuid;
 
 pub struct SilenceStore {
     silences: RwLock<HashMap<String, Silence>>,
@@ -14,7 +14,9 @@ pub struct SilenceStore {
 
 impl SilenceStore {
     pub fn new() -> Self {
-        Self { silences: RwLock::new(HashMap::new()) }
+        Self {
+            silences: RwLock::new(HashMap::new()),
+        }
     }
 
     pub fn create(&self, mut silence: Silence) -> String {
@@ -46,7 +48,9 @@ impl SilenceStore {
 
     /// Check if any active silence matches these labels.
     pub fn is_silenced(&self, labels: &Labels, now_rfc3339: &str) -> bool {
-        self.silences.read().values()
+        self.silences
+            .read()
+            .values()
             .any(|s| s.is_active(now_rfc3339) && s.matches(labels))
     }
 }

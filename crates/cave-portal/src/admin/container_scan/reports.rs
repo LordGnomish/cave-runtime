@@ -9,10 +9,10 @@
 //!
 //! Upstream: <https://aquasecurity.github.io/trivy>
 
+use super::ContainerScanViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
-use super::ContainerScanViewError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReportRow {
@@ -20,7 +20,10 @@ pub struct ReportRow {
     pub image_count: usize,
 }
 
-pub fn build(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<ReportRow>, ContainerScanViewError> {
+pub fn build(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<ReportRow>, ContainerScanViewError> {
     let images = super::images::list_images(state, ctx)?;
     let mut high = 0usize;
     let mut medium = 0usize;
@@ -92,21 +95,37 @@ mod tests {
 
     #[test]
     fn build_returns_three_severity_rows() {
-        let rows = build(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
+        let rows = build(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
         assert_eq!(rows.len(), 3);
     }
 
     #[test]
     fn build_severities_sum_to_image_count() {
-        let images = super::super::images::list_images(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
-        let rows = build(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
+        let images = super::super::images::list_images(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
+        let rows = build(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
         let total: usize = rows.iter().map(|r| r.image_count).sum();
         assert_eq!(total, images.len());
     }
 
     #[test]
     fn worst_severity_returns_highest_with_count() {
-        let rows = build(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
+        let rows = build(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
         if let Some(w) = worst_severity_present(&rows) {
             assert!(w.image_count > 0);
         }
@@ -119,7 +138,11 @@ mod tests {
 
     #[test]
     fn render_includes_reports_label() {
-        let html = render(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
+        let html = render(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
         assert!(html.contains("Reports"));
         assert!(html.contains("Trivy Reports"));
     }

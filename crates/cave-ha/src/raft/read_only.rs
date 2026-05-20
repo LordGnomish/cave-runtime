@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-use std::collections::HashSet;
-use tokio::sync::oneshot;
 use crate::error::HaResult;
 use crate::raft::types::{LogIndex, NodeId};
+use std::collections::HashSet;
+use tokio::sync::oneshot;
 
 /// Read-only request mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,14 +36,23 @@ pub struct ReadOnlyQueue {
 
 impl ReadOnlyQueue {
     pub fn new(mode: ReadMode) -> Self {
-        Self { pending: Vec::new(), next_id: 1, mode }
+        Self {
+            pending: Vec::new(),
+            next_id: 1,
+            mode,
+        }
     }
 
     /// Add a new read request at the current commit index.
     pub fn add(&mut self, index: LogIndex, resp: oneshot::Sender<HaResult<LogIndex>>) -> u64 {
         let id = self.next_id;
         self.next_id += 1;
-        self.pending.push(ReadRequest { id, index, acks: HashSet::new(), resp });
+        self.pending.push(ReadRequest {
+            id,
+            index,
+            acks: HashSet::new(),
+            resp,
+        });
         id
     }
 
@@ -71,9 +80,12 @@ impl ReadOnlyQueue {
     }
 
     /// Check if LeaseRead is safe given last heartbeat time.
-    pub fn lease_valid(&self, last_heartbeat: std::time::Instant, timeout: std::time::Duration) -> bool {
-        self.mode == ReadMode::LeaseRead
-            && last_heartbeat.elapsed() < timeout
+    pub fn lease_valid(
+        &self,
+        last_heartbeat: std::time::Instant,
+        timeout: std::time::Duration,
+    ) -> bool {
+        self.mode == ReadMode::LeaseRead && last_heartbeat.elapsed() < timeout
     }
 
     /// Drain all requests (on leader step-down).
@@ -85,7 +97,9 @@ impl ReadOnlyQueue {
         self.pending.is_empty()
     }
 
-    pub fn mode(&self) -> ReadMode { self.mode }
+    pub fn mode(&self) -> ReadMode {
+        self.mode
+    }
 }
 
 /// Lease tracker for LeaseRead.
@@ -96,7 +110,10 @@ pub struct LeaderLease {
 
 impl LeaderLease {
     pub fn new(duration: std::time::Duration) -> Self {
-        Self { granted_at: None, duration }
+        Self {
+            granted_at: None,
+            duration,
+        }
     }
 
     pub fn renew(&mut self) {

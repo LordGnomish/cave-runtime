@@ -9,10 +9,10 @@
 // `enabled`, `defaultAction`, `priority`. Plugin id is the alias.
 
 use axum::{
+    Json,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
@@ -40,7 +40,9 @@ pub struct RequiredActionStore {
 
 impl RequiredActionStore {
     pub fn new() -> Self {
-        Self { inner: DashMap::new() }
+        Self {
+            inner: DashMap::new(),
+        }
     }
 
     pub fn list(&self, realm: &str) -> Vec<RequiredActionProvider> {
@@ -55,7 +57,9 @@ impl RequiredActionStore {
     }
 
     pub fn get(&self, realm: &str, alias: &str) -> Option<RequiredActionProvider> {
-        self.inner.get(&(realm.into(), alias.into())).map(|v| v.clone())
+        self.inner
+            .get(&(realm.into(), alias.into()))
+            .map(|v| v.clone())
     }
 
     /// Upsert.

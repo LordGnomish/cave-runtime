@@ -134,7 +134,11 @@ mod tests {
 
     #[test]
     fn log_entry_serializes_with_byte_data() {
-        let e = LogEntry { index: 42, term: 7, data: b"hello".to_vec() };
+        let e = LogEntry {
+            index: 42,
+            term: 7,
+            data: b"hello".to_vec(),
+        };
         let json = serde_json::to_value(&e).unwrap();
         assert_eq!(json["index"], 42);
         assert_eq!(json["term"], 7);

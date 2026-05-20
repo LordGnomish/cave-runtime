@@ -9,12 +9,14 @@
 
 #[cfg(test)]
 mod cycle_1778757314_a2 {
+    use cave_acme::AcmeServer;
+    use cave_acme::MODULE_NAME;
     use cave_acme::account::{Account, AccountStatus, ExternalAccountBinding, Jwk};
     use cave_acme::challenge::{Challenge, ChallengeStatus, ChallengeType};
     use cave_acme::error::{AcmeError, AcmeResult};
-    use cave_acme::order::{Authorization, AuthzStatus, Identifier, IdentifierType, Order, OrderStatus};
-    use cave_acme::AcmeServer;
-    use cave_acme::MODULE_NAME;
+    use cave_acme::order::{
+        Authorization, AuthzStatus, Identifier, IdentifierType, Order, OrderStatus,
+    };
 
     // Helper to create a placeholder Jwk for testing construction
     fn placeholder_jwk() -> Jwk {
@@ -64,7 +66,7 @@ mod cycle_1778757314_a2 {
         let status = AccountStatus::Valid;
         // Verify it's the Valid variant
         match status {
-            AccountStatus::Valid => {},
+            AccountStatus::Valid => {}
             _ => panic!("Expected Valid status"),
         }
     }
@@ -74,7 +76,7 @@ mod cycle_1778757314_a2 {
     fn test_account_status_deactivated_20231027_100002() {
         let status = AccountStatus::Deactivated;
         match status {
-            AccountStatus::Deactivated => {},
+            AccountStatus::Deactivated => {}
             _ => panic!("Expected Deactivated status"),
         }
     }
@@ -84,7 +86,7 @@ mod cycle_1778757314_a2 {
     fn test_account_status_revoked_20231027_100003() {
         let status = AccountStatus::Revoked;
         match status {
-            AccountStatus::Revoked => {},
+            AccountStatus::Revoked => {}
             _ => panic!("Expected Revoked status"),
         }
     }
@@ -94,7 +96,7 @@ mod cycle_1778757314_a2 {
     fn test_authz_status_pending_20231027_100004() {
         let status = AuthzStatus::Pending;
         match status {
-            AuthzStatus::Pending => {},
+            AuthzStatus::Pending => {}
             _ => panic!("Expected Pending status"),
         }
     }
@@ -104,7 +106,7 @@ mod cycle_1778757314_a2 {
     fn test_authz_status_valid_20231027_100005() {
         let status = AuthzStatus::Valid;
         match status {
-            AuthzStatus::Valid => {},
+            AuthzStatus::Valid => {}
             _ => panic!("Expected Valid status"),
         }
     }
@@ -114,7 +116,7 @@ mod cycle_1778757314_a2 {
     fn test_authz_status_invalid_20231027_100006() {
         let status = AuthzStatus::Invalid;
         match status {
-            AuthzStatus::Invalid => {},
+            AuthzStatus::Invalid => {}
             _ => panic!("Expected Invalid status"),
         }
     }
@@ -124,7 +126,7 @@ mod cycle_1778757314_a2 {
     fn test_challenge_status_pending_20231027_100007() {
         let status = ChallengeStatus::Pending;
         match status {
-            ChallengeStatus::Pending => {},
+            ChallengeStatus::Pending => {}
             _ => panic!("Expected Pending status"),
         }
     }
@@ -134,7 +136,7 @@ mod cycle_1778757314_a2 {
     fn test_challenge_status_valid_20231027_100008() {
         let status = ChallengeStatus::Valid;
         match status {
-            ChallengeStatus::Valid => {},
+            ChallengeStatus::Valid => {}
             _ => panic!("Expected Valid status"),
         }
     }
@@ -144,7 +146,7 @@ mod cycle_1778757314_a2 {
     fn test_order_status_pending_20231027_100009() {
         let status = OrderStatus::Pending;
         match status {
-            OrderStatus::Pending => {},
+            OrderStatus::Pending => {}
             _ => panic!("Expected Pending status"),
         }
     }
@@ -154,7 +156,7 @@ mod cycle_1778757314_a2 {
     fn test_order_status_valid_20231027_100010() {
         let status = OrderStatus::Valid;
         match status {
-            OrderStatus::Valid => {},
+            OrderStatus::Valid => {}
             _ => panic!("Expected Valid status"),
         }
     }
@@ -164,7 +166,7 @@ mod cycle_1778757314_a2 {
     fn test_identifier_type_dns_20231027_100011() {
         let id_type = IdentifierType::Dns;
         match id_type {
-            IdentifierType::Dns => {},
+            IdentifierType::Dns => {}
             _ => panic!("Expected Dns identifier type"),
         }
     }
@@ -174,7 +176,7 @@ mod cycle_1778757314_a2 {
     fn test_identifier_type_ip_20231027_100012() {
         let id_type = IdentifierType::Ip;
         match id_type {
-            IdentifierType::Ip => {},
+            IdentifierType::Ip => {}
             _ => panic!("Expected Ip identifier type"),
         }
     }

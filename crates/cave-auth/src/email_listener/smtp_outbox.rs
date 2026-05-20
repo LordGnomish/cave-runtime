@@ -10,15 +10,15 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use lettre::message::{header, Mailbox, MultiPart, SinglePart};
+use lettre::message::{Mailbox, MultiPart, SinglePart, header};
 use lettre::transport::stub::StubTransport;
 use lettre::{Message, Transport};
 use parking_lot::Mutex;
 use serde::Serialize;
 
+use super::EmailError;
 use super::events::AuthEvent;
 use super::templates::Templates;
-use super::EmailError;
 
 /// Composed email message ready for SMTP.
 pub struct OutgoingEmail {
@@ -237,8 +237,8 @@ impl SmtpOutbox {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::events::*;
+    use super::*;
     use std::sync::Arc;
 
     fn login_payload() -> LoginAlertPayload {
@@ -315,12 +315,16 @@ mod tests {
         let stub = Arc::new(TestStubTransport::new());
         let outbox = SmtpOutbox::new_with_transport(OutboxConfig::test_defaults(), stub.clone());
         outbox
-            .send_event(AuthEvent::PasswordChange, &PasswordChangePayload {
-                to: "bob@example.com".into(),
-                display_name: "Bob".into(),
-                at: "2024-01-01T00:00:00Z".into(),
-                ip_address: "5.6.7.8".into(),
-            }, "bob@example.com")
+            .send_event(
+                AuthEvent::PasswordChange,
+                &PasswordChangePayload {
+                    to: "bob@example.com".into(),
+                    display_name: "Bob".into(),
+                    at: "2024-01-01T00:00:00Z".into(),
+                    ip_address: "5.6.7.8".into(),
+                },
+                "bob@example.com",
+            )
             .unwrap();
         let captured = stub.captured();
         assert!(captured[0].contains("Your password was changed"));
@@ -336,6 +340,9 @@ mod tests {
         // Build error -> deadletter (since send_outgoing wraps), but actually
         // the build fails before retry loop starts and we surface Send.
         // Either Send or Deadletter is acceptable — both honest signals.
-        assert!(matches!(err, EmailError::Send(_) | EmailError::Deadletter(_)));
+        assert!(matches!(
+            err,
+            EmailError::Send(_) | EmailError::Deadletter(_)
+        ));
     }
 }

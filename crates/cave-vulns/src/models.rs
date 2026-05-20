@@ -148,7 +148,8 @@ mod tests {
     #[test]
     fn test_component_version_deserialize() {
         let json = r#"{"name":"openssl","version":"1.0.1"}"#;
-        let cv: ComponentVersion = serde_json::from_str(json).expect("deserialize component version");
+        let cv: ComponentVersion =
+            serde_json::from_str(json).expect("deserialize component version");
         assert_eq!(cv.name, "openssl");
         assert_eq!(cv.version, "1.0.1");
     }

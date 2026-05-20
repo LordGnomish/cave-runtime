@@ -39,7 +39,7 @@ CAVE is a multi-tenant platform where workloads from different tenants share clu
 
 ### Istio Sidecar Mode — Rejected
 
-**Primary:** Resource overhead. Envoy sidecar adds ~50-100MB RAM per pod. On a 500-pod cluster = 25-50GB overhead. On Hetzner dev profiles (CX42 = 16GB total), sidecar overhead would consume 50%+ of available memory. Ambient ztunnel runs per-node (~50MB/node × 8 nodes = 400MB total) — 60x more efficient.
+**Primary:** Resource overhead. Envoy sidecar adds ~50-100MB RAM per pod. On a 500-pod cluster = 25-50GB overhead. On the sovereign profile dev profiles (CX42 = 16GB total), sidecar overhead would consume 50%+ of available memory. Ambient ztunnel runs per-node (~50MB/node × 8 nodes = 400MB total) — 60x more efficient.
 
 **Secondary:** Operational complexity. Sidecar injection, lifecycle management (sidecar must restart when app restarts), sidecar version skew, sidecar-to-sidecar debugging. All eliminated by ambient mode. Ambient ztunnel handles L4 mTLS transparently at node level — zero per-pod configuration.
 

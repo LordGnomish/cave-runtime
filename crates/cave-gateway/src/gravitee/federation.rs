@@ -152,9 +152,8 @@ impl FederationStore {
 
                     // Merge paths with conflict detection
                     if let Some(new_paths) = spec.get("paths").and_then(|p| p.as_object()) {
-                        if let Some(merged_paths) = merged
-                            .get_mut("paths")
-                            .and_then(|p| p.as_object_mut())
+                        if let Some(merged_paths) =
+                            merged.get_mut("paths").and_then(|p| p.as_object_mut())
                         {
                             for (path, path_spec) in new_paths {
                                 if merged_paths.contains_key(path) {
@@ -219,7 +218,9 @@ mod tests {
         let id = api.id;
 
         api.add_source(FederatedSource {
-            source_type: SourceType::StaticOpenApi("http://api1.example.com/openapi.json".to_string()),
+            source_type: SourceType::StaticOpenApi(
+                "http://api1.example.com/openapi.json".to_string(),
+            ),
             discovery_url: "http://api1.example.com/discover".to_string(),
             path_prefix: Some("/api1".to_string()),
             label_selector: HashMap::new(),

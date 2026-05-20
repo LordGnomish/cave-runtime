@@ -70,7 +70,11 @@ pub fn select_terminated_for_gc(
     // Oldest first.
     terminated.sort_by_key(|p| p.created_sec);
     let to_remove = terminated.len() - threshold as usize;
-    terminated.iter().take(to_remove).map(|p| p.name.clone()).collect()
+    terminated
+        .iter()
+        .take(to_remove)
+        .map(|p| p.name.clone())
+        .collect()
 }
 
 /// Selects orphaned pods (bound to a vanished node) — these are immediately

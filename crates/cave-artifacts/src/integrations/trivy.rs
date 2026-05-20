@@ -91,7 +91,11 @@ impl Scanner for CaveScanAdapter {
     }
     fn scan(&self, target: &str, payload: &[u8]) -> Result<Vec<Vulnerability>, ScannerError> {
         let result = self.scan_payload(target, payload);
-        Ok(result.findings.iter().map(Self::finding_to_vulnerability).collect())
+        Ok(result
+            .findings
+            .iter()
+            .map(Self::finding_to_vulnerability)
+            .collect())
     }
 }
 
@@ -153,13 +157,21 @@ impl TrivyJsonScanner {
         for block in &report.results {
             for vuln in &block.vulnerabilities {
                 let severity = Severity::from_scanner_wire(&vuln.severity);
-                let cvss_v3 = vuln.cvss.as_ref().and_then(|c| c.nvd.as_ref()).and_then(|m| m.v3_score);
+                let cvss_v3 = vuln
+                    .cvss
+                    .as_ref()
+                    .and_then(|c| c.nvd.as_ref())
+                    .and_then(|m| m.v3_score);
                 let cve = if vuln.vulnerability_id.starts_with("CVE-") {
                     Some(vuln.vulnerability_id.clone())
                 } else {
                     None
                 };
-                let mut v = Vulnerability::new(vuln.vulnerability_id.clone(), severity, VulnerabilitySource::Trivy);
+                let mut v = Vulnerability::new(
+                    vuln.vulnerability_id.clone(),
+                    severity,
+                    VulnerabilitySource::Trivy,
+                );
                 v.cve = cve;
                 v.cvss_v3 = cvss_v3;
                 v.fixed_in = vuln.fixed_version.clone();
@@ -208,14 +220,25 @@ impl ScanSink {
         self.inner.lock().unwrap().len()
     }
     pub fn count_blocking(&self) -> usize {
-        self.inner.lock().unwrap().iter().filter(|(_, v)| v.is_blocking()).count()
+        self.inner
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, v)| v.is_blocking())
+            .count()
     }
     pub fn findings_for(&self, target_digest: &str) -> Vec<Vulnerability> {
         self.inner
             .lock()
             .unwrap()
             .iter()
-            .filter_map(|(d, v)| if d == target_digest { Some(v.clone()) } else { None })
+            .filter_map(|(d, v)| {
+                if d == target_digest {
+                    Some(v.clone())
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 }
@@ -310,7 +333,10 @@ mod tests {
         assert_eq!(cve.source, VulnerabilitySource::Trivy);
         assert_eq!(cve.affected_components[0].package, "openssl");
         let ghsa = vulns.iter().find(|v| v.id == "GHSA-abcd-1234").unwrap();
-        assert!(ghsa.cve.is_none(), "non-CVE id should not populate cve field");
+        assert!(
+            ghsa.cve.is_none(),
+            "non-CVE id should not populate cve field"
+        );
         assert_eq!(ghsa.severity, Severity::Medium);
     }
 
@@ -326,7 +352,11 @@ mod tests {
         let sink = ScanSink::new();
         sink.record(
             "sha256:a",
-            vec![Vulnerability::new("CVE-1", Severity::Critical, VulnerabilitySource::Trivy)],
+            vec![Vulnerability::new(
+                "CVE-1",
+                Severity::Critical,
+                VulnerabilitySource::Trivy,
+            )],
         );
         sink.record(
             "sha256:b",

@@ -3,11 +3,11 @@
 use crate::models::*;
 use crate::store::ErpStore;
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -152,10 +152,7 @@ async fn list_entries(State(store): State<Arc<ErpStore>>) -> impl IntoResponse {
     Json(entries)
 }
 
-async fn post_entry(
-    State(store): State<Arc<ErpStore>>,
-    Path(id): Path<Uuid>,
-) -> impl IntoResponse {
+async fn post_entry(State(store): State<Arc<ErpStore>>, Path(id): Path<Uuid>) -> impl IntoResponse {
     let mut entries = store.entries.write().await;
     if let Some(entry) = entries.get_mut(&id) {
         let debit_sum: f64 = entry.lines.iter().map(|l| l.debit).sum();
@@ -168,15 +165,18 @@ async fn post_entry(
             (StatusCode::BAD_REQUEST, Json(entry.clone()))
         }
     } else {
-        (StatusCode::NOT_FOUND, Json(JournalEntry {
-            id: Uuid::nil(),
-            journal_id: Uuid::nil(),
-            date: Utc::now(),
-            reference: String::new(),
-            lines: vec![],
-            state: JournalEntryState::Draft,
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(JournalEntry {
+                id: Uuid::nil(),
+                journal_id: Uuid::nil(),
+                date: Utc::now(),
+                reference: String::new(),
+                lines: vec![],
+                state: JournalEntryState::Draft,
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -209,12 +209,8 @@ async fn create_invoice(
     let mut total = 0.0;
 
     for line_req in req.lines {
-        let subtotal = crate::engine::line_subtotal(
-            line_req.quantity,
-            line_req.unit_price,
-            0.0,
-            &[],
-        );
+        let subtotal =
+            crate::engine::line_subtotal(line_req.quantity, line_req.unit_price, 0.0, &[]);
         total += subtotal;
 
         lines.push(InvoiceLine {
@@ -264,18 +260,21 @@ async fn post_invoice(
             (StatusCode::BAD_REQUEST, Json(invoice.clone()))
         }
     } else {
-        (StatusCode::NOT_FOUND, Json(Invoice {
-            id: Uuid::nil(),
-            number: String::new(),
-            partner_id: Uuid::nil(),
-            kind: InvoiceKind::Customer,
-            journal_id: Uuid::nil(),
-            lines: vec![],
-            amount_total: 0.0,
-            state: InvoiceState::Draft,
-            due_date: Utc::now(),
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(Invoice {
+                id: Uuid::nil(),
+                number: String::new(),
+                partner_id: Uuid::nil(),
+                kind: InvoiceKind::Customer,
+                journal_id: Uuid::nil(),
+                lines: vec![],
+                amount_total: 0.0,
+                state: InvoiceState::Draft,
+                due_date: Utc::now(),
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -304,11 +303,23 @@ async fn list_payments(State(store): State<Arc<ErpStore>>) -> impl IntoResponse 
 
 pub fn create_router(state: Arc<ErpStore>) -> Router {
     Router::new()
-        .route("/api/erp/accounting/journals", post(create_journal).get(list_journals))
-        .route("/api/erp/accounting/accounts", post(create_account).get(list_accounts))
-        .route("/api/erp/accounting/entries", post(create_entry).get(list_entries))
+        .route(
+            "/api/erp/accounting/journals",
+            post(create_journal).get(list_journals),
+        )
+        .route(
+            "/api/erp/accounting/accounts",
+            post(create_account).get(list_accounts),
+        )
+        .route(
+            "/api/erp/accounting/entries",
+            post(create_entry).get(list_entries),
+        )
         .route("/api/erp/accounting/entries/{id}/post", post(post_entry))
-        .route("/api/erp/accounting/taxes", post(create_tax).get(list_taxes))
+        .route(
+            "/api/erp/accounting/taxes",
+            post(create_tax).get(list_taxes),
+        )
         .route(
             "/api/erp/accounting/invoices",
             post(create_invoice).get(list_invoices),

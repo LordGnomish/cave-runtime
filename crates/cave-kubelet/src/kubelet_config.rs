@@ -236,7 +236,10 @@ mod tests {
     fn image_gc_over_hundred_rejected() {
         let mut c = KubeletConfiguration::defaults("acme");
         c.image_gc_high_threshold_percent = 200;
-        assert!(matches!(c.validate(), Err(ConfigError::ImageGcOverHundred(200))));
+        assert!(matches!(
+            c.validate(),
+            Err(ConfigError::ImageGcOverHundred(200))
+        ));
     }
 
     #[test]

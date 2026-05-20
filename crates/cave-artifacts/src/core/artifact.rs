@@ -95,7 +95,9 @@ pub fn is_canonical_sha256(s: &str) -> bool {
     if !s.starts_with("sha256:") {
         return false;
     }
-    s[7..].chars().all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c))
+    s[7..]
+        .chars()
+        .all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c))
 }
 
 #[cfg(test)]

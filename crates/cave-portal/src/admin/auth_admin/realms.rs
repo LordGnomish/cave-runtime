@@ -5,9 +5,9 @@
 //! port of `js/apps/admin-ui/src/realm-settings/RealmSettingsTabs.tsx`
 //! plus the list view from `js/apps/admin-ui/src/realm/RealmSection.tsx`.
 
+use super::{AuthAdminError, render_admin_nav, require_platform};
 use crate::admin::permission::RequestCtx;
 use crate::admin::render::{escape, page_shell_full, table_html};
-use super::{render_admin_nav, require_platform, AuthAdminError};
 
 /// One realm row.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,7 +82,14 @@ pub fn render(ctx: &RequestCtx) -> Result<String, AuthAdminError> {
 </section>"#,
         nav = render_admin_nav("/admin/auth/realms"),
         tbl = table_html(
-            &["realm", "display name", "status", "login theme", "AT lifespan (s)", "SSO idle (s)"],
+            &[
+                "realm",
+                "display name",
+                "status",
+                "login theme",
+                "AT lifespan (s)",
+                "SSO idle (s)"
+            ],
             &table_rows
         ),
     );

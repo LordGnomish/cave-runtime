@@ -8,8 +8,8 @@
 //! corresponds to one upstream verifier-side scenario.
 
 use base64::Engine;
-use cave_auth::dpop::{verify_proof, DpopProof, DpopVerifyError, Jwk, ReplayGuard};
 use cave_auth::dpop::verify::VerifyConfig;
+use cave_auth::dpop::{DpopProof, DpopVerifyError, Jwk, ReplayGuard, verify_proof};
 
 fn b64u(b: &[u8]) -> String {
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b)

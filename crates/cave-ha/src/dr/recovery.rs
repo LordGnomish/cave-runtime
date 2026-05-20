@@ -64,7 +64,11 @@ impl PitrManager {
         let data_dir = data_dir.as_ref().to_path_buf();
         let snap_dir = data_dir.join("snapshots");
         let snapshot_store = SnapshotStore::open(&snap_dir).await?;
-        Ok(Self { data_dir, config, snapshot_store })
+        Ok(Self {
+            data_dir,
+            config,
+            snapshot_store,
+        })
     }
 
     /// List all available recovery points (from snapshot + WAL).
@@ -140,11 +144,7 @@ impl PitrManager {
         replay.entries.last().map(|e| e.index)
     }
 
-    async fn load_wal_entries(
-        &self,
-        from: LogIndex,
-        to: LogIndex,
-    ) -> HaResult<Vec<LogEntry>> {
+    async fn load_wal_entries(&self, from: LogIndex, to: LogIndex) -> HaResult<Vec<LogEntry>> {
         let wal_path = self.data_dir.join("raft.wal");
         let mut wal = crate::storage::Wal::open(&wal_path).await?;
         let replay = wal.replay().await?;
@@ -157,14 +157,15 @@ impl PitrManager {
 
     /// RPO check: how many seconds of data would be lost if primary fails now.
     pub fn rpo_seconds(&self, dr_lag_entries: u64, entries_per_second: f64) -> f64 {
-        if entries_per_second <= 0.0 { return 0.0; }
+        if entries_per_second <= 0.0 {
+            return 0.0;
+        }
         dr_lag_entries as f64 / entries_per_second
     }
 
     /// Check if RPO target is met.
     pub fn rpo_ok(&self, dr_lag_entries: u64, entries_per_second: f64) -> bool {
-        self.rpo_seconds(dr_lag_entries, entries_per_second)
-            <= self.config.rpo_seconds as f64
+        self.rpo_seconds(dr_lag_entries, entries_per_second) <= self.config.rpo_seconds as f64
     }
 }
 

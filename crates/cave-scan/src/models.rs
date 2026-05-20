@@ -104,7 +104,8 @@ mod tests {
         ];
         for variant in variants {
             let json = serde_json::to_string(&variant).expect("serialize finding severity");
-            let back: FindingSeverity = serde_json::from_str(&json).expect("deserialize finding severity");
+            let back: FindingSeverity =
+                serde_json::from_str(&json).expect("deserialize finding severity");
             assert_eq!(variant, back);
         }
     }

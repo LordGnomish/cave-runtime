@@ -40,7 +40,10 @@ pub struct PassiveRst {
 impl PassiveRst {
     /// Build from a flat query-string map.
     pub fn from_query(q: &std::collections::BTreeMap<String, String>) -> Result<Self, WsFedError> {
-        let wa = q.get("wa").cloned().ok_or_else(|| WsFedError::MissingField("wa".into()))?;
+        let wa = q
+            .get("wa")
+            .cloned()
+            .ok_or_else(|| WsFedError::MissingField("wa".into()))?;
         Ok(Self {
             wa,
             wtrealm: q.get("wtrealm").cloned(),
@@ -101,11 +104,15 @@ impl Rstr {
         // Pull out the assertion fragment.
         let start_tag = "<wst:RequestedSecurityToken>";
         let end_tag = "</wst:RequestedSecurityToken>";
-        let start = xml.find(start_tag).ok_or_else(|| WsFedError::MissingField("RequestedSecurityToken".into()))?;
-        let end = xml.find(end_tag).ok_or_else(|| WsFedError::MissingField("RequestedSecurityToken end".into()))?;
+        let start = xml
+            .find(start_tag)
+            .ok_or_else(|| WsFedError::MissingField("RequestedSecurityToken".into()))?;
+        let end = xml
+            .find(end_tag)
+            .ok_or_else(|| WsFedError::MissingField("RequestedSecurityToken end".into()))?;
         let assertion_xml = xml[start + start_tag.len()..end].to_string();
-        let applies_to = extract_text_between(xml, "<wsa:Address>", "</wsa:Address>")
-            .unwrap_or_default();
+        let applies_to =
+            extract_text_between(xml, "<wsa:Address>", "</wsa:Address>").unwrap_or_default();
         let created = extract_text_between(xml, "<wsu:Created", "</wsu:Created>")
             .and_then(|s| s.split('>').nth(1).map(str::to_string))
             .and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
@@ -116,12 +123,19 @@ impl Rstr {
             .and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
             .map(|d| d.with_timezone(&chrono::Utc))
             .unwrap_or_else(chrono::Utc::now);
-        Ok(Self { assertion_xml, created, expires, applies_to })
+        Ok(Self {
+            assertion_xml,
+            created,
+            expires,
+            applies_to,
+        })
     }
 }
 
 fn xml_escape(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 fn extract_text_between(haystack: &str, open: &str, close: &str) -> Option<String> {
@@ -194,7 +208,9 @@ mod tests {
         assert!(xml.contains("xmlns:wst=\"http://schemas.xmlsoap.org/ws/2005/02/trust\""));
         assert!(xml.contains("<wst:RequestSecurityTokenResponse"));
         assert!(xml.contains("<wst:RequestedSecurityToken>"));
-        assert!(xml.contains("<wst:TokenType>urn:oasis:names:tc:SAML:1.0:assertion</wst:TokenType>"));
+        assert!(
+            xml.contains("<wst:TokenType>urn:oasis:names:tc:SAML:1.0:assertion</wst:TokenType>")
+        );
     }
 
     #[test]
@@ -223,11 +239,16 @@ mod tests {
 
     #[test]
     fn rstr_carries_lifetime() {
-        let created = chrono::DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z").unwrap().with_timezone(&chrono::Utc);
-        let expires = chrono::DateTime::parse_from_rfc3339("2024-01-01T00:05:00Z").unwrap().with_timezone(&chrono::Utc);
+        let created = chrono::DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let expires = chrono::DateTime::parse_from_rfc3339("2024-01-01T00:05:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
         let r = Rstr {
             assertion_xml: "<x/>".into(),
-            created, expires,
+            created,
+            expires,
             applies_to: "urn:rp".into(),
         };
         let xml = r.to_xml().unwrap();

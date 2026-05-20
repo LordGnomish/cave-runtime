@@ -11,10 +11,10 @@
 // validation surface.
 
 use axum::{
+    Json,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
@@ -55,7 +55,9 @@ pub struct AuthenticationFlowStore {
 
 impl AuthenticationFlowStore {
     pub fn new() -> Self {
-        Self { inner: DashMap::new() }
+        Self {
+            inner: DashMap::new(),
+        }
     }
 
     pub fn list(&self, realm: &str) -> Vec<AuthenticationFlow> {
@@ -70,7 +72,9 @@ impl AuthenticationFlowStore {
     }
 
     pub fn get(&self, realm: &str, id: &str) -> Option<AuthenticationFlow> {
-        self.inner.get(&(realm.into(), id.into())).map(|v| v.clone())
+        self.inner
+            .get(&(realm.into(), id.into()))
+            .map(|v| v.clone())
     }
 
     /// Look up by alias (used by the `executions` sub-resource which

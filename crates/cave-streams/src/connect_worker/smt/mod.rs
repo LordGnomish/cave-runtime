@@ -233,10 +233,7 @@ impl SmtRegistry {
     /// Construct a SmtChain from a Connect-style config map. Reads
     /// `transforms` (comma-separated aliases), then for each alias
     /// looks up `transforms.<alias>.type` in the registry.
-    pub fn build_chain(
-        &self,
-        config: &BTreeMap<String, String>,
-    ) -> StreamsResult<SmtChain> {
+    pub fn build_chain(&self, config: &BTreeMap<String, String>) -> StreamsResult<SmtChain> {
         let aliases = match config.get("transforms") {
             None => return Ok(SmtChain::new()),
             Some(s) if s.is_empty() => return Ok(SmtChain::new()),
@@ -249,12 +246,12 @@ impl SmtRegistry {
         let mut chain = SmtChain::new();
         for alias in aliases {
             let type_key = format!("transforms.{alias}.type");
-            let type_value = config.get(&type_key).ok_or_else(|| {
-                StreamsError::Internal(format!("missing {type_key}"))
-            })?;
-            let builder = self.builder(type_value).ok_or_else(|| {
-                StreamsError::Internal(format!("unknown SMT type: {type_value}"))
-            })?;
+            let type_value = config
+                .get(&type_key)
+                .ok_or_else(|| StreamsError::Internal(format!("missing {type_key}")))?;
+            let builder = self
+                .builder(type_value)
+                .ok_or_else(|| StreamsError::Internal(format!("unknown SMT type: {type_value}")))?;
             // Slice out transforms.<alias>.* into a fresh map with
             // the prefix removed.
             let prefix = format!("transforms.{alias}.");
@@ -361,8 +358,14 @@ mod tests {
     #[test]
     fn registry_lookup_resolves_known() {
         let reg = SmtRegistry::with_defaults();
-        assert!(reg.builder("org.apache.kafka.connect.transforms.Cast$Value").is_some());
-        assert!(reg.builder("org.apache.kafka.connect.transforms.MaskField$Value").is_some());
+        assert!(
+            reg.builder("org.apache.kafka.connect.transforms.Cast$Value")
+                .is_some()
+        );
+        assert!(
+            reg.builder("org.apache.kafka.connect.transforms.MaskField$Value")
+                .is_some()
+        );
     }
 
     #[test]

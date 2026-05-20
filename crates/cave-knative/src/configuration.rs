@@ -3,7 +3,7 @@
 //! Knative Configuration — desired state spawning Revisions.
 //! upstream: knative/serving v1.18.x — pkg/apis/serving/v1/configuration_types.go
 
-use crate::meta::{validate_template, ObjectMeta, RevisionTemplateSpec};
+use crate::meta::{ObjectMeta, RevisionTemplateSpec, validate_template};
 
 #[derive(Default, Debug, Clone)]
 pub struct Configuration {

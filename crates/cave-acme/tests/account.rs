@@ -7,8 +7,10 @@ use cave_acme::{Account, AccountStatus, ExternalAccountBinding, Jwk};
 const TENANT: &str = "tenant-acme-prod";
 
 fn ed25519_jwk() -> Jwk {
-    Jwk::OKP { crv: "Ed25519".into(),
-        x: "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo".into() }
+    Jwk::OKP {
+        crv: "Ed25519".into(),
+        x: "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo".into(),
+    }
 }
 
 /// Cite: RFC 7638 §3 — JWK thumbprint MUST be deterministic and based
@@ -22,8 +24,10 @@ fn jwk_thumbprint_is_deterministic() {
     assert!(!t1.is_empty(), "thumbprint must be non-empty");
 
     // Different JWK ⇒ different thumbprint.
-    let other = Jwk::OKP { crv: "Ed25519".into(),
-        x: "different-base64-value".into() };
+    let other = Jwk::OKP {
+        crv: "Ed25519".into(),
+        x: "different-base64-value".into(),
+    };
     assert_ne!(jwk.thumbprint(), other.thumbprint());
 }
 
@@ -82,7 +86,7 @@ fn external_account_binding_validates_algorithm_and_required_fields() {
         jwk,
         eab: Some(ExternalAccountBinding {
             kid: "operator-key-1".into(),
-            alg: "HS512".into(),  // unsupported
+            alg: "HS512".into(), // unsupported
             mac: "BASE64URL-MAC".into(),
         }),
         created_at: chrono::Utc::now(),
@@ -91,7 +95,7 @@ fn external_account_binding_validates_algorithm_and_required_fields() {
     assert!(err.to_string().contains("unsupported EAB alg"));
 
     a.eab = Some(ExternalAccountBinding {
-        kid: "".into(),  // missing
+        kid: "".into(), // missing
         alg: "HS256".into(),
         mac: "BASE64URL-MAC".into(),
     });

@@ -30,6 +30,7 @@ pub mod auth;
 pub mod circuit;
 pub mod error;
 pub mod federation;
+pub mod jwks;
 pub mod metrics;
 pub mod models;
 pub mod mtls;
@@ -38,13 +39,12 @@ pub mod observability;
 pub mod rate_limit;
 pub mod registry;
 pub mod routes;
+pub mod service_entry;
 pub mod spiffe;
 pub mod store;
 pub mod telemetry;
 pub mod traffic;
 pub mod traffic_policy;
-pub mod service_entry;
-pub mod jwks;
 
 /// Ambient-mode parity (ztunnel L4 mTLS, waypoint L7, AuthZ, VS/DR,
 /// SPIFFE SVID, telemetry). Pinned to istio/istio v1.30.0.
@@ -66,8 +66,8 @@ pub use telemetry::TelemetryManager;
 pub use traffic::TrafficManager;
 
 use axum::Router;
-use std::sync::{Arc, RwLock};
 use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 // ─────────────────────────────────────────────────────────────
 // MeshState — shared state injected into every route handler
@@ -161,30 +161,46 @@ mod tests {
     // ── Helpers ────────────────────────────────────────────
 
     fn simple_labels(pairs: &[(&str, &str)]) -> HashMap<String, String> {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
     fn make_endpoint(addr: &str, port: u16, health: HealthStatus) -> Endpoint {
         Endpoint {
-            address: addr.to_string(), port, health, weight: 100,
-            labels: HashMap::new(), last_checked: Utc::now(),
-            locality: None, network: None,
+            address: addr.to_string(),
+            port,
+            health,
+            weight: 100,
+            labels: HashMap::new(),
+            last_checked: Utc::now(),
+            locality: None,
+            network: None,
         }
     }
 
     fn make_meta(namespace: &str, name: &str) -> ServiceMeta {
         ServiceMeta {
-            name: name.to_string(), namespace: namespace.to_string(),
-            labels: HashMap::new(), created_at: Utc::now(),
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+            labels: HashMap::new(),
+            created_at: Utc::now(),
         }
     }
 
     fn make_vs(name: &str, host: &str, routes: Vec<HttpRoute>) -> VirtualService {
         VirtualService {
-            name: name.to_string(), namespace: "default".to_string(),
-            hosts: vec![host.to_string()], gateways: vec![],
-            http: routes, tcp: vec![], tls: vec![], export_to: vec![],
-            created_at: Utc::now(), updated_at: Utc::now(),
+            name: name.to_string(),
+            namespace: "default".to_string(),
+            hosts: vec![host.to_string()],
+            gateways: vec![],
+            http: routes,
+            tcp: vec![],
+            tls: vec![],
+            export_to: vec![],
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         }
     }
 
@@ -220,8 +236,14 @@ mod tests {
     #[test]
     fn registry_healthy_endpoints_only() {
         let reg = ServiceRegistry::new();
-        reg.register(make_meta("ns", "svc"), make_endpoint("10.0.0.1", 8080, HealthStatus::Healthy));
-        reg.register(make_meta("ns", "svc"), make_endpoint("10.0.0.2", 8080, HealthStatus::Unhealthy));
+        reg.register(
+            make_meta("ns", "svc"),
+            make_endpoint("10.0.0.1", 8080, HealthStatus::Healthy),
+        );
+        reg.register(
+            make_meta("ns", "svc"),
+            make_endpoint("10.0.0.2", 8080, HealthStatus::Unhealthy),
+        );
         let eps = reg.resolve("ns/svc");
         assert_eq!(eps.len(), 1);
         assert_eq!(eps[0].address, "10.0.0.1");
@@ -230,7 +252,10 @@ mod tests {
     #[test]
     fn registry_health_update() {
         let reg = ServiceRegistry::new();
-        reg.register(make_meta("ns", "s"), make_endpoint("1.2.3.4", 80, HealthStatus::Unknown));
+        reg.register(
+            make_meta("ns", "s"),
+            make_endpoint("1.2.3.4", 80, HealthStatus::Unknown),
+        );
         reg.update_health("ns", "s", "1.2.3.4", 80, HealthStatus::Healthy);
         let eps = reg.resolve("ns/s");
         // Unknown is not Unhealthy — both Unknown and Healthy are "healthy" in resolve()
@@ -240,7 +265,10 @@ mod tests {
     #[test]
     fn registry_deregister_endpoint() {
         let reg = ServiceRegistry::new();
-        reg.register(make_meta("ns", "svc"), make_endpoint("1.2.3.4", 80, HealthStatus::Healthy));
+        reg.register(
+            make_meta("ns", "svc"),
+            make_endpoint("1.2.3.4", 80, HealthStatus::Healthy),
+        );
         assert!(!reg.list_services().is_empty());
         reg.deregister("ns", "svc", "1.2.3.4", 80);
         // Service record still exists but no endpoints
@@ -272,7 +300,9 @@ mod tests {
         reg.register(make_meta("ns", "svc"), ep1);
         reg.register(make_meta("ns", "svc"), ep2);
         let local = reg.resolve_locality(
-            "ns/svc", &Locality::new("us-east-1").with_zone("us-east-1a"));
+            "ns/svc",
+            &Locality::new("us-east-1").with_zone("us-east-1a"),
+        );
         assert!(local.iter().any(|e| e.address == "10.0.0.1"));
     }
 
@@ -283,7 +313,9 @@ mod tests {
     fn route_dest(host: &str, weight: u32) -> HttpRouteDestination {
         HttpRouteDestination {
             destination: Destination {
-                host: host.to_string(), subset: None, port: None,
+                host: host.to_string(),
+                subset: None,
+                port: None,
             },
             weight: Some(weight),
             headers: None,
@@ -293,16 +325,25 @@ mod tests {
     #[test]
     fn traffic_basic_route() {
         let tm = TrafficManager::new();
-        let vs = make_vs("vs", "svc.ns.svc.cluster.local", vec![
-            HttpRoute {
-                name: None, match_rules: vec![],
+        let vs = make_vs(
+            "vs",
+            "svc.ns.svc.cluster.local",
+            vec![HttpRoute {
+                name: None,
+                match_rules: vec![],
                 route: vec![route_dest("backend", 100)],
-                timeout_ms: None, retries: None, fault: None,
-                mirror: None, mirror_percentage: None,
-                headers: None, redirect: None,
-                direct_response: None, rewrite: None, cors_policy: None,
-            }
-        ]);
+                timeout_ms: None,
+                retries: None,
+                fault: None,
+                mirror: None,
+                mirror_percentage: None,
+                headers: None,
+                redirect: None,
+                direct_response: None,
+                rewrite: None,
+                cors_policy: None,
+            }],
+        );
         tm.upsert_virtual_service(vs);
         let req = make_req("/api", "GET");
         let decision = tm.resolve_route("svc.ns.svc.cluster.local", &req).unwrap();
@@ -312,21 +353,31 @@ mod tests {
     #[test]
     fn traffic_redirect() {
         let tm = TrafficManager::new();
-        let vs = make_vs("vs", "old.svc", vec![
-            HttpRoute {
-                name: None, match_rules: vec![],
+        let vs = make_vs(
+            "vs",
+            "old.svc",
+            vec![HttpRoute {
+                name: None,
+                match_rules: vec![],
                 route: vec![],
-                timeout_ms: None, retries: None, fault: None,
-                mirror: None, mirror_percentage: None, headers: None,
+                timeout_ms: None,
+                retries: None,
+                fault: None,
+                mirror: None,
+                mirror_percentage: None,
+                headers: None,
                 redirect: Some(HttpRedirect {
                     uri: Some("/new".to_string()),
                     authority: Some("new.svc".to_string()),
                     redirect_code: 301,
-                    port: None, scheme: None,
+                    port: None,
+                    scheme: None,
                 }),
-                direct_response: None, rewrite: None, cors_policy: None,
-            }
-        ]);
+                direct_response: None,
+                rewrite: None,
+                cors_policy: None,
+            }],
+        );
         tm.upsert_virtual_service(vs);
         let req = make_req("/old", "GET");
         let decision = tm.resolve_route("old.svc", &req).unwrap();
@@ -337,50 +388,82 @@ mod tests {
     #[test]
     fn traffic_rewrite() {
         let tm = TrafficManager::new();
-        let vs = make_vs("vs", "rewrite.svc", vec![
-            HttpRoute {
-                name: None, match_rules: vec![],
+        let vs = make_vs(
+            "vs",
+            "rewrite.svc",
+            vec![HttpRoute {
+                name: None,
+                match_rules: vec![],
                 route: vec![route_dest("backend", 100)],
-                timeout_ms: None, retries: None, fault: None,
-                mirror: None, mirror_percentage: None, headers: None,
+                timeout_ms: None,
+                retries: None,
+                fault: None,
+                mirror: None,
+                mirror_percentage: None,
+                headers: None,
                 redirect: None,
-                rewrite: Some(HttpRewrite { uri: Some("/v2".to_string()), authority: None }),
-                direct_response: None, cors_policy: None,
-            }
-        ]);
+                rewrite: Some(HttpRewrite {
+                    uri: Some("/v2".to_string()),
+                    authority: None,
+                }),
+                direct_response: None,
+                cors_policy: None,
+            }],
+        );
         tm.upsert_virtual_service(vs);
-        let decision = tm.resolve_route("rewrite.svc", &make_req("/v1", "GET")).unwrap();
+        let decision = tm
+            .resolve_route("rewrite.svc", &make_req("/v1", "GET"))
+            .unwrap();
         assert!(decision.rewrite.is_some());
     }
 
     #[test]
     fn traffic_header_match() {
         let tm = TrafficManager::new();
-        let vs = make_vs("vs", "header.svc", vec![
-            HttpRoute {
+        let vs = make_vs(
+            "vs",
+            "header.svc",
+            vec![HttpRoute {
                 name: None,
                 match_rules: vec![HttpMatchRequest {
                     headers: {
                         let mut m = HashMap::new();
-                        m.insert("x-env".to_string(), StringMatch::Exact("canary".to_string()));
+                        m.insert(
+                            "x-env".to_string(),
+                            StringMatch::Exact("canary".to_string()),
+                        );
                         m
                     },
-                    name: None, uri: None, method: None, authority: None,
-                    query_params: HashMap::new(), gateways: vec![],
-                    source_namespace: None, without_headers: HashMap::new(),
-                    port: None, ignore_uri_case: false,
+                    name: None,
+                    uri: None,
+                    method: None,
+                    authority: None,
+                    query_params: HashMap::new(),
+                    gateways: vec![],
+                    source_namespace: None,
+                    without_headers: HashMap::new(),
+                    port: None,
+                    ignore_uri_case: false,
                     source_labels: HashMap::new(),
                 }],
                 route: vec![route_dest("canary", 100)],
-                timeout_ms: None, retries: None, fault: None,
-                mirror: None, mirror_percentage: None, headers: None,
-                redirect: None, direct_response: None, rewrite: None, cors_policy: None,
-            }
-        ]);
+                timeout_ms: None,
+                retries: None,
+                fault: None,
+                mirror: None,
+                mirror_percentage: None,
+                headers: None,
+                redirect: None,
+                direct_response: None,
+                rewrite: None,
+                cors_policy: None,
+            }],
+        );
         tm.upsert_virtual_service(vs);
 
         let mut req = make_req("/", "GET");
-        req.headers.insert("x-env".to_string(), "canary".to_string());
+        req.headers
+            .insert("x-env".to_string(), "canary".to_string());
         let decision = tm.resolve_route("header.svc", &req).unwrap();
         assert_eq!(decision.destination_host, "canary");
     }
@@ -388,8 +471,10 @@ mod tests {
     #[test]
     fn traffic_header_match_no_match() {
         let tm = TrafficManager::new();
-        let vs = make_vs("vs", "hm.svc", vec![
-            HttpRoute {
+        let vs = make_vs(
+            "vs",
+            "hm.svc",
+            vec![HttpRoute {
                 name: None,
                 match_rules: vec![HttpMatchRequest {
                     name: None,
@@ -398,17 +483,30 @@ mod tests {
                         m.insert("x-flag".to_string(), StringMatch::Exact("yes".to_string()));
                         m
                     },
-                    uri: None, method: None, authority: None,
-                    query_params: HashMap::new(), gateways: vec![],
-                    source_namespace: None, without_headers: HashMap::new(),
-                    port: None, ignore_uri_case: false, source_labels: HashMap::new(),
+                    uri: None,
+                    method: None,
+                    authority: None,
+                    query_params: HashMap::new(),
+                    gateways: vec![],
+                    source_namespace: None,
+                    without_headers: HashMap::new(),
+                    port: None,
+                    ignore_uri_case: false,
+                    source_labels: HashMap::new(),
                 }],
                 route: vec![route_dest("special", 100)],
-                timeout_ms: None, retries: None, fault: None,
-                mirror: None, mirror_percentage: None, headers: None,
-                redirect: None, direct_response: None, rewrite: None, cors_policy: None,
-            }
-        ]);
+                timeout_ms: None,
+                retries: None,
+                fault: None,
+                mirror: None,
+                mirror_percentage: None,
+                headers: None,
+                redirect: None,
+                direct_response: None,
+                rewrite: None,
+                cors_policy: None,
+            }],
+        );
         tm.upsert_virtual_service(vs);
         // No matching header → no decision
         let decision = tm.resolve_route("hm.svc", &make_req("/", "GET"));
@@ -418,32 +516,51 @@ mod tests {
     #[test]
     fn traffic_without_header_excludes() {
         let tm = TrafficManager::new();
-        let vs = make_vs("vs", "excl.svc", vec![
-            HttpRoute {
+        let vs = make_vs(
+            "vs",
+            "excl.svc",
+            vec![HttpRoute {
                 name: None,
                 match_rules: vec![HttpMatchRequest {
-                    name: None, headers: HashMap::new(), uri: None, method: None, authority: None,
-                    query_params: HashMap::new(), gateways: vec![],
+                    name: None,
+                    headers: HashMap::new(),
+                    uri: None,
+                    method: None,
+                    authority: None,
+                    query_params: HashMap::new(),
+                    gateways: vec![],
                     source_namespace: None,
                     without_headers: {
                         let mut m = HashMap::new();
-                        m.insert("x-internal".to_string(),
-                            StringMatch::Exact("true".to_string()));
+                        m.insert(
+                            "x-internal".to_string(),
+                            StringMatch::Exact("true".to_string()),
+                        );
                         m
                     },
-                    port: None, ignore_uri_case: false, source_labels: HashMap::new(),
+                    port: None,
+                    ignore_uri_case: false,
+                    source_labels: HashMap::new(),
                 }],
                 route: vec![route_dest("public", 100)],
-                timeout_ms: None, retries: None, fault: None,
-                mirror: None, mirror_percentage: None, headers: None,
-                redirect: None, direct_response: None, rewrite: None, cors_policy: None,
-            }
-        ]);
+                timeout_ms: None,
+                retries: None,
+                fault: None,
+                mirror: None,
+                mirror_percentage: None,
+                headers: None,
+                redirect: None,
+                direct_response: None,
+                rewrite: None,
+                cors_policy: None,
+            }],
+        );
         tm.upsert_virtual_service(vs);
 
         // Request with excluded header should NOT match
         let mut req = make_req("/", "GET");
-        req.headers.insert("x-internal".to_string(), "true".to_string());
+        req.headers
+            .insert("x-internal".to_string(), "true".to_string());
         let decision = tm.resolve_route("excl.svc", &req);
         assert!(decision.is_none());
 
@@ -457,7 +574,8 @@ mod tests {
     fn traffic_consistent_hash_endpoint_index_stable() {
         let tm = TrafficManager::new();
         let dr = DestinationRule {
-            name: "dr".to_string(), namespace: "default".to_string(),
+            name: "dr".to_string(),
+            namespace: "default".to_string(),
             host: "hash.svc".to_string(),
             traffic_policy: Some(TrafficPolicy {
                 load_balancer: Some(LoadBalancerSettings {
@@ -469,11 +587,15 @@ mod tests {
                     locality_lb_setting: None,
                     warmup_duration_secs: None,
                 }),
-                connection_pool: None, outlier_detection: None, tls: None,
+                connection_pool: None,
+                outlier_detection: None,
+                tls: None,
                 port_level_settings: vec![],
             }),
-            subsets: vec![], export_to: vec![],
-            created_at: Utc::now(), updated_at: Utc::now(),
+            subsets: vec![],
+            export_to: vec![],
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         tm.upsert_destination_rule(dr);
         // Same key → same index (deterministic)
@@ -493,9 +615,14 @@ mod tests {
     #[test]
     fn circuit_breaker_opens_after_threshold() {
         let cb = CircuitBreaker::new();
-        cb.configure("svc", None, BreakerConfig {
-            consecutive_errors: 3, ..BreakerConfig::default()
-        });
+        cb.configure(
+            "svc",
+            None,
+            BreakerConfig {
+                consecutive_errors: 3,
+                ..BreakerConfig::default()
+            },
+        );
         assert!(!cb.is_open("svc", None));
         cb.record_failure("svc", None);
         cb.record_failure("svc", None);
@@ -507,9 +634,14 @@ mod tests {
     #[test]
     fn circuit_breaker_success_resets_errors() {
         let cb = CircuitBreaker::new();
-        cb.configure("svc", None, BreakerConfig {
-            consecutive_errors: 5, ..BreakerConfig::default()
-        });
+        cb.configure(
+            "svc",
+            None,
+            BreakerConfig {
+                consecutive_errors: 5,
+                ..BreakerConfig::default()
+            },
+        );
         cb.record_failure("svc", None);
         cb.record_failure("svc", None);
         cb.record_success("svc", None); // resets error counter
@@ -559,14 +691,22 @@ mod tests {
     fn mtls_strict_rejects_no_cert() {
         let mgr = MtlsManager::new();
         let pa = PeerAuthentication {
-            name: "pa".to_string(), namespace: "ns".to_string(),
+            name: "pa".to_string(),
+            namespace: "ns".to_string(),
             selector: None,
-            mtls: MtlsConfig { mode: MtlsMode::Strict },
+            mtls: MtlsConfig {
+                mode: MtlsMode::Strict,
+            },
             port_level_mtls: HashMap::new(),
-            created_at: Utc::now(), updated_at: Utc::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         mgr.upsert_policy(pa);
-        let ctx = TlsContext { peer_principal: None, is_mtls: false, peer_cert_san: vec![] };
+        let ctx = TlsContext {
+            peer_principal: None,
+            is_mtls: false,
+            peer_cert_san: vec![],
+        };
         let result = mgr.validate_peer("ns", &HashMap::new(), &ctx, None);
         assert!(result.is_err());
     }
@@ -575,14 +715,22 @@ mod tests {
     fn mtls_permissive_allows_no_cert() {
         let mgr = MtlsManager::new();
         let pa = PeerAuthentication {
-            name: "pa".to_string(), namespace: "ns".to_string(),
+            name: "pa".to_string(),
+            namespace: "ns".to_string(),
             selector: None,
-            mtls: MtlsConfig { mode: MtlsMode::Permissive },
+            mtls: MtlsConfig {
+                mode: MtlsMode::Permissive,
+            },
             port_level_mtls: HashMap::new(),
-            created_at: Utc::now(), updated_at: Utc::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         mgr.upsert_policy(pa);
-        let ctx = TlsContext { peer_principal: None, is_mtls: false, peer_cert_san: vec![] };
+        let ctx = TlsContext {
+            peer_principal: None,
+            is_mtls: false,
+            peer_cert_san: vec![],
+        };
         assert!(mgr.validate_peer("ns", &HashMap::new(), &ctx, None).is_ok());
     }
 
@@ -590,14 +738,22 @@ mod tests {
     fn mtls_disable_allows_without_cert() {
         let mgr = MtlsManager::new();
         let pa = PeerAuthentication {
-            name: "pa".to_string(), namespace: "ns".to_string(),
+            name: "pa".to_string(),
+            namespace: "ns".to_string(),
             selector: None,
-            mtls: MtlsConfig { mode: MtlsMode::Disable },
+            mtls: MtlsConfig {
+                mode: MtlsMode::Disable,
+            },
             port_level_mtls: HashMap::new(),
-            created_at: Utc::now(), updated_at: Utc::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         mgr.upsert_policy(pa);
-        let ctx = TlsContext { peer_principal: None, is_mtls: false, peer_cert_san: vec![] };
+        let ctx = TlsContext {
+            peer_principal: None,
+            is_mtls: false,
+            peer_cert_san: vec![],
+        };
         assert!(mgr.validate_peer("ns", &HashMap::new(), &ctx, None).is_ok());
     }
 
@@ -614,13 +770,22 @@ mod tests {
     fn mtls_per_port_override() {
         let mgr = MtlsManager::new();
         let mut port_map: HashMap<u16, MtlsConfig> = HashMap::new();
-        port_map.insert(8080u16, MtlsConfig { mode: MtlsMode::Disable });
+        port_map.insert(
+            8080u16,
+            MtlsConfig {
+                mode: MtlsMode::Disable,
+            },
+        );
         let pa = PeerAuthentication {
-            name: "pa".to_string(), namespace: "ns".to_string(),
+            name: "pa".to_string(),
+            namespace: "ns".to_string(),
             selector: None,
-            mtls: MtlsConfig { mode: MtlsMode::Strict },
+            mtls: MtlsConfig {
+                mode: MtlsMode::Strict,
+            },
             port_level_mtls: port_map,
-            created_at: Utc::now(), updated_at: Utc::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         mgr.upsert_policy(pa);
         let mode = mgr.effective_mode("ns", &HashMap::new(), Some(8080));
@@ -650,18 +815,32 @@ mod tests {
     fn auth_deny_overrides_allow() {
         let engine = AuthEngine::new("secret");
         let deny = AuthorizationPolicy {
-            name: "deny-all".to_string(), namespace: "ns".to_string(),
-            selector: None, action: AuthzAction::Deny,
-            rules: vec![AuthzRule { from: vec![], to: vec![], when: vec![] }],
+            name: "deny-all".to_string(),
+            namespace: "ns".to_string(),
+            selector: None,
+            action: AuthzAction::Deny,
+            rules: vec![AuthzRule {
+                from: vec![],
+                to: vec![],
+                when: vec![],
+            }],
             provider: None,
-            created_at: Utc::now(), updated_at: Utc::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         let allow = AuthorizationPolicy {
-            name: "allow-all".to_string(), namespace: "ns".to_string(),
-            selector: None, action: AuthzAction::Allow,
-            rules: vec![AuthzRule { from: vec![], to: vec![], when: vec![] }],
+            name: "allow-all".to_string(),
+            namespace: "ns".to_string(),
+            selector: None,
+            action: AuthzAction::Allow,
+            rules: vec![AuthzRule {
+                from: vec![],
+                to: vec![],
+                when: vec![],
+            }],
             provider: None,
-            created_at: Utc::now(), updated_at: Utc::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         engine.upsert_authz_policy(deny);
         engine.upsert_authz_policy(allow);
@@ -673,11 +852,18 @@ mod tests {
     fn auth_allow_with_no_deny() {
         let engine = AuthEngine::new("secret");
         let allow = AuthorizationPolicy {
-            name: "allow-all".to_string(), namespace: "ns".to_string(),
-            selector: None, action: AuthzAction::Allow,
-            rules: vec![AuthzRule { from: vec![], to: vec![], when: vec![] }],
+            name: "allow-all".to_string(),
+            namespace: "ns".to_string(),
+            selector: None,
+            action: AuthzAction::Allow,
+            rules: vec![AuthzRule {
+                from: vec![],
+                to: vec![],
+                when: vec![],
+            }],
             provider: None,
-            created_at: Utc::now(), updated_at: Utc::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         engine.upsert_authz_policy(allow);
         let ctx = make_req_ctx("GET", "/");
@@ -695,11 +881,18 @@ mod tests {
     fn auth_remove_policy() {
         let engine = AuthEngine::new("secret");
         let deny = AuthorizationPolicy {
-            name: "deny".to_string(), namespace: "ns".to_string(),
-            selector: None, action: AuthzAction::Deny,
-            rules: vec![AuthzRule { from: vec![], to: vec![], when: vec![] }],
+            name: "deny".to_string(),
+            namespace: "ns".to_string(),
+            selector: None,
+            action: AuthzAction::Deny,
+            rules: vec![AuthzRule {
+                from: vec![],
+                to: vec![],
+                when: vec![],
+            }],
             provider: None,
-            created_at: Utc::now(), updated_at: Utc::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         engine.upsert_authz_policy(deny);
         engine.remove_authz_policy("ns", "deny");
@@ -784,8 +977,14 @@ mod tests {
         let tdr = spiffe::TrustDomainRegistry::new();
         let td = spiffe::TrustDomain::new("partner.org", "CERT-PEM");
         tdr.register(td);
-        let partner_id = SpiffeId { trust_domain: "partner.org".to_string(), path: "/ns/x/sa/y".to_string() };
-        let evil_id = SpiffeId { trust_domain: "evil.org".to_string(), path: "/ns/x/sa/y".to_string() };
+        let partner_id = SpiffeId {
+            trust_domain: "partner.org".to_string(),
+            path: "/ns/x/sa/y".to_string(),
+        };
+        let evil_id = SpiffeId {
+            trust_domain: "evil.org".to_string(),
+            path: "/ns/x/sa/y".to_string(),
+        };
         assert!(tdr.is_trusted(&partner_id));
         assert!(!tdr.is_trusted(&evil_id));
     }
@@ -795,7 +994,10 @@ mod tests {
         let tdr = spiffe::TrustDomainRegistry::new();
         tdr.register(spiffe::TrustDomain::new("x.org", "CERT"));
         tdr.remove("x.org");
-        let x_id = SpiffeId { trust_domain: "x.org".to_string(), path: "/ns/x/sa/y".to_string() };
+        let x_id = SpiffeId {
+            trust_domain: "x.org".to_string(),
+            path: "/ns/x/sa/y".to_string(),
+        };
         assert!(!tdr.is_trusted(&x_id));
     }
 
@@ -810,12 +1012,20 @@ mod tests {
     // 9 — Telemetry
     // ═══════════════════════════════════════════════════════
 
-    fn make_telemetry(name: &str, ns: &str, selector: Option<HashMap<String, String>>) -> Telemetry {
+    fn make_telemetry(
+        name: &str,
+        ns: &str,
+        selector: Option<HashMap<String, String>>,
+    ) -> Telemetry {
         Telemetry {
-            name: name.to_string(), namespace: ns.to_string(),
+            name: name.to_string(),
+            namespace: ns.to_string(),
             selector,
-            tracing: vec![], metrics: vec![], access_logging: vec![],
-            created_at: Utc::now(), updated_at: Utc::now(),
+            tracing: vec![],
+            metrics: vec![],
+            access_logging: vec![],
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         }
     }
 
@@ -823,10 +1033,14 @@ mod tests {
     fn telemetry_workload_priority_over_namespace() {
         let mgr = TelemetryManager::new();
         mgr.upsert(make_telemetry("ns-tel", "ns", None));
-        mgr.upsert(make_telemetry("wl-tel", "ns",
-            Some(simple_labels(&[("app", "api")]))));
-        let eff = mgr.effective_telemetry("ns",
-            &simple_labels(&[("app", "api")])).unwrap();
+        mgr.upsert(make_telemetry(
+            "wl-tel",
+            "ns",
+            Some(simple_labels(&[("app", "api")])),
+        ));
+        let eff = mgr
+            .effective_telemetry("ns", &simple_labels(&[("app", "api")]))
+            .unwrap();
         assert_eq!(eff.name, "wl-tel");
     }
 
@@ -843,16 +1057,20 @@ mod tests {
     fn telemetry_tracing_sampling_rate() {
         let mgr = TelemetryManager::new();
         mgr.upsert(Telemetry {
-            name: "t".to_string(), namespace: "ns".to_string(),
+            name: "t".to_string(),
+            namespace: "ns".to_string(),
             selector: None,
             tracing: vec![Tracing {
-                providers: vec![], custom_tags: HashMap::new(),
+                providers: vec![],
+                custom_tags: HashMap::new(),
                 disable_span_reporting: None,
                 random_sampling_percentage: Some(5.0),
                 use_request_id_for_trace_sampling: None,
             }],
-            metrics: vec![], access_logging: vec![],
-            created_at: Utc::now(), updated_at: Utc::now(),
+            metrics: vec![],
+            access_logging: vec![],
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         });
         let rate = mgr.tracing_sampling_rate("ns", &HashMap::new());
         assert_eq!(rate, Some(5.0));
@@ -873,7 +1091,11 @@ mod tests {
     #[test]
     fn multicluster_register_and_list() {
         let reg = MultiClusterRegistry::new("local");
-        reg.register_cluster(multicluster::RemoteCluster::new("remote1", "network1", "remote1.local"));
+        reg.register_cluster(multicluster::RemoteCluster::new(
+            "remote1",
+            "network1",
+            "remote1.local",
+        ));
         let clusters = reg.list_clusters();
         assert_eq!(clusters.len(), 1);
         assert_eq!(clusters[0].name, "remote1");
@@ -892,14 +1114,21 @@ mod tests {
     #[test]
     fn multicluster_export_and_visible_services() {
         let reg = MultiClusterRegistry::new("local");
-        reg.register_cluster(multicluster::RemoteCluster::new("remote", "net", "remote.local"));
+        reg.register_cluster(multicluster::RemoteCluster::new(
+            "remote",
+            "net",
+            "remote.local",
+        ));
         let svc = multicluster::CrossClusterService {
-            name: "payments".to_string(), namespace: "billing".to_string(),
+            name: "payments".to_string(),
+            namespace: "billing".to_string(),
             source_cluster: "remote".to_string(),
             host_fqdn: "payments.billing.svc.cluster.local".to_string(),
-            ports: vec![], endpoints: vec![],
+            ports: vec![],
+            endpoints: vec![],
             export_to: vec!["*".to_string()],
-            registered_at: Utc::now(), updated_at: Utc::now(),
+            registered_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         reg.export_service(svc);
         assert_eq!(reg.visible_services().len(), 1);
@@ -908,8 +1137,8 @@ mod tests {
     #[test]
     fn multicluster_trust_federation() {
         let reg = MultiClusterRegistry::new("local");
-        let fed = multicluster::TrustDomainFederation::new(
-            "local", "remote.partner", "FAKE-CA-CERT");
+        let fed =
+            multicluster::TrustDomainFederation::new("local", "remote.partner", "FAKE-CA-CERT");
         reg.federate(fed);
         assert!(reg.is_federated("remote.partner"));
         assert!(!reg.is_federated("unknown.org"));
@@ -922,12 +1151,15 @@ mod tests {
         let reg = MultiClusterRegistry::new("local");
         reg.register_cluster(multicluster::RemoteCluster::new("r", "net", "r.local"));
         reg.export_service(multicluster::CrossClusterService {
-            name: "svc".to_string(), namespace: "ns".to_string(),
+            name: "svc".to_string(),
+            namespace: "ns".to_string(),
             source_cluster: "r".to_string(),
             host_fqdn: "svc.ns.svc".to_string(),
-            ports: vec![], endpoints: vec![],
+            ports: vec![],
+            endpoints: vec![],
             export_to: vec!["*".to_string()],
-            registered_at: Utc::now(), updated_at: Utc::now(),
+            registered_at: Utc::now(),
+            updated_at: Utc::now(),
         });
         assert_eq!(reg.visible_services().len(), 1);
         reg.remove_cluster("r");
@@ -1108,14 +1340,21 @@ mod tests {
     #[test]
     fn multicluster_export_to_local_only_filters_others() {
         let reg = MultiClusterRegistry::new("clusterA");
-        reg.register_cluster(multicluster::RemoteCluster::new("remote", "net", "remote.local"));
+        reg.register_cluster(multicluster::RemoteCluster::new(
+            "remote",
+            "net",
+            "remote.local",
+        ));
         let svc = multicluster::CrossClusterService {
-            name: "internal-only".to_string(), namespace: "ns".to_string(),
+            name: "internal-only".to_string(),
+            namespace: "ns".to_string(),
             source_cluster: "remote".to_string(),
             host_fqdn: "internal-only.ns.svc".to_string(),
-            ports: vec![], endpoints: vec![],
+            ports: vec![],
+            endpoints: vec![],
             export_to: vec!["clusterB".to_string()], // not exported to clusterA
-            registered_at: Utc::now(), updated_at: Utc::now(),
+            registered_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         reg.export_service(svc);
         // clusterA cannot see it
@@ -1125,14 +1364,21 @@ mod tests {
     #[test]
     fn multicluster_export_to_wildcard_visible_everywhere() {
         let reg = MultiClusterRegistry::new("clusterA");
-        reg.register_cluster(multicluster::RemoteCluster::new("remote", "net", "remote.local"));
+        reg.register_cluster(multicluster::RemoteCluster::new(
+            "remote",
+            "net",
+            "remote.local",
+        ));
         let svc = multicluster::CrossClusterService {
-            name: "public".to_string(), namespace: "ns".to_string(),
+            name: "public".to_string(),
+            namespace: "ns".to_string(),
             source_cluster: "remote".to_string(),
             host_fqdn: "public.ns.svc".to_string(),
-            ports: vec![], endpoints: vec![],
+            ports: vec![],
+            endpoints: vec![],
             export_to: vec!["*".to_string()],
-            registered_at: Utc::now(), updated_at: Utc::now(),
+            registered_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         reg.export_service(svc);
         assert_eq!(reg.visible_services().len(), 1);
@@ -1141,16 +1387,27 @@ mod tests {
     #[test]
     fn multicluster_services_from_cluster_returns_only_that_clusters_services() {
         let reg = MultiClusterRegistry::new("local");
-        reg.register_cluster(multicluster::RemoteCluster::new("east", "net1", "east.local"));
-        reg.register_cluster(multicluster::RemoteCluster::new("west", "net2", "west.local"));
+        reg.register_cluster(multicluster::RemoteCluster::new(
+            "east",
+            "net1",
+            "east.local",
+        ));
+        reg.register_cluster(multicluster::RemoteCluster::new(
+            "west",
+            "net2",
+            "west.local",
+        ));
         for cluster in ["east", "west"] {
             reg.export_service(multicluster::CrossClusterService {
-                name: format!("svc-{cluster}"), namespace: "n".to_string(),
+                name: format!("svc-{cluster}"),
+                namespace: "n".to_string(),
                 source_cluster: cluster.to_string(),
                 host_fqdn: format!("svc-{cluster}.n.svc"),
-                ports: vec![], endpoints: vec![],
+                ports: vec![],
+                endpoints: vec![],
                 export_to: vec!["*".to_string()],
-                registered_at: Utc::now(), updated_at: Utc::now(),
+                registered_at: Utc::now(),
+                updated_at: Utc::now(),
             });
         }
         let east = reg.services_from_cluster("east");
@@ -1163,14 +1420,19 @@ mod tests {
         let reg = MultiClusterRegistry::new("local");
         reg.register_cluster(multicluster::RemoteCluster::new("r", "n", "r.local"));
         let mk = |port: u16| multicluster::CrossClusterService {
-            name: "svc".to_string(), namespace: "ns".to_string(),
+            name: "svc".to_string(),
+            namespace: "ns".to_string(),
             source_cluster: "r".to_string(),
             host_fqdn: "svc.ns.svc".to_string(),
             ports: vec![multicluster::CrossClusterPort {
-                port, protocol: "HTTP".to_string(), name: "http".to_string(),
+                port,
+                protocol: "HTTP".to_string(),
+                name: "http".to_string(),
             }],
-            endpoints: vec![], export_to: vec!["*".to_string()],
-            registered_at: Utc::now(), updated_at: Utc::now(),
+            endpoints: vec![],
+            export_to: vec!["*".to_string()],
+            registered_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         reg.export_service(mk(80));
         reg.export_service(mk(8080)); // upsert
@@ -1185,12 +1447,15 @@ mod tests {
         reg.register_cluster(multicluster::RemoteCluster::new("r", "n", "r.local"));
         for name in ["a", "b"] {
             reg.export_service(multicluster::CrossClusterService {
-                name: name.to_string(), namespace: "ns".to_string(),
+                name: name.to_string(),
+                namespace: "ns".to_string(),
                 source_cluster: "r".to_string(),
                 host_fqdn: format!("{name}.ns.svc"),
-                ports: vec![], endpoints: vec![],
+                ports: vec![],
+                endpoints: vec![],
                 export_to: vec!["*".to_string()],
-                registered_at: Utc::now(), updated_at: Utc::now(),
+                registered_at: Utc::now(),
+                updated_at: Utc::now(),
             });
         }
         reg.remove_exported_service("r", "ns", "a");
@@ -1224,15 +1489,20 @@ mod tests {
         reg.update_cluster_status("spoke1", multicluster::RemoteClusterStatus::Connected);
         for n in ["s1", "s2"] {
             reg.export_service(multicluster::CrossClusterService {
-                name: n.to_string(), namespace: "ns".to_string(),
+                name: n.to_string(),
+                namespace: "ns".to_string(),
                 source_cluster: "spoke1".to_string(),
                 host_fqdn: format!("{n}.ns.svc"),
-                ports: vec![], endpoints: vec![],
+                ports: vec![],
+                endpoints: vec![],
                 export_to: vec!["*".to_string()],
-                registered_at: Utc::now(), updated_at: Utc::now(),
+                registered_at: Utc::now(),
+                updated_at: Utc::now(),
             });
         }
-        reg.federate(multicluster::TrustDomainFederation::new("hub", "s1.local", "CA"));
+        reg.federate(multicluster::TrustDomainFederation::new(
+            "hub", "s1.local", "CA",
+        ));
         let snap = reg.federation_snapshot();
         assert_eq!(snap.local_cluster, "hub");
         assert_eq!(snap.connected_clusters, 1);
@@ -1248,15 +1518,20 @@ mod tests {
     fn telemetry_access_logging_disabled_short_circuits() {
         let mgr = TelemetryManager::new();
         mgr.upsert(Telemetry {
-            name: "t".to_string(), namespace: "ns".to_string(),
+            name: "t".to_string(),
+            namespace: "ns".to_string(),
             selector: None,
-            tracing: vec![], metrics: vec![],
+            tracing: vec![],
+            metrics: vec![],
             access_logging: vec![AccessLogging {
-                providers: vec![ProviderRef { name: "otel".to_string() }],
+                providers: vec![ProviderRef {
+                    name: "otel".to_string(),
+                }],
                 disabled: Some(true),
                 filter: None,
             }],
-            created_at: Utc::now(), updated_at: Utc::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         });
         assert!(!mgr.access_logging_enabled("ns", &HashMap::new()));
     }
@@ -1265,12 +1540,18 @@ mod tests {
     fn telemetry_access_logging_no_providers_returns_false() {
         let mgr = TelemetryManager::new();
         mgr.upsert(Telemetry {
-            name: "t".to_string(), namespace: "ns".to_string(),
-            selector: None, tracing: vec![], metrics: vec![],
+            name: "t".to_string(),
+            namespace: "ns".to_string(),
+            selector: None,
+            tracing: vec![],
+            metrics: vec![],
             access_logging: vec![AccessLogging {
-                providers: vec![], disabled: None, filter: None,
+                providers: vec![],
+                disabled: None,
+                filter: None,
             }],
-            created_at: Utc::now(), updated_at: Utc::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         });
         assert!(!mgr.access_logging_enabled("ns", &HashMap::new()));
     }
@@ -1279,13 +1560,20 @@ mod tests {
     fn telemetry_access_logging_enabled_with_providers() {
         let mgr = TelemetryManager::new();
         mgr.upsert(Telemetry {
-            name: "t".to_string(), namespace: "ns".to_string(),
-            selector: None, tracing: vec![], metrics: vec![],
+            name: "t".to_string(),
+            namespace: "ns".to_string(),
+            selector: None,
+            tracing: vec![],
+            metrics: vec![],
             access_logging: vec![AccessLogging {
-                providers: vec![ProviderRef { name: "stdout".to_string() }],
-                disabled: None, filter: None,
+                providers: vec![ProviderRef {
+                    name: "stdout".to_string(),
+                }],
+                disabled: None,
+                filter: None,
             }],
-            created_at: Utc::now(), updated_at: Utc::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         });
         assert!(mgr.access_logging_enabled("ns", &HashMap::new()));
     }
@@ -1323,63 +1611,122 @@ mod tests {
 
     fn match_uri(uri: StringMatch) -> HttpMatchRequest {
         HttpMatchRequest {
-            name: None, headers: HashMap::new(),
-            uri: Some(uri), method: None, authority: None,
-            query_params: HashMap::new(), gateways: vec![],
-            source_namespace: None, without_headers: HashMap::new(),
-            port: None, ignore_uri_case: false, source_labels: HashMap::new(),
+            name: None,
+            headers: HashMap::new(),
+            uri: Some(uri),
+            method: None,
+            authority: None,
+            query_params: HashMap::new(),
+            gateways: vec![],
+            source_namespace: None,
+            without_headers: HashMap::new(),
+            port: None,
+            ignore_uri_case: false,
+            source_labels: HashMap::new(),
         }
     }
 
     #[test]
     fn traffic_uri_prefix_match() {
         let tm = TrafficManager::new();
-        let vs = make_vs("vs", "h", vec![HttpRoute {
-            name: None,
-            match_rules: vec![match_uri(StringMatch::Prefix("/api/v1".to_string()))],
-            route: vec![route_dest("v1", 100)],
-            timeout_ms: None, retries: None, fault: None,
-            mirror: None, mirror_percentage: None, headers: None,
-            redirect: None, direct_response: None, rewrite: None, cors_policy: None,
-        }]);
+        let vs = make_vs(
+            "vs",
+            "h",
+            vec![HttpRoute {
+                name: None,
+                match_rules: vec![match_uri(StringMatch::Prefix("/api/v1".to_string()))],
+                route: vec![route_dest("v1", 100)],
+                timeout_ms: None,
+                retries: None,
+                fault: None,
+                mirror: None,
+                mirror_percentage: None,
+                headers: None,
+                redirect: None,
+                direct_response: None,
+                rewrite: None,
+                cors_policy: None,
+            }],
+        );
         tm.upsert_virtual_service(vs);
-        assert!(tm.resolve_route("h", &make_req("/api/v1/users", "GET")).is_some());
-        assert!(tm.resolve_route("h", &make_req("/api/v2/users", "GET")).is_none());
+        assert!(
+            tm.resolve_route("h", &make_req("/api/v1/users", "GET"))
+                .is_some()
+        );
+        assert!(
+            tm.resolve_route("h", &make_req("/api/v2/users", "GET"))
+                .is_none()
+        );
     }
 
     #[test]
     fn traffic_uri_regex_match() {
         let tm = TrafficManager::new();
-        let vs = make_vs("vs", "h", vec![HttpRoute {
-            name: None,
-            match_rules: vec![match_uri(StringMatch::Regex(r"^/users/\d+$".to_string()))],
-            route: vec![route_dest("users", 100)],
-            timeout_ms: None, retries: None, fault: None,
-            mirror: None, mirror_percentage: None, headers: None,
-            redirect: None, direct_response: None, rewrite: None, cors_policy: None,
-        }]);
+        let vs = make_vs(
+            "vs",
+            "h",
+            vec![HttpRoute {
+                name: None,
+                match_rules: vec![match_uri(StringMatch::Regex(r"^/users/\d+$".to_string()))],
+                route: vec![route_dest("users", 100)],
+                timeout_ms: None,
+                retries: None,
+                fault: None,
+                mirror: None,
+                mirror_percentage: None,
+                headers: None,
+                redirect: None,
+                direct_response: None,
+                rewrite: None,
+                cors_policy: None,
+            }],
+        );
         tm.upsert_virtual_service(vs);
-        assert!(tm.resolve_route("h", &make_req("/users/42", "GET")).is_some());
-        assert!(tm.resolve_route("h", &make_req("/users/abc", "GET")).is_none());
+        assert!(
+            tm.resolve_route("h", &make_req("/users/42", "GET"))
+                .is_some()
+        );
+        assert!(
+            tm.resolve_route("h", &make_req("/users/abc", "GET"))
+                .is_none()
+        );
     }
 
     #[test]
     fn traffic_method_match() {
         let tm = TrafficManager::new();
-        let vs = make_vs("vs", "h", vec![HttpRoute {
-            name: None,
-            match_rules: vec![HttpMatchRequest {
-                name: None, headers: HashMap::new(),
-                uri: None, method: Some(StringMatch::Exact("POST".to_string())),
-                authority: None, query_params: HashMap::new(), gateways: vec![],
-                source_namespace: None, without_headers: HashMap::new(),
-                port: None, ignore_uri_case: false, source_labels: HashMap::new(),
+        let vs = make_vs(
+            "vs",
+            "h",
+            vec![HttpRoute {
+                name: None,
+                match_rules: vec![HttpMatchRequest {
+                    name: None,
+                    headers: HashMap::new(),
+                    uri: None,
+                    method: Some(StringMatch::Exact("POST".to_string())),
+                    authority: None,
+                    query_params: HashMap::new(),
+                    gateways: vec![],
+                    source_namespace: None,
+                    without_headers: HashMap::new(),
+                    port: None,
+                    ignore_uri_case: false,
+                    source_labels: HashMap::new(),
+                }],
+                route: vec![route_dest("writer", 100)],
+                timeout_ms: None,
+                retries: None,
+                fault: None,
+                mirror: None,
+                mirror_percentage: None,
+                headers: None,
+                redirect: None,
+                direct_response: None,
+                rewrite: None,
+                cors_policy: None,
             }],
-            route: vec![route_dest("writer", 100)],
-            timeout_ms: None, retries: None, fault: None,
-            mirror: None, mirror_percentage: None, headers: None,
-            redirect: None, direct_response: None, rewrite: None, cors_policy: None,
-        }]);
+        );
         tm.upsert_virtual_service(vs);
         assert!(tm.resolve_route("h", &make_req("/", "POST")).is_some());
         assert!(tm.resolve_route("h", &make_req("/", "GET")).is_none());
@@ -1388,25 +1735,42 @@ mod tests {
     #[test]
     fn traffic_query_param_match() {
         let tm = TrafficManager::new();
-        let vs = make_vs("vs", "h", vec![HttpRoute {
-            name: None,
-            match_rules: vec![HttpMatchRequest {
-                name: None, headers: HashMap::new(),
-                uri: None, method: None, authority: None,
-                query_params: {
-                    let mut q = HashMap::new();
-                    q.insert("v".to_string(), StringMatch::Exact("2".to_string()));
-                    q
-                },
-                gateways: vec![],
-                source_namespace: None, without_headers: HashMap::new(),
-                port: None, ignore_uri_case: false, source_labels: HashMap::new(),
+        let vs = make_vs(
+            "vs",
+            "h",
+            vec![HttpRoute {
+                name: None,
+                match_rules: vec![HttpMatchRequest {
+                    name: None,
+                    headers: HashMap::new(),
+                    uri: None,
+                    method: None,
+                    authority: None,
+                    query_params: {
+                        let mut q = HashMap::new();
+                        q.insert("v".to_string(), StringMatch::Exact("2".to_string()));
+                        q
+                    },
+                    gateways: vec![],
+                    source_namespace: None,
+                    without_headers: HashMap::new(),
+                    port: None,
+                    ignore_uri_case: false,
+                    source_labels: HashMap::new(),
+                }],
+                route: vec![route_dest("v2", 100)],
+                timeout_ms: None,
+                retries: None,
+                fault: None,
+                mirror: None,
+                mirror_percentage: None,
+                headers: None,
+                redirect: None,
+                direct_response: None,
+                rewrite: None,
+                cors_policy: None,
             }],
-            route: vec![route_dest("v2", 100)],
-            timeout_ms: None, retries: None, fault: None,
-            mirror: None, mirror_percentage: None, headers: None,
-            redirect: None, direct_response: None, rewrite: None, cors_policy: None,
-        }]);
+        );
         tm.upsert_virtual_service(vs);
         let mut req = make_req("/", "GET");
         req.query_params.insert("v".to_string(), "2".to_string());
@@ -1417,22 +1781,38 @@ mod tests {
     #[test]
     fn traffic_source_namespace_match() {
         let tm = TrafficManager::new();
-        let vs = make_vs("vs", "h", vec![HttpRoute {
-            name: None,
-            match_rules: vec![HttpMatchRequest {
-                name: None, headers: HashMap::new(),
-                uri: None, method: None, authority: None,
-                query_params: HashMap::new(),
-                gateways: vec![],
-                source_namespace: Some("trusted".to_string()),
-                without_headers: HashMap::new(),
-                port: None, ignore_uri_case: false, source_labels: HashMap::new(),
+        let vs = make_vs(
+            "vs",
+            "h",
+            vec![HttpRoute {
+                name: None,
+                match_rules: vec![HttpMatchRequest {
+                    name: None,
+                    headers: HashMap::new(),
+                    uri: None,
+                    method: None,
+                    authority: None,
+                    query_params: HashMap::new(),
+                    gateways: vec![],
+                    source_namespace: Some("trusted".to_string()),
+                    without_headers: HashMap::new(),
+                    port: None,
+                    ignore_uri_case: false,
+                    source_labels: HashMap::new(),
+                }],
+                route: vec![route_dest("internal", 100)],
+                timeout_ms: None,
+                retries: None,
+                fault: None,
+                mirror: None,
+                mirror_percentage: None,
+                headers: None,
+                redirect: None,
+                direct_response: None,
+                rewrite: None,
+                cors_policy: None,
             }],
-            route: vec![route_dest("internal", 100)],
-            timeout_ms: None, retries: None, fault: None,
-            mirror: None, mirror_percentage: None, headers: None,
-            redirect: None, direct_response: None, rewrite: None, cors_policy: None,
-        }]);
+        );
         tm.upsert_virtual_service(vs);
         let mut req = make_req("/", "GET");
         req.source_namespace = Some("trusted".to_string());
@@ -1444,13 +1824,25 @@ mod tests {
     #[test]
     fn traffic_remove_virtual_service_clears_routing() {
         let tm = TrafficManager::new();
-        let vs = make_vs("vs", "rm.svc", vec![HttpRoute {
-            name: None, match_rules: vec![],
-            route: vec![route_dest("backend", 100)],
-            timeout_ms: None, retries: None, fault: None,
-            mirror: None, mirror_percentage: None, headers: None,
-            redirect: None, direct_response: None, rewrite: None, cors_policy: None,
-        }]);
+        let vs = make_vs(
+            "vs",
+            "rm.svc",
+            vec![HttpRoute {
+                name: None,
+                match_rules: vec![],
+                route: vec![route_dest("backend", 100)],
+                timeout_ms: None,
+                retries: None,
+                fault: None,
+                mirror: None,
+                mirror_percentage: None,
+                headers: None,
+                redirect: None,
+                direct_response: None,
+                rewrite: None,
+                cors_policy: None,
+            }],
+        );
         tm.upsert_virtual_service(vs);
         assert!(tm.resolve_route("rm.svc", &make_req("/", "GET")).is_some());
         tm.remove_virtual_service("vs");

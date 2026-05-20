@@ -7,7 +7,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, TrackerIssue};
+use crate::admin::state::{AdminState, TrackerIssue, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -16,10 +16,18 @@ pub enum TrackerViewError {
     Auth(#[from] crate::admin::permission::AuthError),
 }
 
-pub fn list_records(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<TrackerIssue>, TrackerViewError> {
+pub fn list_records(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<TrackerIssue>, TrackerViewError> {
     ctx.authorise(Permission::TrackerRead)?;
-    let mut rows: Vec<TrackerIssue> = scope(&state.tracker_issues.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter().cloned().collect();
+    let mut rows: Vec<TrackerIssue> =
+        scope(&state.tracker_issues.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| a.state.cmp(b.state).then(a.id.cmp(&b.id)));
     Ok(rows)
 }
@@ -27,7 +35,9 @@ pub fn list_records(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<TrackerI
 pub fn group_by_state(rows: &[TrackerIssue]) -> Vec<(String, usize)> {
     use std::collections::BTreeMap;
     let mut acc: BTreeMap<String, usize> = BTreeMap::new();
-    for r in rows { *acc.entry(r.state.to_string()).or_insert(0) += 1; }
+    for r in rows {
+        *acc.entry(r.state.to_string()).or_insert(0) += 1;
+    }
     acc.into_iter().collect()
 }
 
@@ -36,7 +46,9 @@ pub fn unassigned<'a>(rows: &'a [TrackerIssue]) -> Vec<&'a TrackerIssue> {
 }
 
 pub fn by_assignee<'a>(rows: &'a [TrackerIssue], assignee: &str) -> Vec<&'a TrackerIssue> {
-    rows.iter().filter(|r| r.assignee.as_deref() == Some(assignee)).collect()
+    rows.iter()
+        .filter(|r| r.assignee.as_deref() == Some(assignee))
+        .collect()
 }
 
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, TrackerViewError> {
@@ -46,10 +58,17 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, TrackerVie
     let chips: String = groups.iter().map(|(s, n)| format!(
         r#"<span class="px-2 py-1 mr-2 rounded bg-gray-200 text-sm">{s} <strong>×{n}</strong></span>"#,
         s = escape(s), n = n)).collect();
-    let table_rows: Vec<Vec<String>> = rows.iter().map(|r| vec![
-        escape(&r.id), escape(&r.title), r.state.into(),
-        r.assignee.clone().unwrap_or_else(|| "—".into()),
-    ]).collect();
+    let table_rows: Vec<Vec<String>> = rows
+        .iter()
+        .map(|r| {
+            vec![
+                escape(&r.id),
+                escape(&r.title),
+                r.state.into(),
+                r.assignee.clone().unwrap_or_else(|| "—".into()),
+            ]
+        })
+        .collect();
     let body = format!(
         r#"<section>
   <p class="text-sm text-gray-600 mb-3">Linear / Plane (cave-tracker). Upstream: <a class="text-blue-700 underline" href="https://linear.app/">linear.app</a>.</p>
@@ -66,23 +85,35 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, TrackerVie
         chips = chips,
         tbl = table(&["id", "title", "state", "assignee"], &table_rows),
     );
-    Ok(page_shell_full(ctx, "/admin/tracker", &format!("tracker · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/tracker",
+        &format!("tracker · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::backstage("plugins/tracker/src/components/IssuesList.tsx", "IssuesList");
+const FILE_CITE: Cite = Cite::backstage(
+    "plugins/tracker/src/components/IssuesList.tsx",
+    "IssuesList",
+);
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::portal_test_ctx;
-    fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
+    fn ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer("acme", perms)
+    }
 
     #[test]
     fn list_filters_to_owner_sorted_by_state() {
         let r = list_records(&AdminState::seeded(), &ctx(&[Permission::TrackerRead])).unwrap();
         assert_eq!(r.len(), 2);
-        for w in r.windows(2) { assert!(w[0].state <= w[1].state || w[0].id.as_str() <= w[1].id.as_str()); }
+        for w in r.windows(2) {
+            assert!(w[0].state <= w[1].state || w[0].id.as_str() <= w[1].id.as_str());
+        }
     }
 
     #[test]
@@ -109,7 +140,11 @@ mod tests {
         let r = list_records(&AdminState::seeded(), &ctx(&[Permission::TrackerRead])).unwrap();
         if let Some(a) = r.iter().find_map(|x| x.assignee.as_deref()) {
             let an = a.to_string();
-            assert!(by_assignee(&r, &an).iter().all(|x| x.assignee.as_deref() == Some(an.as_str())));
+            assert!(
+                by_assignee(&r, &an)
+                    .iter()
+                    .all(|x| x.assignee.as_deref() == Some(an.as_str()))
+            );
         }
         assert!(by_assignee(&r, "ghost").is_empty());
     }

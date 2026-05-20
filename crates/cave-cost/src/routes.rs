@@ -5,9 +5,9 @@
 use crate::models::*;
 use crate::{CostState, CostStore};
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     routing::{delete, get, post},
-    Json, Router,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -94,7 +94,10 @@ pub fn create_router(state: Arc<CostState>) -> Router {
         .route("/api/cost/budgets", get(list_budgets))
         .route("/api/cost/budgets/{id}", get(get_budget))
         .route("/api/cost/budgets/{id}", delete(delete_budget))
-        .route("/api/cost/budgets/{id}/evaluate", post(evaluate_budget_handler))
+        .route(
+            "/api/cost/budgets/{id}/evaluate",
+            post(evaluate_budget_handler),
+        )
         // Alerts
         .route("/api/cost/alerts", get(list_alerts))
         // Recommendations
@@ -137,11 +140,7 @@ async fn query_costs(
     let filtered: Vec<ResourceCost> = store
         .resource_costs
         .iter()
-        .filter(|c| {
-            req.namespace
-                .as_ref()
-                .map_or(true, |ns| &c.namespace == ns)
-        })
+        .filter(|c| req.namespace.as_ref().map_or(true, |ns| &c.namespace == ns))
         .cloned()
         .collect();
 

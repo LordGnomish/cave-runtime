@@ -9,21 +9,20 @@
 use super::VaultViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, table};
-use crate::admin::state::{scope, AdminState, VaultPolicy};
+use crate::admin::state::{AdminState, VaultPolicy, scope};
 
 pub fn list_policies(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<Vec<VaultPolicy>, VaultViewError> {
     ctx.authorise(Permission::VaultRead)?;
-    let mut rows: Vec<VaultPolicy> = scope(
-        &state.vault_policies.read().unwrap(),
-        &ctx.tenant,
-        |r| &r.tenant,
-    )
-    .into_iter()
-    .cloned()
-    .collect();
+    let mut rows: Vec<VaultPolicy> =
+        scope(&state.vault_policies.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(rows)
 }
@@ -45,7 +44,10 @@ pub fn detail(
 /// warning on the policies page).
 pub fn unused(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<VaultPolicy>, VaultViewError> {
     let rows = list_policies(state, ctx)?;
-    Ok(rows.into_iter().filter(|p| p.bound_token_count == 0).collect())
+    Ok(rows
+        .into_iter()
+        .filter(|p| p.bound_token_count == 0)
+        .collect())
 }
 
 pub(super) fn render_section(
@@ -139,9 +141,15 @@ mod tests {
             "DetailMissing",
             "acme"
         );
-        assert!(detail(&AdminState::seeded(), &ctx(&[Permission::VaultRead]), "no-such")
+        assert!(
+            detail(
+                &AdminState::seeded(),
+                &ctx(&[Permission::VaultRead]),
+                "no-such"
+            )
             .unwrap()
-            .is_none());
+            .is_none()
+        );
     }
 
     #[test]
@@ -154,7 +162,11 @@ mod tests {
             "acme"
         );
         let s = AdminState::seeded();
-        assert!(unused(&s, &ctx(&[Permission::VaultRead])).unwrap().is_empty());
+        assert!(
+            unused(&s, &ctx(&[Permission::VaultRead]))
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]

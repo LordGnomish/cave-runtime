@@ -123,7 +123,8 @@ impl LakehousePlugin {
         if !self.catalogs.iter().any(|c| c.name == ns.catalog) {
             return Err(LakehouseError::CatalogNotFound(ns.catalog.clone()));
         }
-        self.namespaces.retain(|n| !(n.catalog == ns.catalog && n.name == ns.name));
+        self.namespaces
+            .retain(|n| !(n.catalog == ns.catalog && n.name == ns.name));
         self.namespaces.push(ns);
         Ok(())
     }
@@ -141,9 +142,7 @@ impl LakehousePlugin {
             ));
         }
         self.tables.retain(|t| {
-            !(t.catalog == table.catalog
-                && t.namespace == table.namespace
-                && t.name == table.name)
+            !(t.catalog == table.catalog && t.namespace == table.namespace && t.name == table.name)
         });
         self.tables.push(table);
         Ok(())
@@ -244,7 +243,9 @@ impl LakehousePlugin {
                 "only SELECT / EXPLAIN allowed in portal".into(),
             ));
         }
-        for forbidden in ["DROP ", "DELETE ", "UPDATE ", "INSERT ", "CREATE ", "ALTER "] {
+        for forbidden in [
+            "DROP ", "DELETE ", "UPDATE ", "INSERT ", "CREATE ", "ALTER ",
+        ] {
             if upper.contains(forbidden) {
                 return Err(LakehouseError::InvalidSql(format!(
                     "forbidden keyword: {}",
@@ -254,11 +255,7 @@ impl LakehousePlugin {
         }
         // Enforce tenant scoping for non-admin personas.
         if persona != ViewPersona::Admin {
-            for cat in self
-                .catalogs
-                .iter()
-                .filter(|c| c.tenant != tenant)
-            {
+            for cat in self.catalogs.iter().filter(|c| c.tenant != tenant) {
                 if upper.contains(&cat.name.to_ascii_uppercase()) {
                     return Err(LakehouseError::CrossTenant(cat.name.clone()));
                 }
@@ -348,8 +345,10 @@ mod tests {
     #[test]
     fn register_catalog_and_namespace() {
         let mut p = LakehousePlugin::new();
-        p.register_catalog(sample_catalog("acme_warehouse", "acme")).unwrap();
-        p.register_namespace(sample_ns("acme_warehouse", "raw", "acme")).unwrap();
+        p.register_catalog(sample_catalog("acme_warehouse", "acme"))
+            .unwrap();
+        p.register_namespace(sample_ns("acme_warehouse", "raw", "acme"))
+            .unwrap();
         assert_eq!(p.list_catalogs(ViewPersona::Admin, "any").len(), 1);
         assert_eq!(
             p.list_namespaces("acme_warehouse", ViewPersona::Admin, "any")
@@ -361,7 +360,9 @@ mod tests {
     #[test]
     fn register_namespace_requires_existing_catalog() {
         let mut p = LakehousePlugin::new();
-        let err = p.register_namespace(sample_ns("missing", "raw", "acme")).unwrap_err();
+        let err = p
+            .register_namespace(sample_ns("missing", "raw", "acme"))
+            .unwrap_err();
         assert!(matches!(err, LakehouseError::CatalogNotFound(_)));
     }
 
@@ -380,16 +381,22 @@ mod tests {
         let mut p = LakehousePlugin::new();
         p.register_catalog(sample_catalog("c1", "acme")).unwrap();
         p.register_catalog(sample_catalog("c2", "globex")).unwrap();
-        p.register_namespace(sample_ns("c1", "raw", "acme")).unwrap();
-        p.register_namespace(sample_ns("c2", "raw", "globex")).unwrap();
-        p.register_table(sample_table("c1", "raw", "ev_a", "acme")).unwrap();
-        p.register_table(sample_table("c2", "raw", "ev_b", "globex")).unwrap();
+        p.register_namespace(sample_ns("c1", "raw", "acme"))
+            .unwrap();
+        p.register_namespace(sample_ns("c2", "raw", "globex"))
+            .unwrap();
+        p.register_table(sample_table("c1", "raw", "ev_a", "acme"))
+            .unwrap();
+        p.register_table(sample_table("c2", "raw", "ev_b", "globex"))
+            .unwrap();
         assert_eq!(
-            p.list_tables("c1", "raw", ViewPersona::Tenant, "acme").len(),
+            p.list_tables("c1", "raw", ViewPersona::Tenant, "acme")
+                .len(),
             1
         );
         assert_eq!(
-            p.list_tables("c2", "raw", ViewPersona::Tenant, "acme").len(),
+            p.list_tables("c2", "raw", ViewPersona::Tenant, "acme")
+                .len(),
             0
         );
         assert_eq!(p.list_tables("c1", "raw", ViewPersona::Admin, "x").len(), 1);
@@ -400,7 +407,8 @@ mod tests {
         let mut p = LakehousePlugin::new();
         p.register_catalog(sample_catalog("c", "acme")).unwrap();
         p.register_namespace(sample_ns("c", "raw", "acme")).unwrap();
-        p.register_table(sample_table("c", "raw", "events", "acme")).unwrap();
+        p.register_table(sample_table("c", "raw", "events", "acme"))
+            .unwrap();
         let panel = p.dashboard(ViewPersona::Admin, "acme");
         assert_eq!(panel.table_count, 1);
         assert_eq!(panel.total_bytes, 1_000_000);
@@ -450,7 +458,9 @@ mod tests {
             "CREATE TABLE quux ()",
             "ALTER TABLE q ADD COLUMN c TEXT",
         ] {
-            let err = p.validate_query(sql, ViewPersona::Admin, "acme").unwrap_err();
+            let err = p
+                .validate_query(sql, ViewPersona::Admin, "acme")
+                .unwrap_err();
             assert!(matches!(err, LakehouseError::InvalidSql(_)));
         }
     }

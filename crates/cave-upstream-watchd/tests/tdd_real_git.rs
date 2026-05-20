@@ -10,7 +10,7 @@
 use std::path::Path;
 use std::process::Command;
 
-use cave_upstream_watchd::tdd::{analyze_tdd_compliance, scan_stubs, ShellGitInspector};
+use cave_upstream_watchd::tdd::{ShellGitInspector, analyze_tdd_compliance, scan_stubs};
 
 fn git(repo: &Path, args: &[&str]) -> String {
     let out = Command::new("git")

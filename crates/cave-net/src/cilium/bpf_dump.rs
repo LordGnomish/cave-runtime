@@ -98,24 +98,42 @@ pub struct BpfMapRegistry {
 
 impl BpfMapRegistry {
     pub fn new(tenant: TenantId) -> Self {
-        Self { tenant, maps: BTreeMap::new() }
+        Self {
+            tenant,
+            maps: BTreeMap::new(),
+        }
     }
 
     pub fn register(&mut self, name: impl Into<String>, kind: BpfMapKind, max_entries: u64) {
         let name = name.into();
-        self.maps.insert(name.clone(), BpfMapDump {
-            name, kind, max_entries, entries: Vec::new(),
-        });
+        self.maps.insert(
+            name.clone(),
+            BpfMapDump {
+                name,
+                kind,
+                max_entries,
+                entries: Vec::new(),
+            },
+        );
     }
 
     pub fn unregister(&mut self, name: &str) -> Result<(), DumpError> {
-        self.maps.remove(name).ok_or_else(|| DumpError::NotFound(name.to_string()))?;
+        self.maps
+            .remove(name)
+            .ok_or_else(|| DumpError::NotFound(name.to_string()))?;
         Ok(())
     }
 
     pub fn upsert_entry(&mut self, name: &str, entry: BpfDumpEntry) -> Result<(), DumpError> {
-        let map = self.maps.get_mut(name).ok_or_else(|| DumpError::NotFound(name.to_string()))?;
-        if let Some(slot) = map.entries.iter_mut().find(|e| e.key_pretty == entry.key_pretty) {
+        let map = self
+            .maps
+            .get_mut(name)
+            .ok_or_else(|| DumpError::NotFound(name.to_string()))?;
+        if let Some(slot) = map
+            .entries
+            .iter_mut()
+            .find(|e| e.key_pretty == entry.key_pretty)
+        {
             *slot = entry;
             return Ok(());
         }
@@ -127,21 +145,30 @@ impl BpfMapRegistry {
     }
 
     pub fn remove_entry(&mut self, name: &str, key_pretty: &str) -> Result<(), DumpError> {
-        let map = self.maps.get_mut(name).ok_or_else(|| DumpError::NotFound(name.to_string()))?;
+        let map = self
+            .maps
+            .get_mut(name)
+            .ok_or_else(|| DumpError::NotFound(name.to_string()))?;
         map.entries.retain(|e| e.key_pretty != key_pretty);
         Ok(())
     }
 
     pub fn dump(&self, name: &str) -> Result<&BpfMapDump, DumpError> {
-        self.maps.get(name).ok_or_else(|| DumpError::NotFound(name.to_string()))
+        self.maps
+            .get(name)
+            .ok_or_else(|| DumpError::NotFound(name.to_string()))
     }
 
     pub fn fill_metric(&self, name: &str) -> Result<BpfFillMetric, DumpError> {
-        let map = self.maps.get(name).ok_or_else(|| DumpError::NotFound(name.to_string()))?;
+        let map = self
+            .maps
+            .get(name)
+            .ok_or_else(|| DumpError::NotFound(name.to_string()))?;
         let used = map.entries.len() as u64;
         let cap = map.max_entries.max(1);
         Ok(BpfFillMetric {
-            used, capacity: map.max_entries,
+            used,
+            capacity: map.max_entries,
             ratio: (used as f32) / (cap as f32),
         })
     }
@@ -168,7 +195,10 @@ mod tests {
     }
 
     fn entry(k: &str, v: &str) -> BpfDumpEntry {
-        BpfDumpEntry { key_pretty: k.into(), value_pretty: v.into() }
+        BpfDumpEntry {
+            key_pretty: k.into(),
+            value_pretty: v.into(),
+        }
     }
 
     // ── BpfMapKind ─────────────────────────────────────────────────────────
@@ -207,7 +237,11 @@ mod tests {
 
     #[test]
     fn registry_unregister_unknown_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maps/cmd/dump.go", "Unregister.NotFound", "tenant-bd-unf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/maps/cmd/dump.go",
+            "Unregister.NotFound",
+            "tenant-bd-unf"
+        );
         let mut r = reg(tenant);
         let err = r.unregister("ghost").unwrap_err();
         assert!(matches!(err, DumpError::NotFound(_)));
@@ -215,7 +249,8 @@ mod tests {
 
     #[test]
     fn registry_register_replaces_in_place() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maps/cmd/dump.go", "Register.Replace", "tenant-bd-rep");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/maps/cmd/dump.go", "Register.Replace", "tenant-bd-rep");
         let mut r = reg(tenant);
         r.register("cilium_policy", BpfMapKind::Policy, 1024);
         r.register("cilium_policy", BpfMapKind::Policy, 4096);
@@ -230,17 +265,24 @@ mod tests {
         let (_c, tenant) = cilium_test_ctx!("pkg/maps/cmd/dump.go", "UpsertEntry", "tenant-bd-ue");
         let mut r = reg(tenant);
         r.register("cilium_ipcache", BpfMapKind::Ipcache, 100);
-        r.upsert_entry("cilium_ipcache", entry("10.0.0.1", "id=256")).unwrap();
+        r.upsert_entry("cilium_ipcache", entry("10.0.0.1", "id=256"))
+            .unwrap();
         assert_eq!(r.dump("cilium_ipcache").unwrap().entries.len(), 1);
     }
 
     #[test]
     fn upsert_entry_replaces_existing_key() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maps/cmd/dump.go", "UpsertEntry.Replace", "tenant-bd-uer");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/maps/cmd/dump.go",
+            "UpsertEntry.Replace",
+            "tenant-bd-uer"
+        );
         let mut r = reg(tenant);
         r.register("cilium_ipcache", BpfMapKind::Ipcache, 100);
-        r.upsert_entry("cilium_ipcache", entry("10.0.0.1", "id=256")).unwrap();
-        r.upsert_entry("cilium_ipcache", entry("10.0.0.1", "id=999")).unwrap();
+        r.upsert_entry("cilium_ipcache", entry("10.0.0.1", "id=256"))
+            .unwrap();
+        r.upsert_entry("cilium_ipcache", entry("10.0.0.1", "id=999"))
+            .unwrap();
         let d = r.dump("cilium_ipcache").unwrap();
         assert_eq!(d.entries.len(), 1);
         assert_eq!(d.entries[0].value_pretty, "id=999");
@@ -248,7 +290,11 @@ mod tests {
 
     #[test]
     fn upsert_entry_at_capacity_returns_error() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maps/cmd/dump.go", "UpsertEntry.AtCapacity", "tenant-bd-uec");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/maps/cmd/dump.go",
+            "UpsertEntry.AtCapacity",
+            "tenant-bd-uec"
+        );
         let mut r = reg(tenant);
         r.register("cilium_lb", BpfMapKind::Lb, 2);
         r.upsert_entry("cilium_lb", entry("a", "x")).unwrap();
@@ -259,7 +305,11 @@ mod tests {
 
     #[test]
     fn upsert_entry_unknown_map_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maps/cmd/dump.go", "UpsertEntry.NotFound", "tenant-bd-uenf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/maps/cmd/dump.go",
+            "UpsertEntry.NotFound",
+            "tenant-bd-uenf"
+        );
         let mut r = reg(tenant);
         let err = r.upsert_entry("ghost", entry("k", "v")).unwrap_err();
         assert!(matches!(err, DumpError::NotFound(_)));
@@ -270,24 +320,34 @@ mod tests {
         let (_c, tenant) = cilium_test_ctx!("pkg/maps/cmd/dump.go", "RemoveEntry", "tenant-bd-re");
         let mut r = reg(tenant);
         r.register("cilium_ipcache", BpfMapKind::Ipcache, 100);
-        r.upsert_entry("cilium_ipcache", entry("10.0.0.1", "id=256")).unwrap();
+        r.upsert_entry("cilium_ipcache", entry("10.0.0.1", "id=256"))
+            .unwrap();
         r.remove_entry("cilium_ipcache", "10.0.0.1").unwrap();
         assert_eq!(r.dump("cilium_ipcache").unwrap().entries.len(), 0);
     }
 
     #[test]
     fn remove_entry_no_match_is_a_noop() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maps/cmd/dump.go", "RemoveEntry.NoMatch", "tenant-bd-renm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/maps/cmd/dump.go",
+            "RemoveEntry.NoMatch",
+            "tenant-bd-renm"
+        );
         let mut r = reg(tenant);
         r.register("cilium_ipcache", BpfMapKind::Ipcache, 100);
-        r.upsert_entry("cilium_ipcache", entry("10.0.0.1", "id=256")).unwrap();
+        r.upsert_entry("cilium_ipcache", entry("10.0.0.1", "id=256"))
+            .unwrap();
         r.remove_entry("cilium_ipcache", "no-such-key").unwrap();
         assert_eq!(r.dump("cilium_ipcache").unwrap().entries.len(), 1);
     }
 
     #[test]
     fn remove_entry_unknown_map_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maps/cmd/dump.go", "RemoveEntry.NotFound", "tenant-bd-renf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/maps/cmd/dump.go",
+            "RemoveEntry.NotFound",
+            "tenant-bd-renf"
+        );
         let mut r = reg(tenant);
         let err = r.remove_entry("ghost", "k").unwrap_err();
         assert!(matches!(err, DumpError::NotFound(_)));
@@ -300,8 +360,10 @@ mod tests {
         let (_c, tenant) = cilium_test_ctx!("pkg/maps/cmd/dump.go", "Dump", "tenant-bd-d");
         let mut r = reg(tenant);
         r.register("cilium_ipcache", BpfMapKind::Ipcache, 100);
-        r.upsert_entry("cilium_ipcache", entry("10.0.0.1", "id=256")).unwrap();
-        r.upsert_entry("cilium_ipcache", entry("10.0.0.2", "id=257")).unwrap();
+        r.upsert_entry("cilium_ipcache", entry("10.0.0.1", "id=256"))
+            .unwrap();
+        r.upsert_entry("cilium_ipcache", entry("10.0.0.2", "id=257"))
+            .unwrap();
         let d = r.dump("cilium_ipcache").unwrap();
         assert_eq!(d.entries.len(), 2);
         assert_eq!(d.kind, BpfMapKind::Ipcache);
@@ -309,7 +371,8 @@ mod tests {
 
     #[test]
     fn dump_unknown_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maps/cmd/dump.go", "Dump.NotFound", "tenant-bd-dnf");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/maps/cmd/dump.go", "Dump.NotFound", "tenant-bd-dnf");
         let r = reg(tenant);
         let err = r.dump("ghost").unwrap_err();
         assert!(matches!(err, DumpError::NotFound(_)));
@@ -333,7 +396,8 @@ mod tests {
         let mut r = reg(tenant);
         r.register("cilium_policy", BpfMapKind::Policy, 100);
         for i in 0..25 {
-            r.upsert_entry("cilium_policy", entry(&format!("k{i}"), "v")).unwrap();
+            r.upsert_entry("cilium_policy", entry(&format!("k{i}"), "v"))
+                .unwrap();
         }
         let m = r.fill_metric("cilium_policy").unwrap();
         assert_eq!(m.used, 25);
@@ -343,7 +407,11 @@ mod tests {
 
     #[test]
     fn fill_metric_unknown_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maps/cmd/dump.go", "FillMetric.NotFound", "tenant-bd-fmnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/maps/cmd/dump.go",
+            "FillMetric.NotFound",
+            "tenant-bd-fmnf"
+        );
         let r = reg(tenant);
         let err = r.fill_metric("ghost").unwrap_err();
         assert!(matches!(err, DumpError::NotFound(_)));
@@ -351,7 +419,11 @@ mod tests {
 
     #[test]
     fn fill_metric_zero_capacity_does_not_divide_by_zero() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maps/cmd/dump.go", "FillMetric.ZeroCap", "tenant-bd-fmzc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/maps/cmd/dump.go",
+            "FillMetric.ZeroCap",
+            "tenant-bd-fmzc"
+        );
         let mut r = reg(tenant);
         r.register("zero", BpfMapKind::Other, 0);
         let m = r.fill_metric("zero").unwrap();
@@ -364,8 +436,12 @@ mod tests {
     fn map_kind_serde_round_trip() {
         let (_c, _t) = cilium_test_ctx!("pkg/maps/cmd/dump.go", "Kind.Serde", "tenant-bd-kserde");
         for k in [
-            BpfMapKind::Endpoints, BpfMapKind::Ipcache, BpfMapKind::Policy,
-            BpfMapKind::CtTcp, BpfMapKind::Lb, BpfMapKind::Auth,
+            BpfMapKind::Endpoints,
+            BpfMapKind::Ipcache,
+            BpfMapKind::Policy,
+            BpfMapKind::CtTcp,
+            BpfMapKind::Lb,
+            BpfMapKind::Auth,
         ] {
             let s = serde_json::to_string(&k).unwrap();
             let back: BpfMapKind = serde_json::from_str(&s).unwrap();
@@ -375,7 +451,8 @@ mod tests {
 
     #[test]
     fn dump_serde_round_trip() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maps/cmd/dump.go", "Dump.Serde", "tenant-bd-dserde");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/maps/cmd/dump.go", "Dump.Serde", "tenant-bd-dserde");
         let mut r = reg(tenant);
         r.register("cilium_policy", BpfMapKind::Policy, 100);
         r.upsert_entry("cilium_policy", entry("k", "v")).unwrap();
@@ -387,8 +464,16 @@ mod tests {
 
     #[test]
     fn fill_metric_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/maps/cmd/dump.go", "FillMetric.Serde", "tenant-bd-fmserde");
-        let m = BpfFillMetric { used: 50, capacity: 100, ratio: 0.5 };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/maps/cmd/dump.go",
+            "FillMetric.Serde",
+            "tenant-bd-fmserde"
+        );
+        let m = BpfFillMetric {
+            used: 50,
+            capacity: 100,
+            ratio: 0.5,
+        };
         let s = serde_json::to_string(&m).unwrap();
         let back: BpfFillMetric = serde_json::from_str(&s).unwrap();
         assert_eq!(back, m);

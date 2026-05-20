@@ -65,8 +65,15 @@ mod tests {
     #[test]
     fn registry_has_all_seven_parsers() {
         let names: Vec<_> = registry().iter().map(|p| p.scan_type()).collect();
-        for expected in ["Bandit Scan", "Trivy Scan", "ZAP Scan", "Semgrep JSON Report",
-                         "SARIF", "Snyk Scan", "Nuclei Scan"] {
+        for expected in [
+            "Bandit Scan",
+            "Trivy Scan",
+            "ZAP Scan",
+            "Semgrep JSON Report",
+            "SARIF",
+            "Snyk Scan",
+            "Nuclei Scan",
+        ] {
             assert!(names.contains(&expected), "missing {expected}");
         }
     }

@@ -134,10 +134,17 @@ impl SearchPlugin {
                     return None;
                 }
                 let boosted = score * (1.0 + d.boost as f64 / 10.0);
-                Some(SearchHit { doc: d.clone(), score: boosted })
+                Some(SearchHit {
+                    doc: d.clone(),
+                    score: boosted,
+                })
             })
             .collect();
-        hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        hits.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         hits.truncate(limit);
         Ok(hits)
     }

@@ -8,7 +8,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, K8sResource};
+use crate::admin::state::{AdminState, K8sResource, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -33,12 +33,17 @@ pub fn list_resources(
         })
         .cloned()
         .collect();
-    rows.sort_by(|a, b| (a.kind.as_str(), a.name.as_str()).cmp(&(b.kind.as_str(), b.name.as_str())));
+    rows.sort_by(|a, b| {
+        (a.kind.as_str(), a.name.as_str()).cmp(&(b.kind.as_str(), b.name.as_str()))
+    });
     Ok(rows)
 }
 
 /// Distinct resource kinds visible to this caller — drives the filter chips.
-pub fn distinct_kinds(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<String>, ApiserverViewError> {
+pub fn distinct_kinds(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<String>, ApiserverViewError> {
     let rows = list_resources(state, ctx, None)?;
     let mut kinds: Vec<String> = rows.iter().map(|r| r.kind.clone()).collect();
     kinds.sort();
@@ -46,7 +51,11 @@ pub fn distinct_kinds(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<String
     Ok(kinds)
 }
 
-pub fn render(state: &AdminState, ctx: &RequestCtx, kind: Option<&str>) -> Result<String, ApiserverViewError> {
+pub fn render(
+    state: &AdminState,
+    ctx: &RequestCtx,
+    kind: Option<&str>,
+) -> Result<String, ApiserverViewError> {
     let rows = list_resources(state, ctx, kind)?;
     let table_rows: Vec<Vec<String>> = rows
         .iter()
@@ -103,7 +112,8 @@ mod tests {
             "acme"
         );
         let state = AdminState::seeded();
-        let rows = list_resources(&state, &ctx(&[Permission::ApiserverRead]), Some("Service")).unwrap();
+        let rows =
+            list_resources(&state, &ctx(&[Permission::ApiserverRead]), Some("Service")).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].name, "web");
     }

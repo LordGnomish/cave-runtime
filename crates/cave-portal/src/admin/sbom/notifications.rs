@@ -5,10 +5,10 @@
 //!
 //! Upstream: <https://dependencytrack.org/docs/integrations/notifications/>
 
+use super::SbomViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
-use super::SbomViewError;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct NotificationRow {
@@ -59,12 +59,14 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SbomViewEr
     let rows = list();
     let table_rows: Vec<Vec<String>> = rows
         .iter()
-        .map(|r| vec![
-            r.publisher.to_string(),
-            if r.enabled { "yes" } else { "no" }.to_string(),
-            r.events.join(", "),
-            r.min_level.to_string(),
-        ])
+        .map(|r| {
+            vec![
+                r.publisher.to_string(),
+                if r.enabled { "yes" } else { "no" }.to_string(),
+                r.events.join(", "),
+                r.min_level.to_string(),
+            ]
+        })
         .collect();
     let body = format!(
         r#"<section>
@@ -73,7 +75,10 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SbomViewEr
   {tbl}
 </section>"#,
         n = rows.len(),
-        tbl = table(&["publisher", "enabled", "events", "min_level"], &table_rows),
+        tbl = table(
+            &["publisher", "enabled", "events", "min_level"],
+            &table_rows
+        ),
     );
     Ok(page_shell_full(
         ctx,
@@ -86,7 +91,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SbomViewEr
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
+    fn ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer("acme", perms)
+    }
 
     #[test]
     fn list_includes_five_publishers() {

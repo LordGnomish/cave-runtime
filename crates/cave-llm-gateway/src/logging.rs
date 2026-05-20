@@ -5,8 +5,8 @@
 use crate::openai::{ChatCompletionRequest, ChatCompletionResponse};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,12 +62,16 @@ impl RequestLogger {
         latency_ms: u64,
         cache_hit: bool,
     ) -> String {
-        let prompt_preview = req.messages.last()
+        let prompt_preview = req
+            .messages
+            .last()
             .and_then(|m| m.content.as_text())
             .map(|t| t.chars().take(200).collect::<String>())
             .unwrap_or_default();
 
-        let response_preview = resp.choices.first()
+        let response_preview = resp
+            .choices
+            .first()
             .and_then(|c| c.message.as_ref())
             .and_then(|m| m.content.as_text())
             .map(|t| t.chars().take(200).collect::<String>())
@@ -81,7 +85,11 @@ impl RequestLogger {
             input_tokens: resp.usage.prompt_tokens,
             output_tokens: resp.usage.completion_tokens,
             latency_ms,
-            status: if cache_hit { LogStatus::CacheHit } else { LogStatus::Success },
+            status: if cache_hit {
+                LogStatus::CacheHit
+            } else {
+                LogStatus::Success
+            },
             error: None,
             timestamp_ms: chrono::Utc::now().timestamp_millis(),
             prompt_preview,
@@ -149,7 +157,9 @@ impl RequestLogger {
     }
 
     pub fn list_for_consumer(&self, consumer: &str, limit: usize) -> Vec<RequestLog> {
-        let mut logs: Vec<RequestLog> = self.logs.iter()
+        let mut logs: Vec<RequestLog> = self
+            .logs
+            .iter()
             .filter(|e| e.value().consumer == consumer)
             .map(|e| e.value().clone())
             .collect();
@@ -159,7 +169,10 @@ impl RequestLogger {
     }
 
     pub fn consumer_request_count(&self, consumer: &str) -> u64 {
-        self.counter.get(consumer).map(|c| c.load(Ordering::Relaxed)).unwrap_or(0)
+        self.counter
+            .get(consumer)
+            .map(|c| c.load(Ordering::Relaxed))
+            .unwrap_or(0)
     }
 }
 
@@ -178,10 +191,20 @@ mod tests {
         ChatCompletionRequest {
             model: "gpt-4o".into(),
             messages: vec![ChatMessage::user("what is rust?")],
-            temperature: None, top_p: None, max_tokens: None, stream: None,
-            stop: None, presence_penalty: None, frequency_penalty: None,
-            n: None, user: None, tools: None, tool_choice: None,
-            response_format: None, seed: None, logprobs: None,
+            temperature: None,
+            top_p: None,
+            max_tokens: None,
+            stream: None,
+            stop: None,
+            presence_penalty: None,
+            frequency_penalty: None,
+            n: None,
+            user: None,
+            tools: None,
+            tool_choice: None,
+            response_format: None,
+            seed: None,
+            logprobs: None,
         }
     }
 
@@ -189,7 +212,11 @@ mod tests {
     fn log_success_and_retrieve() {
         let logger = RequestLogger::new(100);
         let req = make_req();
-        let resp = ChatCompletionResponse::simple("gpt-4o", "Rust is a systems language".into(), Usage::new(10, 20));
+        let resp = ChatCompletionResponse::simple(
+            "gpt-4o",
+            "Rust is a systems language".into(),
+            Usage::new(10, 20),
+        );
         let id = logger.log_success("alice", "openai", &req, &resp, 250, false);
         let log = logger.get(&id).unwrap();
         assert_eq!(log.consumer, "alice");

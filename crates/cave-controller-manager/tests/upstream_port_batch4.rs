@@ -21,13 +21,13 @@
 //! Each `#[test]` carries an `Upstream:` doc-comment with the upstream
 //! path + symbol it asserts on, per Charter v2 traceability.
 
-use cave_controller_manager::cronjob::{next_schedule_time, CronJobSpec, ScheduleError};
+use cave_controller_manager::cronjob::{CronJobSpec, ScheduleError, next_schedule_time};
 use cave_controller_manager::deployment::{
-    compute_conditions, DeploymentSpec, DeploymentStatus, RolloutConditionStatus,
-    RolloutConditionType, RolloutReason, Strategy,
+    DeploymentSpec, DeploymentStatus, RolloutConditionStatus, RolloutConditionType, RolloutReason,
+    Strategy, compute_conditions,
 };
 use cave_controller_manager::job::{
-    past_active_deadline, reconcile_with_clock as job_reconcile, JobSpec, JobStatus,
+    JobSpec, JobStatus, past_active_deadline, reconcile_with_clock as job_reconcile,
 };
 use cave_controller_manager::types::{Reconcile, TenantId};
 use chrono::{Duration, TimeZone, Utc};
@@ -154,10 +154,7 @@ fn upstream_deployment_progress_one_second_past_deadline_times_out() {
         .find(|c| c.kind == RolloutConditionType::Progressing)
         .expect("Progressing condition present");
     assert_eq!(progressing.status, RolloutConditionStatus::False);
-    assert_eq!(
-        progressing.reason,
-        RolloutReason::ProgressDeadlineExceeded
-    );
+    assert_eq!(progressing.reason, RolloutReason::ProgressDeadlineExceeded);
 }
 
 /// Upstream: pkg/controller/deployment/progress_test.go::TestSyncRolloutStatus
@@ -374,7 +371,10 @@ fn upstream_cronjob_next_schedule_top_of_hour_when_just_past() {
     let spec = cron("0 * * * *");
     let now = Utc.with_ymd_and_hms(2026, 5, 14, 12, 0, 2).unwrap();
     let next = next_schedule_time(&spec.schedule, None, now).unwrap();
-    assert_eq!(next, Some(Utc.with_ymd_and_hms(2026, 5, 14, 12, 0, 0).unwrap()));
+    assert_eq!(
+        next,
+        Some(Utc.with_ymd_and_hms(2026, 5, 14, 12, 0, 0).unwrap())
+    );
 }
 
 /// Upstream: utils_test.go::TestMostRecentScheduleTime case 1 — `0 * * * *`,
@@ -409,7 +409,10 @@ fn upstream_cronjob_step_field_returns_most_recent_multiple() {
     let spec = cron("*/5 * * * *");
     let now = Utc.with_ymd_and_hms(2026, 5, 14, 12, 7, 30).unwrap();
     let next = next_schedule_time(&spec.schedule, None, now).unwrap();
-    assert_eq!(next, Some(Utc.with_ymd_and_hms(2026, 5, 14, 12, 5, 0).unwrap()));
+    assert_eq!(
+        next,
+        Some(Utc.with_ymd_and_hms(2026, 5, 14, 12, 5, 0).unwrap())
+    );
 }
 
 /// Upstream: utils_test.go — `30 10,11,12 * * 1-5` list of hours,
@@ -421,7 +424,10 @@ fn upstream_cronjob_list_and_range_resolves_within_day() {
     // 2026-05-11 is a Monday; 12:30 fires on the list.
     let now = Utc.with_ymd_and_hms(2026, 5, 11, 12, 35, 0).unwrap();
     let next = next_schedule_time(&spec.schedule, None, now).unwrap();
-    assert_eq!(next, Some(Utc.with_ymd_and_hms(2026, 5, 11, 12, 30, 0).unwrap()));
+    assert_eq!(
+        next,
+        Some(Utc.with_ymd_and_hms(2026, 5, 11, 12, 30, 0).unwrap())
+    );
 }
 
 /// Upstream: cronjob_controllerv2_test.go::TestSyncCronJob — when the
@@ -442,7 +448,10 @@ fn upstream_cronjob_does_not_fire_when_no_schedule_passed() {
 fn upstream_cronjob_whitespace_tolerant_parsing() {
     let now = Utc.with_ymd_and_hms(2026, 5, 14, 12, 7, 30).unwrap();
     let next = next_schedule_time("*/5  *   *  *  *", None, now).unwrap();
-    assert_eq!(next, Some(Utc.with_ymd_and_hms(2026, 5, 14, 12, 5, 0).unwrap()));
+    assert_eq!(
+        next,
+        Some(Utc.with_ymd_and_hms(2026, 5, 14, 12, 5, 0).unwrap())
+    );
 }
 
 /// Upstream: utils.go — non-numeric / unparseable field → InvalidField.

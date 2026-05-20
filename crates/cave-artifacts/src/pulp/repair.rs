@@ -40,11 +40,7 @@ impl RepairReport {
 }
 
 /// Enqueue a repair task.
-pub fn enqueue_repair(
-    repo_version_href: &str,
-    options: &RepairOptions,
-    queue: &TaskQueue,
-) -> Task {
+pub fn enqueue_repair(repo_version_href: &str, options: &RepairOptions, queue: &TaskQueue) -> Task {
     let task = queue.enqueue("pulp.tasks.repair");
     tracing::info!(
         repo_version = %repo_version_href,
@@ -82,7 +78,10 @@ pub fn check_artifact(artifact: &Artifact, data: Option<&[u8]>) -> ArtifactCheck
 pub enum ArtifactCheck {
     Ok,
     Missing,
-    Corrupted { expected_sha256: String, actual_size: u64 },
+    Corrupted {
+        expected_sha256: String,
+        actual_size: u64,
+    },
 }
 
 impl ArtifactCheck {
@@ -95,8 +94,8 @@ impl ArtifactCheck {
 mod tests {
     use super::*;
     use crate::pulp::models::Artifact;
-    use uuid::Uuid;
     use chrono::Utc;
+    use uuid::Uuid;
 
     fn make_artifact(size: u64, sha256: &str) -> Artifact {
         let id = Uuid::new_v4();

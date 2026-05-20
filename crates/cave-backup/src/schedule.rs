@@ -60,9 +60,9 @@ mod tests {
 
     #[test]
     fn validate_cron_rejects_wrong_field_count() {
-        assert!(!validate_cron("* * * *"));         // 4 fields
-        assert!(!validate_cron("* * * * * *"));     // 6 fields
-        assert!(!validate_cron(""));                // 0 fields
+        assert!(!validate_cron("* * * *")); // 4 fields
+        assert!(!validate_cron("* * * * * *")); // 6 fields
+        assert!(!validate_cron("")); // 0 fields
         assert!(!validate_cron("0 0 * * * extra")); // 6 fields
     }
 

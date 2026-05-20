@@ -8,21 +8,17 @@
 //! audit logs, labels, P2P preheat, LDAP/OIDC config, system info, GC.
 
 use axum::{
+    Router,
     extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Json, Response},
     routing::{get, post, put},
-    Router,
 };
 use chrono::Utc;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::harbor::{
-    gc::run_gc,
-    harbor::*,
-    RegistryState,
-};
+use crate::harbor::{RegistryState, gc::run_gc, harbor::*};
 
 // ── Router ────────────────────────────────────────────────────────────────────
 
@@ -210,10 +206,19 @@ async fn update_project(
     Path(project_name): Path<String>,
     Json(req): Json<UpdateProjectRequest>,
 ) -> Response {
-    match state.projects.update(&project_name, req.public, req.description, req.metadata) {
+    match state
+        .projects
+        .update(&project_name, req.public, req.description, req.metadata)
+    {
         Ok(_) => StatusCode::OK.into_response(),
-        Err(crate::harbor::project_store::ProjectError::NotFound(_)) => StatusCode::NOT_FOUND.into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(crate::harbor::project_store::ProjectError::NotFound(_)) => {
+            StatusCode::NOT_FOUND.into_response()
+        }
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -290,9 +295,10 @@ async fn create_robot(
     Json(req): Json<CreateRobotRequest>,
 ) -> impl IntoResponse {
     let now = Utc::now();
-    let expires_at = req.duration.filter(|&d| d > 0).map(|d| {
-        now + chrono::Duration::days(d)
-    });
+    let expires_at = req
+        .duration
+        .filter(|&d| d > 0)
+        .map(|d| now + chrono::Duration::days(d));
     let resp = CreateRobotResponse {
         id: Uuid::new_v4(),
         name: format!("robot${}+{}", project_name, req.name),

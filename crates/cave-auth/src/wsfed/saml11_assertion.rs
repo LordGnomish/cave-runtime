@@ -105,7 +105,9 @@ impl Saml11Assertion {
             ns = NS_SAML_1_1,
             aid = xml_escape_attr(&self.assertion_id),
             iss = xml_escape_attr(&self.issuer),
-            iat = self.issue_instant.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+            iat = self
+                .issue_instant
+                .to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
         )
         .map_err(|e| WsFedError::Parse(format!("fmt: {e}")))?;
 
@@ -113,8 +115,12 @@ impl Saml11Assertion {
         write!(
             out,
             "<saml:Conditions NotBefore=\"{nb}\" NotOnOrAfter=\"{nooa}\">",
-            nb = self.not_before.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-            nooa = self.not_on_or_after.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+            nb = self
+                .not_before
+                .to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+            nooa = self
+                .not_on_or_after
+                .to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
         )
         .unwrap();
         if let Some(aud) = &self.audience {
@@ -162,8 +168,12 @@ impl Saml11Assertion {
                 )
                 .unwrap();
                 for v in values {
-                    write!(out, "<saml:AttributeValue>{v}</saml:AttributeValue>", v = xml_escape(v))
-                        .unwrap();
+                    write!(
+                        out,
+                        "<saml:AttributeValue>{v}</saml:AttributeValue>",
+                        v = xml_escape(v)
+                    )
+                    .unwrap();
                 }
                 out.push_str("</saml:Attribute>");
             }
@@ -188,8 +198,8 @@ fn xml_escape_attr(s: &str) -> String {
 /// Parse the subset of SAML 1.1 we emit — enough for round-trip tests
 /// and for the RSTR consumer to lift attributes back out.
 pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
-    use quick_xml::events::Event;
     use quick_xml::Reader;
+    use quick_xml::events::Event;
 
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
@@ -325,7 +335,8 @@ pub fn parse_minimal(xml: &str) -> Result<Saml11Assertion, WsFedError> {
                     "AttributeValue" => in_attr_value = false,
                     "Attribute" => {
                         if let Some(n) = current_attr_name.take() {
-                            a.attributes.insert(n, std::mem::take(&mut current_attr_values));
+                            a.attributes
+                                .insert(n, std::mem::take(&mut current_attr_values));
                         }
                     }
                     _ => {}
@@ -484,7 +495,10 @@ mod tests {
             parsed.attributes.get("group").map(|v| v.as_slice()),
             Some(&["admins".to_string(), "engineers".to_string()][..])
         );
-        assert_eq!(parsed.attributes.get("name").map(|v| v.as_slice()), Some(&["Alice Cooper".to_string()][..]));
+        assert_eq!(
+            parsed.attributes.get("name").map(|v| v.as_slice()),
+            Some(&["Alice Cooper".to_string()][..])
+        );
     }
 
     #[test]
@@ -492,7 +506,10 @@ mod tests {
         let a = fixture();
         let xml = a.to_xml().unwrap();
         let parsed = parse_minimal(&xml).unwrap();
-        assert_eq!(parsed.audience.as_deref(), Some("urn:example:relying-party"));
+        assert_eq!(
+            parsed.audience.as_deref(),
+            Some("urn:example:relying-party")
+        );
     }
 
     #[test]

@@ -20,7 +20,7 @@ use async_trait::async_trait;
 pub trait Transaction: Send + Sync {
     async fn commit(self: Box<Self>) -> Result<(), crate::persistence::backend::PersistenceError>;
     async fn rollback(self: Box<Self>)
-        -> Result<(), crate::persistence::backend::PersistenceError>;
+    -> Result<(), crate::persistence::backend::PersistenceError>;
     /// Inspection helper for in-memory backend tests; SQL backends may
     /// return `None`.
     fn is_in_memory(&self) -> bool {

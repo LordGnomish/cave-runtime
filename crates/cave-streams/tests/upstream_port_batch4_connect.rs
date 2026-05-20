@@ -15,16 +15,12 @@
 
 use std::collections::BTreeMap;
 
-use cave_streams::connect_worker::distributed_herder::{
-    DistributedHerder, HerderState, MemberId,
-};
+use cave_streams::connect_worker::distributed_herder::{DistributedHerder, HerderState, MemberId};
 use cave_streams::connect_worker::kafka_offset_backing_store::{
     KafkaOffsetBackingStore, OffsetRecord, RecordLog,
 };
 use cave_streams::connect_worker::offset_store::{OffsetBackingStore, OffsetKey, OffsetValue};
-use cave_streams::connect_worker::standalone_herder::{
-    HerderError, StandaloneHerder, TargetState,
-};
+use cave_streams::connect_worker::standalone_herder::{HerderError, StandaloneHerder, TargetState};
 use cave_streams::connect_worker::task_runtime::TaskKind;
 use cave_streams::tiered_storage::{
     InMemoryRemoteLogMetadataManager, InMemoryRemoteStorageManager, RemoteIndexCache,
@@ -136,7 +132,10 @@ fn upstream_standalone_patch_connector_config_merges_keys() {
     patch.insert("topics".into(), "orders,refunds".into());
     h.patch_connector_config("jdbc", patch).unwrap();
     let cfg = h.connector_config("jdbc").unwrap();
-    assert_eq!(cfg.get("topics").map(|s| s.as_str()), Some("orders,refunds"));
+    assert_eq!(
+        cfg.get("topics").map(|s| s.as_str()),
+        Some("orders,refunds")
+    );
     assert_eq!(
         cfg.get("connector.class").map(|s| s.as_str()),
         Some("...JdbcSource")
@@ -147,7 +146,9 @@ fn upstream_standalone_patch_connector_config_merges_keys() {
 #[test]
 fn upstream_standalone_patch_unknown_returns_not_found() {
     let mut h = StandaloneHerder::new();
-    let err = h.patch_connector_config("nope", BTreeMap::new()).unwrap_err();
+    let err = h
+        .patch_connector_config("nope", BTreeMap::new())
+        .unwrap_err();
     assert!(matches!(err, HerderError::NotFound(_)));
 }
 
@@ -175,10 +176,7 @@ fn upstream_standalone_alter_offsets_requires_stopped_state() {
     let err = h
         .alter_connector_offsets("jdbc", vec![(BTreeMap::new(), Some(BTreeMap::new()))])
         .unwrap_err();
-    assert!(
-        matches!(err, HerderError::IllegalState(_)),
-        "got {err:?}"
-    );
+    assert!(matches!(err, HerderError::IllegalState(_)), "got {err:?}");
 }
 
 /// Upstream: `StandaloneHerderTest.testAlterConnectorOffsets`.
@@ -204,10 +202,7 @@ fn upstream_standalone_alter_offsets_succeeds_when_stopped() {
 fn upstream_standalone_put_task_configs_unsupported() {
     let mut h = StandaloneHerder::new();
     let err = h.put_task_configs("jdbc", vec![]).unwrap_err();
-    assert!(
-        matches!(err, HerderError::Unsupported(_)),
-        "got {err:?}"
-    );
+    assert!(matches!(err, HerderError::Unsupported(_)), "got {err:?}");
 }
 
 /// Upstream: `StandaloneHerderTest.testAccessors`.
@@ -251,9 +246,7 @@ fn upstream_distributed_assign_distributes_tasks_rendezvous() {
     let mut h = DistributedHerder::new();
     h.join("w1".into());
     h.join("w2".into());
-    h.register_tasks(&[
-        "c:0", "c:1", "c:2", "c:3",
-    ]);
+    h.register_tasks(&["c:0", "c:1", "c:2", "c:3"]);
     h.assign();
     let owners = h.assignment();
     // Both members should own at least one task — rendezvous
@@ -368,8 +361,14 @@ fn upstream_kafka_offset_store_replay_empty_returns_empty() {
 #[test]
 fn upstream_kafka_offset_store_replay_rebuilds_map_from_records() {
     let mut log = RecordLog::new();
-    log.append(OffsetRecord::put(offset_key("jdbc", "a"), offset_value("1")));
-    log.append(OffsetRecord::put(offset_key("jdbc", "b"), offset_value("2")));
+    log.append(OffsetRecord::put(
+        offset_key("jdbc", "a"),
+        offset_value("1"),
+    ));
+    log.append(OffsetRecord::put(
+        offset_key("jdbc", "b"),
+        offset_value("2"),
+    ));
     let store = KafkaOffsetBackingStore::new(log);
     assert_eq!(store.get(&offset_key("jdbc", "a")), Some(offset_value("1")));
     assert_eq!(store.get(&offset_key("jdbc", "b")), Some(offset_value("2")));
@@ -379,7 +378,10 @@ fn upstream_kafka_offset_store_replay_rebuilds_map_from_records() {
 #[test]
 fn upstream_kafka_offset_store_replay_tombstone_deletes_key() {
     let mut log = RecordLog::new();
-    log.append(OffsetRecord::put(offset_key("jdbc", "a"), offset_value("1")));
+    log.append(OffsetRecord::put(
+        offset_key("jdbc", "a"),
+        offset_value("1"),
+    ));
     log.append(OffsetRecord::tombstone(offset_key("jdbc", "a")));
     let store = KafkaOffsetBackingStore::new(log);
     assert!(store.get(&offset_key("jdbc", "a")).is_none());
@@ -390,7 +392,10 @@ fn upstream_kafka_offset_store_replay_tombstone_deletes_key() {
 fn upstream_kafka_offset_store_commit_appends_and_reads() {
     let mut store = KafkaOffsetBackingStore::new(RecordLog::new());
     store.commit(offset_key("jdbc", "x"), offset_value("100"));
-    assert_eq!(store.get(&offset_key("jdbc", "x")), Some(offset_value("100")));
+    assert_eq!(
+        store.get(&offset_key("jdbc", "x")),
+        Some(offset_value("100"))
+    );
 }
 
 // ── Tiered Storage ───────────────────────────────────────────────────────────
@@ -427,7 +432,8 @@ fn upstream_tiered_remote_log_mgr_copy_emits_metadata() {
     let rmm = InMemoryRemoteLogMetadataManager::new();
     let mut mgr = RemoteLogManager::new(Box::new(rsm), Box::new(rmm));
     let m = metadata_for("orders", 0, 0, 100);
-    mgr.copy_log_segment(m.clone(), b"segment-bytes".to_vec()).unwrap();
+    mgr.copy_log_segment(m.clone(), b"segment-bytes".to_vec())
+        .unwrap();
     let listed = mgr
         .list_segments(&topic_id_partition("orders", 0))
         .collect::<Vec<_>>();
@@ -462,9 +468,7 @@ fn upstream_tiered_remote_log_mgr_retention_removes_old() {
     mgr.copy_log_segment(m1, b"y".to_vec()).unwrap();
     let removed = mgr.apply_retention(&topic_id_partition("orders", 0), 100);
     assert_eq!(removed.len(), 1);
-    let remaining = mgr
-        .list_segments(&topic_id_partition("orders", 0))
-        .count();
+    let remaining = mgr.list_segments(&topic_id_partition("orders", 0)).count();
     assert_eq!(remaining, 1);
 }
 

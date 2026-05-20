@@ -43,18 +43,17 @@ pub fn matches_policy(policy: &Policy, resource: &Resource, operation: Operation
 /// message if the rule is violated, or `None` if it passes.
 pub fn evaluate_validation_rule(rule: &PolicyRule, resource: &Resource) -> Option<String> {
     match rule {
-        PolicyRule::RequiredLabel { key, allowed_values } => {
-            match resource.metadata.labels.get(key) {
-                None => Some(format!("Required label '{}' is missing", key)),
-                Some(v) if !allowed_values.is_empty() && !allowed_values.contains(v) => Some(
-                    format!(
-                        "Label '{}' has disallowed value '{}'; allowed: {:?}",
-                        key, v, allowed_values
-                    ),
-                ),
-                _ => None,
-            }
-        }
+        PolicyRule::RequiredLabel {
+            key,
+            allowed_values,
+        } => match resource.metadata.labels.get(key) {
+            None => Some(format!("Required label '{}' is missing", key)),
+            Some(v) if !allowed_values.is_empty() && !allowed_values.contains(v) => Some(format!(
+                "Label '{}' has disallowed value '{}'; allowed: {:?}",
+                key, v, allowed_values
+            )),
+            _ => None,
+        },
         PolicyRule::RequiredAnnotation { key } => {
             if resource.metadata.annotations.contains_key(key) {
                 None
@@ -222,7 +221,12 @@ pub fn evaluate_policy(
     // Audit mode: record violations but still allow the request.
     let allowed = violations.is_empty() || policy.audit_mode;
 
-    AdmissionResult { allowed, violations, mutations, generated_resources }
+    AdmissionResult {
+        allowed,
+        violations,
+        mutations,
+        generated_resources,
+    }
 }
 
 /// Evaluate all matching policies against a resource, merging results.

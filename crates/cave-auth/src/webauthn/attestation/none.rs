@@ -17,9 +17,7 @@ pub fn parse(stmt: &Value) -> Result<(), WebAuthnError> {
         Value::Map(_) => Err(WebAuthnError::Attestation(
             "none attStmt must be empty map".into(),
         )),
-        _ => Err(WebAuthnError::Attestation(
-            "none attStmt not a map".into(),
-        )),
+        _ => Err(WebAuthnError::Attestation("none attStmt not a map".into())),
     }
 }
 

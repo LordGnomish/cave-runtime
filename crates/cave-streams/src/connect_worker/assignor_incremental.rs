@@ -131,10 +131,7 @@ impl IncrementalConnectAssignor {
 
     /// Seed previous-generation assignments — used after a restart
     /// or by tests to inject specific state.
-    pub fn seed_previous(
-        &mut self,
-        previous: BTreeMap<MemberId, PreviousAssignment>,
-    ) {
+    pub fn seed_previous(&mut self, previous: BTreeMap<MemberId, PreviousAssignment>) {
         self.previous = previous;
     }
 
@@ -191,7 +188,10 @@ impl IncrementalConnectAssignor {
             let p_owner = prev_owner.get(unit).copied();
             match (p_owner, picked) {
                 (Some(prev), Some(new)) if prev == &new && alive.contains(prev) => {
-                    final_per.entry(prev.clone()).or_default().insert(unit.clone());
+                    final_per
+                        .entry(prev.clone())
+                        .or_default()
+                        .insert(unit.clone());
                 }
                 (Some(prev), Some(_new)) if alive.contains(prev) => {
                     // Owner alive but rendezvous moved → revoke from
@@ -224,7 +224,10 @@ impl IncrementalConnectAssignor {
         // Place every unit in to_place via rendezvous-hash.
         for unit in to_place {
             if let Some(owner) = rendezvous_pick(members, &unit) {
-                assigned_per.entry(owner.clone()).or_default().insert(unit.clone());
+                assigned_per
+                    .entry(owner.clone())
+                    .or_default()
+                    .insert(unit.clone());
                 final_per.entry(owner).or_default().insert(unit);
             }
         }
@@ -238,14 +241,18 @@ impl IncrementalConnectAssignor {
                 .iter()
                 .map(|m| (m.clone(), final_per.get(m).map(|s| s.len()).unwrap_or(0)))
                 .collect();
-            let max = load.iter().max_by_key(|(_, v)| **v).map(|(m, v)| (m.clone(), *v));
-            let min = load.iter().min_by_key(|(_, v)| **v).map(|(m, v)| (m.clone(), *v));
+            let max = load
+                .iter()
+                .max_by_key(|(_, v)| **v)
+                .map(|(m, v)| (m.clone(), *v));
+            let min = load
+                .iter()
+                .min_by_key(|(_, v)| **v)
+                .map(|(m, v)| (m.clone(), *v));
             match (max, min) {
                 (Some((hi, h)), Some((lo, l))) if h > l + 1 && hi != lo => {
                     // Donate the alphabetically-first unit.
-                    let pick = final_per
-                        .get(&hi)
-                        .and_then(|s| s.iter().next().cloned());
+                    let pick = final_per.get(&hi).and_then(|s| s.iter().next().cloned());
                     if let Some(u) = pick {
                         final_per.entry(hi.clone()).and_modify(|s| {
                             s.remove(&u);
@@ -264,7 +271,10 @@ impl IncrementalConnectAssignor {
                             // record an honest revocation.
                             revoked_per.entry(hi.clone()).or_default().insert(u.clone());
                         }
-                        assigned_per.entry(lo.clone()).or_default().insert(u.clone());
+                        assigned_per
+                            .entry(lo.clone())
+                            .or_default()
+                            .insert(u.clone());
                         final_per.entry(lo).or_default().insert(u);
                     } else {
                         break;
@@ -410,7 +420,10 @@ mod tests {
         a.assign(&ms(&["w1", "w2"]), &desired, 0);
         // Delay window already elapsed.
         let d2 = a.assign(&ms(&["w1"]), &desired, 10_000);
-        assert!(d2.deferred.is_empty(), "after delay everything must be reassigned");
+        assert!(
+            d2.deferred.is_empty(),
+            "after delay everything must be reassigned"
+        );
         let w1 = &d2.per_worker[&MemberId::from("w1")];
         assert_eq!(w1.final_set.len(), 4);
     }
@@ -481,11 +494,7 @@ mod tests {
         let mut a = IncrementalConnectAssignor::new();
         let desired = set((0..10).map(|i| task("c", i)).collect());
         let d = a.assign(&ms(&["w1", "w2", "w3"]), &desired, 0);
-        let counts: Vec<usize> = d
-            .per_worker
-            .values()
-            .map(|r| r.final_set.len())
-            .collect();
+        let counts: Vec<usize> = d.per_worker.values().map(|r| r.final_set.len()).collect();
         let max = *counts.iter().max().unwrap();
         let min = *counts.iter().min().unwrap();
         assert!(max - min <= 1, "expected imbalance ≤1, got {counts:?}");

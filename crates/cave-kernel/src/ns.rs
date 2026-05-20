@@ -49,8 +49,12 @@ impl TenantId {
         Ok(Self(s))
     }
 
-    pub fn as_str(&self) -> &str { &self.0 }
-    pub fn into_inner(self) -> String { self.0 }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+    pub fn into_inner(self) -> String {
+        self.0
+    }
 }
 
 impl fmt::Display for TenantId {
@@ -60,7 +64,9 @@ impl fmt::Display for TenantId {
 }
 
 impl AsRef<str> for TenantId {
-    fn as_ref(&self) -> &str { &self.0 }
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
 }
 
 impl FromStr for TenantId {
@@ -100,7 +106,10 @@ pub struct TenantScope {
 
 impl TenantScope {
     pub fn new(tenant: TenantId) -> Self {
-        Self { tenant, namespace: None }
+        Self {
+            tenant,
+            namespace: None,
+        }
     }
 
     pub fn with_namespace(mut self, ns: impl Into<String>) -> Self {
@@ -122,13 +131,19 @@ mod tests {
 
     #[test]
     fn rejects_empty() {
-        assert_eq!("".parse::<TenantId>().unwrap_err(), TenantError::BadLength(0));
+        assert_eq!(
+            "".parse::<TenantId>().unwrap_err(),
+            TenantError::BadLength(0)
+        );
     }
 
     #[test]
     fn rejects_too_long() {
         let s = "a".repeat(64);
-        assert_eq!(s.parse::<TenantId>().unwrap_err(), TenantError::BadLength(64));
+        assert_eq!(
+            s.parse::<TenantId>().unwrap_err(),
+            TenantError::BadLength(64)
+        );
     }
 
     #[test]
@@ -145,12 +160,18 @@ mod tests {
 
     #[test]
     fn rejects_leading_dash() {
-        assert_eq!("-acme".parse::<TenantId>().unwrap_err(), TenantError::BadEdge);
+        assert_eq!(
+            "-acme".parse::<TenantId>().unwrap_err(),
+            TenantError::BadEdge
+        );
     }
 
     #[test]
     fn rejects_trailing_dash() {
-        assert_eq!("acme-".parse::<TenantId>().unwrap_err(), TenantError::BadEdge);
+        assert_eq!(
+            "acme-".parse::<TenantId>().unwrap_err(),
+            TenantError::BadEdge
+        );
     }
 
     #[test]

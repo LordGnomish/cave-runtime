@@ -6,7 +6,7 @@
 //! HTTP routes for cave-dast — ZAP-style REST surface.
 
 use crate::State;
-use axum::{routing::get, Json, Router};
+use axum::{Json, Router, routing::get};
 use std::sync::Arc;
 
 pub fn create_router(state: Arc<State>) -> Router {

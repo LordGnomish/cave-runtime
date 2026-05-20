@@ -28,8 +28,14 @@ pub struct KvValue {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum KvEvent {
-    Put { key: String, value: KvValue },
-    Delete { key: String, prev_value: Option<KvValue> },
+    Put {
+        key: String,
+        value: KvValue,
+    },
+    Delete {
+        key: String,
+        prev_value: Option<KvValue>,
+    },
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -57,7 +63,8 @@ pub struct KvStore {
 impl KvStore {
     pub fn new(tenant: TenantId) -> Self {
         Self {
-            tenant, revision: 0,
+            tenant,
+            revision: 0,
             data: BTreeMap::new(),
             leases: BTreeMap::new(),
             watchers: Vec::new(),
@@ -72,13 +79,22 @@ impl KvStore {
     pub fn put(&mut self, key: impl Into<String>, value: Vec<u8>, lease: Option<u64>) -> KvValue {
         let key = key.into();
         self.revision += 1;
-        let create_rev = self.data.get(&key).map(|v| v.create_revision).unwrap_or(self.revision);
+        let create_rev = self
+            .data
+            .get(&key)
+            .map(|v| v.create_revision)
+            .unwrap_or(self.revision);
         let v = KvValue {
-            value, mod_revision: self.revision,
-            create_revision: create_rev, lease_id: lease,
+            value,
+            mod_revision: self.revision,
+            create_revision: create_rev,
+            lease_id: lease,
         };
         self.data.insert(key.clone(), v.clone());
-        self.fan_out(KvEvent::Put { key, value: v.clone() });
+        self.fan_out(KvEvent::Put {
+            key,
+            value: v.clone(),
+        });
         v
     }
 
@@ -90,13 +106,17 @@ impl KvStore {
         let prev = self.data.remove(key);
         if prev.is_some() {
             self.revision += 1;
-            self.fan_out(KvEvent::Delete { key: key.to_string(), prev_value: prev.clone() });
+            self.fan_out(KvEvent::Delete {
+                key: key.to_string(),
+                prev_value: prev.clone(),
+            });
         }
         prev
     }
 
     pub fn list_prefix(&self, prefix: &str) -> Vec<(String, KvValue)> {
-        self.data.range(prefix.to_string()..)
+        self.data
+            .range(prefix.to_string()..)
             .take_while(|(k, _)| k.starts_with(prefix))
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect()
@@ -126,14 +146,18 @@ impl KvStore {
     /// Reap expired leases and the keys attached to them. Returns the
     /// number of removed keys.
     pub fn revoke_expired(&mut self, now: u64) -> usize {
-        let expired: Vec<u64> = self.leases.iter()
+        let expired: Vec<u64> = self
+            .leases
+            .iter()
             .filter(|(_, &exp)| exp <= now)
             .map(|(&id, _)| id)
             .collect();
         let mut removed = 0;
         for id in expired {
             self.leases.remove(&id);
-            let keys: Vec<String> = self.data.iter()
+            let keys: Vec<String> = self
+                .data
+                .iter()
                 .filter(|(_, v)| v.lease_id == Some(id))
                 .map(|(k, _)| k.clone())
                 .collect();
@@ -214,15 +238,24 @@ impl RemoteClusterStatus {
             (from, to),
             (RemoteClusterState::Connecting, RemoteClusterState::Synced)
                 | (RemoteClusterState::Connecting, RemoteClusterState::Failed)
-                | (RemoteClusterState::Connecting, RemoteClusterState::Disconnected)
+                | (
+                    RemoteClusterState::Connecting,
+                    RemoteClusterState::Disconnected
+                )
                 | (RemoteClusterState::Synced, RemoteClusterState::Failed)
                 | (RemoteClusterState::Synced, RemoteClusterState::Disconnected)
                 | (RemoteClusterState::Synced, RemoteClusterState::Synced)
                 | (RemoteClusterState::Failed, RemoteClusterState::Connecting)
-                | (RemoteClusterState::Disconnected, RemoteClusterState::Connecting)
+                | (
+                    RemoteClusterState::Disconnected,
+                    RemoteClusterState::Connecting
+                )
         );
         if !ok {
-            return Err(KvError::CasMismatch { expected: 0, actual: 0 });
+            return Err(KvError::CasMismatch {
+                expected: 0,
+                actual: 0,
+            });
         }
         self.state = to;
         Ok(())
@@ -270,10 +303,17 @@ pub struct GlobalService {
 }
 
 impl GlobalService {
-    pub fn new(name: impl Into<String>, namespace: impl Into<String>, affinity: ServiceAffinity) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        namespace: impl Into<String>,
+        affinity: ServiceAffinity,
+    ) -> Self {
         Self {
-            name: name.into(), namespace: namespace.into(), affinity,
-            local_endpoints: Vec::new(), remote_endpoints: Vec::new(),
+            name: name.into(),
+            namespace: namespace.into(),
+            affinity,
+            local_endpoints: Vec::new(),
+            remote_endpoints: Vec::new(),
         }
     }
 
@@ -344,7 +384,11 @@ mod tests {
 
     #[test]
     fn kv_create_revision_persists_across_updates() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/kvstore/etcd.go", "Put.CreateRevision", "tenant-kv-crev");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/kvstore/etcd.go",
+            "Put.CreateRevision",
+            "tenant-kv-crev"
+        );
         let mut s = KvStore::new(tenant);
         let v1 = s.put("a", b"1".to_vec(), None);
         let v2 = s.put("a", b"2".to_vec(), None);
@@ -394,13 +438,17 @@ mod tests {
 
     #[test]
     fn kv_cas_fails_on_stale_revision() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/kvstore/etcd.go", "CAS.Stale", "tenant-kv-cas-stale");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/kvstore/etcd.go", "CAS.Stale", "tenant-kv-cas-stale");
         let mut s = KvStore::new(tenant);
         s.put("a", b"1".to_vec(), None);
         s.put("a", b"2".to_vec(), None);
         let err = s.cas("a", 1, b"3".to_vec()).unwrap_err();
         match err {
-            KvError::CasMismatch { expected: 1, actual: 2 } => {}
+            KvError::CasMismatch {
+                expected: 1,
+                actual: 2,
+            } => {}
             other => panic!("unexpected: {other:?}"),
         }
     }
@@ -418,7 +466,8 @@ mod tests {
 
     #[test]
     fn kv_watch_emits_delete_event() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/kvstore/etcd.go", "Watch.Delete", "tenant-kv-w-del");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/kvstore/etcd.go", "Watch.Delete", "tenant-kv-w-del");
         let mut s = KvStore::new(tenant);
         s.put("/cilium/x", b"v".to_vec(), None);
         let w = s.watch("/cilium/");
@@ -430,7 +479,8 @@ mod tests {
 
     #[test]
     fn kv_watch_filters_by_prefix() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/kvstore/etcd.go", "Watch.Filter", "tenant-kv-w-flt");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/kvstore/etcd.go", "Watch.Filter", "tenant-kv-w-flt");
         let mut s = KvStore::new(tenant);
         let w = s.watch("/cilium/identities/");
         s.put("/cilium/identities/256", b"a".to_vec(), None);
@@ -441,7 +491,8 @@ mod tests {
 
     #[test]
     fn kv_lease_expiry_revokes_attached_keys() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/kvstore/etcd.go", "Lease.Revoke", "tenant-kv-lease");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/kvstore/etcd.go", "Lease.Revoke", "tenant-kv-lease");
         let mut s = KvStore::new(tenant);
         let lease = s.grant_lease(60, 100);
         s.put("ephemeral", b"x".to_vec(), Some(lease));
@@ -454,7 +505,11 @@ mod tests {
 
     #[test]
     fn kv_lease_not_expired_keeps_keys() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/kvstore/etcd.go", "Lease.NotExpired", "tenant-kv-lease-ok");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/kvstore/etcd.go",
+            "Lease.NotExpired",
+            "tenant-kv-lease-ok"
+        );
         let mut s = KvStore::new(tenant);
         let lease = s.grant_lease(60, 100);
         s.put("k", b"v".to_vec(), Some(lease));
@@ -465,7 +520,8 @@ mod tests {
 
     #[test]
     fn kv_drain_watch_returns_empty_after_drain() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/kvstore/etcd.go", "Watch.Drain", "tenant-kv-w-drain");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/kvstore/etcd.go", "Watch.Drain", "tenant-kv-w-drain");
         let mut s = KvStore::new(tenant);
         let w = s.watch("/p/");
         s.put("/p/a", b"x".to_vec(), None);
@@ -477,7 +533,11 @@ mod tests {
 
     #[test]
     fn rc_initial_state_is_connecting() {
-        let (_c, _t) = cilium_test_ctx!("pkg/clustermesh/clustermesh.go", "RemoteCluster.Init", "tenant-rc-init");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/clustermesh/clustermesh.go",
+            "RemoteCluster.Init",
+            "tenant-rc-init"
+        );
         let s = RemoteClusterStatus::new("us-east");
         assert_eq!(s.state, RemoteClusterState::Connecting);
         assert!(!s.is_ready());
@@ -485,7 +545,11 @@ mod tests {
 
     #[test]
     fn rc_advances_to_synced() {
-        let (_c, _t) = cilium_test_ctx!("pkg/clustermesh/clustermesh.go", "RemoteCluster.Synced", "tenant-rc-sync");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/clustermesh/clustermesh.go",
+            "RemoteCluster.Synced",
+            "tenant-rc-sync"
+        );
         let mut s = RemoteClusterStatus::new("us-east");
         s.transition(RemoteClusterState::Synced).unwrap();
         assert!(s.is_ready());
@@ -493,7 +557,11 @@ mod tests {
 
     #[test]
     fn rc_advances_to_failed() {
-        let (_c, _t) = cilium_test_ctx!("pkg/clustermesh/clustermesh.go", "RemoteCluster.Failed", "tenant-rc-fail");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/clustermesh/clustermesh.go",
+            "RemoteCluster.Failed",
+            "tenant-rc-fail"
+        );
         let mut s = RemoteClusterStatus::new("us-east");
         s.transition(RemoteClusterState::Failed).unwrap();
         assert!(!s.is_ready());
@@ -501,7 +569,11 @@ mod tests {
 
     #[test]
     fn rc_failed_can_recover_to_connecting() {
-        let (_c, _t) = cilium_test_ctx!("pkg/clustermesh/clustermesh.go", "RemoteCluster.Recover", "tenant-rc-rec");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/clustermesh/clustermesh.go",
+            "RemoteCluster.Recover",
+            "tenant-rc-rec"
+        );
         let mut s = RemoteClusterStatus::new("us-east");
         s.transition(RemoteClusterState::Failed).unwrap();
         s.transition(RemoteClusterState::Connecting).unwrap();
@@ -510,7 +582,11 @@ mod tests {
 
     #[test]
     fn rc_invalid_transition_rejected() {
-        let (_c, _t) = cilium_test_ctx!("pkg/clustermesh/clustermesh.go", "RemoteCluster.BadTransition", "tenant-rc-bad");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/clustermesh/clustermesh.go",
+            "RemoteCluster.BadTransition",
+            "tenant-rc-bad"
+        );
         let mut s = RemoteClusterStatus::new("us-east");
         s.transition(RemoteClusterState::Synced).unwrap();
         // Synced → Connecting is not allowed.
@@ -519,7 +595,11 @@ mod tests {
 
     #[test]
     fn rc_heartbeat_updates_last_seen() {
-        let (_c, _t) = cilium_test_ctx!("pkg/clustermesh/clustermesh.go", "RemoteCluster.Heartbeat", "tenant-rc-hb");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/clustermesh/clustermesh.go",
+            "RemoteCluster.Heartbeat",
+            "tenant-rc-hb"
+        );
         let mut s = RemoteClusterStatus::new("us-east");
         s.heartbeat(1234);
         assert_eq!(s.last_heartbeat, 1234);
@@ -527,7 +607,11 @@ mod tests {
 
     #[test]
     fn rc_check_stale_marks_failed_after_threshold() {
-        let (_c, _t) = cilium_test_ctx!("pkg/clustermesh/clustermesh.go", "RemoteCluster.Stale", "tenant-rc-stale");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/clustermesh/clustermesh.go",
+            "RemoteCluster.Stale",
+            "tenant-rc-stale"
+        );
         let mut s = RemoteClusterStatus::new("us-east");
         s.transition(RemoteClusterState::Synced).unwrap();
         s.heartbeat(100);
@@ -538,7 +622,11 @@ mod tests {
 
     #[test]
     fn rc_check_stale_keeps_synced_within_threshold() {
-        let (_c, _t) = cilium_test_ctx!("pkg/clustermesh/clustermesh.go", "RemoteCluster.NotStale", "tenant-rc-fresh");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/clustermesh/clustermesh.go",
+            "RemoteCluster.NotStale",
+            "tenant-rc-fresh"
+        );
         let mut s = RemoteClusterStatus::new("us-east");
         s.transition(RemoteClusterState::Synced).unwrap();
         s.heartbeat(100);
@@ -548,7 +636,11 @@ mod tests {
 
     #[test]
     fn rc_status_round_trips_serde() {
-        let (_c, _t) = cilium_test_ctx!("pkg/clustermesh/clustermesh.go", "RemoteCluster.Serde", "tenant-rc-serde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/clustermesh/clustermesh.go",
+            "RemoteCluster.Serde",
+            "tenant-rc-serde"
+        );
         let s = RemoteClusterStatus {
             name: "us-east".into(),
             state: RemoteClusterState::Synced,
@@ -566,10 +658,22 @@ mod tests {
 
     #[test]
     fn svc_affinity_local_prefers_local_endpoints() {
-        let (_c, _t) = cilium_test_ctx!("pkg/service/global.go", "Affinity.Local", "tenant-svc-aff-loc");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/service/global.go",
+            "Affinity.Local",
+            "tenant-svc-aff-loc"
+        );
         let mut s = GlobalService::new("api", "default", ServiceAffinity::Local);
-        s.local_endpoints.push(GlobalServiceEndpoint { cluster: "self".into(), address: "10.0.1.1".into(), port: 80 });
-        s.remote_endpoints.push(GlobalServiceEndpoint { cluster: "us-east".into(), address: "10.0.2.1".into(), port: 80 });
+        s.local_endpoints.push(GlobalServiceEndpoint {
+            cluster: "self".into(),
+            address: "10.0.1.1".into(),
+            port: 80,
+        });
+        s.remote_endpoints.push(GlobalServiceEndpoint {
+            cluster: "us-east".into(),
+            address: "10.0.2.1".into(),
+            port: 80,
+        });
         let r = s.resolve();
         assert_eq!(r.len(), 1);
         assert_eq!(r[0].cluster, "self");
@@ -577,9 +681,17 @@ mod tests {
 
     #[test]
     fn svc_affinity_local_falls_back_to_remote_when_no_local() {
-        let (_c, _t) = cilium_test_ctx!("pkg/service/global.go", "Affinity.LocalFallback", "tenant-svc-aff-locf");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/service/global.go",
+            "Affinity.LocalFallback",
+            "tenant-svc-aff-locf"
+        );
         let mut s = GlobalService::new("api", "default", ServiceAffinity::Local);
-        s.remote_endpoints.push(GlobalServiceEndpoint { cluster: "us-east".into(), address: "10.0.2.1".into(), port: 80 });
+        s.remote_endpoints.push(GlobalServiceEndpoint {
+            cluster: "us-east".into(),
+            address: "10.0.2.1".into(),
+            port: 80,
+        });
         let r = s.resolve();
         assert_eq!(r.len(), 1);
         assert_eq!(r[0].cluster, "us-east");
@@ -587,10 +699,22 @@ mod tests {
 
     #[test]
     fn svc_affinity_remote_prefers_remote_endpoints() {
-        let (_c, _t) = cilium_test_ctx!("pkg/service/global.go", "Affinity.Remote", "tenant-svc-aff-rem");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/service/global.go",
+            "Affinity.Remote",
+            "tenant-svc-aff-rem"
+        );
         let mut s = GlobalService::new("api", "default", ServiceAffinity::Remote);
-        s.local_endpoints.push(GlobalServiceEndpoint { cluster: "self".into(), address: "10.0.1.1".into(), port: 80 });
-        s.remote_endpoints.push(GlobalServiceEndpoint { cluster: "us-east".into(), address: "10.0.2.1".into(), port: 80 });
+        s.local_endpoints.push(GlobalServiceEndpoint {
+            cluster: "self".into(),
+            address: "10.0.1.1".into(),
+            port: 80,
+        });
+        s.remote_endpoints.push(GlobalServiceEndpoint {
+            cluster: "us-east".into(),
+            address: "10.0.2.1".into(),
+            port: 80,
+        });
         let r = s.resolve();
         assert_eq!(r.len(), 1);
         assert_eq!(r[0].cluster, "us-east");
@@ -598,18 +722,38 @@ mod tests {
 
     #[test]
     fn svc_affinity_none_returns_all_endpoints() {
-        let (_c, _t) = cilium_test_ctx!("pkg/service/global.go", "Affinity.None", "tenant-svc-aff-none");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/service/global.go",
+            "Affinity.None",
+            "tenant-svc-aff-none"
+        );
         let mut s = GlobalService::new("api", "default", ServiceAffinity::None);
-        s.local_endpoints.push(GlobalServiceEndpoint { cluster: "self".into(), address: "10.0.1.1".into(), port: 80 });
-        s.remote_endpoints.push(GlobalServiceEndpoint { cluster: "us-east".into(), address: "10.0.2.1".into(), port: 80 });
-        s.remote_endpoints.push(GlobalServiceEndpoint { cluster: "eu-west".into(), address: "10.0.3.1".into(), port: 80 });
+        s.local_endpoints.push(GlobalServiceEndpoint {
+            cluster: "self".into(),
+            address: "10.0.1.1".into(),
+            port: 80,
+        });
+        s.remote_endpoints.push(GlobalServiceEndpoint {
+            cluster: "us-east".into(),
+            address: "10.0.2.1".into(),
+            port: 80,
+        });
+        s.remote_endpoints.push(GlobalServiceEndpoint {
+            cluster: "eu-west".into(),
+            address: "10.0.3.1".into(),
+            port: 80,
+        });
         let r = s.resolve();
         assert_eq!(r.len(), 3);
     }
 
     #[test]
     fn svc_global_service_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/service/global.go", "GlobalService.Serde", "tenant-svc-gs-serde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/service/global.go",
+            "GlobalService.Serde",
+            "tenant-svc-gs-serde"
+        );
         let s = GlobalService::new("api", "default", ServiceAffinity::Local);
         let json = serde_json::to_string(&s).unwrap();
         let back: GlobalService = serde_json::from_str(&json).unwrap();
@@ -618,7 +762,11 @@ mod tests {
 
     #[test]
     fn svc_affinity_local_with_no_endpoints_returns_empty() {
-        let (_c, _t) = cilium_test_ctx!("pkg/service/global.go", "Affinity.Empty", "tenant-svc-aff-emp");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/service/global.go",
+            "Affinity.Empty",
+            "tenant-svc-aff-emp"
+        );
         let s = GlobalService::new("api", "default", ServiceAffinity::Local);
         let r = s.resolve();
         assert!(r.is_empty());
@@ -626,9 +774,17 @@ mod tests {
 
     #[test]
     fn svc_affinity_remote_falls_back_to_local() {
-        let (_c, _t) = cilium_test_ctx!("pkg/service/global.go", "Affinity.RemoteFallback", "tenant-svc-aff-remf");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/service/global.go",
+            "Affinity.RemoteFallback",
+            "tenant-svc-aff-remf"
+        );
         let mut s = GlobalService::new("api", "default", ServiceAffinity::Remote);
-        s.local_endpoints.push(GlobalServiceEndpoint { cluster: "self".into(), address: "10.0.1.1".into(), port: 80 });
+        s.local_endpoints.push(GlobalServiceEndpoint {
+            cluster: "self".into(),
+            address: "10.0.1.1".into(),
+            port: 80,
+        });
         let r = s.resolve();
         assert_eq!(r.len(), 1);
         assert_eq!(r[0].cluster, "self");

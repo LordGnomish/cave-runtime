@@ -52,7 +52,7 @@ pub fn escape(input: &str) -> String {
 /// `<h1>{title}</h1>` / `<title>{title} — cave admin</title>` continue
 /// to pass because shell_v2 emits exactly those tags.
 pub fn page_shell(title: &str, body: &str) -> String {
-    use crate::admin::layout::shell::{shell_v2, ShellOptions};
+    use crate::admin::layout::shell::{ShellOptions, shell_v2};
     use crate::admin::permission::Persona;
     shell_v2(ShellOptions {
         title,
@@ -96,7 +96,7 @@ pub fn page_shell_full(
     title: &str,
     body: &str,
 ) -> String {
-    use crate::admin::layout::shell::{shell_v2, ShellOptions};
+    use crate::admin::layout::shell::{ShellOptions, shell_v2};
     shell_v2(ShellOptions {
         title,
         persona: ctx.persona,
@@ -232,7 +232,9 @@ mod tests {
         );
         let html = table_html(
             &["score"],
-            &[vec![r#"<span class="px-2 rounded bg-green-100">92%</span>"#.into()]],
+            &[vec![
+                r#"<span class="px-2 rounded bg-green-100">92%</span>"#.into(),
+            ]],
         );
         // The span survives intact (not double-escaped).
         assert!(html.contains(r#"<span class="px-2 rounded bg-green-100">92%</span>"#));
@@ -256,10 +258,7 @@ mod tests {
             "Table",
             "tenant-render-table"
         );
-        let html = table(
-            &["key", "value"],
-            &[vec!["a&b".into(), r#"<x>"#.into()]],
-        );
+        let html = table(&["key", "value"], &[vec!["a&b".into(), r#"<x>"#.into()]]);
         assert!(html.contains("a&amp;b"));
         assert!(html.contains("&lt;x&gt;"));
         assert!(!html.contains(">a&b<"));

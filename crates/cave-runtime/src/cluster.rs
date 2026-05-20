@@ -7,7 +7,7 @@
 //! namespaces. The actual control-plane processes are started by
 //! `cave-runtime serve` against the same data dir.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use clap::Subcommand;
 use rcgen::{
     BasicConstraints, CertificateParams, DnType, ExtendedKeyUsagePurpose, IsCa, KeyPair,
@@ -209,8 +209,8 @@ pub fn init(
             .with_context(|| format!("read {}", pki_dir.join("ca.crt").display()))?;
         let ca_key_pem = fs::read_to_string(pki_dir.join("ca.key"))
             .with_context(|| format!("read {}", pki_dir.join("ca.key").display()))?;
-        let ca_key = KeyPair::from_pem(&ca_key_pem)
-            .map_err(|e| anyhow!("parse existing ca.key: {e}"))?;
+        let ca_key =
+            KeyPair::from_pem(&ca_key_pem).map_err(|e| anyhow!("parse existing ca.key: {e}"))?;
         let params = CertificateParams::from_ca_cert_pem(&ca_cert_pem)
             .map_err(|e| anyhow!("parse existing ca.crt: {e}"))?;
         let ca_cert = params
@@ -254,7 +254,10 @@ pub fn init(
     fs::write(&kubeconfig_path, kubeconfig)?;
 
     fs::write(manifests_dir.join("rbac.yaml"), default_rbac_yaml())?;
-    fs::write(manifests_dir.join("namespaces.yaml"), default_namespaces_yaml())?;
+    fs::write(
+        manifests_dir.join("namespaces.yaml"),
+        default_namespaces_yaml(),
+    )?;
 
     // Mint a bootstrap token so workers can join.  Stored as a JSON file the
     // production-mode apiserver listener loads on startup.
@@ -329,8 +332,14 @@ pub fn init(
     println!("    {}", bootstrap_token);
     println!();
     println!("Next: cave-runtime --data-dir {} serve", data_dir.display());
-    println!("  └─ cave-etcd will listen on https://{}:2379", advertise_host);
-    println!("  └─ cave-apiserver will listen on https://{}", advertise_address);
+    println!(
+        "  └─ cave-etcd will listen on https://{}:2379",
+        advertise_host
+    );
+    println!(
+        "  └─ cave-apiserver will listen on https://{}",
+        advertise_address
+    );
     Ok(())
 }
 
@@ -344,13 +353,19 @@ fn generate_root_ca(common_name: &str) -> Result<(String, String, rcgen::Certifi
     let key = KeyPair::generate().map_err(|e| anyhow!("ca keypair: {e}"))?;
     let mut params = CertificateParams::default();
     params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
-    params.distinguished_name.push(DnType::CommonName, common_name);
-    params.distinguished_name.push(DnType::OrganizationName, "cave-runtime");
+    params
+        .distinguished_name
+        .push(DnType::CommonName, common_name);
+    params
+        .distinguished_name
+        .push(DnType::OrganizationName, "cave-runtime");
     params.not_before = OffsetDateTime::now_utc();
     params.not_after = OffsetDateTime::now_utc() + Duration::days(3650);
     params.key_usages.push(KeyUsagePurpose::KeyCertSign);
     params.key_usages.push(KeyUsagePurpose::CrlSign);
-    let cert = params.self_signed(&key).map_err(|e| anyhow!("ca self_signed: {e}"))?;
+    let cert = params
+        .self_signed(&key)
+        .map_err(|e| anyhow!("ca self_signed: {e}"))?;
     Ok((cert.pem(), key.serialize_pem(), cert, key))
 }
 
@@ -365,9 +380,10 @@ fn generate_leaf(
     let mut params = CertificateParams::default();
     let cn = format!("system:{}", component);
     params.distinguished_name.push(DnType::CommonName, &cn);
-    params
-        .distinguished_name
-        .push(DnType::OrganizationName, format!("cave-cluster:{}", cluster_name));
+    params.distinguished_name.push(
+        DnType::OrganizationName,
+        format!("cave-cluster:{}", cluster_name),
+    );
     params.not_before = OffsetDateTime::now_utc();
     params.not_after = OffsetDateTime::now_utc() + Duration::days(365);
     params.key_usages.push(KeyUsagePurpose::DigitalSignature);
@@ -562,10 +578,7 @@ pub async fn join(
             .get("status")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown"),
-        msg = parsed
-            .get("message")
-            .and_then(|v| v.as_str())
-            .unwrap_or(""),
+        msg = parsed.get("message").and_then(|v| v.as_str()).unwrap_or(""),
         pin_source = pin_source,
         csr_summary = csr_summary,
     );
@@ -599,8 +612,8 @@ async fn resolve_master_ca(
     cached_path: &Path,
 ) -> Result<(String, &'static str)> {
     if let Some(p) = explicit_ca_bundle {
-        let pem = fs::read_to_string(p)
-            .with_context(|| format!("read --ca-bundle {}", p.display()))?;
+        let pem =
+            fs::read_to_string(p).with_context(|| format!("read --ca-bundle {}", p.display()))?;
         validate_pem_cert(&pem, p)?;
         return Ok((pem, "--ca-bundle"));
     }
@@ -694,8 +707,7 @@ async fn request_kubelet_certificate(
             text.lines().next().unwrap_or("")
         ));
     }
-    let parsed: serde_json::Value =
-        serde_json::from_str(&text).context("parse CSR response")?;
+    let parsed: serde_json::Value = serde_json::from_str(&text).context("parse CSR response")?;
     let signed_pem = parsed
         .get("certificate")
         .and_then(|v| v.as_str())
@@ -715,14 +727,14 @@ async fn request_kubelet_certificate(
 }
 
 fn hostname() -> Option<String> {
-    std::env::var("HOSTNAME")
-        .ok()
-        .or_else(|| std::process::Command::new("hostname")
+    std::env::var("HOSTNAME").ok().or_else(|| {
+        std::process::Command::new("hostname")
             .output()
             .ok()
             .and_then(|o| String::from_utf8(o.stdout).ok())
             .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty()))
+            .filter(|s| !s.is_empty())
+    })
 }
 
 pub async fn status(kubeconfig_path: &Path) -> Result<()> {
@@ -820,7 +832,11 @@ pub async fn status(kubeconfig_path: &Path) -> Result<()> {
         Ok(resp) if resp.status().is_success() => {
             if let Ok(body) = resp.text().await {
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
-                    let count = json.get("items").and_then(|i| i.as_array()).map(|a| a.len()).unwrap_or(0);
+                    let count = json
+                        .get("items")
+                        .and_then(|i| i.as_array())
+                        .map(|a| a.len())
+                        .unwrap_or(0);
                     println!("Nodes:      {}", count);
                 }
             }
@@ -846,7 +862,10 @@ pub fn destroy(data_dir: &Path, force: bool) -> Result<()> {
         ));
     }
     if !data_dir.exists() {
-        println!("Nothing to destroy at {} (already absent).", data_dir.display());
+        println!(
+            "Nothing to destroy at {} (already absent).",
+            data_dir.display()
+        );
         return Ok(());
     }
     let backup = data_dir.with_extension(format!(
@@ -911,7 +930,16 @@ mod tests {
     fn destroy_requires_force() {
         let tmp = TempDir::new().unwrap();
         let dd = tmp.path().join("cluster");
-        init(&dd, "destroy-test", "127.0.0.1:6443", "single", "", 1, false).unwrap();
+        init(
+            &dd,
+            "destroy-test",
+            "127.0.0.1:6443",
+            "single",
+            "",
+            1,
+            false,
+        )
+        .unwrap();
         assert!(destroy(&dd, false).is_err());
         assert!(dd.join("cluster.json").is_file(), "data dir must persist");
         destroy(&dd, true).expect("force destroy");
@@ -944,9 +972,11 @@ mod tests {
         let dd = tmp.path().join("worker");
         // The short-token guard fires before any network call, so this is
         // safe to run without a live master.
-        assert!(join(&dd, "short", "10.0.0.1:6443", "worker-1", None)
-            .await
-            .is_err());
+        assert!(
+            join(&dd, "short", "10.0.0.1:6443", "worker-1", None)
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]

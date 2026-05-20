@@ -122,10 +122,7 @@ mod tests {
 
     #[test]
     fn src_rs_is_impl() {
-        assert_eq!(
-            classify_file("crates/cave-foo/src/lib.rs"),
-            FileKind::Impl
-        );
+        assert_eq!(classify_file("crates/cave-foo/src/lib.rs"), FileKind::Impl);
         assert_eq!(
             classify_file("crates/cave-foo/src/bin/main.rs"),
             FileKind::Impl
@@ -149,10 +146,7 @@ mod tests {
         );
         assert_eq!(classify_file("README.md"), FileKind::NonCode);
         assert_eq!(classify_file("docs/adr/ADR-001.md"), FileKind::NonCode);
-        assert_eq!(
-            classify_file(".github/workflows/ci.yml"),
-            FileKind::NonCode
-        );
+        assert_eq!(classify_file(".github/workflows/ci.yml"), FileKind::NonCode);
     }
 
     #[test]
@@ -165,14 +159,8 @@ mod tests {
 
     #[test]
     fn module_of_crate_path() {
-        assert_eq!(
-            module_of("crates/cave-foo/src/lib.rs"),
-            "crates/cave-foo"
-        );
-        assert_eq!(
-            module_of("crates/cave-foo/tests/bar.rs"),
-            "crates/cave-foo"
-        );
+        assert_eq!(module_of("crates/cave-foo/src/lib.rs"), "crates/cave-foo");
+        assert_eq!(module_of("crates/cave-foo/tests/bar.rs"), "crates/cave-foo");
         assert_eq!(
             module_of("crates/cave-bar-baz/src/inner/m.rs"),
             "crates/cave-bar-baz"

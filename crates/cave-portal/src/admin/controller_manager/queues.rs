@@ -61,10 +61,7 @@ pub(super) fn render_section(
 </section>"#,
         n = rows.len(),
         d = total_depth(&rows),
-        tbl = table(
-            &["controller", "depth", "adds/s", "retries/s"],
-            &table_rows
-        ),
+        tbl = table(&["controller", "depth", "adds/s", "retries/s"], &table_rows),
     ))
 }
 
@@ -87,7 +84,11 @@ mod tests {
         );
         let s = AdminState::seeded();
         let queues = list_queues(&s, &ctx(&[Permission::ControllerManagerRead])).unwrap();
-        let leases = super::super::leader_election::list_leases(&s, &ctx(&[Permission::ControllerManagerRead])).unwrap();
+        let leases = super::super::leader_election::list_leases(
+            &s,
+            &ctx(&[Permission::ControllerManagerRead]),
+        )
+        .unwrap();
         assert_eq!(queues.len(), leases.len());
     }
 

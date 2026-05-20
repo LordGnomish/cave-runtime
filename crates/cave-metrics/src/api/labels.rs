@@ -2,11 +2,14 @@
 // Copyright 2026 Cave Runtime contributors
 //! /api/v1/labels and /api/v1/label/{name}/values
 
-use axum::{extract::{Path, Query, State}, Json};
-use serde::Deserialize;
-use std::sync::Arc;
 use crate::model::LabelMatcher;
 use crate::state::MetricsState;
+use axum::{
+    Json,
+    extract::{Path, Query, State},
+};
+use serde::Deserialize;
+use std::sync::Arc;
 
 #[derive(Debug, Deserialize)]
 pub struct LabelParams {

@@ -50,8 +50,7 @@ fn extract_after(text: &str, needle: &str) -> Option<String> {
 fn assertion_1_workspace_license_is_agpl() {
     let root = workspace_root();
     let cargo = fs::read_to_string(root.join("Cargo.toml")).expect("read root Cargo.toml");
-    let lic = extract_after(&cargo, "\nlicense ")
-        .or_else(|| extract_after(&cargo, "\nlicense="));
+    let lic = extract_after(&cargo, "\nlicense ").or_else(|| extract_after(&cargo, "\nlicense="));
     assert_eq!(
         lic.as_deref(),
         Some("AGPL-3.0-or-later"),
@@ -65,8 +64,7 @@ fn assertion_1_workspace_license_is_agpl() {
 #[test]
 fn assertion_2_source_sha_present_and_non_empty() {
     let m = manifest_text();
-    let sha = extract_after(&m, "\nsource_sha ")
-        .or_else(|| extract_after(&m, "\nsource_sha="));
+    let sha = extract_after(&m, "\nsource_sha ").or_else(|| extract_after(&m, "\nsource_sha="));
     assert!(
         sha.is_some() && !sha.as_deref().unwrap().is_empty(),
         "[parity] source_sha must be set and non-empty (got {:?})",
@@ -167,7 +165,9 @@ fn assertion_7_no_stub_macros_in_src() {
         if !p.extension().map(|e| e == "rs").unwrap_or(false) {
             return;
         }
-        let Ok(text) = fs::read_to_string(p) else { return };
+        let Ok(text) = fs::read_to_string(p) else {
+            return;
+        };
         for (lineno, line) in text.lines().enumerate() {
             let trimmed = line.trim_start();
             if trimmed.starts_with("//") {
@@ -194,8 +194,7 @@ fn assertion_7_no_stub_macros_in_src() {
 #[test]
 fn assertion_8_last_audit_is_today() {
     let m = manifest_text();
-    let when = extract_after(&m, "\nlast_audit ")
-        .or_else(|| extract_after(&m, "\nlast_audit="));
+    let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert_eq!(
         when.as_deref(),
         Some(TODAY),
@@ -258,7 +257,9 @@ fn assertion_9_parity_index_json_consistency() {
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 fn walk(dir: &PathBuf, cb: &mut dyn FnMut(&PathBuf)) {
-    let Ok(entries) = fs::read_dir(dir) else { return };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
     for e in entries.flatten() {
         let p = e.path();
         if p.is_dir() {

@@ -66,7 +66,11 @@ impl CostInsightPlugin {
     }
 
     pub fn total(&self, tenant: &str) -> f64 {
-        self.entries.iter().filter(|e| e.tenant == tenant).map(|e| e.usd).sum()
+        self.entries
+            .iter()
+            .filter(|e| e.tenant == tenant)
+            .map(|e| e.usd)
+            .sum()
     }
 
     pub fn by_category(&self, tenant: &str) -> HashMap<String, f64> {
@@ -109,34 +113,46 @@ mod tests {
     use super::*;
 
     fn entry(t: &str, d: &str, c: &str, u: f64) -> CostEntry {
-        CostEntry { tenant: t.into(), day: d.into(), category: c.into(), usd: u }
+        CostEntry {
+            tenant: t.into(),
+            day: d.into(),
+            category: c.into(),
+            usd: u,
+        }
     }
 
     #[test]
     fn record_valid() {
         let mut p = CostInsightPlugin::new();
-        p.record(entry("acme", "2026-04-26", "compute", 12.5)).unwrap();
+        p.record(entry("acme", "2026-04-26", "compute", 12.5))
+            .unwrap();
         assert_eq!(p.count(), 1);
     }
 
     #[test]
     fn record_negative_rejected() {
         let mut p = CostInsightPlugin::new();
-        let err = p.record(entry("acme", "2026-04-26", "compute", -1.0)).unwrap_err();
+        let err = p
+            .record(entry("acme", "2026-04-26", "compute", -1.0))
+            .unwrap_err();
         assert!(matches!(err, CostError::InvalidAmount(_)));
     }
 
     #[test]
     fn record_nan_rejected() {
         let mut p = CostInsightPlugin::new();
-        let err = p.record(entry("acme", "2026-04-26", "compute", f64::NAN)).unwrap_err();
+        let err = p
+            .record(entry("acme", "2026-04-26", "compute", f64::NAN))
+            .unwrap_err();
         assert!(matches!(err, CostError::InvalidAmount(_)));
     }
 
     #[test]
     fn record_infinite_rejected() {
         let mut p = CostInsightPlugin::new();
-        let err = p.record(entry("acme", "2026-04-26", "compute", f64::INFINITY)).unwrap_err();
+        let err = p
+            .record(entry("acme", "2026-04-26", "compute", f64::INFINITY))
+            .unwrap_err();
         assert!(matches!(err, CostError::InvalidAmount(_)));
     }
 
@@ -164,18 +180,24 @@ mod tests {
     #[test]
     fn total_sums_for_tenant() {
         let mut p = CostInsightPlugin::new();
-        p.record(entry("acme", "2026-04-26", "compute", 10.0)).unwrap();
-        p.record(entry("acme", "2026-04-26", "storage", 5.0)).unwrap();
-        p.record(entry("globex", "2026-04-26", "compute", 100.0)).unwrap();
+        p.record(entry("acme", "2026-04-26", "compute", 10.0))
+            .unwrap();
+        p.record(entry("acme", "2026-04-26", "storage", 5.0))
+            .unwrap();
+        p.record(entry("globex", "2026-04-26", "compute", 100.0))
+            .unwrap();
         assert_eq!(p.total("acme"), 15.0);
     }
 
     #[test]
     fn by_category_sums_per_category() {
         let mut p = CostInsightPlugin::new();
-        p.record(entry("acme", "2026-04-26", "compute", 10.0)).unwrap();
-        p.record(entry("acme", "2026-04-27", "compute", 12.0)).unwrap();
-        p.record(entry("acme", "2026-04-26", "storage", 5.0)).unwrap();
+        p.record(entry("acme", "2026-04-26", "compute", 10.0))
+            .unwrap();
+        p.record(entry("acme", "2026-04-27", "compute", 12.0))
+            .unwrap();
+        p.record(entry("acme", "2026-04-26", "storage", 5.0))
+            .unwrap();
         let by = p.by_category("acme");
         assert_eq!(by["compute"], 22.0);
         assert_eq!(by["storage"], 5.0);
@@ -195,8 +217,10 @@ mod tests {
     #[test]
     fn by_day_sums_within_day() {
         let mut p = CostInsightPlugin::new();
-        p.record(entry("acme", "2026-04-26", "compute", 10.0)).unwrap();
-        p.record(entry("acme", "2026-04-26", "storage", 5.0)).unwrap();
+        p.record(entry("acme", "2026-04-26", "compute", 10.0))
+            .unwrap();
+        p.record(entry("acme", "2026-04-26", "storage", 5.0))
+            .unwrap();
         let series = p.by_day("acme");
         assert_eq!(series.len(), 1);
         assert_eq!(series[0].1, 15.0);

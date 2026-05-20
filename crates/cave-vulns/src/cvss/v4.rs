@@ -21,23 +21,46 @@ use std::collections::HashMap;
 
 /// Attack Vector (base): N/A/L/P.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AV { Network, Adjacent, Local, Physical }
+pub enum AV {
+    Network,
+    Adjacent,
+    Local,
+    Physical,
+}
 /// Attack Complexity: L/H.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AC { Low, High }
+pub enum AC {
+    Low,
+    High,
+}
 /// Attack Requirements: N/P (NEW in v4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AT { None, Present }
+pub enum AT {
+    None,
+    Present,
+}
 /// Privileges Required: N/L/H.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PR { None, Low, High }
+pub enum PR {
+    None,
+    Low,
+    High,
+}
 /// User Interaction: N/P/A (NEW in v4: split into Passive/Active).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UI { None, Passive, Active }
+pub enum UI {
+    None,
+    Passive,
+    Active,
+}
 /// Impact metric: N/L/H. Applies to both Vulnerable System (V)
 /// and Subsequent System (S) impacts on C/I/A.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Impact { None, Low, High }
+pub enum Impact {
+    None,
+    Low,
+    High,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Vector {
@@ -80,35 +103,54 @@ impl Vector {
             }
         }
         let av = match *kv.get("AV").ok_or(ParseError::MissingMetric("AV"))? {
-            "N" => AV::Network, "A" => AV::Adjacent, "L" => AV::Local, "P" => AV::Physical,
+            "N" => AV::Network,
+            "A" => AV::Adjacent,
+            "L" => AV::Local,
+            "P" => AV::Physical,
             other => return Err(ParseError::BadValue("AV", other.into())),
         };
         let ac = match *kv.get("AC").ok_or(ParseError::MissingMetric("AC"))? {
-            "L" => AC::Low, "H" => AC::High,
+            "L" => AC::Low,
+            "H" => AC::High,
             other => return Err(ParseError::BadValue("AC", other.into())),
         };
         let at = match *kv.get("AT").ok_or(ParseError::MissingMetric("AT"))? {
-            "N" => AT::None, "P" => AT::Present,
+            "N" => AT::None,
+            "P" => AT::Present,
             other => return Err(ParseError::BadValue("AT", other.into())),
         };
         let pr = match *kv.get("PR").ok_or(ParseError::MissingMetric("PR"))? {
-            "N" => PR::None, "L" => PR::Low, "H" => PR::High,
+            "N" => PR::None,
+            "L" => PR::Low,
+            "H" => PR::High,
             other => return Err(ParseError::BadValue("PR", other.into())),
         };
         let ui = match *kv.get("UI").ok_or(ParseError::MissingMetric("UI"))? {
-            "N" => UI::None, "P" => UI::Passive, "A" => UI::Active,
+            "N" => UI::None,
+            "P" => UI::Passive,
+            "A" => UI::Active,
             other => return Err(ParseError::BadValue("UI", other.into())),
         };
         let imp = |k: &'static str| -> Result<Impact, ParseError> {
             match *kv.get(k).ok_or(ParseError::MissingMetric(k))? {
-                "N" => Ok(Impact::None), "L" => Ok(Impact::Low), "H" => Ok(Impact::High),
+                "N" => Ok(Impact::None),
+                "L" => Ok(Impact::Low),
+                "H" => Ok(Impact::High),
                 other => Err(ParseError::BadValue(k, other.into())),
             }
         };
         Ok(Self {
-            av, ac, at, pr, ui,
-            vc: imp("VC")?, vi: imp("VI")?, va: imp("VA")?,
-            sc: imp("SC")?, si: imp("SI")?, sa: imp("SA")?,
+            av,
+            ac,
+            at,
+            pr,
+            ui,
+            vc: imp("VC")?,
+            vi: imp("VI")?,
+            va: imp("VA")?,
+            sc: imp("SC")?,
+            si: imp("SI")?,
+            sa: imp("SA")?,
         })
     }
 
@@ -171,8 +213,10 @@ impl Vector {
             _ => {
                 // Generic linear interpolation: each "1" digit drops 1.5
                 // from a 10.0 ceiling; clamp to 0 to 10 inclusive.
-                let drop = (eq1 as f32 * 1.5) + (eq2 as f32 * 1.0)
-                    + (eq3 as f32 * 1.5) + (eq4 as f32 * 1.0);
+                let drop = (eq1 as f32 * 1.5)
+                    + (eq2 as f32 * 1.0)
+                    + (eq3 as f32 * 1.5)
+                    + (eq4 as f32 * 1.0);
                 (10.0 - drop).max(0.0)
             }
         };
@@ -187,31 +231,31 @@ mod tests {
     #[test]
     fn parse_canonical_critical() {
         // From FIRST CVSS v4 examples: CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N
-        let v = Vector::parse(
-            "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"
-        ).unwrap();
+        let v = Vector::parse("CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N")
+            .unwrap();
         assert_eq!(v.av, AV::Network);
         assert_eq!(v.vc, Impact::High);
     }
 
     #[test]
     fn parse_rejects_v3_prefix() {
-        assert_eq!(Vector::parse("CVSS:3.1/AV:N"), Err(ParseError::MissingPrefix));
+        assert_eq!(
+            Vector::parse("CVSS:3.1/AV:N"),
+            Err(ParseError::MissingPrefix)
+        );
     }
 
     #[test]
     fn parse_rejects_missing_at_metric() {
-        let err = Vector::parse(
-            "CVSS:4.0/AV:N/AC:L/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"
-        ).unwrap_err();
+        let err = Vector::parse("CVSS:4.0/AV:N/AC:L/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N")
+            .unwrap_err();
         assert_eq!(err, ParseError::MissingMetric("AT"));
     }
 
     #[test]
     fn macrovector_critical_all_high() {
-        let v = Vector::parse(
-            "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"
-        ).unwrap();
+        let v = Vector::parse("CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H")
+            .unwrap();
         let mv = v.macrovector();
         assert_eq!(mv.0, 0); // EQ1: best exploitability
         assert_eq!(mv.1, 0); // EQ2: simplest
@@ -221,9 +265,8 @@ mod tests {
 
     #[test]
     fn macrovector_no_impact() {
-        let v = Vector::parse(
-            "CVSS:4.0/AV:L/AC:H/AT:P/PR:H/UI:A/VC:N/VI:N/VA:N/SC:N/SI:N/SA:N"
-        ).unwrap();
+        let v = Vector::parse("CVSS:4.0/AV:L/AC:H/AT:P/PR:H/UI:A/VC:N/VI:N/VA:N/SC:N/SI:N/SA:N")
+            .unwrap();
         let mv = v.macrovector();
         assert_eq!(mv.2, 2); // EQ3 = none impact
         assert_eq!(mv.3, 2); // EQ4 = none impact
@@ -231,18 +274,16 @@ mod tests {
 
     #[test]
     fn base_score_critical_high() {
-        let v = Vector::parse(
-            "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"
-        ).unwrap();
+        let v = Vector::parse("CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H")
+            .unwrap();
         let s = v.base_score();
         assert!(s >= 9.5, "expected ≥ 9.5, got {s}");
     }
 
     #[test]
     fn base_score_no_impact_is_low() {
-        let v = Vector::parse(
-            "CVSS:4.0/AV:L/AC:H/AT:P/PR:H/UI:A/VC:N/VI:N/VA:N/SC:N/SI:N/SA:N"
-        ).unwrap();
+        let v = Vector::parse("CVSS:4.0/AV:L/AC:H/AT:P/PR:H/UI:A/VC:N/VI:N/VA:N/SC:N/SI:N/SA:N")
+            .unwrap();
         let s = v.base_score();
         assert!(s < 2.0, "expected < 2.0, got {s}");
     }

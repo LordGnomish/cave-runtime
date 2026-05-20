@@ -44,12 +44,26 @@ pub enum Operator {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PolicyCondition {
-    LicenseAllow { allow: Vec<String> },
-    LicenseDeny { deny: Vec<String> },
-    SeverityAtLeast { min_severity: crate::models::Severity },
-    CvssAtLeast { min_cvss_v3: f32 },
-    AgeOlderThanDays { days: u32 },
-    CoordinatesMatch { group: Option<String>, name: String, version: Option<String> },
+    LicenseAllow {
+        allow: Vec<String>,
+    },
+    LicenseDeny {
+        deny: Vec<String>,
+    },
+    SeverityAtLeast {
+        min_severity: crate::models::Severity,
+    },
+    CvssAtLeast {
+        min_cvss_v3: f32,
+    },
+    AgeOlderThanDays {
+        days: u32,
+    },
+    CoordinatesMatch {
+        group: Option<String>,
+        name: String,
+        version: Option<String>,
+    },
 }
 
 /// One concrete violation, mirroring `org.dependencytrack.model.PolicyViolation`.
@@ -86,12 +100,12 @@ pub fn evaluate_pipeline(
                     PolicyCondition::CvssAtLeast { min_cvss_v3 } => {
                         vuln::component_has_cvss_at_least(c, vulns, *min_cvss_v3)
                     }
-                    PolicyCondition::AgeOlderThanDays { days } => {
-                        age::violates(c, *days, now)
-                    }
-                    PolicyCondition::CoordinatesMatch { group, name, version } => {
-                        coordinates::violates(c, group.as_deref(), name, version.as_deref())
-                    }
+                    PolicyCondition::AgeOlderThanDays { days } => age::violates(c, *days, now),
+                    PolicyCondition::CoordinatesMatch {
+                        group,
+                        name,
+                        version,
+                    } => coordinates::violates(c, group.as_deref(), name, version.as_deref()),
                 };
                 if let Some(msg) = hit {
                     hits.push((i, msg));
@@ -175,7 +189,9 @@ mod tests {
     #[test]
     fn license_deny_triggers_violation() {
         let p = mk_policy(
-            vec![PolicyCondition::LicenseDeny { deny: vec!["GPL-3.0".into()] }],
+            vec![PolicyCondition::LicenseDeny {
+                deny: vec!["GPL-3.0".into()],
+            }],
             Operator::Any,
             ViolationState::Fail,
         );
@@ -188,7 +204,9 @@ mod tests {
     #[test]
     fn license_allow_violates_when_not_in_list() {
         let p = mk_policy(
-            vec![PolicyCondition::LicenseAllow { allow: vec!["MIT".into(), "Apache-2.0".into()] }],
+            vec![PolicyCondition::LicenseAllow {
+                allow: vec!["MIT".into(), "Apache-2.0".into()],
+            }],
             Operator::Any,
             ViolationState::Warn,
         );
@@ -201,7 +219,9 @@ mod tests {
     #[test]
     fn severity_threshold_finds_critical_vuln() {
         let p = mk_policy(
-            vec![PolicyCondition::SeverityAtLeast { min_severity: Severity::High }],
+            vec![PolicyCondition::SeverityAtLeast {
+                min_severity: Severity::High,
+            }],
             Operator::Any,
             ViolationState::Fail,
         );
@@ -241,7 +261,9 @@ mod tests {
     fn operator_all_requires_every_condition() {
         let p = mk_policy(
             vec![
-                PolicyCondition::LicenseDeny { deny: vec!["GPL-3.0".into()] },
+                PolicyCondition::LicenseDeny {
+                    deny: vec!["GPL-3.0".into()],
+                },
                 PolicyCondition::CvssAtLeast { min_cvss_v3: 7.0 },
             ],
             Operator::All,
@@ -257,7 +279,9 @@ mod tests {
     fn operator_any_fires_on_first_match() {
         let p = mk_policy(
             vec![
-                PolicyCondition::LicenseAllow { allow: vec!["MIT".into()] },
+                PolicyCondition::LicenseAllow {
+                    allow: vec!["MIT".into()],
+                },
                 PolicyCondition::AgeOlderThanDays { days: 999 },
             ],
             Operator::Any,

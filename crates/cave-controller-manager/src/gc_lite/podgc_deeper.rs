@@ -94,15 +94,14 @@ pub fn select_disrupted(views: &[PodNodeView], now_sec: u64) -> Vec<DisruptedPod
 /// for deletion (so PodGC may still see it after kubelet acknowledged
 /// the delete).
 pub fn is_collectible(view: &PodNodeView) -> bool {
-    matches!(view.pod.phase, PodPhase::Succeeded | PodPhase::Failed | PodPhase::Unknown)
-        || view.deletion_timestamp_sec.is_some()
+    matches!(
+        view.pod.phase,
+        PodPhase::Succeeded | PodPhase::Failed | PodPhase::Unknown
+    ) || view.deletion_timestamp_sec.is_some()
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::new(
-    "pkg/controller/podgc/gc_controller.go",
-    "PodGCController",
-);
+const FILE_CITE: Cite = Cite::new("pkg/controller/podgc/gc_controller.go", "PodGCController");
 
 #[cfg(test)]
 mod tests {
@@ -120,13 +119,7 @@ mod tests {
             orphaned: false,
         }
     }
-    fn v(
-        pod: PodSummary,
-        dt: Option<u64>,
-        grace: u32,
-        oos: bool,
-        not_ready: bool,
-    ) -> PodNodeView {
+    fn v(pod: PodSummary, dt: Option<u64>, grace: u32, oos: bool, not_ready: bool) -> PodNodeView {
         PodNodeView {
             pod,
             deletion_timestamp_sec: dt,

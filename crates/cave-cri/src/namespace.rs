@@ -22,7 +22,14 @@ pub struct NamespaceConfig {
 
 impl Default for NamespaceConfig {
     fn default() -> Self {
-        Self { pid: true, net: true, mnt: true, uts: true, ipc: true, user: false }
+        Self {
+            pid: true,
+            net: true,
+            mnt: true,
+            uts: true,
+            ipc: true,
+            user: false,
+        }
     }
 }
 
@@ -39,12 +46,24 @@ pub fn build_clone_flags(_config: &NamespaceConfig) -> i32 {
     #[cfg(target_os = "linux")]
     {
         use nix::sched::CloneFlags;
-        if config.pid { flags |= CloneFlags::CLONE_NEWPID.bits(); }
-        if config.net { flags |= CloneFlags::CLONE_NEWNS.bits(); }
-        if config.mnt { flags |= CloneFlags::CLONE_NEWNS.bits(); }
-        if config.uts { flags |= CloneFlags::CLONE_NEWUTS.bits(); }
-        if config.ipc { flags |= CloneFlags::CLONE_NEWIPC.bits(); }
-        if config.user { flags |= CloneFlags::CLONE_NEWUSER.bits(); }
+        if config.pid {
+            flags |= CloneFlags::CLONE_NEWPID.bits();
+        }
+        if config.net {
+            flags |= CloneFlags::CLONE_NEWNS.bits();
+        }
+        if config.mnt {
+            flags |= CloneFlags::CLONE_NEWNS.bits();
+        }
+        if config.uts {
+            flags |= CloneFlags::CLONE_NEWUTS.bits();
+        }
+        if config.ipc {
+            flags |= CloneFlags::CLONE_NEWIPC.bits();
+        }
+        if config.user {
+            flags |= CloneFlags::CLONE_NEWUSER.bits();
+        }
     }
     #[cfg(not(target_os = "linux"))]
     {
@@ -56,7 +75,10 @@ pub fn build_clone_flags(_config: &NamespaceConfig) -> i32 {
 /// Create namespaces for a container.
 pub fn create_namespaces(config: &NamespaceConfig) -> CriResult<NamespaceSet> {
     let flags = build_clone_flags(config);
-    Ok(NamespaceSet { config: config.clone(), clone_flags: flags })
+    Ok(NamespaceSet {
+        config: config.clone(),
+        clone_flags: flags,
+    })
 }
 
 /// Enter an existing container's namespaces by PID (for exec).
@@ -74,9 +96,11 @@ pub fn enter_namespaces(pid: u32) -> CriResult<()> {
                     let fd = f.as_raw_fd();
                     unsafe {
                         if libc::setns(fd, 0) != 0 {
-                            return Err(CriError::Namespace(
-                                format!("setns({}) failed: {}", ns, std::io::Error::last_os_error())
-                            ));
+                            return Err(CriError::Namespace(format!(
+                                "setns({}) failed: {}",
+                                ns,
+                                std::io::Error::last_os_error()
+                            )));
                         }
                     }
                     tracing::debug!("entered {} namespace of pid {}", ns, pid);
@@ -125,7 +149,14 @@ mod tests {
 
     #[test]
     fn test_build_clone_flags_all_false() {
-        let config = NamespaceConfig { pid: false, net: false, mnt: false, uts: false, ipc: false, user: false };
+        let config = NamespaceConfig {
+            pid: false,
+            net: false,
+            mnt: false,
+            uts: false,
+            ipc: false,
+            user: false,
+        };
         let flags = build_clone_flags(&config);
         // On non-linux always returns 0; on linux also 0 since all disabled
         assert_eq!(flags, 0);
@@ -133,21 +164,42 @@ mod tests {
 
     #[test]
     fn test_build_clone_flags_all_true_no_panic() {
-        let config = NamespaceConfig { pid: true, net: true, mnt: true, uts: true, ipc: true, user: true };
+        let config = NamespaceConfig {
+            pid: true,
+            net: true,
+            mnt: true,
+            uts: true,
+            ipc: true,
+            user: true,
+        };
         let _flags = build_clone_flags(&config);
         // Just verify it doesn't panic; value is platform-dependent
     }
 
     #[test]
     fn test_build_clone_flags_mixed() {
-        let config = NamespaceConfig { pid: true, net: false, mnt: true, uts: false, ipc: false, user: false };
+        let config = NamespaceConfig {
+            pid: true,
+            net: false,
+            mnt: true,
+            uts: false,
+            ipc: false,
+            user: false,
+        };
         let _flags = build_clone_flags(&config);
         // Verify no panic on partial config
     }
 
     #[test]
     fn test_create_namespaces_preserves_all_fields() {
-        let config = NamespaceConfig { pid: true, net: false, mnt: true, uts: false, ipc: false, user: true };
+        let config = NamespaceConfig {
+            pid: true,
+            net: false,
+            mnt: true,
+            uts: false,
+            ipc: false,
+            user: true,
+        };
         let ns = create_namespaces(&config).unwrap();
         assert!(ns.config.pid);
         assert!(!ns.config.net);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/vulns/reports` — executive summary.
 
-use crate::admin::layout::shell::{shell_v2, ShellOptions};
+use crate::admin::layout::shell::{ShellOptions, shell_v2};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::state::AdminState;
 use crate::admin::vulns::VulnsViewError;

@@ -496,11 +496,13 @@ impl ProfileConfig {
     /// Load from YAML file, falling back to defaults for missing fields.
     pub fn load(path: &std::path::Path) -> Result<Self, crate::CaveError> {
         let contents = std::fs::read_to_string(path).map_err(|e| {
-            crate::CaveError::Config(format!("Failed to read profile config {}: {e}", path.display()))
+            crate::CaveError::Config(format!(
+                "Failed to read profile config {}: {e}",
+                path.display()
+            ))
         })?;
-        serde_yaml::from_str(&contents).map_err(|e| {
-            crate::CaveError::Config(format!("Failed to parse profile config: {e}"))
-        })
+        serde_yaml::from_str(&contents)
+            .map_err(|e| crate::CaveError::Config(format!("Failed to parse profile config: {e}")))
     }
 
     /// Profile config file path: ~/.cave/profiles/<name>.yaml
@@ -615,7 +617,10 @@ mod tests {
 
     #[test]
     fn test_profile_config_domain() {
-        let p = ProfileConfig::from_profile(DeploymentProfile::new(Environment::Prod, Provider::Hetzner));
+        let p = ProfileConfig::from_profile(DeploymentProfile::new(
+            Environment::Prod,
+            Provider::Hetzner,
+        ));
         assert_eq!(p.domain, "caveplatform.dev");
         assert_eq!(p.platform_wildcard, "*.cave.caveplatform.dev");
         assert_eq!(p.api_wildcard, "*.api.caveplatform.dev");

@@ -43,10 +43,7 @@ pub enum AttachAction {
 }
 
 /// Diff desired vs actual and emit the per-volume actions.
-pub fn reconcile(
-    desired: &[DesiredAttachment],
-    actual: &[ActualAttachment],
-) -> Vec<AttachAction> {
+pub fn reconcile(desired: &[DesiredAttachment], actual: &[ActualAttachment]) -> Vec<AttachAction> {
     let mut actions = Vec::new();
     // Attach: every (volume, node) pair in desired but missing from actual.
     for d in desired {
@@ -174,10 +171,7 @@ mod tests {
             "reconcile",
             "tenant-ad-mixed"
         );
-        let acts = reconcile(
-            &[d("v1", "n1")],
-            &[a("v1", "n1", 1), a("v2", "n1", 0)],
-        );
+        let acts = reconcile(&[d("v1", "n1")], &[a("v1", "n1", 1), a("v2", "n1", 0)]);
         // v1 already attached → no attach. v2 has no use → detach.
         assert_eq!(acts.len(), 1);
         match &acts[0] {
@@ -221,7 +215,10 @@ mod tests {
             "AttachAction",
             "tenant-ad-action-serde"
         );
-        let v = VolumeRef { volume_id: "v".into(), node: "n".into() };
+        let v = VolumeRef {
+            volume_id: "v".into(),
+            node: "n".into(),
+        };
         for a in [
             AttachAction::Attach(v.clone()),
             AttachAction::Detach(v.clone()),

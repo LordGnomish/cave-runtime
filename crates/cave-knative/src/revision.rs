@@ -3,7 +3,7 @@
 //! Knative Revision — immutable snapshot of code + config.
 //! upstream: knative/serving v1.18.x — pkg/apis/serving/v1/revision_types.go
 
-use crate::meta::{validate_template, ObjectMeta, RevisionTemplateSpec, TrafficTarget};
+use crate::meta::{ObjectMeta, RevisionTemplateSpec, TrafficTarget, validate_template};
 
 #[derive(Default, Debug, Clone)]
 pub struct Revision {

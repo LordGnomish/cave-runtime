@@ -103,8 +103,13 @@ pub enum GuardError {
     MissingRole(String),
     #[error("tenant id required")]
     TenantRequired,
-    #[error("cross-tenant access denied: principal tenant {principal:?} does not match {requested:?}")]
-    TenantMismatch { principal: String, requested: String },
+    #[error(
+        "cross-tenant access denied: principal tenant {principal:?} does not match {requested:?}"
+    )]
+    TenantMismatch {
+        principal: String,
+        requested: String,
+    },
 }
 
 /// Per-handler guard configuration.
@@ -270,7 +275,10 @@ mod tests {
     #[test]
     fn guard_tenant_only_allows_tenant_persona() {
         let g = Guard::tenant_only(None);
-        assert!(g.authorize(Some(&tenant_principal("acme")), Some("acme")).is_ok());
+        assert!(
+            g.authorize(Some(&tenant_principal("acme")), Some("acme"))
+                .is_ok()
+        );
     }
 
     #[test]
@@ -282,14 +290,18 @@ mod tests {
     #[test]
     fn guard_tenant_only_rejects_operator() {
         let g = Guard::tenant_only(None);
-        let err = g.authorize(Some(&operator_principal()), Some("acme")).unwrap_err();
+        let err = g
+            .authorize(Some(&operator_principal()), Some("acme"))
+            .unwrap_err();
         assert!(matches!(err, GuardError::PersonaForbidden { .. }));
     }
 
     #[test]
     fn guard_operator_only_rejects_tenant() {
         let g = Guard::operator_only();
-        let err = g.authorize(Some(&tenant_principal("acme")), None).unwrap_err();
+        let err = g
+            .authorize(Some(&tenant_principal("acme")), None)
+            .unwrap_err();
         assert!(matches!(err, GuardError::PersonaForbidden { .. }));
     }
 
@@ -347,14 +359,23 @@ mod tests {
     fn guard_admin_can_access_any_tenant() {
         let g = Guard::tenant_only(None);
         // Admin persona is cross-tenant — not constrained by p.tenant
-        assert!(g.authorize(Some(&admin_principal()), Some("globex")).is_ok());
+        assert!(
+            g.authorize(Some(&admin_principal()), Some("globex"))
+                .is_ok()
+        );
     }
 
     #[test]
     fn guard_cross_persona_allows_all_three() {
         let g = Guard::cross_persona(None);
-        assert!(g.authorize(Some(&tenant_principal("acme")), Some("acme")).is_ok());
-        assert!(g.authorize(Some(&operator_principal()), Some("acme")).is_ok());
+        assert!(
+            g.authorize(Some(&tenant_principal("acme")), Some("acme"))
+                .is_ok()
+        );
+        assert!(
+            g.authorize(Some(&operator_principal()), Some("acme"))
+                .is_ok()
+        );
         assert!(g.authorize(Some(&admin_principal()), Some("acme")).is_ok());
     }
 
@@ -374,7 +395,9 @@ mod tests {
             required_role: Some("nuke".into()),
             ..g
         };
-        let err = g_with_role.authorize(Some(&tenant_principal("acme")), None).unwrap_err();
+        let err = g_with_role
+            .authorize(Some(&tenant_principal("acme")), None)
+            .unwrap_err();
         assert!(matches!(err, GuardError::PersonaForbidden { .. }));
     }
 }

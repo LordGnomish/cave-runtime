@@ -144,37 +144,51 @@ pub enum AttrValue {
 
 /// Converts a string slice into an `AttrValue::String`.
 impl From<&str> for AttrValue {
-    fn from(v: &str) -> Self { AttrValue::String(v.to_string()) }
+    fn from(v: &str) -> Self {
+        AttrValue::String(v.to_string())
+    }
 }
 
 /// Converts a `String` into an `AttrValue::String`.
 impl From<String> for AttrValue {
-    fn from(v: String) -> Self { AttrValue::String(v) }
+    fn from(v: String) -> Self {
+        AttrValue::String(v)
+    }
 }
 
 /// Converts an `i64` into an `AttrValue::Int`.
 impl From<i64> for AttrValue {
-    fn from(v: i64) -> Self { AttrValue::Int(v) }
+    fn from(v: i64) -> Self {
+        AttrValue::Int(v)
+    }
 }
 
 /// Converts an `i32` into an `AttrValue::Int`.
 impl From<i32> for AttrValue {
-    fn from(v: i32) -> Self { AttrValue::Int(v as i64) }
+    fn from(v: i32) -> Self {
+        AttrValue::Int(v as i64)
+    }
 }
 
 /// Converts a `u32` into an `AttrValue::Int`.
 impl From<u32> for AttrValue {
-    fn from(v: u32) -> Self { AttrValue::Int(v as i64) }
+    fn from(v: u32) -> Self {
+        AttrValue::Int(v as i64)
+    }
 }
 
 /// Converts an `f64` into an `AttrValue::Float`.
 impl From<f64> for AttrValue {
-    fn from(v: f64) -> Self { AttrValue::Float(v) }
+    fn from(v: f64) -> Self {
+        AttrValue::Float(v)
+    }
 }
 
 /// Converts a `bool` into an `AttrValue::Bool`.
 impl From<bool> for AttrValue {
-    fn from(v: bool) -> Self { AttrValue::Bool(v) }
+    fn from(v: bool) -> Self {
+        AttrValue::Bool(v)
+    }
 }
 
 /// A collection of span attributes, mapping attribute names to values.
@@ -218,7 +232,7 @@ impl SpanContext {
             trace_flags: if sampled { Self::FLAG_SAMPLED } else { 0 },
             is_remote: false,
         }
-     }
+    }
 
     /// Creates an invalid `SpanContext` with zeroed IDs and flags.
     ///
@@ -226,8 +240,13 @@ impl SpanContext {
     ///
     /// A `SpanContext` with all fields set to zero/false.
     pub fn invalid() -> Self {
-        SpanContext { trace_id: 0, span_id: 0, trace_flags: 0, is_remote: false }
-     }
+        SpanContext {
+            trace_id: 0,
+            span_id: 0,
+            trace_flags: 0,
+            is_remote: false,
+        }
+    }
 
     /// Checks if the span context is valid (non-zero IDs).
     ///
@@ -236,7 +255,7 @@ impl SpanContext {
     /// `true` if both `trace_id` and `span_id` are non-zero, `false` otherwise.
     pub fn is_valid(&self) -> bool {
         self.trace_id != 0 && self.span_id != 0
-     }
+    }
 
     /// Checks if the span is sampled based on trace flags.
     ///
@@ -245,7 +264,7 @@ impl SpanContext {
     /// `true` if the `FLAG_SAMPLED` bit is set, `false` otherwise.
     pub fn is_sampled(&self) -> bool {
         self.trace_flags & Self::FLAG_SAMPLED == Self::FLAG_SAMPLED
-     }
+    }
 }
 
 /// Represents an event within a span.
@@ -320,7 +339,9 @@ pub const DEFAULT_TENANT: &str = "anonymous";
 pub const TENANT_LABEL: &str = "tenant_id";
 
 /// Default function to provide the default tenant ID.
-fn default_tenant() -> String { DEFAULT_TENANT.to_string() }
+fn default_tenant() -> String {
+    DEFAULT_TENANT.to_string()
+}
 
 impl SpanData {
     /// Calculates the duration of the span.
@@ -330,7 +351,7 @@ impl SpanData {
     /// The duration between `start_time` and `end_time`.
     pub fn duration(&self) -> chrono::Duration {
         self.end_time.signed_duration_since(self.start_time)
-     }
+    }
 }
 
 #[cfg(test)]
@@ -339,7 +360,10 @@ mod tests {
 
     #[test]
     fn test_format_trace_id_pads_to_32() {
-        assert_eq!(format_trace_id(0xdeadbeef), "000000000000000000000000deadbeef");
+        assert_eq!(
+            format_trace_id(0xdeadbeef),
+            "000000000000000000000000deadbeef"
+        );
     }
 
     #[test]

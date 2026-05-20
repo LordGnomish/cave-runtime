@@ -4,7 +4,7 @@
 //! num_uses, child token TTL clamp, default-policy injection toggle,
 //! orphan parenting. Pinned to openbao v2.5.3.
 
-use cave_vault::token::{parse_duration, CreateTokenParams, TokenStore};
+use cave_vault::token::{CreateTokenParams, TokenStore, parse_duration};
 
 const TENANT: &str = "tenant-acme-prod";
 
@@ -36,10 +36,14 @@ fn renew_clamps_to_explicit_max_ttl_even_with_huge_increment() {
     assert_eq!(tok.max_ttl, 4 * 3600);
 
     let renewed = store.renew(&tok.id, 99 * 3600).unwrap();
-    assert!(renewed.remaining_ttl() <= 4 * 3600,
-        "max_ttl clamps a huge increment to 4h");
-    assert!(renewed.remaining_ttl() >= 4 * 3600 - 5,
-        "and uses the clamped max, not 1h");
+    assert!(
+        renewed.remaining_ttl() <= 4 * 3600,
+        "max_ttl clamps a huge increment to 4h"
+    );
+    assert!(
+        renewed.remaining_ttl() >= 4 * 3600 - 5,
+        "and uses the clamped max, not 1h"
+    );
 }
 
 /// Cite: openbao `vault/token_store.go::create` `period` field — periodic
@@ -112,10 +116,15 @@ fn child_token_records_parent_and_revoke_tree_cascades() {
     let mut store = TokenStore::default();
     let parent = store.create(&token_params(&["default"]), None).unwrap();
     let parent_clone = parent.clone();
-    let child = store.create(
-        &CreateTokenParams { ttl: Some("30m".into()), ..token_params(&["default"]) },
-        Some(&parent_clone),
-    ).unwrap();
+    let child = store
+        .create(
+            &CreateTokenParams {
+                ttl: Some("30m".into()),
+                ..token_params(&["default"])
+            },
+            Some(&parent_clone),
+        )
+        .unwrap();
 
     assert_eq!(child.parent.as_deref(), Some(parent.id.as_str()));
     assert!(!child.orphan);
@@ -143,8 +152,10 @@ fn no_parent_orphans_token_even_with_parent_supplied() {
     // Parent revoke does NOT cascade.
     store.revoke_tree(&parent.id);
     assert!(store.lookup(&parent.id).is_none());
-    assert!(store.lookup(&orphan.id).is_some(),
-        "orphan survives parent revocation");
+    assert!(
+        store.lookup(&orphan.id).is_some(),
+        "orphan survives parent revocation"
+    );
 }
 
 /// Cite: openbao `vault/token_store.go::renew` non-renewable branch —
@@ -159,8 +170,10 @@ fn renew_on_non_renewable_token_errors() {
     };
     let tok = store.create(&params, None).unwrap();
     assert!(!tok.renewable);
-    assert!(store.renew(&tok.id, 60).is_err(),
-        "non-renewable ⇒ renew rejected");
+    assert!(
+        store.renew(&tok.id, 60).is_err(),
+        "non-renewable ⇒ renew rejected"
+    );
     // Bonus: parse_duration default for unrecognised units → 0 (no fallback).
     assert_eq!(parse_duration("5x"), 0);
 }

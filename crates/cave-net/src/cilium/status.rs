@@ -73,16 +73,32 @@ pub struct ComponentStatus {
 
 impl ComponentStatus {
     pub fn ok(msg: impl Into<String>) -> Self {
-        Self { state: DaemonState::Ok, message: msg.into(), last_updated_ns: 0 }
+        Self {
+            state: DaemonState::Ok,
+            message: msg.into(),
+            last_updated_ns: 0,
+        }
     }
     pub fn disabled() -> Self {
-        Self { state: DaemonState::Disabled, message: "disabled".into(), last_updated_ns: 0 }
+        Self {
+            state: DaemonState::Disabled,
+            message: "disabled".into(),
+            last_updated_ns: 0,
+        }
     }
     pub fn degraded(msg: impl Into<String>) -> Self {
-        Self { state: DaemonState::Degraded, message: msg.into(), last_updated_ns: 0 }
+        Self {
+            state: DaemonState::Degraded,
+            message: msg.into(),
+            last_updated_ns: 0,
+        }
     }
     pub fn failure(msg: impl Into<String>) -> Self {
-        Self { state: DaemonState::Failure, message: msg.into(), last_updated_ns: 0 }
+        Self {
+            state: DaemonState::Failure,
+            message: msg.into(),
+            last_updated_ns: 0,
+        }
     }
 }
 
@@ -124,7 +140,9 @@ impl StatusBoard {
     }
 
     pub fn unregister(&mut self, component: ComponentName) -> Result<(), StatusError> {
-        self.components.remove(&component).ok_or(StatusError::ComponentNotFound(component))?;
+        self.components
+            .remove(&component)
+            .ok_or(StatusError::ComponentNotFound(component))?;
         Ok(())
     }
 
@@ -175,7 +193,11 @@ impl StatusBoard {
         DaemonStatus {
             overall,
             components: out,
-            stale_since_ns: if stale_seen == u64::MAX { 0 } else { stale_seen },
+            stale_since_ns: if stale_seen == u64::MAX {
+                0
+            } else {
+                stale_seen
+            },
         }
     }
 }
@@ -196,7 +218,11 @@ mod tests {
 
     #[test]
     fn component_labels_match_cli_output() {
-        let (_c, _t) = cilium_test_ctx!("pkg/status/status.go", "ComponentName.Label", "tenant-st-lbl");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/status/status.go",
+            "ComponentName.Label",
+            "tenant-st-lbl"
+        );
         assert_eq!(ComponentName::Kvstore.label(), "kvstore");
         assert_eq!(ComponentName::Kubernetes.label(), "kubernetes");
         assert_eq!(ComponentName::IPAM.label(), "ipam");
@@ -245,7 +271,11 @@ mod tests {
     fn report_records_status_with_timestamp() {
         let (_c, tenant) = cilium_test_ctx!("pkg/status/status.go", "Report", "tenant-st-rep");
         let mut b = board(tenant);
-        b.report(ComponentName::Kvstore, ComponentStatus::ok("connected"), 100);
+        b.report(
+            ComponentName::Kvstore,
+            ComponentStatus::ok("connected"),
+            100,
+        );
         let s = b.lookup(ComponentName::Kvstore).unwrap();
         assert_eq!(s.last_updated_ns, 100);
         assert_eq!(s.state, DaemonState::Ok);
@@ -253,10 +283,22 @@ mod tests {
 
     #[test]
     fn report_overwrites_existing() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/status/status.go", "Report.Overwrite", "tenant-st-repov");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/status/status.go",
+            "Report.Overwrite",
+            "tenant-st-repov"
+        );
         let mut b = board(tenant);
-        b.report(ComponentName::Kvstore, ComponentStatus::ok("connected"), 100);
-        b.report(ComponentName::Kvstore, ComponentStatus::failure("disconnected"), 200);
+        b.report(
+            ComponentName::Kvstore,
+            ComponentStatus::ok("connected"),
+            100,
+        );
+        b.report(
+            ComponentName::Kvstore,
+            ComponentStatus::failure("disconnected"),
+            200,
+        );
         let s = b.lookup(ComponentName::Kvstore).unwrap();
         assert_eq!(s.state, DaemonState::Failure);
     }
@@ -272,7 +314,11 @@ mod tests {
 
     #[test]
     fn unregister_unknown_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/status/status.go", "Unregister.NotFound", "tenant-st-unrnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/status/status.go",
+            "Unregister.NotFound",
+            "tenant-st-unrnf"
+        );
         let mut b = board(tenant);
         let err = b.unregister(ComponentName::Kvstore).unwrap_err();
         assert!(matches!(err, StatusError::ComponentNotFound(_)));
@@ -291,9 +337,14 @@ mod tests {
 
     #[test]
     fn aggregate_all_ok_returns_ok() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/status/status.go", "Aggregate.AllOk", "tenant-st-agok");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/status/status.go", "Aggregate.AllOk", "tenant-st-agok");
         let mut b = board(tenant);
-        b.report(ComponentName::Kvstore, ComponentStatus::ok("connected"), 100);
+        b.report(
+            ComponentName::Kvstore,
+            ComponentStatus::ok("connected"),
+            100,
+        );
         b.report(ComponentName::IPAM, ComponentStatus::ok("ready"), 100);
         let agg = b.aggregate(100);
         assert_eq!(agg.overall, DaemonState::Ok);
@@ -301,27 +352,51 @@ mod tests {
 
     #[test]
     fn aggregate_with_one_degraded_returns_degraded() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/status/status.go", "Aggregate.Degraded", "tenant-st-agdeg");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/status/status.go",
+            "Aggregate.Degraded",
+            "tenant-st-agdeg"
+        );
         let mut b = board(tenant);
         b.report(ComponentName::Kvstore, ComponentStatus::ok("ok"), 100);
-        b.report(ComponentName::IPAM, ComponentStatus::degraded("low pool"), 100);
+        b.report(
+            ComponentName::IPAM,
+            ComponentStatus::degraded("low pool"),
+            100,
+        );
         let agg = b.aggregate(100);
         assert_eq!(agg.overall, DaemonState::Degraded);
     }
 
     #[test]
     fn aggregate_with_one_failure_returns_failure() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/status/status.go", "Aggregate.Failure", "tenant-st-agfail");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/status/status.go",
+            "Aggregate.Failure",
+            "tenant-st-agfail"
+        );
         let mut b = board(tenant);
-        b.report(ComponentName::Kvstore, ComponentStatus::degraded("flaky"), 100);
-        b.report(ComponentName::IPAM, ComponentStatus::failure("exhausted"), 100);
+        b.report(
+            ComponentName::Kvstore,
+            ComponentStatus::degraded("flaky"),
+            100,
+        );
+        b.report(
+            ComponentName::IPAM,
+            ComponentStatus::failure("exhausted"),
+            100,
+        );
         let agg = b.aggregate(100);
         assert_eq!(agg.overall, DaemonState::Failure);
     }
 
     #[test]
     fn aggregate_disabled_component_does_not_influence_overall() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/status/status.go", "Aggregate.SkipDisabled", "tenant-st-agdis");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/status/status.go",
+            "Aggregate.SkipDisabled",
+            "tenant-st-agdis"
+        );
         let mut b = board(tenant);
         b.report(ComponentName::Kvstore, ComponentStatus::ok("ok"), 100);
         b.report(ComponentName::Encryption, ComponentStatus::disabled(), 100);
@@ -331,7 +406,8 @@ mod tests {
 
     #[test]
     fn aggregate_empty_returns_ok() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/status/status.go", "Aggregate.Empty", "tenant-st-agem");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/status/status.go", "Aggregate.Empty", "tenant-st-agem");
         let b = board(tenant);
         let agg = b.aggregate(100);
         assert_eq!(agg.overall, DaemonState::Ok);
@@ -341,18 +417,25 @@ mod tests {
 
     #[test]
     fn aggregate_stale_component_marked_degraded() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/status/status.go", "Aggregate.Stale", "tenant-st-stale");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/status/status.go", "Aggregate.Stale", "tenant-st-stale");
         let mut b = board(tenant);
         b.report(ComponentName::Kvstore, ComponentStatus::ok("ok"), 0);
         // 60s elapsed > 30s threshold.
         let agg = b.aggregate(60_000_000_000);
         assert_eq!(agg.overall, DaemonState::Degraded);
-        assert!(agg.components.get("kvstore").unwrap().message.starts_with("stale"));
+        assert!(agg
+            .components
+            .get("kvstore")
+            .unwrap()
+            .message
+            .starts_with("stale"));
     }
 
     #[test]
     fn aggregate_recent_component_not_marked_stale() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/status/status.go", "Aggregate.Fresh", "tenant-st-fresh");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/status/status.go", "Aggregate.Fresh", "tenant-st-fresh");
         let mut b = board(tenant);
         b.report(ComponentName::Kvstore, ComponentStatus::ok("ok"), 0);
         let agg = b.aggregate(10_000_000_000);
@@ -361,20 +444,35 @@ mod tests {
 
     #[test]
     fn aggregate_disabled_not_marked_stale_even_when_old() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/status/status.go", "Aggregate.DisabledNotStale", "tenant-st-disns");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/status/status.go",
+            "Aggregate.DisabledNotStale",
+            "tenant-st-disns"
+        );
         let mut b = board(tenant);
         b.report(ComponentName::Encryption, ComponentStatus::disabled(), 0);
         let agg = b.aggregate(60_000_000_000);
         assert_eq!(agg.overall, DaemonState::Ok);
-        assert_eq!(agg.components.get("encryption").unwrap().state, DaemonState::Disabled);
+        assert_eq!(
+            agg.components.get("encryption").unwrap().state,
+            DaemonState::Disabled
+        );
     }
 
     #[test]
     fn aggregate_stale_since_ns_records_oldest_observed() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/status/status.go", "Aggregate.StaleSince", "tenant-st-stsince");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/status/status.go",
+            "Aggregate.StaleSince",
+            "tenant-st-stsince"
+        );
         let mut b = board(tenant);
         b.report(ComponentName::Kvstore, ComponentStatus::ok("ok"), 0);
-        b.report(ComponentName::Kubernetes, ComponentStatus::ok("ok"), 5_000_000_000);
+        b.report(
+            ComponentName::Kubernetes,
+            ComponentStatus::ok("ok"),
+            5_000_000_000,
+        );
         let agg = b.aggregate(60_000_000_000);
         // Both stale; the oldest is at t=0.
         assert_eq!(agg.stale_since_ns, 0);
@@ -384,7 +482,8 @@ mod tests {
 
     #[test]
     fn aggregate_components_map_keyed_by_label() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/status/status.go", "Aggregate.MapKeys", "tenant-st-mk");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/status/status.go", "Aggregate.MapKeys", "tenant-st-mk");
         let mut b = board(tenant);
         b.report(ComponentName::Hubble, ComponentStatus::ok("ok"), 0);
         b.report(ComponentName::Bgp, ComponentStatus::ok("ok"), 0);
@@ -397,8 +496,17 @@ mod tests {
 
     #[test]
     fn daemon_state_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/status/status.go", "DaemonState.Serde", "tenant-st-dsserde");
-        for s in [DaemonState::Ok, DaemonState::Degraded, DaemonState::Failure, DaemonState::Disabled] {
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/status/status.go",
+            "DaemonState.Serde",
+            "tenant-st-dsserde"
+        );
+        for s in [
+            DaemonState::Ok,
+            DaemonState::Degraded,
+            DaemonState::Failure,
+            DaemonState::Disabled,
+        ] {
             let j = serde_json::to_string(&s).unwrap();
             let back: DaemonState = serde_json::from_str(&j).unwrap();
             assert_eq!(back, s);
@@ -407,7 +515,11 @@ mod tests {
 
     #[test]
     fn component_status_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/status/status.go", "ComponentStatus.Serde", "tenant-st-csserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/status/status.go",
+            "ComponentStatus.Serde",
+            "tenant-st-csserde"
+        );
         let s = ComponentStatus::ok("connected");
         let j = serde_json::to_string(&s).unwrap();
         let back: ComponentStatus = serde_json::from_str(&j).unwrap();
@@ -416,7 +528,11 @@ mod tests {
 
     #[test]
     fn daemon_status_serde_round_trip() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/status/status.go", "DaemonStatus.Serde", "tenant-st-dstserde");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/status/status.go",
+            "DaemonStatus.Serde",
+            "tenant-st-dstserde"
+        );
         let mut b = board(tenant);
         b.report(ComponentName::Kvstore, ComponentStatus::ok("ok"), 0);
         let agg = b.aggregate(0);
@@ -429,16 +545,25 @@ mod tests {
 
     #[test]
     fn daemon_state_priority_failure_gt_degraded_gt_ok() {
-        let (_c, _t) = cilium_test_ctx!("pkg/status/status.go", "DaemonState.Order", "tenant-st-ord");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/status/status.go", "DaemonState.Order", "tenant-st-ord");
         assert!(DaemonState::Failure > DaemonState::Degraded);
         assert!(DaemonState::Degraded > DaemonState::Ok);
     }
 
     #[test]
     fn aggregate_component_status_carries_through_to_output_map() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/status/status.go", "Aggregate.PassThrough", "tenant-st-pt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/status/status.go",
+            "Aggregate.PassThrough",
+            "tenant-st-pt"
+        );
         let mut b = board(tenant);
-        b.report(ComponentName::IPAM, ComponentStatus::degraded("low pool"), 100);
+        b.report(
+            ComponentName::IPAM,
+            ComponentStatus::degraded("low pool"),
+            100,
+        );
         let agg = b.aggregate(100);
         assert_eq!(agg.components.get("ipam").unwrap().message, "low pool");
     }

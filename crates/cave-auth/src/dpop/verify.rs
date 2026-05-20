@@ -132,8 +132,7 @@ fn normalise_htu(uri: &str) -> String {
 
 /// Computes the value the proof's `ath` claim must carry for the given token.
 pub fn expected_ath(access_token: &str) -> String {
-    base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .encode(Sha256::digest(access_token.as_bytes()))
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(Sha256::digest(access_token.as_bytes()))
 }
 
 #[cfg(test)]
@@ -144,12 +143,10 @@ mod tests {
     fn build_proof(htm: &str, htu: &str, iat: i64, jti: &str, ath: Option<&str>) -> DpopProof {
         let h = r#"{"alg":"ES256","typ":"dpop+jwt","jwk":{"kty":"EC","crv":"P-256","x":"AAAA","y":"BBBB"}}"#;
         let p = match ath {
-            None => format!(
-                r#"{{"jti":"{jti}","htm":"{htm}","htu":"{htu}","iat":{iat}}}"#
-            ),
-            Some(a) => format!(
-                r#"{{"jti":"{jti}","htm":"{htm}","htu":"{htu}","iat":{iat},"ath":"{a}"}}"#
-            ),
+            None => format!(r#"{{"jti":"{jti}","htm":"{htm}","htu":"{htu}","iat":{iat}}}"#),
+            Some(a) => {
+                format!(r#"{{"jti":"{jti}","htm":"{htm}","htu":"{htu}","iat":{iat},"ath":"{a}"}}"#)
+            }
         };
         let sig = b64url_encode(&[0u8; 64]);
         let raw = format!(
@@ -161,7 +158,12 @@ mod tests {
         DpopProof::parse(&raw).unwrap()
     }
 
-    fn cfg<'a>(method: &'a str, uri: &'a str, now: i64, token: Option<&'a str>) -> VerifyConfig<'a> {
+    fn cfg<'a>(
+        method: &'a str,
+        uri: &'a str,
+        now: i64,
+        token: Option<&'a str>,
+    ) -> VerifyConfig<'a> {
         VerifyConfig {
             http_method: method,
             http_uri: uri,
@@ -212,7 +214,8 @@ mod tests {
     fn htu_mismatch_rejected() {
         let proof = build_proof("POST", "https://other/y", 1000, "j", None);
         let guard = ReplayGuard::with_default_window();
-        let err = verify_proof(&proof, &cfg("POST", "https://r/x", 1000, None), &guard).unwrap_err();
+        let err =
+            verify_proof(&proof, &cfg("POST", "https://r/x", 1000, None), &guard).unwrap_err();
         assert!(matches!(err, DpopVerifyError::HtuMismatch { .. }));
     }
 
@@ -220,7 +223,8 @@ mod tests {
     fn iat_outside_window_rejected() {
         let proof = build_proof("POST", "https://r/x", 1000, "j", None);
         let guard = ReplayGuard::with_default_window();
-        let err = verify_proof(&proof, &cfg("POST", "https://r/x", 9000, None), &guard).unwrap_err();
+        let err =
+            verify_proof(&proof, &cfg("POST", "https://r/x", 9000, None), &guard).unwrap_err();
         assert!(matches!(err, DpopVerifyError::IatOutOfWindow { .. }));
     }
 
@@ -240,16 +244,24 @@ mod tests {
         let ath = expected_ath(token);
         let proof = build_proof("POST", "https://r/x", 1000, "j", Some(&ath));
         let guard = ReplayGuard::with_default_window();
-        verify_proof(&proof, &cfg("POST", "https://r/x", 1000, Some(token)), &guard).unwrap();
+        verify_proof(
+            &proof,
+            &cfg("POST", "https://r/x", 1000, Some(token)),
+            &guard,
+        )
+        .unwrap();
     }
 
     #[test]
     fn ath_mismatch_rejected() {
         let proof = build_proof("POST", "https://r/x", 1000, "j", Some("wrong"));
         let guard = ReplayGuard::with_default_window();
-        let err =
-            verify_proof(&proof, &cfg("POST", "https://r/x", 1000, Some("tok")), &guard)
-                .unwrap_err();
+        let err = verify_proof(
+            &proof,
+            &cfg("POST", "https://r/x", 1000, Some("tok")),
+            &guard,
+        )
+        .unwrap_err();
         assert!(matches!(err, DpopVerifyError::AthMismatch));
     }
 
@@ -257,9 +269,12 @@ mod tests {
     fn missing_ath_when_token_bound() {
         let proof = build_proof("POST", "https://r/x", 1000, "j", None);
         let guard = ReplayGuard::with_default_window();
-        let err =
-            verify_proof(&proof, &cfg("POST", "https://r/x", 1000, Some("tok")), &guard)
-                .unwrap_err();
+        let err = verify_proof(
+            &proof,
+            &cfg("POST", "https://r/x", 1000, Some("tok")),
+            &guard,
+        )
+        .unwrap_err();
         assert!(matches!(err, DpopVerifyError::MissingAth));
     }
 

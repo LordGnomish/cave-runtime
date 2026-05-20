@@ -5,16 +5,22 @@
 use super::types::{LiteLlmTraffic, LiteLlmViewError};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
+use crate::admin::state::{AdminState, scope};
 
 pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<LiteLlmTraffic>, LiteLlmViewError> {
     ctx.authorise(Permission::LiteLlmRead)?;
     let mut rows: Vec<LiteLlmTraffic> =
-        scope(&state.litellm_traffic.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-            .into_iter()
-            .cloned()
-            .collect();
-    rows.sort_by(|a, b| b.request_count.cmp(&a.request_count).then(a.model_name.cmp(&b.model_name)));
+        scope(&state.litellm_traffic.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
+    rows.sort_by(|a, b| {
+        b.request_count
+            .cmp(&a.request_count)
+            .then(a.model_name.cmp(&b.model_name))
+    });
     Ok(rows)
 }
 
@@ -70,7 +76,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LiteLlmVie
         dollars = spend / 100,
         cents = spend % 100,
         tbl = table(
-            &["model", "window_s", "requests", "errors", "spend", "p50_lat", "timeouts"],
+            &[
+                "model", "window_s", "requests", "errors", "spend", "p50_lat", "timeouts"
+            ],
             &rows_html,
         ),
     );

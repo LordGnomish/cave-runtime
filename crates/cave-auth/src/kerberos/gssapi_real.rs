@@ -68,7 +68,9 @@ work on every host without the feature.\n";
 /// when the binary was built without the feature.
 #[derive(Debug, Error)]
 pub enum GssapiError {
-    #[error("GSSAPI feature 'kerberos-gssapi' is disabled — rebuild with --features kerberos-gssapi to enable")]
+    #[error(
+        "GSSAPI feature 'kerberos-gssapi' is disabled — rebuild with --features kerberos-gssapi to enable"
+    )]
     FeatureDisabled,
     #[error("empty GSSAPI token")]
     EmptyToken,
@@ -189,13 +191,12 @@ fn accept_security_context_impl(
 ) -> Result<AcceptOutcome, GssapiError> {
     use libgssapi::context::{SecurityContext, ServerCtx};
     use libgssapi::credential::{Cred, CredUsage};
-    use libgssapi::oid::{OidSet, GSS_MECH_KRB5};
+    use libgssapi::oid::{GSS_MECH_KRB5, OidSet};
 
     // Optional keytab override — set KRB5_KTNAME before acquiring credentials.
     let _guard = keytab_path.map(KrbKtnameGuard::set);
 
-    let mech_set = OidSet::new()
-        .map_err(|e| GssapiError::Gssapi(format!("OidSet::new: {e}")))?;
+    let mech_set = OidSet::new().map_err(|e| GssapiError::Gssapi(format!("OidSet::new: {e}")))?;
     mech_set
         .add(&GSS_MECH_KRB5)
         .map_err(|e| GssapiError::Gssapi(format!("OidSet::add krb5: {e}")))?;
@@ -234,7 +235,7 @@ fn init_security_context_impl(target_name: &str) -> Result<InitiatedContext, Gss
     use libgssapi::context::{ClientCtx, CtxFlags, SecurityContext};
     use libgssapi::credential::{Cred, CredUsage};
     use libgssapi::name::Name;
-    use libgssapi::oid::{OidSet, GSS_MECH_KRB5, GSS_NT_KRB5_PRINCIPAL};
+    use libgssapi::oid::{GSS_MECH_KRB5, GSS_NT_KRB5_PRINCIPAL, OidSet};
 
     let name = Name::new(target_name.as_bytes(), Some(&GSS_NT_KRB5_PRINCIPAL))
         .map_err(|e| GssapiError::Gssapi(format!("Name::new: {e}")))?;
@@ -242,8 +243,7 @@ fn init_security_context_impl(target_name: &str) -> Result<InitiatedContext, Gss
         .canonicalize(Some(&GSS_MECH_KRB5))
         .map_err(|e| GssapiError::Gssapi(format!("Name::canonicalize: {e}")))?;
 
-    let mech_set = OidSet::new()
-        .map_err(|e| GssapiError::Gssapi(format!("OidSet::new: {e}")))?;
+    let mech_set = OidSet::new().map_err(|e| GssapiError::Gssapi(format!("OidSet::new: {e}")))?;
     mech_set
         .add(&GSS_MECH_KRB5)
         .map_err(|e| GssapiError::Gssapi(format!("OidSet::add krb5: {e}")))?;

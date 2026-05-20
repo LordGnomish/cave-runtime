@@ -192,9 +192,9 @@ fn scan_inputs_without_label(html: &str) -> Vec<A11yIssue> {
             // unclosed `<label`.
             let lookback_start = abs_start.saturating_sub(200);
             let lookback = &html[lookback_start..abs_start];
-            let in_label = lookback.rfind("<label").map_or(false, |li| {
-                lookback[li..].find("</label>").is_none()
-            });
+            let in_label = lookback
+                .rfind("<label")
+                .map_or(false, |li| lookback[li..].find("</label>").is_none());
 
             if !has_aria && !has_placeholder && !in_label {
                 out.push(A11yIssue {
@@ -270,7 +270,8 @@ fn scan_dialogs_without_aria(html: &str) -> Vec<A11yIssue> {
 
 /// A11y-005 — interactive markup without any `:focus-visible` rule.
 fn scan_focus_visible(html: &str) -> Vec<A11yIssue> {
-    let has_interactive = html.contains("<button") || html.contains("<a ") || html.contains("<input");
+    let has_interactive =
+        html.contains("<button") || html.contains("<a ") || html.contains("<input");
     if !has_interactive {
         return Vec::new();
     }
@@ -293,35 +294,55 @@ mod tests {
     fn flags_button_with_empty_body_and_no_aria() {
         let html = r#"<button class="x"></button>"#;
         let issues = audit(html);
-        assert!(issues.iter().any(|i| i.code == A11yCode::InteractiveWithoutName));
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.code == A11yCode::InteractiveWithoutName)
+        );
     }
 
     #[test]
     fn passes_button_with_text() {
         let html = r#"<button class="x">Save</button>"#;
         let issues = audit(html);
-        assert!(!issues.iter().any(|i| i.code == A11yCode::InteractiveWithoutName));
+        assert!(
+            !issues
+                .iter()
+                .any(|i| i.code == A11yCode::InteractiveWithoutName)
+        );
     }
 
     #[test]
     fn passes_icon_only_button_with_aria_label() {
         let html = r#"<button aria-label="Close"><svg></svg></button>"#;
         let issues = audit(html);
-        assert!(!issues.iter().any(|i| i.code == A11yCode::InteractiveWithoutName));
+        assert!(
+            !issues
+                .iter()
+                .any(|i| i.code == A11yCode::InteractiveWithoutName)
+        );
     }
 
     #[test]
     fn passes_anchor_with_text_inside_nested_span() {
         let html = r#"<a href="/x"><span>Go</span></a>"#;
         let issues = audit(html);
-        assert!(!issues.iter().any(|i| i.code == A11yCode::InteractiveWithoutName));
+        assert!(
+            !issues
+                .iter()
+                .any(|i| i.code == A11yCode::InteractiveWithoutName)
+        );
     }
 
     #[test]
     fn flags_anchor_with_only_nested_svg() {
         let html = r#"<a href="/x"><svg></svg></a>"#;
         let issues = audit(html);
-        assert!(issues.iter().any(|i| i.code == A11yCode::InteractiveWithoutName));
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.code == A11yCode::InteractiveWithoutName)
+        );
     }
 
     // ── A11y-002 — InputWithoutLabel ──────────────────────────────
@@ -406,21 +427,33 @@ mod tests {
     fn flags_doc_with_button_but_no_focus_visible() {
         let html = r#"<style>.x{color:red}</style><button>x</button>"#;
         let issues = audit(html);
-        assert!(issues.iter().any(|i| i.code == A11yCode::NoFocusVisibleStyles));
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.code == A11yCode::NoFocusVisibleStyles)
+        );
     }
 
     #[test]
     fn passes_doc_with_focus_visible_rule() {
         let html = r#"<style>.x:focus-visible{outline:2px solid blue}</style><button>x</button>"#;
         let issues = audit(html);
-        assert!(!issues.iter().any(|i| i.code == A11yCode::NoFocusVisibleStyles));
+        assert!(
+            !issues
+                .iter()
+                .any(|i| i.code == A11yCode::NoFocusVisibleStyles)
+        );
     }
 
     #[test]
     fn passes_doc_with_tailwind_focus_visible_utility() {
         let html = r#"<button class="focus-visible:outline-2">x</button>"#;
         let issues = audit(html);
-        assert!(!issues.iter().any(|i| i.code == A11yCode::NoFocusVisibleStyles));
+        assert!(
+            !issues
+                .iter()
+                .any(|i| i.code == A11yCode::NoFocusVisibleStyles)
+        );
     }
 
     #[test]
@@ -434,7 +467,7 @@ mod tests {
 
     #[test]
     fn shell_v2_passes_full_a11y_audit() {
-        use crate::admin::layout::shell::{shell_v2, ShellOptions};
+        use crate::admin::layout::shell::{ShellOptions, shell_v2};
         use crate::admin::permission::Persona;
         let html = shell_v2(ShellOptions {
             title: "WCAG audit",
@@ -463,7 +496,7 @@ mod tests {
 
     #[test]
     fn shell_v2_for_tenant_admin_also_passes_a11y_audit() {
-        use crate::admin::layout::shell::{shell_v2, ShellOptions};
+        use crate::admin::layout::shell::{ShellOptions, shell_v2};
         use crate::admin::permission::Persona;
         // Same chrome but with TenantAdmin persona — disabled
         // shortcut rows + filtered palette must still be a11y-clean.

@@ -43,13 +43,19 @@ impl Default for InMemoryStore {
 
 impl LedgerStore for InMemoryStore {
     fn persist(&self, entry: &LedgerEntry) -> Result<(), String> {
-        let mut entries = self.entries.write().map_err(|e| format!("Lock error: {e}"))?;
+        let mut entries = self
+            .entries
+            .write()
+            .map_err(|e| format!("Lock error: {e}"))?;
         entries.push(entry.clone());
         Ok(())
     }
 
     fn load_all(&self) -> Result<Vec<LedgerEntry>, String> {
-        let entries = self.entries.read().map_err(|e| format!("Lock error: {e}"))?;
+        let entries = self
+            .entries
+            .read()
+            .map_err(|e| format!("Lock error: {e}"))?;
         Ok(entries.clone())
     }
 
@@ -174,8 +180,22 @@ mod tests {
         let store = FileStore::new(path.clone());
         store.health_check().unwrap();
 
-        let e1 = LedgerEntry::new(0, "", LedgerEntryKind::Deployment, "a", "first", serde_json::json!({}));
-        let e2 = LedgerEntry::new(1, &e1.hash, LedgerEntryKind::Security, "b", "second", serde_json::json!({}));
+        let e1 = LedgerEntry::new(
+            0,
+            "",
+            LedgerEntryKind::Deployment,
+            "a",
+            "first",
+            serde_json::json!({}),
+        );
+        let e2 = LedgerEntry::new(
+            1,
+            &e1.hash,
+            LedgerEntryKind::Security,
+            "b",
+            "second",
+            serde_json::json!({}),
+        );
 
         store.persist(&e1).unwrap();
         store.persist(&e2).unwrap();

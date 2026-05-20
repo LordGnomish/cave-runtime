@@ -55,7 +55,10 @@ impl Default for AutoscalerMetric {
 
 impl AutoscalerMetric {
     pub fn new() -> Self {
-        Self { samples: Vec::new(), last_activity: None }
+        Self {
+            samples: Vec::new(),
+            last_activity: None,
+        }
     }
 
     pub fn record(&mut self, concurrency: f64) {
@@ -150,9 +153,16 @@ impl Autoscaler {
             }
         }
 
-        let active = if mode == AutoscalerMode::Panic { panic } else { stable };
+        let active = if mode == AutoscalerMode::Panic {
+            panic
+        } else {
+            stable
+        };
         let raw = (active / self.config.target_concurrency).ceil() as i32;
-        let desired = raw.max(self.config.min_scale).min(self.config.max_scale).max(0);
+        let desired = raw
+            .max(self.config.min_scale)
+            .min(self.config.max_scale)
+            .max(0);
 
         ScaleDecision {
             desired_replicas: desired,

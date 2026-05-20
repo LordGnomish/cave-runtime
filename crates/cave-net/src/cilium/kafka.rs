@@ -130,10 +130,18 @@ pub struct KafkaRule {
 
 impl KafkaRule {
     pub fn allow_all() -> Self {
-        Self { role: None, api_key: None, topic: None, client_id: None }
+        Self {
+            role: None,
+            api_key: None,
+            topic: None,
+            client_id: None,
+        }
     }
     pub fn is_empty(&self) -> bool {
-        self.role.is_none() && self.api_key.is_none() && self.topic.is_none() && self.client_id.is_none()
+        self.role.is_none()
+            && self.api_key.is_none()
+            && self.topic.is_none()
+            && self.client_id.is_none()
     }
 }
 
@@ -299,8 +307,16 @@ mod tests {
     fn req(api: KafkaApiKey, topic: &str, cid: &str) -> KafkaRequest {
         KafkaRequest {
             api_key: api,
-            topic: if topic.is_empty() { None } else { Some(topic.to_string()) },
-            client_id: if cid.is_empty() { None } else { Some(cid.to_string()) },
+            topic: if topic.is_empty() {
+                None
+            } else {
+                Some(topic.to_string())
+            },
+            client_id: if cid.is_empty() {
+                None
+            } else {
+                Some(cid.to_string())
+            },
         }
     }
 
@@ -318,7 +334,8 @@ mod tests {
 
     #[test]
     fn kafka_role_produce_expands_to_produce_and_metadata() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "Role.Produce", "tenant-kf-rprod");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/policy/api/kafka.go", "Role.Produce", "tenant-kf-rprod");
         let keys = role_api_keys(KafkaRole::Produce);
         assert!(keys.contains(&KafkaApiKey::Produce));
         assert!(keys.contains(&KafkaApiKey::ApiVersions));
@@ -328,7 +345,8 @@ mod tests {
 
     #[test]
     fn kafka_role_consume_expands_to_consumer_keys() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "Role.Consume", "tenant-kf-rcons");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/policy/api/kafka.go", "Role.Consume", "tenant-kf-rcons");
         let keys = role_api_keys(KafkaRole::Consume);
         assert!(keys.contains(&KafkaApiKey::Fetch));
         assert!(keys.contains(&KafkaApiKey::JoinGroup));
@@ -340,15 +358,27 @@ mod tests {
 
     #[test]
     fn kafka_empty_rule_list_allows_everything() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "PortRuleKafka.Empty", "tenant-kf-empty");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/kafka.go",
+            "PortRuleKafka.Empty",
+            "tenant-kf-empty"
+        );
         let v = evaluate(&[], &req(KafkaApiKey::Produce, "orders", "client-A")).unwrap();
         assert_eq!(v, KafkaVerdict::Allow);
     }
 
     #[test]
     fn kafka_empty_rule_in_list_allows_anything() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "PortRuleKafka.AllowAll", "tenant-kf-allowall");
-        let v = evaluate(&[KafkaRule::allow_all()], &req(KafkaApiKey::Produce, "orders", "client")).unwrap();
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/kafka.go",
+            "PortRuleKafka.AllowAll",
+            "tenant-kf-allowall"
+        );
+        let v = evaluate(
+            &[KafkaRule::allow_all()],
+            &req(KafkaApiKey::Produce, "orders", "client"),
+        )
+        .unwrap();
         assert_eq!(v, KafkaVerdict::Allow);
     }
 
@@ -356,122 +386,261 @@ mod tests {
 
     #[test]
     fn kafka_role_produce_blocks_fetch_request() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "Role.Produce.BlocksFetch", "tenant-kf-rblock");
-        let r = KafkaRule { role: Some(KafkaRole::Produce), ..KafkaRule::allow_all() };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/kafka.go",
+            "Role.Produce.BlocksFetch",
+            "tenant-kf-rblock"
+        );
+        let r = KafkaRule {
+            role: Some(KafkaRole::Produce),
+            ..KafkaRule::allow_all()
+        };
         let v = evaluate(&[r], &req(KafkaApiKey::Fetch, "orders", "client")).unwrap();
         assert_eq!(v, KafkaVerdict::Deny);
     }
 
     #[test]
     fn kafka_role_produce_allows_produce_request() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "Role.Produce.AllowsProduce", "tenant-kf-rallow");
-        let r = KafkaRule { role: Some(KafkaRole::Produce), ..KafkaRule::allow_all() };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/kafka.go",
+            "Role.Produce.AllowsProduce",
+            "tenant-kf-rallow"
+        );
+        let r = KafkaRule {
+            role: Some(KafkaRole::Produce),
+            ..KafkaRule::allow_all()
+        };
         let v = evaluate(&[r], &req(KafkaApiKey::Produce, "orders", "client")).unwrap();
         assert_eq!(v, KafkaVerdict::Allow);
     }
 
     #[test]
     fn kafka_specific_api_key_matches_request() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "PortRuleKafka.APIKey", "tenant-kf-akey");
-        let r = KafkaRule { api_key: Some(KafkaApiKey::Fetch), ..KafkaRule::allow_all() };
-        assert_eq!(evaluate(&[r.clone()], &req(KafkaApiKey::Fetch, "x", "y")).unwrap(), KafkaVerdict::Allow);
-        assert_eq!(evaluate(&[r], &req(KafkaApiKey::Produce, "x", "y")).unwrap(), KafkaVerdict::Deny);
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/kafka.go",
+            "PortRuleKafka.APIKey",
+            "tenant-kf-akey"
+        );
+        let r = KafkaRule {
+            api_key: Some(KafkaApiKey::Fetch),
+            ..KafkaRule::allow_all()
+        };
+        assert_eq!(
+            evaluate(&[r.clone()], &req(KafkaApiKey::Fetch, "x", "y")).unwrap(),
+            KafkaVerdict::Allow
+        );
+        assert_eq!(
+            evaluate(&[r], &req(KafkaApiKey::Produce, "x", "y")).unwrap(),
+            KafkaVerdict::Deny
+        );
     }
 
     #[test]
     fn kafka_role_and_api_key_must_both_match() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "PortRuleKafka.AND", "tenant-kf-and");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/kafka.go",
+            "PortRuleKafka.AND",
+            "tenant-kf-and"
+        );
         let r = KafkaRule {
             role: Some(KafkaRole::Consume),
             api_key: Some(KafkaApiKey::Fetch),
             ..KafkaRule::allow_all()
         };
-        assert_eq!(evaluate(&[r.clone()], &req(KafkaApiKey::Fetch, "t", "")).unwrap(), KafkaVerdict::Allow);
+        assert_eq!(
+            evaluate(&[r.clone()], &req(KafkaApiKey::Fetch, "t", "")).unwrap(),
+            KafkaVerdict::Allow
+        );
         // Heartbeat is in Consume role but not the specified api_key.
-        assert_eq!(evaluate(&[r], &req(KafkaApiKey::Heartbeat, "t", "")).unwrap(), KafkaVerdict::Deny);
+        assert_eq!(
+            evaluate(&[r], &req(KafkaApiKey::Heartbeat, "t", "")).unwrap(),
+            KafkaVerdict::Deny
+        );
     }
 
     // ── topic ────────────────────────────────────────────────────────────────
 
     #[test]
     fn kafka_topic_exact_match() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "PortRuleKafka.Topic", "tenant-kf-topex");
-        let r = KafkaRule { topic: Some("orders".into()), ..KafkaRule::allow_all() };
-        assert_eq!(evaluate(&[r.clone()], &req(KafkaApiKey::Produce, "orders", "")).unwrap(), KafkaVerdict::Allow);
-        assert_eq!(evaluate(&[r], &req(KafkaApiKey::Produce, "events", "")).unwrap(), KafkaVerdict::Deny);
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/kafka.go",
+            "PortRuleKafka.Topic",
+            "tenant-kf-topex"
+        );
+        let r = KafkaRule {
+            topic: Some("orders".into()),
+            ..KafkaRule::allow_all()
+        };
+        assert_eq!(
+            evaluate(&[r.clone()], &req(KafkaApiKey::Produce, "orders", "")).unwrap(),
+            KafkaVerdict::Allow
+        );
+        assert_eq!(
+            evaluate(&[r], &req(KafkaApiKey::Produce, "events", "")).unwrap(),
+            KafkaVerdict::Deny
+        );
     }
 
     #[test]
     fn kafka_topic_regex_with_dot_star() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "PortRuleKafka.TopicRegex", "tenant-kf-toprx");
-        let r = KafkaRule { topic: Some("events\\.[a-z]*".into()), ..KafkaRule::allow_all() };
-        assert_eq!(evaluate(&[r.clone()], &req(KafkaApiKey::Produce, "events.orders", "")).unwrap(), KafkaVerdict::Allow);
-        assert_eq!(evaluate(&[r.clone()], &req(KafkaApiKey::Produce, "events.users", "")).unwrap(), KafkaVerdict::Allow);
-        assert_eq!(evaluate(&[r], &req(KafkaApiKey::Produce, "logs.orders", "")).unwrap(), KafkaVerdict::Deny);
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/kafka.go",
+            "PortRuleKafka.TopicRegex",
+            "tenant-kf-toprx"
+        );
+        let r = KafkaRule {
+            topic: Some("events\\.[a-z]*".into()),
+            ..KafkaRule::allow_all()
+        };
+        assert_eq!(
+            evaluate(
+                &[r.clone()],
+                &req(KafkaApiKey::Produce, "events.orders", "")
+            )
+            .unwrap(),
+            KafkaVerdict::Allow
+        );
+        assert_eq!(
+            evaluate(&[r.clone()], &req(KafkaApiKey::Produce, "events.users", "")).unwrap(),
+            KafkaVerdict::Allow
+        );
+        assert_eq!(
+            evaluate(&[r], &req(KafkaApiKey::Produce, "logs.orders", "")).unwrap(),
+            KafkaVerdict::Deny
+        );
     }
 
     #[test]
     fn kafka_topic_regex_digit_class() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "PortRuleKafka.TopicDigit", "tenant-kf-topdig");
-        let r = KafkaRule { topic: Some("part-\\d".into()), ..KafkaRule::allow_all() };
-        assert_eq!(evaluate(&[r.clone()], &req(KafkaApiKey::Produce, "part-7", "")).unwrap(), KafkaVerdict::Allow);
-        assert_eq!(evaluate(&[r], &req(KafkaApiKey::Produce, "part-x", "")).unwrap(), KafkaVerdict::Deny);
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/kafka.go",
+            "PortRuleKafka.TopicDigit",
+            "tenant-kf-topdig"
+        );
+        let r = KafkaRule {
+            topic: Some("part-\\d".into()),
+            ..KafkaRule::allow_all()
+        };
+        assert_eq!(
+            evaluate(&[r.clone()], &req(KafkaApiKey::Produce, "part-7", "")).unwrap(),
+            KafkaVerdict::Allow
+        );
+        assert_eq!(
+            evaluate(&[r], &req(KafkaApiKey::Produce, "part-x", "")).unwrap(),
+            KafkaVerdict::Deny
+        );
     }
 
     // ── client_id ────────────────────────────────────────────────────────────
 
     #[test]
     fn kafka_client_id_match() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "PortRuleKafka.ClientID", "tenant-kf-cid");
-        let r = KafkaRule { client_id: Some("billing-svc".into()), ..KafkaRule::allow_all() };
-        assert_eq!(evaluate(&[r.clone()], &req(KafkaApiKey::Produce, "x", "billing-svc")).unwrap(), KafkaVerdict::Allow);
-        assert_eq!(evaluate(&[r], &req(KafkaApiKey::Produce, "x", "other-svc")).unwrap(), KafkaVerdict::Deny);
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/kafka.go",
+            "PortRuleKafka.ClientID",
+            "tenant-kf-cid"
+        );
+        let r = KafkaRule {
+            client_id: Some("billing-svc".into()),
+            ..KafkaRule::allow_all()
+        };
+        assert_eq!(
+            evaluate(&[r.clone()], &req(KafkaApiKey::Produce, "x", "billing-svc")).unwrap(),
+            KafkaVerdict::Allow
+        );
+        assert_eq!(
+            evaluate(&[r], &req(KafkaApiKey::Produce, "x", "other-svc")).unwrap(),
+            KafkaVerdict::Deny
+        );
     }
 
     // ── multi-rule OR ────────────────────────────────────────────────────────
 
     #[test]
     fn kafka_multi_rule_first_match_allows() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "PortRuleKafka.MultiRule", "tenant-kf-multi");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/kafka.go",
+            "PortRuleKafka.MultiRule",
+            "tenant-kf-multi"
+        );
         let rules = vec![
-            KafkaRule { topic: Some("orders".into()), ..KafkaRule::allow_all() },
-            KafkaRule { topic: Some("payments".into()), ..KafkaRule::allow_all() },
+            KafkaRule {
+                topic: Some("orders".into()),
+                ..KafkaRule::allow_all()
+            },
+            KafkaRule {
+                topic: Some("payments".into()),
+                ..KafkaRule::allow_all()
+            },
         ];
-        assert_eq!(evaluate(&rules, &req(KafkaApiKey::Produce, "payments", "")).unwrap(), KafkaVerdict::Allow);
-        assert_eq!(evaluate(&rules, &req(KafkaApiKey::Produce, "logs", "")).unwrap(), KafkaVerdict::Deny);
+        assert_eq!(
+            evaluate(&rules, &req(KafkaApiKey::Produce, "payments", "")).unwrap(),
+            KafkaVerdict::Allow
+        );
+        assert_eq!(
+            evaluate(&rules, &req(KafkaApiKey::Produce, "logs", "")).unwrap(),
+            KafkaVerdict::Deny
+        );
     }
 
     // ── Role + topic ─────────────────────────────────────────────────────────
 
     #[test]
     fn kafka_role_and_topic_combine_with_and() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "PortRuleKafka.RoleTopic", "tenant-kf-rt");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/kafka.go",
+            "PortRuleKafka.RoleTopic",
+            "tenant-kf-rt"
+        );
         let r = KafkaRule {
             role: Some(KafkaRole::Consume),
             topic: Some("orders".into()),
             ..KafkaRule::allow_all()
         };
-        assert_eq!(evaluate(&[r.clone()], &req(KafkaApiKey::Fetch, "orders", "")).unwrap(), KafkaVerdict::Allow);
+        assert_eq!(
+            evaluate(&[r.clone()], &req(KafkaApiKey::Fetch, "orders", "")).unwrap(),
+            KafkaVerdict::Allow
+        );
         // Consume role but wrong topic.
-        assert_eq!(evaluate(&[r.clone()], &req(KafkaApiKey::Fetch, "logs", "")).unwrap(), KafkaVerdict::Deny);
+        assert_eq!(
+            evaluate(&[r.clone()], &req(KafkaApiKey::Fetch, "logs", "")).unwrap(),
+            KafkaVerdict::Deny
+        );
         // Right topic but Produce role.
-        assert_eq!(evaluate(&[r], &req(KafkaApiKey::Produce, "orders", "")).unwrap(), KafkaVerdict::Deny);
+        assert_eq!(
+            evaluate(&[r], &req(KafkaApiKey::Produce, "orders", "")).unwrap(),
+            KafkaVerdict::Deny
+        );
     }
 
     // ── Verdict default ──────────────────────────────────────────────────────
 
     #[test]
     fn kafka_no_matching_rule_denies() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "PortRuleKafka.NoMatch", "tenant-kf-nomatch");
-        let r = KafkaRule { topic: Some("orders".into()), ..KafkaRule::allow_all() };
-        assert_eq!(evaluate(&[r], &req(KafkaApiKey::Produce, "events", "")).unwrap(), KafkaVerdict::Deny);
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/kafka.go",
+            "PortRuleKafka.NoMatch",
+            "tenant-kf-nomatch"
+        );
+        let r = KafkaRule {
+            topic: Some("orders".into()),
+            ..KafkaRule::allow_all()
+        };
+        assert_eq!(
+            evaluate(&[r], &req(KafkaApiKey::Produce, "events", "")).unwrap(),
+            KafkaVerdict::Deny
+        );
     }
 
     // ── Serde ────────────────────────────────────────────────────────────────
 
     #[test]
     fn kafka_rule_round_trips_serde() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "PortRuleKafka.Serde", "tenant-kf-serde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/kafka.go",
+            "PortRuleKafka.Serde",
+            "tenant-kf-serde"
+        );
         let r = KafkaRule {
             role: Some(KafkaRole::Consume),
             api_key: Some(KafkaApiKey::Fetch),
@@ -485,16 +654,36 @@ mod tests {
 
     #[test]
     fn kafka_topic_anchored_full_match_required() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "PortRuleKafka.Anchored", "tenant-kf-anchor");
-        let r = KafkaRule { topic: Some("ord".into()), ..KafkaRule::allow_all() };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/kafka.go",
+            "PortRuleKafka.Anchored",
+            "tenant-kf-anchor"
+        );
+        let r = KafkaRule {
+            topic: Some("ord".into()),
+            ..KafkaRule::allow_all()
+        };
         // "orders" has extra chars after "ord" → should NOT match (anchored).
-        assert_eq!(evaluate(&[r], &req(KafkaApiKey::Produce, "orders", "")).unwrap(), KafkaVerdict::Deny);
+        assert_eq!(
+            evaluate(&[r], &req(KafkaApiKey::Produce, "orders", "")).unwrap(),
+            KafkaVerdict::Deny
+        );
     }
 
     #[test]
     fn kafka_role_consume_includes_metadata() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/api/kafka.go", "Role.Consume.Metadata", "tenant-kf-cmeta");
-        let r = KafkaRule { role: Some(KafkaRole::Consume), ..KafkaRule::allow_all() };
-        assert_eq!(evaluate(&[r], &req(KafkaApiKey::Metadata, "", "")).unwrap(), KafkaVerdict::Allow);
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/api/kafka.go",
+            "Role.Consume.Metadata",
+            "tenant-kf-cmeta"
+        );
+        let r = KafkaRule {
+            role: Some(KafkaRole::Consume),
+            ..KafkaRule::allow_all()
+        };
+        assert_eq!(
+            evaluate(&[r], &req(KafkaApiKey::Metadata, "", "")).unwrap(),
+            KafkaVerdict::Allow
+        );
     }
 }

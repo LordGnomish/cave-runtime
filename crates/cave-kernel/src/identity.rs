@@ -43,7 +43,10 @@ pub struct SpiffeId {
 }
 
 impl SpiffeId {
-    pub fn new(trust_domain: impl Into<String>, path: impl Into<String>) -> Result<Self, SpiffeError> {
+    pub fn new(
+        trust_domain: impl Into<String>,
+        path: impl Into<String>,
+    ) -> Result<Self, SpiffeError> {
         let trust_domain = trust_domain.into();
         let path = path.into();
         validate_trust_domain(&trust_domain)?;
@@ -51,8 +54,12 @@ impl SpiffeId {
         Ok(Self { trust_domain, path })
     }
 
-    pub fn trust_domain(&self) -> &str { &self.trust_domain }
-    pub fn path(&self) -> &str { &self.path }
+    pub fn trust_domain(&self) -> &str {
+        &self.trust_domain
+    }
+    pub fn path(&self) -> &str {
+        &self.path
+    }
 
     /// True if this ID is a workload under the given trust domain.
     pub fn is_member_of(&self, trust_domain: &str) -> bool {
@@ -73,7 +80,9 @@ impl fmt::Display for SpiffeId {
 impl FromStr for SpiffeId {
     type Err = SpiffeError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let rest = s.strip_prefix("spiffe://").ok_or(SpiffeError::MissingScheme)?;
+        let rest = s
+            .strip_prefix("spiffe://")
+            .ok_or(SpiffeError::MissingScheme)?;
         if rest.contains('%') {
             return Err(SpiffeError::PercentEncoded);
         }
@@ -93,11 +102,8 @@ fn validate_trust_domain(td: &str) -> Result<(), SpiffeError> {
         return Err(SpiffeError::TrustDomainTooLong);
     }
     for ch in td.chars() {
-        let ok = ch.is_ascii_lowercase()
-            || ch.is_ascii_digit()
-            || ch == '.'
-            || ch == '-'
-            || ch == '_';
+        let ok =
+            ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '.' || ch == '-' || ch == '_';
         if !ok {
             return Err(SpiffeError::InvalidTrustDomain(ch));
         }
@@ -147,7 +153,9 @@ mod tests {
 
     #[test]
     fn parse_nested_path() {
-        let id: SpiffeId = "spiffe://prod.cave/ns/default/sa/scheduler".parse().unwrap();
+        let id: SpiffeId = "spiffe://prod.cave/ns/default/sa/scheduler"
+            .parse()
+            .unwrap();
         assert_eq!(id.trust_domain(), "prod.cave");
         assert_eq!(id.path(), "ns/default/sa/scheduler");
     }
@@ -172,7 +180,9 @@ mod tests {
 
     #[test]
     fn reject_percent_encoding() {
-        let err = "spiffe://example.org/foo%20bar".parse::<SpiffeId>().unwrap_err();
+        let err = "spiffe://example.org/foo%20bar"
+            .parse::<SpiffeId>()
+            .unwrap_err();
         assert_eq!(err, SpiffeError::PercentEncoded);
     }
 
@@ -211,7 +221,11 @@ mod tests {
     #[test]
     fn svid_metadata_validity_window() {
         let id: SpiffeId = "spiffe://prod.cave/svc".parse().unwrap();
-        let m = SvidMetadata { id, not_before: 100, not_after: 200 };
+        let m = SvidMetadata {
+            id,
+            not_before: 100,
+            not_after: 200,
+        };
         assert!(!m.is_valid_at(50));
         assert!(m.is_valid_at(100));
         assert!(m.is_valid_at(150));

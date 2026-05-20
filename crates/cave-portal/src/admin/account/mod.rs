@@ -58,7 +58,11 @@ mod tests {
 
     #[test]
     fn gate_admits_tenant_admin() {
-        let ctx = RequestCtx::developer_as("acme", &[Permission::AuthSessionsRead], Persona::TenantAdmin);
+        let ctx = RequestCtx::developer_as(
+            "acme",
+            &[Permission::AuthSessionsRead],
+            Persona::TenantAdmin,
+        );
         assert!(require_account_user(&ctx).is_ok());
     }
 

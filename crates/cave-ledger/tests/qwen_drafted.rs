@@ -10,13 +10,13 @@
 mod cycle_1779052669_a3 {
     use cave_ledger::LedgerState;
     use cave_ledger::MerkleChain;
+    use cave_ledger::chain::VerifyResult;
     use cave_ledger::entry::LedgerEntry;
     use cave_ledger::entry::LedgerEntryKind;
-    use cave_ledger::store::LedgerStore;
-    use cave_ledger::store::InMemoryStore;
     use cave_ledger::store::FileStore;
+    use cave_ledger::store::InMemoryStore;
+    use cave_ledger::store::LedgerStore;
     use cave_ledger::store::LedgerStoreConfig;
-    use cave_ledger::chain::VerifyResult;
     use std::sync::Arc;
 
     // Helper to create a basic LedgerEntry for testing
@@ -24,19 +24,19 @@ mod cycle_1779052669_a3 {
         // TODO not_yet_exposed: LedgerEntry::new or similar constructor if it exists and is public
         // Since we cannot see the struct fields or constructors in the allowed symbols,
         // we must assume standard construction or use unimplemented! if no public constructor is visible.
-        // However, typically LedgerEntry might have a new() or builder. 
+        // However, typically LedgerEntry might have a new() or builder.
         // Given the error "no function or associated item named `new` found for struct `LedgerState`",
-        // it implies LedgerState does NOT have a `new`. 
+        // it implies LedgerState does NOT have a `new`.
         // Let's assume LedgerEntry might have a `new` or we need to construct it.
         // Without visibility into LedgerEntry's public API beyond its name, we must be careful.
         // Let's assume for the sake of the test structure that we can't easily instantiate it without more info.
-        // But wait, the prompt says "ALLOWED_SYMBOLS ... extracted via cargo metadata". 
+        // But wait, the prompt says "ALLOWED_SYMBOLS ... extracted via cargo metadata".
         // It lists `pub struct LedgerEntry`. It does NOT list `pub fn new` for LedgerEntry.
         // Therefore, we likely cannot create a LedgerEntry directly in an integration test unless there is a public constructor.
         // If there is no public constructor, we cannot test functionality that requires a LedgerEntry instance easily.
         // However, the previous errors were about LedgerState::new and VerifyResult::Valid/Invalid.
         // Let's focus on what IS available.
-        
+
         // Since we cannot instantiate LedgerEntry, we will focus on tests that don't require it,
         // or use unimplemented! for parts requiring it.
         unimplemented!("LedgerEntry construction not exposed via public API in allowed symbols")

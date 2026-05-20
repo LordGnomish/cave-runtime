@@ -30,19 +30,19 @@ pub mod state;
 pub mod template;
 pub mod tsdb;
 
+pub use discovery_cloud::{Target as CloudTarget, parse_azure_vms, parse_hetzner_servers};
 pub use error::{MetricsError, Result};
-pub use model::{Labels, LabelMatcher, MatchOp, MetricType, QueryResult, Sample, TimeSeries};
-pub use promql::{Engine, parse};
-pub use tsdb::{Tsdb, TsdbConfig};
-pub use state::MetricsState;
-pub use discovery_cloud::{Target as CloudTarget, parse_hetzner_servers, parse_azure_vms};
 pub use exemplars::{Exemplar, ExemplarRing, NativeHistogram};
+pub use model::{LabelMatcher, Labels, MatchOp, MetricType, QueryResult, Sample, TimeSeries};
 pub use notifier_sharded::{Notification, PeerQueue, ShardedNotifier};
+pub use promql::{Engine, parse};
 pub use remote_read_backend::{
     LabelMatcher as RemoteLabelMatcher, MatcherKind, MemoryReadBackend, ReadQuery,
     RemoteReadBackend, Sample as RemoteSample, SeriesSamples,
 };
-pub use template::{render as render_template, TemplateContext};
+pub use state::MetricsState;
+pub use template::{TemplateContext, render as render_template};
+pub use tsdb::{Tsdb, TsdbConfig};
 
 use axum::Router;
 use std::sync::Arc;
@@ -61,15 +61,15 @@ pub const MODULE_NAME: &str = "metrics";
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Labels, LabelMatcher, Sample};
-    use crate::tsdb::{Tsdb, TsdbConfig};
-    use crate::promql::{parse, Engine};
-    use crate::rules::{AlertRule, RecordingRule, AlertState};
-    use crate::ingestion::{exposition, statsd, graphite, influx, otlp};
     use crate::ingestion::remote_write::{
-        WriteRequest, ProtoTimeSeries, ProtoLabel, ProtoSample,
-        encode_write_request, decode_write_request, write_request_to_batch,
+        ProtoLabel, ProtoSample, ProtoTimeSeries, WriteRequest, decode_write_request,
+        encode_write_request, write_request_to_batch,
     };
+    use crate::ingestion::{exposition, graphite, influx, otlp, statsd};
+    use crate::model::{LabelMatcher, Labels, Sample};
+    use crate::promql::{Engine, parse};
+    use crate::rules::{AlertRule, AlertState, RecordingRule};
+    use crate::tsdb::{Tsdb, TsdbConfig};
     use std::sync::Arc;
 
     // ─── Label / fingerprint tests ────────────────────────────────────────
@@ -150,7 +150,10 @@ mod tests {
     #[test]
     fn test_tsdb_no_match() {
         let db = Tsdb::default();
-        db.append(Labels::from_pairs([("__name__", "cpu")]), Sample::new(1000, 1.0));
+        db.append(
+            Labels::from_pairs([("__name__", "cpu")]),
+            Sample::new(1000, 1.0),
+        );
         let result = db.select(&[LabelMatcher::equal("__name__", "nonexistent")], 0, 9999);
         assert!(result.is_empty());
     }
@@ -158,8 +161,14 @@ mod tests {
     #[test]
     fn test_tsdb_label_enumeration() {
         let db = Tsdb::default();
-        db.append(Labels::from_pairs([("__name__", "cpu"), ("job", "api")]), Sample::new(1000, 1.0));
-        db.append(Labels::from_pairs([("__name__", "mem"), ("job", "web")]), Sample::new(1000, 2.0));
+        db.append(
+            Labels::from_pairs([("__name__", "cpu"), ("job", "api")]),
+            Sample::new(1000, 1.0),
+        );
+        db.append(
+            Labels::from_pairs([("__name__", "mem"), ("job", "web")]),
+            Sample::new(1000, 2.0),
+        );
 
         let names = db.label_names(&[]);
         assert!(names.contains(&"__name__".to_string()));
@@ -200,7 +209,11 @@ mod tests {
     fn test_parse_label_matchers() {
         let expr = parse(r#"http_requests{method="GET", code!="500"}"#).unwrap();
         if let crate::promql::ast::Expr::VectorSelector(vs) = expr {
-            assert!(vs.matchers.iter().any(|m| m.name == "__name__" && m.value == "http_requests"));
+            assert!(
+                vs.matchers
+                    .iter()
+                    .any(|m| m.name == "__name__" && m.value == "http_requests")
+            );
             assert!(vs.matchers.iter().any(|m| m.name == "method"));
             assert!(vs.matchers.iter().any(|m| m.name == "code"));
         }
@@ -302,11 +315,8 @@ mod tests {
         let db = Arc::new(Tsdb::default());
         // Seed histogram _bucket series
         for (le, count) in [("0.1", 10.0), ("0.5", 50.0), ("1.0", 80.0), ("+Inf", 100.0)] {
-            let labels = Labels::from_pairs([
-                ("__name__", "latency_bucket"),
-                ("job", "api"),
-                ("le", le),
-            ]);
+            let labels =
+                Labels::from_pairs([("__name__", "latency_bucket"), ("job", "api"), ("le", le)]);
             db.append(labels, Sample::new(1000, count));
         }
 
@@ -353,7 +363,10 @@ mod tests {
         let result = engine.eval_instant(&ast, 30_000).unwrap();
         if let QueryResult::InstantVector(iv) = result {
             assert!(!iv.is_empty());
-            let api_series: Vec<_> = iv.iter().filter(|(l, _)| l.get("job") == Some("api")).collect();
+            let api_series: Vec<_> = iv
+                .iter()
+                .filter(|(l, _)| l.get("job") == Some("api"))
+                .collect();
             if !api_series.is_empty() {
                 assert_eq!(api_series[0].0.get("env"), Some("production"));
             }
@@ -382,7 +395,7 @@ mod tests {
         let engine = Engine::new(Arc::clone(&db));
 
         for (func, expected) in [
-            ("abs(-4)",  "abs"),
+            ("abs(-4)", "abs"),
             ("ceil(1.1)", "ceil"),
             ("floor(1.9)", "floor"),
             ("sqrt(x)", "sqrt"),
@@ -400,7 +413,14 @@ mod tests {
         let engine = Engine::new(Arc::clone(&db));
         let ts_ms = 1_700_000_000_000i64;
 
-        for func in ["time()", "hour()", "minute()", "day_of_week()", "month()", "year()"] {
+        for func in [
+            "time()",
+            "hour()",
+            "minute()",
+            "day_of_week()",
+            "month()",
+            "year()",
+        ] {
             let ast = parse(func).unwrap();
             let _ = engine.eval_instant(&ast, ts_ms).unwrap();
         }
@@ -412,11 +432,17 @@ mod tests {
         let engine = Engine::new(Arc::clone(&db));
         let ts_ms = 30_000;
 
-        for agg in ["sum", "min", "max", "avg", "count", "stddev", "stdvar", "group"] {
+        for agg in [
+            "sum", "min", "max", "avg", "count", "stddev", "stdvar", "group",
+        ] {
             let query = format!("{}(requests)", agg);
             let ast = parse(&query).unwrap();
             let result = engine.eval_instant(&ast, ts_ms).unwrap();
-            assert!(matches!(result, QueryResult::InstantVector(_)), "Failed: {}", agg);
+            assert!(
+                matches!(result, QueryResult::InstantVector(_)),
+                "Failed: {}",
+                agg
+            );
         }
     }
 
@@ -432,13 +458,13 @@ mod tests {
 
     #[test]
     fn test_gorilla_compression_roundtrip() {
-        use crate::tsdb::block::{ChunkWriter, ChunkReader};
+        use crate::tsdb::block::{ChunkReader, ChunkWriter};
         let samples = vec![
             (1_000_000_000i64, 1.0f64),
-            (1_000_015_000,    1.5),
-            (1_000_030_000,    2.0),
-            (1_000_045_000,    2.0), // same value — XOR = 0
-            (1_000_060_000,    -1.0),
+            (1_000_015_000, 1.5),
+            (1_000_030_000, 2.0),
+            (1_000_045_000, 2.0), // same value — XOR = 0
+            (1_000_060_000, -1.0),
         ];
         let mut w = ChunkWriter::new();
         for (ts, v) in &samples {
@@ -461,10 +487,19 @@ mod tests {
         let req = WriteRequest {
             timeseries: vec![ProtoTimeSeries {
                 labels: vec![
-                    ProtoLabel { name: "__name__".into(), value: "test_metric".into() },
-                    ProtoLabel { name: "job".into(), value: "api".into() },
+                    ProtoLabel {
+                        name: "__name__".into(),
+                        value: "test_metric".into(),
+                    },
+                    ProtoLabel {
+                        name: "job".into(),
+                        value: "api".into(),
+                    },
                 ],
-                samples: vec![ProtoSample { value: 42.0, timestamp: 1_000_000 }],
+                samples: vec![ProtoSample {
+                    value: 42.0,
+                    timestamp: 1_000_000,
+                }],
                 exemplars: vec![],
             }],
             metadata: vec![],
@@ -479,8 +514,14 @@ mod tests {
     fn test_remote_write_to_batch() {
         let req = WriteRequest {
             timeseries: vec![ProtoTimeSeries {
-                labels: vec![ProtoLabel { name: "__name__".into(), value: "cpu".into() }],
-                samples: vec![ProtoSample { value: 0.5, timestamp: 1000 }],
+                labels: vec![ProtoLabel {
+                    name: "__name__".into(),
+                    value: "cpu".into(),
+                }],
+                samples: vec![ProtoSample {
+                    value: 0.5,
+                    timestamp: 1000,
+                }],
                 exemplars: vec![],
             }],
             metadata: vec![],
@@ -592,7 +633,8 @@ req_duration_sum 25.3
 
         let recorded = db.select(
             &[LabelMatcher::equal("__name__", "job:http_req:sum")],
-            0, 3000,
+            0,
+            3000,
         );
         assert!(!recorded.is_empty());
         // sum should be 15
@@ -652,20 +694,14 @@ req_duration_sum 25.3
 
     #[test]
     fn test_fn_rate_basic() {
-        let samples = vec![
-            Sample::new(0, 0.0),
-            Sample::new(60_000, 60.0),
-        ];
+        let samples = vec![Sample::new(0, 0.0), Sample::new(60_000, 60.0)];
         let r = crate::promql::functions::rate(&samples, 60_000).unwrap();
         assert!((r - 1.0).abs() < 0.1);
     }
 
     #[test]
     fn test_fn_irate_basic() {
-        let samples = vec![
-            Sample::new(0, 0.0),
-            Sample::new(10_000, 100.0),
-        ];
+        let samples = vec![Sample::new(0, 0.0), Sample::new(10_000, 100.0)];
         let r = crate::promql::functions::irate(&samples).unwrap();
         assert!((r - 10.0).abs() < 0.1); // 100 / 10s
     }
@@ -697,9 +733,9 @@ req_duration_sum 25.3
         let samples = vec![
             Sample::new(0, 5.0),
             Sample::new(1000, 10.0),
-            Sample::new(2000, 2.0),  // reset
+            Sample::new(2000, 2.0), // reset
             Sample::new(3000, 15.0),
-            Sample::new(4000, 3.0),  // reset
+            Sample::new(4000, 3.0), // reset
         ];
         assert_eq!(crate::promql::functions::resets(&samples), 2.0);
     }
@@ -758,19 +794,17 @@ req_duration_sum 25.3
     #[test]
     fn test_fn_label_replace() {
         let labels = Labels::from_pairs([("__name__", "cpu"), ("job", "api-v2")]);
-        let result = crate::promql::functions::label_replace(
-            &labels, "service", "$1", "job", r"(\w+)-.*"
-        ).unwrap();
+        let result =
+            crate::promql::functions::label_replace(&labels, "service", "$1", "job", r"(\w+)-.*")
+                .unwrap();
         assert_eq!(result.get("service"), Some("api"));
     }
 
     #[test]
     fn test_fn_label_join() {
-        let labels = Labels::from_pairs([
-            ("namespace", "prod"),
-            ("service", "api"),
-        ]);
-        let result = crate::promql::functions::label_join(&labels, "fqdn", ".", &["namespace", "service"]);
+        let labels = Labels::from_pairs([("namespace", "prod"), ("service", "api")]);
+        let result =
+            crate::promql::functions::label_join(&labels, "fqdn", ".", &["namespace", "service"]);
         assert_eq!(result.get("fqdn"), Some("prod.api"));
     }
 
@@ -809,10 +843,10 @@ req_duration_sum 25.3
         use crate::promql::functions::rate;
         // Counter resets to 0 between samples — rate should still be positive.
         let samples = vec![
-            Sample::new(0,    100.0),
+            Sample::new(0, 100.0),
             Sample::new(1000, 110.0),
-            Sample::new(2000,   5.0), // reset
-            Sample::new(3000,  20.0),
+            Sample::new(2000, 5.0), // reset
+            Sample::new(3000, 20.0),
         ];
         let r = rate(&samples, 3000).unwrap();
         // Without the reset, total would be 20-100 = -80 (nonsense).
@@ -836,10 +870,7 @@ req_duration_sum 25.3
     #[test]
     fn parity_increase_scales_with_range() {
         use crate::promql::functions::{increase, rate};
-        let samples = vec![
-            Sample::new(0, 0.0),
-            Sample::new(2000, 10.0),
-        ];
+        let samples = vec![Sample::new(0, 0.0), Sample::new(2000, 10.0)];
         let r = rate(&samples, 2000).unwrap();
         let i = increase(&samples, 2000).unwrap();
         // increase = rate * range_seconds
@@ -876,11 +907,11 @@ req_duration_sum 25.3
     fn parity_resets_counts_counter_resets() {
         use crate::promql::functions::resets;
         let samples = vec![
-            Sample::new(0,   10.0),
+            Sample::new(0, 10.0),
             Sample::new(100, 20.0),
-            Sample::new(200,  5.0), // reset
+            Sample::new(200, 5.0), // reset
             Sample::new(300, 30.0),
-            Sample::new(400,  1.0), // reset
+            Sample::new(400, 1.0), // reset
         ];
         assert_eq!(resets(&samples), 2.0);
     }
@@ -901,16 +932,18 @@ req_duration_sum 25.3
     #[test]
     fn parity_avg_over_time_correct() {
         use crate::promql::functions::avg_over_time;
-        let samples = vec![Sample::new(0, 1.0), Sample::new(1, 2.0), Sample::new(2, 3.0)];
+        let samples = vec![
+            Sample::new(0, 1.0),
+            Sample::new(1, 2.0),
+            Sample::new(2, 3.0),
+        ];
         assert_eq!(avg_over_time(&samples), Some(2.0));
     }
 
     #[test]
     fn parity_quantile_over_time_p95() {
         use crate::promql::functions::quantile_over_time;
-        let samples: Vec<Sample> = (0..=100)
-            .map(|i| Sample::new(i as i64, i as f64))
-            .collect();
+        let samples: Vec<Sample> = (0..=100).map(|i| Sample::new(i as i64, i as f64)).collect();
         let q = quantile_over_time(0.95, &samples).unwrap();
         // 95th percentile of 0..=100 should be ~95
         assert!((q - 95.0).abs() < 1.0);
@@ -955,9 +988,18 @@ req_duration_sum 25.3
     #[test]
     fn parity_tsdb_label_values_filtered_by_matchers() {
         let db = Tsdb::default();
-        db.append(Labels::from_pairs([("__name__", "cpu"), ("env", "prod")]), Sample::new(1000, 1.0));
-        db.append(Labels::from_pairs([("__name__", "cpu"), ("env", "dev")]), Sample::new(1000, 1.0));
-        db.append(Labels::from_pairs([("__name__", "mem"), ("env", "prod")]), Sample::new(1000, 1.0));
+        db.append(
+            Labels::from_pairs([("__name__", "cpu"), ("env", "prod")]),
+            Sample::new(1000, 1.0),
+        );
+        db.append(
+            Labels::from_pairs([("__name__", "cpu"), ("env", "dev")]),
+            Sample::new(1000, 1.0),
+        );
+        db.append(
+            Labels::from_pairs([("__name__", "mem"), ("env", "prod")]),
+            Sample::new(1000, 1.0),
+        );
         let cpu_envs = db.label_values("env", &[LabelMatcher::equal("__name__", "cpu")]);
         assert!(cpu_envs.contains(&"prod".to_string()));
         assert!(cpu_envs.contains(&"dev".to_string()));
@@ -967,8 +1009,14 @@ req_duration_sum 25.3
     #[test]
     fn parity_tsdb_series_for_returns_distinct_label_sets() {
         let db = Tsdb::default();
-        db.append(Labels::from_pairs([("__name__", "cpu"), ("inst", "a")]), Sample::new(1000, 1.0));
-        db.append(Labels::from_pairs([("__name__", "cpu"), ("inst", "b")]), Sample::new(1000, 2.0));
+        db.append(
+            Labels::from_pairs([("__name__", "cpu"), ("inst", "a")]),
+            Sample::new(1000, 1.0),
+        );
+        db.append(
+            Labels::from_pairs([("__name__", "cpu"), ("inst", "b")]),
+            Sample::new(1000, 2.0),
+        );
         let series = db.series_for(&[LabelMatcher::equal("__name__", "cpu")]);
         assert_eq!(series.len(), 2);
     }
@@ -978,7 +1026,11 @@ req_duration_sum 25.3
         let db = Tsdb::default();
         let ts = TimeSeries {
             labels: Labels::from_pairs([("__name__", "y")]),
-            samples: vec![Sample::new(100, 1.0), Sample::new(200, 2.0), Sample::new(300, 3.0)],
+            samples: vec![
+                Sample::new(100, 1.0),
+                Sample::new(200, 2.0),
+                Sample::new(300, 3.0),
+            ],
         };
         db.append_many(&ts);
         let r = db.select(&[LabelMatcher::equal("__name__", "y")], 0, i64::MAX);
@@ -990,7 +1042,7 @@ req_duration_sum 25.3
 
     #[test]
     fn parity_block_writer_reader_roundtrip() {
-        use crate::tsdb::block::{ChunkWriter, ChunkReader};
+        use crate::tsdb::block::{ChunkReader, ChunkWriter};
         let mut enc = ChunkWriter::new();
         let pairs = vec![(1000i64, 1.0f64), (2000, 2.5), (3000, 3.7), (4000, 4.2)];
         for (t, v) in &pairs {
@@ -1011,9 +1063,7 @@ req_duration_sum 25.3
     fn parity_wal_record_serializable() {
         use crate::tsdb::wal::WalRecord;
         let rec = WalRecord::Sample {
-            labels: std::collections::BTreeMap::from([
-                ("__name__".to_string(), "cpu".to_string()),
-            ]),
+            labels: std::collections::BTreeMap::from([("__name__".to_string(), "cpu".to_string())]),
             timestamp_ms: 1000,
             value: 0.5,
         };
@@ -1021,7 +1071,11 @@ req_duration_sum 25.3
         assert!(json.contains("\"cpu\""));
         let parsed: WalRecord = serde_json::from_str(&json).unwrap();
         match parsed {
-            WalRecord::Sample { timestamp_ms, value, .. } => {
+            WalRecord::Sample {
+                timestamp_ms,
+                value,
+                ..
+            } => {
                 assert_eq!(timestamp_ms, 1000);
                 assert_eq!(value, 0.5);
             }
@@ -1033,7 +1087,7 @@ req_duration_sum 25.3
 
     #[test]
     fn parity_multitenant_enforce_filter_idempotent() {
-        use crate::multitenant::{enforce_tenant_filter, TENANT_LABEL};
+        use crate::multitenant::{TENANT_LABEL, enforce_tenant_filter};
         let m1 = enforce_tenant_filter(vec![LabelMatcher::equal("__name__", "x")], "acme");
         let m2 = enforce_tenant_filter(m1.clone(), "acme");
         let count = m2.iter().filter(|m| m.name == TENANT_LABEL).count();
@@ -1052,7 +1106,7 @@ req_duration_sum 25.3
     #[test]
     fn parity_remote_write_protobuf_roundtrip() {
         use crate::ingestion::remote_write::{
-            batch_to_write_request, encode_write_request, decode_write_request,
+            batch_to_write_request, decode_write_request, encode_write_request,
             write_request_to_batch,
         };
         let batch: Vec<TimeSeries> = vec![TimeSeries {
@@ -1083,7 +1137,8 @@ req_duration_sum 25.3
 
         let recorded = db.select(
             &[LabelMatcher::equal("__name__", "raw_aggregated")],
-            0, i64::MAX,
+            0,
+            i64::MAX,
         );
         assert_eq!(recorded.len(), 1);
         assert_eq!(recorded[0].0.get("derived"), Some("true"));
@@ -1133,20 +1188,24 @@ req_duration_sum 25.3
 
     #[test]
     fn parity_silence_store_create_get_list() {
-        use crate::alertmgr::silence::SilenceStore;
         use crate::alertmgr::model::{Silence, SilenceMatcher, SilenceStatus};
+        use crate::alertmgr::silence::SilenceStore;
         let store = SilenceStore::new();
         let s = Silence {
             id: String::new(), // auto-assigned
             matchers: vec![SilenceMatcher {
-                name: "alertname".to_string(), value: "Foo".to_string(),
-                is_regex: false, is_equal: true,
+                name: "alertname".to_string(),
+                value: "Foo".to_string(),
+                is_regex: false,
+                is_equal: true,
             }],
             starts_at: "2026-01-01T00:00:00Z".to_string(),
             ends_at: "2030-01-01T00:00:00Z".to_string(),
             created_by: "test".to_string(),
             comment: "test".to_string(),
-            status: SilenceStatus { state: "active".to_string() },
+            status: SilenceStatus {
+                state: "active".to_string(),
+            },
         };
         let id = store.create(s);
         assert!(!id.is_empty());
@@ -1156,19 +1215,24 @@ req_duration_sum 25.3
 
     #[test]
     fn parity_silence_matches_active_window_and_labels() {
-        use crate::alertmgr::silence::SilenceStore;
         use crate::alertmgr::model::{Silence, SilenceMatcher, SilenceStatus};
+        use crate::alertmgr::silence::SilenceStore;
         let store = SilenceStore::new();
         store.create(Silence {
             id: String::new(),
             matchers: vec![SilenceMatcher {
-                name: "alertname".to_string(), value: "Foo".to_string(),
-                is_regex: false, is_equal: true,
+                name: "alertname".to_string(),
+                value: "Foo".to_string(),
+                is_regex: false,
+                is_equal: true,
             }],
             starts_at: "2026-01-01T00:00:00Z".to_string(),
             ends_at: "2030-01-01T00:00:00Z".to_string(),
-            created_by: "x".to_string(), comment: "x".to_string(),
-            status: SilenceStatus { state: "active".to_string() },
+            created_by: "x".to_string(),
+            comment: "x".to_string(),
+            status: SilenceStatus {
+                state: "active".to_string(),
+            },
         });
         let foo_labels = Labels::from_pairs([("alertname", "Foo")]);
         let bar_labels = Labels::from_pairs([("alertname", "Bar")]);
@@ -1181,18 +1245,24 @@ req_duration_sum 25.3
 
     #[test]
     fn parity_silence_expire_drops_to_expired_state() {
-        use crate::alertmgr::silence::SilenceStore;
         use crate::alertmgr::model::{Silence, SilenceMatcher, SilenceStatus};
+        use crate::alertmgr::silence::SilenceStore;
         let store = SilenceStore::new();
         let id = store.create(Silence {
-            id: String::new(), matchers: vec![SilenceMatcher {
-                name: "x".to_string(), value: "y".to_string(),
-                is_regex: false, is_equal: true,
+            id: String::new(),
+            matchers: vec![SilenceMatcher {
+                name: "x".to_string(),
+                value: "y".to_string(),
+                is_regex: false,
+                is_equal: true,
             }],
             starts_at: "2020-01-01T00:00:00Z".to_string(),
             ends_at: "2030-01-01T00:00:00Z".to_string(),
-            created_by: "x".to_string(), comment: "x".to_string(),
-            status: SilenceStatus { state: "active".to_string() },
+            created_by: "x".to_string(),
+            comment: "x".to_string(),
+            status: SilenceStatus {
+                state: "active".to_string(),
+            },
         });
         assert!(store.expire(&id));
         let s = store.get(&id).unwrap();
@@ -1235,10 +1305,12 @@ req_duration_sum 25.3
         let body = "# HELP weird metric\n# TYPE weird gauge\nweird +Inf\nweird_nan NaN\n";
         let batch = exposition::parse(body).unwrap();
         // Both lines should parse — Inf and NaN are valid Prometheus values
-        let any_inf = batch.iter().any(|ts|
-            ts.samples.iter().any(|s| s.value.is_infinite()));
-        let any_nan = batch.iter().any(|ts|
-            ts.samples.iter().any(|s| s.value.is_nan()));
+        let any_inf = batch
+            .iter()
+            .any(|ts| ts.samples.iter().any(|s| s.value.is_infinite()));
+        let any_nan = batch
+            .iter()
+            .any(|ts| ts.samples.iter().any(|s| s.value.is_nan()));
         assert!(any_inf, "expected an infinity sample");
         assert!(any_nan, "expected a NaN sample");
     }

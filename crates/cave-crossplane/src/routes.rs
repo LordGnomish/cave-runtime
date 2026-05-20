@@ -2,17 +2,17 @@
 // Copyright 2026 Cave Runtime contributors
 //! HTTP routes for cave-crossplane.
 
+use crate::CrossplaneState;
 use crate::models::{
     CreateClaimRequest, CreateCompositionRequest, CreateProviderRequest, CreateXrdRequest,
     DeletionPolicy,
 };
-use crate::CrossplaneState;
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, post},
-    Json, Router,
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -30,7 +30,10 @@ pub fn create_router(state: Arc<CrossplaneState>) -> Router {
             "/api/crossplane/xrds/{group}/{kind}",
             get(get_xrd).delete(delete_xrd),
         )
-        .route("/api/crossplane/xrds/{group}/{kind}/versions", get(get_xrd_versions))
+        .route(
+            "/api/crossplane/xrds/{group}/{kind}/versions",
+            get(get_xrd_versions),
+        )
         // Compositions
         .route(
             "/api/crossplane/compositions",
@@ -59,16 +62,16 @@ pub fn create_router(state: Arc<CrossplaneState>) -> Router {
         )
         // Composites
         .route("/api/crossplane/composites", get(list_composites))
-        .route("/api/crossplane/composites/{kind}/{name}", get(get_composite))
+        .route(
+            "/api/crossplane/composites/{kind}/{name}",
+            get(get_composite),
+        )
         // Providers
         .route(
             "/api/crossplane/providers",
             get(list_providers).post(install_provider),
         )
-        .route(
-            "/api/crossplane/providers/catalog",
-            get(provider_catalog),
-        )
+        .route("/api/crossplane/providers/catalog", get(provider_catalog))
         .route(
             "/api/crossplane/providers/{name}",
             get(get_provider).delete(delete_provider),
@@ -230,10 +233,7 @@ async fn create_composition(
     }
 }
 
-async fn get_composition(
-    State(s): State<AppState>,
-    Path(name): Path<String>,
-) -> impl IntoResponse {
+async fn get_composition(State(s): State<AppState>, Path(name): Path<String>) -> impl IntoResponse {
     match s.composition_store.get(&name) {
         Ok(c) => Json(json!({
             "id": c.id,
@@ -540,10 +540,7 @@ async fn provider_catalog(State(s): State<AppState>) -> Json<serde_json::Value> 
     }))
 }
 
-async fn get_provider(
-    State(s): State<AppState>,
-    Path(name): Path<String>,
-) -> impl IntoResponse {
+async fn get_provider(State(s): State<AppState>, Path(name): Path<String>) -> impl IntoResponse {
     match s.provider_store.get(&name) {
         Ok(p) => Json(json!({
             "id": p.id,
@@ -560,10 +557,7 @@ async fn get_provider(
     }
 }
 
-async fn delete_provider(
-    State(s): State<AppState>,
-    Path(name): Path<String>,
-) -> impl IntoResponse {
+async fn delete_provider(State(s): State<AppState>, Path(name): Path<String>) -> impl IntoResponse {
     match s.provider_store.delete(&name) {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),

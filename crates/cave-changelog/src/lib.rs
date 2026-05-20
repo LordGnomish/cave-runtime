@@ -5,9 +5,9 @@
 //! Upstream tracking: custom
 //! Features: Auto-generated changelogs from git commits + SBOM diffs per deployment
 
-pub mod routes;
-pub mod models;
 pub mod engine;
+pub mod models;
+pub mod routes;
 
 use axum::Router;
 

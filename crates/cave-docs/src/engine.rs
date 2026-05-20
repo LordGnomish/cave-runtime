@@ -25,18 +25,21 @@ pub fn detect_breaking_changes(old_content: &str, new_content: &str) -> Vec<Stri
             (trimmed.starts_with('"') && l.contains("\"path\"")) || trimmed.starts_with('/')
         })
         .collect();
-    old_paths.difference(&new_paths).map(|s| s.to_string()).collect()
+    old_paths
+        .difference(&new_paths)
+        .map(|s| s.to_string())
+        .collect()
 }
 
 /// Get the latest version from a list of specs (semver comparison)
 pub fn latest_version<'a>(specs: &'a [ApiSpec]) -> Option<&'a ApiSpec> {
-    specs.iter().max_by(|a, b| compare_versions(&a.version, &b.version))
+    specs
+        .iter()
+        .max_by(|a, b| compare_versions(&a.version, &b.version))
 }
 
 fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
-    let parse = |s: &str| -> Vec<u32> {
-        s.split('.').filter_map(|p| p.parse().ok()).collect()
-    };
+    let parse = |s: &str| -> Vec<u32> { s.split('.').filter_map(|p| p.parse().ok()).collect() };
     let va = parse(a);
     let vb = parse(b);
     for i in 0..va.len().max(vb.len()) {
@@ -110,10 +113,7 @@ mod tests {
             compare_versions("2.0.0", "1.9.9"),
             std::cmp::Ordering::Greater
         );
-        assert_eq!(
-            compare_versions("1.9.9", "2.0.0"),
-            std::cmp::Ordering::Less
-        );
+        assert_eq!(compare_versions("1.9.9", "2.0.0"), std::cmp::Ordering::Less);
         assert_eq!(
             compare_versions("1.0.0", "1.0.0"),
             std::cmp::Ordering::Equal

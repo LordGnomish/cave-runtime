@@ -46,10 +46,7 @@ pub fn highest_score(rows: &[NodeScoreRow]) -> Option<&NodeScoreRow> {
     rows.iter().max_by_key(|r| r.total)
 }
 
-pub fn render_section(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, SchedulerViewError> {
+pub fn render_section(state: &AdminState, ctx: &RequestCtx) -> Result<String, SchedulerViewError> {
     let rows = list_node_scores(state, ctx)?;
     let table_rows: Vec<Vec<String>> = rows
         .iter()
@@ -75,7 +72,14 @@ pub fn render_section(
         n = rows.len(),
         w = winner,
         tbl = table(
-            &["node", "Fit", "Balanced", "ImageLocality", "Spread", "total"],
+            &[
+                "node",
+                "Fit",
+                "Balanced",
+                "ImageLocality",
+                "Spread",
+                "total"
+            ],
             &table_rows
         ),
     ))
@@ -100,7 +104,8 @@ mod tests {
         );
         let s = AdminState::seeded();
         let scores = list_node_scores(&s, &ctx(&[Permission::SchedulerRead])).unwrap();
-        let nodes = super::super::plugins::list_nodes(&s, &ctx(&[Permission::SchedulerRead])).unwrap();
+        let nodes =
+            super::super::plugins::list_nodes(&s, &ctx(&[Permission::SchedulerRead])).unwrap();
         assert_eq!(scores.len(), nodes.len());
     }
 
@@ -122,7 +127,14 @@ mod tests {
     fn render_section_emits_columns() {
         let s = AdminState::seeded();
         let html = render_section(&s, &ctx(&[Permission::SchedulerRead])).unwrap();
-        for col in ["node", "Fit", "Balanced", "ImageLocality", "Spread", "total"] {
+        for col in [
+            "node",
+            "Fit",
+            "Balanced",
+            "ImageLocality",
+            "Spread",
+            "total",
+        ] {
             assert!(html.contains(&format!(">{}<", col)));
         }
     }

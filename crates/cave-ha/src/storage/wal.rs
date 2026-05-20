@@ -90,7 +90,9 @@ impl Wal {
 
     /// Replay all records from the beginning of the WAL.
     pub async fn replay(&mut self) -> HaResult<WalReplay> {
-        self.file.seek(std::io::SeekFrom::Start(0)).await
+        self.file
+            .seek(std::io::SeekFrom::Start(0))
+            .await
             .map_err(|e| HaError::Storage(e.to_string()))?;
         let mut replay = WalReplay::default();
         let mut buf = Vec::new();
@@ -153,8 +155,12 @@ impl Wal {
         Ok(())
     }
 
-    pub fn size(&self) -> u64 { self.size }
-    pub fn path(&self) -> &Path { &self.path }
+    pub fn size(&self) -> u64 {
+        self.size
+    }
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
 }
 
 // ── Seek shim ─────────────────────────────────────────────────────────────
@@ -180,5 +186,6 @@ pub struct WalReplay {
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 fn simple_checksum(data: &[u8]) -> u32 {
-    data.iter().fold(0u32, |acc, &b| acc.wrapping_mul(31).wrapping_add(b as u32))
+    data.iter()
+        .fold(0u32, |acc, &b| acc.wrapping_mul(31).wrapping_add(b as u32))
 }

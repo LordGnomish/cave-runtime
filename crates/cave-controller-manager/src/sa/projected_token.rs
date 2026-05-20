@@ -34,8 +34,13 @@ pub fn normalize(p: &TokenProjection) -> Result<TokenProjection, ControllerError
             reason: "path required".into(),
         });
     }
-    let aud = p.audience.clone().unwrap_or_else(|| DEFAULT_AUDIENCE.to_string());
-    let exp = p.expiration_sec.clamp(MIN_EXPIRATION_SEC, MAX_EXPIRATION_SEC);
+    let aud = p
+        .audience
+        .clone()
+        .unwrap_or_else(|| DEFAULT_AUDIENCE.to_string());
+    let exp = p
+        .expiration_sec
+        .clamp(MIN_EXPIRATION_SEC, MAX_EXPIRATION_SEC);
     Ok(TokenProjection {
         path: p.path.clone(),
         audience: Some(aud),
@@ -125,10 +130,7 @@ pub fn should_automount(sa_default: bool, pod_override: Option<bool>) -> bool {
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::new(
-    "pkg/serviceaccount/jwt.go",
-    "BoundServiceAccountTokens",
-);
+const FILE_CITE: Cite = Cite::new("pkg/serviceaccount/jwt.go", "BoundServiceAccountTokens");
 
 #[cfg(test)]
 mod tests {
@@ -226,7 +228,10 @@ mod tests {
             "Create",
             "tenant-sa-proj-rev-empty"
         );
-        let r = TokenReview { token: String::new(), audiences: vec![] };
+        let r = TokenReview {
+            token: String::new(),
+            audiences: vec![],
+        };
         assert!(review_token(&r, |_| None).is_err());
     }
 
@@ -237,7 +242,10 @@ mod tests {
             "Create",
             "tenant-sa-proj-rev-unknown"
         );
-        let r = TokenReview { token: "x.y.z".into(), audiences: vec![] };
+        let r = TokenReview {
+            token: "x.y.z".into(),
+            audiences: vec![],
+        };
         let status = review_token(&r, |_| None).unwrap();
         assert!(!status.authenticated);
         assert!(status.error.is_some());
@@ -274,7 +282,10 @@ mod tests {
             "Create",
             "tenant-sa-proj-rev-no-req"
         );
-        let r = TokenReview { token: "abc".into(), audiences: vec![] };
+        let r = TokenReview {
+            token: "abc".into(),
+            audiences: vec![],
+        };
         let status = review_token(&r, |_| {
             Some((
                 "u".into(),

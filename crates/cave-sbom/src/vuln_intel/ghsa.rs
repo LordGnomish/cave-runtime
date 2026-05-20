@@ -134,7 +134,12 @@ fn advisory_to_intel(a: GhsaAdvisory) -> VulnIntel {
         .find(|i| i.kind.eq_ignore_ascii_case("CVE"))
         .map(|i| i.value.clone())
         .unwrap_or_else(|| a.ghsa_id.clone());
-    let severity = match a.severity.as_deref().map(str::to_ascii_uppercase).as_deref() {
+    let severity = match a
+        .severity
+        .as_deref()
+        .map(str::to_ascii_uppercase)
+        .as_deref()
+    {
         Some("CRITICAL") => Severity::Critical,
         Some("HIGH") => Severity::High,
         Some("MODERATE") => Severity::Medium,
@@ -287,7 +292,10 @@ mod tests {
     #[test]
     fn parse_handles_missing_data_block() {
         let blob = r#"{"errors":[{"message":"oops"}]}"#;
-        assert!(matches!(parse_graphql_response(blob.as_bytes()), Err(GhsaError::MissingData)));
+        assert!(matches!(
+            parse_graphql_response(blob.as_bytes()),
+            Err(GhsaError::MissingData)
+        ));
     }
 
     #[test]

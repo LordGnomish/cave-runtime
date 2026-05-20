@@ -18,7 +18,9 @@ use std::collections::HashSet;
 pub struct NodeName;
 
 impl FilterPlugin for NodeName {
-    fn name(&self) -> &str { "NodeName" }
+    fn name(&self) -> &str {
+        "NodeName"
+    }
     fn filter(&self, pod: &Pod, node: &Node, _: &ClusterSnapshot) -> Status {
         match &pod.spec.node_name {
             None => Status::skip("NodeName"),
@@ -35,14 +37,23 @@ impl FilterPlugin for NodeName {
 pub struct NodeUnschedulable;
 
 impl FilterPlugin for NodeUnschedulable {
-    fn name(&self) -> &str { "NodeUnschedulable" }
+    fn name(&self) -> &str {
+        "NodeUnschedulable"
+    }
     fn filter(&self, pod: &Pod, node: &Node, _: &ClusterSnapshot) -> Status {
-        if node.status != NodeStatus::Cordoned { return Status::success("NodeUnschedulable"); }
-        let tolerated = pod.spec.tolerations.iter().any(|t| {
-            t.key.as_deref() == Some("node.kubernetes.io/unschedulable")
-        });
-        if tolerated { Status::success("NodeUnschedulable") }
-        else { Status::unschedulable("NodeUnschedulable", "node is cordoned") }
+        if node.status != NodeStatus::Cordoned {
+            return Status::success("NodeUnschedulable");
+        }
+        let tolerated = pod
+            .spec
+            .tolerations
+            .iter()
+            .any(|t| t.key.as_deref() == Some("node.kubernetes.io/unschedulable"));
+        if tolerated {
+            Status::success("NodeUnschedulable")
+        } else {
+            Status::unschedulable("NodeUnschedulable", "node is cordoned")
+        }
     }
 }
 
@@ -54,18 +65,28 @@ pub struct Resources;
 
 fn available(node: &Node) -> ResourceCapacity {
     ResourceCapacity {
-        cpu_millicores: node.allocatable.cpu_millicores.saturating_sub(node.allocated.cpu_millicores),
-        memory_bytes: node.allocatable.memory_bytes.saturating_sub(node.allocated.memory_bytes),
+        cpu_millicores: node
+            .allocatable
+            .cpu_millicores
+            .saturating_sub(node.allocated.cpu_millicores),
+        memory_bytes: node
+            .allocatable
+            .memory_bytes
+            .saturating_sub(node.allocated.memory_bytes),
         pods: node.allocatable.pods.saturating_sub(node.allocated.pods),
         ephemeral_storage_bytes: 0,
     }
 }
 
 impl FilterPlugin for Resources {
-    fn name(&self) -> &str { "Resources" }
+    fn name(&self) -> &str {
+        "Resources"
+    }
     fn filter(&self, pod: &Pod, node: &Node, _: &ClusterSnapshot) -> Status {
         let avail = available(node);
-        if avail.pods == 0 { return Status::unschedulable("Resources", "node pod capacity exhausted"); }
+        if avail.pods == 0 {
+            return Status::unschedulable("Resources", "node pod capacity exhausted");
+        }
         if !avail.has_room_for(&pod.spec.resources) {
             return Status::unschedulable("Resources", "insufficient cpu or memory");
         }
@@ -74,13 +95,19 @@ impl FilterPlugin for Resources {
 }
 
 impl ScorePlugin for Resources {
-    fn name(&self) -> &str { "Resources" }
+    fn name(&self) -> &str {
+        "Resources"
+    }
     fn score(&self, _: &Pod, node: &Node, _: &ClusterSnapshot) -> i64 {
         // LeastAllocated: prefer node with the most free CPU/memory.
         let cpu_total = node.allocatable.cpu_millicores.max(1);
         let mem_total = node.allocatable.memory_bytes.max(1);
-        let cpu_free = (cpu_total - node.allocated.cpu_millicores.min(cpu_total)) as i64 * MAX_NODE_SCORE / cpu_total as i64;
-        let mem_free = (mem_total - node.allocated.memory_bytes.min(mem_total)) as i64 * MAX_NODE_SCORE / mem_total as i64;
+        let cpu_free = (cpu_total - node.allocated.cpu_millicores.min(cpu_total)) as i64
+            * MAX_NODE_SCORE
+            / cpu_total as i64;
+        let mem_free = (mem_total - node.allocated.memory_bytes.min(mem_total)) as i64
+            * MAX_NODE_SCORE
+            / mem_total as i64;
         (cpu_free + mem_free) / 2
     }
 }
@@ -97,15 +124,25 @@ pub fn node_selector_term_matches(term: &NodeSelectorTerm, node: &Node) -> bool 
 
 fn term_matches(term: &NodeSelectorTerm, node: &Node) -> bool {
     term.match_expressions.iter().all(|req| match req.operator {
-        NodeSelectorOp::In => node.labels.get(&req.key).map_or(false, |v| req.values.iter().any(|x| x == v)),
-        NodeSelectorOp::NotIn => node.labels.get(&req.key).map_or(true, |v| !req.values.iter().any(|x| x == v)),
+        NodeSelectorOp::In => node
+            .labels
+            .get(&req.key)
+            .map_or(false, |v| req.values.iter().any(|x| x == v)),
+        NodeSelectorOp::NotIn => node
+            .labels
+            .get(&req.key)
+            .map_or(true, |v| !req.values.iter().any(|x| x == v)),
         NodeSelectorOp::Exists => node.labels.contains_key(&req.key),
         NodeSelectorOp::DoesNotExist => !node.labels.contains_key(&req.key),
-        NodeSelectorOp::Gt => node.labels.get(&req.key)
+        NodeSelectorOp::Gt => node
+            .labels
+            .get(&req.key)
             .and_then(|v| v.parse::<i64>().ok())
             .zip(req.values.first().and_then(|s| s.parse::<i64>().ok()))
             .map_or(false, |(a, b)| a > b),
-        NodeSelectorOp::Lt => node.labels.get(&req.key)
+        NodeSelectorOp::Lt => node
+            .labels
+            .get(&req.key)
             .and_then(|v| v.parse::<i64>().ok())
             .zip(req.values.first().and_then(|s| s.parse::<i64>().ok()))
             .map_or(false, |(a, b)| a < b),
@@ -113,16 +150,25 @@ fn term_matches(term: &NodeSelectorTerm, node: &Node) -> bool {
 }
 
 impl FilterPlugin for NodeAffinity {
-    fn name(&self) -> &str { "NodeAffinity" }
+    fn name(&self) -> &str {
+        "NodeAffinity"
+    }
     fn filter(&self, pod: &Pod, node: &Node, _: &ClusterSnapshot) -> Status {
         // Honor nodeSelector first (legacy required AND).
         for (k, v) in &pod.spec.node_selector {
             if node.labels.get(k) != Some(v) {
-                return Status::unschedulable("NodeAffinity", format!("nodeSelector {}={} not matched", k, v));
+                return Status::unschedulable(
+                    "NodeAffinity",
+                    format!("nodeSelector {}={} not matched", k, v),
+                );
             }
         }
-        let Some(aff) = &pod.spec.node_affinity else { return Status::success("NodeAffinity"); };
-        if aff.required.is_empty() { return Status::success("NodeAffinity"); }
+        let Some(aff) = &pod.spec.node_affinity else {
+            return Status::success("NodeAffinity");
+        };
+        if aff.required.is_empty() {
+            return Status::success("NodeAffinity");
+        }
         if aff.required.iter().any(|t| term_matches(t, node)) {
             Status::success("NodeAffinity")
         } else {
@@ -151,11 +197,20 @@ fn tolerates(pod: &Pod, taint: &crate::models::Taint) -> bool {
 }
 
 impl FilterPlugin for TaintToleration {
-    fn name(&self) -> &str { "TaintToleration" }
+    fn name(&self) -> &str {
+        "TaintToleration"
+    }
     fn filter(&self, pod: &Pod, node: &Node, _: &ClusterSnapshot) -> Status {
         for taint in &node.taints {
-            if matches!(taint.effect, TaintEffect::NoSchedule | TaintEffect::NoExecute) && !tolerates(pod, taint) {
-                return Status::unschedulable("TaintToleration", format!("taint {} not tolerated", taint.key));
+            if matches!(
+                taint.effect,
+                TaintEffect::NoSchedule | TaintEffect::NoExecute
+            ) && !tolerates(pod, taint)
+            {
+                return Status::unschedulable(
+                    "TaintToleration",
+                    format!("taint {} not tolerated", taint.key),
+                );
             }
         }
         Status::success("TaintToleration")
@@ -239,7 +294,10 @@ impl ImageLocality {
 
     /// Bulk replace + recompute `total_nodes`. Use when feeding the
     /// scheduler from a fresh CRI dump on every scheduling cycle.
-    pub fn set_cluster_state(&mut self, per_node: std::collections::HashMap<String, NodeImageStates>) {
+    pub fn set_cluster_state(
+        &mut self,
+        per_node: std::collections::HashMap<String, NodeImageStates>,
+    ) {
         self.total_nodes = per_node.len() as u32;
         self.node_states = per_node;
     }
@@ -289,7 +347,9 @@ impl ImageLocality {
 }
 
 impl ScorePlugin for ImageLocality {
-    fn name(&self) -> &str { "ImageLocality" }
+    fn name(&self) -> &str {
+        "ImageLocality"
+    }
     fn score(&self, pod: &Pod, node: &Node, _: &ClusterSnapshot) -> i64 {
         if pod.spec.container_images.is_empty() {
             return 0;
@@ -307,7 +367,6 @@ impl ScorePlugin for ImageLocality {
 // Cite: pkg/scheduler/framework/plugins/interpodaffinity/plugin.go
 
 pub struct InterPodAffinity;
-
 
 /// Effective selector for a podAffinity term: literal `label_selector`
 /// (HashMap) ANDed with optional `selector_v2` (rich `LabelSelector`),
@@ -327,57 +386,88 @@ fn pod_term_matches_with_pod(p: &Pod, term: &PodAffinityTerm, scheduler_pod: &Po
         // namespace_selector with no labels → match everything.
         true
     };
-    if !ns_ok { return false; }
+    if !ns_ok {
+        return false;
+    }
 
     // match_label_keys: lift scheduler-pod labels into matchLabels.
-    let scheduler_labels: &std::collections::HashMap<String, String> = &scheduler_pod.spec.node_selector;
+    let scheduler_labels: &std::collections::HashMap<String, String> =
+        &scheduler_pod.spec.node_selector;
     for k in &term.match_label_keys {
         if let Some(v) = scheduler_labels.get(k) {
-            if p.spec.node_selector.get(k) != Some(v) { return false; }
+            if p.spec.node_selector.get(k) != Some(v) {
+                return false;
+            }
         }
     }
     // mismatch_label_keys: lifted value must NOT match.
     for k in &term.mismatch_label_keys {
         if let Some(v) = scheduler_labels.get(k) {
-            if p.spec.node_selector.get(k) == Some(v) { return false; }
+            if p.spec.node_selector.get(k) == Some(v) {
+                return false;
+            }
         }
     }
 
     // Legacy HashMap label_selector — ANDed entries.
-    let legacy_ok = term.label_selector.iter().all(|(k, v)| p.spec.node_selector.get(k) == Some(v));
-    if !legacy_ok { return false; }
+    let legacy_ok = term
+        .label_selector
+        .iter()
+        .all(|(k, v)| p.spec.node_selector.get(k) == Some(v));
+    if !legacy_ok {
+        return false;
+    }
     // Rich selector_v2 — when provided, ANDed on top of legacy.
     if let Some(sel) = &term.selector_v2 {
-        if !sel.matches(&p.spec.node_selector) { return false; }
+        if !sel.matches(&p.spec.node_selector) {
+            return false;
+        }
     }
     true
 }
 
 impl FilterPlugin for InterPodAffinity {
-    fn name(&self) -> &str { "InterPodAffinity" }
+    fn name(&self) -> &str {
+        "InterPodAffinity"
+    }
     fn filter(&self, pod: &Pod, node: &Node, snap: &ClusterSnapshot) -> Status {
         // PodAffinity: each required term must have AT LEAST ONE matching pod
         // on a node sharing the same topology key value as `node`.
         for term in &pod.spec.pod_affinity {
             let Some(my_topo) = node.labels.get(&term.topology_key) else {
-                return Status::unschedulable("InterPodAffinity", format!("node lacks topology key {}", term.topology_key));
+                return Status::unschedulable(
+                    "InterPodAffinity",
+                    format!("node lacks topology key {}", term.topology_key),
+                );
             };
             let mut found = false;
             'outer: for n in &snap.nodes {
-                if n.labels.get(&term.topology_key) != Some(my_topo) { continue; }
+                if n.labels.get(&term.topology_key) != Some(my_topo) {
+                    continue;
+                }
                 for p in snap.pods_on(&n.name) {
-                    if pod_term_matches_with_pod(p, term, pod) { found = true; break 'outer; }
+                    if pod_term_matches_with_pod(p, term, pod) {
+                        found = true;
+                        break 'outer;
+                    }
                 }
             }
             if !found {
-                return Status::unschedulable("InterPodAffinity", "no pod satisfies podAffinity term");
+                return Status::unschedulable(
+                    "InterPodAffinity",
+                    "no pod satisfies podAffinity term",
+                );
             }
         }
         // PodAntiAffinity: each required term must have NO matching pod sharing topology key.
         for term in &pod.spec.pod_anti_affinity {
-            let Some(my_topo) = node.labels.get(&term.topology_key) else { continue; };
+            let Some(my_topo) = node.labels.get(&term.topology_key) else {
+                continue;
+            };
             for n in &snap.nodes {
-                if n.labels.get(&term.topology_key) != Some(my_topo) { continue; }
+                if n.labels.get(&term.topology_key) != Some(my_topo) {
+                    continue;
+                }
                 for p in snap.pods_on(&n.name) {
                     if pod_term_matches_with_pod(p, term, pod) {
                         return Status::unschedulable("InterPodAffinity", "antiAffinity violated");
@@ -401,39 +491,61 @@ pub struct InterPodAffinityScore {
 
 impl InterPodAffinityScore {
     pub fn new() -> Self {
-        Self { preferred_affinity: vec![], preferred_anti_affinity: vec![] }
+        Self {
+            preferred_affinity: vec![],
+            preferred_anti_affinity: vec![],
+        }
     }
     pub fn with_preferred_affinity(mut self, t: WeightedPodAffinityTerm) -> Self {
-        self.preferred_affinity.push(t); self
+        self.preferred_affinity.push(t);
+        self
     }
     pub fn with_preferred_anti_affinity(mut self, t: WeightedPodAffinityTerm) -> Self {
-        self.preferred_anti_affinity.push(t); self
+        self.preferred_anti_affinity.push(t);
+        self
     }
 }
 
 impl Default for InterPodAffinityScore {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ScorePlugin for InterPodAffinityScore {
-    fn name(&self) -> &str { "InterPodAffinityScore" }
+    fn name(&self) -> &str {
+        "InterPodAffinityScore"
+    }
     fn score(&self, pod: &Pod, node: &Node, snap: &ClusterSnapshot) -> i64 {
         let mut s: i64 = 0;
         for w in &self.preferred_affinity {
-            let Some(topo_v) = node.labels.get(&w.term.topology_key) else { continue; };
+            let Some(topo_v) = node.labels.get(&w.term.topology_key) else {
+                continue;
+            };
             let mut matched = false;
             'outer: for n in &snap.nodes {
-                if n.labels.get(&w.term.topology_key) != Some(topo_v) { continue; }
+                if n.labels.get(&w.term.topology_key) != Some(topo_v) {
+                    continue;
+                }
                 for p in snap.pods_on(&n.name) {
-                    if pod_term_matches_with_pod(p, &w.term, pod) { matched = true; break 'outer; }
+                    if pod_term_matches_with_pod(p, &w.term, pod) {
+                        matched = true;
+                        break 'outer;
+                    }
                 }
             }
-            if matched { s += w.weight as i64; }
+            if matched {
+                s += w.weight as i64;
+            }
         }
         for w in &self.preferred_anti_affinity {
-            let Some(topo_v) = node.labels.get(&w.term.topology_key) else { continue; };
+            let Some(topo_v) = node.labels.get(&w.term.topology_key) else {
+                continue;
+            };
             'outer2: for n in &snap.nodes {
-                if n.labels.get(&w.term.topology_key) != Some(topo_v) { continue; }
+                if n.labels.get(&w.term.topology_key) != Some(topo_v) {
+                    continue;
+                }
                 for p in snap.pods_on(&n.name) {
                     if pod_term_matches_with_pod(p, &w.term, pod) {
                         s -= w.weight as i64;
@@ -452,9 +564,13 @@ impl ScorePlugin for InterPodAffinityScore {
 pub struct NodeAffinityScore;
 
 impl ScorePlugin for NodeAffinityScore {
-    fn name(&self) -> &str { "NodeAffinityScore" }
+    fn name(&self) -> &str {
+        "NodeAffinityScore"
+    }
     fn score(&self, pod: &Pod, node: &Node, _: &ClusterSnapshot) -> i64 {
-        let Some(aff) = &pod.spec.node_affinity else { return 0 };
+        let Some(aff) = &pod.spec.node_affinity else {
+            return 0;
+        };
         let mut s: i64 = 0;
         for pref in &aff.preferred {
             if term_matches(&pref.preference, node) {
@@ -472,12 +588,21 @@ impl ScorePlugin for NodeAffinityScore {
 pub struct VolumeBinding;
 
 impl FilterPlugin for VolumeBinding {
-    fn name(&self) -> &str { "VolumeBinding" }
+    fn name(&self) -> &str {
+        "VolumeBinding"
+    }
     fn filter(&self, pod: &Pod, node: &Node, _: &ClusterSnapshot) -> Status {
         for v in &pod.spec.volumes {
-            if let VolumeKind::PersistentVolumeClaim { bound_node: Some(bn), claim_name } = &v.kind {
+            if let VolumeKind::PersistentVolumeClaim {
+                bound_node: Some(bn),
+                claim_name,
+            } = &v.kind
+            {
                 if bn != &node.name {
-                    return Status::unschedulable("VolumeBinding", format!("PVC {} bound to {}", claim_name, bn));
+                    return Status::unschedulable(
+                        "VolumeBinding",
+                        format!("PVC {} bound to {}", claim_name, bn),
+                    );
                 }
             }
         }
@@ -493,14 +618,21 @@ impl FilterPlugin for VolumeBinding {
 pub struct VolumeRestrictions;
 
 impl FilterPlugin for VolumeRestrictions {
-    fn name(&self) -> &str { "VolumeRestrictions" }
+    fn name(&self) -> &str {
+        "VolumeRestrictions"
+    }
     fn filter(&self, pod: &Pod, node: &Node, snap: &ClusterSnapshot) -> Status {
         for v in &pod.spec.volumes {
             for other in snap.pods_on(&node.name) {
-                if other.uid == pod.uid { continue; }
+                if other.uid == pod.uid {
+                    continue;
+                }
                 for ov in &other.spec.volumes {
                     if same_exclusive_volume(&v.kind, &ov.kind) {
-                        return Status::unschedulable("VolumeRestrictions", "exclusive volume already in use on node");
+                        return Status::unschedulable(
+                            "VolumeRestrictions",
+                            "exclusive volume already in use on node",
+                        );
                     }
                 }
             }
@@ -526,15 +658,24 @@ fn same_exclusive_volume(a: &VolumeKind, b: &VolumeKind) -> bool {
 pub struct NodePorts;
 
 impl FilterPlugin for NodePorts {
-    fn name(&self) -> &str { "NodePorts" }
+    fn name(&self) -> &str {
+        "NodePorts"
+    }
     fn filter(&self, pod: &Pod, node: &Node, snap: &ClusterSnapshot) -> Status {
-        if pod.spec.host_ports.is_empty() { return Status::success("NodePorts"); }
+        if pod.spec.host_ports.is_empty() {
+            return Status::success("NodePorts");
+        }
         for other in snap.pods_on(&node.name) {
             for op in &other.spec.host_ports {
                 for p in &pod.spec.host_ports {
-                    let ip_overlap = p.host_ip == op.host_ip || p.host_ip == "0.0.0.0" || op.host_ip == "0.0.0.0";
+                    let ip_overlap = p.host_ip == op.host_ip
+                        || p.host_ip == "0.0.0.0"
+                        || op.host_ip == "0.0.0.0";
                     if ip_overlap && p.port == op.port && p.protocol == op.protocol {
-                        return Status::unschedulable("NodePorts", format!("host port {}/{} in use", p.port, p.protocol));
+                        return Status::unschedulable(
+                            "NodePorts",
+                            format!("host port {}/{} in use", p.port, p.protocol),
+                        );
                     }
                 }
             }
@@ -553,17 +694,39 @@ pub struct NodeVolumeLimits {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum VolumeProvider { Ebs, GcePd, AzureDisk, Csi }
+pub enum VolumeProvider {
+    Ebs,
+    GcePd,
+    AzureDisk,
+    Csi,
+}
 
 impl NodeVolumeLimits {
-    pub fn ebs(limit: usize) -> Self { Self { provider: VolumeProvider::Ebs, limit_per_node: limit } }
-    pub fn gce_pd(limit: usize) -> Self { Self { provider: VolumeProvider::GcePd, limit_per_node: limit } }
-    pub fn azure_disk(limit: usize) -> Self { Self { provider: VolumeProvider::AzureDisk, limit_per_node: limit } }
+    pub fn ebs(limit: usize) -> Self {
+        Self {
+            provider: VolumeProvider::Ebs,
+            limit_per_node: limit,
+        }
+    }
+    pub fn gce_pd(limit: usize) -> Self {
+        Self {
+            provider: VolumeProvider::GcePd,
+            limit_per_node: limit,
+        }
+    }
+    pub fn azure_disk(limit: usize) -> Self {
+        Self {
+            provider: VolumeProvider::AzureDisk,
+            limit_per_node: limit,
+        }
+    }
     fn matches(&self, v: &VolumeKind) -> bool {
-        matches!((&self.provider, v),
+        matches!(
+            (&self.provider, v),
             (VolumeProvider::Ebs, VolumeKind::EBS { .. })
-            | (VolumeProvider::GcePd, VolumeKind::GCEPD { .. })
-            | (VolumeProvider::AzureDisk, VolumeKind::AzureDisk { .. }))
+                | (VolumeProvider::GcePd, VolumeKind::GCEPD { .. })
+                | (VolumeProvider::AzureDisk, VolumeKind::AzureDisk { .. })
+        )
     }
 }
 
@@ -577,14 +740,26 @@ impl FilterPlugin for NodeVolumeLimits {
         }
     }
     fn filter(&self, pod: &Pod, node: &Node, snap: &ClusterSnapshot) -> Status {
-        let mine: usize = pod.spec.volumes.iter().filter(|v| self.matches(&v.kind)).count();
-        if mine == 0 { return Status::success(self.name()); }
-        let attached: usize = snap.pods_on(&node.name).iter()
+        let mine: usize = pod
+            .spec
+            .volumes
+            .iter()
+            .filter(|v| self.matches(&v.kind))
+            .count();
+        if mine == 0 {
+            return Status::success(self.name());
+        }
+        let attached: usize = snap
+            .pods_on(&node.name)
+            .iter()
             .flat_map(|p| p.spec.volumes.iter())
             .filter(|v| self.matches(&v.kind))
             .count();
         if attached + mine > self.limit_per_node {
-            return Status::unschedulable(self.name(), format!("volume limit {} exceeded", self.limit_per_node));
+            return Status::unschedulable(
+                self.name(),
+                format!("volume limit {} exceeded", self.limit_per_node),
+            );
         }
         Status::success(self.name())
     }
@@ -600,17 +775,35 @@ mod tests {
 
     fn n(name: &str) -> Node {
         Node {
-            name: name.into(), uid: Uuid::new_v4(), status: NodeStatus::Ready,
-            capacity: ResourceCapacity { cpu_millicores: 4000, memory_bytes: 8_000_000_000, pods: 110, ephemeral_storage_bytes: 0 },
-            allocatable: ResourceCapacity { cpu_millicores: 4000, memory_bytes: 8_000_000_000, pods: 110, ephemeral_storage_bytes: 0 },
+            name: name.into(),
+            uid: Uuid::new_v4(),
+            status: NodeStatus::Ready,
+            capacity: ResourceCapacity {
+                cpu_millicores: 4000,
+                memory_bytes: 8_000_000_000,
+                pods: 110,
+                ephemeral_storage_bytes: 0,
+            },
+            allocatable: ResourceCapacity {
+                cpu_millicores: 4000,
+                memory_bytes: 8_000_000_000,
+                pods: 110,
+                ephemeral_storage_bytes: 0,
+            },
             allocated: ResourceCapacity::default(),
-            labels: HashMap::new(), taints: vec![], conditions: vec![],
-            registered_at: Utc::now(), last_heartbeat: Utc::now(),
+            labels: HashMap::new(),
+            taints: vec![],
+            conditions: vec![],
+            registered_at: Utc::now(),
+            last_heartbeat: Utc::now(),
         }
     }
 
     fn empty_snap(nodes: Vec<Node>) -> ClusterSnapshot {
-        ClusterSnapshot { nodes, pods_by_node: HashMap::new() }
+        ClusterSnapshot {
+            nodes,
+            pods_by_node: HashMap::new(),
+        }
     }
 
     // NodeName --------------------------------------------------------------
@@ -622,12 +815,16 @@ mod tests {
     }
     #[test]
     fn node_name_passes_match() {
-        let mut p = Pod::new("t", "ns", "p"); p.spec.node_name = Some("a".into());
-        assert!(NodeName.filter(&p, &n("a"), &empty_snap(vec![])).is_success());
+        let mut p = Pod::new("t", "ns", "p");
+        p.spec.node_name = Some("a".into());
+        assert!(NodeName
+            .filter(&p, &n("a"), &empty_snap(vec![]))
+            .is_success());
     }
     #[test]
     fn node_name_unresolvable_when_mismatch() {
-        let mut p = Pod::new("t", "ns", "p"); p.spec.node_name = Some("a".into());
+        let mut p = Pod::new("t", "ns", "p");
+        p.spec.node_name = Some("a".into());
         let s = NodeName.filter(&p, &n("b"), &empty_snap(vec![]));
         assert_eq!(s.code, Code::UnschedulableAndUnresolvable);
     }
@@ -636,37 +833,55 @@ mod tests {
     #[test]
     fn node_unsched_passes_ready() {
         let p = Pod::new("t", "ns", "p");
-        assert!(NodeUnschedulable.filter(&p, &n("a"), &empty_snap(vec![])).is_success());
+        assert!(NodeUnschedulable
+            .filter(&p, &n("a"), &empty_snap(vec![]))
+            .is_success());
     }
     #[test]
     fn node_unsched_blocks_cordoned() {
-        let mut node = n("a"); node.status = NodeStatus::Cordoned;
+        let mut node = n("a");
+        node.status = NodeStatus::Cordoned;
         let p = Pod::new("t", "ns", "p");
         let s = NodeUnschedulable.filter(&p, &node, &empty_snap(vec![]));
         assert_eq!(s.code, Code::Unschedulable);
     }
     #[test]
     fn node_unsched_allows_cordoned_with_toleration() {
-        let mut node = n("a"); node.status = NodeStatus::Cordoned;
+        let mut node = n("a");
+        node.status = NodeStatus::Cordoned;
         let mut p = Pod::new("t", "ns", "p");
         p.spec.tolerations.push(Toleration {
             key: Some("node.kubernetes.io/unschedulable".into()),
-            operator: "Exists".into(), value: None, effect: None,
+            operator: "Exists".into(),
+            value: None,
+            effect: None,
         });
-        assert!(NodeUnschedulable.filter(&p, &node, &empty_snap(vec![])).is_success());
+        assert!(NodeUnschedulable
+            .filter(&p, &node, &empty_snap(vec![]))
+            .is_success());
     }
 
     // Resources ------------------------------------------------------------
     #[test]
     fn resources_filter_rejects_when_insufficient() {
-        let mut node = n("a"); node.allocated.cpu_millicores = 3900;
+        let mut node = n("a");
+        node.allocated.cpu_millicores = 3900;
         let mut p = Pod::new("t", "ns", "p");
-        p.spec.resources = ResourceRequest { cpu_millicores: 500, memory_bytes: 0, ..Default::default() };
-        assert_eq!(Resources.filter(&p, &node, &empty_snap(vec![])).code, Code::Unschedulable);
+        p.spec.resources = ResourceRequest {
+            cpu_millicores: 500,
+            memory_bytes: 0,
+            ..Default::default()
+        };
+        assert_eq!(
+            Resources.filter(&p, &node, &empty_snap(vec![])).code,
+            Code::Unschedulable
+        );
     }
     #[test]
     fn resources_score_higher_when_more_free() {
-        let mut a = n("a"); a.allocated.cpu_millicores = 3000; a.allocated.memory_bytes = 6_000_000_000;
+        let mut a = n("a");
+        a.allocated.cpu_millicores = 3000;
+        a.allocated.memory_bytes = 6_000_000_000;
         let b = n("b");
         let p = Pod::new("t", "ns", "p");
         let snap = empty_snap(vec![]);
@@ -676,67 +891,138 @@ mod tests {
     // NodeAffinity ---------------------------------------------------------
     #[test]
     fn node_affinity_in_operator_match() {
-        let mut node = n("a"); node.labels.insert("zone".into(), "eu-west".into());
+        let mut node = n("a");
+        node.labels.insert("zone".into(), "eu-west".into());
         let mut p = Pod::new("t", "ns", "p");
-        p.spec.node_affinity = Some(NodeAffinitySpec { required: vec![NodeSelectorTerm {
-            match_expressions: vec![NodeSelectorRequirement { key: "zone".into(), operator: NodeSelectorOp::In, values: vec!["eu-west".into(), "us-east".into()] }],
-        }], ..Default::default() });
-        assert!(NodeAffinity.filter(&p, &node, &empty_snap(vec![])).is_success());
+        p.spec.node_affinity = Some(NodeAffinitySpec {
+            required: vec![NodeSelectorTerm {
+                match_expressions: vec![NodeSelectorRequirement {
+                    key: "zone".into(),
+                    operator: NodeSelectorOp::In,
+                    values: vec!["eu-west".into(), "us-east".into()],
+                }],
+            }],
+            ..Default::default()
+        });
+        assert!(NodeAffinity
+            .filter(&p, &node, &empty_snap(vec![]))
+            .is_success());
     }
     #[test]
     fn node_affinity_does_not_exist() {
         let node = n("a");
         let mut p = Pod::new("t", "ns", "p");
-        p.spec.node_affinity = Some(NodeAffinitySpec { required: vec![NodeSelectorTerm {
-            match_expressions: vec![NodeSelectorRequirement { key: "gpu".into(), operator: NodeSelectorOp::DoesNotExist, values: vec![] }],
-        }], ..Default::default() });
-        assert!(NodeAffinity.filter(&p, &node, &empty_snap(vec![])).is_success());
+        p.spec.node_affinity = Some(NodeAffinitySpec {
+            required: vec![NodeSelectorTerm {
+                match_expressions: vec![NodeSelectorRequirement {
+                    key: "gpu".into(),
+                    operator: NodeSelectorOp::DoesNotExist,
+                    values: vec![],
+                }],
+            }],
+            ..Default::default()
+        });
+        assert!(NodeAffinity
+            .filter(&p, &node, &empty_snap(vec![]))
+            .is_success());
     }
     #[test]
     fn node_affinity_gt_lt() {
-        let mut node = n("a"); node.labels.insert("cores".into(), "16".into());
+        let mut node = n("a");
+        node.labels.insert("cores".into(), "16".into());
         let mut p = Pod::new("t", "ns", "p");
-        p.spec.node_affinity = Some(NodeAffinitySpec { required: vec![NodeSelectorTerm {
-            match_expressions: vec![NodeSelectorRequirement { key: "cores".into(), operator: NodeSelectorOp::Gt, values: vec!["8".into()] }],
-        }], ..Default::default() });
-        assert!(NodeAffinity.filter(&p, &node, &empty_snap(vec![])).is_success());
+        p.spec.node_affinity = Some(NodeAffinitySpec {
+            required: vec![NodeSelectorTerm {
+                match_expressions: vec![NodeSelectorRequirement {
+                    key: "cores".into(),
+                    operator: NodeSelectorOp::Gt,
+                    values: vec!["8".into()],
+                }],
+            }],
+            ..Default::default()
+        });
+        assert!(NodeAffinity
+            .filter(&p, &node, &empty_snap(vec![]))
+            .is_success());
 
-        p.spec.node_affinity = Some(NodeAffinitySpec { required: vec![NodeSelectorTerm {
-            match_expressions: vec![NodeSelectorRequirement { key: "cores".into(), operator: NodeSelectorOp::Lt, values: vec!["8".into()] }],
-        }], ..Default::default() });
-        assert_eq!(NodeAffinity.filter(&p, &node, &empty_snap(vec![])).code, Code::Unschedulable);
+        p.spec.node_affinity = Some(NodeAffinitySpec {
+            required: vec![NodeSelectorTerm {
+                match_expressions: vec![NodeSelectorRequirement {
+                    key: "cores".into(),
+                    operator: NodeSelectorOp::Lt,
+                    values: vec!["8".into()],
+                }],
+            }],
+            ..Default::default()
+        });
+        assert_eq!(
+            NodeAffinity.filter(&p, &node, &empty_snap(vec![])).code,
+            Code::Unschedulable
+        );
     }
     #[test]
     fn node_selector_takes_precedence() {
         let node = n("a");
         let mut p = Pod::new("t", "ns", "p");
         p.spec.node_selector.insert("missing".into(), "v".into());
-        assert_eq!(NodeAffinity.filter(&p, &node, &empty_snap(vec![])).code, Code::Unschedulable);
+        assert_eq!(
+            NodeAffinity.filter(&p, &node, &empty_snap(vec![])).code,
+            Code::Unschedulable
+        );
     }
 
     // TaintToleration -----------------------------------------------------
     #[test]
     fn taint_blocks_when_no_toleration() {
         let mut node = n("a");
-        node.taints.push(Taint { key: "dedicated".into(), value: Some("gpu".into()), effect: TaintEffect::NoSchedule });
+        node.taints.push(Taint {
+            key: "dedicated".into(),
+            value: Some("gpu".into()),
+            effect: TaintEffect::NoSchedule,
+        });
         let p = Pod::new("t", "ns", "p");
-        assert_eq!(TaintToleration.filter(&p, &node, &empty_snap(vec![])).code, Code::Unschedulable);
+        assert_eq!(
+            TaintToleration.filter(&p, &node, &empty_snap(vec![])).code,
+            Code::Unschedulable
+        );
     }
     #[test]
     fn taint_equal_toleration_passes() {
         let mut node = n("a");
-        node.taints.push(Taint { key: "dedicated".into(), value: Some("gpu".into()), effect: TaintEffect::NoSchedule });
+        node.taints.push(Taint {
+            key: "dedicated".into(),
+            value: Some("gpu".into()),
+            effect: TaintEffect::NoSchedule,
+        });
         let mut p = Pod::new("t", "ns", "p");
-        p.spec.tolerations.push(Toleration { key: Some("dedicated".into()), operator: "Equal".into(), value: Some("gpu".into()), effect: Some(TaintEffect::NoSchedule) });
-        assert!(TaintToleration.filter(&p, &node, &empty_snap(vec![])).is_success());
+        p.spec.tolerations.push(Toleration {
+            key: Some("dedicated".into()),
+            operator: "Equal".into(),
+            value: Some("gpu".into()),
+            effect: Some(TaintEffect::NoSchedule),
+        });
+        assert!(TaintToleration
+            .filter(&p, &node, &empty_snap(vec![]))
+            .is_success());
     }
     #[test]
     fn taint_exists_no_key_tolerates_all() {
         let mut node = n("a");
-        node.taints.push(Taint { key: "any".into(), value: None, effect: TaintEffect::NoExecute });
+        node.taints.push(Taint {
+            key: "any".into(),
+            value: None,
+            effect: TaintEffect::NoExecute,
+        });
         let mut p = Pod::new("t", "ns", "p");
-        p.spec.tolerations.push(Toleration { key: None, operator: "Exists".into(), value: None, effect: None });
-        assert!(TaintToleration.filter(&p, &node, &empty_snap(vec![])).is_success());
+        p.spec.tolerations.push(Toleration {
+            key: None,
+            operator: "Exists".into(),
+            value: None,
+            effect: None,
+        });
+        assert!(TaintToleration
+            .filter(&p, &node, &empty_snap(vec![]))
+            .is_success());
     }
 
     // ImageLocality -------------------------------------------------------
@@ -832,14 +1118,8 @@ mod tests {
         p.spec.container_images = vec!["postgres:16".into()];
         let mut il = ImageLocality::new();
         il.total_nodes = 4;
-        il.update_node_images(
-            "a",
-            states(&[("postgres:16", 500 * 1024 * 1024, 4)]),
-        );
-        il.update_node_images(
-            "b",
-            states(&[("postgres:16", 500 * 1024 * 1024, 1)]),
-        );
+        il.update_node_images("a", states(&[("postgres:16", 500 * 1024 * 1024, 4)]));
+        il.update_node_images("b", states(&[("postgres:16", 500 * 1024 * 1024, 1)]));
         let a = il.score(&p, &n("a"), &empty_snap(vec![]));
         let b = il.score(&p, &n("b"), &empty_snap(vec![]));
         assert!(a > b, "a={a} b={b}");
@@ -893,7 +1173,10 @@ mod tests {
     fn scaled_image_score_clamps_num_nodes_to_total() {
         // Defensive: if state.num_nodes exceeds total_nodes (stale
         // metadata) we shouldn't return more than image size.
-        let s = ImageStateSummary { size_bytes: 100, num_nodes: 50 };
+        let s = ImageStateSummary {
+            size_bytes: 100,
+            num_nodes: 50,
+        };
         assert_eq!(ImageLocality::scaled_image_score(&s, 4), 100);
     }
 
@@ -901,10 +1184,7 @@ mod tests {
     fn calculate_priority_clamps_below_min_to_zero() {
         let p = ImageLocality::calculate_priority(0, 1);
         assert_eq!(p, 0);
-        let p = ImageLocality::calculate_priority(
-            (IMAGE_LOCALITY_MIN_THRESHOLD as i64) - 1,
-            1,
-        );
+        let p = ImageLocality::calculate_priority((IMAGE_LOCALITY_MIN_THRESHOLD as i64) - 1, 1);
         assert_eq!(p, 0);
     }
 
@@ -942,78 +1222,157 @@ mod tests {
     // InterPodAffinity ----------------------------------------------------
     #[test]
     fn pod_affinity_requires_matching_pod_in_topo() {
-        let mut a = n("a"); a.labels.insert("zone".into(), "z1".into());
-        let mut existing = Pod::new("t", "ns", "front"); existing.spec.node_selector.insert("app".into(), "web".into());
+        let mut a = n("a");
+        a.labels.insert("zone".into(), "z1".into());
+        let mut existing = Pod::new("t", "ns", "front");
+        existing
+            .spec
+            .node_selector
+            .insert("app".into(), "web".into());
         let mut snap = empty_snap(vec![a.clone()]);
         snap.pods_by_node.insert("a".into(), vec![existing]);
 
         let mut p = Pod::new("t", "ns", "back");
-        let mut sel = HashMap::new(); sel.insert("app".into(), "web".into());
-        p.spec.pod_affinity.push(PodAffinityTerm { label_selector: sel, topology_key: "zone".into(), namespaces: vec![], ..Default::default() });
+        let mut sel = HashMap::new();
+        sel.insert("app".into(), "web".into());
+        p.spec.pod_affinity.push(PodAffinityTerm {
+            label_selector: sel,
+            topology_key: "zone".into(),
+            namespaces: vec![],
+            ..Default::default()
+        });
         assert!(InterPodAffinity.filter(&p, &a, &snap).is_success());
     }
 
     #[test]
     fn pod_anti_affinity_rejects_when_match_exists() {
-        let mut a = n("a"); a.labels.insert("zone".into(), "z1".into());
-        let mut existing = Pod::new("t", "ns", "x"); existing.spec.node_selector.insert("app".into(), "db".into());
+        let mut a = n("a");
+        a.labels.insert("zone".into(), "z1".into());
+        let mut existing = Pod::new("t", "ns", "x");
+        existing
+            .spec
+            .node_selector
+            .insert("app".into(), "db".into());
         let mut snap = empty_snap(vec![a.clone()]);
         snap.pods_by_node.insert("a".into(), vec![existing]);
 
         let mut p = Pod::new("t", "ns", "y");
-        let mut sel = HashMap::new(); sel.insert("app".into(), "db".into());
-        p.spec.pod_anti_affinity.push(PodAffinityTerm { label_selector: sel, topology_key: "zone".into(), namespaces: vec![], ..Default::default() });
-        assert_eq!(InterPodAffinity.filter(&p, &a, &snap).code, Code::Unschedulable);
+        let mut sel = HashMap::new();
+        sel.insert("app".into(), "db".into());
+        p.spec.pod_anti_affinity.push(PodAffinityTerm {
+            label_selector: sel,
+            topology_key: "zone".into(),
+            namespaces: vec![],
+            ..Default::default()
+        });
+        assert_eq!(
+            InterPodAffinity.filter(&p, &a, &snap).code,
+            Code::Unschedulable
+        );
     }
 
     #[test]
     fn pod_affinity_namespace_scope() {
-        let mut a = n("a"); a.labels.insert("zone".into(), "z1".into());
-        let mut existing = Pod::new("t", "other", "front"); existing.spec.node_selector.insert("app".into(), "web".into());
+        let mut a = n("a");
+        a.labels.insert("zone".into(), "z1".into());
+        let mut existing = Pod::new("t", "other", "front");
+        existing
+            .spec
+            .node_selector
+            .insert("app".into(), "web".into());
         let mut snap = empty_snap(vec![a.clone()]);
         snap.pods_by_node.insert("a".into(), vec![existing]);
 
         let mut p = Pod::new("t", "ns", "back");
-        let mut sel = HashMap::new(); sel.insert("app".into(), "web".into());
-        p.spec.pod_affinity.push(PodAffinityTerm { label_selector: sel, topology_key: "zone".into(), namespaces: vec!["ns".into()], ..Default::default() });
-        assert_eq!(InterPodAffinity.filter(&p, &a, &snap).code, Code::Unschedulable);
+        let mut sel = HashMap::new();
+        sel.insert("app".into(), "web".into());
+        p.spec.pod_affinity.push(PodAffinityTerm {
+            label_selector: sel,
+            topology_key: "zone".into(),
+            namespaces: vec!["ns".into()],
+            ..Default::default()
+        });
+        assert_eq!(
+            InterPodAffinity.filter(&p, &a, &snap).code,
+            Code::Unschedulable
+        );
     }
 
     // VolumeBinding -------------------------------------------------------
     #[test]
     fn volume_binding_passes_unbound() {
         let mut p = Pod::new("t", "ns", "p");
-        p.spec.volumes.push(VolumeSpec { name: "v".into(), kind: VolumeKind::PersistentVolumeClaim { claim_name: "c".into(), bound_node: None } });
-        assert!(VolumeBinding.filter(&p, &n("a"), &empty_snap(vec![])).is_success());
+        p.spec.volumes.push(VolumeSpec {
+            name: "v".into(),
+            kind: VolumeKind::PersistentVolumeClaim {
+                claim_name: "c".into(),
+                bound_node: None,
+            },
+        });
+        assert!(VolumeBinding
+            .filter(&p, &n("a"), &empty_snap(vec![]))
+            .is_success());
     }
     #[test]
     fn volume_binding_rejects_wrong_node() {
         let mut p = Pod::new("t", "ns", "p");
-        p.spec.volumes.push(VolumeSpec { name: "v".into(), kind: VolumeKind::PersistentVolumeClaim { claim_name: "c".into(), bound_node: Some("b".into()) } });
-        assert_eq!(VolumeBinding.filter(&p, &n("a"), &empty_snap(vec![])).code, Code::Unschedulable);
+        p.spec.volumes.push(VolumeSpec {
+            name: "v".into(),
+            kind: VolumeKind::PersistentVolumeClaim {
+                claim_name: "c".into(),
+                bound_node: Some("b".into()),
+            },
+        });
+        assert_eq!(
+            VolumeBinding.filter(&p, &n("a"), &empty_snap(vec![])).code,
+            Code::Unschedulable
+        );
     }
 
     // VolumeRestrictions --------------------------------------------------
     #[test]
     fn volume_restrictions_blocks_duplicate_ebs() {
         let mut existing = Pod::new("t", "ns", "p1");
-        existing.spec.volumes.push(VolumeSpec { name: "v".into(), kind: VolumeKind::EBS { volume_id: "vol-1".into() } });
+        existing.spec.volumes.push(VolumeSpec {
+            name: "v".into(),
+            kind: VolumeKind::EBS {
+                volume_id: "vol-1".into(),
+            },
+        });
         let mut snap = empty_snap(vec![n("a")]);
         snap.pods_by_node.insert("a".into(), vec![existing]);
 
         let mut p = Pod::new("t", "ns", "p2");
-        p.spec.volumes.push(VolumeSpec { name: "v".into(), kind: VolumeKind::EBS { volume_id: "vol-1".into() } });
-        assert_eq!(VolumeRestrictions.filter(&p, &n("a"), &snap).code, Code::Unschedulable);
+        p.spec.volumes.push(VolumeSpec {
+            name: "v".into(),
+            kind: VolumeKind::EBS {
+                volume_id: "vol-1".into(),
+            },
+        });
+        assert_eq!(
+            VolumeRestrictions.filter(&p, &n("a"), &snap).code,
+            Code::Unschedulable
+        );
     }
     #[test]
     fn volume_restrictions_allows_distinct_volumes() {
         let mut existing = Pod::new("t", "ns", "p1");
-        existing.spec.volumes.push(VolumeSpec { name: "v".into(), kind: VolumeKind::EBS { volume_id: "vol-1".into() } });
+        existing.spec.volumes.push(VolumeSpec {
+            name: "v".into(),
+            kind: VolumeKind::EBS {
+                volume_id: "vol-1".into(),
+            },
+        });
         let mut snap = empty_snap(vec![n("a")]);
         snap.pods_by_node.insert("a".into(), vec![existing]);
 
         let mut p = Pod::new("t", "ns", "p2");
-        p.spec.volumes.push(VolumeSpec { name: "v".into(), kind: VolumeKind::EBS { volume_id: "vol-2".into() } });
+        p.spec.volumes.push(VolumeSpec {
+            name: "v".into(),
+            kind: VolumeKind::EBS {
+                volume_id: "vol-2".into(),
+            },
+        });
         assert!(VolumeRestrictions.filter(&p, &n("a"), &snap).is_success());
     }
 
@@ -1021,18 +1380,31 @@ mod tests {
     #[test]
     fn node_ports_passes_when_empty() {
         let p = Pod::new("t", "ns", "p");
-        assert!(NodePorts.filter(&p, &n("a"), &empty_snap(vec![])).is_success());
+        assert!(NodePorts
+            .filter(&p, &n("a"), &empty_snap(vec![]))
+            .is_success());
     }
     #[test]
     fn node_ports_blocks_collision() {
         let mut existing = Pod::new("t", "ns", "p1");
-        existing.spec.host_ports.push(HostPort { host_ip: "0.0.0.0".into(), port: 80, protocol: "TCP".into() });
+        existing.spec.host_ports.push(HostPort {
+            host_ip: "0.0.0.0".into(),
+            port: 80,
+            protocol: "TCP".into(),
+        });
         let mut snap = empty_snap(vec![n("a")]);
         snap.pods_by_node.insert("a".into(), vec![existing]);
 
         let mut p = Pod::new("t", "ns", "p2");
-        p.spec.host_ports.push(HostPort { host_ip: "10.0.0.5".into(), port: 80, protocol: "TCP".into() });
-        assert_eq!(NodePorts.filter(&p, &n("a"), &snap).code, Code::Unschedulable);
+        p.spec.host_ports.push(HostPort {
+            host_ip: "10.0.0.5".into(),
+            port: 80,
+            protocol: "TCP".into(),
+        });
+        assert_eq!(
+            NodePorts.filter(&p, &n("a"), &snap).code,
+            Code::Unschedulable
+        );
     }
 
     // NodeVolumeLimits ----------------------------------------------------
@@ -1040,7 +1412,14 @@ mod tests {
     fn ebs_limits_rejects_over_cap() {
         let snap = empty_snap(vec![n("a")]);
         let mut p = Pod::new("t", "ns", "p");
-        for i in 0..3 { p.spec.volumes.push(VolumeSpec { name: format!("v{}", i), kind: VolumeKind::EBS { volume_id: format!("v-{}", i) } }); }
+        for i in 0..3 {
+            p.spec.volumes.push(VolumeSpec {
+                name: format!("v{}", i),
+                kind: VolumeKind::EBS {
+                    volume_id: format!("v-{}", i),
+                },
+            });
+        }
         let plug = NodeVolumeLimits::ebs(2);
         assert_eq!(plug.filter(&p, &n("a"), &snap).code, Code::Unschedulable);
         assert_eq!(plug.name(), "EBSLimits");
@@ -1048,12 +1427,22 @@ mod tests {
     #[test]
     fn gce_pd_limits_counts_attached() {
         let mut existing = Pod::new("t", "ns", "p1");
-        existing.spec.volumes.push(VolumeSpec { name: "a".into(), kind: VolumeKind::GCEPD { pd_name: "pd-1".into() } });
+        existing.spec.volumes.push(VolumeSpec {
+            name: "a".into(),
+            kind: VolumeKind::GCEPD {
+                pd_name: "pd-1".into(),
+            },
+        });
         let mut snap = empty_snap(vec![n("a")]);
         snap.pods_by_node.insert("a".into(), vec![existing]);
 
         let mut p = Pod::new("t", "ns", "p2");
-        p.spec.volumes.push(VolumeSpec { name: "b".into(), kind: VolumeKind::GCEPD { pd_name: "pd-2".into() } });
+        p.spec.volumes.push(VolumeSpec {
+            name: "b".into(),
+            kind: VolumeKind::GCEPD {
+                pd_name: "pd-2".into(),
+            },
+        });
         let plug = NodeVolumeLimits::gce_pd(2);
         assert!(plug.filter(&p, &n("a"), &snap).is_success());
         assert_eq!(plug.name(), "GCEPDLimits");
@@ -1064,14 +1453,27 @@ mod tests {
     #[test]
     fn azure_disk_limits_only_counts_azure() {
         let mut existing = Pod::new("t", "ns", "p1");
-        existing.spec.volumes.push(VolumeSpec { name: "a".into(), kind: VolumeKind::EBS { volume_id: "vol-1".into() } });
+        existing.spec.volumes.push(VolumeSpec {
+            name: "a".into(),
+            kind: VolumeKind::EBS {
+                volume_id: "vol-1".into(),
+            },
+        });
         let mut snap = empty_snap(vec![n("a")]);
         snap.pods_by_node.insert("a".into(), vec![existing]);
 
         let mut p = Pod::new("t", "ns", "p2");
-        p.spec.volumes.push(VolumeSpec { name: "b".into(), kind: VolumeKind::AzureDisk { disk_name: "az-1".into() } });
+        p.spec.volumes.push(VolumeSpec {
+            name: "b".into(),
+            kind: VolumeKind::AzureDisk {
+                disk_name: "az-1".into(),
+            },
+        });
         let plug = NodeVolumeLimits::azure_disk(1);
-        assert!(plug.filter(&p, &n("a"), &snap).is_success(), "EBS volumes don't count against Azure limit");
+        assert!(
+            plug.filter(&p, &n("a"), &snap).is_success(),
+            "EBS volumes don't count against Azure limit"
+        );
         assert_eq!(plug.name(), "AzureDiskLimits");
     }
 
@@ -1132,13 +1534,17 @@ mod tests {
         let exists = LabelSelector {
             match_labels: HashMap::new(),
             match_expressions: vec![LabelSelectorRequirement {
-                key: "k".into(), operator: LabelSelectorOp::Exists, values: vec![],
+                key: "k".into(),
+                operator: LabelSelectorOp::Exists,
+                values: vec![],
             }],
         };
         let dne = LabelSelector {
             match_labels: HashMap::new(),
             match_expressions: vec![LabelSelectorRequirement {
-                key: "k".into(), operator: LabelSelectorOp::DoesNotExist, values: vec![],
+                key: "k".into(),
+                operator: LabelSelectorOp::DoesNotExist,
+                values: vec![],
             }],
         };
         let mut labels = HashMap::new();
@@ -1173,14 +1579,19 @@ mod tests {
     fn pod_affinity_namespace_selector_matches_all_when_present() {
         // namespace_selector with no labels → cave-scheduler treats as
         // "match every namespace" since we don't store ns labels.
-        let mut a = n("a"); a.labels.insert("zone".into(), "z1".into());
+        let mut a = n("a");
+        a.labels.insert("zone".into(), "z1".into());
         let mut existing = Pod::new("t", "other-ns", "front");
-        existing.spec.node_selector.insert("app".into(), "web".into());
+        existing
+            .spec
+            .node_selector
+            .insert("app".into(), "web".into());
         let mut snap = empty_snap(vec![a.clone()]);
         snap.pods_by_node.insert("a".into(), vec![existing]);
 
         let mut p = Pod::new("t", "ns", "back");
-        let mut sel = HashMap::new(); sel.insert("app".into(), "web".into());
+        let mut sel = HashMap::new();
+        sel.insert("app".into(), "web".into());
         p.spec.pod_affinity.push(PodAffinityTerm {
             label_selector: sel,
             topology_key: "zone".into(),
@@ -1194,21 +1605,36 @@ mod tests {
 
     #[test]
     fn pod_affinity_match_label_keys_lifts_scheduler_labels() {
-        let mut a = n("a"); a.labels.insert("zone".into(), "z1".into());
+        let mut a = n("a");
+        a.labels.insert("zone".into(), "z1".into());
         let mut existing1 = Pod::new("t", "ns", "front-rev1");
-        existing1.spec.node_selector.insert("app".into(), "web".into());
-        existing1.spec.node_selector.insert("rev".into(), "1".into());
+        existing1
+            .spec
+            .node_selector
+            .insert("app".into(), "web".into());
+        existing1
+            .spec
+            .node_selector
+            .insert("rev".into(), "1".into());
         let mut existing2 = Pod::new("t", "ns", "front-rev2");
-        existing2.spec.node_selector.insert("app".into(), "web".into());
-        existing2.spec.node_selector.insert("rev".into(), "2".into());
+        existing2
+            .spec
+            .node_selector
+            .insert("app".into(), "web".into());
+        existing2
+            .spec
+            .node_selector
+            .insert("rev".into(), "2".into());
         let mut snap = empty_snap(vec![a.clone()]);
-        snap.pods_by_node.insert("a".into(), vec![existing1, existing2]);
+        snap.pods_by_node
+            .insert("a".into(), vec![existing1, existing2]);
 
         // Scheduler pod carries rev=1; matchLabelKeys=[rev] lifts that into
         // the selector → only rev=1 pod counts as a match.
         let mut p = Pod::new("t", "ns", "back");
         p.spec.node_selector.insert("rev".into(), "1".into());
-        let mut sel = HashMap::new(); sel.insert("app".into(), "web".into());
+        let mut sel = HashMap::new();
+        sel.insert("app".into(), "web".into());
         p.spec.pod_affinity.push(PodAffinityTerm {
             label_selector: sel.clone(),
             topology_key: "zone".into(),
@@ -1233,9 +1659,13 @@ mod tests {
 
     #[test]
     fn pod_affinity_mismatch_label_keys_excludes_same_value() {
-        let mut a = n("a"); a.labels.insert("zone".into(), "z1".into());
+        let mut a = n("a");
+        a.labels.insert("zone".into(), "z1".into());
         let mut existing = Pod::new("t", "ns", "x");
-        existing.spec.node_selector.insert("app".into(), "db".into());
+        existing
+            .spec
+            .node_selector
+            .insert("app".into(), "db".into());
         existing.spec.node_selector.insert("rev".into(), "1".into());
         let mut snap = empty_snap(vec![a.clone()]);
         snap.pods_by_node.insert("a".into(), vec![existing]);
@@ -1244,7 +1674,8 @@ mod tests {
         // rev=1 should NOT match a pod with rev=1 → no anti-violation.
         let mut p = Pod::new("t", "ns", "y");
         p.spec.node_selector.insert("rev".into(), "1".into());
-        let mut sel = HashMap::new(); sel.insert("app".into(), "db".into());
+        let mut sel = HashMap::new();
+        sel.insert("app".into(), "db".into());
         p.spec.pod_anti_affinity.push(PodAffinityTerm {
             label_selector: sel.clone(),
             topology_key: "zone".into(),
@@ -1271,15 +1702,23 @@ mod tests {
 
     #[test]
     fn pod_affinity_selector_v2_anded_with_legacy() {
-        let mut a = n("a"); a.labels.insert("zone".into(), "z1".into());
+        let mut a = n("a");
+        a.labels.insert("zone".into(), "z1".into());
         let mut existing = Pod::new("t", "ns", "front");
-        existing.spec.node_selector.insert("app".into(), "web".into());
-        existing.spec.node_selector.insert("env".into(), "prod".into());
+        existing
+            .spec
+            .node_selector
+            .insert("app".into(), "web".into());
+        existing
+            .spec
+            .node_selector
+            .insert("env".into(), "prod".into());
         let mut snap = empty_snap(vec![a.clone()]);
         snap.pods_by_node.insert("a".into(), vec![existing]);
 
         // Legacy hashmap: app=web. Rich selector_v2: env IN [prod].
-        let mut sel_legacy = HashMap::new(); sel_legacy.insert("app".into(), "web".into());
+        let mut sel_legacy = HashMap::new();
+        sel_legacy.insert("app".into(), "web".into());
         let sel_v2 = LabelSelector {
             match_labels: HashMap::new(),
             match_expressions: vec![LabelSelectorRequirement {
@@ -1300,7 +1739,10 @@ mod tests {
 
         // existing pod missing env=prod → no match → reject.
         let mut existing2 = Pod::new("t", "ns", "front");
-        existing2.spec.node_selector.insert("app".into(), "web".into());
+        existing2
+            .spec
+            .node_selector
+            .insert("app".into(), "web".into());
         let mut snap2 = empty_snap(vec![a.clone()]);
         snap2.pods_by_node.insert("a".into(), vec![existing2]);
         assert!(InterPodAffinity.filter(&p, &a, &snap2).is_rejected());
@@ -1319,21 +1761,33 @@ mod tests {
             preferred: vec![
                 PreferredSchedulingTerm {
                     weight: 30,
-                    preference: NodeSelectorTerm { match_expressions: vec![NodeSelectorRequirement {
-                        key: "zone".into(), operator: NodeSelectorOp::In, values: vec!["us-east".into()],
-                    }]},
+                    preference: NodeSelectorTerm {
+                        match_expressions: vec![NodeSelectorRequirement {
+                            key: "zone".into(),
+                            operator: NodeSelectorOp::In,
+                            values: vec!["us-east".into()],
+                        }],
+                    },
                 },
                 PreferredSchedulingTerm {
                     weight: 20,
-                    preference: NodeSelectorTerm { match_expressions: vec![NodeSelectorRequirement {
-                        key: "rack".into(), operator: NodeSelectorOp::In, values: vec!["r1".into()],
-                    }]},
+                    preference: NodeSelectorTerm {
+                        match_expressions: vec![NodeSelectorRequirement {
+                            key: "rack".into(),
+                            operator: NodeSelectorOp::In,
+                            values: vec!["r1".into()],
+                        }],
+                    },
                 },
                 PreferredSchedulingTerm {
                     weight: 99,
-                    preference: NodeSelectorTerm { match_expressions: vec![NodeSelectorRequirement {
-                        key: "zone".into(), operator: NodeSelectorOp::In, values: vec!["eu-west".into()],
-                    }]},
+                    preference: NodeSelectorTerm {
+                        match_expressions: vec![NodeSelectorRequirement {
+                            key: "zone".into(),
+                            operator: NodeSelectorOp::In,
+                            values: vec!["eu-west".into()],
+                        }],
+                    },
                 },
             ],
         });
@@ -1350,12 +1804,19 @@ mod tests {
             required: vec![],
             preferred: vec![PreferredSchedulingTerm {
                 weight: 200,
-                preference: NodeSelectorTerm { match_expressions: vec![NodeSelectorRequirement {
-                    key: "k".into(), operator: NodeSelectorOp::In, values: vec!["v".into()],
-                }]},
+                preference: NodeSelectorTerm {
+                    match_expressions: vec![NodeSelectorRequirement {
+                        key: "k".into(),
+                        operator: NodeSelectorOp::In,
+                        values: vec!["v".into()],
+                    }],
+                },
             }],
         });
-        assert_eq!(NodeAffinityScore.score(&p, &node, &empty_snap(vec![])), MAX_NODE_SCORE);
+        assert_eq!(
+            NodeAffinityScore.score(&p, &node, &empty_snap(vec![])),
+            MAX_NODE_SCORE
+        );
     }
 
     #[test]
@@ -1368,39 +1829,48 @@ mod tests {
 
     #[test]
     fn inter_pod_affinity_score_adds_preferred_match_weight() {
-        let mut a = n("a"); a.labels.insert("zone".into(), "z1".into());
+        let mut a = n("a");
+        a.labels.insert("zone".into(), "z1".into());
         let mut existing = Pod::new("t", "ns", "x");
-        existing.spec.node_selector.insert("app".into(), "web".into());
+        existing
+            .spec
+            .node_selector
+            .insert("app".into(), "web".into());
         let mut snap = empty_snap(vec![a.clone()]);
         snap.pods_by_node.insert("a".into(), vec![existing]);
 
-        let mut sel = HashMap::new(); sel.insert("app".into(), "web".into());
+        let mut sel = HashMap::new();
+        sel.insert("app".into(), "web".into());
         let p = Pod::new("t", "ns", "y");
-        let plug = InterPodAffinityScore::new()
-            .with_preferred_affinity(WeightedPodAffinityTerm {
-                weight: 40,
-                term: PodAffinityTerm {
-                    label_selector: sel,
-                    topology_key: "zone".into(),
-                    namespaces: vec![],
-                    ..Default::default()
-                },
-            });
+        let plug = InterPodAffinityScore::new().with_preferred_affinity(WeightedPodAffinityTerm {
+            weight: 40,
+            term: PodAffinityTerm {
+                label_selector: sel,
+                topology_key: "zone".into(),
+                namespaces: vec![],
+                ..Default::default()
+            },
+        });
         assert_eq!(plug.score(&p, &a, &snap), 40);
     }
 
     #[test]
     fn inter_pod_affinity_score_subtracts_anti_affinity_weight() {
-        let mut a = n("a"); a.labels.insert("zone".into(), "z1".into());
+        let mut a = n("a");
+        a.labels.insert("zone".into(), "z1".into());
         let mut existing = Pod::new("t", "ns", "x");
-        existing.spec.node_selector.insert("app".into(), "db".into());
+        existing
+            .spec
+            .node_selector
+            .insert("app".into(), "db".into());
         let mut snap = empty_snap(vec![a.clone()]);
         snap.pods_by_node.insert("a".into(), vec![existing]);
 
-        let mut sel = HashMap::new(); sel.insert("app".into(), "db".into());
+        let mut sel = HashMap::new();
+        sel.insert("app".into(), "db".into());
         let p = Pod::new("t", "ns", "y");
-        let plug = InterPodAffinityScore::new()
-            .with_preferred_anti_affinity(WeightedPodAffinityTerm {
+        let plug =
+            InterPodAffinityScore::new().with_preferred_anti_affinity(WeightedPodAffinityTerm {
                 weight: 25,
                 term: PodAffinityTerm {
                     label_selector: sel,
@@ -1415,7 +1885,8 @@ mod tests {
 
     #[test]
     fn inter_pod_affinity_score_combined_affinity_and_anti() {
-        let mut a = n("a"); a.labels.insert("zone".into(), "z1".into());
+        let mut a = n("a");
+        a.labels.insert("zone".into(), "z1".into());
         let mut web = Pod::new("t", "ns", "web1");
         web.spec.node_selector.insert("app".into(), "web".into());
         let mut db = Pod::new("t", "ns", "db1");
@@ -1423,8 +1894,10 @@ mod tests {
         let mut snap = empty_snap(vec![a.clone()]);
         snap.pods_by_node.insert("a".into(), vec![web, db]);
 
-        let mut sel_web = HashMap::new(); sel_web.insert("app".into(), "web".into());
-        let mut sel_db = HashMap::new(); sel_db.insert("app".into(), "db".into());
+        let mut sel_web = HashMap::new();
+        sel_web.insert("app".into(), "web".into());
+        let mut sel_db = HashMap::new();
+        sel_db.insert("app".into(), "db".into());
 
         let plug = InterPodAffinityScore::new()
             .with_preferred_affinity(WeightedPodAffinityTerm {
@@ -1454,40 +1927,44 @@ mod tests {
     fn inter_pod_affinity_score_zero_when_no_topology_label() {
         let a = n("a"); // no zone label
         let snap = empty_snap(vec![a.clone()]);
-        let mut sel = HashMap::new(); sel.insert("app".into(), "web".into());
+        let mut sel = HashMap::new();
+        sel.insert("app".into(), "web".into());
         let p = Pod::new("t", "ns", "y");
-        let plug = InterPodAffinityScore::new()
-            .with_preferred_affinity(WeightedPodAffinityTerm {
-                weight: 40,
-                term: PodAffinityTerm {
-                    label_selector: sel,
-                    topology_key: "zone".into(),
-                    namespaces: vec![],
-                    ..Default::default()
-                },
-            });
+        let plug = InterPodAffinityScore::new().with_preferred_affinity(WeightedPodAffinityTerm {
+            weight: 40,
+            term: PodAffinityTerm {
+                label_selector: sel,
+                topology_key: "zone".into(),
+                namespaces: vec![],
+                ..Default::default()
+            },
+        });
         assert_eq!(plug.score(&p, &a, &snap), 0);
     }
 
     #[test]
     fn inter_pod_affinity_score_clamps_above_max() {
-        let mut a = n("a"); a.labels.insert("zone".into(), "z1".into());
+        let mut a = n("a");
+        a.labels.insert("zone".into(), "z1".into());
         let mut existing = Pod::new("t", "ns", "x");
-        existing.spec.node_selector.insert("app".into(), "web".into());
+        existing
+            .spec
+            .node_selector
+            .insert("app".into(), "web".into());
         let mut snap = empty_snap(vec![a.clone()]);
         snap.pods_by_node.insert("a".into(), vec![existing]);
 
-        let mut sel = HashMap::new(); sel.insert("app".into(), "web".into());
-        let plug = InterPodAffinityScore::new()
-            .with_preferred_affinity(WeightedPodAffinityTerm {
-                weight: 200,
-                term: PodAffinityTerm {
-                    label_selector: sel,
-                    topology_key: "zone".into(),
-                    namespaces: vec![],
-                    ..Default::default()
-                },
-            });
+        let mut sel = HashMap::new();
+        sel.insert("app".into(), "web".into());
+        let plug = InterPodAffinityScore::new().with_preferred_affinity(WeightedPodAffinityTerm {
+            weight: 200,
+            term: PodAffinityTerm {
+                label_selector: sel,
+                topology_key: "zone".into(),
+                namespaces: vec![],
+                ..Default::default()
+            },
+        });
         let p = Pod::new("t", "ns", "y");
         assert_eq!(plug.score(&p, &a, &snap), MAX_NODE_SCORE);
     }

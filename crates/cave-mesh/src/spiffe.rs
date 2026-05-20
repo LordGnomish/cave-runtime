@@ -15,8 +15,8 @@ use crate::{
 };
 use chrono::{DateTime, Datelike, Duration, Utc};
 use rcgen::{
-    BasicConstraints, Certificate, CertificateParams, DnType, ExtendedKeyUsagePurpose,
-    Ia5String, IsCa, KeyPair, KeyUsagePurpose, SanType,
+    BasicConstraints, Certificate, CertificateParams, DnType, ExtendedKeyUsagePurpose, Ia5String,
+    IsCa, KeyPair, KeyUsagePurpose, SanType,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -105,12 +105,13 @@ impl InternalCa {
 
         let mut params = CertificateParams::default();
         params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
-        params.distinguished_name.push(DnType::CommonName, format!("CAVE Mesh CA — {trust_domain}"));
-        params.distinguished_name.push(DnType::OrganizationName, "CAVE Platform");
-        params.key_usages = vec![
-            KeyUsagePurpose::KeyCertSign,
-            KeyUsagePurpose::CrlSign,
-        ];
+        params
+            .distinguished_name
+            .push(DnType::CommonName, format!("CAVE Mesh CA — {trust_domain}"));
+        params
+            .distinguished_name
+            .push(DnType::OrganizationName, "CAVE Platform");
+        params.key_usages = vec![KeyUsagePurpose::KeyCertSign, KeyUsagePurpose::CrlSign];
         params.not_before = rcgen::date_time_ymd(2024, 1, 1);
         params.not_after = rcgen::date_time_ymd(2034, 1, 1);
 
@@ -158,10 +159,9 @@ impl InternalCa {
 
         let mut params = CertificateParams::default();
         params.is_ca = IsCa::NoCa;
-        params.distinguished_name.push(
-            DnType::CommonName,
-            format!("{namespace}/{service_account}"),
-        );
+        params
+            .distinguished_name
+            .push(DnType::CommonName, format!("{namespace}/{service_account}"));
         params.subject_alt_names = vec![SanType::URI(uri_ia5)];
         params.key_usages = vec![KeyUsagePurpose::DigitalSignature];
         params.extended_key_usages = vec![
@@ -171,10 +171,9 @@ impl InternalCa {
         // Compute validity window using chrono (avoids direct `time` crate dependency).
         let now = Utc::now();
         let expire = now + Duration::hours(ttl_hours as i64);
-        params.not_before = rcgen::date_time_ymd(
-            now.year(), now.month() as u8, now.day() as u8);
-        params.not_after = rcgen::date_time_ymd(
-            expire.year(), expire.month() as u8, expire.day() as u8);
+        params.not_before = rcgen::date_time_ymd(now.year(), now.month() as u8, now.day() as u8);
+        params.not_after =
+            rcgen::date_time_ymd(expire.year(), expire.month() as u8, expire.day() as u8);
 
         let leaf = params
             .signed_by(&leaf_kp, &self.ca_cert, &self.ca_kp)
@@ -290,7 +289,11 @@ impl CertRotationManager {
             .filter(|s| s.expires_within(self.rotation_threshold_secs))
             .count();
         let expired = svids.values().filter(|s| s.is_expired()).count();
-        RotationSnapshot { total, pending_rotation: pending, expired }
+        RotationSnapshot {
+            total,
+            pending_rotation: pending,
+            expired,
+        }
     }
 }
 
@@ -319,11 +322,16 @@ impl Default for TrustDomainRegistry {
 
 impl TrustDomainRegistry {
     pub fn new() -> Self {
-        Self { domains: Arc::new(RwLock::new(HashMap::new())) }
+        Self {
+            domains: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 
     pub fn register(&self, domain: TrustDomain) {
-        self.domains.write().unwrap().insert(domain.name.clone(), domain);
+        self.domains
+            .write()
+            .unwrap()
+            .insert(domain.name.clone(), domain);
     }
 
     pub fn get(&self, name: &str) -> Option<TrustDomain> {
@@ -340,6 +348,9 @@ impl TrustDomainRegistry {
 
     /// Verify that a SPIFFE ID belongs to a known trust domain.
     pub fn is_trusted(&self, spiffe_id: &SpiffeId) -> bool {
-        self.domains.read().unwrap().contains_key(&spiffe_id.trust_domain)
+        self.domains
+            .read()
+            .unwrap()
+            .contains_key(&spiffe_id.trust_domain)
     }
 }

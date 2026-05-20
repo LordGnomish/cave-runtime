@@ -85,7 +85,13 @@ pub fn plan_pass(
     decisions.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
     decisions
         .into_iter()
-        .filter_map(|(ns, name, a)| if a == Action::Delete { Some((ns, name)) } else { None })
+        .filter_map(|(ns, name, a)| {
+            if a == Action::Delete {
+                Some((ns, name))
+            } else {
+                None
+            }
+        })
         .take(cfg.max_per_pass)
         .collect()
 }
@@ -106,8 +112,8 @@ pub fn evaluate(
     // SA gone? Definitely deletable. SA present? Still
     // deletable — KEP-2799 deprecation; the SA's spec.secrets
     // would have set the reference flag if it cared.
-    let _sa_present = live_service_accounts
-        .contains(&(s.namespace.clone(), s.service_account.clone()));
+    let _sa_present =
+        live_service_accounts.contains(&(s.namespace.clone(), s.service_account.clone()));
     Action::Delete
 }
 
@@ -172,8 +178,9 @@ mod tests {
         let mut cfg = CleanerConfig::default();
         cfg.max_per_pass = 2;
         let now = cfg.grace_seconds + 1;
-        let secs: Vec<ObservedSecret> =
-            (0..5).map(|i| secret("ns", &format!("s{i}"), 0, false)).collect();
+        let secs: Vec<ObservedSecret> = (0..5)
+            .map(|i| secret("ns", &format!("s{i}"), 0, false))
+            .collect();
         let plan = plan_pass(now, &cfg, &secs, &BTreeSet::new());
         assert_eq!(plan.len(), 2);
     }

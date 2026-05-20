@@ -39,10 +39,17 @@ pub enum RaftCommand {
     /// `cave-etcd` PUT. cave-etcd's `KvStore::put` keys keys as `String`
     /// (utf-8); the RaftCommand surface follows the same contract.
     /// When `lease` is Some, the put is associated with that lease ID.
-    EtcdPut { key: String, value: String, lease: Option<i64> },
+    EtcdPut {
+        key: String,
+        value: String,
+        lease: Option<i64>,
+    },
     /// `cave-etcd` DELETE — single-key removal. range_end is optional
     /// to match `DeleteRangeRequest` (None = single-key).
-    EtcdDelete { key: String, range_end: Option<String> },
+    EtcdDelete {
+        key: String,
+        range_end: Option<String>,
+    },
     /// `cave-apiserver` upsert — JSON-encoded `Resource` (the
     /// `#[serde(tag = "kind")]` discriminator is preserved).
     /// Apiserver-side wiring takes care of the conflict semantics —
@@ -51,7 +58,11 @@ pub enum RaftCommand {
     ApiserverUpsert { resource: serde_json::Value },
     /// `cave-apiserver` delete — addresses a resource by its
     /// `(kind, namespace, name)` triple as the store keys it.
-    ApiserverDelete { kind: String, namespace: String, name: String },
+    ApiserverDelete {
+        kind: String,
+        namespace: String,
+        name: String,
+    },
     /// New-leader marker. Per Raft §8 a fresh leader commits one to
     /// re-anchor the read-index without changing state-machine
     /// state. The apply daemon recognises and ignores it.
@@ -107,7 +118,11 @@ impl RaftCommand {
                     .unwrap_or("?");
                 format!("apiserver_upsert({kind}/{name})")
             }
-            Self::ApiserverDelete { kind, namespace, name } => {
+            Self::ApiserverDelete {
+                kind,
+                namespace,
+                name,
+            } => {
                 format!("apiserver_delete({kind}/{namespace}/{name})")
             }
             Self::NoOp => "noop".into(),
@@ -130,7 +145,11 @@ mod tests {
 
     #[test]
     fn etcd_put_roundtrip() {
-        let cmd = RaftCommand::EtcdPut { key: "/foo".into(), value: "bar".into(), lease: None };
+        let cmd = RaftCommand::EtcdPut {
+            key: "/foo".into(),
+            value: "bar".into(),
+            lease: None,
+        };
         let bytes = cmd.encode().unwrap();
         let back = RaftCommand::decode(&bytes).unwrap();
         assert_eq!(back, cmd);
@@ -149,7 +168,10 @@ mod tests {
 
     #[test]
     fn etcd_delete_roundtrip() {
-        let cmd = RaftCommand::EtcdDelete { key: "/foo".into(), range_end: None };
+        let cmd = RaftCommand::EtcdDelete {
+            key: "/foo".into(),
+            range_end: None,
+        };
         let bytes = cmd.encode().unwrap();
         assert_eq!(RaftCommand::decode(&bytes).unwrap(), cmd);
     }
@@ -233,7 +255,10 @@ mod tests {
     #[test]
     fn summary_truncates_long_keys() {
         let key: String = (0..200).map(|i| (b'a' + (i % 26) as u8) as char).collect();
-        let cmd = RaftCommand::EtcdDelete { key, range_end: None };
+        let cmd = RaftCommand::EtcdDelete {
+            key,
+            range_end: None,
+        };
         let s = cmd.summary();
         assert!(s.contains("…(200B)"));
         // Ensure the human-readable head is included.

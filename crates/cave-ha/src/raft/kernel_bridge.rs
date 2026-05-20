@@ -40,8 +40,8 @@ use crate::raft::node::RaftHandle as HaRaftHandle;
 use crate::raft::types::{EntryType, NodeId as HaNodeId, Role as HaRole};
 use async_trait::async_trait;
 use cave_kernel::consensus::{
-    ConsensusError, ConsensusResult, LeaderInfo, LogEntry as KernelLogEntry, LogIndex,
-    LogStore, NodeId as KernelNodeId, RaftHandle as KernelRaftHandleTrait, Role as KernelRole,
+    ConsensusError, ConsensusResult, LeaderInfo, LogEntry as KernelLogEntry, LogIndex, LogStore,
+    NodeId as KernelNodeId, RaftHandle as KernelRaftHandleTrait, Role as KernelRole,
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -90,7 +90,9 @@ pub fn map_ha_error(e: HaError) -> ConsensusError {
         HaError::ProposalDropped => ConsensusError::Aborted("proposal dropped".into()),
         HaError::TransferInProgress => ConsensusError::Aborted("transfer in progress".into()),
         HaError::IsLearner => ConsensusError::Aborted("node is learner".into()),
-        HaError::MembershipChangePending => ConsensusError::Aborted("membership change pending".into()),
+        HaError::MembershipChangePending => {
+            ConsensusError::Aborted("membership change pending".into())
+        }
         HaError::NodeNotFound(id) => ConsensusError::Aborted(format!("node {id} not found")),
         HaError::NoQuorum => ConsensusError::Aborted("no quorum".into()),
         HaError::Dr(s) => ConsensusError::Aborted(format!("dr: {s}")),
@@ -129,7 +131,9 @@ pub struct KernelLogStore {
 
 impl KernelLogStore {
     pub fn new() -> Self {
-        Self { inner: Arc::new(Mutex::new(MemLog::new())) }
+        Self {
+            inner: Arc::new(Mutex::new(MemLog::new())),
+        }
     }
 
     pub fn from_arc(inner: Arc<Mutex<MemLog>>) -> Self {
@@ -142,7 +146,9 @@ impl KernelLogStore {
 }
 
 impl Default for KernelLogStore {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
@@ -253,18 +259,27 @@ mod tests {
         let k = to_kernel_entry(&barrier);
         assert_eq!(k.index, 11);
         assert_eq!(k.term, 2);
-        assert!(k.data.is_empty(),
-            "barrier data is empty by construction; kernel surface untagged");
+        assert!(
+            k.data.is_empty(),
+            "barrier data is empty by construction; kernel surface untagged"
+        );
     }
 
     #[test]
     fn from_kernel_entry_lifts_to_normal_variant() {
-        let k = KernelLogEntry { index: 4, term: 1, data: b"abc".to_vec() };
+        let k = KernelLogEntry {
+            index: 4,
+            term: 1,
+            data: b"abc".to_vec(),
+        };
         let ha = from_kernel_entry(&k);
         assert_eq!(ha.index, 4);
         assert_eq!(ha.term, 1);
-        assert_eq!(ha.entry_type, EntryType::Normal,
-            "kernel-staged entries are always Normal at the bridge");
+        assert_eq!(
+            ha.entry_type,
+            EntryType::Normal,
+            "kernel-staged entries are always Normal at the bridge"
+        );
         assert_eq!(ha.data, b"abc".to_vec());
     }
 
@@ -295,7 +310,10 @@ mod tests {
 
     #[test]
     fn map_ha_error_log_compacted_surfaces_log_not_found() {
-        let e = HaError::LogCompacted { requested: 42, snapshot: 100 };
+        let e = HaError::LogCompacted {
+            requested: 42,
+            snapshot: 100,
+        };
         assert!(matches!(map_ha_error(e), ConsensusError::LogNotFound(42)));
     }
 
@@ -335,11 +353,22 @@ mod tests {
 
     #[test]
     fn to_kernel_role_collapses_pre_candidate() {
-        assert!(matches!(to_kernel_role(&HaRole::Follower), KernelRole::Follower));
-        assert!(matches!(to_kernel_role(&HaRole::Candidate), KernelRole::Candidate));
-        assert!(matches!(to_kernel_role(&HaRole::PreCandidate), KernelRole::Candidate),
-            "PreCandidate is an internal phase; kernel surface sees Candidate");
-        assert!(matches!(to_kernel_role(&HaRole::Leader), KernelRole::Leader));
+        assert!(matches!(
+            to_kernel_role(&HaRole::Follower),
+            KernelRole::Follower
+        ));
+        assert!(matches!(
+            to_kernel_role(&HaRole::Candidate),
+            KernelRole::Candidate
+        ));
+        assert!(
+            matches!(to_kernel_role(&HaRole::PreCandidate), KernelRole::Candidate),
+            "PreCandidate is an internal phase; kernel surface sees Candidate"
+        );
+        assert!(matches!(
+            to_kernel_role(&HaRole::Leader),
+            KernelRole::Leader
+        ));
     }
 
     #[test]
@@ -355,8 +384,16 @@ mod tests {
     async fn log_store_append_then_get_round_trips() {
         let store = KernelLogStore::new();
         let entries = vec![
-            KernelLogEntry { index: 1, term: 1, data: b"a".to_vec() },
-            KernelLogEntry { index: 2, term: 1, data: b"b".to_vec() },
+            KernelLogEntry {
+                index: 1,
+                term: 1,
+                data: b"a".to_vec(),
+            },
+            KernelLogEntry {
+                index: 2,
+                term: 1,
+                data: b"b".to_vec(),
+            },
         ];
         store.append(&entries).await.unwrap();
         let got = store.get(1).await.unwrap().expect("entry 1 present");
@@ -367,21 +404,42 @@ mod tests {
     #[tokio::test]
     async fn log_store_last_index_advances_with_appends() {
         let store = KernelLogStore::new();
-        assert_eq!(store.last_index().await.unwrap(), 0,
-            "empty log has last_index 0");
-        store.append(&[KernelLogEntry { index: 1, term: 1, data: vec![] }])
-            .await.unwrap();
+        assert_eq!(
+            store.last_index().await.unwrap(),
+            0,
+            "empty log has last_index 0"
+        );
+        store
+            .append(&[KernelLogEntry {
+                index: 1,
+                term: 1,
+                data: vec![],
+            }])
+            .await
+            .unwrap();
         assert_eq!(store.last_index().await.unwrap(), 1);
-        store.append(&[KernelLogEntry { index: 2, term: 1, data: vec![] }])
-            .await.unwrap();
+        store
+            .append(&[KernelLogEntry {
+                index: 2,
+                term: 1,
+                data: vec![],
+            }])
+            .await
+            .unwrap();
         assert_eq!(store.last_index().await.unwrap(), 2);
     }
 
     #[tokio::test]
     async fn log_store_get_missing_returns_none() {
         let store = KernelLogStore::new();
-        store.append(&[KernelLogEntry { index: 1, term: 1, data: vec![] }])
-            .await.unwrap();
+        store
+            .append(&[KernelLogEntry {
+                index: 1,
+                term: 1,
+                data: vec![],
+            }])
+            .await
+            .unwrap();
         // Asking for an index past the last → kernel contract says Ok(None).
         let got = store.get(99).await.unwrap();
         assert!(got.is_none(), "missing index → None, not error");
@@ -390,14 +448,32 @@ mod tests {
     #[tokio::test]
     async fn log_store_truncate_after_drops_suffix() {
         let store = KernelLogStore::new();
-        store.append(&[
-            KernelLogEntry { index: 1, term: 1, data: vec![1] },
-            KernelLogEntry { index: 2, term: 1, data: vec![2] },
-            KernelLogEntry { index: 3, term: 1, data: vec![3] },
-        ]).await.unwrap();
+        store
+            .append(&[
+                KernelLogEntry {
+                    index: 1,
+                    term: 1,
+                    data: vec![1],
+                },
+                KernelLogEntry {
+                    index: 2,
+                    term: 1,
+                    data: vec![2],
+                },
+                KernelLogEntry {
+                    index: 3,
+                    term: 1,
+                    data: vec![3],
+                },
+            ])
+            .await
+            .unwrap();
         store.truncate_after(1).await.unwrap();
-        assert_eq!(store.last_index().await.unwrap(), 1,
-            "truncate_after(1) keeps entries [0..=1]");
+        assert_eq!(
+            store.last_index().await.unwrap(),
+            1,
+            "truncate_after(1) keeps entries [0..=1]"
+        );
         assert!(store.get(2).await.unwrap().is_none());
     }
 
@@ -407,17 +483,35 @@ mod tests {
         // diverging suffix, then accepts the leader's new entries at the same
         // indices.
         let store = KernelLogStore::new();
-        store.append(&[
-            KernelLogEntry { index: 1, term: 1, data: vec![1] },
-            KernelLogEntry { index: 2, term: 1, data: vec![2] },
-        ]).await.unwrap();
+        store
+            .append(&[
+                KernelLogEntry {
+                    index: 1,
+                    term: 1,
+                    data: vec![1],
+                },
+                KernelLogEntry {
+                    index: 2,
+                    term: 1,
+                    data: vec![2],
+                },
+            ])
+            .await
+            .unwrap();
         store.truncate_after(1).await.unwrap();
-        store.append(&[
-            KernelLogEntry { index: 2, term: 2, data: vec![20] },
-        ]).await.unwrap();
+        store
+            .append(&[KernelLogEntry {
+                index: 2,
+                term: 2,
+                data: vec![20],
+            }])
+            .await
+            .unwrap();
         let e = store.get(2).await.unwrap().expect("entry 2 present");
-        assert_eq!(e.term, 2,
-            "post-truncation append takes the new leader's term at index 2");
+        assert_eq!(
+            e.term, 2,
+            "post-truncation append takes the new leader's term at index 2"
+        );
         assert_eq!(e.data, vec![20]);
     }
 
@@ -425,8 +519,14 @@ mod tests {
     async fn log_store_clone_shares_storage() {
         let store = KernelLogStore::new();
         let store2 = store.clone();
-        store.append(&[KernelLogEntry { index: 1, term: 1, data: vec![1] }])
-            .await.unwrap();
+        store
+            .append(&[KernelLogEntry {
+                index: 1,
+                term: 1,
+                data: vec![1],
+            }])
+            .await
+            .unwrap();
         // Second handle observes the same backing store.
         assert_eq!(store2.last_index().await.unwrap(), 1);
     }
@@ -435,8 +535,14 @@ mod tests {
     async fn log_store_from_arc_shares_existing_memlog() {
         let mem = Arc::new(Mutex::new(MemLog::new()));
         let store = KernelLogStore::from_arc(mem.clone());
-        store.append(&[KernelLogEntry { index: 1, term: 1, data: vec![1] }])
-            .await.unwrap();
+        store
+            .append(&[KernelLogEntry {
+                index: 1,
+                term: 1,
+                data: vec![1],
+            }])
+            .await
+            .unwrap();
         // Inspect via the original Arc — same data.
         let inner = mem.lock().await;
         assert_eq!(inner.last_index(), 1);
@@ -447,7 +553,11 @@ mod tests {
     #[tokio::test]
     async fn noop_state_machine_apply_returns_empty() {
         let sm = NoopStateMachine::default();
-        let entry = KernelLogEntry { index: 1, term: 1, data: b"anything".to_vec() };
+        let entry = KernelLogEntry {
+            index: 1,
+            term: 1,
+            data: b"anything".to_vec(),
+        };
         assert!(sm.apply(&entry).await.unwrap().is_empty());
     }
 
@@ -465,7 +575,8 @@ mod tests {
         let sm = KvStateMachine::new();
         let cmd = json!({ "Set": { "key": "k", "value": "v" } });
         let entry = KernelLogEntry {
-            index: 1, term: 1,
+            index: 1,
+            term: 1,
             data: serde_json::to_vec(&cmd).unwrap(),
         };
         sm.apply(&entry).await.unwrap();
@@ -478,23 +589,45 @@ mod tests {
         let sm = KvStateMachine::new();
         let set = serde_json::to_vec(&json!({ "Set": { "key": "k", "value": "v" } })).unwrap();
         let del = serde_json::to_vec(&json!({ "Delete": { "key": "k" } })).unwrap();
-        sm.apply(&KernelLogEntry { index: 1, term: 1, data: set }).await.unwrap();
-        sm.apply(&KernelLogEntry { index: 2, term: 1, data: del }).await.unwrap();
+        sm.apply(&KernelLogEntry {
+            index: 1,
+            term: 1,
+            data: set,
+        })
+        .await
+        .unwrap();
+        sm.apply(&KernelLogEntry {
+            index: 2,
+            term: 1,
+            data: del,
+        })
+        .await
+        .unwrap();
         assert_eq!(sm.get("k").await, None);
     }
 
     #[tokio::test]
     async fn kv_state_machine_apply_empty_data_is_noop() {
         let sm = KvStateMachine::new();
-        let entry = KernelLogEntry { index: 1, term: 1, data: vec![] };
-        assert!(sm.apply(&entry).await.unwrap().is_empty(),
-            "empty data is a no-op (matches Barrier semantics)");
+        let entry = KernelLogEntry {
+            index: 1,
+            term: 1,
+            data: vec![],
+        };
+        assert!(
+            sm.apply(&entry).await.unwrap().is_empty(),
+            "empty data is a no-op (matches Barrier semantics)"
+        );
     }
 
     #[tokio::test]
     async fn kv_state_machine_apply_invalid_data_yields_storage_error() {
         let sm = KvStateMachine::new();
-        let entry = KernelLogEntry { index: 1, term: 1, data: b"not-json".to_vec() };
+        let entry = KernelLogEntry {
+            index: 1,
+            term: 1,
+            data: b"not-json".to_vec(),
+        };
         match sm.apply(&entry).await.unwrap_err() {
             ConsensusError::Storage(_) => {} // expected
             other => panic!("expected Storage error, got {other:?}"),
@@ -507,8 +640,13 @@ mod tests {
         let sm = KvStateMachine::new();
         for (i, (k, v)) in [("a", "1"), ("b", "2"), ("c", "3")].iter().enumerate() {
             let cmd = serde_json::to_vec(&json!({ "Set": { "key": k, "value": v } })).unwrap();
-            sm.apply(&KernelLogEntry { index: (i as u64) + 1, term: 1, data: cmd })
-                .await.unwrap();
+            sm.apply(&KernelLogEntry {
+                index: (i as u64) + 1,
+                term: 1,
+                data: cmd,
+            })
+            .await
+            .unwrap();
         }
         let snapshot = sm.snapshot().await.unwrap();
         let sm2 = KvStateMachine::new();
@@ -537,9 +675,14 @@ mod tests {
         let sm: Arc<dyn StateMachine> = Arc::new(KvStateMachine::new());
         let store: Arc<dyn LogStore> = Arc::new(KernelLogStore::new());
 
-        store.append(&[KernelLogEntry {
-            index: 1, term: 1, data: vec![],
-        }]).await.unwrap();
+        store
+            .append(&[KernelLogEntry {
+                index: 1,
+                term: 1,
+                data: vec![],
+            }])
+            .await
+            .unwrap();
         let entry = store.get(1).await.unwrap().expect("entry");
         sm.apply(&entry).await.unwrap();
     }
@@ -578,7 +721,11 @@ mod tests {
         let metrics = Metrics::new(&mut registry);
         let inner = RaftNode::spawn(
             cfg(id),
-            vec![NodeInfo { id, addr: format!("mem:{id}"), is_learner: false }],
+            vec![NodeInfo {
+                id,
+                addr: format!("mem:{id}"),
+                is_learner: false,
+            }],
             Arc::new(transport),
             sm,
             metrics,
@@ -586,7 +733,9 @@ mod tests {
         let msg_tx = inner.msg_tx.clone();
         tokio::spawn(async move {
             while let Some((from, msg)) = rx.recv().await {
-                if msg_tx.send((from, msg)).is_err() { break; }
+                if msg_tx.send((from, msg)).is_err() {
+                    break;
+                }
             }
         });
         let kernel = KernelRaftHandle::new(inner.clone());
@@ -602,7 +751,9 @@ mod tests {
                 panic!("timed out waiting for self-election");
             }
             if let Ok(s) = h.status().await {
-                if s.role == "Leader" { return; }
+                if s.role == "Leader" {
+                    return;
+                }
             }
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         }
@@ -624,10 +775,15 @@ mod tests {
         wait_until_leader(&inner).await;
         let info = kernel.leader().await.unwrap();
         assert!(info.term >= 1, "leader info carries the elected term");
-        assert!(matches!(info.role, KernelRole::Leader),
-            "single-node cluster elects itself");
-        assert_eq!(info.leader, Some("1".to_string()),
-            "leader is reported as the kernel-stringified node id");
+        assert!(
+            matches!(info.role, KernelRole::Leader),
+            "single-node cluster elects itself"
+        );
+        assert_eq!(
+            info.leader,
+            Some("1".to_string()),
+            "leader is reported as the kernel-stringified node id"
+        );
         inner.shutdown().await;
     }
 
@@ -636,10 +792,12 @@ mod tests {
         let sm: Arc<dyn StateMachine> = Arc::new(KvStateMachine::new());
         let (inner, kernel) = spawn_single(1, sm).await;
         wait_until_leader(&inner).await;
-        let cmd = serde_json::to_vec(
-            &serde_json::json!({ "Set": { "key": "k", "value": "v" } }),
-        ).unwrap();
-        let idx = kernel.propose(cmd).await.expect("propose succeeds on leader");
+        let cmd = serde_json::to_vec(&serde_json::json!({ "Set": { "key": "k", "value": "v" } }))
+            .unwrap();
+        let idx = kernel
+            .propose(cmd)
+            .await
+            .expect("propose succeeds on leader");
         assert!(idx >= 1, "propose returns a committed log index");
         inner.shutdown().await;
     }

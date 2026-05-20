@@ -90,7 +90,10 @@ pub(crate) fn render_section(
         e = count_by_severity(&rows, "Error"),
         w = count_by_severity(&rows, "Warning"),
         i = count_by_severity(&rows, "Info"),
-        tbl = table(&["code", "severity", "kind", "name", "message"], &table_rows),
+        tbl = table(
+            &["code", "severity", "kind", "name", "message"],
+            &table_rows
+        ),
     ))
 }
 

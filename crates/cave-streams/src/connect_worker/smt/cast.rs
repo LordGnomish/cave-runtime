@@ -51,7 +51,7 @@ impl CastTarget {
             other => {
                 return Err(StreamsError::Internal(format!(
                     "Cast: unsupported target type '{other}'"
-                )))
+                )));
             }
         })
     }
@@ -113,7 +113,7 @@ impl CastTarget {
             (t, v) => {
                 return Err(StreamsError::Internal(format!(
                     "Cast: incompatible cast {v:?} → {t:?}"
-                )))
+                )));
             }
         })
     }
@@ -170,9 +170,7 @@ impl Smt for Cast {
                 r.value = target.cast(&r.value)?;
             } else {
                 let obj = r.value.as_object_mut().ok_or_else(|| {
-                    StreamsError::Internal(
-                        "Cast: cannot cast field on non-object value".into(),
-                    )
+                    StreamsError::Internal("Cast: cannot cast field on non-object value".into())
                 })?;
                 if let Some(existing) = obj.get(field) {
                     let casted = target.cast(existing)?;
@@ -220,10 +218,7 @@ mod tests {
         let mut cfg = BTreeMap::new();
         cfg.insert("spec".into(), "amount:int64".into());
         let c = Cast::from_config(&cfg).unwrap();
-        let r = RecordEnvelope::new(
-            "t",
-            obj(&[("amount", Value::String("42".into()))]),
-        );
+        let r = RecordEnvelope::new("t", obj(&[("amount", Value::String("42".into()))]));
         let out = c.apply(r).unwrap().unwrap();
         assert_eq!(
             out.value.as_object().unwrap().get("amount"),

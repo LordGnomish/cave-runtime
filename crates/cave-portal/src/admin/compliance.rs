@@ -825,9 +825,7 @@ pub fn parse_parity_index_json(raw: &str) -> HashMap<String, ParityIndexEntry> {
 /// workspace root and falling back to the binary-embedded snapshot. The
 /// disk path is `<workspace>/docs/parity/parity-index.json`.
 pub fn load_parity_index(workspace_root: &Path) -> HashMap<String, ParityIndexEntry> {
-    let on_disk = load_parity_index_from(
-        &workspace_root.join("docs/parity/parity-index.json"),
-    );
+    let on_disk = load_parity_index_from(&workspace_root.join("docs/parity/parity-index.json"));
     if !on_disk.is_empty() {
         return on_disk;
     }
@@ -1047,7 +1045,9 @@ pub fn build_crate_detail(
     // "Not covered by the parity audit (no parity.manifest.toml or
     // audit-pending)" — even for crates whose manifest carries an
     // explicit fill_ratio. Burak's "Cilium 0" report came from here.
-    let mut single = ComplianceSnapshot { crates: vec![compliance] };
+    let mut single = ComplianceSnapshot {
+        crates: vec![compliance],
+    };
     let index = load_parity_index(workspace_root);
     attach_parity_index(&mut single, &index);
     let compliance = single.crates.pop().expect("single-crate snapshot");
@@ -1101,7 +1101,9 @@ pub fn analyse_crate(
             .exists();
     let cavectl_path = workspace_root.join("crates/cave-cli/src/main.rs");
     let cavectl_subcommand_present = match fs::read_to_string(&cavectl_path) {
-        Ok(c) => c.contains(&format!("/api/{crate_name}/")) || c.contains(&format!("/api/{short}/")),
+        Ok(c) => {
+            c.contains(&format!("/api/{crate_name}/")) || c.contains(&format!("/api/{short}/"))
+        }
         Err(_) => false,
     };
     let obs_alerts_present = workspace_root
@@ -1215,7 +1217,10 @@ pub fn attach_parity_index(
             // Only override fill if the manifest value differs OR the
             // index didn't carry a source — that way audit-doc-only
             // crates (no manifest) keep their original entry.
-            if c.parity_ratio.map(|r| (r - live.fill_ratio).abs() > 0.000_5).unwrap_or(true) {
+            if c.parity_ratio
+                .map(|r| (r - live.fill_ratio).abs() > 0.000_5)
+                .unwrap_or(true)
+            {
                 c.parity_ratio = Some(live.fill_ratio);
             }
             c.parity_ratio_source = Some("manifest".into());
@@ -1254,7 +1259,10 @@ pub struct LiveManifestParity {
 /// `None` when the manifest hasn't been re-audited under the
 /// 2026-05-13 schema. Pure I/O.
 pub fn read_manifest_parity(crate_name: &str) -> Option<LiveManifestParity> {
-    let path = workspace_root().join("crates").join(crate_name).join("parity.manifest.toml");
+    let path = workspace_root()
+        .join("crates")
+        .join(crate_name)
+        .join("parity.manifest.toml");
     let text = fs::read_to_string(&path).ok()?;
 
     // Find the [parity] section so we don't accidentally match a key
@@ -1276,7 +1284,10 @@ pub fn read_manifest_parity(crate_name: &str) -> Option<LiveManifestParity> {
         }
         if in_section {
             // A new section header ends the [parity] block.
-            if trimmed.starts_with('[') && !trimmed.starts_with("[parity]") && !trimmed.starts_with('#') {
+            if trimmed.starts_with('[')
+                && !trimmed.starts_with("[parity]")
+                && !trimmed.starts_with('#')
+            {
                 break;
             }
             let value_part = trimmed.split('#').next().unwrap_or(trimmed);
@@ -1433,7 +1444,10 @@ pub struct CachedSnapshot {
 
 impl CachedSnapshot {
     pub fn new(snapshot: ComplianceSnapshot, cached_at: DateTime<Utc>) -> Self {
-        Self { snapshot, cached_at }
+        Self {
+            snapshot,
+            cached_at,
+        }
     }
 
     /// Returns `true` when `now - cached_at > max_age`.
@@ -1468,10 +1482,7 @@ pub fn cached_snapshot_or_refresh() -> ComplianceSnapshot {
 }
 
 /// Testable variant: callers inject `now` + `max_age`.
-pub fn cached_snapshot_or_refresh_at(
-    now: DateTime<Utc>,
-    max_age: Duration,
-) -> ComplianceSnapshot {
+pub fn cached_snapshot_or_refresh_at(now: DateTime<Utc>, max_age: Duration) -> ComplianceSnapshot {
     let cell = cache_cell();
     {
         let guard = cell.lock().expect("compliance cache poisoned");
@@ -1579,11 +1590,7 @@ fn cell_color(value: u8) -> &'static str {
 }
 
 fn check(b: bool) -> &'static str {
-    if b {
-        "✓"
-    } else {
-        "—"
-    }
+    if b { "✓" } else { "—" }
 }
 
 /// Column the dashboard rows are sorted by. The selector is exposed
@@ -1710,10 +1717,12 @@ impl ViewQuery {
             .cloned()
             .collect();
         match self.sort {
-            SortKey::Score => rows.sort_by(|a, b| match a.four_track_score.cmp(&b.four_track_score) {
-                Ordering::Equal => a.name.cmp(&b.name),
-                ord => ord,
-            }),
+            SortKey::Score => {
+                rows.sort_by(|a, b| match a.four_track_score.cmp(&b.four_track_score) {
+                    Ordering::Equal => a.name.cmp(&b.name),
+                    ord => ord,
+                })
+            }
             SortKey::StubCount => {
                 rows.sort_by(|a, b| {
                     let sa = a.unimplemented_count + a.todo_count + a.ignored_test_count;
@@ -1744,7 +1753,11 @@ impl ViewQuery {
 
     /// Build the `?sort=…&filter=…` querystring fragment (without `?`).
     pub fn to_query_string(&self) -> String {
-        format!("sort={}&filter={}", self.sort.as_str(), self.filter.as_str())
+        format!(
+            "sort={}&filter={}",
+            self.sort.as_str(),
+            self.filter.as_str()
+        )
     }
 }
 
@@ -1812,19 +1825,17 @@ impl StaleStateBanner {
 /// callers check `is_stale()`.
 pub fn check_stale_state(workspace_root: &Path) -> StaleStateBanner {
     let parity_index_mtime = mtime_secs(&workspace_root.join("docs/parity/parity-index.json"));
-    let newest_manifest_mtime = newest_mtime_in(
-        &workspace_root.join("crates"),
-        |p| p.file_name().and_then(|n| n.to_str()) == Some("parity.manifest.toml"),
-    );
+    let newest_manifest_mtime = newest_mtime_in(&workspace_root.join("crates"), |p| {
+        p.file_name().and_then(|n| n.to_str()) == Some("parity.manifest.toml")
+    });
     // Prefer the release binary if both exist (production-style); fall back
     // to debug for dev installs.
     let release_bin = workspace_root.join("target/release/cave-runtime");
     let debug_bin = workspace_root.join("target/debug/cave-runtime");
     let binary_mtime = mtime_secs(&release_bin).or_else(|| mtime_secs(&debug_bin));
-    let newest_source_mtime = newest_mtime_in(
-        &workspace_root.join("crates"),
-        |p| p.extension().and_then(|e| e.to_str()) == Some("rs"),
-    );
+    let newest_source_mtime = newest_mtime_in(&workspace_root.join("crates"), |p| {
+        p.extension().and_then(|e| e.to_str()) == Some("rs")
+    });
 
     // Tolerance: clocks + git checkouts can introduce 1–2s of jitter. Only
     // flag staleness when the gap is meaningful (5 seconds).
@@ -1851,7 +1862,9 @@ pub fn check_stale_state(workspace_root: &Path) -> StaleStateBanner {
 fn mtime_secs(p: &Path) -> Option<i64> {
     let md = fs::metadata(p).ok()?;
     let mt = md.modified().ok()?;
-    mt.duration_since(std::time::UNIX_EPOCH).ok().map(|d| d.as_secs() as i64)
+    mt.duration_since(std::time::UNIX_EPOCH)
+        .ok()
+        .map(|d| d.as_secs() as i64)
 }
 
 /// Walk `root` recursively and return the newest mtime among files matching
@@ -2148,16 +2161,56 @@ pub fn render_with_view(
   <span class="text-xs text-gray-500 ml-2">showing {shown} / {total}</span>
 </form>"#,
         tenant = escape(ctx.tenant.as_str()),
-        sel_score = if view.sort == SortKey::Score { " selected" } else { "" },
-        sel_parity = if view.sort == SortKey::Parity { " selected" } else { "" },
-        sel_stubs = if view.sort == SortKey::StubCount { " selected" } else { "" },
-        sel_name = if view.sort == SortKey::Name { " selected" } else { "" },
-        f_all = if view.filter == FilterMode::All { " selected" } else { "" },
-        f_lt50 = if view.filter == FilterMode::ScoreUnder50 { " selected" } else { "" },
-        f_gap = if view.filter == FilterMode::TrackGap { " selected" } else { "" },
-        f_mfe = if view.filter == FilterMode::ManifestEmpty { " selected" } else { "" },
-        f_pms = if view.filter == FilterMode::ParityMeasured { " selected" } else { "" },
-        f_xinf = if view.filter == FilterMode::ExcludeInfra { " selected" } else { "" },
+        sel_score = if view.sort == SortKey::Score {
+            " selected"
+        } else {
+            ""
+        },
+        sel_parity = if view.sort == SortKey::Parity {
+            " selected"
+        } else {
+            ""
+        },
+        sel_stubs = if view.sort == SortKey::StubCount {
+            " selected"
+        } else {
+            ""
+        },
+        sel_name = if view.sort == SortKey::Name {
+            " selected"
+        } else {
+            ""
+        },
+        f_all = if view.filter == FilterMode::All {
+            " selected"
+        } else {
+            ""
+        },
+        f_lt50 = if view.filter == FilterMode::ScoreUnder50 {
+            " selected"
+        } else {
+            ""
+        },
+        f_gap = if view.filter == FilterMode::TrackGap {
+            " selected"
+        } else {
+            ""
+        },
+        f_mfe = if view.filter == FilterMode::ManifestEmpty {
+            " selected"
+        } else {
+            ""
+        },
+        f_pms = if view.filter == FilterMode::ParityMeasured {
+            " selected"
+        } else {
+            ""
+        },
+        f_xinf = if view.filter == FilterMode::ExcludeInfra {
+            " selected"
+        } else {
+            ""
+        },
         shown = filtered.len(),
         total = total,
     );
@@ -2275,9 +2328,21 @@ pub fn render_with_view(
         // literal `<span ...>92%</span>` text in the browser.
         tbl = table_html(
             &[
-                "crate", "upstream", "loc", "tests", "ignored", "unimpl!",
-                "portal", "cavectl", "alerts", "dash", "structural", "parity",
-                "honest", "portal-ui", "behavioral",
+                "crate",
+                "upstream",
+                "loc",
+                "tests",
+                "ignored",
+                "unimpl!",
+                "portal",
+                "cavectl",
+                "alerts",
+                "dash",
+                "structural",
+                "parity",
+                "honest",
+                "portal-ui",
+                "behavioral",
             ],
             &rows,
         ),
@@ -2305,7 +2370,8 @@ fn render_parity_block(c: &CrateCompliance) -> (String, String) {
   <div class="text-xs text-gray-500 uppercase tracking-wide">Upstream Parity</div>
   <div class="text-3xl font-bold text-gray-600 mt-1">infra</div>
   <div class="text-xs text-gray-500 mt-2">Infrastructure-only crate — no upstream counterpart.</div>
-</div>"#.to_string();
+</div>"#
+            .to_string();
         return (card, String::new());
     }
     let card = match c.parity_ratio {
@@ -2506,7 +2572,11 @@ pub fn render_detail(
     Ok(page_shell_full(
         ctx,
         "/admin/compliance",
-        &format!("compliance · {} · {}", escape(ctx.tenant.as_str()), escape(&c.name)),
+        &format!(
+            "compliance · {} · {}",
+            escape(ctx.tenant.as_str()),
+            escape(&c.name)
+        ),
         &body,
     ))
 }
@@ -2624,7 +2694,9 @@ name = "cave-x"
         i1.infra_only = true;
         let mut i2 = stub_compliance("cave-core", 25);
         i2.infra_only = true;
-        let snap = ComplianceSnapshot { crates: vec![t1, i1, i2] };
+        let snap = ComplianceSnapshot {
+            crates: vec![t1, i1, i2],
+        };
         assert_eq!(snap.aggregate_score(), 50);
         assert_eq!(snap.tier1_count(), 1);
         assert_eq!(snap.infra_count(), 2);
@@ -2744,44 +2816,42 @@ version = "7.2.0"
             "acme"
         );
         let snap = ComplianceSnapshot {
-            crates: vec![
-                CrateCompliance {
-                    name: "a".into(),
-                    upstream_version: None,
-                    upstream_org_repo: None,
-                    backend_loc: 10,
-                    backend_test_count: 1,
-                    ignored_test_count: 3,
-                    unimplemented_count: 5,
-                    todo_count: 2,
-                    portal_admin_present: false,
-                    cavectl_subcommand_present: false,
-                    obs_alerts_present: false,
-                    obs_dashboard_present: false,
-                    four_track_score: 25,
-                    infra_only: false,
-                    parity_ratio: None,
-                    parity_ratio_source: None,
-                    parity_ratio_last_audit: None,
-                    honest_parity_ratio: None,
-                    parity_mapped_count: None,
-                    parity_partial_count: None,
-                    parity_skipped_count: None,
-                    parity_unmapped_count: None,
-                    parity_total_count: None,
-                    manifest_filled: None,
-                    audit_tier: None,
-                    portal_ui_status: None,
-                    portal_ui_priority: None,
-                    portal_ui_upstream_url: None,
-                    portal_ui_score: None,
-                    behavioral_parity: None,
-                    behavioral_ported: None,
-                    behavioral_total: None,
-                    behavioral_audit_scope: None,
-                    behavioral_audit_at: None,
-                },
-            ],
+            crates: vec![CrateCompliance {
+                name: "a".into(),
+                upstream_version: None,
+                upstream_org_repo: None,
+                backend_loc: 10,
+                backend_test_count: 1,
+                ignored_test_count: 3,
+                unimplemented_count: 5,
+                todo_count: 2,
+                portal_admin_present: false,
+                cavectl_subcommand_present: false,
+                obs_alerts_present: false,
+                obs_dashboard_present: false,
+                four_track_score: 25,
+                infra_only: false,
+                parity_ratio: None,
+                parity_ratio_source: None,
+                parity_ratio_last_audit: None,
+                honest_parity_ratio: None,
+                parity_mapped_count: None,
+                parity_partial_count: None,
+                parity_skipped_count: None,
+                parity_unmapped_count: None,
+                parity_total_count: None,
+                manifest_filled: None,
+                audit_tier: None,
+                portal_ui_status: None,
+                portal_ui_priority: None,
+                portal_ui_upstream_url: None,
+                portal_ui_score: None,
+                behavioral_parity: None,
+                behavioral_ported: None,
+                behavioral_total: None,
+                behavioral_audit_scope: None,
+                behavioral_audit_at: None,
+            }],
         };
         assert_eq!(snap.total_stub_count(), 10);
     }
@@ -2794,8 +2864,8 @@ version = "7.2.0"
             "acme"
         );
         let workspace = locate_workspace_root();
-        let snap = build_snapshot(&workspace, &["cave-cache", "cave-docdb", "cave-streams"])
-            .unwrap();
+        let snap =
+            build_snapshot(&workspace, &["cave-cache", "cave-docdb", "cave-streams"]).unwrap();
         assert_eq!(snap.crates.len(), 3);
         // Lowest score first.
         for w in snap.crates.windows(2) {
@@ -3039,7 +3109,11 @@ version = "7.2.0"
         handle.abort();
         // After the background pass, the cache should be populated and
         // a follow-up call within the TTL must return it without re-walking.
-        let stored = cache_cell().lock().unwrap().clone().expect("cache populated");
+        let stored = cache_cell()
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("cache populated");
         let now = stored.cached_at + chrono::Duration::seconds(1);
         let snap = cached_snapshot_or_refresh_at(now, Duration::from_secs(300));
         assert_eq!(snap, stored.snapshot);
@@ -3087,7 +3161,10 @@ version = "7.2.0"
         // honest_ratio should also be populated.
         assert!(detail.compliance.honest_parity_ratio.is_some());
         // And the upstream metadata.
-        assert_eq!(detail.compliance.upstream_org_repo.as_deref(), Some("cilium/cilium"));
+        assert_eq!(
+            detail.compliance.upstream_org_repo.as_deref(),
+            Some("cilium/cilium")
+        );
     }
 
     #[test]
@@ -3238,7 +3315,9 @@ version = "7.2.0"
         c.unimplemented_count = 0;
         let mut infra = stub_compliance("cave-cli", 25);
         infra.infra_only = true;
-        ComplianceSnapshot { crates: vec![a, b, c, infra] }
+        ComplianceSnapshot {
+            crates: vec![a, b, c, infra],
+        }
     }
 
     #[test]
@@ -3254,7 +3333,7 @@ version = "7.2.0"
         };
         let rows = view.apply(&snap_three());
         assert_eq!(rows.first().unwrap().name, "cave-cli"); // 25 (lowest)
-        assert_eq!(rows.last().unwrap().name, "cave-c");    // 100 (highest)
+        assert_eq!(rows.last().unwrap().name, "cave-c"); // 100 (highest)
     }
 
     #[test]
@@ -3498,7 +3577,12 @@ version = "7.2.0"
         // their respective manifest [parity] blocks. cave-etcd (2026-05-12)
         // had already moved to 0.9155 via the same pattern.
         let m = parse_parity_index_json(PARITY_INDEX_EMBEDDED);
-        for name in ["cave-apiserver", "cave-cri", "cave-kubelet", "cave-scheduler"] {
+        for name in [
+            "cave-apiserver",
+            "cave-cri",
+            "cave-kubelet",
+            "cave-scheduler",
+        ] {
             let e = m.get(name).unwrap_or_else(|| panic!("missing {name}"));
             assert_eq!(e.tier, "100", "{name} should be tier 100");
             // Post-2026-05-12: measured ratios are strictly < 1.0 and > 0.7.
@@ -3586,7 +3670,7 @@ version = "7.2.0"
                 portal_ui_compliance("a", false, Some("complete"), Some("P0")),
                 portal_ui_compliance("b", false, Some("partial"), Some("P1")),
                 portal_ui_compliance("c", false, Some("scaffold"), Some("P2")),
-                portal_ui_compliance("d", false, None, None),     // unknown excluded
+                portal_ui_compliance("d", false, None, None), // unknown excluded
                 portal_ui_compliance("e", true, Some("none"), Some("P2")), // infra excluded
             ],
         };
@@ -3756,7 +3840,11 @@ priority = "P0"
         };
         let index = parse_parity_index_json(PARITY_INDEX_EMBEDDED);
         attach_parity_index(&mut snap, &index);
-        let api = snap.crates.iter().find(|c| c.name == "cave-apiserver").unwrap();
+        let api = snap
+            .crates
+            .iter()
+            .find(|c| c.name == "cave-apiserver")
+            .unwrap();
         // Post-2026-05-12 trajectory:
         //   1.0  (wave3 self-report)
         //   0.86 (measured audit pass: 26 mapped / 17 skipped / 7 unmapped of 50)
@@ -3842,7 +3930,14 @@ priority = "P0"
         );
         let snap = ComplianceSnapshot {
             crates: vec![
-                parity_compliance("cave-apiserver", 100, Some(1.0), Some(true), Some("100"), false),
+                parity_compliance(
+                    "cave-apiserver",
+                    100,
+                    Some(1.0),
+                    Some(true),
+                    Some("100"),
+                    false,
+                ),
                 parity_compliance("cave-portal", 100, Some(0.25), Some(true), Some("B"), false),
             ],
         };
@@ -3868,7 +3963,14 @@ priority = "P0"
             "acme"
         );
         let snap = ComplianceSnapshot {
-            crates: vec![parity_compliance("cave-unmeasured", 87, None, None, None, false)],
+            crates: vec![parity_compliance(
+                "cave-unmeasured",
+                87,
+                None,
+                None,
+                None,
+                false,
+            )],
         };
         let html = render(&snap, &ctx(&[Permission::AdminComplianceView])).unwrap();
         assert!(html.contains("not covered by parity audit"));
@@ -4118,7 +4220,10 @@ priority = "P0"
         assert!(c.parity_partial_count.is_some());
         let honest = c.honest_parity_ratio.unwrap();
         let shape = c.parity_ratio.unwrap();
-        assert!(honest <= shape + 0.000_5, "honest must be ≤ shape: {honest} > {shape}");
+        assert!(
+            honest <= shape + 0.000_5,
+            "honest must be ≤ shape: {honest} > {shape}"
+        );
     }
 
     #[test]
@@ -4129,10 +4234,19 @@ priority = "P0"
         let cache_parity = read_manifest_parity("cave-cache")
             .expect("cave-cache manifest exists in the workspace");
         assert!(cache_parity.fill_ratio > 0.9);
-        assert!(cache_parity.honest_ratio.is_some(), "honest_ratio populated by 2026-05-13 pass");
+        assert!(
+            cache_parity.honest_ratio.is_some(),
+            "honest_ratio populated by 2026-05-13 pass"
+        );
         let honest = cache_parity.honest_ratio.unwrap();
-        assert!(honest < cache_parity.fill_ratio, "honest < shape after partial demotions");
-        assert!(cache_parity.partial_count.unwrap_or(0) > 0, "cache has 4 self-flagged partials");
+        assert!(
+            honest < cache_parity.fill_ratio,
+            "honest < shape after partial demotions"
+        );
+        assert!(
+            cache_parity.partial_count.unwrap_or(0) > 0,
+            "cache has 4 self-flagged partials"
+        );
         // Sum of class counts equals total.
         let sum = cache_parity.mapped_count.unwrap()
             + cache_parity.partial_count.unwrap()
@@ -4151,8 +4265,8 @@ priority = "P0"
         // returns `Some(LiveManifestParity)` with the new fields as
         // `None`. The cave-runtime workspace ships such a manifest
         // for cave-acme (infra-only, fill_ratio = 0.0, no honest).
-        let p = read_manifest_parity("cave-acme")
-            .expect("cave-acme manifest exists and is parseable");
+        let p =
+            read_manifest_parity("cave-acme").expect("cave-acme manifest exists and is parseable");
         // cave-acme is infra-only with fill_ratio = 0.0 (no inventory);
         // either honest_ratio = None or honest_ratio = 0.0 is acceptable
         // — the parser must just not crash.
@@ -4196,8 +4310,14 @@ priority = "P0"
         }
         let c_path = CString::new(path.as_os_str().to_str().unwrap()).unwrap();
         let tv = [
-            Timeval { tv_sec: secs_since_epoch as c_long, tv_usec: 0 },
-            Timeval { tv_sec: secs_since_epoch as c_long, tv_usec: 0 },
+            Timeval {
+                tv_sec: secs_since_epoch as c_long,
+                tv_usec: 0,
+            },
+            Timeval {
+                tv_sec: secs_since_epoch as c_long,
+                tv_usec: 0,
+            },
         ];
         // SAFETY: c_path is a valid NUL-terminated string; tv is a fixed-
         // size local array passed by pointer.
@@ -4316,7 +4436,10 @@ priority = "P0"
         let banner = check_stale_state(root);
         // target_rs is under target/ → ignored; real_src is newest.
         assert_eq!(banner.newest_source_mtime, Some(1_700_000_050));
-        assert!(!banner.binary_stale, "real source older than binary → not stale");
+        assert!(
+            !banner.binary_stale,
+            "real source older than binary → not stale"
+        );
     }
 
     #[test]
@@ -4477,9 +4600,13 @@ priority = "P0"
         // Burak's "Cilium 0" report came partly from this. The matrix
         // now goes through `table_html` so spans survive intact.
         let snap = ComplianceSnapshot {
-            crates: vec![
-                honest_compliance("cave-x", Some(0.95), Some(0.84), Some(4), false),
-            ],
+            crates: vec![honest_compliance(
+                "cave-x",
+                Some(0.95),
+                Some(0.84),
+                Some(4),
+                false,
+            )],
         };
         let html = render_with_view(
             &snap,
@@ -4541,7 +4668,10 @@ priority = "P0"
         // structural, parity, honest, portal-ui — one each. (Portal UI card
         // requires its own data; without it the card shows 'F'.)
         let grade_count = html.matches("Grade ").count();
-        assert!(grade_count >= 4, "four cards each carry a Grade label; got {grade_count}");
+        assert!(
+            grade_count >= 4,
+            "four cards each carry a Grade label; got {grade_count}"
+        );
     }
 
     #[test]
@@ -4559,7 +4689,10 @@ priority = "P0"
         )
         .expect("render OK");
         // The drop badge format is " -<N>" (no plus sign; never zero).
-        assert!(html.contains("-11"), "demotion drop -11 rendered in honest column");
+        assert!(
+            html.contains("-11"),
+            "demotion drop -11 rendered in honest column"
+        );
         // Partial count badge "4p"
         assert!(html.contains("4p"), "partial count badge rendered");
     }
@@ -4570,14 +4703,24 @@ priority = "P0"
         // [parity] block must have mapped + partial + skipped + unmapped
         // == total, and fill_ratio + honest_ratio must lie in [0, 1].
         let top14 = [
-            "cave-cache","cave-cri","cave-net","cave-etcd","cave-scheduler",
-            "cave-apiserver","cave-kubelet","cave-mesh","cave-rdbms-operator",
-            "cave-streams","cave-vault","cave-controller-manager","cave-auth",
+            "cave-cache",
+            "cave-cri",
+            "cave-net",
+            "cave-etcd",
+            "cave-scheduler",
+            "cave-apiserver",
+            "cave-kubelet",
+            "cave-mesh",
+            "cave-rdbms-operator",
+            "cave-streams",
+            "cave-vault",
+            "cave-controller-manager",
+            "cave-auth",
             "cave-karpenter",
         ];
         for name in top14 {
-            let p = read_manifest_parity(name)
-                .unwrap_or_else(|| panic!("manifest missing for {name}"));
+            let p =
+                read_manifest_parity(name).unwrap_or_else(|| panic!("manifest missing for {name}"));
             let total = p.total_count.expect(&format!("{name} declares total"));
             let mapped = p.mapped_count.unwrap_or(0);
             let partial = p.partial_count.unwrap_or(0);
@@ -4588,9 +4731,17 @@ priority = "P0"
                 total,
                 "{name}: counts sum to total"
             );
-            assert!((0.0..=1.0).contains(&p.fill_ratio), "{name}: fill_ratio in [0,1]");
-            let honest = p.honest_ratio.expect(&format!("{name} carries honest_ratio"));
-            assert!((0.0..=1.0).contains(&honest), "{name}: honest_ratio in [0,1]");
+            assert!(
+                (0.0..=1.0).contains(&p.fill_ratio),
+                "{name}: fill_ratio in [0,1]"
+            );
+            let honest = p
+                .honest_ratio
+                .expect(&format!("{name} carries honest_ratio"));
+            assert!(
+                (0.0..=1.0).contains(&honest),
+                "{name}: honest_ratio in [0,1]"
+            );
             assert!(
                 honest <= p.fill_ratio + 0.000_5,
                 "{name}: honest_ratio ({honest}) must be ≤ fill_ratio ({})",
@@ -4607,13 +4758,16 @@ priority = "P0"
         // commits may add more (new [[mapped]] entries whose notes
         // re-trigger the self-flag regex), but never fewer.
         let lower_bound = [
-            ("cave-cache", 4), ("cave-cri", 3), ("cave-etcd", 2),
-            ("cave-apiserver", 1), ("cave-mesh", 1),
-            ("cave-controller-manager", 1), ("cave-auth", 1),
+            ("cave-cache", 4),
+            ("cave-cri", 3),
+            ("cave-etcd", 2),
+            ("cave-apiserver", 1),
+            ("cave-mesh", 1),
+            ("cave-controller-manager", 1),
+            ("cave-auth", 1),
         ];
         for (name, lower) in lower_bound {
-            let p = read_manifest_parity(name)
-                .unwrap_or_else(|| panic!("{name} manifest exists"));
+            let p = read_manifest_parity(name).unwrap_or_else(|| panic!("{name} manifest exists"));
             assert!(
                 p.partial_count.unwrap_or(0) >= lower,
                 "{name}: partial_count must be ≥ {lower}, got {:?}",
@@ -4636,7 +4790,10 @@ priority = "P0"
         // Before the pass: mapped=106 skipped=17 → after: mapped=42 skipped=81.
         // Tolerate small drift from later edits by checking the directional
         // invariant.
-        assert!(p.mapped_count.unwrap() < 50, "mapped count dropped below 50");
+        assert!(
+            p.mapped_count.unwrap() < 50,
+            "mapped count dropped below 50"
+        );
         assert!(p.skipped_count.unwrap() > 70, "skipped count grew above 70");
     }
 
@@ -4651,9 +4808,13 @@ priority = "P0"
         // the expected lower-bound partial_count — never less. Re-running the
         // script must be non-decreasing on these counts.
         let lower_bound = [
-            ("cave-cache", 4), ("cave-cri", 3), ("cave-etcd", 2),
-            ("cave-apiserver", 1), ("cave-mesh", 1),
-            ("cave-controller-manager", 1), ("cave-auth", 1),
+            ("cave-cache", 4),
+            ("cave-cri", 3),
+            ("cave-etcd", 2),
+            ("cave-apiserver", 1),
+            ("cave-mesh", 1),
+            ("cave-controller-manager", 1),
+            ("cave-auth", 1),
         ];
         for (name, lower) in lower_bound {
             let p = read_manifest_parity(name).unwrap();
@@ -4771,7 +4932,13 @@ priority = "P0"
             "acme"
         );
         let snap = ComplianceSnapshot {
-            crates: vec![behavioral_compliance("a", false, Some(0.8), Some(8), Some(10))],
+            crates: vec![behavioral_compliance(
+                "a",
+                false,
+                Some(0.8),
+                Some(8),
+                Some(10),
+            )],
         };
         let html = render(&snap, &ctx(&[Permission::AdminComplianceView])).unwrap();
         // Headline card.

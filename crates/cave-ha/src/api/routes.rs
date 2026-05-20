@@ -17,11 +17,11 @@
 use std::sync::Arc;
 
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{delete, get, post},
-    Json, Router,
 };
 use prometheus_client::{encoding::text::encode, registry::Registry};
 use serde::{Deserialize, Serialize};
@@ -96,7 +96,11 @@ async fn add_member(
     State(s): State<Arc<ApiState>>,
     Json(body): Json<AddMemberBody>,
 ) -> impl IntoResponse {
-    let node = NodeInfo { id: body.id, addr: body.addr, is_learner: body.is_learner };
+    let node = NodeInfo {
+        id: body.id,
+        addr: body.addr,
+        is_learner: body.is_learner,
+    };
     match s.node.add_node(node).await {
         Ok(()) => Ok(StatusCode::NO_CONTENT),
         Err(e) => Err(api_error(e)),
@@ -139,7 +143,11 @@ async fn metrics(State(s): State<Arc<ApiState>>) -> impl IntoResponse {
     let registry = s.metrics_registry.read().await;
     let mut buf = String::new();
     if encode(&mut buf, &*registry).is_ok() {
-        (StatusCode::OK, [("content-type", "text/plain; version=0.0.4")], buf)
+        (
+            StatusCode::OK,
+            [("content-type", "text/plain; version=0.0.4")],
+            buf,
+        )
     } else {
         (
             StatusCode::INTERNAL_SERVER_ERROR,

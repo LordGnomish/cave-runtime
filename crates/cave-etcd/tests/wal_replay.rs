@@ -21,9 +21,7 @@
 //!   end-to-end. The replay helper exposed here lets a future caller
 //!   compose the two without touching KvStore internals.
 
-use cave_etcd::models::{
-    DeleteRangeRequest, LeaseGrantRequest, PutRequest, RangeRequest,
-};
+use cave_etcd::models::{DeleteRangeRequest, LeaseGrantRequest, PutRequest, RangeRequest};
 use cave_etcd::store::KvStore;
 use cave_etcd::wal::{replay_into_store, Wal, WalOp, WalRecord};
 use tempfile::tempdir;
@@ -282,7 +280,8 @@ fn wal_replay_under_truncate_preserves_observable_state() {
     {
         let mut wal = Wal::open(dir.path()).unwrap();
         for i in 1..=5 {
-            wal.append_entry(1, put_op(&format!("k{i}"), &format!("v{i}"))).unwrap();
+            wal.append_entry(1, put_op(&format!("k{i}"), &format!("v{i}")))
+                .unwrap();
         }
         wal.truncate_through(3).unwrap();
     }
@@ -302,7 +301,10 @@ fn wal_replay_under_truncate_preserves_observable_state() {
                 count_only: false,
             })
             .unwrap();
-        assert!(resp.kvs.is_empty(), "{absent} should be absent after truncate");
+        assert!(
+            resp.kvs.is_empty(),
+            "{absent} should be absent after truncate"
+        );
     }
     for present in ["k4", "k5"] {
         let resp = store

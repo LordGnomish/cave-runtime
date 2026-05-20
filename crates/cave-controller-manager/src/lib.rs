@@ -245,8 +245,18 @@ mod admin_surface_tests {
 
     #[test]
     fn controllers_list_includes_workload_core() {
-        for must in ["deployment", "replicaset", "statefulset", "daemonset", "job", "cronjob"] {
-            assert!(CONTROLLERS.contains(&must), "missing core controller: {must}");
+        for must in [
+            "deployment",
+            "replicaset",
+            "statefulset",
+            "daemonset",
+            "job",
+            "cronjob",
+        ] {
+            assert!(
+                CONTROLLERS.contains(&must),
+                "missing core controller: {must}"
+            );
         }
     }
 

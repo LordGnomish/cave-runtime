@@ -45,7 +45,13 @@ impl NetState {
     }
 
     /// Allocate a pod IP from the CIDR.
-    pub fn allocate_pod_ip(&self, pod_name: &str, namespace: &str, node_name: &str, labels: HashMap<String, String>) -> PodNetwork {
+    pub fn allocate_pod_ip(
+        &self,
+        pod_name: &str,
+        namespace: &str,
+        node_name: &str,
+        labels: HashMap<String, String>,
+    ) -> PodNetwork {
         let counter = self.ip_counter.fetch_add(1, Ordering::SeqCst);
         let third = (counter / 256) as u8;
         let fourth = (counter % 256) as u8;
@@ -105,9 +111,18 @@ impl NetState {
     }
 
     /// Check if traffic is allowed by network policies.
-    pub fn check_policy(&self, _src_pod: &str, _src_ns: &str, dst_pod: &str, dst_ns: &str, _dst_port: u16) -> FlowVerdict {
+    pub fn check_policy(
+        &self,
+        _src_pod: &str,
+        _src_ns: &str,
+        dst_pod: &str,
+        dst_ns: &str,
+        _dst_port: u16,
+    ) -> FlowVerdict {
         // If no policies in destination namespace, allow all (K8s default)
-        let ns_policies: Vec<_> = self.policies.iter()
+        let ns_policies: Vec<_> = self
+            .policies
+            .iter()
             .filter(|r| r.value().namespace == dst_ns)
             .map(|r| r.value().clone())
             .collect();
@@ -117,16 +132,23 @@ impl NetState {
         }
 
         // Check if any policy allows this traffic
-        let dst_pod_labels = self.pods.get(&format!("{}/{}", dst_ns, dst_pod))
+        let dst_pod_labels = self
+            .pods
+            .get(&format!("{}/{}", dst_ns, dst_pod))
             .map(|p| p.labels.clone())
             .unwrap_or_default();
 
         for policy in &ns_policies {
             // Check if policy applies to destination pod
-            let applies = policy.pod_selector.is_empty() ||
-                policy.pod_selector.iter().all(|(k, v)| dst_pod_labels.get(k) == Some(v));
+            let applies = policy.pod_selector.is_empty()
+                || policy
+                    .pod_selector
+                    .iter()
+                    .all(|(k, v)| dst_pod_labels.get(k) == Some(v));
 
-            if !applies { continue; }
+            if !applies {
+                continue;
+            }
 
             // If policy applies and has ingress rules, check them
             if policy.policy_types.contains(&PolicyType::Ingress) {
@@ -160,7 +182,9 @@ impl NetState {
 }
 
 impl Default for NetState {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -190,10 +214,13 @@ mod tests {
     fn test_service_registration() {
         let state = NetState::new();
         state.register_service(ServiceEntry {
-            name: "api".into(), namespace: "default".into(),
+            name: "api".into(),
+            namespace: "default".into(),
             cluster_ip: IpAddr::V4(Ipv4Addr::new(10, 96, 0, 1)),
             service_type: ServiceType::ClusterIP,
-            ports: vec![], selector: HashMap::new(), endpoints: vec![],
+            ports: vec![],
+            selector: HashMap::new(),
+            endpoints: vec![],
             created_at: Utc::now(),
         });
         assert_eq!(state.services.len(), 1);
@@ -211,7 +238,8 @@ mod tests {
         let state = NetState::new();
         state.allocate_pod_ip("dst", "prod", "node1", HashMap::new());
         state.apply_policy(NetworkPolicy {
-            name: "deny-all".into(), namespace: "prod".into(),
+            name: "deny-all".into(),
+            namespace: "prod".into(),
             pod_selector: HashMap::new(),
             policy_types: vec![PolicyType::Ingress],
             ingress_rules: vec![],
@@ -226,13 +254,16 @@ mod tests {
     fn test_flow_recording() {
         let state = NetState::new();
         state.record_flow(FlowRecord {
-            id: Uuid::new_v4(), timestamp: Utc::now(),
+            id: Uuid::new_v4(),
+            timestamp: Utc::now(),
             source_ip: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
             source_pod: Some("src".into()),
             destination_ip: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
             destination_pod: Some("dst".into()),
-            destination_port: 80, protocol: Protocol::TCP,
-            verdict: FlowVerdict::Allowed, bytes: 1500,
+            destination_port: 80,
+            protocol: Protocol::TCP,
+            verdict: FlowVerdict::Allowed,
+            bytes: 1500,
             direction: FlowDirection::Forward,
         });
         assert_eq!(state.flows.len(), 1);
@@ -258,10 +289,13 @@ mod tests {
     fn test_remove_service_drops_entry() {
         let state = NetState::new();
         state.register_service(ServiceEntry {
-            name: "api".into(), namespace: "default".into(),
+            name: "api".into(),
+            namespace: "default".into(),
             cluster_ip: IpAddr::V4(Ipv4Addr::new(10, 96, 0, 1)),
             service_type: ServiceType::ClusterIP,
-            ports: vec![], selector: HashMap::new(), endpoints: vec![],
+            ports: vec![],
+            selector: HashMap::new(),
+            endpoints: vec![],
             created_at: Utc::now(),
         });
         assert_eq!(state.services.len(), 1);
@@ -276,19 +310,36 @@ mod tests {
         let state = NetState::new();
         let key = "default/web";
         state.register_service(ServiceEntry {
-            name: "web".into(), namespace: "default".into(),
+            name: "web".into(),
+            namespace: "default".into(),
             cluster_ip: IpAddr::V4(Ipv4Addr::new(10, 96, 0, 2)),
             service_type: ServiceType::ClusterIP,
             ports: vec![],
             selector: HashMap::new(),
-            endpoints: vec![Endpoint { ip: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)), port: 80, pod_name: "web-0".into(), ready: true }],
+            endpoints: vec![Endpoint {
+                ip: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+                port: 80,
+                pod_name: "web-0".into(),
+                ready: true,
+            }],
             created_at: Utc::now(),
         });
         state.update_endpoints(
-            "web", "default",
+            "web",
+            "default",
             vec![
-                Endpoint { ip: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 5)), port: 80, pod_name: "web-1".into(), ready: true },
-                Endpoint { ip: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 6)), port: 80, pod_name: "web-2".into(), ready: false },
+                Endpoint {
+                    ip: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 5)),
+                    port: 80,
+                    pod_name: "web-1".into(),
+                    ready: true,
+                },
+                Endpoint {
+                    ip: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 6)),
+                    port: 80,
+                    pod_name: "web-2".into(),
+                    ready: false,
+                },
             ],
         );
         let svc = state.services.get(key).unwrap();
@@ -302,10 +353,12 @@ mod tests {
     fn test_apply_then_remove_policy_round_trip() {
         let state = NetState::new();
         state.apply_policy(NetworkPolicy {
-            name: "deny-all".into(), namespace: "ns1".into(),
+            name: "deny-all".into(),
+            namespace: "ns1".into(),
             pod_selector: HashMap::new(),
             policy_types: vec![PolicyType::Ingress],
-            ingress_rules: vec![], egress_rules: vec![],
+            ingress_rules: vec![],
+            egress_rules: vec![],
             created_at: Utc::now(),
         });
         assert_eq!(state.policies.len(), 1);
@@ -324,15 +377,21 @@ mod tests {
         let mut sel = HashMap::new();
         sel.insert("app".into(), "web".into());
         state.apply_policy(NetworkPolicy {
-            name: "web-only".into(), namespace: "prod".into(),
+            name: "web-only".into(),
+            namespace: "prod".into(),
             pod_selector: sel,
             policy_types: vec![PolicyType::Ingress],
-            ingress_rules: vec![], egress_rules: vec![],
+            ingress_rules: vec![],
+            egress_rules: vec![],
             created_at: Utc::now(),
         });
 
         let v = state.check_policy("client", "other", "api", "prod", 80);
-        assert_eq!(v, FlowVerdict::Allowed, "policy with non-matching selector must not apply");
+        assert_eq!(
+            v,
+            FlowVerdict::Allowed,
+            "policy with non-matching selector must not apply"
+        );
     }
 
     #[test]
@@ -346,15 +405,21 @@ mod tests {
         let mut sel = HashMap::new();
         sel.insert("app".into(), "web".into());
         state.apply_policy(NetworkPolicy {
-            name: "web-only".into(), namespace: "prod".into(),
+            name: "web-only".into(),
+            namespace: "prod".into(),
             pod_selector: sel,
             policy_types: vec![PolicyType::Ingress],
-            ingress_rules: vec![], egress_rules: vec![],
+            ingress_rules: vec![],
+            egress_rules: vec![],
             created_at: Utc::now(),
         });
 
         let v = state.check_policy("client", "other", "frontend", "prod", 80);
-        assert_eq!(v, FlowVerdict::Denied, "matching selector + empty ingress = deny");
+        assert_eq!(
+            v,
+            FlowVerdict::Denied,
+            "matching selector + empty ingress = deny"
+        );
     }
 
     #[test]
@@ -363,10 +428,12 @@ mod tests {
         let state = NetState::new();
         state.allocate_pod_ip("svc", "B", "n1", HashMap::new());
         state.apply_policy(NetworkPolicy {
-            name: "deny".into(), namespace: "A".into(),
+            name: "deny".into(),
+            namespace: "A".into(),
             pod_selector: HashMap::new(),
             policy_types: vec![PolicyType::Ingress],
-            ingress_rules: vec![], egress_rules: vec![],
+            ingress_rules: vec![],
+            egress_rules: vec![],
             created_at: Utc::now(),
         });
         let v = state.check_policy("c", "X", "svc", "B", 80);

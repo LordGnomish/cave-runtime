@@ -32,7 +32,10 @@ pub struct PvcProtectionView {
 }
 
 pub fn evaluate_pvc(view: &PvcProtectionView) -> FinalizerOp {
-    let has_fin = view.finalizers.iter().any(|f| f == FINALIZER_PVC_PROTECTION);
+    let has_fin = view
+        .finalizers
+        .iter()
+        .any(|f| f == FINALIZER_PVC_PROTECTION);
     if view.deletion_timestamp_set {
         // Only remove once nothing references the PVC.
         if has_fin && view.pods_using == 0 {
@@ -41,7 +44,11 @@ pub fn evaluate_pvc(view: &PvcProtectionView) -> FinalizerOp {
         return FinalizerOp::NoOp;
     }
     // Live PVC: ensure the finalizer is present.
-    if has_fin { FinalizerOp::NoOp } else { FinalizerOp::Add }
+    if has_fin {
+        FinalizerOp::NoOp
+    } else {
+        FinalizerOp::Add
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,7 +66,11 @@ pub fn evaluate_pv(view: &PvProtectionView) -> FinalizerOp {
         }
         return FinalizerOp::NoOp;
     }
-    if has_fin { FinalizerOp::NoOp } else { FinalizerOp::Add }
+    if has_fin {
+        FinalizerOp::NoOp
+    } else {
+        FinalizerOp::Add
+    }
 }
 
 #[allow(dead_code)]

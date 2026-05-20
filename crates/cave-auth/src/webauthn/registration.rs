@@ -17,13 +17,13 @@
 
 use sha2::{Digest, Sha256};
 
+use super::WebAuthnError;
 use super::attestation::{self, AttestationStatement};
 use super::authenticator_data::{self, AuthFlags, AuthenticatorData};
 use super::cbor;
 use super::client_data::{self, ClientDataType, CollectedClientData};
 use super::cose::{self, CoseKey};
 use super::credential_store::{CredentialStore, StoredCredential};
-use super::WebAuthnError;
 
 /// Options the RP issues to the browser via `navigator.credentials.create()`.
 ///
@@ -138,7 +138,11 @@ impl<S: CredentialStore> RegistrationManager<S> {
         let cred_key: CoseKey = cose::parse(&acd.credential_public_key)?;
 
         // §7.1 step 14 — exclude list.
-        if opts.exclude_credentials.iter().any(|id| id == &acd.credential_id) {
+        if opts
+            .exclude_credentials
+            .iter()
+            .any(|id| id == &acd.credential_id)
+        {
             return Err(WebAuthnError::Registration(
                 "credential id is in excludeCredentials".into(),
             ));
@@ -167,9 +171,8 @@ impl<S: CredentialStore> RegistrationManager<S> {
                     // matches; otherwise we accept the structural parse and let
                     // the policy decide.
                     if p.alg == cred_key.algorithm() {
-                        let mut data = Vec::with_capacity(
-                            att.auth_data_raw.len() + client_data_hash.len(),
-                        );
+                        let mut data =
+                            Vec::with_capacity(att.auth_data_raw.len() + client_data_hash.len());
                         data.extend_from_slice(&att.auth_data_raw);
                         data.extend_from_slice(&client_data_hash);
                         // Best-effort — accept the parsed form, sig check
@@ -232,7 +235,10 @@ pub fn build_attestation_object_none(auth_data: &[u8]) -> Vec<u8> {
     use ciborium::value::Value;
     let m = Value::Map(vec![
         (Value::Text("fmt".into()), Value::Text("none".into())),
-        (Value::Text("authData".into()), Value::Bytes(auth_data.to_vec())),
+        (
+            Value::Text("authData".into()),
+            Value::Bytes(auth_data.to_vec()),
+        ),
         (Value::Text("attStmt".into()), Value::Map(vec![])),
     ]);
     cbor::encode(&m).unwrap()
@@ -352,8 +358,8 @@ mod tests {
             "login.cave.dev",
             "https://login.cave.dev",
         );
-        assert!(mgr
-            .verify(
+        assert!(
+            mgr.verify(
                 &RegistrationOptions {
                     challenge,
                     rp_id: "login.cave.dev".into(),
@@ -371,7 +377,8 @@ mod tests {
                     transports: vec![]
                 }
             )
-            .is_err());
+            .is_err()
+        );
     }
 
     #[test]
@@ -395,8 +402,8 @@ mod tests {
             "login.cave.dev",
             "https://login.cave.dev",
         );
-        assert!(mgr
-            .verify(
+        assert!(
+            mgr.verify(
                 &RegistrationOptions {
                     challenge,
                     rp_id: "login.cave.dev".into(),
@@ -414,7 +421,8 @@ mod tests {
                     transports: vec![]
                 }
             )
-            .is_err());
+            .is_err()
+        );
     }
 
     #[test]
@@ -438,8 +446,8 @@ mod tests {
             "login.cave.dev",
             "https://login.cave.dev",
         );
-        assert!(mgr
-            .verify(
+        assert!(
+            mgr.verify(
                 &RegistrationOptions {
                     challenge,
                     rp_id: "login.cave.dev".into(),
@@ -457,7 +465,8 @@ mod tests {
                     transports: vec![]
                 }
             )
-            .is_err());
+            .is_err()
+        );
     }
 
     #[test]
@@ -548,8 +557,8 @@ mod tests {
             "login.cave.dev",
             "https://login.cave.dev",
         );
-        assert!(mgr
-            .verify(
+        assert!(
+            mgr.verify(
                 &RegistrationOptions {
                     challenge,
                     rp_id: "login.cave.dev".into(),
@@ -567,6 +576,7 @@ mod tests {
                     transports: vec![]
                 }
             )
-            .is_err());
+            .is_err()
+        );
     }
 }

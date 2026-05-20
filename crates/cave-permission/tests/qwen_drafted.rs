@@ -9,23 +9,21 @@
 
 #[cfg(test)]
 mod cycle_1778764552_a2 {
+    use cave_permission::PermissionState;
     use cave_permission::catalog::{
-        CATALOG_ENTITY_CREATE, CATALOG_ENTITY_DELETE, CATALOG_ENTITY_READ,
-        CATALOG_ENTITY_REFRESH, CATALOG_ENTITY_UPDATE,
-        CATALOG_LOCATION_CREATE, CATALOG_LOCATION_DELETE, CATALOG_LOCATION_READ,
-        catalog_entity_create_permission, catalog_entity_delete_permission,
+        CATALOG_ENTITY_CREATE, CATALOG_ENTITY_DELETE, CATALOG_ENTITY_READ, CATALOG_ENTITY_REFRESH,
+        CATALOG_ENTITY_UPDATE, CATALOG_LOCATION_CREATE, CATALOG_LOCATION_DELETE,
+        CATALOG_LOCATION_READ, catalog_entity_create_permission, catalog_entity_delete_permission,
         catalog_entity_read_permission,
     };
     use cave_permission::models::{
-        AuthorizeRequest, AuthorizeResponse, AuthorizeResult,
-        EvaluatePermissionRequest, EvaluatePermissionResponse,
-        Permission, PermissionAction, PermissionAttributes, PolicyDecision,
-        ResourcePermission,
+        AuthorizeRequest, AuthorizeResponse, AuthorizeResult, EvaluatePermissionRequest,
+        EvaluatePermissionResponse, Permission, PermissionAction, PermissionAttributes,
+        PolicyDecision, ResourcePermission,
     };
     use cave_permission::policy::{
         AllowAllPermissionPolicy, BackstagePrincipal, PermissionPolicy, PolicyQuery,
     };
-    use cave_permission::PermissionState;
     use std::sync::Arc;
 
     // Helper to create a minimal PermissionState for testing

@@ -110,7 +110,9 @@ pub struct AttributionCache {
 
 impl Default for AttributionCache {
     fn default() -> Self {
-        Self { inner: Mutex::new(HashMap::new()) }
+        Self {
+            inner: Mutex::new(HashMap::new()),
+        }
     }
 }
 
@@ -129,7 +131,10 @@ impl AttributionCache {
         let mut guard = self.inner.lock().unwrap();
         guard.insert(
             (days, repo.to_owned()),
-            CacheEntry { computed_at: Instant::now(), response },
+            CacheEntry {
+                computed_at: Instant::now(),
+                response,
+            },
         );
     }
 }
@@ -272,7 +277,11 @@ fn collect_commits(repo_path: &Path, days: u32) -> Result<Vec<CommitRecord>> {
         .output()
         .context("git log hash pass failed")?;
     let hash_str = String::from_utf8_lossy(&hash_out.stdout);
-    let hashes: Vec<&str> = hash_str.split('\0').map(str::trim).filter(|s| !s.is_empty()).collect();
+    let hashes: Vec<&str> = hash_str
+        .split('\0')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
 
     for (rec, hash) in records.iter_mut().zip(hashes.iter()) {
         if let Some((a, d, f)) = stat_map.get(*hash) {
@@ -285,7 +294,14 @@ fn collect_commits(repo_path: &Path, days: u32) -> Result<Vec<CommitRecord>> {
     Ok(records)
 }
 
-fn aggregate(records: &[CommitRecord]) -> (AuthorBreakdown, AuthorBreakdown, AuthorBreakdown, Timestamps) {
+fn aggregate(
+    records: &[CommitRecord],
+) -> (
+    AuthorBreakdown,
+    AuthorBreakdown,
+    AuthorBreakdown,
+    Timestamps,
+) {
     let mut by_commits = AuthorBreakdown::default();
     let mut by_loc = AuthorBreakdown::default();
     let mut by_files = AuthorBreakdown::default();
@@ -331,7 +347,12 @@ fn aggregate(records: &[CommitRecord]) -> (AuthorBreakdown, AuthorBreakdown, Aut
         }
     }
 
-    (by_commits, by_loc, by_files, Timestamps { earliest, latest })
+    (
+        by_commits,
+        by_loc,
+        by_files,
+        Timestamps { earliest, latest },
+    )
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -396,13 +417,24 @@ mod tests {
 
     fn make_fixture_repo(dir: &std::path::Path) {
         // init
-        Command::new("git").args(["-C", dir.to_str().unwrap(), "init"]).output().unwrap();
         Command::new("git")
-            .args(["-C", dir.to_str().unwrap(), "config", "user.email", "test@test.com"])
-            .output().unwrap();
+            .args(["-C", dir.to_str().unwrap(), "init"])
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args([
+                "-C",
+                dir.to_str().unwrap(),
+                "config",
+                "user.email",
+                "test@test.com",
+            ])
+            .output()
+            .unwrap();
         Command::new("git")
             .args(["-C", dir.to_str().unwrap(), "config", "user.name", "Test"])
-            .output().unwrap();
+            .output()
+            .unwrap();
 
         for (msg, author) in [
             (
@@ -418,15 +450,22 @@ mod tests {
             fs::write(dir.join("file.txt"), msg.as_bytes()).unwrap();
             Command::new("git")
                 .args(["-C", dir.to_str().unwrap(), "add", "."])
-                .output().unwrap();
+                .output()
+                .unwrap();
             Command::new("git")
                 .args([
-                    "-C", dir.to_str().unwrap(),
-                    "-c", &format!("user.name={author}"),
-                    "-c", "user.email=test@test.com",
-                    "commit", "-m", msg,
+                    "-C",
+                    dir.to_str().unwrap(),
+                    "-c",
+                    &format!("user.name={author}"),
+                    "-c",
+                    "user.email=test@test.com",
+                    "commit",
+                    "-m",
+                    msg,
                 ])
-                .output().unwrap();
+                .output()
+                .unwrap();
         }
     }
 

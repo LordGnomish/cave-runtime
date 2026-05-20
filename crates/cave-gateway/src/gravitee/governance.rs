@@ -300,9 +300,8 @@ impl GovernanceEngine {
                     // Check path naming convention
                     if rule.id == "paths-kebab-case" {
                         if let Some(paths) = openapi.get("paths").and_then(|p| p.as_object()) {
-                            let regex = regex::Regex::new(regex_str).unwrap_or_else(|_| {
-                                regex::Regex::new("^.*$").unwrap()
-                            });
+                            let regex = regex::Regex::new(regex_str)
+                                .unwrap_or_else(|_| regex::Regex::new("^.*$").unwrap());
                             for path in paths.keys() {
                                 if !regex.is_match(path) {
                                     findings.push(Finding {
@@ -473,15 +472,13 @@ mod tests {
         assert_eq!(score.score, 100.0);
 
         // Test with errors (1 error = 90, still 'A')
-        let findings = vec![
-            Finding {
-                rule_id: "test1".to_string(),
-                rule_name: "Test".to_string(),
-                severity: Severity::Error,
-                message: "Error".to_string(),
-                location: "loc".to_string(),
-            },
-        ];
+        let findings = vec![Finding {
+            rule_id: "test1".to_string(),
+            rule_name: "Test".to_string(),
+            severity: Severity::Error,
+            message: "Error".to_string(),
+            location: "loc".to_string(),
+        }];
         let score = engine.aggregate_score(&findings);
         assert_eq!(score.grade, 'A');
         assert_eq!(score.error_count, 1);

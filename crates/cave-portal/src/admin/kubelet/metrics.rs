@@ -63,18 +63,25 @@ pub fn list_metrics(
         .collect())
 }
 
-pub fn render_section(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, KubeletViewError> {
+pub fn render_section(state: &AdminState, ctx: &RequestCtx) -> Result<String, KubeletViewError> {
     let rows = list_metrics(state, ctx)?;
     let table_rows: Vec<Vec<String>> = rows
         .iter()
         .map(|m| {
             vec![
                 escape(&m.node),
-                format!("{}m / {}m ({}%)", m.cpu_used_milli, m.cpu_capacity_milli, m.cpu_pct()),
-                format!("{}Mi / {}Mi ({}%)", m.mem_used_mib, m.mem_capacity_mib, m.mem_pct()),
+                format!(
+                    "{}m / {}m ({}%)",
+                    m.cpu_used_milli,
+                    m.cpu_capacity_milli,
+                    m.cpu_pct()
+                ),
+                format!(
+                    "{}Mi / {}Mi ({}%)",
+                    m.mem_used_mib,
+                    m.mem_capacity_mib,
+                    m.mem_pct()
+                ),
                 format!("{} KiB/s", m.disk_read_kib_s),
                 format!("{} KiB/s", m.disk_write_kib_s),
             ]

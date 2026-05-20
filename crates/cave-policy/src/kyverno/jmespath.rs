@@ -85,7 +85,9 @@ fn eval_expr(expr: &str, ctx: &Value) -> Result<Value, PolicyError> {
         let pairs: Vec<&str> = split_top_level(inner, ',');
         let mut m = serde_json::Map::new();
         for pair in pairs {
-            let colon = pair.find(':').ok_or_else(|| PolicyError::Eval(format!("invalid object projection: {pair}")))?;
+            let colon = pair
+                .find(':')
+                .ok_or_else(|| PolicyError::Eval(format!("invalid object projection: {pair}")))?;
             let key = pair[..colon].trim().trim_matches('"').to_string();
             let val = eval_expr(pair[colon + 1..].trim(), ctx)?;
             m.insert(key, val);
@@ -151,12 +153,17 @@ fn eval_segment(seg: &str, ctx: &Value) -> Result<Value, PolicyError> {
         }
 
         // Numeric index
-        let idx: i64 = inner.parse()
+        let idx: i64 = inner
+            .parse()
             .map_err(|_| PolicyError::Eval(format!("invalid index: {inner}")))?;
         return Ok(match ctx {
             Value::Array(a) => {
                 let len = a.len() as i64;
-                let actual = if idx < 0 { (len + idx).max(0) as usize } else { idx as usize };
+                let actual = if idx < 0 {
+                    (len + idx).max(0) as usize
+                } else {
+                    idx as usize
+                };
                 a.get(actual).cloned().unwrap_or(Value::Null)
             }
             _ => Value::Null,
@@ -196,14 +203,17 @@ fn eval_slice(inner: &str, ctx: &Value) -> Result<Value, PolicyError> {
     let parts: Vec<&str> = inner.split(':').collect();
     let len = arr.len() as i64;
     let parse_idx = |s: &str, default: i64| -> i64 {
-        if s.is_empty() { default } else { s.parse().unwrap_or(default) }
+        if s.is_empty() {
+            default
+        } else {
+            s.parse().unwrap_or(default)
+        }
     };
     let start = parse_idx(parts.first().copied().unwrap_or(""), 0);
     let end = parse_idx(parts.get(1).copied().unwrap_or(""), len);
     let step = parse_idx(parts.get(2).copied().unwrap_or(""), 1);
-    let normalize = |i: i64| -> usize {
-        (if i < 0 { (len + i).max(0) } else { i.min(len) }) as usize
-    };
+    let normalize =
+        |i: i64| -> usize { (if i < 0 { (len + i).max(0) } else { i.min(len) }) as usize };
     let start = normalize(start);
     let end = normalize(end);
     if step == 0 {
@@ -213,14 +223,20 @@ fn eval_slice(inner: &str, ctx: &Value) -> Result<Value, PolicyError> {
     if step > 0 {
         let mut i = start;
         while i < end {
-            if let Some(v) = arr.get(i) { result.push(v.clone()); }
+            if let Some(v) = arr.get(i) {
+                result.push(v.clone());
+            }
             i += step as usize;
         }
     } else {
         let mut i = (end as i64 - 1).max(0) as usize;
         while i >= start {
-            if let Some(v) = arr.get(i) { result.push(v.clone()); }
-            if i == 0 { break; }
+            if let Some(v) = arr.get(i) {
+                result.push(v.clone());
+            }
+            if i == 0 {
+                break;
+            }
             i = i.saturating_sub((-step) as usize);
         }
     }
@@ -228,9 +244,7 @@ fn eval_slice(inner: &str, ctx: &Value) -> Result<Value, PolicyError> {
 }
 
 fn eval_comparison(left: &Value, right: &Value, op: &str) -> Result<Value, PolicyError> {
-    let cmp = |a: &Value, b: &Value| -> std::cmp::Ordering {
-        crate::rego::value::json_cmp(a, b)
-    };
+    let cmp = |a: &Value, b: &Value| -> std::cmp::Ordering { crate::rego::value::json_cmp(a, b) };
     let result = match op {
         "==" => left == right,
         "!=" => left != right,
@@ -267,7 +281,9 @@ fn eval_function(name: &str, args_str: &str, ctx: &Value) -> Result<Value, Polic
         "keys" => {
             let v = args.first().unwrap_or(&Value::Null);
             match v {
-                Value::Object(m) => Ok(Value::Array(m.keys().map(|k| Value::String(k.clone())).collect())),
+                Value::Object(m) => Ok(Value::Array(
+                    m.keys().map(|k| Value::String(k.clone())).collect(),
+                )),
                 _ => Ok(Value::Null),
             }
         }
@@ -335,14 +351,17 @@ fn eval_function(name: &str, args_str: &str, ctx: &Value) -> Result<Value, Polic
         }
         "type" => {
             let v = args.first().unwrap_or(&Value::Null);
-            Ok(Value::String(match v {
-                Value::Null => "null",
-                Value::Bool(_) => "boolean",
-                Value::Number(_) => "number",
-                Value::String(_) => "string",
-                Value::Array(_) => "array",
-                Value::Object(_) => "object",
-            }.into()))
+            Ok(Value::String(
+                match v {
+                    Value::Null => "null",
+                    Value::Bool(_) => "boolean",
+                    Value::Number(_) => "number",
+                    Value::String(_) => "string",
+                    Value::Array(_) => "array",
+                    Value::Object(_) => "object",
+                }
+                .into(),
+            ))
         }
         "sort" => {
             let mut arr = match args.first().unwrap_or(&Value::Null) {
@@ -361,10 +380,13 @@ fn eval_function(name: &str, args_str: &str, ctx: &Value) -> Result<Value, Polic
                 Some(Value::String(s)) => s.clone(),
                 _ => return Ok(Value::Array(arr)),
             };
-            let mut indexed: Vec<(Value, Value)> = arr.into_iter().map(|v| {
-                let k = eval_expr(&key_expr, &v).unwrap_or(Value::Null);
-                (k, v)
-            }).collect();
+            let mut indexed: Vec<(Value, Value)> = arr
+                .into_iter()
+                .map(|v| {
+                    let k = eval_expr(&key_expr, &v).unwrap_or(Value::Null);
+                    (k, v)
+                })
+                .collect();
             indexed.sort_by(|(a, _), (b, _)| crate::rego::value::json_cmp(a, b));
             Ok(Value::Array(indexed.into_iter().map(|(_, v)| v).collect()))
         }
@@ -382,14 +404,22 @@ fn eval_function(name: &str, args_str: &str, ctx: &Value) -> Result<Value, Polic
                 Value::Array(a) if !a.is_empty() => a,
                 _ => return Ok(Value::Null),
             };
-            Ok(arr.iter().min_by(|a, b| crate::rego::value::json_cmp(a, b)).cloned().unwrap_or(Value::Null))
+            Ok(arr
+                .iter()
+                .min_by(|a, b| crate::rego::value::json_cmp(a, b))
+                .cloned()
+                .unwrap_or(Value::Null))
         }
         "max" => {
             let arr = match args.first().unwrap_or(&Value::Null) {
                 Value::Array(a) if !a.is_empty() => a,
                 _ => return Ok(Value::Null),
             };
-            Ok(arr.iter().max_by(|a, b| crate::rego::value::json_cmp(a, b)).cloned().unwrap_or(Value::Null))
+            Ok(arr
+                .iter()
+                .max_by(|a, b| crate::rego::value::json_cmp(a, b))
+                .cloned()
+                .unwrap_or(Value::Null))
         }
         "min_by" => {
             let arr = match args.first().unwrap_or(&Value::Null) {
@@ -400,11 +430,14 @@ fn eval_function(name: &str, args_str: &str, ctx: &Value) -> Result<Value, Polic
                 Some(Value::String(s)) => s.clone(),
                 _ => return Ok(Value::Null),
             };
-            arr.into_iter().min_by(|a, b| {
-                let ka = eval_expr(&key_expr, a).unwrap_or(Value::Null);
-                let kb = eval_expr(&key_expr, b).unwrap_or(Value::Null);
-                crate::rego::value::json_cmp(&ka, &kb)
-            }).map(Ok).unwrap_or(Ok(Value::Null))
+            arr.into_iter()
+                .min_by(|a, b| {
+                    let ka = eval_expr(&key_expr, a).unwrap_or(Value::Null);
+                    let kb = eval_expr(&key_expr, b).unwrap_or(Value::Null);
+                    crate::rego::value::json_cmp(&ka, &kb)
+                })
+                .map(Ok)
+                .unwrap_or(Ok(Value::Null))
         }
         "max_by" => {
             let arr = match args.first().unwrap_or(&Value::Null) {
@@ -415,11 +448,14 @@ fn eval_function(name: &str, args_str: &str, ctx: &Value) -> Result<Value, Polic
                 Some(Value::String(s)) => s.clone(),
                 _ => return Ok(Value::Null),
             };
-            arr.into_iter().max_by(|a, b| {
-                let ka = eval_expr(&key_expr, a).unwrap_or(Value::Null);
-                let kb = eval_expr(&key_expr, b).unwrap_or(Value::Null);
-                crate::rego::value::json_cmp(&ka, &kb)
-            }).map(Ok).unwrap_or(Ok(Value::Null))
+            arr.into_iter()
+                .max_by(|a, b| {
+                    let ka = eval_expr(&key_expr, a).unwrap_or(Value::Null);
+                    let kb = eval_expr(&key_expr, b).unwrap_or(Value::Null);
+                    crate::rego::value::json_cmp(&ka, &kb)
+                })
+                .map(Ok)
+                .unwrap_or(Ok(Value::Null))
         }
         "sum" | "avg" => {
             let arr = match args.first().unwrap_or(&Value::Null) {
@@ -427,16 +463,24 @@ fn eval_function(name: &str, args_str: &str, ctx: &Value) -> Result<Value, Polic
                 _ => return Ok(Value::Null),
             };
             let nums: Vec<f64> = arr.iter().filter_map(|v| v.as_f64()).collect();
-            if nums.is_empty() { return Ok(Value::Null); }
+            if nums.is_empty() {
+                return Ok(Value::Null);
+            }
             let s: f64 = nums.iter().sum();
-            let result = if name == "avg" { s / nums.len() as f64 } else { s };
+            let result = if name == "avg" {
+                s / nums.len() as f64
+            } else {
+                s
+            };
             Ok(serde_json::json!(result))
         }
         "merge" => {
             let mut result = serde_json::Map::new();
             for arg in &args {
                 if let Value::Object(m) = arg {
-                    for (k, v) in m { result.insert(k.clone(), v.clone()); }
+                    for (k, v) in m {
+                        result.insert(k.clone(), v.clone());
+                    }
                 }
             }
             Ok(Value::Object(result))
@@ -450,19 +494,23 @@ fn eval_function(name: &str, args_str: &str, ctx: &Value) -> Result<Value, Polic
                 Value::Array(a) => a.clone(),
                 _ => return Ok(Value::Null),
             };
-            Ok(Value::Array(a1.into_iter().zip(a2).map(|(a, b)| Value::Array(vec![a, b])).collect()))
+            Ok(Value::Array(
+                a1.into_iter()
+                    .zip(a2)
+                    .map(|(a, b)| Value::Array(vec![a, b]))
+                    .collect(),
+            ))
         }
-        "items" => {
-            match args.first().unwrap_or(&Value::Null) {
-                Value::Object(m) => {
-                    let items: Vec<Value> = m.iter()
-                        .map(|(k, v)| Value::Array(vec![Value::String(k.clone()), v.clone()]))
-                        .collect();
-                    Ok(Value::Array(items))
-                }
-                _ => Ok(Value::Null),
+        "items" => match args.first().unwrap_or(&Value::Null) {
+            Value::Object(m) => {
+                let items: Vec<Value> = m
+                    .iter()
+                    .map(|(k, v)| Value::Array(vec![Value::String(k.clone()), v.clone()]))
+                    .collect();
+                Ok(Value::Array(items))
             }
-        }
+            _ => Ok(Value::Null),
+        },
         "group_by" => {
             let arr = match args.first().unwrap_or(&Value::Null) {
                 Value::Array(a) => a.clone(),
@@ -495,7 +543,8 @@ fn eval_function(name: &str, args_str: &str, ctx: &Value) -> Result<Value, Polic
                 Some(Value::String(s)) => s.clone(),
                 _ => return Ok(Value::Null),
             };
-            let results: Vec<Value> = arr.iter()
+            let results: Vec<Value> = arr
+                .iter()
                 .map(|item| eval_expr(&expr, item).unwrap_or(Value::Null))
                 .collect();
             Ok(Value::Array(results))
@@ -513,15 +562,21 @@ fn eval_function(name: &str, args_str: &str, ctx: &Value) -> Result<Value, Polic
                 Value::Array(a) => a.clone(),
                 _ => return Ok(Value::Null),
             };
-            Ok(Value::Array(arr.into_iter().flat_map(|v| match v {
-                Value::Array(inner) => inner,
-                other => vec![other],
-            }).collect()))
+            Ok(Value::Array(
+                arr.into_iter()
+                    .flat_map(|v| match v {
+                        Value::Array(inner) => inner,
+                        other => vec![other],
+                    })
+                    .collect(),
+            ))
         }
         "split" => {
             let s = args.first().and_then(|v| v.as_str()).unwrap_or("");
             let delim = args.get(1).and_then(|v| v.as_str()).unwrap_or("");
-            Ok(Value::Array(s.split(delim).map(|p| Value::String(p.into())).collect()))
+            Ok(Value::Array(
+                s.split(delim).map(|p| Value::String(p.into())).collect(),
+            ))
         }
         "join" => {
             let arr = match args.first().unwrap_or(&Value::Null) {
@@ -529,8 +584,13 @@ fn eval_function(name: &str, args_str: &str, ctx: &Value) -> Result<Value, Polic
                 _ => return Ok(Value::Null),
             };
             let delim = args.get(1).and_then(|v| v.as_str()).unwrap_or("");
-            let parts: Vec<String> = arr.iter()
-                .map(|v| v.as_str().map(String::from).unwrap_or_else(|| v.to_string()))
+            let parts: Vec<String> = arr
+                .iter()
+                .map(|v| {
+                    v.as_str()
+                        .map(String::from)
+                        .unwrap_or_else(|| v.to_string())
+                })
                 .collect();
             Ok(Value::String(parts.join(delim)))
         }
@@ -558,7 +618,11 @@ fn eval_function(name: &str, args_str: &str, ctx: &Value) -> Result<Value, Polic
                 _ => return Ok(Value::Null),
             };
             let search = args.get(1).unwrap_or(&Value::Null);
-            let idx = arr.iter().position(|v| v == search).map(|i| i as i64).unwrap_or(-1);
+            let idx = arr
+                .iter()
+                .position(|v| v == search)
+                .map(|i| i as i64)
+                .unwrap_or(-1);
             Ok(serde_json::json!(idx))
         }
         "find_first" | "find_last" => {
@@ -570,21 +634,27 @@ fn eval_function(name: &str, args_str: &str, ctx: &Value) -> Result<Value, Polic
             let found = if name == "find_first" {
                 arr.iter().find(|v| v.as_str() == Some(search)).cloned()
             } else {
-                arr.iter().rev().find(|v| v.as_str() == Some(search)).cloned()
+                arr.iter()
+                    .rev()
+                    .find(|v| v.as_str() == Some(search))
+                    .cloned()
             };
             Ok(found.unwrap_or(Value::Null))
         }
         "base64_decode" => {
             use base64::Engine as _;
             let s = args.first().and_then(|v| v.as_str()).unwrap_or("");
-            let bytes = base64::engine::general_purpose::STANDARD.decode(s)
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(s)
                 .map_err(|e| PolicyError::Eval(format!("base64_decode: {e}")))?;
             Ok(Value::String(String::from_utf8_lossy(&bytes).into_owned()))
         }
         "base64_encode" => {
             use base64::Engine as _;
             let s = args.first().and_then(|v| v.as_str()).unwrap_or("");
-            Ok(Value::String(base64::engine::general_purpose::STANDARD.encode(s.as_bytes())))
+            Ok(Value::String(
+                base64::engine::general_purpose::STANDARD.encode(s.as_bytes()),
+            ))
         }
         "parse_json" => {
             let s = args.first().and_then(|v| v.as_str()).unwrap_or("null");
@@ -610,7 +680,9 @@ fn eval_function(name: &str, args_str: &str, ctx: &Value) -> Result<Value, Polic
         "regex_match" => {
             let pattern = args.first().and_then(|v| v.as_str()).unwrap_or("");
             let s = args.get(1).and_then(|v| v.as_str()).unwrap_or("");
-            let ok = regex::Regex::new(pattern).map(|re| re.is_match(s)).unwrap_or(false);
+            let ok = regex::Regex::new(pattern)
+                .map(|re| re.is_match(s))
+                .unwrap_or(false);
             Ok(Value::Bool(ok))
         }
         "pattern_match" => {
@@ -618,7 +690,9 @@ fn eval_function(name: &str, args_str: &str, ctx: &Value) -> Result<Value, Polic
             let s = args.get(1).and_then(|v| v.as_str()).unwrap_or("");
             Ok(Value::Bool(kyverno_pattern_match(pattern, s)))
         }
-        _ => Err(PolicyError::Eval(format!("unknown JMESPath function: {name}"))),
+        _ => Err(PolicyError::Eval(format!(
+            "unknown JMESPath function: {name}"
+        ))),
     }
 }
 
@@ -636,7 +710,9 @@ pub fn kyverno_pattern_match(pattern: &str, value: &str) -> bool {
             '|' => re.push('|'),
             '\\' => {
                 re.push('\\');
-                if let Some(next) = chars.next() { re.push(next); }
+                if let Some(next) = chars.next() {
+                    re.push(next);
+                }
             }
             c => {
                 let escaped = regex::escape(&c.to_string());
@@ -645,7 +721,9 @@ pub fn kyverno_pattern_match(pattern: &str, value: &str) -> bool {
         }
     }
     re.push('$');
-    regex::Regex::new(&re).map(|r| r.is_match(value)).unwrap_or(false)
+    regex::Regex::new(&re)
+        .map(|r| r.is_match(value))
+        .unwrap_or(false)
 }
 
 /// Variable substitution: replace `{{request.object.spec.replicas}}` style templates.
@@ -692,7 +770,10 @@ pub fn substitute_variables_json(value: &Value, context: &Value) -> Result<Value
             Ok(Value::Object(new_m))
         }
         Value::Array(a) => {
-            let new_a: Result<Vec<_>, _> = a.iter().map(|v| substitute_variables_json(v, context)).collect();
+            let new_a: Result<Vec<_>, _> = a
+                .iter()
+                .map(|v| substitute_variables_json(v, context))
+                .collect();
             Ok(Value::Array(new_a?))
         }
         _ => Ok(value.clone()),
@@ -714,7 +795,9 @@ fn split_top_level(s: &str, sep: char) -> Vec<&str> {
             b'"' => {
                 i += 1;
                 while i < bytes.len() && bytes[i] != b'"' {
-                    if bytes[i] == b'\\' { i += 1; }
+                    if bytes[i] == b'\\' {
+                        i += 1;
+                    }
                     i += 1;
                 }
             }
@@ -750,7 +833,13 @@ fn split_first_segment(expr: &str) -> Option<(&str, String)> {
                 while j < bytes.len() {
                     match bytes[j] {
                         b'[' => d += 1,
-                        b']' => { d -= 1; if d == 0 { j += 1; break; } }
+                        b']' => {
+                            d -= 1;
+                            if d == 0 {
+                                j += 1;
+                                break;
+                            }
+                        }
                         _ => {}
                     }
                     j += 1;
@@ -793,7 +882,9 @@ fn find_binary_op(expr: &str, ch: u8, len: usize, check: impl Fn(&[u8]) -> bool)
             b')' | b']' | b'}' => depth -= 1,
             b'"' => {
                 i += 1;
-                while i < bytes.len() && bytes[i] != b'"' { i += 1; }
+                while i < bytes.len() && bytes[i] != b'"' {
+                    i += 1;
+                }
             }
             c if c == ch && depth == 0 && i > 0 => {
                 let ahead = &bytes[i + 1..];
@@ -850,12 +941,14 @@ fn find_function_call(expr: &str) -> Option<usize> {
 
 fn flatten_array(v: &Value) -> Value {
     match v {
-        Value::Array(a) => {
-            Value::Array(a.iter().flat_map(|item| match item {
-                Value::Array(inner) => inner.clone(),
-                _ => vec![item.clone()],
-            }).collect())
-        }
+        Value::Array(a) => Value::Array(
+            a.iter()
+                .flat_map(|item| match item {
+                    Value::Array(inner) => inner.clone(),
+                    _ => vec![item.clone()],
+                })
+                .collect(),
+        ),
         _ => v.clone(),
     }
 }

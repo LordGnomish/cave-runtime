@@ -6,9 +6,9 @@
 //! Native Okta/Keycloak auth, shared PostgreSQL, eBPF hooks.
 
 use axum::{
+    Router,
     response::{Html, IntoResponse},
     routing::get,
-    Router,
 };
 use clap::{Parser, Subcommand};
 use std::sync::Arc;
@@ -29,7 +29,11 @@ mod raft_transport;
 static PORTAL_HTML: &str = include_str!("portal_index.html");
 
 #[derive(Parser)]
-#[command(name = "cave-runtime", version, about = "CAVE Platform Unified Runtime")]
+#[command(
+    name = "cave-runtime",
+    version,
+    about = "CAVE Platform Unified Runtime"
+)]
 struct Cli {
     /// Legacy: path to runtime config. Used when no subcommand is given
     /// (treated as implicit `serve --config <path>`).
@@ -121,7 +125,7 @@ async fn main() -> anyhow::Result<()> {
     // of seeded fixtures.
     let admin_state = Arc::new(cave_portal::admin::state::AdminState::seeded());
     {
-        use cave_portal::admin::runtime_client::{probe_data_dir_for_runtime, WireOutcome};
+        use cave_portal::admin::runtime_client::{WireOutcome, probe_data_dir_for_runtime};
         let outcome = probe_data_dir_for_runtime(&admin_state, cli.data_dir.as_deref());
         match outcome {
             WireOutcome::Wired => {
@@ -131,7 +135,9 @@ async fn main() -> anyhow::Result<()> {
                 info!("portal admin → seeded fixtures (no data dir / no kubeconfig)");
             }
             WireOutcome::KubeconfigBroken => {
-                tracing::warn!("portal admin → seeded fixtures (kubeconfig present but unparseable)");
+                tracing::warn!(
+                    "portal admin → seeded fixtures (kubeconfig present but unparseable)"
+                );
             }
         }
     }
@@ -160,7 +166,9 @@ async fn main() -> anyhow::Result<()> {
     // Observability
     let metrics_state = cave_metrics::MetricsState::new();
     let logs_state = cave_logs::default_state();
-    let trace_state = Arc::new(cave_trace::TraceState::new(&cave_trace::TraceConfig::default()));
+    let trace_state = Arc::new(cave_trace::TraceState::new(
+        &cave_trace::TraceConfig::default(),
+    ));
 
     // Security & Admission
     let admission_state = Arc::new(cave_admission::AdmissionState::default());
@@ -205,7 +213,10 @@ async fn main() -> anyhow::Result<()> {
         for d in cave_kernel::parity::discover_workspace(&workspace_root) {
             cache.insert(d.report.module.clone(), d.report);
         }
-        info!(modules = cache.len(), "parity cache populated from manifests");
+        info!(
+            modules = cache.len(),
+            "parity cache populated from manifests"
+        );
     }
 
     let app = Router::new()
@@ -221,15 +232,42 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/cache/health", get(api_cache_health))
         // controller-manager + cloud-controller-manager admin (in-tree library crates,
         // surfaced as inline endpoints — no separate axum router needed).
-        .route("/api/portal/controller-manager/health", get(api_controller_manager_health))
-        .route("/api/controller-manager/leader", get(api_controller_manager_leader))
-        .route("/api/controller-manager/controllers", get(api_controller_manager_controllers))
-        .route("/api/controller-manager/status", get(api_controller_manager_status))
-        .route("/api/controller-manager/parity", get(api_controller_manager_parity))
-        .route("/api/portal/cloud-controller-manager/health", get(api_cloud_controller_manager_health))
-        .route("/api/cloud-controller-manager/cloud-controllers", get(api_cloud_controller_manager_controllers))
-        .route("/api/cloud-controller-manager/status", get(api_cloud_controller_manager_status))
-        .route("/api/cloud-controller-manager/parity", get(api_cloud_controller_manager_parity))
+        .route(
+            "/api/portal/controller-manager/health",
+            get(api_controller_manager_health),
+        )
+        .route(
+            "/api/controller-manager/leader",
+            get(api_controller_manager_leader),
+        )
+        .route(
+            "/api/controller-manager/controllers",
+            get(api_controller_manager_controllers),
+        )
+        .route(
+            "/api/controller-manager/status",
+            get(api_controller_manager_status),
+        )
+        .route(
+            "/api/controller-manager/parity",
+            get(api_controller_manager_parity),
+        )
+        .route(
+            "/api/portal/cloud-controller-manager/health",
+            get(api_cloud_controller_manager_health),
+        )
+        .route(
+            "/api/cloud-controller-manager/cloud-controllers",
+            get(api_cloud_controller_manager_controllers),
+        )
+        .route(
+            "/api/cloud-controller-manager/status",
+            get(api_cloud_controller_manager_status),
+        )
+        .route(
+            "/api/cloud-controller-manager/parity",
+            get(api_cloud_controller_manager_parity),
+        )
         // Phase 1 module routers
         .merge(cave_net::router(net_state))
         .merge(cave_kubelet::router(kubelet_state))
@@ -313,13 +351,13 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_compliance::router(compliance_state))
         .merge(cave_cost_alloc::router(cost_alloc_state))
         // SCIM 2.0 provisioning
-        .merge(cave_auth::okta::scim_router(
-            std::sync::Arc::new(cave_auth::TokenStore::new(
+        .merge(cave_auth::okta::scim_router(std::sync::Arc::new(
+            cave_auth::TokenStore::new(
                 std::env::var("CAVE_JWT_SECRET")
                     .expect("CAVE_JWT_SECRET must be set (use any string for dev)")
                     .as_bytes(),
-            )),
-        ))
+            ),
+        )))
         // New crates (this session)
         .merge(cave_oncall::router(oncall_state))
         .merge(cave_container_scan::router(container_scan_state))
@@ -335,8 +373,12 @@ async fn main() -> anyhow::Result<()> {
         // gates `/admin/realms/...` to platform_admin via the bypass list,
         // and the per-handler persona-gate (added in `admin_realms_gate`)
         // rejects tenant_admin callers with 403.
-        .merge(cave_auth::admin_idp::router(cave_auth::admin_idp::AdminIdpState::new()))
-        .merge(cave_auth::admin_flows::router(cave_auth::admin_flows::AdminFlowsState::new()))
+        .merge(cave_auth::admin_idp::router(
+            cave_auth::admin_idp::AdminIdpState::new(),
+        ))
+        .merge(cave_auth::admin_flows::router(
+            cave_auth::admin_flows::AdminFlowsState::new(),
+        ))
         // Persona gate for `/admin/realms/*` — runs AFTER the JWT
         // middleware has injected `JwtClaims`; rejects everything that
         // is not `platform_admin`.
@@ -344,46 +386,58 @@ async fn main() -> anyhow::Result<()> {
         // Portal-facing handlers: persona auth, upstream tracker, ADR browser, attribution
         .merge(portal::router())
         // JWT auth middleware
-        .layer(axum::middleware::from_fn(|mut req: axum::extract::Request, next: axum::middleware::Next| async move {
-            let state = req.extensions().get::<Arc<cave_auth::jwt_middleware::AuthState>>().cloned();
-            match state {
-                Some(s) => cave_auth::jwt_middleware::auth_middleware_inner(s, req, next).await,
-                None => next.run(req).await,
-            }
-        }))
-        .layer(axum::Extension(Arc::new(cave_auth::jwt_middleware::AuthState {
-            jwt_secret: std::env::var("CAVE_JWT_SECRET")
-                .expect("CAVE_JWT_SECRET must be set (use any string for dev)"),
-            bypass_paths: vec![
-                "_exact:/".into(),
-                "/health".into(), "/ready".into(),
-                "/api/modules".into(), "/api/health".into(),
-                "/portal/".into(), "/api/portal/".into(), "/api/auth/".into(),
-                // Portal sign-in surface — must be reachable without a session.
-                "/login".into(),
-                "/v2/".into(),
-                "/loki/".into(), "/tempo/".into(),
-                "/api/registry/".into(),
-                // Per-module admin views are mounted via
-                // `cave_portal::admin::router`. Authorisation is
-                // enforced inside each handler via
-                // `RequestCtx::authorise(Permission::...)` against the
-                // dev-token granted in `extract_ctx_from_query`. The
-                // JWT middleware shouldn't double-gate — that would
-                // make the dashboard unreachable without an
-                // externally-issued session, which is the wrong UX
-                // for the development serve.
-                "/admin/".into(),
-                "/api/compliance/".into(),
-                // 2026-05-13 realtime + power-user batch: SSE event
-                // stream + bulk-op submit endpoints. The handlers
-                // re-check Permission inside the request context
-                // (extract_ctx_from_query grants a dev-token), so
-                // the JWT layer doesn't double-gate.
-                "/api/events/".into(),
-                "/api/bulk/".into(),
-            ],
-        })))
+        .layer(axum::middleware::from_fn(
+            |mut req: axum::extract::Request, next: axum::middleware::Next| async move {
+                let state = req
+                    .extensions()
+                    .get::<Arc<cave_auth::jwt_middleware::AuthState>>()
+                    .cloned();
+                match state {
+                    Some(s) => cave_auth::jwt_middleware::auth_middleware_inner(s, req, next).await,
+                    None => next.run(req).await,
+                }
+            },
+        ))
+        .layer(axum::Extension(Arc::new(
+            cave_auth::jwt_middleware::AuthState {
+                jwt_secret: std::env::var("CAVE_JWT_SECRET")
+                    .expect("CAVE_JWT_SECRET must be set (use any string for dev)"),
+                bypass_paths: vec![
+                    "_exact:/".into(),
+                    "/health".into(),
+                    "/ready".into(),
+                    "/api/modules".into(),
+                    "/api/health".into(),
+                    "/portal/".into(),
+                    "/api/portal/".into(),
+                    "/api/auth/".into(),
+                    // Portal sign-in surface — must be reachable without a session.
+                    "/login".into(),
+                    "/v2/".into(),
+                    "/loki/".into(),
+                    "/tempo/".into(),
+                    "/api/registry/".into(),
+                    // Per-module admin views are mounted via
+                    // `cave_portal::admin::router`. Authorisation is
+                    // enforced inside each handler via
+                    // `RequestCtx::authorise(Permission::...)` against the
+                    // dev-token granted in `extract_ctx_from_query`. The
+                    // JWT middleware shouldn't double-gate — that would
+                    // make the dashboard unreachable without an
+                    // externally-issued session, which is the wrong UX
+                    // for the development serve.
+                    "/admin/".into(),
+                    "/api/compliance/".into(),
+                    // 2026-05-13 realtime + power-user batch: SSE event
+                    // stream + bulk-op submit endpoints. The handlers
+                    // re-check Permission inside the request context
+                    // (extract_ctx_from_query grants a dev-token), so
+                    // the JWT layer doesn't double-gate.
+                    "/api/events/".into(),
+                    "/api/bulk/".into(),
+                ],
+            },
+        )))
         // Middleware
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
@@ -391,32 +445,32 @@ async fn main() -> anyhow::Result<()> {
 
     // Production-mode cluster runtime: if cluster.json exists, spawn dedicated
     // TLS listeners for cave-etcd (2379) and cave-apiserver (6443).
-    let cluster_handles =
-        match cluster_runtime::ClusterRuntime::load(cli.data_dir.as_deref()).await {
-            Ok(Some(rt)) => {
-                info!(
-                    cluster = %rt.manifest.cluster_name,
-                    data_dir = %rt.data_dir.display(),
-                    "production-mode cluster detected — starting dedicated TLS listeners"
-                );
-                let rt_for_shutdown = rt.clone();
-                tokio::spawn(async move {
-                    if tokio::signal::ctrl_c().await.is_ok() {
-                        info!("Ctrl-C received, persisting etcd snapshot");
-                        let _ = rt_for_shutdown.shutdown_persist().await;
-                    }
-                });
-                rt.spawn_listeners().await.ok()
-            }
-            Ok(None) => {
-                info!("no cluster.json found — development mode (unified listener only)");
-                None
-            }
-            Err(e) => {
-                tracing::warn!(error = %e, "failed to load cluster.json — falling back to development mode");
-                None
-            }
-        };
+    let cluster_handles = match cluster_runtime::ClusterRuntime::load(cli.data_dir.as_deref()).await
+    {
+        Ok(Some(rt)) => {
+            info!(
+                cluster = %rt.manifest.cluster_name,
+                data_dir = %rt.data_dir.display(),
+                "production-mode cluster detected — starting dedicated TLS listeners"
+            );
+            let rt_for_shutdown = rt.clone();
+            tokio::spawn(async move {
+                if tokio::signal::ctrl_c().await.is_ok() {
+                    info!("Ctrl-C received, persisting etcd snapshot");
+                    let _ = rt_for_shutdown.shutdown_persist().await;
+                }
+            });
+            rt.spawn_listeners().await.ok()
+        }
+        Ok(None) => {
+            info!("no cluster.json found — development mode (unified listener only)");
+            None
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to load cluster.json — falling back to development mode");
+            None
+        }
+    };
     let _ = cluster_handles; // handles run for the lifetime of the process
 
     let port = cli.port.unwrap_or(8080);
@@ -460,10 +514,11 @@ async fn admin_realms_persona_gate(
     if !path.starts_with("/admin/realms/") {
         return next.run(req).await;
     }
-    match req.extensions().get::<cave_auth::jwt_middleware::JwtClaims>() {
-        Some(claims) if claims.roles.iter().any(|r| r == "platform_admin") => {
-            next.run(req).await
-        }
+    match req
+        .extensions()
+        .get::<cave_auth::jwt_middleware::JwtClaims>()
+    {
+        Some(claims) if claims.roles.iter().any(|r| r == "platform_admin") => next.run(req).await,
         Some(_) => (
             axum::http::StatusCode::FORBIDDEN,
             axum::Json(serde_json::json!({
@@ -482,7 +537,15 @@ async fn admin_realms_persona_gate(
 }
 
 async fn api_modules() -> axum::Json<serde_json::Value> {
-    let phase1 = ["secrets", "lint", "docs", "status", "changelog", "certs", "portal"];
+    let phase1 = [
+        "secrets",
+        "lint",
+        "docs",
+        "status",
+        "changelog",
+        "certs",
+        "portal",
+    ];
     let modules = cave_upstream::TRACKED_PROJECTS
         .iter()
         .map(|p| {
@@ -517,7 +580,9 @@ async fn api_controller_manager_health() -> axum::Json<serde_json::Value> {
 
 async fn api_controller_manager_leader() -> axum::Json<serde_json::Value> {
     axum::Json(cave_controller_manager::leader_state(
-        std::env::var("CAVE_POD_NAME").as_deref().unwrap_or("manager-0"),
+        std::env::var("CAVE_POD_NAME")
+            .as_deref()
+            .unwrap_or("manager-0"),
     ))
 }
 

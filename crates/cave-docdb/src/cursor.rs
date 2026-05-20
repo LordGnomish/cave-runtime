@@ -4,8 +4,8 @@
 
 use crate::bson::Document;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicI64, Ordering};
 use tokio::sync::RwLock;
 
 #[derive(Clone)]

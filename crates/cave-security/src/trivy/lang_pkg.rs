@@ -56,12 +56,18 @@ pub fn parse_go_sum(content: &str, file_path: &str) -> Vec<LangPackage> {
 
     for line in content.lines() {
         let line = line.trim();
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
         let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() < 3 { continue; }
+        if parts.len() < 3 {
+            continue;
+        }
         let name = parts[0];
         let ver = parts[1].trim_end_matches("/go.mod");
-        if seen.contains(&(name.to_string(), ver.to_string())) { continue; }
+        if seen.contains(&(name.to_string(), ver.to_string())) {
+            continue;
+        }
         seen.insert((name.to_string(), ver.to_string()));
         pkgs.push(LangPackage {
             name: name.to_string(),
@@ -90,7 +96,9 @@ pub fn parse_package_lock_json(content: &str, file_path: &str) -> Vec<LangPackag
     // lockfileVersion 2 / 3: "packages" key
     if let Some(packages) = v.get("packages").and_then(|p| p.as_object()) {
         for (path, info) in packages {
-            if path.is_empty() { continue; } // root package
+            if path.is_empty() {
+                continue;
+            } // root package
             let name = path
                 .trim_start_matches("node_modules/")
                 .trim_start_matches("../node_modules/");
@@ -99,11 +107,10 @@ pub fn parse_package_lock_json(content: &str, file_path: &str) -> Vec<LangPackag
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            if version.is_empty() { continue; }
-            let dev = info
-                .get("dev")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
+            if version.is_empty() {
+                continue;
+            }
+            let dev = info.get("dev").and_then(|v| v.as_bool()).unwrap_or(false);
             pkgs.push(LangPackage {
                 name: name.to_string(),
                 version,
@@ -124,7 +131,9 @@ pub fn parse_package_lock_json(content: &str, file_path: &str) -> Vec<LangPackag
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            if version.is_empty() { continue; }
+            if version.is_empty() {
+                continue;
+            }
             pkgs.push(LangPackage {
                 name: name.to_string(),
                 version,
@@ -150,24 +159,41 @@ pub fn parse_requirements_txt(content: &str, file_path: &str) -> Vec<LangPackage
     for line in content.lines() {
         let line = line.trim();
         // Strip inline comments
-        let line = if let Some(pos) = line.find('#') { &line[..pos] } else { line };
+        let line = if let Some(pos) = line.find('#') {
+            &line[..pos]
+        } else {
+            line
+        };
         let line = line.trim();
-        if line.is_empty() || line.starts_with('-') { continue; }
+        if line.is_empty() || line.starts_with('-') {
+            continue;
+        }
 
         // Find version specifier
         let (name, version) = if let Some(pos) = line.find("==") {
-            (line[..pos].trim().to_string(), line[pos + 2..].trim().to_string())
+            (
+                line[..pos].trim().to_string(),
+                line[pos + 2..].trim().to_string(),
+            )
         } else if let Some(pos) = line.find(">=") {
-            (line[..pos].trim().to_string(), line[pos + 2..].trim().to_string())
+            (
+                line[..pos].trim().to_string(),
+                line[pos + 2..].trim().to_string(),
+            )
         } else if let Some(pos) = line.find("~=") {
-            (line[..pos].trim().to_string(), line[pos + 2..].trim().to_string())
+            (
+                line[..pos].trim().to_string(),
+                line[pos + 2..].trim().to_string(),
+            )
         } else {
             (line.to_string(), String::new())
         };
 
         // Normalize extras: flask[async] → flask
         let name = name.split('[').next().unwrap_or(&name).trim().to_string();
-        if name.is_empty() { continue; }
+        if name.is_empty() {
+            continue;
+        }
 
         pkgs.push(LangPackage {
             name,
@@ -198,7 +224,9 @@ pub fn parse_pom_xml(content: &str, file_path: &str) -> Vec<LangPackage> {
         let group = extract_xml_tag(block, "groupId").unwrap_or_default();
         let artifact = extract_xml_tag(block, "artifactId").unwrap_or_default();
         let version = extract_xml_tag(block, "version").unwrap_or_default();
-        if group.is_empty() || artifact.is_empty() { continue; }
+        if group.is_empty() || artifact.is_empty() {
+            continue;
+        }
         let name = format!("{group}:{artifact}");
         pkgs.push(LangPackage {
             name,
@@ -237,7 +265,9 @@ pub fn parse_cargo_lock(content: &str, file_path: &str) -> Vec<LangPackage> {
         let name = extract_toml_value(block, "name").unwrap_or_default();
         let version = extract_toml_value(block, "version").unwrap_or_default();
         let checksum = extract_toml_value(block, "checksum");
-        if name.is_empty() || version.is_empty() { continue; }
+        if name.is_empty() || version.is_empty() {
+            continue;
+        }
         pkgs.push(LangPackage {
             name: name.trim_matches('"').to_string(),
             version: version.trim_matches('"').to_string(),
@@ -276,9 +306,19 @@ pub fn parse_composer_lock(content: &str, file_path: &str) -> Vec<LangPackage> {
     for key in &["packages", "packages-dev"] {
         if let Some(arr) = v.get(*key).and_then(|a| a.as_array()) {
             for pkg in arr {
-                let name = pkg.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let version = pkg.get("version").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                if name.is_empty() { continue; }
+                let name = pkg
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let version = pkg
+                    .get("version")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if name.is_empty() {
+                    continue;
+                }
                 pkgs.push(LangPackage {
                     name,
                     version,
@@ -378,10 +418,19 @@ version = "1.35.0"
     fn manifest_detection() {
         assert_eq!(detect_manifest_type("go.sum"), Some(Ecosystem::Go));
         assert_eq!(detect_manifest_type("Cargo.lock"), Some(Ecosystem::Cargo));
-        assert_eq!(detect_manifest_type("requirements.txt"), Some(Ecosystem::Pip));
+        assert_eq!(
+            detect_manifest_type("requirements.txt"),
+            Some(Ecosystem::Pip)
+        );
         assert_eq!(detect_manifest_type("pom.xml"), Some(Ecosystem::Maven));
-        assert_eq!(detect_manifest_type("package-lock.json"), Some(Ecosystem::Npm));
-        assert_eq!(detect_manifest_type("composer.lock"), Some(Ecosystem::Composer));
+        assert_eq!(
+            detect_manifest_type("package-lock.json"),
+            Some(Ecosystem::Npm)
+        );
+        assert_eq!(
+            detect_manifest_type("composer.lock"),
+            Some(Ecosystem::Composer)
+        );
         assert_eq!(detect_manifest_type("Makefile"), None);
     }
 }

@@ -89,10 +89,7 @@ pub trait LlmGateway: Send + Sync {
 
     /// Issue one completion. Implementors are expected to enforce their
     /// own timeouts; the runtime won't wrap the call.
-    async fn complete(
-        &self,
-        req: &CompletionRequest,
-    ) -> Result<CompletionResponse, HermesError>;
+    async fn complete(&self, req: &CompletionRequest) -> Result<CompletionResponse, HermesError>;
 
     /// Sync convenience for callers stuck in a sync context. Requires a
     /// live tokio runtime [`Handle`]; in non-tokio environments use
@@ -169,10 +166,7 @@ impl LlmGateway for OllamaGateway {
         ProviderKind::Ollama
     }
 
-    async fn complete(
-        &self,
-        req: &CompletionRequest,
-    ) -> Result<CompletionResponse, HermesError> {
+    async fn complete(&self, req: &CompletionRequest) -> Result<CompletionResponse, HermesError> {
         let body = OllamaRequest {
             model: &req.model,
             prompt: req.user.clone(),
@@ -257,10 +251,7 @@ impl LlmGateway for AnthropicStubGateway {
         ProviderKind::Anthropic
     }
 
-    async fn complete(
-        &self,
-        req: &CompletionRequest,
-    ) -> Result<CompletionResponse, HermesError> {
+    async fn complete(&self, req: &CompletionRequest) -> Result<CompletionResponse, HermesError> {
         if req.user.trim().is_empty() {
             return Err(HermesError::PlannerRejected(
                 "anthropic-stub: empty user message".into(),

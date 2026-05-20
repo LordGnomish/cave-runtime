@@ -6,7 +6,7 @@
 //! optionally filtered to a tenant or focused on one module.
 //! Output rendering (DOT, JSON, ASCII) is the caller's choice.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Args;
 
 use super::{HttpVerb, PreparedRequest};

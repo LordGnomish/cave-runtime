@@ -67,9 +67,12 @@ pub fn scan(content: &str, filename: &str, detectors: &[SecretDetector]) -> Vec<
         }
         // High entropy check for hex/base64 strings
         if line.len() > 20 && shannon_entropy(line) > 4.5 {
-            let has_key_hint = line.contains("key") || line.contains("secret")
-                || line.contains("token") || line.contains("password")
-                || line.contains("KEY") || line.contains("SECRET");
+            let has_key_hint = line.contains("key")
+                || line.contains("secret")
+                || line.contains("token")
+                || line.contains("password")
+                || line.contains("KEY")
+                || line.contains("SECRET");
             if has_key_hint {
                 findings.push(Finding {
                     detector: "high-entropy".to_string(),
@@ -87,7 +90,7 @@ pub fn scan(content: &str, filename: &str, detectors: &[SecretDetector]) -> Vec<
 
 fn redact_match(line: &str) -> String {
     if line.len() > 20 {
-        format!("{}...{}", &line[..8], &line[line.len()-4..])
+        format!("{}...{}", &line[..8], &line[line.len() - 4..])
     } else {
         line.to_string()
     }
@@ -109,7 +112,8 @@ pub fn builtin_detectors() -> Vec<SecretDetector> {
         },
         SecretDetector {
             name: "generic-api-key",
-            pattern: Regex::new(r#"(?i)(api[_-]?key|apikey)\s*[=:]\s*["']?[A-Za-z0-9_\-]{20,}"#).unwrap(),
+            pattern: Regex::new(r#"(?i)(api[_-]?key|apikey)\s*[=:]\s*["']?[A-Za-z0-9_\-]{20,}"#)
+                .unwrap(),
             severity: Severity::High,
             verify: false,
         },
@@ -121,19 +125,26 @@ pub fn builtin_detectors() -> Vec<SecretDetector> {
         },
         SecretDetector {
             name: "jwt-token",
-            pattern: Regex::new(r"eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+").unwrap(),
+            pattern: Regex::new(r"eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+")
+                .unwrap(),
             severity: Severity::High,
             verify: false,
         },
         SecretDetector {
             name: "slack-webhook",
-            pattern: Regex::new(r"https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]+").unwrap(),
+            pattern: Regex::new(
+                r"https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]+",
+            )
+            .unwrap(),
             severity: Severity::High,
             verify: true,
         },
         SecretDetector {
             name: "azure-connection-string",
-            pattern: Regex::new(r"(?i)DefaultEndpointsProtocol=https;AccountName=[^;]+;AccountKey=[A-Za-z0-9+/=]+").unwrap(),
+            pattern: Regex::new(
+                r"(?i)DefaultEndpointsProtocol=https;AccountName=[^;]+;AccountKey=[A-Za-z0-9+/=]+",
+            )
+            .unwrap(),
             severity: Severity::Critical,
             verify: false,
         },
@@ -250,7 +261,11 @@ mod tests {
     #[test]
     fn test_builtin_detectors_count() {
         let detectors = builtin_detectors();
-        assert!(detectors.len() >= 5, "Expected at least 5 builtin detectors, got {}", detectors.len());
+        assert!(
+            detectors.len() >= 5,
+            "Expected at least 5 builtin detectors, got {}",
+            detectors.len()
+        );
     }
 
     #[test]
@@ -266,7 +281,11 @@ mod tests {
         let detectors = builtin_detectors();
         let content = "AWS_KEY=AKIAIOSFODNN7EXAMPLE\n-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----\n";
         let findings = scan(content, "secrets.txt", &detectors);
-        assert!(findings.len() >= 2, "Expected at least 2 findings, got {}", findings.len());
+        assert!(
+            findings.len() >= 2,
+            "Expected at least 2 findings, got {}",
+            findings.len()
+        );
         let has_aws = findings.iter().any(|f| f.detector == "aws-access-key");
         let has_pk = findings.iter().any(|f| f.detector == "private-key");
         assert!(has_aws, "Expected aws-access-key finding");
@@ -280,7 +299,11 @@ mod tests {
         let findings = scan(content, "test.env", &detectors);
         let aws_finding = findings.iter().find(|f| f.detector == "aws-access-key");
         assert!(aws_finding.is_some(), "Expected aws-access-key finding");
-        assert_eq!(aws_finding.unwrap().line, 3, "AWS key should be found on line 3");
+        assert_eq!(
+            aws_finding.unwrap().line,
+            3,
+            "AWS key should be found on line 3"
+        );
     }
 
     // ---------------------------------------------------------------------
@@ -300,7 +323,11 @@ mod tests {
         let detectors = builtin_detectors();
         let content = "AZ=DefaultEndpointsProtocol=https;AccountName=mystore;AccountKey=YWJjZGVmZ2hpamtsbW5vcA==";
         let findings = scan(content, "az.env", &detectors);
-        assert!(findings.iter().any(|f| f.detector == "azure-connection-string"));
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.detector == "azure-connection-string")
+        );
     }
 
     #[test]
@@ -378,7 +405,10 @@ mod tests {
         let detectors = builtin_detectors();
         let content = "config_token_string=AKIAIOSFODNN7EXAMPLEEXTRAPADDING";
         let findings = scan(content, "x.env", &detectors);
-        let aws = findings.iter().find(|f| f.detector == "aws-access-key").unwrap();
+        let aws = findings
+            .iter()
+            .find(|f| f.detector == "aws-access-key")
+            .unwrap();
         assert!(aws.matched.contains("..."));
     }
 
@@ -387,7 +417,10 @@ mod tests {
         let detectors = builtin_detectors();
         let content = "K=AKIAIOSFODNN7EXAMPLE";
         let findings = scan(content, "x.env", &detectors);
-        let aws = findings.iter().find(|f| f.detector == "aws-access-key").unwrap();
+        let aws = findings
+            .iter()
+            .find(|f| f.detector == "aws-access-key")
+            .unwrap();
         assert_eq!(aws.severity, Severity::Critical);
     }
 

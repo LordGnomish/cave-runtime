@@ -226,11 +226,7 @@ impl GenericPleg {
     ///   4. Apply the IP preservation rule (upstream's
     ///      `updateCache` step: if the new pod has no IP but the
     ///      cached one did, carry the cached IP forward).
-    pub fn relist(
-        &mut self,
-        now: DateTime<Utc>,
-        new_pods: Vec<PodSnapshot>,
-    ) -> RelistOutcome {
+    pub fn relist(&mut self, now: DateTime<Utc>, new_pods: Vec<PodSnapshot>) -> RelistOutcome {
         self.last_relist_time = Some(now);
 
         let new_uids: HashSet<String> = new_pods.iter().map(|p| p.uid.clone()).collect();

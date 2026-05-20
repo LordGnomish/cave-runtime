@@ -43,7 +43,11 @@ fn diff_recursive(desired: &Value, live: &Value, path: &str, entries: &mut Vec<D
         (Value::Object(d_map), Value::Object(l_map)) => {
             // Check all desired keys
             for (k, d_val) in d_map {
-                let child_path = if path.is_empty() { k.clone() } else { format!("{}.{}", path, k) };
+                let child_path = if path.is_empty() {
+                    k.clone()
+                } else {
+                    format!("{}.{}", path, k)
+                };
                 match l_map.get(k) {
                     None => entries.push(DiffEntry {
                         path: child_path,
@@ -57,7 +61,11 @@ fn diff_recursive(desired: &Value, live: &Value, path: &str, entries: &mut Vec<D
             // Keys in live but not in desired
             for (k, l_val) in l_map {
                 if !d_map.contains_key(k) {
-                    let child_path = if path.is_empty() { k.clone() } else { format!("{}.{}", path, k) };
+                    let child_path = if path.is_empty() {
+                        k.clone()
+                    } else {
+                        format!("{}.{}", path, k)
+                    };
                     entries.push(DiffEntry {
                         path: child_path,
                         diff_type: DiffType::Removed,
@@ -130,9 +138,10 @@ pub fn apply_ignored_differences(
     entries: Vec<DiffEntry>,
     ignored: &[IgnoredDiff],
 ) -> Vec<DiffEntry> {
-    entries.into_iter().filter(|e| {
-        !ignored.iter().any(|ig| ig.matches(&e.path))
-    }).collect()
+    entries
+        .into_iter()
+        .filter(|e| !ignored.iter().any(|ig| ig.matches(&e.path)))
+        .collect()
 }
 
 #[derive(Debug, Clone)]
@@ -265,12 +274,24 @@ mod tests {
     #[test]
     fn apply_ignored_differences() {
         let entries = vec![
-            DiffEntry { path: "metadata.annotations.kubectl.kubernetes.io/last-applied-configuration".to_string(), diff_type: DiffType::Modified, desired: None, live: None },
-            DiffEntry { path: "spec.replicas".to_string(), diff_type: DiffType::Modified, desired: Some(json!(3)), live: Some(json!(1)) },
+            DiffEntry {
+                path: "metadata.annotations.kubectl.kubernetes.io/last-applied-configuration"
+                    .to_string(),
+                diff_type: DiffType::Modified,
+                desired: None,
+                live: None,
+            },
+            DiffEntry {
+                path: "spec.replicas".to_string(),
+                diff_type: DiffType::Modified,
+                desired: Some(json!(3)),
+                live: Some(json!(1)),
+            },
         ];
-        let ignored = vec![
-            IgnoredDiff { json_pointer: Some("/metadata/annotations".to_string()), jq_expression: None },
-        ];
+        let ignored = vec![IgnoredDiff {
+            json_pointer: Some("/metadata/annotations".to_string()),
+            jq_expression: None,
+        }];
         let remaining = super::apply_ignored_differences(entries, &ignored);
         assert_eq!(remaining.len(), 1);
         assert_eq!(remaining[0].path, "spec.replicas");

@@ -49,7 +49,9 @@ pub enum FailurePolicyType {
 }
 
 impl Default for FailurePolicyType {
-    fn default() -> Self { FailurePolicyType::Fail }
+    fn default() -> Self {
+        FailurePolicyType::Fail
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,7 +62,9 @@ pub enum ParameterNotFoundActionType {
 }
 
 impl Default for ParameterNotFoundActionType {
-    fn default() -> Self { ParameterNotFoundActionType::Deny }
+    fn default() -> Self {
+        ParameterNotFoundActionType::Deny
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -80,7 +84,9 @@ pub enum ScopeType {
 }
 
 impl Default for ScopeType {
-    fn default() -> Self { ScopeType::All }
+    fn default() -> Self {
+        ScopeType::All
+    }
 }
 
 /// `RuleWithOperations` from admissionregistration/v1.
@@ -130,7 +136,9 @@ pub enum MatchPolicyType {
 }
 
 impl Default for MatchPolicyType {
-    fn default() -> Self { MatchPolicyType::Equivalent }
+    fn default() -> Self {
+        MatchPolicyType::Equivalent
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -349,7 +357,8 @@ impl AuthorizerView {
 
     /// Convenience builder for tests / authorizer-resolver code.
     pub fn allow(mut self, verb: &str, group: &str, resource: &str, ns: Option<&str>) -> Self {
-        self.grants.insert(Self::grant_key(verb, group, resource, ns));
+        self.grants
+            .insert(Self::grant_key(verb, group, resource, ns));
         self
     }
 
@@ -370,7 +379,13 @@ impl AuthorizerView {
     /// slot of the snapshot. Verb/resource wildcards in the CEL
     /// query itself are NOT supported (real callers spell out the
     /// verb).
-    pub fn check_resource(&self, verb: &str, group: &str, resource: &str, ns: Option<&str>) -> bool {
+    pub fn check_resource(
+        &self,
+        verb: &str,
+        group: &str,
+        resource: &str,
+        ns: Option<&str>,
+    ) -> bool {
         for key in &self.grants {
             if Self::key_matches(key, verb, group, resource, ns) {
                 return true;
@@ -443,7 +458,11 @@ pub struct FixedEvaluator {
 }
 
 impl FixedEvaluator {
-    pub fn new() -> Self { Self { answers: HashMap::new() } }
+    pub fn new() -> Self {
+        Self {
+            answers: HashMap::new(),
+        }
+    }
     pub fn with(mut self, expr: impl Into<String>, val: CelValue) -> Self {
         self.answers.insert(expr.into(), Ok(val));
         self
@@ -455,7 +474,9 @@ impl FixedEvaluator {
 }
 
 impl Default for FixedEvaluator {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CelEvaluator for FixedEvaluator {
@@ -466,7 +487,8 @@ impl CelEvaluator for FixedEvaluator {
                 CelError::Compile(m) => CelError::Compile(m.clone()),
                 CelError::Runtime(m) => CelError::Runtime(m.clone()),
                 CelError::Type { expected, got } => CelError::Type {
-                    expected: expected.clone(), got: got.clone(),
+                    expected: expected.clone(),
+                    got: got.clone(),
                 },
             }),
             None => Err(CelError::Compile(format!("no fixed answer for {expr}"))),
@@ -495,7 +517,9 @@ fn tenant_of(meta: &ObjectMeta) -> String {
 }
 
 impl VapStore {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn put_policy(&self, p: ValidatingAdmissionPolicy) {
         let key = (tenant_of(&p.metadata), p.metadata.name.clone());
@@ -503,17 +527,29 @@ impl VapStore {
     }
 
     pub fn get_policy(&self, tenant: &str, name: &str) -> Option<ValidatingAdmissionPolicy> {
-        self.policies.read().unwrap().get(&(tenant.to_string(), name.to_string())).cloned()
+        self.policies
+            .read()
+            .unwrap()
+            .get(&(tenant.to_string(), name.to_string()))
+            .cloned()
     }
 
     pub fn delete_policy(&self, tenant: &str, name: &str) -> bool {
-        self.policies.write().unwrap().remove(&(tenant.to_string(), name.to_string())).is_some()
+        self.policies
+            .write()
+            .unwrap()
+            .remove(&(tenant.to_string(), name.to_string()))
+            .is_some()
     }
 
     pub fn list_policies(&self, tenant: &str) -> Vec<ValidatingAdmissionPolicy> {
-        self.policies.read().unwrap().iter()
+        self.policies
+            .read()
+            .unwrap()
+            .iter()
             .filter(|((t, _), _)| t == tenant)
-            .map(|(_, v)| v.clone()).collect()
+            .map(|(_, v)| v.clone())
+            .collect()
     }
 
     pub fn put_binding(&self, b: ValidatingAdmissionPolicyBinding) {
@@ -521,28 +557,49 @@ impl VapStore {
         self.bindings.write().unwrap().insert(key, b);
     }
 
-    pub fn get_binding(&self, tenant: &str, name: &str) -> Option<ValidatingAdmissionPolicyBinding> {
-        self.bindings.read().unwrap().get(&(tenant.to_string(), name.to_string())).cloned()
+    pub fn get_binding(
+        &self,
+        tenant: &str,
+        name: &str,
+    ) -> Option<ValidatingAdmissionPolicyBinding> {
+        self.bindings
+            .read()
+            .unwrap()
+            .get(&(tenant.to_string(), name.to_string()))
+            .cloned()
     }
 
     pub fn delete_binding(&self, tenant: &str, name: &str) -> bool {
-        self.bindings.write().unwrap().remove(&(tenant.to_string(), name.to_string())).is_some()
+        self.bindings
+            .write()
+            .unwrap()
+            .remove(&(tenant.to_string(), name.to_string()))
+            .is_some()
     }
 
     pub fn list_bindings(&self, tenant: &str) -> Vec<ValidatingAdmissionPolicyBinding> {
-        self.bindings.read().unwrap().iter()
+        self.bindings
+            .read()
+            .unwrap()
+            .iter()
             .filter(|((t, _), _)| t == tenant)
-            .map(|(_, v)| v.clone()).collect()
+            .map(|(_, v)| v.clone())
+            .collect()
     }
 
     /// Return all (policy, binding) pairs in tenant scope where the binding
     /// references the policy by name. Mirrors the dispatcher inner loop.
     pub fn pairs_for_tenant(
-        &self, tenant: &str,
+        &self,
+        tenant: &str,
     ) -> Vec<(ValidatingAdmissionPolicy, ValidatingAdmissionPolicyBinding)> {
-        let policies: HashMap<String, _> =
-            self.list_policies(tenant).into_iter().map(|p| (p.metadata.name.clone(), p)).collect();
-        self.list_bindings(tenant).into_iter()
+        let policies: HashMap<String, _> = self
+            .list_policies(tenant)
+            .into_iter()
+            .map(|p| (p.metadata.name.clone(), p))
+            .collect();
+        self.list_bindings(tenant)
+            .into_iter()
             .filter_map(|b| policies.get(&b.spec.policy_name).cloned().map(|p| (p, b)))
             .collect()
     }
@@ -566,7 +623,9 @@ pub struct MatchInput<'a> {
 }
 
 pub fn op_matches(rule: &str, op: &Operation) -> bool {
-    if rule == "*" { return true; }
+    if rule == "*" {
+        return true;
+    }
     match (rule, op) {
         ("CREATE", Operation::Create) => true,
         ("UPDATE", Operation::Update) => true,
@@ -581,19 +640,25 @@ fn glob_or_eq(rule: &str, val: &str) -> bool {
 }
 
 pub fn rule_matches(rule: &RuleWithOperations, input: &MatchInput) -> bool {
-    if !rule.operations.iter().any(|o| op_matches(o, input.operation)) {
+    if !rule
+        .operations
+        .iter()
+        .any(|o| op_matches(o, input.operation))
+    {
         return false;
     }
-    if !rule.api_groups.is_empty()
-        && !rule.api_groups.iter().any(|g| glob_or_eq(g, input.group)) {
+    if !rule.api_groups.is_empty() && !rule.api_groups.iter().any(|g| glob_or_eq(g, input.group)) {
         return false;
     }
     if !rule.api_versions.is_empty()
-        && !rule.api_versions.iter().any(|v| glob_or_eq(v, input.version)) {
+        && !rule
+            .api_versions
+            .iter()
+            .any(|v| glob_or_eq(v, input.version))
+    {
         return false;
     }
-    if !rule.resources.is_empty()
-        && !rule.resources.iter().any(|r| glob_or_eq(r, input.resource)) {
+    if !rule.resources.is_empty() && !rule.resources.iter().any(|r| glob_or_eq(r, input.resource)) {
         return false;
     }
     match rule.scope {
@@ -604,9 +669,10 @@ pub fn rule_matches(rule: &RuleWithOperations, input: &MatchInput) -> bool {
 }
 
 pub fn named_rule_matches(rule: &NamedRuleWithOperations, input: &MatchInput) -> bool {
-    if !rule_matches(&rule.rule, input) { return false; }
-    if !rule.resource_names.is_empty()
-        && !rule.resource_names.iter().any(|n| n == input.name) {
+    if !rule_matches(&rule.rule, input) {
+        return false;
+    }
+    if !rule.resource_names.is_empty() && !rule.resource_names.iter().any(|n| n == input.name) {
         return false;
     }
     true
@@ -614,21 +680,39 @@ pub fn named_rule_matches(rule: &NamedRuleWithOperations, input: &MatchInput) ->
 
 pub fn label_selector_matches(sel: &LabelSelector, labels: &HashMap<String, String>) -> bool {
     for (k, v) in &sel.match_labels {
-        if labels.get(k) != Some(v) { return false; }
+        if labels.get(k) != Some(v) {
+            return false;
+        }
     }
     for req in &sel.match_expressions {
         let present = labels.contains_key(&req.key);
         let val = labels.get(&req.key);
         match req.operator.as_str() {
             "In" => {
-                let Some(v) = val else { return false; };
-                if !req.values.contains(v) { return false; }
+                let Some(v) = val else {
+                    return false;
+                };
+                if !req.values.contains(v) {
+                    return false;
+                }
             }
             "NotIn" => {
-                if let Some(v) = val { if req.values.contains(v) { return false; } }
+                if let Some(v) = val {
+                    if req.values.contains(v) {
+                        return false;
+                    }
+                }
             }
-            "Exists" => { if !present { return false; } }
-            "DoesNotExist" => { if present { return false; } }
+            "Exists" => {
+                if !present {
+                    return false;
+                }
+            }
+            "DoesNotExist" => {
+                if present {
+                    return false;
+                }
+            }
             _ => return false, // unknown operator — never matches
         }
     }
@@ -636,19 +720,32 @@ pub fn label_selector_matches(sel: &LabelSelector, labels: &HashMap<String, Stri
 }
 
 pub fn match_resources_matches(mr: &MatchResources, input: &MatchInput) -> bool {
-    let any_excl = mr.exclude_resource_rules.iter().any(|r| named_rule_matches(r, input));
-    if any_excl { return false; }
+    let any_excl = mr
+        .exclude_resource_rules
+        .iter()
+        .any(|r| named_rule_matches(r, input));
+    if any_excl {
+        return false;
+    }
     let any_incl = if mr.resource_rules.is_empty() {
         true
     } else {
-        mr.resource_rules.iter().any(|r| named_rule_matches(r, input))
+        mr.resource_rules
+            .iter()
+            .any(|r| named_rule_matches(r, input))
     };
-    if !any_incl { return false; }
+    if !any_incl {
+        return false;
+    }
     if let Some(sel) = &mr.namespace_selector {
-        if !label_selector_matches(sel, input.namespace_labels) { return false; }
+        if !label_selector_matches(sel, input.namespace_labels) {
+            return false;
+        }
     }
     if let Some(sel) = &mr.object_selector {
-        if !label_selector_matches(sel, input.object_labels) { return false; }
+        if !label_selector_matches(sel, input.object_labels) {
+            return false;
+        }
     }
     true
 }
@@ -663,7 +760,10 @@ pub fn match_resources_matches(mr: &MatchResources, input: &MatchInput) -> bool 
 
 pub trait ParamResolver: Send + Sync {
     fn resolve(
-        &self, tenant: &str, kind: &ParamKind, param_ref: &ParamRef,
+        &self,
+        tenant: &str,
+        kind: &ParamKind,
+        param_ref: &ParamRef,
     ) -> Result<Vec<serde_json::Value>, ParamResolveError>;
 }
 
@@ -684,28 +784,48 @@ pub struct InMemoryParamResolver {
 }
 
 impl InMemoryParamResolver {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn insert(
-        &self, tenant: &str, kind: &ParamKind, namespace: &str, name: &str,
+        &self,
+        tenant: &str,
+        kind: &ParamKind,
+        namespace: &str,
+        name: &str,
         value: serde_json::Value,
     ) {
-        let key = (tenant.to_string(), format!("{}/{}", kind.api_version, kind.kind),
-                   namespace.to_string(), name.to_string());
+        let key = (
+            tenant.to_string(),
+            format!("{}/{}", kind.api_version, kind.kind),
+            namespace.to_string(),
+            name.to_string(),
+        );
         self.items.write().unwrap().insert(key, value);
     }
 }
 
 impl ParamResolver for InMemoryParamResolver {
     fn resolve(
-        &self, tenant: &str, kind: &ParamKind, param_ref: &ParamRef,
+        &self,
+        tenant: &str,
+        kind: &ParamKind,
+        param_ref: &ParamRef,
     ) -> Result<Vec<serde_json::Value>, ParamResolveError> {
         let kind_key = format!("{}/{}", kind.api_version, kind.kind);
         let map = self.items.read().unwrap();
         if !param_ref.name.is_empty() {
-            let key = (tenant.to_string(), kind_key,
-                       param_ref.namespace.clone(), param_ref.name.clone());
-            return map.get(&key).map(|v| vec![v.clone()]).ok_or(ParamResolveError::NotFound);
+            let key = (
+                tenant.to_string(),
+                kind_key,
+                param_ref.namespace.clone(),
+                param_ref.name.clone(),
+            );
+            return map
+                .get(&key)
+                .map(|v| vec![v.clone()])
+                .ok_or(ParamResolveError::NotFound);
         }
         if param_ref.selector.is_some() {
             // Selector-based: we don't index labels yet — return all in tenant+kind+namespace.
@@ -731,7 +851,10 @@ impl ParamResolver for InMemoryParamResolver {
 pub enum DispatchOutcome {
     Allow,
     /// At least one validation returned false; carries the message + reason.
-    Deny { message: String, reason: String },
+    Deny {
+        message: String,
+        reason: String,
+    },
     /// A validation returned a warning; AdmissionResponse should attach it.
     Warn(String),
     /// FailurePolicy=Ignore swallowed an error.
@@ -752,18 +875,24 @@ impl Dispatcher {
 
     /// Evaluate one (policy, binding) pair against a single match input.
     pub fn dispatch_one(
-        &self, tenant: &str,
+        &self,
+        tenant: &str,
         policy: &ValidatingAdmissionPolicy,
         binding: &ValidatingAdmissionPolicyBinding,
-        req: &AdmissionRequest, input: &MatchInput,
+        req: &AdmissionRequest,
+        input: &MatchInput,
     ) -> Vec<DispatchOutcome> {
         // 1. matchConstraints on policy
         if let Some(mc) = &policy.spec.match_constraints {
-            if !match_resources_matches(mc, input) { return vec![]; }
+            if !match_resources_matches(mc, input) {
+                return vec![];
+            }
         }
         // 2. matchResources on binding (further narrows)
         if let Some(mr) = &binding.spec.match_resources {
-            if !match_resources_matches(mr, input) { return vec![]; }
+            if !match_resources_matches(mr, input) {
+                return vec![];
+            }
         }
         // 3. matchConditions — short-circuit if any returns false. Errors -> fail policy.
         for cond in &policy.spec.match_conditions {
@@ -771,34 +900,48 @@ impl Dispatcher {
             match self.evaluator.evaluate(&cond.expression, &act) {
                 Ok(CelValue::Bool(true)) => continue,
                 Ok(CelValue::Bool(false)) => return vec![],
-                Ok(other) => return vec![self.fail_outcome(
-                    policy, format!("matchCondition {} returned non-bool: {:?}", cond.name, other))],
-                Err(e) => return vec![self.fail_outcome(
-                    policy, format!("matchCondition {} error: {e}", cond.name))],
+                Ok(other) => {
+                    return vec![self.fail_outcome(
+                        policy,
+                        format!(
+                            "matchCondition {} returned non-bool: {:?}",
+                            cond.name, other
+                        ),
+                    )]
+                }
+                Err(e) => {
+                    return vec![self
+                        .fail_outcome(policy, format!("matchCondition {} error: {e}", cond.name))]
+                }
             }
         }
         // 4. resolve params
-        let params: Option<serde_json::Value> = if let (Some(kind), Some(pref)) =
-            (&policy.spec.param_kind, &binding.spec.param_ref)
-        {
-            match self.params.resolve(tenant, kind, pref) {
-                Ok(v) if v.is_empty() => match pref.parameter_not_found_action {
-                    ParameterNotFoundActionType::Allow => None,
-                    ParameterNotFoundActionType::Deny => return vec![DispatchOutcome::Deny {
-                        message: format!("param {} not found", pref.name),
-                        reason: "Forbidden".into(),
-                    }],
-                },
-                Ok(v) => Some(serde_json::Value::Array(v)),
-                Err(_) => match pref.parameter_not_found_action {
-                    ParameterNotFoundActionType::Allow => None,
-                    ParameterNotFoundActionType::Deny => return vec![DispatchOutcome::Deny {
-                        message: format!("param {} not found", pref.name),
-                        reason: "Forbidden".into(),
-                    }],
-                },
-            }
-        } else { None };
+        let params: Option<serde_json::Value> =
+            if let (Some(kind), Some(pref)) = (&policy.spec.param_kind, &binding.spec.param_ref) {
+                match self.params.resolve(tenant, kind, pref) {
+                    Ok(v) if v.is_empty() => match pref.parameter_not_found_action {
+                        ParameterNotFoundActionType::Allow => None,
+                        ParameterNotFoundActionType::Deny => {
+                            return vec![DispatchOutcome::Deny {
+                                message: format!("param {} not found", pref.name),
+                                reason: "Forbidden".into(),
+                            }]
+                        }
+                    },
+                    Ok(v) => Some(serde_json::Value::Array(v)),
+                    Err(_) => match pref.parameter_not_found_action {
+                        ParameterNotFoundActionType::Allow => None,
+                        ParameterNotFoundActionType::Deny => {
+                            return vec![DispatchOutcome::Deny {
+                                message: format!("param {} not found", pref.name),
+                                reason: "Forbidden".into(),
+                            }]
+                        }
+                    },
+                }
+            } else {
+                None
+            };
         // 5. evaluate validations
         let act = self.activation_for(req, params);
         let mut out = vec![];
@@ -806,14 +949,31 @@ impl Dispatcher {
             match self.evaluator.evaluate(&v.expression, &act) {
                 Ok(CelValue::Bool(true)) => out.push(DispatchOutcome::Allow),
                 Ok(CelValue::Bool(false)) => {
-                    let msg = if v.message.is_empty() { v.expression.clone() } else { v.message.clone() };
-                    let reason = if v.reason.is_empty() { "Forbidden".into() } else { v.reason.clone() };
+                    let msg = if v.message.is_empty() {
+                        v.expression.clone()
+                    } else {
+                        v.message.clone()
+                    };
+                    let reason = if v.reason.is_empty() {
+                        "Forbidden".into()
+                    } else {
+                        v.reason.clone()
+                    };
                     let dispatched = self.dispatch_validation_actions(
-                        binding, DispatchOutcome::Deny { message: msg, reason });
+                        binding,
+                        DispatchOutcome::Deny {
+                            message: msg,
+                            reason,
+                        },
+                    );
                     out.extend(dispatched);
                 }
-                Ok(other) => return vec![self.fail_outcome(
-                    policy, format!("validation returned non-bool: {:?}", other))],
+                Ok(other) => {
+                    return vec![self.fail_outcome(
+                        policy,
+                        format!("validation returned non-bool: {:?}", other),
+                    )]
+                }
                 Err(e) => out.push(self.fail_outcome(policy, format!("validation error: {e}"))),
             }
         }
@@ -828,9 +988,13 @@ impl Dispatcher {
     }
 
     fn dispatch_validation_actions(
-        &self, binding: &ValidatingAdmissionPolicyBinding, outcome: DispatchOutcome,
+        &self,
+        binding: &ValidatingAdmissionPolicyBinding,
+        outcome: DispatchOutcome,
     ) -> Vec<DispatchOutcome> {
-        let DispatchOutcome::Deny { message, reason } = outcome else { return vec![outcome]; };
+        let DispatchOutcome::Deny { message, reason } = outcome else {
+            return vec![outcome];
+        };
         if binding.spec.validation_actions.is_empty() {
             // upstream default = Deny when not specified
             return vec![DispatchOutcome::Deny { message, reason }];
@@ -838,8 +1002,10 @@ impl Dispatcher {
         let mut out = vec![];
         for action in &binding.spec.validation_actions {
             match action {
-                ValidationAction::Deny => out.push(
-                    DispatchOutcome::Deny { message: message.clone(), reason: reason.clone() }),
+                ValidationAction::Deny => out.push(DispatchOutcome::Deny {
+                    message: message.clone(),
+                    reason: reason.clone(),
+                }),
                 ValidationAction::Warn => out.push(DispatchOutcome::Warn(message.clone())),
                 ValidationAction::Audit => { /* TODO M4: emit audit annotation */ }
             }
@@ -847,11 +1013,21 @@ impl Dispatcher {
         out
     }
 
-    fn activation_for(&self, req: &AdmissionRequest, params: Option<serde_json::Value>) -> CelActivation {
+    fn activation_for(
+        &self,
+        req: &AdmissionRequest,
+        params: Option<serde_json::Value>,
+    ) -> CelActivation {
         CelActivation {
             request: serde_json::to_value(req).ok(),
-            object: req.object.as_ref().and_then(|o| serde_json::to_value(o).ok()),
-            old_object: req.old_object.as_ref().and_then(|o| serde_json::to_value(o).ok()),
+            object: req
+                .object
+                .as_ref()
+                .and_then(|o| serde_json::to_value(o).ok()),
+            old_object: req
+                .old_object
+                .as_ref()
+                .and_then(|o| serde_json::to_value(o).ok()),
             params,
             namespace_object: None,
             variables: HashMap::new(),
@@ -882,20 +1058,28 @@ impl VapPlugin {
 }
 
 impl ValidatingWebhook for VapPlugin {
-    fn name(&self) -> &str { "validating-admission-policy" }
+    fn name(&self) -> &str {
+        "validating-admission-policy"
+    }
     fn validate(&self, req: &AdmissionRequest) -> AdmissionResponse {
         let pairs = self.store.pairs_for_tenant(&req.tenant_id);
         let object_labels = req.object.as_ref().map(meta_labels).unwrap_or_default();
         let input = MatchInput {
-            group: "", version: "", resource: &req.kind.to_lowercase(),
-            name: &req.name, namespace: &req.namespace,
+            group: "",
+            version: "",
+            resource: &req.kind.to_lowercase(),
+            name: &req.name,
+            namespace: &req.namespace,
             operation: &req.operation,
             object_labels: &object_labels,
             namespace_labels: &HashMap::new(),
         };
         let mut warnings = vec![];
         for (p, b) in pairs {
-            for outcome in self.dispatcher.dispatch_one(&req.tenant_id, &p, &b, req, &input) {
+            for outcome in self
+                .dispatcher
+                .dispatch_one(&req.tenant_id, &p, &b, req, &input)
+            {
                 match outcome {
                     DispatchOutcome::Allow => {}
                     DispatchOutcome::Deny { message, reason: _ } => {

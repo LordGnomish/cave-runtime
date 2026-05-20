@@ -49,10 +49,7 @@ impl QueryEngine {
     pub async fn search(&self, query: &TraceSearchQuery) -> Result<Vec<Trace>> {
         let store = self.store.read().await;
         let records = store.search(query);
-        let traces = records
-            .into_iter()
-            .filter_map(|r| r.to_trace())
-            .collect();
+        let traces = records.into_iter().filter_map(|r| r.to_trace()).collect();
         Ok(traces)
     }
 
@@ -153,7 +150,11 @@ impl QueryEngine {
         counts
             .into_iter()
             .map(|(k, (total, errors))| {
-                let rate = if total > 0 { errors as f64 / total as f64 } else { 0.0 };
+                let rate = if total > 0 {
+                    errors as f64 / total as f64
+                } else {
+                    0.0
+                };
                 (k, rate)
             })
             .collect()
@@ -194,7 +195,9 @@ impl QueryEngine {
                             };
                             let e = edges.entry(edge).or_insert((0, 0, 0));
                             e.0 += 1;
-                            if span.has_error() { e.1 += 1; }
+                            if span.has_error() {
+                                e.1 += 1;
+                            }
                             e.2 += span.duration_ns;
                         }
                     }
@@ -221,10 +224,7 @@ impl QueryEngine {
         trace_a: TraceId,
         trace_b: TraceId,
     ) -> Result<TraceComparisonResult> {
-        let (a, b) = tokio::try_join!(
-            self.get_trace(trace_a),
-            self.get_trace(trace_b),
-        )?;
+        let (a, b) = tokio::try_join!(self.get_trace(trace_a), self.get_trace(trace_b),)?;
         Ok(compare(&a, &b))
     }
 
@@ -233,16 +233,21 @@ impl QueryEngine {
     pub async fn critical_path(&self, trace_id: TraceId) -> Result<CriticalPathResult> {
         let spans = self.get_trace_spans(trace_id).await?;
         let forest = crate::types::SpanNode::build_forest(&spans);
-        let root = forest.into_iter().next().ok_or_else(|| {
-            TraceError::StorageError("no root span found".into())
-        })?;
+        let root = forest
+            .into_iter()
+            .next()
+            .ok_or_else(|| TraceError::StorageError("no root span found".into()))?;
         let path_ids = root.critical_path();
         let path_spans: Vec<Span> = path_ids
             .iter()
             .filter_map(|id| spans.iter().find(|s| s.span_id == *id).cloned())
             .collect();
         let total_ns = path_spans.iter().map(|s| s.duration_ns).sum();
-        Ok(CriticalPathResult { path_span_ids: path_ids, path_spans, total_duration_ns: total_ns })
+        Ok(CriticalPathResult {
+            path_span_ids: path_ids,
+            path_spans,
+            total_duration_ns: total_ns,
+        })
     }
 
     // ── Throughput (spans / traces per time bucket) ────────────────────────
@@ -269,7 +274,9 @@ impl QueryEngine {
 
         for record in records {
             let ts = record.trace_start_ns();
-            if ts < start_ns || ts > end_ns { continue; }
+            if ts < start_ns || ts > end_ns {
+                continue;
+            }
             let idx = ((ts - start_ns) / bucket_size_ns) as usize;
             if let Some(b) = buckets.get_mut(idx) {
                 b.trace_count += 1;
@@ -312,12 +319,22 @@ fn compare(a: &Trace, b: &Trace) -> TraceComparisonResult {
     let ops_a: HashMap<(String, String), u64> = a
         .spans
         .iter()
-        .map(|s| ((s.service_name.clone(), s.operation_name.clone()), s.duration_ns))
+        .map(|s| {
+            (
+                (s.service_name.clone(), s.operation_name.clone()),
+                s.duration_ns,
+            )
+        })
         .collect();
     let ops_b: HashMap<(String, String), u64> = b
         .spans
         .iter()
-        .map(|s| ((s.service_name.clone(), s.operation_name.clone()), s.duration_ns))
+        .map(|s| {
+            (
+                (s.service_name.clone(), s.operation_name.clone()),
+                s.duration_ns,
+            )
+        })
         .collect();
 
     let keys_a: HashSet<_> = ops_a.keys().collect();
@@ -338,7 +355,11 @@ fn compare(a: &Trace, b: &Trace) -> TraceComparisonResult {
             let da = ops_a[&(svc.clone(), op.clone())];
             let db = ops_b[&(svc.clone(), op.clone())];
             let delta = db as i128 - da as i128;
-            let pct = if da > 0 { delta as f64 / da as f64 * 100.0 } else { 0.0 };
+            let pct = if da > 0 {
+                delta as f64 / da as f64 * 100.0
+            } else {
+                0.0
+            };
             OperationDelta {
                 operation: op.clone(),
                 service: svc.clone(),
@@ -404,7 +425,7 @@ mod tests {
             operation_name: op.into(),
             service_name: svc.into(),
             start_time_unix_nano: 1_000_000_000,
-            end_time_unix_nano:   1_005_000_000,
+            end_time_unix_nano: 1_005_000_000,
             duration_ns: 5_000_000,
             status: SpanStatus::Ok,
             kind: SpanKind::Server,
@@ -445,12 +466,9 @@ mod tests {
             w.ingest_spans(vec![span(1, 1, "svc", "op")]);
         }
         let engine = QueryEngine::new(store);
-        let buckets = engine.throughput(
-            1_000_000_000,
-            0,
-            2_000_000_000,
-            None,
-        ).await;
+        let buckets = engine
+            .throughput(1_000_000_000, 0, 2_000_000_000, None)
+            .await;
         let total_traces: u64 = buckets.iter().map(|b| b.trace_count).sum();
         assert_eq!(total_traces, 1);
     }

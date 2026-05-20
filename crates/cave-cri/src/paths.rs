@@ -26,7 +26,10 @@ pub fn container_dir(container_id: &str) -> PathBuf {
 
 /// Default log path for a container: `<root>/log/containers/<container_id>.log`.
 pub fn container_log_path(container_id: &str) -> PathBuf {
-    root().join("log").join("containers").join(format!("{}.log", container_id))
+    root()
+        .join("log")
+        .join("containers")
+        .join(format!("{}.log", container_id))
 }
 
 /// Image cache directory: `<root>/images`.
@@ -99,7 +102,10 @@ mod tests {
     #[test]
     fn image_cache_dir_under_root() {
         with_root("/tmp/cave-test-img", || {
-            assert_eq!(image_cache_dir(), PathBuf::from("/tmp/cave-test-img/images"));
+            assert_eq!(
+                image_cache_dir(),
+                PathBuf::from("/tmp/cave-test-img/images")
+            );
         });
     }
 

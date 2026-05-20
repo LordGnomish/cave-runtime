@@ -16,7 +16,7 @@ use super::{GatewayPlugin, PluginCtx, PluginResult};
 use async_trait::async_trait;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
 use serde_json::Value;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -31,7 +31,10 @@ fn extract_jwt_token(ctx: &PluginCtx, config: &Value) -> Option<String> {
 
     for h in &header_names {
         if let Some(v) = ctx.headers.get(*h) {
-            if let Some(token) = v.strip_prefix("Bearer ").or_else(|| v.strip_prefix("bearer ")) {
+            if let Some(token) = v
+                .strip_prefix("Bearer ")
+                .or_else(|| v.strip_prefix("bearer "))
+            {
                 return Some(token.to_string());
             }
         }
@@ -91,7 +94,11 @@ impl GatewayPlugin for JwtPlugin {
                     return PluginResult::Continue;
                 }
                 return PluginResult::Halt(
-                    (StatusCode::UNAUTHORIZED, axum::Json(serde_json::json!({"message": "Unauthorized"}))).into_response(),
+                    (
+                        StatusCode::UNAUTHORIZED,
+                        axum::Json(serde_json::json!({"message": "Unauthorized"})),
+                    )
+                        .into_response(),
                 );
             }
         };
@@ -101,7 +108,10 @@ impl GatewayPlugin for JwtPlugin {
             Ok(h) => h,
             Err(_) => {
                 return PluginResult::Halt(
-                    (StatusCode::UNAUTHORIZED, axum::Json(serde_json::json!({"message": "Bad token; invalid JWT"})))
+                    (
+                        StatusCode::UNAUTHORIZED,
+                        axum::Json(serde_json::json!({"message": "Bad token; invalid JWT"})),
+                    )
                         .into_response(),
                 );
             }
@@ -124,19 +134,32 @@ impl GatewayPlugin for JwtPlugin {
         match unverified {
             Ok(data) => {
                 if let Some(iss) = data.claims.get(key_claim).and_then(|v| v.as_str()) {
-                    ctx.ctx.insert("jwt_token".to_string(), Value::String(token));
-                    ctx.ctx.insert("jwt_iss".to_string(), Value::String(iss.to_string()));
-                    ctx.ctx.insert("jwt_alg".to_string(), Value::String(format!("{:?}", header.alg)));
+                    ctx.ctx
+                        .insert("jwt_token".to_string(), Value::String(token));
+                    ctx.ctx
+                        .insert("jwt_iss".to_string(), Value::String(iss.to_string()));
+                    ctx.ctx.insert(
+                        "jwt_alg".to_string(),
+                        Value::String(format!("{:?}", header.alg)),
+                    );
                     PluginResult::Continue
                 } else {
                     PluginResult::Halt(
-                        (StatusCode::UNAUTHORIZED, axum::Json(serde_json::json!({"message": "Invalid JWT: missing key claim"})))
+                        (
+                            StatusCode::UNAUTHORIZED,
+                            axum::Json(
+                                serde_json::json!({"message": "Invalid JWT: missing key claim"}),
+                            ),
+                        )
                             .into_response(),
                     )
                 }
             }
             Err(_) => PluginResult::Halt(
-                (StatusCode::UNAUTHORIZED, axum::Json(serde_json::json!({"message": "Invalid JWT"})))
+                (
+                    StatusCode::UNAUTHORIZED,
+                    axum::Json(serde_json::json!({"message": "Invalid JWT"})),
+                )
                     .into_response(),
             ),
         }
@@ -147,7 +170,12 @@ impl GatewayPlugin for JwtPlugin {
 pub fn verify_jwt_hs256(token: &str, secret: &str, validate_exp: bool) -> bool {
     let mut validation = Validation::new(Algorithm::HS256);
     validation.validate_exp = validate_exp;
-    decode::<Value>(token, &DecodingKey::from_secret(secret.as_bytes()), &validation).is_ok()
+    decode::<Value>(
+        token,
+        &DecodingKey::from_secret(secret.as_bytes()),
+        &validation,
+    )
+    .is_ok()
 }
 
 pub fn verify_jwt_rs256(token: &str, public_key_pem: &str, validate_exp: bool) -> bool {
@@ -172,13 +200,18 @@ pub fn verify_jwt_es256(token: &str, public_key_pem: &str, validate_exp: bool) -
 mod tests {
     use super::*;
     use bytes::Bytes;
-    use jsonwebtoken::{encode, EncodingKey, Header};
+    use jsonwebtoken::{EncodingKey, Header, encode};
     use serde_json::json;
     use std::collections::HashMap;
 
     fn make_token(secret: &str) -> String {
         let claims = json!({"sub": "test", "iss": "my-key", "exp": 9999999999u64});
-        encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_bytes())).unwrap()
+        encode(
+            &Header::default(),
+            &claims,
+            &EncodingKey::from_secret(secret.as_bytes()),
+        )
+        .unwrap()
     }
 
     #[tokio::test]
@@ -188,11 +221,20 @@ mod tests {
         let mut headers = HashMap::new();
         headers.insert("authorization".to_string(), format!("Bearer {}", token));
 
-        let mut ctx = PluginCtx::new("GET".into(), "/".into(), headers, Bytes::new(), "1.2.3.4".into());
+        let mut ctx = PluginCtx::new(
+            "GET".into(),
+            "/".into(),
+            headers,
+            Bytes::new(),
+            "1.2.3.4".into(),
+        );
         let config = json!({"key_claim_name": "iss"});
         let result = plugin.access(&mut ctx, &config).await;
         assert!(matches!(result, PluginResult::Continue));
-        assert_eq!(ctx.ctx.get("jwt_iss").and_then(|v| v.as_str()), Some("my-key"));
+        assert_eq!(
+            ctx.ctx.get("jwt_iss").and_then(|v| v.as_str()),
+            Some("my-key")
+        );
     }
 
     #[test]

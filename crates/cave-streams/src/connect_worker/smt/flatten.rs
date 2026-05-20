@@ -67,12 +67,7 @@ impl Smt for Flatten {
     }
 }
 
-fn flatten_into(
-    out: &mut BTreeMap<String, Value>,
-    prefix: &str,
-    value: Value,
-    delim: &str,
-) {
+fn flatten_into(out: &mut BTreeMap<String, Value>, prefix: &str, value: Value, delim: &str) {
     if let Value::Object(m) = value {
         for (k, v) in m {
             let key = format!("{prefix}{delim}{k}");
@@ -98,10 +93,7 @@ mod tests {
     #[test]
     fn flatten_one_level_no_change() {
         let s = Flatten::from_config(&BTreeMap::new()).unwrap();
-        let r = RecordEnvelope::new(
-            "t",
-            obj(&[("a", Value::Int(1)), ("b", Value::Bool(true))]),
-        );
+        let r = RecordEnvelope::new("t", obj(&[("a", Value::Int(1)), ("b", Value::Bool(true))]));
         let out = s.apply(r).unwrap().unwrap();
         let m = out.value.as_object().unwrap();
         assert_eq!(m.get("a"), Some(&Value::Int(1)));
@@ -124,10 +116,7 @@ mod tests {
         let out = s.apply(r).unwrap().unwrap();
         let m = out.value.as_object().unwrap();
         assert_eq!(m.get("user.name"), Some(&Value::String("alice".into())));
-        assert_eq!(
-            m.get("user.addr.city"),
-            Some(&Value::String("Ist".into()))
-        );
+        assert_eq!(m.get("user.addr.city"), Some(&Value::String("Ist".into())));
     }
 
     #[test]

@@ -2,11 +2,10 @@
 // Copyright 2026 Cave Runtime contributors
 //! HTTP routes for cave-changelog.
 
-use axum::{routing::get, Json, Router};
+use axum::{Json, Router, routing::get};
 
 pub fn create_router() -> Router {
-    Router::new()
-        .route("/api/changelog/health", get(health))
+    Router::new().route("/api/changelog/health", get(health))
 }
 
 async fn health() -> Json<serde_json::Value> {

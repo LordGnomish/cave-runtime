@@ -86,11 +86,10 @@ impl AuthScheme {
                 region,
             };
         }
-        if host.ends_with(".gcr.io")
-            || host == "gcr.io"
-            || host.ends_with("-docker.pkg.dev")
-        {
-            return AuthScheme::GcpGcr { access_token: String::new() };
+        if host.ends_with(".gcr.io") || host == "gcr.io" || host.ends_with("-docker.pkg.dev") {
+            return AuthScheme::GcpGcr {
+                access_token: String::new(),
+            };
         }
         if host.ends_with(".azurecr.io") {
             let tenant = host.trim_end_matches(".azurecr.io").to_string();
@@ -100,7 +99,9 @@ impl AuthScheme {
             };
         }
         if host == "ghcr.io" {
-            return AuthScheme::Bearer { token: String::new() };
+            return AuthScheme::Bearer {
+                token: String::new(),
+            };
         }
         AuthScheme::None
     }
@@ -116,11 +117,13 @@ impl AuthScheme {
                 let encoded = base64_encode(raw.as_bytes());
                 Some(format!("Basic {}", encoded))
             }
-            AuthScheme::Bearer { token } if !token.is_empty() => {
-                Some(format!("Bearer {}", token))
-            }
+            AuthScheme::Bearer { token } if !token.is_empty() => Some(format!("Bearer {}", token)),
             AuthScheme::Bearer { .. } => None,
-            AuthScheme::Oauth2 { username: Some(u), password: Some(p), .. } => {
+            AuthScheme::Oauth2 {
+                username: Some(u),
+                password: Some(p),
+                ..
+            } => {
                 // Pre-token: send Basic for the exchange request.
                 let raw = format!("{}:{}", u, p);
                 Some(format!("Basic {}", base64_encode(raw.as_bytes())))
@@ -131,9 +134,9 @@ impl AuthScheme {
                 Some(format!("Bearer {}", access_token))
             }
             AuthScheme::GcpGcr { .. } => None,
-            AuthScheme::AzureAcr { aad_access_token, .. } if !aad_access_token.is_empty() => {
-                Some(format!("Bearer {}", aad_access_token))
-            }
+            AuthScheme::AzureAcr {
+                aad_access_token, ..
+            } if !aad_access_token.is_empty() => Some(format!("Bearer {}", aad_access_token)),
             AuthScheme::AzureAcr { .. } => None,
         }
     }
@@ -143,18 +146,18 @@ impl AuthScheme {
     /// (used for OAuth2 scope generation).
     pub fn token_exchange_url(&self, repo: &str) -> Option<String> {
         match self {
-            AuthScheme::Oauth2 { token_url, service, .. } => Some(format!(
+            AuthScheme::Oauth2 {
+                token_url, service, ..
+            } => Some(format!(
                 "{}?service={}&scope=repository:{}:pull",
                 token_url, service, repo
             )),
-            AuthScheme::AwsEcr { region, .. } => Some(format!(
-                "https://api.ecr.{}.amazonaws.com/",
-                region
-            )),
-            AuthScheme::AzureAcr { tenant, .. } => Some(format!(
-                "https://{}.azurecr.io/oauth2/exchange",
-                tenant
-            )),
+            AuthScheme::AwsEcr { region, .. } => {
+                Some(format!("https://api.ecr.{}.amazonaws.com/", region))
+            }
+            AuthScheme::AzureAcr { tenant, .. } => {
+                Some(format!("https://{}.azurecr.io/oauth2/exchange", tenant))
+            }
             _ => None,
         }
     }
@@ -204,7 +207,10 @@ impl CredentialStore {
     }
 
     pub fn set(&self, registry_host: &str, scheme: AuthScheme) {
-        self.creds.write().unwrap().insert(registry_host.to_string(), scheme);
+        self.creds
+            .write()
+            .unwrap()
+            .insert(registry_host.to_string(), scheme);
     }
 
     pub fn get(&self, registry_host: &str) -> AuthScheme {
@@ -275,7 +281,9 @@ mod tests {
     fn default_for_docker_hub_returns_oauth2() {
         let s = AuthScheme::default_for_registry("docker.io");
         match s {
-            AuthScheme::Oauth2 { token_url, service, .. } => {
+            AuthScheme::Oauth2 {
+                token_url, service, ..
+            } => {
                 assert_eq!(token_url, "https://auth.docker.io/token");
                 assert_eq!(service, "registry.docker.io");
             }
@@ -296,7 +304,12 @@ mod tests {
     fn default_for_gcr_uses_gcp_scheme() {
         for host in ["gcr.io", "us.gcr.io", "us-central1-docker.pkg.dev"] {
             let s = AuthScheme::default_for_registry(host);
-            assert!(matches!(s, AuthScheme::GcpGcr { .. }), "host {} → {:?}", host, s);
+            assert!(
+                matches!(s, AuthScheme::GcpGcr { .. }),
+                "host {} → {:?}",
+                host,
+                s
+            );
         }
     }
 
@@ -345,13 +358,17 @@ mod tests {
 
     #[test]
     fn bearer_with_token_renders() {
-        let s = AuthScheme::Bearer { token: "abc".into() };
+        let s = AuthScheme::Bearer {
+            token: "abc".into(),
+        };
         assert_eq!(s.authorization_header(), Some("Bearer abc".to_string()));
     }
 
     #[test]
     fn bearer_with_empty_token_returns_none() {
-        let s = AuthScheme::Bearer { token: String::new() };
+        let s = AuthScheme::Bearer {
+            token: String::new(),
+        };
         assert!(s.authorization_header().is_none());
     }
 
@@ -392,7 +409,9 @@ mod tests {
 
     #[test]
     fn gcp_with_token_renders_bearer() {
-        let s = AuthScheme::GcpGcr { access_token: "ya29.abc".into() };
+        let s = AuthScheme::GcpGcr {
+            access_token: "ya29.abc".into(),
+        };
         assert_eq!(s.authorization_header(), Some("Bearer ya29.abc".into()));
     }
 
@@ -445,14 +464,32 @@ mod tests {
 
     #[test]
     fn vendor_classifies_known_hosts() {
-        assert_eq!(RegistryVendor::from_host("docker.io"), RegistryVendor::DockerHub);
-        assert_eq!(RegistryVendor::from_host("a.dkr.ecr.us-east-1.amazonaws.com"), RegistryVendor::AwsEcr);
+        assert_eq!(
+            RegistryVendor::from_host("docker.io"),
+            RegistryVendor::DockerHub
+        );
+        assert_eq!(
+            RegistryVendor::from_host("a.dkr.ecr.us-east-1.amazonaws.com"),
+            RegistryVendor::AwsEcr
+        );
         assert_eq!(RegistryVendor::from_host("gcr.io"), RegistryVendor::GcpGcr);
-        assert_eq!(RegistryVendor::from_host("us.gcr.io"), RegistryVendor::GcpGcr);
-        assert_eq!(RegistryVendor::from_host("us-central1-docker.pkg.dev"), RegistryVendor::GcpGcr);
-        assert_eq!(RegistryVendor::from_host("myorg.azurecr.io"), RegistryVendor::AzureAcr);
+        assert_eq!(
+            RegistryVendor::from_host("us.gcr.io"),
+            RegistryVendor::GcpGcr
+        );
+        assert_eq!(
+            RegistryVendor::from_host("us-central1-docker.pkg.dev"),
+            RegistryVendor::GcpGcr
+        );
+        assert_eq!(
+            RegistryVendor::from_host("myorg.azurecr.io"),
+            RegistryVendor::AzureAcr
+        );
         assert_eq!(RegistryVendor::from_host("ghcr.io"), RegistryVendor::Ghcr);
-        assert_eq!(RegistryVendor::from_host("harbor.internal"), RegistryVendor::Generic);
+        assert_eq!(
+            RegistryVendor::from_host("harbor.internal"),
+            RegistryVendor::Generic
+        );
     }
 
     // ── CredentialStore ───────────────────────────────────────────────────────
@@ -477,7 +514,13 @@ mod tests {
     #[test]
     fn credential_store_remove() {
         let s = CredentialStore::new();
-        s.set("x", AuthScheme::Basic { username: "u".into(), password: "p".into() });
+        s.set(
+            "x",
+            AuthScheme::Basic {
+                username: "u".into(),
+                password: "p".into(),
+            },
+        );
         assert_eq!(s.len(), 1);
         let removed = s.remove("x").unwrap();
         assert!(matches!(removed, AuthScheme::Basic { .. }));

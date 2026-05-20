@@ -171,11 +171,7 @@ fn extract_upstream_block(text: &str) -> Option<String> {
             out.push('\n');
         }
     }
-    if out.is_empty() {
-        None
-    } else {
-        Some(out)
-    }
+    if out.is_empty() { None } else { Some(out) }
 }
 
 fn pick_str_value(block: &str, key: &str) -> Option<String> {
@@ -293,11 +289,17 @@ version = "v3.5.13"  # pinned
         let d = fixture();
         let got = load_from_workspace(d.path()).unwrap();
         assert_eq!(
-            got.iter().find(|p| p.cave_module == "cave-etcd").unwrap().priority,
+            got.iter()
+                .find(|p| p.cave_module == "cave-etcd")
+                .unwrap()
+                .priority,
             Priority::High,
         );
         assert_eq!(
-            got.iter().find(|p| p.cave_module == "cave-portal").unwrap().priority,
+            got.iter()
+                .find(|p| p.cave_module == "cave-portal")
+                .unwrap()
+                .priority,
             Priority::Normal,
         );
     }
@@ -307,11 +309,17 @@ version = "v3.5.13"  # pinned
         let direct = r#"org = "etcd-io"
 repo = "etcd"
 "#;
-        assert_eq!(parse_github_repo(&format!("[upstream]\n{direct}")).as_deref(), Some("etcd-io/etcd"));
+        assert_eq!(
+            parse_github_repo(&format!("[upstream]\n{direct}")).as_deref(),
+            Some("etcd-io/etcd")
+        );
 
         let url = r#"url = "https://github.com/etcd-io/etcd"
 "#;
-        assert_eq!(parse_github_repo(&format!("[upstream]\n{url}")).as_deref(), Some("etcd-io/etcd"));
+        assert_eq!(
+            parse_github_repo(&format!("[upstream]\n{url}")).as_deref(),
+            Some("etcd-io/etcd")
+        );
     }
 
     #[test]

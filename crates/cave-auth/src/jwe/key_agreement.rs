@@ -81,7 +81,7 @@ pub fn unwrap_rsa_oaep(
 // ship key-wrap, and pulling another crate just for that is heavier than a
 // 20-line in-tree implementation that matches RFC 3394 line-by-line.
 
-use p256::{ecdh::EphemeralSecret, EncodedPoint, PublicKey};
+use p256::{EncodedPoint, PublicKey, ecdh::EphemeralSecret};
 
 pub fn wrap_ecdh_es_a256kw(
     receiver_pub: &PublicKey,
@@ -122,19 +122,15 @@ pub fn unwrap_ecdh_es_a256kw(
         .decode(&epk.y)
         .map_err(|e| KeyAgreementError::Ecdh(e.to_string()))?;
     if x.len() != 32 || y.len() != 32 {
-        return Err(KeyAgreementError::Ecdh("epk coords must be 32 bytes".into()));
+        return Err(KeyAgreementError::Ecdh(
+            "epk coords must be 32 bytes".into(),
+        ));
     }
-    let point = EncodedPoint::from_affine_coordinates(
-        x.as_slice().into(),
-        y.as_slice().into(),
-        false,
-    );
-    let ephem_pub =
-        PublicKey::from_sec1_bytes(point.as_bytes()).map_err(|e| KeyAgreementError::Ecdh(e.to_string()))?;
-    let z = p256::ecdh::diffie_hellman(
-        receiver_priv.to_nonzero_scalar(),
-        ephem_pub.as_affine(),
-    );
+    let point =
+        EncodedPoint::from_affine_coordinates(x.as_slice().into(), y.as_slice().into(), false);
+    let ephem_pub = PublicKey::from_sec1_bytes(point.as_bytes())
+        .map_err(|e| KeyAgreementError::Ecdh(e.to_string()))?;
+    let z = p256::ecdh::diffie_hellman(receiver_priv.to_nonzero_scalar(), ephem_pub.as_affine());
     let key = concat_kdf_sha256(z.raw_secret_bytes().as_slice(), b"A256KW", 32);
     aes_key_unwrap(&key, wrapped)
 }
@@ -178,9 +174,9 @@ fn build_other_info(alg_id: &[u8]) -> Vec<u8> {
 const IV_KW: [u8; 8] = [0xA6; 8];
 
 fn aes_key_wrap(kek: &[u8], plaintext: &[u8]) -> Result<Vec<u8>, KeyAgreementError> {
+    use aes::Aes256;
     use aes::cipher::generic_array::GenericArray;
     use aes::cipher::{BlockEncrypt, KeyInit};
-    use aes::Aes256;
     if plaintext.len() % 8 != 0 || plaintext.is_empty() {
         return Err(KeyAgreementError::Kw(
             "plaintext length must be a positive multiple of 8".into(),
@@ -220,9 +216,9 @@ fn aes_key_wrap(kek: &[u8], plaintext: &[u8]) -> Result<Vec<u8>, KeyAgreementErr
 }
 
 fn aes_key_unwrap(kek: &[u8], wrapped: &[u8]) -> Result<Vec<u8>, KeyAgreementError> {
+    use aes::Aes256;
     use aes::cipher::generic_array::GenericArray;
     use aes::cipher::{BlockDecrypt, KeyInit};
-    use aes::Aes256;
     if wrapped.len() % 8 != 0 || wrapped.len() < 24 {
         return Err(KeyAgreementError::Kw(
             "wrapped key length must be at least 24 and a multiple of 8".into(),

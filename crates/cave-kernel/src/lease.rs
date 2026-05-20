@@ -35,7 +35,11 @@ pub struct LeaseInfo {
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum LeaseError {
     #[error("lease {name} held by {holder} until unix {expires_at}")]
-    Held { name: String, holder: String, expires_at: u64 },
+    Held {
+        name: String,
+        holder: String,
+        expires_at: u64,
+    },
     #[error("lease {0} does not exist")]
     NotFound(String),
     #[error("ttl_seconds must be > 0")]
@@ -55,7 +59,9 @@ struct Inner {
 }
 
 impl LeaseManager {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Acquire `name` for `holder` with the given TTL. Succeeds if
     /// the lease is free OR currently held by the same `holder`
@@ -69,7 +75,9 @@ impl LeaseManager {
         ttl: Duration,
         now: SystemTime,
     ) -> Result<LeaseInfo, LeaseError> {
-        if ttl.is_zero() { return Err(LeaseError::InvalidTtl); }
+        if ttl.is_zero() {
+            return Err(LeaseError::InvalidTtl);
+        }
         let now_unix = unix_seconds(now);
         let mut g = self.inner.write().unwrap();
         if let Some(existing) = g.leases.get(name) {
@@ -102,9 +110,13 @@ impl LeaseManager {
         ttl: Duration,
         now: SystemTime,
     ) -> Result<LeaseInfo, LeaseError> {
-        if ttl.is_zero() { return Err(LeaseError::InvalidTtl); }
+        if ttl.is_zero() {
+            return Err(LeaseError::InvalidTtl);
+        }
         let mut g = self.inner.write().unwrap();
-        let info = g.leases.get_mut(name)
+        let info = g
+            .leases
+            .get_mut(name)
             .ok_or_else(|| LeaseError::NotFound(name.into()))?;
         if info.holder != holder {
             return Err(LeaseError::Held {
@@ -121,7 +133,9 @@ impl LeaseManager {
     /// the current holder may revoke.
     pub fn revoke(&self, name: &str, holder: &str) -> Result<(), LeaseError> {
         let mut g = self.inner.write().unwrap();
-        let info = g.leases.get(name)
+        let info = g
+            .leases
+            .get(name)
             .ok_or_else(|| LeaseError::NotFound(name.into()))?;
         if info.holder != holder {
             return Err(LeaseError::Held {
@@ -143,7 +157,13 @@ impl LeaseManager {
 
     /// Snapshot of every active lease — useful for the dashboard.
     pub fn list(&self) -> Vec<LeaseInfo> {
-        self.inner.read().unwrap().leases.values().cloned().collect()
+        self.inner
+            .read()
+            .unwrap()
+            .leases
+            .values()
+            .cloned()
+            .collect()
     }
 
     /// Sweep expired leases. Returns the count removed.
@@ -157,19 +177,25 @@ impl LeaseManager {
 }
 
 fn unix_seconds(t: SystemTime) -> u64 {
-    t.duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+    t.duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn now() -> SystemTime { SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000) }
+    fn now() -> SystemTime {
+        SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000)
+    }
 
     #[test]
     fn acquire_succeeds_on_free_lease() {
         let m = LeaseManager::new();
-        let info = m.acquire("leader", "node-a", Duration::from_secs(30), now()).unwrap();
+        let info = m
+            .acquire("leader", "node-a", Duration::from_secs(30), now())
+            .unwrap();
         assert_eq!(info.name, "leader");
         assert_eq!(info.holder, "node-a");
         assert_eq!(info.expires_at_unix, 1_000_030);
@@ -179,10 +205,15 @@ mod tests {
     #[test]
     fn acquire_fails_when_other_holds_unexpired_lease() {
         let m = LeaseManager::new();
-        m.acquire("leader", "node-a", Duration::from_secs(30), now()).unwrap();
-        let err = m.acquire("leader", "node-b", Duration::from_secs(30), now()).unwrap_err();
+        m.acquire("leader", "node-a", Duration::from_secs(30), now())
+            .unwrap();
+        let err = m
+            .acquire("leader", "node-b", Duration::from_secs(30), now())
+            .unwrap_err();
         match err {
-            LeaseError::Held { holder, expires_at, .. } => {
+            LeaseError::Held {
+                holder, expires_at, ..
+            } => {
                 assert_eq!(holder, "node-a");
                 assert_eq!(expires_at, 1_000_030);
             }
@@ -203,9 +234,12 @@ mod tests {
     #[test]
     fn acquire_after_expiry_succeeds_for_new_holder() {
         let m = LeaseManager::new();
-        m.acquire("l", "old", Duration::from_secs(5), now()).unwrap();
+        m.acquire("l", "old", Duration::from_secs(5), now())
+            .unwrap();
         let later = now() + Duration::from_secs(10);
-        let v = m.acquire("l", "new", Duration::from_secs(5), later).unwrap();
+        let v = m
+            .acquire("l", "new", Duration::from_secs(5), later)
+            .unwrap();
         assert_eq!(v.holder, "new");
     }
 
@@ -224,7 +258,8 @@ mod tests {
         let m = LeaseManager::new();
         m.acquire("l", "a", Duration::from_secs(5), now()).unwrap();
         assert!(matches!(
-            m.renew("l", "b", Duration::from_secs(5), now()).unwrap_err(),
+            m.renew("l", "b", Duration::from_secs(5), now())
+                .unwrap_err(),
             LeaseError::Held { .. }
         ));
     }
@@ -233,7 +268,8 @@ mod tests {
     fn renew_fails_for_missing_lease() {
         let m = LeaseManager::new();
         assert!(matches!(
-            m.renew("nope", "a", Duration::from_secs(1), now()).unwrap_err(),
+            m.renew("nope", "a", Duration::from_secs(1), now())
+                .unwrap_err(),
             LeaseError::NotFound(_)
         ));
     }

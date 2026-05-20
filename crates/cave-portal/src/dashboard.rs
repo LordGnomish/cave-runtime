@@ -7,8 +7,8 @@
 //! and notification feed.
 
 use crate::models::{
-    DashboardData, DashboardWidget, HealthStatus, ModuleSummary, NavigationGroup,
-    NavigationItem, Notification, NotificationSeverity, SearchResult,
+    DashboardData, DashboardWidget, HealthStatus, ModuleSummary, NavigationGroup, NavigationItem,
+    Notification, NotificationSeverity, SearchResult,
 };
 use chrono::Utc;
 use uuid::Uuid;
@@ -19,63 +19,88 @@ type ModuleMeta = (&'static str, &'static str, &'static str, &'static str);
 fn all_modules() -> Vec<ModuleMeta> {
     vec![
         // Security
-        ("secrets",   "Secrets Scanner",     "security",      "TruffleHog / Gitleaks"),
-        ("certs",     "Certificates",         "security",      "cert-manager"),
-        ("vulns",     "Vulnerability Mgmt",   "security",      "Snyk"),
-        ("sbom",      "SBOM",                 "security",      "Syft / Grype"),
-        ("sign",      "Artifact Signing",     "security",      "cosign"),
-        ("forensics", "Runtime Forensics",    "security",      "Falco"),
-        ("pii",       "PII Scanner",          "security",      "Microsoft Presidio"),
-        ("scan",      "Container Scanner",    "security",      "Trivy"),
-        ("policy",    "Policy Engine",        "security",      "OPA / Gatekeeper"),
-        ("dast",      "DAST Scanner",         "security",      "OWASP ZAP"),
-        ("pam",       "Privileged Access",    "security",      "HashiCorp Boundary"),
+        (
+            "secrets",
+            "Secrets Scanner",
+            "security",
+            "TruffleHog / Gitleaks",
+        ),
+        ("certs", "Certificates", "security", "cert-manager"),
+        ("vulns", "Vulnerability Mgmt", "security", "Snyk"),
+        ("sbom", "SBOM", "security", "Syft / Grype"),
+        ("sign", "Artifact Signing", "security", "cosign"),
+        ("forensics", "Runtime Forensics", "security", "Falco"),
+        ("pii", "PII Scanner", "security", "Microsoft Presidio"),
+        ("scan", "Container Scanner", "security", "Trivy"),
+        ("policy", "Policy Engine", "security", "OPA / Gatekeeper"),
+        ("dast", "DAST Scanner", "security", "OWASP ZAP"),
+        ("pam", "Privileged Access", "security", "HashiCorp Boundary"),
         // Observability
-        ("status",    "Status Page",          "observability", "Statuspage.io"),
-        ("uptime",    "Uptime Monitor",       "observability", "Pingdom"),
-        ("alerts",    "Alerts",               "observability", "Alertmanager"),
-        ("slo",       "SLO Tracker",          "observability", "SLO tools"),
-        ("incidents", "Incidents",            "observability", "PagerDuty"),
-        ("profiler",  "Profiler",             "observability", "Pyroscope"),
+        ("status", "Status Page", "observability", "Statuspage.io"),
+        ("uptime", "Uptime Monitor", "observability", "Pingdom"),
+        ("alerts", "Alerts", "observability", "Alertmanager"),
+        ("slo", "SLO Tracker", "observability", "SLO tools"),
+        ("incidents", "Incidents", "observability", "PagerDuty"),
+        ("profiler", "Profiler", "observability", "Pyroscope"),
         // Dev Tools
-        ("lint",      "API Linter",           "dev-tools",     "ESLint / Spectral"),
-        ("docs",      "Documentation",        "dev-tools",     "Confluence"),
-        ("changelog", "Changelog",            "dev-tools",     "Conventional Commits"),
-        ("devlake",   "Engineering Metrics",  "dev-tools",     "Apache DevLake"),
-        ("workflows", "CI/CD Workflows",      "dev-tools",     "GitHub Actions"),
-        ("scaffold",  "Service Scaffold",     "dev-tools",     "Backstage Scaffolding"),
+        ("lint", "API Linter", "dev-tools", "ESLint / Spectral"),
+        ("docs", "Documentation", "dev-tools", "Confluence"),
+        (
+            "changelog",
+            "Changelog",
+            "dev-tools",
+            "Conventional Commits",
+        ),
+        (
+            "devlake",
+            "Engineering Metrics",
+            "dev-tools",
+            "Apache DevLake",
+        ),
+        (
+            "workflows",
+            "CI/CD Workflows",
+            "dev-tools",
+            "GitHub Actions",
+        ),
+        (
+            "scaffold",
+            "Service Scaffold",
+            "dev-tools",
+            "Backstage Scaffolding",
+        ),
         // Platform
-        ("flags",     "Feature Flags",        "platform",      "LaunchDarkly"),
-        ("cost",      "Cost Analytics",       "platform",      "Kubecost"),
-        ("registry",  "Artifact Registry",    "platform",      "Harbor"),
-        ("gateway",   "API Gateway",          "platform",      "Kong + Gravitee"),
-        ("chat",      "Team Chat",            "platform",      "Slack"),
-        ("chaos",     "Chaos Engineering",    "platform",      "Chaos Monkey"),
-        ("backup",    "Backup & Restore",     "platform",      "Velero"),
+        ("flags", "Feature Flags", "platform", "LaunchDarkly"),
+        ("cost", "Cost Analytics", "platform", "Kubecost"),
+        ("registry", "Artifact Registry", "platform", "Harbor"),
+        ("gateway", "API Gateway", "platform", "Kong + Gravitee"),
+        ("chat", "Team Chat", "platform", "Slack"),
+        ("chaos", "Chaos Engineering", "platform", "Chaos Monkey"),
+        ("backup", "Backup & Restore", "platform", "Velero"),
         // AI
-        ("ai-obs",    "AI Observability",     "ai",            "Langfuse"),
+        ("ai-obs", "AI Observability", "ai", "Langfuse"),
     ]
 }
 
 fn category_icon(category: &str) -> &'static str {
     match category {
-        "security"      => "shield",
+        "security" => "shield",
         "observability" => "chart-bar",
-        "dev-tools"     => "wrench",
-        "platform"      => "cog",
-        "ai"            => "cpu-chip",
-        _               => "cube",
+        "dev-tools" => "wrench",
+        "platform" => "cog",
+        "ai" => "cpu-chip",
+        _ => "cube",
     }
 }
 
 fn category_label(category: &str) -> &'static str {
     match category {
-        "security"      => "Security",
+        "security" => "Security",
         "observability" => "Observability",
-        "dev-tools"     => "Dev Tools",
-        "platform"      => "Platform",
-        "ai"            => "AI / Data",
-        _               => "Other",
+        "dev-tools" => "Dev Tools",
+        "platform" => "Platform",
+        "ai" => "AI / Data",
+        _ => "Other",
     }
 }
 

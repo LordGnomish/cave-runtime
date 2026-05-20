@@ -11,9 +11,9 @@
 //! informer; the caller hands us the current state and we compute the
 //! next status block + the actions to take.
 
-use std::collections::HashMap;
-use crate::meta::ObjectMeta;
 use crate::eventing::{Channel, Trigger};
+use crate::meta::ObjectMeta;
+use std::collections::HashMap;
 
 #[derive(Default, Debug, Clone)]
 pub struct Broker {
@@ -58,7 +58,9 @@ pub enum ConditionState {
 }
 
 impl Default for ConditionState {
-    fn default() -> Self { ConditionState::Unknown }
+    fn default() -> Self {
+        ConditionState::Unknown
+    }
 }
 
 /// One action a controller would dispatch — typed so the cave-runtime
@@ -99,7 +101,10 @@ impl Broker {
 
         // Stage 1 — config validation. ConfigReady gates the rest.
         if self.spec.class.is_empty() {
-            self.set_condition("ConfigReady", ConditionState::False("missing class".to_string()));
+            self.set_condition(
+                "ConfigReady",
+                ConditionState::False("missing class".to_string()),
+            );
             return actions;
         }
         if self.spec.config_ref.is_none() && self.spec.class != "in-memory" {
@@ -180,9 +185,15 @@ mod tests {
         let mut b = Broker::new("t", "br1", "in-memory");
         let actions = b.reconcile();
         assert_eq!(b.status.conditions["ConfigReady"], ConditionState::True);
-        assert!(actions.iter().any(|a| matches!(a, ReconcileAction::EnsureChannel { class, .. } if class == "in-memory")));
+        assert!(actions.iter().any(
+            |a| matches!(a, ReconcileAction::EnsureChannel { class, .. } if class == "in-memory")
+        ));
         // in-memory has no separate topic
-        assert!(actions.iter().all(|a| !matches!(a, ReconcileAction::EnsureTopic { .. })));
+        assert!(
+            actions
+                .iter()
+                .all(|a| !matches!(a, ReconcileAction::EnsureTopic { .. }))
+        );
     }
 
     #[test]
@@ -190,7 +201,10 @@ mod tests {
         let mut b = Broker::new("t", "br1", "kafka");
         let actions = b.reconcile();
         assert!(actions.is_empty());
-        assert!(matches!(b.status.conditions["ConfigReady"], ConditionState::False(_)));
+        assert!(matches!(
+            b.status.conditions["ConfigReady"],
+            ConditionState::False(_)
+        ));
     }
 
     #[test]
@@ -198,7 +212,11 @@ mod tests {
         let mut b = Broker::new("t", "br1", "kafka");
         b.spec.config_ref = Some("kafka-broker-config".to_string());
         let actions = b.reconcile();
-        assert!(actions.iter().any(|a| matches!(a, ReconcileAction::EnsureTopic { .. })));
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a, ReconcileAction::EnsureTopic { .. }))
+        );
         assert_eq!(b.status.conditions["TopicReady"], ConditionState::True);
     }
 

@@ -27,9 +27,7 @@ pub async fn serve(
     let tls_config = load_tls_config(&cert_path, &key_path)?;
     let acceptor = TlsAcceptor::from(Arc::new(tls_config));
 
-    let listener = TcpListener::bind(&addr)
-        .await
-        .map_err(DnsError::Io)?;
+    let listener = TcpListener::bind(&addr).await.map_err(DnsError::Io)?;
     tracing::info!(addr = %addr, "DoT server listening");
 
     loop {

@@ -1,20 +1,211 @@
-# parity.manifest.toml — cave-iceberg  [DEPRECATED ALIAS]
-# Status: alias retained for dependent crates; primary upstream surface
-#         was merged into cave-lakehouse per ADR-147.
+# parity.manifest.toml — cave-iceberg
+# Upstream: apache/iceberg-rust  https://github.com/apache/iceberg-rust
 #
-# Stubbed 2026-05-02 to make the crate visible to cave-upstream-watchd
-# and stop it from showing up in the "missing manifest" audit. No bump
-# task should be dispatched against this manifest — bumps go to
-# cave-lakehouse.
+# Cave-iceberg is a function-based reimplementation of the Iceberg
+# table-format spec in pure Rust. The upstream `apache/iceberg-rust`
+# crate is Apache-2.0; cave-iceberg inherits the workspace
+# AGPL-3.0-or-later license and does not vendor any upstream source —
+# only the on-disk metadata shapes, REST-spec wire contracts, and
+# spec-driven semantics documented below.
+#
+# 2026-05-19 — Charter v2 8-gate close-out (`claude/data-layer-close-2026-05-19`):
+#   * Crate revived from "DEPRECATED ALIAS for cave-lakehouse" status
+#     (ADR-147 was Proposed — pending approval; user's data-layer
+#     directive supersedes that consolidation).
+#   * Pinned latest stable apache/iceberg-rust v0.9.1.
+#   * Read-side MVP: Catalog trait + MemoryCatalog + RestCatalog +
+#     TableMetadata v2/v3 + Schema + PartitionSpec + SortOrder +
+#     Snapshot + Manifest + ManifestList + Predicate + ScanBuilder +
+#     FileIO trait.
+#   * Write-side (transaction commits, data-file writer, Avro on-disk
+#     codec, predicate pushdown to Parquet row-groups) deferred to
+#     lakehouse-ray-2 — see [[scope_cuts]].
 
 [upstream]
-org     = "apache"
-repo    = "iceberg"
-version = "apache-iceberg-1.9.2"
+org      = "apache"
+repo     = "iceberg-rust"
+version  = "v0.9.1"
+source_sha = "96cde57d94635613ab1d79b5b9a63b09a1a1ef1c"
+name     = "Apache Iceberg (Rust impl)"
+license  = "Apache-2.0"
+language = "Rust"
+url      = "https://github.com/apache/iceberg-rust"
+
+[parity]
+# Enumeration scope — apache/iceberg-rust v0.9.1 published crate set
+# (`crates/iceberg`, `crates/iceberg-catalog-{memory,rest,sql,glue,hms}`,
+# `crates/iceberg-datafusion`, `crates/iceberg-integration-tests`)
+# decomposed into 24 distinct subsystems below. Counts (mapped +
+# partial + skipped + unmapped) sum to total. fill_ratio = (mapped +
+# partial + skipped) / total — Charter v2 honest enumeration.
+mapped_count   = 14
+partial_count  = 3
+skipped_count  = 5
+unmapped_count = 2
+total          = 24
+fill_ratio     = 0.9167
+honest_ratio   = 0.5833
+parity_ratio_source = "manifest"
+last_audit     = "2026-05-19"
+infra_only     = false
 
 [module]
 name        = "cave-iceberg"
-description = "Iceberg table format — DEPRECATED ALIAS, see cave-lakehouse"
+description = "Sovereign Apache Iceberg table format — read-side reimplementation"
 source_root = "src"
-deprecated  = true
-deprecated_reason = "Merged into cave-lakehouse per ADR-147."
+
+# ─── Mapped (14) ─────────────────────────────────────────────────────────────
+
+[[mapped]]
+upstream = "crates/iceberg/src/spec/schema.rs"
+local    = "src/schema.rs"
+notes    = "Schema + NestedField + Type (Primitive/Struct/List/Map) + SchemaBuilder + validate."
+
+[[mapped]]
+upstream = "crates/iceberg/src/spec/datatypes.rs"
+local    = "src/schema.rs"
+notes    = "PrimitiveType — Boolean/Int/Long/Float/Double/Date/Time/Timestamp[tz]/String/Uuid/Fixed/Binary/Decimal."
+
+[[mapped]]
+upstream = "crates/iceberg/src/spec/transform.rs"
+local    = "src/transform.rs"
+notes    = "All 8 partition transforms (identity/year/month/day/hour/bucket[N]/truncate[W]/void) + parse + spec-str + scalar-value evaluators."
+
+[[mapped]]
+upstream = "crates/iceberg/src/spec/sort_order.rs"
+local    = "src/sort_order.rs"
+notes    = "SortOrder + SortField + direction/null-order semantics + unsorted() default."
+
+[[mapped]]
+upstream = "crates/iceberg/src/spec/table_metadata.rs"
+local    = "src/table_metadata.rs"
+notes    = "TableMetadata v2 (full); v3 enum variant accepted at parse-time (partial — see below)."
+
+[[mapped]]
+upstream = "crates/iceberg/src/spec/snapshot.rs"
+local    = "src/snapshot.rs"
+notes    = "Snapshot + SnapshotRef (Branch/Tag) + ancestors_of(head, limit) parent-chain walker."
+
+[[mapped]]
+upstream = "crates/iceberg/src/spec/manifest.rs"
+local    = "src/manifest.rs"
+notes    = "Manifest + ManifestEntry (Added/Existing/Deleted) + DataFile + DataFileContent (Data/PositionDeletes/EqualityDeletes) + live_data_files iterator."
+
+[[mapped]]
+upstream = "crates/iceberg/src/spec/manifest_list.rs"
+local    = "src/manifest_list.rs"
+notes    = "ManifestFile + ManifestListContent (Data/Deletes) + live_rows + live_files + matches_content router."
+
+[[mapped]]
+upstream = "crates/iceberg/src/catalog.rs"
+local    = "src/catalog.rs"
+notes    = "Catalog async trait — namespace CRUD + table CRUD + rename + replace_table_metadata."
+
+[[mapped]]
+upstream = "crates/iceberg-catalog-memory/src/lib.rs"
+local    = "src/memory_catalog.rs"
+notes    = "In-memory Catalog impl backed by RwLock<HashMap> — full CRUD + cascade-drop + rename rollback."
+
+[[mapped]]
+upstream = "crates/iceberg-catalog-rest/src/catalog.rs"
+local    = "src/rest_catalog.rs"
+notes    = "RestCatalog client over an injectable Transport trait — full URL builder + body codec + load/create/drop/rename + commit endpoint."
+
+[[mapped]]
+upstream = "crates/iceberg/src/table.rs"
+local    = "src/table.rs"
+notes    = "TableIdent + Table struct + scan() builder entrypoint."
+
+[[mapped]]
+upstream = "crates/iceberg/src/scan.rs"
+local    = "src/scan.rs"
+notes    = "ScanBuilder + FileScanTask emission from manifests — select/filter/snapshot pinning + residual predicate attach."
+
+[[mapped]]
+upstream = "crates/iceberg/src/expr/predicate.rs"
+local    = "src/expr.rs"
+notes    = "Predicate AST (Compare/And/Or/Not + IsNull/IsNotNull) + JSON-row evaluator + short-circuit boolean semantics."
+
+# ─── Partial (3) ─────────────────────────────────────────────────────────────
+
+[[partial]]
+upstream = "crates/iceberg/src/spec/table_metadata.rs (v3 spec)"
+local    = "src/table_metadata.rs"
+notes    = "FormatVersion::V3 variant accepted at parse-time and round-trips; v3-only fields (row-id assignment, default-row, deletion-vector references) are not yet decoded."
+
+[[partial]]
+upstream = "crates/iceberg/src/io/"
+local    = "src/file_io.rs"
+notes    = "FileIO async trait + MemFileIo impl. Real S3/MinIO/GCS impls live in cave-store; the cross-crate wiring lands in v0.2."
+
+[[partial]]
+upstream = "crates/iceberg/src/spec/partition_spec.rs"
+local    = "src/table_metadata.rs"
+notes    = "PartitionSpec + PartitionField shape carried; transform application against actual row values for partition-pruning is wired (see src/transform.rs) but manifest-time bound pruning is not yet hooked into ScanBuilder."
+
+# ─── Skipped — alt-language / vendor catalog / write-only (5) ────────────────
+
+[[skipped]]
+upstream = "crates/iceberg-catalog-glue/"
+reason   = "AWS Glue catalog — vendor adapter, replaced by cave-store-native catalogs"
+
+[[skipped]]
+upstream = "crates/iceberg-catalog-hms/"
+reason   = "Hive Metastore (Thrift) — Java vendor surface, sovereign deployment uses MemoryCatalog / RestCatalog"
+
+[[skipped]]
+upstream = "crates/iceberg-catalog-sql/"
+reason   = "SQL catalog backed by sqlx — Postgres impl is in cave-rdbms-operator; defer wiring to v0.2"
+
+[[skipped]]
+upstream = "crates/iceberg-datafusion/"
+reason   = "Iceberg ↔ DataFusion adapter — sibling crate cave-datafusion lives in this workspace; cross-crate adapter lands in lakehouse-ray-2"
+
+[[skipped]]
+upstream = "crates/iceberg-integration-tests/"
+reason   = "Integration test harness against external services (REST server, MinIO) — replaced by cave-store-native test fixtures"
+
+# ─── Unmapped (2) — honest port gaps for lakehouse-ray-2 ─────────────────────
+
+[[unmapped]]
+upstream = "crates/iceberg/src/writer/"
+reason   = "Data file writer (Parquet/Avro/ORC write paths). MVP is read-side only per user-explicit scope cut."
+
+[[unmapped]]
+upstream = "crates/iceberg/src/transaction.rs"
+reason   = "Transaction commit coordinator — depends on the writer module. Manifest-list rewrite + atomic metadata-pointer-swap is sketched in MemoryCatalog::replace_table_metadata but full ACID against object-store needs the writer first."
+
+# ─── Scope cuts ───────────────────────────────────────────────────────────────
+
+[[scope_cuts]]
+area = "write-side"
+deferred_to = "lakehouse-ray-2"
+reason = "Data-file writer + transaction commit coordinator. User MVP directive is read-heavy; writes deferred."
+
+[[scope_cuts]]
+area = "avro-wire"
+deferred_to = "lakehouse-ray-2"
+reason = "On-disk Avro codec for manifests + manifest-lists. The in-memory shapes round-trip JSON today; Avro on-disk requires apache-avro dep + schema reconciliation. Engines pass already-decoded manifests via ScanBuilder::add_manifest() until then."
+
+[[scope_cuts]]
+area = "predicate-pushdown-parquet"
+deferred_to = "lakehouse-ray-2"
+reason = "Row-group-level Parquet pushdown. The Predicate AST evaluates against JSON rows + manifest-recorded value-counts/lower-upper-bounds, but Parquet row-group elimination requires the parquet crate wired in."
+
+[[scope_cuts]]
+area = "format-version-v3"
+deferred_to = "lakehouse-ray-2"
+reason = "Iceberg v3 spec (row-id assignment, deletion vectors, default row) — accept-at-parse-time only; full semantics deferred."
+
+[[scope_cuts]]
+area = "vendor-catalogs"
+deferred_to = "lakehouse-ray-2"
+reason = "Glue / HMS / SQL catalogs — sovereign deployment uses MemoryCatalog + RestCatalog only."
+
+[portal_ui]
+upstream_ui  = "Iceberg REST server admin UI"
+upstream_url = "https://iceberg.apache.org/"
+status       = "deferred"
+priority     = "P2"
+notes        = "cave-portal /admin/lakehouse/iceberg scaffold pending v0.2"
+last_audit   = "2026-05-19"

@@ -2,20 +2,20 @@
 // Copyright 2026 Cave Runtime contributors
 //! SQL type system and value coercion.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::cmp::Ordering;
 
 /// PostgreSQL OID (Object ID) constants for common types.
 pub mod oid {
-    pub const INT4: u32 = 23;       // int
-    pub const INT8: u32 = 20;       // bigint
-    pub const NUMERIC: u32 = 1700;  // numeric
-    pub const TEXT: u32 = 25;       // text
-    pub const VARCHAR: u32 = 1043;  // varchar
-    pub const BOOL: u32 = 16;       // bool
-    pub const DATE: u32 = 1082;     // date
+    pub const INT4: u32 = 23; // int
+    pub const INT8: u32 = 20; // bigint
+    pub const NUMERIC: u32 = 1700; // numeric
+    pub const TEXT: u32 = 25; // text
+    pub const VARCHAR: u32 = 1043; // varchar
+    pub const BOOL: u32 = 16; // bool
+    pub const DATE: u32 = 1082; // date
     pub const TIMESTAMP: u32 = 1114; // timestamp without time zone
-    pub const NULL: u32 = 0;        // null
+    pub const NULL: u32 = 0; // null
 }
 
 /// Rust representation of SQL types.
@@ -86,7 +86,7 @@ pub enum SqlValue {
     Numeric(f64),
     Text(String),
     Bool(bool),
-    Date(String), // "YYYY-MM-DD"
+    Date(String),      // "YYYY-MM-DD"
     Timestamp(String), // "YYYY-MM-DD HH:MM:SS"
 }
 
@@ -238,11 +238,15 @@ impl SqlValue {
             }
             (SqlValue::Bool(b), SqlType::Int4) => Ok(SqlValue::Int4(if *b { 1 } else { 0 })),
             (SqlValue::Bool(b), SqlType::Int8) => Ok(SqlValue::Int8(if *b { 1 } else { 0 })),
-            (SqlValue::Bool(b), SqlType::Text) => {
-                Ok(SqlValue::Text(if *b { "true" } else { "false" }.to_string()))
-            }
+            (SqlValue::Bool(b), SqlType::Text) => Ok(SqlValue::Text(
+                if *b { "true" } else { "false" }.to_string(),
+            )),
             (v, t) if v.type_of() == *t => Ok(v.clone()),
-            _ => Err(format!("cannot coerce {:?} to {:?}", self.type_of(), target)),
+            _ => Err(format!(
+                "cannot coerce {:?} to {:?}",
+                self.type_of(),
+                target
+            )),
         }
     }
 }

@@ -66,13 +66,25 @@ impl PathPattern {
         // Returns matched length for scoring
         match self {
             PathPattern::Exact(p) => {
-                if path == p.as_str() { Some(p.len()) } else { None }
+                if path == p.as_str() {
+                    Some(p.len())
+                } else {
+                    None
+                }
             }
             PathPattern::Prefix(p) => {
-                if path.starts_with(p.as_str()) { Some(p.len()) } else { None }
+                if path.starts_with(p.as_str()) {
+                    Some(p.len())
+                } else {
+                    None
+                }
             }
             PathPattern::Regex(re, _) => {
-                if re.is_match(path) { Some(0) } else { None }
+                if re.is_match(path) {
+                    Some(0)
+                } else {
+                    None
+                }
             }
         }
     }
@@ -198,7 +210,9 @@ pub fn match_request(
                     Some(v) => allowed_values.iter().any(|av| {
                         // Kong supports regex values here
                         if av.starts_with("~*") {
-                            Regex::new(&av[2..]).map(|re| re.is_match(v)).unwrap_or(false)
+                            Regex::new(&av[2..])
+                                .map(|re| re.is_match(v))
+                                .unwrap_or(false)
                         } else {
                             av == v
                         }
@@ -227,8 +241,7 @@ pub fn match_request(
         }
 
         // Score = regex_priority * 1000 + host_specificity * 100 + path_length
-        let score =
-            cr.regex_priority * 1_000 + host_score * 100 + path_len as i64;
+        let score = cr.regex_priority * 1_000 + host_score * 100 + path_len as i64;
 
         let result = MatchResult {
             route_id: cr.route_id,
@@ -282,7 +295,11 @@ mod tests {
     use crate::models::{PathHandling, Protocol, Route};
     use uuid::Uuid;
 
-    fn make_route(paths: Vec<&str>, methods: Option<Vec<&str>>, hosts: Option<Vec<&str>>) -> CompiledRoute {
+    fn make_route(
+        paths: Vec<&str>,
+        methods: Option<Vec<&str>>,
+        hosts: Option<Vec<&str>>,
+    ) -> CompiledRoute {
         let mut r = Route::new(Uuid::new_v4());
         r.paths = Some(paths.into_iter().map(String::from).collect());
         r.methods = methods.map(|ms| ms.into_iter().map(String::from).collect());
@@ -294,7 +311,15 @@ mod tests {
     fn test_prefix_match() {
         let compiled = vec![make_route(vec!["/api"], None, None)];
         let hdrs = HashMap::new();
-        let res = match_request(&compiled, "GET", "example.com", "/api/users", &hdrs, &Protocol::Http, None);
+        let res = match_request(
+            &compiled,
+            "GET",
+            "example.com",
+            "/api/users",
+            &hdrs,
+            &Protocol::Http,
+            None,
+        );
         assert!(res.is_some());
         assert_eq!(res.unwrap().matched_path_len, 4);
     }
@@ -303,7 +328,15 @@ mod tests {
     fn test_no_match_wrong_path() {
         let compiled = vec![make_route(vec!["/api"], None, None)];
         let hdrs = HashMap::new();
-        let res = match_request(&compiled, "GET", "example.com", "/other", &hdrs, &Protocol::Http, None);
+        let res = match_request(
+            &compiled,
+            "GET",
+            "example.com",
+            "/other",
+            &hdrs,
+            &Protocol::Http,
+            None,
+        );
         assert!(res.is_none());
     }
 
@@ -311,7 +344,15 @@ mod tests {
     fn test_host_match() {
         let compiled = vec![make_route(vec!["/"], None, Some(vec!["api.example.com"]))];
         let hdrs = HashMap::new();
-        let res = match_request(&compiled, "GET", "api.example.com", "/foo", &hdrs, &Protocol::Http, None);
+        let res = match_request(
+            &compiled,
+            "GET",
+            "api.example.com",
+            "/foo",
+            &hdrs,
+            &Protocol::Http,
+            None,
+        );
         assert!(res.is_some());
     }
 
@@ -319,9 +360,25 @@ mod tests {
     fn test_wildcard_host() {
         let compiled = vec![make_route(vec!["/"], None, Some(vec!["*.example.com"]))];
         let hdrs = HashMap::new();
-        let res = match_request(&compiled, "GET", "api.example.com", "/foo", &hdrs, &Protocol::Http, None);
+        let res = match_request(
+            &compiled,
+            "GET",
+            "api.example.com",
+            "/foo",
+            &hdrs,
+            &Protocol::Http,
+            None,
+        );
         assert!(res.is_some());
-        let res2 = match_request(&compiled, "GET", "other.io", "/foo", &hdrs, &Protocol::Http, None);
+        let res2 = match_request(
+            &compiled,
+            "GET",
+            "other.io",
+            "/foo",
+            &hdrs,
+            &Protocol::Http,
+            None,
+        );
         assert!(res2.is_none());
     }
 
@@ -329,9 +386,25 @@ mod tests {
     fn test_method_filter() {
         let compiled = vec![make_route(vec!["/"], Some(vec!["POST"]), None)];
         let hdrs = HashMap::new();
-        let res = match_request(&compiled, "GET", "example.com", "/", &hdrs, &Protocol::Http, None);
+        let res = match_request(
+            &compiled,
+            "GET",
+            "example.com",
+            "/",
+            &hdrs,
+            &Protocol::Http,
+            None,
+        );
         assert!(res.is_none());
-        let res2 = match_request(&compiled, "POST", "example.com", "/", &hdrs, &Protocol::Http, None);
+        let res2 = match_request(
+            &compiled,
+            "POST",
+            "example.com",
+            "/",
+            &hdrs,
+            &Protocol::Http,
+            None,
+        );
         assert!(res2.is_some());
     }
 
@@ -346,8 +419,16 @@ mod tests {
 
         let compiled = vec![compile_route(&r1), compile_route(&r2)];
         let hdrs = HashMap::new();
-        let res = match_request(&compiled, "GET", "x", "/api/v1/users", &hdrs, &Protocol::Http, None)
-            .unwrap();
+        let res = match_request(
+            &compiled,
+            "GET",
+            "x",
+            "/api/v1/users",
+            &hdrs,
+            &Protocol::Http,
+            None,
+        )
+        .unwrap();
         assert_eq!(res.route_id, r2.id);
     }
 
@@ -376,6 +457,9 @@ mod tests {
             score: 0,
             path_handling: PathHandling::V0,
         };
-        assert_eq!(upstream_path(&m, "/api/users", Some("/v2")), "/v2/api/users");
+        assert_eq!(
+            upstream_path(&m, "/api/users", Some("/v2")),
+            "/v2/api/users"
+        );
     }
 }

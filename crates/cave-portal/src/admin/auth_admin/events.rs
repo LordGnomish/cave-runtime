@@ -6,9 +6,9 @@
 
 use std::collections::BTreeMap;
 
+use super::{AuthAdminError, render_admin_nav, require_platform};
 use crate::admin::permission::RequestCtx;
 use crate::admin::render::{escape, page_shell_full, table_html};
-use super::{render_admin_nav, require_platform, AuthAdminError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventRow {
@@ -105,7 +105,11 @@ pub fn seeded_events() -> Vec<EventRow> {
     ]
 }
 
-pub fn filter_events<'a>(rows: &'a [EventRow], kind: Option<EventKind>, user: Option<&str>) -> Vec<&'a EventRow> {
+pub fn filter_events<'a>(
+    rows: &'a [EventRow],
+    kind: Option<EventKind>,
+    user: Option<&str>,
+) -> Vec<&'a EventRow> {
     rows.iter()
         .filter(|e| kind.map_or(true, |k| e.kind == k))
         .filter(|e| user.map_or(true, |u| e.user.contains(u)))
@@ -124,7 +128,10 @@ pub fn render(ctx: &RequestCtx) -> Result<String, AuthAdminError> {
                 k = e.kind.as_str()
             );
             let err_cell = match &e.error {
-                Some(err) => format!(r#"<code class="text-xs text-red-700">{}</code>"#, escape(err)),
+                Some(err) => format!(
+                    r#"<code class="text-xs text-red-700">{}</code>"#,
+                    escape(err)
+                ),
                 None => "".to_string(),
             };
             vec![
@@ -202,7 +209,11 @@ mod tests {
         let e = seeded_events();
         let filtered = filter_events(&e, Some(EventKind::LoginError), None);
         assert!(!filtered.is_empty());
-        assert!(filtered.iter().all(|x| matches!(x.kind, EventKind::LoginError)));
+        assert!(
+            filtered
+                .iter()
+                .all(|x| matches!(x.kind, EventKind::LoginError))
+        );
     }
 
     #[test]

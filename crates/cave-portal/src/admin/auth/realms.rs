@@ -9,10 +9,10 @@
 
 use std::collections::BTreeMap;
 
+use super::AuthViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
-use super::AuthViewError;
+use crate::admin::state::{AdminState, scope};
 
 /// One realm-row as the operator sees it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,7 +28,9 @@ pub struct RealmRow {
 pub fn list_realms(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<RealmRow>, AuthViewError> {
     ctx.authorise(Permission::AuthSessionsRead)?;
     let mut grouped: BTreeMap<String, RealmRow> = BTreeMap::new();
-    for s in scope(&state.auth_sessions.read().unwrap(), &ctx.tenant, |r| &r.tenant) {
+    for s in scope(&state.auth_sessions.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    }) {
         let row = grouped.entry(s.realm.clone()).or_insert_with(|| RealmRow {
             realm: s.realm.clone(),
             active_sessions: 0,

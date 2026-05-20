@@ -5,10 +5,10 @@
 //!
 //! Upstream: <https://dependencytrack.org/docs/glossary/#portfolio>
 
+use super::SbomViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, SbomComponent};
-use super::SbomViewError;
+use crate::admin::state::{AdminState, SbomComponent, scope};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PortfolioRow {
@@ -20,14 +20,13 @@ pub struct PortfolioRow {
 
 pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<PortfolioRow>, SbomViewError> {
     ctx.authorise(Permission::SbomRead)?;
-    let rows: Vec<SbomComponent> = scope(
-        &state.sbom_components.read().unwrap(),
-        &ctx.tenant,
-        |r| &r.tenant,
-    )
-    .into_iter()
-    .cloned()
-    .collect();
+    let rows: Vec<SbomComponent> =
+        scope(&state.sbom_components.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     use std::collections::BTreeMap;
     let mut by_image: BTreeMap<String, (usize, usize, f64)> = BTreeMap::new();
     for r in &rows {
@@ -63,12 +62,14 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SbomViewEr
     let total = total_inherited_risk(&rows);
     let table_rows: Vec<Vec<String>> = rows
         .iter()
-        .map(|r| vec![
-            escape(&r.image),
-            r.component_count.to_string(),
-            r.vulnerable.to_string(),
-            format!("{:.1}", r.inherited_risk_score),
-        ])
+        .map(|r| {
+            vec![
+                escape(&r.image),
+                r.component_count.to_string(),
+                r.vulnerable.to_string(),
+                format!("{:.1}", r.inherited_risk_score),
+            ]
+        })
         .collect();
     let body = format!(
         r#"<section>
@@ -76,8 +77,12 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SbomViewEr
   <p class="text-sm text-gray-600 mb-3">Inherited Risk Score: <strong>{total:.1}</strong> across {n} projects. Weights: critical=10, high=5, medium=3 (Dependency-Track default).</p>
   {tbl}
 </section>"#,
-        total = total, n = rows.len(),
-        tbl = table(&["project", "components", "vulnerable", "risk"], &table_rows),
+        total = total,
+        n = rows.len(),
+        tbl = table(
+            &["project", "components", "vulnerable", "risk"],
+            &table_rows
+        ),
     );
     Ok(page_shell_full(
         ctx,
@@ -90,7 +95,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SbomViewEr
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
+    fn ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer("acme", perms)
+    }
 
     #[test]
     fn list_rejects_no_perm() {

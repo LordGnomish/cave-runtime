@@ -6,7 +6,7 @@
 //! resource. Server returns the same shape as `get` plus events,
 //! conditions, and recent reconcile diffs.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Args;
 
 use super::{HttpVerb, PreparedRequest};
@@ -65,10 +65,7 @@ mod tests {
         let mut a = args("pods", "nginx");
         a.tenant = Some("acme".into());
         let r = prepare(&a).unwrap();
-        assert_eq!(
-            r.path,
-            "/api/native/tenants/acme/pods/nginx?describe=true"
-        );
+        assert_eq!(r.path, "/api/native/tenants/acme/pods/nginx?describe=true");
     }
 
     #[test]
@@ -88,10 +85,7 @@ mod tests {
     #[test]
     fn describe_module() {
         let r = prepare(&args("modules", "cave-apiserver")).unwrap();
-        assert_eq!(
-            r.path,
-            "/api/native/modules/cave-apiserver?describe=true"
-        );
+        assert_eq!(r.path, "/api/native/modules/cave-apiserver?describe=true");
     }
 
     #[test]

@@ -58,10 +58,18 @@ pub enum WatchCacheEvent {
 impl WatchCacheEvent {
     pub fn resource_version(&self) -> u64 {
         match self {
-            WatchCacheEvent::Added { resource_version, .. }
-            | WatchCacheEvent::Modified { resource_version, .. }
-            | WatchCacheEvent::Deleted { resource_version, .. }
-            | WatchCacheEvent::Bookmark { resource_version, .. } => *resource_version,
+            WatchCacheEvent::Added {
+                resource_version, ..
+            }
+            | WatchCacheEvent::Modified {
+                resource_version, ..
+            }
+            | WatchCacheEvent::Deleted {
+                resource_version, ..
+            }
+            | WatchCacheEvent::Bookmark {
+                resource_version, ..
+            } => *resource_version,
         }
     }
 
@@ -116,7 +124,9 @@ pub enum ReplayOutcome {
     /// `since_rv` is below the compacted floor. The watcher must restart
     /// with a full LIST + new resourceVersion (upstream
     /// `apierrors.NewResourceExpired`).
-    Compacted { compacted_to: u64 },
+    Compacted {
+        compacted_to: u64,
+    },
     Events(Vec<WatchCacheEvent>),
 }
 
@@ -178,7 +188,9 @@ impl WatchCache {
     /// events themselves are tenant-tagged.
     pub fn compact(&self, floor: u64) {
         let prev = self.compacted_rv.load(Ordering::SeqCst);
-        if floor <= prev { return; }
+        if floor <= prev {
+            return;
+        }
         self.compacted_rv.store(floor, Ordering::SeqCst);
         let mut inner = self.inner.lock().unwrap();
         inner.events.retain(|e| e.resource_version() > floor);
@@ -195,7 +207,9 @@ impl WatchCache {
     pub fn record_added(&self, tenant_id: &str, resource: Resource) -> u64 {
         let rv = self.next_rv();
         self.push(WatchCacheEvent::Added {
-            resource_version: rv, tenant_id: tenant_id.into(), resource,
+            resource_version: rv,
+            tenant_id: tenant_id.into(),
+            resource,
         });
         rv
     }
@@ -203,7 +217,9 @@ impl WatchCache {
     pub fn record_modified(&self, tenant_id: &str, resource: Resource) -> u64 {
         let rv = self.next_rv();
         self.push(WatchCacheEvent::Modified {
-            resource_version: rv, tenant_id: tenant_id.into(), resource,
+            resource_version: rv,
+            tenant_id: tenant_id.into(),
+            resource,
         });
         rv
     }
@@ -211,7 +227,9 @@ impl WatchCache {
     pub fn record_deleted(&self, tenant_id: &str, resource: Resource) -> u64 {
         let rv = self.next_rv();
         self.push(WatchCacheEvent::Deleted {
-            resource_version: rv, tenant_id: tenant_id.into(), resource,
+            resource_version: rv,
+            tenant_id: tenant_id.into(),
+            resource,
         });
         rv
     }
@@ -221,7 +239,8 @@ impl WatchCache {
     pub fn force_bookmark(&self, tenant_id: &str) -> u64 {
         let rv = self.rv.load(Ordering::SeqCst);
         let bookmark = WatchCacheEvent::Bookmark {
-            resource_version: rv, tenant_id: tenant_id.into(),
+            resource_version: rv,
+            tenant_id: tenant_id.into(),
         };
         {
             let mut inner = self.inner.lock().unwrap();
@@ -247,7 +266,8 @@ impl WatchCache {
             inner.events_since_bookmark += 1;
             if inner.events_since_bookmark >= self.bookmark_interval {
                 let bookmark = WatchCacheEvent::Bookmark {
-                    resource_version: rv, tenant_id: tenant,
+                    resource_version: rv,
+                    tenant_id: tenant,
                 };
                 inner.events.push_back(bookmark.clone());
                 if inner.events.len() > self.capacity {
@@ -269,7 +289,9 @@ impl WatchCache {
     /// Mirrors `cacher.GetEvents(rv)` + per-tenant filter.
     pub fn replay_for_tenant(&self, tenant_id: &str, since_rv: u64) -> Vec<WatchCacheEvent> {
         let inner = self.inner.lock().unwrap();
-        inner.events.iter()
+        inner
+            .events
+            .iter()
             .filter(|e| e.resource_version() > since_rv && e.tenant_id() == tenant_id)
             .cloned()
             .collect()
@@ -279,14 +301,12 @@ impl WatchCache {
     /// `since_rv` is at-or-below the compaction floor — the watcher must
     /// restart with a fresh LIST. Mirrors upstream
     /// `cacher.GetAllEventsSince -> apierrors.NewResourceExpired`.
-    pub fn replay_for_tenant_checked(
-        &self,
-        tenant_id: &str,
-        since_rv: u64,
-    ) -> ReplayOutcome {
+    pub fn replay_for_tenant_checked(&self, tenant_id: &str, since_rv: u64) -> ReplayOutcome {
         let floor = self.compacted_rv.load(Ordering::SeqCst);
         if since_rv < floor {
-            return ReplayOutcome::Compacted { compacted_to: floor };
+            return ReplayOutcome::Compacted {
+                compacted_to: floor,
+            };
         }
         ReplayOutcome::Events(self.replay_for_tenant(tenant_id, since_rv))
     }
@@ -317,15 +337,24 @@ impl WatchCache {
         match match_kind {
             ResourceVersionMatch::Unspecified => {
                 // Empty resourceVersion → most-up-to-date.
-                Ok(ListSelection { serve_at: current, can_serve_from_cache: true })
+                Ok(ListSelection {
+                    serve_at: current,
+                    can_serve_from_cache: true,
+                })
             }
             ResourceVersionMatch::NotOlderThan => {
                 if requested_rv > current {
                     // Consistent read past our cache; caller must wait.
-                    return Err(ListRevisionError::TooNew { requested: requested_rv, current });
+                    return Err(ListRevisionError::TooNew {
+                        requested: requested_rv,
+                        current,
+                    });
                 }
                 if requested_rv < floor && floor > 0 {
-                    return Err(ListRevisionError::Compacted { requested: requested_rv, floor });
+                    return Err(ListRevisionError::Compacted {
+                        requested: requested_rv,
+                        floor,
+                    });
                 }
                 Ok(ListSelection {
                     serve_at: requested_rv.max(floor),
@@ -334,10 +363,16 @@ impl WatchCache {
             }
             ResourceVersionMatch::Exact => {
                 if requested_rv > current {
-                    return Err(ListRevisionError::TooNew { requested: requested_rv, current });
+                    return Err(ListRevisionError::TooNew {
+                        requested: requested_rv,
+                        current,
+                    });
                 }
                 if requested_rv <= floor && floor > 0 {
-                    return Err(ListRevisionError::Compacted { requested: requested_rv, floor });
+                    return Err(ListRevisionError::Compacted {
+                        requested: requested_rv,
+                        floor,
+                    });
                 }
                 Ok(ListSelection {
                     serve_at: requested_rv,
@@ -351,16 +386,15 @@ impl WatchCache {
     /// terminator bookmark carrying the `kubernetes.io/initial-events-end`
     /// annotation. Mirrors upstream
     /// `apiserver/pkg/storage/cacher/cacher.go::watchInitialEvents`.
-    pub fn watch_list_initial(
-        &self,
-        tenant_id: &str,
-    ) -> WatchListBatch {
+    pub fn watch_list_initial(&self, tenant_id: &str) -> WatchListBatch {
         let inner = self.inner.lock().unwrap();
         let rv = self.rv.load(Ordering::SeqCst);
         // Initial state — every Added event still in the cache for this
         // tenant, ordered by RV asc. Skip Modified/Deleted (initial sync
         // semantics).
-        let mut initial: Vec<WatchCacheEvent> = inner.events.iter()
+        let mut initial: Vec<WatchCacheEvent> = inner
+            .events
+            .iter()
             .filter(|e| e.tenant_id() == tenant_id)
             .filter(|e| matches!(e, WatchCacheEvent::Added { .. }))
             .cloned()
@@ -379,7 +413,9 @@ impl WatchCache {
         self.inner.lock().unwrap().events.len()
     }
 
-    pub fn is_empty(&self) -> bool { self.len() == 0 }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 /// `?resourceVersionMatch=` semantics from KEP-1904.
@@ -434,8 +470,10 @@ mod tests {
 
     fn cm(name: &str, ns: &str) -> Resource {
         Resource::ConfigMap(ConfigMap {
-            api_version: "v1".into(), kind: "ConfigMap".into(),
-            metadata: ObjectMeta::new(name, ns), data: HashMap::new(),
+            api_version: "v1".into(),
+            kind: "ConfigMap".into(),
+            metadata: ObjectMeta::new(name, ns),
+            data: HashMap::new(),
         })
     }
 
@@ -449,8 +487,10 @@ mod tests {
         assert_eq!(wc.current_resource_version(), rv2);
         let evs = wc.replay_for_tenant("acme", 0);
         assert_eq!(evs.len(), 2);
-        assert!(evs.iter().all(|e| e.tenant_id() == "acme"),
-            "tenant_id invariant: replay returns only matching tenant events");
+        assert!(
+            evs.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant: replay returns only matching tenant events"
+        );
     }
 
     /// Upstream parity: `TestWatchCache_BookmarkInterval` (KEP-365).
@@ -464,8 +504,11 @@ mod tests {
         let evs = wc.replay_for_tenant("acme", 0);
         let bookmarks: Vec<_> = evs.iter().filter(|e| e.is_bookmark()).collect();
         assert_eq!(bookmarks.len(), 1, "exactly one bookmark after interval");
-        assert_eq!(bookmarks[0].tenant_id(), "acme",
-            "tenant_id invariant: bookmark carries tenant_id");
+        assert_eq!(
+            bookmarks[0].tenant_id(),
+            "acme",
+            "tenant_id invariant: bookmark carries tenant_id"
+        );
     }
 
     /// Upstream parity: `TestWatchCache_BookmarkResourceVersionMatchesLatest`.
@@ -475,9 +518,15 @@ mod tests {
         let _ = wc.record_added("acme", cm("a", "default"));
         let rv2 = wc.record_added("acme", cm("b", "default"));
         let evs = wc.replay_for_tenant("acme", 0);
-        let bm = evs.iter().find(|e| e.is_bookmark()).expect("bookmark present");
-        assert_eq!(bm.resource_version(), rv2,
-            "bookmark rv equals latest event rv");
+        let bm = evs
+            .iter()
+            .find(|e| e.is_bookmark())
+            .expect("bookmark present");
+        assert_eq!(
+            bm.resource_version(),
+            rv2,
+            "bookmark rv equals latest event rv"
+        );
         assert_eq!(bm.tenant_id(), "acme", "tenant_id invariant");
     }
 
@@ -492,10 +541,14 @@ mod tests {
         let globex = wc.replay_for_tenant("globex", 0);
         assert_eq!(acme.len(), 2);
         assert_eq!(globex.len(), 1);
-        assert!(acme.iter().all(|e| e.tenant_id() == "acme"),
-            "tenant_id invariant: no cross-tenant leak");
-        assert!(globex.iter().all(|e| e.tenant_id() == "globex"),
-            "tenant_id invariant: no cross-tenant leak");
+        assert!(
+            acme.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant: no cross-tenant leak"
+        );
+        assert!(
+            globex.iter().all(|e| e.tenant_id() == "globex"),
+            "tenant_id invariant: no cross-tenant leak"
+        );
     }
 
     /// Upstream parity: `TestWatchCache_ForceBookmarkOnHeartbeat`.
@@ -533,12 +586,18 @@ mod tests {
         assert_eq!(wc.len(), 2, "capacity bounded");
         let evs = wc.replay_for_tenant("acme", 0);
         // Oldest evicted, only 'b' and 'c' remain.
-        let names: Vec<_> = evs.iter().filter_map(|e| match e {
-            WatchCacheEvent::Added { resource, .. } => Some(resource.name().to_string()),
-            _ => None,
-        }).collect();
+        let names: Vec<_> = evs
+            .iter()
+            .filter_map(|e| match e {
+                WatchCacheEvent::Added { resource, .. } => Some(resource.name().to_string()),
+                _ => None,
+            })
+            .collect();
         assert!(!names.contains(&"a".to_string()));
-        assert!(evs.iter().all(|e| e.tenant_id() == "acme"), "tenant_id invariant");
+        assert!(
+            evs.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant"
+        );
     }
 
     /// Upstream parity: `TestWatchCache_ModifyAndDelete`.
@@ -552,7 +611,10 @@ mod tests {
         assert!(matches!(evs[0], WatchCacheEvent::Added { .. }));
         assert!(matches!(evs[1], WatchCacheEvent::Modified { .. }));
         assert!(matches!(evs[2], WatchCacheEvent::Deleted { .. }));
-        assert!(evs.iter().all(|e| e.tenant_id() == "acme"), "tenant_id invariant");
+        assert!(
+            evs.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant"
+        );
     }
 
     // ── Deeper coverage (v1.36.0) ─────────────────────────────────────────────
@@ -565,13 +627,17 @@ mod tests {
         let _rv1 = wc.record_added("acme", cm("a", "default"));
         let rv2 = wc.record_added("acme", cm("b", "default"));
         let from_latest = wc.replay_for_tenant("acme", rv2);
-        assert!(from_latest.is_empty(),
-            "no events strictly newer than latest RV");
+        assert!(
+            from_latest.is_empty(),
+            "no events strictly newer than latest RV"
+        );
         // tenant_id invariant smoke: empty result still scoped to acme query.
         let _ = wc.record_added("globex", cm("x", "default"));
         let after = wc.replay_for_tenant("acme", rv2);
-        assert!(after.iter().all(|e| e.tenant_id() == "acme"),
-            "tenant_id invariant: globex event must not appear in acme replay");
+        assert!(
+            after.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant: globex event must not appear in acme replay"
+        );
     }
 
     /// Upstream parity: `TestWatchCache_ConcurrentMultiTenantOrdering`
@@ -592,13 +658,20 @@ mod tests {
                 }
             }));
         }
-        for h in handles { h.join().unwrap(); }
-        assert_eq!(wc.current_resource_version(), 60,
-            "60 writes total — RV monotonic + atomic");
+        for h in handles {
+            h.join().unwrap();
+        }
+        assert_eq!(
+            wc.current_resource_version(),
+            60,
+            "60 writes total — RV monotonic + atomic"
+        );
         let acme = wc.replay_for_tenant("acme", 0);
         assert_eq!(acme.iter().filter(|e| !e.is_bookmark()).count(), 20);
-        assert!(acme.iter().all(|e| e.tenant_id() == "acme"),
-            "tenant_id invariant: no cross-tenant bleed under concurrency");
+        assert!(
+            acme.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant: no cross-tenant bleed under concurrency"
+        );
     }
 
     /// Upstream parity: `TestWatchCache_ForceBookmarkPerTenantIsolated`
@@ -613,10 +686,14 @@ mod tests {
         let globex = wc.replay_for_tenant("globex", 0);
         let acme_bookmarks = acme.iter().filter(|e| e.is_bookmark()).count();
         let globex_bookmarks = globex.iter().filter(|e| e.is_bookmark()).count();
-        assert_eq!(acme_bookmarks, 1,
-            "force_bookmark on acme creates exactly one acme-tagged bookmark");
-        assert_eq!(globex_bookmarks, 0,
-            "tenant_id invariant: globex must not receive acme's heartbeat");
+        assert_eq!(
+            acme_bookmarks, 1,
+            "force_bookmark on acme creates exactly one acme-tagged bookmark"
+        );
+        assert_eq!(
+            globex_bookmarks, 0,
+            "tenant_id invariant: globex must not receive acme's heartbeat"
+        );
         assert!(acme.iter().all(|e| e.tenant_id() == "acme"));
     }
 
@@ -633,10 +710,14 @@ mod tests {
         wc.record_added("acme", cm("d", "default"));
         let evs = wc.replay_for_tenant("acme", 0);
         let bms = evs.iter().filter(|e| e.is_bookmark()).count();
-        assert_eq!(bms, 2,
-            "interval counter resets after each bookmark — expect two over four writes");
-        assert!(evs.iter().all(|e| e.tenant_id() == "acme"),
-            "tenant_id invariant across multiple bookmark emissions");
+        assert_eq!(
+            bms, 2,
+            "interval counter resets after each bookmark — expect two over four writes"
+        );
+        assert!(
+            evs.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant across multiple bookmark emissions"
+        );
     }
 
     /// Upstream parity: `TestWatchCache_BookmarkAccessorsExposeTenant`
@@ -647,10 +728,16 @@ mod tests {
         wc.record_added("acme", cm("a", "default"));
         let rv = wc.force_bookmark("acme");
         let evs = wc.replay_for_tenant("acme", 0);
-        let bm = evs.iter().find(|e| e.is_bookmark()).expect("bookmark present");
+        let bm = evs
+            .iter()
+            .find(|e| e.is_bookmark())
+            .expect("bookmark present");
         assert!(bm.is_bookmark());
-        assert_eq!(bm.tenant_id(), "acme",
-            "tenant_id invariant: accessor returns scoped tenant");
+        assert_eq!(
+            bm.tenant_id(),
+            "acme",
+            "tenant_id invariant: accessor returns scoped tenant"
+        );
         assert_eq!(bm.resource_version(), rv);
     }
 
@@ -662,11 +749,15 @@ mod tests {
         wc.record_added("acme", cm("a", "default"));
         wc.record_added("globex", cm("b", "default"));
         let unknown = wc.replay_for_tenant("missing-tenant", 0);
-        assert!(unknown.is_empty(),
-            "tenant_id invariant: unknown tenant gets empty replay, never bleed");
+        assert!(
+            unknown.is_empty(),
+            "tenant_id invariant: unknown tenant gets empty replay, never bleed"
+        );
         let acme = wc.replay_for_tenant("acme", 0);
-        assert!(acme.iter().all(|e| e.tenant_id() == "acme"),
-            "tenant_id invariant: only acme entries returned");
+        assert!(
+            acme.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant: only acme entries returned"
+        );
     }
 
     // ── Restart + event compaction (deeper-003) ──────────────────────────────
@@ -681,15 +772,22 @@ mod tests {
         let rv2 = wc.record_added("acme", cm("b", "default"));
         let rv3 = wc.record_added("acme", cm("c", "default"));
         wc.compact(rv2);
-        assert_eq!(wc.compacted_revision(), rv2,
-            "compaction floor advanced to requested rv");
+        assert_eq!(
+            wc.compacted_revision(),
+            rv2,
+            "compaction floor advanced to requested rv"
+        );
         let evs = wc.replay_for_tenant("acme", 0);
         // Only events strictly newer than the floor remain — rv3 stays.
         assert!(evs.iter().any(|e| e.resource_version() == rv3));
-        assert!(!evs.iter().any(|e| e.resource_version() <= rv2),
-            "no event at-or-below floor remains in cache");
-        assert!(evs.iter().all(|e| e.tenant_id() == "acme"),
-            "tenant_id invariant: trimming preserves tenant scoping");
+        assert!(
+            !evs.iter().any(|e| e.resource_version() <= rv2),
+            "no event at-or-below floor remains in cache"
+        );
+        assert!(
+            evs.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant: trimming preserves tenant scoping"
+        );
     }
 
     /// Upstream parity: `TestWatchCache_ReplayFromBelowFloorReturnsCompacted`
@@ -714,8 +812,10 @@ mod tests {
         // is not tenant-bearing, so this only proves the signal is uniform,
         // not a leak. Verify the per-tenant payload path is still empty.
         let g = wc.replay_for_tenant_checked("globex", rv2);
-        assert!(matches!(g, ReplayOutcome::Events(ref v) if v.is_empty()),
-            "tenant_id invariant: globex sees no acme events post-compaction");
+        assert!(
+            matches!(g, ReplayOutcome::Events(ref v) if v.is_empty()),
+            "tenant_id invariant: globex sees no acme events post-compaction"
+        );
     }
 
     /// Upstream parity: `TestWatchCache_ReplayAtOrAboveFloorReturnsEvents`
@@ -732,8 +832,11 @@ mod tests {
             ReplayOutcome::Events(evs) => {
                 assert_eq!(evs.len(), 1, "exactly one event > rv2 remains");
                 assert_eq!(evs[0].resource_version(), rv3);
-                assert_eq!(evs[0].tenant_id(), "acme",
-                    "tenant_id invariant on event reachable above floor");
+                assert_eq!(
+                    evs[0].tenant_id(),
+                    "acme",
+                    "tenant_id invariant on event reachable above floor"
+                );
             }
             ReplayOutcome::Compacted { .. } => panic!("rv2 == floor must not be Compacted"),
         }
@@ -751,16 +854,28 @@ mod tests {
         wc.compact(rv2);
         let restart = wc.restart_for_tenant("acme");
         assert!(matches!(restart, WatchCacheEvent::Bookmark { .. }));
-        assert_eq!(restart.resource_version(), rv2,
-            "restart bookmark carries the current RV (post-compaction)");
-        assert_eq!(restart.tenant_id(), "acme",
-            "tenant_id invariant: restart bookmark scoped to caller");
+        assert_eq!(
+            restart.resource_version(),
+            rv2,
+            "restart bookmark carries the current RV (post-compaction)"
+        );
+        assert_eq!(
+            restart.tenant_id(),
+            "acme",
+            "tenant_id invariant: restart bookmark scoped to caller"
+        );
         // Globex restart returns its own bookmark, not acme's.
         let g_restart = wc.restart_for_tenant("globex");
-        assert_eq!(g_restart.tenant_id(), "globex",
-            "tenant_id invariant: globex restart distinct from acme");
-        assert_eq!(g_restart.resource_version(), rv2,
-            "RV is global but the bookmark is tenant-tagged");
+        assert_eq!(
+            g_restart.tenant_id(),
+            "globex",
+            "tenant_id invariant: globex restart distinct from acme"
+        );
+        assert_eq!(
+            g_restart.resource_version(),
+            rv2,
+            "RV is global but the bookmark is tenant-tagged"
+        );
     }
 
     /// Upstream parity: `TestWatchCache_CompactBelowFloorIsNoop`
@@ -773,13 +888,18 @@ mod tests {
         wc.compact(rv2);
         assert_eq!(wc.compacted_revision(), rv2);
         wc.compact(0); // earlier revision — must be ignored
-        assert_eq!(wc.compacted_revision(), rv2,
-            "compaction floor is monotonic; lower floor MUST NOT take effect");
+        assert_eq!(
+            wc.compacted_revision(),
+            rv2,
+            "compaction floor is monotonic; lower floor MUST NOT take effect"
+        );
         // tenant_id invariant smoke: subsequent acme writes still tagged.
         let _ = wc.record_added("acme", cm("d", "default"));
         let evs = wc.replay_for_tenant("acme", rv2);
-        assert!(evs.iter().all(|e| e.tenant_id() == "acme"),
-            "tenant_id invariant retained after monotonic-floor check");
+        assert!(
+            evs.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant retained after monotonic-floor check"
+        );
     }
 
     // ── Deeper coverage (deeper-005) — KEP-956 + KEP-1904 ────────────────────
@@ -791,9 +911,13 @@ mod tests {
         let wc = WatchCache::new(64, 1000);
         wc.record_added("acme", cm("a", "default"));
         let rv2 = wc.record_added("acme", cm("b", "default"));
-        let sel = wc.select_list_revision(0, ResourceVersionMatch::Unspecified).unwrap();
-        assert_eq!(sel.serve_at, rv2,
-            "Unspecified match → server returns current RV");
+        let sel = wc
+            .select_list_revision(0, ResourceVersionMatch::Unspecified)
+            .unwrap();
+        assert_eq!(
+            sel.serve_at, rv2,
+            "Unspecified match → server returns current RV"
+        );
         assert!(sel.can_serve_from_cache);
         // tenant_id invariant smoke: select_list_revision is RV-only,
         // no tenant scoping at this layer.
@@ -807,7 +931,8 @@ mod tests {
         let wc = WatchCache::new(64, 1000);
         wc.record_added("acme", cm("a", "default"));
         let rv2 = wc.record_added("acme", cm("b", "default"));
-        let err = wc.select_list_revision(rv2 + 100, ResourceVersionMatch::NotOlderThan)
+        let err = wc
+            .select_list_revision(rv2 + 100, ResourceVersionMatch::NotOlderThan)
             .unwrap_err();
         match err {
             ListRevisionError::TooNew { requested, current } => {
@@ -826,7 +951,8 @@ mod tests {
         let rv1 = wc.record_added("acme", cm("a", "default"));
         let rv2 = wc.record_added("acme", cm("b", "default"));
         wc.compact(rv2);
-        let err = wc.select_list_revision(rv1, ResourceVersionMatch::Exact)
+        let err = wc
+            .select_list_revision(rv1, ResourceVersionMatch::Exact)
             .unwrap_err();
         match err {
             ListRevisionError::Compacted { requested, floor } => {
@@ -844,7 +970,9 @@ mod tests {
         let wc = WatchCache::new(64, 1000);
         wc.record_added("acme", cm("a", "default"));
         let rv2 = wc.record_added("acme", cm("b", "default"));
-        let sel = wc.select_list_revision(rv2, ResourceVersionMatch::Exact).unwrap();
+        let sel = wc
+            .select_list_revision(rv2, ResourceVersionMatch::Exact)
+            .unwrap();
         assert_eq!(sel.serve_at, rv2);
         assert!(sel.can_serve_from_cache);
     }
@@ -859,15 +987,24 @@ mod tests {
         wc.record_added("acme", cm("b", "default"));
         wc.record_added("globex", cm("c", "default"));
         let acme_batch = wc.watch_list_initial("acme");
-        assert_eq!(acme_batch.initial.len(), 2,
-            "initial stream contains acme's two Added events");
-        assert!(acme_batch.initial.iter().all(|e| e.tenant_id() == "acme"),
-            "tenant_id invariant: globex's event MUST NOT appear in acme's WatchList");
-        assert_eq!(acme_batch.terminator.tenant_id, "acme",
-            "tenant_id invariant: terminator bookmark scoped to acme");
-        assert_eq!(InitialEventsEndBookmark::ANNOTATION,
+        assert_eq!(
+            acme_batch.initial.len(),
+            2,
+            "initial stream contains acme's two Added events"
+        );
+        assert!(
+            acme_batch.initial.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant: globex's event MUST NOT appear in acme's WatchList"
+        );
+        assert_eq!(
+            acme_batch.terminator.tenant_id, "acme",
+            "tenant_id invariant: terminator bookmark scoped to acme"
+        );
+        assert_eq!(
+            InitialEventsEndBookmark::ANNOTATION,
             "k8s.io/initial-events-end",
-            "annotation name matches KEP-956");
+            "annotation name matches KEP-956"
+        );
     }
 
     /// Upstream parity: `TestWatchList_TerminatorRvEqualsCurrent`
@@ -879,10 +1016,14 @@ mod tests {
         wc.record_added("acme", cm("a", "default"));
         let rv2 = wc.record_added("acme", cm("b", "default"));
         let batch = wc.watch_list_initial("acme");
-        assert_eq!(batch.terminator.resource_version, rv2,
-            "terminator RV equals the current cache RV at the time of stream");
-        assert_eq!(batch.terminator.tenant_id, "acme",
-            "tenant_id invariant: terminator scoped to caller");
+        assert_eq!(
+            batch.terminator.resource_version, rv2,
+            "terminator RV equals the current cache RV at the time of stream"
+        );
+        assert_eq!(
+            batch.terminator.tenant_id, "acme",
+            "tenant_id invariant: terminator scoped to caller"
+        );
     }
 
     // ── F2-B: live fan-out via cave_kernel::eventbus::EventBus ───────────────
@@ -900,10 +1041,16 @@ mod tests {
         let rv = wc.record_added("acme", cm("a", "default"));
         let ev = sub.recv().await.unwrap();
         match ev {
-            WatchCacheEvent::Added { resource_version, tenant_id, .. } => {
+            WatchCacheEvent::Added {
+                resource_version,
+                tenant_id,
+                ..
+            } => {
                 assert_eq!(resource_version, rv);
-                assert_eq!(tenant_id, "acme",
-                    "tenant_id invariant: live event carries scoped tenant");
+                assert_eq!(
+                    tenant_id, "acme",
+                    "tenant_id invariant: live event carries scoped tenant"
+                );
             }
             other => panic!("expected Added, got {:?}", other),
         }
@@ -918,16 +1065,22 @@ mod tests {
         let mut a = wc.subscribe();
         let mut b = wc.subscribe();
         let mut c = wc.subscribe();
-        assert_eq!(wc.subscriber_count(), 3,
-            "subscriber_count tracks active live tailers");
+        assert_eq!(
+            wc.subscriber_count(),
+            3,
+            "subscriber_count tracks active live tailers"
+        );
         wc.record_added("acme", cm("x", "default"));
         let ea = a.recv().await.unwrap();
         let eb = b.recv().await.unwrap();
         let ec = c.recv().await.unwrap();
         assert_eq!(ea.tenant_id(), "acme");
         assert_eq!(eb.tenant_id(), "acme");
-        assert_eq!(ec.tenant_id(), "acme",
-            "tenant_id invariant: every fan-out copy carries the same tenant");
+        assert_eq!(
+            ec.tenant_id(),
+            "acme",
+            "tenant_id invariant: every fan-out copy carries the same tenant"
+        );
     }
 
     /// Multi-tenant isolation at the consumer side: subscribers see all
@@ -951,10 +1104,14 @@ mod tests {
                 other => panic!("unknown tenant {other}"),
             }
         }
-        assert_eq!(acme_seen, 2,
-            "tenant_id invariant: acme tailer would see exactly two acme events");
-        assert_eq!(globex_seen, 1,
-            "tenant_id invariant: globex tailer would see exactly one globex event");
+        assert_eq!(
+            acme_seen, 2,
+            "tenant_id invariant: acme tailer would see exactly two acme events"
+        );
+        assert_eq!(
+            globex_seen, 1,
+            "tenant_id invariant: globex tailer would see exactly one globex event"
+        );
     }
 
     /// Lag detection: when a subscriber falls behind the live bus capacity,
@@ -970,14 +1127,20 @@ mod tests {
             wc.record_added("acme", cm(&format!("k{i}"), "default"));
         }
         let err = sub.recv().await.unwrap_err();
-        assert!(matches!(err, EventBusError::Lagged(_)),
-            "lagged subscriber receives Lagged signal, not silent drop");
+        assert!(
+            matches!(err, EventBusError::Lagged(_)),
+            "lagged subscriber receives Lagged signal, not silent drop"
+        );
         // Replay buffer untouched — recovery via replay_for_tenant works.
         let evs = wc.replay_for_tenant("acme", 0);
-        assert!(evs.iter().filter(|e| !e.is_bookmark()).count() >= 10,
-            "ring buffer retains history independently of live-bus capacity");
-        assert!(evs.iter().all(|e| e.tenant_id() == "acme"),
-            "tenant_id invariant retained on recovery replay");
+        assert!(
+            evs.iter().filter(|e| !e.is_bookmark()).count() >= 10,
+            "ring buffer retains history independently of live-bus capacity"
+        );
+        assert!(
+            evs.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant retained on recovery replay"
+        );
     }
 
     /// Capacity-rotation independence: live-bus capacity is decoupled from
@@ -998,12 +1161,17 @@ mod tests {
         let mut received = 0;
         for _ in 0..5 {
             let ev = sub.recv().await.unwrap();
-            assert_eq!(ev.tenant_id(), "acme",
-                "tenant_id invariant: live event scoped to producer");
+            assert_eq!(
+                ev.tenant_id(),
+                "acme",
+                "tenant_id invariant: live event scoped to producer"
+            );
             received += 1;
         }
-        assert_eq!(received, 5,
-            "live tailer never starves on a small ring buffer when live bus has capacity");
+        assert_eq!(
+            received, 5,
+            "live tailer never starves on a small ring buffer when live bus has capacity"
+        );
     }
 
     /// Bookmark events are fanned out on the live bus alongside ring-buffer
@@ -1019,8 +1187,11 @@ mod tests {
         let ev = sub.recv().await.unwrap();
         assert!(ev.is_bookmark(), "live bus delivers Bookmark event");
         assert_eq!(ev.resource_version(), rv);
-        assert_eq!(ev.tenant_id(), "acme",
-            "tenant_id invariant: bookmark scoped on live bus");
+        assert_eq!(
+            ev.tenant_id(),
+            "acme",
+            "tenant_id invariant: bookmark scoped on live bus"
+        );
     }
 
     /// Interval bookmarks (every N events) ride the live bus too so live
@@ -1038,8 +1209,11 @@ mod tests {
         assert!(matches!(e1, WatchCacheEvent::Added { .. }));
         assert!(matches!(e2, WatchCacheEvent::Added { .. }));
         assert!(e3.is_bookmark(), "interval bookmark fanned out live");
-        assert_eq!(e3.tenant_id(), "acme",
-            "tenant_id invariant: interval bookmark scoped to producer");
+        assert_eq!(
+            e3.tenant_id(),
+            "acme",
+            "tenant_id invariant: interval bookmark scoped to producer"
+        );
     }
 
     /// `try_recv` surfaces backpressure semantics: `Ok(None)` when empty,
@@ -1049,12 +1223,17 @@ mod tests {
     async fn test_try_recv_returns_none_when_no_events() {
         let wc = WatchCache::new(64, 1000);
         let mut sub = wc.subscribe();
-        assert!(matches!(sub.try_recv(), Ok(None)),
-            "no events queued → Ok(None)");
+        assert!(
+            matches!(sub.try_recv(), Ok(None)),
+            "no events queued → Ok(None)"
+        );
         wc.record_added("acme", cm("a", "default"));
         match sub.try_recv() {
-            Ok(Some(ev)) => assert_eq!(ev.tenant_id(), "acme",
-                "tenant_id invariant: try_recv yields scoped event"),
+            Ok(Some(ev)) => assert_eq!(
+                ev.tenant_id(),
+                "acme",
+                "tenant_id invariant: try_recv yields scoped event"
+            ),
             other => panic!("expected Ok(Some(_)), got {:?}", other.map(|_| "value")),
         }
     }
@@ -1071,8 +1250,11 @@ mod tests {
         let ev = sub.recv().await.unwrap();
         match ev {
             WatchCacheEvent::Added { resource, .. } => {
-                assert_eq!(resource.name(), "post-sub",
-                    "subscriber sees only events after subscribe()");
+                assert_eq!(
+                    resource.name(),
+                    "post-sub",
+                    "subscriber sees only events after subscribe()"
+                );
             }
             other => panic!("expected Added(post-sub), got {:?}", other),
         }
@@ -1089,15 +1271,13 @@ mod tests {
         let producer = wc.clone();
         let h1 = tokio::task::spawn_blocking(move || {
             for i in 0..30u32 {
-                producer.record_added("acme",
-                    cm(&format!("a{i}"), "default"));
+                producer.record_added("acme", cm(&format!("a{i}"), "default"));
             }
         });
         let producer2 = wc.clone();
         let h2 = tokio::task::spawn_blocking(move || {
             for i in 0..30u32 {
-                producer2.record_added("globex",
-                    cm(&format!("g{i}"), "default"));
+                producer2.record_added("globex", cm(&format!("g{i}"), "default"));
             }
         });
         h1.await.unwrap();
@@ -1117,8 +1297,11 @@ mod tests {
         }
         assert!(acme_count > 0, "acme writes reached the live bus");
         assert!(globex_count > 0, "globex writes reached the live bus");
-        assert_eq!(acme_count + globex_count, 60,
-            "tenant_id invariant: every received event accounted to its producer");
+        assert_eq!(
+            acme_count + globex_count,
+            60,
+            "tenant_id invariant: every received event accounted to its producer"
+        );
     }
 
     /// `subscriber_count` reflects only currently-live subscriptions; dropping
@@ -1131,8 +1314,11 @@ mod tests {
         let s2 = wc.subscribe();
         assert_eq!(wc.subscriber_count(), 2);
         drop(s1);
-        assert_eq!(wc.subscriber_count(), 1,
-            "drop releases the live-bus slot immediately");
+        assert_eq!(
+            wc.subscriber_count(),
+            1,
+            "drop releases the live-bus slot immediately"
+        );
         drop(s2);
         assert_eq!(wc.subscriber_count(), 0);
     }
@@ -1150,9 +1336,13 @@ mod tests {
         assert!(rv > 0);
         // Replay still works for retrospective reads.
         let evs = wc.replay_for_tenant("acme", 0);
-        assert!(evs.iter().any(|e| !e.is_bookmark()),
-            "ring buffer recorded the event even without live tailers");
-        assert!(evs.iter().all(|e| e.tenant_id() == "acme"),
-            "tenant_id invariant in no-subscriber path");
+        assert!(
+            evs.iter().any(|e| !e.is_bookmark()),
+            "ring buffer recorded the event even without live tailers"
+        );
+        assert!(
+            evs.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant in no-subscriber path"
+        );
     }
 }

@@ -46,12 +46,12 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-pub use classifier::{classify_file, FileKind};
+pub use classifier::{FileKind, classify_file};
 pub use git_inspector::{
     CommitInfo, FileChange, FileChangeKind, GitError, GitInspector, ShellGitInspector,
 };
-pub use stub_scan::{scan_path, scan_stubs, StubFinding, StubKind};
-pub use tdd_analyzer::{analyze_tdd_compliance, scan_ignore_in_body, TddAnalyzer};
+pub use stub_scan::{StubFinding, StubKind, scan_path, scan_stubs};
+pub use tdd_analyzer::{TddAnalyzer, analyze_tdd_compliance, scan_ignore_in_body};
 
 /// TDD-strict mode verdict. All four booleans must be true for the gate to
 /// pass; `details` records the supporting evidence.

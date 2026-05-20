@@ -14,9 +14,8 @@ use crate::{
 ///
 /// Supports: $ORIGIN, $TTL directives and standard RR lines.
 pub fn load_zone_file(path: &Path, origin: &Name) -> DnsResult<Zone> {
-    let content = std::fs::read_to_string(path).map_err(|e| {
-        DnsError::Zone(format!("cannot read zone file {}: {}", path.display(), e))
-    })?;
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| DnsError::Zone(format!("cannot read zone file {}: {}", path.display(), e)))?;
 
     parse_zone_content(&content, origin)
 }
@@ -76,9 +75,8 @@ pub fn parse_zone_content(content: &str, origin: &Name) -> DnsResult<Zone> {
         }
     }
 
-    let soa = soa_record.ok_or_else(|| {
-        DnsError::Zone("no SOA record found in zone file".into())
-    })?;
+    let soa =
+        soa_record.ok_or_else(|| DnsError::Zone("no SOA record found in zone file".into()))?;
 
     let mut zone = Zone::new(current_origin, soa, ZoneType::Primary);
     for r in records {
@@ -202,11 +200,21 @@ fn parse_rdata(rtype: RecordType, s: &str, origin: &Name) -> DnsResult<RData> {
             }
             let mname = resolve_name(parts[0], origin)?;
             let rname = resolve_name(parts[1], origin)?;
-            let serial: u32 = parts[2].parse().map_err(|e: std::num::ParseIntError| DnsError::Parse(e.to_string()))?;
-            let refresh: i32 = parts[3].parse().map_err(|e: std::num::ParseIntError| DnsError::Parse(e.to_string()))?;
-            let retry: i32 = parts[4].parse().map_err(|e: std::num::ParseIntError| DnsError::Parse(e.to_string()))?;
-            let expire: i32 = parts[5].parse().map_err(|e: std::num::ParseIntError| DnsError::Parse(e.to_string()))?;
-            let minimum: u32 = parts[6].parse().map_err(|e: std::num::ParseIntError| DnsError::Parse(e.to_string()))?;
+            let serial: u32 = parts[2]
+                .parse()
+                .map_err(|e: std::num::ParseIntError| DnsError::Parse(e.to_string()))?;
+            let refresh: i32 = parts[3]
+                .parse()
+                .map_err(|e: std::num::ParseIntError| DnsError::Parse(e.to_string()))?;
+            let retry: i32 = parts[4]
+                .parse()
+                .map_err(|e: std::num::ParseIntError| DnsError::Parse(e.to_string()))?;
+            let expire: i32 = parts[5]
+                .parse()
+                .map_err(|e: std::num::ParseIntError| DnsError::Parse(e.to_string()))?;
+            let minimum: u32 = parts[6]
+                .parse()
+                .map_err(|e: std::num::ParseIntError| DnsError::Parse(e.to_string()))?;
             Ok(RData::SOA(hickory_proto::rr::rdata::SOA::new(
                 mname, rname, serial, refresh, retry, expire, minimum,
             )))
@@ -216,15 +224,25 @@ fn parse_rdata(rtype: RecordType, s: &str, origin: &Name) -> DnsResult<RData> {
             if parts.len() < 4 {
                 return Err(DnsError::Parse(format!("SRV too few fields: {s}")));
             }
-            let priority: u16 = parts[0].parse().map_err(|e: std::num::ParseIntError| DnsError::Parse(e.to_string()))?;
-            let weight: u16 = parts[1].parse().map_err(|e: std::num::ParseIntError| DnsError::Parse(e.to_string()))?;
-            let port: u16 = parts[2].parse().map_err(|e: std::num::ParseIntError| DnsError::Parse(e.to_string()))?;
+            let priority: u16 = parts[0]
+                .parse()
+                .map_err(|e: std::num::ParseIntError| DnsError::Parse(e.to_string()))?;
+            let weight: u16 = parts[1]
+                .parse()
+                .map_err(|e: std::num::ParseIntError| DnsError::Parse(e.to_string()))?;
+            let port: u16 = parts[2]
+                .parse()
+                .map_err(|e: std::num::ParseIntError| DnsError::Parse(e.to_string()))?;
             let target = resolve_name(parts[3], origin)?;
-            Ok(RData::SRV(hickory_proto::rr::rdata::SRV::new(priority, weight, port, target)))
+            Ok(RData::SRV(hickory_proto::rr::rdata::SRV::new(
+                priority, weight, port, target,
+            )))
         }
         _ => {
             // For unsupported types, skip
-            Err(DnsError::Parse(format!("unsupported type in zone file: {rtype}")))
+            Err(DnsError::Parse(format!(
+                "unsupported type in zone file: {rtype}"
+            )))
         }
     }
 }
@@ -264,8 +282,7 @@ pub fn save_zone_file(zone: &Zone, path: &Path) -> DnsResult<()> {
         }
     }
 
-    std::fs::write(path, out)
-        .map_err(|e| DnsError::Zone(format!("cannot write zone file: {e}")))
+    std::fs::write(path, out).map_err(|e| DnsError::Zone(format!("cannot write zone file: {e}")))
 }
 
 fn record_to_zone_format(r: &Record) -> String {
@@ -282,7 +299,9 @@ fn record_to_zone_format(r: &Record) -> String {
 /// Create a minimal SOA record for a newly-created empty zone.
 pub fn make_default_soa(origin: &Name) -> Record {
     let soa_data = hickory_proto::rr::rdata::SOA::new(
-        format!("ns1.{}", origin).parse().unwrap_or_else(|_| origin.clone()),
+        format!("ns1.{}", origin)
+            .parse()
+            .unwrap_or_else(|_| origin.clone()),
         format!("hostmaster.{}", origin)
             .parse()
             .unwrap_or_else(|_| origin.clone()),

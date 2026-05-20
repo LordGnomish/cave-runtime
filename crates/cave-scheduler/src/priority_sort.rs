@@ -20,11 +20,16 @@ use std::cmp::Ordering;
 pub struct PrioritySort;
 
 impl QueueSortPlugin for PrioritySort {
-    fn name(&self) -> &str { "PrioritySort" }
+    fn name(&self) -> &str {
+        "PrioritySort"
+    }
     fn less(&self, a: &Pod, b: &Pod) -> Ordering {
         // Less means "schedule a before b". Higher priority first → if a's
         // priority is greater, return Less.
-        b.spec.priority.cmp(&a.spec.priority).then_with(|| a.uid.cmp(&b.uid))
+        b.spec
+            .priority
+            .cmp(&a.spec.priority)
+            .then_with(|| a.uid.cmp(&b.uid))
     }
 }
 
@@ -100,11 +105,23 @@ mod tests {
     fn default_profile_plugin_names_include_required_set() {
         let names = default_profile_plugin_names();
         for required in &[
-            "PrioritySort", "NodeName", "NodeUnschedulable", "NodeResources",
-            "NodeAffinity", "TaintToleration", "InterPodAffinity",
-            "PodTopologySpread", "VolumeBinding", "VolumeRestrictions",
-            "VolumeZone", "NodePorts", "NodeVolumeLimits", "ImageLocality",
-            "DefaultPreemption", "DefaultBinder", "SchedulingGates",
+            "PrioritySort",
+            "NodeName",
+            "NodeUnschedulable",
+            "NodeResources",
+            "NodeAffinity",
+            "TaintToleration",
+            "InterPodAffinity",
+            "PodTopologySpread",
+            "VolumeBinding",
+            "VolumeRestrictions",
+            "VolumeZone",
+            "NodePorts",
+            "NodeVolumeLimits",
+            "ImageLocality",
+            "DefaultPreemption",
+            "DefaultBinder",
+            "SchedulingGates",
         ] {
             assert!(names.contains(required), "{} missing", required);
         }

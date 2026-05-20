@@ -18,7 +18,9 @@ const HLL_MAGIC: &[u8] = b"HYLL";
 const HLL_SPARSE_XZERO_MAX_LEN: usize = 16384;
 
 pub fn cmd_pfadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 2 { return Err(CacheError::wrong_arity("pfadd")); }
+    if args.len() < 2 {
+        return Err(CacheError::wrong_arity("pfadd"));
+    }
     let key = args[1].clone();
 
     // Get or create HLL
@@ -28,7 +30,9 @@ pub fn cmd_pfadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
                 if v.starts_with(HLL_MAGIC) {
                     HyperLogLog::from_bytes(v)?
                 } else {
-                    return Err(CacheError::generic("WRONGTYPE Key is not a valid HyperLogLog string value."));
+                    return Err(CacheError::generic(
+                        "WRONGTYPE Key is not a valid HyperLogLog string value.",
+                    ));
                 }
             }
             _ => unreachable!(),
@@ -50,7 +54,9 @@ pub fn cmd_pfadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 }
 
 pub fn cmd_pfcount(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 2 { return Err(CacheError::wrong_arity("pfcount")); }
+    if args.len() < 2 {
+        return Err(CacheError::wrong_arity("pfcount"));
+    }
 
     if args.len() == 2 {
         // Single key
@@ -60,7 +66,9 @@ pub fn cmd_pfcount(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
                     if v.starts_with(HLL_MAGIC) {
                         HyperLogLog::from_bytes(v)?.count()
                     } else {
-                        return Err(CacheError::generic("WRONGTYPE Key is not a valid HyperLogLog string value."));
+                        return Err(CacheError::generic(
+                            "WRONGTYPE Key is not a valid HyperLogLog string value.",
+                        ));
                     }
                 }
                 _ => unreachable!(),
@@ -79,7 +87,9 @@ pub fn cmd_pfcount(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
                             let hll = HyperLogLog::from_bytes(v)?;
                             merged.merge(&hll);
                         } else {
-                            return Err(CacheError::generic("WRONGTYPE Key is not a valid HyperLogLog string value."));
+                            return Err(CacheError::generic(
+                                "WRONGTYPE Key is not a valid HyperLogLog string value.",
+                            ));
                         }
                     }
                     _ => unreachable!(),
@@ -92,7 +102,9 @@ pub fn cmd_pfcount(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 }
 
 pub fn cmd_pfmerge(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 2 { return Err(CacheError::wrong_arity("pfmerge")); }
+    if args.len() < 2 {
+        return Err(CacheError::wrong_arity("pfmerge"));
+    }
     let dst = args[1].clone();
 
     let mut merged = HyperLogLog::new();
@@ -113,7 +125,9 @@ pub fn cmd_pfmerge(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
                     if v.starts_with(HLL_MAGIC) {
                         merged.merge(&HyperLogLog::from_bytes(v)?);
                     } else {
-                        return Err(CacheError::generic("WRONGTYPE Key is not a valid HyperLogLog string value."));
+                        return Err(CacheError::generic(
+                            "WRONGTYPE Key is not a valid HyperLogLog string value.",
+                        ));
                     }
                 }
                 _ => unreachable!(),
@@ -158,7 +172,9 @@ impl HyperLogLog {
         let m = HLL_M as f64;
         let alpha = 0.7213 / (1.0 + 1.079 / m);
 
-        let sum: f64 = self.registers.iter()
+        let sum: f64 = self
+            .registers
+            .iter()
             .map(|&r| 2.0f64.powi(-(r as i32)))
             .sum();
 
@@ -216,10 +232,14 @@ impl HyperLogLog {
 
     fn from_bytes(data: &[u8]) -> CacheResult<Self> {
         if data.len() < HLL_HEADER_SIZE + 4 {
-            return Err(CacheError::generic("WRONGTYPE Key is not a valid HyperLogLog string value."));
+            return Err(CacheError::generic(
+                "WRONGTYPE Key is not a valid HyperLogLog string value.",
+            ));
         }
         if !data.starts_with(HLL_MAGIC) {
-            return Err(CacheError::generic("WRONGTYPE Key is not a valid HyperLogLog string value."));
+            return Err(CacheError::generic(
+                "WRONGTYPE Key is not a valid HyperLogLog string value.",
+            ));
         }
 
         let ver = data[4];
@@ -235,7 +255,9 @@ impl HyperLogLog {
             let bit_pos = i * 6;
             let byte_pos = bit_pos / 8;
             let bit_offset = bit_pos % 8;
-            if byte_pos >= packed.len() { break; }
+            if byte_pos >= packed.len() {
+                break;
+            }
             let mut val = (packed[byte_pos] >> bit_offset) as usize;
             if bit_offset > 2 && byte_pos + 1 < packed.len() {
                 val |= (packed[byte_pos + 1] as usize) << (8 - bit_offset);
@@ -261,25 +283,49 @@ fn murmur3_64(data: &[u8], seed: u64) -> u64 {
 
         let k1 = k1.wrapping_mul(c1).rotate_left(31).wrapping_mul(c2);
         h1 ^= k1;
-        h1 = h1.rotate_left(27).wrapping_add(h2).wrapping_mul(5).wrapping_add(0x52dce729);
+        h1 = h1
+            .rotate_left(27)
+            .wrapping_add(h2)
+            .wrapping_mul(5)
+            .wrapping_add(0x52dce729);
 
         let k2 = k2.wrapping_mul(c2).rotate_left(33).wrapping_mul(c1);
         h2 ^= k2;
-        h2 = h2.rotate_left(31).wrapping_add(h1).wrapping_mul(5).wrapping_add(0x38495ab5);
+        h2 = h2
+            .rotate_left(31)
+            .wrapping_add(h1)
+            .wrapping_mul(5)
+            .wrapping_add(0x38495ab5);
     }
 
     let tail = &data[blocks * 16..];
     let mut k1: u64 = 0;
     let mut k2: u64 = 0;
 
-    if tail.len() >= 8 { k2 ^= (tail[7] as u64) << 56; }
-    if tail.len() >= 7 { k2 ^= (tail[6] as u64) << 48; }
-    if tail.len() >= 6 { k2 ^= (tail[5] as u64) << 40; }
-    if tail.len() >= 5 { k2 ^= (tail[4] as u64) << 32; }
-    if tail.len() >= 4 { k2 ^= (tail[3] as u64) << 24; }
-    if tail.len() >= 3 { k2 ^= (tail[2] as u64) << 16; }
-    if tail.len() >= 2 { k2 ^= (tail[1] as u64) << 8; }
-    if !tail.is_empty() { k2 ^= tail[0] as u64; }
+    if tail.len() >= 8 {
+        k2 ^= (tail[7] as u64) << 56;
+    }
+    if tail.len() >= 7 {
+        k2 ^= (tail[6] as u64) << 48;
+    }
+    if tail.len() >= 6 {
+        k2 ^= (tail[5] as u64) << 40;
+    }
+    if tail.len() >= 5 {
+        k2 ^= (tail[4] as u64) << 32;
+    }
+    if tail.len() >= 4 {
+        k2 ^= (tail[3] as u64) << 24;
+    }
+    if tail.len() >= 3 {
+        k2 ^= (tail[2] as u64) << 16;
+    }
+    if tail.len() >= 2 {
+        k2 ^= (tail[1] as u64) << 8;
+    }
+    if !tail.is_empty() {
+        k2 ^= tail[0] as u64;
+    }
 
     k2 = k2.wrapping_mul(c2).rotate_left(33).wrapping_mul(c1);
     h2 ^= k2;

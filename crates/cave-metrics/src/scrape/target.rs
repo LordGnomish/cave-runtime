@@ -2,8 +2,8 @@
 // Copyright 2026 Cave Runtime contributors
 //! Scrape target configuration and state.
 
-use serde::{Deserialize, Serialize};
 use crate::model::Labels;
+use serde::{Deserialize, Serialize};
 
 /// Configuration for a single scrape job.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -12,7 +12,7 @@ pub struct ScrapeConfig {
     pub scrape_interval_ms: i64,
     pub scrape_timeout_ms: i64,
     pub metrics_path: String,
-    pub scheme: String,          // http / https
+    pub scheme: String, // http / https
     pub honor_labels: bool,
     pub honor_timestamps: bool,
     pub static_configs: Vec<StaticConfig>,
@@ -39,7 +39,7 @@ impl Default for ScrapeConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StaticConfig {
-    pub targets: Vec<String>,   // host:port
+    pub targets: Vec<String>, // host:port
     pub labels: Labels,
 }
 
@@ -71,7 +71,7 @@ pub enum K8sRole {
 #[derive(Debug, Clone)]
 pub struct ScrapeTarget {
     pub url: String,
-    pub labels: Labels,    // discovered + job labels
+    pub labels: Labels, // discovered + job labels
     pub config: ScrapeConfig,
     pub last_scrape_ms: i64,
     pub last_error: Option<String>,

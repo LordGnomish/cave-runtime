@@ -31,9 +31,9 @@ pub mod revoke;
 pub mod tests;
 
 use axum::Router;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use std::collections::HashMap;
 
 use crate::keycloak::{client::ClientStore, realm::RealmStore, user::UserStore};
 
@@ -61,7 +61,9 @@ pub struct AuthorizationCodeStore {
 }
 
 impl AuthorizationCodeStore {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub async fn put(&self, code: AuthorizationCode) {
         self.inner.write().await.insert(code.code.clone(), code);
@@ -94,10 +96,15 @@ pub struct ParStore {
 }
 
 impl ParStore {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub async fn put(&self, rec: ParRecord) {
-        self.inner.write().await.insert(rec.request_uri.clone(), rec);
+        self.inner
+            .write()
+            .await
+            .insert(rec.request_uri.clone(), rec);
     }
 
     pub async fn take(&self, uri: &str) -> Option<ParRecord> {
@@ -143,11 +150,19 @@ pub struct DeviceCodeStore {
 }
 
 impl DeviceCodeStore {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub async fn put(&self, auth: DeviceAuthorization) {
-        self.by_user.write().await.insert(auth.user_code.clone(), auth.device_code.clone());
-        self.by_device.write().await.insert(auth.device_code.clone(), auth);
+        self.by_user
+            .write()
+            .await
+            .insert(auth.user_code.clone(), auth.device_code.clone());
+        self.by_device
+            .write()
+            .await
+            .insert(auth.device_code.clone(), auth);
     }
 
     pub async fn get_by_device(&self, device_code: &str) -> Option<DeviceAuthorization> {
@@ -160,7 +175,10 @@ impl DeviceCodeStore {
     }
 
     pub async fn update(&self, auth: DeviceAuthorization) {
-        self.by_device.write().await.insert(auth.device_code.clone(), auth);
+        self.by_device
+            .write()
+            .await
+            .insert(auth.device_code.clone(), auth);
     }
 
     pub async fn len(&self) -> usize {
@@ -198,7 +216,9 @@ pub struct CibaStore {
 }
 
 impl CibaStore {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub async fn put(&self, r: CibaRequest) {
         self.inner.write().await.insert(r.auth_req_id.clone(), r);
@@ -225,7 +245,9 @@ pub struct RevocationStore {
 }
 
 impl RevocationStore {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub async fn revoke(&self, token: &str) {
         self.inner.write().await.insert(token.to_string());

@@ -24,7 +24,7 @@ use std::sync::{Arc, RwLock};
 use chrono::Utc;
 
 use super::authn_request::AuthnRequest;
-use super::binding::{redirect_encode, BINDING_POST, BINDING_REDIRECT};
+use super::binding::{BINDING_POST, BINDING_REDIRECT, redirect_encode};
 use super::response::{Assertion, Response, StatusCode};
 use super::{SamlError, SamlSubject};
 
@@ -81,8 +81,7 @@ impl SamlBroker {
     ) -> Result<(String, String), SamlError> {
         let idp_sso_url = idp_sso_url.into();
         let idp_entity_id = idp_entity_id.into();
-        let req = AuthnRequest::new(sp_entity_id, &idp_sso_url)
-            .with_acs_url(acs_url);
+        let req = AuthnRequest::new(sp_entity_id, &idp_sso_url).with_acs_url(acs_url);
         let id = req.id.clone();
 
         self.in_flight.write().expect("poisoned").insert(
@@ -392,12 +391,7 @@ mod tests {
         let mut b = SamlBroker::new();
         b.ttl_seconds = 1;
         let _ = b
-            .start_sp_initiated_login(
-                "sp",
-                "https://idp/sso",
-                "idp",
-                "https://sp/acs",
-            )
+            .start_sp_initiated_login("sp", "https://idp/sso", "idp", "https://sp/acs")
             .unwrap();
         assert_eq!(b.in_flight_count(), 1);
 

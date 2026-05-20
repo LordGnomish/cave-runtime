@@ -4,18 +4,18 @@
 //! Compatible with: Jira
 //! Features: Projects, boards, sprints, issues, workflows, custom fields, JQL-like queries.
 
-pub mod models;
-pub mod workflow;
-pub mod query;
-pub mod sprint;
 pub mod board;
 pub mod fields;
+pub mod models;
+pub mod query;
 pub mod routes;
+pub mod sprint;
+pub mod workflow;
 
 use axum::Router;
+use models::*;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
-use models::*;
 
 pub struct TrackerStore {
     pub projects: HashMap<uuid::Uuid, Project>,
@@ -63,7 +63,9 @@ pub struct TrackerState {
 
 impl Default for TrackerState {
     fn default() -> Self {
-        Self { store: Arc::new(RwLock::new(TrackerStore::default())) }
+        Self {
+            store: Arc::new(RwLock::new(TrackerStore::default())),
+        }
     }
 }
 

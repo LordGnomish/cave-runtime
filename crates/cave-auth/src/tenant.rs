@@ -161,7 +161,10 @@ impl TenantRegistry {
                 .filter(|m| m.tenant_id == member.tenant_id && m.active)
                 .count();
             if count >= max {
-                return Err(format!("Tenant {} has reached member limit ({max})", member.tenant_id));
+                return Err(format!(
+                    "Tenant {} has reached member limit ({max})",
+                    member.tenant_id
+                ));
             }
         }
         drop(tenants);
@@ -209,7 +212,9 @@ impl TenantRegistry {
         if is_member {
             Ok(())
         } else {
-            Err(format!("User {user_id} is not a member of tenant {tenant_id}"))
+            Err(format!(
+                "User {user_id} is not a member of tenant {tenant_id}"
+            ))
         }
     }
 

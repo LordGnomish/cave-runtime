@@ -14,9 +14,9 @@
 //!   PackedForward: [tag, entries_msgpack_bytes, option?]
 //!   CompressedPackedForward: gzip/deflate compressed PackedForward
 
+use chrono::Utc;
 use std::collections::HashMap;
 use std::sync::Arc;
-use chrono::Utc;
 
 use crate::models::{Labels, LogEntry, TimestampNs};
 use crate::store::LogStore;
@@ -39,7 +39,10 @@ pub enum MsgpackValue {
 
 impl MsgpackValue {
     pub fn as_str(&self) -> Option<&str> {
-        match self { MsgpackValue::Str(s) => Some(s.as_str()), _ => None }
+        match self {
+            MsgpackValue::Str(s) => Some(s.as_str()),
+            _ => None,
+        }
     }
 
     pub fn as_u64(&self) -> Option<u64> {
@@ -59,15 +62,24 @@ impl MsgpackValue {
     }
 
     pub fn into_map(self) -> Option<Vec<(MsgpackValue, MsgpackValue)>> {
-        match self { MsgpackValue::Map(m) => Some(m), _ => None }
+        match self {
+            MsgpackValue::Map(m) => Some(m),
+            _ => None,
+        }
     }
 
     pub fn into_array(self) -> Option<Vec<MsgpackValue>> {
-        match self { MsgpackValue::Array(a) => Some(a), _ => None }
+        match self {
+            MsgpackValue::Array(a) => Some(a),
+            _ => None,
+        }
     }
 
     pub fn as_bytes(&self) -> Option<&[u8]> {
-        match self { MsgpackValue::Bin(b) => Some(b), _ => None }
+        match self {
+            MsgpackValue::Bin(b) => Some(b),
+            _ => None,
+        }
     }
 }
 
@@ -77,23 +89,31 @@ struct MsgpackReader<'a> {
 }
 
 impl<'a> MsgpackReader<'a> {
-    fn new(buf: &'a [u8]) -> Self { Self { buf, pos: 0 } }
+    fn new(buf: &'a [u8]) -> Self {
+        Self { buf, pos: 0 }
+    }
 
     fn read_byte(&mut self) -> anyhow::Result<u8> {
-        if self.pos >= self.buf.len() { return Err(anyhow::anyhow!("msgpack: EOF")); }
+        if self.pos >= self.buf.len() {
+            return Err(anyhow::anyhow!("msgpack: EOF"));
+        }
         let b = self.buf[self.pos];
         self.pos += 1;
         Ok(b)
     }
 
     fn read_bytes(&mut self, n: usize) -> anyhow::Result<&'a [u8]> {
-        if self.pos + n > self.buf.len() { return Err(anyhow::anyhow!("msgpack: not enough bytes")); }
+        if self.pos + n > self.buf.len() {
+            return Err(anyhow::anyhow!("msgpack: not enough bytes"));
+        }
         let s = &self.buf[self.pos..self.pos + n];
         self.pos += n;
         Ok(s)
     }
 
-    fn read_u8(&mut self) -> anyhow::Result<u8> { self.read_byte() }
+    fn read_u8(&mut self) -> anyhow::Result<u8> {
+        self.read_byte()
+    }
     fn read_u16(&mut self) -> anyhow::Result<u16> {
         let b = self.read_bytes(2)?;
         Ok(u16::from_be_bytes([b[0], b[1]]))
@@ -106,7 +126,9 @@ impl<'a> MsgpackReader<'a> {
         let b = self.read_bytes(8)?;
         Ok(u64::from_be_bytes(b.try_into().unwrap()))
     }
-    fn read_i8(&mut self) -> anyhow::Result<i8> { Ok(self.read_byte()? as i8) }
+    fn read_i8(&mut self) -> anyhow::Result<i8> {
+        Ok(self.read_byte()? as i8)
+    }
     fn read_i16(&mut self) -> anyhow::Result<i16> {
         let b = self.read_bytes(2)?;
         Ok(i16::from_be_bytes([b[0], b[1]]))
@@ -152,12 +174,36 @@ impl<'a> MsgpackReader<'a> {
             0xc0 => Ok(MsgpackValue::Nil),
             0xc2 => Ok(MsgpackValue::Bool(false)),
             0xc3 => Ok(MsgpackValue::Bool(true)),
-            0xc4 => { let n = self.read_u8()? as usize; Ok(MsgpackValue::Bin(self.read_bytes(n)?.to_vec())) }
-            0xc5 => { let n = self.read_u16()? as usize; Ok(MsgpackValue::Bin(self.read_bytes(n)?.to_vec())) }
-            0xc6 => { let n = self.read_u32()? as usize; Ok(MsgpackValue::Bin(self.read_bytes(n)?.to_vec())) }
-            0xc7 => { let n = self.read_u8()? as usize; let t = self.read_i8()?; let d = self.read_bytes(n)?.to_vec(); Ok(MsgpackValue::Ext(t, d)) }
-            0xc8 => { let n = self.read_u16()? as usize; let t = self.read_i8()?; let d = self.read_bytes(n)?.to_vec(); Ok(MsgpackValue::Ext(t, d)) }
-            0xc9 => { let n = self.read_u32()? as usize; let t = self.read_i8()?; let d = self.read_bytes(n)?.to_vec(); Ok(MsgpackValue::Ext(t, d)) }
+            0xc4 => {
+                let n = self.read_u8()? as usize;
+                Ok(MsgpackValue::Bin(self.read_bytes(n)?.to_vec()))
+            }
+            0xc5 => {
+                let n = self.read_u16()? as usize;
+                Ok(MsgpackValue::Bin(self.read_bytes(n)?.to_vec()))
+            }
+            0xc6 => {
+                let n = self.read_u32()? as usize;
+                Ok(MsgpackValue::Bin(self.read_bytes(n)?.to_vec()))
+            }
+            0xc7 => {
+                let n = self.read_u8()? as usize;
+                let t = self.read_i8()?;
+                let d = self.read_bytes(n)?.to_vec();
+                Ok(MsgpackValue::Ext(t, d))
+            }
+            0xc8 => {
+                let n = self.read_u16()? as usize;
+                let t = self.read_i8()?;
+                let d = self.read_bytes(n)?.to_vec();
+                Ok(MsgpackValue::Ext(t, d))
+            }
+            0xc9 => {
+                let n = self.read_u32()? as usize;
+                let t = self.read_i8()?;
+                let d = self.read_bytes(n)?.to_vec();
+                Ok(MsgpackValue::Ext(t, d))
+            }
             0xca => Ok(MsgpackValue::Float(self.read_f32()? as f64)),
             0xcb => Ok(MsgpackValue::Float(self.read_f64()?)),
             0xcc => Ok(MsgpackValue::UInt(self.read_u8()? as u64)),
@@ -174,13 +220,37 @@ impl<'a> MsgpackReader<'a> {
                 let d = self.read_bytes(len)?.to_vec();
                 Ok(MsgpackValue::Ext(t, d))
             }
-            0xd9 => { let n = self.read_u8()? as usize; let s = self.read_bytes(n)?; Ok(MsgpackValue::Str(String::from_utf8_lossy(s).into_owned())) }
-            0xda => { let n = self.read_u16()? as usize; let s = self.read_bytes(n)?; Ok(MsgpackValue::Str(String::from_utf8_lossy(s).into_owned())) }
-            0xdb => { let n = self.read_u32()? as usize; let s = self.read_bytes(n)?; Ok(MsgpackValue::Str(String::from_utf8_lossy(s).into_owned())) }
-            0xdc => { let n = self.read_u16()? as usize; self.read_array(n) }
-            0xdd => { let n = self.read_u32()? as usize; self.read_array(n) }
-            0xde => { let n = self.read_u16()? as usize; self.read_map(n) }
-            0xdf => { let n = self.read_u32()? as usize; self.read_map(n) }
+            0xd9 => {
+                let n = self.read_u8()? as usize;
+                let s = self.read_bytes(n)?;
+                Ok(MsgpackValue::Str(String::from_utf8_lossy(s).into_owned()))
+            }
+            0xda => {
+                let n = self.read_u16()? as usize;
+                let s = self.read_bytes(n)?;
+                Ok(MsgpackValue::Str(String::from_utf8_lossy(s).into_owned()))
+            }
+            0xdb => {
+                let n = self.read_u32()? as usize;
+                let s = self.read_bytes(n)?;
+                Ok(MsgpackValue::Str(String::from_utf8_lossy(s).into_owned()))
+            }
+            0xdc => {
+                let n = self.read_u16()? as usize;
+                self.read_array(n)
+            }
+            0xdd => {
+                let n = self.read_u32()? as usize;
+                self.read_array(n)
+            }
+            0xde => {
+                let n = self.read_u16()? as usize;
+                self.read_map(n)
+            }
+            0xdf => {
+                let n = self.read_u32()? as usize;
+                self.read_map(n)
+            }
             // negative fixint
             0xe0..=0xff => Ok(MsgpackValue::Int(byte as i8 as i64)),
             _ => Err(anyhow::anyhow!("msgpack: unrecognised byte 0x{:02x}", byte)),
@@ -189,7 +259,9 @@ impl<'a> MsgpackReader<'a> {
 
     fn read_array(&mut self, n: usize) -> anyhow::Result<MsgpackValue> {
         let mut arr = Vec::with_capacity(n);
-        for _ in 0..n { arr.push(self.read_value()?); }
+        for _ in 0..n {
+            arr.push(self.read_value()?);
+        }
         Ok(MsgpackValue::Array(arr))
     }
 
@@ -223,7 +295,8 @@ fn decode_event_time(v: &MsgpackValue) -> Option<TimestampNs> {
 // ── Record conversion ─────────────────────────────────────────────────────────
 
 fn map_to_strings(pairs: Vec<(MsgpackValue, MsgpackValue)>) -> HashMap<String, String> {
-    pairs.into_iter()
+    pairs
+        .into_iter()
         .map(|(k, v)| {
             let key = k.as_str().unwrap_or("").to_owned();
             let value = match &v {
@@ -243,11 +316,7 @@ fn map_to_strings(pairs: Vec<(MsgpackValue, MsgpackValue)>) -> HashMap<String, S
 // ── Parsing ───────────────────────────────────────────────────────────────────
 
 /// Parse and ingest a Fluentd forward protocol message (MessagePack encoded).
-pub fn ingest_forward(
-    data: &[u8],
-    tenant: &str,
-    store: &Arc<LogStore>,
-) -> anyhow::Result<usize> {
+pub fn ingest_forward(data: &[u8], tenant: &str, store: &Arc<LogStore>) -> anyhow::Result<usize> {
     let mut reader = MsgpackReader::new(data);
     let msg = reader.read_value()?;
 
@@ -278,11 +347,19 @@ pub fn ingest_forward(
                     Some(m) => map_to_strings(m),
                     None => continue,
                 };
-                let line = record.get("message").or(record.get("log")).cloned().unwrap_or_default();
+                let line = record
+                    .get("message")
+                    .or(record.get("log"))
+                    .cloned()
+                    .unwrap_or_default();
                 let mut meta = record;
                 meta.remove("message");
                 meta.remove("log");
-                log_entries.push(LogEntry { ts, line, metadata: meta });
+                log_entries.push(LogEntry {
+                    ts,
+                    line,
+                    metadata: meta,
+                });
             }
             let n = log_entries.len();
             if !log_entries.is_empty() {
@@ -303,11 +380,19 @@ pub fn ingest_forward(
                 Some(m) => map_to_strings(m),
                 None => return Ok(0),
             };
-            let line = record.get("message").or(record.get("log")).cloned().unwrap_or_default();
+            let line = record
+                .get("message")
+                .or(record.get("log"))
+                .cloned()
+                .unwrap_or_default();
             let mut meta = record;
             meta.remove("message");
             meta.remove("log");
-            let entry = LogEntry { ts, line, metadata: meta };
+            let entry = LogEntry {
+                ts,
+                line,
+                metadata: meta,
+            };
             store.push(tenant, Labels::new(label_map), vec![entry])?;
             Ok(1)
         }
@@ -335,11 +420,19 @@ fn ingest_packed_forward(
             Some(m) => map_to_strings(m),
             None => continue,
         };
-        let line = record.get("message").or(record.get("log")).cloned().unwrap_or_default();
+        let line = record
+            .get("message")
+            .or(record.get("log"))
+            .cloned()
+            .unwrap_or_default();
         let mut meta = record;
         meta.remove("message");
         meta.remove("log");
-        entries.push(LogEntry { ts, line, metadata: meta });
+        entries.push(LogEntry {
+            ts,
+            line,
+            metadata: meta,
+        });
     }
 
     let n = entries.len();
@@ -352,8 +445,8 @@ fn ingest_packed_forward(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::store::LogStore;
     use crate::models::Direction;
+    use crate::store::LogStore;
 
     /// Build a minimal MessagePack forward-mode message:
     /// [tag, [[time, {record}]]]
@@ -386,7 +479,11 @@ mod tests {
     #[test]
     fn forward_mode_basic() {
         let store = LogStore::new();
-        let msg = build_forward_msg("app.logs", 1_000_000, &[("message", "hello"), ("level", "info")]);
+        let msg = build_forward_msg(
+            "app.logs",
+            1_000_000,
+            &[("message", "hello"), ("level", "info")],
+        );
         let n = ingest_forward(&msg, "t", &store).unwrap();
         assert_eq!(n, 1);
 
@@ -410,6 +507,8 @@ mod tests {
             assert_eq!(arr.len(), 2);
             assert!(matches!(arr[0], MsgpackValue::UInt(1)));
             assert_eq!(arr[1].as_str(), Some("foo"));
-        } else { panic!("expected array"); }
+        } else {
+            panic!("expected array");
+        }
     }
 }

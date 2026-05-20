@@ -40,7 +40,10 @@ impl Store {
     }
 
     pub fn put_claim(&self, claim: NodeClaim) {
-        self.claims.write().unwrap().insert(claim.name.clone(), claim);
+        self.claims
+            .write()
+            .unwrap()
+            .insert(claim.name.clone(), claim);
     }
 
     pub fn list_claims(&self) -> Vec<NodeClaim> {

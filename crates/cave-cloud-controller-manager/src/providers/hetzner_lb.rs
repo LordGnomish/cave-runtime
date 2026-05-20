@@ -256,7 +256,11 @@ mod tests {
 
     #[test]
     fn lb_algorithm_names_match_hetzner_api_strings() {
-        let _ = ctx("acme", "hcloud/load_balancer.go", "LoadBalancerAlgorithmType");
+        let _ = ctx(
+            "acme",
+            "hcloud/load_balancer.go",
+            "LoadBalancerAlgorithmType",
+        );
         assert_eq!(LbAlgorithm::RoundRobin.name(), "round_robin");
         assert_eq!(LbAlgorithm::LeastConnections.name(), "least_connections");
         assert_eq!(LbAlgorithm::IpHash.name(), "ip_hash");
@@ -266,13 +270,21 @@ mod tests {
 
     #[test]
     fn tcp_healthcheck_constructor_is_valid() {
-        let _ = ctx("acme", "hcloud/load_balancer.go", "LoadBalancerServiceHealthCheck");
+        let _ = ctx(
+            "acme",
+            "hcloud/load_balancer.go",
+            "LoadBalancerServiceHealthCheck",
+        );
         assert!(LbHealthCheck::tcp(8080).validate().is_ok());
     }
 
     #[test]
     fn http_healthcheck_constructor_is_valid() {
-        let _ = ctx("acme", "hcloud/load_balancer.go", "LoadBalancerServiceHealthCheck");
+        let _ = ctx(
+            "acme",
+            "hcloud/load_balancer.go",
+            "LoadBalancerServiceHealthCheck",
+        );
         assert!(LbHealthCheck::http(8080, "/healthz").validate().is_ok());
     }
 
@@ -281,9 +293,15 @@ mod tests {
         let _ = ctx("acme", "hcloud/load_balancer.go", "validateHealthCheck");
         let mut h = LbHealthCheck::tcp(80);
         h.interval_seconds = 2;
-        assert!(matches!(h.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            h.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         h.interval_seconds = 120;
-        assert!(matches!(h.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            h.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -292,7 +310,10 @@ mod tests {
         let mut h = LbHealthCheck::tcp(80);
         h.interval_seconds = 5;
         h.timeout_seconds = 10;
-        assert!(matches!(h.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            h.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -300,9 +321,15 @@ mod tests {
         let _ = ctx("acme", "hcloud/load_balancer.go", "validateHealthCheck");
         let mut h = LbHealthCheck::tcp(80);
         h.retries = 0;
-        assert!(matches!(h.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            h.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         h.retries = 99;
-        assert!(matches!(h.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            h.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -310,9 +337,15 @@ mod tests {
         let _ = ctx("acme", "hcloud/load_balancer.go", "validateHealthCheck");
         let mut h = LbHealthCheck::http(80, "/healthz");
         h.path = None;
-        assert!(matches!(h.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            h.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         h.path = Some("".into());
-        assert!(matches!(h.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            h.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -320,12 +353,19 @@ mod tests {
         let _ = ctx("acme", "hcloud/load_balancer.go", "validateHealthCheck");
         let mut h = LbHealthCheck::tcp(80);
         h.path = Some("/wrong".into());
-        assert!(matches!(h.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            h.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn healthcheck_protocol_names_match_api_strings() {
-        let _ = ctx("acme", "hcloud/load_balancer.go", "LoadBalancerServiceHealthCheckProtocol");
+        let _ = ctx(
+            "acme",
+            "hcloud/load_balancer.go",
+            "LoadBalancerServiceHealthCheckProtocol",
+        );
         assert_eq!(HealthCheckProtocol::Tcp.name(), "tcp");
         assert_eq!(HealthCheckProtocol::Http.name(), "http");
         assert_eq!(HealthCheckProtocol::Https.name(), "https");
@@ -339,25 +379,43 @@ mod tests {
     fn managed_certificate_requires_one_domain() {
         let _ = ctx("acme", "hcloud/certificate.go", "CertificateTypeManaged");
         let cert = LbCertificate::Managed { domains: vec![] };
-        assert!(matches!(cert.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
-        let cert = LbCertificate::Managed { domains: vec!["example.com".into()] };
+        assert!(matches!(
+            cert.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
+        let cert = LbCertificate::Managed {
+            domains: vec!["example.com".into()],
+        };
         assert!(cert.validate().is_ok());
     }
 
     #[test]
     fn managed_certificate_rejects_invalid_domains() {
         let _ = ctx("acme", "hcloud/certificate.go", "CertificateTypeManaged");
-        let cert = LbCertificate::Managed { domains: vec!["nodot".into()] };
-        assert!(matches!(cert.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
-        let cert = LbCertificate::Managed { domains: vec![".leading-dot.example".into()] };
-        assert!(matches!(cert.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        let cert = LbCertificate::Managed {
+            domains: vec!["nodot".into()],
+        };
+        assert!(matches!(
+            cert.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
+        let cert = LbCertificate::Managed {
+            domains: vec![".leading-dot.example".into()],
+        };
+        assert!(matches!(
+            cert.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn uploaded_certificate_requires_nonzero_id() {
         let _ = ctx("acme", "hcloud/certificate.go", "CertificateTypeUploaded");
         let bad = LbCertificate::Uploaded { certificate_id: 0 };
-        assert!(matches!(bad.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            bad.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         let good = LbCertificate::Uploaded { certificate_id: 7 };
         assert!(good.validate().is_ok());
     }
@@ -365,8 +423,17 @@ mod tests {
     #[test]
     fn certificate_kind_reports_managed_or_uploaded() {
         let _ = ctx("acme", "hcloud/certificate.go", "Certificate");
-        assert_eq!(LbCertificate::Managed { domains: vec!["a.b".into()] }.kind(), "managed");
-        assert_eq!(LbCertificate::Uploaded { certificate_id: 1 }.kind(), "uploaded");
+        assert_eq!(
+            LbCertificate::Managed {
+                domains: vec!["a.b".into()]
+            }
+            .kind(),
+            "managed"
+        );
+        assert_eq!(
+            LbCertificate::Uploaded { certificate_id: 1 }.kind(),
+            "uploaded"
+        );
     }
 
     // ─── Service config ──────────────────────────────────────────────────────
@@ -382,7 +449,10 @@ mod tests {
         let _ = ctx("acme", "hcloud/load_balancer.go", "LoadBalancerService");
         let mut c = LbServiceConfig::http(80, 8080);
         c.listen_port = 0;
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -391,7 +461,10 @@ mod tests {
         let mut c = LbServiceConfig::http(443, 8443);
         c.health_check.protocol = HealthCheckProtocol::Https;
         c.health_check.path = Some("/healthz".into());
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         c.certificate = Some(LbCertificate::Uploaded { certificate_id: 7 });
         assert!(c.validate().is_ok());
     }
@@ -401,7 +474,10 @@ mod tests {
         let _ = ctx("acme", "hcloud/load_balancer.go", "LoadBalancerService");
         let mut c = LbServiceConfig::http(80, 8080);
         c.health_check.interval_seconds = 1;
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]

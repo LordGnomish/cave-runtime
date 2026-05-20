@@ -5,14 +5,14 @@
 //! Upstream tracking: cert-manager
 //! Features: ACME/Lets Encrypt, cert issuance, auto-renewal, expiry alerting, K8s CRDs
 
-pub mod routes;
-pub mod models;
-pub mod engine;
-pub mod crds;
 pub mod acme_client;
-pub mod solvers;
-pub mod renewal;
+pub mod crds;
+pub mod engine;
+pub mod models;
 pub mod pqc;
+pub mod renewal;
+pub mod routes;
+pub mod solvers;
 
 use axum::Router;
 

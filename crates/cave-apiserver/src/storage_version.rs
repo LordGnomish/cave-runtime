@@ -58,7 +58,9 @@ pub struct StorageVersionRegistry {
 
 impl StorageVersionRegistry {
     pub fn new() -> Self {
-        Self { inner: Mutex::new(HashMap::new()) }
+        Self {
+            inner: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn register_version(
@@ -75,7 +77,8 @@ impl StorageVersionRegistry {
         };
         let mut inner = self.inner.lock().unwrap();
         let entry = inner.entry(key).or_insert(VersionTable {
-            versions: vec![], storage: None,
+            versions: vec![],
+            storage: None,
         });
         if entry.versions.iter().any(|v| v == version) {
             return Err(StorageError::VersionAlreadyRegistered {
@@ -108,39 +111,39 @@ impl StorageVersionRegistry {
             version: version.into(),
         })?;
         if !entry.versions.iter().any(|v| v == version) {
-            return Err(StorageError::UnknownVersion { version: version.into() });
+            return Err(StorageError::UnknownVersion {
+                version: version.into(),
+            });
         }
         entry.storage = Some(version.into());
         Ok(())
     }
 
-    pub fn storage_version(
-        &self,
-        tenant_id: &str,
-        group: &str,
-        kind: &str,
-    ) -> Option<String> {
+    pub fn storage_version(&self, tenant_id: &str, group: &str, kind: &str) -> Option<String> {
         let key = VersionsKey {
             tenant_id: tenant_id.into(),
             group: group.into(),
             kind: kind.into(),
         };
-        self.inner.lock().unwrap().get(&key).and_then(|t| t.storage.clone())
+        self.inner
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|t| t.storage.clone())
     }
 
-    pub fn known_versions(
-        &self,
-        tenant_id: &str,
-        group: &str,
-        kind: &str,
-    ) -> Vec<String> {
+    pub fn known_versions(&self, tenant_id: &str, group: &str, kind: &str) -> Vec<String> {
         let key = VersionsKey {
             tenant_id: tenant_id.into(),
             group: group.into(),
             kind: kind.into(),
         };
-        self.inner.lock().unwrap().get(&key)
-            .map(|t| t.versions.clone()).unwrap_or_default()
+        self.inner
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|t| t.versions.clone())
+            .unwrap_or_default()
     }
 
     /// Encode an object at the elected storage version. Returns the JSON
@@ -152,7 +155,8 @@ impl StorageVersionRegistry {
         kind: &str,
         body: serde_json::Value,
     ) -> Result<serde_json::Value, StorageError> {
-        let storage = self.storage_version(tenant_id, group, kind)
+        let storage = self
+            .storage_version(tenant_id, group, kind)
             .ok_or(StorageError::NoStorageVersionElected)?;
         let api_version = if group.is_empty() {
             storage.clone()
@@ -178,10 +182,15 @@ impl StorageVersionRegistry {
     ) -> Result<serde_json::Value, StorageError> {
         let known = self.known_versions(tenant_id, group, kind);
         if !known.iter().any(|v| v == at_version) {
-            return Err(StorageError::UnknownVersion { version: at_version.into() });
+            return Err(StorageError::UnknownVersion {
+                version: at_version.into(),
+            });
         }
-        let actual_api_version = encoded.get("apiVersion")
-            .and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let actual_api_version = encoded
+            .get("apiVersion")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
         let expected_api_version = if group.is_empty() {
             at_version.to_string()
         } else {
@@ -216,7 +225,9 @@ impl StorageVersionRegistry {
 }
 
 impl Default for StorageVersionRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -230,12 +241,17 @@ mod tests {
     #[test]
     fn test_first_registered_version_is_auto_elected_as_storage() {
         let r = StorageVersionRegistry::new();
-        r.register_version("acme", "acme.io", "Widget", "v1alpha1").unwrap();
-        assert_eq!(r.storage_version("acme", "acme.io", "Widget").as_deref(),
-            Some("v1alpha1"));
+        r.register_version("acme", "acme.io", "Widget", "v1alpha1")
+            .unwrap();
+        assert_eq!(
+            r.storage_version("acme", "acme.io", "Widget").as_deref(),
+            Some("v1alpha1")
+        );
         // tenant_id invariant: globex sees nothing for the same kind.
-        assert!(r.storage_version("globex", "acme.io", "Widget").is_none(),
-            "tenant_id invariant: storage version is per-tenant");
+        assert!(
+            r.storage_version("globex", "acme.io", "Widget").is_none(),
+            "tenant_id invariant: storage version is per-tenant"
+        );
     }
 
     /// Upstream parity: `TestStorageVersion_ElectExplicitVersion`
@@ -244,14 +260,21 @@ mod tests {
     #[test]
     fn test_elect_storage_version_promotes_registered_version() {
         let r = StorageVersionRegistry::new();
-        r.register_version("acme", "acme.io", "Widget", "v1alpha1").unwrap();
-        r.register_version("acme", "acme.io", "Widget", "v1").unwrap();
-        r.elect_storage_version("acme", "acme.io", "Widget", "v1").unwrap();
-        assert_eq!(r.storage_version("acme", "acme.io", "Widget").as_deref(),
-            Some("v1"));
+        r.register_version("acme", "acme.io", "Widget", "v1alpha1")
+            .unwrap();
+        r.register_version("acme", "acme.io", "Widget", "v1")
+            .unwrap();
+        r.elect_storage_version("acme", "acme.io", "Widget", "v1")
+            .unwrap();
+        assert_eq!(
+            r.storage_version("acme", "acme.io", "Widget").as_deref(),
+            Some("v1")
+        );
         // tenant_id invariant: election is scoped — globex still sees nothing.
-        assert!(r.storage_version("globex", "acme.io", "Widget").is_none(),
-            "tenant_id invariant: globex unaffected by acme election");
+        assert!(
+            r.storage_version("globex", "acme.io", "Widget").is_none(),
+            "tenant_id invariant: globex unaffected by acme election"
+        );
     }
 
     /// Upstream parity: `TestStorageVersion_RejectsElectionOfUnknown`
@@ -259,13 +282,22 @@ mod tests {
     #[test]
     fn test_elect_unknown_version_returns_error() {
         let r = StorageVersionRegistry::new();
-        r.register_version("acme", "acme.io", "Widget", "v1").unwrap();
-        let err = r.elect_storage_version("acme", "acme.io", "Widget", "v2")
+        r.register_version("acme", "acme.io", "Widget", "v1")
+            .unwrap();
+        let err = r
+            .elect_storage_version("acme", "acme.io", "Widget", "v2")
             .expect_err("must reject unknown version");
-        assert_eq!(err, StorageError::UnknownVersion { version: "v2".into() });
+        assert_eq!(
+            err,
+            StorageError::UnknownVersion {
+                version: "v2".into()
+            }
+        );
         // tenant_id invariant: storage version unchanged.
-        assert_eq!(r.storage_version("acme", "acme.io", "Widget").as_deref(),
-            Some("v1"));
+        assert_eq!(
+            r.storage_version("acme", "acme.io", "Widget").as_deref(),
+            Some("v1")
+        );
     }
 
     /// Upstream parity: `TestStorageVersion_EncodeStampsApiVersion`
@@ -274,18 +306,24 @@ mod tests {
     #[test]
     fn test_encode_stamps_storage_version_api_version_and_kind() {
         let r = StorageVersionRegistry::new();
-        r.register_version("acme", "acme.io", "Widget", "v1alpha1").unwrap();
-        r.register_version("acme", "acme.io", "Widget", "v1").unwrap();
-        r.elect_storage_version("acme", "acme.io", "Widget", "v1").unwrap();
-        let encoded = r.encode("acme", "acme.io", "Widget", json!({"foo": "bar"})).unwrap();
+        r.register_version("acme", "acme.io", "Widget", "v1alpha1")
+            .unwrap();
+        r.register_version("acme", "acme.io", "Widget", "v1")
+            .unwrap();
+        r.elect_storage_version("acme", "acme.io", "Widget", "v1")
+            .unwrap();
+        let encoded = r
+            .encode("acme", "acme.io", "Widget", json!({"foo": "bar"}))
+            .unwrap();
         assert_eq!(encoded["apiVersion"], "acme.io/v1");
         assert_eq!(encoded["kind"], "Widget");
-        assert_eq!(encoded["foo"], "bar",
-            "encoding preserves payload fields");
+        assert_eq!(encoded["foo"], "bar", "encoding preserves payload fields");
         // tenant_id invariant: globex's encode would fail without its own setup.
         let g = r.encode("globex", "acme.io", "Widget", json!({}));
-        assert!(matches!(g, Err(StorageError::NoStorageVersionElected)),
-            "tenant_id invariant: globex has no election even if acme does");
+        assert!(
+            matches!(g, Err(StorageError::NoStorageVersionElected)),
+            "tenant_id invariant: globex has no election even if acme does"
+        );
     }
 
     /// Upstream parity: `TestStorageVersion_DecodeAtRequestedVersionMatches`
@@ -293,28 +331,38 @@ mod tests {
     #[test]
     fn test_decode_at_requested_version_succeeds_when_match() {
         let r = StorageVersionRegistry::new();
-        r.register_version("acme", "acme.io", "Widget", "v1").unwrap();
+        r.register_version("acme", "acme.io", "Widget", "v1")
+            .unwrap();
         let encoded = json!({
             "apiVersion": "acme.io/v1",
             "kind": "Widget",
             "spec": {"replicas": 3},
         });
-        let decoded = r.decode("acme", "acme.io", "Widget", "v1", &encoded).unwrap();
+        let decoded = r
+            .decode("acme", "acme.io", "Widget", "v1", &encoded)
+            .unwrap();
         assert_eq!(decoded["spec"]["replicas"], 3);
         // Mismatch path:
         let bad = json!({
             "apiVersion": "acme.io/v2",
             "kind": "Widget",
         });
-        let err = r.decode("acme", "acme.io", "Widget", "v1", &bad).unwrap_err();
-        assert_eq!(err, StorageError::DecodeApiVersionMismatch {
-            expected: "acme.io/v1".into(),
-            actual: "acme.io/v2".into(),
-        });
+        let err = r
+            .decode("acme", "acme.io", "Widget", "v1", &bad)
+            .unwrap_err();
+        assert_eq!(
+            err,
+            StorageError::DecodeApiVersionMismatch {
+                expected: "acme.io/v1".into(),
+                actual: "acme.io/v2".into(),
+            }
+        );
         // tenant_id invariant: decode is scoped per-tenant version table.
         let unknown = r.decode("globex", "acme.io", "Widget", "v1", &encoded);
-        assert!(matches!(unknown, Err(StorageError::UnknownVersion { .. })),
-            "tenant_id invariant: globex has no version table for the same kind");
+        assert!(
+            matches!(unknown, Err(StorageError::UnknownVersion { .. })),
+            "tenant_id invariant: globex has no version table for the same kind"
+        );
     }
 
     /// Upstream parity: `TestStorageVersion_HashChangesWithVersionSet`
@@ -323,19 +371,27 @@ mod tests {
     #[test]
     fn test_version_set_hash_changes_when_set_changes_and_is_per_tenant() {
         let r = StorageVersionRegistry::new();
-        r.register_version("acme", "acme.io", "Widget", "v1").unwrap();
+        r.register_version("acme", "acme.io", "Widget", "v1")
+            .unwrap();
         let h1 = r.version_set_hash("acme", "acme.io", "Widget");
-        r.register_version("acme", "acme.io", "Widget", "v2").unwrap();
+        r.register_version("acme", "acme.io", "Widget", "v2")
+            .unwrap();
         let h2 = r.version_set_hash("acme", "acme.io", "Widget");
-        assert_ne!(h1, h2, "hash differs after registering an additional version");
+        assert_ne!(
+            h1, h2,
+            "hash differs after registering an additional version"
+        );
         // tenant_id invariant: globex starts at the empty hash — distinct from
         // acme's even when versions match.
         let g0 = r.version_set_hash("globex", "acme.io", "Widget");
-        r.register_version("globex", "acme.io", "Widget", "v1").unwrap();
+        r.register_version("globex", "acme.io", "Widget", "v1")
+            .unwrap();
         let g1 = r.version_set_hash("globex", "acme.io", "Widget");
         assert_ne!(g0, g1);
-        assert_ne!(g1, h2,
-            "tenant_id invariant: globex hash distinct from acme even with same kind");
+        assert_ne!(
+            g1, h2,
+            "tenant_id invariant: globex hash distinct from acme even with same kind"
+        );
     }
 
     /// Upstream parity: `TestStorageVersion_DuplicateRegisterRejected`
@@ -344,14 +400,23 @@ mod tests {
     #[test]
     fn test_duplicate_version_registration_rejected() {
         let r = StorageVersionRegistry::new();
-        r.register_version("acme", "acme.io", "Widget", "v1").unwrap();
-        let err = r.register_version("acme", "acme.io", "Widget", "v1")
+        r.register_version("acme", "acme.io", "Widget", "v1")
+            .unwrap();
+        let err = r
+            .register_version("acme", "acme.io", "Widget", "v1")
             .expect_err("duplicate registration must error");
-        assert_eq!(err, StorageError::VersionAlreadyRegistered { version: "v1".into() });
+        assert_eq!(
+            err,
+            StorageError::VersionAlreadyRegistered {
+                version: "v1".into()
+            }
+        );
         // tenant_id invariant: registration is per-tenant; globex can register
         // its own v1 independently.
         let ok = r.register_version("globex", "acme.io", "Widget", "v1");
-        assert!(ok.is_ok(),
-            "tenant_id invariant: globex can have its own v1 entry");
+        assert!(
+            ok.is_ok(),
+            "tenant_id invariant: globex can have its own v1 entry"
+        );
     }
 }

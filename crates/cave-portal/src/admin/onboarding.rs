@@ -39,8 +39,7 @@ pub fn tour_for(persona: Persona) -> Vec<TourStep> {
                 title: "Charter compliance".into(),
                 href: "/admin/compliance".into(),
                 description:
-                    "Per-crate dual-grade matrix. Start here to see what's at Grade A vs F."
-                        .into(),
+                    "Per-crate dual-grade matrix. Start here to see what's at Grade A vs F.".into(),
             },
             TourStep {
                 id: "upstream".into(),
@@ -95,14 +94,12 @@ pub fn tour_for(persona: Persona) -> Vec<TourStep> {
                 description: "Per-sandbox and per-container state — exec, logs, attach.".into(),
             },
         ],
-        Persona::Anonymous => vec![
-            TourStep {
-                id: "login".into(),
-                title: "Sign in".into(),
-                href: "/login".into(),
-                description: "Sign in to begin. WebAuthn required for admin views.".into(),
-            },
-        ],
+        Persona::Anonymous => vec![TourStep {
+            id: "login".into(),
+            title: "Sign in".into(),
+            href: "/login".into(),
+            description: "Sign in to begin. WebAuthn required for admin views.".into(),
+        }],
     }
 }
 
@@ -165,7 +162,11 @@ impl OnboardingState {
 
     /// Mark a step complete. Errors if the step id is not part of
     /// the caller persona's tour or if already complete.
-    pub fn complete_step(&self, ctx: &RequestCtx, step_id: &str) -> Result<TourProgress, OnboardError> {
+    pub fn complete_step(
+        &self,
+        ctx: &RequestCtx,
+        step_id: &str,
+    ) -> Result<TourProgress, OnboardError> {
         ctx.authorise(Permission::OnboardWrite)?;
         let tour = tour_for(ctx.persona);
         if !tour.iter().any(|s| s.id == step_id) {

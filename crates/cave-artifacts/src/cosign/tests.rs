@@ -9,11 +9,11 @@
 
 #![cfg(test)]
 
-use super::manifest::{build_payload, manifest_digest, signature_tag, SignatureIndex};
-use super::routes::{router, CosignState};
-use super::{sign, verify, Alg, CosignError, KeyPair, PublicKeyHandle, Signature};
+use super::manifest::{SignatureIndex, build_payload, manifest_digest, signature_tag};
+use super::routes::{CosignState, router};
+use super::{Alg, CosignError, KeyPair, PublicKeyHandle, Signature, sign, verify};
 use axum::{
-    body::{to_bytes, Body},
+    body::{Body, to_bytes},
     http::{Method, Request, StatusCode},
 };
 use serde_json::json;
@@ -102,8 +102,14 @@ fn cross_alg_mismatch_is_typed() {
 fn build_payload_pins_digest_in_critical_image() {
     let bytes = build_payload("registry/foo:bar", "sha256:abc123");
     let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-    assert_eq!(v["critical"]["image"]["docker-manifest-digest"], "sha256:abc123");
-    assert_eq!(v["critical"]["identity"]["docker-reference"], "registry/foo:bar");
+    assert_eq!(
+        v["critical"]["image"]["docker-manifest-digest"],
+        "sha256:abc123"
+    );
+    assert_eq!(
+        v["critical"]["identity"]["docker-reference"],
+        "registry/foo:bar"
+    );
     assert_eq!(v["critical"]["type"], "cosign container image signature");
 }
 

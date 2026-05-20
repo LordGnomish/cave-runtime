@@ -100,11 +100,7 @@ impl RecallEngine for HashRecall {
             .iter()
             .filter_map(|ir| {
                 let score = jaccard(&q_tokens, &ir.tokens);
-                if score > 0.0 {
-                    Some((score, ir))
-                } else {
-                    None
-                }
+                if score > 0.0 { Some((score, ir)) } else { None }
             })
             .collect();
         scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
@@ -234,7 +230,11 @@ impl Embedder for HashEmbedder {
             let bucket = (u32::from_be_bytes([digest[0], digest[1], digest[2], digest[3]])
                 as usize)
                 % self.dim;
-            let sign = if (digest[4] & 1) == 0 { 1.0f32 } else { -1.0f32 };
+            let sign = if (digest[4] & 1) == 0 {
+                1.0f32
+            } else {
+                -1.0f32
+            };
             v[bucket] += sign;
         }
         let norm = v.iter().map(|x| x * x).sum::<f32>().sqrt();

@@ -162,7 +162,10 @@ impl Sentinel {
             .get_mut(name)
             .ok_or_else(|| SentinelError::UnknownMaster(name.into()))?;
         m.last_ping_ok_ms = now;
-        if matches!(m.state, MasterState::SubjectiveDown | MasterState::ObjectiveDown) {
+        if matches!(
+            m.state,
+            MasterState::SubjectiveDown | MasterState::ObjectiveDown
+        ) {
             m.state = MasterState::Up;
             m.odown_votes.clear();
         }
@@ -198,15 +201,18 @@ impl Sentinel {
             .ok_or_else(|| SentinelError::UnknownMaster(name.into()))?;
         m.odown_votes.insert(peer_sentinel_id.into());
         // Quorum reached → escalate to ObjectiveDown.
-        if m.odown_votes.len() as u32 >= m.quorum
-            && matches!(m.state, MasterState::SubjectiveDown)
+        if m.odown_votes.len() as u32 >= m.quorum && matches!(m.state, MasterState::SubjectiveDown)
         {
             m.state = MasterState::ObjectiveDown;
         }
         Ok(m.state)
     }
 
-    pub fn register_replica(&mut self, name: &str, replica: ReplicaInfo) -> Result<(), SentinelError> {
+    pub fn register_replica(
+        &mut self,
+        name: &str,
+        replica: ReplicaInfo,
+    ) -> Result<(), SentinelError> {
         let m = self
             .masters
             .get_mut(name)
@@ -336,7 +342,10 @@ mod tests {
     fn monitor_duplicate_refused() {
         let mut s = s();
         s.monitor("m", "a", 1, 1000).unwrap();
-        assert!(matches!(s.monitor("m", "a", 1, 1000).unwrap_err(), SentinelError::AlreadyMonitored(_)));
+        assert!(matches!(
+            s.monitor("m", "a", 1, 1000).unwrap_err(),
+            SentinelError::AlreadyMonitored(_)
+        ));
     }
 
     #[test]
@@ -433,8 +442,10 @@ mod tests {
     fn full_failover_lifecycle() {
         let mut s = s();
         s.monitor("m", "old:6379", 2, 1000).unwrap();
-        s.register_replica("m", replica("r1:6379", 100, 50)).unwrap();
-        s.register_replica("m", replica("r2:6379", 200, 10)).unwrap();
+        s.register_replica("m", replica("r1:6379", 100, 50))
+            .unwrap();
+        s.register_replica("m", replica("r2:6379", 200, 10))
+            .unwrap();
         s.advance_clock(2000);
         s.tick("m").unwrap();
         s.record_peer_down_vote("m", "p1").unwrap();
@@ -457,7 +468,10 @@ mod tests {
         let mut s = s();
         s.monitor("m", "a", 1, 1000).unwrap();
         s.register_replica("m", replica("r1", 100, 0)).unwrap();
-        assert!(matches!(s.select_promotion_candidate("m").unwrap_err(), SentinelError::NoEligibleReplica));
+        assert!(matches!(
+            s.select_promotion_candidate("m").unwrap_err(),
+            SentinelError::NoEligibleReplica
+        ));
     }
 
     #[test]
@@ -465,7 +479,10 @@ mod tests {
         let mut s = s();
         s.monitor("m", "a", 1, 1000).unwrap();
         s.remove("m").unwrap();
-        assert!(matches!(s.remove("m").unwrap_err(), SentinelError::UnknownMaster(_)));
+        assert!(matches!(
+            s.remove("m").unwrap_err(),
+            SentinelError::UnknownMaster(_)
+        ));
     }
 
     #[test]

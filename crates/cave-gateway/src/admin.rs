@@ -8,15 +8,15 @@
 use crate::models::*;
 use crate::store::SharedStore;
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{delete, get, patch, post, put},
-    Json, Router,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -30,48 +30,130 @@ pub fn admin_router(store: SharedStore) -> Router {
         .route("/", get(root_info))
         // Services
         .route("/services", get(list_services).post(create_service))
-        .route("/services/{id_or_name}", get(get_service).patch(update_service).put(upsert_service).delete(delete_service))
-        .route("/services/{id_or_name}/routes", get(list_routes_for_service))
-        .route("/services/{id_or_name}/plugins", get(list_plugins_for_service))
+        .route(
+            "/services/{id_or_name}",
+            get(get_service)
+                .patch(update_service)
+                .put(upsert_service)
+                .delete(delete_service),
+        )
+        .route(
+            "/services/{id_or_name}/routes",
+            get(list_routes_for_service),
+        )
+        .route(
+            "/services/{id_or_name}/plugins",
+            get(list_plugins_for_service),
+        )
         // Routes
         .route("/routes", get(list_routes).post(create_route))
-        .route("/routes/{id_or_name}", get(get_route).patch(update_route).put(upsert_route).delete(delete_route))
+        .route(
+            "/routes/{id_or_name}",
+            get(get_route)
+                .patch(update_route)
+                .put(upsert_route)
+                .delete(delete_route),
+        )
         .route("/routes/{id_or_name}/plugins", get(list_plugins_for_route))
         // Upstreams
         .route("/upstreams", get(list_upstreams).post(create_upstream))
-        .route("/upstreams/{id_or_name}", get(get_upstream).patch(update_upstream).put(upsert_upstream).delete(delete_upstream))
-        .route("/upstreams/{id_or_name}/targets", get(list_targets).post(create_target))
-        .route("/upstreams/{id_or_name}/targets/{target_id}", get(get_target).delete(delete_target))
-        .route("/upstreams/{id_or_name}/targets/{target_id}/healthy", put(set_target_healthy))
-        .route("/upstreams/{id_or_name}/targets/{target_id}/unhealthy", put(set_target_unhealthy))
+        .route(
+            "/upstreams/{id_or_name}",
+            get(get_upstream)
+                .patch(update_upstream)
+                .put(upsert_upstream)
+                .delete(delete_upstream),
+        )
+        .route(
+            "/upstreams/{id_or_name}/targets",
+            get(list_targets).post(create_target),
+        )
+        .route(
+            "/upstreams/{id_or_name}/targets/{target_id}",
+            get(get_target).delete(delete_target),
+        )
+        .route(
+            "/upstreams/{id_or_name}/targets/{target_id}/healthy",
+            put(set_target_healthy),
+        )
+        .route(
+            "/upstreams/{id_or_name}/targets/{target_id}/unhealthy",
+            put(set_target_unhealthy),
+        )
         .route("/upstreams/{id_or_name}/health", get(get_upstream_health))
         // Consumers
         .route("/consumers", get(list_consumers).post(create_consumer))
-        .route("/consumers/{id_or_name}", get(get_consumer).patch(update_consumer).delete(delete_consumer))
-        .route("/consumers/{id_or_name}/plugins", get(list_plugins_for_consumer))
+        .route(
+            "/consumers/{id_or_name}",
+            get(get_consumer)
+                .patch(update_consumer)
+                .delete(delete_consumer),
+        )
+        .route(
+            "/consumers/{id_or_name}/plugins",
+            get(list_plugins_for_consumer),
+        )
         // Consumer credentials
-        .route("/consumers/{id_or_name}/key-auth", get(list_key_auth).post(create_key_auth))
-        .route("/consumers/{id_or_name}/key-auth/{cred_id}", delete(delete_key_auth))
-        .route("/consumers/{id_or_name}/jwt", get(list_jwt).post(create_jwt))
+        .route(
+            "/consumers/{id_or_name}/key-auth",
+            get(list_key_auth).post(create_key_auth),
+        )
+        .route(
+            "/consumers/{id_or_name}/key-auth/{cred_id}",
+            delete(delete_key_auth),
+        )
+        .route(
+            "/consumers/{id_or_name}/jwt",
+            get(list_jwt).post(create_jwt),
+        )
         .route("/consumers/{id_or_name}/jwt/{cred_id}", delete(delete_jwt))
-        .route("/consumers/{id_or_name}/basic-auth", get(list_basic_auth).post(create_basic_auth))
-        .route("/consumers/{id_or_name}/basic-auth/{cred_id}", delete(delete_basic_auth))
-        .route("/consumers/{id_or_name}/hmac-auth", get(list_hmac_auth).post(create_hmac_auth))
-        .route("/consumers/{id_or_name}/hmac-auth/{cred_id}", delete(delete_hmac_auth))
-        .route("/consumers/{id_or_name}/acls", get(list_acls).post(create_acl))
+        .route(
+            "/consumers/{id_or_name}/basic-auth",
+            get(list_basic_auth).post(create_basic_auth),
+        )
+        .route(
+            "/consumers/{id_or_name}/basic-auth/{cred_id}",
+            delete(delete_basic_auth),
+        )
+        .route(
+            "/consumers/{id_or_name}/hmac-auth",
+            get(list_hmac_auth).post(create_hmac_auth),
+        )
+        .route(
+            "/consumers/{id_or_name}/hmac-auth/{cred_id}",
+            delete(delete_hmac_auth),
+        )
+        .route(
+            "/consumers/{id_or_name}/acls",
+            get(list_acls).post(create_acl),
+        )
         .route("/consumers/{id_or_name}/acls/{acl_id}", delete(delete_acl))
         // Plugins
         .route("/plugins", get(list_plugins).post(create_plugin))
-        .route("/plugins/{id}", get(get_plugin).patch(update_plugin).delete(delete_plugin))
+        .route(
+            "/plugins/{id}",
+            get(get_plugin).patch(update_plugin).delete(delete_plugin),
+        )
         .route("/plugins/enabled", get(list_enabled_plugins))
         .route("/plugins/schema/{plugin_name}", get(get_plugin_schema))
         // Certificates
-        .route("/certificates", get(list_certificates).post(create_certificate))
-        .route("/certificates/{id}", get(get_certificate).patch(update_certificate).delete(delete_certificate))
+        .route(
+            "/certificates",
+            get(list_certificates).post(create_certificate),
+        )
+        .route(
+            "/certificates/{id}",
+            get(get_certificate)
+                .patch(update_certificate)
+                .delete(delete_certificate),
+        )
         .route("/certificates/{id}/snis", get(list_snis_for_cert))
         // SNIs
         .route("/snis", get(list_snis).post(create_sni))
-        .route("/snis/{id_or_name}", get(get_sni).patch(update_sni).delete(delete_sni))
+        .route(
+            "/snis/{id_or_name}",
+            get(get_sni).patch(update_sni).delete(delete_sni),
+        )
         // Tags
         .route("/tags", get(list_tags))
         .route("/tags/{tag}", get(list_entities_by_tag))
@@ -147,22 +229,46 @@ async fn create_service(
     let (host, port, protocol) = if let Some(url) = &body.url {
         parse_url(url)
     } else {
-        (body.host.clone(), body.port.unwrap_or(80), body.protocol.clone().unwrap_or(Protocol::Http))
+        (
+            body.host.clone(),
+            body.port.unwrap_or(80),
+            body.protocol.clone().unwrap_or(Protocol::Http),
+        )
     };
 
     let mut svc = Service::new(host, port, protocol);
     svc.name = body.name;
-    if let Some(p) = body.path { svc.path = Some(p); }
-    if let Some(r) = body.retries { svc.retries = r; }
-    if let Some(t) = body.connect_timeout { svc.connect_timeout = t; }
-    if let Some(t) = body.write_timeout { svc.write_timeout = t; }
-    if let Some(t) = body.read_timeout { svc.read_timeout = t; }
-    if let Some(e) = body.enabled { svc.enabled = e; }
-    if let Some(tags) = body.tags { svc.tags = tags; }
-    if let Some(v) = body.tls_verify { svc.tls_verify = Some(v); }
+    if let Some(p) = body.path {
+        svc.path = Some(p);
+    }
+    if let Some(r) = body.retries {
+        svc.retries = r;
+    }
+    if let Some(t) = body.connect_timeout {
+        svc.connect_timeout = t;
+    }
+    if let Some(t) = body.write_timeout {
+        svc.write_timeout = t;
+    }
+    if let Some(t) = body.read_timeout {
+        svc.read_timeout = t;
+    }
+    if let Some(e) = body.enabled {
+        svc.enabled = e;
+    }
+    if let Some(tags) = body.tags {
+        svc.tags = tags;
+    }
+    if let Some(v) = body.tls_verify {
+        svc.tls_verify = Some(v);
+    }
 
     store.insert_service(svc.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(svc).unwrap())).into_response()
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(svc).unwrap()),
+    )
+        .into_response()
 }
 
 async fn update_service(
@@ -175,12 +281,24 @@ async fn update_service(
         None => return not_found("service"),
     };
 
-    if let Some(n) = body.name { svc.name = Some(n); }
-    if let Some(h) = body.protocol { svc.protocol = h; }
-    if !body.host.is_empty() { svc.host = body.host; }
-    if let Some(p) = body.port { svc.port = p; }
-    if let Some(p) = body.path { svc.path = Some(p); }
-    if let Some(r) = body.retries { svc.retries = r; }
+    if let Some(n) = body.name {
+        svc.name = Some(n);
+    }
+    if let Some(h) = body.protocol {
+        svc.protocol = h;
+    }
+    if !body.host.is_empty() {
+        svc.host = body.host;
+    }
+    if let Some(p) = body.port {
+        svc.port = p;
+    }
+    if let Some(p) = body.path {
+        svc.path = Some(p);
+    }
+    if let Some(r) = body.retries {
+        svc.retries = r;
+    }
     svc.updated_at = Utc::now();
 
     store.insert_service(svc.clone());
@@ -193,9 +311,13 @@ async fn upsert_service(
     Json(body): Json<CreateService>,
 ) -> Response {
     if store.get_service_by_id_or_name(&id_or_name).is_some() {
-        update_service(State(store), Path(id_or_name), Json(body)).await.into_response()
+        update_service(State(store), Path(id_or_name), Json(body))
+            .await
+            .into_response()
     } else {
-        create_service(State(store), Json(body)).await.into_response()
+        create_service(State(store), Json(body))
+            .await
+            .into_response()
     }
 }
 
@@ -203,9 +325,7 @@ async fn delete_service(
     State(store): State<AdminState>,
     Path(id_or_name): Path<String>,
 ) -> impl IntoResponse {
-    let id = store
-        .get_service_by_id_or_name(&id_or_name)
-        .map(|s| s.id);
+    let id = store.get_service_by_id_or_name(&id_or_name).map(|s| s.id);
     match id {
         Some(id) if store.delete_service(&id) => StatusCode::NO_CONTENT.into_response(),
         _ => not_found("service"),
@@ -264,20 +384,46 @@ async fn create_route(
         route.service_id = None;
     }
     route.name = body.name;
-    if let Some(p) = body.protocols { route.protocols = p; }
-    if let Some(m) = body.methods { route.methods = Some(m); }
-    if let Some(h) = body.hosts { route.hosts = Some(h); }
-    if let Some(p) = body.paths { route.paths = Some(p); }
-    if let Some(h) = body.headers { route.headers = Some(h); }
-    if let Some(rp) = body.regex_priority { route.regex_priority = rp; }
-    if let Some(sp) = body.strip_path { route.strip_path = sp; }
-    if let Some(ph) = body.preserve_host { route.preserve_host = ph; }
-    if let Some(ph) = body.path_handling { route.path_handling = ph; }
-    if let Some(snis) = body.snis { route.snis = Some(snis); }
-    if let Some(tags) = body.tags { route.tags = tags; }
+    if let Some(p) = body.protocols {
+        route.protocols = p;
+    }
+    if let Some(m) = body.methods {
+        route.methods = Some(m);
+    }
+    if let Some(h) = body.hosts {
+        route.hosts = Some(h);
+    }
+    if let Some(p) = body.paths {
+        route.paths = Some(p);
+    }
+    if let Some(h) = body.headers {
+        route.headers = Some(h);
+    }
+    if let Some(rp) = body.regex_priority {
+        route.regex_priority = rp;
+    }
+    if let Some(sp) = body.strip_path {
+        route.strip_path = sp;
+    }
+    if let Some(ph) = body.preserve_host {
+        route.preserve_host = ph;
+    }
+    if let Some(ph) = body.path_handling {
+        route.path_handling = ph;
+    }
+    if let Some(snis) = body.snis {
+        route.snis = Some(snis);
+    }
+    if let Some(tags) = body.tags {
+        route.tags = tags;
+    }
 
     store.insert_route(route.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(route).unwrap())).into_response()
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(route).unwrap()),
+    )
+        .into_response()
 }
 
 async fn update_route(
@@ -290,14 +436,30 @@ async fn update_route(
         None => return not_found("route"),
     };
 
-    if let Some(n) = body.name { route.name = Some(n); }
-    if let Some(p) = body.protocols { route.protocols = p; }
-    if let Some(m) = body.methods { route.methods = Some(m); }
-    if let Some(h) = body.hosts { route.hosts = Some(h); }
-    if let Some(p) = body.paths { route.paths = Some(p); }
-    if let Some(h) = body.headers { route.headers = Some(h); }
-    if let Some(rp) = body.regex_priority { route.regex_priority = rp; }
-    if let Some(sp) = body.strip_path { route.strip_path = sp; }
+    if let Some(n) = body.name {
+        route.name = Some(n);
+    }
+    if let Some(p) = body.protocols {
+        route.protocols = p;
+    }
+    if let Some(m) = body.methods {
+        route.methods = Some(m);
+    }
+    if let Some(h) = body.hosts {
+        route.hosts = Some(h);
+    }
+    if let Some(p) = body.paths {
+        route.paths = Some(p);
+    }
+    if let Some(h) = body.headers {
+        route.headers = Some(h);
+    }
+    if let Some(rp) = body.regex_priority {
+        route.regex_priority = rp;
+    }
+    if let Some(sp) = body.strip_path {
+        route.strip_path = sp;
+    }
     route.updated_at = Utc::now();
 
     store.insert_route(route.clone());
@@ -310,7 +472,9 @@ async fn upsert_route(
     Json(body): Json<CreateRoute>,
 ) -> Response {
     if store.get_route_by_id_or_name(&id_or_name).is_some() {
-        update_route(State(store), Path(id_or_name), Json(body)).await.into_response()
+        update_route(State(store), Path(id_or_name), Json(body))
+            .await
+            .into_response()
     } else {
         create_route(State(store), Json(body)).await.into_response()
     }
@@ -332,7 +496,9 @@ async fn list_plugins_for_route(
     Path(id_or_name): Path<String>,
 ) -> impl IntoResponse {
     match store.get_route_by_id_or_name(&id_or_name) {
-        Some(r) => Json(json!({"data": store.plugins_for_route(&r.id), "next": null})).into_response(),
+        Some(r) => {
+            Json(json!({"data": store.plugins_for_route(&r.id), "next": null})).into_response()
+        }
         None => not_found("route"),
     }
 }
@@ -358,11 +524,21 @@ async fn create_upstream(
     Json(body): Json<CreateUpstream>,
 ) -> impl IntoResponse {
     let mut up = Upstream::new(body.name);
-    if let Some(a) = body.algorithm { up.algorithm = a; }
-    if let Some(h) = body.hash_on { up.hash_on = h; }
-    if let Some(s) = body.slots { up.slots = s; }
-    if let Some(hc) = body.healthchecks { up.healthchecks = hc; }
-    if let Some(tags) = body.tags { up.tags = tags; }
+    if let Some(a) = body.algorithm {
+        up.algorithm = a;
+    }
+    if let Some(h) = body.hash_on {
+        up.hash_on = h;
+    }
+    if let Some(s) = body.slots {
+        up.slots = s;
+    }
+    if let Some(hc) = body.healthchecks {
+        up.healthchecks = hc;
+    }
+    if let Some(tags) = body.tags {
+        up.tags = tags;
+    }
 
     store.insert_upstream(up.clone());
     (StatusCode::CREATED, Json(serde_json::to_value(up).unwrap())).into_response()
@@ -377,9 +553,15 @@ async fn update_upstream(
         Some(u) => u,
         None => return not_found("upstream"),
     };
-    if let Some(a) = body.algorithm { up.algorithm = a; }
-    if let Some(h) = body.hash_on { up.hash_on = h; }
-    if let Some(hc) = body.healthchecks { up.healthchecks = hc; }
+    if let Some(a) = body.algorithm {
+        up.algorithm = a;
+    }
+    if let Some(h) = body.hash_on {
+        up.hash_on = h;
+    }
+    if let Some(hc) = body.healthchecks {
+        up.healthchecks = hc;
+    }
     up.updated_at = Utc::now();
     store.insert_upstream(up.clone());
     Json(serde_json::to_value(up).unwrap()).into_response()
@@ -391,9 +573,13 @@ async fn upsert_upstream(
     Json(body): Json<CreateUpstream>,
 ) -> Response {
     if store.get_upstream_by_id_or_name(&id_or_name).is_some() {
-        update_upstream(State(store), Path(id_or_name), Json(body)).await.into_response()
+        update_upstream(State(store), Path(id_or_name), Json(body))
+            .await
+            .into_response()
     } else {
-        create_upstream(State(store), Json(body)).await.into_response()
+        create_upstream(State(store), Json(body))
+            .await
+            .into_response()
     }
 }
 
@@ -444,7 +630,9 @@ async fn create_target(
     };
 
     let mut t = Target::new(up.id, body.target, body.weight.unwrap_or(100));
-    if let Some(tags) = body.tags { t.tags = tags; }
+    if let Some(tags) = body.tags {
+        t.tags = tags;
+    }
     store.insert_target(t.clone());
     (StatusCode::CREATED, Json(serde_json::to_value(t).unwrap())).into_response()
 }
@@ -481,16 +669,20 @@ async fn get_upstream_health(
     match store.get_upstream_by_id_or_name(&id_or_name) {
         Some(up) => {
             let targets = store.targets_for_upstream(&up.id);
-            let health_data: Vec<Value> = targets.iter().map(|t| {
-                json!({
-                    "id": t.id,
-                    "target": t.target,
-                    "weight": t.weight,
-                    "health": "HEALTHY",
-                    "data": {}
+            let health_data: Vec<Value> = targets
+                .iter()
+                .map(|t| {
+                    json!({
+                        "id": t.id,
+                        "target": t.target,
+                        "weight": t.weight,
+                        "health": "HEALTHY",
+                        "data": {}
+                    })
                 })
-            }).collect();
-            Json(json!({"data": health_data, "node_id": Uuid::new_v4(), "now": Utc::now()})).into_response()
+                .collect();
+            Json(json!({"data": health_data, "node_id": Uuid::new_v4(), "now": Utc::now()}))
+                .into_response()
         }
         None => not_found("upstream"),
     }
@@ -517,7 +709,9 @@ async fn create_consumer(
     Json(body): Json<CreateConsumer>,
 ) -> impl IntoResponse {
     let mut c = Consumer::new(body.username, body.custom_id);
-    if let Some(tags) = body.tags { c.tags = tags; }
+    if let Some(tags) = body.tags {
+        c.tags = tags;
+    }
     store.insert_consumer(c.clone());
     (StatusCode::CREATED, Json(serde_json::to_value(c).unwrap())).into_response()
 }
@@ -531,9 +725,15 @@ async fn update_consumer(
         Some(c) => c,
         None => return not_found("consumer"),
     };
-    if let Some(u) = body.username { c.username = Some(u); }
-    if let Some(ci) = body.custom_id { c.custom_id = Some(ci); }
-    if let Some(tags) = body.tags { c.tags = tags; }
+    if let Some(u) = body.username {
+        c.username = Some(u);
+    }
+    if let Some(ci) = body.custom_id {
+        c.custom_id = Some(ci);
+    }
+    if let Some(tags) = body.tags {
+        c.tags = tags;
+    }
     c.updated_at = Utc::now();
     store.insert_consumer(c.clone());
     Json(serde_json::to_value(c).unwrap()).into_response()
@@ -604,9 +804,13 @@ async fn create_key_auth(
     };
 
     let key = body.key.unwrap_or_else(|| {
-        use rand::distributions::Alphanumeric;
         use rand::Rng;
-        rand::thread_rng().sample_iter(&Alphanumeric).take(32).map(char::from).collect()
+        use rand::distributions::Alphanumeric;
+        rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(32)
+            .map(char::from)
+            .collect()
     });
 
     let cred = KeyAuthCredential {
@@ -621,7 +825,11 @@ async fn create_key_auth(
     store.key_auth.insert(cred.id, cred.clone());
     store.key_auth_idx.insert(key, cred.id);
 
-    (StatusCode::CREATED, Json(serde_json::to_value(cred).unwrap())).into_response()
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(cred).unwrap()),
+    )
+        .into_response()
 }
 
 async fn delete_key_auth(
@@ -674,9 +882,13 @@ async fn create_jwt(
 
     let key = body.key.unwrap_or_else(|| Uuid::new_v4().to_string());
     let secret = body.secret.unwrap_or_else(|| {
-        use rand::distributions::Alphanumeric;
         use rand::Rng;
-        rand::thread_rng().sample_iter(&Alphanumeric).take(32).map(char::from).collect()
+        use rand::distributions::Alphanumeric;
+        rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(32)
+            .map(char::from)
+            .collect()
     });
 
     let cred = JwtCredential {
@@ -693,7 +905,11 @@ async fn create_jwt(
     store.jwt_creds.insert(cred.id, cred.clone());
     store.jwt_key_idx.insert(key, cred.id);
 
-    (StatusCode::CREATED, Json(serde_json::to_value(cred).unwrap())).into_response()
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(cred).unwrap()),
+    )
+        .into_response()
 }
 
 async fn delete_jwt(
@@ -758,7 +974,11 @@ async fn create_basic_auth(
     store.basic_auth.insert(cred.id, cred.clone());
     store.basic_auth_idx.insert(body.username, cred.id);
 
-    (StatusCode::CREATED, Json(serde_json::to_value(cred).unwrap())).into_response()
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(cred).unwrap()),
+    )
+        .into_response()
 }
 
 async fn delete_basic_auth(
@@ -807,9 +1027,13 @@ async fn create_hmac_auth(
         None => return not_found("consumer"),
     };
     let secret = body.secret.unwrap_or_else(|| {
-        use rand::distributions::Alphanumeric;
         use rand::Rng;
-        rand::thread_rng().sample_iter(&Alphanumeric).take(32).map(char::from).collect()
+        use rand::distributions::Alphanumeric;
+        rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(32)
+            .map(char::from)
+            .collect()
     });
     let cred = HmacAuthCredential {
         id: Uuid::new_v4(),
@@ -821,7 +1045,11 @@ async fn create_hmac_auth(
     };
     store.hmac_auth.insert(cred.id, cred.clone());
     store.hmac_auth_idx.insert(body.username, cred.id);
-    (StatusCode::CREATED, Json(serde_json::to_value(cred).unwrap())).into_response()
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(cred).unwrap()),
+    )
+        .into_response()
 }
 
 async fn delete_hmac_auth(
@@ -876,7 +1104,11 @@ async fn create_acl(
         created_at: Utc::now(),
     };
     store.acl_groups.insert(acl.id, acl.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(acl).unwrap())).into_response()
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(acl).unwrap()),
+    )
+        .into_response()
 }
 
 async fn delete_acl(
@@ -896,10 +1128,7 @@ async fn list_plugins(State(store): State<AdminState>) -> Json<Value> {
     Json(json!({"data": store.list_plugins(), "next": null}))
 }
 
-async fn get_plugin(
-    State(store): State<AdminState>,
-    Path(id): Path<Uuid>,
-) -> impl IntoResponse {
+async fn get_plugin(State(store): State<AdminState>, Path(id): Path<Uuid>) -> impl IntoResponse {
     match store.plugins.get(&id) {
         Some(p) => Json(serde_json::to_value(p.value().clone()).unwrap()).into_response(),
         None => not_found("plugin"),
@@ -910,16 +1139,29 @@ async fn create_plugin(
     State(store): State<AdminState>,
     Json(body): Json<CreatePlugin>,
 ) -> impl IntoResponse {
-    let mut plugin = Plugin::new(body.name, body.config.unwrap_or(Value::Object(Default::default())));
+    let mut plugin = Plugin::new(
+        body.name,
+        body.config.unwrap_or(Value::Object(Default::default())),
+    );
     plugin.service_id = body.service.as_ref().and_then(|r| r.id);
     plugin.route_id = body.route.as_ref().and_then(|r| r.id);
     plugin.consumer_id = body.consumer.as_ref().and_then(|r| r.id);
-    if let Some(e) = body.enabled { plugin.enabled = e; }
-    if let Some(p) = body.protocols { plugin.protocols = p; }
-    if let Some(tags) = body.tags { plugin.tags = tags; }
+    if let Some(e) = body.enabled {
+        plugin.enabled = e;
+    }
+    if let Some(p) = body.protocols {
+        plugin.protocols = p;
+    }
+    if let Some(tags) = body.tags {
+        plugin.tags = tags;
+    }
 
     store.insert_plugin(plugin.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(plugin).unwrap())).into_response()
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(plugin).unwrap()),
+    )
+        .into_response()
 }
 
 async fn update_plugin(
@@ -931,19 +1173,24 @@ async fn update_plugin(
         Some(p) => p.value().clone(),
         None => return not_found("plugin"),
     };
-    if let Some(c) = body.config { plugin.config = c; }
-    if let Some(e) = body.enabled { plugin.enabled = e; }
-    if let Some(p) = body.protocols { plugin.protocols = p; }
-    if let Some(tags) = body.tags { plugin.tags = tags; }
+    if let Some(c) = body.config {
+        plugin.config = c;
+    }
+    if let Some(e) = body.enabled {
+        plugin.enabled = e;
+    }
+    if let Some(p) = body.protocols {
+        plugin.protocols = p;
+    }
+    if let Some(tags) = body.tags {
+        plugin.tags = tags;
+    }
     plugin.updated_at = Utc::now();
     store.insert_plugin(plugin.clone());
     Json(serde_json::to_value(plugin).unwrap()).into_response()
 }
 
-async fn delete_plugin(
-    State(store): State<AdminState>,
-    Path(id): Path<Uuid>,
-) -> impl IntoResponse {
+async fn delete_plugin(State(store): State<AdminState>, Path(id): Path<Uuid>) -> impl IntoResponse {
     if store.delete_plugin(&id) {
         StatusCode::NO_CONTENT.into_response()
     } else {
@@ -992,7 +1239,9 @@ async fn create_certificate(
     let mut cert = Certificate::new(body.cert, body.key);
     cert.cert_alt = body.cert_alt;
     cert.key_alt = body.key_alt;
-    if let Some(tags) = body.tags { cert.tags = tags; }
+    if let Some(tags) = body.tags {
+        cert.tags = tags;
+    }
 
     // Auto-create SNIs if provided
     let cert_id = cert.id;
@@ -1005,7 +1254,11 @@ async fn create_certificate(
         }
     }
 
-    (StatusCode::CREATED, Json(serde_json::to_value(cert).unwrap())).into_response()
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(cert).unwrap()),
+    )
+        .into_response()
 }
 
 async fn update_certificate(
@@ -1077,13 +1330,25 @@ async fn create_sni(
 ) -> impl IntoResponse {
     let cert_id = match body.certificate.id {
         Some(id) => id,
-        None => return (StatusCode::BAD_REQUEST, Json(json!({"message": "certificate.id required"}))).into_response(),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"message": "certificate.id required"})),
+            )
+                .into_response();
+        }
     };
 
     let mut sni = Sni::new(body.name, cert_id);
-    if let Some(tags) = body.tags { sni.tags = tags; }
+    if let Some(tags) = body.tags {
+        sni.tags = tags;
+    }
     store.insert_sni(sni.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(sni).unwrap())).into_response()
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(sni).unwrap()),
+    )
+        .into_response()
 }
 
 async fn update_sni(
@@ -1100,7 +1365,9 @@ async fn update_sni(
         Some(s) => s,
         None => return not_found("sni"),
     };
-    if let Some(cert_id) = body.certificate.id { sni.certificate_id = cert_id; }
+    if let Some(cert_id) = body.certificate.id {
+        sni.certificate_id = cert_id;
+    }
     sni.updated_at = Utc::now();
     store.insert_sni(sni.clone());
     Json(serde_json::to_value(sni).unwrap()).into_response()
@@ -1125,11 +1392,30 @@ async fn delete_sni(
 
 async fn list_tags(State(store): State<AdminState>) -> Json<Value> {
     let mut tags = std::collections::HashSet::new();
-    for s in store.list_services() { for t in s.tags { tags.insert(t); } }
-    for r in store.list_routes() { for t in r.tags { tags.insert(t); } }
-    for u in store.list_upstreams() { for t in u.tags { tags.insert(t); } }
-    for c in store.list_consumers() { for t in c.tags { tags.insert(t); } }
-    let data: Vec<Value> = tags.into_iter().map(|t| json!({"tag": t, "entity_type": "mixed"})).collect();
+    for s in store.list_services() {
+        for t in s.tags {
+            tags.insert(t);
+        }
+    }
+    for r in store.list_routes() {
+        for t in r.tags {
+            tags.insert(t);
+        }
+    }
+    for u in store.list_upstreams() {
+        for t in u.tags {
+            tags.insert(t);
+        }
+    }
+    for c in store.list_consumers() {
+        for t in c.tags {
+            tags.insert(t);
+        }
+    }
+    let data: Vec<Value> = tags
+        .into_iter()
+        .map(|t| json!({"tag": t, "entity_type": "mixed"}))
+        .collect();
     Json(json!({"data": data, "next": null}))
 }
 

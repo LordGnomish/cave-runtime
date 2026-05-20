@@ -32,36 +32,36 @@ struct Inner {
     next_version_id: i64,
 
     // Core entities
-    dashboards: HashMap<String, Dashboard>,          // uid → dashboard
-    dashboard_by_id: HashMap<i64, String>,           // id → uid
+    dashboards: HashMap<String, Dashboard>, // uid → dashboard
+    dashboard_by_id: HashMap<i64, String>,  // id → uid
     dashboard_versions: HashMap<i64, Vec<DashboardVersion>>, // dashboard_id → versions
-    starred: HashMap<(i64, String), bool>,           // (user_id, dashboard_uid)
+    starred: HashMap<(i64, String), bool>,  // (user_id, dashboard_uid)
 
-    folders: HashMap<String, Folder>,               // uid → folder
-    folder_by_id: HashMap<i64, String>,             // id → uid
+    folders: HashMap<String, Folder>,   // uid → folder
+    folder_by_id: HashMap<i64, String>, // id → uid
 
-    datasources: HashMap<String, DataSource>,        // uid → datasource
-    datasource_by_id: HashMap<i64, String>,          // id → uid
+    datasources: HashMap<String, DataSource>, // uid → datasource
+    datasource_by_id: HashMap<i64, String>,   // id → uid
     datasource_by_name: HashMap<(i64, String), String>, // (org_id, name) → uid
 
     orgs: HashMap<i64, Org>,
     users: HashMap<i64, User>,
     user_by_login: HashMap<String, i64>,
     teams: HashMap<i64, Team>,
-    team_members: HashMap<i64, Vec<TeamMember>>,     // team_id → members
+    team_members: HashMap<i64, Vec<TeamMember>>, // team_id → members
     api_keys: HashMap<i64, ApiKey>,
     api_key_by_hash: HashMap<String, i64>,
     service_accounts: HashMap<i64, ServiceAccount>,
 
     annotations: HashMap<i64, Annotation>,
-    snapshots: HashMap<String, Snapshot>,            // key → snapshot
+    snapshots: HashMap<String, Snapshot>, // key → snapshot
     snapshot_by_delete_key: HashMap<String, String>, // delete_key → key
     playlists: HashMap<i64, Playlist>,
 
     // Unified alerting
-    alert_rules: HashMap<String, AlertRule>,         // uid → rule
+    alert_rules: HashMap<String, AlertRule>, // uid → rule
     rule_groups: HashMap<(String, String), Vec<String>>, // (folder_uid, group) → rule uids
-    contact_points: HashMap<String, ContactPoint>,   // uid → contact point
+    contact_points: HashMap<String, ContactPoint>, // uid → contact point
     notification_policy: Option<NotificationPolicy>,
     silences: HashMap<String, Silence>,
     mute_timings: HashMap<String, MuteTiming>,
@@ -191,10 +191,13 @@ impl DashboardStore {
         let now = Utc::now();
 
         // If UID exists — update; else create
-        let existing_snapshot = inner.dashboards.get(&dashboard.uid).map(|e| {
-            (e.version, e.id, e.revision, e.created)
-        });
-        if let Some((existing_version, existing_id, existing_revision, existing_created)) = existing_snapshot {
+        let existing_snapshot = inner
+            .dashboards
+            .get(&dashboard.uid)
+            .map(|e| (e.version, e.id, e.revision, e.created));
+        if let Some((existing_version, existing_id, existing_revision, existing_created)) =
+            existing_snapshot
+        {
             if !overwrite && existing_version != dashboard.version {
                 return Err(StoreError::Conflict(format!(
                     "version mismatch: expected {existing_version}, got {}",
@@ -269,24 +272,40 @@ impl DashboardStore {
             }
         }
 
-        inner.dashboards.insert(dashboard.uid.clone(), dashboard.clone());
+        inner
+            .dashboards
+            .insert(dashboard.uid.clone(), dashboard.clone());
         Ok(dashboard)
     }
 
     pub fn get_dashboard_by_uid(&self, uid: &str) -> StoreResult<Dashboard> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        inner.dashboards.get(uid).cloned().ok_or_else(|| StoreError::NotFound(format!("dashboard {uid}")))
+        inner
+            .dashboards
+            .get(uid)
+            .cloned()
+            .ok_or_else(|| StoreError::NotFound(format!("dashboard {uid}")))
     }
 
     pub fn get_dashboard_by_id(&self, id: i64) -> StoreResult<Dashboard> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        let uid = inner.dashboard_by_id.get(&id).ok_or_else(|| StoreError::NotFound(format!("dashboard id={id}")))?;
-        inner.dashboards.get(uid).cloned().ok_or_else(|| StoreError::NotFound(format!("dashboard {uid}")))
+        let uid = inner
+            .dashboard_by_id
+            .get(&id)
+            .ok_or_else(|| StoreError::NotFound(format!("dashboard id={id}")))?;
+        inner
+            .dashboards
+            .get(uid)
+            .cloned()
+            .ok_or_else(|| StoreError::NotFound(format!("dashboard {uid}")))
     }
 
     pub fn delete_dashboard(&self, uid: &str) -> StoreResult<()> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        let d = inner.dashboards.remove(uid).ok_or_else(|| StoreError::NotFound(format!("dashboard {uid}")))?;
+        let d = inner
+            .dashboards
+            .remove(uid)
+            .ok_or_else(|| StoreError::NotFound(format!("dashboard {uid}")))?;
         if let Some(id) = d.id {
             inner.dashboard_by_id.remove(&id);
             inner.dashboard_versions.remove(&id);
@@ -296,7 +315,12 @@ impl DashboardStore {
 
     pub fn list_dashboards(&self, org_id: i64) -> StoreResult<Vec<Dashboard>> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        Ok(inner.dashboards.values().filter(|d| d.org_id == org_id).cloned().collect())
+        Ok(inner
+            .dashboards
+            .values()
+            .filter(|d| d.org_id == org_id)
+            .cloned()
+            .collect())
     }
 
     pub fn search_dashboards(&self, q: &SearchQuery) -> StoreResult<Vec<SearchResult>> {
@@ -354,7 +378,9 @@ impl DashboardStore {
         if q.result_type.as_deref() != Some("dash-db") {
             for folder in inner.folders.values().filter(|f| f.org_id == org_id) {
                 if let Some(ref qstr) = q.query {
-                    if !qstr.is_empty() && !folder.title.to_lowercase().contains(&qstr.to_lowercase()) {
+                    if !qstr.is_empty()
+                        && !folder.title.to_lowercase().contains(&qstr.to_lowercase())
+                    {
                         continue;
                     }
                 }
@@ -362,7 +388,11 @@ impl DashboardStore {
                     id: folder.id,
                     uid: folder.uid.clone(),
                     title: folder.title.clone(),
-                    uri: format!("f/{}/{}", folder.uid, Dashboard::slug_from_title(&folder.title)),
+                    uri: format!(
+                        "f/{}/{}",
+                        folder.uid,
+                        Dashboard::slug_from_title(&folder.title)
+                    ),
                     url: folder.url.clone(),
                     slug: Dashboard::slug_from_title(&folder.title),
                     r#type: "dash-folder".into(),
@@ -385,7 +415,10 @@ impl DashboardStore {
 
     pub fn star_dashboard(&self, user_id: i64, uid: &str, star: bool) -> StoreResult<()> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        let d = inner.dashboards.get_mut(uid).ok_or_else(|| StoreError::NotFound(uid.to_string()))?;
+        let d = inner
+            .dashboards
+            .get_mut(uid)
+            .ok_or_else(|| StoreError::NotFound(uid.to_string()))?;
         d.is_starred = star;
         if star {
             inner.starred.insert((user_id, uid.to_string()), true);
@@ -397,19 +430,33 @@ impl DashboardStore {
 
     pub fn get_dashboard_versions(&self, dashboard_id: i64) -> StoreResult<Vec<DashboardVersion>> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        Ok(inner.dashboard_versions.get(&dashboard_id).cloned().unwrap_or_default())
+        Ok(inner
+            .dashboard_versions
+            .get(&dashboard_id)
+            .cloned()
+            .unwrap_or_default())
     }
 
-    pub fn restore_dashboard_version(&self, dashboard_id: i64, version: i64, user: &str) -> StoreResult<Dashboard> {
+    pub fn restore_dashboard_version(
+        &self,
+        dashboard_id: i64,
+        version: i64,
+        user: &str,
+    ) -> StoreResult<Dashboard> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        let uid = inner.dashboard_by_id.get(&dashboard_id)
+        let uid = inner
+            .dashboard_by_id
+            .get(&dashboard_id)
             .ok_or_else(|| StoreError::NotFound(format!("dashboard id={dashboard_id}")))?
             .clone();
-        let _versions = inner.dashboard_versions.get(&dashboard_id)
-            .ok_or_else(|| StoreError::NotFound(format!("versions for dashboard {dashboard_id}")))?;
+        let _versions = inner.dashboard_versions.get(&dashboard_id).ok_or_else(|| {
+            StoreError::NotFound(format!("versions for dashboard {dashboard_id}"))
+        })?;
         // In a full impl, we'd restore the dashboard JSON from that version.
         // Here we just bump the version number.
-        let d = inner.dashboards.get_mut(&uid)
+        let d = inner
+            .dashboards
+            .get_mut(&uid)
             .ok_or_else(|| StoreError::NotFound(uid.clone()))?;
         let new_version = d.version + 1;
         d.version = new_version;
@@ -429,16 +476,26 @@ impl DashboardStore {
             message: format!("Restored from version {version}"),
             data: None,
         };
-        inner.dashboard_versions.entry(dashboard_id).or_default().push(dv);
+        inner
+            .dashboard_versions
+            .entry(dashboard_id)
+            .or_default()
+            .push(dv);
         Ok(restored)
     }
 
     // ── Permissions ───────────────────────────────────────────────────────────
 
-    pub fn set_dashboard_permissions(&self, dashboard_id: i64, perms: Vec<DashboardPermission>) -> StoreResult<()> {
+    pub fn set_dashboard_permissions(
+        &self,
+        dashboard_id: i64,
+        perms: Vec<DashboardPermission>,
+    ) -> StoreResult<()> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
         // Remove old permissions for this dashboard
-        inner.permissions.retain(|_, v| v.dashboard_id != dashboard_id);
+        inner
+            .permissions
+            .retain(|_, v| v.dashboard_id != dashboard_id);
         for mut p in perms {
             let id = inner.next_permission_id();
             p.id = id;
@@ -447,20 +504,38 @@ impl DashboardStore {
         Ok(())
     }
 
-    pub fn get_dashboard_permissions(&self, dashboard_id: i64) -> StoreResult<Vec<DashboardPermission>> {
+    pub fn get_dashboard_permissions(
+        &self,
+        dashboard_id: i64,
+    ) -> StoreResult<Vec<DashboardPermission>> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        Ok(inner.permissions.values().filter(|p| p.dashboard_id == dashboard_id).cloned().collect())
+        Ok(inner
+            .permissions
+            .values()
+            .filter(|p| p.dashboard_id == dashboard_id)
+            .cloned()
+            .collect())
     }
 
     // ── Folder ────────────────────────────────────────────────────────────────
 
-    pub fn create_folder(&self, org_id: i64, uid: Option<&str>, title: &str, parent_uid: Option<&str>) -> StoreResult<Folder> {
+    pub fn create_folder(
+        &self,
+        org_id: i64,
+        uid: Option<&str>,
+        title: &str,
+        parent_uid: Option<&str>,
+    ) -> StoreResult<Folder> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
         let id = inner.next_folder_id();
-        let uid = uid.map(str::to_string).unwrap_or_else(|| Uuid::new_v4().to_string().replace('-', "")[..9].to_string());
+        let uid = uid
+            .map(str::to_string)
+            .unwrap_or_else(|| Uuid::new_v4().to_string().replace('-', "")[..9].to_string());
 
         if inner.folders.contains_key(&uid) {
-            return Err(StoreError::Conflict(format!("folder uid {uid} already exists")));
+            return Err(StoreError::Conflict(format!(
+                "folder uid {uid} already exists"
+            )));
         }
 
         let mut folder = Folder::new(id, org_id, &uid, title);
@@ -472,18 +547,32 @@ impl DashboardStore {
 
     pub fn get_folder_by_uid(&self, uid: &str) -> StoreResult<Folder> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        inner.folders.get(uid).cloned().ok_or_else(|| StoreError::NotFound(format!("folder {uid}")))
+        inner
+            .folders
+            .get(uid)
+            .cloned()
+            .ok_or_else(|| StoreError::NotFound(format!("folder {uid}")))
     }
 
     pub fn get_folder_by_id(&self, id: i64) -> StoreResult<Folder> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        let uid = inner.folder_by_id.get(&id).ok_or_else(|| StoreError::NotFound(format!("folder id={id}")))?;
-        inner.folders.get(uid).cloned().ok_or_else(|| StoreError::NotFound(format!("folder {uid}")))
+        let uid = inner
+            .folder_by_id
+            .get(&id)
+            .ok_or_else(|| StoreError::NotFound(format!("folder id={id}")))?;
+        inner
+            .folders
+            .get(uid)
+            .cloned()
+            .ok_or_else(|| StoreError::NotFound(format!("folder {uid}")))
     }
 
     pub fn update_folder(&self, uid: &str, title: &str) -> StoreResult<Folder> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        let folder = inner.folders.get_mut(uid).ok_or_else(|| StoreError::NotFound(format!("folder {uid}")))?;
+        let folder = inner
+            .folders
+            .get_mut(uid)
+            .ok_or_else(|| StoreError::NotFound(format!("folder {uid}")))?;
         folder.title = title.to_string();
         folder.version += 1;
         folder.updated = Utc::now();
@@ -492,25 +581,45 @@ impl DashboardStore {
 
     pub fn delete_folder(&self, uid: &str) -> StoreResult<()> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        let f = inner.folders.remove(uid).ok_or_else(|| StoreError::NotFound(format!("folder {uid}")))?;
+        let f = inner
+            .folders
+            .remove(uid)
+            .ok_or_else(|| StoreError::NotFound(format!("folder {uid}")))?;
         inner.folder_by_id.remove(&f.id);
         Ok(())
     }
 
     pub fn list_folders(&self, org_id: i64) -> StoreResult<Vec<Folder>> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        Ok(inner.folders.values().filter(|f| f.org_id == org_id).cloned().collect())
+        Ok(inner
+            .folders
+            .values()
+            .filter(|f| f.org_id == org_id)
+            .cloned()
+            .collect())
     }
 
     // ── DataSource ────────────────────────────────────────────────────────────
 
-    pub fn create_datasource(&self, req: crate::models::CreateDataSourceRequest, org_id: i64) -> StoreResult<DataSource> {
+    pub fn create_datasource(
+        &self,
+        req: crate::models::CreateDataSourceRequest,
+        org_id: i64,
+    ) -> StoreResult<DataSource> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
         let id = inner.next_ds_id();
-        let uid = req.uid.unwrap_or_else(|| Uuid::new_v4().to_string().replace('-', "")[..9].to_string());
+        let uid = req
+            .uid
+            .unwrap_or_else(|| Uuid::new_v4().to_string().replace('-', "")[..9].to_string());
 
-        if inner.datasource_by_name.contains_key(&(org_id, req.name.clone())) {
-            return Err(StoreError::Conflict(format!("datasource name '{}' already exists", req.name)));
+        if inner
+            .datasource_by_name
+            .contains_key(&(org_id, req.name.clone()))
+        {
+            return Err(StoreError::Conflict(format!(
+                "datasource name '{}' already exists",
+                req.name
+            )));
         }
 
         let mut ds = DataSource::new(id, org_id, &uid, &req.name, req.ds_type, &req.url);
@@ -524,7 +633,11 @@ impl DashboardStore {
 
         if req.is_default {
             // Clear existing default for same org
-            for existing in inner.datasources.values_mut().filter(|d| d.org_id == org_id) {
+            for existing in inner
+                .datasources
+                .values_mut()
+                .filter(|d| d.org_id == org_id)
+            {
                 existing.is_default = false;
             }
         }
@@ -537,18 +650,36 @@ impl DashboardStore {
 
     pub fn get_datasource_by_uid(&self, uid: &str) -> StoreResult<DataSource> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        inner.datasources.get(uid).cloned().ok_or_else(|| StoreError::NotFound(format!("datasource {uid}")))
+        inner
+            .datasources
+            .get(uid)
+            .cloned()
+            .ok_or_else(|| StoreError::NotFound(format!("datasource {uid}")))
     }
 
     pub fn get_datasource_by_id(&self, id: i64) -> StoreResult<DataSource> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        let uid = inner.datasource_by_id.get(&id).ok_or_else(|| StoreError::NotFound(format!("datasource id={id}")))?;
-        inner.datasources.get(uid).cloned().ok_or_else(|| StoreError::NotFound(uid.as_str().to_string()))
+        let uid = inner
+            .datasource_by_id
+            .get(&id)
+            .ok_or_else(|| StoreError::NotFound(format!("datasource id={id}")))?;
+        inner
+            .datasources
+            .get(uid)
+            .cloned()
+            .ok_or_else(|| StoreError::NotFound(uid.as_str().to_string()))
     }
 
-    pub fn update_datasource(&self, uid: &str, req: CreateDataSourceRequest) -> StoreResult<DataSource> {
+    pub fn update_datasource(
+        &self,
+        uid: &str,
+        req: CreateDataSourceRequest,
+    ) -> StoreResult<DataSource> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        let ds = inner.datasources.get_mut(uid).ok_or_else(|| StoreError::NotFound(format!("datasource {uid}")))?;
+        let ds = inner
+            .datasources
+            .get_mut(uid)
+            .ok_or_else(|| StoreError::NotFound(format!("datasource {uid}")))?;
         ds.name = req.name;
         ds.ds_type = req.ds_type;
         ds.url = req.url;
@@ -566,7 +697,10 @@ impl DashboardStore {
 
     pub fn delete_datasource(&self, uid: &str) -> StoreResult<()> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        let ds = inner.datasources.remove(uid).ok_or_else(|| StoreError::NotFound(format!("datasource {uid}")))?;
+        let ds = inner
+            .datasources
+            .remove(uid)
+            .ok_or_else(|| StoreError::NotFound(format!("datasource {uid}")))?;
         inner.datasource_by_id.remove(&ds.id);
         inner.datasource_by_name.remove(&(ds.org_id, ds.name));
         Ok(())
@@ -574,12 +708,22 @@ impl DashboardStore {
 
     pub fn list_datasources(&self, org_id: i64) -> StoreResult<Vec<DataSource>> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        Ok(inner.datasources.values().filter(|d| d.org_id == org_id).cloned().collect())
+        Ok(inner
+            .datasources
+            .values()
+            .filter(|d| d.org_id == org_id)
+            .cloned()
+            .collect())
     }
 
     // ── Annotation ────────────────────────────────────────────────────────────
 
-    pub fn create_annotation(&self, req: CreateAnnotationRequest, user_id: i64, org_id: i64) -> StoreResult<Annotation> {
+    pub fn create_annotation(
+        &self,
+        req: CreateAnnotationRequest,
+        user_id: i64,
+        org_id: i64,
+    ) -> StoreResult<Annotation> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
         let id = inner.next_annotation_id();
         let now = Utc::now();
@@ -609,9 +753,15 @@ impl DashboardStore {
         Ok(annotation)
     }
 
-    pub fn list_annotations(&self, dashboard_uid: Option<&str>, org_id: i64) -> StoreResult<Vec<Annotation>> {
+    pub fn list_annotations(
+        &self,
+        dashboard_uid: Option<&str>,
+        org_id: i64,
+    ) -> StoreResult<Vec<Annotation>> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        let anns: Vec<Annotation> = inner.annotations.values()
+        let anns: Vec<Annotation> = inner
+            .annotations
+            .values()
             .filter(|a| {
                 if let Some(uid) = dashboard_uid {
                     a.dashboard_uid == uid
@@ -626,17 +776,29 @@ impl DashboardStore {
 
     pub fn delete_annotation(&self, id: i64) -> StoreResult<()> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        inner.annotations.remove(&id).ok_or_else(|| StoreError::NotFound(format!("annotation {id}")))?;
+        inner
+            .annotations
+            .remove(&id)
+            .ok_or_else(|| StoreError::NotFound(format!("annotation {id}")))?;
         Ok(())
     }
 
     // ── Snapshot ──────────────────────────────────────────────────────────────
 
-    pub fn create_snapshot(&self, req: CreateSnapshotRequest, org_id: i64, user_id: i64) -> StoreResult<Snapshot> {
+    pub fn create_snapshot(
+        &self,
+        req: CreateSnapshotRequest,
+        org_id: i64,
+        user_id: i64,
+    ) -> StoreResult<Snapshot> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
         let id = inner.next_snapshot_id();
-        let key = req.key.unwrap_or_else(|| Uuid::new_v4().to_string().replace('-', ""));
-        let delete_key = req.delete_key.unwrap_or_else(|| Uuid::new_v4().to_string().replace('-', ""));
+        let key = req
+            .key
+            .unwrap_or_else(|| Uuid::new_v4().to_string().replace('-', ""));
+        let delete_key = req
+            .delete_key
+            .unwrap_or_else(|| Uuid::new_v4().to_string().replace('-', ""));
         let now = Utc::now();
         let expires_secs = req.expires.unwrap_or(0);
         let expires = if expires_secs > 0 {
@@ -645,7 +807,11 @@ impl DashboardStore {
             now + chrono::Duration::days(365 * 100) // "never"
         };
         let name = req.name.unwrap_or_else(|| {
-            req.dashboard.get("title").and_then(|t| t.as_str()).unwrap_or("Snapshot").to_string()
+            req.dashboard
+                .get("title")
+                .and_then(|t| t.as_str())
+                .unwrap_or("Snapshot")
+                .to_string()
         });
         let snapshot = Snapshot {
             id,
@@ -669,7 +835,10 @@ impl DashboardStore {
 
     pub fn get_snapshot(&self, key: &str) -> StoreResult<Snapshot> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        let snap = inner.snapshots.get(key).ok_or_else(|| StoreError::NotFound(format!("snapshot {key}")))?;
+        let snap = inner
+            .snapshots
+            .get(key)
+            .ok_or_else(|| StoreError::NotFound(format!("snapshot {key}")))?;
         if snap.expires < Utc::now() {
             return Err(StoreError::NotFound("snapshot expired".into()));
         }
@@ -678,7 +847,9 @@ impl DashboardStore {
 
     pub fn delete_snapshot_by_delete_key(&self, delete_key: &str) -> StoreResult<()> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        let key = inner.snapshot_by_delete_key.remove(delete_key)
+        let key = inner
+            .snapshot_by_delete_key
+            .remove(delete_key)
             .ok_or_else(|| StoreError::NotFound(format!("snapshot delete_key {delete_key}")))?;
         inner.snapshots.remove(&key);
         Ok(())
@@ -686,7 +857,13 @@ impl DashboardStore {
 
     // ── Playlist ──────────────────────────────────────────────────────────────
 
-    pub fn create_playlist(&self, org_id: i64, name: &str, interval: &str, items: Vec<PlaylistItem>) -> StoreResult<Playlist> {
+    pub fn create_playlist(
+        &self,
+        org_id: i64,
+        name: &str,
+        interval: &str,
+        items: Vec<PlaylistItem>,
+    ) -> StoreResult<Playlist> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
         let id = inner.next_playlist_id();
         let now = Utc::now();
@@ -706,12 +883,25 @@ impl DashboardStore {
 
     pub fn get_playlist(&self, id: i64) -> StoreResult<Playlist> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        inner.playlists.get(&id).cloned().ok_or_else(|| StoreError::NotFound(format!("playlist {id}")))
+        inner
+            .playlists
+            .get(&id)
+            .cloned()
+            .ok_or_else(|| StoreError::NotFound(format!("playlist {id}")))
     }
 
-    pub fn update_playlist(&self, id: i64, name: &str, interval: &str, items: Vec<PlaylistItem>) -> StoreResult<Playlist> {
+    pub fn update_playlist(
+        &self,
+        id: i64,
+        name: &str,
+        interval: &str,
+        items: Vec<PlaylistItem>,
+    ) -> StoreResult<Playlist> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        let p = inner.playlists.get_mut(&id).ok_or_else(|| StoreError::NotFound(format!("playlist {id}")))?;
+        let p = inner
+            .playlists
+            .get_mut(&id)
+            .ok_or_else(|| StoreError::NotFound(format!("playlist {id}")))?;
         p.name = name.to_string();
         p.interval = interval.to_string();
         p.items = items;
@@ -721,13 +911,21 @@ impl DashboardStore {
 
     pub fn delete_playlist(&self, id: i64) -> StoreResult<()> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        inner.playlists.remove(&id).ok_or_else(|| StoreError::NotFound(format!("playlist {id}")))?;
+        inner
+            .playlists
+            .remove(&id)
+            .ok_or_else(|| StoreError::NotFound(format!("playlist {id}")))?;
         Ok(())
     }
 
     pub fn list_playlists(&self, org_id: i64) -> StoreResult<Vec<Playlist>> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        Ok(inner.playlists.values().filter(|p| p.org_id == org_id).cloned().collect())
+        Ok(inner
+            .playlists
+            .values()
+            .filter(|p| p.org_id == org_id)
+            .cloned()
+            .collect())
     }
 
     // ── Alert Rules (Unified Alerting) ────────────────────────────────────────
@@ -744,7 +942,8 @@ impl DashboardStore {
             rule.created = Utc::now();
             rule.updated = Utc::now();
         }
-        inner.rule_groups
+        inner
+            .rule_groups
             .entry((rule.folder_uid.clone(), rule.rule_group.clone()))
             .or_default()
             .push(rule.uid.clone());
@@ -754,13 +953,23 @@ impl DashboardStore {
 
     pub fn get_alert_rule(&self, uid: &str) -> StoreResult<AlertRule> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        inner.alert_rules.get(uid).cloned().ok_or_else(|| StoreError::NotFound(format!("alert rule {uid}")))
+        inner
+            .alert_rules
+            .get(uid)
+            .cloned()
+            .ok_or_else(|| StoreError::NotFound(format!("alert rule {uid}")))
     }
 
     pub fn delete_alert_rule(&self, uid: &str) -> StoreResult<()> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        let rule = inner.alert_rules.remove(uid).ok_or_else(|| StoreError::NotFound(uid.to_string()))?;
-        if let Some(group) = inner.rule_groups.get_mut(&(rule.folder_uid.clone(), rule.rule_group.clone())) {
+        let rule = inner
+            .alert_rules
+            .remove(uid)
+            .ok_or_else(|| StoreError::NotFound(uid.to_string()))?;
+        if let Some(group) = inner
+            .rule_groups
+            .get_mut(&(rule.folder_uid.clone(), rule.rule_group.clone()))
+        {
             group.retain(|u| u != uid);
         }
         Ok(())
@@ -768,23 +977,32 @@ impl DashboardStore {
 
     pub fn list_alert_rules(&self, org_id: i64) -> StoreResult<Vec<AlertRule>> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        Ok(inner.alert_rules.values().filter(|r| r.org_id == org_id).cloned().collect())
+        Ok(inner
+            .alert_rules
+            .values()
+            .filter(|r| r.org_id == org_id)
+            .cloned()
+            .collect())
     }
 
     pub fn list_rule_groups(&self, org_id: i64) -> StoreResult<Vec<RuleGroup>> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
         let mut groups: HashMap<(String, String), Vec<AlertRule>> = HashMap::new();
         for rule in inner.alert_rules.values().filter(|r| r.org_id == org_id) {
-            groups.entry((rule.folder_uid.clone(), rule.rule_group.clone()))
+            groups
+                .entry((rule.folder_uid.clone(), rule.rule_group.clone()))
                 .or_default()
                 .push(rule.clone());
         }
-        Ok(groups.into_iter().map(|((folder_uid, name), rules)| RuleGroup {
-            name,
-            folder_uid,
-            interval: 60,
-            rules,
-        }).collect())
+        Ok(groups
+            .into_iter()
+            .map(|((folder_uid, name), rules)| RuleGroup {
+                name,
+                folder_uid,
+                interval: 60,
+                rules,
+            })
+            .collect())
     }
 
     // ── Contact Points ────────────────────────────────────────────────────────
@@ -797,12 +1015,19 @@ impl DashboardStore {
 
     pub fn get_contact_point(&self, uid: &str) -> StoreResult<ContactPoint> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        inner.contact_points.get(uid).cloned().ok_or_else(|| StoreError::NotFound(format!("contact point {uid}")))
+        inner
+            .contact_points
+            .get(uid)
+            .cloned()
+            .ok_or_else(|| StoreError::NotFound(format!("contact point {uid}")))
     }
 
     pub fn delete_contact_point(&self, uid: &str) -> StoreResult<()> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        inner.contact_points.remove(uid).ok_or_else(|| StoreError::NotFound(format!("contact point {uid}")))?;
+        inner
+            .contact_points
+            .remove(uid)
+            .ok_or_else(|| StoreError::NotFound(format!("contact point {uid}")))?;
         Ok(())
     }
 
@@ -821,7 +1046,10 @@ impl DashboardStore {
 
     pub fn get_notification_policy(&self) -> StoreResult<NotificationPolicy> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        inner.notification_policy.clone().ok_or_else(|| StoreError::NotFound("notification policy".into()))
+        inner
+            .notification_policy
+            .clone()
+            .ok_or_else(|| StoreError::NotFound("notification policy".into()))
     }
 
     // ── Silences ─────────────────────────────────────────────────────────────
@@ -837,12 +1065,19 @@ impl DashboardStore {
 
     pub fn get_silence(&self, id: &str) -> StoreResult<Silence> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        inner.silences.get(id).cloned().ok_or_else(|| StoreError::NotFound(format!("silence {id}")))
+        inner
+            .silences
+            .get(id)
+            .cloned()
+            .ok_or_else(|| StoreError::NotFound(format!("silence {id}")))
     }
 
     pub fn delete_silence(&self, id: &str) -> StoreResult<()> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        let silence = inner.silences.get_mut(id).ok_or_else(|| StoreError::NotFound(format!("silence {id}")))?;
+        let silence = inner
+            .silences
+            .get_mut(id)
+            .ok_or_else(|| StoreError::NotFound(format!("silence {id}")))?;
         silence.status.state = "expired".into();
         silence.ends_at = Utc::now();
         Ok(())
@@ -863,7 +1098,10 @@ impl DashboardStore {
 
     pub fn delete_mute_timing(&self, name: &str) -> StoreResult<()> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        inner.mute_timings.remove(name).ok_or_else(|| StoreError::NotFound(format!("mute timing {name}")))?;
+        inner
+            .mute_timings
+            .remove(name)
+            .ok_or_else(|| StoreError::NotFound(format!("mute timing {name}")))?;
         Ok(())
     }
 
@@ -874,7 +1112,10 @@ impl DashboardStore {
 
     // ── Legacy Notification Channels ─────────────────────────────────────────
 
-    pub fn create_notification_channel(&self, mut ch: AlertNotificationChannel) -> StoreResult<AlertNotificationChannel> {
+    pub fn create_notification_channel(
+        &self,
+        mut ch: AlertNotificationChannel,
+    ) -> StoreResult<AlertNotificationChannel> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
         ch.id = inner.next_notification_channel_id();
         inner.notification_channels.insert(ch.id, ch.clone());
@@ -883,12 +1124,23 @@ impl DashboardStore {
 
     pub fn get_notification_channel(&self, id: i64) -> StoreResult<AlertNotificationChannel> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        inner.notification_channels.get(&id).cloned().ok_or_else(|| StoreError::NotFound(format!("channel {id}")))
+        inner
+            .notification_channels
+            .get(&id)
+            .cloned()
+            .ok_or_else(|| StoreError::NotFound(format!("channel {id}")))
     }
 
-    pub fn update_notification_channel(&self, id: i64, mut ch: AlertNotificationChannel) -> StoreResult<AlertNotificationChannel> {
+    pub fn update_notification_channel(
+        &self,
+        id: i64,
+        mut ch: AlertNotificationChannel,
+    ) -> StoreResult<AlertNotificationChannel> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        let existing = inner.notification_channels.get(&id).ok_or_else(|| StoreError::NotFound(format!("channel {id}")))?;
+        let existing = inner
+            .notification_channels
+            .get(&id)
+            .ok_or_else(|| StoreError::NotFound(format!("channel {id}")))?;
         ch.id = existing.id;
         ch.created = existing.created;
         ch.updated = Utc::now();
@@ -898,13 +1150,24 @@ impl DashboardStore {
 
     pub fn delete_notification_channel(&self, id: i64) -> StoreResult<()> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        inner.notification_channels.remove(&id).ok_or_else(|| StoreError::NotFound(format!("channel {id}")))?;
+        inner
+            .notification_channels
+            .remove(&id)
+            .ok_or_else(|| StoreError::NotFound(format!("channel {id}")))?;
         Ok(())
     }
 
-    pub fn list_notification_channels(&self, org_id: i64) -> StoreResult<Vec<AlertNotificationChannel>> {
+    pub fn list_notification_channels(
+        &self,
+        org_id: i64,
+    ) -> StoreResult<Vec<AlertNotificationChannel>> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        Ok(inner.notification_channels.values().filter(|c| c.org_id == org_id).cloned().collect())
+        Ok(inner
+            .notification_channels
+            .values()
+            .filter(|c| c.org_id == org_id)
+            .cloned()
+            .collect())
     }
 
     // ── Org ───────────────────────────────────────────────────────────────────
@@ -913,14 +1176,24 @@ impl DashboardStore {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
         let id = inner.next_org_id();
         let now = Utc::now();
-        let org = Org { id, name: name.to_string(), address: OrgAddress::default(), created: now, updated: now };
+        let org = Org {
+            id,
+            name: name.to_string(),
+            address: OrgAddress::default(),
+            created: now,
+            updated: now,
+        };
         inner.orgs.insert(id, org.clone());
         Ok(org)
     }
 
     pub fn get_org(&self, id: i64) -> StoreResult<Org> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        inner.orgs.get(&id).cloned().ok_or_else(|| StoreError::NotFound(format!("org {id}")))
+        inner
+            .orgs
+            .get(&id)
+            .cloned()
+            .ok_or_else(|| StoreError::NotFound(format!("org {id}")))
     }
 
     pub fn list_orgs(&self) -> StoreResult<Vec<Org>> {
@@ -933,7 +1206,10 @@ impl DashboardStore {
     pub fn create_user(&self, req: CreateUserRequest) -> StoreResult<User> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
         if inner.user_by_login.contains_key(&req.login) {
-            return Err(StoreError::Conflict(format!("login '{}' already exists", req.login)));
+            return Err(StoreError::Conflict(format!(
+                "login '{}' already exists",
+                req.login
+            )));
         }
         let id = inner.next_user_id();
         let now = Utc::now();
@@ -960,7 +1236,11 @@ impl DashboardStore {
 
     pub fn get_user(&self, id: i64) -> StoreResult<User> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        inner.users.get(&id).cloned().ok_or_else(|| StoreError::NotFound(format!("user {id}")))
+        inner
+            .users
+            .get(&id)
+            .cloned()
+            .ok_or_else(|| StoreError::NotFound(format!("user {id}")))
     }
 
     pub fn list_users(&self) -> StoreResult<Vec<User>> {
@@ -991,19 +1271,31 @@ impl DashboardStore {
 
     pub fn get_team(&self, id: i64) -> StoreResult<Team> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        inner.teams.get(&id).cloned().ok_or_else(|| StoreError::NotFound(format!("team {id}")))
+        inner
+            .teams
+            .get(&id)
+            .cloned()
+            .ok_or_else(|| StoreError::NotFound(format!("team {id}")))
     }
 
     pub fn list_teams(&self, org_id: i64) -> StoreResult<Vec<Team>> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        Ok(inner.teams.values().filter(|t| t.org_id == org_id).cloned().collect())
+        Ok(inner
+            .teams
+            .values()
+            .filter(|t| t.org_id == org_id)
+            .cloned()
+            .collect())
     }
 
     pub fn add_team_member(&self, team_id: i64, member: TeamMember) -> StoreResult<()> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
         let members = inner.team_members.entry(team_id).or_default();
         if members.iter().any(|m| m.user_id == member.user_id) {
-            return Err(StoreError::Conflict(format!("user {} already in team {team_id}", member.user_id)));
+            return Err(StoreError::Conflict(format!(
+                "user {} already in team {team_id}",
+                member.user_id
+            )));
         }
         members.push(member);
         if let Some(team) = inner.teams.get_mut(&team_id) {
@@ -1014,12 +1306,24 @@ impl DashboardStore {
 
     pub fn list_team_members(&self, team_id: i64) -> StoreResult<Vec<TeamMember>> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        Ok(inner.team_members.get(&team_id).cloned().unwrap_or_default())
+        Ok(inner
+            .team_members
+            .get(&team_id)
+            .cloned()
+            .unwrap_or_default())
     }
 
     // ── API Keys ─────────────────────────────────────────────────────────────
 
-    pub fn create_api_key(&self, org_id: i64, name: &str, role: OrgRole, seconds_to_live: Option<i64>, key_hash: &str, key: &str) -> StoreResult<ApiKey> {
+    pub fn create_api_key(
+        &self,
+        org_id: i64,
+        name: &str,
+        role: OrgRole,
+        seconds_to_live: Option<i64>,
+        key_hash: &str,
+        key: &str,
+    ) -> StoreResult<ApiKey> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
         let id = inner.next_apikey_id();
         let now = Utc::now();
@@ -1042,29 +1346,49 @@ impl DashboardStore {
 
     pub fn delete_api_key(&self, id: i64) -> StoreResult<()> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
-        let key = inner.api_keys.remove(&id).ok_or_else(|| StoreError::NotFound(format!("api key {id}")))?;
+        let key = inner
+            .api_keys
+            .remove(&id)
+            .ok_or_else(|| StoreError::NotFound(format!("api key {id}")))?;
         inner.api_key_by_hash.remove(&key.key_hash);
         Ok(())
     }
 
     pub fn list_api_keys(&self, org_id: i64) -> StoreResult<Vec<ApiKey>> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        Ok(inner.api_keys.values().filter(|k| k.org_id == org_id).map(|k| {
-            let mut k = k.clone();
-            k.key = None; // Never return key after creation
-            k
-        }).collect())
+        Ok(inner
+            .api_keys
+            .values()
+            .filter(|k| k.org_id == org_id)
+            .map(|k| {
+                let mut k = k.clone();
+                k.key = None; // Never return key after creation
+                k
+            })
+            .collect())
     }
 
     pub fn lookup_api_key(&self, key_hash: &str) -> StoreResult<ApiKey> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        let id = inner.api_key_by_hash.get(key_hash).ok_or_else(|| StoreError::NotFound("api key".into()))?;
-        inner.api_keys.get(id).cloned().ok_or_else(|| StoreError::NotFound("api key".into()))
+        let id = inner
+            .api_key_by_hash
+            .get(key_hash)
+            .ok_or_else(|| StoreError::NotFound("api key".into()))?;
+        inner
+            .api_keys
+            .get(id)
+            .cloned()
+            .ok_or_else(|| StoreError::NotFound("api key".into()))
     }
 
     // ── Service Accounts ─────────────────────────────────────────────────────
 
-    pub fn create_service_account(&self, org_id: i64, name: &str, role: OrgRole) -> StoreResult<ServiceAccount> {
+    pub fn create_service_account(
+        &self,
+        org_id: i64,
+        name: &str,
+        role: OrgRole,
+    ) -> StoreResult<ServiceAccount> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
         let id = inner.next_sa_id();
         let now = Utc::now();
@@ -1087,11 +1411,20 @@ impl DashboardStore {
 
     pub fn get_service_account(&self, id: i64) -> StoreResult<ServiceAccount> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        inner.service_accounts.get(&id).cloned().ok_or_else(|| StoreError::NotFound(format!("service account {id}")))
+        inner
+            .service_accounts
+            .get(&id)
+            .cloned()
+            .ok_or_else(|| StoreError::NotFound(format!("service account {id}")))
     }
 
     pub fn list_service_accounts(&self, org_id: i64) -> StoreResult<Vec<ServiceAccount>> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
-        Ok(inner.service_accounts.values().filter(|s| s.org_id == org_id).cloned().collect())
+        Ok(inner
+            .service_accounts
+            .values()
+            .filter(|s| s.org_id == org_id)
+            .cloned()
+            .collect())
     }
 }

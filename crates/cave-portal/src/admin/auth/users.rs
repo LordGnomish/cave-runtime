@@ -9,10 +9,10 @@
 
 use std::collections::BTreeSet;
 
+use super::AuthViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
-use super::AuthViewError;
+use crate::admin::state::{AdminState, scope};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct UserRow {
@@ -23,7 +23,9 @@ pub struct UserRow {
 pub fn list_users(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<UserRow>, AuthViewError> {
     ctx.authorise(Permission::AuthSessionsRead)?;
     let mut seen: BTreeSet<UserRow> = BTreeSet::new();
-    for s in scope(&state.auth_sessions.read().unwrap(), &ctx.tenant, |r| &r.tenant) {
+    for s in scope(&state.auth_sessions.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    }) {
         seen.insert(UserRow {
             realm: s.realm.clone(),
             principal: s.principal.clone(),
@@ -88,7 +90,8 @@ mod tests {
 
     #[test]
     fn list_returns_unique_principal_per_realm() {
-        let rows = list_users(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
+        let rows =
+            list_users(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
         // Each (realm, principal) pair should appear once.
         let mut by_pair = std::collections::HashSet::new();
         for r in &rows {
@@ -98,13 +101,15 @@ mod tests {
 
     #[test]
     fn list_excludes_other_tenants() {
-        let rows = list_users(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
+        let rows =
+            list_users(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
         assert!(rows.iter().all(|r| !r.principal.contains("mallory")));
     }
 
     #[test]
     fn count_by_realm_sums_to_total_users() {
-        let rows = list_users(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
+        let rows =
+            list_users(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
         let summary = count_by_realm(&rows);
         let total: usize = summary.iter().map(|(_, n)| *n).sum();
         assert_eq!(total, rows.len());

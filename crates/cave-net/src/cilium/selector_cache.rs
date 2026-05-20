@@ -89,7 +89,15 @@ impl SelectorCache {
                 matched.insert(*i);
             }
         }
-        self.by_id.insert(id, CachedSelector { id, selector, matched, refcount: 1 });
+        self.by_id.insert(
+            id,
+            CachedSelector {
+                id,
+                selector,
+                matched,
+                refcount: 1,
+            },
+        );
         self.by_key.insert(key, id);
         id
     }
@@ -97,7 +105,10 @@ impl SelectorCache {
     /// Release a reference. When refcount hits zero the selector is
     /// removed from the cache.
     pub fn release(&mut self, id: SelectorId) -> Result<(), SelectorCacheError> {
-        let entry = self.by_id.get_mut(&id).ok_or(SelectorCacheError::NotFound(id))?;
+        let entry = self
+            .by_id
+            .get_mut(&id)
+            .ok_or(SelectorCacheError::NotFound(id))?;
         if entry.refcount > 0 {
             entry.refcount -= 1;
         }
@@ -174,7 +185,9 @@ impl SelectorCache {
 
 fn selector_key(s: &EndpointSelector) -> String {
     // Stable serialisation: JSON with sorted match_labels for dedup.
-    let mut sorted_labels: Vec<(String, String)> = s.match_labels.iter()
+    let mut sorted_labels: Vec<(String, String)> = s
+        .match_labels
+        .iter()
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
     sorted_labels.sort();
@@ -196,7 +209,10 @@ mod tests {
 
     fn endpoint_sel(pairs: &[(&str, &str)]) -> EndpointSelector {
         EndpointSelector {
-            match_labels: pairs.iter().map(|(k, v)| ((*k).into(), (*v).into())).collect(),
+            match_labels: pairs
+                .iter()
+                .map(|(k, v)| ((*k).into(), (*v).into()))
+                .collect(),
             match_expressions: Vec::new(),
         }
     }
@@ -209,7 +225,11 @@ mod tests {
 
     #[test]
     fn intern_returns_monotonic_id() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "Intern.Monotonic", "tenant-sc-mono");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/selectorcache.go",
+            "Intern.Monotonic",
+            "tenant-sc-mono"
+        );
         let mut c = cache(tenant);
         let a = c.intern(endpoint_sel(&[("app", "a")]));
         let b = c.intern(endpoint_sel(&[("app", "b")]));
@@ -218,7 +238,8 @@ mod tests {
 
     #[test]
     fn intern_dedupes_equal_selectors() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "Intern.Dedup", "tenant-sc-d");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/policy/selectorcache.go", "Intern.Dedup", "tenant-sc-d");
         let mut c = cache(tenant);
         let a = c.intern(endpoint_sel(&[("app", "web")]));
         let b = c.intern(endpoint_sel(&[("app", "web")]));
@@ -228,7 +249,11 @@ mod tests {
 
     #[test]
     fn intern_dedupes_regardless_of_label_order() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "Intern.Dedup.Order", "tenant-sc-do");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/selectorcache.go",
+            "Intern.Dedup.Order",
+            "tenant-sc-do"
+        );
         let mut c = cache(tenant);
         let a = c.intern(endpoint_sel(&[("app", "web"), ("env", "prod")]));
         let b = c.intern(endpoint_sel(&[("env", "prod"), ("app", "web")]));
@@ -237,7 +262,11 @@ mod tests {
 
     #[test]
     fn distinct_selectors_distinct_ids() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "Intern.Distinct", "tenant-sc-di");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/selectorcache.go",
+            "Intern.Distinct",
+            "tenant-sc-di"
+        );
         let mut c = cache(tenant);
         let a = c.intern(endpoint_sel(&[("app", "web")]));
         let b = c.intern(endpoint_sel(&[("app", "api")]));
@@ -248,7 +277,11 @@ mod tests {
 
     #[test]
     fn intern_initialises_matched_with_existing_identities() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "Intern.MatchExisting", "tenant-sc-me");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/selectorcache.go",
+            "Intern.MatchExisting",
+            "tenant-sc-me"
+        );
         let mut c = cache(tenant);
         c.update_identity(256, ls(&[("app", "web")]));
         c.update_identity(257, ls(&[("app", "api")]));
@@ -259,7 +292,11 @@ mod tests {
 
     #[test]
     fn matched_unknown_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "Matched.NotFound", "tenant-sc-mnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/selectorcache.go",
+            "Matched.NotFound",
+            "tenant-sc-mnf"
+        );
         let c = cache(tenant);
         assert!(c.matched(99).is_none());
     }
@@ -268,7 +305,11 @@ mod tests {
 
     #[test]
     fn new_identity_triggers_added_change_for_matching_selector() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "UpdateIdentity.Added", "tenant-sc-ua");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/selectorcache.go",
+            "UpdateIdentity.Added",
+            "tenant-sc-ua"
+        );
         let mut c = cache(tenant);
         let sid = c.intern(endpoint_sel(&[("app", "web")]));
         c.update_identity(256, ls(&[("app", "web")]));
@@ -280,7 +321,11 @@ mod tests {
 
     #[test]
     fn identity_label_change_can_trigger_removed() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "UpdateIdentity.Removed", "tenant-sc-ur");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/selectorcache.go",
+            "UpdateIdentity.Removed",
+            "tenant-sc-ur"
+        );
         let mut c = cache(tenant);
         let sid = c.intern(endpoint_sel(&[("app", "web")]));
         c.update_identity(256, ls(&[("app", "web")]));
@@ -294,7 +339,11 @@ mod tests {
 
     #[test]
     fn no_change_when_match_state_unchanged() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "UpdateIdentity.NoChange", "tenant-sc-unc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/selectorcache.go",
+            "UpdateIdentity.NoChange",
+            "tenant-sc-unc"
+        );
         let mut c = cache(tenant);
         c.intern(endpoint_sel(&[("app", "web")]));
         c.update_identity(256, ls(&[("app", "web")]));
@@ -306,7 +355,11 @@ mod tests {
 
     #[test]
     fn remove_identity_emits_removed_changes() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "RemoveIdentity", "tenant-sc-rmi");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/selectorcache.go",
+            "RemoveIdentity",
+            "tenant-sc-rmi"
+        );
         let mut c = cache(tenant);
         let sid = c.intern(endpoint_sel(&[("app", "web")]));
         c.update_identity(256, ls(&[("app", "web")]));
@@ -320,7 +373,11 @@ mod tests {
 
     #[test]
     fn remove_unknown_identity_emits_nothing() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "RemoveIdentity.NotFound", "tenant-sc-rmnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/selectorcache.go",
+            "RemoveIdentity.NotFound",
+            "tenant-sc-rmnf"
+        );
         let mut c = cache(tenant);
         c.intern(endpoint_sel(&[("app", "web")]));
         c.remove_identity(999);
@@ -331,7 +388,8 @@ mod tests {
 
     #[test]
     fn release_decrements_refcount() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "Release", "tenant-sc-rel");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/policy/selectorcache.go", "Release", "tenant-sc-rel");
         let mut c = cache(tenant);
         let id = c.intern(endpoint_sel(&[("app", "web")]));
         c.intern(endpoint_sel(&[("app", "web")]));
@@ -341,7 +399,11 @@ mod tests {
 
     #[test]
     fn release_to_zero_drops_selector() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "Release.Drop", "tenant-sc-reld");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/selectorcache.go",
+            "Release.Drop",
+            "tenant-sc-reld"
+        );
         let mut c = cache(tenant);
         let id = c.intern(endpoint_sel(&[("app", "web")]));
         c.release(id).unwrap();
@@ -350,7 +412,11 @@ mod tests {
 
     #[test]
     fn release_unknown_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "Release.NotFound", "tenant-sc-relnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/selectorcache.go",
+            "Release.NotFound",
+            "tenant-sc-relnf"
+        );
         let mut c = cache(tenant);
         let err = c.release(99).unwrap_err();
         assert_eq!(err, SelectorCacheError::NotFound(99));
@@ -360,7 +426,8 @@ mod tests {
 
     #[test]
     fn cached_count_tracks_intern() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "CachedCount", "tenant-sc-cc");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/policy/selectorcache.go", "CachedCount", "tenant-sc-cc");
         let mut c = cache(tenant);
         for i in 0..5 {
             c.intern(endpoint_sel(&[("app", &format!("a{i}"))]));
@@ -370,7 +437,11 @@ mod tests {
 
     #[test]
     fn identity_count_tracks_updates() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "IdentityCount", "tenant-sc-ic");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/selectorcache.go",
+            "IdentityCount",
+            "tenant-sc-ic"
+        );
         let mut c = cache(tenant);
         for i in 0..3u32 {
             c.update_identity(256 + i, ls(&[("app", "x")]));
@@ -382,7 +453,8 @@ mod tests {
 
     #[test]
     fn multiple_selectors_match_disjoint_identities() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "MultiMatch", "tenant-sc-mm");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/policy/selectorcache.go", "MultiMatch", "tenant-sc-mm");
         let mut c = cache(tenant);
         let s_web = c.intern(endpoint_sel(&[("app", "web")]));
         let s_api = c.intern(endpoint_sel(&[("app", "api")]));
@@ -395,7 +467,11 @@ mod tests {
 
     #[test]
     fn empty_selector_matches_all_identities() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "EmptySelector.MatchAll", "tenant-sc-es");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/selectorcache.go",
+            "EmptySelector.MatchAll",
+            "tenant-sc-es"
+        );
         let mut c = cache(tenant);
         let id = c.intern(EndpointSelector::default());
         c.update_identity(256, ls(&[("app", "web")]));
@@ -408,7 +484,8 @@ mod tests {
 
     #[test]
     fn drain_returns_pending_changes_then_clears() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/selectorcache.go", "Drain", "tenant-sc-drn");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/policy/selectorcache.go", "Drain", "tenant-sc-drn");
         let mut c = cache(tenant);
         c.intern(endpoint_sel(&[("app", "web")]));
         c.update_identity(256, ls(&[("app", "web")]));
@@ -422,7 +499,11 @@ mod tests {
 
     #[test]
     fn selector_change_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/selectorcache.go", "Change.Serde", "tenant-sc-cserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/selectorcache.go",
+            "Change.Serde",
+            "tenant-sc-cserde"
+        );
         let ch = SelectorChange {
             selector_id: 1,
             added: BTreeSet::from([256, 257]),
@@ -435,9 +516,14 @@ mod tests {
 
     #[test]
     fn cached_selector_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/policy/selectorcache.go", "Cached.Serde", "tenant-sc-csserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/policy/selectorcache.go",
+            "Cached.Serde",
+            "tenant-sc-csserde"
+        );
         let cs = CachedSelector {
-            id: 1, selector: endpoint_sel(&[("app", "web")]),
+            id: 1,
+            selector: endpoint_sel(&[("app", "web")]),
             matched: BTreeSet::from([256]),
             refcount: 1,
         };

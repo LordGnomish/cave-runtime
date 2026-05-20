@@ -59,7 +59,11 @@ impl GatewayPlugin for BotDetectionPlugin {
 
         if matches_any(&ua, &deny) {
             return PluginResult::Halt(
-                (StatusCode::FORBIDDEN, axum::Json(serde_json::json!({"message": "Forbidden"}))).into_response(),
+                (
+                    StatusCode::FORBIDDEN,
+                    axum::Json(serde_json::json!({"message": "Forbidden"})),
+                )
+                    .into_response(),
             );
         }
 

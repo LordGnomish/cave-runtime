@@ -25,7 +25,7 @@ pub mod vulnerabilities;
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, SbomComponent};
+use crate::admin::state::{AdminState, SbomComponent, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -34,10 +34,18 @@ pub enum SbomViewError {
     Auth(#[from] crate::admin::permission::AuthError),
 }
 
-pub fn list_records(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<SbomComponent>, SbomViewError> {
+pub fn list_records(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<SbomComponent>, SbomViewError> {
     ctx.authorise(Permission::SbomRead)?;
-    let mut rows: Vec<SbomComponent> = scope(&state.sbom_components.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter().cloned().collect();
+    let mut rows: Vec<SbomComponent> =
+        scope(&state.sbom_components.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| a.image.cmp(&b.image).then(a.package.cmp(&b.package)));
     Ok(rows)
 }
@@ -45,14 +53,18 @@ pub fn list_records(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<SbomComp
 pub fn group_by_image(rows: &[SbomComponent]) -> Vec<(String, Vec<SbomComponent>)> {
     use std::collections::BTreeMap;
     let mut acc: BTreeMap<String, Vec<SbomComponent>> = BTreeMap::new();
-    for r in rows { acc.entry(r.image.clone()).or_default().push(r.clone()); }
+    for r in rows {
+        acc.entry(r.image.clone()).or_default().push(r.clone());
+    }
     acc.into_iter().collect()
 }
 
 pub fn unique_licenses(rows: &[SbomComponent]) -> Vec<String> {
     use std::collections::BTreeSet;
     let mut set: BTreeSet<String> = BTreeSet::new();
-    for r in rows { set.insert(r.license.clone()); }
+    for r in rows {
+        set.insert(r.license.clone());
+    }
     set.into_iter().collect()
 }
 
@@ -64,9 +76,17 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SbomViewEr
     let rows = list_records(state, ctx)?;
     let licenses = unique_licenses(&rows);
     let images = group_by_image(&rows);
-    let table_rows: Vec<Vec<String>> = rows.iter().map(|r| vec![
-        escape(&r.image), escape(&r.package), escape(&r.version), escape(&r.license),
-    ]).collect();
+    let table_rows: Vec<Vec<String>> = rows
+        .iter()
+        .map(|r| {
+            vec![
+                escape(&r.image),
+                escape(&r.package),
+                escape(&r.version),
+                escape(&r.license),
+            ]
+        })
+        .collect();
     let body = format!(
         r#"<section>
   <p class="text-sm text-gray-600 mb-3">Dependency-Track (cave-sbom). Upstream: <a class="text-blue-700 underline" href="https://dependencytrack.org/">dependencytrack.org</a>.</p>
@@ -83,24 +103,37 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SbomViewEr
         l = licenses.len(),
         tbl = table(&["image", "package", "version", "license"], &table_rows),
     );
-    Ok(page_shell_full(ctx, "/admin/sbom", &format!("sbom · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/sbom",
+        &format!("sbom · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::backstage("plugins/sbom/src/components/ComponentsList.tsx", "ComponentsList");
+const FILE_CITE: Cite = Cite::backstage(
+    "plugins/sbom/src/components/ComponentsList.tsx",
+    "ComponentsList",
+);
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::portal_test_ctx;
-    fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
+    fn ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer("acme", perms)
+    }
 
     #[test]
     fn list_filters_to_owner_sorted_by_image_then_package() {
         let r = list_records(&AdminState::seeded(), &ctx(&[Permission::SbomRead])).unwrap();
         assert_eq!(r.len(), 2);
         for w in r.windows(2) {
-            assert!((w[0].image.as_str(), w[0].package.as_str()) <= (w[1].image.as_str(), w[1].package.as_str()));
+            assert!(
+                (w[0].image.as_str(), w[0].package.as_str())
+                    <= (w[1].image.as_str(), w[1].package.as_str())
+            );
         }
     }
 

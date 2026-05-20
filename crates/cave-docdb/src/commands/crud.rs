@@ -20,8 +20,17 @@ pub async fn find(
         .unwrap_or_else(|| "test".to_string());
 
     const FIND_PARAMS: &[&str] = &[
-        "filter", "projection", "sort", "limit", "skip", "hint", "batchSize",
-        "singleBatch", "comment", "maxTimeMS", "readConcern",
+        "filter",
+        "projection",
+        "sort",
+        "limit",
+        "skip",
+        "hint",
+        "batchSize",
+        "singleBatch",
+        "comment",
+        "maxTimeMS",
+        "readConcern",
     ];
     let col_name = cmd_doc
         .keys()
@@ -55,14 +64,8 @@ pub async fn find(
         }
     });
 
-    let limit = cmd_doc
-        .get("limit")
-        .and_then(|v| v.as_i64())
-        .unwrap_or(0) as usize;
-    let skip = cmd_doc
-        .get("skip")
-        .and_then(|v| v.as_i64())
-        .unwrap_or(0) as usize;
+    let limit = cmd_doc.get("limit").and_then(|v| v.as_i64()).unwrap_or(0) as usize;
+    let skip = cmd_doc.get("skip").and_then(|v| v.as_i64()).unwrap_or(0) as usize;
 
     let db = engine.get_or_create_database(&db_name).await;
     let col = db.get_or_create_collection(&col_name).await;
@@ -81,11 +84,9 @@ pub async fn find(
         filtered.push(projected);
     }
 
-    let cursor_id = cursors.create(
-        format!("{}.{}", db_name, col_name),
-        filtered.clone(),
-        100,
-    ).await;
+    let cursor_id = cursors
+        .create(format!("{}.{}", db_name, col_name), filtered.clone(), 100)
+        .await;
 
     let mut cursor = serde_json::Map::new();
     cursor.insert("id".to_string(), Value::Number(cursor_id.into()));
@@ -96,13 +97,7 @@ pub async fn find(
 
     let first_batch: Vec<Value> = filtered
         .iter()
-        .map(|doc| {
-            Value::Object(
-                doc.iter()
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect(),
-            )
-        })
+        .map(|doc| Value::Object(doc.iter().map(|(k, v)| (k.clone(), v.clone())).collect()))
         .collect();
     cursor.insert("firstBatch".to_string(), Value::Array(first_batch));
 
@@ -275,7 +270,9 @@ mod tests {
         assert_eq!(ids.len(), 2);
 
         let find_cmd = make_find_doc("items", "testdb");
-        let resp = find(&find_cmd, engine.clone(), cursors.clone()).await.unwrap();
+        let resp = find(&find_cmd, engine.clone(), cursors.clone())
+            .await
+            .unwrap();
         assert_eq!(resp.get("ok"), Some(&Value::Number(1.into())));
         let cursor = resp.get("cursor").and_then(|v| v.as_object()).unwrap();
         let batch = cursor.get("firstBatch").and_then(|v| v.as_array()).unwrap();
@@ -287,16 +284,15 @@ mod tests {
         let engine = Arc::new(Engine::new());
         let cursors = Arc::new(CursorStore::new());
 
-        let insert_cmd = make_insert_doc(
-            "things",
-            "testdb",
-            json!([{"x": 10}, {"x": 20}, {"x": 30}]),
-        );
+        let insert_cmd =
+            make_insert_doc("things", "testdb", json!([{"x": 10}, {"x": 20}, {"x": 30}]));
         insert(&insert_cmd, engine.clone()).await.unwrap();
 
         let mut find_cmd = make_find_doc("things", "testdb");
         find_cmd.insert("filter".to_string(), json!({"x": {"$gt": 15}}));
-        let resp = find(&find_cmd, engine.clone(), cursors.clone()).await.unwrap();
+        let resp = find(&find_cmd, engine.clone(), cursors.clone())
+            .await
+            .unwrap();
         let cursor = resp.get("cursor").and_then(|v| v.as_object()).unwrap();
         let batch = cursor.get("firstBatch").and_then(|v| v.as_array()).unwrap();
         assert_eq!(batch.len(), 2); // x=20 and x=30
@@ -305,11 +301,7 @@ mod tests {
     #[tokio::test]
     async fn test_count_via_command() {
         let engine = Arc::new(Engine::new());
-        let insert_cmd = make_insert_doc(
-            "widgets",
-            "testdb",
-            json!([{"a": 1}, {"a": 2}]),
-        );
+        let insert_cmd = make_insert_doc("widgets", "testdb", json!([{"a": 1}, {"a": 2}]));
         insert(&insert_cmd, engine.clone()).await.unwrap();
 
         let count_cmd = make_find_doc("widgets", "testdb");
@@ -320,11 +312,8 @@ mod tests {
     #[tokio::test]
     async fn test_delete_via_command() {
         let engine = Arc::new(Engine::new());
-        let insert_cmd = make_insert_doc(
-            "trash",
-            "testdb",
-            json!([{"keep": false}, {"keep": true}]),
-        );
+        let insert_cmd =
+            make_insert_doc("trash", "testdb", json!([{"keep": false}, {"keep": true}]));
         insert(&insert_cmd, engine.clone()).await.unwrap();
 
         let mut del_cmd = Document::new();

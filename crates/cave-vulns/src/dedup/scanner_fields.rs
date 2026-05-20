@@ -66,28 +66,185 @@ impl HashField {
 /// Source: DefectDojo/django-DefectDojo@6eab8738 dojo/settings/settings.dist.py
 ///         lines 978-1135 (subset).
 pub static HASHCODE_FIELDS_PER_SCANNER: &[(&str, &[HashField])] = &[
-    ("Bandit Scan", &[HashField::FilePath, HashField::Line, HashField::VulnIdFromTool]),
-    ("ZAP Scan", &[HashField::Title, HashField::Cwe, HashField::Severity]),
-    ("Trivy Scan", &[HashField::Title, HashField::Severity, HashField::VulnerabilityIds, HashField::Cwe, HashField::Description]),
-    ("Semgrep JSON Report", &[HashField::Title, HashField::Cwe, HashField::Line, HashField::FilePath, HashField::Description]),
-    ("SARIF", &[HashField::Title, HashField::Cwe, HashField::Line, HashField::FilePath, HashField::Description]),
-    ("Snyk Scan", &[HashField::VulnIdFromTool, HashField::FilePath, HashField::ComponentName, HashField::ComponentVersion]),
-    ("Nuclei Scan", &[HashField::Title, HashField::Severity, HashField::VulnIdFromTool]),
-    ("Anchore Engine Scan", &[HashField::Title, HashField::Severity, HashField::ComponentName, HashField::ComponentVersion, HashField::FilePath]),
-    ("Anchore Grype", &[HashField::Title, HashField::Severity, HashField::ComponentName, HashField::ComponentVersion]),
-    ("Aqua Scan", &[HashField::Severity, HashField::VulnerabilityIds, HashField::ComponentName, HashField::ComponentVersion]),
-    ("Burp Scan", &[HashField::Title, HashField::Severity, HashField::VulnIdFromTool]),
-    ("CargoAudit Scan", &[HashField::VulnerabilityIds, HashField::Severity, HashField::ComponentName, HashField::ComponentVersion, HashField::VulnIdFromTool]),
-    ("Checkmarx Scan", &[HashField::Cwe, HashField::Severity, HashField::FilePath]),
-    ("Cloudsploit Scan", &[HashField::Title, HashField::Description]),
-    ("SonarQube Scan", &[HashField::Cwe, HashField::Severity, HashField::FilePath]),
-    ("Dependency Check Scan", &[HashField::Title, HashField::Cwe, HashField::FilePath]),
-    ("NPM Audit Scan", &[HashField::Title, HashField::Severity, HashField::FilePath, HashField::VulnerabilityIds, HashField::Cwe]),
-    ("Yarn Audit Scan", &[HashField::Title, HashField::Severity, HashField::FilePath, HashField::VulnerabilityIds, HashField::Cwe]),
-    ("GitLab Dependency Scanning Report", &[HashField::Title, HashField::VulnerabilityIds, HashField::FilePath, HashField::ComponentName, HashField::ComponentVersion]),
-    ("Github SAST Scan", &[HashField::VulnIdFromTool, HashField::Severity, HashField::FilePath, HashField::Line]),
-    ("TFSec Scan", &[HashField::Severity, HashField::VulnIdFromTool, HashField::FilePath, HashField::Line]),
-    ("Tenable Scan", &[HashField::Title, HashField::Severity, HashField::VulnerabilityIds, HashField::Cwe, HashField::Description]),
+    (
+        "Bandit Scan",
+        &[
+            HashField::FilePath,
+            HashField::Line,
+            HashField::VulnIdFromTool,
+        ],
+    ),
+    (
+        "ZAP Scan",
+        &[HashField::Title, HashField::Cwe, HashField::Severity],
+    ),
+    (
+        "Trivy Scan",
+        &[
+            HashField::Title,
+            HashField::Severity,
+            HashField::VulnerabilityIds,
+            HashField::Cwe,
+            HashField::Description,
+        ],
+    ),
+    (
+        "Semgrep JSON Report",
+        &[
+            HashField::Title,
+            HashField::Cwe,
+            HashField::Line,
+            HashField::FilePath,
+            HashField::Description,
+        ],
+    ),
+    (
+        "SARIF",
+        &[
+            HashField::Title,
+            HashField::Cwe,
+            HashField::Line,
+            HashField::FilePath,
+            HashField::Description,
+        ],
+    ),
+    (
+        "Snyk Scan",
+        &[
+            HashField::VulnIdFromTool,
+            HashField::FilePath,
+            HashField::ComponentName,
+            HashField::ComponentVersion,
+        ],
+    ),
+    (
+        "Nuclei Scan",
+        &[
+            HashField::Title,
+            HashField::Severity,
+            HashField::VulnIdFromTool,
+        ],
+    ),
+    (
+        "Anchore Engine Scan",
+        &[
+            HashField::Title,
+            HashField::Severity,
+            HashField::ComponentName,
+            HashField::ComponentVersion,
+            HashField::FilePath,
+        ],
+    ),
+    (
+        "Anchore Grype",
+        &[
+            HashField::Title,
+            HashField::Severity,
+            HashField::ComponentName,
+            HashField::ComponentVersion,
+        ],
+    ),
+    (
+        "Aqua Scan",
+        &[
+            HashField::Severity,
+            HashField::VulnerabilityIds,
+            HashField::ComponentName,
+            HashField::ComponentVersion,
+        ],
+    ),
+    (
+        "Burp Scan",
+        &[
+            HashField::Title,
+            HashField::Severity,
+            HashField::VulnIdFromTool,
+        ],
+    ),
+    (
+        "CargoAudit Scan",
+        &[
+            HashField::VulnerabilityIds,
+            HashField::Severity,
+            HashField::ComponentName,
+            HashField::ComponentVersion,
+            HashField::VulnIdFromTool,
+        ],
+    ),
+    (
+        "Checkmarx Scan",
+        &[HashField::Cwe, HashField::Severity, HashField::FilePath],
+    ),
+    (
+        "Cloudsploit Scan",
+        &[HashField::Title, HashField::Description],
+    ),
+    (
+        "SonarQube Scan",
+        &[HashField::Cwe, HashField::Severity, HashField::FilePath],
+    ),
+    (
+        "Dependency Check Scan",
+        &[HashField::Title, HashField::Cwe, HashField::FilePath],
+    ),
+    (
+        "NPM Audit Scan",
+        &[
+            HashField::Title,
+            HashField::Severity,
+            HashField::FilePath,
+            HashField::VulnerabilityIds,
+            HashField::Cwe,
+        ],
+    ),
+    (
+        "Yarn Audit Scan",
+        &[
+            HashField::Title,
+            HashField::Severity,
+            HashField::FilePath,
+            HashField::VulnerabilityIds,
+            HashField::Cwe,
+        ],
+    ),
+    (
+        "GitLab Dependency Scanning Report",
+        &[
+            HashField::Title,
+            HashField::VulnerabilityIds,
+            HashField::FilePath,
+            HashField::ComponentName,
+            HashField::ComponentVersion,
+        ],
+    ),
+    (
+        "Github SAST Scan",
+        &[
+            HashField::VulnIdFromTool,
+            HashField::Severity,
+            HashField::FilePath,
+            HashField::Line,
+        ],
+    ),
+    (
+        "TFSec Scan",
+        &[
+            HashField::Severity,
+            HashField::VulnIdFromTool,
+            HashField::FilePath,
+            HashField::Line,
+        ],
+    ),
+    (
+        "Tenable Scan",
+        &[
+            HashField::Title,
+            HashField::Severity,
+            HashField::VulnerabilityIds,
+            HashField::Cwe,
+            HashField::Description,
+        ],
+    ),
 ];
 
 /// Lookup the field tuple for `scanner`. Falls back to the legacy
@@ -99,7 +256,11 @@ pub fn fields_for_scanner(scanner: &str) -> &'static [HashField] {
         }
     }
     const LEGACY: &[HashField] = &[
-        HashField::Title, HashField::Cwe, HashField::Line, HashField::FilePath, HashField::Description,
+        HashField::Title,
+        HashField::Cwe,
+        HashField::Line,
+        HashField::FilePath,
+        HashField::Description,
     ];
     LEGACY
 }
@@ -111,7 +272,14 @@ mod tests {
     #[test]
     fn known_scanner_returns_explicit_fields() {
         let fields = fields_for_scanner("Bandit Scan");
-        assert_eq!(fields, &[HashField::FilePath, HashField::Line, HashField::VulnIdFromTool]);
+        assert_eq!(
+            fields,
+            &[
+                HashField::FilePath,
+                HashField::Line,
+                HashField::VulnIdFromTool
+            ]
+        );
     }
 
     #[test]
@@ -125,10 +293,22 @@ mod tests {
     #[test]
     fn all_high_traffic_scanners_present() {
         // Each scanner we ship a parser for MUST have an explicit row.
-        for s in ["Bandit Scan", "ZAP Scan", "Trivy Scan", "Semgrep JSON Report",
-                  "SARIF", "Snyk Scan", "Nuclei Scan"] {
-            let explicit = HASHCODE_FIELDS_PER_SCANNER.iter().any(|(name, _)| *name == s);
-            assert!(explicit, "scanner {s} missing from HASHCODE_FIELDS_PER_SCANNER");
+        for s in [
+            "Bandit Scan",
+            "ZAP Scan",
+            "Trivy Scan",
+            "Semgrep JSON Report",
+            "SARIF",
+            "Snyk Scan",
+            "Nuclei Scan",
+        ] {
+            let explicit = HASHCODE_FIELDS_PER_SCANNER
+                .iter()
+                .any(|(name, _)| *name == s);
+            assert!(
+                explicit,
+                "scanner {s} missing from HASHCODE_FIELDS_PER_SCANNER"
+            );
         }
     }
 

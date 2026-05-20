@@ -101,7 +101,9 @@ impl Advertisement {
         self.attributes.communities.contains(&COMMUNITY_NO_EXPORT)
     }
     pub fn has_no_advertise(&self) -> bool {
-        self.attributes.communities.contains(&COMMUNITY_NO_ADVERTISE)
+        self.attributes
+            .communities
+            .contains(&COMMUNITY_NO_ADVERTISE)
     }
 }
 
@@ -127,10 +129,19 @@ pub enum AddressFamily {
 
 impl PeerConfig {
     /// Default timers from RFC 4271: hold = 90s, keepalive = hold/3.
-    pub fn defaults(name: impl Into<String>, peer_address: IpAddr, peer_asn: u32, local_asn: u32) -> Self {
+    pub fn defaults(
+        name: impl Into<String>,
+        peer_address: IpAddr,
+        peer_asn: u32,
+        local_asn: u32,
+    ) -> Self {
         Self {
-            name: name.into(), peer_address, peer_asn, local_asn,
-            hold_time_seconds: 90, keepalive_seconds: 30,
+            name: name.into(),
+            peer_address,
+            peer_asn,
+            local_asn,
+            hold_time_seconds: 90,
+            keepalive_seconds: 30,
             auth_md5_secret: None,
             families: vec![AddressFamily::Ipv4Unicast],
         }
@@ -161,7 +172,9 @@ pub struct BgpInstance {
 impl BgpInstance {
     pub fn new(tenant: TenantId, local_asn: u32, router_id: IpAddr) -> Self {
         Self {
-            tenant, local_asn, router_id,
+            tenant,
+            local_asn,
+            router_id,
             peers: HashMap::new(),
             advertisements: BTreeMap::new(),
             incoming_paths: BTreeMap::new(),
@@ -169,16 +182,21 @@ impl BgpInstance {
     }
 
     pub fn upsert_peer(&mut self, config: PeerConfig) {
-        self.peers.insert(config.name.clone(), PeerStatus {
-            state: PeerState::Idle,
-            last_event: None,
-            uptime_seconds: 0,
-            config,
-        });
+        self.peers.insert(
+            config.name.clone(),
+            PeerStatus {
+                state: PeerState::Idle,
+                last_event: None,
+                uptime_seconds: 0,
+                config,
+            },
+        );
     }
 
     pub fn remove_peer(&mut self, name: &str) -> Result<(), BgpError> {
-        self.peers.remove(name).ok_or_else(|| BgpError::PeerNotFound(name.to_string()))?;
+        self.peers
+            .remove(name)
+            .ok_or_else(|| BgpError::PeerNotFound(name.to_string()))?;
         Ok(())
     }
 
@@ -192,7 +210,10 @@ impl BgpInstance {
 
     /// Drive the peer FSM with an event. Mirrors RFC 4271 §8.
     pub fn handle_event(&mut self, peer: &str, event: PeerEvent) -> Result<PeerState, BgpError> {
-        let p = self.peers.get_mut(peer).ok_or_else(|| BgpError::PeerNotFound(peer.to_string()))?;
+        let p = self
+            .peers
+            .get_mut(peer)
+            .ok_or_else(|| BgpError::PeerNotFound(peer.to_string()))?;
         let next = match (p.state, event) {
             // Start path.
             (PeerState::Idle, PeerEvent::Start) => PeerState::Connect,
@@ -207,7 +228,9 @@ impl BgpInstance {
             (_, PeerEvent::Stop) => PeerState::Idle,
             (_, PeerEvent::NotificationReceived) => PeerState::Idle,
             (PeerState::Established, PeerEvent::HoldTimerExpired) => PeerState::Idle,
-            (PeerState::OpenSent | PeerState::OpenConfirm, PeerEvent::HoldTimerExpired) => PeerState::Idle,
+            (PeerState::OpenSent | PeerState::OpenConfirm, PeerEvent::HoldTimerExpired) => {
+                PeerState::Idle
+            }
             (from, ev) => return Err(BgpError::BadTransition { from, event: ev }),
         };
         p.state = next;
@@ -225,7 +248,9 @@ impl BgpInstance {
     }
 
     pub fn withdraw(&mut self, name: &str) -> Result<(), BgpError> {
-        self.advertisements.remove(name).ok_or_else(|| BgpError::RouteNotFound(name.to_string()))?;
+        self.advertisements
+            .remove(name)
+            .ok_or_else(|| BgpError::RouteNotFound(name.to_string()))?;
         Ok(())
     }
 
@@ -240,10 +265,18 @@ impl BgpInstance {
     /// Effective advertisements for a given peer — filters out routes
     /// flagged NO_EXPORT when the peer is in a different ASN, and routes
     /// flagged NO_ADVERTISE always (mirrors RFC 1997).
-    pub fn effective_advertisements_for(&self, peer: &str) -> Result<Vec<&Advertisement>, BgpError> {
-        let p = self.peers.get(peer).ok_or_else(|| BgpError::PeerNotFound(peer.to_string()))?;
+    pub fn effective_advertisements_for(
+        &self,
+        peer: &str,
+    ) -> Result<Vec<&Advertisement>, BgpError> {
+        let p = self
+            .peers
+            .get(peer)
+            .ok_or_else(|| BgpError::PeerNotFound(peer.to_string()))?;
         let cross_as = p.config.peer_asn != self.local_asn;
-        Ok(self.advertisements.values()
+        Ok(self
+            .advertisements
+            .values()
             .filter(|a| !a.has_no_advertise())
             .filter(|a| !(cross_as && a.has_no_export()))
             .collect())
@@ -251,9 +284,17 @@ impl BgpInstance {
 
     // ── Path selection ───────────────────────────────────────────────────────
 
-    pub fn record_incoming_path(&mut self, prefix: impl Into<String>, peer: impl Into<String>, attrs: PathAttributes) {
+    pub fn record_incoming_path(
+        &mut self,
+        prefix: impl Into<String>,
+        peer: impl Into<String>,
+        attrs: PathAttributes,
+    ) {
         let prefix = prefix.into();
-        self.incoming_paths.entry(prefix).or_default().push((peer.into(), attrs));
+        self.incoming_paths
+            .entry(prefix)
+            .or_default()
+            .push((peer.into(), attrs));
     }
 
     /// Pick the best path for `prefix` using RFC 4271 tie-breaking:
@@ -288,7 +329,8 @@ impl BgpInstance {
     }
 
     pub fn paths_for(&self, prefix: &str) -> Vec<(&str, &PathAttributes)> {
-        self.incoming_paths.get(prefix)
+        self.incoming_paths
+            .get(prefix)
             .map(|v| v.iter().map(|(p, a)| (p.as_str(), a)).collect())
             .unwrap_or_default()
     }
@@ -303,7 +345,11 @@ fn path_compare(a: &PathAttributes, b: &PathAttributes) -> std::cmp::Ordering {
     if a.as_path.len() != b.as_path.len() {
         return b.as_path.len().cmp(&a.as_path.len()); // shorter is better → reversed
     }
-    let origin_rank = |o: PathOrigin| match o { PathOrigin::Igp => 0, PathOrigin::Egp => 1, PathOrigin::Incomplete => 2 };
+    let origin_rank = |o: PathOrigin| match o {
+        PathOrigin::Igp => 0,
+        PathOrigin::Egp => 1,
+        PathOrigin::Incomplete => 2,
+    };
     let oa = origin_rank(a.origin);
     let ob = origin_rank(b.origin);
     if oa != ob {
@@ -351,7 +397,11 @@ mod tests {
 
     #[test]
     fn bgp_peer_initial_state_idle() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/agent/controller.go", "Peer.InitialState", "tenant-bgp-init");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/agent/controller.go",
+            "Peer.InitialState",
+            "tenant-bgp-init"
+        );
         let mut i = instance(tenant);
         i.upsert_peer(peer(64999));
         assert_eq!(i.peer_status("peer-a").unwrap().state, PeerState::Idle);
@@ -359,7 +409,11 @@ mod tests {
 
     #[test]
     fn bgp_peer_start_advances_to_connect() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/agent/controller.go", "Peer.Start", "tenant-bgp-start");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/agent/controller.go",
+            "Peer.Start",
+            "tenant-bgp-start"
+        );
         let mut i = instance(tenant);
         i.upsert_peer(peer(64999));
         let s = i.handle_event("peer-a", PeerEvent::Start).unwrap();
@@ -368,7 +422,11 @@ mod tests {
 
     #[test]
     fn bgp_peer_tcp_connected_advances_to_open_sent() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/agent/controller.go", "Peer.OpenSent", "tenant-bgp-os");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/agent/controller.go",
+            "Peer.OpenSent",
+            "tenant-bgp-os"
+        );
         let mut i = instance(tenant);
         i.upsert_peer(peer(64999));
         i.handle_event("peer-a", PeerEvent::Start).unwrap();
@@ -378,7 +436,11 @@ mod tests {
 
     #[test]
     fn bgp_peer_tcp_failed_advances_to_active() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/agent/controller.go", "Peer.Active", "tenant-bgp-act");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/agent/controller.go",
+            "Peer.Active",
+            "tenant-bgp-act"
+        );
         let mut i = instance(tenant);
         i.upsert_peer(peer(64999));
         i.handle_event("peer-a", PeerEvent::Start).unwrap();
@@ -388,67 +450,104 @@ mod tests {
 
     #[test]
     fn bgp_peer_full_handshake_to_established() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/agent/controller.go", "Peer.Established", "tenant-bgp-est");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/agent/controller.go",
+            "Peer.Established",
+            "tenant-bgp-est"
+        );
         let mut i = instance(tenant);
         i.upsert_peer(peer(64999));
         i.handle_event("peer-a", PeerEvent::Start).unwrap();
         i.handle_event("peer-a", PeerEvent::TcpConnected).unwrap();
         i.handle_event("peer-a", PeerEvent::OpenReceived).unwrap();
-        let s = i.handle_event("peer-a", PeerEvent::KeepaliveReceived).unwrap();
+        let s = i
+            .handle_event("peer-a", PeerEvent::KeepaliveReceived)
+            .unwrap();
         assert_eq!(s, PeerState::Established);
     }
 
     #[test]
     fn bgp_peer_keepalive_in_established_stays_established() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/agent/controller.go", "Peer.KeepaliveRefresh", "tenant-bgp-kar");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/agent/controller.go",
+            "Peer.KeepaliveRefresh",
+            "tenant-bgp-kar"
+        );
         let mut i = instance(tenant);
         i.upsert_peer(peer(64999));
         i.handle_event("peer-a", PeerEvent::Start).unwrap();
         i.handle_event("peer-a", PeerEvent::TcpConnected).unwrap();
         i.handle_event("peer-a", PeerEvent::OpenReceived).unwrap();
-        i.handle_event("peer-a", PeerEvent::KeepaliveReceived).unwrap();
-        let s = i.handle_event("peer-a", PeerEvent::KeepaliveReceived).unwrap();
+        i.handle_event("peer-a", PeerEvent::KeepaliveReceived)
+            .unwrap();
+        let s = i
+            .handle_event("peer-a", PeerEvent::KeepaliveReceived)
+            .unwrap();
         assert_eq!(s, PeerState::Established);
     }
 
     #[test]
     fn bgp_peer_notification_drops_back_to_idle() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/agent/controller.go", "Peer.Notification", "tenant-bgp-nt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/agent/controller.go",
+            "Peer.Notification",
+            "tenant-bgp-nt"
+        );
         let mut i = instance(tenant);
         i.upsert_peer(peer(64999));
         i.handle_event("peer-a", PeerEvent::Start).unwrap();
         i.handle_event("peer-a", PeerEvent::TcpConnected).unwrap();
         i.handle_event("peer-a", PeerEvent::OpenReceived).unwrap();
-        i.handle_event("peer-a", PeerEvent::KeepaliveReceived).unwrap();
-        let s = i.handle_event("peer-a", PeerEvent::NotificationReceived).unwrap();
+        i.handle_event("peer-a", PeerEvent::KeepaliveReceived)
+            .unwrap();
+        let s = i
+            .handle_event("peer-a", PeerEvent::NotificationReceived)
+            .unwrap();
         assert_eq!(s, PeerState::Idle);
     }
 
     #[test]
     fn bgp_peer_hold_timer_expired_in_established_drops_to_idle() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/agent/controller.go", "Peer.HoldTimerExpired", "tenant-bgp-hte");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/agent/controller.go",
+            "Peer.HoldTimerExpired",
+            "tenant-bgp-hte"
+        );
         let mut i = instance(tenant);
         i.upsert_peer(peer(64999));
         i.handle_event("peer-a", PeerEvent::Start).unwrap();
         i.handle_event("peer-a", PeerEvent::TcpConnected).unwrap();
         i.handle_event("peer-a", PeerEvent::OpenReceived).unwrap();
-        i.handle_event("peer-a", PeerEvent::KeepaliveReceived).unwrap();
-        let s = i.handle_event("peer-a", PeerEvent::HoldTimerExpired).unwrap();
+        i.handle_event("peer-a", PeerEvent::KeepaliveReceived)
+            .unwrap();
+        let s = i
+            .handle_event("peer-a", PeerEvent::HoldTimerExpired)
+            .unwrap();
         assert_eq!(s, PeerState::Idle);
     }
 
     #[test]
     fn bgp_peer_invalid_transition_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/agent/controller.go", "Peer.BadTransition", "tenant-bgp-bad");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/agent/controller.go",
+            "Peer.BadTransition",
+            "tenant-bgp-bad"
+        );
         let mut i = instance(tenant);
         i.upsert_peer(peer(64999));
-        let err = i.handle_event("peer-a", PeerEvent::OpenReceived).unwrap_err();
+        let err = i
+            .handle_event("peer-a", PeerEvent::OpenReceived)
+            .unwrap_err();
         assert!(matches!(err, BgpError::BadTransition { .. }));
     }
 
     #[test]
     fn bgp_peer_event_on_unknown_peer_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/agent/controller.go", "Peer.NotFound", "tenant-bgp-nf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/agent/controller.go",
+            "Peer.NotFound",
+            "tenant-bgp-nf"
+        );
         let mut i = instance(tenant);
         let err = i.handle_event("ghost", PeerEvent::Start).unwrap_err();
         assert!(matches!(err, BgpError::PeerNotFound(_)));
@@ -456,7 +555,11 @@ mod tests {
 
     #[test]
     fn bgp_peer_stop_returns_to_idle_from_any_state() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/agent/controller.go", "Peer.Stop", "tenant-bgp-stop");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/agent/controller.go",
+            "Peer.Stop",
+            "tenant-bgp-stop"
+        );
         let mut i = instance(tenant);
         i.upsert_peer(peer(64999));
         i.handle_event("peer-a", PeerEvent::Start).unwrap();
@@ -469,7 +572,11 @@ mod tests {
 
     #[test]
     fn bgp_peer_config_defaults_use_rfc_timers() {
-        let (_c, _t) = cilium_test_ctx!("pkg/bgpv1/manager/reconcile.go", "PeerConfig.Defaults", "tenant-bgp-cfg");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/reconcile.go",
+            "PeerConfig.Defaults",
+            "tenant-bgp-cfg"
+        );
         let p = PeerConfig::defaults("peer-a", ip(10, 0, 0, 2), 64999, 65000);
         assert_eq!(p.hold_time_seconds, 90);
         assert_eq!(p.keepalive_seconds, 30);
@@ -477,7 +584,11 @@ mod tests {
 
     #[test]
     fn bgp_peer_config_dual_stack_families() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2alpha1/bgp_types.go", "PeerConfig.Families", "tenant-bgp-fam");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2alpha1/bgp_types.go",
+            "PeerConfig.Families",
+            "tenant-bgp-fam"
+        );
         let mut p = peer(64999);
         p.families = vec![AddressFamily::Ipv4Unicast, AddressFamily::Ipv6Unicast];
         assert_eq!(p.families.len(), 2);
@@ -485,7 +596,11 @@ mod tests {
 
     #[test]
     fn bgp_peer_config_md5_authentication() {
-        let (_c, _t) = cilium_test_ctx!("pkg/bgpv1/manager/reconcile.go", "PeerConfig.AuthMD5", "tenant-bgp-md5");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/reconcile.go",
+            "PeerConfig.AuthMD5",
+            "tenant-bgp-md5"
+        );
         let mut p = peer(64999);
         p.auth_md5_secret = Some("shared-secret".into());
         assert!(p.auth_md5_secret.is_some());
@@ -495,33 +610,54 @@ mod tests {
 
     #[test]
     fn bgp_advertise_pod_cidr() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/reconcile.go", "Advertise.PodCIDR", "tenant-bgp-pod");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/reconcile.go",
+            "Advertise.PodCIDR",
+            "tenant-bgp-pod"
+        );
         let mut i = instance(tenant);
         i.advertise(Advertisement {
-            name: "pods".into(), kind: AdvertisementKind::PodCidr,
-            prefix: "10.244.1.0/24".into(), attributes: attrs(),
+            name: "pods".into(),
+            kind: AdvertisementKind::PodCidr,
+            prefix: "10.244.1.0/24".into(),
+            attributes: attrs(),
         });
         assert_eq!(i.advertisements().len(), 1);
     }
 
     #[test]
     fn bgp_advertise_loadbalancer_ip() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/reconcile.go", "Advertise.LBIP", "tenant-bgp-lb");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/reconcile.go",
+            "Advertise.LBIP",
+            "tenant-bgp-lb"
+        );
         let mut i = instance(tenant);
         i.advertise(Advertisement {
-            name: "lb".into(), kind: AdvertisementKind::LoadBalancerIp,
-            prefix: "203.0.113.10/32".into(), attributes: attrs(),
+            name: "lb".into(),
+            kind: AdvertisementKind::LoadBalancerIp,
+            prefix: "203.0.113.10/32".into(),
+            attributes: attrs(),
         });
-        assert_eq!(i.advertisement("lb").unwrap().kind, AdvertisementKind::LoadBalancerIp);
+        assert_eq!(
+            i.advertisement("lb").unwrap().kind,
+            AdvertisementKind::LoadBalancerIp
+        );
     }
 
     #[test]
     fn bgp_withdraw_advertisement() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/reconcile.go", "Advertise.Withdraw", "tenant-bgp-wd");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/reconcile.go",
+            "Advertise.Withdraw",
+            "tenant-bgp-wd"
+        );
         let mut i = instance(tenant);
         i.advertise(Advertisement {
-            name: "pods".into(), kind: AdvertisementKind::PodCidr,
-            prefix: "10.244.1.0/24".into(), attributes: attrs(),
+            name: "pods".into(),
+            kind: AdvertisementKind::PodCidr,
+            prefix: "10.244.1.0/24".into(),
+            attributes: attrs(),
         });
         i.withdraw("pods").unwrap();
         assert!(i.advertisement("pods").is_none());
@@ -529,7 +665,11 @@ mod tests {
 
     #[test]
     fn bgp_withdraw_unknown_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/reconcile.go", "Advertise.Withdraw.NotFound", "tenant-bgp-wdnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/reconcile.go",
+            "Advertise.Withdraw.NotFound",
+            "tenant-bgp-wdnf"
+        );
         let mut i = instance(tenant);
         let err = i.withdraw("ghost").unwrap_err();
         assert!(matches!(err, BgpError::RouteNotFound(_)));
@@ -537,15 +677,23 @@ mod tests {
 
     #[test]
     fn bgp_advertise_idempotent_replaces_in_place() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/reconcile.go", "Advertise.Idempotent", "tenant-bgp-idem");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/reconcile.go",
+            "Advertise.Idempotent",
+            "tenant-bgp-idem"
+        );
         let mut i = instance(tenant);
         i.advertise(Advertisement {
-            name: "pods".into(), kind: AdvertisementKind::PodCidr,
-            prefix: "10.244.1.0/24".into(), attributes: attrs(),
+            name: "pods".into(),
+            kind: AdvertisementKind::PodCidr,
+            prefix: "10.244.1.0/24".into(),
+            attributes: attrs(),
         });
         i.advertise(Advertisement {
-            name: "pods".into(), kind: AdvertisementKind::PodCidr,
-            prefix: "10.244.2.0/24".into(), attributes: attrs(),
+            name: "pods".into(),
+            kind: AdvertisementKind::PodCidr,
+            prefix: "10.244.2.0/24".into(),
+            attributes: attrs(),
         });
         assert_eq!(i.advertisements().len(), 1);
         assert_eq!(i.advertisement("pods").unwrap().prefix, "10.244.2.0/24");
@@ -555,14 +703,20 @@ mod tests {
 
     #[test]
     fn bgp_no_export_filters_cross_as_advertisement() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/reconcile.go", "Community.NoExport", "tenant-bgp-ne");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/reconcile.go",
+            "Community.NoExport",
+            "tenant-bgp-ne"
+        );
         let mut i = instance(tenant);
         i.upsert_peer(PeerConfig::defaults("ext", ip(10, 0, 0, 2), 65001, 65000)); // cross-AS
         let mut a = attrs();
         a.communities = vec![COMMUNITY_NO_EXPORT];
         i.advertise(Advertisement {
-            name: "internal".into(), kind: AdvertisementKind::ServiceCidr,
-            prefix: "10.96.0.0/12".into(), attributes: a,
+            name: "internal".into(),
+            kind: AdvertisementKind::ServiceCidr,
+            prefix: "10.96.0.0/12".into(),
+            attributes: a,
         });
         let r = i.effective_advertisements_for("ext").unwrap();
         assert!(r.is_empty());
@@ -570,14 +724,20 @@ mod tests {
 
     #[test]
     fn bgp_no_export_keeps_intra_as_advertisement() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/reconcile.go", "Community.NoExport.SameAs", "tenant-bgp-nesame");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/reconcile.go",
+            "Community.NoExport.SameAs",
+            "tenant-bgp-nesame"
+        );
         let mut i = instance(tenant);
         i.upsert_peer(peer(65000)); // same AS
         let mut a = attrs();
         a.communities = vec![COMMUNITY_NO_EXPORT];
         i.advertise(Advertisement {
-            name: "internal".into(), kind: AdvertisementKind::ServiceCidr,
-            prefix: "10.96.0.0/12".into(), attributes: a,
+            name: "internal".into(),
+            kind: AdvertisementKind::ServiceCidr,
+            prefix: "10.96.0.0/12".into(),
+            attributes: a,
         });
         let r = i.effective_advertisements_for("peer-a").unwrap();
         assert_eq!(r.len(), 1);
@@ -585,14 +745,20 @@ mod tests {
 
     #[test]
     fn bgp_no_advertise_filters_all_peers() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/reconcile.go", "Community.NoAdvertise", "tenant-bgp-na");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/reconcile.go",
+            "Community.NoAdvertise",
+            "tenant-bgp-na"
+        );
         let mut i = instance(tenant);
         i.upsert_peer(peer(65000));
         let mut a = attrs();
         a.communities = vec![COMMUNITY_NO_ADVERTISE];
         i.advertise(Advertisement {
-            name: "secret".into(), kind: AdvertisementKind::ServiceCidr,
-            prefix: "10.96.0.0/12".into(), attributes: a,
+            name: "secret".into(),
+            kind: AdvertisementKind::ServiceCidr,
+            prefix: "10.96.0.0/12".into(),
+            attributes: a,
         });
         let r = i.effective_advertisements_for("peer-a").unwrap();
         assert!(r.is_empty());
@@ -602,10 +768,16 @@ mod tests {
 
     #[test]
     fn bgp_path_selection_higher_local_pref_wins() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/reconcile.go", "BestPath.LocalPref", "tenant-bgp-lp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/reconcile.go",
+            "BestPath.LocalPref",
+            "tenant-bgp-lp"
+        );
         let mut i = instance(tenant);
-        let mut a = attrs(); a.local_pref = 100;
-        let mut b = attrs(); b.local_pref = 200;
+        let mut a = attrs();
+        a.local_pref = 100;
+        let mut b = attrs();
+        b.local_pref = 200;
         i.record_incoming_path("10.0.0.0/24", "p1", a);
         i.record_incoming_path("10.0.0.0/24", "p2", b);
         let (peer_name, _) = i.best_path("10.0.0.0/24").unwrap();
@@ -614,10 +786,16 @@ mod tests {
 
     #[test]
     fn bgp_path_selection_shorter_as_path_wins() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/reconcile.go", "BestPath.AsPathLength", "tenant-bgp-aspath");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/reconcile.go",
+            "BestPath.AsPathLength",
+            "tenant-bgp-aspath"
+        );
         let mut i = instance(tenant);
-        let mut a = attrs(); a.as_path = vec![65001, 65002, 65003];
-        let mut b = attrs(); b.as_path = vec![65010];
+        let mut a = attrs();
+        a.as_path = vec![65001, 65002, 65003];
+        let mut b = attrs();
+        b.as_path = vec![65010];
         i.record_incoming_path("10.0.0.0/24", "p1", a);
         i.record_incoming_path("10.0.0.0/24", "p2", b);
         let (peer_name, _) = i.best_path("10.0.0.0/24").unwrap();
@@ -626,10 +804,16 @@ mod tests {
 
     #[test]
     fn bgp_path_selection_lower_origin_wins() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/reconcile.go", "BestPath.Origin", "tenant-bgp-org");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/reconcile.go",
+            "BestPath.Origin",
+            "tenant-bgp-org"
+        );
         let mut i = instance(tenant);
-        let mut a = attrs(); a.origin = PathOrigin::Egp;
-        let mut b = attrs(); b.origin = PathOrigin::Igp;
+        let mut a = attrs();
+        a.origin = PathOrigin::Egp;
+        let mut b = attrs();
+        b.origin = PathOrigin::Igp;
         i.record_incoming_path("10.0.0.0/24", "p1", a);
         i.record_incoming_path("10.0.0.0/24", "p2", b);
         let (peer_name, _) = i.best_path("10.0.0.0/24").unwrap();
@@ -638,10 +822,16 @@ mod tests {
 
     #[test]
     fn bgp_path_selection_lower_med_wins() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/reconcile.go", "BestPath.MED", "tenant-bgp-med");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/reconcile.go",
+            "BestPath.MED",
+            "tenant-bgp-med"
+        );
         let mut i = instance(tenant);
-        let mut a = attrs(); a.med = 100;
-        let mut b = attrs(); b.med = 50;
+        let mut a = attrs();
+        a.med = 100;
+        let mut b = attrs();
+        b.med = 50;
         i.record_incoming_path("10.0.0.0/24", "p1", a);
         i.record_incoming_path("10.0.0.0/24", "p2", b);
         let (peer_name, _) = i.best_path("10.0.0.0/24").unwrap();
@@ -650,14 +840,22 @@ mod tests {
 
     #[test]
     fn bgp_best_path_no_candidates_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/reconcile.go", "BestPath.NoCandidates", "tenant-bgp-nc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/reconcile.go",
+            "BestPath.NoCandidates",
+            "tenant-bgp-nc"
+        );
         let i = instance(tenant);
         assert!(i.best_path("10.0.0.0/24").is_none());
     }
 
     #[test]
     fn bgp_best_path_single_candidate_returns_it() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/reconcile.go", "BestPath.Single", "tenant-bgp-single");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/reconcile.go",
+            "BestPath.Single",
+            "tenant-bgp-single"
+        );
         let mut i = instance(tenant);
         i.record_incoming_path("10.0.0.0/24", "p1", attrs());
         let (peer_name, _) = i.best_path("10.0.0.0/24").unwrap();
@@ -666,7 +864,11 @@ mod tests {
 
     #[test]
     fn bgp_paths_for_returns_all_recorded() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/reconcile.go", "PathsFor", "tenant-bgp-pf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/reconcile.go",
+            "PathsFor",
+            "tenant-bgp-pf"
+        );
         let mut i = instance(tenant);
         i.record_incoming_path("10.0.0.0/24", "p1", attrs());
         i.record_incoming_path("10.0.0.0/24", "p2", attrs());
@@ -678,7 +880,11 @@ mod tests {
 
     #[test]
     fn bgp_remove_peer_drops_status() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/manager.go", "RemovePeer", "tenant-bgp-rmp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/manager.go",
+            "RemovePeer",
+            "tenant-bgp-rmp"
+        );
         let mut i = instance(tenant);
         i.upsert_peer(peer(64999));
         i.remove_peer("peer-a").unwrap();
@@ -687,7 +893,11 @@ mod tests {
 
     #[test]
     fn bgp_remove_unknown_peer_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/manager.go", "RemovePeer.NotFound", "tenant-bgp-rmpnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/manager.go",
+            "RemovePeer.NotFound",
+            "tenant-bgp-rmpnf"
+        );
         let mut i = instance(tenant);
         let err = i.remove_peer("ghost").unwrap_err();
         assert!(matches!(err, BgpError::PeerNotFound(_)));
@@ -695,10 +905,19 @@ mod tests {
 
     #[test]
     fn bgp_peer_count_tracks_upserts() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/bgpv1/manager/manager.go", "PeerCount", "tenant-bgp-cnt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/bgpv1/manager/manager.go",
+            "PeerCount",
+            "tenant-bgp-cnt"
+        );
         let mut i = instance(tenant);
         for i_n in 0..5u8 {
-            i.upsert_peer(PeerConfig::defaults(format!("p-{i_n}"), ip(10, 0, 0, i_n), 64999, 65000));
+            i.upsert_peer(PeerConfig::defaults(
+                format!("p-{i_n}"),
+                ip(10, 0, 0, i_n),
+                64999,
+                65000,
+            ));
         }
         assert_eq!(i.peer_count(), 5);
     }
@@ -707,7 +926,11 @@ mod tests {
 
     #[test]
     fn bgp_peer_config_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2alpha1/bgp_types.go", "PeerConfig.Serde", "tenant-bgp-pserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2alpha1/bgp_types.go",
+            "PeerConfig.Serde",
+            "tenant-bgp-pserde"
+        );
         let p = peer(64999);
         let json = serde_json::to_string(&p).unwrap();
         let back: PeerConfig = serde_json::from_str(&json).unwrap();
@@ -716,10 +939,16 @@ mod tests {
 
     #[test]
     fn bgp_advertisement_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2alpha1/bgp_types.go", "Advertisement.Serde", "tenant-bgp-aserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2alpha1/bgp_types.go",
+            "Advertisement.Serde",
+            "tenant-bgp-aserde"
+        );
         let ad = Advertisement {
-            name: "pods".into(), kind: AdvertisementKind::PodCidr,
-            prefix: "10.244.1.0/24".into(), attributes: attrs(),
+            name: "pods".into(),
+            kind: AdvertisementKind::PodCidr,
+            prefix: "10.244.1.0/24".into(),
+            attributes: attrs(),
         };
         let json = serde_json::to_string(&ad).unwrap();
         let back: Advertisement = serde_json::from_str(&json).unwrap();
@@ -728,7 +957,11 @@ mod tests {
 
     #[test]
     fn bgp_path_attributes_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/bgpv1/types/types.go", "PathAttributes.Serde", "tenant-bgp-attrserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/bgpv1/types/types.go",
+            "PathAttributes.Serde",
+            "tenant-bgp-attrserde"
+        );
         let mut a = attrs();
         a.communities = vec![COMMUNITY_NO_EXPORT, 65001];
         let json = serde_json::to_string(&a).unwrap();
@@ -738,8 +971,19 @@ mod tests {
 
     #[test]
     fn bgp_peer_state_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/bgpv1/types/types.go", "PeerState.Serde", "tenant-bgp-pstate");
-        for s in [PeerState::Idle, PeerState::Connect, PeerState::Active, PeerState::OpenSent, PeerState::OpenConfirm, PeerState::Established] {
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/bgpv1/types/types.go",
+            "PeerState.Serde",
+            "tenant-bgp-pstate"
+        );
+        for s in [
+            PeerState::Idle,
+            PeerState::Connect,
+            PeerState::Active,
+            PeerState::OpenSent,
+            PeerState::OpenConfirm,
+            PeerState::Established,
+        ] {
             let j = serde_json::to_string(&s).unwrap();
             let back: PeerState = serde_json::from_str(&j).unwrap();
             assert_eq!(back, s);

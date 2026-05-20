@@ -2,17 +2,12 @@
 // Copyright 2026 Cave Runtime contributors
 //! HTTP API routes for cave-deploy.
 
-use crate::{
-    appset::ApplicationSet,
-    models::*,
-    rbac::AppProject,
-    DeployState,
-};
+use crate::{DeployState, appset::ApplicationSet, models::*, rbac::AppProject};
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     routing::{delete, get, post},
-    Json, Router,
 };
 use chrono::Utc;
 use std::sync::Arc;
@@ -21,27 +16,53 @@ use uuid::Uuid;
 pub fn create_router(state: Arc<DeployState>) -> Router {
     Router::new()
         // Application CRUD
-        .route("/api/deploy/apps", get(list_applications).post(create_application))
-        .route("/api/deploy/apps/{name}", get(get_application).put(update_application).delete(delete_application))
+        .route(
+            "/api/deploy/apps",
+            get(list_applications).post(create_application),
+        )
+        .route(
+            "/api/deploy/apps/{name}",
+            get(get_application)
+                .put(update_application)
+                .delete(delete_application),
+        )
         // Sync operations
         .route("/api/deploy/apps/{name}/sync", post(sync_application))
         .route("/api/deploy/apps/{name}/refresh", post(refresh_application))
-        .route("/api/deploy/apps/{name}/rollback", post(rollback_application))
+        .route(
+            "/api/deploy/apps/{name}/rollback",
+            post(rollback_application),
+        )
         .route("/api/deploy/apps/{name}/diff", get(diff_application))
         .route("/api/deploy/apps/{name}/history", get(get_revision_history))
         // ApplicationSet
         .route("/api/deploy/appsets", get(list_appsets).post(create_appset))
-        .route("/api/deploy/appsets/{name}", get(get_appset).delete(delete_appset))
+        .route(
+            "/api/deploy/appsets/{name}",
+            get(get_appset).delete(delete_appset),
+        )
         // Projects
-        .route("/api/deploy/projects", get(list_projects).post(create_project))
-        .route("/api/deploy/projects/{name}", get(get_project).put(update_project).delete(delete_project))
+        .route(
+            "/api/deploy/projects",
+            get(list_projects).post(create_project),
+        )
+        .route(
+            "/api/deploy/projects/{name}",
+            get(get_project).put(update_project).delete(delete_project),
+        )
         // Repository credentials
         .route("/api/deploy/repos", get(list_repos).post(add_repo))
         .route("/api/deploy/repos/{id}", delete(remove_repo))
         // Notifications
-        .route("/api/deploy/notifications", get(list_notifications).post(create_notification))
+        .route(
+            "/api/deploy/notifications",
+            get(list_notifications).post(create_notification),
+        )
         // SSO
-        .route("/api/deploy/sso/config", get(get_sso_config).put(update_sso_config))
+        .route(
+            "/api/deploy/sso/config",
+            get(get_sso_config).put(update_sso_config),
+        )
         // Webhook
         .route("/api/deploy/webhook", post(handle_webhook))
         // Health
@@ -59,9 +80,7 @@ async fn health() -> Json<serde_json::Value> {
 
 // ─── Application CRUD ────────────────────────────────────────────────────────
 
-async fn list_applications(
-    State(_state): State<Arc<DeployState>>,
-) -> Json<serde_json::Value> {
+async fn list_applications(State(_state): State<Arc<DeployState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({ "items": [], "total": 0 }))
 }
 
@@ -188,9 +207,7 @@ async fn get_revision_history(
 
 // ─── ApplicationSet ───────────────────────────────────────────────────────────
 
-async fn list_appsets(
-    State(_state): State<Arc<DeployState>>,
-) -> Json<serde_json::Value> {
+async fn list_appsets(State(_state): State<Arc<DeployState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({ "items": [], "total": 0 }))
 }
 
@@ -205,7 +222,10 @@ async fn get_appset(
     State(_state): State<Arc<DeployState>>,
     Path(name): Path<String>,
 ) -> Result<Json<ApplicationSet>, (StatusCode, Json<serde_json::Value>)> {
-    Err((StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": format!("AppSet '{}' not found", name) }))))
+    Err((
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({ "error": format!("AppSet '{}' not found", name) })),
+    ))
 }
 
 async fn delete_appset(
@@ -217,9 +237,7 @@ async fn delete_appset(
 
 // ─── Projects ────────────────────────────────────────────────────────────────
 
-async fn list_projects(
-    State(_state): State<Arc<DeployState>>,
-) -> Json<serde_json::Value> {
+async fn list_projects(State(_state): State<Arc<DeployState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({ "items": [] }))
 }
 
@@ -234,7 +252,10 @@ async fn get_project(
     State(_state): State<Arc<DeployState>>,
     Path(name): Path<String>,
 ) -> Result<Json<AppProject>, (StatusCode, Json<serde_json::Value>)> {
-    Err((StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": format!("Project '{}' not found", name) }))))
+    Err((
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({ "error": format!("Project '{}' not found", name) })),
+    ))
 }
 
 async fn update_project(
@@ -254,9 +275,7 @@ async fn delete_project(
 
 // ─── Repository credentials ──────────────────────────────────────────────────
 
-async fn list_repos(
-    State(_state): State<Arc<DeployState>>,
-) -> Json<serde_json::Value> {
+async fn list_repos(State(_state): State<Arc<DeployState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({ "repos": [] }))
 }
 
@@ -267,18 +286,13 @@ async fn add_repo(
     (StatusCode::CREATED, Json(cred))
 }
 
-async fn remove_repo(
-    State(_state): State<Arc<DeployState>>,
-    Path(_id): Path<Uuid>,
-) -> StatusCode {
+async fn remove_repo(State(_state): State<Arc<DeployState>>, Path(_id): Path<Uuid>) -> StatusCode {
     StatusCode::NO_CONTENT
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
-async fn list_notifications(
-    State(_state): State<Arc<DeployState>>,
-) -> Json<serde_json::Value> {
+async fn list_notifications(State(_state): State<Arc<DeployState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({ "notifications": [] }))
 }
 
@@ -291,9 +305,7 @@ async fn create_notification(
 
 // ─── SSO ─────────────────────────────────────────────────────────────────────
 
-async fn get_sso_config(
-    State(_state): State<Arc<DeployState>>,
-) -> Json<serde_json::Value> {
+async fn get_sso_config(State(_state): State<Arc<DeployState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({ "configured": false }))
 }
 

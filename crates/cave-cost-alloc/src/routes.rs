@@ -4,30 +4,33 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     routing::get,
-    Json, Router,
 };
 use chrono::Utc;
 use uuid::Uuid;
 
 use crate::{
-    allocator,
+    CostAllocState, allocator,
     models::{
         BudgetPolicy, ChargebackQuery, ChargebackRule, CostAnomaly, CostCenter,
         CreateBudgetPolicyRequest, CreateChargebackRuleRequest, CreateCostCenterRequest,
         ForecastModel, ForecastQuery, IdleResource, Invoice, ShowbackQuery, ShowbackReport,
         UnitEconomics,
     },
-    reporting, CostAllocState,
+    reporting,
 };
 
 type ApiError = (StatusCode, Json<serde_json::Value>);
 type ApiResult<T> = Result<Json<T>, ApiError>;
 
 fn not_found(msg: &str) -> ApiError {
-    (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": msg })))
+    (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({ "error": msg })),
+    )
 }
 
 pub fn create_router(state: Arc<CostAllocState>) -> Router {
@@ -39,10 +42,15 @@ pub fn create_router(state: Arc<CostAllocState>) -> Router {
         )
         .route(
             "/api/v1/finops/cost-centers/{id}",
-            get(get_cost_center).put(update_cost_center).delete(delete_cost_center),
+            get(get_cost_center)
+                .put(update_cost_center)
+                .delete(delete_cost_center),
         )
         // Budgets
-        .route("/api/v1/finops/budgets", get(list_budgets).post(create_budget))
+        .route(
+            "/api/v1/finops/budgets",
+            get(list_budgets).post(create_budget),
+        )
         .route(
             "/api/v1/finops/budgets/{id}",
             get(get_budget).delete(delete_budget),
@@ -169,7 +177,12 @@ async fn create_budget(
         created_at: now,
         updated_at: now,
     };
-    state.store.lock().unwrap().budget_policies.push(policy.clone());
+    state
+        .store
+        .lock()
+        .unwrap()
+        .budget_policies
+        .push(policy.clone());
     Json(policy)
 }
 
@@ -223,7 +236,12 @@ async fn create_allocation_rule(
         cost_center_ids: req.cost_center_ids,
         created_at: Utc::now(),
     };
-    state.store.lock().unwrap().chargeback_rules.push(rule.clone());
+    state
+        .store
+        .lock()
+        .unwrap()
+        .chargeback_rules
+        .push(rule.clone());
     Json(rule)
 }
 

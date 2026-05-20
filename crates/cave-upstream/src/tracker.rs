@@ -116,10 +116,7 @@ impl UpstreamTracker {
             }
         }
 
-        info!(
-            total_changes = changes.len(),
-            "Upstream check complete"
-        );
+        info!(total_changes = changes.len(), "Upstream check complete");
         changes
     }
 }

@@ -71,11 +71,7 @@ impl VoterSet {
     /// Record a new election outcome. Returns `Err` if `node_id`
     /// isn't in the voter set, or if `new_epoch` isn't strictly
     /// greater than the current epoch (stale leadership claim).
-    pub fn elect(
-        &mut self,
-        node_id: i32,
-        new_epoch: ControllerEpoch,
-    ) -> Result<(), String> {
+    pub fn elect(&mut self, node_id: i32, new_epoch: ControllerEpoch) -> Result<(), String> {
         if !self.voters.contains(&node_id) {
             return Err(format!("node {node_id} not in voter set"));
         }

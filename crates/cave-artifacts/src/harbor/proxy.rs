@@ -224,7 +224,10 @@ pub enum ProxyError {
     #[error("upstream {0:?} is disabled")]
     UpstreamDisabled(Ecosystem),
     #[error("package {ecosystem}/{name} is on the static blocklist")]
-    Blocked { ecosystem: &'static str, name: String },
+    Blocked {
+        ecosystem: &'static str,
+        name: String,
+    },
     #[error("upstream {upstream} returned status {status}")]
     UpstreamStatus { upstream: String, status: u16 },
     #[error("upstream {upstream} fetch failed: {source}")]
@@ -314,7 +317,11 @@ impl ProxyClient {
             return Err(ProxyError::UpstreamDisabled(ecosystem));
         }
 
-        let url = format!("{}/{}", up.base_url.trim_end_matches('/'), path.trim_start_matches('/'));
+        let url = format!(
+            "{}/{}",
+            up.base_url.trim_end_matches('/'),
+            path.trim_start_matches('/')
+        );
         debug!(target: "cave_registry::proxy", %url, "cache-miss upstream fetch");
 
         let mut req = self.http.get(&url);
@@ -392,7 +399,11 @@ impl ProxyClient {
         if up.disabled {
             return Err(ProxyError::UpstreamDisabled(ecosystem));
         }
-        let url = format!("{}/{}", up.base_url.trim_end_matches('/'), path.trim_start_matches('/'));
+        let url = format!(
+            "{}/{}",
+            up.base_url.trim_end_matches('/'),
+            path.trim_start_matches('/')
+        );
         let mut req = self.http.get(&url);
         if let Some(auth) = &up.auth_header {
             req = req.header(reqwest::header::AUTHORIZATION, auth);
@@ -433,8 +444,13 @@ impl ProxyClient {
     /// since PyPI Simple HTML is very regular.
     pub fn rewrite_urls(&self, ecosystem: Ecosystem, body: &str, registry_host: &str) -> String {
         use regex::Regex;
-        let host = registry_host.trim_start_matches("https://").trim_start_matches("http://");
-        let replacement = format!("https://{host}/api/registry/{eco}/blob", eco = ecosystem.as_str());
+        let host = registry_host
+            .trim_start_matches("https://")
+            .trim_start_matches("http://");
+        let replacement = format!(
+            "https://{host}/api/registry/{eco}/blob",
+            eco = ecosystem.as_str()
+        );
         let re = match ecosystem {
             Ecosystem::PyPI => Regex::new(r#"https://files\.pythonhosted\.org[^\s"'<>]+"#).ok(),
             Ecosystem::Npm => Regex::new(r#"https://registry\.npmjs\.org[^\s"'<>]+"#).ok(),
@@ -511,7 +527,10 @@ mod tests {
         let mut cfg = ProxyConfig::default();
         cfg.mode = ProxyMode::Off;
         let c = ProxyClient::new(cfg);
-        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
         let err = rt
             .block_on(c.fetch(Ecosystem::PyPI, "requests", None, "requests/"))
             .unwrap_err();
@@ -523,7 +542,9 @@ mod tests {
         let c = ProxyClient::new(ProxyConfig::default());
         let html = r#"<a href="https://files.pythonhosted.org/packages/ab/cd/requests-2.31.0.tar.gz">requests-2.31.0.tar.gz</a>"#;
         let rewritten = c.rewrite_urls(Ecosystem::PyPI, html, "cave-registry.caveplatform.dev");
-        assert!(rewritten.contains("https://cave-registry.caveplatform.dev/api/registry/pypi/blob"));
+        assert!(
+            rewritten.contains("https://cave-registry.caveplatform.dev/api/registry/pypi/blob")
+        );
         assert!(!rewritten.contains("files.pythonhosted.org"));
     }
 

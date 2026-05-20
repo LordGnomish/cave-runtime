@@ -59,9 +59,9 @@ pub fn is_high_risk(experiment: &ChaosExperiment) -> bool {
 mod tests {
     use super::*;
     use crate::models::{ChaosTarget, ExperimentParams};
+    use chrono::{Duration, Utc};
     use std::collections::HashMap;
     use uuid::Uuid;
-    use chrono::{Duration, Utc};
 
     fn make_experiment(
         exp_type: ExperimentType,
@@ -112,7 +112,10 @@ mod tests {
 
     #[test]
     fn test_validate_latency_valid() {
-        let params = ExperimentParams { latency_ms: Some(100), ..empty_params() };
+        let params = ExperimentParams {
+            latency_ms: Some(100),
+            ..empty_params()
+        };
         let exp = make_experiment(
             ExperimentType::NetworkLatency,
             params,
@@ -126,7 +129,10 @@ mod tests {
 
     #[test]
     fn test_validate_zero_duration() {
-        let params = ExperimentParams { latency_ms: Some(100), ..empty_params() };
+        let params = ExperimentParams {
+            latency_ms: Some(100),
+            ..empty_params()
+        };
         let exp = make_experiment(
             ExperimentType::NetworkLatency,
             params,
@@ -224,7 +230,10 @@ mod tests {
         let now = Utc::now();
         let mut exp = make_experiment(
             ExperimentType::CpuStress,
-            ExperimentParams { cpu_load_percent: Some(80), ..empty_params() },
+            ExperimentParams {
+                cpu_load_percent: Some(80),
+                ..empty_params()
+            },
             ExperimentStatus::Completed,
             "staging",
             60,

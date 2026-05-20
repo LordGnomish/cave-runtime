@@ -236,9 +236,7 @@ mod tests {
         let tenant_id = "ip-004";
         let r = ProducerIdRegistry::new();
         let pid = r.allocate();
-        let outcome = r
-            .check(pid, 0, &topic(tenant_id, "t"), 0, 0, 5)
-            .unwrap();
+        let outcome = r.check(pid, 0, &topic(tenant_id, "t"), 0, 0, 5).unwrap();
         assert_eq!(outcome, SequenceCheck::Accepted);
         let st = r.partition_state(pid, &topic(tenant_id, "t"), 0).unwrap();
         assert_eq!(st.last_sequence, 4); // base 0 + 5 records - 1
@@ -251,9 +249,7 @@ mod tests {
         let r = ProducerIdRegistry::new();
         let pid = r.allocate();
         r.check(pid, 0, &topic(tenant_id, "t"), 0, 0, 3).unwrap();
-        let outcome = r
-            .check(pid, 0, &topic(tenant_id, "t"), 0, 3, 2)
-            .unwrap();
+        let outcome = r.check(pid, 0, &topic(tenant_id, "t"), 0, 3, 2).unwrap();
         assert_eq!(outcome, SequenceCheck::Accepted);
         let st = r.partition_state(pid, &topic(tenant_id, "t"), 0).unwrap();
         assert_eq!(st.last_sequence, 4); // base 3 + 2 records - 1
@@ -266,9 +262,7 @@ mod tests {
         let r = ProducerIdRegistry::new();
         let pid = r.allocate();
         r.check(pid, 0, &topic(tenant_id, "t"), 0, 0, 5).unwrap();
-        let outcome = r
-            .check(pid, 0, &topic(tenant_id, "t"), 0, 2, 1)
-            .unwrap();
+        let outcome = r.check(pid, 0, &topic(tenant_id, "t"), 0, 2, 1).unwrap();
         assert_eq!(outcome, SequenceCheck::Duplicate);
     }
 
@@ -279,9 +273,7 @@ mod tests {
         let r = ProducerIdRegistry::new();
         let pid = r.allocate();
         r.check(pid, 0, &topic(tenant_id, "t"), 0, 0, 5).unwrap();
-        let outcome = r
-            .check(pid, 0, &topic(tenant_id, "t"), 0, 99, 1)
-            .unwrap();
+        let outcome = r.check(pid, 0, &topic(tenant_id, "t"), 0, 99, 1).unwrap();
         assert_eq!(outcome, SequenceCheck::OutOfOrder);
     }
 
@@ -317,8 +309,6 @@ mod tests {
         assert_eq!(r.active_producers(), 1);
         r.forget(pid);
         assert_eq!(r.active_producers(), 0);
-        assert!(r
-            .partition_state(pid, &topic(tenant_id, "t"), 0)
-            .is_none());
+        assert!(r.partition_state(pid, &topic(tenant_id, "t"), 0).is_none());
     }
 }

@@ -73,18 +73,13 @@ impl UnifiedCursorStore {
         now_ms: i64,
     ) -> StreamsResult<CursorPosition> {
         if offset < 0 {
-            return Err(StreamsError::Internal(format!(
-                "negative offset {offset}"
-            )));
+            return Err(StreamsError::Internal(format!("negative offset {offset}")));
         }
-        let mut entry = self
-            .cursors
-            .entry(key)
-            .or_insert_with(|| CursorPosition {
-                committed: -1,
-                metadata: None,
-                committed_at_ms: now_ms,
-            });
+        let mut entry = self.cursors.entry(key).or_insert_with(|| CursorPosition {
+            committed: -1,
+            metadata: None,
+            committed_at_ms: now_ms,
+        });
         if offset < entry.committed {
             return Err(StreamsError::Internal(format!(
                 "OFFSET_OUT_OF_ORDER_COMMIT: had={}, got={}",
@@ -205,11 +200,7 @@ impl UnifiedCursorStore {
                 found = true;
             }
         }
-        if found {
-            Some(min)
-        } else {
-            None
-        }
+        if found { Some(min) } else { None }
     }
 }
 
@@ -259,7 +250,9 @@ mod tests {
         store
             .pulsar_mark_delete("sub", &topic(tenant_id, "t"), 0, 99, 1_000)
             .unwrap();
-        let p = store.pulsar_fetch("sub", &topic(tenant_id, "t"), 0).unwrap();
+        let p = store
+            .pulsar_fetch("sub", &topic(tenant_id, "t"), 0)
+            .unwrap();
         assert_eq!(p.committed, 99);
     }
 
@@ -296,8 +289,12 @@ mod tests {
             .pulsar_mark_delete("same-name", &topic(tenant_id, "t"), 0, 200, 1)
             .unwrap();
         assert_eq!(store.len(), 2);
-        let k = store.kafka_fetch("same-name", &topic(tenant_id, "t"), 0).unwrap();
-        let p = store.pulsar_fetch("same-name", &topic(tenant_id, "t"), 0).unwrap();
+        let k = store
+            .kafka_fetch("same-name", &topic(tenant_id, "t"), 0)
+            .unwrap();
+        let p = store
+            .pulsar_fetch("same-name", &topic(tenant_id, "t"), 0)
+            .unwrap();
         assert_eq!(k.committed, 10);
         assert_eq!(p.committed, 200);
     }
@@ -316,10 +313,7 @@ mod tests {
         store
             .pulsar_mark_delete("sub", &topic(tenant_id, "t"), 0, 75, 1)
             .unwrap();
-        assert_eq!(
-            store.min_committed_for(&topic(tenant_id, "t"), 0),
-            Some(50)
-        );
+        assert_eq!(store.min_committed_for(&topic(tenant_id, "t"), 0), Some(50));
     }
 
     #[test]

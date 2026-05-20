@@ -195,7 +195,10 @@ mod tests {
 
     #[test]
     fn test_matches_tenant_when_no_matcher() {
-        assert!(matches_tenant(&[LabelMatcher::equal("__name__", "x")], "acme"));
+        assert!(matches_tenant(
+            &[LabelMatcher::equal("__name__", "x")],
+            "acme"
+        ));
     }
 
     #[test]
@@ -269,10 +272,7 @@ mod tests {
 
     #[test]
     fn test_tenant_count_handles_missing_label() {
-        let all = vec![
-            lbl(&[(TENANT_LABEL, "acme")]),
-            lbl(&[("__name__", "x")]),
-        ];
+        let all = vec![lbl(&[(TENANT_LABEL, "acme")]), lbl(&[("__name__", "x")])];
         assert_eq!(tenant_count(all.into_iter()), 1);
     }
 
@@ -301,8 +301,10 @@ mod tests {
         inject_tenant_label(&mut globex_labels, "globex");
         let all = vec![acme_labels.clone(), globex_labels.clone()];
 
-        let acme_filter = enforce_tenant_filter(vec![LabelMatcher::equal("__name__", "cpu")], "acme");
-        let acme_visible: Vec<_> = all.iter()
+        let acme_filter =
+            enforce_tenant_filter(vec![LabelMatcher::equal("__name__", "cpu")], "acme");
+        let acme_visible: Vec<_> = all
+            .iter()
             .filter(|l| acme_filter.iter().all(|m| m.matches(l)))
             .collect();
         assert_eq!(acme_visible.len(), 1);

@@ -5,14 +5,16 @@
 use super::types::{MlflowRun, MlflowViewError};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
+use crate::admin::state::{AdminState, scope};
 
 pub fn list_all(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<MlflowRun>, MlflowViewError> {
     ctx.authorise(Permission::MlflowRead)?;
-    let mut rows: Vec<MlflowRun> = scope(&state.mlflow_runs.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter()
-        .cloned()
-        .collect();
+    let mut rows: Vec<MlflowRun> = scope(&state.mlflow_runs.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
+    .into_iter()
+    .cloned()
+    .collect();
     rows.sort_by(|a, b| b.start_time_ms.cmp(&a.start_time_ms));
     Ok(rows)
 }
@@ -28,7 +30,11 @@ pub fn list_for_experiment(
         .collect())
 }
 
-pub fn get(state: &AdminState, ctx: &RequestCtx, run_id: &str) -> Result<MlflowRun, MlflowViewError> {
+pub fn get(
+    state: &AdminState,
+    ctx: &RequestCtx,
+    run_id: &str,
+) -> Result<MlflowRun, MlflowViewError> {
     list_all(state, ctx)?
         .into_iter()
         .find(|r| r.run_id == run_id)
@@ -45,7 +51,9 @@ pub fn status_histogram(rows: &[MlflowRun]) -> Vec<(String, usize)> {
 }
 
 pub fn failed_runs(rows: &[MlflowRun]) -> Vec<&MlflowRun> {
-    rows.iter().filter(|r| r.status == "FAILED" || r.status == "KILLED").collect()
+    rows.iter()
+        .filter(|r| r.status == "FAILED" || r.status == "KILLED")
+        .collect()
 }
 
 pub fn average_duration_ms(rows: &[MlflowRun]) -> u64 {
@@ -95,7 +103,15 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, MlflowView
         avg = avg,
         chips = chips,
         tbl = table(
-            &["run_id", "name", "experiment", "status", "user", "start", "metric"],
+            &[
+                "run_id",
+                "name",
+                "experiment",
+                "status",
+                "user",
+                "start",
+                "metric"
+            ],
             &rows_html,
         ),
     );
@@ -168,7 +184,10 @@ mod tests {
         let s = seeded();
         let c = ctx(&[Permission::MlflowRead]);
         assert_eq!(get(&s, &c, "r1").unwrap().status, "FINISHED");
-        assert!(matches!(get(&s, &c, "nope").unwrap_err(), MlflowViewError::RunNotFound(_)));
+        assert!(matches!(
+            get(&s, &c, "nope").unwrap_err(),
+            MlflowViewError::RunNotFound(_)
+        ));
     }
 
     #[test]
@@ -176,7 +195,11 @@ mod tests {
         let s = seeded();
         let rows = list_all(&s, &ctx(&[Permission::MlflowRead])).unwrap();
         let h = status_histogram(&rows);
-        let fin = h.iter().find(|(s, _)| s == "FINISHED").map(|(_, n)| *n).unwrap();
+        let fin = h
+            .iter()
+            .find(|(s, _)| s == "FINISHED")
+            .map(|(_, n)| *n)
+            .unwrap();
         assert_eq!(fin, 1);
     }
 

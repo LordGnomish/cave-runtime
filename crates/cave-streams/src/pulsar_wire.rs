@@ -216,8 +216,7 @@ impl BaseCommand {
 /// hand-rolled tests stay readable; a future swap to `prost` keeps the
 /// outer framing untouched.
 pub fn encode_frame(cmd: &BaseCommand) -> StreamsResult<BytesMut> {
-    let body = serde_json::to_vec(cmd)
-        .map_err(|e| StreamsError::ProtocolEncode(e.to_string()))?;
+    let body = serde_json::to_vec(cmd).map_err(|e| StreamsError::ProtocolEncode(e.to_string()))?;
     let cmd_size = 1 + body.len() as u32;
     let total_size = 4 + cmd_size;
     let mut buf = BytesMut::with_capacity(4 + total_size as usize);
@@ -251,8 +250,8 @@ pub fn decode_frame(buf: &mut impl Buf) -> StreamsResult<BaseCommand> {
     let type_byte = buf.get_u8();
     let body_len = cmd_size - 1;
     let bytes = buf.copy_to_bytes(body_len);
-    let cmd: BaseCommand = serde_json::from_slice(&bytes)
-        .map_err(|e| StreamsError::ProtocolDecode(e.to_string()))?;
+    let cmd: BaseCommand =
+        serde_json::from_slice(&bytes).map_err(|e| StreamsError::ProtocolDecode(e.to_string()))?;
     if cmd.cmd_type() as u8 != type_byte {
         return Err(StreamsError::ProtocolDecode(format!(
             "type byte {type_byte} does not match decoded variant {:?}",
@@ -491,13 +490,9 @@ impl PulsarServer {
         session: &mut PulsarSession,
         f: CommandFlow,
     ) -> StreamsResult<BaseCommand> {
-        let cons = session
-            .consumers
-            .get_mut(&f.consumer_id)
-            .ok_or_else(|| StreamsError::Internal(format!(
-                "unknown consumer_id {}",
-                f.consumer_id
-            )))?;
+        let cons = session.consumers.get_mut(&f.consumer_id).ok_or_else(|| {
+            StreamsError::Internal(format!("unknown consumer_id {}", f.consumer_id))
+        })?;
         cons.permits = cons.permits.saturating_add(f.message_permits);
         // FLOW has no explicit response — we return a Success-like
         // ProducerSuccess as a server-side ack so the test harness can
@@ -521,9 +516,7 @@ impl PulsarServer {
         let cons = session
             .consumers
             .get_mut(&consumer_id)
-            .ok_or_else(|| StreamsError::Internal(format!(
-                "unknown consumer_id {consumer_id}"
-            )))?;
+            .ok_or_else(|| StreamsError::Internal(format!("unknown consumer_id {consumer_id}")))?;
         if cons.permits == 0 {
             return Ok(None);
         }
@@ -547,13 +540,9 @@ impl PulsarServer {
         session: &mut PulsarSession,
         a: CommandAck,
     ) -> StreamsResult<BaseCommand> {
-        let cons = session
-            .consumers
-            .get_mut(&a.consumer_id)
-            .ok_or_else(|| StreamsError::Internal(format!(
-                "unknown consumer_id {}",
-                a.consumer_id
-            )))?;
+        let cons = session.consumers.get_mut(&a.consumer_id).ok_or_else(|| {
+            StreamsError::Internal(format!("unknown consumer_id {}", a.consumer_id))
+        })?;
         for mid in &a.message_ids {
             let id = mid.entry_id as i64;
             match a.ack_type {
@@ -1016,10 +1005,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(
-            session.consumers.get(&1).unwrap().ack_cumulative,
-            42
-        );
+        assert_eq!(session.consumers.get(&1).unwrap().ack_cumulative, 42);
     }
 
     #[test]

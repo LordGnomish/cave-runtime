@@ -14,8 +14,8 @@
 //! Mirrors `recognizers` map.
 
 use crate::csr_signer::{
-    CsrCondition, CsrSummary, KeyUsage, SIGNER_KUBELET_SERVING,
-    SIGNER_KUBE_APISERVER_CLIENT_KUBELET,
+    CsrCondition, CsrSummary, KeyUsage, SIGNER_KUBE_APISERVER_CLIENT_KUBELET,
+    SIGNER_KUBELET_SERVING,
 };
 use crate::csr_signer_deeper::CsrSubject;
 use crate::types::Cite;
@@ -51,11 +51,7 @@ pub fn is_bootstrap_node_client(
     if csr.signer_name != SIGNER_KUBE_APISERVER_CLIENT_KUBELET {
         return false;
     }
-    if !requester
-        .groups
-        .iter()
-        .any(|g| g == NODE_CLIENT_GROUP)
-    {
+    if !requester.groups.iter().any(|g| g == NODE_CLIENT_GROUP) {
         return false;
     }
     // Subject must satisfy the client-kubelet form (no SANs).
@@ -64,15 +60,14 @@ pub fn is_bootstrap_node_client(
 
 /// Self-node-client recognizer. The requesting username equals the subject
 /// CN — i.e. `system:node:<X>` is renewing its own client cert.
-pub fn is_self_node_client(
-    csr: &CsrSummary,
-    subj: &CsrSubject,
-    requester: &CsrRequester,
-) -> bool {
+pub fn is_self_node_client(csr: &CsrSummary, subj: &CsrSubject, requester: &CsrRequester) -> bool {
     if csr.signer_name != SIGNER_KUBE_APISERVER_CLIENT_KUBELET {
         return false;
     }
-    if !requester.username.starts_with(SELF_NODE_CLIENT_USERNAME_PREFIX) {
+    if !requester
+        .username
+        .starts_with(SELF_NODE_CLIENT_USERNAME_PREFIX)
+    {
         return false;
     }
     if requester.username != subj.common_name {
@@ -110,7 +105,11 @@ pub fn evaluate(
 /// Returns true when the CSR's usages match `kube-apiserver-client-kubelet`
 /// (DigitalSignature + KeyEncipherment + ClientAuth).
 pub fn client_kubelet_usages_ok(usages: &[KeyUsage]) -> bool {
-    let must = [KeyUsage::DigitalSignature, KeyUsage::KeyEncipherment, KeyUsage::ClientAuth];
+    let must = [
+        KeyUsage::DigitalSignature,
+        KeyUsage::KeyEncipherment,
+        KeyUsage::ClientAuth,
+    ];
     must.iter().all(|u| usages.contains(u)) && !usages.contains(&KeyUsage::ServerAuth)
 }
 
@@ -162,7 +161,10 @@ mod tests {
         let c = csr(SIGNER_KUBE_APISERVER_CLIENT_KUBELET, vec![]);
         let s = subj_client("worker-1");
         let r = user("system:bootstrap:abc123", vec![NODE_CLIENT_GROUP]);
-        assert_eq!(evaluate(&c, &s, &r), AutoApproveDecision::BootstrapNodeClient);
+        assert_eq!(
+            evaluate(&c, &s, &r),
+            AutoApproveDecision::BootstrapNodeClient
+        );
     }
 
     #[test]
@@ -202,7 +204,10 @@ mod tests {
             "isNodeClientCert",
             "tenant-csr-aa-already-approved"
         );
-        let c = csr(SIGNER_KUBE_APISERVER_CLIENT_KUBELET, vec![CsrCondition::Approved]);
+        let c = csr(
+            SIGNER_KUBE_APISERVER_CLIENT_KUBELET,
+            vec![CsrCondition::Approved],
+        );
         let s = subj_client("w");
         let r = user("system:node:w", vec!["system:nodes".into()]);
         match evaluate(&c, &s, &r) {
@@ -218,7 +223,10 @@ mod tests {
             "isNodeClientCert",
             "tenant-csr-aa-denied"
         );
-        let c = csr(SIGNER_KUBE_APISERVER_CLIENT_KUBELET, vec![CsrCondition::Denied]);
+        let c = csr(
+            SIGNER_KUBE_APISERVER_CLIENT_KUBELET,
+            vec![CsrCondition::Denied],
+        );
         let s = subj_client("w");
         let r = user("system:node:w", vec!["system:nodes".into()]);
         match evaluate(&c, &s, &r) {

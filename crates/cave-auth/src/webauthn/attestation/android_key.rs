@@ -15,9 +15,9 @@
 
 use ciborium::value::Value;
 
-use crate::webauthn::cbor;
-use crate::webauthn::WebAuthnError;
 use crate::webauthn::CoseAlg;
+use crate::webauthn::WebAuthnError;
+use crate::webauthn::cbor;
 
 #[derive(Debug, Clone)]
 pub struct AndroidKeyAttStmt {
@@ -41,12 +41,16 @@ pub fn parse(stmt: &Value) -> Result<AndroidKeyAttStmt, WebAuthnError> {
             .iter()
             .map(|it| cbor::as_bytes(it).map(|b| b.to_vec()))
             .collect::<Result<Vec<_>, _>>()?,
-        Some(_) => return Err(WebAuthnError::Attestation(
-            "android-key: x5c not array".into(),
-        )),
-        None => return Err(WebAuthnError::Attestation(
-            "android-key: missing x5c".into(),
-        )),
+        Some(_) => {
+            return Err(WebAuthnError::Attestation(
+                "android-key: x5c not array".into(),
+            ));
+        }
+        None => {
+            return Err(WebAuthnError::Attestation(
+                "android-key: missing x5c".into(),
+            ));
+        }
     };
     if x5c.is_empty() {
         return Err(WebAuthnError::Attestation(

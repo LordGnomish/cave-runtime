@@ -38,7 +38,11 @@ pub struct PauseContainer {
 
 impl PauseContainer {
     pub fn new(sandbox_id: Uuid) -> Self {
-        Self { sandbox_id, image: DEFAULT_PAUSE_IMAGE.into(), pid: None }
+        Self {
+            sandbox_id,
+            image: DEFAULT_PAUSE_IMAGE.into(),
+            pid: None,
+        }
     }
 }
 
@@ -55,7 +59,10 @@ impl SandboxNamespaces {
     /// Compute the namespace paths for a sandbox under
     /// `<root>/sandboxes/<id>/ns/`.
     pub fn for_sandbox(sandbox_id: Uuid) -> Self {
-        let root = paths::root().join("sandboxes").join(sandbox_id.to_string()).join("ns");
+        let root = paths::root()
+            .join("sandboxes")
+            .join(sandbox_id.to_string())
+            .join("ns");
         Self {
             network: root.join("net"),
             ipc: root.join("ipc"),
@@ -129,9 +136,9 @@ pub fn run_pod_sandbox(
     namespaces.create()?;
 
     let user_namespace = match (spec.user_namespace_mode.clone(), userns_allocator) {
-        (UserNamespaceMode::Pod, Some(alloc)) => alloc
-            .allocate_namespace()
-            .map_err(CriError::Sandbox)?,
+        (UserNamespaceMode::Pod, Some(alloc)) => {
+            alloc.allocate_namespace().map_err(CriError::Sandbox)?
+        }
         (UserNamespaceMode::Pod, None) => {
             return Err(CriError::Sandbox(
                 "user_namespace_mode=Pod but no UserNsAllocator configured".into(),
@@ -179,7 +186,8 @@ pub fn validate_port_mapping(pm: &PortMapping) -> CriResult<()> {
     }
     if !matches!(pm.protocol.to_uppercase().as_str(), "TCP" | "UDP" | "SCTP") {
         return Err(CriError::Sandbox(format!(
-            "unsupported port protocol: {}", pm.protocol
+            "unsupported port protocol: {}",
+            pm.protocol
         )));
     }
     if let Some(ip) = &pm.host_ip {
@@ -303,7 +311,12 @@ mod tests {
         ensure_test_root();
         let r = run_pod_sandbox(spec("p1", vec![]), None).unwrap();
         assert_eq!(r.sandbox.state, SandboxState::Ready);
-        assert!(r.sandbox.network_ip.as_deref().unwrap().starts_with("10.244."));
+        assert!(r
+            .sandbox
+            .network_ip
+            .as_deref()
+            .unwrap()
+            .starts_with("10.244."));
     }
 
     #[test]

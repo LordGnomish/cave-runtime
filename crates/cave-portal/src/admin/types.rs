@@ -33,16 +33,28 @@ pub struct Cite {
 
 impl Cite {
     pub const fn backstage(path: &'static str, symbol: &'static str) -> Self {
-        Self { repo: UPSTREAM_REPO, path, symbol, version: UPSTREAM_VERSION }
+        Self {
+            repo: UPSTREAM_REPO,
+            path,
+            symbol,
+            version: UPSTREAM_VERSION,
+        }
     }
     pub fn url(&self) -> String {
-        format!("https://github.com/{}/blob/{}/{}", self.repo, self.version, self.path)
+        format!(
+            "https://github.com/{}/blob/{}/{}",
+            self.repo, self.version, self.path
+        )
     }
 }
 
 impl fmt::Display for Cite {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}::{}::{} @ {}", self.repo, self.path, self.symbol, self.version)
+        write!(
+            f,
+            "{}::{}::{} @ {}",
+            self.repo, self.path, self.symbol, self.version
+        )
     }
 }
 

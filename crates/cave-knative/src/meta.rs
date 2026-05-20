@@ -25,8 +25,10 @@ pub struct ObjectMeta {
 impl ObjectMeta {
     pub fn with_creator(tenant_id: &str) -> Self {
         let mut m = ObjectMeta::default();
-        m.annotations.insert(ANNOTATION_CREATOR.to_string(), tenant_id.to_string());
-        m.annotations.insert(ANNOTATION_LAST_MODIFIER.to_string(), tenant_id.to_string());
+        m.annotations
+            .insert(ANNOTATION_CREATOR.to_string(), tenant_id.to_string());
+        m.annotations
+            .insert(ANNOTATION_LAST_MODIFIER.to_string(), tenant_id.to_string());
         m
     }
 
@@ -78,8 +80,14 @@ pub fn validate_traffic(targets: &[TrafficTarget]) -> Result<(), String> {
         return Err(format!("traffic percentages must sum to 100 (got {sum})"));
     }
     for t in targets {
-        if t.revision_name.is_none() && t.configuration_name.is_none() && t.latest_revision != Some(true) {
-            return Err("traffic target must reference a revision, configuration, or latestRevision=true".to_string());
+        if t.revision_name.is_none()
+            && t.configuration_name.is_none()
+            && t.latest_revision != Some(true)
+        {
+            return Err(
+                "traffic target must reference a revision, configuration, or latestRevision=true"
+                    .to_string(),
+            );
         }
     }
     Ok(())

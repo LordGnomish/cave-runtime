@@ -110,16 +110,27 @@ mod tests {
 
     #[test]
     fn empty_spec_validates() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ciliumenvoyconfig/cec_resource_parser.go", "Spec.Empty", "tenant-cec-e");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ciliumenvoyconfig/cec_resource_parser.go",
+            "Spec.Empty",
+            "tenant-cec-e"
+        );
         let s = CecSpec::default();
         assert!(validate_spec(&s).is_ok());
     }
 
     #[test]
     fn unknown_type_url_fails_validation() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ciliumenvoyconfig/cec_resource_parser.go", "Spec.Bad", "tenant-cec-b");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ciliumenvoyconfig/cec_resource_parser.go",
+            "Spec.Bad",
+            "tenant-cec-b"
+        );
         let s = CecSpec {
-            resources: vec![EnvoyResource { type_url: "weird".into(), body: serde_json::json!({}) }],
+            resources: vec![EnvoyResource {
+                type_url: "weird".into(),
+                body: serde_json::json!({}),
+            }],
             ..Default::default()
         };
         let e = validate_spec(&s).unwrap_err();
@@ -128,9 +139,16 @@ mod tests {
 
     #[test]
     fn known_listener_passes_validation() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ciliumenvoyconfig/cec_resource_parser.go", "Spec.Listener", "tenant-cec-lst");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ciliumenvoyconfig/cec_resource_parser.go",
+            "Spec.Listener",
+            "tenant-cec-lst"
+        );
         let s = CecSpec {
-            resources: vec![EnvoyResource { type_url: t::LISTENER.into(), body: serde_json::json!({"name":"l1"}) }],
+            resources: vec![EnvoyResource {
+                type_url: t::LISTENER.into(),
+                body: serde_json::json!({"name":"l1"}),
+            }],
             ..Default::default()
         };
         assert!(validate_spec(&s).is_ok());
@@ -138,13 +156,29 @@ mod tests {
 
     #[test]
     fn count_by_kind_buckets_correctly() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ciliumenvoyconfig/cec_resource_parser.go", "Counts", "tenant-cec-c");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ciliumenvoyconfig/cec_resource_parser.go",
+            "Counts",
+            "tenant-cec-c"
+        );
         let s = CecSpec {
             resources: vec![
-                EnvoyResource { type_url: t::LISTENER.into(), body: serde_json::json!({}) },
-                EnvoyResource { type_url: t::LISTENER.into(), body: serde_json::json!({}) },
-                EnvoyResource { type_url: t::ROUTE.into(), body: serde_json::json!({}) },
-                EnvoyResource { type_url: t::CLUSTER.into(), body: serde_json::json!({}) },
+                EnvoyResource {
+                    type_url: t::LISTENER.into(),
+                    body: serde_json::json!({}),
+                },
+                EnvoyResource {
+                    type_url: t::LISTENER.into(),
+                    body: serde_json::json!({}),
+                },
+                EnvoyResource {
+                    type_url: t::ROUTE.into(),
+                    body: serde_json::json!({}),
+                },
+                EnvoyResource {
+                    type_url: t::CLUSTER.into(),
+                    body: serde_json::json!({}),
+                },
             ],
             ..Default::default()
         };
@@ -154,8 +188,16 @@ mod tests {
 
     #[test]
     fn service_listener_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ciliumenvoyconfig/cec_resource_parser.go", "ServiceListener", "tenant-cec-sl");
-        let sl = ServiceListener { name: "s".into(), namespace: "ns".into(), listener: Some("l".into()) };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ciliumenvoyconfig/cec_resource_parser.go",
+            "ServiceListener",
+            "tenant-cec-sl"
+        );
+        let sl = ServiceListener {
+            name: "s".into(),
+            namespace: "ns".into(),
+            listener: Some("l".into()),
+        };
         let s = serde_json::to_string(&sl).unwrap();
         let back: ServiceListener = serde_json::from_str(&s).unwrap();
         assert_eq!(sl, back);
@@ -163,15 +205,30 @@ mod tests {
 
     #[test]
     fn backend_service_supports_named_ports() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ciliumenvoyconfig/cec_resource_parser.go", "BackendService", "tenant-cec-bs");
-        let bs = BackendService { name: "x".into(), namespace: "default".into(), number: vec!["http".into(), "https".into()] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ciliumenvoyconfig/cec_resource_parser.go",
+            "BackendService",
+            "tenant-cec-bs"
+        );
+        let bs = BackendService {
+            name: "x".into(),
+            namespace: "default".into(),
+            number: vec!["http".into(), "https".into()],
+        };
         assert_eq!(bs.number.len(), 2);
     }
 
     #[test]
     fn envoy_resource_uses_at_type_field_in_json() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ciliumenvoyconfig/cec_resource_parser.go", "Resource.AtType", "tenant-cec-at");
-        let er = EnvoyResource { type_url: t::CLUSTER.into(), body: serde_json::json!({"name":"c1"}) };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ciliumenvoyconfig/cec_resource_parser.go",
+            "Resource.AtType",
+            "tenant-cec-at"
+        );
+        let er = EnvoyResource {
+            type_url: t::CLUSTER.into(),
+            body: serde_json::json!({"name":"c1"}),
+        };
         let s = serde_json::to_string(&er).unwrap();
         // Serde renames type_url to @type
         assert!(s.contains("\"@type\""));
@@ -179,18 +236,37 @@ mod tests {
 
     #[test]
     fn cec_error_renders() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ciliumenvoyconfig/cec_resource_parser.go", "Errors", "tenant-cec-er");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ciliumenvoyconfig/cec_resource_parser.go",
+            "Errors",
+            "tenant-cec-er"
+        );
         let e = CecError::MissingField("name");
         assert!(format!("{}", e).contains("name"));
     }
 
     #[test]
     fn spec_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/ciliumenvoyconfig/cec_resource_parser.go", "Spec.Serde", "tenant-cec-s");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/ciliumenvoyconfig/cec_resource_parser.go",
+            "Spec.Serde",
+            "tenant-cec-s"
+        );
         let s = CecSpec {
-            services: vec![ServiceListener { name: "s".into(), namespace: "ns".into(), listener: None }],
-            backend_services: vec![BackendService { name: "b".into(), namespace: "ns".into(), number: vec![] }],
-            resources: vec![EnvoyResource { type_url: t::LISTENER.into(), body: serde_json::json!({"name":"l"}) }],
+            services: vec![ServiceListener {
+                name: "s".into(),
+                namespace: "ns".into(),
+                listener: None,
+            }],
+            backend_services: vec![BackendService {
+                name: "b".into(),
+                namespace: "ns".into(),
+                number: vec![],
+            }],
+            resources: vec![EnvoyResource {
+                type_url: t::LISTENER.into(),
+                body: serde_json::json!({"name":"l"}),
+            }],
             node_selector: None,
         };
         let j = serde_json::to_string(&s).unwrap();

@@ -8,7 +8,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, PgTable};
+use crate::admin::state::{AdminState, PgTable, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -25,10 +25,12 @@ pub enum PgViewError {
 
 pub fn list_tables(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<PgTable>, PgViewError> {
     ctx.authorise(Permission::PgRead)?;
-    Ok(scope(&state.pg_tables.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter()
-        .cloned()
-        .collect())
+    Ok(
+        scope(&state.pg_tables.read().unwrap(), &ctx.tenant, |r| &r.tenant)
+            .into_iter()
+            .cloned()
+            .collect(),
+    )
 }
 
 /// Validate that `sql` is a single read-only `SELECT`. Returns the
@@ -185,7 +187,10 @@ mod tests {
             "CREATE TABLE x (a int)",
         ] {
             let err = validate_select(bad).unwrap_err();
-            assert!(matches!(err, PgViewError::NotSelect(_) | PgViewError::ForbiddenKeyword(_)));
+            assert!(matches!(
+                err,
+                PgViewError::NotSelect(_) | PgViewError::ForbiddenKeyword(_)
+            ));
         }
     }
 
@@ -239,6 +244,9 @@ mod tests {
             "validate",
             "acme"
         );
-        assert!(matches!(validate_select("   ;").unwrap_err(), PgViewError::EmptyStatement));
+        assert!(matches!(
+            validate_select("   ;").unwrap_err(),
+            PgViewError::EmptyStatement
+        ));
     }
 }

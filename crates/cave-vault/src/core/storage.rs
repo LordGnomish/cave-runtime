@@ -24,7 +24,11 @@ impl StorageBackend {
 
     /// List all keys directly under prefix (one level deep, like a directory listing).
     pub fn list(&self, prefix: &str) -> Vec<String> {
-        let prefix = if prefix.ends_with('/') { prefix.to_string() } else { format!("{prefix}/") };
+        let prefix = if prefix.ends_with('/') {
+            prefix.to_string()
+        } else {
+            format!("{prefix}/")
+        };
         let mut keys = std::collections::BTreeSet::new();
         for key in self.data.keys() {
             if let Some(rest) = key.strip_prefix(&prefix) {

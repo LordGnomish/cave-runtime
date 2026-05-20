@@ -19,7 +19,12 @@ struct TokenBucket {
 
 impl TokenBucket {
     fn new(capacity: f64, refill_rate: f64) -> Self {
-        Self { capacity, tokens: capacity, refill_rate, last_refill: Instant::now() }
+        Self {
+            capacity,
+            tokens: capacity,
+            refill_rate,
+            last_refill: Instant::now(),
+        }
     }
 
     fn try_consume(&mut self) -> bool {
@@ -109,7 +114,9 @@ impl RateLimiter {
             RateLimitDecision::Allowed
         } else {
             debug!(service = %service, "Rate limit: denied");
-            RateLimitDecision::Denied { service: service.to_string() }
+            RateLimitDecision::Denied {
+                service: service.to_string(),
+            }
         }
     }
 

@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Runtime, Universal
+**Scope:** Hyperscaler, Sovereign, Runtime, Universal
 
 **Category:** Platform
 
@@ -10,7 +10,7 @@
 
 ## Context
 
-CAVE runs on two fundamentally different providers (Hetzner self-hosted, Azure managed). Developers should not need to understand or interact with provider-specific details when using the platform.
+CAVE runs on two fundamentally different providers (sovereign self-hosted, Azure managed). Developers should not need to understand or interact with provider-specific details when using the platform.
 
 ## Candidates
 
@@ -39,7 +39,7 @@ Backstage presents identical self-service UX regardless of target provider. Back
 - Golden Path compliance easily measurable (ADR-140) — same templates, same metrics.
 
 **Negative:**
-- Provider-specific edge cases (e.g., Azure PG zone-redundant HA has no direct Hetzner equivalent) must be handled silently by Compositions. This means some Azure features may be silently downgraded on Hetzner or vice versa.
+- Provider-specific edge cases (e.g., Azure PG zone-redundant HA has no direct Hetzner equivalent) must be handled silently by Compositions. This means some Azure features may be silently downgraded on the sovereign profile or vice versa.
 - Parity exceptions must be documented (ADR-135 parity-exceptions.yaml) so tenants understand behavioral differences.
 
 ## Compliance Mapping

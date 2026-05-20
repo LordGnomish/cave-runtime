@@ -7,7 +7,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, tally_by_kind, ActivityEntry, AdminState};
+use crate::admin::state::{ActivityEntry, AdminState, scope, tally_by_kind};
 use crate::admin::types::{Cite, TenantId};
 use std::collections::BTreeMap;
 
@@ -16,7 +16,10 @@ pub enum DashboardError {
     #[error(transparent)]
     Auth(#[from] crate::admin::permission::AuthError),
     #[error("dashboard tenant {requested} does not match request tenant {actual}")]
-    PathTenantMismatch { requested: TenantId, actual: TenantId },
+    PathTenantMismatch {
+        requested: TenantId,
+        actual: TenantId,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,15 +34,30 @@ pub struct ResourceSummary {
 }
 
 /// Compute the per-tenant resource summary by scoping every collection.
-pub fn resource_summary(state: &AdminState, ctx: &RequestCtx) -> Result<ResourceSummary, DashboardError> {
+pub fn resource_summary(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<ResourceSummary, DashboardError> {
     ctx.authorise(Permission::DashboardRead)?;
     let kv_count = scope(&state.etcd_kv.read().unwrap(), &ctx.tenant, |r| &r.tenant).len();
-    let sandbox_count = scope(&state.cri_sandboxes.read().unwrap(), &ctx.tenant, |r| &r.tenant).len();
-    let k8s_count = scope(&state.k8s_resources.read().unwrap(), &ctx.tenant, |r| &r.tenant).len();
+    let sandbox_count = scope(&state.cri_sandboxes.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
+    .len();
+    let k8s_count = scope(&state.k8s_resources.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
+    .len();
     let user_count = scope(&state.iam_users.read().unwrap(), &ctx.tenant, |r| &r.tenant).len();
-    let policy_count = scope(&state.mesh_authz.read().unwrap(), &ctx.tenant, |r| &r.tenant).len();
+    let policy_count = scope(&state.mesh_authz.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
+    .len();
     let table_count = scope(&state.pg_tables.read().unwrap(), &ctx.tenant, |r| &r.tenant).len();
-    let secret_count = scope(&state.vault_secrets.read().unwrap(), &ctx.tenant, |r| &r.tenant).len();
+    let secret_count = scope(&state.vault_secrets.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
+    .len();
     Ok(ResourceSummary {
         kv_count,
         sandbox_count,
@@ -59,8 +77,10 @@ pub fn recent_activity(
 ) -> Result<Vec<ActivityEntry>, DashboardError> {
     ctx.authorise(Permission::DashboardRead)?;
     let log = state.recent_activity.read().unwrap();
-    let mut rows: Vec<ActivityEntry> =
-        scope(&log, &ctx.tenant, |r| &r.tenant).into_iter().cloned().collect();
+    let mut rows: Vec<ActivityEntry> = scope(&log, &ctx.tenant, |r| &r.tenant)
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| b.when_unix.cmp(&a.when_unix));
     rows.truncate(limit);
     Ok(rows)

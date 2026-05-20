@@ -125,10 +125,7 @@ pub fn parse_keytab(bytes: &[u8]) -> Result<Vec<KeytabEntry>, KerberosError> {
     Ok(entries)
 }
 
-fn parse_entry(
-    cur: &mut Cursor<&[u8]>,
-    size: u64,
-) -> Result<KeytabEntry, KerberosError> {
+fn parse_entry(cur: &mut Cursor<&[u8]>, size: u64) -> Result<KeytabEntry, KerberosError> {
     let start = cur.position();
     let num_components = cur
         .read_u16::<BigEndian>()

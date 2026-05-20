@@ -13,7 +13,7 @@ pub mod filter;
 pub mod keymap;
 pub mod render;
 
-pub use app::{AppState, Action, View, reduce};
+pub use app::{Action, AppState, View, reduce};
 pub use filter::{fuzzy_match, fuzzy_score};
 pub use keymap::{Key, KeyAction, default_keymap};
 pub use render::{

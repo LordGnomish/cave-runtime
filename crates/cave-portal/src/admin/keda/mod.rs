@@ -14,15 +14,15 @@
 //! CRUD pages and the catalog.
 
 pub mod metrics;
-pub mod scaled_objects;
 pub mod scaled_jobs;
+pub mod scaled_objects;
 pub mod scalers;
 pub mod trigger_authentications;
 pub mod types;
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, KedaScaledObject, KedaScalerEvent};
+use crate::admin::state::{AdminState, KedaScaledObject, KedaScalerEvent, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -38,10 +38,14 @@ pub fn list_scaled_objects(
     ctx: &RequestCtx,
 ) -> Result<Vec<KedaScaledObject>, KedaViewError> {
     ctx.authorise(Permission::KedaRead)?;
-    Ok(scope(&state.keda_scaled_objects.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter()
-        .cloned()
-        .collect())
+    Ok(scope(
+        &state.keda_scaled_objects.read().unwrap(),
+        &ctx.tenant,
+        |r| &r.tenant,
+    )
+    .into_iter()
+    .cloned()
+    .collect())
 }
 
 pub fn list_scaler_events(
@@ -49,10 +53,14 @@ pub fn list_scaler_events(
     ctx: &RequestCtx,
 ) -> Result<Vec<KedaScalerEvent>, KedaViewError> {
     ctx.authorise(Permission::KedaRead)?;
-    Ok(scope(&state.keda_scaler_events.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter()
-        .cloned()
-        .collect())
+    Ok(scope(
+        &state.keda_scaler_events.read().unwrap(),
+        &ctx.tenant,
+        |r| &r.tenant,
+    )
+    .into_iter()
+    .cloned()
+    .collect())
 }
 
 pub fn pause_scaled_object(
@@ -107,8 +115,15 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, KedaViewEr
             vec![
                 s.name.clone(),
                 s.target_ref.clone(),
-                format!("{}/{}/{}", s.min_replicas, s.current_replicas, s.max_replicas),
-                if s.paused { "paused".into() } else { "active".into() },
+                format!(
+                    "{}/{}/{}",
+                    s.min_replicas, s.current_replicas, s.max_replicas
+                ),
+                if s.paused {
+                    "paused".into()
+                } else {
+                    "active".into()
+                },
                 s.triggers.join(","),
             ]
         })
@@ -144,7 +159,13 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, KedaViewEr
         ),
         trigger_tbl = table(&["trigger", "count"], &trigger_rows),
         event_tbl = table(
-            &["when_unix", "scaled_object", "trigger", "replicas", "verdict"],
+            &[
+                "when_unix",
+                "scaled_object",
+                "trigger",
+                "replicas",
+                "verdict"
+            ],
             &event_rows
         ),
     );
@@ -210,10 +231,20 @@ mod tests {
         let c = ctx(&[Permission::KedaRead, Permission::KedaWrite]);
         pause_scaled_object(&state, &c, "ingest-worker").unwrap();
         let sos = list_scaled_objects(&state, &c).unwrap();
-        assert!(sos.iter().find(|s| s.name == "ingest-worker").unwrap().paused);
+        assert!(
+            sos.iter()
+                .find(|s| s.name == "ingest-worker")
+                .unwrap()
+                .paused
+        );
         resume_scaled_object(&state, &c, "ingest-worker").unwrap();
         let sos = list_scaled_objects(&state, &c).unwrap();
-        assert!(!sos.iter().find(|s| s.name == "ingest-worker").unwrap().paused);
+        assert!(
+            !sos.iter()
+                .find(|s| s.name == "ingest-worker")
+                .unwrap()
+                .paused
+        );
     }
 
     #[test]
@@ -249,12 +280,8 @@ mod tests {
             "acme"
         );
         let state = AdminState::seeded();
-        let err = pause_scaled_object(
-            &state,
-            &ctx(&[Permission::KedaRead]),
-            "ingest-worker",
-        )
-        .unwrap_err();
+        let err = pause_scaled_object(&state, &ctx(&[Permission::KedaRead]), "ingest-worker")
+            .unwrap_err();
         assert!(matches!(err, KedaViewError::Auth(_)));
     }
 

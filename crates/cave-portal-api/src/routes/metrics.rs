@@ -86,7 +86,9 @@ pub struct MetricsStore {
 
 impl Default for MetricsStore {
     fn default() -> Self {
-        Self { series: Mutex::new(HashMap::new()) }
+        Self {
+            series: Mutex::new(HashMap::new()),
+        }
     }
 }
 
@@ -155,7 +157,10 @@ impl MetricsStore {
                     })
                     .cloned()
                     .collect();
-                Series { id: s.id.clone(), samples }
+                Series {
+                    id: s.id.clone(),
+                    samples,
+                }
             })
             .collect();
         out.sort_by(|a, b| a.id.key().cmp(&b.id.key()));
@@ -191,19 +196,29 @@ mod tests {
     use super::*;
     use crate::routes::rbac::Persona;
 
-    fn op() -> Principal { Principal::new("o", Persona::Operator) }
-    fn dev(t: &str) -> Principal { Principal::new("d", Persona::Tenant).with_tenant(t) }
+    fn op() -> Principal {
+        Principal::new("o", Persona::Operator)
+    }
+    fn dev(t: &str) -> Principal {
+        Principal::new("d", Persona::Tenant).with_tenant(t)
+    }
 
     fn series(tenant: &str, name: &str, labels: &[(&str, &str)]) -> SeriesId {
         SeriesId {
             tenant: tenant.into(),
             name: name.into(),
-            labels: labels.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            labels: labels
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
         }
     }
 
     fn sample(ts: u64, v: f64) -> Sample {
-        Sample { timestamp: ts, value: v }
+        Sample {
+            timestamp: ts,
+            value: v,
+        }
     }
 
     #[test]
@@ -216,29 +231,45 @@ mod tests {
     #[test]
     fn record_anonymous_denied() {
         let s = MetricsStore::new();
-        let err = s.record(None, series("t", "n", &[]), sample(0, 0.0)).unwrap_err();
+        let err = s
+            .record(None, series("t", "n", &[]), sample(0, 0.0))
+            .unwrap_err();
         assert!(matches!(err, MetricsError::Guard(GuardError::Anonymous)));
     }
 
     #[test]
     fn record_tenant_persona_denied() {
         let s = MetricsStore::new();
-        let err = s.record(Some(&dev("acme")), series("acme", "n", &[]), sample(0, 0.0)).unwrap_err();
-        assert!(matches!(err, MetricsError::Guard(GuardError::PersonaForbidden { .. })));
+        let err = s
+            .record(Some(&dev("acme")), series("acme", "n", &[]), sample(0, 0.0))
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            MetricsError::Guard(GuardError::PersonaForbidden { .. })
+        ));
     }
 
     #[test]
     fn record_operator_succeeds() {
         let s = MetricsStore::new();
-        assert!(s.record(Some(&op()), series("acme", "n", &[]), sample(1, 2.0)).is_ok());
+        assert!(
+            s.record(Some(&op()), series("acme", "n", &[]), sample(1, 2.0))
+                .is_ok()
+        );
     }
 
     #[test]
     fn query_returns_recorded_series() {
         let s = MetricsStore::new();
-        s.record(Some(&op()), series("acme", "cpu", &[]), sample(1, 0.5)).unwrap();
-        s.record(Some(&op()), series("acme", "cpu", &[]), sample(2, 0.6)).unwrap();
-        let q = MetricQuery { tenant: "acme".into(), name: "cpu".into(), ..Default::default() };
+        s.record(Some(&op()), series("acme", "cpu", &[]), sample(1, 0.5))
+            .unwrap();
+        s.record(Some(&op()), series("acme", "cpu", &[]), sample(2, 0.6))
+            .unwrap();
+        let q = MetricQuery {
+            tenant: "acme".into(),
+            name: "cpu".into(),
+            ..Default::default()
+        };
         let out = s.query(Some(&dev("acme")), &q).unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].samples.len(), 2);
@@ -247,9 +278,15 @@ mod tests {
     #[test]
     fn query_filters_by_tenant() {
         let s = MetricsStore::new();
-        s.record(Some(&op()), series("acme", "cpu", &[]), sample(1, 0.5)).unwrap();
-        s.record(Some(&op()), series("globex", "cpu", &[]), sample(1, 0.9)).unwrap();
-        let q = MetricQuery { tenant: "acme".into(), name: "cpu".into(), ..Default::default() };
+        s.record(Some(&op()), series("acme", "cpu", &[]), sample(1, 0.5))
+            .unwrap();
+        s.record(Some(&op()), series("globex", "cpu", &[]), sample(1, 0.9))
+            .unwrap();
+        let q = MetricQuery {
+            tenant: "acme".into(),
+            name: "cpu".into(),
+            ..Default::default()
+        };
         let out = s.query(Some(&dev("acme")), &q).unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].samples[0].value, 0.5);
@@ -258,17 +295,35 @@ mod tests {
     #[test]
     fn query_dev_cross_tenant_denied() {
         let s = MetricsStore::new();
-        s.record(Some(&op()), series("acme", "cpu", &[]), sample(1, 0.5)).unwrap();
-        let q = MetricQuery { tenant: "acme".into(), name: "cpu".into(), ..Default::default() };
+        s.record(Some(&op()), series("acme", "cpu", &[]), sample(1, 0.5))
+            .unwrap();
+        let q = MetricQuery {
+            tenant: "acme".into(),
+            name: "cpu".into(),
+            ..Default::default()
+        };
         let err = s.query(Some(&dev("globex")), &q).unwrap_err();
-        assert!(matches!(err, MetricsError::Guard(GuardError::TenantMismatch { .. })));
+        assert!(matches!(
+            err,
+            MetricsError::Guard(GuardError::TenantMismatch { .. })
+        ));
     }
 
     #[test]
     fn query_filters_by_label() {
         let s = MetricsStore::new();
-        s.record(Some(&op()), series("acme", "cpu", &[("host", "h1")]), sample(1, 0.5)).unwrap();
-        s.record(Some(&op()), series("acme", "cpu", &[("host", "h2")]), sample(1, 0.9)).unwrap();
+        s.record(
+            Some(&op()),
+            series("acme", "cpu", &[("host", "h1")]),
+            sample(1, 0.5),
+        )
+        .unwrap();
+        s.record(
+            Some(&op()),
+            series("acme", "cpu", &[("host", "h2")]),
+            sample(1, 0.9),
+        )
+        .unwrap();
         let q = MetricQuery {
             tenant: "acme".into(),
             name: "cpu".into(),
@@ -284,7 +339,8 @@ mod tests {
         let s = MetricsStore::new();
         let id = series("acme", "cpu", &[]);
         for ts in 1..=5 {
-            s.record(Some(&op()), id.clone(), sample(ts, ts as f64)).unwrap();
+            s.record(Some(&op()), id.clone(), sample(ts, ts as f64))
+                .unwrap();
         }
         let q = MetricQuery {
             tenant: "acme".into(),
@@ -318,7 +374,11 @@ mod tests {
         s.record(Some(&op()), id.clone(), sample(1, 1.0)).unwrap();
         s.record(Some(&op()), id.clone(), sample(2, 2.0)).unwrap();
         s.record(Some(&op()), id.clone(), sample(3, 3.0)).unwrap();
-        let q = MetricQuery { tenant: "acme".into(), name: "cpu".into(), ..Default::default() };
+        let q = MetricQuery {
+            tenant: "acme".into(),
+            name: "cpu".into(),
+            ..Default::default()
+        };
         let v = s.aggregate(Some(&dev("acme")), &q, Aggregate::Sum).unwrap();
         assert!((v - 6.0).abs() < 1e-9);
     }
@@ -329,7 +389,11 @@ mod tests {
         let id = series("acme", "cpu", &[]);
         s.record(Some(&op()), id.clone(), sample(1, 2.0)).unwrap();
         s.record(Some(&op()), id.clone(), sample(2, 4.0)).unwrap();
-        let q = MetricQuery { tenant: "acme".into(), name: "cpu".into(), ..Default::default() };
+        let q = MetricQuery {
+            tenant: "acme".into(),
+            name: "cpu".into(),
+            ..Default::default()
+        };
         let v = s.aggregate(Some(&dev("acme")), &q, Aggregate::Avg).unwrap();
         assert!((v - 3.0).abs() < 1e-9);
     }
@@ -341,7 +405,11 @@ mod tests {
         for v in [3.0, 1.0, 7.0, 2.0] {
             s.record(Some(&op()), id.clone(), sample(0, v)).unwrap();
         }
-        let q = MetricQuery { tenant: "acme".into(), name: "cpu".into(), ..Default::default() };
+        let q = MetricQuery {
+            tenant: "acme".into(),
+            name: "cpu".into(),
+            ..Default::default()
+        };
         let p = dev("acme");
         assert_eq!(s.aggregate(Some(&p), &q, Aggregate::Min).unwrap(), 1.0);
         assert_eq!(s.aggregate(Some(&p), &q, Aggregate::Max).unwrap(), 7.0);
@@ -351,17 +419,37 @@ mod tests {
     #[test]
     fn aggregate_empty_errors() {
         let s = MetricsStore::new();
-        let q = MetricQuery { tenant: "acme".into(), name: "cpu".into(), ..Default::default() };
-        let err = s.aggregate(Some(&dev("acme")), &q, Aggregate::Sum).unwrap_err();
+        let q = MetricQuery {
+            tenant: "acme".into(),
+            name: "cpu".into(),
+            ..Default::default()
+        };
+        let err = s
+            .aggregate(Some(&dev("acme")), &q, Aggregate::Sum)
+            .unwrap_err();
         assert_eq!(err, MetricsError::Empty);
     }
 
     #[test]
     fn query_returns_sorted_by_series_key() {
         let s = MetricsStore::new();
-        s.record(Some(&op()), series("acme", "cpu", &[("z", "1")]), sample(0, 0.0)).unwrap();
-        s.record(Some(&op()), series("acme", "cpu", &[("a", "1")]), sample(0, 0.0)).unwrap();
-        let q = MetricQuery { tenant: "acme".into(), name: "cpu".into(), ..Default::default() };
+        s.record(
+            Some(&op()),
+            series("acme", "cpu", &[("z", "1")]),
+            sample(0, 0.0),
+        )
+        .unwrap();
+        s.record(
+            Some(&op()),
+            series("acme", "cpu", &[("a", "1")]),
+            sample(0, 0.0),
+        )
+        .unwrap();
+        let q = MetricQuery {
+            tenant: "acme".into(),
+            name: "cpu".into(),
+            ..Default::default()
+        };
         let out = s.query(Some(&dev("acme")), &q).unwrap();
         let keys: Vec<String> = out.iter().map(|s| s.id.key()).collect();
         let mut sorted = keys.clone();

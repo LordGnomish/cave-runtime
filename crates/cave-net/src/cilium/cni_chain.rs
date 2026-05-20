@@ -72,7 +72,10 @@ pub struct CniChain {
 
 impl CniChain {
     pub fn new(tenant: TenantId) -> Self {
-        Self { tenant, plugins: Vec::new() }
+        Self {
+            tenant,
+            plugins: Vec::new(),
+        }
     }
 
     pub fn append(&mut self, plugin: CniNetConf) -> Result<(), ChainError> {
@@ -132,9 +135,15 @@ impl CniChain {
     /// Find any chained `portmap` plugin's mappings (just the count for
     /// our purposes).
     pub fn portmap_count(&self) -> usize {
-        self.plugins.iter()
+        self.plugins
+            .iter()
             .filter(|p| p.plugin == "portmap")
-            .map(|p| p.config.get("ports").map(|s| s.split(',').count()).unwrap_or(0))
+            .map(|p| {
+                p.config
+                    .get("ports")
+                    .map(|s| s.split(',').count())
+                    .unwrap_or(0)
+            })
             .sum()
     }
 }
@@ -196,7 +205,10 @@ mod tests {
                 gateway: Some(ip(10, 244, 1, 1)),
                 interface: Some(0),
             }],
-            routes: vec![CniRoute { dst: "0.0.0.0/0".into(), gw: Some(ip(10, 244, 1, 1)) }],
+            routes: vec![CniRoute {
+                dst: "0.0.0.0/0".into(),
+                gw: Some(ip(10, 244, 1, 1)),
+            }],
             dns_nameservers: vec![ip(10, 96, 0, 10)],
         }
     }
@@ -209,7 +221,11 @@ mod tests {
 
     #[test]
     fn chain_append_records_plugin() {
-        let (_c, tenant) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "Append", "tenant-cn-a");
+        let (_c, tenant) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "Append",
+            "tenant-cn-a"
+        );
         let mut c = chain(tenant);
         c.append(cilium_conf()).unwrap();
         assert!(c.has_cilium());
@@ -217,7 +233,11 @@ mod tests {
 
     #[test]
     fn chain_append_duplicate_plugin_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "Append.Duplicate", "tenant-cn-ad");
+        let (_c, tenant) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "Append.Duplicate",
+            "tenant-cn-ad"
+        );
         let mut c = chain(tenant);
         c.append(cilium_conf()).unwrap();
         let err = c.append(cilium_conf()).unwrap_err();
@@ -226,7 +246,11 @@ mod tests {
 
     #[test]
     fn chain_position_of_locates_plugin() {
-        let (_c, tenant) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "Position", "tenant-cn-p");
+        let (_c, tenant) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "Position",
+            "tenant-cn-p"
+        );
         let mut c = chain(tenant);
         c.append(portmap_conf("80,443")).unwrap();
         c.append(cilium_conf()).unwrap();
@@ -235,14 +259,22 @@ mod tests {
 
     #[test]
     fn chain_position_unknown_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "Position.NotFound", "tenant-cn-pn");
+        let (_c, tenant) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "Position.NotFound",
+            "tenant-cn-pn"
+        );
         let c = chain(tenant);
         assert!(c.position_of("ghost").is_none());
     }
 
     #[test]
     fn chain_len_tracks_appends() {
-        let (_c, tenant) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "Len", "tenant-cn-l");
+        let (_c, tenant) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "Len",
+            "tenant-cn-l"
+        );
         let mut c = chain(tenant);
         c.append(cilium_conf()).unwrap();
         c.append(portmap_conf("80,443")).unwrap();
@@ -252,7 +284,11 @@ mod tests {
 
     #[test]
     fn chain_is_empty_initially() {
-        let (_c, tenant) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "IsEmpty", "tenant-cn-emp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "IsEmpty",
+            "tenant-cn-emp"
+        );
         let c = chain(tenant);
         assert!(c.is_empty());
     }
@@ -261,7 +297,11 @@ mod tests {
 
     #[test]
     fn run_chain_returns_prev_result_unchanged() {
-        let (_c, tenant) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "Run", "tenant-cn-r");
+        let (_c, tenant) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "Run",
+            "tenant-cn-r"
+        );
         let mut c = chain(tenant);
         c.append(cilium_conf()).unwrap();
         let prev = prev_result("10.244.1.5/24");
@@ -271,16 +311,26 @@ mod tests {
 
     #[test]
     fn run_chain_without_cilium_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "Run.MissingCilium", "tenant-cn-rm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "Run.MissingCilium",
+            "tenant-cn-rm"
+        );
         let mut c = chain(tenant);
         c.append(portmap_conf("80")).unwrap();
-        let err = c.run_cilium_chain(prev_result("10.244.1.5/24")).unwrap_err();
+        let err = c
+            .run_cilium_chain(prev_result("10.244.1.5/24"))
+            .unwrap_err();
         assert!(matches!(err, ChainError::MissingCilium));
     }
 
     #[test]
     fn run_chain_without_container_ip_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "Run.NoIP", "tenant-cn-rn");
+        let (_c, tenant) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "Run.NoIP",
+            "tenant-cn-rn"
+        );
         let mut c = chain(tenant);
         c.append(cilium_conf()).unwrap();
         let mut prev = prev_result("10.244.1.5/24");
@@ -291,7 +341,11 @@ mod tests {
 
     #[test]
     fn run_chain_with_bad_interface_ref_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "Run.BadInterfaceRef", "tenant-cn-rb");
+        let (_c, tenant) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "Run.BadInterfaceRef",
+            "tenant-cn-rb"
+        );
         let mut c = chain(tenant);
         c.append(cilium_conf()).unwrap();
         let mut prev = prev_result("10.244.1.5/24");
@@ -304,7 +358,11 @@ mod tests {
 
     #[test]
     fn bandwidth_limit_extracted_from_chained_plugin() {
-        let (_c, tenant) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "BandwidthLimit", "tenant-cn-bl");
+        let (_c, tenant) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "BandwidthLimit",
+            "tenant-cn-bl"
+        );
         let mut c = chain(tenant);
         c.append(cilium_conf()).unwrap();
         c.append(bandwidth_conf("100M")).unwrap();
@@ -313,7 +371,11 @@ mod tests {
 
     #[test]
     fn bandwidth_limit_none_when_no_bandwidth_plugin() {
-        let (_c, tenant) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "BandwidthLimit.None", "tenant-cn-bln");
+        let (_c, tenant) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "BandwidthLimit.None",
+            "tenant-cn-bln"
+        );
         let mut c = chain(tenant);
         c.append(cilium_conf()).unwrap();
         assert!(c.bandwidth_limit().is_none());
@@ -321,7 +383,11 @@ mod tests {
 
     #[test]
     fn portmap_count_sums_chained_portmaps() {
-        let (_c, tenant) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "PortmapCount", "tenant-cn-pc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "PortmapCount",
+            "tenant-cn-pc"
+        );
         let mut c = chain(tenant);
         c.append(cilium_conf()).unwrap();
         c.append(portmap_conf("80,443,8080")).unwrap();
@@ -330,7 +396,11 @@ mod tests {
 
     #[test]
     fn portmap_count_zero_when_no_portmap() {
-        let (_c, tenant) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "PortmapCount.Zero", "tenant-cn-pcz");
+        let (_c, tenant) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "PortmapCount.Zero",
+            "tenant-cn-pcz"
+        );
         let mut c = chain(tenant);
         c.append(cilium_conf()).unwrap();
         assert_eq!(c.portmap_count(), 0);
@@ -340,7 +410,11 @@ mod tests {
 
     #[test]
     fn ordering_preserved_in_chain() {
-        let (_c, tenant) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "Order", "tenant-cn-o");
+        let (_c, tenant) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "Order",
+            "tenant-cn-o"
+        );
         let mut c = chain(tenant);
         c.append(portmap_conf("80")).unwrap();
         c.append(cilium_conf()).unwrap();
@@ -354,7 +428,11 @@ mod tests {
 
     #[test]
     fn cni_netconf_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "NetConf.Serde", "tenant-cn-nserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "NetConf.Serde",
+            "tenant-cn-nserde"
+        );
         let p = portmap_conf("80,443");
         let s = serde_json::to_string(&p).unwrap();
         let back: CniNetConf = serde_json::from_str(&s).unwrap();
@@ -363,7 +441,11 @@ mod tests {
 
     #[test]
     fn cni_result_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "Result.Serde", "tenant-cn-rserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "Result.Serde",
+            "tenant-cn-rserde"
+        );
         let r = prev_result("10.244.1.5/24");
         let s = serde_json::to_string(&r).unwrap();
         let back: CniResult = serde_json::from_str(&s).unwrap();
@@ -372,8 +454,15 @@ mod tests {
 
     #[test]
     fn cni_route_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "Route.Serde", "tenant-cn-roserde");
-        let r = CniRoute { dst: "0.0.0.0/0".into(), gw: Some(ip(10, 0, 0, 1)) };
+        let (_c, _t) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "Route.Serde",
+            "tenant-cn-roserde"
+        );
+        let r = CniRoute {
+            dst: "0.0.0.0/0".into(),
+            gw: Some(ip(10, 0, 0, 1)),
+        };
         let s = serde_json::to_string(&r).unwrap();
         let back: CniRoute = serde_json::from_str(&s).unwrap();
         assert_eq!(back, r);
@@ -383,7 +472,11 @@ mod tests {
 
     #[test]
     fn full_chain_runs_with_three_plugins() {
-        let (_c, tenant) = cilium_test_ctx!("plugins/cilium-cni/chaining/chaining.go", "FullChain", "tenant-cn-fc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "plugins/cilium-cni/chaining/chaining.go",
+            "FullChain",
+            "tenant-cn-fc"
+        );
         let mut c = chain(tenant);
         c.append(portmap_conf("80,443")).unwrap();
         c.append(cilium_conf()).unwrap();

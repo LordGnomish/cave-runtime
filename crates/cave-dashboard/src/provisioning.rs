@@ -52,9 +52,15 @@ pub struct DashboardProviderOptions {
     pub folders_from_files_structure: bool,
 }
 
-fn default_org_id() -> i64 { 1 }
-fn default_provider_type() -> String { "file".into() }
-fn default_update_interval() -> u64 { 10 }
+fn default_org_id() -> i64 {
+    1
+}
+fn default_provider_type() -> String {
+    "file".into()
+}
+fn default_update_interval() -> u64 {
+    10
+}
 
 /// A provisioned dashboard wrapper (JSON format that Grafana uses in files).
 #[derive(Debug, Deserialize)]
@@ -82,7 +88,9 @@ pub struct ProvisionedDashboardFile {
 }
 
 /// Parse a provisioning config YAML file.
-pub fn parse_provisioning_config(yaml: &str) -> Result<DashboardProvisioningConfig, ProvisioningError> {
+pub fn parse_provisioning_config(
+    yaml: &str,
+) -> Result<DashboardProvisioningConfig, ProvisioningError> {
     Ok(serde_yaml::from_str(yaml)?)
 }
 
@@ -111,7 +119,9 @@ pub fn provision_from_yaml(yaml: &str) -> Result<serde_json::Value, Provisioning
 /// Load all dashboard files from a directory.
 pub fn load_dashboards_from_dir(dir: &Path) -> Vec<Result<serde_json::Value, ProvisioningError>> {
     let mut results = Vec::new();
-    let Ok(entries) = std::fs::read_dir(dir) else { return results; };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return results;
+    };
 
     for entry in entries.flatten() {
         let path = entry.path();
@@ -173,7 +183,9 @@ pub struct ProvisionedDataSource {
     pub editable: bool,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 #[derive(Debug, Deserialize)]
 pub struct DeleteDataSource {
@@ -219,7 +231,9 @@ impl ProvisionedDataSource {
 }
 
 /// Parse a datasource provisioning YAML file.
-pub fn parse_datasource_provisioning(yaml: &str) -> Result<DataSourceProvisioningConfig, ProvisioningError> {
+pub fn parse_datasource_provisioning(
+    yaml: &str,
+) -> Result<DataSourceProvisioningConfig, ProvisioningError> {
     Ok(serde_yaml::from_str(yaml)?)
 }
 
@@ -277,17 +291,34 @@ impl AlertRuleProvisioning {
             "KeepState" => ExecErrState::KeepState,
             _ => ExecErrState::Alerting,
         };
-        let data: Vec<AlertRuleQuery> = self.data.iter().filter_map(|d| {
-            Some(AlertRuleQuery {
-                ref_id: d.get("refId").and_then(|v| v.as_str()).unwrap_or("A").to_string(),
-                query_type: d.get("queryType").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                relative_time_range: d.get("relativeTimeRange")
-                    .and_then(|v| serde_json::from_value::<RelativeTimeRange>(v.clone()).ok())
-                    .unwrap_or_default(),
-                datasource_uid: d.get("datasourceUid").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                model: d.get("model").cloned().unwrap_or_default(),
+        let data: Vec<AlertRuleQuery> = self
+            .data
+            .iter()
+            .filter_map(|d| {
+                Some(AlertRuleQuery {
+                    ref_id: d
+                        .get("refId")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("A")
+                        .to_string(),
+                    query_type: d
+                        .get("queryType")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    relative_time_range: d
+                        .get("relativeTimeRange")
+                        .and_then(|v| serde_json::from_value::<RelativeTimeRange>(v.clone()).ok())
+                        .unwrap_or_default(),
+                    datasource_uid: d
+                        .get("datasourceUid")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    model: d.get("model").cloned().unwrap_or_default(),
+                })
             })
-        }).collect();
+            .collect();
 
         let now = chrono::Utc::now();
         AlertRule {
@@ -316,7 +347,9 @@ impl AlertRuleProvisioning {
 }
 
 /// Parse an alert rules provisioning YAML file.
-pub fn parse_alert_rule_provisioning(yaml: &str) -> Result<AlertRuleProvisioningConfig, ProvisioningError> {
+pub fn parse_alert_rule_provisioning(
+    yaml: &str,
+) -> Result<AlertRuleProvisioningConfig, ProvisioningError> {
     Ok(serde_yaml::from_str(yaml)?)
 }
 
@@ -350,31 +383,36 @@ pub struct ContactPointReceiverProvisioning {
 
 impl ContactPointProvisioning {
     pub fn into_contact_points(self) -> Vec<ContactPoint> {
-        self.receivers.into_iter().map(|r| {
-            let cp_type = match r.cp_type.as_str() {
-                "webhook" => ContactPointType::Webhook,
-                "email" => ContactPointType::Email,
-                "slack" => ContactPointType::Slack,
-                "pagerduty" => ContactPointType::PagerDuty,
-                "opsgenie" => ContactPointType::Opsgenie,
-                "telegram" => ContactPointType::Telegram,
-                "teams" => ContactPointType::Teams,
-                _ => ContactPointType::Webhook,
-            };
-            ContactPoint {
-                uid: r.uid,
-                name: self.name.clone(),
-                cp_type,
-                settings: r.settings,
-                disable_resolve_message: r.disable_resolve_message,
-                send_reminder: false,
-                frequency: String::new(),
-            }
-        }).collect()
+        self.receivers
+            .into_iter()
+            .map(|r| {
+                let cp_type = match r.cp_type.as_str() {
+                    "webhook" => ContactPointType::Webhook,
+                    "email" => ContactPointType::Email,
+                    "slack" => ContactPointType::Slack,
+                    "pagerduty" => ContactPointType::PagerDuty,
+                    "opsgenie" => ContactPointType::Opsgenie,
+                    "telegram" => ContactPointType::Telegram,
+                    "teams" => ContactPointType::Teams,
+                    _ => ContactPointType::Webhook,
+                };
+                ContactPoint {
+                    uid: r.uid,
+                    name: self.name.clone(),
+                    cp_type,
+                    settings: r.settings,
+                    disable_resolve_message: r.disable_resolve_message,
+                    send_reminder: false,
+                    frequency: String::new(),
+                }
+            })
+            .collect()
     }
 }
 
-pub fn parse_contact_point_provisioning(yaml: &str) -> Result<ContactPointProvisioningConfig, ProvisioningError> {
+pub fn parse_contact_point_provisioning(
+    yaml: &str,
+) -> Result<ContactPointProvisioningConfig, ProvisioningError> {
     Ok(serde_yaml::from_str(yaml)?)
 }
 
@@ -395,7 +433,9 @@ pub struct NotificationPolicyProvisioning {
     pub policy: serde_json::Value,
 }
 
-pub fn parse_notification_policy_provisioning(yaml: &str) -> Result<NotificationPolicyProvisioningConfig, ProvisioningError> {
+pub fn parse_notification_policy_provisioning(
+    yaml: &str,
+) -> Result<NotificationPolicyProvisioningConfig, ProvisioningError> {
     Ok(serde_yaml::from_str(yaml)?)
 }
 

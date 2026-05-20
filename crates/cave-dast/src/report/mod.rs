@@ -5,7 +5,7 @@
 //! HTML report renderer. Mirrors ZAP's classic HTML report — a single
 //! self-contained HTML document grouping alerts by risk.
 
-use crate::alert::{cwe_to_owasp, Alert};
+use crate::alert::{Alert, cwe_to_owasp};
 use crate::models::RiskLevel;
 
 pub fn render_html_report(target: &str, alerts: &[Alert]) -> String {
@@ -54,18 +54,12 @@ code{background:#eee;padding:.1rem .3rem;border-radius:.2rem}\
         }
     }
     s.push_str("<div class=\"summary\">\n");
-    s.push_str(&format!(
-        "<span class=\"pill High\">High: {}</span>",
-        high
-    ));
+    s.push_str(&format!("<span class=\"pill High\">High: {}</span>", high));
     s.push_str(&format!(
         "<span class=\"pill Medium\">Medium: {}</span>",
         medium
     ));
-    s.push_str(&format!(
-        "<span class=\"pill Low\">Low: {}</span>",
-        low
-    ));
+    s.push_str(&format!("<span class=\"pill Low\">Low: {}</span>", low));
     s.push_str(&format!(
         "<span class=\"pill Informational\">Informational: {}</span>",
         info
@@ -105,10 +99,7 @@ code{background:#eee;padding:.1rem .3rem;border-radius:.2rem}\
                 "<p><strong>Plugin id:</strong> {}</p>\n",
                 a.plugin_id
             ));
-            s.push_str(&format!(
-                "<p>{}</p>\n",
-                html_escape(&a.description)
-            ));
+            s.push_str(&format!("<p>{}</p>\n", html_escape(&a.description)));
             if let Some(ev) = &a.evidence {
                 s.push_str(&format!(
                     "<p><strong>Evidence:</strong> <code>{}</code></p>\n",

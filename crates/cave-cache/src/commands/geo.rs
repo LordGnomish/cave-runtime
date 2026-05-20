@@ -7,7 +7,7 @@
 use crate::db::Db;
 use crate::error::{CacheError, CacheResult};
 use crate::resp::Resp;
-use crate::types::{bytes_to_f64, bytes_to_i64, Entry, Value, ZSet};
+use crate::types::{Entry, Value, ZSet, bytes_to_f64, bytes_to_i64};
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -20,7 +20,9 @@ const EARTH_RADIUS_M: f64 = 6372797.560856;
 // ── GEOADD ───────────────────────────────────────────────────────────────────
 
 pub fn cmd_geoadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 5 { return Err(CacheError::wrong_arity("geoadd")); }
+    if args.len() < 5 {
+        return Err(CacheError::wrong_arity("geoadd"));
+    }
     let key = args[1].clone();
 
     let mut nx = false;
@@ -29,9 +31,18 @@ pub fn cmd_geoadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
     let mut i = 2;
     while i < args.len() {
         match args[i].to_ascii_uppercase().as_slice() {
-            b"NX" => { nx = true; i += 1; }
-            b"XX" => { xx = true; i += 1; }
-            b"CH" => { ch = true; i += 1; }
+            b"NX" => {
+                nx = true;
+                i += 1;
+            }
+            b"XX" => {
+                xx = true;
+                i += 1;
+            }
+            b"CH" => {
+                ch = true;
+                i += 1;
+            }
             _ => break,
         }
     }
@@ -72,12 +83,20 @@ pub fn cmd_geoadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
         }
 
         let old_exists = zset.score(&member).is_some();
-        if nx && old_exists { continue; }
-        if xx && !old_exists { continue; }
+        if nx && old_exists {
+            continue;
+        }
+        if xx && !old_exists {
+            continue;
+        }
 
         let score = encode_geohash(lon, lat);
         let was_new = zset.add(member, score);
-        if was_new { added += 1; } else { changed += 1; }
+        if was_new {
+            added += 1;
+        } else {
+            changed += 1;
+        }
     }
 
     Ok(Resp::Integer(if ch { added + changed } else { added }))
@@ -86,8 +105,14 @@ pub fn cmd_geoadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 // ── GEODIST ──────────────────────────────────────────────────────────────────
 
 pub fn cmd_geodist(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 4 || args.len() > 5 { return Err(CacheError::wrong_arity("geodist")); }
-    let unit = args.get(4).map(|u| parse_unit(u)).transpose()?.unwrap_or(1.0);
+    if args.len() < 4 || args.len() > 5 {
+        return Err(CacheError::wrong_arity("geodist"));
+    }
+    let unit = args
+        .get(4)
+        .map(|u| parse_unit(u))
+        .transpose()?
+        .unwrap_or(1.0);
 
     let pos1 = get_geo_pos(db, &args[1], &args[2])?;
     let pos2 = get_geo_pos(db, &args[1], &args[3])?;
@@ -95,7 +120,9 @@ pub fn cmd_geodist(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
     match (pos1, pos2) {
         (Some((lon1, lat1)), Some((lon2, lat2))) => {
             let dist = haversine(lat1, lon1, lat2, lon2);
-            Ok(Resp::BulkString(Some(format!("{:.4}", dist / unit).into_bytes())))
+            Ok(Resp::BulkString(Some(
+                format!("{:.4}", dist / unit).into_bytes(),
+            )))
         }
         _ => Ok(Resp::nil()),
     }
@@ -104,9 +131,7 @@ pub fn cmd_geodist(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 fn get_geo_pos(db: &mut Db, key: &[u8], member: &[u8]) -> CacheResult<Option<(f64, f64)>> {
     match db.get_typed(key, "zset")? {
         Some(e) => match &e.value {
-            Value::ZSet(z) => {
-                Ok(z.score(member).map(|score| decode_geohash(score)))
-            }
+            Value::ZSet(z) => Ok(z.score(member).map(|score| decode_geohash(score))),
             _ => unreachable!(),
         },
         None => Ok(None),
@@ -116,45 +141,63 @@ fn get_geo_pos(db: &mut Db, key: &[u8], member: &[u8]) -> CacheResult<Option<(f6
 // ── GEOHASH ──────────────────────────────────────────────────────────────────
 
 pub fn cmd_geohash(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 3 { return Err(CacheError::wrong_arity("geohash")); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity("geohash"));
+    }
     match db.get_typed(&args[1], "zset")? {
         Some(e) => match &e.value {
             Value::ZSet(z) => {
-                let results: Vec<Resp> = args[2..].iter().map(|member| {
-                    z.score(member).map(|score| {
-                        let (lon, lat) = decode_geohash(score);
-                        Resp::BulkString(Some(base32_encode_geohash(lat, lon).into_bytes()))
-                    }).unwrap_or(Resp::nil())
-                }).collect();
+                let results: Vec<Resp> = args[2..]
+                    .iter()
+                    .map(|member| {
+                        z.score(member)
+                            .map(|score| {
+                                let (lon, lat) = decode_geohash(score);
+                                Resp::BulkString(Some(base32_encode_geohash(lat, lon).into_bytes()))
+                            })
+                            .unwrap_or(Resp::nil())
+                    })
+                    .collect();
                 Ok(Resp::Array(Some(results)))
             }
             _ => unreachable!(),
         },
-        None => Ok(Resp::Array(Some(args[2..].iter().map(|_| Resp::nil()).collect()))),
+        None => Ok(Resp::Array(Some(
+            args[2..].iter().map(|_| Resp::nil()).collect(),
+        ))),
     }
 }
 
 // ── GEOPOS ───────────────────────────────────────────────────────────────────
 
 pub fn cmd_geopos(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 3 { return Err(CacheError::wrong_arity("geopos")); }
+    if args.len() < 3 {
+        return Err(CacheError::wrong_arity("geopos"));
+    }
     match db.get_typed(&args[1], "zset")? {
         Some(e) => match &e.value {
             Value::ZSet(z) => {
-                let results: Vec<Resp> = args[2..].iter().map(|member| {
-                    z.score(member).map(|score| {
-                        let (lon, lat) = decode_geohash(score);
-                        Resp::Array(Some(vec![
-                            Resp::BulkString(Some(format!("{:.17}", lon).into_bytes())),
-                            Resp::BulkString(Some(format!("{:.17}", lat).into_bytes())),
-                        ]))
-                    }).unwrap_or(Resp::nil_array())
-                }).collect();
+                let results: Vec<Resp> = args[2..]
+                    .iter()
+                    .map(|member| {
+                        z.score(member)
+                            .map(|score| {
+                                let (lon, lat) = decode_geohash(score);
+                                Resp::Array(Some(vec![
+                                    Resp::BulkString(Some(format!("{:.17}", lon).into_bytes())),
+                                    Resp::BulkString(Some(format!("{:.17}", lat).into_bytes())),
+                                ]))
+                            })
+                            .unwrap_or(Resp::nil_array())
+                    })
+                    .collect();
                 Ok(Resp::Array(Some(results)))
             }
             _ => unreachable!(),
         },
-        None => Ok(Resp::Array(Some(args[2..].iter().map(|_| Resp::nil_array()).collect()))),
+        None => Ok(Resp::Array(Some(
+            args[2..].iter().map(|_| Resp::nil_array()).collect(),
+        ))),
     }
 }
 
@@ -165,13 +208,17 @@ pub fn cmd_geosearch(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 }
 
 pub fn cmd_geosearchstore(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
-    if args.len() < 2 { return Err(CacheError::wrong_arity("geosearchstore")); }
+    if args.len() < 2 {
+        return Err(CacheError::wrong_arity("geosearchstore"));
+    }
     let dst = args[1].clone();
     geosearch_impl(&args[1..], db, Some(dst))
 }
 
 fn geosearch_impl(args: &[Vec<u8>], db: &mut Db, dst: Option<Vec<u8>>) -> CacheResult<Resp> {
-    if args.len() < 6 { return Err(CacheError::wrong_arity("geosearch")); }
+    if args.len() < 6 {
+        return Err(CacheError::wrong_arity("geosearch"));
+    }
     let key = &args[1];
 
     let mut center_lon: f64 = 0.0;
@@ -189,8 +236,11 @@ fn geosearch_impl(args: &[Vec<u8>], db: &mut Db, dst: Option<Vec<u8>>) -> CacheR
         match args[i].to_ascii_uppercase().as_slice() {
             b"FROMMEMBER" => {
                 i += 1;
-                let pos = get_geo_pos(db, key, &args[i])?
-                    .ok_or_else(|| CacheError::generic("ERR Could not perform this operation on a key that doesn't exist"))?;
+                let pos = get_geo_pos(db, key, &args[i])?.ok_or_else(|| {
+                    CacheError::generic(
+                        "ERR Could not perform this operation on a key that doesn't exist",
+                    )
+                })?;
                 center_lon = pos.0;
                 center_lat = pos.1;
                 i += 1;
@@ -216,26 +266,50 @@ fn geosearch_impl(args: &[Vec<u8>], db: &mut Db, dst: Option<Vec<u8>>) -> CacheR
                 is_circle = false;
                 i += 4;
             }
-            b"ASC" => { ascending = true; i += 1; }
-            b"DESC" => { ascending = false; i += 1; }
-            b"COUNT" => { count = Some(bytes_to_i64(&args[i + 1]).ok_or(CacheError::NotInteger)? as usize); i += 2; }
-            b"WITHCOORD" => { withcoord = true; i += 1; }
-            b"WITHDIST" => { withdist = true; i += 1; }
-            b"WITHSCORE" => { withscore = true; i += 1; }
-            _ => { i += 1; }
+            b"ASC" => {
+                ascending = true;
+                i += 1;
+            }
+            b"DESC" => {
+                ascending = false;
+                i += 1;
+            }
+            b"COUNT" => {
+                count = Some(bytes_to_i64(&args[i + 1]).ok_or(CacheError::NotInteger)? as usize);
+                i += 2;
+            }
+            b"WITHCOORD" => {
+                withcoord = true;
+                i += 1;
+            }
+            b"WITHDIST" => {
+                withdist = true;
+                i += 1;
+            }
+            b"WITHSCORE" => {
+                withscore = true;
+                i += 1;
+            }
+            _ => {
+                i += 1;
+            }
         }
     }
 
     // Find all members within radius
     let members = match db.get_typed(key, "zset")? {
         Some(e) => match &e.value {
-            Value::ZSet(z) => z.iter_asc().map(|(m, s)| (m.clone(), s)).collect::<Vec<_>>(),
+            Value::ZSet(z) => z
+                .iter_asc()
+                .map(|(m, s)| (m.clone(), s))
+                .collect::<Vec<_>>(),
             _ => unreachable!(),
         },
         None => vec![],
     };
 
-    let mut results: Vec<(Vec<u8>, f64, f64, f64)> = members.into_iter()
+    let mut results: Vec<(Vec<u8>, f64, f64, f64)> = members
+        .into_iter()
         .filter_map(|(member, score)| {
             let (lon, lat) = decode_geohash(score);
             let dist = haversine(center_lat, center_lon, lat, lon);
@@ -268,23 +342,28 @@ fn geosearch_impl(args: &[Vec<u8>], db: &mut Db, dst: Option<Vec<u8>>) -> CacheR
         return Ok(Resp::Integer(len));
     }
 
-    let resp: Vec<Resp> = results.into_iter().map(|(member, dist, lon, lat)| {
-        if !withdist && !withcoord && !withscore {
-            Resp::BulkString(Some(member))
-        } else {
-            let mut parts = vec![Resp::BulkString(Some(member))];
-            if withdist {
-                parts.push(Resp::BulkString(Some(format!("{:.4}", dist / 1000.0).into_bytes())));
+    let resp: Vec<Resp> = results
+        .into_iter()
+        .map(|(member, dist, lon, lat)| {
+            if !withdist && !withcoord && !withscore {
+                Resp::BulkString(Some(member))
+            } else {
+                let mut parts = vec![Resp::BulkString(Some(member))];
+                if withdist {
+                    parts.push(Resp::BulkString(Some(
+                        format!("{:.4}", dist / 1000.0).into_bytes(),
+                    )));
+                }
+                if withcoord {
+                    parts.push(Resp::Array(Some(vec![
+                        Resp::BulkString(Some(format!("{:.17}", lon).into_bytes())),
+                        Resp::BulkString(Some(format!("{:.17}", lat).into_bytes())),
+                    ])));
+                }
+                Resp::Array(Some(parts))
             }
-            if withcoord {
-                parts.push(Resp::Array(Some(vec![
-                    Resp::BulkString(Some(format!("{:.17}", lon).into_bytes())),
-                    Resp::BulkString(Some(format!("{:.17}", lat).into_bytes())),
-                ])));
-            }
-            Resp::Array(Some(parts))
-        }
-    }).collect();
+        })
+        .collect();
 
     Ok(Resp::Array(Some(resp)))
 }
@@ -342,7 +421,9 @@ fn parse_unit(u: &[u8]) -> CacheResult<f64> {
         b"km" => Ok(1000.0),
         b"mi" => Ok(1609.344),
         b"ft" => Ok(0.3048),
-        _ => Err(CacheError::generic("ERR unsupported unit provided. please use M, KM, FT, MI")),
+        _ => Err(CacheError::generic(
+            "ERR unsupported unit provided. please use M, KM, FT, MI",
+        )),
     }
 }
 

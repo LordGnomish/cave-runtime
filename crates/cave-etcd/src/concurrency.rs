@@ -118,10 +118,20 @@ impl DistMutex {
         if let Some((&existing_rev, _)) = inner.queue.iter().find(|(_, e)| e.lease_id == lease_id) {
             return Ok(existing_rev);
         }
-        inner.queue.insert(rev, MutexEntry { lease_id, create_revision: rev });
+        inner.queue.insert(
+            rev,
+            MutexEntry {
+                lease_id,
+                create_revision: rev,
+            },
+        );
         // Holder is the entry with the smallest rev.
         let head = *inner.queue.keys().next().unwrap();
-        if head == rev { Ok(rev) } else { Err(ConcurrencyError::WouldBlock) }
+        if head == rev {
+            Ok(rev)
+        } else {
+            Err(ConcurrencyError::WouldBlock)
+        }
     }
 
     /// `try_lock` — succeeds only if the queue is empty.  Mirrors
@@ -132,7 +142,13 @@ impl DistMutex {
             return Err(ConcurrencyError::WouldBlock);
         }
         let rev = self.revision.fetch_add(1, Ordering::SeqCst) + 1;
-        inner.queue.insert(rev, MutexEntry { lease_id, create_revision: rev });
+        inner.queue.insert(
+            rev,
+            MutexEntry {
+                lease_id,
+                create_revision: rev,
+            },
+        );
         Ok(rev)
     }
 
@@ -157,11 +173,15 @@ impl DistMutex {
     /// been revoked or expired.  Removes any queued entry for that lease.
     pub fn expire_lease(&self, lease_id: i64) {
         let mut inner = self.inner.lock().unwrap();
-        let revs: Vec<u64> = inner.queue.iter()
+        let revs: Vec<u64> = inner
+            .queue
+            .iter()
             .filter(|(_, e)| e.lease_id == lease_id)
             .map(|(r, _)| *r)
             .collect();
-        for r in revs { inner.queue.remove(&r); }
+        for r in revs {
+            inner.queue.remove(&r);
+        }
     }
 
     /// Whether this lease currently holds the lock (smallest rev).
@@ -171,7 +191,9 @@ impl DistMutex {
     }
 
     /// Number of queued waiters (including the holder if any).
-    pub fn queue_len(&self) -> usize { self.inner.lock().unwrap().queue.len() }
+    pub fn queue_len(&self) -> usize {
+        self.inner.lock().unwrap().queue.len()
+    }
 
     /// Snapshot the queue — primarily for tests/debug.
     pub fn snapshot(&self) -> Vec<MutexEntry> {
@@ -183,9 +205,11 @@ impl DistMutex {
     /// free.
     pub fn key(&self) -> Option<String> {
         let inner = self.inner.lock().unwrap();
-        inner.queue.iter().next().map(|(_, e)| {
-            format!("{}/{:x}", self.prefix, e.lease_id)
-        })
+        inner
+            .queue
+            .iter()
+            .next()
+            .map(|(_, e)| format!("{}/{:x}", self.prefix, e.lease_id))
     }
 }
 
@@ -216,7 +240,9 @@ impl DistRWMutex {
         }
     }
 
-    fn next_rev(&self) -> u64 { self.rev.fetch_add(1, Ordering::SeqCst) + 1 }
+    fn next_rev(&self) -> u64 {
+        self.rev.fetch_add(1, Ordering::SeqCst) + 1
+    }
 
     /// Acquire a read lock.  Succeeds when no writer is queued ahead of us.
     /// Returns the revision we registered at.
@@ -242,16 +268,23 @@ impl DistRWMutex {
     pub fn wlock(&self, lease_id: i64) -> Result<u64, ConcurrencyError> {
         let rev = self.next_rev();
         let mut inner = self.inner.lock().unwrap();
-        let blocked = !inner.readers.is_empty()
-            || inner.writers.keys().any(|&w| w < rev);
+        let blocked = !inner.readers.is_empty() || inner.writers.keys().any(|&w| w < rev);
         inner.writers.insert(rev, lease_id);
-        if blocked { Err(ConcurrencyError::WouldBlock) } else { Ok(rev) }
+        if blocked {
+            Err(ConcurrencyError::WouldBlock)
+        } else {
+            Ok(rev)
+        }
     }
 
     /// Release a previously-held read lock.
     pub fn runlock(&self, lease_id: i64) -> Result<(), ConcurrencyError> {
         let mut inner = self.inner.lock().unwrap();
-        let rev = inner.readers.iter().find(|(_, &l)| l == lease_id).map(|(r, _)| *r);
+        let rev = inner
+            .readers
+            .iter()
+            .find(|(_, &l)| l == lease_id)
+            .map(|(r, _)| *r);
         let rev = rev.ok_or(ConcurrencyError::NotOwner)?;
         inner.readers.remove(&rev);
         Ok(())
@@ -260,22 +293,46 @@ impl DistRWMutex {
     /// Release a previously-held write lock.
     pub fn wunlock(&self, lease_id: i64) -> Result<(), ConcurrencyError> {
         let mut inner = self.inner.lock().unwrap();
-        let rev = inner.writers.iter().find(|(_, &l)| l == lease_id).map(|(r, _)| *r);
+        let rev = inner
+            .writers
+            .iter()
+            .find(|(_, &l)| l == lease_id)
+            .map(|(r, _)| *r);
         let rev = rev.ok_or(ConcurrencyError::NotOwner)?;
         inner.writers.remove(&rev);
         Ok(())
     }
 
-    pub fn reader_count(&self) -> usize { self.inner.lock().unwrap().readers.len() }
-    pub fn writer_count(&self) -> usize { self.inner.lock().unwrap().writers.len() }
-    pub fn has_writer(&self) -> bool { self.writer_count() > 0 }
+    pub fn reader_count(&self) -> usize {
+        self.inner.lock().unwrap().readers.len()
+    }
+    pub fn writer_count(&self) -> usize {
+        self.inner.lock().unwrap().writers.len()
+    }
+    pub fn has_writer(&self) -> bool {
+        self.writer_count() > 0
+    }
 
     pub fn expire_lease(&self, lease_id: i64) {
         let mut inner = self.inner.lock().unwrap();
-        let r_revs: Vec<u64> = inner.readers.iter().filter(|(_, &l)| l == lease_id).map(|(r, _)| *r).collect();
-        for r in r_revs { inner.readers.remove(&r); }
-        let w_revs: Vec<u64> = inner.writers.iter().filter(|(_, &l)| l == lease_id).map(|(r, _)| *r).collect();
-        for r in w_revs { inner.writers.remove(&r); }
+        let r_revs: Vec<u64> = inner
+            .readers
+            .iter()
+            .filter(|(_, &l)| l == lease_id)
+            .map(|(r, _)| *r)
+            .collect();
+        for r in r_revs {
+            inner.readers.remove(&r);
+        }
+        let w_revs: Vec<u64> = inner
+            .writers
+            .iter()
+            .filter(|(_, &l)| l == lease_id)
+            .map(|(r, _)| *r)
+            .collect();
+        for r in w_revs {
+            inner.writers.remove(&r);
+        }
     }
 }
 
@@ -314,7 +371,9 @@ impl DistElection {
         }
     }
 
-    fn next_rev(&self) -> u64 { self.rev.fetch_add(1, Ordering::SeqCst) + 1 }
+    fn next_rev(&self) -> u64 {
+        self.rev.fetch_add(1, Ordering::SeqCst) + 1
+    }
 
     /// Campaign for leadership.  If queue is empty we become leader; else
     /// we're queued.  The return value is `(create_revision, became_leader)`.
@@ -322,16 +381,30 @@ impl DistElection {
         let rev = self.next_rev();
         let mut inner = self.inner.lock().unwrap();
         let was_empty = inner.queue.is_empty();
-        inner.queue.insert(rev, ElectionCandidate { lease_id, value, create_revision: rev });
+        inner.queue.insert(
+            rev,
+            ElectionCandidate {
+                lease_id,
+                value,
+                create_revision: rev,
+            },
+        );
         (rev, was_empty)
     }
 
     /// Update the leader's published value without re-electing.
     pub fn proclaim(&self, lease_id: i64, value: Vec<u8>) -> Result<(), ConcurrencyError> {
         let mut inner = self.inner.lock().unwrap();
-        let leader = inner.queue.iter().next().map(|(r, _)| *r).ok_or(ConcurrencyError::NoLeader)?;
+        let leader = inner
+            .queue
+            .iter()
+            .next()
+            .map(|(r, _)| *r)
+            .ok_or(ConcurrencyError::NoLeader)?;
         let entry = inner.queue.get_mut(&leader).unwrap();
-        if entry.lease_id != lease_id { return Err(ConcurrencyError::NotLeader); }
+        if entry.lease_id != lease_id {
+            return Err(ConcurrencyError::NotLeader);
+        }
         entry.value = value;
         Ok(())
     }
@@ -340,9 +413,16 @@ impl DistElection {
     /// the new leader automatically.  Returns the new leader's lease (if any).
     pub fn resign(&self, lease_id: i64) -> Result<Option<i64>, ConcurrencyError> {
         let mut inner = self.inner.lock().unwrap();
-        let leader_rev = inner.queue.iter().next().map(|(r, _)| *r).ok_or(ConcurrencyError::NoLeader)?;
+        let leader_rev = inner
+            .queue
+            .iter()
+            .next()
+            .map(|(r, _)| *r)
+            .ok_or(ConcurrencyError::NoLeader)?;
         let leader_lease = inner.queue.get(&leader_rev).map(|c| c.lease_id);
-        if leader_lease != Some(lease_id) { return Err(ConcurrencyError::NotLeader); }
+        if leader_lease != Some(lease_id) {
+            return Err(ConcurrencyError::NotLeader);
+        }
         inner.queue.remove(&leader_rev);
         Ok(inner.queue.iter().next().map(|(_, c)| c.lease_id))
     }
@@ -363,14 +443,23 @@ impl DistElection {
     pub fn expire_lease(&self, lease_id: i64) -> Option<i64> {
         let mut inner = self.inner.lock().unwrap();
         let prev_leader_rev = inner.queue.iter().next().map(|(r, _)| *r);
-        let prev_leader_lease = prev_leader_rev.and_then(|r| inner.queue.get(&r).map(|c| c.lease_id));
-        let revs: Vec<u64> = inner.queue.iter()
+        let prev_leader_lease =
+            prev_leader_rev.and_then(|r| inner.queue.get(&r).map(|c| c.lease_id));
+        let revs: Vec<u64> = inner
+            .queue
+            .iter()
             .filter(|(_, c)| c.lease_id == lease_id)
             .map(|(r, _)| *r)
             .collect();
-        for r in revs { inner.queue.remove(&r); }
+        for r in revs {
+            inner.queue.remove(&r);
+        }
         let new_leader_lease = inner.queue.iter().next().map(|(_, c)| c.lease_id);
-        if new_leader_lease != prev_leader_lease { new_leader_lease } else { None }
+        if new_leader_lease != prev_leader_lease {
+            new_leader_lease
+        } else {
+            None
+        }
     }
 
     /// All currently-queued candidates, ordered by create_revision.
@@ -378,7 +467,9 @@ impl DistElection {
         self.inner.lock().unwrap().queue.values().cloned().collect()
     }
 
-    pub fn queue_len(&self) -> usize { self.inner.lock().unwrap().queue.len() }
+    pub fn queue_len(&self) -> usize {
+        self.inner.lock().unwrap().queue.len()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -659,14 +750,20 @@ mod tests {
         let e = DistElection::new("/e");
         e.campaign(1, b"A".to_vec());
         e.campaign(2, b"B".to_vec());
-        assert_eq!(e.proclaim(2, b"x".to_vec()).unwrap_err(), ConcurrencyError::NotLeader);
+        assert_eq!(
+            e.proclaim(2, b"x".to_vec()).unwrap_err(),
+            ConcurrencyError::NotLeader
+        );
     }
 
     #[test]
     fn test_election_proclaim_with_no_leader() {
         // cite: clientv3/concurrency.Election.Proclaim
         let e = DistElection::new("/e");
-        assert_eq!(e.proclaim(1, b"x".to_vec()).unwrap_err(), ConcurrencyError::NoLeader);
+        assert_eq!(
+            e.proclaim(1, b"x".to_vec()).unwrap_err(),
+            ConcurrencyError::NoLeader
+        );
     }
 
     #[test]

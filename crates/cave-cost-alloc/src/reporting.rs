@@ -10,14 +10,19 @@ use crate::models::{
 };
 
 /// Generate showback (awareness-only) reports per team.
-pub fn generate_showback(cost_centers: &[CostCenter], reports: &[CostReport]) -> Vec<ShowbackReport> {
+pub fn generate_showback(
+    cost_centers: &[CostCenter],
+    reports: &[CostReport],
+) -> Vec<ShowbackReport> {
     let now = Utc::now();
 
     cost_centers
         .iter()
         .map(|cc| {
-            let cc_reports: Vec<&CostReport> =
-                reports.iter().filter(|r| r.cost_center_id == cc.id).collect();
+            let cc_reports: Vec<&CostReport> = reports
+                .iter()
+                .filter(|r| r.cost_center_id == cc.id)
+                .collect();
 
             let actual_cost: f64 = cc_reports.iter().map(|r| r.total_cost_usd).sum();
             let (period_start, period_end) = period_range(&cc_reports, now);
@@ -44,8 +49,10 @@ pub fn generate_chargeback(cost_centers: &[CostCenter], reports: &[CostReport]) 
     cost_centers
         .iter()
         .map(|cc| {
-            let cc_reports: Vec<&CostReport> =
-                reports.iter().filter(|r| r.cost_center_id == cc.id).collect();
+            let cc_reports: Vec<&CostReport> = reports
+                .iter()
+                .filter(|r| r.cost_center_id == cc.id)
+                .collect();
 
             let line_items: Vec<InvoiceLineItem> = cc_reports
                 .iter()
@@ -216,10 +223,7 @@ fn linear_regression(values: &[f64]) -> (f64, f64) {
     (slope, intercept)
 }
 
-fn period_range(
-    reports: &[&CostReport],
-    default: DateTime<Utc>,
-) -> (DateTime<Utc>, DateTime<Utc>) {
+fn period_range(reports: &[&CostReport], default: DateTime<Utc>) -> (DateTime<Utc>, DateTime<Utc>) {
     let mut sorted = reports.to_vec();
     sorted.sort_by_key(|r| r.period_start);
     match (sorted.first(), sorted.last()) {

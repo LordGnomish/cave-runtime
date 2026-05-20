@@ -34,7 +34,13 @@ pub fn validate_rule(
 
     // Deny conditions
     if let Some(deny) = &validate.deny {
-        return validate_deny(deny, resource, context, &rule.name, validate.message.as_deref());
+        return validate_deny(
+            deny,
+            resource,
+            context,
+            &rule.name,
+            validate.message.as_deref(),
+        );
     }
 
     // AnyPattern
@@ -46,7 +52,10 @@ pub fn validate_rule(
             }
         }
         let msg = validate.message.clone().unwrap_or_else(|| {
-            format!("rule {} validation failed: none of the anyPattern conditions matched", rule.name)
+            format!(
+                "rule {} validation failed: none of the anyPattern conditions matched",
+                rule.name
+            )
         });
         return Ok(Some(PolicyViolation {
             policy: String::new(),
@@ -62,7 +71,10 @@ pub fn validate_rule(
         let substituted = substitute_variables_json(pattern, context)?;
         if !pattern_match_value(&substituted, resource) {
             let msg = validate.message.clone().unwrap_or_else(|| {
-                format!("rule {} validation failed: resource does not match pattern", rule.name)
+                format!(
+                    "rule {} validation failed: resource does not match pattern",
+                    rule.name
+                )
             });
             return Ok(Some(PolicyViolation {
                 policy: String::new(),
@@ -101,13 +113,21 @@ fn validate_foreach(
     for item in &items {
         // Check preconditions for this element
         if let Some(preconds) = &foreach.preconditions {
-            let elem_ctx = if foreach.element_scope { item } else { resource };
+            let elem_ctx = if foreach.element_scope {
+                item
+            } else {
+                resource
+            };
             if !eval_conditions(preconds, elem_ctx, context)? {
                 continue;
             }
         }
 
-        let target = if foreach.element_scope { item } else { resource };
+        let target = if foreach.element_scope {
+            item
+        } else {
+            resource
+        };
 
         // Pattern match
         if let Some(pattern) = &foreach.pattern {
@@ -116,7 +136,10 @@ fn validate_foreach(
                 return Ok(Some(PolicyViolation {
                     policy: String::new(),
                     rule: rule_name.to_string(),
-                    message: format!("foreach validation failed for element: {}", serde_json::to_string(item).unwrap_or_default()),
+                    message: format!(
+                        "foreach validation failed for element: {}",
+                        serde_json::to_string(item).unwrap_or_default()
+                    ),
                     severity: None,
                     resource: None,
                 }));
@@ -134,7 +157,10 @@ fn validate_foreach(
                 return Ok(Some(PolicyViolation {
                     policy: String::new(),
                     rule: rule_name.to_string(),
-                    message: format!("foreach anyPattern validation failed for element: {}", serde_json::to_string(item).unwrap_or_default()),
+                    message: format!(
+                        "foreach anyPattern validation failed for element: {}",
+                        serde_json::to_string(item).unwrap_or_default()
+                    ),
                     severity: None,
                     resource: None,
                 }));
@@ -159,9 +185,9 @@ fn validate_deny(
     message: Option<&str>,
 ) -> Result<Option<PolicyViolation>, PolicyError> {
     if eval_conditions(&deny.conditions, resource, context)? {
-        let msg = message.map(String::from).unwrap_or_else(|| {
-            format!("rule {rule_name} deny conditions matched")
-        });
+        let msg = message
+            .map(String::from)
+            .unwrap_or_else(|| format!("rule {rule_name} deny conditions matched"));
         return Ok(Some(PolicyViolation {
             policy: String::new(),
             rule: rule_name.to_string(),
@@ -199,20 +225,36 @@ pub fn eval_conditions(
 ) -> Result<bool, PolicyError> {
     // ANY: at least one condition must be true
     if let Some(any) = &conditions.any {
-        let any_true = any.iter().any(|c| eval_condition(c, resource, context).unwrap_or(false));
-        if !any_true { return Ok(false); }
+        let any_true = any
+            .iter()
+            .any(|c| eval_condition(c, resource, context).unwrap_or(false));
+        if !any_true {
+            return Ok(false);
+        }
     }
     // ALL: every condition must be true
     if let Some(all) = &conditions.all {
-        let all_true = all.iter().all(|c| eval_condition(c, resource, context).unwrap_or(false));
-        if !all_true { return Ok(false); }
+        let all_true = all
+            .iter()
+            .all(|c| eval_condition(c, resource, context).unwrap_or(false));
+        if !all_true {
+            return Ok(false);
+        }
     }
     Ok(true)
 }
 
-fn eval_condition(cond: &Condition, resource: &Value, context: &Value) -> Result<bool, PolicyError> {
+fn eval_condition(
+    cond: &Condition,
+    resource: &Value,
+    context: &Value,
+) -> Result<bool, PolicyError> {
     let key_val = eval_condition_value(&cond.key, resource, context)?;
-    let compare_to = cond.value.as_ref().map(|v| eval_condition_value(v, resource, context)).transpose()?;
+    let compare_to = cond
+        .value
+        .as_ref()
+        .map(|v| eval_condition_value(v, resource, context))
+        .transpose()?;
 
     match &cond.operator {
         ConditionOperator::Equals => {
@@ -235,10 +277,15 @@ fn eval_condition(cond: &Condition, resource: &Value, context: &Value) -> Result
                 _ => Ok(true),
             }
         }
-        ConditionOperator::GreaterThan | ConditionOperator::GreaterThanOrEquals
-        | ConditionOperator::LessThan | ConditionOperator::LessThanOrEquals => {
+        ConditionOperator::GreaterThan
+        | ConditionOperator::GreaterThanOrEquals
+        | ConditionOperator::LessThan
+        | ConditionOperator::LessThanOrEquals => {
             let kn = key_val.as_f64().unwrap_or(f64::NAN);
-            let vn = compare_to.as_ref().and_then(|v| v.as_f64()).unwrap_or(f64::NAN);
+            let vn = compare_to
+                .as_ref()
+                .and_then(|v| v.as_f64())
+                .unwrap_or(f64::NAN);
             Ok(match &cond.operator {
                 ConditionOperator::GreaterThan => kn > vn,
                 ConditionOperator::GreaterThanOrEquals => kn >= vn,
@@ -247,28 +294,28 @@ fn eval_condition(cond: &Condition, resource: &Value, context: &Value) -> Result
                 _ => false,
             })
         }
-        ConditionOperator::Contains => {
-            match &key_val {
-                Value::Array(a) => Ok(a.contains(compare_to.as_ref().unwrap_or(&Value::Null))),
-                Value::String(s) => {
-                    if let Some(Value::String(sub)) = &compare_to {
-                        Ok(s.contains(sub.as_str()))
-                    } else { Ok(false) }
+        ConditionOperator::Contains => match &key_val {
+            Value::Array(a) => Ok(a.contains(compare_to.as_ref().unwrap_or(&Value::Null))),
+            Value::String(s) => {
+                if let Some(Value::String(sub)) = &compare_to {
+                    Ok(s.contains(sub.as_str()))
+                } else {
+                    Ok(false)
                 }
-                _ => Ok(false),
             }
-        }
-        ConditionOperator::NotContains => {
-            match &key_val {
-                Value::Array(a) => Ok(!a.contains(compare_to.as_ref().unwrap_or(&Value::Null))),
-                Value::String(s) => {
-                    if let Some(Value::String(sub)) = &compare_to {
-                        Ok(!s.contains(sub.as_str()))
-                    } else { Ok(true) }
+            _ => Ok(false),
+        },
+        ConditionOperator::NotContains => match &key_val {
+            Value::Array(a) => Ok(!a.contains(compare_to.as_ref().unwrap_or(&Value::Null))),
+            Value::String(s) => {
+                if let Some(Value::String(sub)) = &compare_to {
+                    Ok(!s.contains(sub.as_str()))
+                } else {
+                    Ok(true)
                 }
-                _ => Ok(true),
             }
-        }
+            _ => Ok(true),
+        },
         ConditionOperator::AnyIn => {
             if let (Value::Array(keys), Some(Value::Array(vals))) = (&key_val, &compare_to) {
                 return Ok(keys.iter().any(|k| vals.contains(k)));
@@ -293,11 +340,17 @@ fn eval_condition(cond: &Condition, resource: &Value, context: &Value) -> Result
             }
             Ok(true)
         }
-        ConditionOperator::DurationGreaterThan | ConditionOperator::DurationLessThan
-        | ConditionOperator::DurationGreaterThanOrEquals | ConditionOperator::DurationLessThanOrEquals => {
+        ConditionOperator::DurationGreaterThan
+        | ConditionOperator::DurationLessThan
+        | ConditionOperator::DurationGreaterThanOrEquals
+        | ConditionOperator::DurationLessThanOrEquals => {
             // Duration comparison: compare ns values
             let kns = parse_duration_ns(key_val.as_str().unwrap_or("0")).unwrap_or(0);
-            let vns = compare_to.as_ref().and_then(|v| v.as_str()).and_then(|s| parse_duration_ns(s)).unwrap_or(0);
+            let vns = compare_to
+                .as_ref()
+                .and_then(|v| v.as_str())
+                .and_then(|s| parse_duration_ns(s))
+                .unwrap_or(0);
             Ok(match &cond.operator {
                 ConditionOperator::DurationGreaterThan => kns > vns,
                 ConditionOperator::DurationLessThan => kns < vns,
@@ -310,7 +363,11 @@ fn eval_condition(cond: &Condition, resource: &Value, context: &Value) -> Result
     }
 }
 
-fn eval_condition_value(v: &Value, resource: &Value, context: &Value) -> Result<Value, PolicyError> {
+fn eval_condition_value(
+    v: &Value,
+    resource: &Value,
+    context: &Value,
+) -> Result<Value, PolicyError> {
     match v {
         Value::String(s) => {
             let trimmed = s.trim();
@@ -330,9 +387,13 @@ fn parse_duration_ns(s: &str) -> Option<i64> {
     let mut remaining = s;
     while !remaining.is_empty() {
         let num_end = remaining.find(|c: char| c.is_alphabetic())?;
-        if num_end == 0 { break; }
+        if num_end == 0 {
+            break;
+        }
         let num: f64 = remaining[..num_end].parse().ok()?;
-        let unit_end = remaining[num_end..].find(|c: char| c.is_ascii_digit()).unwrap_or(remaining.len() - num_end);
+        let unit_end = remaining[num_end..]
+            .find(|c: char| c.is_ascii_digit())
+            .unwrap_or(remaining.len() - num_end);
         let unit = &remaining[num_end..num_end + unit_end];
         let mult: i64 = match unit {
             "ns" => 1,
@@ -358,15 +419,13 @@ pub fn pattern_match_value(pattern: &Value, value: &Value) -> bool {
         (Value::Null, Value::Null) => true,
         (Value::Bool(p), Value::Bool(v)) => p == v,
         (Value::Number(p), Value::Number(v)) => p == v,
-        (Value::String(p), v) => {
-            match v {
-                Value::String(s) => match_string_pattern(p, s),
-                Value::Number(n) => match_string_pattern(p, &n.to_string()),
-                Value::Bool(b) => match_string_pattern(p, &b.to_string()),
-                Value::Null => p == "null",
-                _ => false,
-            }
-        }
+        (Value::String(p), v) => match v {
+            Value::String(s) => match_string_pattern(p, s),
+            Value::Number(n) => match_string_pattern(p, &n.to_string()),
+            Value::Bool(b) => match_string_pattern(p, &b.to_string()),
+            Value::Null => p == "null",
+            _ => false,
+        },
         (Value::Object(pattern_obj), Value::Object(resource_obj)) => {
             // Every key in the pattern must match the resource
             pattern_obj.iter().all(|(k, pv)| {
@@ -382,11 +441,16 @@ pub fn pattern_match_value(pattern: &Value, value: &Value) -> bool {
             if pattern_arr.len() == 1 {
                 // Array pattern with one element = each element must match
                 let elem_pattern = &pattern_arr[0];
-                resource_arr.iter().all(|rv| pattern_match_value(elem_pattern, rv))
+                resource_arr
+                    .iter()
+                    .all(|rv| pattern_match_value(elem_pattern, rv))
             } else {
                 // Exact length match with element-wise comparison
                 pattern_arr.len() == resource_arr.len()
-                    && pattern_arr.iter().zip(resource_arr.iter()).all(|(p, v)| pattern_match_value(p, v))
+                    && pattern_arr
+                        .iter()
+                        .zip(resource_arr.iter())
+                        .all(|(p, v)| pattern_match_value(p, v))
             }
         }
         _ => false,

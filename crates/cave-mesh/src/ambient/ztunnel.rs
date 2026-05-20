@@ -15,7 +15,7 @@
 //! `Established` exposes a byte-counting bidirectional pipe so tests can
 //! drive both directions without networking.
 
-use crate::ambient::hbone::{authorise, parse_request, HboneError, HboneRequest};
+use crate::ambient::hbone::{HboneError, HboneRequest, authorise, parse_request};
 use crate::ambient::types::{Cite, TenantId};
 use serde::{Deserialize, Serialize};
 
@@ -32,7 +32,10 @@ pub enum ZtunnelState {
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ZtunnelError {
     #[error("invalid transition from {from:?} to {to}")]
-    BadTransition { from: ZtunnelState, to: &'static str },
+    BadTransition {
+        from: ZtunnelState,
+        to: &'static str,
+    },
     #[error("hbone error: {0}")]
     Hbone(#[from] HboneError),
     #[error("peer mTLS identity {peer} did not match expected SPIFFE prefix {expected}")]
@@ -78,7 +81,10 @@ impl ZtunnelConn {
 
     /// Called when the underlying mTLS handshake reports the peer's SPIFFE id.
     /// The peer id must start with the expected prefix (tenant isolation).
-    pub fn complete_handshake(&mut self, peer_identity: impl Into<String>) -> Result<(), ZtunnelError> {
+    pub fn complete_handshake(
+        &mut self,
+        peer_identity: impl Into<String>,
+    ) -> Result<(), ZtunnelError> {
         if self.state != ZtunnelState::TlsHandshake {
             return Err(ZtunnelError::BadTransition {
                 from: self.state.clone(),
@@ -162,7 +168,10 @@ mod tests {
     use crate::ambient_test_ctx;
 
     fn conn(tenant: &str) -> ZtunnelConn {
-        ZtunnelConn::new(TenantId::new(tenant).expect("test fixture"), format!("spiffe://cluster.local/ns/{tenant}/"))
+        ZtunnelConn::new(
+            TenantId::new(tenant).expect("test fixture"),
+            format!("spiffe://cluster.local/ns/{tenant}/"),
+        )
     }
 
     fn good_headers() -> Vec<(&'static str, &'static str)> {
@@ -185,7 +194,8 @@ mod tests {
         );
         let mut c = conn("acme");
         c.accept().unwrap();
-        c.complete_handshake("spiffe://cluster.local/ns/acme/sa/web").unwrap();
+        c.complete_handshake("spiffe://cluster.local/ns/acme/sa/web")
+            .unwrap();
         c.receive_hbone(&good_headers()).unwrap();
         assert!(c.is_established());
         c.push_inbound(1024).unwrap();
@@ -239,7 +249,8 @@ mod tests {
         );
         let mut c = conn("acme");
         c.accept().unwrap();
-        c.complete_handshake("spiffe://cluster.local/ns/acme/sa/web").unwrap();
+        c.complete_handshake("spiffe://cluster.local/ns/acme/sa/web")
+            .unwrap();
         // Baggage header is for a different tenant.
         let bad = vec![
             (":method", "CONNECT"),
@@ -248,7 +259,10 @@ mod tests {
             ("baggage", "tenant=evil"),
         ];
         let err = c.receive_hbone(&bad).unwrap_err();
-        assert!(matches!(err, ZtunnelError::Hbone(HboneError::TenantDenied { .. })));
+        assert!(matches!(
+            err,
+            ZtunnelError::Hbone(HboneError::TenantDenied { .. })
+        ));
     }
 
     #[test]
@@ -264,7 +278,8 @@ mod tests {
         let err = c.push_inbound(100).unwrap_err();
         assert!(matches!(err, ZtunnelError::BadTransition { .. }));
         c.accept().unwrap();
-        c.complete_handshake("spiffe://cluster.local/ns/acme/sa/web").unwrap();
+        c.complete_handshake("spiffe://cluster.local/ns/acme/sa/web")
+            .unwrap();
         c.receive_hbone(&good_headers()).unwrap();
         assert!(c.push_inbound(100).is_ok());
         assert!(c.push_outbound(50).is_ok());

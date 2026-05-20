@@ -7,7 +7,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, ArtifactRecord};
+use crate::admin::state::{AdminState, ArtifactRecord, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -16,21 +16,39 @@ pub enum ArtifactsViewError {
     Auth(#[from] crate::admin::permission::AuthError),
 }
 
-pub fn list_artifacts(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<ArtifactRecord>, ArtifactsViewError> {
+pub fn list_artifacts(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<ArtifactRecord>, ArtifactsViewError> {
     ctx.authorise(Permission::ArtifactsRead)?;
-    Ok(scope(&state.artifact_records.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter().cloned().collect())
+    Ok(
+        scope(&state.artifact_records.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect(),
+    )
 }
 
-pub fn artifacts_by_registry(state: &AdminState, ctx: &RequestCtx, registry_glob: &str) -> Result<Vec<ArtifactRecord>, ArtifactsViewError> {
+pub fn artifacts_by_registry(
+    state: &AdminState,
+    ctx: &RequestCtx,
+    registry_glob: &str,
+) -> Result<Vec<ArtifactRecord>, ArtifactsViewError> {
     let all = list_artifacts(state, ctx)?;
-    Ok(all.into_iter().filter(|a| a.registry.contains(registry_glob)).collect())
+    Ok(all
+        .into_iter()
+        .filter(|a| a.registry.contains(registry_glob))
+        .collect())
 }
 
 pub fn group_by_registry(arts: &[ArtifactRecord]) -> Vec<(String, usize)> {
     use std::collections::BTreeMap;
     let mut acc: BTreeMap<String, usize> = BTreeMap::new();
-    for r in arts { *acc.entry(r.registry.clone()).or_insert(0) += 1; }
+    for r in arts {
+        *acc.entry(r.registry.clone()).or_insert(0) += 1;
+    }
     acc.into_iter().collect()
 }
 
@@ -45,10 +63,18 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ArtifactsV
     let chips: String = regs.iter().map(|(r, n)| format!(
         r#"<span class="px-2 py-1 mr-2 rounded bg-gray-200 text-sm">{r} <strong>×{n}</strong></span>"#,
         r = escape(r), n = n)).collect();
-    let rows: Vec<Vec<String>> = arts.iter().map(|a| vec![
-        a.registry.clone(), a.name.clone(), a.digest.clone(),
-        format!("{} B", a.size_bytes), a.pushed_unix.to_string(),
-    ]).collect();
+    let rows: Vec<Vec<String>> = arts
+        .iter()
+        .map(|a| {
+            vec![
+                a.registry.clone(),
+                a.name.clone(),
+                a.digest.clone(),
+                format!("{} B", a.size_bytes),
+                a.pushed_unix.to_string(),
+            ]
+        })
+        .collect();
     let body = format!(
         r#"<section>
   <p class="text-sm text-gray-600 mb-3">Pulp Web UI (cave-artifacts). Upstream: <a class="text-blue-700 underline" href="https://pulpproject.org/">pulpproject.org</a>.</p>
@@ -64,21 +90,35 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ArtifactsV
         chips = chips,
         tbl = table(&["registry", "name", "digest", "size", "pushed"], &rows),
     );
-    Ok(page_shell_full(ctx, "/admin/artifacts", &format!("artifacts · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/artifacts",
+        &format!("artifacts · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::backstage("plugins/artifacts/src/components/ArtifactsList.tsx", "ArtifactsList");
+const FILE_CITE: Cite = Cite::backstage(
+    "plugins/artifacts/src/components/ArtifactsList.tsx",
+    "ArtifactsList",
+);
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::portal_test_ctx;
-    fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
+    fn ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer("acme", perms)
+    }
 
     #[test]
     fn list_filters_to_owner() {
-        let (_c, _t) = portal_test_ctx!("plugins/artifacts/src/components/ArtifactsList.tsx", "ArtifactsList", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/artifacts/src/components/ArtifactsList.tsx",
+            "ArtifactsList",
+            "acme"
+        );
         let s = AdminState::seeded();
         let a = list_artifacts(&s, &ctx(&[Permission::ArtifactsRead])).unwrap();
         assert_eq!(a.len(), 2);
@@ -86,13 +126,21 @@ mod tests {
 
     #[test]
     fn list_refuses_without_perm() {
-        let (_c, _t) = portal_test_ctx!("plugins/permission-react/src/PermissionApi.ts", "authorize", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/permission-react/src/PermissionApi.ts",
+            "authorize",
+            "acme"
+        );
         assert!(list_artifacts(&AdminState::seeded(), &ctx(&[])).is_err());
     }
 
     #[test]
     fn artifacts_by_registry_filters() {
-        let (_c, _t) = portal_test_ctx!("plugins/artifacts/src/components/RegistryFilter.tsx", "RegistryFilter", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/artifacts/src/components/RegistryFilter.tsx",
+            "RegistryFilter",
+            "acme"
+        );
         let s = AdminState::seeded();
         let a = artifacts_by_registry(&s, &ctx(&[Permission::ArtifactsRead]), "acme/web").unwrap();
         assert_eq!(a.len(), 1);
@@ -101,7 +149,11 @@ mod tests {
 
     #[test]
     fn artifacts_by_registry_excludes_evil() {
-        let (_c, _t) = portal_test_ctx!("plugins/permission-backend/src/PermissionsService.ts", "tenantScopeGuard", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/permission-backend/src/PermissionsService.ts",
+            "tenantScopeGuard",
+            "acme"
+        );
         let s = AdminState::seeded();
         let a = artifacts_by_registry(&s, &ctx(&[Permission::ArtifactsRead]), "evil").unwrap();
         assert!(a.is_empty());
@@ -130,7 +182,11 @@ mod tests {
 
     #[test]
     fn render_does_not_leak_evil() {
-        let (_c, _t) = portal_test_ctx!("plugins/artifacts/src/components/ArtifactsPage.tsx", "ArtifactsPage", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/artifacts/src/components/ArtifactsPage.tsx",
+            "ArtifactsPage",
+            "acme"
+        );
         let s = AdminState::seeded();
         let html = render(&s, &ctx(&[Permission::ArtifactsRead])).unwrap();
         assert!(html.contains("Artifacts (2)"));

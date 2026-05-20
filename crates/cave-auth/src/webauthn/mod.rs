@@ -20,8 +20,8 @@
 // Crypto deps: `ciborium`, `coset`, `p256`, `rsa`, `ed25519-dalek`, `sha2`.
 
 pub mod attestation;
-pub mod authenticator_data;
 pub mod authentication;
+pub mod authenticator_data;
 pub mod cbor;
 pub mod client_data;
 pub mod cose;

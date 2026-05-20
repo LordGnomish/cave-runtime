@@ -10,11 +10,8 @@ pub mod routes;
 pub mod trivy;
 
 use axum::Router;
-use std::{
-    collections::VecDeque,
-    sync::Arc,
-};
-use tokio::sync::{broadcast, Mutex, RwLock};
+use std::{collections::VecDeque, sync::Arc};
+use tokio::sync::{Mutex, RwLock, broadcast};
 
 // ---------------------------------------------------------------------------
 // Module state

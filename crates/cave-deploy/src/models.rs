@@ -446,10 +446,21 @@ pub struct RepositoryCredential {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum CredentialType {
-    SshKey { private_key_ref: String },
-    HttpsPassword { username: String, password_ref: String },
-    GithubApp { app_id: u64, installation_id: u64, private_key_ref: String },
-    GcpServiceAccount { service_account_ref: String },
+    SshKey {
+        private_key_ref: String,
+    },
+    HttpsPassword {
+        username: String,
+        password_ref: String,
+    },
+    GithubApp {
+        app_id: u64,
+        installation_id: u64,
+        private_key_ref: String,
+    },
+    GcpServiceAccount {
+        service_account_ref: String,
+    },
 }
 
 // ─── Notifications ───────────────────────────────────────────────────────────
@@ -601,16 +612,14 @@ mod tests {
                 kustomize: None,
                 directory: None,
             },
-            sources: vec![
-                ApplicationSource {
-                    repo_url: "https://github.com/example/config".to_string(),
-                    target_revision: Some("main".to_string()),
-                    path: Some("values/".to_string()),
-                    helm: None,
-                    kustomize: None,
-                    directory: None,
-                },
-            ],
+            sources: vec![ApplicationSource {
+                repo_url: "https://github.com/example/config".to_string(),
+                target_revision: Some("main".to_string()),
+                path: Some("values/".to_string()),
+                helm: None,
+                kustomize: None,
+                directory: None,
+            }],
             destination: Destination {
                 server: "https://kubernetes.default.svc".to_string(),
                 name: None,

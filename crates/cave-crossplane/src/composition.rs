@@ -2,11 +2,11 @@
 // Copyright 2026 Cave Runtime contributors
 //! Composition store with revision history.
 
-use std::collections::VecDeque;
 use crate::error::{CrossplaneError, CrossplaneResult};
 use crate::models::{Composition, CompositionStatus, CreateCompositionRequest};
 use chrono::Utc;
 use dashmap::DashMap;
+use std::collections::VecDeque;
 use uuid::Uuid;
 
 #[allow(dead_code)]
@@ -83,7 +83,10 @@ impl CompositionStore {
     }
 
     pub fn list(&self) -> Vec<Composition> {
-        self.compositions.iter().map(|r| r.value().clone()).collect()
+        self.compositions
+            .iter()
+            .map(|r| r.value().clone())
+            .collect()
     }
 
     pub fn list_for_type(&self, api_version: &str, kind: &str) -> Vec<Composition> {
@@ -104,8 +107,7 @@ impl CompositionStore {
             Some((_, composition)) => {
                 let type_key = format!(
                     "{}/{}",
-                    composition.composite_type_ref.api_version,
-                    composition.composite_type_ref.kind
+                    composition.composite_type_ref.api_version, composition.composite_type_ref.kind
                 );
                 if let Some(mut names) = self.type_index.get_mut(&type_key) {
                     names.retain(|n| n != name);

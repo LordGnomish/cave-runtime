@@ -29,9 +29,9 @@ pub use lifecycle::desired_phase;
 
 /// Re-export core model structs from the models module.
 pub use models::{
-    Condition, DataVolume, DataVolumeSource, DataVolumeSpec, DataVolumeStatus,
-    DataVolumeTemplate, Domain, DomainCpu, DomainMemory, Firmware, HugepagesSpec, InstancetypeRef,
-    Network, NetworkInterfaceStatus, PreferenceRef, PvcSpec, RunStrategy, VirtualMachine,
+    Condition, DataVolume, DataVolumeSource, DataVolumeSpec, DataVolumeStatus, DataVolumeTemplate,
+    Domain, DomainCpu, DomainMemory, Firmware, HugepagesSpec, InstancetypeRef, Network,
+    NetworkInterfaceStatus, PreferenceRef, PvcSpec, RunStrategy, VirtualMachine,
     VirtualMachineInstance, VirtualMachineInstanceSpec, VirtualMachineInstanceStatus,
     VirtualMachineInstanceTemplateSpec, VirtualMachineSpec, VirtualMachineStatus, VmPhase, Volume,
 };
@@ -72,33 +72,54 @@ mod tests {
 
     #[test]
     fn run_strategy_always_starts_stopped_vm() {
-        assert_eq!(desired_phase(&vm(RunStrategy::Always), VmPhase::Stopped), VmPhase::Starting);
+        assert_eq!(
+            desired_phase(&vm(RunStrategy::Always), VmPhase::Stopped),
+            VmPhase::Starting
+        );
     }
 
     #[test]
     fn run_strategy_always_does_not_disturb_running_vm() {
-        assert_eq!(desired_phase(&vm(RunStrategy::Always), VmPhase::Running), VmPhase::Running);
+        assert_eq!(
+            desired_phase(&vm(RunStrategy::Always), VmPhase::Running),
+            VmPhase::Running
+        );
     }
 
     #[test]
     fn run_strategy_halted_stops_running_vm() {
-        assert_eq!(desired_phase(&vm(RunStrategy::Halted), VmPhase::Running), VmPhase::Stopping);
+        assert_eq!(
+            desired_phase(&vm(RunStrategy::Halted), VmPhase::Running),
+            VmPhase::Stopping
+        );
     }
 
     #[test]
     fn run_strategy_rerun_on_failure_restarts_after_error() {
-        assert_eq!(desired_phase(&vm(RunStrategy::RerunOnFailure), VmPhase::Error), VmPhase::Starting);
+        assert_eq!(
+            desired_phase(&vm(RunStrategy::RerunOnFailure), VmPhase::Error),
+            VmPhase::Starting
+        );
     }
 
     #[test]
     fn run_strategy_rerun_on_failure_does_not_restart_after_clean_stop() {
-        assert_eq!(desired_phase(&vm(RunStrategy::RerunOnFailure), VmPhase::Stopped), VmPhase::Stopped);
+        assert_eq!(
+            desired_phase(&vm(RunStrategy::RerunOnFailure), VmPhase::Stopped),
+            VmPhase::Stopped
+        );
     }
 
     #[test]
     fn run_strategy_manual_is_no_op() {
-        assert_eq!(desired_phase(&vm(RunStrategy::Manual), VmPhase::Running), VmPhase::Running);
-        assert_eq!(desired_phase(&vm(RunStrategy::Manual), VmPhase::Stopped), VmPhase::Stopped);
+        assert_eq!(
+            desired_phase(&vm(RunStrategy::Manual), VmPhase::Running),
+            VmPhase::Running
+        );
+        assert_eq!(
+            desired_phase(&vm(RunStrategy::Manual), VmPhase::Stopped),
+            VmPhase::Stopped
+        );
     }
 
     #[test]

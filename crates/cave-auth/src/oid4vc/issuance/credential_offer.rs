@@ -5,7 +5,7 @@
 //! (out-of-band or via QR code) describing what credentials are on offer
 //! and which grant types the wallet can use to redeem them.
 
-use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use serde::{Deserialize, Serialize};
 
 use super::credential_endpoint::IssuerState;
@@ -26,8 +26,10 @@ pub struct CredentialOffer {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct CredentialOfferGrants {
     /// Pre-authorized code grant — wallet redeems immediately.
-    #[serde(rename = "urn:ietf:params:oauth:grant-type:pre-authorized_code",
-            skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "urn:ietf:params:oauth:grant-type:pre-authorized_code",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub pre_authorized_code: Option<PreAuthorizedCodeGrant>,
     /// Authorization code grant — wallet starts a normal OAuth flow.
     #[serde(rename = "authorization_code", skip_serializing_if = "Option::is_none")]
@@ -59,8 +61,12 @@ pub struct TxCode {
     pub description: Option<String>,
 }
 
-fn default_tx_type() -> String { "numeric".into() }
-fn default_tx_len() -> u32 { 6 }
+fn default_tx_type() -> String {
+    "numeric".into()
+}
+fn default_tx_len() -> u32 {
+    6
+}
 
 /// Authorization-code grant body.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -136,17 +142,22 @@ mod tests {
             },
         };
         let j = serde_json::to_value(&offer).unwrap();
-        assert!(j["grants"]["authorization_code"]["issuer_state"]
-            .as_str()
-            .unwrap()
-            .contains("state-1"));
+        assert!(
+            j["grants"]["authorization_code"]["issuer_state"]
+                .as_str()
+                .unwrap()
+                .contains("state-1")
+        );
     }
 
     #[test]
     fn credential_offer_roundtrip_json() {
         let offer = CredentialOffer {
             credential_issuer: "https://issuer.example".into(),
-            credential_configuration_ids: vec!["EmployeeCredential".into(), "DriversLicense".into()],
+            credential_configuration_ids: vec![
+                "EmployeeCredential".into(),
+                "DriversLicense".into(),
+            ],
             grants: CredentialOfferGrants {
                 pre_authorized_code: Some(PreAuthorizedCodeGrant {
                     pre_authorized_code: "code-xyz".into(),
@@ -169,7 +180,8 @@ mod tests {
         use axum::body::Body;
         use axum::http::Request;
         use tower::ServiceExt;
-        let state = IssuerState::new(crate::oid4vc::issuance::credential_endpoint::IssuerKeys::test());
+        let state =
+            IssuerState::new(crate::oid4vc::issuance::credential_endpoint::IssuerKeys::test());
         let app = axum::Router::new()
             .route("/oid4vc/credential_offer", axum::routing::get(handle_offer))
             .with_state(state);
@@ -190,7 +202,8 @@ mod tests {
         use axum::body::Body;
         use axum::http::Request;
         use tower::ServiceExt;
-        let state = IssuerState::new(crate::oid4vc::issuance::credential_endpoint::IssuerKeys::test());
+        let state =
+            IssuerState::new(crate::oid4vc::issuance::credential_endpoint::IssuerKeys::test());
         let offer = CredentialOffer {
             credential_issuer: "https://i.example".into(),
             credential_configuration_ids: vec!["EmployeeCredential".into()],
@@ -216,7 +229,9 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        let body = axum::body::to_bytes(resp.into_body(), 1_000_000).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), 1_000_000)
+            .await
+            .unwrap();
         let back: CredentialOffer = serde_json::from_slice(&body).unwrap();
         assert_eq!(back, offer);
     }

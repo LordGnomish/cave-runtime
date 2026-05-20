@@ -40,9 +40,17 @@ pub struct ManagedContainer {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ContainerState {
-    Waiting { reason: String },
-    Running { started_at: DateTime<Utc> },
-    Terminated { exit_code: i32, reason: String, finished_at: DateTime<Utc> },
+    Waiting {
+        reason: String,
+    },
+    Running {
+        started_at: DateTime<Utc>,
+    },
+    Terminated {
+        exit_code: i32,
+        reason: String,
+        finished_at: DateTime<Utc>,
+    },
 }
 
 /// Node status report sent to API server.
@@ -79,10 +87,26 @@ impl NodeStatusReport {
             pod_count: 0,
             pod_capacity: 110,
             conditions: vec![
-                NodeCondition { condition_type: "Ready".into(), status: true, message: "kubelet is ready".into() },
-                NodeCondition { condition_type: "MemoryPressure".into(), status: false, message: "".into() },
-                NodeCondition { condition_type: "DiskPressure".into(), status: false, message: "".into() },
-                NodeCondition { condition_type: "PIDPressure".into(), status: false, message: "".into() },
+                NodeCondition {
+                    condition_type: "Ready".into(),
+                    status: true,
+                    message: "kubelet is ready".into(),
+                },
+                NodeCondition {
+                    condition_type: "MemoryPressure".into(),
+                    status: false,
+                    message: "".into(),
+                },
+                NodeCondition {
+                    condition_type: "DiskPressure".into(),
+                    status: false,
+                    message: "".into(),
+                },
+                NodeCondition {
+                    condition_type: "PIDPressure".into(),
+                    status: false,
+                    message: "".into(),
+                },
             ],
             reported_at: Utc::now(),
         }
@@ -109,7 +133,14 @@ mod tests {
 
     #[test]
     fn test_container_state() {
-        let s = ContainerState::Waiting { reason: "PullImage".into() };
-        assert_eq!(s, ContainerState::Waiting { reason: "PullImage".into() });
+        let s = ContainerState::Waiting {
+            reason: "PullImage".into(),
+        };
+        assert_eq!(
+            s,
+            ContainerState::Waiting {
+                reason: "PullImage".into()
+            }
+        );
     }
 }

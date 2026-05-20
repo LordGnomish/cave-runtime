@@ -111,7 +111,9 @@ impl Changelog {
 
     /// Convenience: any entry classified as Breaking?
     pub fn has_breaking(&self) -> bool {
-        self.entries.iter().any(|e| e.breaking || e.kind == ChangeKind::Breaking)
+        self.entries
+            .iter()
+            .any(|e| e.breaking || e.kind == ChangeKind::Breaking)
     }
 
     /// Get entries of a single kind.
@@ -387,10 +389,22 @@ random preamble
         assert_eq!(ChangeKind::from_heading("Added"), ChangeKind::Added);
         assert_eq!(ChangeKind::from_heading("New Features"), ChangeKind::Added);
         assert_eq!(ChangeKind::from_heading("Bug Fixes"), ChangeKind::Fixed);
-        assert_eq!(ChangeKind::from_heading("Breaking Changes"), ChangeKind::Breaking);
-        assert_eq!(ChangeKind::from_heading("Security Advisory"), ChangeKind::Security);
-        assert_eq!(ChangeKind::from_heading("Deprecations"), ChangeKind::Deprecated);
-        assert_eq!(ChangeKind::from_heading("Removed APIs"), ChangeKind::Removed);
+        assert_eq!(
+            ChangeKind::from_heading("Breaking Changes"),
+            ChangeKind::Breaking
+        );
+        assert_eq!(
+            ChangeKind::from_heading("Security Advisory"),
+            ChangeKind::Security
+        );
+        assert_eq!(
+            ChangeKind::from_heading("Deprecations"),
+            ChangeKind::Deprecated
+        );
+        assert_eq!(
+            ChangeKind::from_heading("Removed APIs"),
+            ChangeKind::Removed
+        );
         assert_eq!(ChangeKind::from_heading("Misc"), ChangeKind::Changed);
     }
 }

@@ -132,8 +132,8 @@ pub fn parse_jsonl(input: &str) -> Result<Vec<Contribution>, String> {
         if line.is_empty() {
             continue;
         }
-        let parsed: Contribution = serde_json::from_str(line)
-            .map_err(|e| format!("line {}: {}", lineno + 1, e))?;
+        let parsed: Contribution =
+            serde_json::from_str(line).map_err(|e| format!("line {}: {}", lineno + 1, e))?;
         out.push(parsed);
     }
     Ok(out)
@@ -268,10 +268,7 @@ fn render_contributions_page(ctx: &RequestCtx, title: &str, body: &str) -> Strin
     page_shell_full(ctx, "/admin/contributions", title, &wrapped)
 }
 
-pub fn render_overview(
-    records: &[Contribution],
-    ctx: &RequestCtx,
-) -> Result<String, AuthError> {
+pub fn render_overview(records: &[Contribution], ctx: &RequestCtx) -> Result<String, AuthError> {
     ctx.authorise(Permission::ContributionsRead)?;
     let summaries = aggregate_by_worker(records);
     let mut rows = String::new();
@@ -297,7 +294,11 @@ pub fn render_overview(
   <tbody>{rows}</tbody>
 </table>"#,
     );
-    Ok(render_contributions_page(ctx, "Contributions overview", &body))
+    Ok(render_contributions_page(
+        ctx,
+        "Contributions overview",
+        &body,
+    ))
 }
 
 pub fn render_worker_detail(
@@ -309,7 +310,9 @@ pub fn render_worker_detail(
     let recent = worker_detail(records, worker_id, 50);
     let mut rows = String::new();
     if recent.is_empty() {
-        rows.push_str(r#"<tr><td colspan="5"><em>No batches recorded for this worker.</em></td></tr>"#);
+        rows.push_str(
+            r#"<tr><td colspan="5"><em>No batches recorded for this worker.</em></td></tr>"#,
+        );
     } else {
         for c in &recent {
             rows.push_str(&format!(
@@ -337,10 +340,7 @@ pub fn render_worker_detail(
     ))
 }
 
-pub fn render_timeline(
-    records: &[Contribution],
-    ctx: &RequestCtx,
-) -> Result<String, AuthError> {
+pub fn render_timeline(records: &[Contribution], ctx: &RequestCtx) -> Result<String, AuthError> {
     ctx.authorise(Permission::ContributionsRead)?;
     let buckets = aggregate_timeline(records);
     let max = buckets.iter().map(|b| b.batches).max().unwrap_or(0).max(1);
@@ -365,13 +365,14 @@ pub fn render_timeline(
   <tbody>{rows}</tbody>
 </table>"#,
     );
-    Ok(render_contributions_page(ctx, "Contributions timeline", &body))
+    Ok(render_contributions_page(
+        ctx,
+        "Contributions timeline",
+        &body,
+    ))
 }
 
-pub fn render_leaderboard(
-    records: &[Contribution],
-    ctx: &RequestCtx,
-) -> Result<String, AuthError> {
+pub fn render_leaderboard(records: &[Contribution], ctx: &RequestCtx) -> Result<String, AuthError> {
     ctx.authorise(Permission::ContributionsRead)?;
     let board = leaderboard(records, 10);
     let mut rows = String::new();
@@ -397,7 +398,11 @@ pub fn render_leaderboard(
   <tbody>{rows}</tbody>
 </table>"#,
     );
-    Ok(render_contributions_page(ctx, "Contributions leaderboard", &body))
+    Ok(render_contributions_page(
+        ctx,
+        "Contributions leaderboard",
+        &body,
+    ))
 }
 
 #[cfg(test)]
@@ -884,13 +889,12 @@ mod tests {
     /// directly.
     #[test]
     fn contributions_html_escape_blocks_tenant_injection() {
-        let (_cite, _t) = portal_test_ctx!(
-            "packages/core-components/src/Page/Page.tsx",
-            "Page",
-            "acme"
+        let (_cite, _t) =
+            portal_test_ctx!("packages/core-components/src/Page/Page.tsx", "Page", "acme");
+        assert!(
+            TenantId::new("evil<script>").is_err(),
+            "TenantId must reject HTML-injection-shaped input at construction"
         );
-        assert!(TenantId::new("evil<script>").is_err(),
-            "TenantId must reject HTML-injection-shaped input at construction");
     }
 
     /// cite: detail — worker_kind() helper returns the same enum as static fn

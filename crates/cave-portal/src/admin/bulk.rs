@@ -157,7 +157,10 @@ pub fn submit(
         return Err(BulkOpError::EmptyTargets);
     }
     if req.targets.len() > MAX_BULK_TARGETS {
-        return Err(BulkOpError::LimitExceeded(req.targets.len(), MAX_BULK_TARGETS));
+        return Err(BulkOpError::LimitExceeded(
+            req.targets.len(),
+            MAX_BULK_TARGETS,
+        ));
     }
     let mut results = Vec::with_capacity(req.targets.len());
     let mut ok = 0;
@@ -199,10 +202,7 @@ mod tests {
     use super::*;
 
     fn ctx_full() -> RequestCtx {
-        RequestCtx::developer(
-            "acme",
-            &[Permission::BulkOpsSubmit, Permission::KedaWrite],
-        )
+        RequestCtx::developer("acme", &[Permission::BulkOpsSubmit, Permission::KedaWrite])
     }
 
     fn req(kind: BulkOpKind, targets: &[&str], aon: bool) -> BulkOpRequest {
@@ -298,13 +298,22 @@ mod tests {
 
     #[test]
     fn kind_required_permission_maps_correctly() {
-        assert_eq!(BulkOpKind::PauseScaledObject.required_permission(), Permission::KedaWrite);
-        assert_eq!(BulkOpKind::AckAlert.required_permission(), Permission::AlertsAck);
+        assert_eq!(
+            BulkOpKind::PauseScaledObject.required_permission(),
+            Permission::KedaWrite
+        );
+        assert_eq!(
+            BulkOpKind::AckAlert.required_permission(),
+            Permission::AlertsAck
+        );
     }
 
     #[test]
     fn kind_as_str_stable() {
         assert_eq!(BulkOpKind::PauseScaledObject.as_str(), "pause_scaledobject");
-        assert_eq!(BulkOpKind::DeleteScaledObject.as_str(), "delete_scaledobject");
+        assert_eq!(
+            BulkOpKind::DeleteScaledObject.as_str(),
+            "delete_scaledobject"
+        );
     }
 }

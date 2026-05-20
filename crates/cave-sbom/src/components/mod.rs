@@ -66,11 +66,7 @@ pub struct ComponentRecord {
 }
 
 impl ComponentRecord {
-    pub fn new(
-        project_uuid: Uuid,
-        name: impl Into<String>,
-        version: impl Into<String>,
-    ) -> Self {
+    pub fn new(project_uuid: Uuid, name: impl Into<String>, version: impl Into<String>) -> Self {
         Self {
             uuid: Uuid::new_v4(),
             project_uuid,
@@ -232,7 +228,9 @@ impl Ord for Token {
 pub fn version_index(records: &[ComponentRecord]) -> HashMap<String, Vec<String>> {
     let mut idx: HashMap<String, Vec<String>> = HashMap::new();
     for r in records {
-        idx.entry(r.name.clone()).or_default().push(r.version.clone());
+        idx.entry(r.name.clone())
+            .or_default()
+            .push(r.version.clone());
     }
     for v in idx.values_mut() {
         v.sort_by(|a, b| version_compare(a, b));
@@ -242,10 +240,7 @@ pub fn version_index(records: &[ComponentRecord]) -> HashMap<String, Vec<String>
 }
 
 /// Determine which projects contain a given component (by name).
-pub fn projects_for_component(
-    records: &[ComponentRecord],
-    name: &str,
-) -> Vec<Uuid> {
+pub fn projects_for_component(records: &[ComponentRecord], name: &str) -> Vec<Uuid> {
     let mut s: std::collections::BTreeSet<Uuid> = std::collections::BTreeSet::new();
     for r in records {
         if r.name == name {

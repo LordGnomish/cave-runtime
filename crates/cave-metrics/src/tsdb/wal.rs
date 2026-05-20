@@ -5,8 +5,8 @@
 //! `WalRecord` owns the Prometheus-specific entry shape.  The actual
 //! append/replay machinery lives in `cave_core::wal::{AppendLog, replay}`.
 
-use std::path::Path;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 pub use cave_core::wal::{AppendLog, WalError, WalResult, replay};
 
@@ -29,11 +29,7 @@ pub enum WalRecord {
 // ── Convenience helpers ───────────────────────────────────────────────────────
 
 /// Build a `WalRecord::Sample` from domain types and append it to the log.
-pub fn append_sample(
-    log: &mut AppendLog,
-    labels: &Labels,
-    sample: &Sample,
-) -> WalResult<()> {
+pub fn append_sample(log: &mut AppendLog, labels: &Labels, sample: &Sample) -> WalResult<()> {
     let record = WalRecord::Sample {
         labels: labels.0.clone(),
         timestamp_ms: sample.timestamp_ms,
@@ -43,10 +39,7 @@ pub fn append_sample(
 }
 
 /// Replay all `WalRecord`s from `path`, calling `f` for each valid entry.
-pub fn replay_records<F: FnMut(WalRecord)>(
-    path: impl AsRef<Path>,
-    f: F,
-) -> WalResult<()> {
+pub fn replay_records<F: FnMut(WalRecord)>(path: impl AsRef<Path>, f: F) -> WalResult<()> {
     replay::<WalRecord, F>(path, f)
 }
 

@@ -15,8 +15,8 @@
 //! reconciler will own the singleton lease via cave-controller-manager);
 //! delivery retry budget (handled by cave-keda/cave-runtime data-plane).
 
-use std::collections::HashMap;
 use crate::meta::ObjectMeta;
+use std::collections::HashMap;
 
 #[derive(Default, Debug, Clone)]
 pub struct PingSource {
@@ -113,9 +113,15 @@ impl PingSource {
     /// event id (UUID upstream; we accept any unique string).
     pub fn emit(&self, event_id: &str) -> CloudEvent {
         let mut ext = self.spec.ce_overrides.clone();
-        ext.insert("knativedev_sourceversion".to_string(), "v1.22.0".to_string());
+        ext.insert(
+            "knativedev_sourceversion".to_string(),
+            "v1.22.0".to_string(),
+        );
         let source = if self.metadata.namespace.is_empty() {
-            format!("/apis/sources.knative.dev/v1/pingsources/{}", self.metadata.name)
+            format!(
+                "/apis/sources.knative.dev/v1/pingsources/{}",
+                self.metadata.name
+            )
         } else {
             format!(
                 "/apis/sources.knative.dev/v1/namespaces/{}/pingsources/{}",
@@ -240,9 +246,14 @@ mod tests {
     #[test]
     fn ping_emit_carries_ce_overrides() {
         let mut p = PingSource::new("t", "*/5 * * * *");
-        p.spec.ce_overrides.insert("tenant".to_string(), "alpha".to_string());
+        p.spec
+            .ce_overrides
+            .insert("tenant".to_string(), "alpha".to_string());
         let ev = p.emit("id-1");
-        assert_eq!(ev.extensions.get("tenant").map(|s| s.as_str()), Some("alpha"));
+        assert_eq!(
+            ev.extensions.get("tenant").map(|s| s.as_str()),
+            Some("alpha")
+        );
     }
 
     #[test]
@@ -250,7 +261,10 @@ mod tests {
         let mut p = PingSource::new("t", "*/1 * * * *");
         p.spec.sink = Some("https://sink.example/in".to_string());
         assert_eq!(p.resolve_sink(), Some("https://sink.example/in"));
-        assert_eq!(p.status.sink_uri.as_deref(), Some("https://sink.example/in"));
+        assert_eq!(
+            p.status.sink_uri.as_deref(),
+            Some("https://sink.example/in")
+        );
     }
 
     #[test]

@@ -7,10 +7,17 @@ use tokio::sync::broadcast;
 use tracing::debug;
 
 /// Dispatch an S3 event to all matching notification subscribers.
-pub async fn dispatch(config: &NotificationConfiguration, event: &S3Event, tx: &broadcast::Sender<S3Event>) {
+pub async fn dispatch(
+    config: &NotificationConfiguration,
+    event: &S3Event,
+    tx: &broadcast::Sender<S3Event>,
+) {
     // Queue configurations
     for qc in &config.queue_configurations {
-        if qc.events.iter().any(|e| event_matches(e, &event.event_name))
+        if qc
+            .events
+            .iter()
+            .any(|e| event_matches(e, &event.event_name))
             && event.matches_filter(&qc.filter)
         {
             debug!(
@@ -26,7 +33,10 @@ pub async fn dispatch(config: &NotificationConfiguration, event: &S3Event, tx: &
 
     // Topic configurations
     for tc in &config.topic_configurations {
-        if tc.events.iter().any(|e| event_matches(e, &event.event_name))
+        if tc
+            .events
+            .iter()
+            .any(|e| event_matches(e, &event.event_name))
             && event.matches_filter(&tc.filter)
         {
             debug!(
@@ -40,7 +50,10 @@ pub async fn dispatch(config: &NotificationConfiguration, event: &S3Event, tx: &
 
     // Lambda configurations
     for lc in &config.lambda_function_configurations {
-        if lc.events.iter().any(|e| event_matches(e, &event.event_name))
+        if lc
+            .events
+            .iter()
+            .any(|e| event_matches(e, &event.event_name))
             && event.matches_filter(&lc.filter)
         {
             debug!(

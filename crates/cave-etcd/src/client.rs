@@ -275,7 +275,9 @@ mod tests {
             leader: None,
         }));
         // Non-retryable
-        assert!(!EtcdClient::is_retryable(&EtcdError::KeyNotFound("k".into())));
+        assert!(!EtcdClient::is_retryable(&EtcdError::KeyNotFound(
+            "k".into()
+        )));
     }
 
     #[test]
@@ -325,9 +327,11 @@ mod tests {
         let store = Arc::new(KvStore::new());
         let cli = EtcdClient::with_default_config(store);
         let resp = cli
-            .txn(&crate::grpc_api::TxnBuilder::new()
-                .then_put(&dt(tenant_id, "k"), "v")
-                .build())
+            .txn(
+                &crate::grpc_api::TxnBuilder::new()
+                    .then_put(&dt(tenant_id, "k"), "v")
+                    .build(),
+            )
             .unwrap();
         assert!(resp.succeeded);
     }

@@ -99,10 +99,17 @@ pub struct Svid {
 }
 
 impl Svid {
-    pub fn new(spiffe_id: impl Into<String>, trust_domain: impl Into<String>, issued_at: u64, ttl: u64) -> Self {
+    pub fn new(
+        spiffe_id: impl Into<String>,
+        trust_domain: impl Into<String>,
+        issued_at: u64,
+        ttl: u64,
+    ) -> Self {
         let id = spiffe_id.into();
         Self {
-            spiffe_id: id, trust_domain: trust_domain.into(), issued_at,
+            spiffe_id: id,
+            trust_domain: trust_domain.into(),
+            issued_at,
             expires_at: issued_at + ttl,
         }
     }
@@ -114,22 +121,32 @@ impl Svid {
     }
     pub fn validate_trust_domain(&self, expected_td: &str) -> Result<(), AuthError> {
         if self.trust_domain != expected_td {
-            return Err(AuthError::UntrustedSpiffe(self.spiffe_id.clone(), expected_td.to_string()));
+            return Err(AuthError::UntrustedSpiffe(
+                self.spiffe_id.clone(),
+                expected_td.to_string(),
+            ));
         }
         // Parse with the kernel's SPIFFE 1.0 grammar (sweep-008) instead of
         // a hand-rolled `starts_with` check. The kernel parser rejects
         // empty/percent-encoded/invalid-trust-domain ids that the legacy
         // prefix check accepted.
-        let parsed = KernelSpiffeId::from_str(&self.spiffe_id)
-            .map_err(|_| AuthError::UntrustedSpiffe(self.spiffe_id.clone(), expected_td.to_string()))?;
+        let parsed = KernelSpiffeId::from_str(&self.spiffe_id).map_err(|_| {
+            AuthError::UntrustedSpiffe(self.spiffe_id.clone(), expected_td.to_string())
+        })?;
         if !parsed.is_member_of(expected_td) {
-            return Err(AuthError::UntrustedSpiffe(self.spiffe_id.clone(), expected_td.to_string()));
+            return Err(AuthError::UntrustedSpiffe(
+                self.spiffe_id.clone(),
+                expected_td.to_string(),
+            ));
         }
         // A bare `spiffe://td` (no path) is a trust-domain root id, not a
         // workload id; reject it here to keep the original behaviour where
         // we required a non-empty path after the trust domain.
         if parsed.path().is_empty() {
-            return Err(AuthError::UntrustedSpiffe(self.spiffe_id.clone(), expected_td.to_string()));
+            return Err(AuthError::UntrustedSpiffe(
+                self.spiffe_id.clone(),
+                expected_td.to_string(),
+            ));
         }
         Ok(())
     }
@@ -147,7 +164,12 @@ pub struct AuthManager {
 
 impl AuthManager {
     pub fn new(tenant: TenantId, trust_domain: impl Into<String>) -> Self {
-        Self { tenant, trust_domain: trust_domain.into(), auth: HashMap::new(), svids: HashMap::new() }
+        Self {
+            tenant,
+            trust_domain: trust_domain.into(),
+            auth: HashMap::new(),
+            svids: HashMap::new(),
+        }
     }
 
     pub fn register_svid(&mut self, identity: u32, svid: Svid) -> Result<(), AuthError> {
@@ -164,7 +186,8 @@ impl AuthManager {
         let removed = self.svids.remove(&identity).is_some();
         // Drop any auth entries that referenced this identity.
         if removed {
-            self.auth.retain(|k, _| k.src_identity != identity && k.dst_identity != identity);
+            self.auth
+                .retain(|k, _| k.src_identity != identity && k.dst_identity != identity);
         }
         removed
     }
@@ -176,7 +199,11 @@ impl AuthManager {
             AuthMode::Disabled => AuthVerdict::NotRequired,
             AuthMode::AlwaysFail => AuthVerdict::Denied,
             AuthMode::Required | AuthMode::Spire => {
-                let key = AuthKey { src_identity: src, dst_identity: dst, mode };
+                let key = AuthKey {
+                    src_identity: src,
+                    dst_identity: dst,
+                    mode,
+                };
                 match self.auth.get(&key) {
                     None => AuthVerdict::NeedsAuth,
                     Some(e) if !e.is_valid(now) => AuthVerdict::Expired,
@@ -202,15 +229,25 @@ impl AuthManager {
         if matches!(mode, AuthMode::AlwaysFail) {
             return Err(AuthError::HandshakeFailed("mode is AlwaysFail".into()));
         }
-        let src_svid = self.svids.get(&src).cloned()
+        let src_svid = self
+            .svids
+            .get(&src)
+            .cloned()
             .ok_or_else(|| AuthError::SvidNotFound(format!("identity {src}")))?;
-        let dst_svid = self.svids.get(&dst).cloned()
+        let dst_svid = self
+            .svids
+            .get(&dst)
+            .cloned()
             .ok_or_else(|| AuthError::SvidNotFound(format!("identity {dst}")))?;
         if !src_svid.is_valid(now) {
-            return Err(AuthError::HandshakeFailed(format!("src SVID {src} expired")));
+            return Err(AuthError::HandshakeFailed(format!(
+                "src SVID {src} expired"
+            )));
         }
         if !dst_svid.is_valid(now) {
-            return Err(AuthError::HandshakeFailed(format!("dst SVID {dst} expired")));
+            return Err(AuthError::HandshakeFailed(format!(
+                "dst SVID {dst} expired"
+            )));
         }
         let ttl = src_svid.ttl_remaining(now).min(dst_svid.ttl_remaining(now));
         let entry = AuthEntry {
@@ -219,7 +256,11 @@ impl AuthManager {
             created: now,
             expires_at: now + ttl,
         };
-        let key = AuthKey { src_identity: src, dst_identity: dst, mode };
+        let key = AuthKey {
+            src_identity: src,
+            dst_identity: dst,
+            mode,
+        };
         self.auth.insert(key, entry.clone());
         Ok(entry)
     }
@@ -249,7 +290,13 @@ impl AuthManager {
 
     /// Renew an existing auth entry — returns the renewed entry on
     /// success. Useful when the agent receives a fresh SVID push.
-    pub fn renew(&mut self, src: u32, dst: u32, mode: AuthMode, now: u64) -> Result<AuthEntry, AuthError> {
+    pub fn renew(
+        &mut self,
+        src: u32,
+        dst: u32,
+        mode: AuthMode,
+        now: u64,
+    ) -> Result<AuthEntry, AuthError> {
         // Re-handshake replaces the existing entry.
         self.handshake(src, dst, mode, now)
     }
@@ -268,44 +315,72 @@ mod tests {
     }
 
     fn svid(workload: &str, ttl: u64, now: u64) -> Svid {
-        Svid::new(format!("spiffe://cluster.local/{workload}"), "cluster.local", now, ttl)
+        Svid::new(
+            format!("spiffe://cluster.local/{workload}"),
+            "cluster.local",
+            now,
+            ttl,
+        )
     }
 
     // ── AuthMode resolution ──────────────────────────────────────────────────
 
     #[test]
     fn auth_mode_disabled_resolves_to_not_required() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/auth.go", "Resolve.Disabled", "tenant-auth-dis");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/auth/auth.go", "Resolve.Disabled", "tenant-auth-dis");
         let m = mgr(tenant);
-        assert_eq!(m.resolve(256, 257, AuthMode::Disabled, 100), AuthVerdict::NotRequired);
+        assert_eq!(
+            m.resolve(256, 257, AuthMode::Disabled, 100),
+            AuthVerdict::NotRequired
+        );
     }
 
     #[test]
     fn auth_mode_always_fail_resolves_to_denied() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/auth.go", "Resolve.AlwaysFail", "tenant-auth-fail");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/auth/auth.go", "Resolve.AlwaysFail", "tenant-auth-fail");
         let m = mgr(tenant);
-        assert_eq!(m.resolve(256, 257, AuthMode::AlwaysFail, 100), AuthVerdict::Denied);
+        assert_eq!(
+            m.resolve(256, 257, AuthMode::AlwaysFail, 100),
+            AuthVerdict::Denied
+        );
     }
 
     #[test]
     fn auth_mode_required_no_entry_returns_needs_auth() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/auth.go", "Resolve.Required.NoEntry", "tenant-auth-need");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/auth/auth.go",
+            "Resolve.Required.NoEntry",
+            "tenant-auth-need"
+        );
         let m = mgr(tenant);
-        assert_eq!(m.resolve(256, 257, AuthMode::Required, 100), AuthVerdict::NeedsAuth);
+        assert_eq!(
+            m.resolve(256, 257, AuthMode::Required, 100),
+            AuthVerdict::NeedsAuth
+        );
     }
 
     #[test]
     fn auth_mode_spire_no_entry_returns_needs_auth() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/auth.go", "Resolve.Spire.NoEntry", "tenant-auth-spneed");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/auth/auth.go",
+            "Resolve.Spire.NoEntry",
+            "tenant-auth-spneed"
+        );
         let m = mgr(tenant);
-        assert_eq!(m.resolve(256, 257, AuthMode::Spire, 100), AuthVerdict::NeedsAuth);
+        assert_eq!(
+            m.resolve(256, 257, AuthMode::Spire, 100),
+            AuthVerdict::NeedsAuth
+        );
     }
 
     // ── SVID register + validation ───────────────────────────────────────────
 
     #[test]
     fn svid_register_valid_succeeds() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/spire/cache.go", "RegisterSVID", "tenant-auth-reg");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/auth/spire/cache.go", "RegisterSVID", "tenant-auth-reg");
         let mut m = mgr(tenant);
         m.register_svid(256, svid("workload-a", 3600, 100)).unwrap();
         assert_eq!(m.svid_count(), 1);
@@ -313,22 +388,36 @@ mod tests {
 
     #[test]
     fn svid_register_wrong_trust_domain_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/spire/cache.go", "RegisterSVID.TrustDomain", "tenant-auth-td");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/auth/spire/cache.go",
+            "RegisterSVID.TrustDomain",
+            "tenant-auth-td"
+        );
         let mut m = mgr(tenant);
-        let bad = Svid::new("spiffe://other.example/workload", "other.example", 100, 3600);
+        let bad = Svid::new(
+            "spiffe://other.example/workload",
+            "other.example",
+            100,
+            3600,
+        );
         let err = m.register_svid(256, bad).unwrap_err();
         assert!(matches!(err, AuthError::UntrustedSpiffe(_, _)));
     }
 
     #[test]
     fn svid_register_id_not_in_trust_domain_path_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/spire/cache.go", "RegisterSVID.IDPath", "tenant-auth-idp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/auth/spire/cache.go",
+            "RegisterSVID.IDPath",
+            "tenant-auth-idp"
+        );
         let mut m = mgr(tenant);
         // trust_domain field is right but id doesn't have proper prefix.
         let bad = Svid {
             spiffe_id: "spiffe://other.example/workload".into(),
             trust_domain: "cluster.local".into(),
-            issued_at: 100, expires_at: 3700,
+            issued_at: 100,
+            expires_at: 3700,
         };
         let err = m.register_svid(256, bad).unwrap_err();
         assert!(matches!(err, AuthError::UntrustedSpiffe(_, _)));
@@ -336,7 +425,8 @@ mod tests {
 
     #[test]
     fn svid_lookup_returns_registered() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/spire/cache.go", "LookupSVID", "tenant-auth-lk");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/auth/spire/cache.go", "LookupSVID", "tenant-auth-lk");
         let mut m = mgr(tenant);
         m.register_svid(256, svid("workload-a", 3600, 100)).unwrap();
         let s = m.lookup_svid(256).unwrap();
@@ -345,14 +435,22 @@ mod tests {
 
     #[test]
     fn svid_lookup_unknown_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/spire/cache.go", "LookupSVID.NotFound", "tenant-auth-lknf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/auth/spire/cache.go",
+            "LookupSVID.NotFound",
+            "tenant-auth-lknf"
+        );
         let m = mgr(tenant);
         assert!(m.lookup_svid(999).is_none());
     }
 
     #[test]
     fn svid_revoke_drops_attached_auth_entries() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/spire/cache.go", "RevokeSVID.CascadeAuth", "tenant-auth-rev");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/auth/spire/cache.go",
+            "RevokeSVID.CascadeAuth",
+            "tenant-auth-rev"
+        );
         let mut m = mgr(tenant);
         m.register_svid(256, svid("a", 3600, 100)).unwrap();
         m.register_svid(257, svid("b", 3600, 100)).unwrap();
@@ -364,14 +462,19 @@ mod tests {
 
     #[test]
     fn svid_revoke_unknown_returns_false() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/spire/cache.go", "RevokeSVID.NotFound", "tenant-auth-revnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/auth/spire/cache.go",
+            "RevokeSVID.NotFound",
+            "tenant-auth-revnf"
+        );
         let mut m = mgr(tenant);
         assert!(!m.revoke_svid(999));
     }
 
     #[test]
     fn svid_validity_window() {
-        let (_c, _t) = cilium_test_ctx!("pkg/auth/spire/cache.go", "Svid.IsValid", "tenant-auth-val");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/auth/spire/cache.go", "Svid.IsValid", "tenant-auth-val");
         let s = svid("w", 1000, 100);
         assert!(s.is_valid(500));
         assert!(!s.is_valid(50));
@@ -380,7 +483,11 @@ mod tests {
 
     #[test]
     fn svid_ttl_remaining_decays_with_now() {
-        let (_c, _t) = cilium_test_ctx!("pkg/auth/spire/cache.go", "Svid.TtlRemaining", "tenant-auth-ttl");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/auth/spire/cache.go",
+            "Svid.TtlRemaining",
+            "tenant-auth-ttl"
+        );
         let s = svid("w", 1000, 100);
         assert_eq!(s.ttl_remaining(100), 1000);
         assert_eq!(s.ttl_remaining(600), 500);
@@ -391,19 +498,27 @@ mod tests {
 
     #[test]
     fn handshake_creates_authorized_entry() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/manager.go", "Authenticate", "tenant-auth-hs");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/auth/manager.go", "Authenticate", "tenant-auth-hs");
         let mut m = mgr(tenant);
         m.register_svid(256, svid("a", 3600, 100)).unwrap();
         m.register_svid(257, svid("b", 3600, 100)).unwrap();
         let entry = m.handshake(256, 257, AuthMode::Required, 100).unwrap();
         assert_eq!(entry.src_spiffe, "spiffe://cluster.local/a");
         assert_eq!(entry.dst_spiffe, "spiffe://cluster.local/b");
-        assert_eq!(m.resolve(256, 257, AuthMode::Required, 100), AuthVerdict::Authorized);
+        assert_eq!(
+            m.resolve(256, 257, AuthMode::Required, 100),
+            AuthVerdict::Authorized
+        );
     }
 
     #[test]
     fn handshake_uses_min_of_src_and_dst_ttl() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/manager.go", "Authenticate.MinTTL", "tenant-auth-min");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/auth/manager.go",
+            "Authenticate.MinTTL",
+            "tenant-auth-min"
+        );
         let mut m = mgr(tenant);
         m.register_svid(256, svid("a", 1000, 100)).unwrap(); // expires 1100
         m.register_svid(257, svid("b", 200, 100)).unwrap(); // expires 300
@@ -414,7 +529,11 @@ mod tests {
 
     #[test]
     fn handshake_rejects_disabled_mode() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/manager.go", "Authenticate.Disabled", "tenant-auth-hsdis");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/auth/manager.go",
+            "Authenticate.Disabled",
+            "tenant-auth-hsdis"
+        );
         let mut m = mgr(tenant);
         m.register_svid(256, svid("a", 3600, 100)).unwrap();
         m.register_svid(257, svid("b", 3600, 100)).unwrap();
@@ -423,7 +542,11 @@ mod tests {
 
     #[test]
     fn handshake_rejects_always_fail_mode() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/manager.go", "Authenticate.AlwaysFail", "tenant-auth-hsaf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/auth/manager.go",
+            "Authenticate.AlwaysFail",
+            "tenant-auth-hsaf"
+        );
         let mut m = mgr(tenant);
         m.register_svid(256, svid("a", 3600, 100)).unwrap();
         m.register_svid(257, svid("b", 3600, 100)).unwrap();
@@ -432,7 +555,11 @@ mod tests {
 
     #[test]
     fn handshake_missing_src_svid_errors() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/manager.go", "Authenticate.SvidMissing", "tenant-auth-hsmiss");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/auth/manager.go",
+            "Authenticate.SvidMissing",
+            "tenant-auth-hsmiss"
+        );
         let mut m = mgr(tenant);
         m.register_svid(257, svid("b", 3600, 100)).unwrap();
         let err = m.handshake(256, 257, AuthMode::Required, 100).unwrap_err();
@@ -441,7 +568,11 @@ mod tests {
 
     #[test]
     fn handshake_missing_dst_svid_errors() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/manager.go", "Authenticate.DstMissing", "tenant-auth-hsdst");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/auth/manager.go",
+            "Authenticate.DstMissing",
+            "tenant-auth-hsdst"
+        );
         let mut m = mgr(tenant);
         m.register_svid(256, svid("a", 3600, 100)).unwrap();
         let err = m.handshake(256, 257, AuthMode::Required, 100).unwrap_err();
@@ -450,7 +581,11 @@ mod tests {
 
     #[test]
     fn handshake_with_expired_src_svid_errors() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/manager.go", "Authenticate.SrcExpired", "tenant-auth-hsexp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/auth/manager.go",
+            "Authenticate.SrcExpired",
+            "tenant-auth-hsexp"
+        );
         let mut m = mgr(tenant);
         m.register_svid(256, svid("a", 100, 100)).unwrap(); // expires 200
         m.register_svid(257, svid("b", 3600, 100)).unwrap();
@@ -460,7 +595,11 @@ mod tests {
 
     #[test]
     fn handshake_with_expired_dst_svid_errors() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/manager.go", "Authenticate.DstExpired", "tenant-auth-hsdexp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/auth/manager.go",
+            "Authenticate.DstExpired",
+            "tenant-auth-hsdexp"
+        );
         let mut m = mgr(tenant);
         m.register_svid(256, svid("a", 3600, 100)).unwrap();
         m.register_svid(257, svid("b", 50, 100)).unwrap();
@@ -470,7 +609,11 @@ mod tests {
 
     #[test]
     fn handshake_spire_mode_creates_separate_entry_from_required() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/manager.go", "Authenticate.ModeKey", "tenant-auth-hsmode");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/auth/manager.go",
+            "Authenticate.ModeKey",
+            "tenant-auth-hsmode"
+        );
         let mut m = mgr(tenant);
         m.register_svid(256, svid("a", 3600, 100)).unwrap();
         m.register_svid(257, svid("b", 3600, 100)).unwrap();
@@ -483,13 +626,23 @@ mod tests {
 
     #[test]
     fn auth_entry_expires_after_ttl() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/manager.go", "AuthEntry.Expire", "tenant-auth-aexp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/auth/manager.go",
+            "AuthEntry.Expire",
+            "tenant-auth-aexp"
+        );
         let mut m = mgr(tenant);
         m.register_svid(256, svid("a", 200, 100)).unwrap();
         m.register_svid(257, svid("b", 200, 100)).unwrap();
         m.handshake(256, 257, AuthMode::Required, 100).unwrap();
-        assert_eq!(m.resolve(256, 257, AuthMode::Required, 250), AuthVerdict::Authorized);
-        assert_eq!(m.resolve(256, 257, AuthMode::Required, 350), AuthVerdict::Expired);
+        assert_eq!(
+            m.resolve(256, 257, AuthMode::Required, 250),
+            AuthVerdict::Authorized
+        );
+        assert_eq!(
+            m.resolve(256, 257, AuthMode::Required, 350),
+            AuthVerdict::Expired
+        );
     }
 
     #[test]
@@ -508,7 +661,8 @@ mod tests {
 
     #[test]
     fn auth_gc_keeps_valid_entries() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/manager.go", "GC.KeepValid", "tenant-auth-gck");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/auth/manager.go", "GC.KeepValid", "tenant-auth-gck");
         let mut m = mgr(tenant);
         m.register_svid(256, svid("a", 1000, 100)).unwrap();
         m.register_svid(257, svid("b", 1000, 100)).unwrap();
@@ -547,33 +701,48 @@ mod tests {
 
     #[test]
     fn auth_resolve_after_handshake_authorized_within_window() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/auth.go", "Resolve.Authorized", "tenant-auth-rauth");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/auth/auth.go",
+            "Resolve.Authorized",
+            "tenant-auth-rauth"
+        );
         let mut m = mgr(tenant);
         m.register_svid(256, svid("a", 1000, 100)).unwrap();
         m.register_svid(257, svid("b", 1000, 100)).unwrap();
         m.handshake(256, 257, AuthMode::Required, 100).unwrap();
-        assert_eq!(m.resolve(256, 257, AuthMode::Required, 500), AuthVerdict::Authorized);
+        assert_eq!(
+            m.resolve(256, 257, AuthMode::Required, 500),
+            AuthVerdict::Authorized
+        );
     }
 
     #[test]
     fn auth_resolve_only_matches_exact_src_dst_pair() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/auth.go", "Resolve.Asymmetric", "tenant-auth-rsym");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/auth/auth.go", "Resolve.Asymmetric", "tenant-auth-rsym");
         let mut m = mgr(tenant);
         m.register_svid(256, svid("a", 3600, 100)).unwrap();
         m.register_svid(257, svid("b", 3600, 100)).unwrap();
         m.handshake(256, 257, AuthMode::Required, 100).unwrap();
         // Reverse direction must NOT be authorized.
-        assert_eq!(m.resolve(257, 256, AuthMode::Required, 200), AuthVerdict::NeedsAuth);
+        assert_eq!(
+            m.resolve(257, 256, AuthMode::Required, 200),
+            AuthVerdict::NeedsAuth
+        );
     }
 
     #[test]
     fn auth_resolve_mode_specific_required_does_not_satisfy_spire() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/auth.go", "Resolve.ModeKey", "tenant-auth-rmodek");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/auth/auth.go", "Resolve.ModeKey", "tenant-auth-rmodek");
         let mut m = mgr(tenant);
         m.register_svid(256, svid("a", 3600, 100)).unwrap();
         m.register_svid(257, svid("b", 3600, 100)).unwrap();
         m.handshake(256, 257, AuthMode::Required, 100).unwrap();
-        assert_eq!(m.resolve(256, 257, AuthMode::Spire, 200), AuthVerdict::NeedsAuth);
+        assert_eq!(
+            m.resolve(256, 257, AuthMode::Spire, 200),
+            AuthVerdict::NeedsAuth
+        );
     }
 
     // ── Serde ────────────────────────────────────────────────────────────────
@@ -581,7 +750,12 @@ mod tests {
     #[test]
     fn auth_mode_serde_round_trip() {
         let (_c, _t) = cilium_test_ctx!("pkg/auth/auth.go", "AuthMode.Serde", "tenant-auth-mserde");
-        for m in [AuthMode::Disabled, AuthMode::Required, AuthMode::AlwaysFail, AuthMode::Spire] {
+        for m in [
+            AuthMode::Disabled,
+            AuthMode::Required,
+            AuthMode::AlwaysFail,
+            AuthMode::Spire,
+        ] {
             let s = serde_json::to_string(&m).unwrap();
             let back: AuthMode = serde_json::from_str(&s).unwrap();
             assert_eq!(back, m);
@@ -591,7 +765,11 @@ mod tests {
     #[test]
     fn auth_key_serde_round_trip() {
         let (_c, _t) = cilium_test_ctx!("bpf/lib/auth.h", "AuthKey.Serde", "tenant-auth-kserde");
-        let k = AuthKey { src_identity: 256, dst_identity: 257, mode: AuthMode::Required };
+        let k = AuthKey {
+            src_identity: 256,
+            dst_identity: 257,
+            mode: AuthMode::Required,
+        };
         let s = serde_json::to_string(&k).unwrap();
         let back: AuthKey = serde_json::from_str(&s).unwrap();
         assert_eq!(back, k);
@@ -599,11 +777,13 @@ mod tests {
 
     #[test]
     fn auth_entry_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/auth/auth.go", "AuthEntry.Serde", "tenant-auth-eserde");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/auth/auth.go", "AuthEntry.Serde", "tenant-auth-eserde");
         let e = AuthEntry {
             src_spiffe: "spiffe://cluster.local/a".into(),
             dst_spiffe: "spiffe://cluster.local/b".into(),
-            created: 100, expires_at: 3700,
+            created: 100,
+            expires_at: 3700,
         };
         let s = serde_json::to_string(&e).unwrap();
         let back: AuthEntry = serde_json::from_str(&s).unwrap();
@@ -612,7 +792,11 @@ mod tests {
 
     #[test]
     fn auth_svid_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/auth/spire/cache.go", "Svid.Serde", "tenant-auth-svidserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/auth/spire/cache.go",
+            "Svid.Serde",
+            "tenant-auth-svidserde"
+        );
         let s = svid("w", 3600, 100);
         let json = serde_json::to_string(&s).unwrap();
         let back: Svid = serde_json::from_str(&json).unwrap();
@@ -621,7 +805,11 @@ mod tests {
 
     #[test]
     fn auth_verdict_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/auth/auth.go", "AuthVerdict.Serde", "tenant-auth-vserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/auth/auth.go",
+            "AuthVerdict.Serde",
+            "tenant-auth-vserde"
+        );
         for v in [
             AuthVerdict::NotRequired,
             AuthVerdict::Authorized,
@@ -639,7 +827,8 @@ mod tests {
 
     #[test]
     fn auth_multiple_pairs_independent() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/auth.go", "Multi.Independent", "tenant-auth-multi");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/auth/auth.go", "Multi.Independent", "tenant-auth-multi");
         let mut m = mgr(tenant);
         m.register_svid(256, svid("a", 3600, 100)).unwrap();
         m.register_svid(257, svid("b", 3600, 100)).unwrap();
@@ -647,10 +836,19 @@ mod tests {
         m.handshake(256, 257, AuthMode::Required, 100).unwrap();
         m.handshake(258, 257, AuthMode::Required, 100).unwrap();
         assert_eq!(m.auth_count(), 2);
-        assert_eq!(m.resolve(256, 257, AuthMode::Required, 200), AuthVerdict::Authorized);
-        assert_eq!(m.resolve(258, 257, AuthMode::Required, 200), AuthVerdict::Authorized);
+        assert_eq!(
+            m.resolve(256, 257, AuthMode::Required, 200),
+            AuthVerdict::Authorized
+        );
+        assert_eq!(
+            m.resolve(258, 257, AuthMode::Required, 200),
+            AuthVerdict::Authorized
+        );
         // Cross pairs not authorized.
-        assert_eq!(m.resolve(256, 258, AuthMode::Required, 200), AuthVerdict::NeedsAuth);
+        assert_eq!(
+            m.resolve(256, 258, AuthMode::Required, 200),
+            AuthVerdict::NeedsAuth
+        );
     }
 
     #[test]
@@ -658,7 +856,8 @@ mod tests {
         let (_c, tenant) = cilium_test_ctx!("pkg/auth/auth.go", "AuthCount", "tenant-auth-cnt");
         let mut m = mgr(tenant);
         for i in 0..5u32 {
-            m.register_svid(256 + i, svid(&format!("w{i}"), 3600, 100)).unwrap();
+            m.register_svid(256 + i, svid(&format!("w{i}"), 3600, 100))
+                .unwrap();
         }
         for i in 1..5u32 {
             m.handshake(256, 256 + i, AuthMode::Required, 100).unwrap();
@@ -668,7 +867,8 @@ mod tests {
 
     #[test]
     fn auth_renew_existing_pair_overwrites() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/auth/auth.go", "Renew.Overwrite", "tenant-auth-rwo");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/auth/auth.go", "Renew.Overwrite", "tenant-auth-rwo");
         let mut m = mgr(tenant);
         m.register_svid(256, svid("a", 3600, 100)).unwrap();
         m.register_svid(257, svid("b", 3600, 100)).unwrap();
@@ -681,13 +881,18 @@ mod tests {
 
     #[test]
     fn svid_spiffe_id_must_have_workload_path() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/spire/svid.go", "Svid.PathRequired", "tenant-auth-spath");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/spire/svid.go",
+            "Svid.PathRequired",
+            "tenant-auth-spath"
+        );
         let mut m = mgr(tenant);
         // Apex without trailing path must be rejected.
         let bad = Svid {
             spiffe_id: "spiffe://cluster.local".into(),
             trust_domain: "cluster.local".into(),
-            issued_at: 100, expires_at: 3700,
+            issued_at: 100,
+            expires_at: 3700,
         };
         let err = m.register_svid(256, bad).unwrap_err();
         assert!(matches!(err, AuthError::UntrustedSpiffe(_, _)));
@@ -702,7 +907,11 @@ mod tests {
 
     #[test]
     fn svid_validate_trust_domain_fails_for_wrong_td() {
-        let (_c, _t) = cilium_test_ctx!("pkg/spire/svid.go", "Svid.ValidateTD.Mismatch", "tenant-auth-tdbad");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/spire/svid.go",
+            "Svid.ValidateTD.Mismatch",
+            "tenant-auth-tdbad"
+        );
         let s = svid("w", 3600, 100);
         assert!(s.validate_trust_domain("other.example").is_err());
     }
@@ -712,7 +921,11 @@ mod tests {
         // Sweep-008 — adopting cave_kernel::identity::SpiffeId makes the
         // validator reject malformed IDs that the legacy `starts_with`
         // check accepted: missing scheme, percent-encoded path, etc.
-        let (_c, _t) = cilium_test_ctx!("pkg/spire/svid.go", "Svid.ValidateTD.Malformed", "tenant-auth-tdmal");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/spire/svid.go",
+            "Svid.ValidateTD.Malformed",
+            "tenant-auth-tdmal"
+        );
         let bad_scheme = Svid {
             spiffe_id: "not-spiffe://cluster.local/workload".into(),
             trust_domain: "cluster.local".into(),
@@ -727,17 +940,22 @@ mod tests {
             issued_at: 100,
             expires_at: 3700,
         };
-        assert!(percent_encoded.validate_trust_domain("cluster.local").is_err());
+        assert!(percent_encoded
+            .validate_trust_domain("cluster.local")
+            .is_err());
     }
 
     // ── AuthEntry validity helper ────────────────────────────────────────────
 
     #[test]
     fn auth_entry_is_valid_within_window() {
-        let (_c, _t) = cilium_test_ctx!("pkg/auth/auth.go", "AuthEntry.IsValid", "tenant-auth-eval");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/auth/auth.go", "AuthEntry.IsValid", "tenant-auth-eval");
         let e = AuthEntry {
-            src_spiffe: "x".into(), dst_spiffe: "y".into(),
-            created: 100, expires_at: 200,
+            src_spiffe: "x".into(),
+            dst_spiffe: "y".into(),
+            created: 100,
+            expires_at: 200,
         };
         assert!(e.is_valid(150));
         assert!(!e.is_valid(200));

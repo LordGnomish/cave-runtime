@@ -130,7 +130,10 @@ pub fn materialize(
     // Merge.
     let run_as_user = container.run_as_user.or(pod.run_as_user);
     let run_as_group = container.run_as_group.or(pod.run_as_group);
-    let run_as_non_root = container.run_as_non_root.or(pod.run_as_non_root).unwrap_or(false);
+    let run_as_non_root = container
+        .run_as_non_root
+        .or(pod.run_as_non_root)
+        .unwrap_or(false);
     let privileged = container.privileged.unwrap_or(false);
     let allow_privilege_escalation = container.allow_privilege_escalation.unwrap_or(true);
     let read_only_root_filesystem = container.read_only_root_filesystem.unwrap_or(false);
@@ -199,7 +202,11 @@ pub fn validate(ctx: &EffectiveSecurityContext) -> SecResult<()> {
     // CAP_SYS_ADMIN add → kubelet allows but treats as privilege-escalation;
     // explicit allowPrivilegeEscalation=false then makes it inconsistent.
     if !ctx.allow_privilege_escalation
-        && ctx.capabilities.add.iter().any(|c| c == "SYS_ADMIN" || c == "CAP_SYS_ADMIN")
+        && ctx
+            .capabilities
+            .add
+            .iter()
+            .any(|c| c == "SYS_ADMIN" || c == "CAP_SYS_ADMIN")
     {
         return Err(SecurityError::Invalid(
             "CAP_SYS_ADMIN requires allowPrivilegeEscalation=true".into(),
@@ -328,7 +335,10 @@ pub fn normalize_cap(name: &str) -> String {
 /// Materialise seccomp profile into the runtime's expected JSON path.
 /// RuntimeDefault → `runtime/default`; Unconfined → `unconfined`; Localhost
 /// → `localhost/<resolved-path>` after sandboxing.
-pub fn materialize_seccomp_path(profile: &SeccompProfileType, kubelet_seccomp_dir: &str) -> SecResult<String> {
+pub fn materialize_seccomp_path(
+    profile: &SeccompProfileType,
+    kubelet_seccomp_dir: &str,
+) -> SecResult<String> {
     match profile {
         SeccompProfileType::RuntimeDefault => Ok("runtime/default".into()),
         SeccompProfileType::Unconfined => Ok("unconfined".into()),
@@ -486,13 +496,19 @@ mod tests {
 
     #[test]
     fn seccomp_runtime_default_path_string() {
-        let s = materialize_seccomp_path(&SeccompProfileType::RuntimeDefault, "/var/lib/kubelet/seccomp").unwrap();
+        let s = materialize_seccomp_path(
+            &SeccompProfileType::RuntimeDefault,
+            "/var/lib/kubelet/seccomp",
+        )
+        .unwrap();
         assert_eq!(s, "runtime/default");
     }
 
     #[test]
     fn seccomp_unconfined_path_string() {
-        let s = materialize_seccomp_path(&SeccompProfileType::Unconfined, "/var/lib/kubelet/seccomp").unwrap();
+        let s =
+            materialize_seccomp_path(&SeccompProfileType::Unconfined, "/var/lib/kubelet/seccomp")
+                .unwrap();
         assert_eq!(s, "unconfined");
     }
 
@@ -526,13 +542,19 @@ mod tests {
 
     #[test]
     fn capability_validation_rejects_unknown_in_add() {
-        let c = Capabilities { add: vec!["FAKE".into()], drop: vec![] };
+        let c = Capabilities {
+            add: vec!["FAKE".into()],
+            drop: vec![],
+        };
         assert!(validate_capabilities(&c).is_err());
     }
 
     #[test]
     fn capability_validation_rejects_unknown_in_drop() {
-        let c = Capabilities { add: vec![], drop: vec!["FAKE".into()] };
+        let c = Capabilities {
+            add: vec![],
+            drop: vec!["FAKE".into()],
+        };
         assert!(validate_capabilities(&c).is_err());
     }
 
@@ -601,7 +623,10 @@ mod tests {
         let mut pod = pod_default();
         pod.fs_group_change_policy = Some(FsGroupChangePolicy::OnRootMismatch);
         let e = materialize(&pod, &cont_default()).unwrap();
-        assert_eq!(e.fs_group_change_policy, FsGroupChangePolicy::OnRootMismatch);
+        assert_eq!(
+            e.fs_group_change_policy,
+            FsGroupChangePolicy::OnRootMismatch
+        );
     }
 
     #[test]

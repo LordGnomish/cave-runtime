@@ -6,7 +6,7 @@
 use super::EtcdViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::table;
-use crate::admin::state::{scope, AdminState, EtcdEvent, EtcdKv};
+use crate::admin::state::{AdminState, EtcdEvent, EtcdKv, scope};
 
 pub fn list_kv(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<EtcdKv>, EtcdViewError> {
     ctx.authorise(Permission::EtcdRead)?;
@@ -19,10 +19,7 @@ pub fn list_kv(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<EtcdKv>, Etcd
     Ok(rows)
 }
 
-pub fn watch_stream(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<Vec<EtcdEvent>, EtcdViewError> {
+pub fn watch_stream(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<EtcdEvent>, EtcdViewError> {
     ctx.authorise(Permission::EtcdWatch)?;
     let kv = state.etcd_kv.read().unwrap();
     let allowed_keys: std::collections::HashSet<String> = scope(&kv, &ctx.tenant, |r| &r.tenant)
@@ -62,11 +59,25 @@ pub(super) fn render_section(
     let event_rows: Vec<Vec<String>> = events
         .iter()
         .map(|e| match e {
-            EtcdEvent::Put { key, value, revision } => {
-                vec!["PUT".into(), key.clone(), value.clone(), revision.to_string()]
+            EtcdEvent::Put {
+                key,
+                value,
+                revision,
+            } => {
+                vec![
+                    "PUT".into(),
+                    key.clone(),
+                    value.clone(),
+                    revision.to_string(),
+                ]
             }
             EtcdEvent::Delete { key, revision } => {
-                vec!["DELETE".into(), key.clone(), String::new(), revision.to_string()]
+                vec![
+                    "DELETE".into(),
+                    key.clone(),
+                    String::new(),
+                    revision.to_string(),
+                ]
             }
         })
         .collect();
@@ -123,11 +134,8 @@ mod tests {
     #[test]
     fn render_section_emits_both_subsections() {
         let s = AdminState::seeded();
-        let html = render_section(
-            &s,
-            &ctx(&[Permission::EtcdRead, Permission::EtcdWatch]),
-        )
-        .unwrap();
+        let html =
+            render_section(&s, &ctx(&[Permission::EtcdRead, Permission::EtcdWatch])).unwrap();
         assert!(html.contains("KV ("));
         assert!(html.contains("Watch stream"));
     }

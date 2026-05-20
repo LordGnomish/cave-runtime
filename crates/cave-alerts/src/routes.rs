@@ -24,17 +24,15 @@
 //! Tenancy: every list endpoint scopes by `X-Scope-OrgID`; create endpoints
 //! stamp the tenant onto the new resource.
 
-use crate::engine::{run_pipeline, PipelineInput};
-use crate::models::{
-    Alert, InhibitRule, Receiver, Route, Silence, DEFAULT_TENANT,
-};
+use crate::engine::{PipelineInput, run_pipeline};
+use crate::models::{Alert, DEFAULT_TENANT, InhibitRule, Receiver, Route, Silence};
 use crate::store::AlertStore;
 use crate::tenant::tenant_from_headers;
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
     routing::{delete, get, post, put},
-    Json, Router,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -50,7 +48,9 @@ pub struct AppState {
 
 impl Default for AppState {
     fn default() -> Self {
-        AppState { store: AlertStore::new() }
+        AppState {
+            store: AlertStore::new(),
+        }
     }
 }
 
@@ -62,7 +62,10 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/v2/alerts/groups", get(list_alert_groups))
         .route("/api/v2/alerts/{id}", delete(delete_alert))
         .route("/api/v2/silences", get(list_silences).post(post_silence))
-        .route("/api/v2/silence/{id}", get(get_silence).delete(delete_silence))
+        .route(
+            "/api/v2/silence/{id}",
+            get(get_silence).delete(delete_silence),
+        )
         .route("/api/v2/inhibits", get(list_inhibits).post(post_inhibit))
         .route("/api/v2/inhibits/{id}", delete(delete_inhibit))
         .route("/api/v2/receivers", get(list_receivers).post(post_receiver))
@@ -103,7 +106,10 @@ struct VersionInfo {
 
 async fn status() -> Json<StatusResponse> {
     Json(StatusResponse {
-        cluster: ClusterStatus { status: "ready", peers: vec![] },
+        cluster: ClusterStatus {
+            status: "ready",
+            peers: vec![],
+        },
         version: VersionInfo {
             version: env!("CARGO_PKG_VERSION"),
             revision: "cave",
@@ -115,10 +121,7 @@ async fn status() -> Json<StatusResponse> {
 
 // ─── Alerts ────────────────────────────────────────────────────────────────
 
-async fn list_alerts(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Json<Vec<Alert>> {
+async fn list_alerts(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Json<Vec<Alert>> {
     let tenant = tenant_from_headers(&headers);
     Json(state.store.list_alerts(Some(&tenant)))
 }
@@ -133,7 +136,10 @@ async fn post_alerts(
     for a in alerts.iter() {
         state.store.upsert_alert(a.clone());
     }
-    (StatusCode::ACCEPTED, Json(serde_json::json!({ "ingested": alerts.len() })))
+    (
+        StatusCode::ACCEPTED,
+        Json(serde_json::json!({ "ingested": alerts.len() })),
+    )
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -150,7 +156,10 @@ async fn list_alert_groups(
 ) -> Json<Vec<AlertGroup>> {
     let tenant = tenant_from_headers(&headers);
     let alerts = state.store.list_alerts(Some(&tenant));
-    let root = state.store.get_root_route().unwrap_or_else(|| Route::root("default"));
+    let root = state
+        .store
+        .get_root_route()
+        .unwrap_or_else(|| Route::root("default"));
     let silences = state.store.list_silences(Some(&tenant));
     let rules = state.store.list_inhibit_rules(Some(&tenant));
     let receivers = state.store.receiver_map();
@@ -177,10 +186,7 @@ async fn list_alert_groups(
     )
 }
 
-async fn delete_alert(
-    State(state): State<Arc<AppState>>,
-    Path(id): Path<Uuid>,
-) -> StatusCode {
+async fn delete_alert(State(state): State<Arc<AppState>>, Path(id): Path<Uuid>) -> StatusCode {
     if state.store.delete_alert(id) {
         StatusCode::NO_CONTENT
     } else {
@@ -215,13 +221,14 @@ async fn get_silence(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Silence>, StatusCode> {
-    state.store.get_silence(id).map(Json).ok_or(StatusCode::NOT_FOUND)
+    state
+        .store
+        .get_silence(id)
+        .map(Json)
+        .ok_or(StatusCode::NOT_FOUND)
 }
 
-async fn delete_silence(
-    State(state): State<Arc<AppState>>,
-    Path(id): Path<Uuid>,
-) -> StatusCode {
+async fn delete_silence(State(state): State<Arc<AppState>>, Path(id): Path<Uuid>) -> StatusCode {
     if state.store.delete_silence(id) {
         StatusCode::NO_CONTENT
     } else {
@@ -252,10 +259,7 @@ async fn post_inhibit(
     Json(state.store.create_inhibit_rule(rule))
 }
 
-async fn delete_inhibit(
-    State(state): State<Arc<AppState>>,
-    Path(id): Path<Uuid>,
-) -> StatusCode {
+async fn delete_inhibit(State(state): State<Arc<AppState>>, Path(id): Path<Uuid>) -> StatusCode {
     if state.store.delete_inhibit_rule(id) {
         StatusCode::NO_CONTENT
     } else {
@@ -291,7 +295,11 @@ async fn delete_receiver(
 // ─── Route tree ────────────────────────────────────────────────────────────
 
 async fn get_route(State(state): State<Arc<AppState>>) -> Result<Json<Route>, StatusCode> {
-    state.store.get_root_route().map(Json).ok_or(StatusCode::NOT_FOUND)
+    state
+        .store
+        .get_root_route()
+        .map(Json)
+        .ok_or(StatusCode::NOT_FOUND)
 }
 
 #[derive(Debug, Deserialize)]
@@ -300,10 +308,7 @@ struct PutRoute {
     route: Route,
 }
 
-async fn put_route(
-    State(state): State<Arc<AppState>>,
-    Json(body): Json<PutRoute>,
-) -> StatusCode {
+async fn put_route(State(state): State<Arc<AppState>>, Json(body): Json<PutRoute>) -> StatusCode {
     state.store.set_root_route(body.route);
     StatusCode::NO_CONTENT
 }
@@ -313,9 +318,7 @@ async fn put_route(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{
-        AlertSeverity, AlertState, Matcher, ReceiverConfig, WebhookConfig,
-    };
+    use crate::models::{AlertSeverity, AlertState, Matcher, ReceiverConfig, WebhookConfig};
     use axum::body::Body;
     use axum::http::Request;
     use chrono::Duration;
@@ -362,7 +365,9 @@ mod tests {
         let req = req.body(body).unwrap();
         let resp = router.clone().oneshot(req).await.unwrap();
         let status = resp.status();
-        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let parsed = serde_json::from_slice(&bytes).unwrap();
         (status, parsed)
     }
@@ -370,7 +375,8 @@ mod tests {
     #[tokio::test]
     async fn test_health_returns_ok() {
         let (router, _) = app();
-        let (status, body): (_, serde_json::Value) = json(&router, "GET", "/api/alerts/health", None, None).await;
+        let (status, body): (_, serde_json::Value) =
+            json(&router, "GET", "/api/alerts/health", None, None).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["status"], "ok");
     }
@@ -378,7 +384,8 @@ mod tests {
     #[tokio::test]
     async fn test_status_endpoint() {
         let (router, _) = app();
-        let (status, body): (_, serde_json::Value) = json(&router, "GET", "/api/v2/status", None, None).await;
+        let (status, body): (_, serde_json::Value) =
+            json(&router, "GET", "/api/v2/status", None, None).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["cluster"]["status"], "ready");
     }
@@ -499,7 +506,8 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::OK);
-        let (_, listed): (_, Vec<Receiver>) = json(&router, "GET", "/api/v2/receivers", None, None).await;
+        let (_, listed): (_, Vec<Receiver>) =
+            json(&router, "GET", "/api/v2/receivers", None, None).await;
         assert_eq!(listed.len(), 1);
     }
 
@@ -526,9 +534,12 @@ mod tests {
 
         // Set root route + receiver up so the pipeline produces something.
         state.store.set_root_route(Route::root("default"));
-        state.store.upsert_receiver(Receiver::new("default").with_config(ReceiverConfig::Webhook(
-            WebhookConfig { url: "http://x".into(), send_resolved: true },
-        )));
+        state.store.upsert_receiver(
+            Receiver::new("default").with_config(ReceiverConfig::Webhook(WebhookConfig {
+                url: "http://x".into(),
+                send_resolved: true,
+            })),
+        );
 
         // Two alerts with same alertname (default group_by = alertname).
         let mut a1 = alert("HighCPU", "fp1");

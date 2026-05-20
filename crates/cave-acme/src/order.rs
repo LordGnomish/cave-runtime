@@ -10,7 +10,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum IdentifierType { Dns, Ip }
+pub enum IdentifierType {
+    Dns,
+    Ip,
+}
 
 /// Cite: RFC 8555 §7.1.4 (Identifier object).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -22,7 +25,10 @@ pub struct Identifier {
 
 impl Identifier {
     pub fn dns(value: impl Into<String>) -> Self {
-        Self { kind: IdentifierType::Dns, value: value.into() }
+        Self {
+            kind: IdentifierType::Dns,
+            value: value.into(),
+        }
     }
 }
 
@@ -30,7 +36,13 @@ impl Identifier {
 /// `pending → ready → processing → valid` (with `invalid` as a sink).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum OrderStatus { Pending, Ready, Processing, Valid, Invalid }
+pub enum OrderStatus {
+    Pending,
+    Ready,
+    Processing,
+    Valid,
+    Invalid,
+}
 
 impl OrderStatus {
     /// Cite: RFC 8555 §7.1.6 — only the listed transitions are legal.
@@ -38,15 +50,15 @@ impl OrderStatus {
     pub fn can_transition_to(self, next: OrderStatus) -> bool {
         use OrderStatus::*;
         match (self, next) {
-            (Pending, Ready)         => true,
-            (Pending, Invalid)       => true,
-            (Ready, Processing)      => true,
-            (Ready, Invalid)         => true,
-            (Processing, Valid)      => true,
-            (Processing, Invalid)    => true,
+            (Pending, Ready) => true,
+            (Pending, Invalid) => true,
+            (Ready, Processing) => true,
+            (Ready, Invalid) => true,
+            (Processing, Valid) => true,
+            (Processing, Invalid) => true,
             // Self-transition allowed (idempotent re-set during retries).
-            (a, b) if a == b         => true,
-            _                        => false,
+            (a, b) if a == b => true,
+            _ => false,
         }
     }
 }
@@ -55,7 +67,14 @@ impl OrderStatus {
 /// are terminal; `pending → valid|invalid` is the only forward edge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum AuthzStatus { Pending, Valid, Invalid, Deactivated, Expired, Revoked }
+pub enum AuthzStatus {
+    Pending,
+    Valid,
+    Invalid,
+    Deactivated,
+    Expired,
+    Revoked,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Authorization {
@@ -112,7 +131,9 @@ impl Order {
     /// MUST canonicalise DNS identifiers to lowercase (case-insensitivity).
     pub fn validate_identifiers(&self) -> crate::AcmeResult<()> {
         if self.identifiers.is_empty() {
-            return Err(crate::AcmeError::Malformed("order has no identifiers".into()));
+            return Err(crate::AcmeError::Malformed(
+                "order has no identifiers".into(),
+            ));
         }
         for id in &self.identifiers {
             if id.kind == IdentifierType::Dns {

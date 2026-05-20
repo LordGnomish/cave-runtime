@@ -19,7 +19,12 @@ use serde_json::Value;
 pub struct RequestTransformerPlugin;
 
 fn kv_split(s: &str) -> Option<(&str, &str)> {
-    s.splitn(2, ':').collect::<Vec<_>>().as_slice().try_into().ok().map(|[k, v]: &[&str; 2]| (*k, *v))
+    s.splitn(2, ':')
+        .collect::<Vec<_>>()
+        .as_slice()
+        .try_into()
+        .ok()
+        .map(|[k, v]: &[&str; 2]| (*k, *v))
 }
 
 fn apply_transforms(ctx: &mut PluginCtx, config: &Value) {
@@ -61,7 +66,9 @@ fn apply_transforms(ctx: &mut PluginCtx, config: &Value) {
         for v in arr {
             if let Some(s) = v.as_str() {
                 if let Some((k, val)) = kv_split(s) {
-                    ctx.headers.entry(k.to_lowercase()).or_insert_with(|| val.to_string());
+                    ctx.headers
+                        .entry(k.to_lowercase())
+                        .or_insert_with(|| val.to_string());
                 }
             }
         }
@@ -144,7 +151,8 @@ fn apply_transforms(ctx: &mut PluginCtx, config: &Value) {
                 for v in arr {
                     if let Some(s) = v.as_str() {
                         if let Some((k, val)) = kv_split(s) {
-                            obj.entry(k).or_insert_with(|| Value::String(val.to_string()));
+                            obj.entry(k)
+                                .or_insert_with(|| Value::String(val.to_string()));
                         }
                     }
                 }
@@ -208,10 +216,19 @@ mod tests {
     #[tokio::test]
     async fn adds_header() {
         let plugin = RequestTransformerPlugin;
-        let mut ctx = PluginCtx::new("GET".into(), "/".into(), HashMap::new(), Bytes::new(), "1.2.3.4".into());
+        let mut ctx = PluginCtx::new(
+            "GET".into(),
+            "/".into(),
+            HashMap::new(),
+            Bytes::new(),
+            "1.2.3.4".into(),
+        );
         let config = json!({"add": {"headers": ["x-env:production"]}});
         plugin.access(&mut ctx, &config).await;
-        assert_eq!(ctx.headers.get("x-env").map(String::as_str), Some("production"));
+        assert_eq!(
+            ctx.headers.get("x-env").map(String::as_str),
+            Some("production")
+        );
     }
 
     #[tokio::test]
@@ -219,7 +236,13 @@ mod tests {
         let plugin = RequestTransformerPlugin;
         let mut headers = HashMap::new();
         headers.insert("x-secret".to_string(), "hidden".to_string());
-        let mut ctx = PluginCtx::new("GET".into(), "/".into(), headers, Bytes::new(), "1.2.3.4".into());
+        let mut ctx = PluginCtx::new(
+            "GET".into(),
+            "/".into(),
+            headers,
+            Bytes::new(),
+            "1.2.3.4".into(),
+        );
         let config = json!({"remove": {"headers": ["x-secret"]}});
         plugin.access(&mut ctx, &config).await;
         assert!(!ctx.headers.contains_key("x-secret"));

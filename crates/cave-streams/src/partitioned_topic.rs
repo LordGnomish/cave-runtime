@@ -99,16 +99,15 @@ impl PartitionedTopicRegistry {
 
     /// Return the umbrella topic metadata.  `None` for non-partitioned.
     pub fn get_metadata(&self, topic: &TopicName) -> Option<PartitionedTopicMetadata> {
-        self.metadata.get(&topic.to_string_full()).map(|r| r.clone())
+        self.metadata
+            .get(&topic.to_string_full())
+            .map(|r| r.clone())
     }
 
     /// Return all child partition `TopicName`s for a partitioned topic.
     pub fn list_partitions(&self, topic: &TopicName) -> StreamsResult<Vec<TopicName>> {
         let meta = self.get_metadata(topic).ok_or_else(|| {
-            StreamsError::Internal(format!(
-                "not partitioned: {}",
-                topic.to_string_full()
-            ))
+            StreamsError::Internal(format!("not partitioned: {}", topic.to_string_full()))
         })?;
         let mut out = Vec::with_capacity(meta.partitions as usize);
         for i in 0..meta.partitions as i32 {
@@ -125,26 +124,18 @@ impl PartitionedTopicRegistry {
         key: Option<&[u8]>,
     ) -> StreamsResult<TopicName> {
         let meta = self.get_metadata(topic).ok_or_else(|| {
-            StreamsError::Internal(format!(
-                "not partitioned: {}",
-                topic.to_string_full()
-            ))
+            StreamsError::Internal(format!("not partitioned: {}", topic.to_string_full()))
         })?;
         let n = meta.partitions;
         let pick = match mode {
             PartitionRoutingMode::SinglePartitionByKey => {
                 let key = key.ok_or_else(|| {
-                    StreamsError::InvalidTopicName(
-                        "SinglePartitionByKey requires a key".into(),
-                    )
+                    StreamsError::InvalidTopicName("SinglePartitionByKey requires a key".into())
                 })?;
                 key_hash(key) % n
             }
             PartitionRoutingMode::RoundRobin => {
-                let mut cur = self
-                    .rr_cursor
-                    .entry(topic.to_string_full())
-                    .or_insert(0);
+                let mut cur = self.rr_cursor.entry(topic.to_string_full()).or_insert(0);
                 let pick = *cur % n;
                 *cur = (*cur + 1) % n;
                 pick
@@ -265,11 +256,23 @@ mod tests {
         let r = registry(tenant_id);
         let t = TopicName::persistent(tenant_id, "ns", "rr").unwrap();
         r.create_partitioned_topic(&t, 3).unwrap();
-        let p1 = r.route_message(&t, PartitionRoutingMode::RoundRobin, None).unwrap();
-        let p2 = r.route_message(&t, PartitionRoutingMode::RoundRobin, None).unwrap();
-        let p3 = r.route_message(&t, PartitionRoutingMode::RoundRobin, None).unwrap();
-        let p4 = r.route_message(&t, PartitionRoutingMode::RoundRobin, None).unwrap();
-        let mut got = vec![p1.partition.unwrap(), p2.partition.unwrap(), p3.partition.unwrap()];
+        let p1 = r
+            .route_message(&t, PartitionRoutingMode::RoundRobin, None)
+            .unwrap();
+        let p2 = r
+            .route_message(&t, PartitionRoutingMode::RoundRobin, None)
+            .unwrap();
+        let p3 = r
+            .route_message(&t, PartitionRoutingMode::RoundRobin, None)
+            .unwrap();
+        let p4 = r
+            .route_message(&t, PartitionRoutingMode::RoundRobin, None)
+            .unwrap();
+        let mut got = vec![
+            p1.partition.unwrap(),
+            p2.partition.unwrap(),
+            p3.partition.unwrap(),
+        ];
         got.sort();
         assert_eq!(got, vec![0, 1, 2]);
         assert_eq!(p4.partition, p1.partition, "RR wraps around");
@@ -282,8 +285,20 @@ mod tests {
         let r = registry(tenant_id);
         let t = TopicName::persistent(tenant_id, "ns", "sticky").unwrap();
         r.create_partitioned_topic(&t, 7).unwrap();
-        let p1 = r.route_message(&t, PartitionRoutingMode::SinglePartitionByKey, Some(b"order-77")).unwrap();
-        let p2 = r.route_message(&t, PartitionRoutingMode::SinglePartitionByKey, Some(b"order-77")).unwrap();
+        let p1 = r
+            .route_message(
+                &t,
+                PartitionRoutingMode::SinglePartitionByKey,
+                Some(b"order-77"),
+            )
+            .unwrap();
+        let p2 = r
+            .route_message(
+                &t,
+                PartitionRoutingMode::SinglePartitionByKey,
+                Some(b"order-77"),
+            )
+            .unwrap();
         assert_eq!(p1.partition, p2.partition);
     }
 
@@ -303,7 +318,10 @@ mod tests {
         // cite: pulsar 4.2.0 TopicDomain (persistent vs non-persistent)
         let tenant_id = "pt-007";
         let t = TopicName::persistent(tenant_id, "ns", "k").unwrap();
-        assert_eq!(PersistencePolicy::for_topic(&t), PersistencePolicy::Persistent);
+        assert_eq!(
+            PersistencePolicy::for_topic(&t),
+            PersistencePolicy::Persistent
+        );
         assert!(!PersistencePolicy::for_topic(&t).drop_when_no_consumer());
         assert!(PersistencePolicy::for_topic(&t).participates_in_retention());
     }
@@ -314,7 +332,10 @@ mod tests {
         let tenant_id = "pt-008";
         let s = format!("non-persistent://{}/ns/transient", tenant_id);
         let t = TopicName::parse(&s).unwrap();
-        assert_eq!(PersistencePolicy::for_topic(&t), PersistencePolicy::NonPersistent);
+        assert_eq!(
+            PersistencePolicy::for_topic(&t),
+            PersistencePolicy::NonPersistent
+        );
         assert!(PersistencePolicy::for_topic(&t).drop_when_no_consumer());
         assert!(!PersistencePolicy::for_topic(&t).participates_in_retention());
     }

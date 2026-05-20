@@ -74,8 +74,13 @@ struct SnykCoord {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum SnykRep {
-    Purl { purl: String },
-    Range { vulnerable_range: String, fixed_in: Option<Vec<String>> },
+    Purl {
+        purl: String,
+    },
+    Range {
+        vulnerable_range: String,
+        fixed_in: Option<Vec<String>>,
+    },
 }
 
 pub fn parse_response(input: &[u8]) -> Result<Vec<VulnIntel>, SnykError> {
@@ -98,13 +103,15 @@ fn issue_to_intel(issue: SnykIssue) -> VulnIntel {
         .find(|s| s.score.is_some())
         .map(|s| Severity::from_cvss_v3(s.score.unwrap_or(0.0)))
         .or_else(|| {
-            a.severities.first().map(|s| match s.level.to_ascii_lowercase().as_str() {
-                "critical" => Severity::Critical,
-                "high" => Severity::High,
-                "medium" => Severity::Medium,
-                "low" => Severity::Low,
-                _ => Severity::Unassigned,
-            })
+            a.severities
+                .first()
+                .map(|s| match s.level.to_ascii_lowercase().as_str() {
+                    "critical" => Severity::Critical,
+                    "high" => Severity::High,
+                    "medium" => Severity::Medium,
+                    "low" => Severity::Low,
+                    _ => Severity::Unassigned,
+                })
         })
         .unwrap_or(Severity::Unassigned);
     let cvss_v3_base = a.severities.iter().find_map(|s| s.score);
@@ -112,7 +119,10 @@ fn issue_to_intel(issue: SnykIssue) -> VulnIntel {
     let cwes = a
         .problems
         .iter()
-        .filter_map(|p| p.id.strip_prefix("CWE-").and_then(|n| n.parse::<u32>().ok()))
+        .filter_map(|p| {
+            p.id.strip_prefix("CWE-")
+                .and_then(|n| n.parse::<u32>().ok())
+        })
         .collect();
     let mut affected: Vec<AffectedRange> = Vec::new();
     for c in &a.coordinates {
@@ -122,7 +132,10 @@ fn issue_to_intel(issue: SnykIssue) -> VulnIntel {
         for rep in &c.representation {
             match rep {
                 SnykRep::Purl { purl: p } => purl = Some(p.clone()),
-                SnykRep::Range { vulnerable_range, fixed_in } => {
+                SnykRep::Range {
+                    vulnerable_range,
+                    fixed_in,
+                } => {
                     vers_range = Some(vulnerable_range.clone());
                     if let Some(fi) = fixed_in {
                         fixed = fi.first().cloned();
@@ -175,7 +188,11 @@ fn parse_purl_simple(purl: &str) -> Option<(String, String)> {
     let rest = purl.strip_prefix("pkg:")?;
     let (ptype, rest2) = rest.split_once('/')?;
     let (name, _ver) = rest2.split_once('@').unwrap_or((rest2, ""));
-    let name = name.rsplit_once('/').map(|(_, n)| n).unwrap_or(name).to_string();
+    let name = name
+        .rsplit_once('/')
+        .map(|(_, n)| n)
+        .unwrap_or(name)
+        .to_string();
     Some((ptype.to_string(), name))
 }
 

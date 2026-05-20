@@ -62,9 +62,7 @@ impl<K: Clone + Send + Sync + 'static> ReconcileQueue<K> {
     }
 
     pub fn try_enqueue(&self, key: K) -> Result<(), ReconcileError> {
-        self.tx
-            .try_send(key)
-            .map_err(|_| ReconcileError::Closed)
+        self.tx.try_send(key).map_err(|_| ReconcileError::Closed)
     }
 }
 
@@ -181,11 +179,7 @@ mod tests {
             outcome: ReconcileOutcome::Done,
         });
         let cancel = CancellationToken::new();
-        let (queue, handle) = run_reconciler(
-            r,
-            ReconcileLoopConfig::default(),
-            cancel.clone(),
-        );
+        let (queue, handle) = run_reconciler(r, ReconcileLoopConfig::default(), cancel.clone());
         queue.enqueue(1).await.unwrap();
         queue.enqueue(2).await.unwrap();
         queue.enqueue(3).await.unwrap();
@@ -212,7 +206,9 @@ mod tests {
     #[tokio::test]
     async fn retry_caps_at_max_attempts() {
         let calls = Arc::new(AtomicUsize::new(0));
-        let r = Arc::new(FailReconciler { calls: calls.clone() });
+        let r = Arc::new(FailReconciler {
+            calls: calls.clone(),
+        });
         let cfg = ReconcileLoopConfig {
             max_attempts: 3,
             backoff: BackoffStrategy::Constant(Duration::from_millis(1)),
@@ -235,11 +231,7 @@ mod tests {
             outcome: ReconcileOutcome::Done,
         });
         let cancel = CancellationToken::new();
-        let (_queue, handle) = run_reconciler(
-            r,
-            ReconcileLoopConfig::default(),
-            cancel.clone(),
-        );
+        let (_queue, handle) = run_reconciler(r, ReconcileLoopConfig::default(), cancel.clone());
         cancel.cancel();
         handle.await.unwrap();
     }

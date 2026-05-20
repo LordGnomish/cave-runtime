@@ -48,58 +48,92 @@ pub struct Status {
 impl Status {
     pub fn success(plugin: &str) -> Self {
         Self {
-            code: Code::Success, reasons: vec![], plugin: plugin.into(),
-            wait_duration: None, failed_plugin: None,
+            code: Code::Success,
+            reasons: vec![],
+            plugin: plugin.into(),
+            wait_duration: None,
+            failed_plugin: None,
         }
     }
     pub fn unschedulable(plugin: &str, reason: impl Into<String>) -> Self {
         Self {
-            code: Code::Unschedulable, reasons: vec![reason.into()], plugin: plugin.into(),
-            wait_duration: None, failed_plugin: Some(plugin.into()),
+            code: Code::Unschedulable,
+            reasons: vec![reason.into()],
+            plugin: plugin.into(),
+            wait_duration: None,
+            failed_plugin: Some(plugin.into()),
         }
     }
     pub fn unresolvable(plugin: &str, reason: impl Into<String>) -> Self {
         Self {
-            code: Code::UnschedulableAndUnresolvable, reasons: vec![reason.into()], plugin: plugin.into(),
-            wait_duration: None, failed_plugin: Some(plugin.into()),
+            code: Code::UnschedulableAndUnresolvable,
+            reasons: vec![reason.into()],
+            plugin: plugin.into(),
+            wait_duration: None,
+            failed_plugin: Some(plugin.into()),
         }
     }
     /// Permit plugin asks scheduler to wait up to `dur` before binding.
     pub fn wait(plugin: &str, reason: impl Into<String>, dur: chrono::Duration) -> Self {
         Self {
-            code: Code::Wait, reasons: vec![reason.into()], plugin: plugin.into(),
-            wait_duration: Some(dur), failed_plugin: None,
+            code: Code::Wait,
+            reasons: vec![reason.into()],
+            plugin: plugin.into(),
+            wait_duration: Some(dur),
+            failed_plugin: None,
         }
     }
     /// PreEnqueue plugin keeps the pod in the unschedulable subqueue.
     pub fn pending(plugin: &str, reason: impl Into<String>) -> Self {
         Self {
-            code: Code::Pending, reasons: vec![reason.into()], plugin: plugin.into(),
-            wait_duration: None, failed_plugin: None,
+            code: Code::Pending,
+            reasons: vec![reason.into()],
+            plugin: plugin.into(),
+            wait_duration: None,
+            failed_plugin: None,
         }
     }
     /// Internal error — plugin author bug or transient infra failure.
     pub fn error(plugin: &str, reason: impl Into<String>) -> Self {
         Self {
-            code: Code::Error, reasons: vec![reason.into()], plugin: plugin.into(),
-            wait_duration: None, failed_plugin: None,
+            code: Code::Error,
+            reasons: vec![reason.into()],
+            plugin: plugin.into(),
+            wait_duration: None,
+            failed_plugin: None,
         }
     }
     /// PreFilter/PreScore signals the matching Filter/Score plugin should be skipped.
     pub fn skip(plugin: &str) -> Self {
         Self {
-            code: Code::Skip, reasons: vec![], plugin: plugin.into(),
-            wait_duration: None, failed_plugin: None,
+            code: Code::Skip,
+            reasons: vec![],
+            plugin: plugin.into(),
+            wait_duration: None,
+            failed_plugin: None,
         }
     }
-    pub fn is_success(&self) -> bool { self.code == Code::Success }
-    pub fn is_skip(&self) -> bool { self.code == Code::Skip }
-    pub fn is_wait(&self) -> bool { self.code == Code::Wait }
-    pub fn is_pending(&self) -> bool { self.code == Code::Pending }
-    pub fn is_error(&self) -> bool { self.code == Code::Error }
+    pub fn is_success(&self) -> bool {
+        self.code == Code::Success
+    }
+    pub fn is_skip(&self) -> bool {
+        self.code == Code::Skip
+    }
+    pub fn is_wait(&self) -> bool {
+        self.code == Code::Wait
+    }
+    pub fn is_pending(&self) -> bool {
+        self.code == Code::Pending
+    }
+    pub fn is_error(&self) -> bool {
+        self.code == Code::Error
+    }
     /// True when the node was rejected (Unschedulable or UnschedulableAndUnresolvable).
     pub fn is_rejected(&self) -> bool {
-        matches!(self.code, Code::Unschedulable | Code::UnschedulableAndUnresolvable)
+        matches!(
+            self.code,
+            Code::Unschedulable | Code::UnschedulableAndUnresolvable
+        )
     }
 }
 
@@ -217,7 +251,9 @@ impl LabelSelector {
     /// True when every match_label and match_expression is satisfied by `labels`.
     pub fn matches(&self, labels: &HashMap<String, String>) -> bool {
         for (k, v) in &self.match_labels {
-            if labels.get(k) != Some(v) { return false; }
+            if labels.get(k) != Some(v) {
+                return false;
+            }
         }
         for req in &self.match_expressions {
             let v = labels.get(&req.key);
@@ -227,13 +263,18 @@ impl LabelSelector {
                 LabelSelectorOp::Exists => v.is_some(),
                 LabelSelectorOp::DoesNotExist => v.is_none(),
             };
-            if !ok { return false; }
+            if !ok {
+                return false;
+            }
         }
         true
     }
 
     pub fn from_match_labels(m: HashMap<String, String>) -> Self {
-        Self { match_labels: m, match_expressions: Vec::new() }
+        Self {
+            match_labels: m,
+            match_expressions: Vec::new(),
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -297,7 +338,9 @@ pub enum NodeInclusionPolicy {
 }
 
 impl Default for NodeInclusionPolicy {
-    fn default() -> Self { Self::Honor }
+    fn default() -> Self {
+        Self::Honor
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -307,7 +350,9 @@ pub enum UnsatisfiableAction {
 }
 
 impl Default for UnsatisfiableAction {
-    fn default() -> Self { Self::DoNotSchedule }
+    fn default() -> Self {
+        Self::DoNotSchedule
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -325,11 +370,22 @@ pub struct VolumeSpec {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VolumeKind {
-    EBS { volume_id: String },
-    GCEPD { pd_name: String },
-    AzureDisk { disk_name: String },
-    HostPath { path: String },
-    PersistentVolumeClaim { claim_name: String, bound_node: Option<String> },
+    EBS {
+        volume_id: String,
+    },
+    GCEPD {
+        pd_name: String,
+    },
+    AzureDisk {
+        disk_name: String,
+    },
+    HostPath {
+        path: String,
+    },
+    PersistentVolumeClaim {
+        claim_name: String,
+        bound_node: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -361,7 +417,10 @@ pub struct ClusterSnapshot {
 
 impl ClusterSnapshot {
     pub fn pods_on(&self, node_name: &str) -> &[Pod] {
-        self.pods_by_node.get(node_name).map(|v| v.as_slice()).unwrap_or(&[])
+        self.pods_by_node
+            .get(node_name)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
     }
 }
 
@@ -370,11 +429,15 @@ impl ClusterSnapshot {
 pub struct ScoringWeights(pub HashMap<String, u32>);
 
 impl Default for ScoringWeights {
-    fn default() -> Self { Self(HashMap::new()) }
+    fn default() -> Self {
+        Self(HashMap::new())
+    }
 }
 
 impl ScoringWeights {
-    pub fn weight_for(&self, plugin: &str) -> u32 { self.0.get(plugin).copied().unwrap_or(1) }
+    pub fn weight_for(&self, plugin: &str) -> u32 {
+        self.0.get(plugin).copied().unwrap_or(1)
+    }
     pub fn set(&mut self, plugin: &str, w: u32) {
         assert!((1..=10).contains(&w), "scoring weight must be 1..=10");
         self.0.insert(plugin.into(), w);
@@ -407,62 +470,104 @@ pub struct Framework {
 impl Framework {
     pub fn new() -> Self {
         Self {
-            filters: vec![], scores: vec![], weights: ScoringWeights::default(),
-            queue_sorts: vec![], pre_enqueues: vec![], pre_filters: vec![],
-            post_filters: vec![], pre_scores: vec![], reserves: vec![], permits: vec![],
-            pre_binds: vec![], binds: vec![], post_binds: vec![],
+            filters: vec![],
+            scores: vec![],
+            weights: ScoringWeights::default(),
+            queue_sorts: vec![],
+            pre_enqueues: vec![],
+            pre_filters: vec![],
+            post_filters: vec![],
+            pre_scores: vec![],
+            reserves: vec![],
+            permits: vec![],
+            pre_binds: vec![],
+            binds: vec![],
+            post_binds: vec![],
             score_extensions: HashMap::new(),
         }
     }
 
-    pub fn with_filter(mut self, p: Box<dyn FilterPlugin>) -> Self { self.filters.push(p); self }
-    pub fn with_score(mut self, p: Box<dyn ScorePlugin>) -> Self { self.scores.push(p); self }
-    pub fn with_weight(mut self, plugin: &str, w: u32) -> Self { self.weights.set(plugin, w); self }
-    pub fn with_queue_sort(mut self, p: Box<dyn crate::extension_points::QueueSortPlugin>) -> Self {
-        self.queue_sorts.push(p); self
+    pub fn with_filter(mut self, p: Box<dyn FilterPlugin>) -> Self {
+        self.filters.push(p);
+        self
     }
-    pub fn with_pre_enqueue(mut self, p: Box<dyn crate::extension_points::PreEnqueuePlugin>) -> Self {
-        self.pre_enqueues.push(p); self
+    pub fn with_score(mut self, p: Box<dyn ScorePlugin>) -> Self {
+        self.scores.push(p);
+        self
+    }
+    pub fn with_weight(mut self, plugin: &str, w: u32) -> Self {
+        self.weights.set(plugin, w);
+        self
+    }
+    pub fn with_queue_sort(mut self, p: Box<dyn crate::extension_points::QueueSortPlugin>) -> Self {
+        self.queue_sorts.push(p);
+        self
+    }
+    pub fn with_pre_enqueue(
+        mut self,
+        p: Box<dyn crate::extension_points::PreEnqueuePlugin>,
+    ) -> Self {
+        self.pre_enqueues.push(p);
+        self
     }
     pub fn with_pre_filter(mut self, p: Box<dyn crate::extension_points::PreFilterPlugin>) -> Self {
-        self.pre_filters.push(p); self
+        self.pre_filters.push(p);
+        self
     }
-    pub fn with_post_filter(mut self, p: Box<dyn crate::extension_points::PostFilterPlugin>) -> Self {
-        self.post_filters.push(p); self
+    pub fn with_post_filter(
+        mut self,
+        p: Box<dyn crate::extension_points::PostFilterPlugin>,
+    ) -> Self {
+        self.post_filters.push(p);
+        self
     }
     pub fn with_pre_score(mut self, p: Box<dyn crate::extension_points::PreScorePlugin>) -> Self {
-        self.pre_scores.push(p); self
+        self.pre_scores.push(p);
+        self
     }
     pub fn with_reserve(mut self, p: Box<dyn crate::extension_points::ReservePlugin>) -> Self {
-        self.reserves.push(p); self
+        self.reserves.push(p);
+        self
     }
     pub fn with_permit(mut self, p: Box<dyn crate::extension_points::PermitPlugin>) -> Self {
-        self.permits.push(p); self
+        self.permits.push(p);
+        self
     }
     pub fn with_pre_bind(mut self, p: Box<dyn crate::extension_points::PreBindPlugin>) -> Self {
-        self.pre_binds.push(p); self
+        self.pre_binds.push(p);
+        self
     }
     pub fn with_bind(mut self, p: Box<dyn crate::extension_points::BindPlugin>) -> Self {
-        self.binds.push(p); self
+        self.binds.push(p);
+        self
     }
     pub fn with_post_bind(mut self, p: Box<dyn crate::extension_points::PostBindPlugin>) -> Self {
-        self.post_binds.push(p); self
+        self.post_binds.push(p);
+        self
     }
     pub fn with_score_extension(
         mut self,
         plugin_name: &str,
         ext: Box<dyn crate::extension_points::ScoreExtensions>,
     ) -> Self {
-        self.score_extensions.insert(plugin_name.into(), ext); self
+        self.score_extensions.insert(plugin_name.into(), ext);
+        self
     }
 
     /// Run all filter plugins. Node passes only when EVERY plugin returns Success.
     /// Returns map of node_name → first failing Status (None if it passed all).
-    pub fn run_filters(&self, pod: &Pod, snapshot: &ClusterSnapshot) -> HashMap<String, Option<Status>> {
+    pub fn run_filters(
+        &self,
+        pod: &Pod,
+        snapshot: &ClusterSnapshot,
+    ) -> HashMap<String, Option<Status>> {
         let mut out: HashMap<String, Option<Status>> = HashMap::new();
         for node in &snapshot.nodes {
             if node.status != NodeStatus::Ready && node.status != NodeStatus::Cordoned {
-                out.insert(node.name.clone(), Some(Status::unschedulable("framework", "node not ready")));
+                out.insert(
+                    node.name.clone(),
+                    Some(Status::unschedulable("framework", "node not ready")),
+                );
                 continue;
             }
             let mut fail: Option<Status> = None;
@@ -571,12 +676,7 @@ impl Framework {
     }
 
     /// Run Unreserve on every Reserve plugin in reverse order.
-    pub fn run_unreserve(
-        &self,
-        pod: &Pod,
-        node: &str,
-        state: &crate::cycle_state::CycleState,
-    ) {
+    pub fn run_unreserve(&self, pod: &Pod, node: &str, state: &crate::cycle_state::CycleState) {
         for p in self.reserves.iter().rev() {
             p.unreserve(pod, node, state);
         }
@@ -652,12 +752,7 @@ impl Framework {
     }
 
     /// Run every PostBind plugin. Best-effort, no status.
-    pub fn run_post_bind(
-        &self,
-        pod: &Pod,
-        node: &str,
-        state: &crate::cycle_state::CycleState,
-    ) {
+    pub fn run_post_bind(&self, pod: &Pod, node: &str, state: &crate::cycle_state::CycleState) {
         for p in &self.post_binds {
             p.post_bind(pod, node, state);
         }
@@ -682,15 +777,25 @@ impl Framework {
         if let Some(p) = self.queue_sorts.first() {
             return p.less(a, b);
         }
-        b.spec.priority.cmp(&a.spec.priority).then_with(|| a.uid.cmp(&b.uid))
+        b.spec
+            .priority
+            .cmp(&a.spec.priority)
+            .then_with(|| a.uid.cmp(&b.uid))
     }
 
     /// Run all score plugins on a candidate node list. Final node score is the
     /// weighted sum of plugin scores: Σ weight(p) * score_p(node).
-    pub fn run_scores(&self, pod: &Pod, candidates: &[String], snapshot: &ClusterSnapshot) -> HashMap<String, i64> {
+    pub fn run_scores(
+        &self,
+        pod: &Pod,
+        candidates: &[String],
+        snapshot: &ClusterSnapshot,
+    ) -> HashMap<String, i64> {
         let mut totals: HashMap<String, i64> = HashMap::new();
         for cand in candidates {
-            let Some(node) = snapshot.nodes.iter().find(|n| &n.name == cand) else { continue };
+            let Some(node) = snapshot.nodes.iter().find(|n| &n.name == cand) else {
+                continue;
+            };
             let mut total: i64 = 0;
             for s in &self.scores {
                 let raw = s.score(pod, node, snapshot).clamp(0, MAX_NODE_SCORE);
@@ -705,15 +810,20 @@ impl Framework {
     /// Convenience: filter then score, returning the chosen node (highest score, deterministic by name).
     pub fn schedule_one(&self, pod: &Pod, snapshot: &ClusterSnapshot) -> Result<String, Status> {
         let filtered = self.run_filters(pod, snapshot);
-        let candidates: Vec<String> = filtered.iter()
+        let candidates: Vec<String> = filtered
+            .iter()
             .filter(|(_, v)| v.is_none())
             .map(|(k, _)| k.clone())
             .collect();
         if candidates.is_empty() {
-            return Err(Status::unschedulable("framework", "no nodes passed filter chain"));
+            return Err(Status::unschedulable(
+                "framework",
+                "no nodes passed filter chain",
+            ));
         }
         let scores = self.run_scores(pod, &candidates, snapshot);
-        let (winner, _) = scores.iter()
+        let (winner, _) = scores
+            .iter()
             .max_by(|a, b| a.1.cmp(b.1).then_with(|| b.0.cmp(a.0))) // deterministic: higher score, lower name first on ties
             .map(|(k, v)| (k.clone(), *v))
             .unwrap_or((candidates[0].clone(), 0));
@@ -722,7 +832,9 @@ impl Framework {
 }
 
 impl Default for Framework {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -734,33 +846,62 @@ mod tests {
 
     fn ready_node(name: &str) -> Node {
         Node {
-            name: name.into(), uid: Uuid::new_v4(), status: NodeStatus::Ready,
-            capacity: ResourceCapacity { cpu_millicores: 4000, memory_bytes: 8_000_000_000, pods: 110, ephemeral_storage_bytes: 0 },
-            allocatable: ResourceCapacity { cpu_millicores: 4000, memory_bytes: 8_000_000_000, pods: 110, ephemeral_storage_bytes: 0 },
+            name: name.into(),
+            uid: Uuid::new_v4(),
+            status: NodeStatus::Ready,
+            capacity: ResourceCapacity {
+                cpu_millicores: 4000,
+                memory_bytes: 8_000_000_000,
+                pods: 110,
+                ephemeral_storage_bytes: 0,
+            },
+            allocatable: ResourceCapacity {
+                cpu_millicores: 4000,
+                memory_bytes: 8_000_000_000,
+                pods: 110,
+                ephemeral_storage_bytes: 0,
+            },
             allocated: ResourceCapacity::default(),
-            labels: HashMap::new(), taints: vec![], conditions: vec![],
-            registered_at: Utc::now(), last_heartbeat: Utc::now(),
+            labels: HashMap::new(),
+            taints: vec![],
+            conditions: vec![],
+            registered_at: Utc::now(),
+            last_heartbeat: Utc::now(),
         }
     }
 
     struct AlwaysPass;
     impl FilterPlugin for AlwaysPass {
-        fn name(&self) -> &str { "AlwaysPass" }
-        fn filter(&self, _: &Pod, _: &Node, _: &ClusterSnapshot) -> Status { Status::success("AlwaysPass") }
+        fn name(&self) -> &str {
+            "AlwaysPass"
+        }
+        fn filter(&self, _: &Pod, _: &Node, _: &ClusterSnapshot) -> Status {
+            Status::success("AlwaysPass")
+        }
     }
 
     struct RejectByName(&'static str);
     impl FilterPlugin for RejectByName {
-        fn name(&self) -> &str { "RejectByName" }
+        fn name(&self) -> &str {
+            "RejectByName"
+        }
         fn filter(&self, _: &Pod, n: &Node, _: &ClusterSnapshot) -> Status {
-            if n.name == self.0 { Status::unschedulable("RejectByName", "rejected") } else { Status::success("RejectByName") }
+            if n.name == self.0 {
+                Status::unschedulable("RejectByName", "rejected")
+            } else {
+                Status::success("RejectByName")
+            }
         }
     }
 
     struct ConstScore(i64);
     impl ScorePlugin for ConstScore {
-        fn name(&self) -> &str { "ConstScore" }
-        fn score(&self, _: &Pod, _: &Node, _: &ClusterSnapshot) -> i64 { self.0 }
+        fn name(&self) -> &str {
+            "ConstScore"
+        }
+        fn score(&self, _: &Pod, _: &Node, _: &ClusterSnapshot) -> i64 {
+            self.0
+        }
     }
 
     #[test]
@@ -773,7 +914,10 @@ mod tests {
 
     #[test]
     fn framework_filter_chain_passes_when_all_succeed() {
-        let snap = ClusterSnapshot { nodes: vec![ready_node("a"), ready_node("b")], pods_by_node: HashMap::new() };
+        let snap = ClusterSnapshot {
+            nodes: vec![ready_node("a"), ready_node("b")],
+            pods_by_node: HashMap::new(),
+        };
         let fw = Framework::new().with_filter(Box::new(AlwaysPass));
         let pod = Pod::new("t1", "ns", "p");
         let res = fw.run_filters(&pod, &snap);
@@ -783,20 +927,29 @@ mod tests {
 
     #[test]
     fn framework_filter_chain_short_circuits_on_first_fail() {
-        let snap = ClusterSnapshot { nodes: vec![ready_node("a"), ready_node("b")], pods_by_node: HashMap::new() };
+        let snap = ClusterSnapshot {
+            nodes: vec![ready_node("a"), ready_node("b")],
+            pods_by_node: HashMap::new(),
+        };
         let fw = Framework::new()
             .with_filter(Box::new(AlwaysPass))
             .with_filter(Box::new(RejectByName("a")));
         let pod = Pod::new("t1", "ns", "p");
         let res = fw.run_filters(&pod, &snap);
         assert!(res.get("a").unwrap().is_some());
-        assert_eq!(res.get("a").unwrap().as_ref().unwrap().plugin, "RejectByName");
+        assert_eq!(
+            res.get("a").unwrap().as_ref().unwrap().plugin,
+            "RejectByName"
+        );
         assert!(res.get("b").unwrap().is_none());
     }
 
     #[test]
     fn scoring_weights_clamp_and_sum() {
-        let snap = ClusterSnapshot { nodes: vec![ready_node("a")], pods_by_node: HashMap::new() };
+        let snap = ClusterSnapshot {
+            nodes: vec![ready_node("a")],
+            pods_by_node: HashMap::new(),
+        };
         let fw = Framework::new()
             .with_score(Box::new(ConstScore(50)))
             .with_score(Box::new(ConstScore(30)))
@@ -809,7 +962,10 @@ mod tests {
 
     #[test]
     fn scoring_clamps_above_max() {
-        let snap = ClusterSnapshot { nodes: vec![ready_node("a")], pods_by_node: HashMap::new() };
+        let snap = ClusterSnapshot {
+            nodes: vec![ready_node("a")],
+            pods_by_node: HashMap::new(),
+        };
         let fw = Framework::new().with_score(Box::new(ConstScore(9999)));
         let pod = Pod::new("t1", "ns", "p");
         let scores = fw.run_scores(&pod, &["a".into()], &snap);
@@ -818,13 +974,26 @@ mod tests {
 
     #[test]
     fn schedule_one_picks_highest_score() {
-        let mut a = ready_node("a"); a.allocated.cpu_millicores = 1000;
-        let mut b = ready_node("b"); b.allocated.cpu_millicores = 100;
-        let snap = ClusterSnapshot { nodes: vec![a, b], pods_by_node: HashMap::new() };
+        let mut a = ready_node("a");
+        a.allocated.cpu_millicores = 1000;
+        let mut b = ready_node("b");
+        b.allocated.cpu_millicores = 100;
+        let snap = ClusterSnapshot {
+            nodes: vec![a, b],
+            pods_by_node: HashMap::new(),
+        };
         struct ByName;
         impl ScorePlugin for ByName {
-            fn name(&self) -> &str { "ByName" }
-            fn score(&self, _: &Pod, n: &Node, _: &ClusterSnapshot) -> i64 { if n.name == "b" { 90 } else { 10 } }
+            fn name(&self) -> &str {
+                "ByName"
+            }
+            fn score(&self, _: &Pod, n: &Node, _: &ClusterSnapshot) -> i64 {
+                if n.name == "b" {
+                    90
+                } else {
+                    10
+                }
+            }
         }
         let fw = Framework::new().with_score(Box::new(ByName));
         let pod = Pod::new("t", "ns", "p");
@@ -902,50 +1071,91 @@ mod tests {
 
     struct PrePass(&'static str);
     impl crate::extension_points::PreFilterPlugin for PrePass {
-        fn name(&self) -> &str { self.0 }
+        fn name(&self) -> &str {
+            self.0
+        }
         fn pre_filter(
-            &self, _: &Pod, _: &ClusterSnapshot, _: &crate::cycle_state::CycleState,
+            &self,
+            _: &Pod,
+            _: &ClusterSnapshot,
+            _: &crate::cycle_state::CycleState,
         ) -> (crate::extension_points::PreFilterResult, Status) {
-            (crate::extension_points::PreFilterResult::all_nodes(), Status::success(self.0))
+            (
+                crate::extension_points::PreFilterResult::all_nodes(),
+                Status::success(self.0),
+            )
         }
     }
 
     struct PreRestrict(&'static str, Vec<String>);
     impl crate::extension_points::PreFilterPlugin for PreRestrict {
-        fn name(&self) -> &str { self.0 }
+        fn name(&self) -> &str {
+            self.0
+        }
         fn pre_filter(
-            &self, _: &Pod, _: &ClusterSnapshot, _: &crate::cycle_state::CycleState,
+            &self,
+            _: &Pod,
+            _: &ClusterSnapshot,
+            _: &crate::cycle_state::CycleState,
         ) -> (crate::extension_points::PreFilterResult, Status) {
-            (crate::extension_points::PreFilterResult::restrict(self.1.clone()), Status::success(self.0))
+            (
+                crate::extension_points::PreFilterResult::restrict(self.1.clone()),
+                Status::success(self.0),
+            )
         }
     }
 
     struct PreSkip(&'static str);
     impl crate::extension_points::PreFilterPlugin for PreSkip {
-        fn name(&self) -> &str { self.0 }
+        fn name(&self) -> &str {
+            self.0
+        }
         fn pre_filter(
-            &self, _: &Pod, _: &ClusterSnapshot, _: &crate::cycle_state::CycleState,
+            &self,
+            _: &Pod,
+            _: &ClusterSnapshot,
+            _: &crate::cycle_state::CycleState,
         ) -> (crate::extension_points::PreFilterResult, Status) {
-            (crate::extension_points::PreFilterResult::all_nodes(), Status::skip(self.0))
+            (
+                crate::extension_points::PreFilterResult::all_nodes(),
+                Status::skip(self.0),
+            )
         }
     }
 
     struct PreError(&'static str);
     impl crate::extension_points::PreFilterPlugin for PreError {
-        fn name(&self) -> &str { self.0 }
+        fn name(&self) -> &str {
+            self.0
+        }
         fn pre_filter(
-            &self, _: &Pod, _: &ClusterSnapshot, _: &crate::cycle_state::CycleState,
+            &self,
+            _: &Pod,
+            _: &ClusterSnapshot,
+            _: &crate::cycle_state::CycleState,
         ) -> (crate::extension_points::PreFilterResult, Status) {
-            (crate::extension_points::PreFilterResult::all_nodes(), Status::error(self.0, "boom"))
+            (
+                crate::extension_points::PreFilterResult::all_nodes(),
+                Status::error(self.0, "boom"),
+            )
         }
     }
 
     #[test]
     fn run_pre_filters_intersects_results() {
-        let snap = ClusterSnapshot { nodes: vec![], pods_by_node: HashMap::new() };
+        let snap = ClusterSnapshot {
+            nodes: vec![],
+            pods_by_node: HashMap::new(),
+        };
         let fw = Framework::new()
-            .with_pre_filter(Box::new(PreRestrict("A", vec!["n1".into(), "n2".into(), "n3".into()])))
-            .with_pre_filter(Box::new(PreRestrict("B", vec!["n2".into(), "n3".into(), "n4".into()])));
+            .with_pre_filter(Box::new(PreRestrict(
+                "A",
+                vec!["n1".into(), "n2".into(), "n3".into()],
+            )))
+            .with_pre_filter(Box::new(PreRestrict(
+                "B",
+                vec!["n2".into(), "n3".into(), "n4".into()],
+            )));
         let cs = crate::cycle_state::CycleState::new();
         let (res, status) = fw.run_pre_filters(&Pod::new("t", "ns", "p"), &snap, &cs);
         assert!(status.is_success());
@@ -959,7 +1169,10 @@ mod tests {
     fn run_pre_filters_skip_marks_filter_skipped() {
         let fw = Framework::new().with_pre_filter(Box::new(PreSkip("Skipper")));
         let cs = crate::cycle_state::CycleState::new();
-        let snap = ClusterSnapshot { nodes: vec![], pods_by_node: HashMap::new() };
+        let snap = ClusterSnapshot {
+            nodes: vec![],
+            pods_by_node: HashMap::new(),
+        };
         let (_, status) = fw.run_pre_filters(&Pod::new("t", "ns", "p"), &snap, &cs);
         assert!(status.is_success());
         assert!(cs.should_skip_filter("Skipper"));
@@ -972,7 +1185,10 @@ mod tests {
             .with_pre_filter(Box::new(PreError("Boom")))
             .with_pre_filter(Box::new(PrePass("Never")));
         let cs = crate::cycle_state::CycleState::new();
-        let snap = ClusterSnapshot { nodes: vec![], pods_by_node: HashMap::new() };
+        let snap = ClusterSnapshot {
+            nodes: vec![],
+            pods_by_node: HashMap::new(),
+        };
         let (_, status) = fw.run_pre_filters(&Pod::new("t", "ns", "p"), &snap, &cs);
         assert!(status.is_error());
         assert_eq!(status.plugin, "Boom");
@@ -982,26 +1198,39 @@ mod tests {
 
     struct NoNominator(&'static str);
     impl crate::extension_points::PostFilterPlugin for NoNominator {
-        fn name(&self) -> &str { self.0 }
+        fn name(&self) -> &str {
+            self.0
+        }
         fn post_filter(
-            &self, _: &Pod, _: &ClusterSnapshot,
+            &self,
+            _: &Pod,
+            _: &ClusterSnapshot,
             _: &crate::extension_points::NodeToStatusMap,
             _: &crate::cycle_state::CycleState,
         ) -> (crate::extension_points::PostFilterResult, Status) {
-            (crate::extension_points::PostFilterResult::default(),
-             Status::unschedulable(self.0, "no preempt"))
+            (
+                crate::extension_points::PostFilterResult::default(),
+                Status::unschedulable(self.0, "no preempt"),
+            )
         }
     }
 
     struct Nominator(&'static str, &'static str);
     impl crate::extension_points::PostFilterPlugin for Nominator {
-        fn name(&self) -> &str { self.0 }
+        fn name(&self) -> &str {
+            self.0
+        }
         fn post_filter(
-            &self, _: &Pod, _: &ClusterSnapshot,
+            &self,
+            _: &Pod,
+            _: &ClusterSnapshot,
             _: &crate::extension_points::NodeToStatusMap,
             _: &crate::cycle_state::CycleState,
         ) -> (crate::extension_points::PostFilterResult, Status) {
-            (crate::extension_points::PostFilterResult::nominate(self.1), Status::success(self.0))
+            (
+                crate::extension_points::PostFilterResult::nominate(self.1),
+                Status::success(self.0),
+            )
         }
     }
 
@@ -1012,7 +1241,10 @@ mod tests {
             .with_post_filter(Box::new(Nominator("Yes", "n5")))
             .with_post_filter(Box::new(Nominator("Late", "nX")));
         let cs = crate::cycle_state::CycleState::new();
-        let snap = ClusterSnapshot { nodes: vec![], pods_by_node: HashMap::new() };
+        let snap = ClusterSnapshot {
+            nodes: vec![],
+            pods_by_node: HashMap::new(),
+        };
         let nodes = crate::extension_points::NodeToStatusMap::new();
         let (res, st) = fw.run_post_filters(&Pod::new("t", "ns", "p"), &snap, &nodes, &cs);
         assert!(st.is_success());
@@ -1026,7 +1258,10 @@ mod tests {
             .with_post_filter(Box::new(NoNominator("First")))
             .with_post_filter(Box::new(NoNominator("Last")));
         let cs = crate::cycle_state::CycleState::new();
-        let snap = ClusterSnapshot { nodes: vec![], pods_by_node: HashMap::new() };
+        let snap = ClusterSnapshot {
+            nodes: vec![],
+            pods_by_node: HashMap::new(),
+        };
         let nodes = crate::extension_points::NodeToStatusMap::new();
         let (res, st) = fw.run_post_filters(&Pod::new("t", "ns", "p"), &snap, &nodes, &cs);
         assert!(res.nominating_info.is_none());
@@ -1038,15 +1273,29 @@ mod tests {
 
     struct PreScorePass(&'static str);
     impl crate::extension_points::PreScorePlugin for PreScorePass {
-        fn name(&self) -> &str { self.0 }
-        fn pre_score(&self, _: &Pod, _: &ClusterSnapshot, _: &crate::cycle_state::CycleState) -> Status {
+        fn name(&self) -> &str {
+            self.0
+        }
+        fn pre_score(
+            &self,
+            _: &Pod,
+            _: &ClusterSnapshot,
+            _: &crate::cycle_state::CycleState,
+        ) -> Status {
             Status::success(self.0)
         }
     }
     struct PreScoreSkip(&'static str);
     impl crate::extension_points::PreScorePlugin for PreScoreSkip {
-        fn name(&self) -> &str { self.0 }
-        fn pre_score(&self, _: &Pod, _: &ClusterSnapshot, _: &crate::cycle_state::CycleState) -> Status {
+        fn name(&self) -> &str {
+            self.0
+        }
+        fn pre_score(
+            &self,
+            _: &Pod,
+            _: &ClusterSnapshot,
+            _: &crate::cycle_state::CycleState,
+        ) -> Status {
             Status::skip(self.0)
         }
     }
@@ -1057,7 +1306,10 @@ mod tests {
             .with_pre_score(Box::new(PreScorePass("A")))
             .with_pre_score(Box::new(PreScoreSkip("Skipper")));
         let cs = crate::cycle_state::CycleState::new();
-        let snap = ClusterSnapshot { nodes: vec![], pods_by_node: HashMap::new() };
+        let snap = ClusterSnapshot {
+            nodes: vec![],
+            pods_by_node: HashMap::new(),
+        };
         let st = fw.run_pre_scores(&Pod::new("t", "ns", "p"), &snap, &cs);
         assert!(st.is_success());
         assert!(cs.should_skip_score("Skipper"));
@@ -1072,9 +1324,14 @@ mod tests {
         fail: bool,
     }
     impl crate::extension_points::ReservePlugin for LoggingReserve {
-        fn name(&self) -> &str { &self.plugin_name }
+        fn name(&self) -> &str {
+            &self.plugin_name
+        }
         fn reserve(&self, _p: &Pod, _n: &str, _s: &crate::cycle_state::CycleState) -> Status {
-            self.log.lock().unwrap().push(format!("reserve:{}", self.plugin_name));
+            self.log
+                .lock()
+                .unwrap()
+                .push(format!("reserve:{}", self.plugin_name));
             if self.fail {
                 Status::unschedulable(&self.plugin_name, "reserve failed")
             } else {
@@ -1082,35 +1339,63 @@ mod tests {
             }
         }
         fn unreserve(&self, _p: &Pod, _n: &str, _s: &crate::cycle_state::CycleState) {
-            self.log.lock().unwrap().push(format!("unreserve:{}", self.plugin_name));
+            self.log
+                .lock()
+                .unwrap()
+                .push(format!("unreserve:{}", self.plugin_name));
         }
     }
 
     #[test]
     fn run_reserve_failure_rolls_back_in_reverse() {
-        let log: std::sync::Arc<std::sync::Mutex<Vec<String>>> = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let log: std::sync::Arc<std::sync::Mutex<Vec<String>>> =
+            std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let fw = Framework::new()
-            .with_reserve(Box::new(LoggingReserve { plugin_name: "A".into(), log: log.clone(), fail: false }))
-            .with_reserve(Box::new(LoggingReserve { plugin_name: "B".into(), log: log.clone(), fail: true }))
-            .with_reserve(Box::new(LoggingReserve { plugin_name: "C".into(), log: log.clone(), fail: false }));
+            .with_reserve(Box::new(LoggingReserve {
+                plugin_name: "A".into(),
+                log: log.clone(),
+                fail: false,
+            }))
+            .with_reserve(Box::new(LoggingReserve {
+                plugin_name: "B".into(),
+                log: log.clone(),
+                fail: true,
+            }))
+            .with_reserve(Box::new(LoggingReserve {
+                plugin_name: "C".into(),
+                log: log.clone(),
+                fail: false,
+            }));
         let cs = crate::cycle_state::CycleState::new();
         let st = fw.run_reserve(&Pod::new("t", "ns", "p"), "n1", &cs);
         assert!(st.is_rejected());
         let l = log.lock().unwrap();
         // A reserves OK, B reserves fails → rollback A; C never reserves.
-        assert_eq!(*l, vec![
-            "reserve:A".to_string(),
-            "reserve:B".to_string(),
-            "unreserve:A".to_string(),
-        ]);
+        assert_eq!(
+            *l,
+            vec![
+                "reserve:A".to_string(),
+                "reserve:B".to_string(),
+                "unreserve:A".to_string(),
+            ]
+        );
     }
 
     #[test]
     fn run_reserve_success_does_not_unreserve() {
-        let log: std::sync::Arc<std::sync::Mutex<Vec<String>>> = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let log: std::sync::Arc<std::sync::Mutex<Vec<String>>> =
+            std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let fw = Framework::new()
-            .with_reserve(Box::new(LoggingReserve { plugin_name: "A".into(), log: log.clone(), fail: false }))
-            .with_reserve(Box::new(LoggingReserve { plugin_name: "B".into(), log: log.clone(), fail: false }));
+            .with_reserve(Box::new(LoggingReserve {
+                plugin_name: "A".into(),
+                log: log.clone(),
+                fail: false,
+            }))
+            .with_reserve(Box::new(LoggingReserve {
+                plugin_name: "B".into(),
+                log: log.clone(),
+                fail: false,
+            }));
         let cs = crate::cycle_state::CycleState::new();
         let st = fw.run_reserve(&Pod::new("t", "ns", "p"), "n1", &cs);
         assert!(st.is_success());
@@ -1120,40 +1405,62 @@ mod tests {
 
     #[test]
     fn run_unreserve_walks_in_reverse() {
-        let log: std::sync::Arc<std::sync::Mutex<Vec<String>>> = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let log: std::sync::Arc<std::sync::Mutex<Vec<String>>> =
+            std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let fw = Framework::new()
-            .with_reserve(Box::new(LoggingReserve { plugin_name: "A".into(), log: log.clone(), fail: false }))
-            .with_reserve(Box::new(LoggingReserve { plugin_name: "B".into(), log: log.clone(), fail: false }))
-            .with_reserve(Box::new(LoggingReserve { plugin_name: "C".into(), log: log.clone(), fail: false }));
+            .with_reserve(Box::new(LoggingReserve {
+                plugin_name: "A".into(),
+                log: log.clone(),
+                fail: false,
+            }))
+            .with_reserve(Box::new(LoggingReserve {
+                plugin_name: "B".into(),
+                log: log.clone(),
+                fail: false,
+            }))
+            .with_reserve(Box::new(LoggingReserve {
+                plugin_name: "C".into(),
+                log: log.clone(),
+                fail: false,
+            }));
         let cs = crate::cycle_state::CycleState::new();
         fw.run_unreserve(&Pod::new("t", "ns", "p"), "n1", &cs);
         let l = log.lock().unwrap();
-        assert_eq!(*l, vec![
-            "unreserve:C".to_string(),
-            "unreserve:B".to_string(),
-            "unreserve:A".to_string(),
-        ]);
+        assert_eq!(
+            *l,
+            vec![
+                "unreserve:C".to_string(),
+                "unreserve:B".to_string(),
+                "unreserve:A".to_string(),
+            ]
+        );
     }
 
     // ── Framework run_permit ─────────────────────────────────────────────
 
     struct WaitPermit(&'static str, chrono::Duration);
     impl crate::extension_points::PermitPlugin for WaitPermit {
-        fn name(&self) -> &str { self.0 }
+        fn name(&self) -> &str {
+            self.0
+        }
         fn permit(&self, _p: &Pod, _n: &str, _s: &crate::cycle_state::CycleState) -> Status {
             Status::wait(self.0, "waiting", self.1)
         }
     }
     struct OkPermit(&'static str);
     impl crate::extension_points::PermitPlugin for OkPermit {
-        fn name(&self) -> &str { self.0 }
+        fn name(&self) -> &str {
+            self.0
+        }
         fn permit(&self, _: &Pod, _: &str, _: &crate::cycle_state::CycleState) -> Status {
             Status::success(self.0)
         }
     }
     struct DenyPermit(&'static str);
     impl crate::extension_points::PermitPlugin for DenyPermit {
-        fn name(&self) -> &str { self.0 }
+        fn name(&self) -> &str {
+            self.0
+        }
         fn permit(&self, _: &Pod, _: &str, _: &crate::cycle_state::CycleState) -> Status {
             Status::unschedulable(self.0, "denied")
         }
@@ -1162,13 +1469,22 @@ mod tests {
     #[test]
     fn run_permit_max_wait_wins() {
         let fw = Framework::new()
-            .with_permit(Box::new(WaitPermit("Fast", chrono::Duration::milliseconds(50))))
-            .with_permit(Box::new(WaitPermit("Slow", chrono::Duration::milliseconds(500))))
+            .with_permit(Box::new(WaitPermit(
+                "Fast",
+                chrono::Duration::milliseconds(50),
+            )))
+            .with_permit(Box::new(WaitPermit(
+                "Slow",
+                chrono::Duration::milliseconds(500),
+            )))
             .with_permit(Box::new(OkPermit("Ok")));
         let cs = crate::cycle_state::CycleState::new();
         let st = fw.run_permit(&Pod::new("t", "ns", "p"), "n", &cs);
         assert!(st.is_wait());
-        assert_eq!(st.wait_duration.unwrap(), chrono::Duration::milliseconds(500));
+        assert_eq!(
+            st.wait_duration.unwrap(),
+            chrono::Duration::milliseconds(500)
+        );
         assert_eq!(st.plugin, "Slow");
     }
 
@@ -1203,7 +1519,9 @@ mod tests {
         let binder_ref = binder.clone();
         struct Wrapper(std::sync::Arc<DefaultBinder>);
         impl crate::extension_points::BindPlugin for Wrapper {
-            fn name(&self) -> &str { "Wrapper" }
+            fn name(&self) -> &str {
+                "Wrapper"
+            }
             fn bind(&self, p: &Pod, n: &str, s: &crate::cycle_state::CycleState) -> Status {
                 self.0.bind(p, n, s)
             }
@@ -1233,7 +1551,9 @@ mod tests {
 
     struct FailingPreBind(&'static str);
     impl crate::extension_points::PreBindPlugin for FailingPreBind {
-        fn name(&self) -> &str { self.0 }
+        fn name(&self) -> &str {
+            self.0
+        }
         fn pre_bind(&self, _: &Pod, _: &str, _: &crate::cycle_state::CycleState) -> Status {
             Status::error(self.0, "boom")
         }
@@ -1270,7 +1590,9 @@ mod tests {
         let l2 = logger.clone();
         struct Wrap(std::sync::Arc<crate::bind::PostBindLogger>, &'static str);
         impl crate::extension_points::PostBindPlugin for Wrap {
-            fn name(&self) -> &str { self.1 }
+            fn name(&self) -> &str {
+                self.1
+            }
             fn post_bind(&self, p: &Pod, n: &str, s: &crate::cycle_state::CycleState) {
                 self.0.post_bind(p, n, s);
             }
@@ -1307,8 +1629,10 @@ mod tests {
     #[test]
     fn queue_sort_default_uses_priority() {
         let fw = Framework::new();
-        let mut a = Pod::new("t", "ns", "a"); a.spec.priority = 100;
-        let mut b = Pod::new("t", "ns", "b"); b.spec.priority = 50;
+        let mut a = Pod::new("t", "ns", "a");
+        a.spec.priority = 100;
+        let mut b = Pod::new("t", "ns", "b");
+        b.spec.priority = 50;
         // Higher priority first → a < b in queue order.
         assert_eq!(fw.queue_sort(&a, &b), std::cmp::Ordering::Less);
         assert_eq!(fw.queue_sort(&b, &a), std::cmp::Ordering::Greater);
@@ -1318,14 +1642,18 @@ mod tests {
     fn queue_sort_custom_plugin_overrides_default() {
         struct Reversed;
         impl crate::extension_points::QueueSortPlugin for Reversed {
-            fn name(&self) -> &str { "Reversed" }
+            fn name(&self) -> &str {
+                "Reversed"
+            }
             fn less(&self, a: &Pod, b: &Pod) -> std::cmp::Ordering {
                 a.spec.priority.cmp(&b.spec.priority) // ascending
             }
         }
         let fw = Framework::new().with_queue_sort(Box::new(Reversed));
-        let mut a = Pod::new("t", "ns", "a"); a.spec.priority = 100;
-        let mut b = Pod::new("t", "ns", "b"); b.spec.priority = 50;
+        let mut a = Pod::new("t", "ns", "a");
+        a.spec.priority = 100;
+        let mut b = Pod::new("t", "ns", "b");
+        b.spec.priority = 50;
         // Ascending: low priority first → a > b.
         assert_eq!(fw.queue_sort(&a, &b), std::cmp::Ordering::Greater);
     }
@@ -1336,8 +1664,15 @@ mod tests {
     fn score_extension_registered_under_plugin_name() {
         struct Halve;
         impl crate::extension_points::ScoreExtensions for Halve {
-            fn normalize_score(&self, _: &Pod, scores: &mut [(String, i64)], _: &crate::cycle_state::CycleState) -> Status {
-                for (_, s) in scores.iter_mut() { *s /= 2; }
+            fn normalize_score(
+                &self,
+                _: &Pod,
+                scores: &mut [(String, i64)],
+                _: &crate::cycle_state::CycleState,
+            ) -> Status {
+                for (_, s) in scores.iter_mut() {
+                    *s /= 2;
+                }
                 Status::success("Halve")
             }
         }

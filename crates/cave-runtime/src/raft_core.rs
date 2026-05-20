@@ -264,8 +264,7 @@ impl RaftCore {
         if let Some(parent) = self.state_path.parent() {
             std::fs::create_dir_all(parent).ok();
         }
-        let bytes = serde_json::to_vec(&self.persistent)
-            .context("encode raft PersistentState")?;
+        let bytes = serde_json::to_vec(&self.persistent).context("encode raft PersistentState")?;
         let tmp_path = self.state_path.with_extension("bin.tmp");
         let mut f = std::fs::OpenOptions::new()
             .create(true)
@@ -277,8 +276,13 @@ impl RaftCore {
         f.write_all(&bytes).context("write raft state")?;
         f.sync_data().context("fsync raft state")?;
         drop(f);
-        std::fs::rename(&tmp_path, &self.state_path)
-            .with_context(|| format!("rename {} -> {}", tmp_path.display(), self.state_path.display()))?;
+        std::fs::rename(&tmp_path, &self.state_path).with_context(|| {
+            format!(
+                "rename {} -> {}",
+                tmp_path.display(),
+                self.state_path.display()
+            )
+        })?;
         Ok(())
     }
 
@@ -378,7 +382,11 @@ impl RaftCore {
         }
         // Force an immediate heartbeat by setting the deadline to `now`.
         self.next_heartbeat_deadline = now;
-        info!(node = self.local_id, term = self.persistent.current_term, "→ Leader");
+        info!(
+            node = self.local_id,
+            term = self.persistent.current_term,
+            "→ Leader"
+        );
     }
 
     // ── Election timing ────────────────────────────────────────────────────
@@ -836,7 +844,10 @@ impl RaftCore {
 #[derive(Debug, Clone, Copy)]
 pub enum OutboundCtx {
     Vote,
-    Append { prev_log_index: LogIndex, entries_len: usize },
+    Append {
+        prev_log_index: LogIndex,
+        entries_len: usize,
+    },
 }
 
 /// Paper §5.4.1: candidate log is at least as up-to-date as ours iff
@@ -992,11 +1003,31 @@ mod tests {
         let mut core = make_core(1, vec![1, 2, 3], tmp.path());
         // Local has an entry at index=5, term=3.
         core.persistent.log = vec![
-            LogEntry { term: 1, index: 1, command: vec![] },
-            LogEntry { term: 2, index: 2, command: vec![] },
-            LogEntry { term: 2, index: 3, command: vec![] },
-            LogEntry { term: 3, index: 4, command: vec![] },
-            LogEntry { term: 3, index: 5, command: vec![] },
+            LogEntry {
+                term: 1,
+                index: 1,
+                command: vec![],
+            },
+            LogEntry {
+                term: 2,
+                index: 2,
+                command: vec![],
+            },
+            LogEntry {
+                term: 2,
+                index: 3,
+                command: vec![],
+            },
+            LogEntry {
+                term: 3,
+                index: 4,
+                command: vec![],
+            },
+            LogEntry {
+                term: 3,
+                index: 5,
+                command: vec![],
+            },
         ];
         core.persistent.current_term = 3;
         core.save_persistent().unwrap();
@@ -1089,8 +1120,16 @@ mod tests {
                     prev_log_index: 0,
                     prev_log_term: 0,
                     entries: vec![
-                        LogEntry { term: 1, index: 1, command: b"a".to_vec() },
-                        LogEntry { term: 1, index: 2, command: b"b".to_vec() },
+                        LogEntry {
+                            term: 1,
+                            index: 1,
+                            command: b"a".to_vec(),
+                        },
+                        LogEntry {
+                            term: 1,
+                            index: 2,
+                            command: b"b".to_vec(),
+                        },
                     ],
                     leader_commit: 1,
                 },
@@ -1108,7 +1147,11 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let mut core = make_core(1, vec![1, 2, 3], tmp.path());
         // Local has [term=1, index=1].
-        core.persistent.log.push(LogEntry { term: 1, index: 1, command: vec![] });
+        core.persistent.log.push(LogEntry {
+            term: 1,
+            index: 1,
+            command: vec![],
+        });
         core.persistent.current_term = 2;
         core.save_persistent().unwrap();
         // Leader asks for prev_log_index=1, prev_log_term=2 — mismatch.
@@ -1119,7 +1162,11 @@ mod tests {
                     leader_id: 2,
                     prev_log_index: 1,
                     prev_log_term: 2,
-                    entries: vec![LogEntry { term: 2, index: 2, command: vec![] }],
+                    entries: vec![LogEntry {
+                        term: 2,
+                        index: 2,
+                        command: vec![],
+                    }],
                     leader_commit: 0,
                 },
                 t0(),
@@ -1135,9 +1182,21 @@ mod tests {
         let mut core = make_core(1, vec![1, 2, 3], tmp.path());
         // Local has 3 entries, the last is in a different term than leader has.
         core.persistent.log = vec![
-            LogEntry { term: 1, index: 1, command: vec![] },
-            LogEntry { term: 1, index: 2, command: vec![] },
-            LogEntry { term: 3, index: 3, command: b"old".to_vec() },
+            LogEntry {
+                term: 1,
+                index: 1,
+                command: vec![],
+            },
+            LogEntry {
+                term: 1,
+                index: 2,
+                command: vec![],
+            },
+            LogEntry {
+                term: 3,
+                index: 3,
+                command: b"old".to_vec(),
+            },
         ];
         core.persistent.current_term = 5;
         core.save_persistent().unwrap();
@@ -1225,7 +1284,10 @@ mod tests {
         // One peer grants — combined with self-vote that's 2/3 = majority.
         core.handle_request_vote_reply(
             2,
-            RequestVoteReply { term: 1, vote_granted: true },
+            RequestVoteReply {
+                term: 1,
+                vote_granted: true,
+            },
             t0(),
         )
         .unwrap();
@@ -1241,7 +1303,10 @@ mod tests {
         // One peer grants — self + one = 2/5, not majority (3).
         core.handle_request_vote_reply(
             2,
-            RequestVoteReply { term: 1, vote_granted: true },
+            RequestVoteReply {
+                term: 1,
+                vote_granted: true,
+            },
             t0(),
         )
         .unwrap();
@@ -1255,7 +1320,10 @@ mod tests {
         core.become_candidate(t0()).unwrap();
         core.handle_request_vote_reply(
             2,
-            RequestVoteReply { term: 99, vote_granted: false },
+            RequestVoteReply {
+                term: 99,
+                vote_granted: false,
+            },
             t0(),
         )
         .unwrap();
@@ -1498,7 +1566,10 @@ mod tests {
                 }
                 (
                     OutboundMessage::AppendEntries(args),
-                    OutboundCtx::Append { prev_log_index, entries_len },
+                    OutboundCtx::Append {
+                        prev_log_index,
+                        entries_len,
+                    },
                 ) => {
                     let reply = cores[recv_idx].handle_append_entries(args, now).unwrap();
                     replies.push((
@@ -1527,7 +1598,11 @@ mod tests {
                         .handle_request_vote_reply(target_id, r, now)
                         .unwrap();
                 }
-                ReplyKind::Append { reply, prev_log_index, entries_len } => {
+                ReplyKind::Append {
+                    reply,
+                    prev_log_index,
+                    entries_len,
+                } => {
                     cores[sender_idx]
                         .handle_append_entries_reply(
                             target_id,
@@ -1622,8 +1697,7 @@ mod tests {
                 if let Some(l) = leader {
                     let leader_id = l.local_id;
                     let leader_commit = l.commit_index();
-                    let all_have_entry =
-                        cores.iter().all(|c| c.last_log_index() >= 1);
+                    let all_have_entry = cores.iter().all(|c| c.last_log_index() >= 1);
                     if leader_commit >= 1 && all_have_entry {
                         let leader_idx = pos_of(&cores, leader_id).unwrap();
                         let drained = cores[leader_idx].take_committed_entries();

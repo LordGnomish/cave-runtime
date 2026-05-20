@@ -132,7 +132,10 @@ impl<'a> PolicyStore<'a> {
     pub async fn get_policy(&self, id: &str) -> Result<Option<(String, String)>, String> {
         let client = self.pool.get().await.map_err(|e| e.to_string())?;
         let row = client
-            .query_opt("SELECT raw, package_path FROM cave_policy.policies WHERE id = $1", &[&id])
+            .query_opt(
+                "SELECT raw, package_path FROM cave_policy.policies WHERE id = $1",
+                &[&id],
+            )
             .await
             .map_err(|e| e.to_string())?;
         Ok(row.map(|r| (r.get::<_, String>(0), r.get::<_, String>(1))))
@@ -144,7 +147,10 @@ impl<'a> PolicyStore<'a> {
             .query("SELECT id, raw FROM cave_policy.policies ORDER BY id", &[])
             .await
             .map_err(|e| e.to_string())?;
-        Ok(rows.iter().map(|r| (r.get::<_, String>(0), r.get::<_, String>(1))).collect())
+        Ok(rows
+            .iter()
+            .map(|r| (r.get::<_, String>(0), r.get::<_, String>(1)))
+            .collect())
     }
 
     // ── OPA data document CRUD ────────────────────────────────────────────────
@@ -167,7 +173,10 @@ impl<'a> PolicyStore<'a> {
     pub async fn get_data(&self, path: &str) -> Result<Option<serde_json::Value>, String> {
         let client = self.pool.get().await.map_err(|e| e.to_string())?;
         let row = client
-            .query_opt("SELECT value FROM cave_policy.data_documents WHERE path = $1", &[&path])
+            .query_opt(
+                "SELECT value FROM cave_policy.data_documents WHERE path = $1",
+                &[&path],
+            )
             .await
             .map_err(|e| e.to_string())?;
         Ok(row.map(|r| {
@@ -179,7 +188,10 @@ impl<'a> PolicyStore<'a> {
     pub async fn delete_data(&self, path: &str) -> Result<bool, String> {
         let client = self.pool.get().await.map_err(|e| e.to_string())?;
         let rows = client
-            .execute("DELETE FROM cave_policy.data_documents WHERE path = $1", &[&path])
+            .execute(
+                "DELETE FROM cave_policy.data_documents WHERE path = $1",
+                &[&path],
+            )
             .await
             .map_err(|e| e.to_string())?;
         Ok(rows > 0)
@@ -195,7 +207,11 @@ impl<'a> PolicyStore<'a> {
         for row in &rows {
             let path: String = row.get(0);
             let value: tokio_postgres::types::Json<serde_json::Value> = row.get(1);
-            let parts: Vec<String> = path.split('/').filter(|s| !s.is_empty()).map(String::from).collect();
+            let parts: Vec<String> = path
+                .split('/')
+                .filter(|s| !s.is_empty())
+                .map(String::from)
+                .collect();
             crate::rego::value::set_nested_data(&mut root, &parts, value.0);
         }
         Ok(root)
@@ -203,7 +219,10 @@ impl<'a> PolicyStore<'a> {
 
     // ── Decision log ──────────────────────────────────────────────────────────
 
-    pub async fn save_decision(&self, entry: &crate::models::DecisionLogEntry) -> Result<(), String> {
+    pub async fn save_decision(
+        &self,
+        entry: &crate::models::DecisionLogEntry,
+    ) -> Result<(), String> {
         let client = self.pool.get().await.map_err(|e| e.to_string())?;
         let input_pg = entry.input.as_ref().map(tokio_postgres::types::Json);
         let result_pg = entry.result.as_ref().map(tokio_postgres::types::Json);
@@ -254,12 +273,18 @@ impl<'a> PolicyStore<'a> {
                 Ok(crate::models::DecisionLogEntry {
                     decision_id: r.get(0),
                     path: r.get(1),
-                    input: r.get::<_, Option<tokio_postgres::types::Json<serde_json::Value>>>(2).map(|j| j.0),
-                    result: r.get::<_, Option<tokio_postgres::types::Json<serde_json::Value>>>(3).map(|j| j.0),
+                    input: r
+                        .get::<_, Option<tokio_postgres::types::Json<serde_json::Value>>>(2)
+                        .map(|j| j.0),
+                    result: r
+                        .get::<_, Option<tokio_postgres::types::Json<serde_json::Value>>>(3)
+                        .map(|j| j.0),
                     error: r.get(4),
                     requested_by: r.get(5),
                     timestamp: r.get(6),
-                    metrics: r.get::<_, Option<tokio_postgres::types::Json<serde_json::Value>>>(7).map(|j| j.0),
+                    metrics: r
+                        .get::<_, Option<tokio_postgres::types::Json<serde_json::Value>>>(7)
+                        .map(|j| j.0),
                     bundle_name: r.get(8),
                     revision: r.get(9),
                 })
@@ -269,7 +294,10 @@ impl<'a> PolicyStore<'a> {
 
     // ── Kyverno policy CRUD ───────────────────────────────────────────────────
 
-    pub async fn save_cluster_policy(&self, policy: &crate::kyverno::models::ClusterPolicy) -> Result<(), String> {
+    pub async fn save_cluster_policy(
+        &self,
+        policy: &crate::kyverno::models::ClusterPolicy,
+    ) -> Result<(), String> {
         let client = self.pool.get().await.map_err(|e| e.to_string())?;
         let spec = tokio_postgres::types::Json(&policy.spec);
         let meta = tokio_postgres::types::Json(&policy.metadata);
@@ -288,16 +316,24 @@ impl<'a> PolicyStore<'a> {
     pub async fn delete_cluster_policy(&self, name: &str) -> Result<bool, String> {
         let client = self.pool.get().await.map_err(|e| e.to_string())?;
         let rows = client
-            .execute("DELETE FROM cave_policy.cluster_policies WHERE name = $1", &[&name])
+            .execute(
+                "DELETE FROM cave_policy.cluster_policies WHERE name = $1",
+                &[&name],
+            )
             .await
             .map_err(|e| e.to_string())?;
         Ok(rows > 0)
     }
 
-    pub async fn list_cluster_policies(&self) -> Result<Vec<crate::kyverno::models::ClusterPolicy>, String> {
+    pub async fn list_cluster_policies(
+        &self,
+    ) -> Result<Vec<crate::kyverno::models::ClusterPolicy>, String> {
         let client = self.pool.get().await.map_err(|e| e.to_string())?;
         let rows = client
-            .query("SELECT spec, metadata FROM cave_policy.cluster_policies ORDER BY name", &[])
+            .query(
+                "SELECT spec, metadata FROM cave_policy.cluster_policies ORDER BY name",
+                &[],
+            )
             .await
             .map_err(|e| e.to_string())?;
         let mut policies = Vec::new();

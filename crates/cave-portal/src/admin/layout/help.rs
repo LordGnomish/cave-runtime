@@ -83,7 +83,12 @@ mod tests {
 
     #[test]
     fn empty_state_renders_icon_message_cta() {
-        let html = empty_state("📦", "No ScaledObjects yet", "Create your first", "/admin/keda/new");
+        let html = empty_state(
+            "📦",
+            "No ScaledObjects yet",
+            "Create your first",
+            "/admin/keda/new",
+        );
         assert!(html.contains("📦"));
         assert!(html.contains("No ScaledObjects yet"));
         assert!(html.contains(r#"href="/admin/keda/new""#));

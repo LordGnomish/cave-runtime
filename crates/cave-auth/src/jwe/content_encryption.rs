@@ -103,9 +103,7 @@ pub fn decrypt(
     check_lens(alg, cek, iv)?;
     match alg {
         ContentEncAlg::A256Gcm => decrypt_a256gcm(cek, iv, aad, ciphertext, auth_tag),
-        ContentEncAlg::A128CbcHs256 => {
-            decrypt_a128cbc_hs256(cek, iv, aad, ciphertext, auth_tag)
-        }
+        ContentEncAlg::A128CbcHs256 => decrypt_a128cbc_hs256(cek, iv, aad, ciphertext, auth_tag),
     }
 }
 

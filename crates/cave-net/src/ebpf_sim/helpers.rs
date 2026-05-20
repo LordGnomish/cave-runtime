@@ -28,13 +28,17 @@ pub struct MockClock {
 
 impl Default for MockClock {
     fn default() -> Self {
-        Self { now_ns: Arc::new(Mutex::new(0)) }
+        Self {
+            now_ns: Arc::new(Mutex::new(0)),
+        }
     }
 }
 
 impl MockClock {
     pub fn new(initial_ns: u64) -> Self {
-        Self { now_ns: Arc::new(Mutex::new(initial_ns)) }
+        Self {
+            now_ns: Arc::new(Mutex::new(initial_ns)),
+        }
     }
 
     pub fn now_ns(&self) -> u64 {
@@ -110,10 +114,7 @@ impl Helpers {
     }
 
     pub fn perf_events_len(&self) -> usize {
-        self.perf_events
-            .lock()
-            .expect("perf events poisoned")
-            .len()
+        self.perf_events.lock().expect("perf events poisoned").len()
     }
 }
 

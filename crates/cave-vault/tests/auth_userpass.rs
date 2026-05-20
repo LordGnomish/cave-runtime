@@ -29,7 +29,10 @@ fn make_user(name: &str, pw: &str, policies: Vec<&str>) -> UserpassEntry {
 #[test]
 fn create_user_persists_password_hash_and_policies() {
     let mut store = UserpassStore::default();
-    store.users.insert("alice".into(), make_user("alice", "hunter2", vec!["default", "ops"]));
+    store.users.insert(
+        "alice".into(),
+        make_user("alice", "hunter2", vec!["default", "ops"]),
+    );
 
     let u = store.users.get("alice").unwrap();
     assert_eq!(u.username, "alice");
@@ -46,7 +49,10 @@ fn create_user_persists_password_hash_and_policies() {
 #[test]
 fn login_password_mismatch_is_rejected() {
     let mut store = UserpassStore::default();
-    store.users.insert("bob".into(), make_user("bob", "correct-password", vec!["default"]));
+    store.users.insert(
+        "bob".into(),
+        make_user("bob", "correct-password", vec!["default"]),
+    );
 
     let provided = hash("wrong-password");
     let user = store.users.get("bob").unwrap();
@@ -58,7 +64,10 @@ fn login_password_mismatch_is_rejected() {
 #[test]
 fn login_success_yields_user_policies() {
     let mut store = UserpassStore::default();
-    store.users.insert("carol".into(), make_user("carol", "p@ss", vec!["default", "billing"]));
+    store.users.insert(
+        "carol".into(),
+        make_user("carol", "p@ss", vec!["default", "billing"]),
+    );
 
     let provided = hash("p@ss");
     let user = store.users.get("carol").unwrap();
@@ -73,7 +82,9 @@ fn login_success_yields_user_policies() {
 fn list_returns_all_usernames() {
     let mut store = UserpassStore::default();
     for n in &["a", "b", "c"] {
-        store.users.insert((*n).into(), make_user(n, "pw", vec!["default"]));
+        store
+            .users
+            .insert((*n).into(), make_user(n, "pw", vec!["default"]));
     }
     let mut names: Vec<String> = store.users.keys().cloned().collect();
     names.sort();
@@ -86,7 +97,12 @@ fn list_returns_all_usernames() {
 #[test]
 fn delete_user_is_idempotent() {
     let mut store = UserpassStore::default();
-    store.users.insert("dave".into(), make_user("dave", "pw", vec!["default"]));
+    store
+        .users
+        .insert("dave".into(), make_user("dave", "pw", vec!["default"]));
     assert!(store.users.remove("dave").is_some());
-    assert!(store.users.remove("dave").is_none(), "second delete is a no-op");
+    assert!(
+        store.users.remove("dave").is_none(),
+        "second delete is a no-op"
+    );
 }

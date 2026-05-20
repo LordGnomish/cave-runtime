@@ -7,21 +7,20 @@
 use super::VaultViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, table};
-use crate::admin::state::{scope, AdminState, VaultSecretMeta};
+use crate::admin::state::{AdminState, VaultSecretMeta, scope};
 
 pub fn list_secrets(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<Vec<VaultSecretMeta>, VaultViewError> {
     ctx.authorise(Permission::VaultRead)?;
-    let mut rows: Vec<VaultSecretMeta> = scope(
-        &state.vault_secrets.read().unwrap(),
-        &ctx.tenant,
-        |r| &r.tenant,
-    )
-    .into_iter()
-    .cloned()
-    .collect();
+    let mut rows: Vec<VaultSecretMeta> =
+        scope(&state.vault_secrets.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(rows)
 }
@@ -35,7 +34,10 @@ pub fn list_under(
     prefix: &str,
 ) -> Result<Vec<VaultSecretMeta>, VaultViewError> {
     let all = list_secrets(state, ctx)?;
-    Ok(all.into_iter().filter(|s| s.path.starts_with(prefix)).collect())
+    Ok(all
+        .into_iter()
+        .filter(|s| s.path.starts_with(prefix))
+        .collect())
 }
 
 pub(super) fn render_section(

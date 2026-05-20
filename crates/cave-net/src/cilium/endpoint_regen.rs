@@ -47,9 +47,20 @@ pub struct RegenRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RegenStatus {
     Pending,
-    InFlight { started_ns: u64, level: RegenLevel },
-    Success { completed_ns: u64, level: RegenLevel, duration_ns: u64 },
-    Failure { failed_ns: u64, level: RegenLevel, reason: String },
+    InFlight {
+        started_ns: u64,
+        level: RegenLevel,
+    },
+    Success {
+        completed_ns: u64,
+        level: RegenLevel,
+        duration_ns: u64,
+    },
+    Failure {
+        failed_ns: u64,
+        level: RegenLevel,
+        reason: String,
+    },
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -112,7 +123,8 @@ impl RegenController {
             self.queue.push_back(merged.endpoint_id);
         }
         self.pending.insert(merged.endpoint_id, merged.clone());
-        self.history.insert(merged.endpoint_id, RegenStatus::Pending);
+        self.history
+            .insert(merged.endpoint_id, RegenStatus::Pending);
         merged
     }
 
@@ -127,7 +139,13 @@ impl RegenController {
             }
             if let Some(req) = self.pending.remove(&eid) {
                 self.in_flight.insert(eid, req.clone());
-                self.history.insert(eid, RegenStatus::InFlight { started_ns: now_ns, level: req.level });
+                self.history.insert(
+                    eid,
+                    RegenStatus::InFlight {
+                        started_ns: now_ns,
+                        level: req.level,
+                    },
+                );
                 return Some(req);
             }
         }
@@ -136,12 +154,18 @@ impl RegenController {
 
     /// Mark an in-flight regeneration as successful.
     pub fn complete(&mut self, endpoint_id: u64, completed_ns: u64) -> Result<(), RegenError> {
-        let req = self.in_flight.remove(&endpoint_id).ok_or(RegenError::NotInFlight(endpoint_id))?;
-        self.history.insert(endpoint_id, RegenStatus::Success {
-            completed_ns,
-            level: req.level,
-            duration_ns: completed_ns.saturating_sub(req.enqueued_ns),
-        });
+        let req = self
+            .in_flight
+            .remove(&endpoint_id)
+            .ok_or(RegenError::NotInFlight(endpoint_id))?;
+        self.history.insert(
+            endpoint_id,
+            RegenStatus::Success {
+                completed_ns,
+                level: req.level,
+                duration_ns: completed_ns.saturating_sub(req.enqueued_ns),
+            },
+        );
         self.completed += 1;
         // If a follow-up was enqueued during the in-flight, push it onto the queue.
         if self.pending.contains_key(&endpoint_id) && !self.queue.contains(&endpoint_id) {
@@ -151,11 +175,24 @@ impl RegenController {
     }
 
     /// Mark an in-flight regeneration as failed.
-    pub fn fail(&mut self, endpoint_id: u64, failed_ns: u64, reason: impl Into<String>) -> Result<(), RegenError> {
-        let req = self.in_flight.remove(&endpoint_id).ok_or(RegenError::NotInFlight(endpoint_id))?;
-        self.history.insert(endpoint_id, RegenStatus::Failure {
-            failed_ns, level: req.level, reason: reason.into(),
-        });
+    pub fn fail(
+        &mut self,
+        endpoint_id: u64,
+        failed_ns: u64,
+        reason: impl Into<String>,
+    ) -> Result<(), RegenError> {
+        let req = self
+            .in_flight
+            .remove(&endpoint_id)
+            .ok_or(RegenError::NotInFlight(endpoint_id))?;
+        self.history.insert(
+            endpoint_id,
+            RegenStatus::Failure {
+                failed_ns,
+                level: req.level,
+                reason: reason.into(),
+            },
+        );
         self.failed += 1;
         if self.pending.contains_key(&endpoint_id) && !self.queue.contains(&endpoint_id) {
             self.queue.push_back(endpoint_id);
@@ -181,9 +218,14 @@ impl RegenController {
 
     /// Stuck endpoints: in-flight for longer than `threshold_ns`.
     pub fn stuck_endpoints(&self, now_ns: u64, threshold_ns: u64) -> BTreeSet<u64> {
-        self.history.iter()
+        self.history
+            .iter()
             .filter_map(|(eid, status)| match status {
-                RegenStatus::InFlight { started_ns, .. } if now_ns.saturating_sub(*started_ns) >= threshold_ns => Some(*eid),
+                RegenStatus::InFlight { started_ns, .. }
+                    if now_ns.saturating_sub(*started_ns) >= threshold_ns =>
+                {
+                    Some(*eid)
+                }
                 _ => None,
             })
             .collect()
@@ -222,14 +264,23 @@ mod tests {
     }
 
     fn req(eid: u64, level: RegenLevel, ns: u64, reason: &str) -> RegenRequest {
-        RegenRequest { endpoint_id: eid, level, reason: reason.into(), enqueued_ns: ns }
+        RegenRequest {
+            endpoint_id: eid,
+            level,
+            reason: reason.into(),
+            enqueued_ns: ns,
+        }
     }
 
     // ── RegenLevel ordering ─────────────────────────────────────────────────
 
     #[test]
     fn regen_level_ordering_maps_lt_datapath_lt_policy() {
-        let (_c, _t) = cilium_test_ctx!("pkg/endpoint/policy.go", "RegenLevel.Order", "tenant-rg-ord");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/endpoint/policy.go",
+            "RegenLevel.Order",
+            "tenant-rg-ord"
+        );
         assert!(RegenLevel::Maps < RegenLevel::Datapath);
         assert!(RegenLevel::Datapath < RegenLevel::PolicyRecompute);
     }
@@ -238,7 +289,11 @@ mod tests {
 
     #[test]
     fn enqueue_records_pending_and_queue_position() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Enqueue", "tenant-rg-eq");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Enqueue",
+            "tenant-rg-eq"
+        );
         let mut c = ctrl(tenant);
         c.enqueue(req(1, RegenLevel::Maps, 100, "policy-update"));
         assert_eq!(c.pending_count(), 1);
@@ -248,7 +303,11 @@ mod tests {
 
     #[test]
     fn enqueue_coalesces_to_higher_level() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Enqueue.Coalesce", "tenant-rg-coal");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Enqueue.Coalesce",
+            "tenant-rg-coal"
+        );
         let mut c = ctrl(tenant);
         c.enqueue(req(1, RegenLevel::Maps, 100, "first"));
         let merged = c.enqueue(req(1, RegenLevel::PolicyRecompute, 200, "policy"));
@@ -259,7 +318,11 @@ mod tests {
 
     #[test]
     fn enqueue_lower_level_does_not_downgrade() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Enqueue.NoDowngrade", "tenant-rg-cdn");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Enqueue.NoDowngrade",
+            "tenant-rg-cdn"
+        );
         let mut c = ctrl(tenant);
         c.enqueue(req(1, RegenLevel::PolicyRecompute, 100, "high"));
         let merged = c.enqueue(req(1, RegenLevel::Maps, 200, "low"));
@@ -268,7 +331,11 @@ mod tests {
 
     #[test]
     fn enqueue_distinct_endpoints_create_distinct_queue_entries() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Enqueue.Distinct", "tenant-rg-dist");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Enqueue.Distinct",
+            "tenant-rg-dist"
+        );
         let mut c = ctrl(tenant);
         c.enqueue(req(1, RegenLevel::Maps, 100, "x"));
         c.enqueue(req(2, RegenLevel::Maps, 100, "y"));
@@ -280,7 +347,11 @@ mod tests {
 
     #[test]
     fn pop_returns_first_request_and_marks_in_flight() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Pop.InFlight", "tenant-rg-pif");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Pop.InFlight",
+            "tenant-rg-pif"
+        );
         let mut c = ctrl(tenant);
         c.enqueue(req(1, RegenLevel::Maps, 100, "x"));
         let popped = c.pop_for_processing(150).unwrap();
@@ -291,14 +362,22 @@ mod tests {
 
     #[test]
     fn pop_empty_queue_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Pop.Empty", "tenant-rg-pe");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Pop.Empty",
+            "tenant-rg-pe"
+        );
         let mut c = ctrl(tenant);
         assert!(c.pop_for_processing(100).is_none());
     }
 
     #[test]
     fn pop_skips_in_flight_endpoint() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Pop.SkipInFlight", "tenant-rg-pskip");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Pop.SkipInFlight",
+            "tenant-rg-pskip"
+        );
         let mut c = ctrl(tenant);
         c.enqueue(req(1, RegenLevel::Maps, 100, "x"));
         let _ = c.pop_for_processing(150).unwrap();
@@ -313,13 +392,19 @@ mod tests {
 
     #[test]
     fn complete_records_success_and_duration() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Complete", "tenant-rg-cmp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Complete",
+            "tenant-rg-cmp"
+        );
         let mut c = ctrl(tenant);
         c.enqueue(req(1, RegenLevel::Datapath, 100, "x"));
         let _ = c.pop_for_processing(150).unwrap();
         c.complete(1, 200).unwrap();
         match c.status(1).unwrap() {
-            RegenStatus::Success { duration_ns, level, .. } => {
+            RegenStatus::Success {
+                duration_ns, level, ..
+            } => {
                 assert_eq!(*duration_ns, 100);
                 assert_eq!(*level, RegenLevel::Datapath);
             }
@@ -330,7 +415,11 @@ mod tests {
 
     #[test]
     fn complete_for_unknown_endpoint_returns_not_in_flight() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Complete.NotInFlight", "tenant-rg-cnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Complete.NotInFlight",
+            "tenant-rg-cnf"
+        );
         let mut c = ctrl(tenant);
         let err = c.complete(99, 100).unwrap_err();
         assert_eq!(err, RegenError::NotInFlight(99));
@@ -338,7 +427,11 @@ mod tests {
 
     #[test]
     fn complete_followed_by_pending_re_enqueues() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Complete.PendingRequeue", "tenant-rg-creq");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Complete.PendingRequeue",
+            "tenant-rg-creq"
+        );
         let mut c = ctrl(tenant);
         c.enqueue(req(1, RegenLevel::Maps, 100, "x"));
         let _ = c.pop_for_processing(150).unwrap();
@@ -354,7 +447,11 @@ mod tests {
 
     #[test]
     fn fail_records_failure_with_reason() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Fail", "tenant-rg-fail");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Fail",
+            "tenant-rg-fail"
+        );
         let mut c = ctrl(tenant);
         c.enqueue(req(1, RegenLevel::Datapath, 100, "x"));
         let _ = c.pop_for_processing(150).unwrap();
@@ -368,7 +465,11 @@ mod tests {
 
     #[test]
     fn fail_for_unknown_endpoint_returns_not_in_flight() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Fail.NotInFlight", "tenant-rg-fnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Fail.NotInFlight",
+            "tenant-rg-fnf"
+        );
         let mut c = ctrl(tenant);
         let err = c.fail(99, 100, "x").unwrap_err();
         assert_eq!(err, RegenError::NotInFlight(99));
@@ -378,7 +479,11 @@ mod tests {
 
     #[test]
     fn stuck_endpoints_returns_those_past_threshold() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Stuck", "tenant-rg-stk");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Stuck",
+            "tenant-rg-stk"
+        );
         let mut c = ctrl(tenant);
         c.enqueue(req(1, RegenLevel::Maps, 100, "x"));
         c.enqueue(req(2, RegenLevel::Maps, 100, "y"));
@@ -392,7 +497,11 @@ mod tests {
 
     #[test]
     fn stuck_endpoints_excludes_recent_in_flight() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Stuck.NotYet", "tenant-rg-stkny");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Stuck.NotYet",
+            "tenant-rg-stkny"
+        );
         let mut c = ctrl(tenant);
         c.enqueue(req(1, RegenLevel::Maps, 100, "x"));
         let _ = c.pop_for_processing(150);
@@ -402,7 +511,11 @@ mod tests {
 
     #[test]
     fn stuck_endpoints_excludes_completed() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Stuck.Excludes", "tenant-rg-stkc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Stuck.Excludes",
+            "tenant-rg-stkc"
+        );
         let mut c = ctrl(tenant);
         c.enqueue(req(1, RegenLevel::Maps, 100, "x"));
         let _ = c.pop_for_processing(150);
@@ -415,7 +528,11 @@ mod tests {
 
     #[test]
     fn forget_pending_endpoint_drops_from_queue() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Forget", "tenant-rg-fgt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Forget",
+            "tenant-rg-fgt"
+        );
         let mut c = ctrl(tenant);
         c.enqueue(req(1, RegenLevel::Maps, 100, "x"));
         c.forget(1).unwrap();
@@ -426,7 +543,11 @@ mod tests {
 
     #[test]
     fn forget_in_flight_endpoint_drops_state() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Forget.InFlight", "tenant-rg-fgtif");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Forget.InFlight",
+            "tenant-rg-fgtif"
+        );
         let mut c = ctrl(tenant);
         c.enqueue(req(1, RegenLevel::Maps, 100, "x"));
         let _ = c.pop_for_processing(150);
@@ -436,7 +557,11 @@ mod tests {
 
     #[test]
     fn forget_unknown_endpoint_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Forget.NotFound", "tenant-rg-fgtnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Forget.NotFound",
+            "tenant-rg-fgtnf"
+        );
         let mut c = ctrl(tenant);
         let err = c.forget(99).unwrap_err();
         assert_eq!(err, RegenError::NotFound(99));
@@ -446,7 +571,11 @@ mod tests {
 
     #[test]
     fn multiple_endpoints_processed_in_order() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Pipeline", "tenant-rg-pipe");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Pipeline",
+            "tenant-rg-pipe"
+        );
         let mut c = ctrl(tenant);
         c.enqueue(req(1, RegenLevel::Maps, 100, "x"));
         c.enqueue(req(2, RegenLevel::Maps, 100, "y"));
@@ -459,7 +588,11 @@ mod tests {
 
     #[test]
     fn complete_increments_completed_counter() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Counter.Complete", "tenant-rg-cnt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Counter.Complete",
+            "tenant-rg-cnt"
+        );
         let mut c = ctrl(tenant);
         for i in 1..=3u64 {
             c.enqueue(req(i, RegenLevel::Maps, 100, "x"));
@@ -472,7 +605,11 @@ mod tests {
 
     #[test]
     fn fail_increments_failed_counter() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Counter.Fail", "tenant-rg-cntf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Counter.Fail",
+            "tenant-rg-cntf"
+        );
         let mut c = ctrl(tenant);
         for i in 1..=2u64 {
             c.enqueue(req(i, RegenLevel::Maps, 100, "x"));
@@ -486,7 +623,11 @@ mod tests {
 
     #[test]
     fn regen_request_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Request.Serde", "tenant-rg-rserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Request.Serde",
+            "tenant-rg-rserde"
+        );
         let r = req(1, RegenLevel::PolicyRecompute, 100, "policy");
         let s = serde_json::to_string(&r).unwrap();
         let back: RegenRequest = serde_json::from_str(&s).unwrap();
@@ -495,8 +636,16 @@ mod tests {
 
     #[test]
     fn regen_status_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Status.Serde", "tenant-rg-sserde");
-        let st = RegenStatus::Success { completed_ns: 100, level: RegenLevel::Datapath, duration_ns: 50 };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Status.Serde",
+            "tenant-rg-sserde"
+        );
+        let st = RegenStatus::Success {
+            completed_ns: 100,
+            level: RegenLevel::Datapath,
+            duration_ns: 50,
+        };
         let s = serde_json::to_string(&st).unwrap();
         let back: RegenStatus = serde_json::from_str(&s).unwrap();
         assert_eq!(back, st);
@@ -504,8 +653,16 @@ mod tests {
 
     #[test]
     fn regen_level_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/endpoint/regeneration_queue.go", "Level.Serde", "tenant-rg-lserde");
-        for l in [RegenLevel::Maps, RegenLevel::Datapath, RegenLevel::PolicyRecompute] {
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/endpoint/regeneration_queue.go",
+            "Level.Serde",
+            "tenant-rg-lserde"
+        );
+        for l in [
+            RegenLevel::Maps,
+            RegenLevel::Datapath,
+            RegenLevel::PolicyRecompute,
+        ] {
             let s = serde_json::to_string(&l).unwrap();
             let back: RegenLevel = serde_json::from_str(&s).unwrap();
             assert_eq!(back, l);

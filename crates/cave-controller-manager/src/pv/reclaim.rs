@@ -11,7 +11,7 @@
 //! * `Recycle` — DEPRECATED in v1.18; controller scrubs the FS and returns
 //!   PV to `Available` (only NFS / HostPath plugins).
 
-use super::binder::{PvPhase, PersistentVolume, ReclaimPolicy};
+use super::binder::{PersistentVolume, PvPhase, ReclaimPolicy};
 use crate::types::Cite;
 use serde::{Deserialize, Serialize};
 
@@ -145,7 +145,12 @@ mod tests {
             "reclaimVolume",
             "tenant-pv-rec-skip"
         );
-        for phase in [PvPhase::Available, PvPhase::Bound, PvPhase::Pending, PvPhase::Failed] {
+        for phase in [
+            PvPhase::Available,
+            PvPhase::Bound,
+            PvPhase::Pending,
+            PvPhase::Failed,
+        ] {
             assert_eq!(
                 evaluate(&pv(ReclaimPolicy::Delete, phase)),
                 ReclaimAction::Skip
@@ -207,7 +212,10 @@ mod tests {
             allow_dynamic: true,
             wait_for_consumer: true,
         };
-        assert_eq!(evaluate_provisioning(&req), ProvisionAction::WaitForConsumer);
+        assert_eq!(
+            evaluate_provisioning(&req),
+            ProvisionAction::WaitForConsumer
+        );
     }
 
     #[test]

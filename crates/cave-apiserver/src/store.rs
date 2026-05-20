@@ -51,47 +51,79 @@ impl ResourceStore {
     }
 
     pub fn create(&self, resource: Resource) -> ApiResult<Resource> {
-        let key = (resource.kind().to_string(), resource.namespace().to_string(), resource.name().to_string());
+        let key = (
+            resource.kind().to_string(),
+            resource.namespace().to_string(),
+            resource.name().to_string(),
+        );
         if self.resources.contains_key(&key) {
-            return Err(ApiError::AlreadyExists { kind: key.0, name: key.2 });
+            return Err(ApiError::AlreadyExists {
+                kind: key.0,
+                name: key.2,
+            });
         }
         self.resources.insert(key, resource.clone());
-        let _ = self.watch_bus.publish(WatchEvent { event_type: WatchEventType::Added, resource: resource.clone() });
+        let _ = self.watch_bus.publish(WatchEvent {
+            event_type: WatchEventType::Added,
+            resource: resource.clone(),
+        });
         Ok(resource)
     }
 
     pub fn get(&self, kind: &str, namespace: &str, name: &str) -> ApiResult<Resource> {
         let key = (kind.to_string(), namespace.to_string(), name.to_string());
-        self.resources.get(&key)
+        self.resources
+            .get(&key)
             .map(|r| r.value().clone())
-            .ok_or(ApiError::NotFound { kind: kind.to_string(), name: name.to_string() })
+            .ok_or(ApiError::NotFound {
+                kind: kind.to_string(),
+                name: name.to_string(),
+            })
     }
 
     pub fn list(&self, kind: &str, namespace: &str) -> Vec<Resource> {
-        self.resources.iter()
+        self.resources
+            .iter()
             .filter(|r| r.key().0 == kind && (namespace.is_empty() || r.key().1 == namespace))
             .map(|r| r.value().clone())
             .collect()
     }
 
     pub fn update(&self, resource: Resource) -> ApiResult<Resource> {
-        let key = (resource.kind().to_string(), resource.namespace().to_string(), resource.name().to_string());
+        let key = (
+            resource.kind().to_string(),
+            resource.namespace().to_string(),
+            resource.name().to_string(),
+        );
         if !self.resources.contains_key(&key) {
-            return Err(ApiError::NotFound { kind: key.0, name: key.2 });
+            return Err(ApiError::NotFound {
+                kind: key.0,
+                name: key.2,
+            });
         }
         self.resources.insert(key, resource.clone());
-        let _ = self.watch_bus.publish(WatchEvent { event_type: WatchEventType::Modified, resource: resource.clone() });
+        let _ = self.watch_bus.publish(WatchEvent {
+            event_type: WatchEventType::Modified,
+            resource: resource.clone(),
+        });
         Ok(resource)
     }
 
     pub fn delete(&self, kind: &str, namespace: &str, name: &str) -> ApiResult<Resource> {
         let key = (kind.to_string(), namespace.to_string(), name.to_string());
-        self.resources.remove(&key)
+        self.resources
+            .remove(&key)
             .map(|(_, r)| {
-                let _ = self.watch_bus.publish(WatchEvent { event_type: WatchEventType::Deleted, resource: r.clone() });
+                let _ = self.watch_bus.publish(WatchEvent {
+                    event_type: WatchEventType::Deleted,
+                    resource: r.clone(),
+                });
                 r
             })
-            .ok_or(ApiError::NotFound { kind: kind.to_string(), name: name.to_string() })
+            .ok_or(ApiError::NotFound {
+                kind: kind.to_string(),
+                name: name.to_string(),
+            })
     }
 
     /// Subscribe to live watch events. Backpressure is delegated to
@@ -129,7 +161,9 @@ impl ResourceStore {
 }
 
 impl Default for ResourceStore {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -194,70 +228,88 @@ mod tests {
 
     fn make_statefulset(name: &str, ns: &str) -> Resource {
         Resource::StatefulSet(StatefulSet {
-            api_version: "apps/v1".into(), kind: "StatefulSet".into(),
+            api_version: "apps/v1".into(),
+            kind: "StatefulSet".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: StatefulSetSpec::default(), status: StatefulSetStatus::default(),
+            spec: StatefulSetSpec::default(),
+            status: StatefulSetStatus::default(),
         })
     }
     fn make_daemonset(name: &str, ns: &str) -> Resource {
         Resource::DaemonSet(DaemonSet {
-            api_version: "apps/v1".into(), kind: "DaemonSet".into(),
+            api_version: "apps/v1".into(),
+            kind: "DaemonSet".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: DaemonSetSpec::default(), status: DaemonSetStatus::default(),
+            spec: DaemonSetSpec::default(),
+            status: DaemonSetStatus::default(),
         })
     }
     fn make_replicaset(name: &str, ns: &str) -> Resource {
         Resource::ReplicaSet(ReplicaSet {
-            api_version: "apps/v1".into(), kind: "ReplicaSet".into(),
+            api_version: "apps/v1".into(),
+            kind: "ReplicaSet".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: ReplicaSetSpec::default(), status: ReplicaSetStatus::default(),
+            spec: ReplicaSetSpec::default(),
+            status: ReplicaSetStatus::default(),
         })
     }
     fn make_job(name: &str, ns: &str) -> Resource {
         Resource::Job(Job {
-            api_version: "batch/v1".into(), kind: "Job".into(),
+            api_version: "batch/v1".into(),
+            kind: "Job".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: JobSpec::default(), status: JobStatus::default(),
+            spec: JobSpec::default(),
+            status: JobStatus::default(),
         })
     }
     fn make_cronjob(name: &str, ns: &str) -> Resource {
         Resource::CronJob(CronJob {
-            api_version: "batch/v1".into(), kind: "CronJob".into(),
+            api_version: "batch/v1".into(),
+            kind: "CronJob".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: CronJobSpec::default(), status: CronJobStatus::default(),
+            spec: CronJobSpec::default(),
+            status: CronJobStatus::default(),
         })
     }
     fn make_ingress(name: &str, ns: &str) -> Resource {
         Resource::Ingress(Ingress {
-            api_version: "networking.k8s.io/v1".into(), kind: "Ingress".into(),
+            api_version: "networking.k8s.io/v1".into(),
+            kind: "Ingress".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: IngressSpec::default(), status: IngressStatus::default(),
+            spec: IngressSpec::default(),
+            status: IngressStatus::default(),
         })
     }
     fn make_networkpolicy(name: &str, ns: &str) -> Resource {
         Resource::NetworkPolicy(NetworkPolicy {
-            api_version: "networking.k8s.io/v1".into(), kind: "NetworkPolicy".into(),
+            api_version: "networking.k8s.io/v1".into(),
+            kind: "NetworkPolicy".into(),
             metadata: ObjectMeta::new(name, ns),
             spec: NetworkPolicySpec::default(),
         })
     }
     fn make_pv(name: &str) -> Resource {
         Resource::PersistentVolume(PersistentVolume {
-            api_version: "v1".into(), kind: "PersistentVolume".into(),
+            api_version: "v1".into(),
+            kind: "PersistentVolume".into(),
             metadata: ObjectMeta::new(name, ""),
-            spec: PersistentVolumeSpec::default(), status: PersistentVolumeStatus::default(),
+            spec: PersistentVolumeSpec::default(),
+            status: PersistentVolumeStatus::default(),
         })
     }
     fn make_pvc(name: &str, ns: &str) -> Resource {
         Resource::PersistentVolumeClaim(PersistentVolumeClaim {
-            api_version: "v1".into(), kind: "PersistentVolumeClaim".into(),
+            api_version: "v1".into(),
+            kind: "PersistentVolumeClaim".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: PersistentVolumeClaimSpec::default(), status: PersistentVolumeClaimStatus::default(),
+            spec: PersistentVolumeClaimSpec::default(),
+            status: PersistentVolumeClaimStatus::default(),
         })
     }
     fn make_storageclass(name: &str) -> Resource {
         Resource::StorageClass(StorageClass {
-            api_version: "storage.k8s.io/v1".into(), kind: "StorageClass".into(),
+            api_version: "storage.k8s.io/v1".into(),
+            kind: "StorageClass".into(),
             metadata: ObjectMeta::new(name, ""),
             provisioner: "kubernetes.io/no-provisioner".into(),
             parameters: HashMap::new(),
@@ -267,74 +319,102 @@ mod tests {
         })
     }
     fn role_ref() -> RoleRef {
-        RoleRef { api_group: "rbac.authorization.k8s.io".into(), kind: "Role".into(), name: "r".into() }
+        RoleRef {
+            api_group: "rbac.authorization.k8s.io".into(),
+            kind: "Role".into(),
+            name: "r".into(),
+        }
     }
     fn make_role(name: &str, ns: &str) -> Resource {
         Resource::Role(Role {
-            api_version: "rbac.authorization.k8s.io/v1".into(), kind: "Role".into(),
-            metadata: ObjectMeta::new(name, ns), rules: vec![],
+            api_version: "rbac.authorization.k8s.io/v1".into(),
+            kind: "Role".into(),
+            metadata: ObjectMeta::new(name, ns),
+            rules: vec![],
         })
     }
     fn make_clusterrole(name: &str) -> Resource {
         Resource::ClusterRole(ClusterRole {
-            api_version: "rbac.authorization.k8s.io/v1".into(), kind: "ClusterRole".into(),
-            metadata: ObjectMeta::new(name, ""), rules: vec![], aggregation_rule: None,
+            api_version: "rbac.authorization.k8s.io/v1".into(),
+            kind: "ClusterRole".into(),
+            metadata: ObjectMeta::new(name, ""),
+            rules: vec![],
+            aggregation_rule: None,
         })
     }
     fn make_rolebinding(name: &str, ns: &str) -> Resource {
         Resource::RoleBinding(RoleBinding {
-            api_version: "rbac.authorization.k8s.io/v1".into(), kind: "RoleBinding".into(),
-            metadata: ObjectMeta::new(name, ns), subjects: vec![], role_ref: role_ref(),
+            api_version: "rbac.authorization.k8s.io/v1".into(),
+            kind: "RoleBinding".into(),
+            metadata: ObjectMeta::new(name, ns),
+            subjects: vec![],
+            role_ref: role_ref(),
         })
     }
     fn make_clusterrolebinding(name: &str) -> Resource {
         Resource::ClusterRoleBinding(ClusterRoleBinding {
-            api_version: "rbac.authorization.k8s.io/v1".into(), kind: "ClusterRoleBinding".into(),
-            metadata: ObjectMeta::new(name, ""), subjects: vec![], role_ref: role_ref(),
+            api_version: "rbac.authorization.k8s.io/v1".into(),
+            kind: "ClusterRoleBinding".into(),
+            metadata: ObjectMeta::new(name, ""),
+            subjects: vec![],
+            role_ref: role_ref(),
         })
     }
     fn make_serviceaccount(name: &str, ns: &str) -> Resource {
         Resource::ServiceAccount(ServiceAccount {
-            api_version: "v1".into(), kind: "ServiceAccount".into(),
+            api_version: "v1".into(),
+            kind: "ServiceAccount".into(),
             metadata: ObjectMeta::new(name, ns),
-            secrets: vec![], image_pull_secrets: vec![],
+            secrets: vec![],
+            image_pull_secrets: vec![],
             automount_service_account_token: None,
         })
     }
     fn make_node(name: &str) -> Resource {
         Resource::Node(Node {
-            api_version: "v1".into(), kind: "Node".into(),
+            api_version: "v1".into(),
+            kind: "Node".into(),
             metadata: ObjectMeta::new(name, ""),
-            spec: NodeSpec::default(), status: NodeStatus::default(),
+            spec: NodeSpec::default(),
+            status: NodeStatus::default(),
         })
     }
     fn make_event(name: &str, ns: &str) -> Resource {
         Resource::KubeEvent(KubeEvent {
-            api_version: "v1".into(), kind: "Event".into(),
+            api_version: "v1".into(),
+            kind: "Event".into(),
             metadata: ObjectMeta::new(name, ns),
             involved_object: ObjectReference::default(),
-            reason: "TestReason".into(), message: "test".into(),
-            event_type: "Normal".into(), count: 1,
-            first_timestamp: None, last_timestamp: None,
+            reason: "TestReason".into(),
+            message: "test".into(),
+            event_type: "Normal".into(),
+            count: 1,
+            first_timestamp: None,
+            last_timestamp: None,
             source: EventSource::default(),
         })
     }
     fn make_endpoints(name: &str, ns: &str) -> Resource {
         Resource::Endpoints(Endpoints {
-            api_version: "v1".into(), kind: "Endpoints".into(),
-            metadata: ObjectMeta::new(name, ns), subsets: vec![],
+            api_version: "v1".into(),
+            kind: "Endpoints".into(),
+            metadata: ObjectMeta::new(name, ns),
+            subsets: vec![],
         })
     }
     fn make_resourcequota(name: &str, ns: &str) -> Resource {
         Resource::ResourceQuota(ResourceQuota {
-            api_version: "v1".into(), kind: "ResourceQuota".into(),
+            api_version: "v1".into(),
+            kind: "ResourceQuota".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: ResourceQuotaSpec::default(), status: ResourceQuotaStatus::default(),
+            spec: ResourceQuotaSpec::default(),
+            status: ResourceQuotaStatus::default(),
         })
     }
     fn make_limitrange(name: &str, ns: &str) -> Resource {
         Resource::LimitRange(LimitRange {
-            api_version: "v1".into(), kind: "LimitRange".into(),
+            api_version: "v1".into(),
+            kind: "LimitRange".into(),
             metadata: ObjectMeta::new(name, ns),
             spec: LimitRangeSpec::default(),
         })
@@ -346,7 +426,10 @@ mod tests {
     fn test_statefulset_create_and_get() {
         let store = ResourceStore::new();
         store.create(make_statefulset("sts1", "default")).unwrap();
-        assert_eq!(store.get("StatefulSet", "default", "sts1").unwrap().name(), "sts1");
+        assert_eq!(
+            store.get("StatefulSet", "default", "sts1").unwrap().name(),
+            "sts1"
+        );
     }
     #[test]
     fn test_statefulset_list() {
@@ -369,7 +452,10 @@ mod tests {
     fn test_daemonset_create_and_get() {
         let store = ResourceStore::new();
         store.create(make_daemonset("ds1", "default")).unwrap();
-        assert_eq!(store.get("DaemonSet", "default", "ds1").unwrap().name(), "ds1");
+        assert_eq!(
+            store.get("DaemonSet", "default", "ds1").unwrap().name(),
+            "ds1"
+        );
     }
     #[test]
     fn test_daemonset_list() {
@@ -392,7 +478,10 @@ mod tests {
     fn test_replicaset_create_and_get() {
         let store = ResourceStore::new();
         store.create(make_replicaset("rs1", "default")).unwrap();
-        assert_eq!(store.get("ReplicaSet", "default", "rs1").unwrap().name(), "rs1");
+        assert_eq!(
+            store.get("ReplicaSet", "default", "rs1").unwrap().name(),
+            "rs1"
+        );
     }
     #[test]
     fn test_replicaset_list() {
@@ -438,7 +527,10 @@ mod tests {
     fn test_cronjob_create_and_get() {
         let store = ResourceStore::new();
         store.create(make_cronjob("cj1", "default")).unwrap();
-        assert_eq!(store.get("CronJob", "default", "cj1").unwrap().name(), "cj1");
+        assert_eq!(
+            store.get("CronJob", "default", "cj1").unwrap().name(),
+            "cj1"
+        );
     }
     #[test]
     fn test_cronjob_list() {
@@ -461,7 +553,10 @@ mod tests {
     fn test_ingress_create_and_get() {
         let store = ResourceStore::new();
         store.create(make_ingress("ing1", "default")).unwrap();
-        assert_eq!(store.get("Ingress", "default", "ing1").unwrap().name(), "ing1");
+        assert_eq!(
+            store.get("Ingress", "default", "ing1").unwrap().name(),
+            "ing1"
+        );
     }
     #[test]
     fn test_ingress_list() {
@@ -484,7 +579,10 @@ mod tests {
     fn test_networkpolicy_create_and_get() {
         let store = ResourceStore::new();
         store.create(make_networkpolicy("np1", "default")).unwrap();
-        assert_eq!(store.get("NetworkPolicy", "default", "np1").unwrap().name(), "np1");
+        assert_eq!(
+            store.get("NetworkPolicy", "default", "np1").unwrap().name(),
+            "np1"
+        );
     }
     #[test]
     fn test_networkpolicy_list() {
@@ -507,7 +605,10 @@ mod tests {
     fn test_pv_create_and_get() {
         let store = ResourceStore::new();
         store.create(make_pv("pv1")).unwrap();
-        assert_eq!(store.get("PersistentVolume", "", "pv1").unwrap().name(), "pv1");
+        assert_eq!(
+            store.get("PersistentVolume", "", "pv1").unwrap().name(),
+            "pv1"
+        );
     }
     #[test]
     fn test_pv_list() {
@@ -530,7 +631,13 @@ mod tests {
     fn test_pvc_create_and_get() {
         let store = ResourceStore::new();
         store.create(make_pvc("pvc1", "default")).unwrap();
-        assert_eq!(store.get("PersistentVolumeClaim", "default", "pvc1").unwrap().name(), "pvc1");
+        assert_eq!(
+            store
+                .get("PersistentVolumeClaim", "default", "pvc1")
+                .unwrap()
+                .name(),
+            "pvc1"
+        );
     }
     #[test]
     fn test_pvc_list() {
@@ -543,7 +650,9 @@ mod tests {
     fn test_pvc_delete_and_not_found() {
         let store = ResourceStore::new();
         store.create(make_pvc("v", "default")).unwrap();
-        store.delete("PersistentVolumeClaim", "default", "v").unwrap();
+        store
+            .delete("PersistentVolumeClaim", "default", "v")
+            .unwrap();
         assert!(store.get("PersistentVolumeClaim", "default", "v").is_err());
     }
 
@@ -553,7 +662,10 @@ mod tests {
     fn test_storageclass_create_and_get() {
         let store = ResourceStore::new();
         store.create(make_storageclass("standard")).unwrap();
-        assert_eq!(store.get("StorageClass", "", "standard").unwrap().name(), "standard");
+        assert_eq!(
+            store.get("StorageClass", "", "standard").unwrap().name(),
+            "standard"
+        );
     }
     #[test]
     fn test_storageclass_list() {
@@ -622,7 +734,10 @@ mod tests {
     fn test_rolebinding_create_and_get() {
         let store = ResourceStore::new();
         store.create(make_rolebinding("rb1", "default")).unwrap();
-        assert_eq!(store.get("RoleBinding", "default", "rb1").unwrap().name(), "rb1");
+        assert_eq!(
+            store.get("RoleBinding", "default", "rb1").unwrap().name(),
+            "rb1"
+        );
     }
     #[test]
     fn test_rolebinding_list() {
@@ -645,7 +760,10 @@ mod tests {
     fn test_clusterrolebinding_create_and_get() {
         let store = ResourceStore::new();
         store.create(make_clusterrolebinding("crb1")).unwrap();
-        assert_eq!(store.get("ClusterRoleBinding", "", "crb1").unwrap().name(), "crb1");
+        assert_eq!(
+            store.get("ClusterRoleBinding", "", "crb1").unwrap().name(),
+            "crb1"
+        );
     }
     #[test]
     fn test_clusterrolebinding_list() {
@@ -667,8 +785,16 @@ mod tests {
     #[test]
     fn test_serviceaccount_create_and_get() {
         let store = ResourceStore::new();
-        store.create(make_serviceaccount("default", "default")).unwrap();
-        assert_eq!(store.get("ServiceAccount", "default", "default").unwrap().name(), "default");
+        store
+            .create(make_serviceaccount("default", "default"))
+            .unwrap();
+        assert_eq!(
+            store
+                .get("ServiceAccount", "default", "default")
+                .unwrap()
+                .name(),
+            "default"
+        );
     }
     #[test]
     fn test_serviceaccount_list() {
@@ -715,7 +841,10 @@ mod tests {
     fn test_event_create_and_get() {
         let store = ResourceStore::new();
         store.create(make_event("ev1", "default")).unwrap();
-        assert_eq!(store.get("KubeEvent", "default", "ev1").unwrap().name(), "ev1");
+        assert_eq!(
+            store.get("KubeEvent", "default", "ev1").unwrap().name(),
+            "ev1"
+        );
     }
     #[test]
     fn test_event_list() {
@@ -738,7 +867,10 @@ mod tests {
     fn test_endpoints_create_and_get() {
         let store = ResourceStore::new();
         store.create(make_endpoints("ep1", "default")).unwrap();
-        assert_eq!(store.get("Endpoints", "default", "ep1").unwrap().name(), "ep1");
+        assert_eq!(
+            store.get("Endpoints", "default", "ep1").unwrap().name(),
+            "ep1"
+        );
     }
     #[test]
     fn test_endpoints_list() {
@@ -761,7 +893,10 @@ mod tests {
     fn test_resourcequota_create_and_get() {
         let store = ResourceStore::new();
         store.create(make_resourcequota("rq1", "default")).unwrap();
-        assert_eq!(store.get("ResourceQuota", "default", "rq1").unwrap().name(), "rq1");
+        assert_eq!(
+            store.get("ResourceQuota", "default", "rq1").unwrap().name(),
+            "rq1"
+        );
     }
     #[test]
     fn test_resourcequota_list() {
@@ -784,7 +919,10 @@ mod tests {
     fn test_limitrange_create_and_get() {
         let store = ResourceStore::new();
         store.create(make_limitrange("lr1", "default")).unwrap();
-        assert_eq!(store.get("LimitRange", "default", "lr1").unwrap().name(), "lr1");
+        assert_eq!(
+            store.get("LimitRange", "default", "lr1").unwrap().name(),
+            "lr1"
+        );
     }
     #[test]
     fn test_limitrange_list() {
@@ -815,187 +953,251 @@ mod tests_update {
 
     fn make_pod(name: &str, ns: &str) -> Resource {
         Resource::Pod(Pod {
-            api_version: "v1".into(), kind: "Pod".into(),
+            api_version: "v1".into(),
+            kind: "Pod".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: PodSpec::default(), status: PodStatus::default(),
+            spec: PodSpec::default(),
+            status: PodStatus::default(),
         })
     }
     fn make_deployment(name: &str, ns: &str) -> Resource {
         Resource::Deployment(Deployment {
-            api_version: "apps/v1".into(), kind: "Deployment".into(),
+            api_version: "apps/v1".into(),
+            kind: "Deployment".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: DeploymentSpec::default(), status: DeploymentStatus::default(),
+            spec: DeploymentSpec::default(),
+            status: DeploymentStatus::default(),
         })
     }
     fn make_service(name: &str, ns: &str) -> Resource {
         Resource::Service(Service {
-            api_version: "v1".into(), kind: "Service".into(),
+            api_version: "v1".into(),
+            kind: "Service".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: ServiceSpec { service_type: "ClusterIP".into(), selector: HashMap::new(), ports: vec![], cluster_ip: None },
+            spec: ServiceSpec {
+                service_type: "ClusterIP".into(),
+                selector: HashMap::new(),
+                ports: vec![],
+                cluster_ip: None,
+            },
         })
     }
     fn make_secret(name: &str, ns: &str) -> Resource {
         Resource::Secret(Secret {
-            api_version: "v1".into(), kind: "Secret".into(),
+            api_version: "v1".into(),
+            kind: "Secret".into(),
             metadata: ObjectMeta::new(name, ns),
-            data: HashMap::new(), secret_type: "Opaque".into(),
+            data: HashMap::new(),
+            secret_type: "Opaque".into(),
         })
     }
     fn make_configmap(name: &str, ns: &str) -> Resource {
         Resource::ConfigMap(ConfigMap {
-            api_version: "v1".into(), kind: "ConfigMap".into(),
-            metadata: ObjectMeta::new(name, ns), data: HashMap::new(),
+            api_version: "v1".into(),
+            kind: "ConfigMap".into(),
+            metadata: ObjectMeta::new(name, ns),
+            data: HashMap::new(),
         })
     }
     fn make_namespace(name: &str) -> Resource {
         Resource::Namespace(Namespace {
-            api_version: "v1".into(), kind: "Namespace".into(),
+            api_version: "v1".into(),
+            kind: "Namespace".into(),
             metadata: ObjectMeta::new(name, ""),
-            status: NamespaceStatus { phase: "Active".into() },
+            status: NamespaceStatus {
+                phase: "Active".into(),
+            },
         })
     }
     fn make_statefulset(name: &str, ns: &str) -> Resource {
         Resource::StatefulSet(StatefulSet {
-            api_version: "apps/v1".into(), kind: "StatefulSet".into(),
+            api_version: "apps/v1".into(),
+            kind: "StatefulSet".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: StatefulSetSpec::default(), status: StatefulSetStatus::default(),
+            spec: StatefulSetSpec::default(),
+            status: StatefulSetStatus::default(),
         })
     }
     fn make_daemonset(name: &str, ns: &str) -> Resource {
         Resource::DaemonSet(DaemonSet {
-            api_version: "apps/v1".into(), kind: "DaemonSet".into(),
+            api_version: "apps/v1".into(),
+            kind: "DaemonSet".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: DaemonSetSpec::default(), status: DaemonSetStatus::default(),
+            spec: DaemonSetSpec::default(),
+            status: DaemonSetStatus::default(),
         })
     }
     fn make_replicaset(name: &str, ns: &str) -> Resource {
         Resource::ReplicaSet(ReplicaSet {
-            api_version: "apps/v1".into(), kind: "ReplicaSet".into(),
+            api_version: "apps/v1".into(),
+            kind: "ReplicaSet".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: ReplicaSetSpec::default(), status: ReplicaSetStatus::default(),
+            spec: ReplicaSetSpec::default(),
+            status: ReplicaSetStatus::default(),
         })
     }
     fn make_job(name: &str, ns: &str) -> Resource {
         Resource::Job(Job {
-            api_version: "batch/v1".into(), kind: "Job".into(),
+            api_version: "batch/v1".into(),
+            kind: "Job".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: JobSpec::default(), status: JobStatus::default(),
+            spec: JobSpec::default(),
+            status: JobStatus::default(),
         })
     }
     fn make_cronjob(name: &str, ns: &str) -> Resource {
         Resource::CronJob(CronJob {
-            api_version: "batch/v1".into(), kind: "CronJob".into(),
+            api_version: "batch/v1".into(),
+            kind: "CronJob".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: CronJobSpec::default(), status: CronJobStatus::default(),
+            spec: CronJobSpec::default(),
+            status: CronJobStatus::default(),
         })
     }
     fn make_ingress(name: &str, ns: &str) -> Resource {
         Resource::Ingress(Ingress {
-            api_version: "networking.k8s.io/v1".into(), kind: "Ingress".into(),
+            api_version: "networking.k8s.io/v1".into(),
+            kind: "Ingress".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: IngressSpec::default(), status: IngressStatus::default(),
+            spec: IngressSpec::default(),
+            status: IngressStatus::default(),
         })
     }
     fn make_networkpolicy(name: &str, ns: &str) -> Resource {
         Resource::NetworkPolicy(NetworkPolicy {
-            api_version: "networking.k8s.io/v1".into(), kind: "NetworkPolicy".into(),
+            api_version: "networking.k8s.io/v1".into(),
+            kind: "NetworkPolicy".into(),
             metadata: ObjectMeta::new(name, ns),
             spec: NetworkPolicySpec::default(),
         })
     }
     fn make_pv(name: &str) -> Resource {
         Resource::PersistentVolume(PersistentVolume {
-            api_version: "v1".into(), kind: "PersistentVolume".into(),
+            api_version: "v1".into(),
+            kind: "PersistentVolume".into(),
             metadata: ObjectMeta::new(name, ""),
-            spec: PersistentVolumeSpec::default(), status: PersistentVolumeStatus::default(),
+            spec: PersistentVolumeSpec::default(),
+            status: PersistentVolumeStatus::default(),
         })
     }
     fn make_pvc(name: &str, ns: &str) -> Resource {
         Resource::PersistentVolumeClaim(PersistentVolumeClaim {
-            api_version: "v1".into(), kind: "PersistentVolumeClaim".into(),
+            api_version: "v1".into(),
+            kind: "PersistentVolumeClaim".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: PersistentVolumeClaimSpec::default(), status: PersistentVolumeClaimStatus::default(),
+            spec: PersistentVolumeClaimSpec::default(),
+            status: PersistentVolumeClaimStatus::default(),
         })
     }
     fn make_storageclass(name: &str) -> Resource {
         Resource::StorageClass(StorageClass {
-            api_version: "storage.k8s.io/v1".into(), kind: "StorageClass".into(),
+            api_version: "storage.k8s.io/v1".into(),
+            kind: "StorageClass".into(),
             metadata: ObjectMeta::new(name, ""),
-            provisioner: "disk.csi.azure.com".into(), parameters: HashMap::new(),
+            provisioner: "disk.csi.azure.com".into(),
+            parameters: HashMap::new(),
             reclaim_policy: Some("Delete".into()),
             volume_binding_mode: Some("Immediate".into()),
             allow_volume_expansion: true,
         })
     }
     fn role_ref() -> RoleRef {
-        RoleRef { api_group: "rbac.authorization.k8s.io".into(), kind: "Role".into(), name: "r".into() }
+        RoleRef {
+            api_group: "rbac.authorization.k8s.io".into(),
+            kind: "Role".into(),
+            name: "r".into(),
+        }
     }
     fn make_role(name: &str, ns: &str) -> Resource {
         Resource::Role(Role {
-            api_version: "rbac.authorization.k8s.io/v1".into(), kind: "Role".into(),
-            metadata: ObjectMeta::new(name, ns), rules: vec![],
+            api_version: "rbac.authorization.k8s.io/v1".into(),
+            kind: "Role".into(),
+            metadata: ObjectMeta::new(name, ns),
+            rules: vec![],
         })
     }
     fn make_clusterrole(name: &str) -> Resource {
         Resource::ClusterRole(ClusterRole {
-            api_version: "rbac.authorization.k8s.io/v1".into(), kind: "ClusterRole".into(),
-            metadata: ObjectMeta::new(name, ""), rules: vec![], aggregation_rule: None,
+            api_version: "rbac.authorization.k8s.io/v1".into(),
+            kind: "ClusterRole".into(),
+            metadata: ObjectMeta::new(name, ""),
+            rules: vec![],
+            aggregation_rule: None,
         })
     }
     fn make_rolebinding(name: &str, ns: &str) -> Resource {
         Resource::RoleBinding(RoleBinding {
-            api_version: "rbac.authorization.k8s.io/v1".into(), kind: "RoleBinding".into(),
-            metadata: ObjectMeta::new(name, ns), subjects: vec![], role_ref: role_ref(),
+            api_version: "rbac.authorization.k8s.io/v1".into(),
+            kind: "RoleBinding".into(),
+            metadata: ObjectMeta::new(name, ns),
+            subjects: vec![],
+            role_ref: role_ref(),
         })
     }
     fn make_clusterrolebinding(name: &str) -> Resource {
         Resource::ClusterRoleBinding(ClusterRoleBinding {
-            api_version: "rbac.authorization.k8s.io/v1".into(), kind: "ClusterRoleBinding".into(),
-            metadata: ObjectMeta::new(name, ""), subjects: vec![], role_ref: role_ref(),
+            api_version: "rbac.authorization.k8s.io/v1".into(),
+            kind: "ClusterRoleBinding".into(),
+            metadata: ObjectMeta::new(name, ""),
+            subjects: vec![],
+            role_ref: role_ref(),
         })
     }
     fn make_serviceaccount(name: &str, ns: &str) -> Resource {
         Resource::ServiceAccount(ServiceAccount {
-            api_version: "v1".into(), kind: "ServiceAccount".into(),
+            api_version: "v1".into(),
+            kind: "ServiceAccount".into(),
             metadata: ObjectMeta::new(name, ns),
-            secrets: vec![], image_pull_secrets: vec![],
+            secrets: vec![],
+            image_pull_secrets: vec![],
             automount_service_account_token: None,
         })
     }
     fn make_node(name: &str) -> Resource {
         Resource::Node(Node {
-            api_version: "v1".into(), kind: "Node".into(),
+            api_version: "v1".into(),
+            kind: "Node".into(),
             metadata: ObjectMeta::new(name, ""),
-            spec: NodeSpec::default(), status: NodeStatus::default(),
+            spec: NodeSpec::default(),
+            status: NodeStatus::default(),
         })
     }
     fn make_event(name: &str, ns: &str) -> Resource {
         Resource::KubeEvent(KubeEvent {
-            api_version: "v1".into(), kind: "Event".into(),
+            api_version: "v1".into(),
+            kind: "Event".into(),
             metadata: ObjectMeta::new(name, ns),
             involved_object: ObjectReference::default(),
-            reason: "Updated".into(), message: "test update".into(),
-            event_type: "Normal".into(), count: 2,
-            first_timestamp: None, last_timestamp: None,
+            reason: "Updated".into(),
+            message: "test update".into(),
+            event_type: "Normal".into(),
+            count: 2,
+            first_timestamp: None,
+            last_timestamp: None,
             source: EventSource::default(),
         })
     }
     fn make_endpoints(name: &str, ns: &str) -> Resource {
         Resource::Endpoints(Endpoints {
-            api_version: "v1".into(), kind: "Endpoints".into(),
-            metadata: ObjectMeta::new(name, ns), subsets: vec![],
+            api_version: "v1".into(),
+            kind: "Endpoints".into(),
+            metadata: ObjectMeta::new(name, ns),
+            subsets: vec![],
         })
     }
     fn make_resourcequota(name: &str, ns: &str) -> Resource {
         Resource::ResourceQuota(ResourceQuota {
-            api_version: "v1".into(), kind: "ResourceQuota".into(),
+            api_version: "v1".into(),
+            kind: "ResourceQuota".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: ResourceQuotaSpec::default(), status: ResourceQuotaStatus::default(),
+            spec: ResourceQuotaSpec::default(),
+            status: ResourceQuotaStatus::default(),
         })
     }
     fn make_limitrange(name: &str, ns: &str) -> Resource {
         Resource::LimitRange(LimitRange {
-            api_version: "v1".into(), kind: "LimitRange".into(),
+            api_version: "v1".into(),
+            kind: "LimitRange".into(),
             metadata: ObjectMeta::new(name, ns),
             spec: LimitRangeSpec::default(),
         })
@@ -1061,7 +1263,10 @@ mod tests_update {
         let store = ResourceStore::new();
         store.create(make_statefulset("sts", TENANT)).unwrap();
         store.update(make_statefulset("sts", TENANT)).unwrap();
-        assert_eq!(store.get("StatefulSet", TENANT, "sts").unwrap().name(), "sts");
+        assert_eq!(
+            store.get("StatefulSet", TENANT, "sts").unwrap().name(),
+            "sts"
+        );
     }
 
     // upstream: kubernetes/kubernetes pkg/registry/apps/daemonset/storage/storage.go::Update
@@ -1115,7 +1320,10 @@ mod tests_update {
         let store = ResourceStore::new();
         store.create(make_networkpolicy("np", TENANT)).unwrap();
         store.update(make_networkpolicy("np", TENANT)).unwrap();
-        assert_eq!(store.get("NetworkPolicy", TENANT, "np").unwrap().name(), "np");
+        assert_eq!(
+            store.get("NetworkPolicy", TENANT, "np").unwrap().name(),
+            "np"
+        );
     }
 
     // upstream: kubernetes/kubernetes pkg/registry/core/persistentvolume/storage/storage.go::Update
@@ -1124,7 +1332,10 @@ mod tests_update {
         let store = ResourceStore::new();
         store.create(make_pv("pv1")).unwrap();
         store.update(make_pv("pv1")).unwrap();
-        assert_eq!(store.get("PersistentVolume", "", "pv1").unwrap().name(), "pv1");
+        assert_eq!(
+            store.get("PersistentVolume", "", "pv1").unwrap().name(),
+            "pv1"
+        );
     }
 
     // upstream: kubernetes/kubernetes pkg/registry/core/persistentvolumeclaim/storage/storage.go::Update
@@ -1133,7 +1344,13 @@ mod tests_update {
         let store = ResourceStore::new();
         store.create(make_pvc("pvc", TENANT)).unwrap();
         store.update(make_pvc("pvc", TENANT)).unwrap();
-        assert_eq!(store.get("PersistentVolumeClaim", TENANT, "pvc").unwrap().name(), "pvc");
+        assert_eq!(
+            store
+                .get("PersistentVolumeClaim", TENANT, "pvc")
+                .unwrap()
+                .name(),
+            "pvc"
+        );
     }
 
     // upstream: kubernetes/kubernetes pkg/registry/storage/storageclass/storage/storage.go::Update
@@ -1142,7 +1359,10 @@ mod tests_update {
         let store = ResourceStore::new();
         store.create(make_storageclass("standard")).unwrap();
         store.update(make_storageclass("standard")).unwrap();
-        assert_eq!(store.get("StorageClass", "", "standard").unwrap().name(), "standard");
+        assert_eq!(
+            store.get("StorageClass", "", "standard").unwrap().name(),
+            "standard"
+        );
     }
 
     // upstream: kubernetes/kubernetes pkg/registry/rbac/role/storage/storage.go::Update
@@ -1178,7 +1398,10 @@ mod tests_update {
         let store = ResourceStore::new();
         store.create(make_clusterrolebinding("crb")).unwrap();
         store.update(make_clusterrolebinding("crb")).unwrap();
-        assert_eq!(store.get("ClusterRoleBinding", "", "crb").unwrap().name(), "crb");
+        assert_eq!(
+            store.get("ClusterRoleBinding", "", "crb").unwrap().name(),
+            "crb"
+        );
     }
 
     // upstream: kubernetes/kubernetes pkg/registry/core/serviceaccount/storage/storage.go::Update
@@ -1187,7 +1410,10 @@ mod tests_update {
         let store = ResourceStore::new();
         store.create(make_serviceaccount("sa", TENANT)).unwrap();
         store.update(make_serviceaccount("sa", TENANT)).unwrap();
-        assert_eq!(store.get("ServiceAccount", TENANT, "sa").unwrap().name(), "sa");
+        assert_eq!(
+            store.get("ServiceAccount", TENANT, "sa").unwrap().name(),
+            "sa"
+        );
     }
 
     // upstream: kubernetes/kubernetes pkg/registry/core/node/storage/storage.go::Update
@@ -1223,7 +1449,10 @@ mod tests_update {
         let store = ResourceStore::new();
         store.create(make_resourcequota("rq", TENANT)).unwrap();
         store.update(make_resourcequota("rq", TENANT)).unwrap();
-        assert_eq!(store.get("ResourceQuota", TENANT, "rq").unwrap().name(), "rq");
+        assert_eq!(
+            store.get("ResourceQuota", TENANT, "rq").unwrap().name(),
+            "rq"
+        );
     }
 
     // upstream: kubernetes/kubernetes pkg/registry/core/limitrange/storage/storage.go::Update
@@ -1265,43 +1494,59 @@ mod tests_watch {
 
     fn make_cm(name: &str) -> Resource {
         Resource::ConfigMap(ConfigMap {
-            api_version: "v1".into(), kind: "ConfigMap".into(),
-            metadata: ObjectMeta::new(name, TENANT), data: HashMap::new(),
+            api_version: "v1".into(),
+            kind: "ConfigMap".into(),
+            metadata: ObjectMeta::new(name, TENANT),
+            data: HashMap::new(),
         })
     }
     fn make_pod(name: &str) -> Resource {
         Resource::Pod(Pod {
-            api_version: "v1".into(), kind: "Pod".into(),
+            api_version: "v1".into(),
+            kind: "Pod".into(),
             metadata: ObjectMeta::new(name, TENANT),
-            spec: PodSpec::default(), status: PodStatus::default(),
+            spec: PodSpec::default(),
+            status: PodStatus::default(),
         })
     }
     fn make_deployment(name: &str) -> Resource {
         Resource::Deployment(Deployment {
-            api_version: "apps/v1".into(), kind: "Deployment".into(),
+            api_version: "apps/v1".into(),
+            kind: "Deployment".into(),
             metadata: ObjectMeta::new(name, TENANT),
-            spec: DeploymentSpec::default(), status: DeploymentStatus::default(),
+            spec: DeploymentSpec::default(),
+            status: DeploymentStatus::default(),
         })
     }
     fn make_secret(name: &str) -> Resource {
         Resource::Secret(Secret {
-            api_version: "v1".into(), kind: "Secret".into(),
+            api_version: "v1".into(),
+            kind: "Secret".into(),
             metadata: ObjectMeta::new(name, TENANT),
-            data: HashMap::new(), secret_type: "Opaque".into(),
+            data: HashMap::new(),
+            secret_type: "Opaque".into(),
         })
     }
     fn make_service(name: &str) -> Resource {
         Resource::Service(Service {
-            api_version: "v1".into(), kind: "Service".into(),
+            api_version: "v1".into(),
+            kind: "Service".into(),
             metadata: ObjectMeta::new(name, TENANT),
-            spec: ServiceSpec { service_type: "ClusterIP".into(), selector: HashMap::new(), ports: vec![], cluster_ip: None },
+            spec: ServiceSpec {
+                service_type: "ClusterIP".into(),
+                selector: HashMap::new(),
+                ports: vec![],
+                cluster_ip: None,
+            },
         })
     }
     fn make_statefulset(name: &str) -> Resource {
         Resource::StatefulSet(StatefulSet {
-            api_version: "apps/v1".into(), kind: "StatefulSet".into(),
+            api_version: "apps/v1".into(),
+            kind: "StatefulSet".into(),
             metadata: ObjectMeta::new(name, TENANT),
-            spec: StatefulSetSpec::default(), status: StatefulSetStatus::default(),
+            spec: StatefulSetSpec::default(),
+            status: StatefulSetStatus::default(),
         })
     }
 
@@ -1461,7 +1706,14 @@ mod tests_watch {
         store.create(make_cm("c")).unwrap();
         store.create(make_service("s")).unwrap();
         let kinds: Vec<String> = (0..3)
-            .map(|_| rx.try_recv().unwrap().expect("event").resource.kind().to_string())
+            .map(|_| {
+                rx.try_recv()
+                    .unwrap()
+                    .expect("event")
+                    .resource
+                    .kind()
+                    .to_string()
+            })
             .collect();
         assert!(kinds.contains(&"Pod".to_string()));
         assert!(kinds.contains(&"ConfigMap".to_string()));
@@ -1480,29 +1732,37 @@ mod tests_multitenant {
 
     fn make_cm(name: &str, ns: &str) -> Resource {
         Resource::ConfigMap(ConfigMap {
-            api_version: "v1".into(), kind: "ConfigMap".into(),
-            metadata: ObjectMeta::new(name, ns), data: HashMap::new(),
+            api_version: "v1".into(),
+            kind: "ConfigMap".into(),
+            metadata: ObjectMeta::new(name, ns),
+            data: HashMap::new(),
         })
     }
     fn make_pod(name: &str, ns: &str) -> Resource {
         Resource::Pod(Pod {
-            api_version: "v1".into(), kind: "Pod".into(),
+            api_version: "v1".into(),
+            kind: "Pod".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: PodSpec::default(), status: PodStatus::default(),
+            spec: PodSpec::default(),
+            status: PodStatus::default(),
         })
     }
     fn make_secret(name: &str, ns: &str) -> Resource {
         Resource::Secret(Secret {
-            api_version: "v1".into(), kind: "Secret".into(),
+            api_version: "v1".into(),
+            kind: "Secret".into(),
             metadata: ObjectMeta::new(name, ns),
-            data: HashMap::new(), secret_type: "Opaque".into(),
+            data: HashMap::new(),
+            secret_type: "Opaque".into(),
         })
     }
     fn make_deployment(name: &str, ns: &str) -> Resource {
         Resource::Deployment(Deployment {
-            api_version: "apps/v1".into(), kind: "Deployment".into(),
+            api_version: "apps/v1".into(),
+            kind: "Deployment".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: DeploymentSpec::default(), status: DeploymentStatus::default(),
+            spec: DeploymentSpec::default(),
+            status: DeploymentStatus::default(),
         })
     }
 
@@ -1582,7 +1842,9 @@ mod tests_multitenant {
     fn test_tenant_many_resources_per_tenant() {
         let store = ResourceStore::new();
         for i in 0..20u32 {
-            store.create(make_cm(&format!("cm-{i}"), "tenant-heavy")).unwrap();
+            store
+                .create(make_cm(&format!("cm-{i}"), "tenant-heavy"))
+                .unwrap();
         }
         assert_eq!(store.list("ConfigMap", "tenant-heavy").len(), 20);
         assert_eq!(store.list("ConfigMap", "tenant-other").len(), 0);
@@ -1641,22 +1903,28 @@ mod tests_cross_kind {
 
     fn make_cm(name: &str) -> Resource {
         Resource::ConfigMap(ConfigMap {
-            api_version: "v1".into(), kind: "ConfigMap".into(),
-            metadata: ObjectMeta::new(name, TENANT), data: HashMap::new(),
+            api_version: "v1".into(),
+            kind: "ConfigMap".into(),
+            metadata: ObjectMeta::new(name, TENANT),
+            data: HashMap::new(),
         })
     }
     fn make_pod(name: &str) -> Resource {
         Resource::Pod(Pod {
-            api_version: "v1".into(), kind: "Pod".into(),
+            api_version: "v1".into(),
+            kind: "Pod".into(),
             metadata: ObjectMeta::new(name, TENANT),
-            spec: PodSpec::default(), status: PodStatus::default(),
+            spec: PodSpec::default(),
+            status: PodStatus::default(),
         })
     }
     fn make_secret(name: &str) -> Resource {
         Resource::Secret(Secret {
-            api_version: "v1".into(), kind: "Secret".into(),
+            api_version: "v1".into(),
+            kind: "Secret".into(),
             metadata: ObjectMeta::new(name, TENANT),
-            data: HashMap::new(), secret_type: "Opaque".into(),
+            data: HashMap::new(),
+            secret_type: "Opaque".into(),
         })
     }
 
@@ -1782,22 +2050,28 @@ mod tests_edge_cases {
 
     fn pod(name: &str, ns: &str) -> Resource {
         Resource::Pod(Pod {
-            api_version: "v1".into(), kind: "Pod".into(),
+            api_version: "v1".into(),
+            kind: "Pod".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: PodSpec::default(), status: PodStatus::default(),
+            spec: PodSpec::default(),
+            status: PodStatus::default(),
         })
     }
     fn cm(name: &str, ns: &str) -> Resource {
         Resource::ConfigMap(ConfigMap {
-            api_version: "v1".into(), kind: "ConfigMap".into(),
-            metadata: ObjectMeta::new(name, ns), data: HashMap::new(),
+            api_version: "v1".into(),
+            kind: "ConfigMap".into(),
+            metadata: ObjectMeta::new(name, ns),
+            data: HashMap::new(),
         })
     }
     fn deploy(name: &str, ns: &str) -> Resource {
         Resource::Deployment(Deployment {
-            api_version: "apps/v1".into(), kind: "Deployment".into(),
+            api_version: "apps/v1".into(),
+            kind: "Deployment".into(),
             metadata: ObjectMeta::new(name, ns),
-            spec: DeploymentSpec::default(), status: DeploymentStatus::default(),
+            spec: DeploymentSpec::default(),
+            status: DeploymentStatus::default(),
         })
     }
 
@@ -1820,7 +2094,9 @@ mod tests_edge_cases {
             store.create(cm(&format!("cm-{i}"), TENANT)).unwrap();
         }
         for i in 0u32..5 {
-            store.delete("ConfigMap", TENANT, &format!("cm-{i}")).unwrap();
+            store
+                .delete("ConfigMap", TENANT, &format!("cm-{i}"))
+                .unwrap();
         }
         assert_eq!(store.list("ConfigMap", TENANT).len(), 0);
         assert_eq!(store.count("ConfigMap"), 0);
@@ -1923,7 +2199,14 @@ mod tests_edge_cases {
     #[test]
     fn test_fresh_store_is_empty() {
         let store = ResourceStore::new();
-        for kind in ["Pod", "ConfigMap", "Secret", "Deployment", "Service", "Node"] {
+        for kind in [
+            "Pod",
+            "ConfigMap",
+            "Secret",
+            "Deployment",
+            "Service",
+            "Node",
+        ] {
             assert_eq!(store.count(kind), 0);
         }
     }
@@ -1953,7 +2236,7 @@ mod tests_edge_cases {
         let store = ResourceStore::new();
         store.create(pod("pre-sub", TENANT)).unwrap();
         let mut rx = store.subscribe(); // subscribe AFTER create
-        // The event for pre-sub was already sent before rx was created
+                                        // The event for pre-sub was already sent before rx was created
         store.create(pod("post-sub", TENANT)).unwrap();
         let ev = rx.try_recv().unwrap().expect("event");
         assert_eq!(ev.resource.name(), "post-sub");
@@ -1963,9 +2246,15 @@ mod tests_edge_cases {
     #[test]
     fn test_create_many_kinds_count_per_kind() {
         let store = ResourceStore::new();
-        for i in 0u32..5 { store.create(pod(&format!("p{i}"), TENANT)).unwrap(); }
-        for i in 0u32..3 { store.create(cm(&format!("c{i}"), TENANT)).unwrap(); }
-        for i in 0u32..7 { store.create(deploy(&format!("d{i}"), TENANT)).unwrap(); }
+        for i in 0u32..5 {
+            store.create(pod(&format!("p{i}"), TENANT)).unwrap();
+        }
+        for i in 0u32..3 {
+            store.create(cm(&format!("c{i}"), TENANT)).unwrap();
+        }
+        for i in 0u32..7 {
+            store.create(deploy(&format!("d{i}"), TENANT)).unwrap();
+        }
         assert_eq!(store.count("Pod"), 5);
         assert_eq!(store.count("ConfigMap"), 3);
         assert_eq!(store.count("Deployment"), 7);
@@ -2057,7 +2346,10 @@ mod tests_errors {
     // upstream: kubernetes/kubernetes staging/src/k8s.io/apiserver/pkg/api/errors/errors.go::NewNotFound
     #[test]
     fn test_not_found_display() {
-        let e = ApiError::NotFound { kind: "Pod".into(), name: "missing".into() };
+        let e = ApiError::NotFound {
+            kind: "Pod".into(),
+            name: "missing".into(),
+        };
         let s = e.to_string();
         assert!(s.contains("Pod") && s.contains("missing"));
     }
@@ -2065,7 +2357,10 @@ mod tests_errors {
     // upstream: kubernetes/kubernetes staging/src/k8s.io/apiserver/pkg/api/errors/errors.go::NewAlreadyExists
     #[test]
     fn test_already_exists_display() {
-        let e = ApiError::AlreadyExists { kind: "ConfigMap".into(), name: "dup".into() };
+        let e = ApiError::AlreadyExists {
+            kind: "ConfigMap".into(),
+            name: "dup".into(),
+        };
         let s = e.to_string();
         assert!(s.contains("ConfigMap") && s.contains("dup"));
     }
@@ -2105,8 +2400,14 @@ mod tests_errors {
     // upstream: kubernetes/kubernetes staging/src/k8s.io/apiserver/pkg/api/errors/errors.go::IsNotFound
     #[test]
     fn test_not_found_different_kinds() {
-        let e1 = ApiError::NotFound { kind: "Pod".into(), name: "x".into() };
-        let e2 = ApiError::NotFound { kind: "Service".into(), name: "y".into() };
+        let e1 = ApiError::NotFound {
+            kind: "Pod".into(),
+            name: "x".into(),
+        };
+        let e2 = ApiError::NotFound {
+            kind: "Service".into(),
+            name: "y".into(),
+        };
         assert!(e1.to_string().contains("Pod"));
         assert!(e2.to_string().contains("Service"));
     }
@@ -2114,7 +2415,10 @@ mod tests_errors {
     // upstream: kubernetes/kubernetes staging/src/k8s.io/apiserver/pkg/api/errors/errors.go::IsAlreadyExists
     #[test]
     fn test_already_exists_different_tenants() {
-        let e1 = ApiError::AlreadyExists { kind: "Secret".into(), name: "cred".into() };
+        let e1 = ApiError::AlreadyExists {
+            kind: "Secret".into(),
+            name: "cred".into(),
+        };
         assert!(e1.to_string().contains("Secret"));
     }
 
@@ -2147,15 +2451,19 @@ mod tests_generic_storage {
 
     fn cm(name: &str, ns: &str) -> Resource {
         Resource::ConfigMap(ConfigMap {
-            api_version: "v1".into(), kind: "ConfigMap".into(),
-            metadata: ObjectMeta::new(name, ns), data: HashMap::new(),
+            api_version: "v1".into(),
+            kind: "ConfigMap".into(),
+            metadata: ObjectMeta::new(name, ns),
+            data: HashMap::new(),
         })
     }
     fn secret(name: &str, ns: &str) -> Resource {
         Resource::Secret(Secret {
-            api_version: "v1".into(), kind: "Secret".into(),
+            api_version: "v1".into(),
+            kind: "Secret".into(),
             metadata: ObjectMeta::new(name, ns),
-            data: HashMap::new(), secret_type: "Opaque".into(),
+            data: HashMap::new(),
+            secret_type: "Opaque".into(),
         })
     }
 
@@ -2174,13 +2482,19 @@ mod tests_generic_storage {
         let added = rx.try_recv().unwrap().expect("event");
         let modified = rx.try_recv().unwrap().expect("event");
         let deleted = rx.try_recv().unwrap().expect("event");
-        assert!(matches!(added.event_type,    WatchEventType::Added));
+        assert!(matches!(added.event_type, WatchEventType::Added));
         assert!(matches!(modified.event_type, WatchEventType::Modified));
-        assert!(matches!(deleted.event_type,  WatchEventType::Deleted));
-        assert_eq!(added.resource.namespace(),    "acme",
-            "tenant_id invariant: Added event scoped to acme");
-        assert_eq!(deleted.resource.namespace(),  "acme",
-            "tenant_id invariant: Deleted event scoped to acme");
+        assert!(matches!(deleted.event_type, WatchEventType::Deleted));
+        assert_eq!(
+            added.resource.namespace(),
+            "acme",
+            "tenant_id invariant: Added event scoped to acme"
+        );
+        assert_eq!(
+            deleted.resource.namespace(),
+            "acme",
+            "tenant_id invariant: Deleted event scoped to acme"
+        );
     }
 
     /// Upstream parity: `TestStore_TenantIsolatedDeleteDoesNotAffectPeer`
@@ -2192,12 +2506,16 @@ mod tests_generic_storage {
         store.create(cm("shared", "acme")).unwrap();
         store.create(cm("shared", "globex")).unwrap();
         store.delete("ConfigMap", "acme", "shared").unwrap();
-        let acme_q  = store.get("ConfigMap", "acme",   "shared");
+        let acme_q = store.get("ConfigMap", "acme", "shared");
         let globex_q = store.get("ConfigMap", "globex", "shared");
-        assert!(acme_q.is_err(),
-            "tenant_id invariant: acme's object removed");
-        assert!(globex_q.is_ok(),
-            "tenant_id invariant: globex's same-named object UNAFFECTED");
+        assert!(
+            acme_q.is_err(),
+            "tenant_id invariant: acme's object removed"
+        );
+        assert!(
+            globex_q.is_ok(),
+            "tenant_id invariant: globex's same-named object UNAFFECTED"
+        );
         let g = globex_q.unwrap();
         assert_eq!(g.namespace(), "globex");
     }
@@ -2212,13 +2530,17 @@ mod tests_generic_storage {
         store.create(cm("c3", "globex")).unwrap();
         store.create(secret("s1", "acme")).unwrap();
         assert_eq!(store.count("ConfigMap"), 3);
-        assert_eq!(store.count("Secret"),   1);
+        assert_eq!(store.count("Secret"), 1);
         // tenant_id invariant: per-tenant list still segregates by namespace.
         assert_eq!(store.list("ConfigMap", "acme").len(), 2);
         assert_eq!(store.list("ConfigMap", "globex").len(), 1);
-        assert!(store.list("ConfigMap", "acme").iter()
-            .all(|r| r.namespace() == "acme"),
-            "tenant_id invariant: acme list strictly scoped");
+        assert!(
+            store
+                .list("ConfigMap", "acme")
+                .iter()
+                .all(|r| r.namespace() == "acme"),
+            "tenant_id invariant: acme list strictly scoped"
+        );
     }
 
     /// Upstream parity: `TestStore_UpdateMissingObjectReturnsNotFound`
@@ -2228,7 +2550,9 @@ mod tests_generic_storage {
     fn test_update_missing_object_returns_not_found_and_does_not_insert() {
         let store = ResourceStore::new();
         let r = cm("ghost", "acme");
-        let err = store.update(r).expect_err("update of missing object must fail");
+        let err = store
+            .update(r)
+            .expect_err("update of missing object must fail");
         match err {
             ApiError::NotFound { kind, name } => {
                 assert_eq!(kind, "ConfigMap");
@@ -2237,7 +2561,10 @@ mod tests_generic_storage {
             other => panic!("expected NotFound, got {:?}", other),
         }
         // tenant_id invariant: no acme insertion side-effect.
-        assert_eq!(store.list("ConfigMap", "acme").len(), 0,
-            "tenant_id invariant: failed update never created acme entry");
+        assert_eq!(
+            store.list("ConfigMap", "acme").len(),
+            0,
+            "tenant_id invariant: failed update never created acme entry"
+        );
     }
 }

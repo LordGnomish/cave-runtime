@@ -22,8 +22,8 @@ use cave_apiserver::admission::{
     Operation, TenantIdInjector, TenantIdRequired, ValidatingWebhook,
 };
 use cave_apiserver::builtin_admission::{
-    ContainerResources, LimitRangeError, LimitRangeItem, LimitRangeItemType, QuotaError,
-    ResourceQuota, ResourceQuotaSpec, apply_container_defaults, check_quota, validate_container,
+    apply_container_defaults, check_quota, validate_container, ContainerResources, LimitRangeError,
+    LimitRangeItem, LimitRangeItemType, QuotaError, ResourceQuota, ResourceQuotaSpec,
 };
 use cave_apiserver::resources::{ConfigMap, ObjectMeta, Resource};
 use cave_apiserver::selectors::{FieldSelector, LabelOperator, LabelSelector};
@@ -72,10 +72,7 @@ fn upstream_label_selector_parse_equals_single() {
     let sel = LabelSelector::parse("env=prod").unwrap();
     assert_eq!(sel.requirements.len(), 1);
     assert_eq!(sel.requirements[0].key, "env");
-    assert_eq!(
-        sel.requirements[0].op,
-        LabelOperator::Equals("prod".into())
-    );
+    assert_eq!(sel.requirements[0].op, LabelOperator::Equals("prod".into()));
 }
 
 /// Upstream: TestParse / `key in (a, b, c)` set-based.
@@ -154,7 +151,11 @@ fn upstream_namespace_lifecycle_denies_kube_system_writes_by_non_system_user() {
 fn upstream_namespace_lifecycle_allows_kube_system_writes_by_system_user() {
     let r = req(Operation::Create, "kube-system", "t1", "system:apiserver");
     let resp = NamespaceLifecycle.validate(&r);
-    assert!(resp.allowed, "expected allow, got {:?}", resp.status_message);
+    assert!(
+        resp.allowed,
+        "expected allow, got {:?}",
+        resp.status_message
+    );
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -261,7 +262,11 @@ fn upstream_limit_ranger_validate_container_rejects_below_min() {
         ..Default::default()
     }];
     match validate_container(&container, &items) {
-        Err(LimitRangeError::Below { resource, value, min }) => {
+        Err(LimitRangeError::Below {
+            resource,
+            value,
+            min,
+        }) => {
             assert_eq!(resource, "cpu");
             assert_eq!(value, 50);
             assert_eq!(min, 100);

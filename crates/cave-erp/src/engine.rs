@@ -17,10 +17,7 @@ pub fn doc_total(lines_subtotals: &[f64]) -> f64 {
 }
 
 /// Aggregate on-hand quantities by location from done stock moves
-pub fn on_hand_by_location(
-    moves: &[StockMove],
-    product_id: Uuid,
-) -> HashMap<Uuid, f64> {
+pub fn on_hand_by_location(moves: &[StockMove], product_id: Uuid) -> HashMap<Uuid, f64> {
     let mut result: HashMap<Uuid, f64> = HashMap::new();
 
     for m in moves {
@@ -41,11 +38,7 @@ pub fn on_hand_by_location(
 }
 
 /// Multi-level BOM explosion with recursive lookup
-pub fn explode_bom(
-    bom: &Bom,
-    boms: &HashMap<Uuid, Bom>,
-    target_qty: f64,
-) -> Vec<(Uuid, f64)> {
+pub fn explode_bom(bom: &Bom, boms: &HashMap<Uuid, Bom>, target_qty: f64) -> Vec<(Uuid, f64)> {
     let mut result: HashMap<Uuid, f64> = HashMap::new();
 
     fn recurse(
@@ -230,8 +223,7 @@ mod tests {
             created_at: chrono::Utc::now(),
         };
 
-        let boms = std::iter::once((bom_a.id, bom_a.clone()))
-            .collect::<HashMap<_, _>>();
+        let boms = std::iter::once((bom_a.id, bom_a.clone())).collect::<HashMap<_, _>>();
 
         let explosion = explode_bom(&bom_a, &boms, 5.0);
         assert_eq!(explosion.len(), 1);

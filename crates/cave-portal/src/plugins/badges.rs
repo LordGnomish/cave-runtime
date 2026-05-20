@@ -278,9 +278,14 @@ mod tests {
     fn badge_color_css_distinct() {
         let mut seen = std::collections::HashSet::new();
         for c in [
-            BadgeColor::BrightGreen, BadgeColor::Green, BadgeColor::YellowGreen,
-            BadgeColor::Yellow, BadgeColor::Orange, BadgeColor::Red,
-            BadgeColor::Lightgrey, BadgeColor::Blue,
+            BadgeColor::BrightGreen,
+            BadgeColor::Green,
+            BadgeColor::YellowGreen,
+            BadgeColor::Yellow,
+            BadgeColor::Orange,
+            BadgeColor::Red,
+            BadgeColor::Lightgrey,
+            BadgeColor::Blue,
         ] {
             assert!(seen.insert(c.css()));
         }
@@ -288,7 +293,11 @@ mod tests {
 
     #[test]
     fn badge_serializes() {
-        let b = Badge { label: "L".into(), message: "M".into(), color: BadgeColor::Green };
+        let b = Badge {
+            label: "L".into(),
+            message: "M".into(),
+            color: BadgeColor::Green,
+        };
         let s = serde_json::to_string(&b).unwrap();
         assert!(s.contains("\"color\":\"green\""));
     }

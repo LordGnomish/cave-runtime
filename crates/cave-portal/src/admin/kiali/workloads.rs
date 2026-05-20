@@ -76,7 +76,14 @@ pub(super) fn render_section(
 </section>"#,
         n = rows.len(),
         tbl = table(
-            &["name", "namespace", "sidecar", "health", "in rpm", "out rpm"],
+            &[
+                "name",
+                "namespace",
+                "sidecar",
+                "health",
+                "in rpm",
+                "out rpm"
+            ],
             &table_rows
         ),
     ))
@@ -147,7 +154,14 @@ mod tests {
     fn render_section_emits_kiali_columns() {
         let s = AdminState::seeded();
         let html = render_section(&s, &ctx(&[Permission::KialiRead])).unwrap();
-        for col in ["name", "namespace", "sidecar", "health", "in rpm", "out rpm"] {
+        for col in [
+            "name",
+            "namespace",
+            "sidecar",
+            "health",
+            "in rpm",
+            "out rpm",
+        ] {
             assert!(html.contains(&format!(">{}<", col)));
         }
     }

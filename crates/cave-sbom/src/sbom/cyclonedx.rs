@@ -174,8 +174,8 @@ fn ctype_from_str(s: Option<&str>) -> ComponentType {
 /// Parse CycloneDX XML — minimal but spec-faithful for `bom > components > component`
 /// + `bom > dependencies > dependency` shape used by Dependency-Track integration tests.
 pub fn parse_xml(input: &[u8]) -> Result<IngestResult, CycloneDxError> {
-    use quick_xml::events::Event;
     use quick_xml::Reader;
+    use quick_xml::events::Event;
     let mut reader = Reader::from_reader(input);
     reader.config_mut().trim_text(true);
     let mut buf = Vec::new();
@@ -246,7 +246,8 @@ pub fn parse_xml(input: &[u8]) -> Result<IngestResult, CycloneDxError> {
                     } else if !bom_ref.is_empty() {
                         current_dep_children.push(bom_ref);
                     }
-                } else if local == "name" || local == "version" || local == "purl" || local == "id" {
+                } else if local == "name" || local == "version" || local == "purl" || local == "id"
+                {
                     text_target = Some(match local.as_str() {
                         "name" => "name",
                         "version" => "version",
@@ -257,7 +258,10 @@ pub fn parse_xml(input: &[u8]) -> Result<IngestResult, CycloneDxError> {
                 }
             }
             Ok(Event::Text(t)) => {
-                let s = t.unescape().map_err(|e| CycloneDxError::Xml(e.to_string()))?.into_owned();
+                let s = t
+                    .unescape()
+                    .map_err(|e| CycloneDxError::Xml(e.to_string()))?
+                    .into_owned();
                 if let (Some(tag), Some(c)) = (text_target, current_component.as_mut()) {
                     match tag {
                         "name" => c.name = s,
@@ -354,7 +358,10 @@ mod tests {
         assert_eq!(r.components.len(), 2);
         assert_eq!(r.components[0].name, "lodash");
         assert_eq!(r.components[0].license.as_deref(), Some("MIT"));
-        assert_eq!(r.components[1].license.as_deref(), Some("MIT OR Apache-2.0"));
+        assert_eq!(
+            r.components[1].license.as_deref(),
+            Some("MIT OR Apache-2.0")
+        );
     }
 
     #[test]
@@ -383,7 +390,10 @@ mod tests {
     #[test]
     fn parse_cyclonedx_json_rejects_non_cyclonedx() {
         let bad = br#"{"bomFormat":"SPDX","specVersion":"2.3"}"#;
-        assert!(matches!(parse_json(bad), Err(CycloneDxError::WrongFormat(_))));
+        assert!(matches!(
+            parse_json(bad),
+            Err(CycloneDxError::WrongFormat(_))
+        ));
     }
 
     #[test]

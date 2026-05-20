@@ -27,7 +27,7 @@ pub mod status;
 pub mod targets;
 pub mod tsdb;
 
-pub use targets::{list_targets, TargetRow as PrometheusTargetRow};
+pub use targets::{TargetRow as PrometheusTargetRow, list_targets};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum PrometheusViewError {
@@ -74,8 +74,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, Prometheus
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite =
-    Cite::backstage("plugins/prometheus/src/components/Targets.tsx", "Targets");
+const FILE_CITE: Cite = Cite::backstage("plugins/prometheus/src/components/Targets.tsx", "Targets");
 
 #[cfg(test)]
 mod tests {

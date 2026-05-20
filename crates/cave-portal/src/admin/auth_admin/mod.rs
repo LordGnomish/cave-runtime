@@ -89,7 +89,8 @@ pub fn render_admin_nav(current_path: &str) -> String {
     for (label, href) in admin_tabs() {
         let active = current_path.starts_with(href.split('?').next().unwrap_or(href))
             && (href == current_path
-                || current_path.starts_with(&format!("{}/", href.split('?').next().unwrap_or(href))));
+                || current_path
+                    .starts_with(&format!("{}/", href.split('?').next().unwrap_or(href))));
         let cls = if active {
             "px-3 py-2 border-b-2 border-blue-600 text-blue-700 font-medium whitespace-nowrap"
         } else {

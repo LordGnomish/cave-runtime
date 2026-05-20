@@ -5,11 +5,11 @@
 //! upstream: https://github.com/keycloak/keycloak/blob/v22.0.0/services/src/main/java/org/keycloak/services/resources/RealmsResource.java
 
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::get,
-    Json, Router,
 };
 
 use crate::keycloak::token_endpoint::KeycloakTokenService;
@@ -40,7 +40,10 @@ pub async fn discovery_endpoint(
 
 pub fn router(svc: KeycloakTokenService) -> Router {
     Router::new()
-        .route("/realms/{realm}/.well-known/openid-configuration", get(discovery_endpoint))
+        .route(
+            "/realms/{realm}/.well-known/openid-configuration",
+            get(discovery_endpoint),
+        )
         .with_state(svc)
 }
 
@@ -58,7 +61,9 @@ mod tests {
     use tower::ServiceExt;
 
     async fn body_json(resp: axum::response::Response) -> Value {
-        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         serde_json::from_slice(&bytes).unwrap_or(Value::Null)
     }
 
@@ -116,7 +121,10 @@ mod tests {
         let (_, body) = fetch_discovery("acme").await;
         let issuer = body["issuer"].as_str().unwrap();
         assert!(issuer.ends_with("/realms/acme"), "issuer={issuer}");
-        assert!(!issuer.ends_with('/'), "issuer must not have trailing slash");
+        assert!(
+            !issuer.ends_with('/'),
+            "issuer must not have trailing slash"
+        );
     }
 
     // upstream: openid-connect-discovery-1_0.html §3 — every endpoint URL
@@ -157,7 +165,9 @@ mod tests {
             "scopes_supported",
             "claims_supported",
         ] {
-            let arr = body[key].as_array().unwrap_or_else(|| panic!("{key} not an array"));
+            let arr = body[key]
+                .as_array()
+                .unwrap_or_else(|| panic!("{key} not an array"));
             assert!(!arr.is_empty(), "{key} must not be empty");
         }
     }

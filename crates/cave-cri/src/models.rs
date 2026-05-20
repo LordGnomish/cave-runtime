@@ -60,8 +60,7 @@ pub enum ContainerStatus {
     Failed(String),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum NetworkMode {
     Host,
     #[default]
@@ -69,16 +68,15 @@ pub enum NetworkMode {
     None,
 }
 
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum RestartPolicy {
     #[default]
     Never,
-    OnFailure { max_retries: u32 },
+    OnFailure {
+        max_retries: u32,
+    },
     Always,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Mount {
@@ -239,7 +237,10 @@ impl ImageReference {
             if ref_without_digest[idx + 1..].contains('/') {
                 (ref_without_digest, None)
             } else {
-                (&ref_without_digest[..idx], Some(ref_without_digest[idx + 1..].to_string()))
+                (
+                    &ref_without_digest[..idx],
+                    Some(ref_without_digest[idx + 1..].to_string()),
+                )
             }
         } else {
             (ref_without_digest, None)
@@ -248,16 +249,30 @@ impl ImageReference {
         let (registry, repository) = if ref_without_tag.contains('/') {
             let first_slash = ref_without_tag.find('/').unwrap();
             let maybe_registry = &ref_without_tag[..first_slash];
-            if maybe_registry.contains('.') || maybe_registry.contains(':') || maybe_registry == "localhost" {
-                (maybe_registry.to_string(), ref_without_tag[first_slash + 1..].to_string())
+            if maybe_registry.contains('.')
+                || maybe_registry.contains(':')
+                || maybe_registry == "localhost"
+            {
+                (
+                    maybe_registry.to_string(),
+                    ref_without_tag[first_slash + 1..].to_string(),
+                )
             } else {
                 ("docker.io".to_string(), ref_without_tag.to_string())
             }
         } else {
-            ("docker.io".to_string(), format!("library/{}", ref_without_tag))
+            (
+                "docker.io".to_string(),
+                format!("library/{}", ref_without_tag),
+            )
         };
 
-        Self { registry, repository, tag, digest }
+        Self {
+            registry,
+            repository,
+            tag,
+            digest,
+        }
     }
 
     pub fn full_reference(&self) -> String {
@@ -552,7 +567,7 @@ impl Default for HealthCheck {
 pub enum HealthCheckKind {
     Exec { command: Vec<String> },
     Http { url: String, expected_status: u16 },
-    Tcp  { host: String, port: u16 },
+    Tcp { host: String, port: u16 },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -591,7 +606,10 @@ pub struct LogConfig {
 
 impl Default for LogConfig {
     fn default() -> Self {
-        Self { max_size_bytes: 10 * 1024 * 1024, max_files: 5 }
+        Self {
+            max_size_bytes: 10 * 1024 * 1024,
+            max_files: 5,
+        }
     }
 }
 
@@ -716,19 +734,34 @@ mod tests {
 
     #[test]
     fn test_full_reference_no_tag_no_digest() {
-        let r = ImageReference { registry: "docker.io".into(), repository: "library/nginx".into(), tag: None, digest: None };
+        let r = ImageReference {
+            registry: "docker.io".into(),
+            repository: "library/nginx".into(),
+            tag: None,
+            digest: None,
+        };
         assert_eq!(r.full_reference(), "docker.io/library/nginx");
     }
 
     #[test]
     fn test_full_reference_tag_only() {
-        let r = ImageReference { registry: "docker.io".into(), repository: "library/nginx".into(), tag: Some("1.25".into()), digest: None };
+        let r = ImageReference {
+            registry: "docker.io".into(),
+            repository: "library/nginx".into(),
+            tag: Some("1.25".into()),
+            digest: None,
+        };
         assert_eq!(r.full_reference(), "docker.io/library/nginx:1.25");
     }
 
     #[test]
     fn test_full_reference_digest_only() {
-        let r = ImageReference { registry: "docker.io".into(), repository: "library/nginx".into(), tag: None, digest: Some("sha256:abc".into()) };
+        let r = ImageReference {
+            registry: "docker.io".into(),
+            repository: "library/nginx".into(),
+            tag: None,
+            digest: Some("sha256:abc".into()),
+        };
         assert_eq!(r.full_reference(), "docker.io/library/nginx@sha256:abc");
     }
 
@@ -739,7 +772,8 @@ mod tests {
         for json in [r#""Host""#, r#""Bridge""#, r#""None""#] {
             let _: NetworkMode = serde_json::from_str(json).unwrap();
         }
-        let modes: Vec<NetworkMode> = vec![NetworkMode::Host, NetworkMode::Bridge, NetworkMode::None];
+        let modes: Vec<NetworkMode> =
+            vec![NetworkMode::Host, NetworkMode::Bridge, NetworkMode::None];
         for m in modes {
             let s = serde_json::to_string(&m).unwrap();
             let _: NetworkMode = serde_json::from_str(&s).unwrap();
@@ -805,7 +839,12 @@ mod tests {
 
     #[test]
     fn test_resource_limits_zero_values() {
-        let r = ResourceLimits { cpu_shares: Some(0), cpu_quota: Some(0), memory_limit: Some(0), pids_limit: Some(0) };
+        let r = ResourceLimits {
+            cpu_shares: Some(0),
+            cpu_quota: Some(0),
+            memory_limit: Some(0),
+            pids_limit: Some(0),
+        };
         let json = serde_json::to_string(&r).unwrap();
         let back: ResourceLimits = serde_json::from_str(&json).unwrap();
         assert_eq!(back.cpu_shares, Some(0));
@@ -815,7 +854,12 @@ mod tests {
 
     #[test]
     fn test_resource_limits_max_values() {
-        let r = ResourceLimits { cpu_shares: Some(u64::MAX), cpu_quota: Some(i64::MAX), memory_limit: Some(u64::MAX), pids_limit: Some(u64::MAX) };
+        let r = ResourceLimits {
+            cpu_shares: Some(u64::MAX),
+            cpu_quota: Some(i64::MAX),
+            memory_limit: Some(u64::MAX),
+            pids_limit: Some(u64::MAX),
+        };
         let json = serde_json::to_string(&r).unwrap();
         let back: ResourceLimits = serde_json::from_str(&json).unwrap();
         assert_eq!(back.cpu_shares, Some(u64::MAX));

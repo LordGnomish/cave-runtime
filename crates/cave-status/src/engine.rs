@@ -21,7 +21,11 @@ use crate::models::{ComponentStatus, StatusComponent, StatusPage};
 /// * `3` - UnderMaintenance
 /// * `4` - MajorOutage
 pub fn compute_overall_status(components: &[StatusComponent]) -> ComponentStatus {
-    let worst = components.iter().map(|c| status_rank(&c.status)).max().unwrap_or(0);
+    let worst = components
+        .iter()
+        .map(|c| status_rank(&c.status))
+        .max()
+        .unwrap_or(0);
     rank_to_status(worst)
 }
 
@@ -65,7 +69,9 @@ pub fn count_by_status(components: &[StatusComponent]) -> std::collections::Hash
 /// `ComponentStatus::Operational`, indicating some form of issue
 /// or maintenance.
 pub fn has_issues(page: &StatusPage) -> bool {
-    page.components.iter().any(|c| c.status != ComponentStatus::Operational)
+    page.components
+        .iter()
+        .any(|c| c.status != ComponentStatus::Operational)
 }
 
 #[cfg(test)]

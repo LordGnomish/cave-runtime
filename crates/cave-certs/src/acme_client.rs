@@ -12,8 +12,8 @@
 //! `pkg/issuer/acme/order/order.go::syncOrderStatus`.
 
 use cave_acme::{
-    Account, AcmeError, AcmeResult, AcmeServer, ChallengeStatus, ChallengeType,
-    Identifier, Jwk, OrderStatus,
+    Account, AcmeError, AcmeResult, AcmeServer, ChallengeStatus, ChallengeType, Identifier, Jwk,
+    OrderStatus,
 };
 
 #[derive(Debug)]
@@ -34,14 +34,13 @@ impl<'a> AcmeClient<'a> {
         contact: Vec<String>,
     ) -> AcmeResult<Self> {
         let tenant_id = tenant_id.into();
-        let account_id = server.new_account(
-            tenant_id.clone(),
-            jwk.clone(),
-            contact,
-            true,
-            None,
-        )?;
-        Ok(Self { server, tenant_id, account_id, jwk })
+        let account_id = server.new_account(tenant_id.clone(), jwk.clone(), contact, true, None)?;
+        Ok(Self {
+            server,
+            tenant_id,
+            account_id,
+            jwk,
+        })
     }
 
     pub fn account(&self) -> AcmeResult<&Account> {
@@ -51,9 +50,9 @@ impl<'a> AcmeClient<'a> {
     /// Cite: RFC 8555 §7.4 (newOrder) — submit DNS identifiers; server
     /// returns the order id which is the URL slug for finalize/cert.
     pub fn new_order(&mut self, dns_names: &[&str]) -> AcmeResult<String> {
-        let identifiers: Vec<Identifier> = dns_names.iter()
-            .map(|n| Identifier::dns(*n)).collect();
-        self.server.new_order(&self.tenant_id, &self.account_id, identifiers)
+        let identifiers: Vec<Identifier> = dns_names.iter().map(|n| Identifier::dns(*n)).collect();
+        self.server
+            .new_order(&self.tenant_id, &self.account_id, identifiers)
     }
 
     /// Cite: RFC 8555 §8 — drive every authorization on the order to
@@ -64,8 +63,11 @@ impl<'a> AcmeClient<'a> {
         order_id: &str,
         kind: ChallengeType,
     ) -> AcmeResult<Vec<String>> {
-        let authz_ids: Vec<String> = self.server.order(&self.tenant_id, order_id)?
-            .authorization_ids.clone();
+        let authz_ids: Vec<String> = self
+            .server
+            .order(&self.tenant_id, order_id)?
+            .authorization_ids
+            .clone();
         let mut solved = Vec::new();
         for aid in &authz_ids {
             // We don't expose authorization() publicly on AcmeServer,
@@ -75,7 +77,8 @@ impl<'a> AcmeClient<'a> {
             // Find the challenge of the requested kind by walking the
             // authz lookup via the public mark_challenge_valid path.
             let challenge_id = self.find_challenge_id(aid, kind)?;
-            self.server.mark_challenge_valid(&self.tenant_id, &challenge_id)?;
+            self.server
+                .mark_challenge_valid(&self.tenant_id, &challenge_id)?;
             solved.push(challenge_id);
         }
         Ok(solved)
@@ -90,7 +93,9 @@ impl<'a> AcmeClient<'a> {
         // pending.
         Err(AcmeError::Malformed(
             "AcmeClient::solve_challenges requires AcmeServer to expose authorization iterators \
-             — landing in a follow-up batch".into()))
+             — landing in a follow-up batch"
+                .into(),
+        ))
     }
 
     /// Cite: RFC 8555 §7.4 (finalize) — once every authz is valid the
@@ -101,7 +106,8 @@ impl<'a> AcmeClient<'a> {
         order_id: &str,
         certificate_url: impl Into<String>,
     ) -> AcmeResult<()> {
-        self.server.finalize_order(&self.tenant_id, order_id, certificate_url)
+        self.server
+            .finalize_order(&self.tenant_id, order_id, certificate_url)
     }
 
     /// Cite: RFC 8555 §7.4 — order status is consulted by the renewal
@@ -110,8 +116,12 @@ impl<'a> AcmeClient<'a> {
         Ok(self.server.order(&self.tenant_id, order_id)?.status)
     }
 
-    pub fn challenge_status_count(&self, order_id: &str, status: ChallengeStatus) -> AcmeResult<usize> {
-        let _ = (order_id, status);  // tracked via order status; placeholder.
+    pub fn challenge_status_count(
+        &self,
+        order_id: &str,
+        status: ChallengeStatus,
+    ) -> AcmeResult<usize> {
+        let _ = (order_id, status); // tracked via order status; placeholder.
         Ok(0)
     }
 }

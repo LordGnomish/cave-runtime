@@ -52,17 +52,24 @@ pub async fn proxy_handler(
         .headers()
         .iter()
         .filter_map(|(k, v)| {
-            v.to_str().ok().map(|val| (k.as_str().to_lowercase(), val.to_string()))
+            v.to_str()
+                .ok()
+                .map(|val| (k.as_str().to_lowercase(), val.to_string()))
         })
         .collect();
 
-    let protocol = if headers.get("upgrade").map(|v| v.to_lowercase()) == Some("websocket".to_string()) {
-        Protocol::Ws
-    } else if headers.get("content-type").map(|v| v.starts_with("application/grpc")) == Some(true) {
-        Protocol::Grpc
-    } else {
-        Protocol::Http
-    };
+    let protocol =
+        if headers.get("upgrade").map(|v| v.to_lowercase()) == Some("websocket".to_string()) {
+            Protocol::Ws
+        } else if headers
+            .get("content-type")
+            .map(|v| v.starts_with("application/grpc"))
+            == Some(true)
+        {
+            Protocol::Grpc
+        } else {
+            Protocol::Http
+        };
 
     // Collect body (buffered)
     let body_bytes = match axum::body::to_bytes(req.into_body(), 128 * 1024 * 1024).await {
@@ -71,7 +78,13 @@ pub async fn proxy_handler(
     };
 
     // Build plugin context
-    let mut ctx = PluginCtx::new(method.clone(), full_path.clone(), headers.clone(), body_bytes.clone(), client_ip.clone());
+    let mut ctx = PluginCtx::new(
+        method.clone(),
+        full_path.clone(),
+        headers.clone(),
+        body_bytes.clone(),
+        client_ip.clone(),
+    );
 
     // Compile routes for matching
     let routes = state.store.list_routes();
@@ -85,23 +98,28 @@ pub async fn proxy_handler(
         None => {
             return (
                 StatusCode::NOT_FOUND,
-                axum::Json(serde_json::json!({"message": "no route and no API found with those values"})),
-            ).into_response();
+                axum::Json(
+                    serde_json::json!({"message": "no route and no API found with those values"}),
+                ),
+            )
+                .into_response();
         }
     };
 
     ctx.route_id = Some(match_result.route_id);
 
     // Resolve service
-    let service = match match_result.service_id.and_then(|id| {
-        state.store.services.get(&id).map(|e| e.value().clone())
-    }) {
+    let service = match match_result
+        .service_id
+        .and_then(|id| state.store.services.get(&id).map(|e| e.value().clone()))
+    {
         Some(s) => s,
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(serde_json::json!({"message": "service not found for route"})),
-            ).into_response();
+            )
+                .into_response();
         }
     };
 
@@ -127,8 +145,8 @@ pub async fn proxy_handler(
     let _upstream_url = resolve_upstream_url(&state.store, &service, &match_result, &path);
 
     // Proxy the request
-    let http_method = reqwest::Method::from_bytes(ctx.method.as_bytes())
-        .unwrap_or(reqwest::Method::GET);
+    let http_method =
+        reqwest::Method::from_bytes(ctx.method.as_bytes()).unwrap_or(reqwest::Method::GET);
 
     let mut forward_headers = HeaderMap::new();
     for (k, v) in &ctx.headers {
@@ -150,11 +168,13 @@ pub async fn proxy_handler(
     }
     let _ = forward_headers.insert(
         axum::http::HeaderName::from_static("x-forwarded-for"),
-        axum::http::HeaderValue::from_str(&client_ip).unwrap_or_else(|_| axum::http::HeaderValue::from_static("unknown")),
+        axum::http::HeaderValue::from_str(&client_ip)
+            .unwrap_or_else(|_| axum::http::HeaderValue::from_static("unknown")),
     );
     let _ = forward_headers.insert(
         axum::http::HeaderName::from_static("x-real-ip"),
-        axum::http::HeaderValue::from_str(&client_ip).unwrap_or_else(|_| axum::http::HeaderValue::from_static("unknown")),
+        axum::http::HeaderValue::from_str(&client_ip)
+            .unwrap_or_else(|_| axum::http::HeaderValue::from_static("unknown")),
     );
 
     // Pick endpoint for LB
@@ -163,8 +183,13 @@ pub async fn proxy_handler(
         if let Some(upstream) = state.store.get_upstream_by_id_or_name(&service.host) {
             let targets = state.store.targets_for_upstream(&upstream.id);
             if let Some(ep) = state.proxy.pick_endpoint(&upstream, &targets, None) {
-                let url = format!("{}://{}:{}{}", scheme_for_service(&service), ep.host, ep.port,
-                    upstream_path(&match_result, &path, service.path.as_deref()));
+                let url = format!(
+                    "{}://{}:{}{}",
+                    scheme_for_service(&service),
+                    ep.host,
+                    ep.port,
+                    upstream_path(&match_result, &path, service.path.as_deref())
+                );
                 (ep.target_id, url)
             } else {
                 return StatusCode::SERVICE_UNAVAILABLE.into_response();
@@ -172,13 +197,27 @@ pub async fn proxy_handler(
         } else {
             // Direct to service host
             let up_path = upstream_path(&match_result, &path, service.path.as_deref());
-            let url = format!("{}://{}:{}{}", scheme_for_service(&service), service.host, service.port, up_path);
+            let url = format!(
+                "{}://{}:{}{}",
+                scheme_for_service(&service),
+                service.host,
+                service.port,
+                up_path
+            );
             (uuid::Uuid::new_v4(), url)
         }
     };
 
-    let response = state.proxy
-        .proxy_with_retry(&upstream_url, http_method, forward_headers, ctx.body.clone(), target_id, service.retries)
+    let response = state
+        .proxy
+        .proxy_with_retry(
+            &upstream_url,
+            http_method,
+            forward_headers,
+            ctx.body.clone(),
+            target_id,
+            service.retries,
+        )
         .await;
 
     // Collect response status/headers/body for plugin log phase
@@ -203,7 +242,13 @@ fn resolve_upstream_url(
     path: &str,
 ) -> String {
     let up_path = upstream_path(match_result, path, service.path.as_deref());
-    format!("{}://{}:{}{}", scheme_for_service(service), service.host, service.port, up_path)
+    format!(
+        "{}://{}:{}{}",
+        scheme_for_service(service),
+        service.host,
+        service.port,
+        up_path
+    )
 }
 
 fn scheme_for_service(service: &Service) -> &'static str {

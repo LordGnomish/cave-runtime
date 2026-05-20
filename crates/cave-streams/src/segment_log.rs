@@ -22,8 +22,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::error::{StreamsError, StreamsResult};
 
@@ -182,7 +182,12 @@ impl SegmentLog {
 
     /// Total bytes currently retained.
     pub fn total_bytes(&self) -> u64 {
-        self.segments.lock().unwrap().iter().map(|s| s.byte_size).sum()
+        self.segments
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|s| s.byte_size)
+            .sum()
     }
 
     /// Truncate the log forward to `low_watermark`, dropping any entries
@@ -198,8 +203,7 @@ impl SegmentLog {
             let drop_first = segs
                 .first()
                 .map(|s| {
-                    s.entries.last().map(|e| e.offset).unwrap_or(s.base_offset)
-                        < low_watermark
+                    s.entries.last().map(|e| e.offset).unwrap_or(s.base_offset) < low_watermark
                 })
                 .unwrap_or(false);
             if drop_first && segs.len() > 1 {

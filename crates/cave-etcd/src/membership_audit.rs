@@ -73,7 +73,8 @@ impl MembershipAuditLog {
     }
 
     pub fn set_cap(&self, cap: usize) {
-        self.max_entries.store(cap, std::sync::atomic::Ordering::SeqCst);
+        self.max_entries
+            .store(cap, std::sync::atomic::Ordering::SeqCst);
     }
 
     pub fn cap(&self) -> usize {
@@ -184,9 +185,23 @@ mod tests {
         // cite: etcd v3.6.10 (audit log is monotonic)
         let _tenant_id = "ma-001";
         let log = MembershipAuditLog::new();
-        let e1 = log.new_event(MembershipAction::Add, 2, vec![], vec![dummy_member(2, "m2")], None, None);
+        let e1 = log.new_event(
+            MembershipAction::Add,
+            2,
+            vec![],
+            vec![dummy_member(2, "m2")],
+            None,
+            None,
+        );
         let s1 = log.record(e1);
-        let e2 = log.new_event(MembershipAction::Remove, 2, vec![dummy_member(2, "m2")], vec![], None, None);
+        let e2 = log.new_event(
+            MembershipAction::Remove,
+            2,
+            vec![dummy_member(2, "m2")],
+            vec![],
+            None,
+            None,
+        );
         let s2 = log.record(e2);
         assert_eq!(s2, s1 + 1);
     }

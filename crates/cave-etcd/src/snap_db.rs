@@ -28,8 +28,8 @@
 
 use crate::error::{EtcdError, EtcdResult};
 use crate::models::KeyValue;
-use crate::store::KvStore;
 use crate::models::PutRequest;
+use crate::store::KvStore;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const SNAP_MAGIC: u32 = 0x534E_4150; // "SNAP"
@@ -67,7 +67,10 @@ impl SnapBuilder {
         Self {
             header: SnapHeader {
                 version: SNAP_VERSION,
-                created_at: SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0),
+                created_at: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or(0),
                 cluster_id,
                 member_id,
                 raft_term: 0,
@@ -145,37 +148,61 @@ pub fn parse_snap(buf: &[u8]) -> EtcdResult<ParsedSnap> {
     }
 
     let mut p = 0usize;
-    let magic = u32::from_be_bytes(body[p..p + 4].try_into().unwrap()); p += 4;
+    let magic = u32::from_be_bytes(body[p..p + 4].try_into().unwrap());
+    p += 4;
     if magic != SNAP_MAGIC {
-        return Err(EtcdError::SnapshotDecode(format!("bad magic 0x{magic:08x}")));
+        return Err(EtcdError::SnapshotDecode(format!(
+            "bad magic 0x{magic:08x}"
+        )));
     }
-    let version = u16::from_be_bytes(body[p..p + 2].try_into().unwrap()); p += 2;
+    let version = u16::from_be_bytes(body[p..p + 2].try_into().unwrap());
+    p += 2;
     if version != SNAP_VERSION {
-        return Err(EtcdError::SnapshotDecode(format!("unsupported version {version}")));
+        return Err(EtcdError::SnapshotDecode(format!(
+            "unsupported version {version}"
+        )));
     }
-    let created_at = i64::from_be_bytes(body[p..p + 8].try_into().unwrap()); p += 8;
-    let cluster_id = u64::from_be_bytes(body[p..p + 8].try_into().unwrap()); p += 8;
-    let member_id = u64::from_be_bytes(body[p..p + 8].try_into().unwrap()); p += 8;
-    let raft_term = u64::from_be_bytes(body[p..p + 8].try_into().unwrap()); p += 8;
-    let raft_index = u64::from_be_bytes(body[p..p + 8].try_into().unwrap()); p += 8;
-    let revision = u64::from_be_bytes(body[p..p + 8].try_into().unwrap()); p += 8;
-    let entry_count = u64::from_be_bytes(body[p..p + 8].try_into().unwrap()); p += 8;
+    let created_at = i64::from_be_bytes(body[p..p + 8].try_into().unwrap());
+    p += 8;
+    let cluster_id = u64::from_be_bytes(body[p..p + 8].try_into().unwrap());
+    p += 8;
+    let member_id = u64::from_be_bytes(body[p..p + 8].try_into().unwrap());
+    p += 8;
+    let raft_term = u64::from_be_bytes(body[p..p + 8].try_into().unwrap());
+    p += 8;
+    let raft_index = u64::from_be_bytes(body[p..p + 8].try_into().unwrap());
+    p += 8;
+    let revision = u64::from_be_bytes(body[p..p + 8].try_into().unwrap());
+    p += 8;
+    let entry_count = u64::from_be_bytes(body[p..p + 8].try_into().unwrap());
+    p += 8;
 
     let mut entries = Vec::with_capacity(entry_count as usize);
     for i in 0..entry_count {
         if p + 8 > body.len() {
-            return Err(EtcdError::SnapshotDecode(format!("entry {i} header truncated")));
+            return Err(EtcdError::SnapshotDecode(format!(
+                "entry {i} header truncated"
+            )));
         }
-        let key_len = u32::from_be_bytes(body[p..p + 4].try_into().unwrap()) as usize; p += 4;
-        let val_len = u32::from_be_bytes(body[p..p + 4].try_into().unwrap()) as usize; p += 4;
+        let key_len = u32::from_be_bytes(body[p..p + 4].try_into().unwrap()) as usize;
+        p += 4;
+        let val_len = u32::from_be_bytes(body[p..p + 4].try_into().unwrap()) as usize;
+        p += 4;
         if p + key_len + val_len + 24 > body.len() {
-            return Err(EtcdError::SnapshotDecode(format!("entry {i} body truncated")));
+            return Err(EtcdError::SnapshotDecode(format!(
+                "entry {i} body truncated"
+            )));
         }
-        let key = body[p..p + key_len].to_vec(); p += key_len;
-        let value = body[p..p + val_len].to_vec(); p += val_len;
-        let mod_rev = u64::from_be_bytes(body[p..p + 8].try_into().unwrap()); p += 8;
-        let create_rev = u64::from_be_bytes(body[p..p + 8].try_into().unwrap()); p += 8;
-        let version_n = u64::from_be_bytes(body[p..p + 8].try_into().unwrap()); p += 8;
+        let key = body[p..p + key_len].to_vec();
+        p += key_len;
+        let value = body[p..p + val_len].to_vec();
+        p += val_len;
+        let mod_rev = u64::from_be_bytes(body[p..p + 8].try_into().unwrap());
+        p += 8;
+        let create_rev = u64::from_be_bytes(body[p..p + 8].try_into().unwrap());
+        p += 8;
+        let version_n = u64::from_be_bytes(body[p..p + 8].try_into().unwrap());
+        p += 8;
         entries.push(KeyValue {
             key,
             value,
@@ -187,14 +214,21 @@ pub fn parse_snap(buf: &[u8]) -> EtcdResult<ParsedSnap> {
     }
     if p != body.len() {
         return Err(EtcdError::SnapshotDecode(format!(
-            "trailing {} bytes after entries", body.len() - p
+            "trailing {} bytes after entries",
+            body.len() - p
         )));
     }
 
     Ok(ParsedSnap {
         header: SnapHeader {
-            version, created_at, cluster_id, member_id,
-            raft_term, raft_index, revision, entry_count,
+            version,
+            created_at,
+            cluster_id,
+            member_id,
+            raft_term,
+            raft_index,
+            revision,
+            entry_count,
         },
         entries,
     })
@@ -259,7 +293,9 @@ fn snap_hash(data: &[u8]) -> [u8; HASH_LEN] {
     let mut out = [0u8; HASH_LEN];
     for (i, slot) in out.iter_mut().enumerate() {
         let mut h: u64 = 0xcbf29ce484222325 ^ (i as u64).wrapping_mul(0x100000001b3);
-        for &b in data { h = h.wrapping_mul(0x100000001b3).wrapping_add(b as u64); }
+        for &b in data {
+            h = h.wrapping_mul(0x100000001b3).wrapping_add(b as u64);
+        }
         *slot = (h ^ h.rotate_right(31)) as u8;
     }
     out
@@ -267,7 +303,9 @@ fn snap_hash(data: &[u8]) -> [u8; HASH_LEN] {
 
 fn hex_string(bytes: &[u8]) -> String {
     let mut s = String::with_capacity(bytes.len() * 2);
-    for b in bytes { s.push_str(&format!("{b:02x}")); }
+    for b in bytes {
+        s.push_str(&format!("{b:02x}"));
+    }
     s
 }
 
@@ -293,8 +331,12 @@ mod tests {
 
     fn fixed_kv(k: &[u8], v: &[u8], rev: u64) -> KeyValue {
         KeyValue {
-            key: k.to_vec(), value: v.to_vec(),
-            mod_revision: rev, create_revision: rev, version: 1, lease: None,
+            key: k.to_vec(),
+            value: v.to_vec(),
+            mod_revision: rev,
+            create_revision: rev,
+            version: 1,
+            lease: None,
         }
     }
 
@@ -333,7 +375,10 @@ mod tests {
     fn test_snap_truncated() {
         // cite: snap/db.go (parser rejects short buffers)
         let buf = vec![0u8; 5];
-        assert!(matches!(parse_snap(&buf).unwrap_err(), EtcdError::SnapshotDecode(_)));
+        assert!(matches!(
+            parse_snap(&buf).unwrap_err(),
+            EtcdError::SnapshotDecode(_)
+        ));
     }
 
     #[test]
@@ -378,7 +423,9 @@ mod tests {
         // Twiddle a body byte without rebuilding trailer.
         buf[10] ^= 1;
         match parse_snap(&buf).unwrap_err() {
-            EtcdError::SnapshotChecksumMismatch { expected, actual } => assert_ne!(expected, actual),
+            EtcdError::SnapshotChecksumMismatch { expected, actual } => {
+                assert_ne!(expected, actual)
+            }
             other => panic!("{other:?}"),
         }
     }
@@ -416,7 +463,9 @@ mod tests {
         let trailer = snap_hash(&buf[..body_len]);
         buf[body_len..].copy_from_slice(&trailer);
         match parse_snap(&buf).unwrap_err() {
-            EtcdError::SnapshotDecode(m) => assert!(m.contains("truncated") || m.contains("trailing"), "{m}"),
+            EtcdError::SnapshotDecode(m) => {
+                assert!(m.contains("truncated") || m.contains("trailing"), "{m}")
+            }
             other => panic!("{other:?}"),
         }
     }
@@ -465,10 +514,16 @@ mod tests {
         assert_eq!(header.entry_count, 5);
         // Every key from the source should be present in the restored store.
         for i in 0..5 {
-            let r = restored.range(&crate::models::RangeRequest {
-                key: format!("/k/{i}"), range_end: None, limit: None,
-                revision: None, keys_only: false, count_only: false,
-            }).unwrap();
+            let r = restored
+                .range(&crate::models::RangeRequest {
+                    key: format!("/k/{i}"),
+                    range_end: None,
+                    limit: None,
+                    revision: None,
+                    keys_only: false,
+                    count_only: false,
+                })
+                .unwrap();
             assert_eq!(r.kvs.len(), 1, "missing /k/{i}");
             assert_eq!(r.kvs[0].value_str(), format!("v{i}"));
         }
@@ -483,7 +538,10 @@ mod tests {
         let mid = buf.len() / 2;
         buf[mid] ^= 0xFF;
         let err = restore_into_store(&buf).err().expect("expected error");
-        assert!(matches!(err, EtcdError::SnapshotChecksumMismatch { .. }), "{err:?}");
+        assert!(
+            matches!(err, EtcdError::SnapshotChecksumMismatch { .. }),
+            "{err:?}"
+        );
     }
 
     #[test]
@@ -504,10 +562,16 @@ mod tests {
         let buf = save_from_store(&src, 1);
         let (restored, header) = restore_into_store(&buf).unwrap();
         assert_eq!(header.entry_count, 0);
-        let r = restored.range(&crate::models::RangeRequest {
-            key: "".into(), range_end: Some("\u{ffff}".into()),
-            limit: None, revision: None, keys_only: false, count_only: false,
-        }).unwrap();
+        let r = restored
+            .range(&crate::models::RangeRequest {
+                key: "".into(),
+                range_end: Some("\u{ffff}".into()),
+                limit: None,
+                revision: None,
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert!(r.kvs.is_empty());
     }
 
@@ -530,7 +594,10 @@ mod tests {
         let buf = b.encode();
         let parsed = parse_snap(&buf).unwrap();
         // Created within the last day at most.
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
         assert!(parsed.header.created_at <= now);
         assert!(parsed.header.created_at >= now - 86_400);
     }
@@ -562,13 +629,24 @@ mod tests {
         // cite: snap/db.go (no value-size limit beyond u32)
         let store = KvStore::new();
         let big: String = "X".repeat(50_000);
-        store.put(&PutRequest { key: "/big".into(), value: big.clone(), lease: None, prev_kv: false });
+        store.put(&PutRequest {
+            key: "/big".into(),
+            value: big.clone(),
+            lease: None,
+            prev_kv: false,
+        });
         let buf = save_from_store(&store, 1);
         let (restored, _) = restore_into_store(&buf).unwrap();
-        let r = restored.range(&crate::models::RangeRequest {
-            key: "/big".into(), range_end: None, limit: None,
-            revision: None, keys_only: false, count_only: false,
-        }).unwrap();
+        let r = restored
+            .range(&crate::models::RangeRequest {
+                key: "/big".into(),
+                range_end: None,
+                limit: None,
+                revision: None,
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert_eq!(r.kvs[0].value_str().len(), 50_000);
     }
 }

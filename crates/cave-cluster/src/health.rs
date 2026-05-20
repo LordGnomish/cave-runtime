@@ -46,17 +46,19 @@ pub struct NodeSummary {
 
 impl NodeSummary {
     pub fn all_ready(count: i32) -> Self {
-        Self { total: count, ready: count, not_ready: 0, unknown: 0 }
+        Self {
+            total: count,
+            ready: count,
+            not_ready: 0,
+            unknown: 0,
+        }
     }
 }
 
 // ── Health checker ────────────────────────────────────────────────────────────
 
 /// Evaluate the health of a cluster (in-memory simulation).
-pub fn check_cluster_health(
-    cluster: &Cluster,
-    node_count: i32,
-) -> ClusterHealth {
+pub fn check_cluster_health(cluster: &Cluster, node_count: i32) -> ClusterHealth {
     let overall = match cluster.status {
         ClusterStatus::Running => HealthStatus::Healthy,
         ClusterStatus::Upgrading | ClusterStatus::Scaling => HealthStatus::Degraded,
@@ -162,7 +164,12 @@ mod tests {
         let health = check_cluster_health(&cluster, 3);
         assert_eq!(health.overall, HealthStatus::Healthy);
         assert_eq!(health.node_summary.ready, 3);
-        assert!(health.components.iter().all(|c| c.status == HealthStatus::Healthy));
+        assert!(
+            health
+                .components
+                .iter()
+                .all(|c| c.status == HealthStatus::Healthy)
+        );
     }
 
     #[test]

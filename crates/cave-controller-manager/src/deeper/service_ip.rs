@@ -49,10 +49,19 @@ impl IpAllocator {
         if prefix > 30 {
             return Err(IpError::CidrTooNarrow(prefix));
         }
-        let mask: u32 = if prefix == 0 { 0 } else { !0u32 << (32 - prefix) };
+        let mask: u32 = if prefix == 0 {
+            0
+        } else {
+            !0u32 << (32 - prefix)
+        };
         let network = addr & mask;
         let broadcast = network | !mask;
-        Ok(Self { network, broadcast, prefix, allocated: BTreeSet::new() })
+        Ok(Self {
+            network,
+            broadcast,
+            prefix,
+            allocated: BTreeSet::new(),
+        })
     }
 
     /// Allocate the lowest free usable address (skipping network + broadcast).
@@ -88,12 +97,16 @@ impl IpAllocator {
         self.allocated.len()
     }
     pub fn capacity(&self) -> u32 {
-        self.broadcast.saturating_sub(self.network).saturating_sub(1)
+        self.broadcast
+            .saturating_sub(self.network)
+            .saturating_sub(1)
     }
 }
 
 fn parse_cidr(s: &str) -> Result<(u32, u8), IpError> {
-    let (ip, pfx) = s.split_once('/').ok_or_else(|| IpError::BadCidr(s.into()))?;
+    let (ip, pfx) = s
+        .split_once('/')
+        .ok_or_else(|| IpError::BadCidr(s.into()))?;
     let prefix: u8 = pfx.parse().map_err(|_| IpError::BadCidr(s.into()))?;
     if prefix > 32 {
         return Err(IpError::BadCidr(s.into()));
@@ -170,7 +183,9 @@ pub enum LbError {
 /// - On delete: TeardownLb first, then RemoveFinalizer.
 pub fn next_step(svc: &ServiceObject, caller: &TenantId) -> Result<LbStep, LbError> {
     if caller != &svc.tenant {
-        return Err(LbError::TenantDenied { tenant: caller.clone() });
+        return Err(LbError::TenantDenied {
+            tenant: caller.clone(),
+        });
     }
     if svc.cluster_ip.is_none() {
         return Ok(LbStep::AllocateClusterIp);
@@ -286,7 +301,10 @@ mod tests {
             "tenant-svc-release-unknown"
         );
         let mut a = IpAllocator::new("10.96.0.0/29").unwrap();
-        assert!(matches!(a.release(0x0a600005), Err(IpError::NotAllocated(_))));
+        assert!(matches!(
+            a.release(0x0a600005),
+            Err(IpError::NotAllocated(_))
+        ));
     }
 
     #[test]
@@ -296,8 +314,14 @@ mod tests {
             "NewAllocatorCIDRRange",
             "tenant-svc-cidr-bounds"
         );
-        assert!(matches!(IpAllocator::new("10.0.0.0/31"), Err(IpError::CidrTooNarrow(31))));
-        assert!(matches!(IpAllocator::new("10.0.0.0/8"), Err(IpError::CidrTooWide(8))));
+        assert!(matches!(
+            IpAllocator::new("10.0.0.0/31"),
+            Err(IpError::CidrTooNarrow(31))
+        ));
+        assert!(matches!(
+            IpAllocator::new("10.0.0.0/8"),
+            Err(IpError::CidrTooWide(8))
+        ));
     }
 
     #[test]

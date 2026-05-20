@@ -266,8 +266,12 @@ mod tests {
         let state = AdminState::empty();
         let t = tenant();
         let client = seeded_client();
-        materialise_auth_sessions(&state, &*client, "acme-realm", &t).await.unwrap();
-        materialise_auth_sessions(&state, &*client, "acme-realm", &t).await.unwrap();
+        materialise_auth_sessions(&state, &*client, "acme-realm", &t)
+            .await
+            .unwrap();
+        materialise_auth_sessions(&state, &*client, "acme-realm", &t)
+            .await
+            .unwrap();
         let store = state.auth_sessions.read().unwrap();
         let acme: Vec<_> = store.iter().filter(|s| s.tenant == t).collect();
         assert_eq!(acme.len(), 2, "idempotent — no duplication");
@@ -481,7 +485,10 @@ mod tests {
     #[tokio::test]
     async fn bridge_account_profile_round_trip_for_alice() {
         let client = seeded_client();
-        let p = client.get_account_profile("acme-realm", "alice").await.unwrap();
+        let p = client
+            .get_account_profile("acme-realm", "alice")
+            .await
+            .unwrap();
         assert_eq!(p.first_name.as_deref(), Some("Alice"));
         assert_eq!(p.last_name.as_deref(), Some("Doe"));
     }
@@ -518,7 +525,10 @@ mod tests {
         // ctx_anon has AuthSessionsRead, but persona=Anonymous (mock —
         // the handler doesn't enforce persona, just permission).
         let res = realms::list_realms(&state, &ctx);
-        assert!(res.is_ok(), "anonymous w/ perm passes — persona gate not on this surface");
+        assert!(
+            res.is_ok(),
+            "anonymous w/ perm passes — persona gate not on this surface"
+        );
     }
 
     #[test]

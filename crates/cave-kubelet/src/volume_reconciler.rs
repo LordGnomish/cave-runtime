@@ -131,7 +131,10 @@ pub fn apply_plan(plan: &ReconcilePlan, asw: &mut ActualStateOfWorld) -> usize {
         asw.record_mount(MountRecord {
             key: spec.key.clone(),
             device_path: device.clone(),
-            mount_path: format!("/var/lib/kubelet/pods/{}/{}", spec.key.pod_uid, spec.key.volume_name),
+            mount_path: format!(
+                "/var/lib/kubelet/pods/{}/{}",
+                spec.key.pod_uid, spec.key.volume_name
+            ),
             mounted_at: Utc::now(),
         });
         applied += 1;

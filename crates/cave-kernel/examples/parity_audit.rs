@@ -8,7 +8,7 @@
 //! Run from the workspace root:
 //!   cargo run -p cave-kernel --example parity_audit > /tmp/audit.csv
 
-use cave_kernel::parity::{discover_workspace, DiscoveredReport};
+use cave_kernel::parity::{DiscoveredReport, discover_workspace};
 use std::fs;
 use std::path::Path;
 
@@ -75,7 +75,13 @@ fn main() {
 fn lib_line_count(crate_root: &Path) -> usize {
     let lib = crate_root.join("src").join("lib.rs");
     let main = crate_root.join("src").join("main.rs");
-    let path = if lib.exists() { lib } else if main.exists() { main } else { return 0 };
+    let path = if lib.exists() {
+        lib
+    } else if main.exists() {
+        main
+    } else {
+        return 0;
+    };
     fs::read_to_string(&path)
         .map(|s| s.lines().count())
         .unwrap_or(0)

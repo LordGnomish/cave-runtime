@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Runtime, Universal
+**Scope:** Hyperscaler, Sovereign, Runtime, Universal
 
 **Category:** Platform Governance
 
@@ -10,7 +10,7 @@
 
 ## Context
 
-CAVE's core promise is "same developer experience regardless of infrastructure target." Every Crossplane XR abstracts provider differences — a `Database` XR provisions CloudNativePG on Hetzner and Azure PG Flexible on Azure. But without automated verification, this parity is an assertion, not a guarantee.
+CAVE's core promise is "same developer experience regardless of infrastructure target." Every Crossplane XR abstracts provider differences — a `Database` XR provisions CloudNativePG on sovereign cloud and hyperscaler PG Flexible on Azure. But without automated verification, this parity is an assertion, not a guarantee.
 
 Scenarios where parity can silently break:
 - Azure PG adds a feature that changes default backup behavior — Hetzner CNPG doesn't match
@@ -32,7 +32,7 @@ Scenarios where parity can silently break:
 
 ## Decision
 
-Every Crossplane XR must pass **parity contract tests** that verify behavioral equivalence across Hetzner and Azure compositions.
+Every Crossplane XR must pass **parity contract tests** that verify behavioral equivalence across sovereign cloud and hyperscaler compositions.
 
 ### Parity Dimensions
 
@@ -65,7 +65,7 @@ Some capabilities are inherently provider-specific (e.g., Azure PG HA uses zone-
 ## Rejected
 
 - **No parity testing (trust Crossplane abstractions):** Crossplane Compositions may have bugs or provider-specific behavioral differences. Without testing, parity is an assertion, not a fact.
-- **Full parity (identical behavior guaranteed):** Impossible between self-hosted (Hetzner) and managed (Azure) services. Some differences are inherent (backup semantics, failover behavior). Parity exceptions must be documented.
+- **Full parity (identical behavior guaranteed):** Impossible between self-hosted (sovereign) and managed (Azure) services. Some differences are inherent (backup semantics, failover behavior). Parity exceptions must be documented.
 - **Provider-specific testing only:** Tests that only validate one provider don't prove portability. Cross-provider parity tests are specifically designed to validate that the same XR produces equivalent behavior on both providers.
 
 ## Consequences

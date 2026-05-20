@@ -37,7 +37,9 @@ pub async fn list_collections(cmd_doc: &Document, engine: Arc<Engine>) -> Result
             }
         })
         .or_else(|| {
-            cmd_doc.get("$db").and_then(|v| v.as_str().map(|s| s.to_string()))
+            cmd_doc
+                .get("$db")
+                .and_then(|v| v.as_str().map(|s| s.to_string()))
         })
         .unwrap_or_else(|| "admin".to_string());
 
@@ -54,7 +56,10 @@ pub async fn list_collections(cmd_doc: &Document, engine: Arc<Engine>) -> Result
     let collections = db.list_collections().await?;
     let mut cursor = serde_json::Map::new();
     cursor.insert("id".to_string(), Value::Number(0.into()));
-    cursor.insert("ns".to_string(), Value::String(format!("{}.$cmd.listCollections", db_name)));
+    cursor.insert(
+        "ns".to_string(),
+        Value::String(format!("{}.$cmd.listCollections", db_name)),
+    );
 
     let mut first_batch = Vec::new();
     for col_name in collections {
@@ -71,7 +76,10 @@ pub async fn list_collections(cmd_doc: &Document, engine: Arc<Engine>) -> Result
     Ok(resp)
 }
 
-pub async fn create_collection(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Document, String> {
+pub async fn create_collection(
+    cmd_doc: &Document,
+    engine: Arc<Engine>,
+) -> Result<Document, String> {
     let db_name = cmd_doc
         .get("$db")
         .and_then(|v| v.as_str().map(|s| s.to_string()))
@@ -135,7 +143,9 @@ pub async fn drop_database(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Do
             }
         })
         .or_else(|| {
-            cmd_doc.get("$db").and_then(|v| v.as_str().map(|s| s.to_string()))
+            cmd_doc
+                .get("$db")
+                .and_then(|v| v.as_str().map(|s| s.to_string()))
         })
         .unwrap_or_else(|| "test".to_string());
 

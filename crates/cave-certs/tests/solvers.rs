@@ -8,17 +8,22 @@ use cave_certs::solvers::{Dns01Solver, Http01Solver};
 const TENANT: &str = "tenant-acme-prod";
 
 fn jwk() -> Jwk {
-    Jwk::EC { crv: "P-256".into(),
+    Jwk::EC {
+        crv: "P-256".into(),
         x: "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU".into(),
-        y: "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0".into() }
+        y: "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0".into(),
+    }
 }
 
 fn challenge(kind: ChallengeType, token: &str) -> Challenge {
     Challenge {
         id: format!("ch-{}-{}", kind.as_str(), token),
-        kind, status: ChallengeStatus::Pending,
+        kind,
+        status: ChallengeStatus::Pending,
         url: format!("/acme/chall/{}/{}", token, kind.as_str()),
-        token: token.into(), validated_at: None, error: None,
+        token: token.into(),
+        validated_at: None,
+        error: None,
     }
 }
 
@@ -68,5 +73,8 @@ fn http01_solver_present_serve_then_cleanup() {
     assert!(body.contains(&jwk().thumbprint()));
 
     assert!(s.cleanup(&ch));
-    assert!(s.serve(&path).is_none(), "GET on cleaned-up path returns nothing");
+    assert!(
+        s.serve(&path).is_none(),
+        "GET on cleaned-up path returns nothing"
+    );
 }

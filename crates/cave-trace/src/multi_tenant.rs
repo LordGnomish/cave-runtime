@@ -5,9 +5,9 @@
 //! Tenancy follows the Grafana/Tempo convention: the `X-Scope-OrgID` HTTP header
 //! carries the tenant identifier. Absent header → "default" tenant.
 
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::RwLock;
-use serde::{Deserialize, Serialize};
 
 use crate::{Result, TraceError};
 
@@ -65,7 +65,10 @@ impl TenantRegistry {
     }
 
     pub fn register(&self, config: TenantConfig) {
-        self.configs.write().unwrap().insert(config.tenant_id.clone(), config);
+        self.configs
+            .write()
+            .unwrap()
+            .insert(config.tenant_id.clone(), config);
     }
 
     pub fn get(&self, tenant_id: &str) -> Result<TenantConfig> {
@@ -80,7 +83,10 @@ impl TenantRegistry {
                 tenant_id: tenant_id.to_owned(),
                 ..Default::default()
             };
-            self.configs.write().unwrap().insert(tenant_id.to_owned(), cfg.clone());
+            self.configs
+                .write()
+                .unwrap()
+                .insert(tenant_id.to_owned(), cfg.clone());
             Ok(cfg)
         } else {
             Err(TraceError::TenantNotFound(tenant_id.to_owned()))
@@ -104,7 +110,8 @@ impl TenantRegistry {
             Ok(())
         } else {
             Err(TraceError::TenantNotFound(format!(
-                "tenant '{}' cannot query tenant '{}'", requester, target
+                "tenant '{}' cannot query tenant '{}'",
+                requester, target
             )))
         }
     }

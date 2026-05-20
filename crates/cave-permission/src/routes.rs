@@ -5,19 +5,19 @@
 //! Upstream: backstage/plugins/permission-backend/src/service/router.ts
 
 use axum::{
+    Json, Router,
     extract::State,
     routing::{get, post},
-    Json, Router,
 };
 use std::sync::Arc;
 
 use crate::{
+    PermissionState,
     models::{
         AuthorizeRequest, AuthorizeResponse, AuthorizeResult, EvaluatePermissionResponse,
         PolicyDecision,
     },
     policy::{BackstagePrincipal, PolicyQuery},
-    PermissionState,
 };
 
 pub fn create_router(state: Arc<PermissionState>) -> Router {
@@ -51,10 +51,7 @@ async fn authorize(
         };
 
         let principal: Option<BackstagePrincipal> = None;
-        let decision = state
-            .policy
-            .handle(&query, principal.as_ref())
-            .await;
+        let decision = state.policy.handle(&query, principal.as_ref()).await;
 
         let result = match decision {
             PolicyDecision::Allow => AuthorizeResult::Allow,

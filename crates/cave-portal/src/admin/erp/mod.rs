@@ -21,7 +21,7 @@ pub mod projects;
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, ErpInvoice};
+use crate::admin::state::{AdminState, ErpInvoice, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -32,31 +32,47 @@ pub enum ErpViewError {
 
 pub fn list_records(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<ErpInvoice>, ErpViewError> {
     ctx.authorise(Permission::ErpRead)?;
-    let mut rows: Vec<ErpInvoice> =
-        scope(&state.erp_invoices.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-            .into_iter().cloned().collect();
-    rows.sort_by(|a, b| b.amount_cents.cmp(&a.amount_cents).then(a.invoice_id.cmp(&b.invoice_id)));
+    let mut rows: Vec<ErpInvoice> = scope(&state.erp_invoices.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
+    .into_iter()
+    .cloned()
+    .collect();
+    rows.sort_by(|a, b| {
+        b.amount_cents
+            .cmp(&a.amount_cents)
+            .then(a.invoice_id.cmp(&b.invoice_id))
+    });
     Ok(rows)
 }
 
 pub fn group_by_status(rows: &[ErpInvoice]) -> Vec<(String, usize)> {
     use std::collections::BTreeMap;
     let mut acc: BTreeMap<String, usize> = BTreeMap::new();
-    for r in rows { *acc.entry(r.status.to_string()).or_insert(0) += 1; }
+    for r in rows {
+        *acc.entry(r.status.to_string()).or_insert(0) += 1;
+    }
     let mut out: Vec<(String, usize)> = acc.into_iter().collect();
     out.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
     out
 }
 
 pub fn total_outstanding_cents(rows: &[ErpInvoice]) -> u64 {
-    rows.iter().filter(|r| r.status != "Paid").map(|r| r.amount_cents).sum()
+    rows.iter()
+        .filter(|r| r.status != "Paid")
+        .map(|r| r.amount_cents)
+        .sum()
 }
 
 pub fn by_status<'a>(rows: &'a [ErpInvoice], status: &str) -> Vec<&'a ErpInvoice> {
     rows.iter().filter(|r| r.status == status).collect()
 }
 
-pub fn detail(state: &AdminState, ctx: &RequestCtx, invoice_id: &str) -> Result<Option<ErpInvoice>, ErpViewError> {
+pub fn detail(
+    state: &AdminState,
+    ctx: &RequestCtx,
+    invoice_id: &str,
+) -> Result<Option<ErpInvoice>, ErpViewError> {
     let rows = list_records(state, ctx)?;
     Ok(rows.into_iter().find(|r| r.invoice_id == invoice_id))
 }
@@ -69,11 +85,17 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ErpViewErr
         r#"<span class="px-2 py-1 mr-2 rounded bg-gray-200 text-sm">{s} <strong>×{n}</strong></span>"#,
         s = escape(s), n = n
     )).collect();
-    let table_rows: Vec<Vec<String>> = rows.iter().map(|r| vec![
-        escape(&r.invoice_id), escape(&r.customer),
-        format!("${}.{:02}", r.amount_cents / 100, r.amount_cents % 100),
-        r.status.into(),
-    ]).collect();
+    let table_rows: Vec<Vec<String>> = rows
+        .iter()
+        .map(|r| {
+            vec![
+                escape(&r.invoice_id),
+                escape(&r.customer),
+                format!("${}.{:02}", r.amount_cents / 100, r.amount_cents % 100),
+                r.status.into(),
+            ]
+        })
+        .collect();
     let body = format!(
         r#"<section>
   <p class="text-sm text-gray-600 mb-3">ERPNext parity (cave-erp). Upstream: <a class="text-blue-700 underline" href="https://erpnext.com/">erpnext.com</a>.</p>
@@ -91,24 +113,40 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ErpViewErr
         chips = chips,
         tbl = table(&["invoice", "customer", "amount", "status"], &table_rows),
     );
-    Ok(page_shell_full(ctx, "/admin/erp", &format!("erp · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/erp",
+        &format!("erp · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::backstage("plugins/erp/src/components/InvoicesList.tsx", "InvoicesList");
+const FILE_CITE: Cite = Cite::backstage(
+    "plugins/erp/src/components/InvoicesList.tsx",
+    "InvoicesList",
+);
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::portal_test_ctx;
-    fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
+    fn ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer("acme", perms)
+    }
 
     #[test]
     fn list_filters_to_owner_and_sorts_by_amount_desc() {
-        let (_c, _t) = portal_test_ctx!("plugins/erp/src/components/InvoicesList.tsx", "InvoicesList", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/erp/src/components/InvoicesList.tsx",
+            "InvoicesList",
+            "acme"
+        );
         let r = list_records(&AdminState::seeded(), &ctx(&[Permission::ErpRead])).unwrap();
         assert_eq!(r.len(), 2);
-        for w in r.windows(2) { assert!(w[0].amount_cents >= w[1].amount_cents); }
+        for w in r.windows(2) {
+            assert!(w[0].amount_cents >= w[1].amount_cents);
+        }
     }
 
     #[test]
@@ -126,7 +164,11 @@ mod tests {
     #[test]
     fn total_outstanding_excludes_paid() {
         let r = list_records(&AdminState::seeded(), &ctx(&[Permission::ErpRead])).unwrap();
-        let expected: u64 = r.iter().filter(|x| x.status != "Paid").map(|x| x.amount_cents).sum();
+        let expected: u64 = r
+            .iter()
+            .filter(|x| x.status != "Paid")
+            .map(|x| x.amount_cents)
+            .sum();
         assert_eq!(total_outstanding_cents(&r), expected);
     }
 
@@ -143,9 +185,17 @@ mod tests {
         let s = AdminState::seeded();
         let r = list_records(&s, &ctx(&[Permission::ErpRead])).unwrap();
         if let Some(f) = r.first() {
-            assert!(detail(&s, &ctx(&[Permission::ErpRead]), &f.invoice_id).unwrap().is_some());
+            assert!(
+                detail(&s, &ctx(&[Permission::ErpRead]), &f.invoice_id)
+                    .unwrap()
+                    .is_some()
+            );
         }
-        assert!(detail(&s, &ctx(&[Permission::ErpRead]), "no-such").unwrap().is_none());
+        assert!(
+            detail(&s, &ctx(&[Permission::ErpRead]), "no-such")
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

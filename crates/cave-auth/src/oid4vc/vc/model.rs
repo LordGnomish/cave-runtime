@@ -109,7 +109,10 @@ pub struct CredentialSubject {
 
 impl CredentialSubject {
     pub fn new() -> Self {
-        Self { id: None, claims: serde_json::Map::new() }
+        Self {
+            id: None,
+            claims: serde_json::Map::new(),
+        }
     }
     pub fn with_id(mut self, id: impl Into<String>) -> Self {
         self.id = Some(id.into());
@@ -213,7 +216,10 @@ mod tests {
     #[test]
     fn issuer_id_works_for_both_shapes() {
         let i1 = Issuer::Uri("did:a".into());
-        let i2 = Issuer::Object { id: "did:b".into(), name: None };
+        let i2 = Issuer::Object {
+            id: "did:b".into(),
+            name: None,
+        };
         assert_eq!(i1.id(), "did:a");
         assert_eq!(i2.id(), "did:b");
     }
@@ -235,8 +241,8 @@ mod tests {
         let cs = CredentialSubject::new()
             .with_id("did:example:alice")
             .with_claim("name", json!("Alice"));
-        let mut vc = VerifiableCredential::new("did:example:issuer", cs)
-            .with_type("EmployeeCredential");
+        let mut vc =
+            VerifiableCredential::new("did:example:issuer", cs).with_type("EmployeeCredential");
         vc.valid_from = Some("2024-01-01T00:00:00Z".into());
         let j = serde_json::to_string(&vc).unwrap();
         let back: VerifiableCredential = serde_json::from_str(&j).unwrap();

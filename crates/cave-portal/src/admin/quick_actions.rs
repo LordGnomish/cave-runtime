@@ -135,7 +135,12 @@ pub fn smart_suggestions(snapshot: &ComplianceSnapshot, today_unix: i64) -> Vec<
         out.push(format!(
             "{} crate(s) at Grade F: {}",
             grade_f.len(),
-            grade_f.iter().take(5).copied().collect::<Vec<_>>().join(", "),
+            grade_f
+                .iter()
+                .take(5)
+                .copied()
+                .collect::<Vec<_>>()
+                .join(", "),
         ));
     }
     let unmeasured: usize = snapshot
@@ -253,7 +258,10 @@ mod tests {
     fn high_grade_with_low_parity_still_suggests_port_template() {
         let c = crate_at(95, Some(0.30), None);
         let s = suggest_for_crate(&c);
-        assert!(s.iter().any(|q| q.kind == QuickActionKind::OpenPortTemplate));
+        assert!(
+            s.iter()
+                .any(|q| q.kind == QuickActionKind::OpenPortTemplate)
+        );
         // No Grade F suggestion because four_track_score is 95.
         assert!(!s.iter().any(|q| q.kind == QuickActionKind::RunAuditAndFill));
     }
@@ -262,9 +270,10 @@ mod tests {
     fn scaffold_portal_ui_suggests_backstage_template() {
         let c = crate_at(95, Some(0.95), Some("scaffold"));
         let s = suggest_for_crate(&c);
-        assert!(s
-            .iter()
-            .any(|q| q.kind == QuickActionKind::GenerateBackstageTemplate));
+        assert!(
+            s.iter()
+                .any(|q| q.kind == QuickActionKind::GenerateBackstageTemplate)
+        );
     }
 
     #[test]
@@ -272,20 +281,29 @@ mod tests {
         let mut c = crate_at(95, Some(0.10), None);
         c.infra_only = true;
         let s = suggest_for_crate(&c);
-        assert!(!s.iter().any(|q| q.kind == QuickActionKind::OpenPortTemplate));
+        assert!(
+            !s.iter()
+                .any(|q| q.kind == QuickActionKind::OpenPortTemplate)
+        );
     }
 
     #[test]
     fn unknown_parity_skips_port_suggestion() {
         let c = crate_at(95, None, None);
         let s = suggest_for_crate(&c);
-        assert!(!s.iter().any(|q| q.kind == QuickActionKind::OpenPortTemplate));
+        assert!(
+            !s.iter()
+                .any(|q| q.kind == QuickActionKind::OpenPortTemplate)
+        );
     }
 
     #[test]
     fn smart_suggestions_lists_grade_f_crates() {
         let snap = ComplianceSnapshot {
-            crates: vec![crate_at(40, Some(0.8), None), crate_at(95, Some(0.95), None)],
+            crates: vec![
+                crate_at(40, Some(0.8), None),
+                crate_at(95, Some(0.95), None),
+            ],
         };
         let banners = smart_suggestions(&snap, 0);
         assert!(banners.iter().any(|b| b.contains("Grade F")));
@@ -297,14 +315,21 @@ mod tests {
             crates: vec![crate_at(80, None, None), crate_at(80, Some(0.8), None)],
         };
         let banners = smart_suggestions(&snap, 0);
-        assert!(banners.iter().any(|b| b.contains("no measured parity ratio")));
+        assert!(
+            banners
+                .iter()
+                .any(|b| b.contains("no measured parity ratio"))
+        );
     }
 
     #[test]
     fn quick_actions_refuses_without_permission() {
         let c = crate_at(40, Some(0.5), None);
         let ctx = RequestCtx::developer("acme", &[]);
-        assert!(matches!(quick_actions(&ctx, &c).unwrap_err(), QuickActionError::Auth(_)));
+        assert!(matches!(
+            quick_actions(&ctx, &c).unwrap_err(),
+            QuickActionError::Auth(_)
+        ));
     }
 
     #[test]
@@ -317,7 +342,10 @@ mod tests {
     #[test]
     fn kind_as_str_is_stable() {
         assert_eq!(QuickActionKind::RunAuditAndFill.as_str(), "audit_and_fill");
-        assert_eq!(QuickActionKind::OpenPortTemplate.as_str(), "open_port_template");
+        assert_eq!(
+            QuickActionKind::OpenPortTemplate.as_str(),
+            "open_port_template"
+        );
         assert_eq!(
             QuickActionKind::GenerateBackstageTemplate.as_str(),
             "generate_backstage_template"

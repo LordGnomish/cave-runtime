@@ -16,7 +16,7 @@ pub struct Bucket {
     pub created_at: DateTime<Utc>,
     pub versioning: VersioningState,
     pub acl: BucketAcl,
-    pub policy: Option<String>,         // JSON policy doc
+    pub policy: Option<String>, // JSON policy doc
     pub lifecycle_rules: Vec<LifecycleRule>,
     pub notification_config: NotificationConfiguration,
     pub encryption: Option<BucketEncryption>,
@@ -155,7 +155,7 @@ pub struct FilterKey {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FilterRule {
-    pub name: String,  // "prefix" | "suffix"
+    pub name: String, // "prefix" | "suffix"
     pub value: String,
 }
 
@@ -309,10 +309,13 @@ impl S3Event {
     /// Check if this event matches a notification filter rule.
     pub fn matches_filter(&self, filter: &Option<NotificationFilter>) -> bool {
         let Some(f) = filter else { return true };
-        f.key.filter_rules.iter().all(|rule| match rule.name.as_str() {
-            "prefix" => self.key.starts_with(&rule.value),
-            "suffix" => self.key.ends_with(&rule.value),
-            _ => true,
-        })
+        f.key
+            .filter_rules
+            .iter()
+            .all(|rule| match rule.name.as_str() {
+                "prefix" => self.key.starts_with(&rule.value),
+                "suffix" => self.key.ends_with(&rule.value),
+                _ => true,
+            })
     }
 }

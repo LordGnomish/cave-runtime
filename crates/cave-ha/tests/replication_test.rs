@@ -23,7 +23,11 @@ async fn spawn_cluster_kv(n: u32) -> (Vec<RaftHandle>, Vec<Arc<KvStateMachine>>,
     let mut state_machines = Vec::new();
 
     let members: Vec<NodeInfo> = (1..=n)
-        .map(|id| NodeInfo { id: id as NodeId, addr: format!("mem:{id}"), is_learner: false })
+        .map(|id| NodeInfo {
+            id: id as NodeId,
+            addr: format!("mem:{id}"),
+            is_learner: false,
+        })
         .collect();
 
     for id in 1..=n {
@@ -52,7 +56,9 @@ async fn spawn_cluster_kv(n: u32) -> (Vec<RaftHandle>, Vec<Arc<KvStateMachine>>,
         let msg_tx = handle.msg_tx.clone();
         tokio::spawn(async move {
             while let Some((from, msg)) = rx.recv().await {
-                if msg_tx.send((from, msg)).is_err() { break; }
+                if msg_tx.send((from, msg)).is_err() {
+                    break;
+                }
             }
         });
 
@@ -65,10 +71,15 @@ async fn spawn_cluster_kv(n: u32) -> (Vec<RaftHandle>, Vec<Arc<KvStateMachine>>,
 async fn wait_for_leader(handles: &[RaftHandle]) -> NodeId {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
     loop {
-        assert!(tokio::time::Instant::now() < deadline, "timed out waiting for leader");
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "timed out waiting for leader"
+        );
         for h in handles {
             if let Ok(s) = h.status().await {
-                if s.role == "Leader" { return s.id; }
+                if s.role == "Leader" {
+                    return s.id;
+                }
             }
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
@@ -89,7 +100,10 @@ async fn test_single_node_propose() {
     let leader = wait_for_leader(&handles).await;
     let h = handles.iter().find(|h| h.node_id == leader).unwrap();
 
-    let idx = h.propose(b"hello".to_vec()).await.expect("proposal should succeed");
+    let idx = h
+        .propose(b"hello".to_vec())
+        .await
+        .expect("proposal should succeed");
     assert!(idx >= 1, "log index should be >= 1");
 }
 
@@ -102,7 +116,9 @@ async fn test_sequential_proposals() {
 
     let mut prev_idx = 0u64;
     for i in 0..10 {
-        let idx = h.propose(format!("entry-{i}").into_bytes()).await
+        let idx = h
+            .propose(format!("entry-{i}").into_bytes())
+            .await
             .expect("proposal failed");
         assert!(idx > prev_idx, "index should increase monotonically");
         prev_idx = idx;
@@ -118,7 +134,8 @@ async fn test_three_node_replication() {
 
     // Propose 5 entries.
     for i in 0..5 {
-        h.propose(format!("data-{i}").into_bytes()).await
+        h.propose(format!("data-{i}").into_bytes())
+            .await
             .expect("proposal failed");
     }
 
@@ -135,7 +152,10 @@ async fn test_three_node_replication() {
     let max_ci = *commit_indices.iter().max().unwrap();
     for ci in &commit_indices {
         // Allow 1 entry lag (replication can be slightly behind).
-        assert!(max_ci - ci <= 2, "commit index divergence too large: {commit_indices:?}");
+        assert!(
+            max_ci - ci <= 2,
+            "commit index divergence too large: {commit_indices:?}"
+        );
     }
 }
 
@@ -183,10 +203,7 @@ async fn test_follower_catches_up() {
     let h = handles.iter().find(|h| h.node_id == ldr).unwrap();
 
     // Find a follower.
-    let follower_id = handles.iter()
-        .find(|h| h.node_id != ldr)
-        .unwrap()
-        .node_id;
+    let follower_id = handles.iter().find(|h| h.node_id != ldr).unwrap().node_id;
 
     // Partition the follower.
     network.partition(ldr, follower_id, true);
@@ -207,7 +224,10 @@ async fn test_follower_catches_up() {
     let follower_h = handles.iter().find(|h| h.node_id == follower_id).unwrap();
     let follower_ci = follower_h.status().await.unwrap().commit_index;
 
-    assert_eq!(follower_ci, leader_ci, "follower should catch up to leader's commit index");
+    assert_eq!(
+        follower_ci, leader_ci,
+        "follower should catch up to leader's commit index"
+    );
 }
 
 /// Not-leader nodes reject proposals.

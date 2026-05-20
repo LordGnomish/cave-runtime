@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Runtime, Universal
+**Scope:** Hyperscaler, Sovereign, Runtime, Universal
 
 **Category:** Identity
 
@@ -22,7 +22,7 @@ Enterprise tenants (Hard/Dedicated tiers) want to authenticate their users via t
 
 ## Decision
 
-Hard/Dedicated tiers: BYOID via SAML 2.0 or OIDC. Tenant IdP federated into Keycloak (Hetzner) / Okta (Azure) as external identity provider. Soft tier: platform-managed only. Canonical identity: `cave_uid` (UUID). Token claims: sub (IdP-specific), cave_uid (stable), tenant_id, env. Apps MUST use cave_uid, never sub. Federation scope: tenant-scoped roles only — never platform admin.
+Hard/Dedicated tiers: BYOID via SAML 2.0 or OIDC. Tenant IdP federated into Keycloak (sovereign) / Okta (Azure) as external identity provider. Soft tier: platform-managed only. Canonical identity: `cave_uid` (UUID). Token claims: sub (IdP-specific), cave_uid (stable), tenant_id, env. Apps MUST use cave_uid, never sub. Federation scope: tenant-scoped roles only — never platform admin.
 
 ## Rejected
 

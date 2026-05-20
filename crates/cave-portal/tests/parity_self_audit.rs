@@ -44,8 +44,7 @@ fn extract_after(text: &str, needle: &str) -> Option<String> {
 #[test]
 fn upstream_version_is_pinned_v1_50_3() {
     let m = manifest_text();
-    let v =
-        extract_after(&m, "\nversion ").or_else(|| extract_after(&m, "\nversion="));
+    let v = extract_after(&m, "\nversion ").or_else(|| extract_after(&m, "\nversion="));
     assert_eq!(
         v.as_deref(),
         Some("v1.50.3"),
@@ -57,8 +56,7 @@ fn upstream_version_is_pinned_v1_50_3() {
 #[test]
 fn upstream_source_sha_is_present() {
     let m = manifest_text();
-    let sha = extract_after(&m, "\nsource_sha ")
-        .or_else(|| extract_after(&m, "\nsource_sha="));
+    let sha = extract_after(&m, "\nsource_sha ").or_else(|| extract_after(&m, "\nsource_sha="));
     assert!(
         sha.is_some() && !sha.as_deref().unwrap().is_empty(),
         "manifest [upstream] source_sha must be set for reproducibility (got {:?})",
@@ -69,8 +67,7 @@ fn upstream_source_sha_is_present() {
 #[test]
 fn parity_fill_ratio_is_measured_and_at_least_0_65() {
     let m = manifest_text();
-    let raw = extract_after(&m, "\nfill_ratio ")
-        .or_else(|| extract_after(&m, "\nfill_ratio="));
+    let raw = extract_after(&m, "\nfill_ratio ").or_else(|| extract_after(&m, "\nfill_ratio="));
     let ratio: f64 = raw
         .as_deref()
         .expect("[parity] fill_ratio must be present after close-out")
@@ -91,8 +88,7 @@ fn parity_fill_ratio_is_measured_and_at_least_0_65() {
 #[test]
 fn parity_last_audit_is_2026_05_19() {
     let m = manifest_text();
-    let when = extract_after(&m, "\nlast_audit ")
-        .or_else(|| extract_after(&m, "\nlast_audit="));
+    let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert_eq!(
         when.as_deref(),
         Some("2026-05-19"),
@@ -103,8 +99,7 @@ fn parity_last_audit_is_2026_05_19() {
 #[test]
 fn parity_infra_only_is_false() {
     let m = manifest_text();
-    let v = extract_after(&m, "\ninfra_only ")
-        .or_else(|| extract_after(&m, "\ninfra_only="));
+    let v = extract_after(&m, "\ninfra_only ").or_else(|| extract_after(&m, "\ninfra_only="));
     assert_eq!(
         v.as_deref(),
         Some("false"),
@@ -179,11 +174,18 @@ fn parity_ratio_source_is_manifest() {
 
 #[test]
 fn parity_report_md_exists_with_8_gate_stamp() {
-    let p: std::path::PathBuf =
-        [env!("CARGO_MANIFEST_DIR"), "PARITY_REPORT.md"].iter().collect();
-    assert!(p.exists(), "PARITY_REPORT.md required for Charter v2 close-out");
+    let p: std::path::PathBuf = [env!("CARGO_MANIFEST_DIR"), "PARITY_REPORT.md"]
+        .iter()
+        .collect();
+    assert!(
+        p.exists(),
+        "PARITY_REPORT.md required for Charter v2 close-out"
+    );
     let body = std::fs::read_to_string(&p).expect("read PARITY_REPORT.md");
-    assert!(body.contains("Charter v2"), "report must mention Charter v2");
+    assert!(
+        body.contains("Charter v2"),
+        "report must mention Charter v2"
+    );
     assert!(
         body.contains("8/8 PASS") || body.contains("8-gate"),
         "report must include 8/8 PASS or 8-gate stamp"

@@ -30,10 +30,7 @@ pub fn apply_update(doc: &mut Document, update: &Document) -> Result<(), String>
                     if let Some(obj) = value.as_object() {
                         for (k, v) in obj {
                             if let Some(inc_val) = v.as_i64() {
-                                let current = doc
-                                    .get(k)
-                                    .and_then(|val| val.as_i64())
-                                    .unwrap_or(0);
+                                let current = doc.get(k).and_then(|val| val.as_i64()).unwrap_or(0);
                                 doc.insert(k.clone(), Value::Number((current + inc_val).into()));
                             }
                         }
@@ -126,10 +123,7 @@ mod tests {
         update.insert("$set".to_string(), Value::Object(update_map));
 
         apply_update(&mut doc, &update).unwrap();
-        assert_eq!(
-            doc.get("name"),
-            Some(&Value::String("new".to_string()))
-        );
+        assert_eq!(doc.get("name"), Some(&Value::String("new".to_string())));
     }
 
     #[test]
@@ -159,10 +153,7 @@ mod tests {
         update.insert("$inc".to_string(), Value::Object(update_map));
 
         apply_update(&mut doc, &update).unwrap();
-        assert_eq!(
-            doc.get("counter"),
-            Some(&Value::Number(8.into()))
-        );
+        assert_eq!(doc.get("counter"), Some(&Value::Number(8.into())));
     }
 
     #[test]
@@ -232,7 +223,10 @@ mod tests {
         doc.insert("old_name".to_string(), Value::String("value".to_string()));
 
         let mut update_map = serde_json::Map::new();
-        update_map.insert("old_name".to_string(), Value::String("new_name".to_string()));
+        update_map.insert(
+            "old_name".to_string(),
+            Value::String("new_name".to_string()),
+        );
         let mut update = Document::new();
         update.insert("$rename".to_string(), Value::Object(update_map));
 

@@ -13,7 +13,7 @@ Kubernetes is the foundational orchestration layer of the CAVE (Cloud-Agnostic V
 
 The CAVE platform operates two distinct Kubernetes implementations optimized for their respective cloud providers:
 
-**Hetzner Deployment:** Self-managed Kubernetes clusters built on Talos Linux, an immutable, API-first Linux distribution designed specifically for Kubernetes. Talos eliminates the entire SSH/shell attack surface by providing infrastructure state management exclusively through the Kubernetes API. Clusters run bare-metal or dedicated cloud instances with complete operational control.
+**Sovereign-Cloud Deployments:** Self-managed Kubernetes clusters built on Talos Linux, an immutable, API-first Linux distribution designed specifically for Kubernetes. Talos eliminates the entire SSH/shell attack surface by providing infrastructure state management exclusively through the Kubernetes API. Clusters run bare-metal or dedicated cloud instances with complete operational control.
 
 **Azure Deployment:** Managed Kubernetes via Azure Kubernetes Service (AKS), eliminating control-plane operational overhead while maintaining identical developer experiences through consistent networking, storage, and security abstractions above the K8s layer.
 
@@ -27,7 +27,7 @@ This section explains the design decisions that shaped CAVE's Kubernetes infrast
 
 ### ADR-003: Kubernetes Distribution Selection
 
-**Context:** CAVE required a self-managed Kubernetes distribution for Hetzner deployments that could scale to hundreds of nodes while remaining operationally simple. The organization needed immutable infrastructure—no SSH access, no drift risk, no late-night troubleshooting sessions in production systems.
+**Context:** CAVE required a self-managed Kubernetes distribution for sovereign-cloud deployments that could scale to hundreds of nodes while remaining operationally simple. The organization needed immutable infrastructure—no SSH access, no drift risk, no late-night troubleshooting sessions in production systems.
 
 **Decision:** Talos Linux for Hetzner; AKS for Azure.
 
@@ -57,7 +57,7 @@ This section explains the design decisions that shaped CAVE's Kubernetes infrast
 
 **Rejected Alternatives:**
 
-1. **Self-Managed Kubernetes on Azure VMs:** Possible, but introduces operational toil identical to Hetzner without the immutability guarantees of Talos. CAVE would need to manage kubelet versions, etcd backups, and certificate rotation manually—unnecessary work when Azure offers AKS.
+1. **Self-Managed Kubernetes on Azure VMs:** Possible, but introduces operational toil identical to the sovereign profile without the immutability guarantees of Talos. CAVE would need to manage kubelet versions, etcd backups, and certificate rotation manually—unnecessary work when Azure offers AKS.
 
 2. **EKS (Amazon):** Not applicable; CAVE is not deployed on AWS in the initial phase.
 
@@ -151,15 +151,15 @@ The CAVE Kubernetes infrastructure is designed to accommodate anticipated develo
 
 ## 4.5 Kubernetes Architecture
 
-### Hetzner Deployment Architecture
+### Sovereign-Cloud Deployments Architecture
 
-The Hetzner deployment consists of a self-managed Talos Kubernetes cluster running on Hetzner Cloud dedicated instances or bare-metal servers.
+The sovereign-cloud deployments consists of a self-managed Talos Kubernetes cluster running on sovereign cloud dedicated instances or bare-metal servers.
 
 **Control Plane Nodes:** Three dedicated Talos nodes (typically CX32 or larger in "production" profile, smaller in "dev" profile) run the Kubernetes control-plane components: API server, scheduler, controller manager, and etcd. Talos bundles these into a single immutable image that runs on each control-plane node. There is no separate "master" role—Talos nodes run all components and self-elect leaders.
 
-**etcd:** Embedded in Talos control-plane nodes. Three-node consensus ensures quorum for split-brain protection. Encryption at rest is enabled using AES-256-GCM. Regular snapshots (hourly) are taken to an external object storage (Hetzner S3-compatible storage) to enable disaster recovery.
+**etcd:** Embedded in Talos control-plane nodes. Three-node consensus ensures quorum for split-brain protection. Encryption at rest is enabled using AES-256-GCM. Regular snapshots (hourly) are taken to an external object storage (sovereign S3-compatible storage) to enable disaster recovery.
 
-**API Server Load Balancing:** The Kubernetes API is exposed via a Hetzner Load Balancer (Layer 4 TCP load balancer) that distributes traffic across the three control-plane API servers. This eliminates the need for external load-balancer software (like HAProxy on a separate VM) and reduces operational complexity.
+**API Server Load Balancing:** The Kubernetes API is exposed via a sovereign cloud Load Balancer (Layer 4 TCP load balancer) that distributes traffic across the three control-plane API servers. This eliminates the need for external load-balancer software (like HAProxy on a separate VM) and reduces operational complexity.
 
 **Worker Nodes:** A scalable pool of Talos worker nodes (no control-plane components) run tenant workloads. Node count ranges from 3 (minimal) to 50+ (production) depending on workload requirements. All nodes run identical Talos images, ensuring consistent container runtime versions, kubelet behavior, and network configuration.
 
@@ -167,11 +167,11 @@ The Hetzner deployment consists of a self-managed Talos Kubernetes cluster runni
 
 **CNI (Container Network Interface):** Cilium is the network plugin, providing eBPF-powered network policies, service load balancing, and observability. Calico and Flannel were evaluated but rejected in favor of Cilium for superior eBPF-based performance and policy expressiveness.
 
-**Storage:** Hetzner CSI driver provides persistent volume support. Volumes are Hetzner block storage instances that are attached to worker nodes on demand. etcd backups are stored in Hetzner S3-compatible object storage.
+**Storage:** Hetzner CSI driver provides persistent volume support. Volumes are Hetzner block storage instances that are attached to worker nodes on demand. etcd backups are stored in sovereign S3-compatible object storage.
 
-**Autoscaling & Workload Variety (Hetzner):** Three CAVE-native modules carry the workload-elasticity story without leaving the sovereign-OSS boundary:
+**Autoscaling & Workload Variety (sovereign):** Three CAVE-native modules carry the workload-elasticity story without leaving the sovereign-OSS boundary:
 
-- **cave-karpenter** (ADR-145, tracks `kubernetes-sigs/karpenter v1.12.0`) — node autoscaling. NodePool / NodeClaim / NodeClass v1 CRDs, scheduler scoring, drift detection, consolidation. Provider plug-point: `HetznerNodeClass` over the cave-cloud-controller-manager Hetzner provider; bare-metal + cloud-server pools.
+- **cave-karpenter** (ADR-145, tracks `kubernetes-sigs/karpenter v1.12.0`) — node autoscaling. NodePool / NodeClaim / NodeClass v1 CRDs, scheduler scoring, drift detection, consolidation. Provider plug-point: `HetznerNodeClass` over the cave-cloud-controller-manager sovereign-cloud provider; bare-metal + cloud-server pools.
 - **cave-keda** (tracks `kedacore/keda v2.12.0`) — pod-level event-driven autoscaling. ScaledObject / ScaledJob / TriggerAuthentication CRDs, with Kafka-lag, Prometheus, Redis, cron, HTTP-pending, and CPU/Memory scaler types.
 - **cave-kubevirt** (ADR-146, tracks `kubevirt/kubevirt v1.8.2`) — VM-as-K8s-pod for sovereign customers running legacy appliances or kernel-module workloads that cannot be containerised. KVM/QEMU on Talos worker nodes; SR-IOV available where the hardware supports it.
 
@@ -191,7 +191,7 @@ All three are first-party Rust reimplementations under `crates/cave-*` (not fork
 
 **Networking:** Azure CNI (Azure-native networking plugin) in overlay mode with Cilium overlay for advanced network policies. This provides both Azure native integrations (e.g., Network Security Groups) and Cilium's eBPF-powered policies.
 
-**Storage:** Azure Disk CSI driver for block storage (similar to persistent volumes on Hetzner), and Azure Files CSI for NFS/SMB file shares. All storage is managed through Kubernetes PersistentVolumeClaims and StorageClasses.
+**Storage:** Azure Disk CSI driver for block storage (similar to persistent volumes on the sovereign profile), and Azure Files CSI for NFS/SMB file shares. All storage is managed through Kubernetes PersistentVolumeClaims and StorageClasses.
 
 **RBAC & Identity:** AKS integrates with Azure Entra ID (formerly Azure Active Directory). Workloads authenticate to Azure services using Workload Identity (Azure's implementation of OIDC-based service account credentials). This eliminates the need to manage API keys or connection strings in Kubernetes secrets.
 
@@ -203,7 +203,7 @@ CAVE defines seven operational profiles, each with different node counts and siz
 |---------|---------------|--------------|--------------|--------------|----------|
 | **dev-local** | 1 | 1 | 2 | 4 GB | Local development, Hetzner |
 | **dev-azure** | 1 | 2 | 2 | 4 GB | Azure development, managed control plane |
-| **staging-hetzner** | 3 | 5 | 4 | 8 GB | Pre-production testing, self-managed |
+| **staging-sovereign** | 3 | 5 | 4 | 8 GB | Pre-production testing, self-managed |
 | **staging-azure** | — | 5 | 4 | 8 GB | Pre-production testing, AKS |
 | **production-hetzner** | 3 | 10–20 | 8 | 16 GB | Production workloads, cave-karpenter (nodes) + cave-keda (pods) + cave-kubevirt (VMs) |
 | **production-azure** | — | 10–20 | 8 | 16 GB | Production workloads, Karpenter autoscaling |
@@ -215,13 +215,13 @@ Nodes are provisioned on demand via OpenTofu, with autoscaling rules triggered b
 
 ## 4.6 Use Cases & Developer Scenarios
 
-### Scenario 1: Bootstrapping a New Hetzner Cluster
+### Scenario 1: Bootstrapping a New Sovereign-Cloud Cluster
 
-A new development team joins CAVE and needs a dedicated Hetzner cluster for their workloads.
+A new development team joins CAVE and needs a dedicated sovereign-cloud cluster for their workloads.
 
 **Process:**
 1. Platform engineer defines cluster configuration in OpenTofu (node count, region, Talos version).
-2. OpenTofu creates the underlying Hetzner infrastructure: VMs, load balancer, networks.
+2. OpenTofu creates the underlying sovereign-cloud infrastructure: VMs, load balancer, networks.
 3. Talos machines are initialized with their configuration (API server endpoints, kubelet join tokens) via the Talos API.
 4. Kubernetes nodes form quorum, etcd initializes, and the API server becomes available.
 5. Container network (Cilium) is deployed via Helm.
@@ -230,7 +230,7 @@ A new development team joins CAVE and needs a dedicated Hetzner cluster for thei
 
 ### Scenario 2: Kubernetes Version Upgrade on Talos
 
-A new Kubernetes version (e.g., 1.33) is released. CAVE operators decide to upgrade the Hetzner cluster.
+A new Kubernetes version (e.g., 1.33) is released. CAVE operators decide to upgrade the sovereign-cloud cluster.
 
 **On Talos:**
 1. OpenTofu or a Kubernetes operator (e.g., Renovate) detects the new Talos version (which bundles a new Kubernetes version).
@@ -259,7 +259,7 @@ A new tenant signs up for CAVE and their workloads require 8 additional nodes.
 4. Workloads are scheduled and running within 2–3 minutes.
 5. As tenant workloads scale down, Karpenter consolidates workloads to fewer nodes and deprovisions unused VMs, reducing costs.
 
-### Scenario 4: Handling Node Failure on Hetzner
+### Scenario 4: Handling Node Failure on the sovereign profile
 
 A Talos node experiences a disk failure and becomes unresponsive.
 
@@ -279,7 +279,7 @@ Operators perform regular etcd backups to protect against catastrophic cluster f
 **Process:**
 1. A scheduled Kubernetes CronJob runs hourly on a cluster control-plane node.
 2. The job calls `talosctl etcd snapshot` to export an encrypted snapshot.
-3. The snapshot is uploaded to Hetzner S3-compatible object storage.
+3. The snapshot is uploaded to sovereign S3-compatible object storage.
 4. If disaster strikes (e.g., all three control-plane nodes fail), the snapshot is retrieved.
 5. A new cluster is bootstrapped from the snapshot, restoring all Kubernetes objects and application data.
 6. RTO (Recovery Time Objective): ~30 minutes; RPO (Recovery Point Objective): ~1 hour (depending on backup frequency).
@@ -300,7 +300,7 @@ A tenant workload requires GPU acceleration. CAVE operators add a GPU-enabled no
 
 ## 4.7 Configuration Reference
 
-This section explains the OpenTofu configuration that provisions Hetzner and Azure infrastructure. Key decisions and rationale are annotated.
+This section explains the OpenTofu configuration that provisions sovereign cloud and hyperscaler infrastructure. Key decisions and rationale are annotated.
 
 ### Hetzner OpenTofu Configuration (Excerpt)
 
@@ -328,7 +328,7 @@ resource "hcloud_server" "control_plane" {
     "profile"   = var.profile
   }
 
-  # User data: Talos machine configuration passed via Hetzner API
+  # User data: Talos machine configuration passed via sovereign-cloud API
   user_data = file("talos-controlplane-config.yaml")
   # Why YAML API: Machine config is immutable; changes require node recreation, not patch
 }
@@ -385,7 +385,7 @@ resource "hcloud_server" "workers" {
 
 **Key Rationale:**
 
-- **Immutable Images:** Talos images are built from source (via `talosctl gen image`) and uploaded to Hetzner. No runtime configuration is stored on nodes; all state is in the image.
+- **Immutable Images:** Talos images are built from source (via `talosctl gen image`) and uploaded to the sovereign profile. No runtime configuration is stored on nodes; all state is in the image.
 - **Load Balancer:** API server is exposed through Hetzner's managed load balancer, eliminating the need to run external LB software.
 - **Network Isolation:** Each CAVE profile (dev, staging, production) gets a separate Hetzner network to prevent cross-profile traffic and enable soft multi-tenancy.
 
@@ -486,7 +486,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu" {
 
 ### Kubernetes Version Upgrades
 
-**On Hetzner (Talos):**
+**On the sovereign profile (Talos):**
 
 Talos embeds a specific Kubernetes version in each release. Upgrading Kubernetes is inseparable from upgrading Talos.
 
@@ -546,7 +546,7 @@ AKS control plane upgrades are handled by Azure; node pool upgrades are coordina
 
 ### Node Rotation
 
-**Hetzner (Talos):**
+**Sovereign (Talos):**
 
 Nodes are rotated as part of regular maintenance or when security patches require a full image rebuild.
 
@@ -594,7 +594,7 @@ Azure manages system node pool rotation as part of control-plane upgrades. User 
 
 **Backup Strategy:**
 
-Hetzner clusters perform hourly etcd snapshots:
+sovereign-cloud clusters perform hourly etcd snapshots:
 
 1. **Automated Backup:**
    A Kubernetes CronJob runs on a control-plane node:
@@ -603,7 +603,7 @@ Hetzner clusters perform hourly etcd snapshots:
    ```
 
 2. **Store Snapshot:**
-   Snapshots are compressed and uploaded to Hetzner S3-compatible object storage with encryption.
+   Snapshots are compressed and uploaded to sovereign S3-compatible object storage with encryption.
 
 3. **Retention Policy:**
    Snapshots are kept for 30 days (after which they are deleted automatically).
@@ -630,7 +630,7 @@ If etcd becomes corrupted or cluster is lost:
 
 ### Certificate Rotation
 
-**Hetzner (Talos):**
+**Sovereign (Talos):**
 
 Talos automatically rotates Kubernetes API certificates before expiration.
 
@@ -733,7 +733,7 @@ kubectl describe pod -n kube-system <cilium-pod-name>
 - Reduce Cilium verbosity: adjust helm values, redeploy.
 - Check for conflicting NetworkPolicy objects: `kubectl get networkpolicies -A`.
 
-### Issue 5: Hetzner Load Balancer Health Check Failures
+### Issue 5: sovereign cloud Load Balancer Health Check Failures
 
 **Symptom:** Load balancer marks API servers as unhealthy, despite nodes being ready.
 
@@ -750,7 +750,7 @@ kubectl cluster-info
 
 **Resolution:**
 - Verify API server is responsive: `curl -k https://localhost:6443/healthz`.
-- Check health check timeout in Hetzner LB configuration; increase if necessary.
+- Check health check timeout in the sovereign profile LB configuration; increase if necessary.
 - Ensure network policies allow health check traffic on port 6443.
 
 ### Issue 6: Persistent Volume Attachment Failure
@@ -767,12 +767,12 @@ kubectl logs -n kube-system <csi-attacher-pod>
 **Common Causes:**
 - CSI driver is not deployed or running.
 - Volume limit exceeded on the node.
-- Cloud API (Hetzner/Azure) rejected the attachment request.
+- Cloud API (sovereign / hyperscaler) rejected the attachment request.
 
 **Resolution:**
 - Verify CSI driver is running: `kubectl get daemonset -n kube-system | grep csi`.
 - Check node volume limits: `kubectl describe node <node-name> | grep Allocated`.
-- Check cloud API logs (Hetzner/Azure portal) for errors.
+- Check cloud API logs (sovereign / hyperscaler portal) for errors.
 
 ### Issue 7: High CPU Usage on Control-Plane
 
@@ -898,7 +898,7 @@ CAVE's infrastructure supports SOC 2 Type II compliance:
 CAVE aligns with ISO 27001 Information Security Management:
 
 - **Asset Management:** Infrastructure inventory is maintained in OpenTofu, enabling asset tracking.
-- **Access Control:** RBAC via Entra ID (Azure) or Kubernetes RBAC (Hetzner). Principle of least privilege enforced.
+- **Access Control:** RBAC via Entra ID (Azure) or Kubernetes RBAC (sovereign). Principle of least privilege enforced.
 - **Cryptography:** TLS 1.3 for all APIs. AES-256 for etcd encryption.
 - **Monitoring:** 24/7 monitoring via observability stack. Incident response playbooks in place.
 

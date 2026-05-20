@@ -133,7 +133,8 @@ impl MigrationLedger {
     }
 
     pub fn clear_stable(&mut self) {
-        self.by_slot.retain(|_, m| m.state != MigrationState::Stable);
+        self.by_slot
+            .retain(|_, m| m.state != MigrationState::Stable);
     }
 }
 

@@ -28,7 +28,10 @@ pub struct ServiceMetrics {
 
 impl ServiceMetrics {
     pub fn new(service_id: Uuid) -> Self {
-        Self { service_id, ..Default::default() }
+        Self {
+            service_id,
+            ..Default::default()
+        }
     }
 
     pub fn record(&mut self, latency_ms: u64, success: bool) {
@@ -141,7 +144,9 @@ impl Default for ObservabilityStore {
 
 impl ObservabilityStore {
     pub fn new() -> Self {
-        Self { inner: Arc::new(Mutex::new(HashMap::new())) }
+        Self {
+            inner: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
 
     pub fn record_request(&self, service_id: Uuid, latency_ms: u64, success: bool) {
@@ -189,7 +194,11 @@ impl ObservabilityStore {
             }
         };
 
-        let err_rate = if total == 0 { 0.0 } else { failed as f64 / total as f64 };
+        let err_rate = if total == 0 {
+            0.0
+        } else {
+            failed as f64 / total as f64
+        };
         GoldenSignals {
             service_id,
             traffic_total: total,

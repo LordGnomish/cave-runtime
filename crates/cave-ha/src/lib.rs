@@ -42,10 +42,10 @@ pub use metrics::Metrics;
 pub use raft::node::{NodeCmd, RaftHandle};
 pub use raft::state_machine::{KvStateMachine, NoopStateMachine, StateMachine};
 pub use raft::types::{
-    EntryType, HardState, LogIndex, MembershipConfig, NodeId, NodeInfo, NodeStatus,
-    Role, SnapshotMeta, Term,
+    EntryType, HardState, LogIndex, MembershipConfig, NodeId, NodeInfo, NodeStatus, Role,
+    SnapshotMeta, Term,
 };
-pub use transport::memory::{MemNetwork, MemTransport};
 pub use transport::Transport;
+pub use transport::memory::{MemNetwork, MemTransport};
 
 pub const MODULE_NAME: &str = "ha";

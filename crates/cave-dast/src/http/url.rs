@@ -22,13 +22,8 @@ impl ParsedUrl {
     }
 
     pub fn effective_port(&self) -> u16 {
-        self.port.unwrap_or_else(|| {
-            if self.is_https() {
-                443
-            } else {
-                80
-            }
-        })
+        self.port
+            .unwrap_or_else(|| if self.is_https() { 443 } else { 80 })
     }
 
     /// `scheme://host[:port]` — the origin (RFC 6454).
@@ -182,19 +177,13 @@ mod tests {
     #[test]
     fn resolve_root_path() {
         let base = parse("http://x.test/old").unwrap();
-        assert_eq!(
-            resolve(&base, "/new").as_deref(),
-            Some("http://x.test/new")
-        );
+        assert_eq!(resolve(&base, "/new").as_deref(), Some("http://x.test/new"));
     }
 
     #[test]
     fn resolve_relative_path() {
         let base = parse("http://x.test/a/b/c").unwrap();
-        assert_eq!(
-            resolve(&base, "d").as_deref(),
-            Some("http://x.test/a/b/d")
-        );
+        assert_eq!(resolve(&base, "d").as_deref(), Some("http://x.test/a/b/d"));
     }
 
     #[test]

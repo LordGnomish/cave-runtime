@@ -44,7 +44,10 @@ pub fn deduplicate(findings: Vec<Vulnerability>) -> Vec<Vulnerability> {
             }
         }
     }
-    order.into_iter().filter_map(|k| by_key.remove(&k)).collect()
+    order
+        .into_iter()
+        .filter_map(|k| by_key.remove(&k))
+        .collect()
 }
 
 fn severity_rank(s: &Severity) -> u8 {
@@ -118,15 +121,25 @@ mod tests {
     }
 
     #[test]
-    fn sla_critical_seven_days() { assert_eq!(sla_days(&Severity::Critical), Some(7)); }
+    fn sla_critical_seven_days() {
+        assert_eq!(sla_days(&Severity::Critical), Some(7));
+    }
     #[test]
-    fn sla_high_thirty_days() { assert_eq!(sla_days(&Severity::High), Some(30)); }
+    fn sla_high_thirty_days() {
+        assert_eq!(sla_days(&Severity::High), Some(30));
+    }
     #[test]
-    fn sla_medium_ninety_days() { assert_eq!(sla_days(&Severity::Medium), Some(90)); }
+    fn sla_medium_ninety_days() {
+        assert_eq!(sla_days(&Severity::Medium), Some(90));
+    }
     #[test]
-    fn sla_low_one_eighty_days() { assert_eq!(sla_days(&Severity::Low), Some(180)); }
+    fn sla_low_one_eighty_days() {
+        assert_eq!(sla_days(&Severity::Low), Some(180));
+    }
     #[test]
-    fn sla_info_untracked() { assert_eq!(sla_days(&Severity::Info), None); }
+    fn sla_info_untracked() {
+        assert_eq!(sla_days(&Severity::Info), None);
+    }
 
     #[test]
     fn sla_breach_detection() {

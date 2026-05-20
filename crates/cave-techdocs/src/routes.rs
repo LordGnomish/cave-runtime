@@ -7,12 +7,12 @@
 use crate::models::{EntityMetadata, EntityMetadataInner, EntityName};
 use crate::publisher::{Publisher, TechDocsError};
 use axum::{
+    Json, Router,
     body::Body,
     extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{get, post},
-    Json, Router,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -69,9 +69,11 @@ async fn metadata_techdocs(
     let entity = EntityName::new(namespace, kind, name);
     match state.publisher.fetch_metadata(&entity).await {
         Ok(meta) => Json(meta).into_response(),
-        Err(TechDocsError::NotFound(msg)) => {
-            (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": msg }))).into_response()
-        }
+        Err(TechDocsError::NotFound(msg)) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": msg })),
+        )
+            .into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({ "error": e.to_string() })),
@@ -216,7 +218,9 @@ mod tests {
         let resp = get_req(app, "/api/techdocs/health").await;
         assert_eq!(resp.status(), StatusCode::OK);
 
-        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json["status"], "ok");
         assert_eq!(json["upstream"], "Backstage TechDocs");
@@ -249,7 +253,9 @@ mod tests {
         .await;
         assert_eq!(resp.status(), StatusCode::OK);
 
-        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json["kind"], "Component");
         assert_eq!(json["metadata"]["name"], "my-service");
@@ -276,14 +282,12 @@ mod tests {
     #[tokio::test]
     async fn sync_queues_build() {
         let (app, _tmp) = test_app();
-        let resp = post_req(
-            app,
-            "/api/techdocs/sync/default/Component/my-service",
-        )
-        .await;
+        let resp = post_req(app, "/api/techdocs/sync/default/Component/my-service").await;
         assert_eq!(resp.status(), StatusCode::OK);
 
-        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json["status"], "queued");
     }

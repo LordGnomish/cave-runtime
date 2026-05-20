@@ -87,12 +87,10 @@ impl LdapConnection {
         let mut current = self.msg_id.load(Ordering::SeqCst);
         loop {
             let next = if current == i32::MAX { 1 } else { current + 1 };
-            match self.msg_id.compare_exchange(
-                current,
-                next,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
+            match self
+                .msg_id
+                .compare_exchange(current, next, Ordering::SeqCst, Ordering::SeqCst)
+            {
                 Ok(prev) => return prev,
                 Err(actual) => current = actual,
             }

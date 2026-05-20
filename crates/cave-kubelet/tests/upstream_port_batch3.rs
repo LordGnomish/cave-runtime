@@ -15,15 +15,13 @@
 //!   * pkg/kubelet/lifecycle/handlers_test.go
 
 use cave_kubelet::lifecycle::{
-    HookExecution, HookHandler, HookOutcome, HookSample, HookStage, evaluate,
+    evaluate, HookExecution, HookHandler, HookOutcome, HookSample, HookStage,
 };
 use cave_kubelet::pod_status_manager::{
     AttemptOutcome, ContainerStatus, DispatchOutcome, DropReason, PodPhase, PodStatus,
     PodStatusManager, StatusManagerConfig,
 };
-use cave_kubelet::probe::{
-    ProbeKind, ProbeResult, ProbeSpec, ProberAction,
-};
+use cave_kubelet::probe::{ProbeKind, ProbeResult, ProbeSpec, ProberAction};
 use cave_kubelet::prober::{ContainerRef, CoordinatorEvent, ProberConfig, ProberCoordinator};
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use std::time::Duration;
@@ -152,14 +150,20 @@ fn upstream_prober_coordinator_suppresses_duplicate_restart_requests() {
     let mut c = ProberCoordinator::new(ProberConfig::default());
     let cr = cref("pod-1", "main");
     let first = c.coordinate(&cr, ProberAction::RestartContainer, t0());
-    assert!(matches!(first, Some(CoordinatorEvent::RestartContainer { .. })));
+    assert!(matches!(
+        first,
+        Some(CoordinatorEvent::RestartContainer { .. })
+    ));
     // Second tick — still failing, but a restart is in flight already.
     let second = c.coordinate(&cr, ProberAction::RestartContainer, t0());
     assert!(second.is_none(), "duplicate restart must be suppressed");
     // After the kubelet ACKs the restart, a new restart event can fire.
     c.mark_restart_completed(&cr);
     let third = c.coordinate(&cr, ProberAction::RestartContainer, t0());
-    assert!(matches!(third, Some(CoordinatorEvent::RestartContainer { .. })));
+    assert!(matches!(
+        third,
+        Some(CoordinatorEvent::RestartContainer { .. })
+    ));
 }
 
 /// Upstream: TestProberManager / `readiness_only_fires_on_transition`.
@@ -184,7 +188,10 @@ fn upstream_prober_coordinator_emits_startup_complete_once() {
     let mut c = ProberCoordinator::new(ProberConfig::default());
     let cr = cref("pod-1", "main");
     let first = c.coordinate(&cr, ProberAction::StartupComplete, t0());
-    assert!(matches!(first, Some(CoordinatorEvent::StartupComplete { .. })));
+    assert!(matches!(
+        first,
+        Some(CoordinatorEvent::StartupComplete { .. })
+    ));
     // Repeated startup-complete reports are suppressed.
     let second = c.coordinate(&cr, ProberAction::StartupComplete, t0());
     assert!(second.is_none());
@@ -222,11 +229,22 @@ fn upstream_prober_coordinator_restart_suppression_clears_after_window() {
     let cr = cref("pod-1", "main");
     let _ = c.coordinate(&cr, ProberAction::RestartContainer, t0());
     // No ACK yet, but within suppression window → second event suppressed.
-    let still_blocked = c.coordinate(&cr, ProberAction::RestartContainer, t0() + ChronoDuration::seconds(3));
+    let still_blocked = c.coordinate(
+        &cr,
+        ProberAction::RestartContainer,
+        t0() + ChronoDuration::seconds(3),
+    );
     assert!(still_blocked.is_none());
     // Past the suppression window → suppression clears and event fires.
-    let after = c.coordinate(&cr, ProberAction::RestartContainer, t0() + ChronoDuration::seconds(10));
-    assert!(matches!(after, Some(CoordinatorEvent::RestartContainer { .. })));
+    let after = c.coordinate(
+        &cr,
+        ProberAction::RestartContainer,
+        t0() + ChronoDuration::seconds(10),
+    );
+    assert!(matches!(
+        after,
+        Some(CoordinatorEvent::RestartContainer { .. })
+    ));
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -286,7 +304,7 @@ fn upstream_lifecycle_pending_within_timeout_window() {
 /// the Startup probe path).
 #[test]
 fn upstream_probe_startup_kind_default_failure_then_threshold_success() {
-    use cave_kubelet::probe::{ProbeOutcome, ProbeWorkerState, decide};
+    use cave_kubelet::probe::{decide, ProbeOutcome, ProbeWorkerState};
     let mut spec = ProbeSpec::http_get(8080, "/startup");
     spec.kind = ProbeKind::Startup;
     let mut state = ProbeWorkerState::new(t0());
@@ -294,7 +312,11 @@ fn upstream_probe_startup_kind_default_failure_then_threshold_success() {
     // …but only after consecutive failures, not before any sample arrives.
     assert_eq!(state.effective_outcome(&spec), ProbeOutcome::Failure);
     // After one success at successThreshold=1 → StartupComplete.
-    state.record(&spec, ProbeResult::Success, t0() + ChronoDuration::seconds(1));
+    state.record(
+        &spec,
+        ProbeResult::Success,
+        t0() + ChronoDuration::seconds(1),
+    );
     assert_eq!(state.effective_outcome(&spec), ProbeOutcome::Success);
     assert_eq!(decide(&spec, &state), ProberAction::StartupComplete);
 }

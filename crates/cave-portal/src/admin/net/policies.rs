@@ -7,14 +7,18 @@
 use super::NetViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::table;
-use crate::admin::state::{scope, AdminState, NetPolicy};
+use crate::admin::state::{AdminState, NetPolicy, scope};
 
 pub fn list_policies(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<NetPolicy>, NetViewError> {
     ctx.authorise(Permission::NetRead)?;
-    Ok(scope(&state.net_policies.read().unwrap(), &ctx.tenant, |r| &r.tenant)
+    Ok(
+        scope(&state.net_policies.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
         .into_iter()
         .cloned()
-        .collect())
+        .collect(),
+    )
 }
 
 pub fn create_policy(
@@ -35,7 +39,10 @@ pub fn create_policy(
         other => return Err(NetViewError::InvalidDirection(other.into())),
     };
     let mut policies = state.net_policies.write().unwrap();
-    if policies.iter().any(|p| p.tenant == ctx.tenant && p.name == name) {
+    if policies
+        .iter()
+        .any(|p| p.tenant == ctx.tenant && p.name == name)
+    {
         return Err(NetViewError::DuplicatePolicy(name.into()));
     }
     policies.push(NetPolicy {
@@ -77,10 +84,7 @@ pub fn policy_impact(
         .count() as u32)
 }
 
-pub(crate) fn render_section(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, NetViewError> {
+pub(crate) fn render_section(state: &AdminState, ctx: &RequestCtx) -> Result<String, NetViewError> {
     let policies = list_policies(state, ctx)?;
     let rows: Vec<Vec<String>> = policies
         .iter()

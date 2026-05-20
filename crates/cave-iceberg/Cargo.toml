@@ -1,0 +1,27 @@
+[package]
+name = "cave-iceberg"
+description = "Sovereign Apache Iceberg table format — read-side reimplementation, apache/iceberg-rust upstream"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-iceberg"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["iceberg", "lakehouse", "table-format", "sovereign", "reimplementation"]
+categories = ["database-implementations", "data-structures", "encoding"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+thiserror = { workspace = true }
+uuid = { workspace = true, features = ["serde", "v4"] }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]

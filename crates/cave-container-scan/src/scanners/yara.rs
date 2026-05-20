@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
 use crate::engine::{ScanError, Scanner};
-use crate::models::{Finding, FindingCategory, Confidence, ScanKind, ScanRequest, ScanTarget, Severity};
+use crate::models::{
+    Confidence, Finding, FindingCategory, ScanKind, ScanRequest, ScanTarget, Severity,
+};
 use async_trait::async_trait;
 use regex::Regex;
 use std::collections::HashMap;
@@ -80,7 +82,9 @@ impl StubYaraEngine {
                         "This content matches a known malware signature pattern".to_string(),
                     );
                     f.confidence = Confidence::High;
-                    f.remediation = Some("Isolate the affected system and perform incident response".to_string());
+                    f.remediation = Some(
+                        "Isolate the affected system and perform incident response".to_string(),
+                    );
                     findings.push(f);
                     break;
                 }
@@ -128,7 +132,9 @@ impl Scanner for YaraScanner {
                 let findings = self.engine.scan_payload(&payload);
                 Ok(findings)
             }
-            _ => Err(ScanError::InvalidRequest("Expected Content target".to_string())),
+            _ => Err(ScanError::InvalidRequest(
+                "Expected Content target".to_string(),
+            )),
         }
     }
 }
@@ -169,6 +175,11 @@ mod tests {
     fn test_stub_yara_engine_creation() {
         let engine = StubYaraEngine::new();
         assert_eq!(engine.rules.len(), 5);
-        assert!(engine.rules.iter().any(|r| r.id == "M_CryptoMiner_Generic_2024"));
+        assert!(
+            engine
+                .rules
+                .iter()
+                .any(|r| r.id == "M_CryptoMiner_Generic_2024")
+        );
     }
 }

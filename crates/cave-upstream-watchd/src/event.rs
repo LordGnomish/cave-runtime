@@ -114,7 +114,9 @@ impl JsonlSink {
         let base = dirs::data_dir()
             .or_else(dirs::home_dir)
             .unwrap_or_else(|| PathBuf::from("."));
-        base.join("cave-runtime").join("watchd").join("events.jsonl")
+        base.join("cave-runtime")
+            .join("watchd")
+            .join("events.jsonl")
     }
 }
 
@@ -249,7 +251,10 @@ mod tests {
         let sink = JsonlSink::new(path.clone());
         sink.emit(&sample_event("cave-a")).unwrap();
         // Append a garbage line.
-        let mut f = std::fs::OpenOptions::new().append(true).open(&path).unwrap();
+        let mut f = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .unwrap();
         f.write_all(b"{not json\n").unwrap();
         sink.emit(&sample_event("cave-b")).unwrap();
         let got = read_events(&path).unwrap();

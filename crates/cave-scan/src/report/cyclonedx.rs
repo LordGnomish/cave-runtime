@@ -5,7 +5,7 @@
 //! CycloneDX 1.5 SBOM serializer.
 
 use super::Report;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub fn to_cyclonedx(report: &Report) -> Value {
     let components: Vec<Value> = report

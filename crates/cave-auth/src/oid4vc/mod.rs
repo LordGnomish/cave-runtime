@@ -48,9 +48,21 @@ pub enum Oid4vcError {
 pub fn router(state: issuance::credential_endpoint::IssuerState) -> axum::Router {
     use axum::routing::{get, post};
     axum::Router::new()
-        .route("/credential_offer", get(issuance::credential_offer::handle_offer))
-        .route("/credential", post(issuance::credential_endpoint::handle_issue))
-        .route("/oid4vp/authz", get(presentation::authz_request::handle_authz_request))
-        .route("/oid4vp/authz_response", post(presentation::authz_response::handle_authz_response))
+        .route(
+            "/credential_offer",
+            get(issuance::credential_offer::handle_offer),
+        )
+        .route(
+            "/credential",
+            post(issuance::credential_endpoint::handle_issue),
+        )
+        .route(
+            "/oid4vp/authz",
+            get(presentation::authz_request::handle_authz_request),
+        )
+        .route(
+            "/oid4vp/authz_response",
+            post(presentation::authz_response::handle_authz_response),
+        )
         .with_state(state)
 }

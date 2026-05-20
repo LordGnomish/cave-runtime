@@ -5,9 +5,9 @@
 //! cave-auth surfaces. Visual port of
 //! `js/apps/admin-ui/src/identity-providers/add/AddSamlConnect.tsx`.
 
+use super::{AuthAdminError, render_admin_nav, require_platform};
 use crate::admin::permission::RequestCtx;
 use crate::admin::render::{escape, page_shell_full};
-use super::{render_admin_nav, require_platform, AuthAdminError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SamlBrokerConfig {
@@ -146,8 +146,16 @@ pub fn render(ctx: &RequestCtx) -> Result<String, AuthAdminError> {
         slo = escape(&c.slo_url),
         pa = escape(&c.principal_attribute),
         sr = if c.sign_request { "checked" } else { "" },
-        was = if c.want_assertions_signed { "checked" } else { "" },
-        wae = if c.want_assertions_encrypted { "checked" } else { "" },
+        was = if c.want_assertions_signed {
+            "checked"
+        } else {
+            ""
+        },
+        wae = if c.want_assertions_encrypted {
+            "checked"
+        } else {
+            ""
+        },
     );
     Ok(page_shell_full(
         ctx,

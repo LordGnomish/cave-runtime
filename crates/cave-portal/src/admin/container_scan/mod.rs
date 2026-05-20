@@ -23,7 +23,7 @@ pub mod vulnerabilities;
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, ContainerScanResult};
+use crate::admin::state::{AdminState, ContainerScanResult, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -46,7 +46,11 @@ pub fn list_records(
     .cloned()
     .collect();
     // Worst first — operators want vulnerable images at the top.
-    rows.sort_by(|a, b| b.critical_cves.cmp(&a.critical_cves).then(a.image.cmp(&b.image)));
+    rows.sort_by(|a, b| {
+        b.critical_cves
+            .cmp(&a.critical_cves)
+            .then(a.image.cmp(&b.image))
+    });
     Ok(rows)
 }
 
@@ -56,7 +60,9 @@ pub fn critical_only<'a>(
     rows: &'a [ContainerScanResult],
     threshold: u32,
 ) -> Vec<&'a ContainerScanResult> {
-    rows.iter().filter(|r| r.critical_cves >= threshold).collect()
+    rows.iter()
+        .filter(|r| r.critical_cves >= threshold)
+        .collect()
 }
 
 pub fn detail(
@@ -131,8 +137,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ContainerS
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite =
-    Cite::backstage("plugins/trivy/src/components/ScanList.tsx", "ScanList");
+const FILE_CITE: Cite = Cite::backstage("plugins/trivy/src/components/ScanList.tsx", "ScanList");
 
 #[cfg(test)]
 mod tests {
@@ -167,7 +172,11 @@ mod tests {
 
     #[test]
     fn list_sorted_worst_first() {
-        let rows = list_records(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
+        let rows = list_records(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
         for w in rows.windows(2) {
             assert!(w[0].critical_cves >= w[1].critical_cves);
         }
@@ -175,7 +184,11 @@ mod tests {
 
     #[test]
     fn critical_only_filters_above_threshold() {
-        let rows = list_records(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
+        let rows = list_records(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
         let above_one = critical_only(&rows, 1);
         assert!(above_one.iter().all(|r| r.critical_cves >= 1));
         let above_huge = critical_only(&rows, 99_999);
@@ -188,22 +201,26 @@ mod tests {
         let rows = list_records(&s, &ctx(&[Permission::ContainerScanRead])).unwrap();
         if let Some(first) = rows.first() {
             let image = first.image.clone();
-            assert!(detail(&s, &ctx(&[Permission::ContainerScanRead]), &image)
-                .unwrap()
-                .is_some());
+            assert!(
+                detail(&s, &ctx(&[Permission::ContainerScanRead]), &image)
+                    .unwrap()
+                    .is_some()
+            );
         }
-        assert!(detail(
-            &s,
-            &ctx(&[Permission::ContainerScanRead]),
-            "no:such",
-        )
-        .unwrap()
-        .is_none());
+        assert!(
+            detail(&s, &ctx(&[Permission::ContainerScanRead]), "no:such",)
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]
     fn scan_summary_aggregates() {
-        let rows = list_records(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
+        let rows = list_records(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
         let s = scan_summary(&rows);
         assert_eq!(s.images, rows.len() as u32);
         let expected: u32 = rows.iter().map(|r| r.critical_cves).sum();
@@ -217,19 +234,31 @@ mod tests {
             "RenderOwner",
             "acme"
         );
-        let html = render(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
+        let html = render(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
         assert!(html.contains("web:v17"));
     }
 
     #[test]
     fn render_excludes_evil_row() {
-        let html = render(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
+        let html = render(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
         assert!(!html.contains("evil:latest"));
     }
 
     #[test]
     fn render_includes_summary_cards_and_upstream_link() {
-        let html = render(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
+        let html = render(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
         assert!(html.contains("IMAGES"));
         assert!(html.contains("CRITICAL"));
         assert!(html.contains("trivy.dev"));

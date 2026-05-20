@@ -156,8 +156,7 @@ impl ScanPipeline {
         let sbom_fut = self.sbom_generate(art);
         let policy_fut = self.policy_evaluate(art);
 
-        let (ns_res, sbom_res, policy_res) =
-            tokio::join!(container_scan_fut, sbom_fut, policy_fut);
+        let (ns_res, sbom_res, policy_res) = tokio::join!(container_scan_fut, sbom_fut, policy_fut);
 
         let mut findings: Vec<ScanFindingSummary> = Vec::new();
         let mut reasons: Vec<String> = Vec::new();
@@ -266,12 +265,21 @@ impl ScanPipeline {
         &self,
         art: &FetchedArtifact,
     ) -> Result<Vec<ScanFindingSummary>, String> {
-        let url = format!("{}/api/container-scan/namespace", self.cfg.container_scan_url.trim_end_matches('/'));
+        let url = format!(
+            "{}/api/container-scan/namespace",
+            self.cfg.container_scan_url.trim_end_matches('/')
+        );
         let body = serde_json::json!({
             "ecosystem": art.ecosystem.as_str(),
             "name": art.name,
         });
-        let resp = self.http.post(&url).json(&body).send().await.map_err(|e| e.to_string())?;
+        let resp = self
+            .http
+            .post(&url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
         if !resp.status().is_success() {
             return Err(format!("{url} → {}", resp.status()));
         }
@@ -289,7 +297,13 @@ impl ScanPipeline {
             "version": art.version.as_deref().unwrap_or("unknown"),
             "content_sha256": art.sha256_hex,
         });
-        let resp = self.http.post(&url).json(&body).send().await.map_err(|e| e.to_string())?;
+        let resp = self
+            .http
+            .post(&url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
         if !resp.status().is_success() {
             return Err(format!("{url} → {}", resp.status()));
         }
@@ -314,7 +328,13 @@ impl ScanPipeline {
                 "sha256": art.sha256_hex,
             }
         });
-        let resp = self.http.post(&url).json(&body).send().await.map_err(|e| e.to_string())?;
+        let resp = self
+            .http
+            .post(&url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
         if !resp.status().is_success() {
             return Err(format!("{url} → {}", resp.status()));
         }
@@ -326,7 +346,10 @@ impl ScanPipeline {
         if outcome.findings.is_empty() {
             return Ok(());
         }
-        let url = format!("{}/api/vulns/findings/bulk", self.cfg.vulns_url.trim_end_matches('/'));
+        let url = format!(
+            "{}/api/vulns/findings/bulk",
+            self.cfg.vulns_url.trim_end_matches('/')
+        );
         let body = serde_json::json!({
             "source": "cave-registry",
             "artefact": {
@@ -340,7 +363,13 @@ impl ScanPipeline {
             "scan_id": outcome.id,
             "scanned_at": outcome.scanned_at,
         });
-        let _ = self.http.post(&url).json(&body).send().await.map_err(|e| e.to_string())?;
+        let _ = self
+            .http
+            .post(&url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
 }

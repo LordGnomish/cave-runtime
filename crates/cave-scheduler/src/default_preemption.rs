@@ -63,10 +63,15 @@ pub struct NominatedNodeMap {
 }
 
 impl NominatedNodeMap {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn nominate(&self, pod_uid: &str, node: &str) {
-        self.inner.lock().unwrap().insert(pod_uid.into(), node.into());
+        self.inner
+            .lock()
+            .unwrap()
+            .insert(pod_uid.into(), node.into());
     }
 
     pub fn nominated_for(&self, pod_uid: &str) -> Option<String> {
@@ -77,8 +82,12 @@ impl NominatedNodeMap {
         self.inner.lock().unwrap().remove(pod_uid);
     }
 
-    pub fn len(&self) -> usize { self.inner.lock().unwrap().len() }
-    pub fn is_empty(&self) -> bool { self.inner.lock().unwrap().is_empty() }
+    pub fn len(&self) -> usize {
+        self.inner.lock().unwrap().len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.inner.lock().unwrap().is_empty()
+    }
 }
 
 /// Eviction queue — upstream issues eviction subresource RPCs; we record the
@@ -99,7 +108,9 @@ pub struct EvictionTask {
 }
 
 impl AsyncPreemptHandle {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn enqueue(&self, task: EvictionTask) {
         self.pending.lock().unwrap().push(task);
@@ -110,15 +121,23 @@ impl AsyncPreemptHandle {
     /// eviction worker calls it in a tokio task.)
     pub fn dequeue(&self) -> Option<EvictionTask> {
         let mut pending = self.pending.lock().unwrap();
-        if pending.is_empty() { return None; }
+        if pending.is_empty() {
+            return None;
+        }
         let task = pending.remove(0);
         self.completed.lock().unwrap().push(task.clone());
         Some(task)
     }
 
-    pub fn pending_len(&self) -> usize { self.pending.lock().unwrap().len() }
-    pub fn completed_len(&self) -> usize { self.completed.lock().unwrap().len() }
-    pub fn pending(&self) -> Vec<EvictionTask> { self.pending.lock().unwrap().clone() }
+    pub fn pending_len(&self) -> usize {
+        self.pending.lock().unwrap().len()
+    }
+    pub fn completed_len(&self) -> usize {
+        self.completed.lock().unwrap().len()
+    }
+    pub fn pending(&self) -> Vec<EvictionTask> {
+        self.pending.lock().unwrap().clone()
+    }
 }
 
 /// PostFilter plugin running the cave-scheduler preemption algorithm.
@@ -136,7 +155,12 @@ impl DefaultPreemption {
         nominated: Arc<NominatedNodeMap>,
         async_handle: Arc<AsyncPreemptHandle>,
     ) -> Self {
-        Self { args, pdbs, nominated, async_handle }
+        Self {
+            args,
+            pdbs,
+            nominated,
+            async_handle,
+        }
     }
 
     /// Wrap upstream `preempt()` with the per-args min-evictable-priority
@@ -156,7 +180,9 @@ impl DefaultPreemption {
 
     /// Stage every victim on the async handle (or skip when `dry_run`).
     fn stage_evictions(&self, preemptor: &Pod, victims: &[Pod], node: &str) {
-        if self.args.dry_run { return; }
+        if self.args.dry_run {
+            return;
+        }
         for v in victims {
             self.async_handle.enqueue(EvictionTask {
                 victim_uid: v.uid.clone(),
@@ -170,7 +196,9 @@ impl DefaultPreemption {
 }
 
 impl PostFilterPlugin for DefaultPreemption {
-    fn name(&self) -> &str { "DefaultPreemption" }
+    fn name(&self) -> &str {
+        "DefaultPreemption"
+    }
 
     fn post_filter(
         &self,
@@ -182,9 +210,13 @@ impl PostFilterPlugin for DefaultPreemption {
         // Skip nodes whose rejection was UnschedulableAndUnresolvable —
         // those failures cannot be fixed by evicting other pods.
         let mut candidate_snapshot = ClusterSnapshot {
-            nodes: snapshot.nodes.iter()
+            nodes: snapshot
+                .nodes
+                .iter()
                 .filter(|n| match filtered.get(&n.name) {
-                    Some(s) if s.code == crate::framework::Code::UnschedulableAndUnresolvable => false,
+                    Some(s) if s.code == crate::framework::Code::UnschedulableAndUnresolvable => {
+                        false
+                    }
                     _ => true,
                 })
                 .cloned()
@@ -197,7 +229,8 @@ impl PostFilterPlugin for DefaultPreemption {
         let min = std::cmp::max(
             (self.args.min_candidate_nodes_percentage as usize * total) / 100,
             self.args.min_candidate_nodes_absolute as usize,
-        ).min(total);
+        )
+        .min(total);
         if candidate_snapshot.nodes.len() > min {
             // Sort by name (deterministic) and truncate.
             candidate_snapshot.nodes.sort_by(|a, b| a.name.cmp(&b.name));
@@ -230,19 +263,43 @@ mod tests {
 
     fn full_node(name: &str) -> Node {
         Node {
-            name: name.into(), uid: Uuid::new_v4(), status: NodeStatus::Ready,
-            capacity: ResourceCapacity { cpu_millicores: 4000, memory_bytes: 8_000_000_000, pods: 110, ephemeral_storage_bytes: 0 },
-            allocatable: ResourceCapacity { cpu_millicores: 4000, memory_bytes: 8_000_000_000, pods: 110, ephemeral_storage_bytes: 0 },
-            allocated: ResourceCapacity { cpu_millicores: 4000, memory_bytes: 8_000_000_000, pods: 5, ephemeral_storage_bytes: 0 },
-            labels: HashMap::new(), taints: vec![], conditions: vec![],
-            registered_at: Utc::now(), last_heartbeat: Utc::now(),
+            name: name.into(),
+            uid: Uuid::new_v4(),
+            status: NodeStatus::Ready,
+            capacity: ResourceCapacity {
+                cpu_millicores: 4000,
+                memory_bytes: 8_000_000_000,
+                pods: 110,
+                ephemeral_storage_bytes: 0,
+            },
+            allocatable: ResourceCapacity {
+                cpu_millicores: 4000,
+                memory_bytes: 8_000_000_000,
+                pods: 110,
+                ephemeral_storage_bytes: 0,
+            },
+            allocated: ResourceCapacity {
+                cpu_millicores: 4000,
+                memory_bytes: 8_000_000_000,
+                pods: 5,
+                ephemeral_storage_bytes: 0,
+            },
+            labels: HashMap::new(),
+            taints: vec![],
+            conditions: vec![],
+            registered_at: Utc::now(),
+            last_heartbeat: Utc::now(),
         }
     }
 
     fn pod_at(tenant: &str, name: &str, prio: i32, cpu: u64, mem: u64) -> Pod {
         let mut p = Pod::new(tenant, "ns", name);
         p.spec.priority = prio;
-        p.spec.resources = ResourceRequest { cpu_millicores: cpu, memory_bytes: mem, ..Default::default() };
+        p.spec.resources = ResourceRequest {
+            cpu_millicores: cpu,
+            memory_bytes: mem,
+            ..Default::default()
+        };
         p
     }
 
@@ -280,8 +337,11 @@ mod tests {
     fn async_handle_enqueue_and_dequeue() {
         let h = AsyncPreemptHandle::new();
         let task = EvictionTask {
-            victim_uid: "v".into(), victim_namespace: "ns".into(), victim_name: "n".into(),
-            node_name: "node".into(), preemptor_uid: "p".into(),
+            victim_uid: "v".into(),
+            victim_namespace: "ns".into(),
+            victim_name: "n".into(),
+            node_name: "node".into(),
+            preemptor_uid: "p".into(),
         };
         h.enqueue(task.clone());
         assert_eq!(h.pending_len(), 1);
@@ -328,7 +388,10 @@ mod tests {
     // ── DefaultPreemption.post_filter ────────────────────────────────────
 
     fn full_snap(nodes: Vec<Node>, pods_per_node: HashMap<String, Vec<Pod>>) -> ClusterSnapshot {
-        ClusterSnapshot { nodes, pods_by_node: pods_per_node }
+        ClusterSnapshot {
+            nodes,
+            pods_by_node: pods_per_node,
+        }
     }
 
     fn rejected_map(nodes: &[&str], code: crate::framework::Code) -> NodeToStatusMap {
@@ -336,7 +399,9 @@ mod tests {
         for n in nodes {
             let s = match code {
                 crate::framework::Code::Unschedulable => Status::unschedulable("Resources", "x"),
-                crate::framework::Code::UnschedulableAndUnresolvable => Status::unresolvable("X", "x"),
+                crate::framework::Code::UnschedulableAndUnresolvable => {
+                    Status::unresolvable("X", "x")
+                }
                 _ => Status::success("X"),
             };
             m.set(n.to_string(), s);
@@ -350,7 +415,13 @@ mod tests {
         a.allocated.cpu_millicores = 4000;
         let snap = full_snap(
             vec![a],
-            HashMap::from([("a".into(), vec![pod_at("t", "low", 0, 1000, 0), pod_at("t", "low2", 0, 1000, 0)])]),
+            HashMap::from([(
+                "a".into(),
+                vec![
+                    pod_at("t", "low", 0, 1000, 0),
+                    pod_at("t", "low2", 0, 1000, 0),
+                ],
+            )]),
         );
         let preemptor = pod_at("t", "new", 50, 500, 0);
         let nominated = Arc::new(NominatedNodeMap::new());
@@ -369,7 +440,10 @@ mod tests {
         // Async handle staged 1 victim.
         assert_eq!(handle.pending_len(), 1);
         // Nominated map updated.
-        assert_eq!(nominated.nominated_for(&preemptor.uid).as_deref(), Some("a"));
+        assert_eq!(
+            nominated.nominated_for(&preemptor.uid).as_deref(),
+            Some("a")
+        );
     }
 
     #[test]
@@ -467,7 +541,10 @@ mod tests {
         let mut a = full_node("a");
         a.allocated.cpu_millicores = 4000;
         let mut v_protected = pod_at("t", "v1", 0, 2000, 4_000_000_000);
-        v_protected.spec.node_selector.insert("app".into(), "db".into());
+        v_protected
+            .spec
+            .node_selector
+            .insert("app".into(), "db".into());
         let v_free = pod_at("t", "v2", 0, 2000, 4_000_000_000);
         let snap = full_snap(
             vec![a],
@@ -487,7 +564,8 @@ mod tests {
         let plug = DefaultPreemption::new(
             DefaultPreemptionArgs::default(),
             vec![pdb],
-            nominated, handle.clone(),
+            nominated,
+            handle.clone(),
         );
         let cs = CycleState::new();
         let filtered = rejected_map(&["a"], crate::framework::Code::Unschedulable);
@@ -511,8 +589,10 @@ mod tests {
         let nominated = Arc::new(NominatedNodeMap::new());
         let handle = Arc::new(AsyncPreemptHandle::new());
         let plug = DefaultPreemption::new(
-            DefaultPreemptionArgs::default(), vec![],
-            nominated, handle.clone(),
+            DefaultPreemptionArgs::default(),
+            vec![],
+            nominated,
+            handle.clone(),
         );
         let cs = CycleState::new();
         let filtered = rejected_map(&["a"], crate::framework::Code::Unschedulable);
@@ -533,7 +613,10 @@ mod tests {
         let nominated = Arc::new(NominatedNodeMap::new());
         let handle = Arc::new(AsyncPreemptHandle::new());
         let plug = DefaultPreemption::new(
-            DefaultPreemptionArgs::default(), vec![], nominated, handle.clone(),
+            DefaultPreemptionArgs::default(),
+            vec![],
+            nominated,
+            handle.clone(),
         );
         let cs = CycleState::new();
         let filtered = rejected_map(&["a"], crate::framework::Code::Unschedulable);
@@ -553,8 +636,10 @@ mod tests {
         let nominated = Arc::new(NominatedNodeMap::new());
         let handle = Arc::new(AsyncPreemptHandle::new());
         let plug = DefaultPreemption::new(
-            DefaultPreemptionArgs::default(), vec![],
-            nominated.clone(), handle,
+            DefaultPreemptionArgs::default(),
+            vec![],
+            nominated.clone(),
+            handle,
         );
         let cs = CycleState::new();
         let filtered = rejected_map(&["a"], crate::framework::Code::Unschedulable);
@@ -572,7 +657,8 @@ mod tests {
     #[test]
     fn plugin_name_is_default_preemption() {
         let p = DefaultPreemption::new(
-            DefaultPreemptionArgs::default(), vec![],
+            DefaultPreemptionArgs::default(),
+            vec![],
             Arc::new(NominatedNodeMap::new()),
             Arc::new(AsyncPreemptHandle::new()),
         );
@@ -583,13 +669,19 @@ mod tests {
     fn min_candidate_nodes_caps_inspected_set() {
         // 5 nodes, but only 2 should be inspected (min_absolute=2).
         let mut a = full_node("a");
-        let mut b = full_node("b"); let mut c = full_node("c"); let mut d = full_node("d"); let mut e = full_node("e");
+        let mut b = full_node("b");
+        let mut c = full_node("c");
+        let mut d = full_node("d");
+        let mut e = full_node("e");
         for n in [&mut a, &mut b, &mut c, &mut d, &mut e] {
             n.allocated.cpu_millicores = 4000;
         }
         let mut pods_by_node = HashMap::new();
         for nm in ["a", "b", "c", "d", "e"] {
-            pods_by_node.insert(nm.to_string(), vec![pod_at("t", &format!("low-{}", nm), 0, 1000, 0)]);
+            pods_by_node.insert(
+                nm.to_string(),
+                vec![pod_at("t", &format!("low-{}", nm), 0, 1000, 0)],
+            );
         }
         let snap = full_snap(vec![a, b, c, d, e], pods_by_node);
         let preemptor = pod_at("t", "new", 50, 500, 0);
@@ -600,7 +692,10 @@ mod tests {
         args.min_candidate_nodes_percentage = 0; // force absolute path
         let plug = DefaultPreemption::new(args, vec![], nominated, handle.clone());
         let cs = CycleState::new();
-        let filtered = rejected_map(&["a", "b", "c", "d", "e"], crate::framework::Code::Unschedulable);
+        let filtered = rejected_map(
+            &["a", "b", "c", "d", "e"],
+            crate::framework::Code::Unschedulable,
+        );
         let (res, st) = plug.post_filter(&preemptor, &snap, &filtered, &cs);
         assert!(st.is_success());
         // Should still nominate one (out of the 2 inspected — by sorted name "a").

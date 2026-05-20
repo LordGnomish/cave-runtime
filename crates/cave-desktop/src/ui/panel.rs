@@ -11,7 +11,10 @@ pub struct Panel {
 
 impl Panel {
     pub fn new(title: impl Into<String>) -> Self {
-        Self { title: title.into(), body: Vec::new() }
+        Self {
+            title: title.into(),
+            body: Vec::new(),
+        }
     }
 
     pub fn push_line(&mut self, line: impl Into<String>) {

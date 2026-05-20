@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Universal
+**Scope:** Hyperscaler, Sovereign, Universal
 
 **Category:** CI/CD
 
@@ -22,7 +22,7 @@ CI runners need credentials to push images, access registries, and deploy to clu
 
 ## Decision
 
-ARC runners use OIDC token exchange to obtain short-lived credentials from OpenBao (Hetzner) / Key Vault (Azure) via ESO. Runner ServiceAccount has minimal RBAC. Credentials exist only for CI job duration — destroyed with runner pod.
+ARC runners use OIDC token exchange to obtain short-lived credentials from OpenBao (sovereign) / Key Vault (Azure) via ESO. Runner ServiceAccount has minimal RBAC. Credentials exist only for CI job duration — destroyed with runner pod.
 
 ## Rejected
 

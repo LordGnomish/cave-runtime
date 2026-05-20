@@ -33,7 +33,10 @@ impl std::fmt::Display for BalancerError {
         match self {
             Self::NoHealthyEndpoint => write!(f, "no healthy endpoint"),
             Self::EmptyPool => write!(f, "endpoint pool is empty"),
-            Self::RetryBudgetExceeded { attempts, last } => write!(f, "retry budget exceeded after {attempts} attempts; last error: {last}"),
+            Self::RetryBudgetExceeded { attempts, last } => write!(
+                f,
+                "retry budget exceeded after {attempts} attempts; last error: {last}"
+            ),
         }
     }
 }
@@ -91,7 +94,9 @@ impl EndpointPool {
             unhealthy_backoff: Duration::from_secs(5),
             leader_change_retries: AtomicU64::new(0),
         };
-        for u in urls { pool.add(u.into()); }
+        for u in urls {
+            pool.add(u.into());
+        }
         pool
     }
 
@@ -121,17 +126,31 @@ impl EndpointPool {
         let before = inner.endpoints.len();
         inner.endpoints.retain(|e| e.url != url);
         let removed = inner.endpoints.len() != before;
-        if removed { inner.size = inner.endpoints.len(); }
-        if inner.leader_url.as_deref() == Some(url) { inner.leader_url = None; }
+        if removed {
+            inner.size = inner.endpoints.len();
+        }
+        if inner.leader_url.as_deref() == Some(url) {
+            inner.leader_url = None;
+        }
         removed
     }
 
-    pub fn len(&self) -> usize { self.inner.read().unwrap().size }
-    pub fn is_empty(&self) -> bool { self.len() == 0 }
+    pub fn len(&self) -> usize {
+        self.inner.read().unwrap().size
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 
     /// All registered endpoints (regardless of health).
     pub fn endpoints(&self) -> Vec<String> {
-        self.inner.read().unwrap().endpoints.iter().map(|e| e.url.clone()).collect()
+        self.inner
+            .read()
+            .unwrap()
+            .endpoints
+            .iter()
+            .map(|e| e.url.clone())
+            .collect()
     }
 
     pub fn leader(&self) -> Option<String> {
@@ -180,13 +199,21 @@ impl EndpointPool {
     }
 
     pub fn health_of(&self, url: &str) -> Option<EndpointHealth> {
-        self.inner.read().unwrap().endpoints.iter()
+        self.inner
+            .read()
+            .unwrap()
+            .endpoints
+            .iter()
             .find(|e| e.url == url)
             .map(|e| e.health)
     }
 
     pub fn fail_count(&self, url: &str) -> u32 {
-        self.inner.read().unwrap().endpoints.iter()
+        self.inner
+            .read()
+            .unwrap()
+            .endpoints
+            .iter()
             .find(|e| e.url == url)
             .map(|e| e.fail_count)
             .unwrap_or(0)
@@ -196,7 +223,9 @@ impl EndpointPool {
     /// endpoints unless their backoff has elapsed.
     pub fn pick(&self) -> Result<String, BalancerError> {
         let inner = self.inner.read().unwrap();
-        if inner.endpoints.is_empty() { return Err(BalancerError::EmptyPool); }
+        if inner.endpoints.is_empty() {
+            return Err(BalancerError::EmptyPool);
+        }
         let n = inner.endpoints.len();
         let now = Instant::now();
         for _ in 0..n {
@@ -209,7 +238,9 @@ impl EndpointPool {
                     None => true,
                 },
             };
-            if usable { return Ok(e.url.clone()); }
+            if usable {
+                return Ok(e.url.clone());
+            }
         }
         Err(BalancerError::NoHealthyEndpoint)
     }
@@ -221,7 +252,10 @@ impl EndpointPool {
             // — caller will retry and may demote the leader.
             return Ok(EndpointDecision { url, leader: true });
         }
-        Ok(EndpointDecision { url: self.pick()?, leader: false })
+        Ok(EndpointDecision {
+            url: self.pick()?,
+            leader: false,
+        })
     }
 
     /// Forcibly re-promote every endpoint to healthy.  Used after a
@@ -262,7 +296,11 @@ pub struct EndpointDecision {
 pub fn backoff_duration(initial: Duration, attempt: u32, cap: Duration) -> Duration {
     let exp = (attempt as u64).saturating_mul(initial.as_millis() as u64);
     let candidate = Duration::from_millis(exp.saturating_add(initial.as_millis() as u64));
-    if candidate > cap { cap } else { candidate }
+    if candidate > cap {
+        cap
+    } else {
+        candidate
+    }
 }
 
 // ── Retry classifier ──────────────────────────────────────────────────────
@@ -366,7 +404,9 @@ mod tests {
         let p = pool();
         let first = p.pick().unwrap();
         // Three picks completes the cycle and brings us back to `first`.
-        for _ in 0..2 { p.pick().unwrap(); }
+        for _ in 0..2 {
+            p.pick().unwrap();
+        }
         assert_eq!(p.pick().unwrap(), first);
     }
 

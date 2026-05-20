@@ -4,8 +4,8 @@
 //!
 //! Zipkin v2 JSON format: https://zipkin.io/zipkin-api/#/default/post_spans
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use crate::ingestion::{normalise_service, us_to_ns};
 use crate::types::{Span, SpanEvent, SpanId, SpanKind, SpanStatus, TagValue, TraceId};
@@ -74,7 +74,7 @@ pub fn parse_zipkin_json(body: &[u8], tenant_id: &str) -> Result<Vec<Span>> {
 
 fn convert_zipkin_span(z: ZipkinSpan, tenant_id: &str) -> Option<Span> {
     let trace_id = crate::types::parse_trace_id(&z.trace_id).ok()?;
-    let span_id  = crate::types::parse_span_id(&z.id).ok()?;
+    let span_id = crate::types::parse_span_id(&z.id).ok()?;
 
     let parent_span_id = z
         .parent_id
@@ -83,8 +83,8 @@ fn convert_zipkin_span(z: ZipkinSpan, tenant_id: &str) -> Option<Span> {
         .and_then(|s| crate::types::parse_span_id(s).ok());
 
     let start_ns = us_to_ns(z.timestamp.unwrap_or(0));
-    let dur_ns   = us_to_ns(z.duration.unwrap_or(0));
-    let end_ns   = start_ns + dur_ns;
+    let dur_ns = us_to_ns(z.duration.unwrap_or(0));
+    let end_ns = start_ns + dur_ns;
 
     let service_name = z
         .local_endpoint
@@ -94,11 +94,11 @@ fn convert_zipkin_span(z: ZipkinSpan, tenant_id: &str) -> Option<Span> {
         .unwrap_or_else(|| "unknown".into());
 
     let kind = match z.kind.as_deref() {
-        Some("SERVER")   => SpanKind::Server,
-        Some("CLIENT")   => SpanKind::Client,
+        Some("SERVER") => SpanKind::Server,
+        Some("CLIENT") => SpanKind::Client,
         Some("PRODUCER") => SpanKind::Producer,
         Some("CONSUMER") => SpanKind::Consumer,
-        _                => SpanKind::Internal,
+        _ => SpanKind::Internal,
     };
 
     // Zipkin tags are string→string
@@ -135,12 +135,20 @@ fn convert_zipkin_span(z: ZipkinSpan, tenant_id: &str) -> Option<Span> {
     // Local endpoint attributes become resource attributes
     let mut resource_attrs: HashMap<String, TagValue> = HashMap::new();
     if let Some(ep) = &z.local_endpoint {
-        resource_attrs.insert("service.name".into(), TagValue::String(service_name.clone()));
-        if let Some(ip) = &ep.ipv4 { resource_attrs.insert("net.host.ip".into(), TagValue::String(ip.clone())); }
-        if let Some(port) = ep.port { resource_attrs.insert("net.host.port".into(), TagValue::Int(port as i64)); }
+        resource_attrs.insert(
+            "service.name".into(),
+            TagValue::String(service_name.clone()),
+        );
+        if let Some(ip) = &ep.ipv4 {
+            resource_attrs.insert("net.host.ip".into(), TagValue::String(ip.clone()));
+        }
+        if let Some(port) = ep.port {
+            resource_attrs.insert("net.host.port".into(), TagValue::Int(port as i64));
+        }
     }
 
-    let log_labels: HashMap<String, String> = resource_attrs.iter()
+    let log_labels: HashMap<String, String> = resource_attrs
+        .iter()
         .map(|(k, v)| (k.clone(), v.display()))
         .collect();
 
@@ -228,7 +236,10 @@ mod tests {
     fn parse_zipkin_remote_endpoint_tags() {
         let spans = parse_zipkin_json(ZIPKIN_V2.as_bytes(), "default").unwrap();
         let s = &spans[0];
-        assert_eq!(s.tags.get("peer.service"), Some(&TagValue::String("backend".into())));
+        assert_eq!(
+            s.tags.get("peer.service"),
+            Some(&TagValue::String("backend".into()))
+        );
         assert_eq!(s.tags.get("peer.port"), Some(&TagValue::Int(9090)));
     }
 

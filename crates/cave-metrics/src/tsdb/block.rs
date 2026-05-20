@@ -36,7 +36,7 @@ impl ChunkWriter {
         }
         if bit {
             let byte_idx = self.bit_pos / 8;
-            let bit_idx  = 7 - (self.bit_pos % 8);
+            let bit_idx = 7 - (self.bit_pos % 8);
             self.data[byte_idx] |= 1 << bit_idx;
         }
         self.bit_pos += 1;
@@ -60,7 +60,7 @@ impl ChunkWriter {
         } else {
             // Timestamp: delta-of-delta encoding.
             let delta = ts - self.prev_ts;
-            let dod   = delta - self.prev_ts_delta;
+            let dod = delta - self.prev_ts_delta;
             self.encode_dod(dod);
             self.prev_ts_delta = delta;
             self.prev_ts = ts;
@@ -104,7 +104,7 @@ impl ChunkWriter {
         }
         self.write_bit(true);
 
-        let leading  = xor.leading_zeros();
+        let leading = xor.leading_zeros();
         let trailing = xor.trailing_zeros();
 
         // Can we reuse previous leading/trailing?
@@ -118,7 +118,7 @@ impl ChunkWriter {
             let significant = 64 - leading - trailing;
             self.write_bits(significant as u64 - 1, 6);
             self.write_bits(xor >> trailing, significant);
-            self.prev_leading  = leading;
+            self.prev_leading = leading;
             self.prev_trailing = trailing;
         }
     }
@@ -163,9 +163,11 @@ impl<'a> ChunkReader<'a> {
     }
 
     fn read_bit(&mut self) -> bool {
-        if self.bit_pos / 8 >= self.data.len() { return false; }
+        if self.bit_pos / 8 >= self.data.len() {
+            return false;
+        }
         let byte_idx = self.bit_pos / 8;
-        let bit_idx  = 7 - (self.bit_pos % 8);
+        let bit_idx = 7 - (self.bit_pos % 8);
         self.bit_pos += 1;
         (self.data[byte_idx] >> bit_idx) & 1 == 1
     }
@@ -179,7 +181,9 @@ impl<'a> ChunkReader<'a> {
     }
 
     fn read_dod(&mut self) -> i64 {
-        if !self.read_bit() { return 0; }
+        if !self.read_bit() {
+            return 0;
+        }
         if !self.read_bit() {
             let bits = self.read_bits(7);
             return sign_extend(bits, 7);
@@ -196,15 +200,17 @@ impl<'a> ChunkReader<'a> {
     }
 
     fn read_xor(&mut self) -> u64 {
-        if !self.read_bit() { return 0; }
+        if !self.read_bit() {
+            return 0;
+        }
         if !self.read_bit() {
             // Reuse previous leading/trailing
             let significant = 64 - self.prev_leading - self.prev_trailing;
             let bits = self.read_bits(significant);
             return bits << self.prev_trailing;
         }
-        self.prev_leading  = self.read_bits(5) as u32;
-        let significant    = self.read_bits(6) as u32 + 1;
+        self.prev_leading = self.read_bits(5) as u32;
+        let significant = self.read_bits(6) as u32 + 1;
         self.prev_trailing = 64 - self.prev_leading - significant;
         let bits = self.read_bits(significant);
         bits << self.prev_trailing
@@ -212,21 +218,23 @@ impl<'a> ChunkReader<'a> {
 
     /// Decode all samples.
     pub fn decode_all(mut self) -> Vec<(i64, f64)> {
-        if self.count == 0 { return Vec::new(); }
+        if self.count == 0 {
+            return Vec::new();
+        }
         let mut out = Vec::with_capacity(self.count as usize);
 
         // First sample
-        let ts  = self.read_bits(64) as i64;
+        let ts = self.read_bits(64) as i64;
         let val = f64::from_bits(self.read_bits(64));
-        self.prev_ts        = ts;
-        self.prev_val_bits  = val.to_bits();
+        self.prev_ts = ts;
+        self.prev_val_bits = val.to_bits();
         out.push((ts, val));
         self.read += 1;
 
         while self.read < self.count {
-            let dod   = self.read_dod();
+            let dod = self.read_dod();
             self.prev_ts_delta += dod;
-            self.prev_ts       += self.prev_ts_delta;
+            self.prev_ts += self.prev_ts_delta;
 
             let xor = self.read_xor();
             self.prev_val_bits ^= xor;
@@ -251,12 +259,12 @@ mod tests {
     fn test_gorilla_roundtrip() {
         let samples = vec![
             (1_700_000_000_000i64, 1.5f64),
-            (1_700_000_015_000,    1.5),
-            (1_700_000_030_000,    2.0),
-            (1_700_000_045_000,    2.5),
-            (1_700_000_060_000,    2.5),
-            (1_700_000_075_000,    0.0),
-            (1_700_000_090_000,    f64::INFINITY),
+            (1_700_000_015_000, 1.5),
+            (1_700_000_030_000, 2.0),
+            (1_700_000_045_000, 2.5),
+            (1_700_000_060_000, 2.5),
+            (1_700_000_075_000, 0.0),
+            (1_700_000_090_000, f64::INFINITY),
         ];
 
         let mut writer = ChunkWriter::new();

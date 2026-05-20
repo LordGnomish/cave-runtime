@@ -3,9 +3,9 @@
 use std::sync::Arc;
 
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
-    Json,
 };
 use hickory_proto::rr::{DNSClass, RData, Record, RecordType};
 use serde::Deserialize;
@@ -57,29 +57,29 @@ pub async fn list_records(
 ) -> Result<Json<ApiOk<Vec<RecordDto>>>, ApiError> {
     let name = fqdn(&zone_name)
         .parse()
-        .map_err(|e: hickory_proto::error::ProtoError| ApiError { error: e.to_string() })?;
-    let zone_arc = state
-        .zones
-        .get_zone(&name)
-        .ok_or_else(|| ApiError {
-            error: format!("zone {zone_name} not found"),
+        .map_err(|e: hickory_proto::error::ProtoError| ApiError {
+            error: e.to_string(),
         })?;
+    let zone_arc = state.zones.get_zone(&name).ok_or_else(|| ApiError {
+        error: format!("zone {zone_name} not found"),
+    })?;
     let zone = zone_arc.read().await;
 
     let mut records = zone.all_records();
 
     if let Some(name_filter) = &filter.name {
-        let filter_n: hickory_proto::rr::Name = fqdn(name_filter)
-            .parse()
-            .map_err(|e: hickory_proto::error::ProtoError| ApiError { error: e.to_string() })?;
+        let filter_n: hickory_proto::rr::Name =
+            fqdn(name_filter)
+                .parse()
+                .map_err(|e: hickory_proto::error::ProtoError| ApiError {
+                    error: e.to_string(),
+                })?;
         records.retain(|r| r.name() == &filter_n);
     }
     if let Some(type_filter) = &filter.r#type {
-        let rtype: RecordType = type_filter
-            .parse()
-            .map_err(|_| ApiError {
-                error: format!("unknown type: {type_filter}"),
-            })?;
+        let rtype: RecordType = type_filter.parse().map_err(|_| ApiError {
+            error: format!("unknown type: {type_filter}"),
+        })?;
         records.retain(|r| r.record_type() == rtype);
     }
 
@@ -94,25 +94,25 @@ pub async fn create_record(
     Path(zone_name): Path<String>,
     Json(req): Json<CreateRecordRequest>,
 ) -> Result<(StatusCode, Json<ApiOk<RecordDto>>), ApiError> {
-    let zone_n: hickory_proto::rr::Name = fqdn(&zone_name)
-        .parse()
-        .map_err(|e: hickory_proto::error::ProtoError| ApiError { error: e.to_string() })?;
-    let zone_arc = state
-        .zones
-        .get_zone(&zone_n)
-        .ok_or_else(|| ApiError {
-            error: format!("zone {zone_name} not found"),
-        })?;
+    let zone_n: hickory_proto::rr::Name =
+        fqdn(&zone_name)
+            .parse()
+            .map_err(|e: hickory_proto::error::ProtoError| ApiError {
+                error: e.to_string(),
+            })?;
+    let zone_arc = state.zones.get_zone(&zone_n).ok_or_else(|| ApiError {
+        error: format!("zone {zone_name} not found"),
+    })?;
 
-    let rtype: RecordType = req
-        .record_type
-        .parse()
-        .map_err(|_| ApiError {
-            error: format!("unknown type: {}", req.record_type),
-        })?;
-    let rname: hickory_proto::rr::Name = fqdn(&req.name)
-        .parse()
-        .map_err(|e: hickory_proto::error::ProtoError| ApiError { error: e.to_string() })?;
+    let rtype: RecordType = req.record_type.parse().map_err(|_| ApiError {
+        error: format!("unknown type: {}", req.record_type),
+    })?;
+    let rname: hickory_proto::rr::Name =
+        fqdn(&req.name)
+            .parse()
+            .map_err(|e: hickory_proto::error::ProtoError| ApiError {
+                error: e.to_string(),
+            })?;
 
     let rdata = parse_rdata(rtype, &req.rdata)?;
 
@@ -137,24 +137,25 @@ pub async fn delete_record(
     State(state): State<RecordState>,
     Path((zone_name, record_name, rtype_str)): Path<(String, String, String)>,
 ) -> Result<StatusCode, ApiError> {
-    let zone_n: hickory_proto::rr::Name = fqdn(&zone_name)
-        .parse()
-        .map_err(|e: hickory_proto::error::ProtoError| ApiError { error: e.to_string() })?;
-    let zone_arc = state
-        .zones
-        .get_zone(&zone_n)
-        .ok_or_else(|| ApiError {
-            error: format!("zone {zone_name} not found"),
-        })?;
+    let zone_n: hickory_proto::rr::Name =
+        fqdn(&zone_name)
+            .parse()
+            .map_err(|e: hickory_proto::error::ProtoError| ApiError {
+                error: e.to_string(),
+            })?;
+    let zone_arc = state.zones.get_zone(&zone_n).ok_or_else(|| ApiError {
+        error: format!("zone {zone_name} not found"),
+    })?;
 
-    let rtype: RecordType = rtype_str
-        .parse()
-        .map_err(|_| ApiError {
-            error: format!("unknown type: {rtype_str}"),
-        })?;
-    let rname: hickory_proto::rr::Name = fqdn(&record_name)
-        .parse()
-        .map_err(|e: hickory_proto::error::ProtoError| ApiError { error: e.to_string() })?;
+    let rtype: RecordType = rtype_str.parse().map_err(|_| ApiError {
+        error: format!("unknown type: {rtype_str}"),
+    })?;
+    let rname: hickory_proto::rr::Name =
+        fqdn(&record_name)
+            .parse()
+            .map_err(|e: hickory_proto::error::ProtoError| ApiError {
+                error: e.to_string(),
+            })?;
 
     let mut zone = zone_arc.write().await;
     zone.remove_record(&rname, rtype, None);
@@ -167,15 +168,15 @@ pub async fn batch_records(
     Path(zone_name): Path<String>,
     Json(req): Json<BatchRecordRequest>,
 ) -> Result<StatusCode, ApiError> {
-    let zone_n: hickory_proto::rr::Name = fqdn(&zone_name)
-        .parse()
-        .map_err(|e: hickory_proto::error::ProtoError| ApiError { error: e.to_string() })?;
-    let zone_arc = state
-        .zones
-        .get_zone(&zone_n)
-        .ok_or_else(|| ApiError {
-            error: format!("zone {zone_name} not found"),
-        })?;
+    let zone_n: hickory_proto::rr::Name =
+        fqdn(&zone_name)
+            .parse()
+            .map_err(|e: hickory_proto::error::ProtoError| ApiError {
+                error: e.to_string(),
+            })?;
+    let zone_arc = state.zones.get_zone(&zone_n).ok_or_else(|| ApiError {
+        error: format!("zone {zone_name} not found"),
+    })?;
 
     let mut zone = zone_arc.write().await;
 
@@ -183,9 +184,12 @@ pub async fn batch_records(
         let rtype: RecordType = cr.record_type.parse().map_err(|_| ApiError {
             error: format!("unknown type: {}", cr.record_type),
         })?;
-        let rname: hickory_proto::rr::Name = fqdn(&cr.name)
-            .parse()
-            .map_err(|e: hickory_proto::error::ProtoError| ApiError { error: e.to_string() })?;
+        let rname: hickory_proto::rr::Name =
+            fqdn(&cr.name)
+                .parse()
+                .map_err(|e: hickory_proto::error::ProtoError| ApiError {
+                    error: e.to_string(),
+                })?;
         let rdata = parse_rdata(rtype, &cr.rdata)?;
         let mut r = Record::new();
         r.set_name(rname);
@@ -207,11 +211,15 @@ fn parse_rdata(rtype: RecordType, value: &str) -> Result<RData, ApiError> {
 
     match rtype {
         RecordType::A => {
-            let addr: std::net::Ipv4Addr = value.parse().map_err(|e: std::net::AddrParseError| err(&e.to_string()))?;
+            let addr: std::net::Ipv4Addr = value
+                .parse()
+                .map_err(|e: std::net::AddrParseError| err(&e.to_string()))?;
             Ok(RData::A(hickory_proto::rr::rdata::A(addr)))
         }
         RecordType::AAAA => {
-            let addr: std::net::Ipv6Addr = value.parse().map_err(|e: std::net::AddrParseError| err(&e.to_string()))?;
+            let addr: std::net::Ipv6Addr = value
+                .parse()
+                .map_err(|e: std::net::AddrParseError| err(&e.to_string()))?;
             Ok(RData::AAAA(hickory_proto::rr::rdata::AAAA(addr)))
         }
         RecordType::CNAME | RecordType::NS | RecordType::PTR => {

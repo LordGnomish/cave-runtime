@@ -60,7 +60,9 @@ pub struct EndpointHints {
 
 impl EndpointHints {
     pub fn empty() -> Self {
-        Self { for_zones: Vec::new() }
+        Self {
+            for_zones: Vec::new(),
+        }
     }
 
     /// True iff `caller_zone` is in the hint list, i.e. routing should
@@ -81,10 +83,18 @@ pub struct EndpointConditions {
 
 impl EndpointConditions {
     pub fn ready() -> Self {
-        Self { ready: true, serving: true, terminating: false }
+        Self {
+            ready: true,
+            serving: true,
+            terminating: false,
+        }
     }
     pub fn terminating() -> Self {
-        Self { ready: false, serving: true, terminating: true }
+        Self {
+            ready: false,
+            serving: true,
+            terminating: true,
+        }
     }
 }
 
@@ -228,9 +238,7 @@ pub fn validate_service_type(
             if !name.contains('.') {
                 return Err(CloudError::InvalidConfig {
                     provider: ProviderName::Hetzner,
-                    reason: format!(
-                        "ExternalName {name:?} must be a fully-qualified DNS name"
-                    ),
+                    reason: format!("ExternalName {name:?} must be a fully-qualified DNS name"),
                 });
             }
         }
@@ -253,13 +261,22 @@ mod tests {
         assert_eq!(cite.repo, "kubernetes/kubernetes");
     }
 
-    fn entry(addrs: Vec<&str>, ready: bool, zone: Option<&str>, hint_zones: Vec<&str>) -> EndpointEntry {
+    fn entry(
+        addrs: Vec<&str>,
+        ready: bool,
+        zone: Option<&str>,
+        hint_zones: Vec<&str>,
+    ) -> EndpointEntry {
         EndpointEntry {
             addresses: addrs.into_iter().map(String::from).collect(),
             conditions: if ready {
                 EndpointConditions::ready()
             } else {
-                EndpointConditions { ready: false, serving: false, terminating: false }
+                EndpointConditions {
+                    ready: false,
+                    serving: false,
+                    terminating: false,
+                }
             },
             node_name: Some("node-x".into()),
             zone: zone.map(String::from),
@@ -285,19 +302,30 @@ mod tests {
 
     #[test]
     fn traffic_distribution_keys_match_upstream() {
-        ctx("acme", "staging/src/k8s.io/api/core/v1/types.go", "TrafficDistribution");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/api/core/v1/types.go",
+            "TrafficDistribution",
+        );
         assert_eq!(TrafficDistribution::PreferClose.key(), "PreferClose");
         assert_eq!(TrafficDistribution::Default.key(), "");
     }
 
     #[test]
     fn traffic_distribution_round_trips_through_from_key() {
-        ctx("acme", "staging/src/k8s.io/api/core/v1/types.go", "TrafficDistribution");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/api/core/v1/types.go",
+            "TrafficDistribution",
+        );
         assert_eq!(
             TrafficDistribution::from_key("PreferClose"),
             Some(TrafficDistribution::PreferClose)
         );
-        assert_eq!(TrafficDistribution::from_key(""), Some(TrafficDistribution::Default));
+        assert_eq!(
+            TrafficDistribution::from_key(""),
+            Some(TrafficDistribution::Default)
+        );
         assert!(TrafficDistribution::from_key("nonsense").is_none());
     }
 
@@ -305,9 +333,20 @@ mod tests {
 
     #[test]
     fn endpoint_hints_match_zone_returns_true_for_listed_zone() {
-        ctx("acme", "staging/src/k8s.io/api/discovery/v1/types.go", "EndpointHints");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/api/discovery/v1/types.go",
+            "EndpointHints",
+        );
         let h = EndpointHints {
-            for_zones: vec![ForZone { name: "fsn1".into() }, ForZone { name: "nbg1".into() }],
+            for_zones: vec![
+                ForZone {
+                    name: "fsn1".into(),
+                },
+                ForZone {
+                    name: "nbg1".into(),
+                },
+            ],
         };
         assert!(h.matches_zone("fsn1"));
         assert!(!h.matches_zone("hel1"));
@@ -315,7 +354,11 @@ mod tests {
 
     #[test]
     fn empty_endpoint_hints_match_no_zone() {
-        ctx("acme", "staging/src/k8s.io/api/discovery/v1/types.go", "EndpointHints");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/api/discovery/v1/types.go",
+            "EndpointHints",
+        );
         assert!(!EndpointHints::empty().matches_zone("fsn1"));
     }
 
@@ -323,7 +366,11 @@ mod tests {
 
     #[test]
     fn select_targets_returns_ready_addresses_only() {
-        ctx("acme", "pkg/proxy/endpointslicecache.go", "GetEndpointAddresses");
+        ctx(
+            "acme",
+            "pkg/proxy/endpointslicecache.go",
+            "GetEndpointAddresses",
+        );
         let s = slice(vec![
             entry(vec!["10.0.0.1"], true, Some("fsn1"), vec![]),
             entry(vec!["10.0.0.2"], false, Some("fsn1"), vec![]),
@@ -334,7 +381,11 @@ mod tests {
 
     #[test]
     fn select_targets_with_publish_not_ready_returns_all() {
-        ctx("acme", "pkg/proxy/endpointslicecache.go", "GetEndpointAddresses");
+        ctx(
+            "acme",
+            "pkg/proxy/endpointslicecache.go",
+            "GetEndpointAddresses",
+        );
         let s = slice(vec![
             entry(vec!["10.0.0.1"], true, Some("fsn1"), vec![]),
             entry(vec!["10.0.0.2"], false, Some("fsn1"), vec![]),
@@ -345,7 +396,11 @@ mod tests {
 
     #[test]
     fn select_targets_dedupes_addresses() {
-        ctx("acme", "pkg/proxy/endpointslicecache.go", "GetEndpointAddresses");
+        ctx(
+            "acme",
+            "pkg/proxy/endpointslicecache.go",
+            "GetEndpointAddresses",
+        );
         let s = slice(vec![
             entry(vec!["10.0.0.1"], true, None, vec![]),
             entry(vec!["10.0.0.1"], true, None, vec![]),
@@ -378,7 +433,11 @@ mod tests {
 
     #[test]
     fn select_targets_default_distribution_ignores_zone_hint() {
-        ctx("acme", "pkg/proxy/endpointslicecache.go", "GetEndpointAddresses");
+        ctx(
+            "acme",
+            "pkg/proxy/endpointslicecache.go",
+            "GetEndpointAddresses",
+        );
         let s = slice(vec![
             entry(vec!["10.0.0.1"], true, Some("fsn1"), vec!["fsn1"]),
             entry(vec!["10.0.0.2"], true, Some("nbg1"), vec!["nbg1"]),
@@ -389,7 +448,11 @@ mod tests {
 
     #[test]
     fn select_targets_drops_terminating_when_publish_not_ready_is_false() {
-        ctx("acme", "pkg/proxy/endpointslicecache.go", "GetEndpointAddresses");
+        ctx(
+            "acme",
+            "pkg/proxy/endpointslicecache.go",
+            "GetEndpointAddresses",
+        );
         let term = EndpointEntry {
             addresses: vec!["10.0.0.3".into()],
             conditions: EndpointConditions::terminating(),
@@ -404,7 +467,11 @@ mod tests {
 
     #[test]
     fn select_targets_publish_not_ready_includes_terminating() {
-        ctx("acme", "pkg/proxy/endpointslicecache.go", "GetEndpointAddresses");
+        ctx(
+            "acme",
+            "pkg/proxy/endpointslicecache.go",
+            "GetEndpointAddresses",
+        );
         let term = EndpointEntry {
             addresses: vec!["10.0.0.3".into()],
             conditions: EndpointConditions::terminating(),
@@ -421,7 +488,11 @@ mod tests {
 
     #[test]
     fn address_type_keys_match_upstream() {
-        ctx("acme", "staging/src/k8s.io/api/discovery/v1/types.go", "AddressType");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/api/discovery/v1/types.go",
+            "AddressType",
+        );
         assert_eq!(AddressType::Ipv4.key(), "IPv4");
         assert_eq!(AddressType::Ipv6.key(), "IPv6");
         assert_eq!(AddressType::Fqdn.key(), "FQDN");
@@ -431,7 +502,11 @@ mod tests {
 
     #[test]
     fn service_type_keys_match_upstream() {
-        ctx("acme", "staging/src/k8s.io/api/core/v1/types.go", "ServiceType");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/api/core/v1/types.go",
+            "ServiceType",
+        );
         assert_eq!(ServiceType::ClusterIp.key(), "ClusterIP");
         assert_eq!(ServiceType::NodePort.key(), "NodePort");
         assert_eq!(ServiceType::LoadBalancer.key(), "LoadBalancer");
@@ -440,7 +515,11 @@ mod tests {
 
     #[test]
     fn cluster_ip_with_external_name_is_invalid() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateService");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateService",
+        );
         let err = validate_service_type(ServiceType::ClusterIp, None, Some("api.example.com"))
             .unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
@@ -448,38 +527,60 @@ mod tests {
 
     #[test]
     fn nodeport_service_cannot_be_headless() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateService");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateService",
+        );
         let err = validate_service_type(ServiceType::NodePort, Some("None"), None).unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
     }
 
     #[test]
     fn loadbalancer_service_cannot_be_headless() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateService");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateService",
+        );
         let err = validate_service_type(ServiceType::LoadBalancer, Some("None"), None).unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
     }
 
     #[test]
     fn external_name_service_requires_dns_name() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateService");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateService",
+        );
         let err = validate_service_type(ServiceType::ExternalName, None, None).unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
-        let err = validate_service_type(ServiceType::ExternalName, None, Some("nodot")).unwrap_err();
+        let err =
+            validate_service_type(ServiceType::ExternalName, None, Some("nodot")).unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
-        assert!(validate_service_type(ServiceType::ExternalName, None, Some("api.example.com"))
-            .is_ok());
+        assert!(
+            validate_service_type(ServiceType::ExternalName, None, Some("api.example.com")).is_ok()
+        );
     }
 
     #[test]
     fn cluster_ip_headless_is_valid() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateService");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateService",
+        );
         assert!(validate_service_type(ServiceType::ClusterIp, Some("None"), None).is_ok());
     }
 
     #[test]
     fn is_headless_recognises_none_cluster_ip() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "IsHeadless");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "IsHeadless",
+        );
         assert!(is_headless(Some("None")));
         assert!(!is_headless(Some("10.0.0.1")));
         assert!(!is_headless(None));
@@ -489,14 +590,22 @@ mod tests {
 
     #[test]
     fn endpoint_conditions_ready_constructor_sets_flags() {
-        ctx("acme", "staging/src/k8s.io/api/discovery/v1/types.go", "EndpointConditions");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/api/discovery/v1/types.go",
+            "EndpointConditions",
+        );
         let c = EndpointConditions::ready();
         assert!(c.ready && c.serving && !c.terminating);
     }
 
     #[test]
     fn endpoint_conditions_terminating_constructor_sets_flags() {
-        ctx("acme", "staging/src/k8s.io/api/discovery/v1/types.go", "EndpointConditions");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/api/discovery/v1/types.go",
+            "EndpointConditions",
+        );
         let c = EndpointConditions::terminating();
         assert!(!c.ready && c.serving && c.terminating);
     }

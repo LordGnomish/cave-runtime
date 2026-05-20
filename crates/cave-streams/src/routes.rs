@@ -2,21 +2,19 @@
 // Copyright 2026 Cave Runtime contributors
 //! REST management routes: Schema Registry, Kafka Connect, admin endpoints.
 
-use crate::schema_registry::{
-    CompatibilityConfig, RegisterSchemaRequest, SchemaFormat,
-};
-use crate::connect::{ConnectCluster, Connector};
 use crate::StreamsState;
+use crate::connect::{ConnectCluster, Connector};
+use crate::schema_registry::{CompatibilityConfig, RegisterSchemaRequest, SchemaFormat};
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, post, put},
-    Json, Router,
 };
 use serde_json::json;
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 pub fn create_router(state: Arc<StreamsState>) -> Router {
     // Separate state for connect cluster
@@ -120,9 +118,16 @@ async fn health(State((s, _)): State<AppState>) -> Json<serde_json::Value> {
 // ── Schema Registry handlers ──────────────────────────────────────────────────
 
 async fn list_subjects(State((s, _)): State<AppState>) -> Json<Vec<String>> {
-    let _ = Json(s.broker.transactions.list_transactions().into_iter().map(|t| t.transactional_id).collect::<Vec<_>>());
+    let _ = Json(
+        s.broker
+            .transactions
+            .list_transactions()
+            .into_iter()
+            .map(|t| t.transactional_id)
+            .collect::<Vec<_>>(),
+    );
     // Actually list schema subjects
-    Json(vec![])  // Placeholder — real impl routes to schema_registry
+    Json(vec![]) // Placeholder — real impl routes to schema_registry
 }
 
 async fn register_schema(
@@ -132,14 +137,24 @@ async fn register_schema(
 ) -> impl IntoResponse {
     // Schema registry is on the broker for this demo
     let format = SchemaFormat::from_str(&req.schema_type);
-    let refs = req.references.into_iter().map(|r| crate::schema_registry::SchemaReference {
-        name: r.name,
-        subject: r.subject,
-        version: r.version,
-    }).collect();
-    match crate::schema_registry::SchemaRegistry::new().register_schema(&subject, req.schema, format, refs) {
+    let refs = req
+        .references
+        .into_iter()
+        .map(|r| crate::schema_registry::SchemaReference {
+            name: r.name,
+            subject: r.subject,
+            version: r.version,
+        })
+        .collect();
+    match crate::schema_registry::SchemaRegistry::new()
+        .register_schema(&subject, req.schema, format, refs)
+    {
         Ok(id) => (StatusCode::OK, Json(json!({"id": id}))).into_response(),
-        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, Json(json!({"error_code": 42201, "message": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({"error_code": 42201, "message": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -150,7 +165,11 @@ async fn list_versions(Path(_subject): Path<String>) -> Json<Vec<i32>> {
 async fn get_schema_version(
     Path((_subject, _version)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    (StatusCode::NOT_FOUND, Json(json!({"error_code": 40401, "message": "Subject not found"}))).into_response()
+    (
+        StatusCode::NOT_FOUND,
+        Json(json!({"error_code": 40401, "message": "Subject not found"})),
+    )
+        .into_response()
 }
 
 async fn delete_subject(Path(_subject): Path<String>) -> Json<Vec<i32>> {
@@ -158,7 +177,11 @@ async fn delete_subject(Path(_subject): Path<String>) -> Json<Vec<i32>> {
 }
 
 async fn get_schema_by_id(Path(_id): Path<i32>) -> impl IntoResponse {
-    (StatusCode::NOT_FOUND, Json(json!({"error_code": 40403, "message": "Schema not found"}))).into_response()
+    (
+        StatusCode::NOT_FOUND,
+        Json(json!({"error_code": 40403, "message": "Schema not found"})),
+    )
+        .into_response()
 }
 
 async fn check_compatibility(
@@ -169,7 +192,9 @@ async fn check_compatibility(
 }
 
 async fn get_global_config() -> Json<CompatibilityConfig> {
-    Json(CompatibilityConfig { compatibility: "BACKWARD".into() })
+    Json(CompatibilityConfig {
+        compatibility: "BACKWARD".into(),
+    })
 }
 
 async fn set_global_config(Json(req): Json<CompatibilityConfig>) -> Json<CompatibilityConfig> {
@@ -177,7 +202,9 @@ async fn set_global_config(Json(req): Json<CompatibilityConfig>) -> Json<Compati
 }
 
 async fn get_subject_config(Path(_subject): Path<String>) -> Json<CompatibilityConfig> {
-    Json(CompatibilityConfig { compatibility: "BACKWARD".into() })
+    Json(CompatibilityConfig {
+        compatibility: "BACKWARD".into(),
+    })
 }
 
 async fn set_subject_config(
@@ -200,11 +227,19 @@ async fn create_connector(
     let name = req["name"].as_str().unwrap_or("").to_string();
     let config: HashMap<String, String> = req["config"]
         .as_object()
-        .map(|o| o.iter().filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string()))).collect())
+        .map(|o| {
+            o.iter()
+                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                .collect()
+        })
         .unwrap_or_default();
     match connect.create_connector(name, config) {
         Ok(c) => (StatusCode::CREATED, Json(connector_to_json(&c))).into_response(),
-        Err(e) => (StatusCode::CONFLICT, Json(json!({"message": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::CONFLICT,
+            Json(json!({"message": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -214,7 +249,11 @@ async fn get_connector(
 ) -> impl IntoResponse {
     match connect.get_connector(&name) {
         Ok(c) => (StatusCode::OK, Json(connector_to_json(&c))).into_response(),
-        Err(_) => (StatusCode::NOT_FOUND, Json(json!({"message": "connector not found"}))).into_response(),
+        Err(_) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({"message": "connector not found"})),
+        )
+            .into_response(),
     }
 }
 
@@ -224,7 +263,11 @@ async fn delete_connector(
 ) -> impl IntoResponse {
     match connect.delete_connector(&name) {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
-        Err(_) => (StatusCode::NOT_FOUND, Json(json!({"message": "connector not found"}))).into_response(),
+        Err(_) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({"message": "connector not found"})),
+        )
+            .into_response(),
     }
 }
 
@@ -252,7 +295,8 @@ async fn get_connector_status(
                 "state": format!("{:?}", t.state),
                 "worker_id": t.worker_id,
             })).collect::<Vec<_>>()
-        })).into_response(),
+        }))
+        .into_response(),
         Err(_) => (StatusCode::NOT_FOUND, Json(json!({"message": "not found"}))).into_response(),
     }
 }
@@ -292,10 +336,18 @@ async fn list_tasks(
     Path(name): Path<String>,
 ) -> impl IntoResponse {
     match connect.get_tasks(&name) {
-        Ok(tasks) => Json(tasks.iter().map(|t| json!({
-            "id": {"connector": t.id.connector, "task": t.id.task},
-            "config": t.config,
-        })).collect::<Vec<_>>()).into_response(),
+        Ok(tasks) => Json(
+            tasks
+                .iter()
+                .map(|t| {
+                    json!({
+                        "id": {"connector": t.id.connector, "task": t.id.task},
+                        "config": t.config,
+                    })
+                })
+                .collect::<Vec<_>>(),
+        )
+        .into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
 }
@@ -311,11 +363,19 @@ async fn restart_task(
 }
 
 async fn list_plugins(State((_, connect)): State<AppState>) -> Json<Vec<serde_json::Value>> {
-    Json(connect.list_plugins().into_iter().map(|p| json!({
-        "class": p.class,
-        "type": p.plugin_type,
-        "version": p.version,
-    })).collect())
+    Json(
+        connect
+            .list_plugins()
+            .into_iter()
+            .map(|p| {
+                json!({
+                    "class": p.class,
+                    "type": p.plugin_type,
+                    "version": p.version,
+                })
+            })
+            .collect(),
+    )
 }
 
 // ── Broker management handlers ────────────────────────────────────────────────
@@ -370,26 +430,46 @@ async fn alter_topic_config(
 }
 
 async fn list_groups(State((s, _)): State<AppState>) -> Json<Vec<serde_json::Value>> {
-    Json(s.broker.groups.list_groups().into_iter().map(|g| json!({
-        "group_id": g.group_id,
-        "protocol_type": g.protocol_type,
-        "state": g.state,
-    })).collect())
+    Json(
+        s.broker
+            .groups
+            .list_groups()
+            .into_iter()
+            .map(|g| {
+                json!({
+                    "group_id": g.group_id,
+                    "protocol_type": g.protocol_type,
+                    "state": g.state,
+                })
+            })
+            .collect(),
+    )
 }
 
 async fn list_acls(State((s, _)): State<AppState>) -> Json<Vec<serde_json::Value>> {
     let filter = crate::acl::AclFilter {
-        resource_type: None, resource_name: None, pattern_type: None,
-        principal: None, host: None, operation: None, permission: None,
+        resource_type: None,
+        resource_name: None,
+        pattern_type: None,
+        principal: None,
+        host: None,
+        operation: None,
+        permission: None,
     };
     let acls = s.broker.acls.describe_acls(&filter);
-    Json(acls.iter().map(|a| json!({
-        "resource_type": format!("{:?}", a.resource_type),
-        "resource_name": a.resource_name,
-        "principal": a.principal,
-        "operation": format!("{:?}", a.operation),
-        "permission": format!("{:?}", a.permission),
-    })).collect())
+    Json(
+        acls.iter()
+            .map(|a| {
+                json!({
+                    "resource_type": format!("{:?}", a.resource_type),
+                    "resource_name": a.resource_name,
+                    "principal": a.principal,
+                    "operation": format!("{:?}", a.operation),
+                    "permission": format!("{:?}", a.permission),
+                })
+            })
+            .collect(),
+    )
 }
 
 async fn create_acl(
@@ -410,12 +490,21 @@ async fn create_acl(
 }
 
 async fn list_quotas(State((s, _)): State<AppState>) -> Json<Vec<serde_json::Value>> {
-    Json(s.broker.quotas.list_quotas().into_iter().map(|(e, q)| json!({
-        "entity_type": format!("{:?}", e.entity_type),
-        "entity_name": e.entity_name,
-        "producer_byte_rate": q.producer_byte_rate,
-        "consumer_byte_rate": q.consumer_byte_rate,
-    })).collect())
+    Json(
+        s.broker
+            .quotas
+            .list_quotas()
+            .into_iter()
+            .map(|(e, q)| {
+                json!({
+                    "entity_type": format!("{:?}", e.entity_type),
+                    "entity_name": e.entity_name,
+                    "producer_byte_rate": q.producer_byte_rate,
+                    "consumer_byte_rate": q.consumer_byte_rate,
+                })
+            })
+            .collect(),
+    )
 }
 
 async fn set_quota_rest(
@@ -440,11 +529,19 @@ async fn list_mirror_flows() -> Json<Vec<serde_json::Value>> {
 // ── Pulsar admin handlers ─────────────────────────────────────────────────────
 
 async fn pulsar_list_tenants(State((s, _)): State<AppState>) -> Json<Vec<serde_json::Value>> {
-    Json(s.pulsar_admin.list_tenants().into_iter().map(|t| json!({
-        "name": t.name,
-        "admin_roles": t.admin_roles,
-        "allowed_clusters": t.allowed_clusters,
-    })).collect())
+    Json(
+        s.pulsar_admin
+            .list_tenants()
+            .into_iter()
+            .map(|t| {
+                json!({
+                    "name": t.name,
+                    "admin_roles": t.admin_roles,
+                    "allowed_clusters": t.allowed_clusters,
+                })
+            })
+            .collect(),
+    )
 }
 
 async fn pulsar_create_tenant(
@@ -453,7 +550,11 @@ async fn pulsar_create_tenant(
 ) -> impl IntoResponse {
     let name = body["name"].as_str().unwrap_or("").to_string();
     if name.is_empty() {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": "name required"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "name required"})),
+        )
+            .into_response();
     }
     let t = s.pulsar_admin.create_tenant(&name);
     (StatusCode::CREATED, Json(json!({"name": t.name}))).into_response()
@@ -483,7 +584,11 @@ async fn pulsar_create_namespace(
 ) -> impl IntoResponse {
     let name = body["namespace"].as_str().unwrap_or("").to_string();
     if name.is_empty() {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": "namespace required"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "namespace required"})),
+        )
+            .into_response();
     }
     match s.pulsar_admin.create_namespace(&tenant, &name) {
         Ok(ns) => (StatusCode::CREATED, Json(json!({"fqn": ns.fqn()}))).into_response(),
@@ -510,7 +615,10 @@ async fn pulsar_set_retention(
     let fqn = format!("{tenant}/{namespace}");
     let minutes = body["retentionTimeInMinutes"].as_u64().unwrap_or(0);
     let size_mb = body["retentionSizeInMB"].as_u64().unwrap_or(0);
-    match s.pulsar_admin.set_namespace_retention(&fqn, minutes, size_mb) {
+    match s
+        .pulsar_admin
+        .set_namespace_retention(&fqn, minutes, size_mb)
+    {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
@@ -630,7 +738,10 @@ async fn pulsar_create_subscription(
     let fqn = format!("{scheme}://{tenant}/{namespace}/{topic}");
     let sub_type = parse_sub_type(body.sub_type.as_deref());
     let pos = parse_initial_position(body.initial_position.as_deref());
-    match s.pulsar_admin.create_subscription(&fqn, &sub, sub_type, pos) {
+    match s
+        .pulsar_admin
+        .create_subscription(&fqn, &sub, sub_type, pos)
+    {
         Ok(_) => StatusCode::CREATED.into_response(),
         Err(e) => (StatusCode::CONFLICT, Json(json!({"error": e.to_string()}))).into_response(),
     }
@@ -680,7 +791,13 @@ async fn pulsar_reset_cursor(
         Some("latest") => crate::pulsar_admin::MessageId::LATEST,
         Some(other) => match other.parse::<u64>() {
             Ok(n) => crate::pulsar_admin::MessageId::from_offset(n),
-            Err(_) => return (StatusCode::BAD_REQUEST, Json(json!({"error": "invalid position"}))).into_response(),
+            Err(_) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": "invalid position"})),
+                )
+                    .into_response();
+            }
         },
     };
     match s.pulsar_admin.reset_cursor(&fqn, &sub, pos) {

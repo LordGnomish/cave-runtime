@@ -52,17 +52,29 @@ pub struct ConstantSampler {
 }
 
 impl ConstantSampler {
-    pub fn always() -> Self { ConstantSampler { sample: true } }
-    pub fn never()  -> Self { ConstantSampler { sample: false } }
+    pub fn always() -> Self {
+        ConstantSampler { sample: true }
+    }
+    pub fn never() -> Self {
+        ConstantSampler { sample: false }
+    }
 }
 
 impl Sampler for ConstantSampler {
     fn should_sample(&self, _: TraceId, _: &Span) -> SamplingDecision {
-        if self.sample { SamplingDecision::Sample } else { SamplingDecision::Drop }
+        if self.sample {
+            SamplingDecision::Sample
+        } else {
+            SamplingDecision::Drop
+        }
     }
 
     fn description(&self) -> &str {
-        if self.sample { "constant(always)" } else { "constant(never)" }
+        if self.sample {
+            "constant(always)"
+        } else {
+            "constant(never)"
+        }
     }
 }
 
@@ -102,7 +114,9 @@ impl Sampler for ProbabilisticSampler {
 }
 
 impl ProbabilisticSampler {
-    pub fn rate(&self) -> f64 { self.rate }
+    pub fn rate(&self) -> f64 {
+        self.rate
+    }
 }
 
 // ─── RateLimitingSampler ──────────────────────────────────────────────────
@@ -176,16 +190,25 @@ impl TailRule {
         match self {
             TailRule::AlwaysOnError => spans.iter().any(|s| s.has_error()),
             TailRule::SlowTrace { threshold_ns } => {
-                let start = spans.iter().map(|s| s.start_time_unix_nano).min().unwrap_or(0);
-                let end = spans.iter().map(|s| s.end_time_unix_nano).max().unwrap_or(0);
+                let start = spans
+                    .iter()
+                    .map(|s| s.start_time_unix_nano)
+                    .min()
+                    .unwrap_or(0);
+                let end = spans
+                    .iter()
+                    .map(|s| s.end_time_unix_nano)
+                    .max()
+                    .unwrap_or(0);
                 end.saturating_sub(start) >= *threshold_ns
             }
             TailRule::TagMatch { key, value } => spans.iter().any(|s| {
-                s.tags.get(key).map(|v| v.display() == *value).unwrap_or(false)
+                s.tags
+                    .get(key)
+                    .map(|v| v.display() == *value)
+                    .unwrap_or(false)
             }),
-            TailRule::ServiceMatch { service } => {
-                spans.iter().any(|s| &s.service_name == service)
-            }
+            TailRule::ServiceMatch { service } => spans.iter().any(|s| &s.service_name == service),
             TailRule::Probabilistic { rate } => {
                 // Use first span's trace_id for determinism
                 if let Some(span) = spans.first() {
@@ -292,10 +315,20 @@ impl Sampler for AdaptiveSampler {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SamplingConfig {
-    Constant { sample: bool },
-    Probabilistic { rate: f64 },
-    RateLimiting { max_tps: f64 },
-    Adaptive { initial_rate: f64, target_tps: f64, period_secs: f64 },
+    Constant {
+        sample: bool,
+    },
+    Probabilistic {
+        rate: f64,
+    },
+    RateLimiting {
+        max_tps: f64,
+    },
+    Adaptive {
+        initial_rate: f64,
+        target_tps: f64,
+        period_secs: f64,
+    },
 }
 
 impl Default for SamplingConfig {
@@ -313,19 +346,17 @@ pub fn build_sampler(config: &SamplingConfig) -> Arc<dyn Sampler + Send + Sync> 
                 Arc::new(ConstantSampler::never())
             }
         }
-        SamplingConfig::Probabilistic { rate } => {
-            Arc::new(ProbabilisticSampler::new(*rate))
-        }
-        SamplingConfig::RateLimiting { max_tps } => {
-            Arc::new(RateLimitingSampler::new(*max_tps))
-        }
-        SamplingConfig::Adaptive { initial_rate, target_tps, period_secs } => {
-            Arc::new(AdaptiveSampler::new(
-                *initial_rate,
-                *target_tps,
-                Duration::from_secs_f64(*period_secs),
-            ))
-        }
+        SamplingConfig::Probabilistic { rate } => Arc::new(ProbabilisticSampler::new(*rate)),
+        SamplingConfig::RateLimiting { max_tps } => Arc::new(RateLimitingSampler::new(*max_tps)),
+        SamplingConfig::Adaptive {
+            initial_rate,
+            target_tps,
+            period_secs,
+        } => Arc::new(AdaptiveSampler::new(
+            *initial_rate,
+            *target_tps,
+            Duration::from_secs_f64(*period_secs),
+        )),
     }
 }
 
@@ -420,7 +451,9 @@ mod tests {
         let mut span = stub_span(1);
         span.start_time_unix_nano = 0;
         span.end_time_unix_nano = 2_000_000_000; // 2 s
-        let ts = TailSampler::new(vec![TailRule::SlowTrace { threshold_ns: 1_000_000_000 }]);
+        let ts = TailSampler::new(vec![TailRule::SlowTrace {
+            threshold_ns: 1_000_000_000,
+        }]);
         assert!(ts.evaluate(&[span]).is_sample());
     }
 

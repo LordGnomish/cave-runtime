@@ -5,8 +5,8 @@
 //! Compatible with: Hadolint + Checkov + Pluto + kubent
 //! Dockerfile linting, K8s manifest validation, deprecated API detection.
 
-pub mod rules;
 pub mod routes;
+pub mod rules;
 
 use axum::Router;
 use std::sync::Arc;

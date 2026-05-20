@@ -6,7 +6,7 @@
 //! Upstream packages: `sdk/helper/shamir/shamir.go` (split/combine) and
 //! `vault/seal.go` (initialize/unseal/seal state machine).
 
-use cave_vault::core::seal::{combine_shares, split_secret, SealState, SealStatus};
+use cave_vault::core::seal::{SealState, SealStatus, combine_shares, split_secret};
 
 /// Cite: openbao `sdk/helper/shamir/shamir.go:192` (Split) +
 /// `sdk/helper/shamir/shamir.go:251` (Combine) — round-trip a 32-byte
@@ -35,8 +35,11 @@ fn shamir_below_threshold_does_not_reconstruct() {
     // not equal the secret (it's a degree-2 polynomial under-determined).
     let only_two = vec![shares[0].clone(), shares[1].clone()];
     let attempt = combine_shares(&only_two).unwrap();
-    assert_ne!(attempt, secret.to_vec(),
-        "k-1 shares cannot recover the secret");
+    assert_ne!(
+        attempt,
+        secret.to_vec(),
+        "k-1 shares cannot recover the secret"
+    );
 }
 
 /// Cite: openbao `sdk/helper/shamir/shamir.go:192` (Split) — invalid
@@ -59,7 +62,10 @@ fn seal_initialize_5_of_3_generates_root_and_keeps_sealed() {
     assert!(root.starts_with("hvs."));
     assert_eq!(shares.len(), 5);
     assert!(s.is_initialized());
-    assert!(s.is_sealed(), "newly initialized vault remains sealed until threshold shares submitted");
+    assert!(
+        s.is_sealed(),
+        "newly initialized vault remains sealed until threshold shares submitted"
+    );
     assert_eq!(s.threshold, 3);
     assert_eq!(s.shares, 5);
 }

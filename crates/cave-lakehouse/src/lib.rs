@@ -15,5 +15,5 @@
 //! Future sub-upstreams documented in ADR-147 (Delta/Hudi optional table
 //! formats, Arrow/Parquet IO, MinIO substrate) live as future submodules.
 
-pub mod table_format;
 pub mod engine;
+pub mod table_format;

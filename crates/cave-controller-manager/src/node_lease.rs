@@ -69,11 +69,7 @@ pub fn is_lease_expired(lease: &Lease, now_sec: u64) -> bool {
 }
 
 /// Decide what action to take on a node given its lease and timing config.
-pub fn evaluate(
-    lease: &Lease,
-    cfg: &NodeMonitorConfig,
-    now_sec: u64,
-) -> NodeAction {
+pub fn evaluate(lease: &Lease, cfg: &NodeMonitorConfig, now_sec: u64) -> NodeAction {
     let expire = lease.renew_time_sec + lease.lease_duration_sec as u64;
     if now_sec <= expire {
         return NodeAction::Healthy;
@@ -158,7 +154,10 @@ mod tests {
         );
         let cfg = NodeMonitorConfig::default();
         // expire=140, grace=50; now=160 → 20s past expiry, still in grace.
-        assert_eq!(evaluate(&lease(100, 40), &cfg, 160), NodeAction::LeaseExpired);
+        assert_eq!(
+            evaluate(&lease(100, 40), &cfg, 160),
+            NodeAction::LeaseExpired
+        );
     }
 
     #[test]
@@ -170,7 +169,10 @@ mod tests {
         );
         let cfg = NodeMonitorConfig::default();
         // expire=140, grace=50 → 50s past expiry triggers MarkUnknown.
-        assert_eq!(evaluate(&lease(100, 40), &cfg, 200), NodeAction::MarkUnknown);
+        assert_eq!(
+            evaluate(&lease(100, 40), &cfg, 200),
+            NodeAction::MarkUnknown
+        );
     }
 
     #[test]
@@ -182,7 +184,10 @@ mod tests {
         );
         let cfg = NodeMonitorConfig::default();
         // expire=140; need elapsed >= grace(50) + eviction(300) = 350 → now >= 490.
-        assert_eq!(evaluate(&lease(100, 40), &cfg, 600), NodeAction::StartEviction);
+        assert_eq!(
+            evaluate(&lease(100, 40), &cfg, 600),
+            NodeAction::StartEviction
+        );
     }
 
     #[test]
@@ -223,7 +228,11 @@ mod tests {
             "NodeConditionType",
             "tenant-nl-ready-serde"
         );
-        for s in [NodeReadyState::True, NodeReadyState::False, NodeReadyState::Unknown] {
+        for s in [
+            NodeReadyState::True,
+            NodeReadyState::False,
+            NodeReadyState::Unknown,
+        ] {
             let bytes = serde_json::to_string(&s).unwrap();
             let back: NodeReadyState = serde_json::from_str(&bytes).unwrap();
             assert_eq!(s, back);

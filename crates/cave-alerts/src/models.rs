@@ -53,7 +53,8 @@ impl Alert {
 
     pub fn with_tenant(mut self, tenant: impl Into<String>) -> Self {
         self.tenant_id = tenant.into();
-        self.labels.insert(TENANT_LABEL.to_string(), self.tenant_id.clone());
+        self.labels
+            .insert(TENANT_LABEL.to_string(), self.tenant_id.clone());
         self
     }
 
@@ -259,7 +260,9 @@ mod humantime_serde_opt {
     pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Duration>, D::Error> {
         let s: Option<String> = Option::deserialize(d)?;
         match s {
-            Some(s) => parse_duration(&s).map(Some).map_err(serde::de::Error::custom),
+            Some(s) => parse_duration(&s)
+                .map(Some)
+                .map_err(serde::de::Error::custom),
             None => Ok(None),
         }
     }
@@ -277,13 +280,21 @@ mod humantime_serde_opt {
 
     pub fn parse_duration(s: &str) -> Result<Duration, String> {
         if let Some(rest) = s.strip_suffix('h') {
-            rest.parse::<i64>().map(Duration::hours).map_err(|e| e.to_string())
+            rest.parse::<i64>()
+                .map(Duration::hours)
+                .map_err(|e| e.to_string())
         } else if let Some(rest) = s.strip_suffix('m') {
-            rest.parse::<i64>().map(Duration::minutes).map_err(|e| e.to_string())
+            rest.parse::<i64>()
+                .map(Duration::minutes)
+                .map_err(|e| e.to_string())
         } else if let Some(rest) = s.strip_suffix('s') {
-            rest.parse::<i64>().map(Duration::seconds).map_err(|e| e.to_string())
+            rest.parse::<i64>()
+                .map(Duration::seconds)
+                .map_err(|e| e.to_string())
         } else {
-            s.parse::<i64>().map(Duration::seconds).map_err(|e| e.to_string())
+            s.parse::<i64>()
+                .map(Duration::seconds)
+                .map_err(|e| e.to_string())
         }
     }
 }
@@ -443,7 +454,10 @@ pub struct Receiver {
 
 impl Receiver {
     pub fn new(name: impl Into<String>) -> Self {
-        Receiver { name: name.into(), configs: vec![] }
+        Receiver {
+            name: name.into(),
+            configs: vec![],
+        }
     }
 
     pub fn with_config(mut self, c: ReceiverConfig) -> Self {
@@ -452,9 +466,15 @@ impl Receiver {
     }
 }
 
-fn default_true() -> bool { true }
-fn default_smtp_port() -> u16 { 587 }
-fn default_opsgenie_url() -> String { "https://api.opsgenie.com".to_string() }
+fn default_true() -> bool {
+    true
+}
+fn default_smtp_port() -> u16 {
+    587
+}
+fn default_opsgenie_url() -> String {
+    "https://api.opsgenie.com".to_string()
+}
 
 // ─── Notification log entries ──────────────────────────────────────────────
 
@@ -564,9 +584,15 @@ mod tests {
     #[test]
     fn test_matcher_constructors() {
         assert_eq!(Matcher::equal("a", "b").effective_type(), MatchType::Equal);
-        assert_eq!(Matcher::not_equal("a", "b").effective_type(), MatchType::NotEqual);
+        assert_eq!(
+            Matcher::not_equal("a", "b").effective_type(),
+            MatchType::NotEqual
+        );
         assert_eq!(Matcher::regex("a", "b").effective_type(), MatchType::Regex);
-        assert_eq!(Matcher::not_regex("a", "b").effective_type(), MatchType::NotRegex);
+        assert_eq!(
+            Matcher::not_regex("a", "b").effective_type(),
+            MatchType::NotRegex
+        );
     }
 
     #[test]
@@ -582,9 +608,13 @@ mod tests {
 
     #[test]
     fn test_route_serde_roundtrip() {
-        let route = Route::child("alpha", vec![Matcher::equal("a", "b")], vec!["slack".into()])
-            .with_group_by(vec!["alertname".into()])
-            .with_continue(true);
+        let route = Route::child(
+            "alpha",
+            vec![Matcher::equal("a", "b")],
+            vec!["slack".into()],
+        )
+        .with_group_by(vec!["alertname".into()])
+        .with_continue(true);
         let json = serde_json::to_string(&route).unwrap();
         let restored: Route = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.name, route.name);
@@ -603,8 +633,11 @@ mod tests {
 
     #[test]
     fn test_route_with_child() {
-        let r = Route::root("default")
-            .with_child(Route::child("crit", vec![Matcher::equal("severity", "critical")], vec!["pd".into()]));
+        let r = Route::root("default").with_child(Route::child(
+            "crit",
+            vec![Matcher::equal("severity", "critical")],
+            vec!["pd".into()],
+        ));
         assert_eq!(r.routes.len(), 1);
         assert_eq!(r.routes[0].name, "crit");
     }
@@ -612,7 +645,13 @@ mod tests {
     #[test]
     fn test_silence_active_window() {
         let now = Utc::now();
-        let s = Silence::new(vec![], now - Duration::minutes(5), now + Duration::minutes(5), "alice", "x");
+        let s = Silence::new(
+            vec![],
+            now - Duration::minutes(5),
+            now + Duration::minutes(5),
+            "alice",
+            "x",
+        );
         assert!(s.is_active_at(now));
         assert!(!s.is_active_at(now - Duration::minutes(10)));
         assert!(!s.is_active_at(now + Duration::minutes(10)));

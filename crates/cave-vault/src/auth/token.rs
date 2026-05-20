@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+use crate::VaultState;
 use crate::error::{VaultError, VaultResult};
 use crate::response::VaultResponse;
 use crate::token::CreateTokenParams;
-use crate::VaultState;
 use axum::{
+    Router,
     extract::{Extension, Json, State},
     http::HeaderMap,
     routing::{get, post},
-    Router,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 
 fn extract_token(headers: &HeaderMap) -> VaultResult<String> {
-    headers.get("x-vault-token")
+    headers
+        .get("x-vault-token")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or(VaultError::BadToken)
@@ -73,7 +74,9 @@ pub async fn lookup_token(
     Json(body): Json<LookupRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _caller_token = extract_token(&headers)?;
-    let target = body.token.ok_or_else(|| VaultError::InvalidRequest("token required".into()))?;
+    let target = body
+        .token
+        .ok_or_else(|| VaultError::InvalidRequest("token required".into()))?;
     let ts = state.token_store.read().await;
     let token = ts.lookup(&target).ok_or(VaultError::TokenNotFound)?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(token).unwrap_or_default()))
@@ -90,9 +93,13 @@ pub async fn lookup_accessor(
     Json(body): Json<LookupAccessorRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _caller_token = extract_token(&headers)?;
-    let accessor = body.accessor.ok_or_else(|| VaultError::InvalidRequest("accessor required".into()))?;
+    let accessor = body
+        .accessor
+        .ok_or_else(|| VaultError::InvalidRequest("accessor required".into()))?;
     let ts = state.token_store.read().await;
-    let token = ts.lookup_by_accessor(&accessor).ok_or(VaultError::TokenNotFound)?;
+    let token = ts
+        .lookup_by_accessor(&accessor)
+        .ok_or(VaultError::TokenNotFound)?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(token).unwrap_or_default()))
 }
 
@@ -108,8 +115,12 @@ pub async fn renew_token(
     Json(body): Json<RenewRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _caller_token = extract_token(&headers)?;
-    let target = body.token.ok_or_else(|| VaultError::InvalidRequest("token required".into()))?;
-    let increment = body.increment.as_deref()
+    let target = body
+        .token
+        .ok_or_else(|| VaultError::InvalidRequest("token required".into()))?;
+    let increment = body
+        .increment
+        .as_deref()
         .map(crate::token::parse_duration)
         .unwrap_or(3600);
     let mut ts = state.token_store.write().await;
@@ -123,7 +134,9 @@ pub async fn renew_self(
     Json(body): Json<RenewRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let token_str = extract_token(&headers)?;
-    let increment = body.increment.as_deref()
+    let increment = body
+        .increment
+        .as_deref()
         .map(crate::token::parse_duration)
         .unwrap_or(3600);
     let mut ts = state.token_store.write().await;
@@ -142,7 +155,9 @@ pub async fn revoke_token(
     Json(body): Json<RevokeRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _caller_token = extract_token(&headers)?;
-    let target = body.token.ok_or_else(|| VaultError::InvalidRequest("token required".into()))?;
+    let target = body
+        .token
+        .ok_or_else(|| VaultError::InvalidRequest("token required".into()))?;
     let mut ts = state.token_store.write().await;
     ts.revoke_tree(&target);
     Ok(VaultResponse::new())
@@ -169,7 +184,9 @@ pub async fn revoke_accessor(
     Json(body): Json<RevokeAccessorRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _caller_token = extract_token(&headers)?;
-    let accessor = body.accessor.ok_or_else(|| VaultError::InvalidRequest("accessor required".into()))?;
+    let accessor = body
+        .accessor
+        .ok_or_else(|| VaultError::InvalidRequest("accessor required".into()))?;
     let mut ts = state.token_store.write().await;
     let token_id = {
         ts.lookup_by_accessor(&accessor)
@@ -186,7 +203,9 @@ pub async fn revoke_orphan(
     Json(body): Json<RevokeRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _caller_token = extract_token(&headers)?;
-    let target = body.token.ok_or_else(|| VaultError::InvalidRequest("token required".into()))?;
+    let target = body
+        .token
+        .ok_or_else(|| VaultError::InvalidRequest("token required".into()))?;
     let mut ts = state.token_store.write().await;
     ts.revoke(&target);
     Ok(VaultResponse::new())

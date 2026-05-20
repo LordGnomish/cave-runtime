@@ -42,9 +42,7 @@ impl CavePool {
     }
 
     /// Get a connection from the pool.
-    pub async fn get(
-        &self,
-    ) -> Result<deadpool_postgres::Object, deadpool_postgres::PoolError> {
+    pub async fn get(&self) -> Result<deadpool_postgres::Object, deadpool_postgres::PoolError> {
         self.pool.get().await
     }
 
@@ -53,10 +51,7 @@ impl CavePool {
         let client = self.get().await.map_err(|e| e.to_string())?;
         let schema = format!("cave_{module}");
         client
-            .execute(
-                &format!("CREATE SCHEMA IF NOT EXISTS \"{schema}\""),
-                &[],
-            )
+            .execute(&format!("CREATE SCHEMA IF NOT EXISTS \"{schema}\""), &[])
             .await
             .map_err(|e| format!("Failed to create schema {schema}: {e}"))?;
         info!(schema = %schema, "Schema ensured");
@@ -85,9 +80,7 @@ impl CavePool {
         // Check if already applied
         let row = client
             .query_opt(
-                &format!(
-                    "SELECT version FROM \"{schema}\".migrations WHERE version = $1"
-                ),
+                &format!("SELECT version FROM \"{schema}\".migrations WHERE version = $1"),
                 &[&version],
             )
             .await
@@ -106,9 +99,7 @@ impl CavePool {
         // Record migration
         client
             .execute(
-                &format!(
-                    "INSERT INTO \"{schema}\".migrations (version) VALUES ($1)"
-                ),
+                &format!("INSERT INTO \"{schema}\".migrations (version) VALUES ($1)"),
                 &[&version],
             )
             .await

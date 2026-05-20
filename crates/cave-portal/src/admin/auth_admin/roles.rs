@@ -4,9 +4,9 @@
 //! `/admin/auth/roles` — Realm roles + client roles + composite
 //! roles. Visual port of `js/apps/admin-ui/src/realm-roles/RealmRolesSection.tsx`.
 
+use super::{AuthAdminError, render_admin_nav, require_platform};
 use crate::admin::permission::RequestCtx;
 use crate::admin::render::{escape, page_shell_full, table_html};
-use super::{render_admin_nav, require_platform, AuthAdminError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RoleRow {
@@ -102,7 +102,10 @@ pub fn render(ctx: &RequestCtx) -> Result<String, AuthAdminError> {
 </section>"#,
         nav = render_admin_nav("/admin/auth/roles"),
         n = roles.len(),
-        tbl = table_html(&["name", "description", "kind", "container", "action"], &rows),
+        tbl = table_html(
+            &["name", "description", "kind", "container", "action"],
+            &rows
+        ),
     );
     Ok(page_shell_full(
         ctx,
@@ -120,8 +123,14 @@ mod tests {
     #[test]
     fn seeded_roles_split_into_realm_and_client_containers() {
         let r = seeded_roles();
-        assert!(r.iter().any(|x| matches!(x.container, RoleContainer::Realm)));
-        assert!(r.iter().any(|x| matches!(x.container, RoleContainer::Client(_))));
+        assert!(
+            r.iter()
+                .any(|x| matches!(x.container, RoleContainer::Realm))
+        );
+        assert!(
+            r.iter()
+                .any(|x| matches!(x.container, RoleContainer::Client(_)))
+        );
     }
 
     #[test]

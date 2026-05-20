@@ -25,7 +25,10 @@ use std::sync::Mutex;
 pub enum FieldSubject {
     User(String),
     Group(String),
-    ServiceAccount { namespace: String, name: String },
+    ServiceAccount {
+        namespace: String,
+        name: String,
+    },
     /// `*` — any subject. Useful for global protections.
     Any,
 }
@@ -68,12 +71,16 @@ pub struct FieldRbacRegistry {
 
 impl FieldRbacRegistry {
     pub fn new() -> Self {
-        Self { inner: Mutex::new(HashMap::new()) }
+        Self {
+            inner: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn upsert(&self, p: FieldProtection) {
-        self.inner.lock().unwrap().insert(
-            (p.tenant_id.clone(), p.name.clone()), p);
+        self.inner
+            .lock()
+            .unwrap()
+            .insert((p.tenant_id.clone(), p.name.clone()), p);
     }
 
     /// Evaluate `req` against every rule registered under `req.tenant_id`.
@@ -82,12 +89,17 @@ impl FieldRbacRegistry {
     /// adapted to the field-level KEP.
     pub fn evaluate(&self, req: &FieldRequest) -> FieldDecision {
         let inner = self.inner.lock().unwrap();
-        let mut rules: Vec<&FieldProtection> = inner.values()
+        let mut rules: Vec<&FieldProtection> = inner
+            .values()
             .filter(|p| p.tenant_id == req.tenant_id)
             .collect();
         rules.sort_by(|a, b| a.name.cmp(&b.name));
         for rule in rules {
-            if !rule.resources.iter().any(|r| r == "*" || r == &req.resource) {
+            if !rule
+                .resources
+                .iter()
+                .any(|r| r == "*" || r == &req.resource)
+            {
                 continue;
             }
             // Check whether the subject is in the deny list.
@@ -100,7 +112,9 @@ impl FieldRbacRegistry {
                     req.user == qual
                 }
             });
-            let Some(matched_subject) = subject_match else { continue; };
+            let Some(matched_subject) = subject_match else {
+                continue;
+            };
             // Check whether any protected path actually changed.
             for path in &rule.protected_paths {
                 let old_v = json_path(&req.old_object, path);
@@ -119,14 +133,18 @@ impl FieldRbacRegistry {
 }
 
 impl Default for FieldRbacRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn json_path<'a>(obj: &'a serde_json::Value, path: &str) -> Option<&'a serde_json::Value> {
     let mut cur = obj;
     for seg in path.split('.') {
         let s = seg.trim();
-        if s.is_empty() { continue; }
+        if s.is_empty() {
+            continue;
+        }
         cur = cur.get(s)?;
     }
     Some(cur)
@@ -137,22 +155,34 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn rule(tenant: &str, name: &str, subjects: Vec<FieldSubject>, paths: Vec<&str>) -> FieldProtection {
+    fn rule(
+        tenant: &str,
+        name: &str,
+        subjects: Vec<FieldSubject>,
+        paths: Vec<&str>,
+    ) -> FieldProtection {
         FieldProtection {
-            tenant_id: tenant.into(), name: name.into(),
+            tenant_id: tenant.into(),
+            name: name.into(),
             resources: vec!["pods".into()],
             denied_subjects: subjects,
             protected_paths: paths.into_iter().map(String::from).collect(),
         }
     }
 
-    fn req(tenant: &str, user: &str, old: serde_json::Value, new: serde_json::Value) -> FieldRequest {
+    fn req(
+        tenant: &str,
+        user: &str,
+        old: serde_json::Value,
+        new: serde_json::Value,
+    ) -> FieldRequest {
         FieldRequest {
             tenant_id: tenant.into(),
             user: user.into(),
             groups: vec![],
             resource: "pods".into(),
-            old_object: old, new_object: new,
+            old_object: old,
+            new_object: new,
         }
     }
 
@@ -162,14 +192,24 @@ mod tests {
     #[test]
     fn test_deny_when_protected_field_changes_for_denied_user() {
         let r = FieldRbacRegistry::new();
-        r.upsert(rule("acme", "no-sa-rewrite",
+        r.upsert(rule(
+            "acme",
+            "no-sa-rewrite",
             vec![FieldSubject::User("alice".into())],
-            vec!["spec.serviceAccountName"]));
-        let req = req("acme", "alice",
+            vec!["spec.serviceAccountName"],
+        ));
+        let req = req(
+            "acme",
+            "alice",
             json!({"spec": {"serviceAccountName": "default"}}),
-            json!({"spec": {"serviceAccountName": "elevated"}}));
+            json!({"spec": {"serviceAccountName": "elevated"}}),
+        );
         match r.evaluate(&req) {
-            FieldDecision::Deny { rule_name, path, subject } => {
+            FieldDecision::Deny {
+                rule_name,
+                path,
+                subject,
+            } => {
                 assert_eq!(rule_name, "no-sa-rewrite");
                 assert_eq!(path, "spec.serviceAccountName");
                 assert_eq!(subject, FieldSubject::User("alice".into()));
@@ -183,14 +223,23 @@ mod tests {
     #[test]
     fn test_allow_when_protected_field_unchanged_even_for_denied_user() {
         let r = FieldRbacRegistry::new();
-        r.upsert(rule("acme", "no-sa-rewrite",
+        r.upsert(rule(
+            "acme",
+            "no-sa-rewrite",
             vec![FieldSubject::User("alice".into())],
-            vec!["spec.serviceAccountName"]));
-        let req = req("acme", "alice",
+            vec!["spec.serviceAccountName"],
+        ));
+        let req = req(
+            "acme",
+            "alice",
             json!({"spec": {"serviceAccountName": "default", "image": "nginx:1.27"}}),
-            json!({"spec": {"serviceAccountName": "default", "image": "nginx:1.28"}}));
-        assert_eq!(r.evaluate(&req), FieldDecision::Allow,
-            "image change ok — protected SA name unchanged");
+            json!({"spec": {"serviceAccountName": "default", "image": "nginx:1.28"}}),
+        );
+        assert_eq!(
+            r.evaluate(&req),
+            FieldDecision::Allow,
+            "image change ok — protected SA name unchanged"
+        );
     }
 
     /// Upstream parity: `TestFieldRBAC_AllowsForNonDeniedSubject`
@@ -198,14 +247,23 @@ mod tests {
     #[test]
     fn test_allow_when_subject_not_in_deny_list() {
         let r = FieldRbacRegistry::new();
-        r.upsert(rule("acme", "no-sa-rewrite",
+        r.upsert(rule(
+            "acme",
+            "no-sa-rewrite",
             vec![FieldSubject::User("alice".into())],
-            vec!["spec.serviceAccountName"]));
-        let req = req("acme", "system:serviceaccount:kube-system:scheduler",
+            vec!["spec.serviceAccountName"],
+        ));
+        let req = req(
+            "acme",
+            "system:serviceaccount:kube-system:scheduler",
             json!({"spec": {"serviceAccountName": "default"}}),
-            json!({"spec": {"serviceAccountName": "elevated"}}));
-        assert_eq!(r.evaluate(&req), FieldDecision::Allow,
-            "scheduler is not in the deny list — change permitted");
+            json!({"spec": {"serviceAccountName": "elevated"}}),
+        );
+        assert_eq!(
+            r.evaluate(&req),
+            FieldDecision::Allow,
+            "scheduler is not in the deny list — change permitted"
+        );
     }
 
     /// Upstream parity: `TestFieldRBAC_DeniesAnySubjectOnAnyChange`
@@ -214,13 +272,19 @@ mod tests {
     #[test]
     fn test_subject_any_blocks_every_actor_from_changing_path() {
         let r = FieldRbacRegistry::new();
-        r.upsert(rule("acme", "freeze-image",
+        r.upsert(rule(
+            "acme",
+            "freeze-image",
             vec![FieldSubject::Any],
-            vec!["spec.image"]));
+            vec!["spec.image"],
+        ));
         for user in ["alice", "bob", "system:serviceaccount:default:default"] {
-            let req = req("acme", user,
+            let req = req(
+                "acme",
+                user,
                 json!({"spec": {"image": "nginx:1.27"}}),
-                json!({"spec": {"image": "nginx:1.28"}}));
+                json!({"spec": {"image": "nginx:1.28"}}),
+            );
             match r.evaluate(&req) {
                 FieldDecision::Deny { rule_name, .. } => assert_eq!(rule_name, "freeze-image"),
                 _ => panic!("user `{}` should be denied by Any-subject rule", user),
@@ -234,14 +298,23 @@ mod tests {
     #[test]
     fn test_rule_does_not_cross_tenant_boundaries() {
         let r = FieldRbacRegistry::new();
-        r.upsert(rule("acme", "no-sa-rewrite",
+        r.upsert(rule(
+            "acme",
+            "no-sa-rewrite",
             vec![FieldSubject::Any],
-            vec!["spec.serviceAccountName"]));
-        let req = req("globex", "alice",
+            vec!["spec.serviceAccountName"],
+        ));
+        let req = req(
+            "globex",
+            "alice",
             json!({"spec": {"serviceAccountName": "default"}}),
-            json!({"spec": {"serviceAccountName": "elevated"}}));
-        assert_eq!(r.evaluate(&req), FieldDecision::Allow,
-            "tenant_id invariant: acme rule does not block globex's request");
+            json!({"spec": {"serviceAccountName": "elevated"}}),
+        );
+        assert_eq!(
+            r.evaluate(&req),
+            FieldDecision::Allow,
+            "tenant_id invariant: acme rule does not block globex's request"
+        );
     }
 
     /// Upstream parity: `TestFieldRBAC_GroupSubjectMatchesGroupMembership`
@@ -250,12 +323,18 @@ mod tests {
     #[test]
     fn test_group_subject_matches_when_user_belongs_to_named_group() {
         let r = FieldRbacRegistry::new();
-        r.upsert(rule("acme", "no-replicas-rewrite",
+        r.upsert(rule(
+            "acme",
+            "no-replicas-rewrite",
             vec![FieldSubject::Group("ops".into())],
-            vec!["spec.replicas"]));
-        let mut req = req("acme", "alice",
+            vec!["spec.replicas"],
+        ));
+        let mut req = req(
+            "acme",
+            "alice",
             json!({"spec": {"replicas": 3}}),
-            json!({"spec": {"replicas": 10}}));
+            json!({"spec": {"replicas": 10}}),
+        );
         req.groups = vec!["dev".into()];
         // alice is not in `ops` → allow.
         assert_eq!(r.evaluate(&req), FieldDecision::Allow);

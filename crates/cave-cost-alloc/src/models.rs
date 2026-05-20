@@ -115,7 +115,9 @@ pub enum SplitStrategy {
     ByRequestCount,
     Equal,
     /// Explicit per-cost-center weights (cost center ID → weight).
-    ByCustomWeights { weights: HashMap<String, f64> },
+    ByCustomWeights {
+        weights: HashMap<String, f64>,
+    },
 }
 
 /// Showback report — awareness-only, no actual billing.

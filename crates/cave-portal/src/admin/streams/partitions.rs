@@ -8,10 +8,10 @@
 //!
 //! Upstream: <https://kafka.apache.org/documentation/#basic_ops_modify_topic>
 
+use super::StreamsViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
-use super::StreamsViewError;
 
 /// One row in the operator's partition table.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -114,21 +114,28 @@ mod tests {
 
     #[test]
     fn partition_count_matches_topic_sum() {
-        let topics = super::super::topics::list_topics_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let topics = super::super::topics::list_topics_sorted(
+            &AdminState::seeded(),
+            &ctx(&[Permission::StreamsRead]),
+        )
+        .unwrap();
         let expected: u32 = topics.iter().map(|t| t.partitions).sum();
-        let rows = list_partitions(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let rows =
+            list_partitions(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
         assert_eq!(rows.len() as u32, expected);
     }
 
     #[test]
     fn every_partition_has_leader_one_in_single_node() {
-        let rows = list_partitions(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let rows =
+            list_partitions(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
         assert!(rows.iter().all(|r| r.leader_broker_id == 1));
     }
 
     #[test]
     fn leader_counts_sum_to_total_partitions() {
-        let rows = list_partitions(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let rows =
+            list_partitions(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
         let lc = leader_counts(&rows);
         let total: usize = lc.values().sum();
         assert_eq!(total, rows.len());
@@ -141,11 +148,16 @@ mod tests {
 
     #[test]
     fn partition_ids_span_zero_to_count_minus_one_per_topic() {
-        let rows = list_partitions(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let rows =
+            list_partitions(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
         // For each topic, partition_ids should be contiguous.
-        let mut by_topic: std::collections::BTreeMap<String, Vec<u32>> = std::collections::BTreeMap::new();
+        let mut by_topic: std::collections::BTreeMap<String, Vec<u32>> =
+            std::collections::BTreeMap::new();
         for r in &rows {
-            by_topic.entry(r.topic.clone()).or_default().push(r.partition_id);
+            by_topic
+                .entry(r.topic.clone())
+                .or_default()
+                .push(r.partition_id);
         }
         for (_, ids) in &by_topic {
             let expected: Vec<u32> = (0..ids.len() as u32).collect();

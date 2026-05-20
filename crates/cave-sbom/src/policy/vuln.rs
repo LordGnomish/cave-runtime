@@ -96,51 +96,61 @@ mod tests {
 
     #[test]
     fn severity_threshold_fires_on_critical() {
-        assert!(component_has_severity_at_least(
-            &comp("openssl"),
-            &[vuln("openssl", 9.8, Severity::Critical)],
-            Severity::High
-        )
-        .is_some());
+        assert!(
+            component_has_severity_at_least(
+                &comp("openssl"),
+                &[vuln("openssl", 9.8, Severity::Critical)],
+                Severity::High
+            )
+            .is_some()
+        );
     }
 
     #[test]
     fn severity_threshold_skips_below() {
-        assert!(component_has_severity_at_least(
-            &comp("openssl"),
-            &[vuln("openssl", 5.0, Severity::Medium)],
-            Severity::High
-        )
-        .is_none());
+        assert!(
+            component_has_severity_at_least(
+                &comp("openssl"),
+                &[vuln("openssl", 5.0, Severity::Medium)],
+                Severity::High
+            )
+            .is_none()
+        );
     }
 
     #[test]
     fn severity_skips_non_matching_component() {
-        assert!(component_has_severity_at_least(
-            &comp("other"),
-            &[vuln("openssl", 9.8, Severity::Critical)],
-            Severity::High
-        )
-        .is_none());
+        assert!(
+            component_has_severity_at_least(
+                &comp("other"),
+                &[vuln("openssl", 9.8, Severity::Critical)],
+                Severity::High
+            )
+            .is_none()
+        );
     }
 
     #[test]
     fn cvss_threshold_above_fires() {
-        assert!(component_has_cvss_at_least(
-            &comp("openssl"),
-            &[vuln("openssl", 9.0, Severity::Critical)],
-            7.0
-        )
-        .is_some());
+        assert!(
+            component_has_cvss_at_least(
+                &comp("openssl"),
+                &[vuln("openssl", 9.0, Severity::Critical)],
+                7.0
+            )
+            .is_some()
+        );
     }
 
     #[test]
     fn cvss_threshold_below_does_not_fire() {
-        assert!(component_has_cvss_at_least(
-            &comp("openssl"),
-            &[vuln("openssl", 5.0, Severity::Medium)],
-            7.0
-        )
-        .is_none());
+        assert!(
+            component_has_cvss_at_least(
+                &comp("openssl"),
+                &[vuln("openssl", 5.0, Severity::Medium)],
+                7.0
+            )
+            .is_none()
+        );
     }
 }

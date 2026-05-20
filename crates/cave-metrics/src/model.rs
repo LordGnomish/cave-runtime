@@ -2,8 +2,8 @@
 // Copyright 2026 Cave Runtime contributors
 //! Core Prometheus data model: labels, samples, time-series, matchers.
 
-use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// A set of key=value label pairs identifying a time series.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
@@ -14,8 +14,15 @@ impl Labels {
         Self(BTreeMap::new())
     }
 
-    pub fn from_pairs(pairs: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>) -> Self {
-        Self(pairs.into_iter().map(|(k, v)| (k.into(), v.into())).collect())
+    pub fn from_pairs(
+        pairs: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>,
+    ) -> Self {
+        Self(
+            pairs
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect(),
+        )
     }
 
     pub fn get(&self, name: &str) -> Option<&str> {
@@ -34,7 +41,12 @@ impl Labels {
     pub fn fingerprint(&self) -> u64 {
         let mut hash: u64 = 14_695_981_039_346_656_037;
         for (k, v) in &self.0 {
-            for byte in k.bytes().chain(std::iter::once(b'=')).chain(v.bytes()).chain(std::iter::once(b',')) {
+            for byte in k
+                .bytes()
+                .chain(std::iter::once(b'='))
+                .chain(v.bytes())
+                .chain(std::iter::once(b','))
+            {
                 hash ^= byte as u64;
                 hash = hash.wrapping_mul(1_099_511_628_211);
             }
@@ -51,12 +63,24 @@ impl Labels {
 
     /// Return a copy retaining only the specified keys.
     pub fn with_only(&self, keys: &[&str]) -> Self {
-        Self(self.0.iter().filter(|(k, _)| keys.contains(&k.as_str())).map(|(k, v)| (k.clone(), v.clone())).collect())
+        Self(
+            self.0
+                .iter()
+                .filter(|(k, _)| keys.contains(&k.as_str()))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+        )
     }
 
     /// Return a copy excluding the specified keys.
     pub fn without(&self, keys: &[&str]) -> Self {
-        Self(self.0.iter().filter(|(k, _)| !keys.contains(&k.as_str())).map(|(k, v)| (k.clone(), v.clone())).collect())
+        Self(
+            self.0
+                .iter()
+                .filter(|(k, _)| !keys.contains(&k.as_str()))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+        )
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
@@ -69,8 +93,12 @@ impl std::fmt::Display for Labels {
         write!(f, "{{")?;
         let mut first = true;
         for (k, v) in &self.0 {
-            if k == "__name__" { continue; }
-            if !first { write!(f, ",")?; }
+            if k == "__name__" {
+                continue;
+            }
+            if !first {
+                write!(f, ",")?;
+            }
             write!(f, "{}=\"{}\"", k, v)?;
             first = false;
         }
@@ -87,7 +115,10 @@ pub struct Sample {
 
 impl Sample {
     pub fn new(timestamp_ms: i64, value: f64) -> Self {
-        Self { timestamp_ms, value }
+        Self {
+            timestamp_ms,
+            value,
+        }
     }
 }
 
@@ -100,7 +131,10 @@ pub struct TimeSeries {
 
 impl TimeSeries {
     pub fn new(labels: Labels) -> Self {
-        Self { labels, samples: Vec::new() }
+        Self {
+            labels,
+            samples: Vec::new(),
+        }
     }
 
     pub fn push(&mut self, sample: Sample) {
@@ -128,34 +162,70 @@ pub struct LabelMatcher {
 
 impl LabelMatcher {
     pub fn equal(name: impl Into<String>, value: impl Into<String>) -> Self {
-        Self { name: name.into(), op: MatchOp::Equal, value: value.into(), regex: None }
+        Self {
+            name: name.into(),
+            op: MatchOp::Equal,
+            value: value.into(),
+            regex: None,
+        }
     }
 
     pub fn not_equal(name: impl Into<String>, value: impl Into<String>) -> Self {
-        Self { name: name.into(), op: MatchOp::NotEqual, value: value.into(), regex: None }
+        Self {
+            name: name.into(),
+            op: MatchOp::NotEqual,
+            value: value.into(),
+            regex: None,
+        }
     }
 
-    pub fn regex(name: impl Into<String>, pattern: impl Into<String>) -> crate::error::Result<Self> {
+    pub fn regex(
+        name: impl Into<String>,
+        pattern: impl Into<String>,
+    ) -> crate::error::Result<Self> {
         let value: String = pattern.into();
         let anchored = format!("^(?:{})$", value);
-        let re = regex::Regex::new(&anchored).map_err(|e| crate::error::MetricsError::Parse(e.to_string()))?;
-        Ok(Self { name: name.into(), op: MatchOp::RegexMatch, value, regex: Some(re) })
+        let re = regex::Regex::new(&anchored)
+            .map_err(|e| crate::error::MetricsError::Parse(e.to_string()))?;
+        Ok(Self {
+            name: name.into(),
+            op: MatchOp::RegexMatch,
+            value,
+            regex: Some(re),
+        })
     }
 
-    pub fn not_regex(name: impl Into<String>, pattern: impl Into<String>) -> crate::error::Result<Self> {
+    pub fn not_regex(
+        name: impl Into<String>,
+        pattern: impl Into<String>,
+    ) -> crate::error::Result<Self> {
         let value: String = pattern.into();
         let anchored = format!("^(?:{})$", value);
-        let re = regex::Regex::new(&anchored).map_err(|e| crate::error::MetricsError::Parse(e.to_string()))?;
-        Ok(Self { name: name.into(), op: MatchOp::RegexNotMatch, value, regex: Some(re) })
+        let re = regex::Regex::new(&anchored)
+            .map_err(|e| crate::error::MetricsError::Parse(e.to_string()))?;
+        Ok(Self {
+            name: name.into(),
+            op: MatchOp::RegexNotMatch,
+            value,
+            regex: Some(re),
+        })
     }
 
     pub fn matches(&self, labels: &Labels) -> bool {
         let label_val = labels.get(&self.name).unwrap_or("");
         match self.op {
-            MatchOp::Equal        => label_val == self.value,
-            MatchOp::NotEqual     => label_val != self.value,
-            MatchOp::RegexMatch   => self.regex.as_ref().map(|r| r.is_match(label_val)).unwrap_or(false),
-            MatchOp::RegexNotMatch => !self.regex.as_ref().map(|r| r.is_match(label_val)).unwrap_or(false),
+            MatchOp::Equal => label_val == self.value,
+            MatchOp::NotEqual => label_val != self.value,
+            MatchOp::RegexMatch => self
+                .regex
+                .as_ref()
+                .map(|r| r.is_match(label_val))
+                .unwrap_or(false),
+            MatchOp::RegexNotMatch => !self
+                .regex
+                .as_ref()
+                .map(|r| r.is_match(label_val))
+                .unwrap_or(false),
         }
     }
 }
@@ -184,14 +254,14 @@ impl std::str::FromStr for MetricType {
     type Err = ();
     fn from_str(s: &str) -> std::result::Result<Self, ()> {
         Ok(match s.to_ascii_lowercase().as_str() {
-            "counter"        => Self::Counter,
-            "gauge"          => Self::Gauge,
-            "histogram"      => Self::Histogram,
-            "summary"        => Self::Summary,
+            "counter" => Self::Counter,
+            "gauge" => Self::Gauge,
+            "histogram" => Self::Histogram,
+            "summary" => Self::Summary,
             "gaugehistogram" => Self::GaugeHistogram,
-            "info"           => Self::Info,
-            "stateset"       => Self::StateSet,
-            _                => Self::Untyped,
+            "info" => Self::Info,
+            "stateset" => Self::StateSet,
+            _ => Self::Untyped,
         })
     }
 }

@@ -6,9 +6,9 @@
 //! `js/apps/admin-ui/src/realm-settings/SecurityDefencesTab.tsx` →
 //! DPoP section.
 
+use super::{AuthAdminError, render_admin_nav, require_platform};
 use crate::admin::permission::RequestCtx;
 use crate::admin::render::{escape, page_shell_full};
-use super::{render_admin_nav, require_platform, AuthAdminError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DpopConfig {
@@ -93,7 +93,11 @@ pub fn render(ctx: &RequestCtx) -> Result<String, AuthAdminError> {
 </section>"#,
         nav = render_admin_nav("/admin/auth/dpop"),
         en = if cfg.enabled { "checked" } else { "" },
-        bind = if cfg.bind_access_tokens { "checked" } else { "" },
+        bind = if cfg.bind_access_tokens {
+            "checked"
+        } else {
+            ""
+        },
         nonce = if cfg.require_nonce { "checked" } else { "" },
         rep = cfg.replay_window_seconds,
         algs = escape(&cfg.allowed_algorithms.join(", ")),

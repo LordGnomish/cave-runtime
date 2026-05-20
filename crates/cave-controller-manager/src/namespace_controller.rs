@@ -95,7 +95,12 @@ mod tests {
             "tenant-ns-active"
         );
         assert_eq!(
-            evaluate(&ns_state(NamespacePhase::Active, false, &[FINALIZER_KUBERNETES], 0)),
+            evaluate(&ns_state(
+                NamespacePhase::Active,
+                false,
+                &[FINALIZER_KUBERNETES],
+                0
+            )),
             NamespaceAction::NoOp
         );
     }
@@ -108,7 +113,12 @@ mod tests {
             "tenant-ns-set-terminating"
         );
         assert_eq!(
-            evaluate(&ns_state(NamespacePhase::Active, true, &[FINALIZER_KUBERNETES], 0)),
+            evaluate(&ns_state(
+                NamespacePhase::Active,
+                true,
+                &[FINALIZER_KUBERNETES],
+                0
+            )),
             NamespaceAction::SetTerminating
         );
     }

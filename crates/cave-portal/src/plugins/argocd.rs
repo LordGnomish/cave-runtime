@@ -183,7 +183,9 @@ impl ArgoPlugin {
     }
 
     pub fn find(&self, tenant: &str, name: &str) -> Option<&Application> {
-        self.apps.iter().find(|a| a.tenant == tenant && a.name == name)
+        self.apps
+            .iter()
+            .find(|a| a.tenant == tenant && a.name == name)
     }
 
     pub fn find_mut(&mut self, tenant: &str, name: &str) -> Option<&mut Application> {

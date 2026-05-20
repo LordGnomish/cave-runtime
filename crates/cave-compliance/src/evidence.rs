@@ -3,7 +3,13 @@
 use crate::models::{Evidence, EvidenceType};
 use uuid::Uuid;
 
-pub fn create_manual_evidence(control_id: Uuid, finding_id: Option<Uuid>, description: &str, data: serde_json::Value, collected_by: &str) -> Evidence {
+pub fn create_manual_evidence(
+    control_id: Uuid,
+    finding_id: Option<Uuid>,
+    description: &str,
+    data: serde_json::Value,
+    collected_by: &str,
+) -> Evidence {
     Evidence {
         id: Uuid::new_v4(),
         finding_id,
@@ -16,7 +22,11 @@ pub fn create_manual_evidence(control_id: Uuid, finding_id: Option<Uuid>, descri
     }
 }
 
-pub fn create_snapshot_evidence(control_id: Uuid, finding_id: Option<Uuid>, snapshot: serde_json::Value) -> Evidence {
+pub fn create_snapshot_evidence(
+    control_id: Uuid,
+    finding_id: Option<Uuid>,
+    snapshot: serde_json::Value,
+) -> Evidence {
     Evidence {
         id: Uuid::new_v4(),
         finding_id,
@@ -41,7 +51,13 @@ mod tests {
     #[test]
     fn test_create_manual_evidence() {
         let id = Uuid::new_v4();
-        let ev = create_manual_evidence(id, None, "Test evidence", serde_json::json!({"ok": true}), "admin");
+        let ev = create_manual_evidence(
+            id,
+            None,
+            "Test evidence",
+            serde_json::json!({"ok": true}),
+            "admin",
+        );
         assert_eq!(ev.control_id, id);
         assert!(matches!(ev.evidence_type, EvidenceType::Manual));
     }

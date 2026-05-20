@@ -78,7 +78,10 @@ impl Resp {
     }
 
     pub fn is_nil(&self) -> bool {
-        matches!(self, Resp::BulkString(None) | Resp::Array(None) | Resp::Null)
+        matches!(
+            self,
+            Resp::BulkString(None) | Resp::Array(None) | Resp::Null
+        )
     }
 }
 
@@ -89,7 +92,10 @@ pub type Reader = BufReader<OwnedReadHalf>;
 /// Parse a single RESP value from the reader.
 pub async fn parse_resp(reader: &mut Reader) -> CacheResult<Resp> {
     let mut line = String::new();
-    let n = reader.read_line(&mut line).await.map_err(|_| CacheError::Io)?;
+    let n = reader
+        .read_line(&mut line)
+        .await
+        .map_err(|_| CacheError::Io)?;
     if n == 0 {
         return Err(CacheError::Protocol("Connection closed".into()));
     }
@@ -105,11 +111,15 @@ pub async fn parse_resp(reader: &mut Reader) -> CacheResult<Resp> {
         '+' => Ok(Resp::SimpleString(rest.as_bytes().to_vec())),
         '-' => Ok(Resp::Error(rest.to_string())),
         ':' => {
-            let n: i64 = rest.parse().map_err(|_| CacheError::Protocol("Invalid integer".into()))?;
+            let n: i64 = rest
+                .parse()
+                .map_err(|_| CacheError::Protocol("Invalid integer".into()))?;
             Ok(Resp::Integer(n))
         }
         '$' => {
-            let len: i64 = rest.parse().map_err(|_| CacheError::Protocol("Invalid bulk len".into()))?;
+            let len: i64 = rest
+                .parse()
+                .map_err(|_| CacheError::Protocol("Invalid bulk len".into()))?;
             if len == -1 {
                 return Ok(Resp::BulkString(None));
             }
@@ -118,12 +128,17 @@ pub async fn parse_resp(reader: &mut Reader) -> CacheResult<Resp> {
             }
             let len = len as usize;
             let mut buf = vec![0u8; len + 2]; // +2 for \r\n
-            reader.read_exact(&mut buf).await.map_err(|_| CacheError::Io)?;
+            reader
+                .read_exact(&mut buf)
+                .await
+                .map_err(|_| CacheError::Io)?;
             buf.truncate(len);
             Ok(Resp::BulkString(Some(buf)))
         }
         '*' => {
-            let count: i64 = rest.parse().map_err(|_| CacheError::Protocol("Invalid array len".into()))?;
+            let count: i64 = rest
+                .parse()
+                .map_err(|_| CacheError::Protocol("Invalid array len".into()))?;
             if count == -1 {
                 return Ok(Resp::Array(None));
             }
@@ -147,24 +162,36 @@ pub async fn parse_resp(reader: &mut Reader) -> CacheResult<Resp> {
             let f: f64 = match rest {
                 "inf" | "+inf" => f64::INFINITY,
                 "-inf" => f64::NEG_INFINITY,
-                _ => rest.parse().map_err(|_| CacheError::Protocol("Invalid double".into()))?,
+                _ => rest
+                    .parse()
+                    .map_err(|_| CacheError::Protocol("Invalid double".into()))?,
             };
             Ok(Resp::Double(f))
         }
         '(' => Ok(Resp::BigNumber(rest.as_bytes().to_vec())),
         '!' => {
-            let len: usize = rest.parse().map_err(|_| CacheError::Protocol("Invalid blob error len".into()))?;
+            let len: usize = rest
+                .parse()
+                .map_err(|_| CacheError::Protocol("Invalid blob error len".into()))?;
             let mut buf = vec![0u8; len + 2];
-            reader.read_exact(&mut buf).await.map_err(|_| CacheError::Io)?;
+            reader
+                .read_exact(&mut buf)
+                .await
+                .map_err(|_| CacheError::Io)?;
             buf.truncate(len);
             // format: "CODE message"
             let sep = buf.iter().position(|&b| b == b' ').unwrap_or(buf.len());
             Ok(Resp::BlobError(buf[..sep].to_vec(), buf[sep..].to_vec()))
         }
         '=' => {
-            let len: usize = rest.parse().map_err(|_| CacheError::Protocol("Invalid verbatim len".into()))?;
+            let len: usize = rest
+                .parse()
+                .map_err(|_| CacheError::Protocol("Invalid verbatim len".into()))?;
             let mut buf = vec![0u8; len + 2];
-            reader.read_exact(&mut buf).await.map_err(|_| CacheError::Io)?;
+            reader
+                .read_exact(&mut buf)
+                .await
+                .map_err(|_| CacheError::Io)?;
             buf.truncate(len);
             // first 3 bytes = encoding, byte 4 = ':', rest = data
             if buf.len() < 4 {
@@ -173,7 +200,9 @@ pub async fn parse_resp(reader: &mut Reader) -> CacheResult<Resp> {
             Ok(Resp::VerbatimString(buf[..3].to_vec(), buf[4..].to_vec()))
         }
         '%' => {
-            let count: usize = rest.parse().map_err(|_| CacheError::Protocol("Invalid map len".into()))?;
+            let count: usize = rest
+                .parse()
+                .map_err(|_| CacheError::Protocol("Invalid map len".into()))?;
             let mut pairs = Vec::with_capacity(count);
             for _ in 0..count {
                 let k = Box::pin(parse_resp(reader)).await?;
@@ -183,7 +212,9 @@ pub async fn parse_resp(reader: &mut Reader) -> CacheResult<Resp> {
             Ok(Resp::Map(pairs))
         }
         '~' => {
-            let count: usize = rest.parse().map_err(|_| CacheError::Protocol("Invalid set len".into()))?;
+            let count: usize = rest
+                .parse()
+                .map_err(|_| CacheError::Protocol("Invalid set len".into()))?;
             let mut items = Vec::with_capacity(count);
             for _ in 0..count {
                 items.push(Box::pin(parse_resp(reader)).await?);
@@ -191,14 +222,19 @@ pub async fn parse_resp(reader: &mut Reader) -> CacheResult<Resp> {
             Ok(Resp::Set(items))
         }
         '>' => {
-            let count: usize = rest.parse().map_err(|_| CacheError::Protocol("Invalid push len".into()))?;
+            let count: usize = rest
+                .parse()
+                .map_err(|_| CacheError::Protocol("Invalid push len".into()))?;
             let mut items = Vec::with_capacity(count);
             for _ in 0..count {
                 items.push(Box::pin(parse_resp(reader)).await?);
             }
             Ok(Resp::Push(items))
         }
-        _ => Err(CacheError::Protocol(format!("Unknown RESP prefix: {:?}", prefix))),
+        _ => Err(CacheError::Protocol(format!(
+            "Unknown RESP prefix: {:?}",
+            prefix
+        ))),
     }
 }
 
@@ -213,7 +249,11 @@ pub async fn parse_command(reader: &mut Reader) -> CacheResult<Vec<Vec<u8>>> {
                 match item {
                     Resp::BulkString(Some(b)) => args.push(b),
                     Resp::SimpleString(b) => args.push(b),
-                    _ => return Err(CacheError::Protocol("Expected bulk string in command array".into())),
+                    _ => {
+                        return Err(CacheError::Protocol(
+                            "Expected bulk string in command array".into(),
+                        ));
+                    }
                 }
             }
             if args.is_empty() {
@@ -222,16 +262,18 @@ pub async fn parse_command(reader: &mut Reader) -> CacheResult<Vec<Vec<u8>>> {
             Ok(args)
         }
         // Inline commands (for redis-cli compatibility)
-        Resp::SimpleString(s) => {
-            parse_inline(&s)
-        }
+        Resp::SimpleString(s) => parse_inline(&s),
         _ => Err(CacheError::Protocol("Expected array for command".into())),
     }
 }
 
 fn parse_inline(line: &[u8]) -> CacheResult<Vec<Vec<u8>>> {
-    let s = std::str::from_utf8(line).map_err(|_| CacheError::Protocol("Non-UTF8 inline".into()))?;
-    let args: Vec<Vec<u8>> = s.split_whitespace().map(|t| t.as_bytes().to_vec()).collect();
+    let s =
+        std::str::from_utf8(line).map_err(|_| CacheError::Protocol("Non-UTF8 inline".into()))?;
+    let args: Vec<Vec<u8>> = s
+        .split_whitespace()
+        .map(|t| t.as_bytes().to_vec())
+        .collect();
     if args.is_empty() {
         return Err(CacheError::Protocol("Empty inline command".into()));
     }
@@ -293,9 +335,13 @@ pub fn encode_resp(buf: &mut Vec<u8>, resp: &Resp) {
         }
         Resp::Double(f) => {
             buf.push(b',');
-            let s = if f.is_infinite() && *f > 0.0 { "inf".to_string() }
-                    else if f.is_infinite() { "-inf".to_string() }
-                    else { format!("{}", f) };
+            let s = if f.is_infinite() && *f > 0.0 {
+                "inf".to_string()
+            } else if f.is_infinite() {
+                "-inf".to_string()
+            } else {
+                format!("{}", f)
+            };
             buf.extend_from_slice(s.as_bytes());
             buf.extend_from_slice(b"\r\n");
         }
@@ -305,7 +351,12 @@ pub fn encode_resp(buf: &mut Vec<u8>, resp: &Resp) {
             buf.extend_from_slice(b"\r\n");
         }
         Resp::BlobError(code, msg) => {
-            let content: Vec<u8> = code.iter().chain(b" ".iter()).chain(msg.iter()).copied().collect();
+            let content: Vec<u8> = code
+                .iter()
+                .chain(b" ".iter())
+                .chain(msg.iter())
+                .copied()
+                .collect();
             buf.push(b'!');
             buf.extend_from_slice(content.len().to_string().as_bytes());
             buf.extend_from_slice(b"\r\n");

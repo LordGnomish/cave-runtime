@@ -4,9 +4,7 @@
 //! rejection, auto-unseal interface (Transit / KMIP / Azure Key Vault /
 //! AWS KMS / GCP KMS / OCI KMS). Pinned to openbao v2.5.3.
 
-use cave_vault::core::seal::{
-    AutoSealConfig, AutoSealType, SealState, SealStatus,
-};
+use cave_vault::core::seal::{AutoSealConfig, AutoSealType, SealState, SealStatus};
 
 const TENANT: &str = "tenant-acme-prod";
 
@@ -14,12 +12,22 @@ const TENANT: &str = "tenant-acme-prod";
 /// validation) — `threshold` must be ≥ 2 and ≤ shares; shares must be ≥ 1.
 #[test]
 fn validate_threshold_rejects_illegal_combinations() {
-    assert!(SealState::validate_threshold(0, 0).is_err(), "shares=0 rejected");
-    assert!(SealState::validate_threshold(5, 0).is_err(), "threshold=0 rejected");
-    assert!(SealState::validate_threshold(5, 1).is_err(),
-        "threshold=1 (degenerate) rejected");
-    assert!(SealState::validate_threshold(3, 5).is_err(),
-        "threshold > shares rejected");
+    assert!(
+        SealState::validate_threshold(0, 0).is_err(),
+        "shares=0 rejected"
+    );
+    assert!(
+        SealState::validate_threshold(5, 0).is_err(),
+        "threshold=0 rejected"
+    );
+    assert!(
+        SealState::validate_threshold(5, 1).is_err(),
+        "threshold=1 (degenerate) rejected"
+    );
+    assert!(
+        SealState::validate_threshold(3, 5).is_err(),
+        "threshold > shares rejected"
+    );
     assert!(SealState::validate_threshold(5, 3).is_ok());
     assert!(SealState::validate_threshold(5, 5).is_ok(), "k=n is valid");
 }
@@ -55,7 +63,10 @@ fn unseal_with_garbage_share_returns_invalid_request() {
     let _ = s.initialize(5, 3).unwrap();
     let err = s.unseal("not-hex-zzz").unwrap_err();
     assert!(err.to_string().contains("invalid share encoding"));
-    assert_eq!(s.unseal_progress, 0, "rejected share does not consume progress");
+    assert_eq!(
+        s.unseal_progress, 0,
+        "rejected share does not consume progress"
+    );
     assert_eq!(s.status, SealStatus::Sealed);
 }
 
@@ -65,21 +76,29 @@ fn unseal_with_garbage_share_returns_invalid_request() {
 #[test]
 fn auto_seal_type_barrier_identifiers_match_openbao_naming() {
     use AutoSealType::*;
-    assert_eq!(Transit.barrier_type(),       "transit");
+    assert_eq!(Transit.barrier_type(), "transit");
     assert_eq!(AzureKeyVault.barrier_type(), "azurekeyvault");
-    assert_eq!(AwsKms.barrier_type(),        "awskms");
-    assert_eq!(GcpCkms.barrier_type(),       "gcpckms");
-    assert_eq!(OciKms.barrier_type(),        "ocikms");
-    assert_eq!(Pkcs11.barrier_type(),        "pkcs11");
-    assert_eq!(Shamir.barrier_type(),        "shamir");
+    assert_eq!(AwsKms.barrier_type(), "awskms");
+    assert_eq!(GcpCkms.barrier_type(), "gcpckms");
+    assert_eq!(OciKms.barrier_type(), "ocikms");
+    assert_eq!(Pkcs11.barrier_type(), "pkcs11");
+    assert_eq!(Shamir.barrier_type(), "shamir");
 
     // StoredKeysSupported / RecoveryKeySupported — Shamir is the only
     // type that does NEITHER.
     assert!(!Shamir.stores_keys_remotely());
     assert!(!Shamir.supports_recovery_key());
     for t in [Transit, AzureKeyVault, AwsKms, GcpCkms, OciKms, Pkcs11] {
-        assert!(t.stores_keys_remotely(), "{} stores keys remotely", t.barrier_type());
-        assert!(t.supports_recovery_key(), "{} supports recovery key", t.barrier_type());
+        assert!(
+            t.stores_keys_remotely(),
+            "{} stores keys remotely",
+            t.barrier_type()
+        );
+        assert!(
+            t.supports_recovery_key(),
+            "{} supports recovery key",
+            t.barrier_type()
+        );
     }
 }
 

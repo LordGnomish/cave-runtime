@@ -93,14 +93,20 @@ pub fn load_directory(dir: impl AsRef<Path>) -> Result<Vec<RuleFile>, RuleError>
 
 fn validate(file: &RuleFile) -> Result<(), RuleError> {
     if file.alerts.is_empty() {
-        return Err(RuleError::Validation(format!("group '{}' has no alerts", file.group)));
+        return Err(RuleError::Validation(format!(
+            "group '{}' has no alerts",
+            file.group
+        )));
     }
     for spec in &file.alerts {
         if spec.alert.is_empty() {
             return Err(RuleError::Validation("alert name empty".into()));
         }
         if spec.expr.trim().is_empty() {
-            return Err(RuleError::Validation(format!("alert '{}' has empty expr", spec.alert)));
+            return Err(RuleError::Validation(format!(
+                "alert '{}' has empty expr",
+                spec.alert
+            )));
         }
         if spec.annotations.summary.trim().is_empty() {
             return Err(RuleError::Validation(format!(
@@ -224,11 +230,15 @@ alerts:
     #[test]
     fn test_catalog_files_cover_eight_crates() {
         let files = load_directory(rules_dir()).unwrap();
-        let crates: std::collections::HashSet<_> = files
-            .iter()
-            .filter_map(|f| f.crate_.clone())
-            .collect();
-        assert_eq!(crates.len(), 8, "expected 8 crates, got {}: {:?}", crates.len(), crates);
+        let crates: std::collections::HashSet<_> =
+            files.iter().filter_map(|f| f.crate_.clone()).collect();
+        assert_eq!(
+            crates.len(),
+            8,
+            "expected 8 crates, got {}: {:?}",
+            crates.len(),
+            crates
+        );
         for expected in [
             "cave-apiserver",
             "cave-cri",
@@ -255,7 +265,11 @@ alerts:
         let files = load_directory(rules_dir()).unwrap();
         for f in &files {
             for a in &f.alerts {
-                assert!(a.annotations.runbook_url.starts_with("https://docs.cave.dev/runbooks/"));
+                assert!(
+                    a.annotations
+                        .runbook_url
+                        .starts_with("https://docs.cave.dev/runbooks/")
+                );
             }
         }
     }

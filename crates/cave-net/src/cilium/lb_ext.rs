@@ -133,7 +133,10 @@ impl ServiceTrafficConfig {
 /// `Backend.name`'s `<node>:<...>` prefix (mirrors how cilium-agent
 /// derives node-locality from the backend identity).
 pub fn filter_backends_local<'a>(node_name: &str, backends: &'a [Backend]) -> Vec<&'a Backend> {
-    backends.iter().filter(|b| b.name.starts_with(&format!("{node_name}:"))).collect()
+    backends
+        .iter()
+        .filter(|b| b.name.starts_with(&format!("{node_name}:")))
+        .collect()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -163,14 +166,22 @@ impl KubeProxyReplacementStatus {
     }
     /// Try to attach XDP on a device. `Strict` requires the requested
     /// mode to be supported; `Probe` falls back to `Generic`.
-    pub fn attach_xdp(&mut self, device: impl Into<String>, requested: XdpMode, supported: &[XdpMode]) -> Result<XdpMode, LbExtError> {
+    pub fn attach_xdp(
+        &mut self,
+        device: impl Into<String>,
+        requested: XdpMode,
+        supported: &[XdpMode],
+    ) -> Result<XdpMode, LbExtError> {
         let device = device.into();
         if supported.contains(&requested) {
             self.xdp_devices.push((device, requested));
             return Ok(requested);
         }
         match self.mode {
-            KubeProxyReplacementMode::Strict => Err(LbExtError::XdpUnsupported { device, mode: requested }),
+            KubeProxyReplacementMode::Strict => Err(LbExtError::XdpUnsupported {
+                device,
+                mode: requested,
+            }),
             KubeProxyReplacementMode::Probe => {
                 let fallback = if supported.contains(&XdpMode::Generic) {
                     XdpMode::Generic
@@ -209,7 +220,10 @@ impl DsrOption {
     }
     pub fn decode(self) -> (IpAddr, u16) {
         let octets = self.backend_ipv4.to_be_bytes();
-        (IpAddr::V4(std::net::Ipv4Addr::from(octets)), self.backend_port)
+        (
+            IpAddr::V4(std::net::Ipv4Addr::from(octets)),
+            self.backend_port,
+        )
     }
 }
 
@@ -257,8 +271,10 @@ mod tests {
 
     fn flow(src: (u8, u8, u8, u8), sp: u16, dst: (u8, u8, u8, u8), dp: u16) -> FlowKey {
         FlowKey {
-            src_ip: ip(src.0, src.1, src.2, src.3), src_port: sp,
-            dst_ip: ip(dst.0, dst.1, dst.2, dst.3), dst_port: dp,
+            src_ip: ip(src.0, src.1, src.2, src.3),
+            src_port: sp,
+            dst_ip: ip(dst.0, dst.1, dst.2, dst.3),
+            dst_port: dp,
             proto: 6,
         }
     }
@@ -267,19 +283,31 @@ mod tests {
 
     #[test]
     fn kpr_mode_strict_supersedes_kube_proxy() {
-        let (_c, _t) = cilium_test_ctx!("pkg/option/config.go", "KubeProxyReplacement.Strict", "tenant-lbx-strict");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/option/config.go",
+            "KubeProxyReplacement.Strict",
+            "tenant-lbx-strict"
+        );
         assert!(KubeProxyReplacementMode::Strict.supersedes_kube_proxy());
     }
 
     #[test]
     fn kpr_mode_disabled_does_not_supersede() {
-        let (_c, _t) = cilium_test_ctx!("pkg/option/config.go", "KubeProxyReplacement.Disabled", "tenant-lbx-dis");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/option/config.go",
+            "KubeProxyReplacement.Disabled",
+            "tenant-lbx-dis"
+        );
         assert!(!KubeProxyReplacementMode::Disabled.supersedes_kube_proxy());
     }
 
     #[test]
     fn kpr_status_strict_default_uses_hybrid_lb() {
-        let (_c, _t) = cilium_test_ctx!("pkg/option/config.go", "KubeProxyReplacement.Default", "tenant-lbx-def");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/option/config.go",
+            "KubeProxyReplacement.Default",
+            "tenant-lbx-def"
+        );
         let s = KubeProxyReplacementStatus::strict_default();
         assert_eq!(s.lb_mode, LbMode::Hybrid);
         assert!(s.bpf_host_routing);
@@ -287,7 +315,11 @@ mod tests {
 
     #[test]
     fn kpr_status_disabled_uses_snat_no_host_routing() {
-        let (_c, _t) = cilium_test_ctx!("pkg/option/config.go", "KubeProxyReplacement.Disabled.Status", "tenant-lbx-dis2");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/option/config.go",
+            "KubeProxyReplacement.Disabled.Status",
+            "tenant-lbx-dis2"
+        );
         let s = KubeProxyReplacementStatus::disabled();
         assert_eq!(s.lb_mode, LbMode::Snat);
         assert!(!s.bpf_host_routing);
@@ -297,21 +329,33 @@ mod tests {
 
     #[test]
     fn lb_mode_snat_loses_client_ip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/loadbalancer/loadbalancer.go", "LBMode.SNAT", "tenant-lbx-snat");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/loadbalancer/loadbalancer.go",
+            "LBMode.SNAT",
+            "tenant-lbx-snat"
+        );
         assert!(!LbMode::Snat.preserves_client_ip(6));
         assert!(!LbMode::Snat.preserves_client_ip(17));
     }
 
     #[test]
     fn lb_mode_dsr_preserves_client_ip_for_any_proto() {
-        let (_c, _t) = cilium_test_ctx!("pkg/loadbalancer/loadbalancer.go", "LBMode.DSR", "tenant-lbx-dsr");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/loadbalancer/loadbalancer.go",
+            "LBMode.DSR",
+            "tenant-lbx-dsr"
+        );
         assert!(LbMode::Dsr.preserves_client_ip(6));
         assert!(LbMode::Dsr.preserves_client_ip(17));
     }
 
     #[test]
     fn lb_mode_hybrid_preserves_client_ip_only_for_tcp() {
-        let (_c, _t) = cilium_test_ctx!("pkg/loadbalancer/loadbalancer.go", "LBMode.Hybrid", "tenant-lbx-hyb");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/loadbalancer/loadbalancer.go",
+            "LBMode.Hybrid",
+            "tenant-lbx-hyb"
+        );
         assert!(LbMode::Hybrid.preserves_client_ip(6));
         assert!(!LbMode::Hybrid.preserves_client_ip(17));
     }
@@ -320,17 +364,38 @@ mod tests {
 
     #[test]
     fn xdp_strict_rejects_unsupported_mode() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/xdp", "Attach.Strict.Unsupported", "tenant-lbx-xdpstr");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/datapath/xdp",
+            "Attach.Strict.Unsupported",
+            "tenant-lbx-xdpstr"
+        );
         let mut s = KubeProxyReplacementStatus::strict_default();
-        let err = s.attach_xdp("eth0", XdpMode::Native, &[XdpMode::Generic]).unwrap_err();
-        assert_eq!(err, LbExtError::XdpUnsupported { device: "eth0".into(), mode: XdpMode::Native });
+        let err = s
+            .attach_xdp("eth0", XdpMode::Native, &[XdpMode::Generic])
+            .unwrap_err();
+        assert_eq!(
+            err,
+            LbExtError::XdpUnsupported {
+                device: "eth0".into(),
+                mode: XdpMode::Native
+            }
+        );
     }
 
     #[test]
     fn xdp_probe_falls_back_to_generic() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/xdp", "Attach.Probe.Fallback", "tenant-lbx-xdpfb");
-        let mut s = KubeProxyReplacementStatus { mode: KubeProxyReplacementMode::Probe, ..KubeProxyReplacementStatus::strict_default() };
-        let m = s.attach_xdp("eth0", XdpMode::Native, &[XdpMode::Generic]).unwrap();
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/datapath/xdp",
+            "Attach.Probe.Fallback",
+            "tenant-lbx-xdpfb"
+        );
+        let mut s = KubeProxyReplacementStatus {
+            mode: KubeProxyReplacementMode::Probe,
+            ..KubeProxyReplacementStatus::strict_default()
+        };
+        let m = s
+            .attach_xdp("eth0", XdpMode::Native, &[XdpMode::Generic])
+            .unwrap();
         assert_eq!(m, XdpMode::Generic);
     }
 
@@ -338,7 +403,13 @@ mod tests {
     fn xdp_native_supported_attaches_native() {
         let (_c, _t) = cilium_test_ctx!("pkg/datapath/xdp", "Attach.Native", "tenant-lbx-xdpnat");
         let mut s = KubeProxyReplacementStatus::strict_default();
-        let m = s.attach_xdp("eth0", XdpMode::Native, &[XdpMode::Native, XdpMode::Generic]).unwrap();
+        let m = s
+            .attach_xdp(
+                "eth0",
+                XdpMode::Native,
+                &[XdpMode::Native, XdpMode::Generic],
+            )
+            .unwrap();
         assert_eq!(m, XdpMode::Native);
     }
 
@@ -346,15 +417,20 @@ mod tests {
     fn xdp_offload_supported_attaches_offload() {
         let (_c, _t) = cilium_test_ctx!("pkg/datapath/xdp", "Attach.Offload", "tenant-lbx-xdpoff");
         let mut s = KubeProxyReplacementStatus::strict_default();
-        let m = s.attach_xdp("eth0", XdpMode::Offload, &[XdpMode::Offload]).unwrap();
+        let m = s
+            .attach_xdp("eth0", XdpMode::Offload, &[XdpMode::Offload])
+            .unwrap();
         assert_eq!(m, XdpMode::Offload);
     }
 
     #[test]
     fn xdp_disabled_mode_records_disabled() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/xdp", "Attach.Disabled", "tenant-lbx-xdpoff2");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/datapath/xdp", "Attach.Disabled", "tenant-lbx-xdpoff2");
         let mut s = KubeProxyReplacementStatus::disabled();
-        let m = s.attach_xdp("eth0", XdpMode::Native, &[XdpMode::Native]).unwrap();
+        let m = s
+            .attach_xdp("eth0", XdpMode::Native, &[XdpMode::Native])
+            .unwrap();
         // Disabled mode skips XDP attach attempts.
         assert!(matches!(m, XdpMode::Disabled | XdpMode::Native));
     }
@@ -363,7 +439,11 @@ mod tests {
 
     #[test]
     fn traffic_policy_default_is_cluster_for_both() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/api/v1/Service", "TrafficPolicy.Default", "tenant-lbx-tp-def");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/api/v1/Service",
+            "TrafficPolicy.Default",
+            "tenant-lbx-tp-def"
+        );
         let cfg = ServiceTrafficConfig::default();
         assert_eq!(cfg.internal, TrafficPolicy::Cluster);
         assert_eq!(cfg.external, TrafficPolicy::Cluster);
@@ -371,7 +451,11 @@ mod tests {
 
     #[test]
     fn traffic_policy_external_local_preserves_client_ip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/api/v1/Service", "TrafficPolicy.External.Local", "tenant-lbx-tp-extloc");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/api/v1/Service",
+            "TrafficPolicy.External.Local",
+            "tenant-lbx-tp-extloc"
+        );
         let cfg = ServiceTrafficConfig {
             internal: TrafficPolicy::Cluster,
             external: TrafficPolicy::Local,
@@ -384,7 +468,11 @@ mod tests {
 
     #[test]
     fn filter_backends_local_keeps_only_node_owned() {
-        let (_c, _t) = cilium_test_ctx!("pkg/loadbalancer/loadbalancer.go", "FilterLocal", "tenant-lbx-floc");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/loadbalancer/loadbalancer.go",
+            "FilterLocal",
+            "tenant-lbx-floc"
+        );
         let bs = vec![
             Backend::new("node-a:0", ip(10, 0, 1, 1), 80),
             Backend::new("node-a:1", ip(10, 0, 1, 2), 80),
@@ -396,7 +484,11 @@ mod tests {
 
     #[test]
     fn filter_backends_local_empty_when_none_match() {
-        let (_c, _t) = cilium_test_ctx!("pkg/loadbalancer/loadbalancer.go", "FilterLocal.None", "tenant-lbx-floc-none");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/loadbalancer/loadbalancer.go",
+            "FilterLocal.None",
+            "tenant-lbx-floc-none"
+        );
         let bs = vec![Backend::new("node-a:0", ip(10, 0, 1, 1), 80)];
         let local = filter_backends_local("node-z", &bs);
         assert!(local.is_empty());
@@ -406,7 +498,11 @@ mod tests {
 
     #[test]
     fn source_range_allows_match() {
-        let (_c, _t) = cilium_test_ctx!("pkg/loadbalancer/loadbalancer.go", "SourceRanges.Allow", "tenant-lbx-sr-ok");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/loadbalancer/loadbalancer.go",
+            "SourceRanges.Allow",
+            "tenant-lbx-sr-ok"
+        );
         let cfg = ServiceTrafficConfig {
             source_ranges: vec!["10.0.0.0/8".into()],
             ..Default::default()
@@ -416,7 +512,11 @@ mod tests {
 
     #[test]
     fn source_range_denies_outside() {
-        let (_c, _t) = cilium_test_ctx!("pkg/loadbalancer/loadbalancer.go", "SourceRanges.Deny", "tenant-lbx-sr-den");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/loadbalancer/loadbalancer.go",
+            "SourceRanges.Deny",
+            "tenant-lbx-sr-den"
+        );
         let cfg = ServiceTrafficConfig {
             source_ranges: vec!["10.0.0.0/8".into()],
             ..Default::default()
@@ -426,14 +526,22 @@ mod tests {
 
     #[test]
     fn source_range_empty_allows_any() {
-        let (_c, _t) = cilium_test_ctx!("pkg/loadbalancer/loadbalancer.go", "SourceRanges.Empty", "tenant-lbx-sr-emp");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/loadbalancer/loadbalancer.go",
+            "SourceRanges.Empty",
+            "tenant-lbx-sr-emp"
+        );
         let cfg = ServiceTrafficConfig::default();
         assert!(cfg.allows_source(ip(8, 8, 8, 8)).unwrap());
     }
 
     #[test]
     fn source_range_invalid_cidr_returns_error() {
-        let (_c, _t) = cilium_test_ctx!("pkg/loadbalancer/loadbalancer.go", "SourceRanges.BadCIDR", "tenant-lbx-sr-bad");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/loadbalancer/loadbalancer.go",
+            "SourceRanges.BadCIDR",
+            "tenant-lbx-sr-bad"
+        );
         let cfg = ServiceTrafficConfig {
             source_ranges: vec!["not-a-cidr".into()],
             ..Default::default()
@@ -444,7 +552,11 @@ mod tests {
 
     #[test]
     fn source_range_multiple_cidrs_first_match_allows() {
-        let (_c, _t) = cilium_test_ctx!("pkg/loadbalancer/loadbalancer.go", "SourceRanges.Multi", "tenant-lbx-sr-multi");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/loadbalancer/loadbalancer.go",
+            "SourceRanges.Multi",
+            "tenant-lbx-sr-multi"
+        );
         let cfg = ServiceTrafficConfig {
             source_ranges: vec!["10.0.0.0/8".into(), "192.168.0.0/16".into()],
             ..Default::default()
@@ -456,7 +568,8 @@ mod tests {
 
     #[test]
     fn dsr_encode_v4_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/dsr_helpers.h", "set_dsr_opt4", "tenant-lbx-dsr-rt");
+        let (_c, _t) =
+            cilium_test_ctx!("bpf/lib/dsr_helpers.h", "set_dsr_opt4", "tenant-lbx-dsr-rt");
         let opt = DsrOption::encode(ip(10, 0, 1, 5), 8080).unwrap();
         let (back_ip, back_port) = opt.decode();
         assert_eq!(back_ip, ip(10, 0, 1, 5));
@@ -465,7 +578,11 @@ mod tests {
 
     #[test]
     fn dsr_encode_v6_returns_none() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/dsr_helpers.h", "set_dsr_opt4.V6", "tenant-lbx-dsr-v6");
+        let (_c, _t) = cilium_test_ctx!(
+            "bpf/lib/dsr_helpers.h",
+            "set_dsr_opt4.V6",
+            "tenant-lbx-dsr-v6"
+        );
         let v6: IpAddr = "2001:db8::1".parse().unwrap();
         assert!(DsrOption::encode(v6, 8080).is_none());
     }
@@ -474,7 +591,11 @@ mod tests {
 
     #[test]
     fn lb_per_flow_hash_is_stable_across_packets() {
-        let (_c, _t) = cilium_test_ctx!("pkg/loadbalancer/loadbalancer.go", "Hashing.PerFlow", "tenant-lbx-hpf");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/loadbalancer/loadbalancer.go",
+            "Hashing.PerFlow",
+            "tenant-lbx-hpf"
+        );
         let key = flow((10, 0, 0, 1), 1234, (10, 96, 0, 1), 80);
         let a = LbHashing::PerFlow.hash_input(key, 0);
         let b = LbHashing::PerFlow.hash_input(key, 1);
@@ -483,7 +604,11 @@ mod tests {
 
     #[test]
     fn lb_per_packet_hash_changes_across_packets() {
-        let (_c, _t) = cilium_test_ctx!("pkg/loadbalancer/loadbalancer.go", "Hashing.PerPacket", "tenant-lbx-hpp");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/loadbalancer/loadbalancer.go",
+            "Hashing.PerPacket",
+            "tenant-lbx-hpp"
+        );
         let key = flow((10, 0, 0, 1), 1234, (10, 96, 0, 1), 80);
         let a = LbHashing::PerPacket.hash_input(key, 0);
         let b = LbHashing::PerPacket.hash_input(key, 1);
@@ -494,7 +619,11 @@ mod tests {
 
     #[test]
     fn lb_mode_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/loadbalancer/loadbalancer.go", "LBMode.Serde", "tenant-lbx-mode-serde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/loadbalancer/loadbalancer.go",
+            "LBMode.Serde",
+            "tenant-lbx-mode-serde"
+        );
         for m in [LbMode::Snat, LbMode::Dsr, LbMode::Hybrid] {
             let s = serde_json::to_string(&m).unwrap();
             let back: LbMode = serde_json::from_str(&s).unwrap();
@@ -504,8 +633,14 @@ mod tests {
 
     #[test]
     fn xdp_mode_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/datapath/xdp", "XdpMode.Serde", "tenant-lbx-xdp-serde");
-        for m in [XdpMode::Native, XdpMode::Offload, XdpMode::Generic, XdpMode::Disabled] {
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/datapath/xdp", "XdpMode.Serde", "tenant-lbx-xdp-serde");
+        for m in [
+            XdpMode::Native,
+            XdpMode::Offload,
+            XdpMode::Generic,
+            XdpMode::Disabled,
+        ] {
             let s = serde_json::to_string(&m).unwrap();
             let back: XdpMode = serde_json::from_str(&s).unwrap();
             assert_eq!(back, m);
@@ -514,7 +649,11 @@ mod tests {
 
     #[test]
     fn traffic_policy_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/k8s/api/v1/Service", "TrafficPolicy.Serde", "tenant-lbx-tp-serde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/k8s/api/v1/Service",
+            "TrafficPolicy.Serde",
+            "tenant-lbx-tp-serde"
+        );
         let cfg = ServiceTrafficConfig {
             internal: TrafficPolicy::Local,
             external: TrafficPolicy::Local,
@@ -527,7 +666,11 @@ mod tests {
 
     #[test]
     fn kpr_status_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/option/config.go", "KubeProxyReplacement.Serde", "tenant-lbx-kpr-serde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/option/config.go",
+            "KubeProxyReplacement.Serde",
+            "tenant-lbx-kpr-serde"
+        );
         let s = KubeProxyReplacementStatus::strict_default();
         let json = serde_json::to_string(&s).unwrap();
         let back: KubeProxyReplacementStatus = serde_json::from_str(&json).unwrap();
@@ -536,7 +679,11 @@ mod tests {
 
     #[test]
     fn dsr_option_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/dsr_helpers.h", "DsrOption.Serde", "tenant-lbx-dsr-serde");
+        let (_c, _t) = cilium_test_ctx!(
+            "bpf/lib/dsr_helpers.h",
+            "DsrOption.Serde",
+            "tenant-lbx-dsr-serde"
+        );
         let opt = DsrOption::encode(ip(10, 0, 1, 5), 8080).unwrap();
         let json = serde_json::to_string(&opt).unwrap();
         let back: DsrOption = serde_json::from_str(&json).unwrap();

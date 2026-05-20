@@ -7,10 +7,10 @@
 //! - `TempoExporter` — variant that hits Tempo's `/api/push` endpoint.
 //! - `NoopExporter` — drops everything (used when tracing is disabled).
 
-use crate::types::{SpanData, AttrValue, Status};
+use crate::types::{AttrValue, SpanData, Status};
 use async_trait::async_trait;
 use parking_lot::Mutex;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -33,7 +33,9 @@ pub trait SpanExporter: Send + Sync {
     async fn export(&self, batch: Vec<SpanData>) -> ExportResult;
 
     /// Flush any buffered spans. Default no-op.
-    async fn shutdown(&self) -> ExportResult { Ok(()) }
+    async fn shutdown(&self) -> ExportResult {
+        Ok(())
+    }
 }
 
 // ─── NoopExporter ─────────────────────────────────────────────────────────
@@ -43,7 +45,9 @@ pub struct NoopExporter;
 
 #[async_trait]
 impl SpanExporter for NoopExporter {
-    async fn export(&self, _batch: Vec<SpanData>) -> ExportResult { Ok(()) }
+    async fn export(&self, _batch: Vec<SpanData>) -> ExportResult {
+        Ok(())
+    }
 }
 
 // ─── InMemoryExporter ─────────────────────────────────────────────────────
@@ -55,13 +59,17 @@ pub struct InMemoryExporter {
 }
 
 impl InMemoryExporter {
-    pub fn new() -> Self { Default::default() }
+    pub fn new() -> Self {
+        Default::default()
+    }
 
     pub fn collected(&self) -> Vec<SpanData> {
         self.inner.lock().clone()
     }
 
-    pub fn count(&self) -> usize { self.inner.lock().len() }
+    pub fn count(&self) -> usize {
+        self.inner.lock().len()
+    }
 
     /// Force the next `n` exports to fail with `Transport(...)`.
     pub fn fail_next(&self, n: usize) {
@@ -114,20 +122,32 @@ impl OtlpHttpExporter {
         type Key = (String, String, String); // (tenant, scope, resource_hash)
         let mut groups: BTreeMap<Key, Vec<&SpanData>> = BTreeMap::new();
         for span in batch {
-            let mut resource_kvs: Vec<(String, String)> = span.resource.iter()
+            let mut resource_kvs: Vec<(String, String)> = span
+                .resource
+                .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect();
             resource_kvs.sort();
-            let resource_hash = resource_kvs.iter()
-                .map(|(k, v)| format!("{}={}", k, v)).collect::<Vec<_>>().join(",");
-            groups.entry((span.tenant_id.clone(), span.instrumentation_scope.clone(), resource_hash))
+            let resource_hash = resource_kvs
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join(",");
+            groups
+                .entry((
+                    span.tenant_id.clone(),
+                    span.instrumentation_scope.clone(),
+                    resource_hash,
+                ))
                 .or_default()
                 .push(span);
         }
 
         let mut resource_spans: Vec<Value> = Vec::new();
         for ((tenant, scope, _hash), spans) in groups {
-            let resource_attrs: Vec<Value> = spans[0].resource.iter()
+            let resource_attrs: Vec<Value> = spans[0]
+                .resource
+                .iter()
                 .map(|(k, v)| json!({"key": k, "value": {"stringValue": v}}))
                 .chain(std::iter::once(json!({
                     "key": crate::types::TENANT_LABEL,
@@ -155,35 +175,53 @@ fn attr_to_otlp(value: &AttrValue) -> Value {
         AttrValue::Int(i) => json!({"intValue": i.to_string()}),
         AttrValue::Float(f) => json!({"doubleValue": f}),
         AttrValue::Bool(b) => json!({"boolValue": b}),
-        AttrValue::StringArray(a) => json!({"arrayValue": {"values": a.iter().map(|v| json!({"stringValue": v})).collect::<Vec<_>>()}}),
-        AttrValue::IntArray(a) => json!({"arrayValue": {"values": a.iter().map(|v| json!({"intValue": v.to_string()})).collect::<Vec<_>>()}}),
-        AttrValue::FloatArray(a) => json!({"arrayValue": {"values": a.iter().map(|v| json!({"doubleValue": v})).collect::<Vec<_>>()}}),
-        AttrValue::BoolArray(a) => json!({"arrayValue": {"values": a.iter().map(|v| json!({"boolValue": v})).collect::<Vec<_>>()}}),
+        AttrValue::StringArray(a) => {
+            json!({"arrayValue": {"values": a.iter().map(|v| json!({"stringValue": v})).collect::<Vec<_>>()}})
+        }
+        AttrValue::IntArray(a) => {
+            json!({"arrayValue": {"values": a.iter().map(|v| json!({"intValue": v.to_string()})).collect::<Vec<_>>()}})
+        }
+        AttrValue::FloatArray(a) => {
+            json!({"arrayValue": {"values": a.iter().map(|v| json!({"doubleValue": v})).collect::<Vec<_>>()}})
+        }
+        AttrValue::BoolArray(a) => {
+            json!({"arrayValue": {"values": a.iter().map(|v| json!({"boolValue": v})).collect::<Vec<_>>()}})
+        }
     }
 }
 
 fn span_to_otlp(s: &SpanData) -> Value {
-    let attributes: Vec<Value> = s.attributes.iter()
+    let attributes: Vec<Value> = s
+        .attributes
+        .iter()
         .map(|(k, v)| json!({"key": k, "value": attr_to_otlp(v)}))
         .collect();
-    let events: Vec<Value> = s.events.iter().map(|e| {
-        json!({
-            "name": e.name,
-            "timeUnixNano": e.time.timestamp_nanos_opt().unwrap_or(0).to_string(),
-            "attributes": e.attributes.iter()
-                .map(|(k, v)| json!({"key": k, "value": attr_to_otlp(v)}))
-                .collect::<Vec<_>>(),
+    let events: Vec<Value> = s
+        .events
+        .iter()
+        .map(|e| {
+            json!({
+                "name": e.name,
+                "timeUnixNano": e.time.timestamp_nanos_opt().unwrap_or(0).to_string(),
+                "attributes": e.attributes.iter()
+                    .map(|(k, v)| json!({"key": k, "value": attr_to_otlp(v)}))
+                    .collect::<Vec<_>>(),
+            })
         })
-    }).collect();
-    let links: Vec<Value> = s.links.iter().map(|l| {
-        json!({
-            "traceId": crate::types::format_trace_id(l.context.trace_id),
-            "spanId": crate::types::format_span_id(l.context.span_id),
-            "attributes": l.attributes.iter()
-                .map(|(k, v)| json!({"key": k, "value": attr_to_otlp(v)}))
-                .collect::<Vec<_>>(),
+        .collect();
+    let links: Vec<Value> = s
+        .links
+        .iter()
+        .map(|l| {
+            json!({
+                "traceId": crate::types::format_trace_id(l.context.trace_id),
+                "spanId": crate::types::format_span_id(l.context.span_id),
+                "attributes": l.attributes.iter()
+                    .map(|(k, v)| json!({"key": k, "value": attr_to_otlp(v)}))
+                    .collect::<Vec<_>>(),
+            })
         })
-    }).collect();
+        .collect();
     let (status_code, status_msg) = match &s.status {
         Status::Unset => (0, String::new()),
         Status::Ok => (1, String::new()),
@@ -218,7 +256,9 @@ fn kind_int(k: crate::types::SpanKind) -> i32 {
 #[async_trait]
 impl SpanExporter for OtlpHttpExporter {
     async fn export(&self, batch: Vec<SpanData>) -> ExportResult {
-        if batch.is_empty() { return Ok(()); }
+        if batch.is_empty() {
+            return Ok(());
+        }
         let payload = self.render_payload(&batch);
         let client = reqwest::Client::builder()
             .timeout(self.timeout)
@@ -228,7 +268,10 @@ impl SpanExporter for OtlpHttpExporter {
         for (k, v) in &self.headers {
             req = req.header(k, v);
         }
-        let resp = req.send().await.map_err(|e| ExportError::Transport(e.to_string()))?;
+        let resp = req
+            .send()
+            .await
+            .map_err(|e| ExportError::Transport(e.to_string()))?;
         if !resp.status().is_success() {
             return Err(ExportError::Rejected(resp.status().as_u16()));
         }
@@ -288,7 +331,11 @@ mod tests {
                 a.insert("http.status".into(), AttrValue::Int(200));
                 a
             },
-            events: vec![Event { name: "ev".into(), time: now, attributes: HashMap::new() }],
+            events: vec![Event {
+                name: "ev".into(),
+                time: now,
+                attributes: HashMap::new(),
+            }],
             links: vec![],
             status: Status::Ok,
             instrumentation_scope: "test".into(),
@@ -322,8 +369,10 @@ mod tests {
     #[test]
     fn test_otlp_payload_groups_by_scope_and_resource() {
         let exp = OtlpHttpExporter::new("http://localhost");
-        let mut s1 = span("a"); s1.instrumentation_scope = "scope-a".into();
-        let mut s2 = span("b"); s2.instrumentation_scope = "scope-b".into();
+        let mut s1 = span("a");
+        s1.instrumentation_scope = "scope-a".into();
+        let mut s2 = span("b");
+        s2.instrumentation_scope = "scope-b".into();
         let v = exp.render_payload(&[s1, s2]);
         let groups = v["resourceSpans"].as_array().unwrap();
         assert_eq!(groups.len(), 2, "two distinct scopes → two resource_spans");
@@ -332,9 +381,12 @@ mod tests {
     #[test]
     fn test_otlp_payload_includes_tenant_attribute() {
         let exp = OtlpHttpExporter::new("http://localhost");
-        let mut s = span("a"); s.tenant_id = "acme".into();
+        let mut s = span("a");
+        s.tenant_id = "acme".into();
         let v = exp.render_payload(&[s]);
-        let attrs = v["resourceSpans"][0]["resource"]["attributes"].as_array().unwrap();
+        let attrs = v["resourceSpans"][0]["resource"]["attributes"]
+            .as_array()
+            .unwrap();
         let tenant_attr = attrs.iter().find(|a| a["key"] == "tenant_id").unwrap();
         assert_eq!(tenant_attr["value"]["stringValue"], "acme");
     }
@@ -366,7 +418,9 @@ mod tests {
         s.attributes.insert("flag".into(), AttrValue::Bool(true));
         s.attributes.insert("rate".into(), AttrValue::Float(0.42));
         let v = exp.render_payload(&[s]);
-        let attrs = v["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["attributes"].as_array().unwrap();
+        let attrs = v["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["attributes"]
+            .as_array()
+            .unwrap();
         let flag = attrs.iter().find(|a| a["key"] == "flag").unwrap();
         assert_eq!(flag["value"]["boolValue"], true);
         let rate = attrs.iter().find(|a| a["key"] == "rate").unwrap();
@@ -384,8 +438,13 @@ mod tests {
 
     #[test]
     fn test_with_header_appends() {
-        let e = OtlpHttpExporter::new("http://x").with_header("X", "1").with_header("Y", "2");
-        assert_eq!(e.headers, vec![("X".into(), "1".into()), ("Y".into(), "2".into())]);
+        let e = OtlpHttpExporter::new("http://x")
+            .with_header("X", "1")
+            .with_header("Y", "2");
+        assert_eq!(
+            e.headers,
+            vec![("X".into(), "1".into()), ("Y".into(), "2".into())]
+        );
     }
 
     #[test]
@@ -399,10 +458,16 @@ mod tests {
     fn test_attr_array_values_serialize() {
         let exp = OtlpHttpExporter::new("http://x");
         let mut s = span("a");
-        s.attributes.insert("tags".into(), AttrValue::StringArray(vec!["a".into(), "b".into()]));
-        s.attributes.insert("nums".into(), AttrValue::IntArray(vec![1, 2, 3]));
+        s.attributes.insert(
+            "tags".into(),
+            AttrValue::StringArray(vec!["a".into(), "b".into()]),
+        );
+        s.attributes
+            .insert("nums".into(), AttrValue::IntArray(vec![1, 2, 3]));
         let v = exp.render_payload(&[s]);
-        let attrs = v["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["attributes"].as_array().unwrap();
+        let attrs = v["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["attributes"]
+            .as_array()
+            .unwrap();
         assert!(attrs.iter().any(|a| a["key"] == "tags"));
         assert!(attrs.iter().any(|a| a["key"] == "nums"));
     }

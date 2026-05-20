@@ -17,14 +17,18 @@ fn tenant_path(suffix: &str) -> String {
 /// reviewer-friendly policies parse cleanly.
 #[test]
 fn hcl_comments_are_stripped_before_parsing() {
-    let hcl = format!(r#"
+    let hcl = format!(
+        r#"
         # tenant_id: {tenant}
         // ops policy — covers the secret/* path
         path "{path}/*" {{
             // allow read+list, no writes
             capabilities = ["read", "list"]   # tightened 2026-04
         }}
-    "#, tenant = TENANT, path = tenant_path(""));
+    "#,
+        tenant = TENANT,
+        path = tenant_path("")
+    );
     let p = Policy::parse("ops", &hcl).unwrap();
     assert_eq!(p.rules.len(), 1);
     assert_eq!(p.rules[0].path, format!("{}/*", tenant_path("")));
@@ -38,7 +42,8 @@ fn hcl_comments_are_stripped_before_parsing() {
 /// in `allowed`, presence in `denied` blocks the request.
 #[test]
 fn denied_parameters_block_even_when_allowed_lists_them() {
-    let hcl = format!(r#"
+    let hcl = format!(
+        r#"
         path "{path}" {{
             capabilities = ["create", "update"]
             allowed_parameters = {{
@@ -49,14 +54,21 @@ fn denied_parameters_block_even_when_allowed_lists_them() {
                 "private_key" = []
             }}
         }}
-    "#, path = tenant_path("creds"));
+    "#,
+        path = tenant_path("creds")
+    );
     let p = Policy::parse("api", &hcl).unwrap();
-    assert_eq!(p.rules[0].denied_parameters, vec!["secret_token", "private_key"]);
+    assert_eq!(
+        p.rules[0].denied_parameters,
+        vec!["secret_token", "private_key"]
+    );
     assert_eq!(p.rules[0].allowed_parameters, vec!["*"]);
 
     let r = &p.rules[0];
     assert!(r.check_parameters(&["public_id", "name"]).is_ok());
-    let err = r.check_parameters(&["public_id", "secret_token"]).unwrap_err();
+    let err = r
+        .check_parameters(&["public_id", "secret_token"])
+        .unwrap_err();
     assert!(err.contains("'secret_token' is denied"));
 }
 
@@ -65,17 +77,26 @@ fn denied_parameters_block_even_when_allowed_lists_them() {
 /// is rejected with `missing required parameter`.
 #[test]
 fn required_parameters_must_all_be_present() {
-    let hcl = format!(r#"
+    let hcl = format!(
+        r#"
         path "{path}" {{
             capabilities = ["create"]
             required_parameters = ["customer_id", "billing_account"]
         }}
-    "#, path = tenant_path("invoices"));
+    "#,
+        path = tenant_path("invoices")
+    );
     let p = Policy::parse("billing", &hcl).unwrap();
-    assert_eq!(p.rules[0].required_parameters, vec!["customer_id", "billing_account"]);
+    assert_eq!(
+        p.rules[0].required_parameters,
+        vec!["customer_id", "billing_account"]
+    );
 
     let r = &p.rules[0];
-    assert!(r.check_parameters(&["customer_id", "billing_account", "amount"]).is_ok());
+    assert!(
+        r.check_parameters(&["customer_id", "billing_account", "amount"])
+            .is_ok()
+    );
     let err = r.check_parameters(&["customer_id"]).unwrap_err();
     assert!(err.contains("missing required parameter: billing_account"));
 }
@@ -113,21 +134,27 @@ fn sudo_capability_unlocks_root_protected_paths() {
 /// accepts bare integers (seconds), `Ns`, `Nm`, `Nh`, `Nd` suffixes.
 #[test]
 fn min_wrapping_ttl_parses_bare_seconds_and_h_suffix() {
-    let hcl_seconds = format!(r#"
+    let hcl_seconds = format!(
+        r#"
         path "{path}" {{
             capabilities = ["read"]
             min_wrapping_ttl = "3600"
         }}
-    "#, path = tenant_path("a"));
+    "#,
+        path = tenant_path("a")
+    );
     let p = Policy::parse("a", &hcl_seconds).unwrap();
     assert_eq!(p.rules[0].min_wrapping_ttl_seconds, 3600);
 
-    let hcl_hours = format!(r#"
+    let hcl_hours = format!(
+        r#"
         path "{path}" {{
             capabilities = ["read"]
             min_wrapping_ttl = "2h"
         }}
-    "#, path = tenant_path("b"));
+    "#,
+        path = tenant_path("b")
+    );
     let p = Policy::parse("b", &hcl_hours).unwrap();
     assert_eq!(p.rules[0].min_wrapping_ttl_seconds, 2 * 3600);
 }
@@ -153,12 +180,18 @@ fn glob_star_vs_plus_precedence_resolves_via_longest_prefix() {
         ],
         raw: String::new(),
     };
-    assert!(p.allows("secret/admin/key", &Capability::Update),
-        "deeper rule wins for matching admin path");
-    assert!(p.allows("secret/foo", &Capability::Read),
-        "+ rule still matches single-segment paths");
-    assert!(!p.allows("secret/foo", &Capability::Update),
-        "+ rule does NOT grant update");
+    assert!(
+        p.allows("secret/admin/key", &Capability::Update),
+        "deeper rule wins for matching admin path"
+    );
+    assert!(
+        p.allows("secret/foo", &Capability::Read),
+        "+ rule still matches single-segment paths"
+    );
+    assert!(
+        !p.allows("secret/foo", &Capability::Update),
+        "+ rule does NOT grant update"
+    );
 }
 
 /// Cite: openbao `vault/policy.go::parsePaths` multi-statement body —
@@ -166,7 +199,8 @@ fn glob_star_vs_plus_precedence_resolves_via_longest_prefix() {
 /// `min_wrapping_ttl` may all coexist inside a single `path { … }` block.
 #[test]
 fn multiple_statements_inside_one_path_block() {
-    let hcl = format!(r#"
+    let hcl = format!(
+        r#"
         path "{path}" {{
             capabilities       = ["create", "update"]
             required_parameters = ["request_id"]
@@ -175,7 +209,9 @@ fn multiple_statements_inside_one_path_block() {
             }}
             min_wrapping_ttl   = "30m"
         }}
-    "#, path = tenant_path("multi"));
+    "#,
+        path = tenant_path("multi")
+    );
     let p = Policy::parse("multi", &hcl).unwrap();
     let r = &p.rules[0];
     assert!(r.capabilities.contains(&Capability::Create));

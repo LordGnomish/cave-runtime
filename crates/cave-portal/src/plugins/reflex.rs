@@ -214,18 +214,29 @@ impl ReflexConsole {
         if action.status != ActionStatus::Approved && action.status != ActionStatus::Executing {
             return Err(ReflexError::Terminal(action.status));
         }
-        action.status = if success { ActionStatus::Succeeded } else { ActionStatus::Failed };
+        action.status = if success {
+            ActionStatus::Succeeded
+        } else {
+            ActionStatus::Failed
+        };
         action.history.push(DecisionEvent {
             at: "1970-01-01T00:00:00Z".into(),
             actor: "system".into(),
-            action: if success { DecisionAction::Executed } else { DecisionAction::Failed },
+            action: if success {
+                DecisionAction::Executed
+            } else {
+                DecisionAction::Failed
+            },
             note: String::new(),
         });
         Ok(action)
     }
 
     pub fn pending(&self) -> Vec<&ActionRequest> {
-        self.actions.iter().filter(|a| a.status == ActionStatus::Pending).collect()
+        self.actions
+            .iter()
+            .filter(|a| a.status == ActionStatus::Pending)
+            .collect()
     }
 
     pub fn for_tenant(&self, tenant: &str) -> Vec<&ActionRequest> {
@@ -243,7 +254,13 @@ mod tests {
 
     fn console_with_pending() -> ReflexConsole {
         let mut c = ReflexConsole::new();
-        c.submit("acme", "rotate-secret", "rotate db creds", Severity::Medium, "alice");
+        c.submit(
+            "acme",
+            "rotate-secret",
+            "rotate db creds",
+            Severity::Medium,
+            "alice",
+        );
         c
     }
 
@@ -267,7 +284,9 @@ mod tests {
     fn approve_tenant_persona_denied() {
         let mut c = console_with_pending();
         let id = c.actions[0].id.clone();
-        let err = c.approve(ViewPersona::Tenant, &id, "bob", "lgtm").unwrap_err();
+        let err = c
+            .approve(ViewPersona::Tenant, &id, "bob", "lgtm")
+            .unwrap_err();
         assert!(matches!(err, ReflexError::Forbidden(_)));
     }
 
@@ -275,7 +294,9 @@ mod tests {
     fn approve_succeeds_for_operator() {
         let mut c = console_with_pending();
         let id = c.actions[0].id.clone();
-        let a = c.approve(ViewPersona::Operator, &id, "bob", "lgtm").unwrap();
+        let a = c
+            .approve(ViewPersona::Operator, &id, "bob", "lgtm")
+            .unwrap();
         assert_eq!(a.status, ActionStatus::Approved);
         assert_eq!(a.approved_by.as_deref(), Some("bob"));
     }
@@ -284,7 +305,9 @@ mod tests {
     fn approve_self_rejected() {
         let mut c = console_with_pending();
         let id = c.actions[0].id.clone();
-        let err = c.approve(ViewPersona::Operator, &id, "alice", "self").unwrap_err();
+        let err = c
+            .approve(ViewPersona::Operator, &id, "alice", "self")
+            .unwrap_err();
         assert_eq!(err, ReflexError::SelfApproval);
     }
 
@@ -293,7 +316,9 @@ mod tests {
         let mut c = ReflexConsole::new();
         c.submit("acme", "drain", "drain node", Severity::Critical, "alice");
         let id = c.actions[0].id.clone();
-        let err = c.approve(ViewPersona::Operator, &id, "bob", "go").unwrap_err();
+        let err = c
+            .approve(ViewPersona::Operator, &id, "bob", "go")
+            .unwrap_err();
         assert!(matches!(err, ReflexError::AdminOnly(Severity::Critical)));
     }
 
@@ -311,7 +336,9 @@ mod tests {
         let mut c = console_with_pending();
         let id = c.actions[0].id.clone();
         c.deny(ViewPersona::Operator, &id, "bob", "no").unwrap();
-        let err = c.approve(ViewPersona::Operator, &id, "bob", "x").unwrap_err();
+        let err = c
+            .approve(ViewPersona::Operator, &id, "bob", "x")
+            .unwrap_err();
         assert!(matches!(err, ReflexError::Terminal(_)));
     }
 
@@ -406,10 +433,19 @@ mod tests {
 
     #[test]
     fn status_terminal_set() {
-        for s in [ActionStatus::Denied, ActionStatus::Succeeded, ActionStatus::Failed, ActionStatus::Expired] {
+        for s in [
+            ActionStatus::Denied,
+            ActionStatus::Succeeded,
+            ActionStatus::Failed,
+            ActionStatus::Expired,
+        ] {
             assert!(s.is_terminal());
         }
-        for s in [ActionStatus::Pending, ActionStatus::Approved, ActionStatus::Executing] {
+        for s in [
+            ActionStatus::Pending,
+            ActionStatus::Approved,
+            ActionStatus::Executing,
+        ] {
             assert!(!s.is_terminal());
         }
     }

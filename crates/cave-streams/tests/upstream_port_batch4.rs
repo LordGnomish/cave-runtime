@@ -162,9 +162,7 @@ fn upstream_rest_create_connector_all_whitespace_name_normalises_to_empty() {
 #[test]
 fn upstream_rest_create_connector_null_name_normalises_to_empty() {
     let mut admin = ConnectRestAdmin::new();
-    let created = admin
-        .create_connector(None, config_without_name())
-        .unwrap();
+    let created = admin.create_connector(None, config_without_name()).unwrap();
     assert_eq!(created.info.name, "");
     assert_eq!(
         created.info.config.get("name").map(String::as_str),
@@ -203,7 +201,9 @@ fn upstream_rest_restart_connector_and_tasks_returns_202_accepted_with_state_inf
         .create_connector(Some("foo".into()), jdbc_source("foo"))
         .unwrap();
     let report: RestartReport = admin
-        .restart_connector("foo", /* include_tasks */ true, /* only_failed */ false)
+        .restart_connector(
+            "foo", /* include_tasks */ true, /* only_failed */ false,
+        )
         .unwrap();
     assert_eq!(report.status, HttpStatus::Accepted);
     assert_eq!(report.state_info.name, "foo");
@@ -303,10 +303,8 @@ fn upstream_rest_connector_status_present_or_none() {
 #[test]
 fn upstream_rest_validate_config_reports_missing_required_keys() {
     let admin = ConnectRestAdmin::new();
-    let result: ValidationResult = admin.validate_config(
-        "cave.connect.JdbcSourceConnector",
-        &HashMap::new(),
-    );
+    let result: ValidationResult =
+        admin.validate_config("cave.connect.JdbcSourceConnector", &HashMap::new());
     assert_eq!(result.status, HttpStatus::Ok);
     assert!(result.error_count >= 1);
     let class_info: &ConfigInfo = result
@@ -326,8 +324,7 @@ fn upstream_rest_validate_config_reports_missing_required_keys() {
 #[test]
 fn upstream_rest_validate_config_happy_path_reports_zero_errors() {
     let admin = ConnectRestAdmin::new();
-    let result = admin
-        .validate_config("cave.connect.JdbcSourceConnector", &jdbc_source("ok"));
+    let result = admin.validate_config("cave.connect.JdbcSourceConnector", &jdbc_source("ok"));
     assert_eq!(result.error_count, 0);
     assert_eq!(result.status, HttpStatus::Ok);
     assert_eq!(result.name, "cave.connect.JdbcSourceConnector");

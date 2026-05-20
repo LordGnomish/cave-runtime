@@ -24,8 +24,8 @@
 //! }
 //! ```
 
-use super::gssapi::{read_length, read_tlv, push_length};
 use super::KerberosError;
+use super::gssapi::{push_length, read_length, read_tlv};
 
 const TAG_OID: u8 = 0x06;
 const TAG_SEQUENCE: u8 = 0x30;
@@ -149,9 +149,7 @@ impl<'a> NegTokenResp<'a> {
                 TAG_CTX_0 => {
                     let (e, _) = read_tlv(inner, TAG_ENUMERATED)?;
                     if e.is_empty() {
-                        return Err(KerberosError::Spnego(
-                            "empty negState".into(),
-                        ));
+                        return Err(KerberosError::Spnego("empty negState".into()));
                     }
                     let v = e.iter().fold(0u32, |acc, b| (acc << 8) | *b as u32);
                     neg_state = NegState::from_raw(v);
@@ -259,16 +257,17 @@ mod tests {
         // SEQUENCE with no mechTypes — should fail.
         let bytes = vec![0xa0, 0x02, 0x30, 0x00];
         let err = NegTokenInit::parse(&bytes).unwrap_err();
-        assert!(matches!(err, KerberosError::Spnego(_) | KerberosError::Asn1(_)));
+        assert!(matches!(
+            err,
+            KerberosError::Spnego(_) | KerberosError::Asn1(_)
+        ));
     }
 
     #[test]
     fn neg_token_resp_parses_accept_completed() {
         // CHOICE [1] SEQUENCE { negState [0] ENUM 0 }
         // a1 05 30 03 a0 03 0a 01 00
-        let bytes = [
-            0xa1, 0x07, 0x30, 0x05, 0xa0, 0x03, 0x0a, 0x01, 0x00,
-        ];
+        let bytes = [0xa1, 0x07, 0x30, 0x05, 0xa0, 0x03, 0x0a, 0x01, 0x00];
         let parsed = NegTokenResp::parse(&bytes).unwrap();
         assert_eq!(parsed.neg_state, Some(NegState::AcceptCompleted));
     }

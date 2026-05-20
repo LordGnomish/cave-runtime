@@ -55,18 +55,26 @@ pub enum CompileError {
 /// `Route` row, with the weight preserved on `Backend.weight`. The cluster
 /// name follows Istio's naming convention: `<host>|<subset>` (subset omitted
 /// when empty).
-pub fn compile(vs: &VirtualService, default_protocol: Protocol) -> Result<Vec<Route>, CompileError> {
+pub fn compile(
+    vs: &VirtualService,
+    default_protocol: Protocol,
+) -> Result<Vec<Route>, CompileError> {
     if vs.hosts.is_empty() {
         return Err(CompileError::NoHosts(vs.name.clone()));
     }
     let mut out = Vec::new();
     for h in &vs.http {
         if h.route.is_empty() {
-            return Err(CompileError::EmptyDestinations { route: h.name.clone() });
+            return Err(CompileError::EmptyDestinations {
+                route: h.name.clone(),
+            });
         }
         let sum: u32 = h.route.iter().map(|w| w.weight).sum();
         if sum != 100 {
-            return Err(CompileError::BadWeightSum { route: h.name.clone(), actual: sum });
+            return Err(CompileError::BadWeightSum {
+                route: h.name.clone(),
+                actual: sum,
+            });
         }
         for (idx, wd) in h.route.iter().enumerate() {
             let cluster = if wd.destination.subset.is_empty() {
@@ -77,7 +85,10 @@ pub fn compile(vs: &VirtualService, default_protocol: Protocol) -> Result<Vec<Ro
             out.push(Route {
                 name: format!("{}#{}", h.name, idx),
                 r#match: h.r#match.clone(),
-                backend: Backend { cluster, weight: wd.weight },
+                backend: Backend {
+                    cluster,
+                    weight: wd.weight,
+                },
                 protocol: default_protocol,
             });
         }
@@ -86,8 +97,10 @@ pub fn compile(vs: &VirtualService, default_protocol: Protocol) -> Result<Vec<Ro
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite =
-    Cite::istio("pilot/pkg/networking/core/v1alpha3/route/route.go", "translateRoutes");
+const FILE_CITE: Cite = Cite::istio(
+    "pilot/pkg/networking/core/v1alpha3/route/route.go",
+    "translateRoutes",
+);
 
 #[cfg(test)]
 mod tests {
@@ -105,7 +118,10 @@ mod tests {
     }
 
     fn dest(host: &str, subset: &str) -> DestinationRef {
-        DestinationRef { host: host.into(), subset: subset.into() }
+        DestinationRef {
+            host: host.into(),
+            subset: subset.into(),
+        }
     }
 
     #[test]
@@ -118,7 +134,10 @@ mod tests {
         let v = vs(vec![HttpRoute {
             name: "default".into(),
             r#match: RouteMatch::default(),
-            route: vec![WeightedDestination { destination: dest("web", ""), weight: 100 }],
+            route: vec![WeightedDestination {
+                destination: dest("web", ""),
+                weight: 100,
+            }],
         }]);
         let table = compile(&v, Protocol::Http).unwrap();
         assert_eq!(table.len(), 1);
@@ -135,10 +154,19 @@ mod tests {
         );
         let v = vs(vec![HttpRoute {
             name: "canary".into(),
-            r#match: RouteMatch { path_prefix: Some("/api".into()), ..Default::default() },
+            r#match: RouteMatch {
+                path_prefix: Some("/api".into()),
+                ..Default::default()
+            },
             route: vec![
-                WeightedDestination { destination: dest("web", "v1"), weight: 80 },
-                WeightedDestination { destination: dest("web", "v2"), weight: 20 },
+                WeightedDestination {
+                    destination: dest("web", "v1"),
+                    weight: 80,
+                },
+                WeightedDestination {
+                    destination: dest("web", "v2"),
+                    weight: 20,
+                },
             ],
         }]);
         let table = compile(&v, Protocol::Http).unwrap();
@@ -160,8 +188,14 @@ mod tests {
             name: "broken".into(),
             r#match: RouteMatch::default(),
             route: vec![
-                WeightedDestination { destination: dest("a", ""), weight: 30 },
-                WeightedDestination { destination: dest("b", ""), weight: 30 },
+                WeightedDestination {
+                    destination: dest("a", ""),
+                    weight: 30,
+                },
+                WeightedDestination {
+                    destination: dest("b", ""),
+                    weight: 30,
+                },
             ],
         }]);
         assert!(matches!(
@@ -182,7 +216,10 @@ mod tests {
             r#match: RouteMatch::default(),
             route: vec![],
         }]);
-        assert!(matches!(compile(&v, Protocol::Http), Err(CompileError::EmptyDestinations { .. })));
+        assert!(matches!(
+            compile(&v, Protocol::Http),
+            Err(CompileError::EmptyDestinations { .. })
+        ));
     }
 
     #[test]
@@ -195,10 +232,16 @@ mod tests {
         let mut v = vs(vec![HttpRoute {
             name: "default".into(),
             r#match: RouteMatch::default(),
-            route: vec![WeightedDestination { destination: dest("web", ""), weight: 100 }],
+            route: vec![WeightedDestination {
+                destination: dest("web", ""),
+                weight: 100,
+            }],
         }]);
         v.hosts.clear();
-        assert!(matches!(compile(&v, Protocol::Http), Err(CompileError::NoHosts(_))));
+        assert!(matches!(
+            compile(&v, Protocol::Http),
+            Err(CompileError::NoHosts(_))
+        ));
     }
 
     #[test]
@@ -211,8 +254,14 @@ mod tests {
         );
         let v = vs(vec![HttpRoute {
             name: "v1-only".into(),
-            r#match: RouteMatch { path_prefix: Some("/api".into()), ..Default::default() },
-            route: vec![WeightedDestination { destination: dest("web", "v1"), weight: 100 }],
+            r#match: RouteMatch {
+                path_prefix: Some("/api".into()),
+                ..Default::default()
+            },
+            route: vec![WeightedDestination {
+                destination: dest("web", "v1"),
+                weight: 100,
+            }],
         }]);
         let table = compile(&v, Protocol::Http).unwrap();
         let cfg = crate::ambient::waypoint::WaypointConfig {

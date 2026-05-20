@@ -5,7 +5,10 @@ use uuid::Uuid;
 
 pub fn start_sprint(sprint: &mut Sprint) -> Result<(), String> {
     if sprint.state != SprintState::Future {
-        return Err(format!("Sprint '{}' is not in Future state (current: {:?})", sprint.name, sprint.state));
+        return Err(format!(
+            "Sprint '{}' is not in Future state (current: {:?})",
+            sprint.name, sprint.state
+        ));
     }
     sprint.state = SprintState::Active;
     sprint.start_date = Some(chrono::Utc::now());
@@ -16,7 +19,8 @@ pub fn complete_sprint(sprint: &mut Sprint, issues: &[&Issue]) -> Result<(), Str
     if sprint.state != SprintState::Active {
         return Err(format!("Sprint '{}' is not Active", sprint.name));
     }
-    let velocity: f64 = issues.iter()
+    let velocity: f64 = issues
+        .iter()
         .filter(|i| i.resolution.is_some())
         .filter_map(|i| i.story_points)
         .sum();
@@ -29,10 +33,17 @@ pub fn complete_sprint(sprint: &mut Sprint, issues: &[&Issue]) -> Result<(), Str
 pub fn sprint_stats(sprint: &Sprint, issues: &[&Issue]) -> serde_json::Value {
     let total = issues.len();
     let done = issues.iter().filter(|i| i.resolution.is_some()).count();
-    let in_progress = issues.iter().filter(|i| i.resolution.is_none() && i.status != "To Do" && i.status != "Backlog").count();
+    let in_progress = issues
+        .iter()
+        .filter(|i| i.resolution.is_none() && i.status != "To Do" && i.status != "Backlog")
+        .count();
     let todo = total - done - in_progress;
     let total_points: f64 = issues.iter().filter_map(|i| i.story_points).sum();
-    let done_points: f64 = issues.iter().filter(|i| i.resolution.is_some()).filter_map(|i| i.story_points).sum();
+    let done_points: f64 = issues
+        .iter()
+        .filter(|i| i.resolution.is_some())
+        .filter_map(|i| i.story_points)
+        .sum();
     serde_json::json!({
         "sprint_id": sprint.id,
         "sprint_name": sprint.name,
@@ -48,8 +59,13 @@ pub fn sprint_stats(sprint: &Sprint, issues: &[&Issue]) -> serde_json::Value {
 }
 
 /// Get issues not in any sprint (backlog).
-pub fn backlog_issues<'a>(issues: impl Iterator<Item = &'a Issue>, project_id: Uuid) -> Vec<&'a Issue> {
-    issues.filter(|i| i.project_id == project_id && i.sprint_id.is_none()).collect()
+pub fn backlog_issues<'a>(
+    issues: impl Iterator<Item = &'a Issue>,
+    project_id: Uuid,
+) -> Vec<&'a Issue> {
+    issues
+        .filter(|i| i.project_id == project_id && i.sprint_id.is_none())
+        .collect()
 }
 
 #[cfg(test)]
@@ -59,9 +75,16 @@ mod tests {
 
     fn make_sprint(state: SprintState) -> Sprint {
         Sprint {
-            id: Uuid::new_v4(), project_id: Uuid::new_v4(), board_id: Uuid::new_v4(),
-            name: "Sprint 1".to_string(), goal: None, state,
-            start_date: None, end_date: None, completed_at: None, velocity: None,
+            id: Uuid::new_v4(),
+            project_id: Uuid::new_v4(),
+            board_id: Uuid::new_v4(),
+            name: "Sprint 1".to_string(),
+            goal: None,
+            state,
+            start_date: None,
+            end_date: None,
+            completed_at: None,
+            velocity: None,
             created_at: Utc::now(),
         }
     }

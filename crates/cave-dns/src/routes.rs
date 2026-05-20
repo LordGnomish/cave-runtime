@@ -3,14 +3,14 @@
 use std::sync::Arc;
 
 use axum::{
-    routing::{delete, get, post},
     Router,
+    routing::{delete, get, post},
 };
 
 use crate::{
     api::{
-        records::{batch_records, create_record, delete_record, list_records, RecordState},
-        zones::{create_zone, delete_zone, export_zone, get_zone, list_zones, ZoneState},
+        records::{RecordState, batch_records, create_record, delete_record, list_records},
+        zones::{ZoneState, create_zone, delete_zone, export_zone, get_zone, list_zones},
     },
     zone::ZoneManager,
 };

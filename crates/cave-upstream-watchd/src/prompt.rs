@@ -200,18 +200,28 @@ fn changelog_section(c: &Changelog, kind: ChangeKind) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::changelog::{ChangelogEntry, Changelog};
+    use crate::changelog::{Changelog, ChangelogEntry};
     use chrono::{DateTime, Utc};
 
     fn ts() -> DateTime<Utc> {
-        DateTime::parse_from_rfc3339("2026-05-13T14:00:00Z").unwrap().with_timezone(&Utc)
+        DateTime::parse_from_rfc3339("2026-05-13T14:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc)
     }
 
     fn sample_event() -> GapEvent {
         let cl = Changelog {
             entries: vec![
-                ChangelogEntry { kind: ChangeKind::Added, description: "scheduler kubelet image-locality v2".into(), breaking: false },
-                ChangelogEntry { kind: ChangeKind::Breaking, description: "remove deprecated --foo flag".into(), breaking: true },
+                ChangelogEntry {
+                    kind: ChangeKind::Added,
+                    description: "scheduler kubelet image-locality v2".into(),
+                    breaking: false,
+                },
+                ChangelogEntry {
+                    kind: ChangeKind::Breaking,
+                    description: "remove deprecated --foo flag".into(),
+                    breaking: true,
+                },
             ],
         };
         GapEvent::new(
@@ -292,7 +302,10 @@ mod tests {
         );
         // Three phase markers — order matters for the analyzer.
         assert!(p.contains("RED commit"), "prompt must name the RED phase");
-        assert!(p.contains("GREEN commit"), "prompt must name the GREEN phase");
+        assert!(
+            p.contains("GREEN commit"),
+            "prompt must name the GREEN phase"
+        );
         assert!(
             p.contains("REFACTOR commit"),
             "prompt must mention the optional REFACTOR phase"
@@ -374,7 +387,13 @@ mod tests {
     #[test]
     fn output_section_documents_dispatcher_contract_fields() {
         let p = build_prompt(&sample_event(), &sample_ctx());
-        for field in &["commit_sha", "branch", "files_changed", "lines_added", "test_count"] {
+        for field in &[
+            "commit_sha",
+            "branch",
+            "files_changed",
+            "lines_added",
+            "test_count",
+        ] {
             assert!(p.contains(field), "missing OUTPUT field: {field}");
         }
     }

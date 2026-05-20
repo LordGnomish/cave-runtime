@@ -142,9 +142,8 @@ impl WatchState {
     pub fn save(&mut self, path: &Path) -> anyhow::Result<()> {
         self.last_save = Some(Utc::now());
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| {
-                anyhow::anyhow!("create state dir {}: {}", parent.display(), e)
-            })?;
+            std::fs::create_dir_all(parent)
+                .map_err(|e| anyhow::anyhow!("create state dir {}: {}", parent.display(), e))?;
         }
         let tmp = path.with_extension("json.tmp");
         let body = serde_json::to_vec_pretty(self)?;
@@ -156,7 +155,12 @@ impl WatchState {
         std::fs::rename(&tmp, path).map_err(|e| {
             // Best-effort cleanup of the tmp file on rename failure
             let _ = std::fs::remove_file(&tmp);
-            anyhow::anyhow!("rename state {} -> {}: {}", tmp.display(), path.display(), e)
+            anyhow::anyhow!(
+                "rename state {} -> {}: {}",
+                tmp.display(),
+                path.display(),
+                e
+            )
         })?;
         Ok(())
     }
@@ -234,7 +238,10 @@ mod tests {
         std::fs::write(&path, body).unwrap();
         let err = WatchState::load(&path).expect_err("future schema must error");
         let msg = format!("{err}");
-        assert!(msg.contains("9999"), "error mentions the offending version: {msg}");
+        assert!(
+            msg.contains("9999"),
+            "error mentions the offending version: {msg}"
+        );
     }
 
     #[test]
@@ -252,9 +259,13 @@ mod tests {
         let custom = tmp.path().join("custom.json");
         // SAFETY: tests in this module are not run in parallel against this
         // env var; we set/unset locally.
-        unsafe { std::env::set_var("CAVE_UPSTREAM_STATE_PATH", &custom); }
+        unsafe {
+            std::env::set_var("CAVE_UPSTREAM_STATE_PATH", &custom);
+        }
         let resolved = WatchState::default_path();
-        unsafe { std::env::remove_var("CAVE_UPSTREAM_STATE_PATH"); }
+        unsafe {
+            std::env::remove_var("CAVE_UPSTREAM_STATE_PATH");
+        }
         assert_eq!(resolved, custom);
     }
 }

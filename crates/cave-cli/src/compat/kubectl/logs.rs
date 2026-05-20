@@ -2,7 +2,7 @@
 // Copyright 2026 Cave Runtime contributors
 //! `cavectl kubectl logs …`
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Args;
 
 use crate::native::{HttpVerb, PreparedRequest};
@@ -142,10 +142,12 @@ mod tests {
     fn logs_since_time() {
         let mut a = args("nginx");
         a.since_time = Some("2026-04-26T10:00:00Z".into());
-        assert!(prepare(&a)
-            .unwrap()
-            .path
-            .contains("sinceTime=2026-04-26T10:00:00Z"));
+        assert!(
+            prepare(&a)
+                .unwrap()
+                .path
+                .contains("sinceTime=2026-04-26T10:00:00Z")
+        );
     }
 
     #[test]

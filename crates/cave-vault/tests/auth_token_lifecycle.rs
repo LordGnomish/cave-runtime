@@ -5,7 +5,7 @@
 //! Upstream package: `vault/token_store.go` (and helpers in `vault/policy_store.go`).
 //! Each test cites its upstream anchor inline.
 
-use cave_vault::token::{parse_duration, CreateTokenParams, TokenStore, TokenType};
+use cave_vault::token::{CreateTokenParams, TokenStore, TokenType, parse_duration};
 
 /// Cite: openbao `vault/token_store.go:1246` (TokenStore.create) — every
 /// new service token gets a generated ID prefixed `hvs.` and a separate
@@ -19,7 +19,10 @@ fn create_service_token_returns_hvs_prefixed_id_and_accessor() {
         ..Default::default()
     };
     let token = store.create(&params, None).unwrap();
-    assert!(token.id.starts_with("hvs."), "token id must use hvs. prefix");
+    assert!(
+        token.id.starts_with("hvs."),
+        "token id must use hvs. prefix"
+    );
     assert!(!token.accessor.is_empty(), "accessor must be generated");
     assert_eq!(token.token_type, TokenType::Service);
     assert_eq!(token.ttl, 3600);
@@ -39,7 +42,9 @@ fn lookup_by_id_and_by_accessor() {
     let by_id = store.lookup(&token.id).expect("by id");
     assert_eq!(by_id.id, token.id);
 
-    let by_acc = store.lookup_by_accessor(&token.accessor).expect("by accessor");
+    let by_acc = store
+        .lookup_by_accessor(&token.accessor)
+        .expect("by accessor");
     assert_eq!(by_acc.id, token.id);
 
     assert!(store.lookup("hvs.does-not-exist").is_none());
@@ -75,7 +80,10 @@ fn renew_extends_expiry_but_clamps_to_max_ttl() {
 #[test]
 fn revoke_removes_token_and_accessor_lookup() {
     let mut store = TokenStore::default();
-    let params = CreateTokenParams { ttl: Some("1h".into()), ..Default::default() };
+    let params = CreateTokenParams {
+        ttl: Some("1h".into()),
+        ..Default::default()
+    };
     let token = store.create(&params, None).unwrap();
     let id = token.id.clone();
     let acc = token.accessor.clone();
@@ -83,7 +91,10 @@ fn revoke_removes_token_and_accessor_lookup() {
     assert!(store.revoke(&id));
     assert!(store.lookup(&id).is_none());
     assert!(store.lookup_by_accessor(&acc).is_none());
-    assert!(!store.revoke(&id), "double-revoke is idempotent (returns false)");
+    assert!(
+        !store.revoke(&id),
+        "double-revoke is idempotent (returns false)"
+    );
 }
 
 /// Cite: openbao `vault/token_store.go:1135` (rootToken). Root tokens have
@@ -105,19 +116,35 @@ fn root_token_has_no_expiry_and_root_policy() {
 #[test]
 fn revoke_tree_cascades_to_children() {
     let mut store = TokenStore::default();
-    let parent = store.create(&CreateTokenParams { ttl: Some("1h".into()), ..Default::default() }, None).unwrap();
+    let parent = store
+        .create(
+            &CreateTokenParams {
+                ttl: Some("1h".into()),
+                ..Default::default()
+            },
+            None,
+        )
+        .unwrap();
     let parent_clone = parent.clone();
-    let child = store.create(
-        &CreateTokenParams { ttl: Some("30m".into()), ..Default::default() },
-        Some(&parent_clone),
-    ).unwrap();
+    let child = store
+        .create(
+            &CreateTokenParams {
+                ttl: Some("30m".into()),
+                ..Default::default()
+            },
+            Some(&parent_clone),
+        )
+        .unwrap();
 
     assert_eq!(child.parent.as_deref(), Some(parent.id.as_str()));
     assert!(!child.orphan);
 
     store.revoke_tree(&parent.id);
     assert!(store.lookup(&parent.id).is_none());
-    assert!(store.lookup(&child.id).is_none(), "child must be revoked with parent");
+    assert!(
+        store.lookup(&child.id).is_none(),
+        "child must be revoked with parent"
+    );
 }
 
 /// Cite: openbao supports human duration strings (`1h`, `30m`, `7d`) at

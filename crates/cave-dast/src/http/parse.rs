@@ -66,10 +66,7 @@ pub fn parse_request(input: &str) -> Result<HttpRequest, ParseError> {
         .next()
         .filter(|s| !s.is_empty())
         .ok_or_else(|| ParseError::MalformedRequestLine(first.to_string()))?;
-    let version = parts
-        .next()
-        .filter(|s| !s.is_empty())
-        .unwrap_or("HTTP/1.1");
+    let version = parts.next().filter(|s| !s.is_empty()).unwrap_or("HTTP/1.1");
 
     let headers = parse_headers(head)?;
     Ok(HttpRequest {

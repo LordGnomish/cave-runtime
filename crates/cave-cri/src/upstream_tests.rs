@@ -102,7 +102,9 @@ async fn test_container_start() {
     )
     .await
     .unwrap();
-    runtime::start_container(c.id, &state.containers).await.unwrap();
+    runtime::start_container(c.id, &state.containers)
+        .await
+        .unwrap();
     let after = state.containers.get(&c.id).unwrap();
     assert_eq!(after.status, ContainerStatus::Running);
     assert!(after.pid.is_some());
@@ -119,8 +121,12 @@ async fn test_container_stop() {
     )
     .await
     .unwrap();
-    runtime::start_container(c.id, &state.containers).await.unwrap();
-    runtime::stop_container(c.id, 0, &state.containers).await.unwrap();
+    runtime::start_container(c.id, &state.containers)
+        .await
+        .unwrap();
+    runtime::stop_container(c.id, 0, &state.containers)
+        .await
+        .unwrap();
     let after = state.containers.get(&c.id).unwrap();
     assert_eq!(after.status, ContainerStatus::Stopped);
     assert!(after.finished_at.is_some());
@@ -137,7 +143,9 @@ async fn test_container_exec() {
     )
     .await
     .unwrap();
-    runtime::start_container(c.id, &state.containers).await.unwrap();
+    runtime::start_container(c.id, &state.containers)
+        .await
+        .unwrap();
 
     let req = ExecRequest {
         command: vec!["echo".into(), "hi".into()],
@@ -146,7 +154,9 @@ async fn test_container_exec() {
         user: None,
         tty: false,
     };
-    let res = runtime::exec_in_container(c.id, &req, &state.containers).await.unwrap();
+    let res = runtime::exec_in_container(c.id, &req, &state.containers)
+        .await
+        .unwrap();
     assert!(res.duration_ms < 60_000);
     let _ = res.exit_code;
 }
@@ -164,13 +174,25 @@ async fn test_container_lifecycle() {
     .unwrap();
     let id = c.id;
 
-    runtime::start_container(id, &state.containers).await.unwrap();
-    assert_eq!(state.containers.get(&id).unwrap().status, ContainerStatus::Running);
+    runtime::start_container(id, &state.containers)
+        .await
+        .unwrap();
+    assert_eq!(
+        state.containers.get(&id).unwrap().status,
+        ContainerStatus::Running
+    );
 
-    runtime::stop_container(id, 0, &state.containers).await.unwrap();
-    assert_eq!(state.containers.get(&id).unwrap().status, ContainerStatus::Stopped);
+    runtime::stop_container(id, 0, &state.containers)
+        .await
+        .unwrap();
+    assert_eq!(
+        state.containers.get(&id).unwrap().status,
+        ContainerStatus::Stopped
+    );
 
-    runtime::delete_container(id, &state.containers).await.unwrap();
+    runtime::delete_container(id, &state.containers)
+        .await
+        .unwrap();
     assert!(state.containers.get(&id).is_none());
 }
 
@@ -214,7 +236,7 @@ fn test_sandbox_run() {
             log_directory: None,
             cgroup_parent: None,
             runtime_handler: None,
-                user_namespace_mode: crate::models::UserNamespaceMode::Host,
+            user_namespace_mode: crate::models::UserNamespaceMode::Host,
         },
         state: SandboxState::Ready,
         created_at: Utc::now(),
@@ -222,7 +244,10 @@ fn test_sandbox_run() {
     };
     let id = sandbox.id;
     store.insert(sandbox);
-    assert_eq!(store.get(&id).unwrap().spec.port_mappings[0].container_port, 80);
+    assert_eq!(
+        store.get(&id).unwrap().spec.port_mappings[0].container_port,
+        80
+    );
 }
 
 #[test]
@@ -242,7 +267,7 @@ fn test_sandbox_status() {
             log_directory: None,
             cgroup_parent: None,
             runtime_handler: None,
-                user_namespace_mode: crate::models::UserNamespaceMode::Host,
+            user_namespace_mode: crate::models::UserNamespaceMode::Host,
         },
         state: SandboxState::NotReady,
         created_at: Utc::now(),
@@ -291,18 +316,34 @@ use crate::cgroup_v2;
 fn test_cgroup_v2_apply_memory_high() {
     let dir = tempfile::tempdir().unwrap();
     let cg = dir.path().join("cg");
-    let limits = cgroup_v2::CgroupV2Limits { memory_high: Some(1024), ..Default::default() };
+    let limits = cgroup_v2::CgroupV2Limits {
+        memory_high: Some(1024),
+        ..Default::default()
+    };
     cgroup_v2::apply_v2(&cg, &limits).unwrap();
-    assert_eq!(std::fs::read_to_string(cg.join("memory.high")).unwrap().trim(), "1024");
+    assert_eq!(
+        std::fs::read_to_string(cg.join("memory.high"))
+            .unwrap()
+            .trim(),
+        "1024"
+    );
 }
 
 #[test]
 fn test_cgroup_v2_apply_cpu_weight() {
     let dir = tempfile::tempdir().unwrap();
     let cg = dir.path().join("cg");
-    let limits = cgroup_v2::CgroupV2Limits { cpu_weight: Some(750), ..Default::default() };
+    let limits = cgroup_v2::CgroupV2Limits {
+        cpu_weight: Some(750),
+        ..Default::default()
+    };
     cgroup_v2::apply_v2(&cg, &limits).unwrap();
-    assert_eq!(std::fs::read_to_string(cg.join("cpu.weight")).unwrap().trim(), "750");
+    assert_eq!(
+        std::fs::read_to_string(cg.join("cpu.weight"))
+            .unwrap()
+            .trim(),
+        "750"
+    );
 }
 
 #[test]
@@ -311,7 +352,12 @@ fn test_cgroup_v2_apply_io_max_device() {
     let cg = dir.path().join("cg");
     let limits = cgroup_v2::CgroupV2Limits {
         io_max: vec![cgroup_v2::IoMaxEntry {
-            major: 8, minor: 0, rbps: Some(2_000_000), wbps: None, riops: None, wiops: None,
+            major: 8,
+            minor: 0,
+            rbps: Some(2_000_000),
+            wbps: None,
+            riops: None,
+            wiops: None,
         }],
         ..Default::default()
     };
@@ -365,7 +411,10 @@ fn test_cgroup_v2_enable_controller() {
 fn test_cgroup_v2_rejects_out_of_range_weight() {
     let dir = tempfile::tempdir().unwrap();
     let cg = dir.path().join("cg");
-    let limits = cgroup_v2::CgroupV2Limits { cpu_weight: Some(15_000), ..Default::default() };
+    let limits = cgroup_v2::CgroupV2Limits {
+        cpu_weight: Some(15_000),
+        ..Default::default()
+    };
     assert!(cgroup_v2::apply_v2(&cg, &limits).is_err());
 }
 
@@ -373,16 +422,23 @@ fn test_cgroup_v2_rejects_out_of_range_weight() {
 fn test_cgroup_v2_io_weight_zero_rejected() {
     let dir = tempfile::tempdir().unwrap();
     let cg = dir.path().join("cg");
-    let limits = cgroup_v2::CgroupV2Limits { io_weight: Some(0), ..Default::default() };
+    let limits = cgroup_v2::CgroupV2Limits {
+        io_weight: Some(0),
+        ..Default::default()
+    };
     assert!(cgroup_v2::apply_v2(&cg, &limits).is_err());
 }
 
 #[test]
 fn test_cgroup_v2_default_allowlist_has_standard_devices() {
     let list = cgroup_v2::DeviceRule::default_allowlist();
-    let pairs: Vec<_> = list.iter().filter_map(|r| {
-        match (r.major, r.minor) { (Some(a), Some(b)) => Some((a, b)), _ => None }
-    }).collect();
+    let pairs: Vec<_> = list
+        .iter()
+        .filter_map(|r| match (r.major, r.minor) {
+            (Some(a), Some(b)) => Some((a, b)),
+            _ => None,
+        })
+        .collect();
     assert!(pairs.contains(&(1, 3)));
     assert!(pairs.contains(&(1, 5)));
     assert!(pairs.contains(&(1, 8)));
@@ -477,10 +533,16 @@ async fn test_checkpoint_container_writes_manifest() {
         dummy_spec("ckpt-1", "redis:7"),
         &state.images.get("redis:7").unwrap(),
         &state.containers,
-    ).await.unwrap();
-    runtime::start_container(c.id, &state.containers).await.unwrap();
+    )
+    .await
+    .unwrap();
+    runtime::start_container(c.id, &state.containers)
+        .await
+        .unwrap();
 
-    let info = runtime::checkpoint_container(c.id, &state.containers).await.unwrap();
+    let info = runtime::checkpoint_container(c.id, &state.containers)
+        .await
+        .unwrap();
     let dir = std::path::Path::new(&info.path);
     assert!(dir.join(criu::MANIFEST_FILENAME).exists());
     let m = criu::read_manifest(dir).unwrap();
@@ -497,7 +559,9 @@ async fn test_restore_container_rejects_mismatched_manifest() {
         dummy_spec("rstr", "nginx:latest"),
         &state.images.get("nginx:latest").unwrap(),
         &state.containers,
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
     // Write a manifest belonging to a *different* container.
     let dir = tempfile::tempdir().unwrap();
     let other_id = Uuid::new_v4();
@@ -511,7 +575,9 @@ async fn test_restore_container_rejects_mismatched_manifest() {
         options: criu::CheckpointOptions::default(),
     };
     criu::write_manifest(dir.path(), &m).unwrap();
-    let err = runtime::restore_container(c.id, dir.path().to_str().unwrap(), &state.containers).await.unwrap_err();
+    let err = runtime::restore_container(c.id, dir.path().to_str().unwrap(), &state.containers)
+        .await
+        .unwrap_err();
     assert!(err.to_string().contains("does not match"));
 }
 
@@ -524,7 +590,9 @@ async fn test_restore_container_succeeds_with_matching_manifest() {
         dummy_spec("rok", "nginx:latest"),
         &state.images.get("nginx:latest").unwrap(),
         &state.containers,
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
     let dir = tempfile::tempdir().unwrap();
     let m = criu::CheckpointManifest {
         container_id: c.id,
@@ -536,8 +604,13 @@ async fn test_restore_container_succeeds_with_matching_manifest() {
         options: criu::CheckpointOptions::default(),
     };
     criu::write_manifest(dir.path(), &m).unwrap();
-    runtime::restore_container(c.id, dir.path().to_str().unwrap(), &state.containers).await.unwrap();
-    assert_eq!(state.containers.get(&c.id).unwrap().status, ContainerStatus::Running);
+    runtime::restore_container(c.id, dir.path().to_str().unwrap(), &state.containers)
+        .await
+        .unwrap();
+    assert_eq!(
+        state.containers.get(&c.id).unwrap().status,
+        ContainerStatus::Running
+    );
 }
 
 // ── UserNS / KEP-127 ───────────────────────────────────────────────────────────
@@ -546,7 +619,11 @@ use crate::userns;
 
 #[test]
 fn test_userns_id_mapping_translates_both_directions() {
-    let m = userns::IdMapping { container_id: 0, host_id: 1_000_000, size: 65_536 };
+    let m = userns::IdMapping {
+        container_id: 0,
+        host_id: 1_000_000,
+        size: 65_536,
+    };
     assert_eq!(m.translate_to_host(1234), Some(1_001_234));
     assert_eq!(m.translate_to_container(1_001_234), Some(1234));
 }
@@ -569,7 +646,11 @@ fn test_userns_host_passthrough_is_identity() {
 #[test]
 fn test_userns_allocator_unique_ranges() {
     let a = userns::UserNsAllocator::new(0, 65_536 * 4, 65_536);
-    let mut bases = vec![a.allocate().unwrap(), a.allocate().unwrap(), a.allocate().unwrap()];
+    let mut bases = vec![
+        a.allocate().unwrap(),
+        a.allocate().unwrap(),
+        a.allocate().unwrap(),
+    ];
     bases.sort();
     bases.dedup();
     assert_eq!(bases.len(), 3);
@@ -615,7 +696,8 @@ fn test_run_pod_sandbox_userns_pod_without_allocator_errors() {
 fn test_run_pod_sandbox_userns_host_does_not_consume_allocator() {
     ensure_test_root();
     let alloc = userns::UserNsAllocator::new(700_000, 700_000 + 65_536 * 2, 65_536);
-    let r = sb::run_pod_sandbox(sandbox_spec_with_ports("host-mode", vec![]), Some(&alloc)).unwrap();
+    let r =
+        sb::run_pod_sandbox(sandbox_spec_with_ports("host-mode", vec![]), Some(&alloc)).unwrap();
     assert!(r.user_namespace.is_host());
     assert_eq!(alloc.allocated(), 0);
 }
@@ -658,13 +740,21 @@ fn test_auth_resolver_azure_acr() {
 
 #[test]
 fn test_auth_basic_authorization_header() {
-    let s = auth::AuthScheme::Basic { username: "alice".into(), password: "secret".into() };
-    assert_eq!(s.authorization_header(), Some("Basic YWxpY2U6c2VjcmV0".into()));
+    let s = auth::AuthScheme::Basic {
+        username: "alice".into(),
+        password: "secret".into(),
+    };
+    assert_eq!(
+        s.authorization_header(),
+        Some("Basic YWxpY2U6c2VjcmV0".into())
+    );
 }
 
 #[test]
 fn test_auth_bearer_token_header() {
-    let s = auth::AuthScheme::Bearer { token: "abc".into() };
+    let s = auth::AuthScheme::Bearer {
+        token: "abc".into(),
+    };
     assert_eq!(s.authorization_header(), Some("Bearer abc".into()));
 }
 
@@ -723,8 +813,12 @@ fn test_manifest_list_select_amd64() {
 
 #[test]
 fn test_manifest_list_is_index_media_type() {
-    assert!(manifest_list::is_index_media_type(manifest_list::OCI_INDEX_MEDIA_TYPE));
-    assert!(manifest_list::is_index_media_type(manifest_list::DOCKER_MANIFEST_LIST_MEDIA_TYPE));
+    assert!(manifest_list::is_index_media_type(
+        manifest_list::OCI_INDEX_MEDIA_TYPE
+    ));
+    assert!(manifest_list::is_index_media_type(
+        manifest_list::DOCKER_MANIFEST_LIST_MEDIA_TYPE
+    ));
 }
 
 #[test]
@@ -755,7 +849,7 @@ fn sandbox_spec_with_ports(name: &str, ports: Vec<PortMapping>) -> SandboxSpec {
         log_directory: None,
         cgroup_parent: None,
         runtime_handler: None,
-                user_namespace_mode: crate::models::UserNamespaceMode::Host,
+        user_namespace_mode: crate::models::UserNamespaceMode::Host,
     }
 }
 
@@ -796,25 +890,54 @@ fn test_stop_pod_sandbox_clears_namespaces() {
 
 #[test]
 fn test_port_mapping_validation() {
-    let bad = PortMapping { protocol: "TCP".into(), container_port: 0, host_port: 80, host_ip: None };
+    let bad = PortMapping {
+        protocol: "TCP".into(),
+        container_port: 0,
+        host_port: 80,
+        host_ip: None,
+    };
     assert!(sb::validate_port_mapping(&bad).is_err());
-    let good = PortMapping { protocol: "TCP".into(), container_port: 80, host_port: 8080, host_ip: None };
+    let good = PortMapping {
+        protocol: "TCP".into(),
+        container_port: 80,
+        host_port: 8080,
+        host_ip: None,
+    };
     assert!(sb::validate_port_mapping(&good).is_ok());
 }
 
 #[test]
 fn test_port_mapping_protocols() {
     for proto in ["TCP", "UDP", "SCTP", "tcp", "udp"] {
-        let p = PortMapping { protocol: proto.into(), container_port: 80, host_port: 80, host_ip: None };
-        assert!(sb::validate_port_mapping(&p).is_ok(), "{} should be ok", proto);
+        let p = PortMapping {
+            protocol: proto.into(),
+            container_port: 80,
+            host_port: 80,
+            host_ip: None,
+        };
+        assert!(
+            sb::validate_port_mapping(&p).is_ok(),
+            "{} should be ok",
+            proto
+        );
     }
-    let p = PortMapping { protocol: "QUIC".into(), container_port: 80, host_port: 80, host_ip: None };
+    let p = PortMapping {
+        protocol: "QUIC".into(),
+        container_port: 80,
+        host_port: 80,
+        host_ip: None,
+    };
     assert!(sb::validate_port_mapping(&p).is_err());
 }
 
 #[test]
 fn test_render_iptables_rule() {
-    let p = PortMapping { protocol: "TCP".into(), container_port: 80, host_port: 8080, host_ip: None };
+    let p = PortMapping {
+        protocol: "TCP".into(),
+        container_port: 80,
+        host_port: 8080,
+        host_ip: None,
+    };
     let rule = sb::render_iptables_rule("10.244.0.5", &p);
     assert!(rule.contains("-p tcp"));
     assert!(rule.contains("--dport 8080"));
@@ -845,9 +968,7 @@ fn test_stream_frame_roundtrip() {
 
 #[test]
 fn test_stream_protocol_negotiation() {
-    let p = streaming::StreamProtocol::negotiate(
-        "v5.channel.k8s.io,v4.streamprotocol.k8s.io",
-    );
+    let p = streaming::StreamProtocol::negotiate("v5.channel.k8s.io,v4.streamprotocol.k8s.io");
     assert_eq!(p, Some(streaming::StreamProtocol::WebSocketV5));
     let p2 = streaming::StreamProtocol::negotiate("nothing");
     assert!(p2.is_none());
@@ -880,7 +1001,10 @@ fn test_port_forward_channel_allocation() {
 
 #[test]
 fn test_tty_resize() {
-    let size = streaming::TtyWindowSize { width: 200, height: 60 };
+    let size = streaming::TtyWindowSize {
+        width: 200,
+        height: 60,
+    };
     let bytes = size.encode();
     let back = streaming::TtyWindowSize::decode(&bytes).unwrap();
     assert_eq!(size, back);
@@ -913,7 +1037,9 @@ fn make_stats_container() -> crate::models::Container {
                 memory_limit: Some(1024 * 1024),
                 ..Default::default()
             },
-            labels: [("app".to_string(), "web".to_string())].into_iter().collect(),
+            labels: [("app".to_string(), "web".to_string())]
+                .into_iter()
+                .collect(),
             working_dir: None,
             user: None,
             hostname: None,
@@ -955,7 +1081,9 @@ fn test_list_container_stats() {
     let mut b = make_stats_container();
     b.spec.labels.insert("app".into(), "db".into());
     let f = stats::ContainerStatsFilter {
-        label_selector: [("app".to_string(), "db".to_string())].into_iter().collect(),
+        label_selector: [("app".to_string(), "db".to_string())]
+            .into_iter()
+            .collect(),
         ..Default::default()
     };
     let got = stats::filter_containers([&a, &b], &f);
@@ -966,10 +1094,14 @@ fn test_list_container_stats() {
 #[test]
 fn test_image_fs_info() {
     use crate::models::*;
-    let imgs = vec![
-        OciImage { reference: "x".into(), digest: "d".into(), layers: vec![],
-                   config: ImageConfig::default(), size_bytes: 42, pulled_at: Utc::now() },
-    ];
+    let imgs = vec![OciImage {
+        reference: "x".into(),
+        digest: "d".into(),
+        layers: vec![],
+        config: ImageConfig::default(),
+        size_bytes: 42,
+        pulled_at: Utc::now(),
+    }];
     let info = stats::image_fs_info("/var/lib/cave/images", &imgs);
     assert_eq!(info.image_filesystems[0].used_bytes, 42);
 }
@@ -977,8 +1109,12 @@ fn test_image_fs_info() {
 #[test]
 fn test_list_metric_descriptors() {
     let d = stats::cadvisor_descriptors();
-    assert!(d.iter().any(|m| m.name == "container_cpu_usage_seconds_total"));
-    assert!(d.iter().any(|m| m.name == "container_memory_working_set_bytes"));
+    assert!(d
+        .iter()
+        .any(|m| m.name == "container_cpu_usage_seconds_total"));
+    assert!(d
+        .iter()
+        .any(|m| m.name == "container_memory_working_set_bytes"));
 }
 
 #[test]
@@ -995,7 +1131,10 @@ fn test_render_prometheus() {
 fn test_container_stats_filter() {
     let a = make_stats_container();
     let b = make_stats_container();
-    let f = stats::ContainerStatsFilter { id: Some(b.id), ..Default::default() };
+    let f = stats::ContainerStatsFilter {
+        id: Some(b.id),
+        ..Default::default()
+    };
     let got = stats::filter_containers([&a, &b], &f);
     assert_eq!(got.len(), 1);
     assert_eq!(got[0].id, b.id);
@@ -1056,7 +1195,10 @@ fn test_cri_log_tail_lines() {
     }
     let entries = log_v2::read_logs(
         &path,
-        &log_v2::LogOptions { tail_lines: Some(2), ..Default::default() },
+        &log_v2::LogOptions {
+            tail_lines: Some(2),
+            ..Default::default()
+        },
     )
     .unwrap();
     assert_eq!(entries.len(), 2);
@@ -1108,7 +1250,10 @@ fn test_cri_log_limit_bytes() {
     }
     let entries = log_v2::read_logs(
         &path,
-        &log_v2::LogOptions { limit_bytes: Some(15), ..Default::default() },
+        &log_v2::LogOptions {
+            limit_bytes: Some(15),
+            ..Default::default()
+        },
     )
     .unwrap();
     let total: usize = entries.iter().map(|e| e.message.len()).sum();
@@ -1120,7 +1265,15 @@ fn test_cri_log_stitch_partials() {
     let big = "z".repeat(log_v2::MAX_LINE_BYTES + 50);
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("c.log");
-    log_v2::write_log_line(&path, log_v2::Stream::Stdout, &big, chrono::Utc::now(), u64::MAX, 5).unwrap();
+    log_v2::write_log_line(
+        &path,
+        log_v2::Stream::Stdout,
+        &big,
+        chrono::Utc::now(),
+        u64::MAX,
+        5,
+    )
+    .unwrap();
     let raw = log_v2::read_file(&path).unwrap();
     assert!(raw.len() >= 2);
     let stitched = log_v2::stitch_partials(raw);
@@ -1133,7 +1286,15 @@ fn test_cri_log_rotation() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("c.log");
     std::fs::write(&path, vec![b'x'; 200]).unwrap();
-    log_v2::write_log_line(&path, log_v2::Stream::Stdout, "after", chrono::Utc::now(), 100, 3).unwrap();
+    log_v2::write_log_line(
+        &path,
+        log_v2::Stream::Stdout,
+        "after",
+        chrono::Utc::now(),
+        100,
+        3,
+    )
+    .unwrap();
     assert!(dir.path().join("c.log.1").exists());
 }
 
@@ -1180,10 +1341,13 @@ fn test_runtime_handler_select_for_sandbox() {
 #[test]
 fn test_runtime_handler_features() {
     let runc = RuntimeHandler::runc();
-    assert_eq!(runc.features, RuntimeHandlerFeatures {
-        recursive_read_only_mounts: true,
-        user_namespaces: true,
-    });
+    assert_eq!(
+        runc.features,
+        RuntimeHandlerFeatures {
+            recursive_read_only_mounts: true,
+            user_namespaces: true,
+        }
+    );
     let runsc = RuntimeHandler::runsc();
     assert!(!runsc.features.user_namespaces);
 }
@@ -1199,14 +1363,17 @@ async fn test_network_attach() {
     )
     .await
     .unwrap();
-    state.network.insert(c.id, NetworkStatus {
-        container_id: c.id,
-        network_name: "bridge0".into(),
-        ip_address: Some("10.244.0.5".into()),
-        mac_address: None,
-        gateway: Some("10.244.0.1".into()),
-        interface: Some("eth0".into()),
-        attached: true,
-    });
+    state.network.insert(
+        c.id,
+        NetworkStatus {
+            container_id: c.id,
+            network_name: "bridge0".into(),
+            ip_address: Some("10.244.0.5".into()),
+            mac_address: None,
+            gateway: Some("10.244.0.1".into()),
+            interface: Some("eth0".into()),
+            attached: true,
+        },
+    );
     assert!(state.network.get(&c.id).unwrap().attached);
 }

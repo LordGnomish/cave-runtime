@@ -143,24 +143,33 @@ impl Default for ErpStore {
 
         // Seed currencies (synchronously)
         let currencies = vec![
-            ("EUR".to_string(), Currency {
-                code: "EUR".to_string(),
-                name: "Euro".to_string(),
-                symbol: "€".to_string(),
-                rate_to_base: 1.0,
-            }),
-            ("USD".to_string(), Currency {
-                code: "USD".to_string(),
-                name: "US Dollar".to_string(),
-                symbol: "$".to_string(),
-                rate_to_base: 1.1,
-            }),
-            ("TRY".to_string(), Currency {
-                code: "TRY".to_string(),
-                name: "Turkish Lira".to_string(),
-                symbol: "₺".to_string(),
-                rate_to_base: 0.033,
-            }),
+            (
+                "EUR".to_string(),
+                Currency {
+                    code: "EUR".to_string(),
+                    name: "Euro".to_string(),
+                    symbol: "€".to_string(),
+                    rate_to_base: 1.0,
+                },
+            ),
+            (
+                "USD".to_string(),
+                Currency {
+                    code: "USD".to_string(),
+                    name: "US Dollar".to_string(),
+                    symbol: "$".to_string(),
+                    rate_to_base: 1.1,
+                },
+            ),
+            (
+                "TRY".to_string(),
+                Currency {
+                    code: "TRY".to_string(),
+                    name: "Turkish Lira".to_string(),
+                    symbol: "₺".to_string(),
+                    rate_to_base: 0.033,
+                },
+            ),
         ];
 
         // Seed CRM stages

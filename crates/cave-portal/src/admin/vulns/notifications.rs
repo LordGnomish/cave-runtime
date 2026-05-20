@@ -3,19 +3,39 @@
 //!
 //! Source: DefectDojo/django-DefectDojo@6eab8738 dojo/notifications/helper.py
 
-use crate::admin::layout::shell::{shell_v2, ShellOptions};
+use crate::admin::layout::shell::{ShellOptions, shell_v2};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::table;
 use crate::admin::state::AdminState;
 use crate::admin::vulns::VulnsViewError;
 
 pub const SINKS: &[(&str, &str, &str)] = &[
-    ("InMemorySink", "memory", "Used by tests + Portal recent-events feed"),
-    ("WebhookSink (SlackCompatible)", "https POST", "{\"text\": \"…\"} — Slack / Teams"),
-    ("WebhookSink (Raw)", "https POST", "Full event JSON for custom consumers"),
+    (
+        "InMemorySink",
+        "memory",
+        "Used by tests + Portal recent-events feed",
+    ),
+    (
+        "WebhookSink (SlackCompatible)",
+        "https POST",
+        "{\"text\": \"…\"} — Slack / Teams",
+    ),
+    (
+        "WebhookSink (Raw)",
+        "https POST",
+        "Full event JSON for custom consumers",
+    ),
     ("LogSink", "tracing::info!", "Structured logs only"),
-    ("JiraSink", "trait-shaped (Phase 2)", "Requires cave-vault credential plumbing"),
-    ("EmailSink", "trait-shaped (Phase 2)", "Requires cave-vault SMTP plumbing"),
+    (
+        "JiraSink",
+        "trait-shaped (Phase 2)",
+        "Requires cave-vault credential plumbing",
+    ),
+    (
+        "EmailSink",
+        "trait-shaped (Phase 2)",
+        "Requires cave-vault SMTP plumbing",
+    ),
 ];
 
 pub const EVENT_KINDS: &[&str] = &[
@@ -30,10 +50,11 @@ pub const EVENT_KINDS: &[&str] = &[
 
 pub fn render(_state: &AdminState, ctx: &RequestCtx) -> Result<String, VulnsViewError> {
     ctx.authorise(Permission::VulnsRead)?;
-    let sink_rows: Vec<Vec<String>> = SINKS.iter()
-        .map(|(n, t, d)| vec![n.to_string(), t.to_string(), d.to_string()]).collect();
-    let kind_rows: Vec<Vec<String>> = EVENT_KINDS.iter()
-        .map(|k| vec![k.to_string()]).collect();
+    let sink_rows: Vec<Vec<String>> = SINKS
+        .iter()
+        .map(|(n, t, d)| vec![n.to_string(), t.to_string(), d.to_string()])
+        .collect();
+    let kind_rows: Vec<Vec<String>> = EVENT_KINDS.iter().map(|k| vec![k.to_string()]).collect();
     let body = format!(
         r#"<section>
   <h2>Notification sinks ({n_s})</h2>

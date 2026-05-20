@@ -24,15 +24,10 @@ pub struct Monitor;
 
 impl Monitor {
     /// Parse pg_stat_activity rows from a generic map representation.
-    pub fn parse_stat_activity(
-        rows: &[HashMap<String, serde_json::Value>],
-    ) -> Vec<PgStatActivity> {
+    pub fn parse_stat_activity(rows: &[HashMap<String, serde_json::Value>]) -> Vec<PgStatActivity> {
         rows.iter()
             .map(|row| PgStatActivity {
-                pid: row
-                    .get("pid")
-                    .and_then(|v| v.as_i64())
-                    .unwrap_or(0) as i32,
+                pid: row.get("pid").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
                 datname: row
                     .get("datname")
                     .and_then(|v| v.as_str())
@@ -66,17 +61,13 @@ impl Monitor {
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string()),
                 query_start: None,
-                duration_ms: row
-                    .get("duration_ms")
-                    .and_then(|v| v.as_i64()),
+                duration_ms: row.get("duration_ms").and_then(|v| v.as_i64()),
             })
             .collect()
     }
 
     /// Parse pg_stat_user_tables rows.
-    pub fn parse_stat_tables(
-        rows: &[HashMap<String, serde_json::Value>],
-    ) -> Vec<PgStatTable> {
+    pub fn parse_stat_tables(rows: &[HashMap<String, serde_json::Value>]) -> Vec<PgStatTable> {
         rows.iter()
             .map(|row| PgStatTable {
                 schemaname: row
@@ -183,13 +174,22 @@ impl Monitor {
                 instance_id
             ),
             format!("# TYPE pg_connections gauge"),
-            format!("pg_connections_active{{instance=\"{}\"}} {}", instance_id, counts.active),
-            format!("pg_connections_idle{{instance=\"{}\"}} {}", instance_id, counts.idle),
+            format!(
+                "pg_connections_active{{instance=\"{}\"}} {}",
+                instance_id, counts.active
+            ),
+            format!(
+                "pg_connections_idle{{instance=\"{}\"}} {}",
+                instance_id, counts.idle
+            ),
             format!(
                 "pg_connections_idle_in_transaction{{instance=\"{}\"}} {}",
                 instance_id, counts.idle_in_transaction
             ),
-            format!("pg_connections_total{{instance=\"{}\"}} {}", instance_id, counts.total),
+            format!(
+                "pg_connections_total{{instance=\"{}\"}} {}",
+                instance_id, counts.total
+            ),
         ];
 
         for table in tables {

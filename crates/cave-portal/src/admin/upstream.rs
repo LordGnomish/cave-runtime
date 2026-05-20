@@ -21,15 +21,15 @@
 
 use crate::admin::permission::{Permission, Persona, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table, table_html as render_table_html};
-use crate::admin::state::{scope, AdminState, UpstreamProject};
+use crate::admin::state::{AdminState, UpstreamProject, scope};
 use crate::admin::types::Cite;
-use cave_kernel::parity::types::ParityReport;
 use cave_kernel::parity::DiscoveredReport;
+use cave_kernel::parity::types::ParityReport;
 use cave_upstream::projects::TrackedProject;
-use cave_upstream::{adr_links, TRACKED_PROJECTS};
-use cave_upstream_watchd::diff::Severity;
+use cave_upstream::{TRACKED_PROJECTS, adr_links};
 use cave_upstream_watchd::auto_port::{AutoPortStatus, DispatchedRecord};
-use cave_upstream_watchd::event::{read_events, GapEvent, JsonlSink};
+use cave_upstream_watchd::diff::Severity;
+use cave_upstream_watchd::event::{GapEvent, JsonlSink, read_events};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -39,10 +39,19 @@ pub enum UpstreamViewError {
     Auth(#[from] crate::admin::permission::AuthError),
 }
 
-pub fn list_records(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<UpstreamProject>, UpstreamViewError> {
+pub fn list_records(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<UpstreamProject>, UpstreamViewError> {
     ctx.authorise(Permission::UpstreamRead)?;
-    Ok(scope(&state.upstream_projects.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter().cloned().collect())
+    Ok(
+        scope(&state.upstream_projects.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect(),
+    )
 }
 
 /// Locate the watchd events.jsonl. Honours `CAVE_WATCHD_EVENTS` for
@@ -269,8 +278,7 @@ pub fn build_tracker_rows(
 /// module name (so lookups by either spelling succeed). Pure I/O —
 /// callers should run this on a blocking thread for non-trivial trees.
 pub fn build_parity_index_at(workspace_root: &Path) -> HashMap<String, ParityReport> {
-    let reports: Vec<DiscoveredReport> =
-        cave_kernel::parity::discover_workspace(workspace_root);
+    let reports: Vec<DiscoveredReport> = cave_kernel::parity::discover_workspace(workspace_root);
     let mut idx = HashMap::new();
     for d in reports {
         if let Some(crate_dir) = d.manifest_path.parent() {
@@ -426,15 +434,19 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, UpstreamVi
         watchd = watchd_panel,
         auto = auto_port_panel,
     );
-    Ok(page_shell_full(ctx, "/admin/upstream", &format!("upstream · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/upstream",
+        &format!("upstream · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
 }
 
 /// Locate the auto-port dispatcher's `dispatched.jsonl`. Mirrors
 /// `AutoPortDispatcher::default_paths()` so the on-disk shape stays
 /// in sync.
 fn dispatched_path() -> PathBuf {
-    let (_events, dispatched, _audit) =
-        cave_upstream_watchd::AutoPortDispatcher::default_paths();
+    let (_events, dispatched, _audit) = cave_upstream_watchd::AutoPortDispatcher::default_paths();
     dispatched
 }
 
@@ -457,9 +469,7 @@ pub fn read_dispatched(path: &std::path::Path, max_rows: usize) -> Vec<Dispatche
 fn auto_port_status_class(s: &AutoPortStatus) -> &'static str {
     match s {
         AutoPortStatus::Merged => "bg-green-200 text-green-900",
-        AutoPortStatus::Dispatched | AutoPortStatus::Running => {
-            "bg-blue-200 text-blue-900"
-        }
+        AutoPortStatus::Dispatched | AutoPortStatus::Running => "bg-blue-200 text-blue-900",
         AutoPortStatus::CharterFail => "bg-orange-200 text-orange-900",
         AutoPortStatus::BackendFail => "bg-red-200 text-red-900",
     }
@@ -562,7 +572,10 @@ pub fn render_auto_port_panel_in(
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::backstage("plugins/upstream/src/components/ProjectsList.tsx", "ProjectsList");
+const FILE_CITE: Cite = Cite::backstage(
+    "plugins/upstream/src/components/ProjectsList.tsx",
+    "ProjectsList",
+);
 
 #[cfg(test)]
 mod tests {
@@ -572,11 +585,17 @@ mod tests {
     use cave_upstream_watchd::changelog::Changelog;
     use cave_upstream_watchd::event::{GapEvent, GapEventSink, JsonlSink};
 
-    fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
+    fn ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer("acme", perms)
+    }
 
     #[test]
     fn list_filters_to_owner() {
-        let (_c, _t) = portal_test_ctx!("plugins/upstream/src/components/ProjectsList.tsx", "ProjectsList", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/upstream/src/components/ProjectsList.tsx",
+            "ProjectsList",
+            "acme"
+        );
         let s = AdminState::seeded();
         let r = list_records(&s, &ctx(&[Permission::UpstreamRead])).unwrap();
         assert_eq!(r.len(), 2);
@@ -585,20 +604,32 @@ mod tests {
 
     #[test]
     fn list_refuses_without_perm() {
-        let (_c, _t) = portal_test_ctx!("plugins/permission-react/src/PermissionApi.ts", "authorize", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/permission-react/src/PermissionApi.ts",
+            "authorize",
+            "acme"
+        );
         assert!(list_records(&AdminState::seeded(), &ctx(&[])).is_err());
     }
 
     #[test]
     fn render_contains_owner_row() {
-        let (_c, _t) = portal_test_ctx!("plugins/upstream/src/components/ProjectsList.tsx", "RenderOwner", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/upstream/src/components/ProjectsList.tsx",
+            "RenderOwner",
+            "acme"
+        );
         let html = render(&AdminState::seeded(), &ctx(&[Permission::UpstreamRead])).unwrap();
         assert!(html.contains("kubernetes"));
     }
 
     #[test]
     fn render_excludes_evil_row() {
-        let (_c, _t) = portal_test_ctx!("plugins/upstream/src/components/ProjectsList.tsx", "RenderEvil", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/upstream/src/components/ProjectsList.tsx",
+            "RenderEvil",
+            "acme"
+        );
         let html = render(&AdminState::seeded(), &ctx(&[Permission::UpstreamRead])).unwrap();
         assert!(!html.contains("evil-upstream"));
     }
@@ -624,10 +655,26 @@ mod tests {
             module: module.into(),
             upstream_ref: format!("upstream/{module} @ v1"),
             measured_at: chrono::Utc::now(),
-            file_parity: ParityMetric { score: overall, matched: 1, total: 1 },
-            function_parity: ParityMetric { score: overall, matched: 1, total: 1 },
-            test_parity: ParityMetric { score: overall, matched: 1, total: 1 },
-            surface_parity: ParityMetric { score: overall, matched: 1, total: 1 },
+            file_parity: ParityMetric {
+                score: overall,
+                matched: 1,
+                total: 1,
+            },
+            function_parity: ParityMetric {
+                score: overall,
+                matched: 1,
+                total: 1,
+            },
+            test_parity: ParityMetric {
+                score: overall,
+                matched: 1,
+                total: 1,
+            },
+            surface_parity: ParityMetric {
+                score: overall,
+                matched: 1,
+                total: 1,
+            },
             overall,
             stubs_detected: 0,
             gaps: Vec::new(),
@@ -733,12 +780,18 @@ mod tests {
         assert!(html.contains("ADR-004"));
         assert!(html.contains("ADR-014"));
         assert!(html.contains("92%"));
-        assert!(html.contains("bg-green-100 text-green-900"), "synced badge color");
+        assert!(
+            html.contains("bg-green-100 text-green-900"),
+            "synced badge color"
+        );
         // Drill-down link to /admin/compliance for the crate.
         assert!(html.contains("/admin/compliance/cave-net?"));
         // Skeleton row: no-manifest text + 0% bar width.
         assert!(html.contains("no manifest"));
-        assert!(html.contains("bg-red-100 text-red-900"), "pending badge color");
+        assert!(
+            html.contains("bg-red-100 text-red-900"),
+            "pending badge color"
+        );
     }
 
     #[test]
@@ -775,7 +828,10 @@ mod tests {
         let s = AdminState::seeded();
         let plat = platform_ctx(&[Permission::UpstreamRead]);
         let html = render(&s, &plat).unwrap();
-        assert!(html.contains("Upstream Parity Tracker"), "tracker section present");
+        assert!(
+            html.contains("Upstream Parity Tracker"),
+            "tracker section present"
+        );
         // Cilium is a known TRACKED_PROJECT — must appear in the rendered HTML.
         assert!(html.contains("cilium/cilium"));
     }
@@ -788,11 +844,8 @@ mod tests {
             "acme"
         );
         let s = AdminState::seeded();
-        let tenant_ctx = RequestCtx::developer_as(
-            "acme",
-            &[Permission::UpstreamRead],
-            Persona::TenantAdmin,
-        );
+        let tenant_ctx =
+            RequestCtx::developer_as("acme", &[Permission::UpstreamRead], Persona::TenantAdmin);
         let html = render(&s, &tenant_ctx).unwrap();
         // Tenant admin still gets the legacy seeded list + watchd panel,
         // but NOT the cross-tenant tracker.
@@ -803,14 +856,25 @@ mod tests {
 
     #[test]
     fn render_shows_acme_count() {
-        let (_c, _t) = portal_test_ctx!("plugins/upstream/src/components/ProjectsList.tsx", "Count", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/upstream/src/components/ProjectsList.tsx",
+            "Count",
+            "acme"
+        );
         let html = render(&AdminState::seeded(), &ctx(&[Permission::UpstreamRead])).unwrap();
         assert!(html.contains("(2)"));
     }
 
     // ── 2026-05-13: watchd panel ────────────────────────────────
 
-    fn write_event(sink: &JsonlSink, module: &str, repo: &str, latest: &str, sev: Severity, age: i64) {
+    fn write_event(
+        sink: &JsonlSink,
+        module: &str,
+        repo: &str,
+        latest: &str,
+        sev: Severity,
+        age: i64,
+    ) {
         let e = GapEvent::new(
             module,
             repo,
@@ -843,8 +907,22 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let path = dir.path().join("events.jsonl");
         let sink = JsonlSink::new(path.clone());
-        write_event(&sink, "cave-cri", "containerd/containerd", "v1.7.22", Severity::Patch, 3600);
-        write_event(&sink, "cave-etcd", "etcd-io/etcd", "v3.6.0", Severity::Minor, 7200);
+        write_event(
+            &sink,
+            "cave-cri",
+            "containerd/containerd",
+            "v1.7.22",
+            Severity::Patch,
+            3600,
+        );
+        write_event(
+            &sink,
+            "cave-etcd",
+            "etcd-io/etcd",
+            "v3.6.0",
+            Severity::Minor,
+            7200,
+        );
 
         let plat_ctx = RequestCtx::developer_as(
             "platform",
@@ -867,15 +945,26 @@ mod tests {
         let path = dir.path().join("events.jsonl");
         let sink = JsonlSink::new(path.clone());
         // Platform-only module (cave-runtime) should be filtered out.
-        write_event(&sink, "cave-runtime", "anthropic/runtime", "v9.9.9", Severity::Major, 60);
-        // Tenant-relevant module (cave-vault) should pass.
-        write_event(&sink, "cave-vault", "hashicorp/vault", "v1.16.0", Severity::Minor, 300);
-
-        let tenant_ctx = RequestCtx::developer_as(
-            "tenant1",
-            &[Permission::UpstreamRead],
-            Persona::TenantAdmin,
+        write_event(
+            &sink,
+            "cave-runtime",
+            "anthropic/runtime",
+            "v9.9.9",
+            Severity::Major,
+            60,
         );
+        // Tenant-relevant module (cave-vault) should pass.
+        write_event(
+            &sink,
+            "cave-vault",
+            "hashicorp/vault",
+            "v1.16.0",
+            Severity::Minor,
+            300,
+        );
+
+        let tenant_ctx =
+            RequestCtx::developer_as("tenant1", &[Permission::UpstreamRead], Persona::TenantAdmin);
         let html = render_watchd_panel_in(&tenant_ctx, &path, 10);
         assert!(html.contains("cave-vault"));
         assert!(!html.contains("cave-runtime"));
@@ -888,8 +977,22 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let path = dir.path().join("events.jsonl");
         let sink = JsonlSink::new(path.clone());
-        write_event(&sink, "cave-runtime", "anthropic/runtime", "v9.9.9", Severity::Major, 60);
-        write_event(&sink, "cave-vault", "hashicorp/vault", "v1.16.0", Severity::Minor, 300);
+        write_event(
+            &sink,
+            "cave-runtime",
+            "anthropic/runtime",
+            "v9.9.9",
+            Severity::Major,
+            60,
+        );
+        write_event(
+            &sink,
+            "cave-vault",
+            "hashicorp/vault",
+            "v1.16.0",
+            Severity::Minor,
+            300,
+        );
 
         let plat_ctx = RequestCtx::developer_as(
             "platform",
@@ -926,7 +1029,14 @@ mod tests {
         let path = dir.path().join("events.jsonl");
         let sink = JsonlSink::new(path.clone());
         for i in 0..30 {
-            write_event(&sink, &format!("cave-{i}"), "x/y", &format!("v1.{i}.0"), Severity::Patch, 1);
+            write_event(
+                &sink,
+                &format!("cave-{i}"),
+                "x/y",
+                &format!("v1.{i}.0"),
+                Severity::Patch,
+                1,
+            );
         }
         let plat_ctx = RequestCtx::developer_as(
             "platform",
@@ -1035,9 +1145,19 @@ mod tests {
         write_dispatched(
             &path,
             &[
-                dispatched_record("e1", "cave-x", AutoPortStatus::Merged, Some("abcdef0123456789abcdef0123456789abcdef01")),
+                dispatched_record(
+                    "e1",
+                    "cave-x",
+                    AutoPortStatus::Merged,
+                    Some("abcdef0123456789abcdef0123456789abcdef01"),
+                ),
                 dispatched_record("e2", "cave-y", AutoPortStatus::Dispatched, None),
-                dispatched_record("e3", "cave-z", AutoPortStatus::CharterFail, Some("0011223344556677889900112233445566778899")),
+                dispatched_record(
+                    "e3",
+                    "cave-z",
+                    AutoPortStatus::CharterFail,
+                    Some("0011223344556677889900112233445566778899"),
+                ),
                 dispatched_record("e4", "cave-w", AutoPortStatus::BackendFail, None),
             ],
         );
@@ -1066,11 +1186,8 @@ mod tests {
                 dispatched_record("e2", "cave-vault", AutoPortStatus::Merged, None),
             ],
         );
-        let tenant = RequestCtx::developer_as(
-            "tenant1",
-            &[Permission::UpstreamRead],
-            Persona::TenantAdmin,
-        );
+        let tenant =
+            RequestCtx::developer_as("tenant1", &[Permission::UpstreamRead], Persona::TenantAdmin);
         let html = render_auto_port_panel_in(&tenant, &path, 10);
         assert!(html.contains("cave-vault"));
         assert!(!html.contains("cave-runtime"));

@@ -4,9 +4,9 @@ pub mod records;
 pub mod zones;
 
 use axum::{
+    Json,
     http::StatusCode,
     response::{IntoResponse, Response},
-    Json,
 };
 use serde::{Deserialize, Serialize};
 

@@ -25,18 +25,18 @@ pub mod matcher;
 pub mod models;
 pub mod receivers;
 pub mod routes;
-pub mod rules;
 pub mod routing;
+pub mod rules;
 pub mod silence;
 pub mod store;
 pub mod tenant;
 
 pub use models::{
-    Alert, AlertSeverity, AlertState, EmailConfig, GrafanaOnCallConfig, InhibitRule, MatchType,
-    Matcher, OpsGenieConfig, PagerDutyConfig, Receiver, ReceiverConfig, Route, Silence,
-    SlackConfig, WebhookConfig, DEFAULT_TENANT, TENANT_LABEL,
+    Alert, AlertSeverity, AlertState, DEFAULT_TENANT, EmailConfig, GrafanaOnCallConfig,
+    InhibitRule, MatchType, Matcher, OpsGenieConfig, PagerDutyConfig, Receiver, ReceiverConfig,
+    Route, Silence, SlackConfig, TENANT_LABEL, WebhookConfig,
 };
-pub use routes::{create_router as router, AppState};
+pub use routes::{AppState, create_router as router};
 pub use store::AlertStore;
 
 /// Backwards-compatible legacy alias.

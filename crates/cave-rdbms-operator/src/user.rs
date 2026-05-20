@@ -53,7 +53,10 @@ impl UserManager {
 
         let mut roles = self.roles.write().unwrap();
         if roles.contains_key(&role.name) {
-            return Err(PgError::UserError(format!("role already exists: {}", role.name)));
+            return Err(PgError::UserError(format!(
+                "role already exists: {}",
+                role.name
+            )));
         }
         roles.insert(role.name.clone(), role);
         Ok(sql)
@@ -79,19 +82,35 @@ impl UserManager {
 
         if let Some(superuser) = updates.superuser {
             role.superuser = superuser;
-            parts.push(if superuser { "SUPERUSER".to_string() } else { "NOSUPERUSER".to_string() });
+            parts.push(if superuser {
+                "SUPERUSER".to_string()
+            } else {
+                "NOSUPERUSER".to_string()
+            });
         }
         if let Some(create_db) = updates.create_db {
             role.create_db = create_db;
-            parts.push(if create_db { "CREATEDB".to_string() } else { "NOCREATEDB".to_string() });
+            parts.push(if create_db {
+                "CREATEDB".to_string()
+            } else {
+                "NOCREATEDB".to_string()
+            });
         }
         if let Some(create_role) = updates.create_role {
             role.create_role = create_role;
-            parts.push(if create_role { "CREATEROLE".to_string() } else { "NOCREATEROLE".to_string() });
+            parts.push(if create_role {
+                "CREATEROLE".to_string()
+            } else {
+                "NOCREATEROLE".to_string()
+            });
         }
         if let Some(login) = updates.login {
             role.login = login;
-            parts.push(if login { "LOGIN".to_string() } else { "NOLOGIN".to_string() });
+            parts.push(if login {
+                "LOGIN".to_string()
+            } else {
+                "NOLOGIN".to_string()
+            });
         }
         if let Some(limit) = updates.connection_limit {
             role.connection_limit = limit;

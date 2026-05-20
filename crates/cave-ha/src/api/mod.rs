@@ -2,4 +2,4 @@
 // Copyright 2026 Cave Runtime contributors
 pub mod routes;
 
-pub use routes::{router, ApiState};
+pub use routes::{ApiState, router};

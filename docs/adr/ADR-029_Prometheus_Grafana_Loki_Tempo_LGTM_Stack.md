@@ -41,8 +41,8 @@ CAVE platform requires unified observability across all 73 components, 7 profile
 - **Grafana:** Dashboards per tenant (grafana org = tenant). RBAC: tenant admins manage own org. Platform admins manage cluster dashboards.
 - **Loki:** Log aggregation from stderr/stdout (k8s logging driver). WORM-backed storage (Loki + S3 immutability, ADR-106) for forensic compliance
 - **Tempo:** Trace backend. Instrumentation via OpenTelemetry SDKs (all 73 components emit traces)
-- **Thanos:** Multi-profile federation (hetzner-prod + azure-prod + edge metrics in single query, ADR-072)
-- **Storage:** MinIO (Hetzner) / Azure Blob (Azure) for long-term retention
+- **Thanos:** Multi-profile federation (sovereign-prod + azure-prod + edge metrics in single query, ADR-072)
+- **Storage:** MinIO (sovereign) / Azure Blob (Azure) for long-term retention
 
 ## Implementation Reference
 

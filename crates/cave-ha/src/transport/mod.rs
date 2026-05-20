@@ -3,10 +3,10 @@
 pub mod memory;
 pub mod tcp;
 
-use async_trait::async_trait;
 use crate::error::HaResult;
 use crate::raft::messages::RaftMessage;
 use crate::raft::types::NodeId;
+use async_trait::async_trait;
 
 /// Transport abstraction — sends Raft messages between nodes.
 #[async_trait]

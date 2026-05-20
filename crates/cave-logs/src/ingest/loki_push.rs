@@ -72,9 +72,13 @@ struct ProtoReader<'a> {
 }
 
 impl<'a> ProtoReader<'a> {
-    fn new(buf: &'a [u8]) -> Self { Self { buf, pos: 0 } }
+    fn new(buf: &'a [u8]) -> Self {
+        Self { buf, pos: 0 }
+    }
 
-    fn remaining(&self) -> usize { self.buf.len() - self.pos }
+    fn remaining(&self) -> usize {
+        self.buf.len() - self.pos
+    }
 
     fn read_varint(&mut self) -> anyhow::Result<u64> {
         let mut result = 0u64;
@@ -86,9 +90,13 @@ impl<'a> ProtoReader<'a> {
             let b = self.buf[self.pos];
             self.pos += 1;
             result |= ((b & 0x7f) as u64) << shift;
-            if b & 0x80 == 0 { break; }
+            if b & 0x80 == 0 {
+                break;
+            }
             shift += 7;
-            if shift >= 64 { return Err(anyhow::anyhow!("protobuf: varint overflow")); }
+            if shift >= 64 {
+                return Err(anyhow::anyhow!("protobuf: varint overflow"));
+            }
         }
         Ok(result)
     }
@@ -103,20 +111,28 @@ impl<'a> ProtoReader<'a> {
     }
 
     fn read_tag(&mut self) -> anyhow::Result<Option<(u32, u8)>> {
-        if self.remaining() == 0 { return Ok(None); }
+        if self.remaining() == 0 {
+            return Ok(None);
+        }
         let tag = self.read_varint()?;
         Ok(Some(((tag >> 3) as u32, (tag & 0x7) as u8)))
     }
 
     fn skip_field(&mut self, wire_type: u8) -> anyhow::Result<()> {
         match wire_type {
-            WT_VARINT => { self.read_varint()?; }
-            WT_64BIT => { self.read_bytes(8)?; }
+            WT_VARINT => {
+                self.read_varint()?;
+            }
+            WT_64BIT => {
+                self.read_bytes(8)?;
+            }
             WT_LEN => {
                 let len = self.read_varint()? as usize;
                 self.read_bytes(len)?;
             }
-            WT_32BIT => { self.read_bytes(4)?; }
+            WT_32BIT => {
+                self.read_bytes(4)?;
+            }
             wt => return Err(anyhow::anyhow!("protobuf: unknown wire type {}", wt)),
         }
         Ok(())
@@ -160,7 +176,9 @@ fn parse_stream_adapter(buf: &[u8]) -> anyhow::Result<(Labels, Vec<LogEntry>)> {
 
     while let Some((field, wt)) = reader.read_tag()? {
         match (field, wt) {
-            (1, WT_LEN) => { label_str = reader.read_string()?; }
+            (1, WT_LEN) => {
+                label_str = reader.read_string()?;
+            }
             (2, WT_LEN) => {
                 let entry_buf = reader.read_len_delimited()?;
                 entries.push(parse_entry(entry_buf)?);
@@ -186,7 +204,9 @@ fn parse_entry(buf: &[u8]) -> anyhow::Result<LogEntry> {
                 let ts_buf = reader.read_len_delimited()?;
                 ts_ns = parse_timestamp(ts_buf)?;
             }
-            (2, WT_LEN) => { line = reader.read_string()?; }
+            (2, WT_LEN) => {
+                line = reader.read_string()?;
+            }
             (3, WT_LEN) => {
                 let pair_buf = reader.read_len_delimited()?;
                 let (k, v) = parse_label_pair(pair_buf)?;
@@ -196,7 +216,11 @@ fn parse_entry(buf: &[u8]) -> anyhow::Result<LogEntry> {
         }
     }
 
-    Ok(LogEntry { ts: ts_ns, line, metadata })
+    Ok(LogEntry {
+        ts: ts_ns,
+        line,
+        metadata,
+    })
 }
 
 fn parse_timestamp(buf: &[u8]) -> anyhow::Result<TimestampNs> {
@@ -206,8 +230,12 @@ fn parse_timestamp(buf: &[u8]) -> anyhow::Result<TimestampNs> {
 
     while let Some((field, wt)) = reader.read_tag()? {
         match (field, wt) {
-            (1, WT_VARINT) => { secs = reader.read_varint()? as i64; }
-            (2, WT_VARINT) => { nanos = reader.read_varint()? as i32; }
+            (1, WT_VARINT) => {
+                secs = reader.read_varint()? as i64;
+            }
+            (2, WT_VARINT) => {
+                nanos = reader.read_varint()? as i32;
+            }
             _ => reader.skip_field(wt)?,
         }
     }
@@ -222,8 +250,12 @@ fn parse_label_pair(buf: &[u8]) -> anyhow::Result<(String, String)> {
 
     while let Some((field, wt)) = reader.read_tag()? {
         match (field, wt) {
-            (1, WT_LEN) => { name = reader.read_string()?; }
-            (2, WT_LEN) => { value = reader.read_string()?; }
+            (1, WT_LEN) => {
+                name = reader.read_string()?;
+            }
+            (2, WT_LEN) => {
+                value = reader.read_string()?;
+            }
             _ => reader.skip_field(wt)?,
         }
     }
@@ -242,7 +274,12 @@ pub fn parse_label_selector(s: &str) -> Labels {
         let (key, value) = if let Some(i) = find_op(part) {
             let key = part[..i].trim();
             let rest = &part[i..];
-            let op_len = if rest.starts_with("=~") || rest.starts_with("!~") || rest.starts_with("!=") { 2 } else { 1 };
+            let op_len =
+                if rest.starts_with("=~") || rest.starts_with("!~") || rest.starts_with("!=") {
+                    2
+                } else {
+                    1
+                };
             let value_raw = rest[op_len..].trim().trim_matches('"');
             (key, value_raw.to_owned())
         } else {
@@ -287,7 +324,9 @@ fn split_label_pairs(s: &str) -> Vec<&str> {
             _ => {}
         }
     }
-    if start <= s.len() { parts.push(&s[start..]); }
+    if start <= s.len() {
+        parts.push(&s[start..]);
+    }
     parts
 }
 
@@ -306,8 +345,8 @@ pub fn ingest_protobuf(body: &[u8], tenant: &str, store: &Arc<LogStore>) -> anyh
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::store::LogStore;
     use crate::models::Direction;
+    use crate::store::LogStore;
 
     #[test]
     fn parse_selector_eq() {

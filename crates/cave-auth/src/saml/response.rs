@@ -17,7 +17,7 @@ use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 use uuid::Uuid;
 
-use super::{ns, NameIdFormat, SamlError, SamlSubject};
+use super::{NameIdFormat, SamlError, SamlSubject, ns};
 
 /// The two `<samlp:StatusCode>` values cave-auth ever emits. Real
 /// SAML has more, but Keycloak in practice only differentiates
@@ -178,11 +178,10 @@ impl Response {
 
 // ── Writer ───────────────────────────────────────────────────────────────────
 
-fn write_response<W: std::io::Write>(
-    w: &mut Writer<W>,
-    r: &Response,
-) -> Result<(), SamlError> {
-    let issue_instant = r.issue_instant.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+fn write_response<W: std::io::Write>(w: &mut Writer<W>, r: &Response) -> Result<(), SamlError> {
+    let issue_instant = r
+        .issue_instant
+        .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
 
     let mut root = BytesStart::new("samlp:Response");
     root.push_attribute(("xmlns:samlp", ns::SAML_PROTOCOL));
@@ -198,30 +197,38 @@ fn write_response<W: std::io::Write>(
 
     w.write_event(Event::Start(BytesStart::new("saml:Issuer")))
         .map_err(io_err)?;
-    w.write_event(Event::Text(BytesText::new(&r.issuer))).map_err(io_err)?;
-    w.write_event(Event::End(BytesEnd::new("saml:Issuer"))).map_err(io_err)?;
+    w.write_event(Event::Text(BytesText::new(&r.issuer)))
+        .map_err(io_err)?;
+    w.write_event(Event::End(BytesEnd::new("saml:Issuer")))
+        .map_err(io_err)?;
 
-    w.write_event(Event::Start(BytesStart::new("samlp:Status"))).map_err(io_err)?;
+    w.write_event(Event::Start(BytesStart::new("samlp:Status")))
+        .map_err(io_err)?;
     let mut code = BytesStart::new("samlp:StatusCode");
     code.push_attribute(("Value", r.status.as_urn()));
     w.write_event(Event::Empty(code)).map_err(io_err)?;
-    w.write_event(Event::End(BytesEnd::new("samlp:Status"))).map_err(io_err)?;
+    w.write_event(Event::End(BytesEnd::new("samlp:Status")))
+        .map_err(io_err)?;
 
     if let Some(a) = &r.assertion {
         write_assertion(w, a)?;
     }
 
-    w.write_event(Event::End(BytesEnd::new("samlp:Response"))).map_err(io_err)?;
+    w.write_event(Event::End(BytesEnd::new("samlp:Response")))
+        .map_err(io_err)?;
     Ok(())
 }
 
-fn write_assertion<W: std::io::Write>(
-    w: &mut Writer<W>,
-    a: &Assertion,
-) -> Result<(), SamlError> {
-    let issue_instant = a.issue_instant.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    let not_before = a.not_before.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    let not_after = a.not_on_or_after.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+fn write_assertion<W: std::io::Write>(w: &mut Writer<W>, a: &Assertion) -> Result<(), SamlError> {
+    let issue_instant = a
+        .issue_instant
+        .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let not_before = a
+        .not_before
+        .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let not_after = a
+        .not_on_or_after
+        .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
 
     let mut root = BytesStart::new("saml:Assertion");
     root.push_attribute(("ID", a.id.as_str()));
@@ -229,17 +236,24 @@ fn write_assertion<W: std::io::Write>(
     root.push_attribute(("IssueInstant", issue_instant.as_str()));
     w.write_event(Event::Start(root)).map_err(io_err)?;
 
-    w.write_event(Event::Start(BytesStart::new("saml:Issuer"))).map_err(io_err)?;
-    w.write_event(Event::Text(BytesText::new(&a.issuer))).map_err(io_err)?;
-    w.write_event(Event::End(BytesEnd::new("saml:Issuer"))).map_err(io_err)?;
+    w.write_event(Event::Start(BytesStart::new("saml:Issuer")))
+        .map_err(io_err)?;
+    w.write_event(Event::Text(BytesText::new(&a.issuer)))
+        .map_err(io_err)?;
+    w.write_event(Event::End(BytesEnd::new("saml:Issuer")))
+        .map_err(io_err)?;
 
-    w.write_event(Event::Start(BytesStart::new("saml:Subject"))).map_err(io_err)?;
+    w.write_event(Event::Start(BytesStart::new("saml:Subject")))
+        .map_err(io_err)?;
     let mut nid = BytesStart::new("saml:NameID");
     nid.push_attribute(("Format", a.subject_name_id_format.as_urn()));
     w.write_event(Event::Start(nid)).map_err(io_err)?;
-    w.write_event(Event::Text(BytesText::new(&a.subject_name_id))).map_err(io_err)?;
-    w.write_event(Event::End(BytesEnd::new("saml:NameID"))).map_err(io_err)?;
-    w.write_event(Event::End(BytesEnd::new("saml:Subject"))).map_err(io_err)?;
+    w.write_event(Event::Text(BytesText::new(&a.subject_name_id)))
+        .map_err(io_err)?;
+    w.write_event(Event::End(BytesEnd::new("saml:NameID")))
+        .map_err(io_err)?;
+    w.write_event(Event::End(BytesEnd::new("saml:Subject")))
+        .map_err(io_err)?;
 
     let mut cond = BytesStart::new("saml:Conditions");
     cond.push_attribute(("NotBefore", not_before.as_str()));
@@ -251,13 +265,17 @@ fn write_assertion<W: std::io::Write>(
         w.write_event(Event::Start(BytesStart::new("saml:AudienceRestriction")))
             .map_err(io_err)?;
         for aud in &a.audiences {
-            w.write_event(Event::Start(BytesStart::new("saml:Audience"))).map_err(io_err)?;
-            w.write_event(Event::Text(BytesText::new(aud))).map_err(io_err)?;
-            w.write_event(Event::End(BytesEnd::new("saml:Audience"))).map_err(io_err)?;
+            w.write_event(Event::Start(BytesStart::new("saml:Audience")))
+                .map_err(io_err)?;
+            w.write_event(Event::Text(BytesText::new(aud)))
+                .map_err(io_err)?;
+            w.write_event(Event::End(BytesEnd::new("saml:Audience")))
+                .map_err(io_err)?;
         }
         w.write_event(Event::End(BytesEnd::new("saml:AudienceRestriction")))
             .map_err(io_err)?;
-        w.write_event(Event::End(BytesEnd::new("saml:Conditions"))).map_err(io_err)?;
+        w.write_event(Event::End(BytesEnd::new("saml:Conditions")))
+            .map_err(io_err)?;
     }
 
     let mut authn = BytesStart::new("saml:AuthnStatement");
@@ -274,9 +292,12 @@ fn write_assertion<W: std::io::Write>(
         "urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport",
     )))
     .map_err(io_err)?;
-    w.write_event(Event::End(BytesEnd::new("saml:AuthnContextClassRef"))).map_err(io_err)?;
-    w.write_event(Event::End(BytesEnd::new("saml:AuthnContext"))).map_err(io_err)?;
-    w.write_event(Event::End(BytesEnd::new("saml:AuthnStatement"))).map_err(io_err)?;
+    w.write_event(Event::End(BytesEnd::new("saml:AuthnContextClassRef")))
+        .map_err(io_err)?;
+    w.write_event(Event::End(BytesEnd::new("saml:AuthnContext")))
+        .map_err(io_err)?;
+    w.write_event(Event::End(BytesEnd::new("saml:AuthnStatement")))
+        .map_err(io_err)?;
 
     if !a.attributes.is_empty() {
         w.write_event(Event::Start(BytesStart::new("saml:AttributeStatement")))
@@ -288,15 +309,20 @@ fn write_assertion<W: std::io::Write>(
             for v in values {
                 w.write_event(Event::Start(BytesStart::new("saml:AttributeValue")))
                     .map_err(io_err)?;
-                w.write_event(Event::Text(BytesText::new(v))).map_err(io_err)?;
-                w.write_event(Event::End(BytesEnd::new("saml:AttributeValue"))).map_err(io_err)?;
+                w.write_event(Event::Text(BytesText::new(v)))
+                    .map_err(io_err)?;
+                w.write_event(Event::End(BytesEnd::new("saml:AttributeValue")))
+                    .map_err(io_err)?;
             }
-            w.write_event(Event::End(BytesEnd::new("saml:Attribute"))).map_err(io_err)?;
+            w.write_event(Event::End(BytesEnd::new("saml:Attribute")))
+                .map_err(io_err)?;
         }
-        w.write_event(Event::End(BytesEnd::new("saml:AttributeStatement"))).map_err(io_err)?;
+        w.write_event(Event::End(BytesEnd::new("saml:AttributeStatement")))
+            .map_err(io_err)?;
     }
 
-    w.write_event(Event::End(BytesEnd::new("saml:Assertion"))).map_err(io_err)?;
+    w.write_event(Event::End(BytesEnd::new("saml:Assertion")))
+        .map_err(io_err)?;
     Ok(())
 }
 
@@ -367,7 +393,8 @@ fn parse_response(bytes: &[u8]) -> Result<Response, SamlError> {
                                 let val = a
                                     .unescape_value()
                                     .map_err(|err| SamlError::Parse(err.to_string()))?;
-                                status = StatusCode::from_urn(&val).unwrap_or(StatusCode::Responder);
+                                status =
+                                    StatusCode::from_urn(&val).unwrap_or(StatusCode::Responder);
                             }
                         }
                     }
@@ -482,12 +509,12 @@ fn parse_response(bytes: &[u8]) -> Result<Response, SamlError> {
     }
 
     let response_id = response_id.ok_or_else(|| SamlError::MissingField("Response/ID".into()))?;
-    let response_issue = response_issue
-        .ok_or_else(|| SamlError::MissingField("Response/IssueInstant".into()))?;
-    let response_dest = response_dest
-        .ok_or_else(|| SamlError::MissingField("Response/Destination".into()))?;
-    let response_issuer = response_issuer
-        .ok_or_else(|| SamlError::MissingField("Response/Issuer".into()))?;
+    let response_issue =
+        response_issue.ok_or_else(|| SamlError::MissingField("Response/IssueInstant".into()))?;
+    let response_dest =
+        response_dest.ok_or_else(|| SamlError::MissingField("Response/Destination".into()))?;
+    let response_issuer =
+        response_issuer.ok_or_else(|| SamlError::MissingField("Response/Issuer".into()))?;
 
     let response_issue: DateTime<Utc> = DateTime::parse_from_rfc3339(&response_issue)
         .map_err(|e| SamlError::Parse(format!("Response/IssueInstant: {e}")))?
@@ -496,12 +523,12 @@ fn parse_response(bytes: &[u8]) -> Result<Response, SamlError> {
     let assertion = if let Some(aid) = assertion_id {
         let aissue = assertion_issue
             .ok_or_else(|| SamlError::MissingField("Assertion/IssueInstant".into()))?;
-        let aissuer = assertion_issuer
-            .ok_or_else(|| SamlError::MissingField("Assertion/Issuer".into()))?;
-        let nid = subject_name_id
-            .ok_or_else(|| SamlError::MissingField("Assertion/NameID".into()))?;
-        let nb = not_before
-            .ok_or_else(|| SamlError::MissingField("Conditions/NotBefore".into()))?;
+        let aissuer =
+            assertion_issuer.ok_or_else(|| SamlError::MissingField("Assertion/Issuer".into()))?;
+        let nid =
+            subject_name_id.ok_or_else(|| SamlError::MissingField("Assertion/NameID".into()))?;
+        let nb =
+            not_before.ok_or_else(|| SamlError::MissingField("Conditions/NotBefore".into()))?;
         let noa = not_on_or_after
             .ok_or_else(|| SamlError::MissingField("Conditions/NotOnOrAfter".into()))?;
         Some(Assertion {

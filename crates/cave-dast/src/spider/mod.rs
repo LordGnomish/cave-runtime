@@ -218,7 +218,8 @@ mod tests {
 
     #[test]
     fn robots_only_matching_ua() {
-        let body = "User-agent: Googlebot\nDisallow: /no-google\nUser-agent: *\nDisallow: /everyone\n";
+        let body =
+            "User-agent: Googlebot\nDisallow: /no-google\nUser-agent: *\nDisallow: /everyone\n";
         let rules = parse_robots_disallow(body, "*");
         assert_eq!(rules, vec!["/everyone"]);
     }
@@ -286,7 +287,9 @@ mod tests {
         let mut spider = Spider::new(cfg, &ctx);
         spider.set_robots_txt("User-agent: *\nDisallow: /admin/\n");
         let pages = |u: &str| match u {
-            "http://x.test/" => r#"<a href="/admin/secret">A</a><a href="/public">P</a>"#.to_string(),
+            "http://x.test/" => {
+                r#"<a href="/admin/secret">A</a><a href="/public">P</a>"#.to_string()
+            }
             _ => "".to_string(),
         };
         let found = spider.crawl(&["http://x.test/"], pages);

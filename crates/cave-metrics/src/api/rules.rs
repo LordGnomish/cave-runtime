@@ -2,26 +2,35 @@
 // Copyright 2026 Cave Runtime contributors
 //! /api/v1/rules and /api/v1/alerts
 
-use axum::{extract::State, Json};
-use std::sync::Arc;
 use crate::state::MetricsState;
+use axum::{Json, extract::State};
+use std::sync::Arc;
 
 pub async fn list_rules(State(state): State<Arc<MetricsState>>) -> Json<serde_json::Value> {
-    let groups: Vec<serde_json::Value> = state.rule_groups.read().iter().map(|group| {
-        let recording: Vec<serde_json::Value> = group.recording_rules.iter().map(|r| {
-            serde_json::json!({
-                "type": "recording",
-                "name": r.name,
-                "query": r.expr,
-                "labels": r.labels.0,
-                "evaluationTime": 0.0,
-                "lastEvaluation": "",
-                "health": "ok",
-                "lastError": "",
-            })
-        }).collect();
+    let groups: Vec<serde_json::Value> =
+        state
+            .rule_groups
+            .read()
+            .iter()
+            .map(|group| {
+                let recording: Vec<serde_json::Value> = group
+                    .recording_rules
+                    .iter()
+                    .map(|r| {
+                        serde_json::json!({
+                            "type": "recording",
+                            "name": r.name,
+                            "query": r.expr,
+                            "labels": r.labels.0,
+                            "evaluationTime": 0.0,
+                            "lastEvaluation": "",
+                            "health": "ok",
+                            "lastError": "",
+                        })
+                    })
+                    .collect();
 
-        let alerting: Vec<serde_json::Value> = group.alert_rules.iter().map(|r| {
+                let alerting: Vec<serde_json::Value> = group.alert_rules.iter().map(|r| {
             let alerts: Vec<serde_json::Value> = r.active.iter().map(|(fp, (state, ts))| {
                 serde_json::json!({
                     "labels": {},
@@ -48,19 +57,20 @@ pub async fn list_rules(State(state): State<Arc<MetricsState>>) -> Json<serde_js
             })
         }).collect();
 
-        let mut rules = recording;
-        rules.extend(alerting);
+                let mut rules = recording;
+                rules.extend(alerting);
 
-        serde_json::json!({
-            "name": group.name,
-            "file": "",
-            "rules": rules,
-            "interval": group.interval.as_secs_f64(),
-            "limit": 0,
-            "evaluationTime": 0.0,
-            "lastEvaluation": "",
-        })
-    }).collect();
+                serde_json::json!({
+                    "name": group.name,
+                    "file": "",
+                    "rules": rules,
+                    "interval": group.interval.as_secs_f64(),
+                    "limit": 0,
+                    "evaluationTime": 0.0,
+                    "lastEvaluation": "",
+                })
+            })
+            .collect();
 
     Json(serde_json::json!({
         "status": "success",
@@ -69,10 +79,16 @@ pub async fn list_rules(State(state): State<Arc<MetricsState>>) -> Json<serde_js
 }
 
 pub async fn list_alerts(State(state): State<Arc<MetricsState>>) -> Json<serde_json::Value> {
-    let alerts: Vec<serde_json::Value> = state.rule_groups.read().iter()
+    let alerts: Vec<serde_json::Value> = state
+        .rule_groups
+        .read()
+        .iter()
         .flat_map(|group| {
-            group.alert_rules.iter().flat_map(|rule| {
-                rule.active.iter().map(|(_, (alert_state, ts))| {
+            group
+                .alert_rules
+                .iter()
+                .flat_map(|rule| {
+                    rule.active.iter().map(|(_, (alert_state, ts))| {
                     serde_json::json!({
                         "labels": rule.labels.0,
                         "annotations": rule.annotations.0,
@@ -82,7 +98,8 @@ pub async fn list_alerts(State(state): State<Arc<MetricsState>>) -> Json<serde_j
                         "value": "0",
                     })
                 }).collect::<Vec<_>>()
-            }).collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
         })
         .collect();
 

@@ -80,7 +80,9 @@ mod tests {
 
     #[test]
     fn test_module_disabled_is_503() {
-        let err = CaveError::ModuleDisabled { module: "cave-flags".to_string() };
+        let err = CaveError::ModuleDisabled {
+            module: "cave-flags".to_string(),
+        };
         assert_eq!(err.status_code(), 503);
     }
 }

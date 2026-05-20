@@ -25,7 +25,7 @@ pub mod topics;
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, StreamsConsumerGroup, StreamsTopic};
+use crate::admin::state::{AdminState, StreamsConsumerGroup, StreamsTopic, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -47,10 +47,14 @@ pub fn list_topics(
     ctx: &RequestCtx,
 ) -> Result<Vec<StreamsTopic>, StreamsViewError> {
     ctx.authorise(Permission::StreamsRead)?;
-    Ok(scope(&state.streams_topics.read().unwrap(), &ctx.tenant, |r| &r.tenant)
+    Ok(
+        scope(&state.streams_topics.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
         .into_iter()
         .cloned()
-        .collect())
+        .collect(),
+    )
 }
 
 pub fn list_consumer_groups(
@@ -58,10 +62,14 @@ pub fn list_consumer_groups(
     ctx: &RequestCtx,
 ) -> Result<Vec<StreamsConsumerGroup>, StreamsViewError> {
     ctx.authorise(Permission::StreamsRead)?;
-    Ok(scope(&state.streams_consumer_groups.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter()
-        .cloned()
-        .collect())
+    Ok(scope(
+        &state.streams_consumer_groups.read().unwrap(),
+        &ctx.tenant,
+        |r| &r.tenant,
+    )
+    .into_iter()
+    .cloned()
+    .collect())
 }
 
 pub fn inspect_topic(
@@ -173,7 +181,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, StreamsVie
             &t_rows,
         ),
         g_tbl = table(
-            &["group_id", "topic", "members", "current", "end", "lag", "state"],
+            &[
+                "group_id", "topic", "members", "current", "end", "lag", "state"
+            ],
             &g_rows,
         ),
     );
@@ -240,7 +250,10 @@ mod tests {
         let c = ctx(&[Permission::StreamsRead, Permission::StreamsAdmin]);
         reset_consumer_offset(&s, &c, "orders-consumer", 9_900).unwrap();
         let groups = list_consumer_groups(&s, &c).unwrap();
-        let orders = groups.iter().find(|g| g.group_id == "orders-consumer").unwrap();
+        let orders = groups
+            .iter()
+            .find(|g| g.group_id == "orders-consumer")
+            .unwrap();
         assert_eq!(orders.current_offset, 9_900);
         assert_eq!(orders.lag(), 100);
         // Past log_end_offset → rejected.

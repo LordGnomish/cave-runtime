@@ -47,8 +47,8 @@ use cave_apiserver::resources::Resource;
 use cave_apiserver::store::ResourceStore;
 use cave_etcd::models::{DeleteRangeRequest, PutRequest};
 use cave_etcd::store::KvStore;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
@@ -195,25 +195,37 @@ pub fn apply_one(entry: &LogEntry, t: &ApplyTargets, m: &ApplyMetrics) -> Result
     debug!(index = entry.index, summary = %cmd.summary(), "applying");
     match cmd {
         RaftCommand::EtcdPut { key, value, lease } => {
-            let req = PutRequest { key, value, lease, prev_kv: false };
+            let req = PutRequest {
+                key,
+                value,
+                lease,
+                prev_kv: false,
+            };
             let _ = t.kv.put(&req);
             m.etcd_puts.fetch_add(1, Ordering::Relaxed);
         }
         RaftCommand::EtcdDelete { key, range_end } => {
-            let req = DeleteRangeRequest { key, range_end, prev_kv: false };
+            let req = DeleteRangeRequest {
+                key,
+                range_end,
+                prev_kv: false,
+            };
             let _ = t.kv.delete_range(&req);
             m.etcd_deletes.fetch_add(1, Ordering::Relaxed);
         }
         RaftCommand::ApiserverUpsert { resource } => {
             // serde_json::Value → typed Resource via the `#[serde(tag = "kind")]`
             // enum. A malformed payload is logged but never crashes the daemon.
-            let res: Resource = serde_json::from_value(resource).map_err(|e| {
-                ApplyError::ApiserverUpsert(format!("typed-decode: {e}"))
-            })?;
+            let res: Resource = serde_json::from_value(resource)
+                .map_err(|e| ApplyError::ApiserverUpsert(format!("typed-decode: {e}")))?;
             t.resources.upsert(res);
             m.apiserver_upserts.fetch_add(1, Ordering::Relaxed);
         }
-        RaftCommand::ApiserverDelete { kind, namespace, name } => {
+        RaftCommand::ApiserverDelete {
+            kind,
+            namespace,
+            name,
+        } => {
             // `Err(NotFound)` is intentionally swallowed — apply is
             // idempotent. The store reports the delete as a no-op when
             // the row is already gone.
@@ -358,11 +370,11 @@ impl cave_etcd::raft_bridge::RaftBridge for RaftBridgeImpl {
         let cmd = RaftCommand::EtcdPut { key, value, lease };
         match propose_and_wait(&self.core, &self.notifier, cmd, self.timeout).await {
             Ok(_) => Ok(()),
-            Err(WriteError::NotLeader { .. }) => Err(
-                cave_etcd::raft_bridge::RaftBridgeError::NotLeader {
+            Err(WriteError::NotLeader { .. }) => {
+                Err(cave_etcd::raft_bridge::RaftBridgeError::NotLeader {
                     leader_url: self.current_leader_url().await,
-                },
-            ),
+                })
+            }
             Err(WriteError::Timeout { .. }) => {
                 Err(cave_etcd::raft_bridge::RaftBridgeError::Timeout)
             }
@@ -380,11 +392,11 @@ impl cave_etcd::raft_bridge::RaftBridge for RaftBridgeImpl {
         let cmd = RaftCommand::EtcdDelete { key, range_end };
         match propose_and_wait(&self.core, &self.notifier, cmd, self.timeout).await {
             Ok(_) => Ok(()),
-            Err(WriteError::NotLeader { .. }) => Err(
-                cave_etcd::raft_bridge::RaftBridgeError::NotLeader {
+            Err(WriteError::NotLeader { .. }) => {
+                Err(cave_etcd::raft_bridge::RaftBridgeError::NotLeader {
                     leader_url: self.current_leader_url().await,
-                },
-            ),
+                })
+            }
             Err(WriteError::Timeout { .. }) => {
                 Err(cave_etcd::raft_bridge::RaftBridgeError::Timeout)
             }
@@ -507,7 +519,11 @@ pub async fn run_apply_loop_with_notifier(
     mut shutdown: tokio::sync::watch::Receiver<bool>,
     interval: Duration,
 ) {
-    info!(?interval, has_notifier = notifier.is_some(), "raft apply loop starting");
+    info!(
+        ?interval,
+        has_notifier = notifier.is_some(),
+        "raft apply loop starting"
+    );
     let mut ticker = tokio::time::interval(interval);
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     loop {
@@ -582,7 +598,8 @@ mod tests {
     fn apply_etcd_put_writes_through() {
         let (t, m) = targets();
         let entry = mk_entry(
-            1, 1,
+            1,
+            1,
             &RaftCommand::EtcdPut {
                 key: "/foo".into(),
                 value: "bar".into(),
@@ -594,14 +611,16 @@ mod tests {
         assert_eq!(snap.etcd_puts, 1);
         assert_eq!(snap.last_applied_index, 1);
         // Verify the KvStore actually holds the value.
-        let r = t.kv.range(&cave_etcd::models::RangeRequest {
-            key: "/foo".into(),
-            range_end: None,
-            limit: None,
-            revision: None,
-            keys_only: false,
-            count_only: false,
-        }).unwrap();
+        let r =
+            t.kv.range(&cave_etcd::models::RangeRequest {
+                key: "/foo".into(),
+                range_end: None,
+                limit: None,
+                revision: None,
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert_eq!(r.kvs.len(), 1);
         assert_eq!(r.kvs[0].value, b"bar");
     }
@@ -610,25 +629,42 @@ mod tests {
     fn apply_etcd_delete_removes_existing_key() {
         let (t, m) = targets();
         apply_one(
-            &mk_entry(1, 1, &RaftCommand::EtcdPut {
-                key: "/x".into(),
-                value: "1".into(),
-                lease: None,
-            }),
-            &t, &m,
-        ).unwrap();
+            &mk_entry(
+                1,
+                1,
+                &RaftCommand::EtcdPut {
+                    key: "/x".into(),
+                    value: "1".into(),
+                    lease: None,
+                },
+            ),
+            &t,
+            &m,
+        )
+        .unwrap();
         apply_one(
-            &mk_entry(2, 1, &RaftCommand::EtcdDelete {
+            &mk_entry(
+                2,
+                1,
+                &RaftCommand::EtcdDelete {
+                    key: "/x".into(),
+                    range_end: None,
+                },
+            ),
+            &t,
+            &m,
+        )
+        .unwrap();
+        let r =
+            t.kv.range(&cave_etcd::models::RangeRequest {
                 key: "/x".into(),
                 range_end: None,
-            }),
-            &t, &m,
-        ).unwrap();
-        let r = t.kv.range(&cave_etcd::models::RangeRequest {
-            key: "/x".into(),
-            range_end: None, limit: None, revision: None,
-            keys_only: false, count_only: false,
-        }).unwrap();
+                limit: None,
+                revision: None,
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert!(r.kvs.is_empty(), "delete should remove the key");
         let snap = m.snapshot();
         assert_eq!(snap.etcd_puts, 1);
@@ -640,12 +676,18 @@ mod tests {
     fn apply_etcd_delete_on_missing_key_is_noop() {
         let (t, m) = targets();
         apply_one(
-            &mk_entry(1, 1, &RaftCommand::EtcdDelete {
-                key: "/never-existed".into(),
-                range_end: None,
-            }),
-            &t, &m,
-        ).expect("delete of missing key must not error");
+            &mk_entry(
+                1,
+                1,
+                &RaftCommand::EtcdDelete {
+                    key: "/never-existed".into(),
+                    range_end: None,
+                },
+            ),
+            &t,
+            &m,
+        )
+        .expect("delete of missing key must not error");
         assert_eq!(m.snapshot().etcd_deletes, 1);
     }
 
@@ -657,9 +699,7 @@ mod tests {
         // `#[serde(tag = "kind")]` puts the variant fields at the SAME
         // level as `kind`, not nested under another key.
         let cm_json = full_configmap_json("demo", "default");
-        let entry = mk_entry(7, 2, &RaftCommand::ApiserverUpsert {
-            resource: cm_json,
-        });
+        let entry = mk_entry(7, 2, &RaftCommand::ApiserverUpsert { resource: cm_json });
         apply_one(&entry, &t, &m).unwrap();
         assert_eq!(t.resources.count("ConfigMap"), 1);
         let snap = m.snapshot();
@@ -676,13 +716,23 @@ mod tests {
         let cm_json = full_configmap_json("x", "ns");
         for idx in 1..=2 {
             apply_one(
-                &mk_entry(idx, 1, &RaftCommand::ApiserverUpsert {
-                    resource: cm_json.clone(),
-                }),
-                &t, &m,
-            ).unwrap();
+                &mk_entry(
+                    idx,
+                    1,
+                    &RaftCommand::ApiserverUpsert {
+                        resource: cm_json.clone(),
+                    },
+                ),
+                &t,
+                &m,
+            )
+            .unwrap();
         }
-        assert_eq!(t.resources.count("ConfigMap"), 1, "upsert must replace, not duplicate");
+        assert_eq!(
+            t.resources.count("ConfigMap"),
+            1,
+            "upsert must replace, not duplicate"
+        );
         assert_eq!(m.snapshot().apiserver_upserts, 2);
     }
 
@@ -692,17 +742,25 @@ mod tests {
         let cm_json = full_configmap_json("victim", "default");
         apply_one(
             &mk_entry(1, 1, &RaftCommand::ApiserverUpsert { resource: cm_json }),
-            &t, &m,
-        ).unwrap();
+            &t,
+            &m,
+        )
+        .unwrap();
         assert_eq!(t.resources.count("ConfigMap"), 1);
         apply_one(
-            &mk_entry(2, 1, &RaftCommand::ApiserverDelete {
-                kind: "ConfigMap".into(),
-                namespace: "default".into(),
-                name: "victim".into(),
-            }),
-            &t, &m,
-        ).unwrap();
+            &mk_entry(
+                2,
+                1,
+                &RaftCommand::ApiserverDelete {
+                    kind: "ConfigMap".into(),
+                    namespace: "default".into(),
+                    name: "victim".into(),
+                },
+            ),
+            &t,
+            &m,
+        )
+        .unwrap();
         assert_eq!(t.resources.count("ConfigMap"), 0);
         let snap = m.snapshot();
         assert_eq!(snap.apiserver_deletes, 1);
@@ -712,13 +770,19 @@ mod tests {
     fn apply_apiserver_delete_on_missing_is_noop() {
         let (t, m) = targets();
         apply_one(
-            &mk_entry(1, 1, &RaftCommand::ApiserverDelete {
-                kind: "ConfigMap".into(),
-                namespace: "default".into(),
-                name: "ghost".into(),
-            }),
-            &t, &m,
-        ).expect("apiserver delete must be idempotent on missing key");
+            &mk_entry(
+                1,
+                1,
+                &RaftCommand::ApiserverDelete {
+                    kind: "ConfigMap".into(),
+                    namespace: "default".into(),
+                    name: "ghost".into(),
+                },
+            ),
+            &t,
+            &m,
+        )
+        .expect("apiserver delete must be idempotent on missing key");
         assert_eq!(m.snapshot().apiserver_deletes, 1);
         assert_eq!(m.snapshot().apply_errors, 0);
     }
@@ -739,7 +803,11 @@ mod tests {
         // Earlier sessions used `propose(vec![])` for leader markers;
         // make sure those still apply cleanly.
         let (t, m) = targets();
-        let raw = LogEntry { term: 1, index: 10, command: vec![] };
+        let raw = LogEntry {
+            term: 1,
+            index: 10,
+            command: vec![],
+        };
         apply_one(&raw, &t, &m).unwrap();
         assert_eq!(m.snapshot().noops, 1);
     }
@@ -747,17 +815,29 @@ mod tests {
     #[test]
     fn apply_batch_continues_past_a_decode_error() {
         let (t, m) = targets();
-        let good = mk_entry(1, 1, &RaftCommand::EtcdPut {
-            key: "/g".into(),
-            value: "v".into(),
-            lease: None,
-        });
-        let bad = LogEntry { term: 1, index: 2, command: b"not-json".to_vec() };
-        let later = mk_entry(3, 1, &RaftCommand::EtcdPut {
-            key: "/h".into(),
-            value: "w".into(),
-            lease: None,
-        });
+        let good = mk_entry(
+            1,
+            1,
+            &RaftCommand::EtcdPut {
+                key: "/g".into(),
+                value: "v".into(),
+                lease: None,
+            },
+        );
+        let bad = LogEntry {
+            term: 1,
+            index: 2,
+            command: b"not-json".to_vec(),
+        };
+        let later = mk_entry(
+            3,
+            1,
+            &RaftCommand::EtcdPut {
+                key: "/h".into(),
+                value: "w".into(),
+                lease: None,
+            },
+        );
         apply_batch(vec![good, bad, later], &t, &m);
         let snap = m.snapshot();
         assert_eq!(snap.etcd_puts, 2, "the bad entry must not stop the batch");
@@ -774,14 +854,21 @@ mod tests {
         // returns ApiserverUpsert (typed-decode), apply_batch counts
         // it as a non-decode apply error.
         let (t, m) = targets();
-        let bogus_kind = mk_entry(1, 1, &RaftCommand::ApiserverUpsert {
-            resource: serde_json::json!({"kind": "NotAResource", "metadata": {}}),
-        });
+        let bogus_kind = mk_entry(
+            1,
+            1,
+            &RaftCommand::ApiserverUpsert {
+                resource: serde_json::json!({"kind": "NotAResource", "metadata": {}}),
+            },
+        );
         let next = mk_entry(2, 1, &RaftCommand::NoOp);
         apply_batch(vec![bogus_kind, next], &t, &m);
         let snap = m.snapshot();
         assert_eq!(snap.apply_errors, 1);
-        assert_eq!(snap.decode_errors, 0, "typed-decode is not a wire decode error");
+        assert_eq!(
+            snap.decode_errors, 0,
+            "typed-decode is not a wire decode error"
+        );
         assert_eq!(snap.noops, 1);
     }
 
@@ -828,9 +915,13 @@ mod tests {
         // A typed-decode error should NOT bump the notifier — clients
         // waiting for index N must still see "not yet applied" if N
         // failed to land.
-        let bogus = mk_entry(6, 1, &RaftCommand::ApiserverUpsert {
-            resource: serde_json::json!({"kind": "NotAResource"}),
-        });
+        let bogus = mk_entry(
+            6,
+            1,
+            &RaftCommand::ApiserverUpsert {
+                resource: serde_json::json!({"kind": "NotAResource"}),
+            },
+        );
         let _ = apply_one_notify(&bogus, &t, &m, Some(&n));
         assert_eq!(n.current(), 5, "notifier must not advance on apply failure");
     }
@@ -850,7 +941,11 @@ mod tests {
         let (t, m) = targets();
         let n = ApplyNotifier::new();
         let good = mk_entry(1, 1, &RaftCommand::NoOp);
-        let bad = LogEntry { term: 1, index: 2, command: b"not-json".to_vec() };
+        let bad = LogEntry {
+            term: 1,
+            index: 2,
+            command: b"not-json".to_vec(),
+        };
         let later = mk_entry(3, 1, &RaftCommand::NoOp);
         apply_batch_notify(vec![good, bad, later], &t, &m, Some(&n));
         // index 2 failed, so the notifier holds the most recent
@@ -895,7 +990,10 @@ mod tests {
         n.publish(3);
         tokio::time::sleep(Duration::from_millis(10)).await;
         n.publish(5);
-        let got = tokio::time::timeout(Duration::from_secs(5), task).await.unwrap().unwrap();
+        let got = tokio::time::timeout(Duration::from_secs(5), task)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(got, Ok(5));
     }
 
@@ -921,7 +1019,10 @@ mod tests {
         // Publish a couple of small indices — none reach `assigned=10`.
         n.publish(2);
         n.publish(3);
-        let got = tokio::time::timeout(Duration::from_secs(2), task).await.unwrap().unwrap();
+        let got = tokio::time::timeout(Duration::from_secs(2), task)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(got, Err("timeout"));
     }
 
@@ -946,16 +1047,24 @@ mod tests {
         let src = Arc::new(VecSource {
             inner: tokio::sync::Mutex::new(
                 vec![
-                    vec![mk_entry(1, 1, &RaftCommand::EtcdPut {
-                        key: "/k1".into(),
-                        value: "1".into(),
-                        lease: None,
-                    })],
-                    vec![mk_entry(2, 1, &RaftCommand::EtcdPut {
-                        key: "/k2".into(),
-                        value: "2".into(),
-                        lease: None,
-                    })],
+                    vec![mk_entry(
+                        1,
+                        1,
+                        &RaftCommand::EtcdPut {
+                            key: "/k1".into(),
+                            value: "1".into(),
+                            lease: None,
+                        },
+                    )],
+                    vec![mk_entry(
+                        2,
+                        1,
+                        &RaftCommand::EtcdPut {
+                            key: "/k2".into(),
+                            value: "2".into(),
+                            lease: None,
+                        },
+                    )],
                 ]
                 .into_iter()
                 .collect(),

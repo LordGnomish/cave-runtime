@@ -93,8 +93,8 @@ pub mod watch_filters;
 #[cfg(test)]
 mod parity_tests;
 
-use store::KvStore;
 use std::sync::Arc;
+use store::KvStore;
 
 /// Initialize cave-etcd state.
 pub fn new_state() -> Arc<KvStore> {

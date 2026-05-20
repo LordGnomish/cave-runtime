@@ -29,11 +29,11 @@
 //!   (b) plugs in an external c14n implementation (`xmlsec1`)
 //!       via the `canonicalize_fn` field on [`SignedDocument`].
 
-use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD as B64;
 use ring::rand::SystemRandom;
 use ring::signature::{
-    RsaKeyPair, UnparsedPublicKey, RSA_PKCS1_2048_8192_SHA256, RSA_PKCS1_SHA256,
+    RSA_PKCS1_2048_8192_SHA256, RSA_PKCS1_SHA256, RsaKeyPair, UnparsedPublicKey,
 };
 
 use super::SamlError;
@@ -118,8 +118,8 @@ pub fn verify_signature(
 // ─────────────────────────────────────────────────────────────────
 
 use super::signing_ecdsa::{
-    self, EcdsaSigningKey, EcdsaVerifyingKey, HashAlg as EcdsaHashAlg, ALG_ECDSA_SHA256,
-    ALG_ECDSA_SHA384, ALG_ECDSA_SHA512,
+    self, ALG_ECDSA_SHA256, ALG_ECDSA_SHA384, ALG_ECDSA_SHA512, EcdsaSigningKey, EcdsaVerifyingKey,
+    HashAlg as EcdsaHashAlg,
 };
 
 /// One of the four XMLDSig signature methods cave-auth's SAML
@@ -317,7 +317,7 @@ mod tests {
 
     // ─── Algorithm dispatch tests (unified RSA + ECDSA top-level) ───
 
-    use super::super::signing_ecdsa::{generate_keypair, EcdsaCurve};
+    use super::super::signing_ecdsa::{EcdsaCurve, generate_keypair};
 
     #[test]
     fn algorithm_xmldsig_alg_urns_round_trip() {
@@ -340,14 +340,18 @@ mod tests {
         let sig = sign(
             &doc,
             Algorithm::RsaSha256,
-            &SigningMaterial::Rsa { pkcs8_der: &key_der },
+            &SigningMaterial::Rsa {
+                pkcs8_der: &key_der,
+            },
         )
         .unwrap();
         verify(
             &doc,
             Algorithm::RsaSha256,
             &sig,
-            &VerifyingMaterial::Rsa { rsa_pub_der: &pub_der },
+            &VerifyingMaterial::Rsa {
+                rsa_pub_der: &pub_der,
+            },
         )
         .unwrap();
     }
@@ -430,7 +434,9 @@ mod tests {
         let err = sign(
             &doc,
             Algorithm::EcdsaSha256,
-            &SigningMaterial::Rsa { pkcs8_der: &key_der },
+            &SigningMaterial::Rsa {
+                pkcs8_der: &key_der,
+            },
         )
         .unwrap_err();
         assert!(matches!(err, SamlError::InvalidSignature(_)));

@@ -282,12 +282,17 @@ fn render_tags(tags: &[String]) -> String {
     if tags.is_empty() {
         return String::new();
     }
-    let inner: String = tags.iter().map(|t| format!(r#"<span class="tag">{}</span>"#, escape_html(t))).collect::<Vec<_>>().join("");
+    let inner: String = tags
+        .iter()
+        .map(|t| format!(r#"<span class="tag">{}</span>"#, escape_html(t)))
+        .collect::<Vec<_>>()
+        .join("");
     format!(r#"<div class="tags">{inner}</div>"#)
 }
 
 fn render_variables_bar(vars: &[Variable]) -> String {
-    let visible: Vec<&Variable> = vars.iter()
+    let visible: Vec<&Variable> = vars
+        .iter()
         .filter(|v| !matches!(v.hide, VariableHide::HideVariable))
         .collect();
 
@@ -295,7 +300,11 @@ fn render_variables_bar(vars: &[Variable]) -> String {
         return String::new();
     }
 
-    let inner: String = visible.iter().map(|v| render_variable(v)).collect::<Vec<_>>().join("\n");
+    let inner: String = visible
+        .iter()
+        .map(|v| render_variable(v))
+        .collect::<Vec<_>>()
+        .join("\n");
     format!(r#"<div class="variables-bar">{inner}</div>"#)
 }
 
@@ -308,7 +317,8 @@ fn render_variable(var: &Variable) -> String {
 
     let current_val = match &var.current.value {
         serde_json::Value::String(s) => escape_html(s),
-        serde_json::Value::Array(arr) => arr.iter()
+        serde_json::Value::Array(arr) => arr
+            .iter()
             .filter_map(|v| v.as_str())
             .map(escape_html)
             .collect::<Vec<_>>()
@@ -323,21 +333,31 @@ fn render_variable(var: &Variable) -> String {
             )
         }
         _ => {
-            let options_html: String = var.options.iter().map(|opt| {
-                let val = match &opt.value {
-                    serde_json::Value::String(s) => escape_html(s),
-                    other => escape_html(&other.to_string()),
-                };
-                let txt = match &opt.text {
-                    serde_json::Value::String(s) => escape_html(s),
-                    other => escape_html(&other.to_string()),
-                };
-                let selected = if opt.selected { " selected" } else { "" };
-                format!(r#"<option value="{val}"{selected}>{txt}</option>"#)
-            }).collect::<Vec<_>>().join("");
+            let options_html: String = var
+                .options
+                .iter()
+                .map(|opt| {
+                    let val = match &opt.value {
+                        serde_json::Value::String(s) => escape_html(s),
+                        other => escape_html(&other.to_string()),
+                    };
+                    let txt = match &opt.text {
+                        serde_json::Value::String(s) => escape_html(s),
+                        other => escape_html(&other.to_string()),
+                    };
+                    let selected = if opt.selected { " selected" } else { "" };
+                    format!(r#"<option value="{val}"{selected}>{txt}</option>"#)
+                })
+                .collect::<Vec<_>>()
+                .join("");
 
-            let current_opt = format!(r#"<option value="{current_val}" selected>{current_val}</option>"#);
-            let opts = if options_html.is_empty() { current_opt } else { options_html };
+            let current_opt =
+                format!(r#"<option value="{current_val}" selected>{current_val}</option>"#);
+            let opts = if options_html.is_empty() {
+                current_opt
+            } else {
+                options_html
+            };
 
             format!(
                 r#"<div class="var-group"><span class="var-label">{label}</span><select class="var-select">{opts}</select></div>"#
@@ -347,7 +367,11 @@ fn render_variable(var: &Variable) -> String {
 }
 
 fn render_panels(panels: &[Panel]) -> String {
-    panels.iter().map(render_panel).collect::<Vec<_>>().join("\n")
+    panels
+        .iter()
+        .map(render_panel)
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn render_panel(panel: &Panel) -> String {
@@ -356,7 +380,10 @@ fn render_panel(panel: &Panel) -> String {
     let type_icon = panel_type_icon(panel.panel_type);
 
     let description_html = if !panel.description.is_empty() {
-        format!(r#"<div class="panel-description">{}</div>"#, escape_html(&panel.description))
+        format!(
+            r#"<div class="panel-description">{}</div>"#,
+            escape_html(&panel.description)
+        )
     } else {
         String::new()
     };
@@ -372,7 +399,11 @@ fn render_panel(panel: &Panel) -> String {
         String::new()
     };
 
-    let extra_class = if panel.panel_type == PanelType::Row { " panel-row" } else { "" };
+    let extra_class = if panel.panel_type == PanelType::Row {
+        " panel-row"
+    } else {
+        ""
+    };
     let body = render_panel_body(panel);
 
     format!(
@@ -408,7 +439,11 @@ fn render_panel_body(panel: &Panel) -> String {
 
 fn render_stat_panel(panel: &Panel) -> String {
     let unit = panel.field_config.defaults.unit.as_str();
-    let target_expr = panel.targets.first().map(|t| escape_html(&t.expr)).unwrap_or_default();
+    let target_expr = panel
+        .targets
+        .first()
+        .map(|t| escape_html(&t.expr))
+        .unwrap_or_default();
     format!(
         r#"<div class="panel-body" style="flex-direction:column;">
   <div class="panel-stat-value">—<span class="panel-stat-unit">{unit}</span></div>
@@ -433,10 +468,13 @@ fn render_gauge_panel(panel: &Panel) -> String {
 
 fn render_graph_panel(panel: &Panel) -> String {
     // Render a decorative bar chart placeholder
-    let bars: String = (0..20).map(|i| {
-        let h = 20 + (i * 7 + i * i / 4) % 80;
-        format!(r#"<div class="chart-bar" style="height:{h}%"></div>"#)
-    }).collect::<Vec<_>>().join("");
+    let bars: String = (0..20)
+        .map(|i| {
+            let h = 20 + (i * 7 + i * i / 4) % 80;
+            format!(r#"<div class="chart-bar" style="height:{h}%"></div>"#)
+        })
+        .collect::<Vec<_>>()
+        .join("");
 
     format!(
         r#"<div class="panel-body" style="flex-direction:column;width:100%;padding:8px 12px;">
@@ -463,16 +501,20 @@ fn render_bar_gauge_panel(panel: &Panel) -> String {
         return format!(r#"<div class="panel-body">No targets configured</div>"#);
     }
 
-    format!(r#"<div class="panel-body" style="flex-direction:column;width:100%;padding:12px;">{targets}</div>"#)
+    format!(
+        r#"<div class="panel-body" style="flex-direction:column;width:100%;padding:12px;">{targets}</div>"#
+    )
 }
 
 fn render_table_panel(panel: &Panel) -> String {
     let cols = vec!["Time", "Value", "Label"];
     let header: String = cols.iter().map(|c| format!("<th>{c}</th>")).collect();
-    let rows: String = (0..3).map(|_| {
-        let cells: String = cols.iter().map(|_| "<td>—</td>").collect();
-        format!("<tr>{cells}</tr>")
-    }).collect();
+    let rows: String = (0..3)
+        .map(|_| {
+            let cells: String = cols.iter().map(|_| "<td>—</td>").collect();
+            format!("<tr>{cells}</tr>")
+        })
+        .collect();
 
     format!(
         r#"<div class="panel-body" style="align-items:flex-start;padding:0;">
@@ -487,19 +529,28 @@ fn render_table_panel(panel: &Panel) -> String {
 }
 
 fn render_text_panel(panel: &Panel) -> String {
-    let content = panel.options.get("content").and_then(|v| v.as_str()).unwrap_or("*No content configured*");
-    format!(r#"<div class="panel-body text-panel">{}</div>"#, escape_html(content))
+    let content = panel
+        .options
+        .get("content")
+        .and_then(|v| v.as_str())
+        .unwrap_or("*No content configured*");
+    format!(
+        r#"<div class="panel-body text-panel">{}</div>"#,
+        escape_html(content)
+    )
 }
 
 fn render_logs_panel(panel: &Panel) -> String {
-    let entries: String = (0..5).map(|i| {
-        format!(
-            r#"<div class="logs-entry">
+    let entries: String = (0..5)
+        .map(|i| {
+            format!(
+                r#"<div class="logs-entry">
   <span class="logs-time">2026-04-12 00:0{i}:00</span>
   <span class="logs-line">— no live data —</span>
 </div>"#
-        )
-    }).collect();
+            )
+        })
+        .collect();
     format!(
         r#"<div class="panel-body" style="flex-direction:column;align-items:flex-start;overflow:auto;width:100%;padding:8px 12px;">
 {entries}
@@ -536,7 +587,11 @@ fn render_dashboard_list_panel(panel: &Panel) -> String {
 }
 
 fn render_generic_panel(panel: &Panel) -> String {
-    let target_expr = panel.targets.first().map(|t| escape_html(&t.expr)).unwrap_or_default();
+    let target_expr = panel
+        .targets
+        .first()
+        .map(|t| escape_html(&t.expr))
+        .unwrap_or_default();
     format!(
         r#"<div class="panel-body">
   <div style="text-align:center;">
@@ -588,14 +643,16 @@ console.info('CAVE Dashboard renderer loaded — connect datasources for live da
 
 /// Escape HTML special characters to prevent XSS.
 pub fn escape_html(s: &str) -> String {
-    s.chars().map(|c| match c {
-        '&' => "&amp;".to_string(),
-        '<' => "&lt;".to_string(),
-        '>' => "&gt;".to_string(),
-        '"' => "&quot;".to_string(),
-        '\'' => "&#39;".to_string(),
-        c => c.to_string(),
-    }).collect()
+    s.chars()
+        .map(|c| match c {
+            '&' => "&amp;".to_string(),
+            '<' => "&lt;".to_string(),
+            '>' => "&gt;".to_string(),
+            '"' => "&quot;".to_string(),
+            '\'' => "&#39;".to_string(),
+            c => c.to_string(),
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -630,9 +687,14 @@ mod tests {
     fn test_panel_type_icons_no_panic() {
         // Ensure all enum variants have an icon mapping
         for pt in [
-            PanelType::Graph, PanelType::Stat, PanelType::Gauge,
-            PanelType::Table, PanelType::BarGauge, PanelType::Logs,
-            PanelType::Text, PanelType::AlertList,
+            PanelType::Graph,
+            PanelType::Stat,
+            PanelType::Gauge,
+            PanelType::Table,
+            PanelType::BarGauge,
+            PanelType::Logs,
+            PanelType::Text,
+            PanelType::AlertList,
         ] {
             let _ = panel_type_icon(pt);
         }

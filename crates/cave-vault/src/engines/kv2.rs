@@ -1,22 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+use crate::VaultState;
 use crate::error::{VaultError, VaultResult};
 use crate::response::VaultResponse;
-use crate::VaultState;
 use axum::{
+    Router,
     extract::{Json, Path, Query, State},
     http::HeaderMap,
     routing::{delete, get, patch, post, put},
-    Router,
 };
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 fn extract_token(headers: &HeaderMap) -> VaultResult<String> {
-    headers.get("x-vault-token")
+    headers
+        .get("x-vault-token")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or(VaultError::BadToken)
@@ -62,7 +63,9 @@ impl Default for Kv2Secret {
 
 impl Kv2Secret {
     pub fn current(&self) -> Option<&Kv2Version> {
-        self.versions.iter().find(|v| v.version == self.current_version)
+        self.versions
+            .iter()
+            .find(|v| v.version == self.current_version)
     }
 
     pub fn get_version(&self, v: u64) -> Option<&Kv2Version> {
@@ -96,7 +99,9 @@ impl Kv2Secret {
         if self.delete_version_after <= 0 {
             return false;
         }
-        let Some(v) = self.get_version(version) else { return false };
+        let Some(v) = self.get_version(version) else {
+            return false;
+        };
         if v.destroyed {
             return false;
         }
@@ -114,8 +119,12 @@ impl Kv2Secret {
         let ttl = chrono::Duration::seconds(self.delete_version_after);
         let mut swept = Vec::new();
         for v in self.versions.iter_mut() {
-            if v.destroyed { continue; }
-            if v.deletion_time.is_some() { continue; }
+            if v.destroyed {
+                continue;
+            }
+            if v.deletion_time.is_some() {
+                continue;
+            }
             if v.created_time + ttl < now {
                 v.deletion_time = Some(now);
                 swept.push(v.version);
@@ -149,11 +158,18 @@ pub async fn read_secret(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.kv2_store.read().await;
-    let secret = store.data.get(&mount)
+    let secret = store
+        .data
+        .get(&mount)
         .and_then(|m| m.get(&path))
         .ok_or(VaultError::SecretNotFound)?;
     let version = secret.current().ok_or(VaultError::SecretNotFound)?;
-    if version.destroyed || version.deletion_time.map(|d| Utc::now() > d).unwrap_or(false) {
+    if version.destroyed
+        || version
+            .deletion_time
+            .map(|d| Utc::now() > d)
+            .unwrap_or(false)
+    {
         return Err(VaultError::SecretNotFound);
     }
     Ok(VaultResponse::new().with_data(json!({
@@ -175,15 +191,20 @@ pub async fn read_secret_version(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.kv2_store.read().await;
-    let secret = store.data.get(&mount)
+    let secret = store
+        .data
+        .get(&mount)
         .and_then(|m| m.get(&path))
         .ok_or(VaultError::SecretNotFound)?;
 
-    let version_num: u64 = q.get("version")
+    let version_num: u64 = q
+        .get("version")
         .and_then(|v| v.parse().ok())
         .unwrap_or(secret.current_version);
 
-    let version = secret.get_version(version_num).ok_or(VaultError::SecretNotFound)?;
+    let version = secret
+        .get_version(version_num)
+        .ok_or(VaultError::SecretNotFound)?;
     if version.destroyed {
         return Ok(VaultResponse::new().with_data(json!({
             "data": null,
@@ -265,7 +286,8 @@ pub async fn patch_secret(
     let mount_map = store.data.entry(mount).or_default();
     let secret = mount_map.entry(path.clone()).or_default();
 
-    let mut merged: HashMap<String, Value> = secret.current()
+    let mut merged: HashMap<String, Value> = secret
+        .current()
         .and_then(|v| v.data.clone())
         .unwrap_or_default();
     for (k, v) in body {
@@ -380,16 +402,25 @@ pub async fn read_metadata(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.kv2_store.read().await;
-    let secret = store.data.get(&mount)
+    let secret = store
+        .data
+        .get(&mount)
         .and_then(|m| m.get(&path))
         .ok_or(VaultError::SecretNotFound)?;
-    let versions_meta: HashMap<String, Value> = secret.versions.iter().map(|v| {
-        (v.version.to_string(), json!({
-            "created_time": v.created_time.to_rfc3339(),
-            "deletion_time": v.deletion_time.map(|d| d.to_rfc3339()).unwrap_or_default(),
-            "destroyed": v.destroyed,
-        }))
-    }).collect();
+    let versions_meta: HashMap<String, Value> = secret
+        .versions
+        .iter()
+        .map(|v| {
+            (
+                v.version.to_string(),
+                json!({
+                    "created_time": v.created_time.to_rfc3339(),
+                    "deletion_time": v.deletion_time.map(|d| d.to_rfc3339()).unwrap_or_default(),
+                    "destroyed": v.destroyed,
+                }),
+            )
+        })
+        .collect();
     Ok(VaultResponse::new().with_data(json!({
         "current_version": secret.current_version,
         "oldest_version": secret.oldest_version,
@@ -418,10 +449,21 @@ pub async fn write_metadata(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.kv2_store.write().await;
-    let secret = store.data.entry(mount).or_default().entry(path).or_default();
-    if let Some(max) = body.max_versions { secret.max_versions = max; }
-    if let Some(cas) = body.cas_required { secret.cas_required = cas; }
-    if let Some(meta) = body.custom_metadata { secret.custom_metadata = meta; }
+    let secret = store
+        .data
+        .entry(mount)
+        .or_default()
+        .entry(path)
+        .or_default();
+    if let Some(max) = body.max_versions {
+        secret.max_versions = max;
+    }
+    if let Some(cas) = body.cas_required {
+        secret.cas_required = cas;
+    }
+    if let Some(meta) = body.custom_metadata {
+        secret.custom_metadata = meta;
+    }
     Ok(VaultResponse::new())
 }
 
@@ -446,7 +488,11 @@ pub async fn list_secrets(
     let _token = extract_token(&headers)?;
     let store = state.kv2_store.read().await;
     let mount_data = store.data.get(&mount);
-    let prefix = if path.is_empty() { String::new() } else { format!("{}/", path) };
+    let prefix = if path.is_empty() {
+        String::new()
+    } else {
+        format!("{}/", path)
+    };
     let keys: Vec<String> = mount_data
         .map(|m| {
             let mut seen = std::collections::BTreeSet::new();
@@ -481,28 +527,41 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
             get({
                 let s = state.clone();
                 let mount = m.clone();
-                move |headers: HeaderMap, Path(path): Path<String>, Query(q): Query<HashMap<String, String>>| {
+                move |headers: HeaderMap,
+                      Path(path): Path<String>,
+                      Query(q): Query<HashMap<String, String>>| {
                     let state = s.clone();
                     let mount = mount.clone();
-                    async move { read_secret_version(State(state), headers, Path((mount, path)), Query(q)).await }
+                    async move {
+                        read_secret_version(State(state), headers, Path((mount, path)), Query(q))
+                            .await
+                    }
                 }
             })
             .put({
                 let s = state.clone();
                 let mount = m.clone();
-                move |headers: HeaderMap, Path(path): Path<String>, Json(body): Json<WriteRequest>| {
+                move |headers: HeaderMap,
+                      Path(path): Path<String>,
+                      Json(body): Json<WriteRequest>| {
                     let state = s.clone();
                     let mount = mount.clone();
-                    async move { write_secret(State(state), headers, Path((mount, path)), Json(body)).await }
+                    async move {
+                        write_secret(State(state), headers, Path((mount, path)), Json(body)).await
+                    }
                 }
             })
             .post({
                 let s = state.clone();
                 let mount = m.clone();
-                move |headers: HeaderMap, Path(path): Path<String>, Json(body): Json<WriteRequest>| {
+                move |headers: HeaderMap,
+                      Path(path): Path<String>,
+                      Json(body): Json<WriteRequest>| {
                     let state = s.clone();
                     let mount = mount.clone();
-                    async move { write_secret(State(state), headers, Path((mount, path)), Json(body)).await }
+                    async move {
+                        write_secret(State(state), headers, Path((mount, path)), Json(body)).await
+                    }
                 }
             })
             .delete({
@@ -520,10 +579,15 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
             post({
                 let s = state.clone();
                 let mount = m.clone();
-                move |headers: HeaderMap, Path(path): Path<String>, Json(body): Json<DeleteVersionsRequest>| {
+                move |headers: HeaderMap,
+                      Path(path): Path<String>,
+                      Json(body): Json<DeleteVersionsRequest>| {
                     let state = s.clone();
                     let mount = mount.clone();
-                    async move { delete_versions(State(state), headers, Path((mount, path)), Json(body)).await }
+                    async move {
+                        delete_versions(State(state), headers, Path((mount, path)), Json(body))
+                            .await
+                    }
                 }
             }),
         )
@@ -532,10 +596,15 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
             post({
                 let s = state.clone();
                 let mount = m.clone();
-                move |headers: HeaderMap, Path(path): Path<String>, Json(body): Json<DeleteVersionsRequest>| {
+                move |headers: HeaderMap,
+                      Path(path): Path<String>,
+                      Json(body): Json<DeleteVersionsRequest>| {
                     let state = s.clone();
                     let mount = mount.clone();
-                    async move { undelete_versions(State(state), headers, Path((mount, path)), Json(body)).await }
+                    async move {
+                        undelete_versions(State(state), headers, Path((mount, path)), Json(body))
+                            .await
+                    }
                 }
             }),
         )
@@ -544,10 +613,15 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
             post({
                 let s = state.clone();
                 let mount = m.clone();
-                move |headers: HeaderMap, Path(path): Path<String>, Json(body): Json<DeleteVersionsRequest>| {
+                move |headers: HeaderMap,
+                      Path(path): Path<String>,
+                      Json(body): Json<DeleteVersionsRequest>| {
                     let state = s.clone();
                     let mount = mount.clone();
-                    async move { destroy_versions(State(state), headers, Path((mount, path)), Json(body)).await }
+                    async move {
+                        destroy_versions(State(state), headers, Path((mount, path)), Json(body))
+                            .await
+                    }
                 }
             }),
         )
@@ -565,19 +639,27 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
             .put({
                 let s = state.clone();
                 let mount = m.clone();
-                move |headers: HeaderMap, Path(path): Path<String>, Json(body): Json<UpdateMetadataRequest>| {
+                move |headers: HeaderMap,
+                      Path(path): Path<String>,
+                      Json(body): Json<UpdateMetadataRequest>| {
                     let state = s.clone();
                     let mount = mount.clone();
-                    async move { write_metadata(State(state), headers, Path((mount, path)), Json(body)).await }
+                    async move {
+                        write_metadata(State(state), headers, Path((mount, path)), Json(body)).await
+                    }
                 }
             })
             .post({
                 let s = state.clone();
                 let mount = m.clone();
-                move |headers: HeaderMap, Path(path): Path<String>, Json(body): Json<UpdateMetadataRequest>| {
+                move |headers: HeaderMap,
+                      Path(path): Path<String>,
+                      Json(body): Json<UpdateMetadataRequest>| {
                     let state = s.clone();
                     let mount = mount.clone();
-                    async move { write_metadata(State(state), headers, Path((mount, path)), Json(body)).await }
+                    async move {
+                        write_metadata(State(state), headers, Path((mount, path)), Json(body)).await
+                    }
                 }
             })
             .delete({
@@ -612,7 +694,12 @@ mod tests {
         // Write v1
         {
             let mut s = store.write().await;
-            let secret = s.data.entry(mount.to_string()).or_default().entry(path.to_string()).or_default();
+            let secret = s
+                .data
+                .entry(mount.to_string())
+                .or_default()
+                .entry(path.to_string())
+                .or_default();
             let mut data = HashMap::new();
             data.insert("key".to_string(), Value::String("value1".to_string()));
             secret.versions.push(Kv2Version {
@@ -648,7 +735,14 @@ mod tests {
             assert_eq!(secret.current_version, 2);
             assert_eq!(secret.versions.len(), 2);
             let v1 = secret.get_version(1).unwrap();
-            assert_eq!(v1.data.as_ref().unwrap().get("key").and_then(|v| v.as_str()), Some("value1"));
+            assert_eq!(
+                v1.data
+                    .as_ref()
+                    .unwrap()
+                    .get("key")
+                    .and_then(|v| v.as_str()),
+                Some("value1")
+            );
         }
     }
 
@@ -660,7 +754,12 @@ mod tests {
 
         {
             let mut s = store.write().await;
-            let secret = s.data.entry(mount.to_string()).or_default().entry(path.to_string()).or_default();
+            let secret = s
+                .data
+                .entry(mount.to_string())
+                .or_default()
+                .entry(path.to_string())
+                .or_default();
             let mut data = HashMap::new();
             data.insert("val".to_string(), Value::String("hello".to_string()));
             secret.versions.push(Kv2Version {
@@ -710,7 +809,12 @@ mod tests {
         // First write sets current_version = 0 -> 1
         {
             let mut s = store.write().await;
-            let secret = s.data.entry(mount.to_string()).or_default().entry(path.to_string()).or_default();
+            let secret = s
+                .data
+                .entry(mount.to_string())
+                .or_default()
+                .entry(path.to_string())
+                .or_default();
             assert_eq!(secret.current_version, 0);
         }
     }

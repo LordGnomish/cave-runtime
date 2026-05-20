@@ -9,12 +9,12 @@
 
 #[cfg(test)]
 mod cycle_1778624182_a3 {
-    use cave_karpenter::models::{
-        Budget, Disruption, Limits, NodeClaim, NodeClaimSpec, NodeClaimStatus,
-        NodeClass, NodeClassRef, NodePool, Requirement, RequirementOperator, Taint,
-    };
-    use cave_karpenter::scheduler::{schedule_first_match, ScheduleOutcome};
     use cave_karpenter::Store;
+    use cave_karpenter::models::{
+        Budget, Disruption, Limits, NodeClaim, NodeClaimSpec, NodeClaimStatus, NodeClass,
+        NodeClassRef, NodePool, Requirement, RequirementOperator, Taint,
+    };
+    use cave_karpenter::scheduler::{ScheduleOutcome, schedule_first_match};
     use cave_karpenter::{MODULE_NAME, UPSTREAM_REPO, UPSTREAM_VERSION};
 
     #[test]
@@ -131,11 +131,9 @@ mod cycle_1778624182_a3 {
 
 #[cfg(test)]
 mod cycle_1779208173_a2 {
-    use cave_karpenter::models::{
-        NodePool, Requirement, RequirementOperator, Taint,
-    };
-    use cave_karpenter::scheduler::{schedule_first_match, ScheduleOutcome};
     use cave_karpenter::Store;
+    use cave_karpenter::models::{NodePool, Requirement, RequirementOperator, Taint};
+    use cave_karpenter::scheduler::{ScheduleOutcome, schedule_first_match};
     use std::collections::HashMap;
 
     // TODO not_yet_exposed: NodePool::new
@@ -169,11 +167,11 @@ mod cycle_1779208173_a2 {
     fn test_schedule_first_match_empty_pools_20231027100004() {
         let pools: Vec<NodePool> = Vec::new();
         let pod_reqs: Vec<(String, String)> = Vec::new();
-        
+
         // We cannot construct ScheduleOutcome variants directly as they are not exposed.
         // We can only check the return type exists and the function doesn't panic.
         let _result: ScheduleOutcome = schedule_first_match(&pools, &pod_reqs);
-        
+
         // TODO not_yet_exposed: ScheduleOutcome::NoMatch
         // assert_eq!(_result, ScheduleOutcome::NoMatch);
     }
@@ -183,12 +181,10 @@ mod cycle_1779208173_a2 {
     fn test_schedule_first_match_with_pools_20231027100005() {
         // TODO not_yet_exposed: NodePool::new
         let pools: Vec<NodePool> = Vec::new();
-        let pod_reqs: Vec<(String, String)> = vec![
-            ("key".to_string(), "value".to_string()),
-        ];
-        
+        let pod_reqs: Vec<(String, String)> = vec![("key".to_string(), "value".to_string())];
+
         let _result: ScheduleOutcome = schedule_first_match(&pools, &pod_reqs);
-        
+
         // TODO not_yet_exposed: ScheduleOutcome::NoMatch
         // assert_eq!(_result, ScheduleOutcome::NoMatch);
     }

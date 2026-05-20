@@ -1,0 +1,98 @@
+name: Parity Audit
+
+on:
+  schedule:
+    # Daily at 03:00 UTC — same window as parity-index-sync local agent.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      open_drift_issue:
+        description: "Open a GitHub issue if stale crates > 0"
+        required: false
+        default: "true"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  regen-parity-index:
+    name: Regenerate parity-index.json
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Regenerate parity-index.json
+        run: python3 scripts/build-parity-index.py
+
+      - name: Surface drift
+        id: drift
+        # Stale crate = `last_audit` older than 30 days.
+        # `parity_ratio_source != "manifest"` = self-graded, must be fixed.
+        # Exit-code is informational only; the report still uploads.
+        run: |
+          python3 - <<'PY'
+          import json, os, datetime, sys
+          idx = json.load(open("docs/parity/parity-index.json"))
+          today = datetime.date.today()
+          stale, self_graded = [], []
+          for name, crate in idx["crates"].items():
+              audit = crate.get("last_audit_disk")
+              source = crate.get("parity_ratio_source")
+              try:
+                  d = datetime.date.fromisoformat(audit) if audit else None
+              except Exception:
+                  d = None
+              if d is None or (today - d).days > 30:
+                  stale.append((name, audit))
+              if source not in ("manifest", None):
+                  self_graded.append((name, source))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"stale_count={len(stale)}\n")
+              f.write(f"self_graded_count={len(self_graded)}\n")
+          print(f"::group::stale crates ({len(stale)})")
+          for n, a in stale[:50]:
+              print(f"  {n}: last_audit={a}")
+          if len(stale) > 50:
+              print(f"  ... and {len(stale) - 50} more")
+          print("::endgroup::")
+          print(f"::group::self-graded fill_ratios ({len(self_graded)})")
+          for n, s in self_graded:
+              print(f"  {n}: parity_ratio_source={s}")
+          print("::endgroup::")
+          PY
+
+      - name: Upload regenerated parity-index.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-index-${{ github.run_id }}
+          path: docs/parity/parity-index.json
+          retention-days: 90
+
+      - name: Diff against committed parity-index.json
+        run: |
+          if ! git diff --quiet -- docs/parity/parity-index.json; then
+            echo "::warning::parity-index.json drifted from committed copy"
+            git --no-pager diff --stat -- docs/parity/parity-index.json
+          else
+            echo "parity-index.json is in sync with the working tree."
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Parity audit — $(date -u +%F)"
+            echo ""
+            echo "- Stale crates (last_audit > 30d): **${{ steps.drift.outputs.stale_count }}**"
+            echo "- Self-graded fill_ratios: **${{ steps.drift.outputs.self_graded_count }}**"
+            echo ""
+            echo "Charter v2 gate 8 requires every crate to be measured from"
+            echo "its manifest (parity_ratio_source = \"manifest\") and re-audited"
+            echo "at least every 30 days. Stale or self-graded crates block release."
+          } >> "$GITHUB_STEP_SUMMARY"

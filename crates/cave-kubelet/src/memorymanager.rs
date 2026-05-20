@@ -100,9 +100,7 @@ impl ResourceRequest {
     }
 
     pub fn is_zero(&self) -> bool {
-        self.memory_bytes == 0
-            && self.hugepages_2mi_bytes == 0
-            && self.hugepages_1gi_bytes == 0
+        self.memory_bytes == 0 && self.hugepages_2mi_bytes == 0 && self.hugepages_1gi_bytes == 0
     }
 }
 
@@ -420,7 +418,8 @@ mod tests {
     #[test]
     fn manager_allocatable_subtracts_reserved() {
         let mut m = mgr_2numa();
-        m.set_reserved(0, block(0, 1024 * 1024 * 1024, 0, 0)).unwrap();
+        m.set_reserved(0, block(0, 1024 * 1024 * 1024, 0, 0))
+            .unwrap();
         assert_eq!(
             m.allocatable(0, MemoryResource::Memory),
             7 * 1024 * 1024 * 1024
@@ -430,7 +429,8 @@ mod tests {
     #[test]
     fn manager_available_minus_allocated() {
         let mut m = mgr_2numa();
-        m.allocate("p", "c", req(1024 * 1024 * 1024, 0, 0), true).unwrap();
+        m.allocate("p", "c", req(1024 * 1024 * 1024, 0, 0), true)
+            .unwrap();
         assert_eq!(
             m.available(0, MemoryResource::Memory),
             7 * 1024 * 1024 * 1024
@@ -470,12 +470,23 @@ mod tests {
     #[test]
     fn allocate_two_pods_balance_across_numa() {
         let mut m = mgr_2numa();
-        let _ = m.allocate("p1", "c", req(7 * 1024 * 1024 * 1024, 0, 0), true).unwrap();
+        let _ = m
+            .allocate("p1", "c", req(7 * 1024 * 1024 * 1024, 0, 0), true)
+            .unwrap();
         // Second allocation must go to the other NUMA — first is mostly full.
-        let n2 = m.allocate("p2", "c", req(7 * 1024 * 1024 * 1024, 0, 0), true).unwrap().unwrap();
+        let n2 = m
+            .allocate("p2", "c", req(7 * 1024 * 1024 * 1024, 0, 0), true)
+            .unwrap()
+            .unwrap();
         let assignments: Vec<i64> = m.assignments.iter().map(|a| a.numa_node).collect();
         assert!(assignments.contains(&n2));
-        assert_eq!(assignments.iter().collect::<std::collections::BTreeSet<_>>().len(), 2);
+        assert_eq!(
+            assignments
+                .iter()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
+            2
+        );
     }
 
     #[test]
@@ -516,7 +527,10 @@ mod tests {
     #[test]
     fn deallocate_releases_memory() {
         let mut m = mgr_2numa();
-        let n = m.allocate("p", "c", req(1024 * 1024, 0, 0), true).unwrap().unwrap();
+        let n = m
+            .allocate("p", "c", req(1024 * 1024, 0, 0), true)
+            .unwrap()
+            .unwrap();
         m.deallocate("p", "c");
         assert_eq!(m.allocated_on(n, MemoryResource::Memory), 0);
         assert!(m.assignment("p", "c").is_none());
@@ -615,7 +629,10 @@ mod tests {
         let mut m = MemoryManager::new(MemoryManagerPolicy::Static);
         m.add_numa_node(0, block(0, 1 * 1024 * 1024 * 1024, 0, 0));
         m.add_numa_node(1, block(1, 16 * 1024 * 1024 * 1024, 0, 0));
-        let n = m.allocate("p", "c", req(512 * 1024 * 1024, 0, 0), true).unwrap().unwrap();
+        let n = m
+            .allocate("p", "c", req(512 * 1024 * 1024, 0, 0), true)
+            .unwrap()
+            .unwrap();
         // Should pick numa 1 (more headroom).
         assert_eq!(n, 1);
     }

@@ -38,8 +38,10 @@ fn enable_then_disable_round_trips_with_description_preserved() {
     let removed = t.unregister("kv-prod/").expect("returns entry");
     assert_eq!(removed.uuid, mount.uuid);
     assert!(t.lookup("kv-prod/").is_none());
-    assert!(t.unregister("kv-prod/").is_none(),
-        "second disable is a no-op");
+    assert!(
+        t.unregister("kv-prod/").is_none(),
+        "second disable is a no-op"
+    );
 }
 
 /// Cite: openbao `vault/mount.go:328` (findAllNamespaceMounts) — when
@@ -101,7 +103,9 @@ fn list_returns_lexicographically_sorted_paths() {
     assert_eq!(
         listed,
         vec!["alpha/", "audit/", "beta/", "kv-prod/", "zeta/"]
-            .into_iter().map(String::from).collect::<Vec<_>>(),
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>(),
     );
 }
 

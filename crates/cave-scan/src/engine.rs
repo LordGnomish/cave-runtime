@@ -44,7 +44,8 @@ pub fn match_keyword(rule: &ScanRule, content: &str, file_path: &str) -> Vec<Fin
 
 /// Apply all enabled rules to content
 pub fn scan_content(rules: &[ScanRule], content: &str, file_path: &str) -> Vec<Finding> {
-    rules.iter()
+    rules
+        .iter()
         .filter(|r| r.enabled)
         .flat_map(|rule| match rule.rule_type {
             RuleType::Keyword => match_keyword(rule, content, file_path),
@@ -54,7 +55,12 @@ pub fn scan_content(rules: &[ScanRule], content: &str, file_path: &str) -> Vec<F
 }
 
 /// Build a ScanResult from a list of file findings
-pub fn build_result(target: &str, findings: Vec<Finding>, rules_count: usize, files_count: usize) -> ScanResult {
+pub fn build_result(
+    target: &str,
+    findings: Vec<Finding>,
+    rules_count: usize,
+    files_count: usize,
+) -> ScanResult {
     ScanResult {
         scan_id: Uuid::new_v4(),
         target: target.to_string(),
@@ -66,8 +72,12 @@ pub fn build_result(target: &str, findings: Vec<Finding>, rules_count: usize, fi
 }
 
 /// Filter findings at or above a minimum severity level
-pub fn filter_by_min_severity<'a>(findings: &'a [Finding], min_severity: &FindingSeverity) -> Vec<&'a Finding> {
-    findings.iter()
+pub fn filter_by_min_severity<'a>(
+    findings: &'a [Finding],
+    min_severity: &FindingSeverity,
+) -> Vec<&'a Finding> {
+    findings
+        .iter()
         .filter(|f| severity_rank(&f.severity) >= severity_rank(min_severity))
         .collect()
 }
@@ -151,7 +161,8 @@ mod tests {
     #[test]
     fn test_keyword_match_multiple_lines() {
         let rule = make_keyword_rule("secret", FindingSeverity::Major, true);
-        let content = "let secret_key = \"abc\";\nprintln!(\"no match\");\nlet api_secret = \"xyz\";";
+        let content =
+            "let secret_key = \"abc\";\nprintln!(\"no match\");\nlet api_secret = \"xyz\";";
         let findings = match_keyword(&rule, content, "src/main.rs");
         assert_eq!(findings.len(), 2);
         assert_eq!(findings[0].line_number, 1);

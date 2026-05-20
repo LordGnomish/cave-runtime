@@ -47,7 +47,11 @@ pub fn breadcrumb_for_path(path: &str) -> Vec<Crumb> {
         cumulative.push_str(seg);
         out.push(Crumb {
             label: pretty_label(seg),
-            href: if i == last { None } else { Some(cumulative.clone()) },
+            href: if i == last {
+                None
+            } else {
+                Some(cumulative.clone())
+            },
         });
     }
     out

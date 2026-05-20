@@ -36,14 +36,21 @@ pub struct Taint {
 
 impl Taint {
     pub fn new(key: impl Into<String>, effect: TaintEffect) -> Self {
-        Self { key: key.into(), value: String::new(), effect }
+        Self {
+            key: key.into(),
+            value: String::new(),
+            effect,
+        }
     }
 }
 
 /// Add `taint` to `set` if it isn't already present (key+effect match).
 /// Returns true when a change is made.
 pub fn add_taint(set: &mut Vec<Taint>, taint: Taint) -> bool {
-    if set.iter().any(|t| t.key == taint.key && t.effect == taint.effect) {
+    if set
+        .iter()
+        .any(|t| t.key == taint.key && t.effect == taint.effect)
+    {
         return false;
     }
     set.push(taint);
@@ -148,7 +155,10 @@ mod tests {
             "tenant-nl-tnt-add-dup"
         );
         let mut set = vec![t(TAINT_UNREACHABLE, TaintEffect::NoExecute)];
-        assert!(!add_taint(&mut set, t(TAINT_UNREACHABLE, TaintEffect::NoExecute)));
+        assert!(!add_taint(
+            &mut set,
+            t(TAINT_UNREACHABLE, TaintEffect::NoExecute)
+        ));
         assert_eq!(set.len(), 1);
     }
 
@@ -160,7 +170,10 @@ mod tests {
             "tenant-nl-tnt-add"
         );
         let mut set = vec![];
-        assert!(add_taint(&mut set, t(TAINT_NOT_READY, TaintEffect::NoExecute)));
+        assert!(add_taint(
+            &mut set,
+            t(TAINT_NOT_READY, TaintEffect::NoExecute)
+        ));
         assert_eq!(set.len(), 1);
     }
 
@@ -194,7 +207,10 @@ mod tests {
             value: String::new(),
             effect: Some(TaintEffect::NoExecute),
         };
-        assert!(tolerates(&[tol], &t(TAINT_NOT_READY, TaintEffect::NoExecute)));
+        assert!(tolerates(
+            &[tol],
+            &t(TAINT_NOT_READY, TaintEffect::NoExecute)
+        ));
     }
 
     #[test]
@@ -226,7 +242,10 @@ mod tests {
             value: String::new(),
             effect: Some(TaintEffect::NoSchedule),
         };
-        assert!(!tolerates(&[tol], &t(TAINT_NOT_READY, TaintEffect::NoExecute)));
+        assert!(!tolerates(
+            &[tol],
+            &t(TAINT_NOT_READY, TaintEffect::NoExecute)
+        ));
     }
 
     #[test]
@@ -295,8 +314,10 @@ mod tests {
             "tenant-nl-tnt-desired-unsched"
         );
         let want = desired_taints(NodeReadyHint::True, true, false);
-        assert!(want.iter().any(|t| t.key == TAINT_UNSCHEDULABLE
-            && t.effect == TaintEffect::NoSchedule));
+        assert!(
+            want.iter()
+                .any(|t| t.key == TAINT_UNSCHEDULABLE && t.effect == TaintEffect::NoSchedule)
+        );
     }
 
     #[test]

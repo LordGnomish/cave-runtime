@@ -12,9 +12,11 @@ mod cycle_1778755169_a2 {
     use cave_kubevirt::MODULE_NAME;
     use cave_kubevirt::UPSTREAM_REPO;
     use cave_kubevirt::UPSTREAM_VERSION;
-    use cave_kubevirt::store::Store;
     use cave_kubevirt::lifecycle::desired_phase;
-    use cave_kubevirt::models::{VmPhase, RunStrategy, VirtualMachine, VirtualMachineInstance, DataVolume, Domain};
+    use cave_kubevirt::models::{
+        DataVolume, Domain, RunStrategy, VirtualMachine, VirtualMachineInstance, VmPhase,
+    };
+    use cave_kubevirt::store::Store;
 
     #[test]
     #[ignore = "impl pending"]
@@ -149,20 +151,20 @@ mod cycle_1778755169_a2 {
 #[cfg(test)]
 mod cycle_1779193143_a3 {
     use cave_kubevirt::MODULE_NAME;
+    use cave_kubevirt::Store;
     use cave_kubevirt::UPSTREAM_REPO;
     use cave_kubevirt::UPSTREAM_VERSION;
-    use cave_kubevirt::Store;
     use cave_kubevirt::lifecycle::desired_phase;
+    use cave_kubevirt::models::Condition;
+    use cave_kubevirt::models::DataVolume;
+    use cave_kubevirt::models::Domain;
+    use cave_kubevirt::models::RunStrategy;
     use cave_kubevirt::models::VirtualMachine;
-    use cave_kubevirt::models::VirtualMachineSpec;
-    use cave_kubevirt::models::VirtualMachineStatus;
     use cave_kubevirt::models::VirtualMachineInstance;
     use cave_kubevirt::models::VirtualMachineInstanceSpec;
     use cave_kubevirt::models::VirtualMachineInstanceStatus;
-    use cave_kubevirt::models::Domain;
-    use cave_kubevirt::models::DataVolume;
-    use cave_kubevirt::models::Condition;
-    use cave_kubevirt::models::RunStrategy;
+    use cave_kubevirt::models::VirtualMachineSpec;
+    use cave_kubevirt::models::VirtualMachineStatus;
 
     #[test]
     #[ignore = "impl pending"]
@@ -195,7 +197,10 @@ mod cycle_1779193143_a3 {
         // We cannot call it without valid VirtualMachine and VmPhase instances,
         // but we can verify the function is accessible.
         // Since we can't easily construct these without more context, we just assert the function pointer type matches.
-        let _f: fn(&VirtualMachine, cave_kubevirt::models::VmPhase) -> cave_kubevirt::models::VmPhase = desired_phase;
+        let _f: fn(
+            &VirtualMachine,
+            cave_kubevirt::models::VmPhase,
+        ) -> cave_kubevirt::models::VmPhase = desired_phase;
     }
 
     #[test]

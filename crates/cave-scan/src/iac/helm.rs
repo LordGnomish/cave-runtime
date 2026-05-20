@@ -57,7 +57,10 @@ fn scan_chart(v: &Value, path: &str, out: &mut Vec<IacFinding>) {
             line: 0,
         });
     }
-    let kind = v.get("type").and_then(Value::as_str).unwrap_or("application");
+    let kind = v
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or("application");
     if kind != "application" && kind != "library" {
         out.push(IacFinding {
             rule_id: "AVD-HELM-0005".into(),

@@ -8,10 +8,10 @@
 //!
 //! Upstream: <https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/>
 
+use super::ContainerScanViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
-use super::ContainerScanViewError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PolicyRow {
@@ -27,9 +27,15 @@ pub fn list_policies(
 ) -> Result<Vec<PolicyRow>, ContainerScanViewError> {
     let images = super::images::list_images(state, ctx)?;
     let critical_threshold = 1u32;
-    let critical_match = images.iter().filter(|i| i.critical_cves >= critical_threshold).count();
+    let critical_match = images
+        .iter()
+        .filter(|i| i.critical_cves >= critical_threshold)
+        .count();
     let age_threshold_unix = 1_000_000_i64;
-    let stale_match = images.iter().filter(|i| i.last_scan_unix < age_threshold_unix).count();
+    let stale_match = images
+        .iter()
+        .filter(|i| i.last_scan_unix < age_threshold_unix)
+        .count();
     let allowlist = ["docker.io", "quay.io", "gcr.io"];
     let off_registry = images
         .iter()
@@ -102,16 +108,31 @@ mod tests {
 
     #[test]
     fn list_returns_three_canonical_policies() {
-        let rows = list_policies(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
+        let rows = list_policies(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
         assert_eq!(rows.len(), 3);
     }
 
     #[test]
     fn critical_policy_count_matches_image_filter() {
-        let images = super::super::images::list_images(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
+        let images = super::super::images::list_images(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
         let expected = images.iter().filter(|i| i.critical_cves >= 1).count();
-        let rows = list_policies(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
-        let critical = rows.iter().find(|r| r.policy_id == "CRITICAL_CVE_THRESHOLD").unwrap();
+        let rows = list_policies(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
+        let critical = rows
+            .iter()
+            .find(|r| r.policy_id == "CRITICAL_CVE_THRESHOLD")
+            .unwrap();
         assert_eq!(critical.matching_images, expected);
     }
 
@@ -122,8 +143,15 @@ mod tests {
 
     #[test]
     fn registry_allowlist_contains_canonical_set() {
-        let rows = list_policies(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
-        let reg = rows.iter().find(|r| r.policy_id == "REGISTRY_ALLOWLIST").unwrap();
+        let rows = list_policies(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
+        let reg = rows
+            .iter()
+            .find(|r| r.policy_id == "REGISTRY_ALLOWLIST")
+            .unwrap();
         assert!(reg.threshold.contains("docker.io"));
         assert!(reg.threshold.contains("quay.io"));
         assert!(reg.threshold.contains("gcr.io"));
@@ -131,7 +159,11 @@ mod tests {
 
     #[test]
     fn render_includes_policies_table() {
-        let html = render(&AdminState::seeded(), &ctx(&[Permission::ContainerScanRead])).unwrap();
+        let html = render(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ContainerScanRead]),
+        )
+        .unwrap();
         assert!(html.contains("Policies ("));
         assert!(html.contains("Trivy filtering"));
     }

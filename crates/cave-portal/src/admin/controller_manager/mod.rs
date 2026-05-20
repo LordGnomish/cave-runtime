@@ -93,8 +93,18 @@ mod tests {
 
     #[test]
     fn render_includes_all_five_tabs() {
-        let html = render(&AdminState::seeded(), &ctx(&[Permission::ControllerManagerRead])).unwrap();
-        for anchor in ["#cm-controllers", "#cm-leader-election", "#cm-events", "#cm-queues", "#cm-reconciler"] {
+        let html = render(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ControllerManagerRead]),
+        )
+        .unwrap();
+        for anchor in [
+            "#cm-controllers",
+            "#cm-leader-election",
+            "#cm-events",
+            "#cm-queues",
+            "#cm-reconciler",
+        ] {
             assert!(html.contains(anchor));
         }
     }

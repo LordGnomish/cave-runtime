@@ -70,17 +70,35 @@ pub fn desired_for_source(
     reading: &MetricReading,
 ) -> Result<u32, ControllerError> {
     match source {
-        MetricSource::Resource { target_type, target, .. }
-        | MetricSource::ContainerResource { target_type, target, .. } => {
-            resource_desired(reading, *target_type, *target)
+        MetricSource::Resource {
+            target_type,
+            target,
+            ..
         }
+        | MetricSource::ContainerResource {
+            target_type,
+            target,
+            ..
+        } => resource_desired(reading, *target_type, *target),
         MetricSource::Pods { target, .. } => pods_desired(reading, *target),
-        MetricSource::Object { target_type, target, .. } => object_desired(reading, *target_type, *target),
-        MetricSource::External { target_type, target, .. } => object_desired(reading, *target_type, *target),
+        MetricSource::Object {
+            target_type,
+            target,
+            ..
+        } => object_desired(reading, *target_type, *target),
+        MetricSource::External {
+            target_type,
+            target,
+            ..
+        } => object_desired(reading, *target_type, *target),
     }
 }
 
-fn resource_desired(reading: &MetricReading, ttype: TargetType, target: u64) -> Result<u32, ControllerError> {
+fn resource_desired(
+    reading: &MetricReading,
+    ttype: TargetType,
+    target: u64,
+) -> Result<u32, ControllerError> {
     let count = reading.values.len() as u64;
     if count == 0 || target == 0 {
         return Err(ControllerError::InvalidSpec {
@@ -119,7 +137,11 @@ fn pods_desired(reading: &MetricReading, target: u64) -> Result<u32, ControllerE
     Ok(desired as u32)
 }
 
-fn object_desired(reading: &MetricReading, ttype: TargetType, target: u64) -> Result<u32, ControllerError> {
+fn object_desired(
+    reading: &MetricReading,
+    ttype: TargetType,
+    target: u64,
+) -> Result<u32, ControllerError> {
     if reading.values.is_empty() || target == 0 {
         return Err(ControllerError::InvalidSpec {
             kind: "HorizontalPodAutoscaler",
@@ -152,7 +174,10 @@ mod tests {
     use crate::test_ctx;
 
     fn rdg(values: Vec<u64>, cur: u32) -> MetricReading {
-        MetricReading { values, current_replicas: cur }
+        MetricReading {
+            values,
+            current_replicas: cur,
+        }
     }
 
     #[test]
@@ -181,7 +206,10 @@ mod tests {
             "GetMetricReplicas",
             "tenant-hpa-src-pods"
         );
-        let s = MetricSource::Pods { metric: "rps".into(), target: 200 };
+        let s = MetricSource::Pods {
+            metric: "rps".into(),
+            target: 200,
+        };
         // Avg=400, target=200, current=2 → ceil(2*400/200)=4.
         assert_eq!(desired_for_source(&s, &rdg(vec![400, 400], 2)).unwrap(), 4);
     }
@@ -277,7 +305,10 @@ mod tests {
             "GetMetricReplicas",
             "tenant-hpa-src-empty"
         );
-        let s = MetricSource::Pods { metric: "rps".into(), target: 100 };
+        let s = MetricSource::Pods {
+            metric: "rps".into(),
+            target: 100,
+        };
         assert!(desired_for_source(&s, &rdg(vec![], 4)).is_err());
     }
 
@@ -303,11 +334,23 @@ mod tests {
             "MetricSpec",
             "tenant-hpa-src-serde"
         );
-        let s = MetricSource::Pods { metric: "rps".into(), target: 100 };
+        let s = MetricSource::Pods {
+            metric: "rps".into(),
+            target: 100,
+        };
         let bytes = serde_json::to_string(&s).unwrap();
         let back: MetricSource = serde_json::from_str(&bytes).unwrap();
         match (s, back) {
-            (MetricSource::Pods { metric: a, target: ta }, MetricSource::Pods { metric: b, target: tb }) => {
+            (
+                MetricSource::Pods {
+                    metric: a,
+                    target: ta,
+                },
+                MetricSource::Pods {
+                    metric: b,
+                    target: tb,
+                },
+            ) => {
                 assert_eq!(a, b);
                 assert_eq!(ta, tb);
             }

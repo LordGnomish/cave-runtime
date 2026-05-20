@@ -12,9 +12,7 @@
 //!   CommonName must be `system:node:<nodeName>` and Organization must be
 //!   `system:nodes`. Mirrors `regularSelfNodeServerSignerName`.
 
-use crate::csr_signer::{
-    CsrCondition, CsrSummary, KeyUsage, SIGNER_KUBELET_SERVING,
-};
+use crate::csr_signer::{CsrCondition, CsrSummary, KeyUsage, SIGNER_KUBELET_SERVING};
 use crate::types::Cite;
 use serde::{Deserialize, Serialize};
 
@@ -77,7 +75,9 @@ pub fn validate_kubelet_serving_subject(subj: &CsrSubject) -> Result<String, &'s
 /// Validate the subject for `apiserver-client-kubelet`. CN must be
 /// `system:node:<nodeName>` and Org must include `system:nodes`; SANs
 /// are forbidden.
-pub fn validate_apiserver_client_kubelet_subject(subj: &CsrSubject) -> Result<String, &'static str> {
+pub fn validate_apiserver_client_kubelet_subject(
+    subj: &CsrSubject,
+) -> Result<String, &'static str> {
     if !subj.common_name.starts_with("system:node:") {
         return Err("CommonName must be system:node:<nodeName>");
     }
@@ -200,10 +200,7 @@ mod tests {
             "tenant-csr-deep-subj-ok"
         );
         let s = subj("system:node:worker-1", vec!["system:nodes"]);
-        assert_eq!(
-            validate_kubelet_serving_subject(&s).unwrap(),
-            "worker-1"
-        );
+        assert_eq!(validate_kubelet_serving_subject(&s).unwrap(), "worker-1");
     }
 
     #[test]
@@ -263,10 +260,7 @@ mod tests {
         let mut s = subj("system:node:n1", vec!["system:nodes"]);
         s.dns_names.clear();
         s.ip_addresses.clear();
-        assert_eq!(
-            validate_apiserver_client_kubelet_subject(&s).unwrap(),
-            "n1"
-        );
+        assert_eq!(validate_apiserver_client_kubelet_subject(&s).unwrap(), "n1");
     }
 
     #[test]

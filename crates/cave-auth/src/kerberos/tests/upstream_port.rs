@@ -6,10 +6,10 @@
 //! `SPNEGOAuthenticatorTest` / `KeyTabReaderTest` fixture.
 
 use crate::kerberos::{
-    gssapi::{wrap_initial_context_token, InitialContextToken, OID_KRB5, OID_SPNEGO},
-    keytab::{encode_test_keytab, parse_keytab, KeyBlock, KeytabEntry, KrbPrincipal, KEYTAB_MAGIC},
+    gssapi::{InitialContextToken, OID_KRB5, OID_SPNEGO, wrap_initial_context_token},
+    keytab::{KEYTAB_MAGIC, KeyBlock, KeytabEntry, KrbPrincipal, encode_test_keytab, parse_keytab},
     negotiate::NegotiateHandler,
-    spnego::{build_neg_token_init, NegState, NegTokenInit, NegTokenResp},
+    spnego::{NegState, NegTokenInit, NegTokenResp, build_neg_token_init},
 };
 
 fn aes256_entry() -> KeytabEntry {

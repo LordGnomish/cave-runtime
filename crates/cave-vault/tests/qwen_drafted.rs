@@ -12,7 +12,7 @@ mod tests {
     #[test]
     fn root_policy_grants_all_caps_on_any_path() {
         let policy = cave_vault::policy::root_policy();
-        
+
         // Root policy has "**" path with all caps including Sudo.
         assert!(policy.allows("anything/at/all", &Capability::Create));
         assert!(policy.allows("auth/token/create", &Capability::Sudo));
@@ -22,10 +22,10 @@ mod tests {
     #[test]
     fn default_policy_allows_lookup_self_read_only() {
         let policy = cave_vault::policy::default_policy();
-        
+
         // Default policy allows Read on auth/token/lookup-self
         assert!(policy.allows("auth/token/lookup-self", &Capability::Read));
-        
+
         // Default policy does NOT allow Update on auth/token/lookup-self
         assert!(!policy.allows("auth/token/lookup-self", &Capability::Update));
     }
@@ -34,18 +34,16 @@ mod tests {
     fn policy_deny_overrides_cap() {
         let policy = Policy {
             name: "test".to_string(),
-            paths: vec![
-                PolicyPath {
-                    path: "secret/sensitive".to_string(),
-                    capabilities: vec![Capability::Read, Capability::Deny],
-                }
-            ],
+            paths: vec![PolicyPath {
+                path: "secret/sensitive".to_string(),
+                capabilities: vec![Capability::Read, Capability::Deny],
+            }],
         };
 
         // Even though Read is listed, Deny overrides it.
         assert!(!policy.allows("secret/sensitive", &Capability::Read));
-        
-        // Deny itself should return true for allows? 
+
+        // Deny itself should return true for allows?
         // The spec says: "allows() returns true iff cap is in caps and Deny is NOT in caps"
         // So allows("secret/sensitive", &Capability::Deny) should be false because Deny IS in caps.
         assert!(!policy.allows("secret/sensitive", &Capability::Deny));
@@ -90,12 +88,10 @@ mod tests {
         // Add a custom policy.
         let custom_policy = Policy {
             name: "custom".to_string(),
-            paths: vec![
-                PolicyPath {
-                    path: "custom/path".to_string(),
-                    capabilities: vec![Capability::Read],
-                }
-            ],
+            paths: vec![PolicyPath {
+                path: "custom/path".to_string(),
+                capabilities: vec![Capability::Read],
+            }],
         };
         engine.put(custom_policy);
 

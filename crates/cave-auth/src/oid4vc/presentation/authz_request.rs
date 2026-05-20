@@ -13,10 +13,10 @@
 use std::collections::BTreeMap;
 
 use axum::{
+    Json,
     extract::{Query, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
 use serde::{Deserialize, Serialize};
 
@@ -116,13 +116,20 @@ pub async fn handle_authz_request(
 pub fn build_authz_request_from_query(
     q: &BTreeMap<String, String>,
 ) -> Result<AuthzRequest, super::super::Oid4vcError> {
-    fn need<'a>(q: &'a BTreeMap<String, String>, k: &str) -> Result<&'a String, super::super::Oid4vcError> {
-        q.get(k).ok_or_else(|| super::super::Oid4vcError::MissingField(k.into()))
+    fn need<'a>(
+        q: &'a BTreeMap<String, String>,
+        k: &str,
+    ) -> Result<&'a String, super::super::Oid4vcError> {
+        q.get(k)
+            .ok_or_else(|| super::super::Oid4vcError::MissingField(k.into()))
     }
     Ok(AuthzRequest {
         client_id: need(q, "client_id")?.clone(),
         response_type: need(q, "response_type")?.clone(),
-        response_mode: q.get("response_mode").cloned().unwrap_or_else(|| "direct_post".into()),
+        response_mode: q
+            .get("response_mode")
+            .cloned()
+            .unwrap_or_else(|| "direct_post".into()),
         presentation_definition: need(q, "presentation_definition")?.clone(),
         nonce: need(q, "nonce")?.clone(),
         state: q.get("state").cloned(),
@@ -185,7 +192,10 @@ mod tests {
         let mut q = BTreeMap::new();
         q.insert("client_id".into(), "v1".into());
         let err = build_authz_request_from_query(&q).unwrap_err();
-        assert!(matches!(err, super::super::super::Oid4vcError::MissingField(_)));
+        assert!(matches!(
+            err,
+            super::super::super::Oid4vcError::MissingField(_)
+        ));
     }
 
     #[test]
@@ -217,7 +227,9 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        let body = axum::body::to_bytes(resp.into_body(), 1_000_000).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), 1_000_000)
+            .await
+            .unwrap();
         let v: AuthzRequestView = serde_json::from_slice(&body).unwrap();
         assert_eq!(v.client_id, "v1");
         assert_eq!(v.presentation_definition.id, "pd-1");

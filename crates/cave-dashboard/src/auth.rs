@@ -28,9 +28,22 @@ pub fn generate_api_key() -> String {
 /// An authenticated principal for the current request.
 #[derive(Debug, Clone)]
 pub enum Principal {
-    User { id: i64, org_id: i64, role: OrgRole, is_admin: bool },
-    ServiceAccount { id: i64, org_id: i64, role: OrgRole },
-    ApiKey { id: i64, org_id: i64, role: OrgRole },
+    User {
+        id: i64,
+        org_id: i64,
+        role: OrgRole,
+        is_admin: bool,
+    },
+    ServiceAccount {
+        id: i64,
+        org_id: i64,
+        role: OrgRole,
+    },
+    ApiKey {
+        id: i64,
+        org_id: i64,
+        role: OrgRole,
+    },
     Anonymous,
 }
 

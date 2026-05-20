@@ -15,15 +15,15 @@ Complete catalog of all architecture decisions for the CAVE (Cloud Autonomous So
 
 | ADR | Title | Category | Status |
 |-----|-------|----------|--------|
-| [ADR-001](ADR-001_Hetzner_Cloud_as_Sovereign_Infrastructure_Provider.md) | Hetzner Cloud as Sovereign Infrastructure Provider | Infrastructure | Accepted |
+| [ADR-001](ADR-001_Hetzner_Cloud_as_Sovereign_Infrastructure_Provider.md) | sovereign cloud as Sovereign Infrastructure Provider | Infrastructure | Accepted |
 | [ADR-002](ADR-002_Azure_as_Enterprise_Infrastructure_Provider.md) | Azure as Enterprise Infrastructure Provider | Infrastructure | Accepted |
-| [ADR-003](ADR-003_Talos_Linux_for_All_Hetzner_Profiles.md) | Talos Linux for All Hetzner Profiles | Infrastructure | Accepted |
+| [ADR-003](ADR-003_Talos_Linux_for_All_Hetzner_Profiles.md) | Talos Linux for All Sovereign-Cloud Profiles | Infrastructure | Accepted |
 | [ADR-004](ADR-004_Cilium_CNI_Istio_Ambient_Mesh.md) | Cilium CNI + Istio Ambient Mesh | Infrastructure — Networking | Accepted |
 | [ADR-005](ADR-005_Buildah_for_Container_Image_Building.md) | Buildah for Container Image Building | Infrastructure — CI/CD | Accepted |
-| [ADR-006](ADR-006_Keycloak_for_Hetzner_Identity_Provider.md) | Keycloak for Hetzner Identity Provider | Identity | Accepted |
+| [ADR-006](ADR-006_Keycloak_for_Hetzner_Identity_Provider.md) | Keycloak for Sovereign Identity Provider | Identity | Accepted |
 | [ADR-007](ADR-007_Okta_Entra_ID_for_Azure_Identity.md) | Okta + Entra ID for Azure Identity | Identity | Accepted |
-| [ADR-008](ADR-008_Cache_Valkey_Hetzner_Azure_Redis_Azure.md) | Cache — Valkey (Hetzner) / Azure Redis (Azure) | Data | Accepted |
-| [ADR-009](ADR-009_Ollama_Hetzner_Azure_OpenAI_Azure.md) | Ollama (Hetzner) / Azure OpenAI (Azure) | AI/LLM | Accepted |
+| [ADR-008](ADR-008_Cache_Valkey_Hetzner_Azure_Redis_Azure.md) | Cache — Valkey (sovereign) / Azure Redis (Azure) | Data | Accepted |
+| [ADR-009](ADR-009_Ollama_Hetzner_Azure_OpenAI_Azure.md) | Ollama (sovereign) / Azure OpenAI (Azure) | AI/LLM | Accepted |
 | [ADR-010](ADR-010_CI_Pipeline_Architecture_27_Stages.md) | CI Pipeline Architecture — 27 Stages | CI/CD | Accepted |
 | [ADR-011](ADR-011_Backstage_as_Developer_Portal.md) | Backstage as Developer Portal | Platform | Accepted |
 | [ADR-012](ADR-012_vcluster_for_Hard_Tenancy_PR_Environments.md) | vcluster for Hard Tenancy + PR Environments | Multi-Tenancy | Accepted |
@@ -35,7 +35,7 @@ Complete catalog of all architecture decisions for the CAVE (Cloud Autonomous So
 | [ADR-018](ADR-018_Container_Image_Vulnerability_Scanning_Trivy.md) | Container Image Vulnerability Scanning — Trivy | Security | Accepted |
 | [ADR-019](ADR-019_Static_Application_Security_Testing_SonarQube_Semgrep.md) | Static Application Security Testing — SonarQube + Semgrep | Security | Accepted |
 | [ADR-020](ADR-020_OpenBao_for_Hetzner_Secrets_Management.md) | OpenBao for Hetzner Secrets Management | Identity & Secrets | Accepted |
-| [ADR-021](ADR-021_Event_Streaming_Strimzi_Hetzner_Confluent_Cloud_Azure.md) | Event Streaming — Strimzi (Hetzner) / Confluent Cloud (Azure) | Data & Messaging | Accepted |
+| [ADR-021](ADR-021_Event_Streaming_Strimzi_Hetzner_Confluent_Cloud_Azure.md) | Event Streaming — Strimzi (sovereign) / Confluent Cloud (Azure) | Data & Messaging | Accepted |
 | [ADR-022](ADR-022_Change_Data_Capture_Debezium.md) | Change Data Capture — Debezium | Data & Messaging | Accepted |
 | [ADR-023](ADR-023_Dynamic_Application_Security_Testing_OWASP_ZAP.md) | Dynamic Application Security Testing — OWASP ZAP | Security/CI | Accepted |
 | [ADR-024](ADR-024_DNS_CDN_Cloudflare.md) | DNS & CDN — Cloudflare | Infrastructure | Accepted |
@@ -57,9 +57,9 @@ Complete catalog of all architecture decisions for the CAVE (Cloud Autonomous So
 | [ADR-044](ADR-044_Supported_Language_Runtimes.md) | Supported Language Runtimes | CI/CD | Accepted |
 | [ADR-045](ADR-045_Load_Testing_k6.md) | Load Testing — k6 | CI/CD | Accepted |
 | [ADR-046](ADR-046_Kubernetes_Backup_Velero.md) | Kubernetes Backup — Velero | DR | Accepted |
-| [ADR-047](ADR-047_PostgreSQL_CloudNativePG_Hetzner_Azure_PG_Flexible_Azure.md) | PostgreSQL — CloudNativePG (Hetzner) / Azure PG Flexible (Azure) | Data | Accepted |
-| [ADR-049](ADR-049_Full_Text_Search_OpenSearch_Hetzner_Azure_AI_Search_Azure.md) | Full-Text Search — OpenSearch (Hetzner) / Azure AI Search (Azure) | Data | Accepted |
-| [ADR-050](ADR-050_Object_Storage_MinIO_Hetzner_ADLS_Gen2_Azure.md) | Object Storage — MinIO (Hetzner) / ADLS Gen2 (Azure) | Data | Accepted |
+| [ADR-047](ADR-047_PostgreSQL_CloudNativePG_Hetzner_Azure_PG_Flexible_Azure.md) | PostgreSQL — CloudNativePG (sovereign) / Azure PG Flexible (Azure) | Data | Accepted |
+| [ADR-049](ADR-049_Full_Text_Search_OpenSearch_Hetzner_Azure_AI_Search_Azure.md) | Full-Text Search — OpenSearch (sovereign) / Azure AI Search (Azure) | Data | Accepted |
+| [ADR-050](ADR-050_Object_Storage_MinIO_Hetzner_ADLS_Gen2_Azure.md) | Object Storage — MinIO (sovereign) / ADLS Gen2 (Azure) | Data | Accepted |
 | [ADR-051](ADR-051_LLM_Observability_Langfuse.md) | LLM Observability — Langfuse | AI | Accepted |
 | [ADR-052](ADR-052_AI_Chat_Interface_LibreChat.md) | AI Chat Interface — LibreChat | AI | Accepted |
 | [ADR-053](ADR-053_External_Secrets_Operator_ESO.md) | External Secrets Operator (ESO) | Identity & Secrets | Accepted |

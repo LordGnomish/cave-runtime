@@ -2,9 +2,9 @@
 // Copyright 2026 Cave Runtime contributors
 //! `cavectl harbor …` — Harbor (and OCI registry) compat shim.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Subcommand;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::native::{HttpVerb, PreparedRequest};
 
@@ -113,11 +113,10 @@ pub fn prepare(cmd: &HarborCmd) -> Result<PreparedRequest> {
             if registry.is_empty() || username.is_empty() {
                 bail!("registry and username required");
             }
-            Ok(PreparedRequest::new(
-                HttpVerb::Post,
-                "/api/compat/harbor/v2/auth/login",
+            Ok(
+                PreparedRequest::new(HttpVerb::Post, "/api/compat/harbor/v2/auth/login")
+                    .with_body(json!({"registry": registry, "username": username})),
             )
-            .with_body(json!({"registry": registry, "username": username})))
         }
         HarborCmd::Logout { registry } => Ok(PreparedRequest::new(
             HttpVerb::Post,
@@ -327,11 +326,13 @@ mod tests {
 
     #[test]
     fn login_rejects_empty_registry() {
-        assert!(prepare(&HarborCmd::Login {
-            registry: "".into(),
-            username: "x".into(),
-        })
-        .is_err());
+        assert!(
+            prepare(&HarborCmd::Login {
+                registry: "".into(),
+                username: "x".into(),
+            })
+            .is_err()
+        );
     }
 
     #[test]
@@ -407,7 +408,10 @@ mod tests {
     #[test]
     fn parse_image_no_tag() {
         let (p, r, t) = parse_image("library/nginx").unwrap();
-        assert_eq!((p.as_str(), r.as_str(), t.as_str()), ("library", "nginx", "latest"));
+        assert_eq!(
+            (p.as_str(), r.as_str(), t.as_str()),
+            ("library", "nginx", "latest")
+        );
     }
 
     #[test]
@@ -447,7 +451,10 @@ mod tests {
             },
         })
         .unwrap();
-        assert_eq!(r.path, "/api/compat/harbor/v2/projects/library/repositories");
+        assert_eq!(
+            r.path,
+            "/api/compat/harbor/v2/projects/library/repositories"
+        );
     }
 
     #[test]
@@ -458,19 +465,22 @@ mod tests {
             },
         })
         .unwrap();
-        assert!(r
-            .path
-            .ends_with("/projects/library/repositories/nginx/artifacts"));
+        assert!(
+            r.path
+                .ends_with("/projects/library/repositories/nginx/artifacts")
+        );
     }
 
     #[test]
     fn repo_tags_rejects_one_segment() {
-        assert!(prepare(&HarborCmd::Repo {
-            cmd: RepoCmd::Tags {
-                repo: "library".into(),
-            },
-        })
-        .is_err());
+        assert!(
+            prepare(&HarborCmd::Repo {
+                cmd: RepoCmd::Tags {
+                    repo: "library".into(),
+                },
+            })
+            .is_err()
+        );
     }
 
     #[test]
@@ -496,9 +506,10 @@ mod tests {
             },
         })
         .unwrap();
-        assert!(r
-            .path
-            .ends_with("/projects/library/repositories/nginx/artifacts/old"));
+        assert!(
+            r.path
+                .ends_with("/projects/library/repositories/nginx/artifacts/old")
+        );
     }
 
     #[test]
@@ -528,13 +539,15 @@ mod tests {
 
     #[test]
     fn project_create_rejects_unknown_visibility() {
-        assert!(prepare(&HarborCmd::Project {
-            cmd: ProjectCmd::Create {
-                name: "p".into(),
-                visibility: "shared".into(),
-            },
-        })
-        .is_err());
+        assert!(
+            prepare(&HarborCmd::Project {
+                cmd: ProjectCmd::Create {
+                    name: "p".into(),
+                    visibility: "shared".into(),
+                },
+            })
+            .is_err()
+        );
     }
 
     #[test]
@@ -576,9 +589,7 @@ mod tests {
     #[test]
     fn replication_trigger() {
         let r = prepare(&HarborCmd::Replication {
-            cmd: ReplicationCmd::Trigger {
-                id: "x".into(),
-            },
+            cmd: ReplicationCmd::Trigger { id: "x".into() },
         })
         .unwrap();
         assert!(r.path.ends_with("/replication/executions/x"));

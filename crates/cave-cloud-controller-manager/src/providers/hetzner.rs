@@ -106,10 +106,13 @@ impl InstancesIface for HetznerProvider {
     }
     fn zone_for(&self, tenant: &TenantId, node_name: &str) -> Result<(String, String), CloudError> {
         self.authorise(tenant, "Server", node_name)?;
-        let s = self.servers.get(node_name).ok_or_else(|| CloudError::Upstream {
-            provider: ProviderName::Hetzner,
-            reason: format!("server {node_name} not found"),
-        })?;
+        let s = self
+            .servers
+            .get(node_name)
+            .ok_or_else(|| CloudError::Upstream {
+                provider: ProviderName::Hetzner,
+                reason: format!("server {node_name} not found"),
+            })?;
         Ok((s.zone.clone(), s.location.clone()))
     }
 }

@@ -32,7 +32,8 @@ pub enum KeyUsage {
 /// `pkg/apis/certificates/types.go`.
 pub const SIGNER_KUBELET_SERVING: &str = "kubernetes.io/kubelet-serving";
 pub const SIGNER_KUBE_APISERVER_CLIENT: &str = "kubernetes.io/kube-apiserver-client";
-pub const SIGNER_KUBE_APISERVER_CLIENT_KUBELET: &str = "kubernetes.io/kube-apiserver-client-kubelet";
+pub const SIGNER_KUBE_APISERVER_CLIENT_KUBELET: &str =
+    "kubernetes.io/kube-apiserver-client-kubelet";
 pub const SIGNER_LEGACY_UNKNOWN: &str = "kubernetes.io/legacy-unknown";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -259,7 +260,11 @@ mod tests {
         );
         let c = csr(
             SIGNER_LEGACY_UNKNOWN,
-            vec![KeyUsage::ClientAuth, KeyUsage::ServerAuth, KeyUsage::DigitalSignature],
+            vec![
+                KeyUsage::ClientAuth,
+                KeyUsage::ServerAuth,
+                KeyUsage::DigitalSignature,
+            ],
             vec![CsrCondition::Approved],
         );
         assert_eq!(evaluate(&c), SignerAction::Sign);
@@ -284,7 +289,10 @@ mod tests {
             "tenant-csr-signer-const"
         );
         assert_eq!(SIGNER_KUBELET_SERVING, "kubernetes.io/kubelet-serving");
-        assert_eq!(SIGNER_KUBE_APISERVER_CLIENT, "kubernetes.io/kube-apiserver-client");
+        assert_eq!(
+            SIGNER_KUBE_APISERVER_CLIENT,
+            "kubernetes.io/kube-apiserver-client"
+        );
         assert_eq!(
             SIGNER_KUBE_APISERVER_CLIENT_KUBELET,
             "kubernetes.io/kube-apiserver-client-kubelet"

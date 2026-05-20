@@ -26,7 +26,7 @@
 //! keeps the portal layer free of business logic and lets the dashboard
 //! poll for changes without re-rendering the page.
 
-use axum::{response::Html, routing::get, Json, Router};
+use axum::{Json, Router, response::Html, routing::get};
 use serde::Serialize;
 use serde_json::json;
 
@@ -246,7 +246,7 @@ upstream-specific surfaces.</p>"##,
 mod tests {
     use super::*;
     use axum::{
-        body::{to_bytes, Body},
+        body::{Body, to_bytes},
         http::{Request, StatusCode},
     };
     use tower::ServiceExt;
@@ -268,7 +268,12 @@ mod tests {
     #[tokio::test]
     async fn dashboard_lists_all_four_upstreams() {
         let resp = app()
-            .oneshot(Request::builder().uri("/portal/artifacts").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/portal/artifacts")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
@@ -426,7 +431,12 @@ mod tests {
     #[tokio::test]
     async fn dashboard_links_to_each_subpage() {
         let resp = app()
-            .oneshot(Request::builder().uri("/portal/artifacts").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/portal/artifacts")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         let body = body_text(resp).await;

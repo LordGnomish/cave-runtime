@@ -7,7 +7,7 @@
 //! plus an extra `Table` default — kubectl's default is `Wide` so we
 //! map accordingly.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KubectlOutput {
@@ -118,7 +118,10 @@ mod tests {
 
     #[test]
     fn custom_columns_expression() {
-        let out = parse(Some("custom-columns=NAME:.metadata.name,STATUS:.status.phase")).unwrap();
+        let out = parse(Some(
+            "custom-columns=NAME:.metadata.name,STATUS:.status.phase",
+        ))
+        .unwrap();
         match out {
             KubectlOutput::CustomColumns(s) => assert!(s.contains("NAME")),
             _ => panic!("wrong variant"),

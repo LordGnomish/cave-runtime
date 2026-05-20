@@ -8,14 +8,16 @@
 use super::NetViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, table};
-use crate::admin::state::{scope, AdminState, MeshFlow};
+use crate::admin::state::{AdminState, MeshFlow, scope};
 
 pub fn list_flows(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<MeshFlow>, NetViewError> {
     ctx.authorise(Permission::NetRead)?;
-    Ok(scope(&state.mesh_flows.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter()
-        .cloned()
-        .collect())
+    Ok(scope(&state.mesh_flows.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
+    .into_iter()
+    .cloned()
+    .collect())
 }
 
 pub fn forwarded_count(rows: &[MeshFlow]) -> usize {
@@ -30,10 +32,7 @@ pub fn total_bytes(rows: &[MeshFlow]) -> u64 {
     rows.iter().map(|f| f.bytes).sum()
 }
 
-pub(crate) fn render_section(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, NetViewError> {
+pub(crate) fn render_section(state: &AdminState, ctx: &RequestCtx) -> Result<String, NetViewError> {
     let flows = list_flows(state, ctx)?;
     let rows: Vec<Vec<String>> = flows
         .iter()

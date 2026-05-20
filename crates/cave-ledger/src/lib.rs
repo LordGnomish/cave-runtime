@@ -25,9 +25,9 @@ pub mod entry;
 pub mod store;
 
 use axum::{
+    Json, Router,
     extract::State,
     routing::{get, post},
-    Json, Router,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -66,9 +66,7 @@ async fn health() -> Json<serde_json::Value> {
     }))
 }
 
-async fn list_entries(
-    State(state): State<Arc<LedgerState>>,
-) -> Json<serde_json::Value> {
+async fn list_entries(State(state): State<Arc<LedgerState>>) -> Json<serde_json::Value> {
     let chain = state.chain.read().await;
     let entries: Vec<_> = chain
         .entries()
@@ -106,9 +104,7 @@ async fn append_entry(
     }))
 }
 
-async fn verify_chain(
-    State(state): State<Arc<LedgerState>>,
-) -> Json<serde_json::Value> {
+async fn verify_chain(State(state): State<Arc<LedgerState>>) -> Json<serde_json::Value> {
     let chain = state.chain.read().await;
     let result = chain.verify();
 
@@ -119,9 +115,7 @@ async fn verify_chain(
     }))
 }
 
-async fn stats(
-    State(state): State<Arc<LedgerState>>,
-) -> Json<serde_json::Value> {
+async fn stats(State(state): State<Arc<LedgerState>>) -> Json<serde_json::Value> {
     let chain = state.chain.read().await;
     let entries = chain.entries();
 

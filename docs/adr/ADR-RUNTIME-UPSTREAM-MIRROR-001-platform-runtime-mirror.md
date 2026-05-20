@@ -21,7 +21,7 @@ Cevap **ikisine birden**: Platform onu KULLANIR, Runtime onu REIMPLEMENTE eder. 
 
 | OSS app | Platform (deployment) ADR'si | Runtime (upstream-reimpl) ADR'si |
 |---|---|---|
-| Hetzner Cloud | "Sovereign infra Hetzner" | yok (Cave Runtime cloud-agnostic) |
+| sovereign cloud | "Sovereign infra Hetzner" | yok (Cave Runtime cloud-agnostic) |
 | Talos Linux | "Sovereign K8s host OS Talos" | yok (Cave Runtime kendi OS, ADR-RUNTIME-STACK-001) |
 | Cilium | "Sovereign CNI Cilium" | "cave-net upstream = Cilium-inspired eBPF" |
 | Istio Ambient | "Sovereign mesh Istio Ambient" | "cave-mesh upstream = Istio Ambient-inspired" |

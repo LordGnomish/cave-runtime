@@ -7,10 +7,10 @@
 //!
 //! Upstream: <https://kafka.apache.org/documentation/#basic_ops_consumer_lag>
 
+use super::StreamsViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, StreamsConsumerGroup};
-use super::StreamsViewError;
+use crate::admin::state::{AdminState, StreamsConsumerGroup, scope};
 
 pub fn list_groups_sorted(
     state: &AdminState,
@@ -92,7 +92,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, StreamsVie
         n = rows.len(),
         total = total,
         tbl = table(
-            &["group_id", "topic", "members", "offset", "log_end", "lag", "state"],
+            &[
+                "group_id", "topic", "members", "offset", "log_end", "lag", "state"
+            ],
             &table_rows
         ),
     );
@@ -113,13 +115,15 @@ mod tests {
 
     #[test]
     fn list_returns_seeded_groups_for_tenant() {
-        let rows = list_groups_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let rows =
+            list_groups_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
         assert!(rows.iter().all(|g| g.tenant.as_str() == "acme"));
     }
 
     #[test]
     fn list_sorted_by_lag_desc() {
-        let rows = list_groups_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let rows =
+            list_groups_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
         for w in rows.windows(2) {
             assert!(w[0].lag() >= w[1].lag());
         }
@@ -127,7 +131,8 @@ mod tests {
 
     #[test]
     fn total_lag_sums_lag_field() {
-        let rows = list_groups_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let rows =
+            list_groups_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
         let total = total_lag(&rows);
         let expected: u64 = rows.iter().map(|g| g.lag()).sum();
         assert_eq!(total, expected);
@@ -135,7 +140,8 @@ mod tests {
 
     #[test]
     fn lagging_groups_filters_by_threshold() {
-        let rows = list_groups_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let rows =
+            list_groups_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
         let zero = lagging_groups(&rows, 0);
         assert_eq!(zero.len(), rows.len());
         let huge = lagging_groups(&rows, u64::MAX);
@@ -144,7 +150,8 @@ mod tests {
 
     #[test]
     fn groups_by_state_groups_correctly() {
-        let rows = list_groups_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
+        let rows =
+            list_groups_sorted(&AdminState::seeded(), &ctx(&[Permission::StreamsRead])).unwrap();
         let by_s = groups_by_state(&rows);
         let total_in_map: usize = by_s.values().sum();
         assert_eq!(total_in_map, rows.len());

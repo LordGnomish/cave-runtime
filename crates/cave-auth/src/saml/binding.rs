@@ -16,11 +16,11 @@
 
 use std::io::{Read, Write};
 
-use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD as B64;
+use flate2::Compression;
 use flate2::read::DeflateDecoder;
 use flate2::write::DeflateEncoder;
-use flate2::Compression;
 
 use super::SamlError;
 
@@ -71,7 +71,8 @@ pub fn post_decode(encoded: &str) -> Result<Vec<u8>, SamlError> {
 mod tests {
     use super::*;
 
-    const SAMPLE: &[u8] = br#"<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+    const SAMPLE: &[u8] =
+        br#"<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
         ID="_abc" Version="2.0" IssueInstant="2026-05-13T10:00:00Z" Destination="d"/>"#;
 
     #[test]
@@ -87,7 +88,12 @@ mod tests {
         // Deflate + base64 of a small XML doc should still be
         // a meaningful compression vs raw base64.
         let raw_b64 = post_encode(SAMPLE);
-        assert!(enc.len() < raw_b64.len(), "redirect: {}  post: {}", enc.len(), raw_b64.len());
+        assert!(
+            enc.len() < raw_b64.len(),
+            "redirect: {}  post: {}",
+            enc.len(),
+            raw_b64.len()
+        );
     }
 
     #[test]

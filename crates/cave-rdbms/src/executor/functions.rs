@@ -10,9 +10,7 @@ pub fn call_builtin(name: &str, args: &[SqlValue]) -> Result<SqlValue, String> {
         "now" | "current_timestamp" => Ok(SqlValue::Timestamp(
             Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         )),
-        "current_date" => Ok(SqlValue::Date(
-            Local::now().format("%Y-%m-%d").to_string(),
-        )),
+        "current_date" => Ok(SqlValue::Date(Local::now().format("%Y-%m-%d").to_string())),
         "coalesce" => {
             for arg in args {
                 if !matches!(arg, SqlValue::Null) {
@@ -112,10 +110,7 @@ pub fn call_builtin(name: &str, args: &[SqlValue]) -> Result<SqlValue, String> {
             }
             match &args[0] {
                 SqlValue::Numeric(f) => {
-                    let decimals = args
-                        .get(1)
-                        .and_then(|v| v.as_i32())
-                        .unwrap_or(0);
+                    let decimals = args.get(1).and_then(|v| v.as_i32()).unwrap_or(0);
                     let multiplier = 10_f64.powi(decimals);
                     Ok(SqlValue::Numeric((f * multiplier).round() / multiplier))
                 }

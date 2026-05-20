@@ -112,16 +112,26 @@ fn pick_cvss(cvss: &Value) -> (Option<String>, Option<f32>) {
         if let Some(o) = cvss.get(src) {
             let v3v = o.get("V3Vector").and_then(|v| v.as_str()).map(String::from);
             let v3s = o.get("V3Score").and_then(|v| v.as_f64()).map(|x| x as f32);
-            if v3v.is_some() || v3s.is_some() { return (v3v, v3s); }
+            if v3v.is_some() || v3s.is_some() {
+                return (v3v, v3s);
+            }
         }
     }
     (None, None)
 }
 
 impl ScanParser for TrivyParser {
-    fn scan_type(&self) -> &'static str { "Trivy Scan" }
+    fn scan_type(&self) -> &'static str {
+        "Trivy Scan"
+    }
     fn dedupe_fields(&self) -> &'static [&'static str] {
-        &["title", "severity", "vulnerability_ids", "cwe", "description"]
+        &[
+            "title",
+            "severity",
+            "vulnerability_ids",
+            "cwe",
+            "description",
+        ]
     }
     fn parse(&self, data: &[u8]) -> Result<Vec<Finding>, ParserError> {
         let report: Report = serde_json::from_slice(data)?;
@@ -129,7 +139,10 @@ impl ScanParser for TrivyParser {
         for r in report.results {
             // Vulnerabilities → standard SCA findings
             for v in r.vulnerabilities {
-                let title = v.title.clone().unwrap_or_else(|| v.vulnerability_id.clone());
+                let title = v
+                    .title
+                    .clone()
+                    .unwrap_or_else(|| v.vulnerability_id.clone());
                 let mut sev = trivy_severity(&v.severity);
                 let (vec, score) = pick_cvss(&v.cvss);
                 if let Some(s) = score {
@@ -139,7 +152,11 @@ impl ScanParser for TrivyParser {
                     }
                 }
                 let mut f = Finding::new(title.clone(), sev);
-                f.cve = if v.vulnerability_id.starts_with("CVE-") { Some(v.vulnerability_id.clone()) } else { None };
+                f.cve = if v.vulnerability_id.starts_with("CVE-") {
+                    Some(v.vulnerability_id.clone())
+                } else {
+                    None
+                };
                 f.vulnerability_ids = vec![v.vulnerability_id.clone()];
                 f.vuln_id_from_tool = Some(v.vulnerability_id.clone());
                 f.cvssv3 = vec;
@@ -156,9 +173,17 @@ impl ScanParser for TrivyParser {
                     fix = f.fix_version.clone().unwrap_or_else(|| "n/a".into()),
                     desc = v.description.unwrap_or_default(),
                 );
-                if let Some(u) = v.primary_url { f.references = Some(u); }
-                if let Some(cwe) = v.cwe_ids.first().and_then(|s| s.to_ascii_uppercase().strip_prefix("CWE-").map(String::from)) {
-                    if let Ok(n) = cwe.parse() { f.cwe = Some(n); }
+                if let Some(u) = v.primary_url {
+                    f.references = Some(u);
+                }
+                if let Some(cwe) = v.cwe_ids.first().and_then(|s| {
+                    s.to_ascii_uppercase()
+                        .strip_prefix("CWE-")
+                        .map(String::from)
+                }) {
+                    if let Ok(n) = cwe.parse() {
+                        f.cwe = Some(n);
+                    }
                 }
                 f.found_by_scanner = Some("Trivy Scan".into());
                 f.service = Some(r.target.clone());

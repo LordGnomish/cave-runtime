@@ -32,34 +32,34 @@ pub enum Token {
     // Identifier
     Ident(String),
     // Operators
-    Assign,      // :=
-    Unify,       // =
-    Eq,          // ==
-    Ne,          // !=
-    Lt,          // <
-    Gt,          // >
-    Le,          // <=
-    Ge,          // >=
-    Plus,        // +
-    Minus,       // -
-    Mul,         // *
-    Div,         // /
-    Mod,         // %
-    And,         // &
-    Or,          // |
+    Assign, // :=
+    Unify,  // =
+    Eq,     // ==
+    Ne,     // !=
+    Lt,     // <
+    Gt,     // >
+    Le,     // <=
+    Ge,     // >=
+    Plus,   // +
+    Minus,  // -
+    Mul,    // *
+    Div,    // /
+    Mod,    // %
+    And,    // &
+    Or,     // |
     // Punctuation
-    LBrace,      // {
-    RBrace,      // }
-    LBracket,    // [
-    RBracket,    // ]
-    LParen,      // (
-    RParen,      // )
-    Comma,       // ,
-    Semicolon,   // ;
-    Colon,       // :
-    Dot,         // .
-    Underscore,  // _
-    Newline,     // \n (significant in rule bodies)
+    LBrace,     // {
+    RBrace,     // }
+    LBracket,   // [
+    RBracket,   // ]
+    LParen,     // (
+    RParen,     // )
+    Comma,      // ,
+    Semicolon,  // ;
+    Colon,      // :
+    Dot,        // .
+    Underscore, // _
+    Newline,    // \n (significant in rule bodies)
     // Special
     Eof,
 }
@@ -114,22 +114,70 @@ impl<'a> Lexer<'a> {
             }
 
             let tok = match ch {
-                b'{' => { self.advance(); Token::LBrace }
-                b'}' => { self.advance(); Token::RBrace }
-                b'[' => { self.advance(); Token::LBracket }
-                b']' => { self.advance(); Token::RBracket }
-                b'(' => { self.advance(); Token::LParen }
-                b')' => { self.advance(); Token::RParen }
-                b',' => { self.advance(); Token::Comma }
-                b';' => { self.advance(); Token::Semicolon }
-                b'+' => { self.advance(); Token::Plus }
-                b'-' => { self.advance(); Token::Minus }
-                b'*' => { self.advance(); Token::Mul }
-                b'/' => { self.advance(); Token::Div }
-                b'%' => { self.advance(); Token::Mod }
-                b'&' => { self.advance(); Token::And }
-                b'|' => { self.advance(); Token::Or }
-                b'.' => { self.advance(); Token::Dot }
+                b'{' => {
+                    self.advance();
+                    Token::LBrace
+                }
+                b'}' => {
+                    self.advance();
+                    Token::RBrace
+                }
+                b'[' => {
+                    self.advance();
+                    Token::LBracket
+                }
+                b']' => {
+                    self.advance();
+                    Token::RBracket
+                }
+                b'(' => {
+                    self.advance();
+                    Token::LParen
+                }
+                b')' => {
+                    self.advance();
+                    Token::RParen
+                }
+                b',' => {
+                    self.advance();
+                    Token::Comma
+                }
+                b';' => {
+                    self.advance();
+                    Token::Semicolon
+                }
+                b'+' => {
+                    self.advance();
+                    Token::Plus
+                }
+                b'-' => {
+                    self.advance();
+                    Token::Minus
+                }
+                b'*' => {
+                    self.advance();
+                    Token::Mul
+                }
+                b'/' => {
+                    self.advance();
+                    Token::Div
+                }
+                b'%' => {
+                    self.advance();
+                    Token::Mod
+                }
+                b'&' => {
+                    self.advance();
+                    Token::And
+                }
+                b'|' => {
+                    self.advance();
+                    Token::Or
+                }
+                b'.' => {
+                    self.advance();
+                    Token::Dot
+                }
                 b':' => {
                     self.advance();
                     if self.pos < self.src.len() && self.src[self.pos] == b'=' {
@@ -229,7 +277,10 @@ impl<'a> Lexer<'a> {
     }
 
     fn span(&self) -> Span {
-        Span { line: self.line, col: self.col }
+        Span {
+            line: self.line,
+            col: self.col,
+        }
     }
 
     fn skip_whitespace_no_newline(&mut self) {
@@ -280,8 +331,9 @@ impl<'a> Lexer<'a> {
                             .map_err(|e| PolicyError::Parse(e.to_string()))?;
                         let code = u32::from_str_radix(hex, 16)
                             .map_err(|_| PolicyError::Parse(format!("invalid unicode: {hex}")))?;
-                        let ch = char::from_u32(code)
-                            .ok_or_else(|| PolicyError::Parse(format!("invalid codepoint: {code}")))?;
+                        let ch = char::from_u32(code).ok_or_else(|| {
+                            PolicyError::Parse(format!("invalid codepoint: {code}"))
+                        })?;
                         s.push(ch);
                         self.pos += 4;
                         self.col += 4;
@@ -329,9 +381,7 @@ impl<'a> Lexer<'a> {
             }
         }
         // Exponent
-        if self.pos < self.src.len()
-            && (self.src[self.pos] == b'e' || self.src[self.pos] == b'E')
-        {
+        if self.pos < self.src.len() && (self.src[self.pos] == b'e' || self.src[self.pos] == b'E') {
             self.advance();
             if self.pos < self.src.len()
                 && (self.src[self.pos] == b'+' || self.src[self.pos] == b'-')

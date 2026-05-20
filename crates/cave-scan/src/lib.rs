@@ -26,8 +26,8 @@ pub fn router(state: Arc<State>) -> Router {
 pub const MODULE_NAME: &str = "scan";
 
 pub mod iac;
-pub mod secrets;
 pub mod license;
+pub mod secrets;
 // === S2: Trivy scan engine ===
 pub mod analyzer;
 pub mod oci;

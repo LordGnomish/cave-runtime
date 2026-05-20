@@ -2,11 +2,11 @@
 // Copyright 2026 Cave Runtime contributors
 //! Alerting rules: evaluate a condition and transition through pending→firing→resolved.
 
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use crate::error::Result;
 use crate::model::{Labels, QueryResult};
-use crate::promql::{parse, Engine};
+use crate::promql::{Engine, parse};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Alert lifecycle state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -53,8 +53,14 @@ impl AlertRule {
         }
     }
 
-    pub fn with_labels(mut self, labels: Labels) -> Self { self.labels = labels; self }
-    pub fn with_annotations(mut self, annotations: Labels) -> Self { self.annotations = annotations; self }
+    pub fn with_labels(mut self, labels: Labels) -> Self {
+        self.labels = labels;
+        self
+    }
+    pub fn with_annotations(mut self, annotations: Labels) -> Self {
+        self.annotations = annotations;
+        self
+    }
 
     /// Evaluate the alert rule at `ts_ms`. Returns all currently firing alerts.
     pub fn evaluate(&mut self, engine: &Engine, ts_ms: i64) -> Result<Vec<FiringAlert>> {
@@ -68,7 +74,8 @@ impl AlertRule {
         };
 
         // Build set of currently active fingerprints
-        let active_fps: std::collections::HashSet<u64> = currently_active.iter()
+        let active_fps: std::collections::HashSet<u64> = currently_active
+            .iter()
             .map(|(l, _)| l.fingerprint())
             .collect();
 
@@ -79,18 +86,27 @@ impl AlertRule {
 
         for (series_labels, value) in currently_active {
             let mut alert_labels = series_labels.clone();
-            for (k, v) in self.labels.iter() { alert_labels.insert(k, v); }
+            for (k, v) in self.labels.iter() {
+                alert_labels.insert(k, v);
+            }
 
             let fp = series_labels.fingerprint();
 
-            let (state, first_seen_ms) = self.active.entry(fp).or_insert((AlertState::Pending, ts_ms));
+            let (state, first_seen_ms) = self
+                .active
+                .entry(fp)
+                .or_insert((AlertState::Pending, ts_ms));
 
             // Transition Pending → Firing after `for_ms`
             if *state == AlertState::Pending && (ts_ms - *first_seen_ms) >= self.for_ms {
                 *state = AlertState::Firing;
             }
 
-            let fired_at_ms = if *state == AlertState::Firing { Some(*first_seen_ms + self.for_ms) } else { None };
+            let fired_at_ms = if *state == AlertState::Firing {
+                Some(*first_seen_ms + self.for_ms)
+            } else {
+                None
+            };
 
             out.push(FiringAlert {
                 name: self.name.clone(),
@@ -110,8 +126,8 @@ impl AlertRule {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsdb::Tsdb;
     use crate::model::{LabelMatcher, Sample};
+    use crate::tsdb::Tsdb;
     use std::sync::Arc;
 
     #[test]

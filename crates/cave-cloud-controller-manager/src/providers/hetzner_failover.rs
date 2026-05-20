@@ -117,7 +117,10 @@ mod tests {
     fn failover_without_secondary_is_an_error() {
         let _ = ctx("acme", "hcloud/floating_ip.go", "Assign");
         let mut f = FloatingIpFailover::new(7, 100, None);
-        assert!(matches!(f.failover().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            f.failover().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -171,7 +174,10 @@ mod tests {
         let _ = ctx("acme", "hcloud/floating_ip.go", "Update");
         let mut f = FloatingIpFailover::new(7, 100, Some(200));
         f.current_server_id = None;
-        assert!(matches!(f.commit().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            f.commit().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]

@@ -4,9 +4,9 @@
 //! Format: metric.name:value|type[|@rate][|#tag1:val1,tag2:val2]
 //! Types: c (counter), g (gauge), ms (timer/histogram), s (set), h (histogram)
 
+use super::IngestedBatch;
 use crate::error::{MetricsError, Result};
 use crate::model::{Labels, Sample, TimeSeries};
-use super::IngestedBatch;
 
 #[derive(Debug)]
 pub struct StatsdPacket {
@@ -30,21 +30,28 @@ pub enum StatsdType {
 pub fn parse_packet(line: &str) -> Result<StatsdPacket> {
     // Split on | to get components
     let mut parts = line.splitn(2, ':');
-    let name = parts.next().ok_or_else(|| MetricsError::Parse("empty statsd packet".into()))?.to_string();
-    let rest = parts.next().ok_or_else(|| MetricsError::Parse("missing value in statsd packet".into()))?;
+    let name = parts
+        .next()
+        .ok_or_else(|| MetricsError::Parse("empty statsd packet".into()))?
+        .to_string();
+    let rest = parts
+        .next()
+        .ok_or_else(|| MetricsError::Parse("missing value in statsd packet".into()))?;
 
     let mut segments = rest.split('|');
     let value_str = segments.next().unwrap_or("0");
-    let value: f64 = value_str.parse().map_err(|e| MetricsError::Parse(format!("statsd value: {}", e)))?;
+    let value: f64 = value_str
+        .parse()
+        .map_err(|e| MetricsError::Parse(format!("statsd value: {}", e)))?;
 
     let type_str = segments.next().unwrap_or("g");
     let metric_type = match type_str {
-        "c"  => StatsdType::Counter,
-        "g"  => StatsdType::Gauge,
+        "c" => StatsdType::Counter,
+        "g" => StatsdType::Gauge,
         "ms" => StatsdType::Timer,
-        "s"  => StatsdType::Set,
-        "h"  => StatsdType::Histogram,
-        _    => StatsdType::Gauge,
+        "s" => StatsdType::Set,
+        "h" => StatsdType::Histogram,
+        _ => StatsdType::Gauge,
     };
 
     let mut sample_rate = 1.0f64;
@@ -59,12 +66,20 @@ pub fn parse_packet(line: &str) -> Result<StatsdPacket> {
                 let mut kv = tag.splitn(2, ':');
                 let k = kv.next().unwrap_or("").to_string();
                 let v = kv.next().unwrap_or("true").to_string();
-                if !k.is_empty() { tags.push((k, v)); }
+                if !k.is_empty() {
+                    tags.push((k, v));
+                }
             }
         }
     }
 
-    Ok(StatsdPacket { name, value, metric_type, sample_rate, tags })
+    Ok(StatsdPacket {
+        name,
+        value,
+        metric_type,
+        sample_rate,
+        tags,
+    })
 }
 
 /// Convert a StatsD packet to a TimeSeries.
@@ -83,12 +98,16 @@ pub fn packet_to_timeseries(packet: StatsdPacket) -> TimeSeries {
         packet.value
     };
 
-    TimeSeries { labels, samples: vec![Sample::new(ts_ms, value)] }
+    TimeSeries {
+        labels,
+        samples: vec![Sample::new(ts_ms, value)],
+    }
 }
 
 /// Parse a multi-line StatsD batch (newline-separated packets).
 pub fn parse_batch(input: &str) -> IngestedBatch {
-    input.lines()
+    input
+        .lines()
         .filter(|l| !l.trim().is_empty())
         .filter_map(|l| parse_packet(l).ok())
         .map(packet_to_timeseries)
@@ -96,7 +115,15 @@ pub fn parse_batch(input: &str) -> IngestedBatch {
 }
 
 fn sanitize_name(name: &str) -> String {
-    name.chars().map(|c| if c.is_alphanumeric() || c == '_' { c } else { '_' }).collect()
+    name.chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
 }
 
 fn now_ms() -> i64 {

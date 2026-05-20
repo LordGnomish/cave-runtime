@@ -5,24 +5,36 @@
 use super::types::{LiteLlmRoute, LiteLlmViewError};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
+use crate::admin::state::{AdminState, scope};
 
 pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<LiteLlmRoute>, LiteLlmViewError> {
     ctx.authorise(Permission::LiteLlmRead)?;
     let mut rows: Vec<LiteLlmRoute> =
-        scope(&state.litellm_routes.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-            .into_iter()
-            .cloned()
-            .collect();
+        scope(&state.litellm_routes.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(rows)
 }
 
-pub fn list_enabled(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<LiteLlmRoute>, LiteLlmViewError> {
-    Ok(list(state, ctx)?.into_iter().filter(|r| r.enabled).collect())
+pub fn list_enabled(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<LiteLlmRoute>, LiteLlmViewError> {
+    Ok(list(state, ctx)?
+        .into_iter()
+        .filter(|r| r.enabled)
+        .collect())
 }
 
-pub fn get(state: &AdminState, ctx: &RequestCtx, name: &str) -> Result<LiteLlmRoute, LiteLlmViewError> {
+pub fn get(
+    state: &AdminState,
+    ctx: &RequestCtx,
+    name: &str,
+) -> Result<LiteLlmRoute, LiteLlmViewError> {
     list(state, ctx)?
         .into_iter()
         .find(|r| r.name == name)
@@ -66,7 +78,10 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LiteLlmVie
     let body = format!(
         r#"<section><div class="mb-3">{chips}</div>{tbl}</section>"#,
         chips = chips,
-        tbl = table(&["name", "pattern", "targets", "strategy", "state"], &rows_html),
+        tbl = table(
+            &["name", "pattern", "targets", "strategy", "state"],
+            &rows_html
+        ),
     );
     Ok(page_shell_full(
         ctx,
@@ -134,7 +149,10 @@ mod tests {
         let s = seeded();
         let c = ctx(&[Permission::LiteLlmRead]);
         assert_eq!(get(&s, &c, "premium").unwrap().strategy, "weighted");
-        assert!(matches!(get(&s, &c, "nope").unwrap_err(), LiteLlmViewError::RouteNotFound(_)));
+        assert!(matches!(
+            get(&s, &c, "nope").unwrap_err(),
+            LiteLlmViewError::RouteNotFound(_)
+        ));
     }
 
     #[test]
@@ -142,7 +160,11 @@ mod tests {
         let s = seeded();
         let rows = list(&s, &ctx(&[Permission::LiteLlmRead])).unwrap();
         let h = strategy_histogram(&rows);
-        let rr = h.iter().find(|(s, _)| s == "round_robin").map(|(_, n)| *n).unwrap();
+        let rr = h
+            .iter()
+            .find(|(s, _)| s == "round_robin")
+            .map(|(_, n)| *n)
+            .unwrap();
         assert_eq!(rr, 1);
     }
 

@@ -34,7 +34,9 @@
 use crate::state::ProjectState;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use reqwest::header::{HeaderMap, HeaderValue, ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED, USER_AGENT};
+use reqwest::header::{
+    ETAG, HeaderMap, HeaderValue, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED, USER_AGENT,
+};
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -130,12 +132,7 @@ struct GithubRelease {
 /// Phase 1.
 #[async_trait]
 pub trait SurfaceDiffer: Send + Sync {
-    async fn diff(
-        &self,
-        github_repo: &str,
-        old_tag: Option<&str>,
-        new_tag: &str,
-    ) -> SurfaceDiff;
+    async fn diff(&self, github_repo: &str, old_tag: Option<&str>, new_tag: &str) -> SurfaceDiff;
 }
 
 /// Phase-1 default: emits an empty diff. The release tag transition is the
@@ -144,12 +141,7 @@ pub struct TagOnlyDiffer;
 
 #[async_trait]
 impl SurfaceDiffer for TagOnlyDiffer {
-    async fn diff(
-        &self,
-        _repo: &str,
-        _old_tag: Option<&str>,
-        _new_tag: &str,
-    ) -> SurfaceDiff {
+    async fn diff(&self, _repo: &str, _old_tag: Option<&str>, _new_tag: &str) -> SurfaceDiff {
         SurfaceDiff::default()
     }
 }
@@ -343,8 +335,9 @@ mod tests {
         let client = Client::new();
         let mut st = ProjectState::new("etcd-io/etcd");
 
-        let outcome =
-            detect_release_delta(&client, &cfg, &TagOnlyDiffer, &mut st).await.unwrap();
+        let outcome = detect_release_delta(&client, &cfg, &TagOnlyDiffer, &mut st)
+            .await
+            .unwrap();
         match outcome {
             PollOutcome::NewRelease(d) => {
                 assert_eq!(d.new_tag, "v3.5.10");
@@ -380,8 +373,9 @@ mod tests {
         let mut st = ProjectState::new("etcd-io/etcd");
         st.last_known_tag = Some("v3.5.10".to_string());
 
-        let outcome =
-            detect_release_delta(&Client::new(), &cfg, &TagOnlyDiffer, &mut st).await.unwrap();
+        let outcome = detect_release_delta(&Client::new(), &cfg, &TagOnlyDiffer, &mut st)
+            .await
+            .unwrap();
         assert!(matches!(outcome, PollOutcome::Unchanged));
     }
 
@@ -405,8 +399,9 @@ mod tests {
         st.etag = Some("\"abc\"".to_string());
         st.last_known_tag = Some("v3.5.9".to_string());
 
-        let outcome =
-            detect_release_delta(&Client::new(), &cfg, &TagOnlyDiffer, &mut st).await.unwrap();
+        let outcome = detect_release_delta(&Client::new(), &cfg, &TagOnlyDiffer, &mut st)
+            .await
+            .unwrap();
         assert!(matches!(outcome, PollOutcome::Unchanged));
         // ETag and last_known_tag preserved on 304.
         assert_eq!(st.etag.as_deref(), Some("\"abc\""));
@@ -431,8 +426,9 @@ mod tests {
             request_timeout: Duration::from_secs(5),
         };
         let mut st = ProjectState::new("foo/bar");
-        let outcome =
-            detect_release_delta(&Client::new(), &cfg, &TagOnlyDiffer, &mut st).await.unwrap();
+        let outcome = detect_release_delta(&Client::new(), &cfg, &TagOnlyDiffer, &mut st)
+            .await
+            .unwrap();
         match outcome {
             PollOutcome::RateLimited { reset_at } => {
                 assert_eq!(reset_at, Some(1735689600));
@@ -458,8 +454,9 @@ mod tests {
             request_timeout: Duration::from_secs(5),
         };
         let mut st = ProjectState::new("foo/empty");
-        let outcome =
-            detect_release_delta(&Client::new(), &cfg, &TagOnlyDiffer, &mut st).await.unwrap();
+        let outcome = detect_release_delta(&Client::new(), &cfg, &TagOnlyDiffer, &mut st)
+            .await
+            .unwrap();
         assert!(matches!(outcome, PollOutcome::NoReleases));
     }
 
@@ -486,8 +483,9 @@ mod tests {
         let mut st = ProjectState::new("etcd-io/etcd");
         st.last_known_tag = Some("v3.5.10".to_string());
 
-        let outcome =
-            detect_release_delta(&Client::new(), &cfg, &TagOnlyDiffer, &mut st).await.unwrap();
+        let outcome = detect_release_delta(&Client::new(), &cfg, &TagOnlyDiffer, &mut st)
+            .await
+            .unwrap();
         match outcome {
             PollOutcome::NewRelease(d) => {
                 assert_eq!(d.old_tag.as_deref(), Some("v3.5.10"));
@@ -506,10 +504,17 @@ mod tests {
 impl std::fmt::Debug for PollOutcome {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PollOutcome::NewRelease(d) => write!(f, "NewRelease({} -> {})", d.old_tag.as_deref().unwrap_or("∅"), d.new_tag),
+            PollOutcome::NewRelease(d) => write!(
+                f,
+                "NewRelease({} -> {})",
+                d.old_tag.as_deref().unwrap_or("∅"),
+                d.new_tag
+            ),
             PollOutcome::Unchanged => write!(f, "Unchanged"),
             PollOutcome::NoReleases => write!(f, "NoReleases"),
-            PollOutcome::RateLimited { reset_at } => write!(f, "RateLimited(reset_at={reset_at:?})"),
+            PollOutcome::RateLimited { reset_at } => {
+                write!(f, "RateLimited(reset_at={reset_at:?})")
+            }
         }
     }
 }

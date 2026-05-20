@@ -188,9 +188,7 @@ fn build_sarif(findings: &[Finding]) -> SarifLog {
                 driver: SarifDriver {
                     name: "cave-gitleaks".to_string(),
                     semantic_version: env!("CARGO_PKG_VERSION").to_string(),
-                    information_uri:
-                        "https://github.com/cave-runtime/cave-runtime"
-                            .to_string(),
+                    information_uri: "https://github.com/cave-runtime/cave-runtime".to_string(),
                     rules,
                 },
             },
@@ -376,12 +374,11 @@ mod tests {
         write_sarif(&mut buf, &[f]).unwrap();
         let s = String::from_utf8(buf).unwrap();
         let v: serde_json::Value = serde_json::from_str(&s).unwrap();
-        let region = &v["runs"][0]["results"][0]["locations"][0]
-            ["physicalLocation"]["region"];
+        let region = &v["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"];
         assert_eq!(region["startLine"], 12);
         assert_eq!(region["endColumn"], 25);
-        let uri = &v["runs"][0]["results"][0]["locations"][0]
-            ["physicalLocation"]["artifactLocation"]["uri"];
+        let uri = &v["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]
+            ["uri"];
         assert_eq!(uri, "src/main.rs");
     }
 }

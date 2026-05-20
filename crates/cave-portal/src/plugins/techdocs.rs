@@ -125,7 +125,8 @@ mod tests {
     #[test]
     fn put_inserts() {
         let mut t = TechDocsPlugin::new();
-        t.put(page("acme", "web", "intro.md", "Intro", "hello")).unwrap();
+        t.put(page("acme", "web", "intro.md", "Intro", "hello"))
+            .unwrap();
         assert_eq!(t.count(), 1);
     }
 
@@ -187,7 +188,11 @@ mod tests {
         t.put(page("acme", "web", "z.md", "Z", "")).unwrap();
         t.put(page("acme", "web", "a.md", "A", "")).unwrap();
         t.put(page("acme", "web", "m.md", "M", "")).unwrap();
-        let paths: Vec<&str> = t.tree("acme", "web").iter().map(|p| p.path.as_str()).collect();
+        let paths: Vec<&str> = t
+            .tree("acme", "web")
+            .iter()
+            .map(|p| p.path.as_str())
+            .collect();
         assert_eq!(paths, vec!["a.md", "m.md", "z.md"]);
     }
 
@@ -205,7 +210,8 @@ mod tests {
     #[test]
     fn search_finds_in_title() {
         let mut t = TechDocsPlugin::new();
-        t.put(page("acme", "web", "a.md", "Authentication", "body")).unwrap();
+        t.put(page("acme", "web", "a.md", "Authentication", "body"))
+            .unwrap();
         let out = t.search("acme", "auth", 10);
         assert_eq!(out.len(), 1);
     }
@@ -213,7 +219,8 @@ mod tests {
     #[test]
     fn search_finds_in_body() {
         let mut t = TechDocsPlugin::new();
-        t.put(page("acme", "web", "a.md", "T", "OAuth flow notes")).unwrap();
+        t.put(page("acme", "web", "a.md", "T", "OAuth flow notes"))
+            .unwrap();
         let out = t.search("acme", "oauth", 10);
         assert_eq!(out.len(), 1);
     }
@@ -221,7 +228,8 @@ mod tests {
     #[test]
     fn search_case_insensitive() {
         let mut t = TechDocsPlugin::new();
-        t.put(page("acme", "web", "a.md", "RBAC Guide", "")).unwrap();
+        t.put(page("acme", "web", "a.md", "RBAC Guide", ""))
+            .unwrap();
         assert_eq!(t.search("acme", "rbac", 10).len(), 1);
         assert_eq!(t.search("acme", "RBAC", 10).len(), 1);
         assert_eq!(t.search("acme", "Rbac", 10).len(), 1);
@@ -238,7 +246,14 @@ mod tests {
     fn search_respects_limit() {
         let mut t = TechDocsPlugin::new();
         for i in 0..10 {
-            t.put(page("acme", "web", &format!("doc{i}.md"), &format!("Title {i}"), "auth")).unwrap();
+            t.put(page(
+                "acme",
+                "web",
+                &format!("doc{i}.md"),
+                &format!("Title {i}"),
+                "auth",
+            ))
+            .unwrap();
         }
         let out = t.search("acme", "auth", 3);
         assert_eq!(out.len(), 3);

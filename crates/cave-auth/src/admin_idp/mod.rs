@@ -11,8 +11,8 @@ pub mod instances;
 pub mod mappers;
 
 use axum::{
-    routing::{get, post},
     Router,
+    routing::{get, post},
 };
 use std::sync::Arc;
 

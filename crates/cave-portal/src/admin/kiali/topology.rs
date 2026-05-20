@@ -138,11 +138,8 @@ mod tests {
 
     #[test]
     fn list_edges_filters_to_tenant() {
-        let (_c, _t) = portal_test_ctx!(
-            "plugins/kiali/src/components/Topology.tsx",
-            "Edges",
-            "acme"
-        );
+        let (_c, _t) =
+            portal_test_ctx!("plugins/kiali/src/components/Topology.tsx", "Edges", "acme");
         let s = AdminState::seeded();
         let edges = list_edges(&s, &ctx(&[Permission::KialiRead])).unwrap();
         assert!(!edges.is_empty());

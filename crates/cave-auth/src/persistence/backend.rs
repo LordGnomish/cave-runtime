@@ -25,7 +25,10 @@ pub enum PersistenceError {
     NotFound { entity: &'static str, id: String },
 
     #[error("conflict (unique violation) on {entity}: {detail}")]
-    Conflict { entity: &'static str, detail: String },
+    Conflict {
+        entity: &'static str,
+        detail: String,
+    },
 
     #[error("backend i/o: {0}")]
     Backend(String),
@@ -128,7 +131,8 @@ pub trait PersistenceBackend: Send + Sync {
     // ── AuthenticationFlow ───────────────────────────────────────────────
     async fn list_flows_in_realm(&self, realm_id: Uuid) -> Result<Vec<AuthFlowEntity>>;
     async fn get_flow_by_id(&self, id: Uuid) -> Result<Option<AuthFlowEntity>>;
-    async fn get_flow_by_name(&self, realm_id: Uuid, alias: &str) -> Result<Option<AuthFlowEntity>>;
+    async fn get_flow_by_name(&self, realm_id: Uuid, alias: &str)
+    -> Result<Option<AuthFlowEntity>>;
     async fn create_flow(&self, f: AuthFlowEntity) -> Result<AuthFlowEntity>;
     async fn update_flow(&self, f: AuthFlowEntity) -> Result<AuthFlowEntity>;
     async fn delete_flow(&self, id: Uuid) -> Result<()>;

@@ -11,7 +11,9 @@ use crate::types::Entry;
 /// Try to evict keys if maxmemory is exceeded.
 /// Returns the number of keys evicted.
 pub fn evict_if_needed(db: &mut Db, policy: EvictionPolicy, max_memory: Option<usize>) -> usize {
-    let Some(max) = max_memory else { return 0; };
+    let Some(max) = max_memory else {
+        return 0;
+    };
 
     let current = estimate_memory(db);
     if current <= max {
@@ -37,7 +39,8 @@ pub fn evict_keys(db: &mut Db, policy: EvictionPolicy, count: usize) -> usize {
 }
 
 fn evict_random(db: &mut Db, count: usize, volatile_only: bool) -> usize {
-    let candidates: Vec<Vec<u8>> = db.keys
+    let candidates: Vec<Vec<u8>> = db
+        .keys
         .iter()
         .filter(|(_, e)| !volatile_only || e.expires_at.is_some())
         .map(|(k, _)| k.clone())
@@ -53,7 +56,8 @@ fn evict_random(db: &mut Db, count: usize, volatile_only: bool) -> usize {
 }
 
 fn evict_lru(db: &mut Db, count: usize, volatile_only: bool) -> usize {
-    let mut candidates: Vec<(Vec<u8>, u64)> = db.keys
+    let mut candidates: Vec<(Vec<u8>, u64)> = db
+        .keys
         .iter()
         .filter(|(_, e)| !volatile_only || e.expires_at.is_some())
         .map(|(k, e)| (k.clone(), e.lru_clock))
@@ -69,7 +73,8 @@ fn evict_lru(db: &mut Db, count: usize, volatile_only: bool) -> usize {
 }
 
 fn evict_lfu(db: &mut Db, count: usize, volatile_only: bool) -> usize {
-    let mut candidates: Vec<(Vec<u8>, u8)> = db.keys
+    let mut candidates: Vec<(Vec<u8>, u8)> = db
+        .keys
         .iter()
         .filter(|(_, e)| !volatile_only || e.expires_at.is_some())
         .map(|(k, e)| (k.clone(), e.lfu_freq))
@@ -86,11 +91,16 @@ fn evict_lfu(db: &mut Db, count: usize, volatile_only: bool) -> usize {
 
 fn evict_ttl(db: &mut Db, count: usize) -> usize {
     let now = Instant::now();
-    let mut candidates: Vec<(Vec<u8>, u64)> = db.keys
+    let mut candidates: Vec<(Vec<u8>, u64)> = db
+        .keys
         .iter()
         .filter_map(|(k, e)| {
             e.expires_at.map(|t| {
-                let remaining = if t > now { (t - now).as_millis() as u64 } else { 0 };
+                let remaining = if t > now {
+                    (t - now).as_millis() as u64
+                } else {
+                    0
+                };
                 (k.clone(), remaining)
             })
         })

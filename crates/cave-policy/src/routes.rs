@@ -34,14 +34,14 @@
 //! Cave module:
 //!   GET    /api/policy/health                   — module health
 
-use crate::models::*;
 use crate::PolicyState;
+use crate::models::*;
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{delete, get, patch, post, put},
-    Json, Router,
 };
 use std::sync::Arc;
 
@@ -50,11 +50,29 @@ pub fn create_router(state: Arc<PolicyState>) -> Router {
         // ── Cave module health ──────────────────────────────────────────────
         .route("/api/policy/health", get(health))
         // ── OPA Data API ───────────────────────────────────────────────────
-        .route("/v1/data", get(opa_get_data_root).post(opa_query_root).put(opa_put_data_root).patch(opa_patch_data_root))
-        .route("/v1/data/{*path}", get(opa_get_data).post(opa_query_data).put(opa_put_data).patch(opa_patch_data).delete(opa_delete_data))
+        .route(
+            "/v1/data",
+            get(opa_get_data_root)
+                .post(opa_query_root)
+                .put(opa_put_data_root)
+                .patch(opa_patch_data_root),
+        )
+        .route(
+            "/v1/data/{*path}",
+            get(opa_get_data)
+                .post(opa_query_data)
+                .put(opa_put_data)
+                .patch(opa_patch_data)
+                .delete(opa_delete_data),
+        )
         // ── OPA Policy API ─────────────────────────────────────────────────
         .route("/v1/policies", get(opa_list_policies))
-        .route("/v1/policies/{id}", get(opa_get_policy).put(opa_put_policy).delete(opa_delete_policy))
+        .route(
+            "/v1/policies/{id}",
+            get(opa_get_policy)
+                .put(opa_put_policy)
+                .delete(opa_delete_policy),
+        )
         // ── OPA Compile API ────────────────────────────────────────────────
         .route("/v1/compile", post(opa_compile))
         // ── OPA Query API ──────────────────────────────────────────────────
@@ -63,8 +81,16 @@ pub fn create_router(state: Arc<PolicyState>) -> Router {
         .route("/v1/health", get(opa_health))
         .route("/v1/status", get(opa_status))
         // ── Kyverno ClusterPolicy API ──────────────────────────────────────
-        .route("/api/kyverno/policies", get(kyverno_list_policies).post(kyverno_create_policy))
-        .route("/api/kyverno/policies/{name}", get(kyverno_get_policy).put(kyverno_update_policy).delete(kyverno_delete_policy))
+        .route(
+            "/api/kyverno/policies",
+            get(kyverno_list_policies).post(kyverno_create_policy),
+        )
+        .route(
+            "/api/kyverno/policies/{name}",
+            get(kyverno_get_policy)
+                .put(kyverno_update_policy)
+                .delete(kyverno_delete_policy),
+        )
         .route("/api/kyverno/evaluate", post(kyverno_evaluate))
         .route("/api/kyverno/reports", get(kyverno_list_reports))
         // ── Admission Webhooks ─────────────────────────────────────────────
@@ -112,7 +138,11 @@ async fn opa_get_data(
     Path(path): Path<String>,
     Query(params): Query<DataQueryParams>,
 ) -> Response {
-    let path_parts: Vec<String> = path.split('/').filter(|s| !s.is_empty()).map(String::from).collect();
+    let path_parts: Vec<String> = path
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .collect();
     opa_query_impl(state, path_parts, None, params).await
 }
 
@@ -122,7 +152,11 @@ async fn opa_query_data(
     Query(params): Query<DataQueryParams>,
     body: Option<Json<DataQueryRequest>>,
 ) -> Response {
-    let path_parts: Vec<String> = path.split('/').filter(|s| !s.is_empty()).map(String::from).collect();
+    let path_parts: Vec<String> = path
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .collect();
     let input = body.and_then(|b| b.input.clone());
     opa_query_impl(state, path_parts, input, params).await
 }
@@ -149,13 +183,9 @@ async fn opa_query_impl(
 
     // Record decision
     let path_str = format!("data/{}", path.join("/"));
-    state.decision_log.record(
-        &path_str,
-        Some(&input_val),
-        result.as_ref(),
-        None,
-        "http",
-    );
+    state
+        .decision_log
+        .record(&path_str, Some(&input_val), result.as_ref(), None, "http");
 
     let resp = DataResponse {
         result,
@@ -185,7 +215,11 @@ async fn opa_put_data(
     Path(path): Path<String>,
     Json(value): Json<serde_json::Value>,
 ) -> StatusCode {
-    let path_parts: Vec<String> = path.split('/').filter(|s| !s.is_empty()).map(String::from).collect();
+    let path_parts: Vec<String> = path
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .collect();
     let mut engine = state.rego.write().unwrap();
     engine.set_data(&path_parts, value);
     StatusCode::NO_CONTENT
@@ -200,8 +234,13 @@ async fn opa_patch_data_root(
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(e) => (
             StatusCode::BAD_REQUEST,
-            Json(ErrorResponse { code: "patch_error".into(), message: e.to_string(), errors: None }),
-        ).into_response(),
+            Json(ErrorResponse {
+                code: "patch_error".into(),
+                message: e.to_string(),
+                errors: None,
+            }),
+        )
+            .into_response(),
     }
 }
 
@@ -210,14 +249,23 @@ async fn opa_patch_data(
     Path(path): Path<String>,
     Json(patches): Json<PatchDataRequest>,
 ) -> Response {
-    let path_parts: Vec<String> = path.split('/').filter(|s| !s.is_empty()).map(String::from).collect();
+    let path_parts: Vec<String> = path
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .collect();
     let mut engine = state.rego.write().unwrap();
     match engine.patch_data(&path_parts, &patches) {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(e) => (
             StatusCode::BAD_REQUEST,
-            Json(ErrorResponse { code: "patch_error".into(), message: e.to_string(), errors: None }),
-        ).into_response(),
+            Json(ErrorResponse {
+                code: "patch_error".into(),
+                message: e.to_string(),
+                errors: None,
+            }),
+        )
+            .into_response(),
     }
 }
 
@@ -225,7 +273,11 @@ async fn opa_delete_data(
     State(state): State<Arc<PolicyState>>,
     Path(path): Path<String>,
 ) -> StatusCode {
-    let path_parts: Vec<String> = path.split('/').filter(|s| !s.is_empty()).map(String::from).collect();
+    let path_parts: Vec<String> = path
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .collect();
     let mut engine = state.rego.write().unwrap();
     engine.set_data(&path_parts, serde_json::Value::Null);
     StatusCode::NO_CONTENT
@@ -233,9 +285,7 @@ async fn opa_delete_data(
 
 // ─── OPA Policy API ───────────────────────────────────────────────────────────
 
-async fn opa_list_policies(
-    State(state): State<Arc<PolicyState>>,
-) -> Json<ListPoliciesResponse> {
+async fn opa_list_policies(State(state): State<Arc<PolicyState>>) -> Json<ListPoliciesResponse> {
     let engine = state.rego.read().unwrap();
     let policies: Vec<StoredPolicy> = engine
         .module_ids()
@@ -249,16 +299,18 @@ async fn opa_list_policies(
     Json(ListPoliciesResponse { result: policies })
 }
 
-async fn opa_get_policy(
-    State(state): State<Arc<PolicyState>>,
-    Path(id): Path<String>,
-) -> Response {
+async fn opa_get_policy(State(state): State<Arc<PolicyState>>, Path(id): Path<String>) -> Response {
     let engine = state.rego.read().unwrap();
     let ast = engine.module_ast(&id);
     if ast.is_some() {
         Json(GetPolicyResponse {
-            result: StoredPolicy { id, raw: String::new(), ast },
-        }).into_response()
+            result: StoredPolicy {
+                id,
+                raw: String::new(),
+                ast,
+            },
+        })
+        .into_response()
     } else {
         (
             StatusCode::NOT_FOUND,
@@ -267,7 +319,8 @@ async fn opa_get_policy(
                 message: format!("policy '{id}' not found"),
                 errors: None,
             }),
-        ).into_response()
+        )
+            .into_response()
     }
 }
 
@@ -294,7 +347,8 @@ async fn opa_put_policy(
                 message: e.to_string(),
                 errors: None,
             }),
-        ).into_response(),
+        )
+            .into_response(),
     }
 }
 
@@ -315,7 +369,8 @@ async fn opa_delete_policy(
                 message: format!("policy '{id}' not found"),
                 errors: None,
             }),
-        ).into_response()
+        )
+            .into_response()
     }
 }
 
@@ -334,11 +389,17 @@ async fn opa_compile(
                 support: partial.support,
             },
             metrics: None,
-        }).into_response(),
+        })
+        .into_response(),
         Err(e) => (
             StatusCode::BAD_REQUEST,
-            Json(ErrorResponse { code: "compile_error".into(), message: e.to_string(), errors: None }),
-        ).into_response(),
+            Json(ErrorResponse {
+                code: "compile_error".into(),
+                message: e.to_string(),
+                errors: None,
+            }),
+        )
+            .into_response(),
     }
 }
 
@@ -350,11 +411,21 @@ async fn opa_get_query(
 ) -> Response {
     let engine = state.rego.read().unwrap();
     match engine.query_str(&params.q, serde_json::Value::Null) {
-        Ok(bindings) => Json(QueryResponse { result: bindings, metrics: None, explanation: None }).into_response(),
+        Ok(bindings) => Json(QueryResponse {
+            result: bindings,
+            metrics: None,
+            explanation: None,
+        })
+        .into_response(),
         Err(e) => (
             StatusCode::BAD_REQUEST,
-            Json(ErrorResponse { code: "query_error".into(), message: e.to_string(), errors: None }),
-        ).into_response(),
+            Json(ErrorResponse {
+                code: "query_error".into(),
+                message: e.to_string(),
+                errors: None,
+            }),
+        )
+            .into_response(),
     }
 }
 
@@ -365,11 +436,21 @@ async fn opa_post_query(
     let engine = state.rego.read().unwrap();
     let input = req.input.unwrap_or_default();
     match engine.query_str(&req.query, input) {
-        Ok(bindings) => Json(QueryResponse { result: bindings, metrics: None, explanation: None }).into_response(),
+        Ok(bindings) => Json(QueryResponse {
+            result: bindings,
+            metrics: None,
+            explanation: None,
+        })
+        .into_response(),
         Err(e) => (
             StatusCode::BAD_REQUEST,
-            Json(ErrorResponse { code: "query_error".into(), message: e.to_string(), errors: None }),
-        ).into_response(),
+            Json(ErrorResponse {
+                code: "query_error".into(),
+                message: e.to_string(),
+                errors: None,
+            }),
+        )
+            .into_response(),
     }
 }
 
@@ -387,14 +468,25 @@ async fn opa_health(State(state): State<Arc<PolicyState>>) -> Json<HealthRespons
 async fn opa_status(State(state): State<Arc<PolicyState>>) -> Json<StatusResponse> {
     let bundles = state.bundles.read().unwrap();
     let mut plugin_status = std::collections::HashMap::new();
-    plugin_status.insert("kyverno".into(), PluginStatus {
-        state: "OK".into(),
-        message: None,
-    });
-    plugin_status.insert("decision_logger".into(), PluginStatus {
-        state: if state.decision_log.is_enabled() { "OK" } else { "NOT_READY" }.into(),
-        message: None,
-    });
+    plugin_status.insert(
+        "kyverno".into(),
+        PluginStatus {
+            state: "OK".into(),
+            message: None,
+        },
+    );
+    plugin_status.insert(
+        "decision_logger".into(),
+        PluginStatus {
+            state: if state.decision_log.is_enabled() {
+                "OK"
+            } else {
+                "NOT_READY"
+            }
+            .into(),
+            message: None,
+        },
+    );
     Json(StatusResponse {
         result: OpaStatus {
             labels: std::collections::HashMap::new(),
@@ -407,9 +499,7 @@ async fn opa_status(State(state): State<Arc<PolicyState>>) -> Json<StatusRespons
 
 // ─── Kyverno API ──────────────────────────────────────────────────────────────
 
-async fn kyverno_list_policies(
-    State(state): State<Arc<PolicyState>>,
-) -> Json<serde_json::Value> {
+async fn kyverno_list_policies(State(state): State<Arc<PolicyState>>) -> Json<serde_json::Value> {
     let engine = state.kyverno.read().unwrap();
     let policies: Vec<&crate::kyverno::models::ClusterPolicy> = engine.list_cluster_policies();
     Json(serde_json::json!({ "items": policies }))
@@ -439,7 +529,8 @@ async fn kyverno_get_policy(
                 message: format!("ClusterPolicy '{name}' not found"),
                 errors: None,
             }),
-        ).into_response(),
+        )
+            .into_response(),
     }
 }
 
@@ -479,9 +570,7 @@ async fn kyverno_evaluate(
     Json(result)
 }
 
-async fn kyverno_list_reports(
-    State(state): State<Arc<PolicyState>>,
-) -> Json<serde_json::Value> {
+async fn kyverno_list_reports(State(state): State<Arc<PolicyState>>) -> Json<serde_json::Value> {
     let engine = state.kyverno.read().unwrap();
     let report = engine.generate_report(None);
     Json(serde_json::json!({ "items": [report] }))
@@ -503,14 +592,23 @@ async fn webhook_validate(
             tracing::error!(target: "admission", error = e.to_string(), "webhook error");
             if state.fail_open {
                 // Fail-open: allow the request
-                let uid = review.request.as_ref().map(|r| r.uid.clone()).unwrap_or_default();
+                let uid = review
+                    .request
+                    .as_ref()
+                    .map(|r| r.uid.clone())
+                    .unwrap_or_default();
                 Json(crate::admission::AdmissionReview::new_response(
                     uid.clone(),
                     crate::admission::AdmissionResponse::allow(uid),
-                )).into_response()
+                ))
+                .into_response()
             } else {
                 // Fail-closed: deny the request
-                let uid = review.request.as_ref().map(|r| r.uid.clone()).unwrap_or_default();
+                let uid = review
+                    .request
+                    .as_ref()
+                    .map(|r| r.uid.clone())
+                    .unwrap_or_default();
                 Json(crate::admission::AdmissionReview::new_response(
                     uid.clone(),
                     crate::admission::AdmissionResponse::deny(
@@ -518,7 +616,8 @@ async fn webhook_validate(
                         format!("internal error: {e}"),
                         500,
                     ),
-                )).into_response()
+                ))
+                .into_response()
             }
         }
     }

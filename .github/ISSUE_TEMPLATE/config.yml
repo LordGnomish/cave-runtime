@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security disclosure (private)
+    url: https://github.com/LordGnomish/cave-runtime/security/advisories/new
+    about: Report a vulnerability privately. Do not open a public issue for security reports.
+  - name: Discussion / Q&A
+    url: https://github.com/LordGnomish/cave-runtime/discussions
+    about: Open-ended questions, architectural discussion, or RFC-style design conversations.
+  - name: Code of Conduct concern
+    url: mailto:conduct@cave-runtime.dev
+    about: Report a Code of Conduct violation. Reports are confidential.

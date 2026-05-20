@@ -1,23 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+use crate::VaultState;
 use crate::error::{VaultError, VaultResult};
 use crate::response::VaultResponse;
-use crate::VaultState;
 use axum::{
+    Router,
     extract::{Json, Path, State},
     http::HeaderMap,
     routing::{delete, get, post},
-    Router,
 };
 use chrono::{Duration, Utc};
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 fn extract_token(headers: &HeaderMap) -> VaultResult<String> {
-    headers.get("x-vault-token")
+    headers
+        .get("x-vault-token")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or(VaultError::BadToken)
@@ -69,8 +70,9 @@ pub struct DatabaseStore {
 fn random_string(len: usize) -> VaultResult<String> {
     let rng = SystemRandom::new();
     let mut bytes = vec![0u8; len];
-    rng.fill(&mut bytes).map_err(|_| VaultError::Crypto("rng failure".into()))?;
-    Ok(hex::encode(&bytes[..len/2]))
+    rng.fill(&mut bytes)
+        .map_err(|_| VaultError::Crypto("rng failure".into()))?;
+    Ok(hex::encode(&bytes[..len / 2]))
 }
 
 pub async fn configure_connection(
@@ -82,16 +84,47 @@ pub async fn configure_connection(
     let _token = extract_token(&headers)?;
     let conn = DatabaseConnection {
         name: name.clone(),
-        plugin_name: body.get("plugin_name").and_then(|v| v.as_str()).unwrap_or("postgresql-database-plugin").to_string(),
-        connection_url: body.get("connection_url").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        max_open_connections: body.get("max_open_connections").and_then(|v| v.as_i64()).unwrap_or(4) as i32,
-        max_idle_connections: body.get("max_idle_connections").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
-        max_connection_lifetime: body.get("max_connection_lifetime").and_then(|v| v.as_str()).unwrap_or("0s").to_string(),
-        allowed_roles: body.get("allowed_roles").and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+        plugin_name: body
+            .get("plugin_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("postgresql-database-plugin")
+            .to_string(),
+        connection_url: body
+            .get("connection_url")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        max_open_connections: body
+            .get("max_open_connections")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(4) as i32,
+        max_idle_connections: body
+            .get("max_idle_connections")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0) as i32,
+        max_connection_lifetime: body
+            .get("max_connection_lifetime")
+            .and_then(|v| v.as_str())
+            .unwrap_or("0s")
+            .to_string(),
+        allowed_roles: body
+            .get("allowed_roles")
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default(),
-        password_policy: body.get("password_policy").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        verify_connection: body.get("verify_connection").and_then(|v| v.as_bool()).unwrap_or(true),
+        password_policy: body
+            .get("password_policy")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        verify_connection: body
+            .get("verify_connection")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true),
     };
     let mut store = state.database_store.write().await;
     store.connections.insert(name, conn);
@@ -105,7 +138,9 @@ pub async fn read_connection(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.database_store.read().await;
-    let conn = store.connections.get(&name)
+    let conn = store
+        .connections
+        .get(&name)
         .ok_or_else(|| VaultError::NotFound(format!("connection {} not found", name)))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(conn).unwrap_or_default()))
 }
@@ -141,17 +176,41 @@ pub async fn create_role(
     let _token = extract_token(&headers)?;
     let role = DatabaseRole {
         name: role_name.clone(),
-        db_name: body.get("db_name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        creation_statements: body.get("creation_statements").and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+        db_name: body
+            .get("db_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        creation_statements: body
+            .get("creation_statements")
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default(),
-        revocation_statements: body.get("revocation_statements").and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+        revocation_statements: body
+            .get("revocation_statements")
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default(),
         rollback_statements: Vec::new(),
         renew_statements: Vec::new(),
-        default_ttl: body.get("default_ttl").and_then(|v| v.as_str()).map(crate::token::parse_duration).unwrap_or(3600),
-        max_ttl: body.get("max_ttl").and_then(|v| v.as_str()).map(crate::token::parse_duration).unwrap_or(86400),
+        default_ttl: body
+            .get("default_ttl")
+            .and_then(|v| v.as_str())
+            .map(crate::token::parse_duration)
+            .unwrap_or(3600),
+        max_ttl: body
+            .get("max_ttl")
+            .and_then(|v| v.as_str())
+            .map(crate::token::parse_duration)
+            .unwrap_or(86400),
     };
     let mut store = state.database_store.write().await;
     store.roles.insert(role_name, role);
@@ -165,7 +224,9 @@ pub async fn read_role(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.database_store.read().await;
-    let role = store.roles.get(&role_name)
+    let role = store
+        .roles
+        .get(&role_name)
         .ok_or_else(|| VaultError::RoleNotFound(role_name))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(role).unwrap_or_default()))
 }
@@ -199,8 +260,11 @@ pub async fn generate_credentials(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.database_store.read().await;
-    let role = store.roles.get(&role_name)
-        .ok_or_else(|| VaultError::RoleNotFound(role_name.clone()))?.clone();
+    let role = store
+        .roles
+        .get(&role_name)
+        .ok_or_else(|| VaultError::RoleNotFound(role_name.clone()))?
+        .clone();
     drop(store);
 
     let username = format!("v-{}--{}", role_name, random_string(8)?);

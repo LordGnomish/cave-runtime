@@ -7,7 +7,7 @@
 //! `cmd/kube-apiserver/app/options/options.go` (DefaultServiceNodePortRange).
 
 use cave_kube_proxy::{
-    KubeProxyError, NodePortAllocator, DEFAULT_MAX_NODE_PORT, DEFAULT_MIN_NODE_PORT,
+    DEFAULT_MAX_NODE_PORT, DEFAULT_MIN_NODE_PORT, KubeProxyError, NodePortAllocator,
 };
 
 const TENANT: &str = "tenant-acme-prod";
@@ -44,10 +44,16 @@ fn allocate_in_range_succeeds_then_marks_allocated() {
 fn allocate_out_of_range_or_double_allocate_errors() {
     let mut a = NodePortAllocator::new(TENANT);
     let err = a.allocate(80).unwrap_err();
-    assert!(matches!(err, KubeProxyError::PortNotInRange { port: 80, .. }));
+    assert!(matches!(
+        err,
+        KubeProxyError::PortNotInRange { port: 80, .. }
+    ));
 
     let err = a.allocate(40_000).unwrap_err();
-    assert!(matches!(err, KubeProxyError::PortNotInRange { port: 40_000, .. }));
+    assert!(matches!(
+        err,
+        KubeProxyError::PortNotInRange { port: 40_000, .. }
+    ));
 
     a.allocate(30_500).unwrap();
     let err = a.allocate(30_500).unwrap_err();

@@ -43,7 +43,14 @@ pub(super) fn render_section(
     let rows = list_routes(state, ctx)?;
     let table_rows: Vec<Vec<String>> = rows
         .iter()
-        .map(|r| vec![r.node.clone(), r.pod_cidr.clone(), r.next_hop.clone(), r.state.into()])
+        .map(|r| {
+            vec![
+                r.node.clone(),
+                r.pod_cidr.clone(),
+                r.next_hop.clone(),
+                r.state.into(),
+            ]
+        })
         .collect();
     Ok(format!(
         r#"<section id="ccm-routes" class="mt-6">
@@ -75,7 +82,9 @@ mod tests {
         );
         let s = AdminState::seeded();
         let rows = list_routes(&s, &ctx(&[Permission::CloudControllerRead])).unwrap();
-        let nodes = super::super::node_controller::list_nodes(&s, &ctx(&[Permission::CloudControllerRead])).unwrap();
+        let nodes =
+            super::super::node_controller::list_nodes(&s, &ctx(&[Permission::CloudControllerRead]))
+                .unwrap();
         assert_eq!(rows.len(), nodes.len());
     }
 
@@ -89,7 +98,9 @@ mod tests {
     fn active_routes_only_count_initialized_nodes() {
         let s = AdminState::seeded();
         let rows = list_routes(&s, &ctx(&[Permission::CloudControllerRead])).unwrap();
-        let nodes = super::super::node_controller::list_nodes(&s, &ctx(&[Permission::CloudControllerRead])).unwrap();
+        let nodes =
+            super::super::node_controller::list_nodes(&s, &ctx(&[Permission::CloudControllerRead]))
+                .unwrap();
         let active = active_count(&rows);
         let expected = super::super::node_controller::count_initialized(&nodes);
         assert_eq!(active, expected);

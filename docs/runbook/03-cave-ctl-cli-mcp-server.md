@@ -68,7 +68,7 @@ The following matrix evaluates `cave-ctl` against competing approaches across ke
 | **Audit trail** | Complete (Ledger + hash verification) | Workable (Terraform Cloud) | Poor (scattered logs) | Good (event log, but opaque) | Workable (SDK-level) |
 | **Extensibility** | Plugins, custom XR definitions | Providers (large ecosystem) | Limited (shell scripts) | Plugin system | Package management system |
 | **Learning curve** | Gentle (intuitive verbs, help system) | Steep (HCL, state management concepts) | Moderate (Kubernetes knowledge required) | Very gentle (self-service UI) | Steep (programming language) |
-| **Multi-cloud abstraction** | First-class (Hetzner + Azure + future providers) | Mature (multiple providers) | Poor (cluster-specific) | Moderate (depends on plugins) | Mature (multiple providers) |
+| **Multi-cloud abstraction** | First-class (sovereign cloud + hyperscaler + future providers) | Mature (multiple providers) | Poor (cluster-specific) | Moderate (depends on plugins) | Mature (multiple providers) |
 | **Governance operations** | Comprehensive (compliance export, policy override, resurrection drill, etc.) | Limited (mainly provisioning) | None | Limited (policy engine only) | None |
 | **Emergency operations** | Strong (mesh permissive, force-sync, fallback controls) | Not suitable | Not suitable | Limited (not latency-optimized) | Not suitable |
 
@@ -105,7 +105,7 @@ The CAVE team anticipates that within 24 months, 40–60% of routine platform op
 
 - **Natural language self-service:** Developers and operators will describe what they want in English; APOL and Backstage AI translate to `cave-ctl` operations.
 - **Proactive AI:** Rather than reactive CLI calls, AI systems will continuously monitor platform state, recommend optimizations, and offer autonomous execution of low-risk operations.
-- **Hyperscaler AI integration:** Cloud providers are investing heavily in AI-native operations. `cave-ctl` must remain the canonical CAVE interface while coordinating with Azure AI and Hetzner native AI tools.
+- **Hyperscaler AI integration:** Cloud providers are investing heavily in AI-native operations. `cave-ctl` must remain the canonical CAVE interface while coordinating with Azure AI and sovereign-native AI tools.
 
 ---
 
@@ -115,7 +115,7 @@ This section provides the complete `cave-ctl` command reference with detailed ex
 
 ### 3.5.1 Profile Management
 
-Profiles are named configurations representing isolated CAVE deployments. A developer might have `dev`, `staging`, and `prod` profiles, each pointing to a different cloud account and Hetzner/Azure organization.
+Profiles are named configurations representing isolated CAVE deployments. A developer might have `dev`, `staging`, and `prod` profiles, each pointing to a different cloud account and sovereign / hyperscaler organization.
 
 #### `cave-ctl create [dev|staging|prod] [hetzner|azure] [--config <path>]`
 
@@ -124,7 +124,7 @@ Profiles are named configurations representing isolated CAVE deployments. A deve
 **When to use:** During initial platform setup, environment expansion (e.g., adding a new staging environment in a different region), or disaster recovery bootstrap.
 
 **What it triggers:**
-1. Cloud account prerequisites validation (Hetzner project or Azure subscription configured).
+1. Cloud account prerequisites validation (sovereign-cloud project or Azure subscription configured).
 2. Creation of root cloud resources: VPC/vNet, managed Kubernetes cluster, managed database (PostgreSQL), managed object store (S3/Blob), load balancer.
 3. CAVE control plane bootstrap: installation of Crossplane, Backstage database, Ledger, APOL, observability stack.
 4. Writing profile configuration to `~/.cave/profiles/<profile-name>.yaml`.
@@ -426,7 +426,7 @@ Quarantine is logged to Ledger with timestamp and reason, triggering incident es
 
 ### 3.5.5 Privileged Access Management (PAM)
 
-CAVE implements PAM via Teleport (Hetzner) and CyberArk (Azure), transparently managed by `cave-ctl`. This enforces zero-trust access to databases, Kubernetes, and web services.
+CAVE implements PAM via Teleport (sovereign) and CyberArk (Azure), transparently managed by `cave-ctl`. This enforces zero-trust access to databases, Kubernetes, and web services.
 
 #### `cave-ctl pam sessions [list|connect|terminate] [k8s|db|web]`
 
@@ -434,7 +434,7 @@ CAVE implements PAM via Teleport (Hetzner) and CyberArk (Azure), transparently m
 
 #### `cave-ctl pam sessions connect k8s --tenant <name> --pod <pod-name>`
 
-**What happens:** The user's identity is verified against RBAC policies. If authorized, a Teleport (Hetzner) or CyberArk (Azure) session is initiated, provisioning a short-lived certificate or credential. The CLI establishes a secure tunnel and opens an interactive shell in the Kubernetes pod. All keystrokes and output are recorded to the Ledger for forensic audit.
+**What happens:** The user's identity is verified against RBAC policies. If authorized, a Teleport (sovereign) or CyberArk (Azure) session is initiated, provisioning a short-lived certificate or credential. The CLI establishes a secure tunnel and opens an interactive shell in the Kubernetes pod. All keystrokes and output are recorded to the Ledger for forensic audit.
 
 **Example:**
 ```bash
@@ -473,9 +473,9 @@ cave-ctl pam request create --target db:prod-db --justification "debugging repli
 # Sends request to on-call approver; awaits approval
 ```
 
-#### Teleport Integration (Hetzner)
+#### Teleport Integration (sovereign)
 
-On Hetzner, PAM is backed by Teleport, a modern zero-trust access platform. `cave-ctl` abstracts Teleport's complexity: users don't interact with Teleport directly; they use intuitive `cave-ctl pam` commands.
+On the sovereign profile, PAM is backed by Teleport, a modern zero-trust access platform. `cave-ctl` abstracts Teleport's complexity: users don't interact with Teleport directly; they use intuitive `cave-ctl pam` commands.
 
 **Architecture:** Teleport proxy runs in CAVE core stack. Users authenticate via SSO (Okta, Azure AD, GitHub), receive short-lived certificates, and use them to access infrastructure. All access is recorded to Teleport audit log, also synced to CAVE Ledger.
 
@@ -935,7 +935,7 @@ This model allows `cave-ctl` to seamlessly orchestrate infrastructure across mul
 
 ### Teleport MCP Integration (ADR-130, Hetzner PAM)
 
-On Hetzner, `cave-ctl pam` operations are transparently proxied through Teleport's MCP server. This allows AI systems to request PAM sessions with the same security guarantees as human operators:
+On the sovereign profile, `cave-ctl pam` operations are transparently proxied through Teleport's MCP server. This allows AI systems to request PAM sessions with the same security guarantees as human operators:
 
 1. AI system requests a PAM session: `cave-ctl pam sessions connect k8s --pod web-server-abc123`.
 2. `cave-ctl` calls Teleport MCP Server to verify AI identity and request a session.
@@ -1009,7 +1009,7 @@ Backstage: Shows developer "Your cache is ready at redis://..."
 5. Alice updates her microservice Helm values to reference the secret. On next deploy, the application connects to the database.
 
 **What happened under the hood:**
-- Crossplane created a PostgreSQL XR, which mapped to a managed RDS instance (Azure) or Cloud SQL (Hetzner native).
+- Crossplane created a PostgreSQL XR, which mapped to a managed RDS instance (Azure) or Cloud SQL (sovereign native).
 - CAVE provisioned network policies to allow the microservice pod to connect to the database.
 - Automated backups were configured.
 - The operation was logged to the Ledger.
@@ -1173,7 +1173,7 @@ Backstage: Shows developer "Your cache is ready at redis://..."
 3. Grace discovers:
    - A Kubernetes StatefulSet that's not tracked in `cave-ctl` (unknown origin).
    - An Azure VM running a cron job (should be in Kubernetes).
-   - A Hetzner bare-metal server with unknown purpose.
+   - A sovereign bare-metal server with unknown purpose.
 
 4. Grace investigates and finds the resources were created by developers as temporary workarounds and never cleaned up.
 

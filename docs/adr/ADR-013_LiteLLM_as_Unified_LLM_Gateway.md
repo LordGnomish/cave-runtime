@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Universal
+**Scope:** Hyperscaler, Sovereign, Universal
 
 **Category:** AI/LLM
 
@@ -27,7 +27,7 @@ CAVE needs a single API gateway for LLM inference that routes requests to differ
 
 ## Decision
 
-**LiteLLM** as unified LLM gateway for all profiles. Routes requests to Ollama (Hetzner) or Azure OpenAI (Azure) based on data classification. Provides token metering for per-tenant FinOps attribution. PII redaction via Microsoft Presidio middleware before any LLM provider receives data.
+**LiteLLM** as unified LLM gateway for all profiles. Routes requests to Ollama (sovereign) or Azure OpenAI (Azure) based on data classification. Provides token metering for per-tenant FinOps attribution. PII redaction via Microsoft Presidio middleware before any LLM provider receives data.
 
 ## Decision (v2 — LLMPool addendum, 2026-04-26)
 

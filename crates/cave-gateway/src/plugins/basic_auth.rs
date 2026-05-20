@@ -6,7 +6,7 @@ use super::{GatewayPlugin, PluginCtx, PluginResult};
 use async_trait::async_trait;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use serde_json::Value;
 
 pub struct BasicAuthPlugin;
@@ -34,11 +34,18 @@ impl GatewayPlugin for BasicAuthPlugin {
             }
         };
 
-        let encoded = match header.strip_prefix("Basic ").or_else(|| header.strip_prefix("basic ")) {
+        let encoded = match header
+            .strip_prefix("Basic ")
+            .or_else(|| header.strip_prefix("basic "))
+        {
             Some(e) => e.to_string(),
             None => {
                 return PluginResult::Halt(
-                    (StatusCode::UNAUTHORIZED, axum::Json(serde_json::json!({"message": "Invalid authorization header"}))).into_response(),
+                    (
+                        StatusCode::UNAUTHORIZED,
+                        axum::Json(serde_json::json!({"message": "Invalid authorization header"})),
+                    )
+                        .into_response(),
                 );
             }
         };
@@ -47,7 +54,11 @@ impl GatewayPlugin for BasicAuthPlugin {
             Ok(b) => String::from_utf8_lossy(&b).to_string(),
             Err(_) => {
                 return PluginResult::Halt(
-                    (StatusCode::UNAUTHORIZED, axum::Json(serde_json::json!({"message": "Invalid credentials"}))).into_response(),
+                    (
+                        StatusCode::UNAUTHORIZED,
+                        axum::Json(serde_json::json!({"message": "Invalid credentials"})),
+                    )
+                        .into_response(),
                 );
             }
         };
@@ -57,8 +68,10 @@ impl GatewayPlugin for BasicAuthPlugin {
         let password = parts.next().unwrap_or("").to_string();
 
         // Store for handler-side store lookup
-        ctx.ctx.insert("basic_auth_username".to_string(), Value::String(username));
-        ctx.ctx.insert("basic_auth_password".to_string(), Value::String(password));
+        ctx.ctx
+            .insert("basic_auth_username".to_string(), Value::String(username));
+        ctx.ctx
+            .insert("basic_auth_password".to_string(), Value::String(password));
 
         PluginResult::Continue
     }

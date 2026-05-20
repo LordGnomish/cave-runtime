@@ -114,7 +114,9 @@ impl Allowlist {
 
     /// Returns true if `commit_sha` is allowlisted.
     pub fn commit_allowed(&self, commit_sha: &str) -> bool {
-        self.commits.iter().any(|c| c.eq_ignore_ascii_case(commit_sha))
+        self.commits
+            .iter()
+            .any(|c| c.eq_ignore_ascii_case(commit_sha))
     }
 }
 

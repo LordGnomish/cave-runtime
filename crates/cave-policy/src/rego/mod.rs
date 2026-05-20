@@ -34,7 +34,11 @@ impl PolicyEngine {
     }
 
     /// Parse and load a Rego module. Returns the parsed module ID (package path).
-    pub fn load_module(&mut self, id: &str, src: &str) -> Result<String, crate::error::PolicyError> {
+    pub fn load_module(
+        &mut self,
+        id: &str,
+        src: &str,
+    ) -> Result<String, crate::error::PolicyError> {
         let module = parser::parse_module(src)?;
         let pkg = module.package.to_dot_string();
         self.modules.insert(id.to_string(), module);
@@ -80,18 +84,15 @@ impl PolicyEngine {
                 &patch.path,
                 patch.value.as_ref(),
                 patch.from.as_deref(),
-            ).map_err(|e| crate::error::PolicyError::Eval(e))?;
+            )
+            .map_err(|e| crate::error::PolicyError::Eval(e))?;
         }
         Ok(())
     }
 
     /// Create an evaluator for a given input document.
     pub fn evaluator(&self, input: serde_json::Value) -> Evaluator {
-        let ctx = EvalCtx::new(
-            self.data.clone(),
-            input,
-            Arc::new(self.modules.clone()),
-        );
+        let ctx = EvalCtx::new(self.data.clone(), input, Arc::new(self.modules.clone()));
         Evaluator::new(ctx)
     }
 
@@ -160,7 +161,9 @@ impl PolicyEngine {
 }
 
 impl Default for PolicyEngine {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 pub struct PartialResult {

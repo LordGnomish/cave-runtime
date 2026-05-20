@@ -32,16 +32,16 @@ pub struct GatewayStore {
     pub sni_names: DashMap<String, Uuid>,
 
     // Consumer credentials
-    pub key_auth: DashMap<Uuid, KeyAuthCredential>,   // cred_id → cred
-    pub key_auth_idx: DashMap<String, Uuid>,          // key → cred_id
+    pub key_auth: DashMap<Uuid, KeyAuthCredential>, // cred_id → cred
+    pub key_auth_idx: DashMap<String, Uuid>,        // key → cred_id
     pub jwt_creds: DashMap<Uuid, JwtCredential>,
-    pub jwt_key_idx: DashMap<String, Uuid>,           // jwt.key → cred_id
+    pub jwt_key_idx: DashMap<String, Uuid>, // jwt.key → cred_id
     pub basic_auth: DashMap<Uuid, BasicAuthCredential>,
-    pub basic_auth_idx: DashMap<String, Uuid>,        // username → cred_id
+    pub basic_auth_idx: DashMap<String, Uuid>, // username → cred_id
     pub hmac_auth: DashMap<Uuid, HmacAuthCredential>,
-    pub hmac_auth_idx: DashMap<String, Uuid>,         // username → cred_id
+    pub hmac_auth_idx: DashMap<String, Uuid>, // username → cred_id
     pub oauth2_creds: DashMap<Uuid, OAuth2Credential>,
-    pub oauth2_client_idx: DashMap<String, Uuid>,     // client_id → cred_id
+    pub oauth2_client_idx: DashMap<String, Uuid>, // client_id → cred_id
     pub acl_groups: DashMap<Uuid, AclGroup>,
 
     // OAuth2 token store (access_token → consumer_id + expiry)
@@ -262,7 +262,10 @@ impl GatewayStore {
             .iter()
             .filter(|e| {
                 let p = e.value();
-                p.enabled && p.service_id.is_none() && p.route_id.is_none() && p.consumer_id.is_none()
+                p.enabled
+                    && p.service_id.is_none()
+                    && p.route_id.is_none()
+                    && p.consumer_id.is_none()
             })
             .map(|e| e.value().clone())
             .collect()
@@ -279,7 +282,10 @@ impl GatewayStore {
     }
 
     pub fn list_certificates(&self) -> Vec<Certificate> {
-        self.certificates.iter().map(|e| e.value().clone()).collect()
+        self.certificates
+            .iter()
+            .map(|e| e.value().clone())
+            .collect()
     }
 
     pub fn delete_certificate(&self, id: &Uuid) -> bool {

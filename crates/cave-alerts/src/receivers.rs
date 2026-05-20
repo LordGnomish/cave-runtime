@@ -15,15 +15,25 @@
 //! prepared notifications without performing network I/O.
 
 use crate::models::{
-    Alert, AlertState, EmailConfig, GrafanaOnCallConfig, OpsGenieConfig, PagerDutyConfig,
-    Receiver, ReceiverConfig, SlackConfig, WebhookConfig,
+    Alert, AlertState, EmailConfig, GrafanaOnCallConfig, OpsGenieConfig, PagerDutyConfig, Receiver,
+    ReceiverConfig, SlackConfig, WebhookConfig,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Transport {
-    Http { url: String, method: String, headers: Vec<(String, String)> },
-    Smtp { host: String, port: u16, from: String, to: Vec<String>, require_tls: bool },
+    Http {
+        url: String,
+        method: String,
+        headers: Vec<(String, String)>,
+    },
+    Smtp {
+        host: String,
+        port: u16,
+        from: String,
+        to: Vec<String>,
+        require_tls: bool,
+    },
     Noop,
 }
 
@@ -48,7 +58,9 @@ pub fn render_payload(
         ReceiverConfig::Email(c) => render_email(receiver_name, c, firing, resolved),
         ReceiverConfig::PagerDuty(c) => render_pagerduty(receiver_name, c, firing, resolved),
         ReceiverConfig::OpsGenie(c) => render_opsgenie(receiver_name, c, firing, resolved),
-        ReceiverConfig::GrafanaOnCall(c) => render_grafana_oncall(receiver_name, c, firing, resolved),
+        ReceiverConfig::GrafanaOnCall(c) => {
+            render_grafana_oncall(receiver_name, c, firing, resolved)
+        }
     }
 }
 
@@ -86,7 +98,12 @@ fn drop_resolved_only(c: &ReceiverConfig, firing: &[Alert], resolved: &[Alert]) 
 
 // ─── Per-receiver renderers ────────────────────────────────────────────────
 
-fn render_webhook(name: &str, c: &WebhookConfig, firing: &[Alert], resolved: &[Alert]) -> RenderedNotification {
+fn render_webhook(
+    name: &str,
+    c: &WebhookConfig,
+    firing: &[Alert],
+    resolved: &[Alert],
+) -> RenderedNotification {
     let body = json!({
         "version": "4",
         "receiver": name,
@@ -105,7 +122,12 @@ fn render_webhook(name: &str, c: &WebhookConfig, firing: &[Alert], resolved: &[A
     }
 }
 
-fn render_slack(name: &str, c: &SlackConfig, firing: &[Alert], resolved: &[Alert]) -> RenderedNotification {
+fn render_slack(
+    name: &str,
+    c: &SlackConfig,
+    firing: &[Alert],
+    resolved: &[Alert],
+) -> RenderedNotification {
     let title = if firing.is_empty() {
         format!("✅ {} alerts resolved", resolved.len())
     } else {
@@ -149,7 +171,12 @@ fn render_slack(name: &str, c: &SlackConfig, firing: &[Alert], resolved: &[Alert
     }
 }
 
-fn render_email(name: &str, c: &EmailConfig, firing: &[Alert], resolved: &[Alert]) -> RenderedNotification {
+fn render_email(
+    name: &str,
+    c: &EmailConfig,
+    firing: &[Alert],
+    resolved: &[Alert],
+) -> RenderedNotification {
     let subject = if firing.is_empty() {
         format!("[CAVE] {} resolved", resolved.len())
     } else {
@@ -175,12 +202,27 @@ fn render_email(name: &str, c: &EmailConfig, firing: &[Alert], resolved: &[Alert
     }
 }
 
-fn render_pagerduty(name: &str, c: &PagerDutyConfig, firing: &[Alert], resolved: &[Alert]) -> RenderedNotification {
-    let event_action = if firing.is_empty() { "resolve" } else { "trigger" };
+fn render_pagerduty(
+    name: &str,
+    c: &PagerDutyConfig,
+    firing: &[Alert],
+    resolved: &[Alert],
+) -> RenderedNotification {
+    let event_action = if firing.is_empty() {
+        "resolve"
+    } else {
+        "trigger"
+    };
     let primary = firing.first().or_else(|| resolved.first());
-    let summary = primary.map(|a| a.name.clone()).unwrap_or_else(|| name.to_string());
-    let dedup_key = primary.map(|a| a.fingerprint.clone()).unwrap_or_else(|| name.to_string());
-    let severity = primary.map(severity_text).unwrap_or_else(|| "warning".into());
+    let summary = primary
+        .map(|a| a.name.clone())
+        .unwrap_or_else(|| name.to_string());
+    let dedup_key = primary
+        .map(|a| a.fingerprint.clone())
+        .unwrap_or_else(|| name.to_string());
+    let severity = primary
+        .map(severity_text)
+        .unwrap_or_else(|| "warning".into());
 
     let body = json!({
         "routing_key": c.routing_key,
@@ -205,11 +247,22 @@ fn render_pagerduty(name: &str, c: &PagerDutyConfig, firing: &[Alert], resolved:
     }
 }
 
-fn render_opsgenie(name: &str, c: &OpsGenieConfig, firing: &[Alert], resolved: &[Alert]) -> RenderedNotification {
+fn render_opsgenie(
+    name: &str,
+    c: &OpsGenieConfig,
+    firing: &[Alert],
+    resolved: &[Alert],
+) -> RenderedNotification {
     let primary = firing.first().or_else(|| resolved.first());
-    let alias = primary.map(|a| a.fingerprint.clone()).unwrap_or_else(|| name.to_string());
+    let alias = primary
+        .map(|a| a.fingerprint.clone())
+        .unwrap_or_else(|| name.to_string());
     let url = if firing.is_empty() {
-        format!("{}/v2/alerts/{}/close?identifierType=alias", c.api_url.trim_end_matches('/'), alias)
+        format!(
+            "{}/v2/alerts/{}/close?identifierType=alias",
+            c.api_url.trim_end_matches('/'),
+            alias
+        )
     } else {
         format!("{}/v2/alerts", c.api_url.trim_end_matches('/'))
     };
@@ -328,7 +381,15 @@ mod tests {
     #[test]
     fn test_webhook_payload_shape() {
         let a = alert_named("X", AlertSeverity::Warning);
-        let n = render_webhook("rcv", &WebhookConfig { url: "http://h".into(), send_resolved: true }, &[a], &[]);
+        let n = render_webhook(
+            "rcv",
+            &WebhookConfig {
+                url: "http://h".into(),
+                send_resolved: true,
+            },
+            &[a],
+            &[],
+        );
         match &n.transport {
             Transport::Http { url, method, .. } => {
                 assert_eq!(url, "http://h");
@@ -345,7 +406,15 @@ mod tests {
         let a = alert_named("X", AlertSeverity::Warning);
         let mut a = a;
         a.state = AlertState::Resolved;
-        let n = render_webhook("rcv", &WebhookConfig { url: "http://h".into(), send_resolved: true }, &[], &[a]);
+        let n = render_webhook(
+            "rcv",
+            &WebhookConfig {
+                url: "http://h".into(),
+                send_resolved: true,
+            },
+            &[],
+            &[a],
+        );
         assert_eq!(n.body["status"], "resolved");
     }
 
@@ -385,7 +454,12 @@ mod tests {
             &[],
         );
         match &n.transport {
-            Transport::Smtp { host, port, require_tls, .. } => {
+            Transport::Smtp {
+                host,
+                port,
+                require_tls,
+                ..
+            } => {
                 assert_eq!(host, "smtp.example.com");
                 assert_eq!(*port, 587);
                 assert!(*require_tls);
@@ -397,12 +471,30 @@ mod tests {
     #[test]
     fn test_pagerduty_trigger_then_resolve() {
         let a = alert_named("X", AlertSeverity::Critical);
-        let n_trigger = render_pagerduty("pd", &PagerDutyConfig { routing_key: "k".into(), send_resolved: true, severity_label: None }, &[a.clone()], &[]);
+        let n_trigger = render_pagerduty(
+            "pd",
+            &PagerDutyConfig {
+                routing_key: "k".into(),
+                send_resolved: true,
+                severity_label: None,
+            },
+            &[a.clone()],
+            &[],
+        );
         assert_eq!(n_trigger.body["event_action"], "trigger");
         assert_eq!(n_trigger.body["payload"]["severity"], "critical");
         let mut resolved = a;
         resolved.state = AlertState::Resolved;
-        let n_resolve = render_pagerduty("pd", &PagerDutyConfig { routing_key: "k".into(), send_resolved: true, severity_label: None }, &[], &[resolved]);
+        let n_resolve = render_pagerduty(
+            "pd",
+            &PagerDutyConfig {
+                routing_key: "k".into(),
+                send_resolved: true,
+                severity_label: None,
+            },
+            &[],
+            &[resolved],
+        );
         assert_eq!(n_resolve.body["event_action"], "resolve");
     }
 
@@ -411,7 +503,11 @@ mod tests {
         let a = alert_named("X", AlertSeverity::Critical);
         let n = render_opsgenie(
             "og",
-            &OpsGenieConfig { api_key: "secret".into(), api_url: "https://api.opsgenie.com".into(), send_resolved: true },
+            &OpsGenieConfig {
+                api_key: "secret".into(),
+                api_url: "https://api.opsgenie.com".into(),
+                send_resolved: true,
+            },
             &[],
             &[a.clone()],
         );
@@ -430,7 +526,11 @@ mod tests {
         let a = alert_named("X", AlertSeverity::Critical);
         let n = render_opsgenie(
             "og",
-            &OpsGenieConfig { api_key: "k".into(), api_url: "https://api.opsgenie.com".into(), send_resolved: true },
+            &OpsGenieConfig {
+                api_key: "k".into(),
+                api_url: "https://api.opsgenie.com".into(),
+                send_resolved: true,
+            },
             &[a],
             &[],
         );
@@ -442,7 +542,10 @@ mod tests {
         let a = alert_named("X", AlertSeverity::Warning);
         let n = render_grafana_oncall(
             "go",
-            &GrafanaOnCallConfig { webhook_url: "http://x".into(), send_resolved: true },
+            &GrafanaOnCallConfig {
+                webhook_url: "http://x".into(),
+                send_resolved: true,
+            },
             &[a],
             &[],
         );
@@ -460,7 +563,10 @@ mod tests {
             send_resolved: false,
         }));
         let out = render_all(&receiver, &[], &[resolved]);
-        assert!(out.is_empty(), "should drop resolved-only when send_resolved=false");
+        assert!(
+            out.is_empty(),
+            "should drop resolved-only when send_resolved=false"
+        );
     }
 
     #[test]

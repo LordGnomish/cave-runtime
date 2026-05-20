@@ -74,12 +74,19 @@ pub struct Service {
 impl Service {
     pub fn cluster_ip(name: &str, ns: &str, tenant: TenantId, ip: IpAddr, port: u16) -> Self {
         Self {
-            name: name.into(), namespace: ns.into(), tenant,
+            name: name.into(),
+            namespace: ns.into(),
+            tenant,
             service_type: ServiceType::ClusterIP,
             cluster_ip: ip,
             external_ips: Vec::new(),
             load_balancer_ips: Vec::new(),
-            ports: vec![ServicePort { name: "default".into(), port, target_port: port, node_port: None }],
+            ports: vec![ServicePort {
+                name: "default".into(),
+                port,
+                target_port: port,
+                node_port: None,
+            }],
             session_affinity: SessionAffinity::None,
             session_timeout: 0,
             dsr: false,
@@ -172,7 +179,9 @@ impl ServiceRegistry {
     }
 
     pub fn lookup_by_cluster_ip(&self, ip: IpAddr, port: u16) -> Option<&Service> {
-        self.services.values().find(|s| s.cluster_ip == ip && s.ports.iter().any(|p| p.port == port))
+        self.services
+            .values()
+            .find(|s| s.cluster_ip == ip && s.ports.iter().any(|p| p.port == port))
     }
 
     pub fn lookup_by_node_port(&self, np: u16) -> Option<&Service> {
@@ -180,10 +189,10 @@ impl ServiceRegistry {
     }
 
     pub fn lookup_by_external_ip(&self, ip: IpAddr, port: u16) -> Option<&Service> {
-        self.services
-            .values()
-            .find(|s| (s.external_ips.contains(&ip) || s.load_balancer_ips.contains(&ip))
-                && s.ports.iter().any(|p| p.port == port))
+        self.services.values().find(|s| {
+            (s.external_ips.contains(&ip) || s.load_balancer_ips.contains(&ip))
+                && s.ports.iter().any(|p| p.port == port)
+        })
     }
 
     pub fn lb_for(&mut self, key: &str, port_name: &str) -> Option<&mut LoadBalancer> {
@@ -191,7 +200,10 @@ impl ServiceRegistry {
     }
 
     pub fn remove(&mut self, key: &str) -> Result<(), ServiceError> {
-        let svc = self.services.remove(key).ok_or_else(|| ServiceError::NotFound(key.to_string()))?;
+        let svc = self
+            .services
+            .remove(key)
+            .ok_or_else(|| ServiceError::NotFound(key.to_string()))?;
         for p in &svc.ports {
             if let Some(np) = p.node_port {
                 self.nodeports.remove(&np);
@@ -213,8 +225,16 @@ impl ServiceRegistry {
     }
 
     /// Update backend health for a service (e.g. EndpointSlice change).
-    pub fn set_backend_state(&mut self, key: &str, backend_name: &str, state: BackendState) -> Result<(), ServiceError> {
-        let svc = self.services.get_mut(key).ok_or_else(|| ServiceError::NotFound(key.to_string()))?;
+    pub fn set_backend_state(
+        &mut self,
+        key: &str,
+        backend_name: &str,
+        state: BackendState,
+    ) -> Result<(), ServiceError> {
+        let svc = self
+            .services
+            .get_mut(key)
+            .ok_or_else(|| ServiceError::NotFound(key.to_string()))?;
         for b in &mut svc.backends {
             if b.name == backend_name {
                 b.state = state;
@@ -225,10 +245,17 @@ impl ServiceRegistry {
         for p in &svc.ports {
             if let Some(lb) = self.lbs.get_mut(&(svc.key(), p.name.clone())) {
                 lb.replace_backends(
-                    svc.backends.iter().map(|b| LbBackend {
-                        name: b.name.clone(), ip: b.ip, port: p.target_port,
-                        state: b.state, weight: b.weight, open_connections: b.open_connections,
-                    }).collect(),
+                    svc.backends
+                        .iter()
+                        .map(|b| LbBackend {
+                            name: b.name.clone(),
+                            ip: b.ip,
+                            port: p.target_port,
+                            state: b.state,
+                            weight: b.weight,
+                            open_connections: b.open_connections,
+                        })
+                        .collect(),
                 );
             }
         }
@@ -252,8 +279,10 @@ mod tests {
 
     fn fk(src: (u8, u8, u8, u8), sp: u16, dst: (u8, u8, u8, u8), dp: u16) -> FlowKey {
         FlowKey {
-            src_ip: ip(src.0, src.1, src.2, src.3), src_port: sp,
-            dst_ip: ip(dst.0, dst.1, dst.2, dst.3), dst_port: dp,
+            src_ip: ip(src.0, src.1, src.2, src.3),
+            src_port: sp,
+            dst_ip: ip(dst.0, dst.1, dst.2, dst.3),
+            dst_port: dp,
             proto: 6,
         }
     }
@@ -271,7 +300,8 @@ mod tests {
 
     #[test]
     fn svc_register_clusterip_service() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/service/service.go", "UpsertService", "tenant-svc-cip");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/service/service.go", "UpsertService", "tenant-svc-cip");
         let mut reg = ServiceRegistry::new();
         reg.upsert(basic_svc(tenant)).unwrap();
         assert_eq!(reg.len(), 1);
@@ -281,7 +311,11 @@ mod tests {
 
     #[test]
     fn svc_lookup_by_cluster_ip_with_wrong_port_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/service/service.go", "LookupByFrontend", "tenant-svc-port");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/service/service.go",
+            "LookupByFrontend",
+            "tenant-svc-port"
+        );
         let mut reg = ServiceRegistry::new();
         reg.upsert(basic_svc(tenant)).unwrap();
         assert!(reg.lookup_by_cluster_ip(ip(10, 96, 0, 1), 8080).is_none());
@@ -289,7 +323,8 @@ mod tests {
 
     #[test]
     fn svc_remove_drops_service_and_its_lbs() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/service/service.go", "DeleteService", "tenant-svc-rm");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/service/service.go", "DeleteService", "tenant-svc-rm");
         let mut reg = ServiceRegistry::new();
         let svc = basic_svc(tenant);
         let key = svc.key();
@@ -301,7 +336,11 @@ mod tests {
 
     #[test]
     fn svc_remove_unknown_returns_not_found() {
-        let (_c, _t) = cilium_test_ctx!("pkg/service/service.go", "DeleteService.NotFound", "tenant-svc-rmunk");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/service/service.go",
+            "DeleteService.NotFound",
+            "tenant-svc-rmunk"
+        );
         let mut reg = ServiceRegistry::new();
         let err = reg.remove("default/missing").unwrap_err();
         assert_eq!(err, ServiceError::NotFound("default/missing".into()));
@@ -311,7 +350,11 @@ mod tests {
 
     #[test]
     fn svc_register_nodeport_in_range_succeeds() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/service/service.go", "UpsertService.NodePort", "tenant-svc-np");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/service/service.go",
+            "UpsertService.NodePort",
+            "tenant-svc-np"
+        );
         let mut reg = ServiceRegistry::new();
         let mut svc = basic_svc(tenant);
         svc.service_type = ServiceType::NodePort;
@@ -323,7 +366,11 @@ mod tests {
 
     #[test]
     fn svc_register_nodeport_out_of_range_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/service/service.go", "UpsertService.NodePort.Range", "tenant-svc-np-bad");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/service/service.go",
+            "UpsertService.NodePort.Range",
+            "tenant-svc-np-bad"
+        );
         let mut reg = ServiceRegistry::new();
         let mut svc = basic_svc(tenant);
         svc.service_type = ServiceType::NodePort;
@@ -334,7 +381,11 @@ mod tests {
 
     #[test]
     fn svc_register_nodeport_collision_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/service/service.go", "UpsertService.NodePort.InUse", "tenant-svc-np-coll");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/service/service.go",
+            "UpsertService.NodePort.InUse",
+            "tenant-svc-np-coll"
+        );
         let mut reg = ServiceRegistry::new();
         let mut svc1 = basic_svc(tenant.clone());
         svc1.service_type = ServiceType::NodePort;
@@ -349,7 +400,11 @@ mod tests {
 
     #[test]
     fn svc_allocate_node_port_returns_first_free() {
-        let (_c, _t) = cilium_test_ctx!("pkg/loadbalancer/legacy/manager.go", "allocateNodePort", "tenant-svc-np-alloc");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/loadbalancer/legacy/manager.go",
+            "allocateNodePort",
+            "tenant-svc-np-alloc"
+        );
         let reg = ServiceRegistry::new();
         let p = reg.allocate_node_port().unwrap();
         assert_eq!(p, NODEPORT_MIN);
@@ -357,7 +412,11 @@ mod tests {
 
     #[test]
     fn svc_allocate_node_port_skips_in_use() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/loadbalancer/legacy/manager.go", "allocateNodePort.SkipInUse", "tenant-svc-np-skip");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/loadbalancer/legacy/manager.go",
+            "allocateNodePort.SkipInUse",
+            "tenant-svc-np-skip"
+        );
         let mut reg = ServiceRegistry::new();
         let mut svc = basic_svc(tenant);
         svc.service_type = ServiceType::NodePort;
@@ -370,7 +429,8 @@ mod tests {
 
     #[test]
     fn svc_register_external_ip_lookup() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/service/service.go", "ExternalIP", "tenant-svc-ext");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/service/service.go", "ExternalIP", "tenant-svc-ext");
         let mut reg = ServiceRegistry::new();
         let mut svc = basic_svc(tenant);
         svc.external_ips = vec![ip(192, 0, 2, 100)];
@@ -381,7 +441,8 @@ mod tests {
 
     #[test]
     fn svc_register_load_balancer_ip_lookup() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/service/service.go", "LoadBalancer", "tenant-svc-lb");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/service/service.go", "LoadBalancer", "tenant-svc-lb");
         let mut reg = ServiceRegistry::new();
         let mut svc = basic_svc(tenant);
         svc.service_type = ServiceType::LoadBalancer;
@@ -393,19 +454,26 @@ mod tests {
 
     #[test]
     fn svc_external_ip_with_wrong_port_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/service/service.go", "ExternalIP.Port", "tenant-svc-ext-port");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/service/service.go",
+            "ExternalIP.Port",
+            "tenant-svc-ext-port"
+        );
         let mut reg = ServiceRegistry::new();
         let mut svc = basic_svc(tenant);
         svc.external_ips = vec![ip(192, 0, 2, 100)];
         reg.upsert(svc).unwrap();
-        assert!(reg.lookup_by_external_ip(ip(192, 0, 2, 100), 8080).is_none());
+        assert!(reg
+            .lookup_by_external_ip(ip(192, 0, 2, 100), 8080)
+            .is_none());
     }
 
     // ── DSR / session affinity ───────────────────────────────────────────────
 
     #[test]
     fn svc_dsr_flag_persists_through_upsert() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/service/service.go", "ServiceFlagDSR", "tenant-svc-dsr");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/service/service.go", "ServiceFlagDSR", "tenant-svc-dsr");
         let mut reg = ServiceRegistry::new();
         let mut svc = basic_svc(tenant);
         svc.dsr = true;
@@ -415,7 +483,11 @@ mod tests {
 
     #[test]
     fn svc_session_affinity_clientip_uses_lb_affinity_window() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/service/service.go", "SessionAffinity.ClientIP", "tenant-svc-aff");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/service/service.go",
+            "SessionAffinity.ClientIP",
+            "tenant-svc-aff"
+        );
         let mut reg = ServiceRegistry::new();
         let mut svc = basic_svc(tenant);
         svc.session_affinity = SessionAffinity::ClientIP;
@@ -425,7 +497,11 @@ mod tests {
         let lb = reg.lb_for("default/api", "default").unwrap();
         let key = fk((10, 0, 0, 1), 1234, (10, 96, 0, 1), 80);
         let a = lb.select(key, 100).unwrap().name.clone();
-        let b = lb.select(fk((10, 0, 0, 1), 5678, (10, 96, 0, 1), 80), 105).unwrap().name.clone();
+        let b = lb
+            .select(fk((10, 0, 0, 1), 5678, (10, 96, 0, 1), 80), 105)
+            .unwrap()
+            .name
+            .clone();
         assert_eq!(a, b);
     }
 
@@ -433,16 +509,25 @@ mod tests {
 
     #[test]
     fn svc_set_backend_state_terminating_excludes_from_lb() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/service/service.go", "UpdateBackendState", "tenant-svc-hlth");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/service/service.go",
+            "UpdateBackendState",
+            "tenant-svc-hlth"
+        );
         let mut reg = ServiceRegistry::new();
         let mut svc = basic_svc(tenant);
         svc.algorithm = Algorithm::RoundRobin;
         reg.upsert(svc).unwrap();
-        reg.set_backend_state("default/api", "a", BackendState::Terminating).unwrap();
+        reg.set_backend_state("default/api", "a", BackendState::Terminating)
+            .unwrap();
         let lb = reg.lb_for("default/api", "default").unwrap();
         let mut hits: HashMap<String, u32> = HashMap::new();
         for sp in 1000..1010u16 {
-            let n = lb.select(fk((10, 0, 0, 1), sp, (10, 96, 0, 1), 80), 100).unwrap().name.clone();
+            let n = lb
+                .select(fk((10, 0, 0, 1), sp, (10, 96, 0, 1), 80), 100)
+                .unwrap()
+                .name
+                .clone();
             *hits.entry(n).or_default() += 1;
         }
         assert_eq!(hits.get("a"), None);
@@ -451,9 +536,15 @@ mod tests {
 
     #[test]
     fn svc_set_backend_state_unknown_service_returns_not_found() {
-        let (_c, _t) = cilium_test_ctx!("pkg/service/service.go", "UpdateBackendState.NotFound", "tenant-svc-hlth-nf");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/service/service.go",
+            "UpdateBackendState.NotFound",
+            "tenant-svc-hlth-nf"
+        );
         let mut reg = ServiceRegistry::new();
-        let err = reg.set_backend_state("default/missing", "a", BackendState::Active).unwrap_err();
+        let err = reg
+            .set_backend_state("default/missing", "a", BackendState::Active)
+            .unwrap_err();
         assert_eq!(err, ServiceError::NotFound("default/missing".into()));
     }
 
@@ -461,7 +552,11 @@ mod tests {
 
     #[test]
     fn svc_lookup_by_node_port_returns_owning_service() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/service/service.go", "LookupByNodePort", "tenant-svc-np-lk");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/service/service.go",
+            "LookupByNodePort",
+            "tenant-svc-np-lk"
+        );
         let mut reg = ServiceRegistry::new();
         let mut svc = basic_svc(tenant);
         svc.service_type = ServiceType::NodePort;
@@ -473,14 +568,22 @@ mod tests {
 
     #[test]
     fn svc_lookup_by_node_port_unknown_returns_none() {
-        let (_c, _t) = cilium_test_ctx!("pkg/service/service.go", "LookupByNodePort.None", "tenant-svc-np-none");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/service/service.go",
+            "LookupByNodePort.None",
+            "tenant-svc-np-none"
+        );
         let reg = ServiceRegistry::new();
         assert!(reg.lookup_by_node_port(31999).is_none());
     }
 
     #[test]
     fn svc_upsert_idempotent_for_same_key() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/service/service.go", "UpsertService.Idempotent", "tenant-svc-idem");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/service/service.go",
+            "UpsertService.Idempotent",
+            "tenant-svc-idem"
+        );
         let mut reg = ServiceRegistry::new();
         reg.upsert(basic_svc(tenant.clone())).unwrap();
         reg.upsert(basic_svc(tenant)).unwrap();

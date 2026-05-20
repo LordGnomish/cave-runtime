@@ -93,8 +93,8 @@ pub use exporter::{
 /// Includes functions for extracting, injecting, and formatting trace context
 /// headers, as well as the `TraceState` type and related constants.
 pub use propagation::{
-    extract_or_new, format_traceparent, inject, parse_traceparent, parse_tracestate,
-    PropagationError, TraceState, TRACEPARENT, TRACESTATE,
+    PropagationError, TRACEPARENT, TRACESTATE, TraceState, extract_or_new, format_traceparent,
+    inject, parse_traceparent, parse_tracestate,
 };
 
 /// Re-export of sampling policies and types.
@@ -110,21 +110,24 @@ pub use sampling::{
 ///
 /// Includes functions for filtering by tenant, injecting tenant labels,
 /// and extracting tenant IDs from headers.
-pub use tenant::{filter_by_tenant, inject_tenant, tenant_from_headers, X_SCOPE_ORG_ID};
+pub use tenant::{X_SCOPE_ORG_ID, filter_by_tenant, inject_tenant, tenant_from_headers};
 
 /// Re-export of tracer and processor types.
 ///
 /// Includes `Tracer`, `TracerProvider`, `SpanBuilder`, `SpanProcessor`,
 /// and `InMemoryProcessor`.
-pub use tracer::{InMemoryProcessor, Span, SpanBuilder, SpanProcessor, Tracer, TracerProvider, TracerProviderBuilder};
+pub use tracer::{
+    InMemoryProcessor, Span, SpanBuilder, SpanProcessor, Tracer, TracerProvider,
+    TracerProviderBuilder,
+};
 
 /// Re-export of fundamental types and utility functions.
 ///
 /// Includes ID formatting/parsing functions, attribute types, span data
 /// structures, and constants like `DEFAULT_TENANT`.
 pub use types::{
-    format_span_id, format_trace_id, parse_span_id, parse_trace_id, AttrValue, Attributes, Event,
-    Link, SpanContext, SpanData, SpanKind, SpanId, Status, TraceId, DEFAULT_TENANT, TENANT_LABEL,
+    AttrValue, Attributes, DEFAULT_TENANT, Event, Link, SpanContext, SpanData, SpanId, SpanKind,
+    Status, TENANT_LABEL, TraceId, format_span_id, format_trace_id, parse_span_id, parse_trace_id,
 };
 
 /// The name of the tracing module.

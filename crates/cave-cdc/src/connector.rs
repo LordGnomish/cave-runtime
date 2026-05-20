@@ -30,19 +30,23 @@ pub enum ChangeOperation {
 impl ChangeOperation {
     pub fn as_str(&self) -> &'static str {
         match self {
-            Self::Create => "c", Self::Update => "u", Self::Delete => "d",
-            Self::Read   => "r", Self::Truncate => "t", Self::Message => "m",
+            Self::Create => "c",
+            Self::Update => "u",
+            Self::Delete => "d",
+            Self::Read => "r",
+            Self::Truncate => "t",
+            Self::Message => "m",
         }
     }
 
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
-            "c" | "create"   => Some(Self::Create),
-            "u" | "update"   => Some(Self::Update),
-            "d" | "delete"   => Some(Self::Delete),
-            "r" | "read"     => Some(Self::Read),
+            "c" | "create" => Some(Self::Create),
+            "u" | "update" => Some(Self::Update),
+            "d" | "delete" => Some(Self::Delete),
+            "r" | "read" => Some(Self::Read),
             "t" | "truncate" => Some(Self::Truncate),
-            "m" | "message"  => Some(Self::Message),
+            "m" | "message" => Some(Self::Message),
             _ => None,
         }
     }
@@ -120,13 +124,13 @@ impl ConnectorState {
     pub fn can_transition_to(self, next: ConnectorState) -> bool {
         use ConnectorState::*;
         match (self, next) {
-            (Initial, Snapshotting)       => true,
-            (Initial, Streaming)          => true, // skip-snapshot mode
-            (Snapshotting, Streaming)     => true,
-            (Snapshotting, Stopped)       => true,
-            (Streaming, Stopped)          => true,
+            (Initial, Snapshotting) => true,
+            (Initial, Streaming) => true, // skip-snapshot mode
+            (Snapshotting, Streaming) => true,
+            (Snapshotting, Stopped) => true,
+            (Streaming, Stopped) => true,
             (Initial | Snapshotting | Streaming, Failed) => true,
-            (a, b) if a == b              => true, // self-loop (idempotent)
+            (a, b) if a == b => true, // self-loop (idempotent)
             _ => false,
         }
     }

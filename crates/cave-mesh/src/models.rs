@@ -75,7 +75,11 @@ pub struct Locality {
 
 impl Locality {
     pub fn new(region: impl Into<String>) -> Self {
-        Self { region: region.into(), zone: None, sub_zone: None }
+        Self {
+            region: region.into(),
+            zone: None,
+            sub_zone: None,
+        }
     }
 
     pub fn with_zone(mut self, zone: impl Into<String>) -> Self {
@@ -150,7 +154,13 @@ pub struct HttpRedirect {
 
 impl Default for HttpRedirect {
     fn default() -> Self {
-        Self { uri: None, authority: None, port: None, scheme: None, redirect_code: 301 }
+        Self {
+            uri: None,
+            authority: None,
+            port: None,
+            scheme: None,
+            redirect_code: 301,
+        }
     }
 }
 
@@ -395,7 +405,11 @@ pub enum ConsistentHashKey {
     /// Hash on an HTTP header value.
     HttpHeaderName(String),
     /// Hash on a cookie (name, path, TTL).
-    HttpCookie { name: String, path: Option<String>, ttl_seconds: u64 },
+    HttpCookie {
+        name: String,
+        path: Option<String>,
+        ttl_seconds: u64,
+    },
     /// Hash on the source IP.
     UseSourceIp,
     /// Hash on a query parameter.
@@ -851,8 +865,14 @@ pub struct ProviderRef {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TraceTag {
     Literal(String),
-    Environment { name: String, default_value: Option<String> },
-    Header { name: String, default_value: Option<String> },
+    Environment {
+        name: String,
+        default_value: Option<String>,
+    },
+    Header {
+        name: String,
+        default_value: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

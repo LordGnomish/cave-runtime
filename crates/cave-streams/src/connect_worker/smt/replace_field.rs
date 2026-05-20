@@ -173,7 +173,11 @@ mod tests {
         let s = ReplaceField::from_config(&cfg).unwrap();
         let r = RecordEnvelope::new(
             "t",
-            obj(&[("a", Value::Int(1)), ("b", Value::Int(2)), ("c", Value::Int(3))]),
+            obj(&[
+                ("a", Value::Int(1)),
+                ("b", Value::Int(2)),
+                ("c", Value::Int(3)),
+            ]),
         );
         let out = s.apply(r).unwrap().unwrap();
         let m = out.value.as_object().unwrap();

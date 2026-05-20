@@ -93,7 +93,10 @@ pub enum EvictionAction {
     EvictNow { pod_uid: String, reason: String },
     /// Pod tolerates the taint for `tolerationSeconds`; schedule a
     /// future eviction at `evict_at`.
-    Schedule { pod_uid: String, evict_at: DateTime<Utc> },
+    Schedule {
+        pod_uid: String,
+        evict_at: DateTime<Utc>,
+    },
     /// Pod's toleration window has expired — evict now.
     Expired { pod_uid: String, reason: String },
 }
@@ -128,10 +131,7 @@ pub fn matches(t: &PodToleration, taint: &NodeTaint) -> bool {
 /// Find the *first* matching toleration. The first match wins
 /// because pod authors typically list the most-specific toleration
 /// first; upstream behaves the same.
-pub fn first_matching<'a>(
-    pod: &'a PodView,
-    taint: &NodeTaint,
-) -> Option<&'a PodToleration> {
+pub fn first_matching<'a>(pod: &'a PodView, taint: &NodeTaint) -> Option<&'a PodToleration> {
     pod.tolerations.iter().find(|t| matches(t, taint))
 }
 
@@ -143,11 +143,7 @@ pub fn first_matching<'a>(
 /// * Matching toleration with `seconds = Some(s)`:
 ///   * `now < taint.time_added + s` → `Schedule { evict_at }`.
 ///   * `now >= taint.time_added + s` → `Expired`.
-pub fn evaluate(
-    pod: &PodView,
-    taint: &NodeTaint,
-    now: DateTime<Utc>,
-) -> EvictionAction {
+pub fn evaluate(pod: &PodView, taint: &NodeTaint, now: DateTime<Utc>) -> EvictionAction {
     let Some(t) = first_matching(pod, taint) else {
         return EvictionAction::EvictNow {
             pod_uid: pod.uid.clone(),
@@ -165,10 +161,7 @@ pub fn evaluate(
             if now >= evict_at {
                 EvictionAction::Expired {
                     pod_uid: pod.uid.clone(),
-                    reason: format!(
-                        "tolerationSeconds={s} expired for taint key={}",
-                        taint.key
-                    ),
+                    reason: format!("tolerationSeconds={s} expired for taint key={}", taint.key),
                 }
             } else {
                 EvictionAction::Schedule {
@@ -198,8 +191,7 @@ impl EvictionLedger {
     /// `Schedule` upserts the timer; `Tolerated` is a no-op.
     pub fn apply(&mut self, action: &EvictionAction) {
         match action {
-            EvictionAction::EvictNow { pod_uid, .. }
-            | EvictionAction::Expired { pod_uid, .. } => {
+            EvictionAction::EvictNow { pod_uid, .. } | EvictionAction::Expired { pod_uid, .. } => {
                 self.scheduled.remove(pod_uid);
             }
             EvictionAction::Schedule { pod_uid, evict_at } => {
@@ -346,10 +338,7 @@ mod tests {
 
     #[test]
     fn equal_operator_requires_value_match() {
-        let pod = pod_with_tolerations(
-            "p1",
-            vec![tol_eq("disk-pressure", Some("red"), None)],
-        );
+        let pod = pod_with_tolerations("p1", vec![tol_eq("disk-pressure", Some("red"), None)]);
         let red = taint("disk-pressure", Some("red"));
         let blue = taint("disk-pressure", Some("blue"));
         assert_eq!(evaluate(&pod, &red, t0()), EvictionAction::Tolerated);
@@ -383,8 +372,10 @@ mod tests {
     #[test]
     fn ledger_due_returns_pods_past_deadline() {
         let mut led = EvictionLedger::new();
-        led.scheduled.insert("p-old".into(), t0() - ChronoDuration::seconds(1));
-        led.scheduled.insert("p-future".into(), t0() + ChronoDuration::seconds(1));
+        led.scheduled
+            .insert("p-old".into(), t0() - ChronoDuration::seconds(1));
+        led.scheduled
+            .insert("p-future".into(), t0() + ChronoDuration::seconds(1));
         let due = led.due(t0());
         assert_eq!(due, vec!["p-old".to_string()]);
     }

@@ -4,19 +4,19 @@
 //! Compatible with: Manual CIS Benchmark checks, SOC2/PCI-DSS/HIPAA audit tooling.
 //! Features: Automated control checks, evidence collection, audit trail, policy mapping.
 
-pub mod models;
-pub mod frameworks;
+pub mod audit;
 pub mod checks;
 pub mod evidence;
-pub mod audit;
+pub mod frameworks;
+pub mod models;
 pub mod policy;
 pub mod reports;
 pub mod routes;
 
 use axum::Router;
+use models::*;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
-use models::*;
 
 pub struct ComplianceStore {
     pub frameworks: HashMap<uuid::Uuid, ComplianceFramework>,
@@ -58,7 +58,9 @@ pub struct ComplianceState {
 
 impl Default for ComplianceState {
     fn default() -> Self {
-        Self { store: Arc::new(RwLock::new(ComplianceStore::default())) }
+        Self {
+            store: Arc::new(RwLock::new(ComplianceStore::default())),
+        }
     }
 }
 

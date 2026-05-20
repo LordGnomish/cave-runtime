@@ -2,7 +2,7 @@
 // Copyright 2026 Cave Runtime contributors
 //! `cavectl kubectl describe …`
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Args;
 
 use crate::compat::kubectl::resource::ns_path;

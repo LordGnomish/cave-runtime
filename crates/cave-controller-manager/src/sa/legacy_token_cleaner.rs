@@ -42,11 +42,7 @@ pub enum CleanerAction {
     Keep,
 }
 
-pub fn evaluate(
-    token: &LegacyToken,
-    now_sec: u64,
-    cleanup_grace_sec: u64,
-) -> CleanerAction {
+pub fn evaluate(token: &LegacyToken, now_sec: u64, cleanup_grace_sec: u64) -> CleanerAction {
     if token.orphaned {
         return CleanerAction::Delete;
     }
@@ -118,7 +114,11 @@ mod tests {
         );
         // last_used 30 minutes ago → within BUFFER_SEC.
         assert_eq!(
-            evaluate(&tok(Some(99_900), false), 100_000, DEFAULT_CLEANUP_GRACE_SEC),
+            evaluate(
+                &tok(Some(99_900), false),
+                100_000,
+                DEFAULT_CLEANUP_GRACE_SEC
+            ),
             CleanerAction::Keep
         );
     }

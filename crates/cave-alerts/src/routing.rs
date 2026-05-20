@@ -34,8 +34,14 @@ const DEFAULT_REPEAT_INTERVAL_SECS: i64 = 4 * 60 * 60;
 
 fn root_inherited(root: &Route) -> Inherited {
     Inherited {
-        group_by: if root.group_by.is_empty() { vec!["alertname".into()] } else { root.group_by.clone() },
-        group_wait: root.group_wait.unwrap_or_else(|| Duration::seconds(DEFAULT_GROUP_WAIT)),
+        group_by: if root.group_by.is_empty() {
+            vec!["alertname".into()]
+        } else {
+            root.group_by.clone()
+        },
+        group_wait: root
+            .group_wait
+            .unwrap_or_else(|| Duration::seconds(DEFAULT_GROUP_WAIT)),
         group_interval: root
             .group_interval
             .unwrap_or_else(|| Duration::seconds(DEFAULT_GROUP_INTERVAL_SECS)),
@@ -47,7 +53,11 @@ fn root_inherited(root: &Route) -> Inherited {
 
 fn merge_inherited(parent: &Inherited, child: &Route) -> Inherited {
     Inherited {
-        group_by: if child.group_by.is_empty() { parent.group_by.clone() } else { child.group_by.clone() },
+        group_by: if child.group_by.is_empty() {
+            parent.group_by.clone()
+        } else {
+            child.group_by.clone()
+        },
         group_wait: child.group_wait.unwrap_or(parent.group_wait),
         group_interval: child.group_interval.unwrap_or(parent.group_interval),
         repeat_interval: child.repeat_interval.unwrap_or(parent.repeat_interval),
@@ -65,7 +75,14 @@ pub fn route_alert_tree(root: &Route, alert: &Alert) -> RoutingDecision {
     // children match, their settings override those of the root.
     let mut leaf_inherited: Inherited = inherited.clone();
 
-    walk(root, alert, &inherited, &mut receivers, &mut leaf_inherited, true);
+    walk(
+        root,
+        alert,
+        &inherited,
+        &mut receivers,
+        &mut leaf_inherited,
+        true,
+    );
 
     // Default to root receivers if nothing was pushed (no match anywhere).
     if receivers.is_empty() {
@@ -151,7 +168,12 @@ pub fn group_key(decision: &RoutingDecision, alert: &Alert) -> String {
     parts.sort();
     // Include receivers + tenant in the key so different routes don't collide.
     let recv = decision.receivers.join(",");
-    format!("tenant={};recv={};{}", alert.tenant_id, recv, parts.join(","))
+    format!(
+        "tenant={};recv={};{}",
+        alert.tenant_id,
+        recv,
+        parts.join(",")
+    )
 }
 
 #[cfg(test)]
@@ -166,7 +188,10 @@ mod tests {
         Alert {
             id: Uuid::new_v4(),
             name: name.into(),
-            labels: labels.into_iter().map(|(k, v)| (k.into(), v.into())).collect(),
+            labels: labels
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect(),
             annotations: HashMap::new(),
             severity: AlertSeverity::Warning,
             state: AlertState::Firing,
@@ -214,8 +239,12 @@ mod tests {
     fn test_continue_matches_multiple_children() {
         let root = Route::root("default")
             .with_child(
-                Route::child("a", vec![Matcher::equal("env", "prod")], vec!["slack".into()])
-                    .with_continue(true),
+                Route::child(
+                    "a",
+                    vec![Matcher::equal("env", "prod")],
+                    vec!["slack".into()],
+                )
+                .with_continue(true),
             )
             .with_child(Route::child(
                 "b",
@@ -231,8 +260,16 @@ mod tests {
     #[test]
     fn test_no_continue_stops_after_first_match() {
         let root = Route::root("default")
-            .with_child(Route::child("a", vec![Matcher::equal("env", "prod")], vec!["slack".into()]))
-            .with_child(Route::child("b", vec![Matcher::equal("env", "prod")], vec!["webhook".into()]));
+            .with_child(Route::child(
+                "a",
+                vec![Matcher::equal("env", "prod")],
+                vec!["slack".into()],
+            ))
+            .with_child(Route::child(
+                "b",
+                vec![Matcher::equal("env", "prod")],
+                vec!["webhook".into()],
+            ));
         let a = alert("X", vec![("env", "prod")]);
         let d = route_alert_tree(&root, &a);
         assert_eq!(d.receivers, vec!["slack".to_string()]);
@@ -256,7 +293,11 @@ mod tests {
 
         let a = alert(
             "X",
-            vec![("team", "platform"), ("severity", "critical"), ("service", "auth")],
+            vec![
+                ("team", "platform"),
+                ("severity", "critical"),
+                ("service", "auth"),
+            ],
         );
         let d = route_alert_tree(&root, &a);
         assert_eq!(d.receivers, vec!["pd".to_string()]);
@@ -274,11 +315,7 @@ mod tests {
 
     #[test]
     fn test_tenant_isolation_excludes_route() {
-        let mut child = Route::child(
-            "acme-only",
-            vec![],
-            vec!["acme-pager".into()],
-        );
+        let mut child = Route::child("acme-only", vec![], vec!["acme-pager".into()]);
         child.tenant_id = Some("acme".into());
         let root = Route::root("default").with_child(child);
 
@@ -286,8 +323,14 @@ mod tests {
         let mut a_acme = alert("X", vec![]);
         a_acme.tenant_id = "acme".into();
 
-        assert_eq!(route_alert_tree(&root, &a_anon).receivers, vec!["default".to_string()]);
-        assert_eq!(route_alert_tree(&root, &a_acme).receivers, vec!["acme-pager".to_string()]);
+        assert_eq!(
+            route_alert_tree(&root, &a_anon).receivers,
+            vec!["default".to_string()]
+        );
+        assert_eq!(
+            route_alert_tree(&root, &a_acme).receivers,
+            vec!["acme-pager".to_string()]
+        );
     }
 
     #[test]

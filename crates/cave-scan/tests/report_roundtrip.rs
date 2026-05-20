@@ -2,8 +2,8 @@
 // Copyright 2026 Cave Runtime contributors
 
 use cave_scan::report::{
-    cyclonedx, json as json_fmt, sarif, spdx, table, template, Finding, PackageRef, Report,
-    Severity,
+    Finding, PackageRef, Report, Severity, cyclonedx, json as json_fmt, sarif, spdx, table,
+    template,
 };
 
 fn sample_report() -> Report {
@@ -181,10 +181,7 @@ fn table_empty_no_findings_line() {
 // ── Template ───────────────────────────────────────────────────────────────
 #[test]
 fn template_substitutes_target_and_count() {
-    let s = template::render(
-        "tgt={{ target }} count={{ count }}",
-        &sample_report(),
-    );
+    let s = template::render("tgt={{ target }} count={{ count }}", &sample_report());
     assert_eq!(s, "tgt=alpine:3.20 count=3");
 }
 

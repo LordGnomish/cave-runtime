@@ -43,11 +43,6 @@ pub mod meta_audit;
 /// excludes `docs/adr/internal/`.
 pub mod adr;
 
-/// 2026-05-13 Portal UX foundation: top bar + sidebar + breadcrumb
-/// + footer + command palette (Cmd+K) + keyboard shortcuts (g h/k/c)
-/// + dark mode toggle + tooltips + empty states + skeleton loaders
-/// + toast notifications. See `layout/mod.rs` for the entry points.
-pub mod layout;
 pub mod container_scan;
 pub mod contributions;
 pub mod controller_manager;
@@ -70,20 +65,25 @@ pub mod ha;
 pub mod iam;
 pub mod incidents;
 pub mod infra;
+pub mod kamaji;
 pub mod karpenter;
+pub mod keda;
 pub mod knative;
+pub mod kube_proxy;
+pub mod kubelet;
 pub mod kubevirt;
+pub mod lakehouse;
+/// 2026-05-13 Portal UX foundation: top bar + sidebar + breadcrumb
+/// + footer + command palette (Cmd+K) + keyboard shortcuts (g h/k/c)
+/// + dark mode toggle + tooltips + empty states + skeleton loaders
+/// + toast notifications. See `layout/mod.rs` for the entry points.
+pub mod layout;
 pub mod ledger;
 pub mod llm_gateway;
 pub mod local_llm;
 pub mod logs;
-pub mod metrics;
-pub mod kamaji;
-pub mod keda;
-pub mod kube_proxy;
-pub mod kubelet;
-pub mod lakehouse;
 pub mod mesh;
+pub mod metrics;
 pub mod net;
 pub mod oncall;
 pub mod pam;
@@ -103,14 +103,14 @@ pub mod security;
 pub mod slo;
 pub mod store;
 pub mod streams;
+pub mod tenant_dashboard;
 pub mod trace;
 pub mod tracker;
-pub mod uptime;
 pub mod upstream;
+pub mod uptime;
+pub mod vault;
 pub mod vulns;
 pub mod workflows;
-pub mod tenant_dashboard;
-pub mod vault;
 
 // ── 2026-05-11 batch I: upstream-UI parity admin pages ──────────────
 pub mod grafana;
@@ -120,29 +120,29 @@ pub mod loki;
 pub mod prometheus;
 
 // ── 2026-05-13 realtime + power-user batch ──────────────────────────
-pub mod events;
 pub mod audit;
-pub mod global_search;
-pub mod quick_actions;
-pub mod onboarding;
-pub mod cluster_live;
 pub mod bulk;
+pub mod cluster_live;
+pub mod events;
+pub mod global_search;
+pub mod onboarding;
+pub mod quick_actions;
 
 // ── 2026-05-13 P1 scratch pages (iceberg / mlflow / litellm) ───────
 pub mod iceberg;
-pub mod mlflow;
 pub mod litellm;
+pub mod mlflow;
 
 // ── 2026-05-15 cave-auth deep push (sub-agent A6): account + auth_admin ──
 pub mod account;
 pub mod auth_admin;
 
 use axum::{
+    Router,
     extract::{Path, Query, State as AxumState},
     http::StatusCode,
     response::Html,
     routing::get,
-    Router,
 };
 use serde::Deserialize;
 use std::sync::Arc;
@@ -316,10 +316,7 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
 /// dev request keeps grant-all semantics so a handler that opts in
 /// only adds the persona check, doesn't lose its existing permission
 /// flow.
-pub fn extract_ctx_from_query_with_claims(
-    q: AdminQuery,
-    claims: Option<&JwtClaims>,
-) -> RequestCtx {
+pub fn extract_ctx_from_query_with_claims(q: AdminQuery, claims: Option<&JwtClaims>) -> RequestCtx {
     let mut ctx = extract_ctx_from_query(q);
     ctx.persona = match claims {
         Some(c) => Persona::from_roles(&c.roles),
@@ -351,7 +348,9 @@ async fn etcd_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    etcd::render(&state, &ctx).map(Html).map_err(err_to_response)
+    etcd::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn cri_handler(
@@ -359,7 +358,9 @@ async fn cri_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    cri::render_list_page(&state, &ctx).map(Html).map_err(err_to_response)
+    cri::render_list_page(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn apiserver_handler(
@@ -367,7 +368,9 @@ async fn apiserver_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    apiserver::render(&state, &ctx, None).map(Html).map_err(err_to_response)
+    apiserver::render(&state, &ctx, None)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn auth_handler(
@@ -383,7 +386,9 @@ async fn mesh_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    mesh::render(&state, &ctx).map(Html).map_err(err_to_response)
+    mesh::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn pg_handler(
@@ -399,7 +404,9 @@ async fn vault_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    vault::render(&state, &ctx).map(Html).map_err(err_to_response)
+    vault::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn keda_handler(
@@ -410,7 +417,9 @@ async fn keda_handler(
     if let Err(e) = state.materialise_keda_scaled_objects(&ctx.tenant).await {
         tracing::warn!(error = %e, "keda materialise failed; falling back to cached rows");
     }
-    keda::render(&state, &ctx).map(Html).map_err(err_to_response)
+    keda::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn keda_scaledobjects_list_handler(
@@ -512,7 +521,9 @@ async fn keda_scalers_list_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    keda::scalers::render(&ctx).map(Html).map_err(err_to_response)
+    keda::scalers::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn keda_scalers_detail_handler(
@@ -566,7 +577,9 @@ async fn kamaji_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    kamaji::render(&state, &ctx).map(Html).map_err(err_to_response)
+    kamaji::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 /// 2026-05-14 consolidation: `/admin/net` 308-redirects into the
@@ -616,7 +629,9 @@ async fn rdbms_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    rdbms::render(&state, &ctx).map(Html).map_err(err_to_response)
+    rdbms::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn docdb_handler(
@@ -624,7 +639,9 @@ async fn docdb_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    docdb::render(&state, &ctx).map(Html).map_err(err_to_response)
+    docdb::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn cache_handler(
@@ -632,7 +649,9 @@ async fn cache_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    cache::render(&state, &ctx).map(Html).map_err(err_to_response)
+    cache::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn rdbms_operator_handler(
@@ -650,7 +669,9 @@ async fn lakehouse_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    lakehouse::render(&state, &ctx).map(Html).map_err(err_to_response)
+    lakehouse::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn streams_handler(
@@ -658,7 +679,9 @@ async fn streams_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    streams::render(&state, &ctx).map(Html).map_err(err_to_response)
+    streams::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 #[derive(Debug, Deserialize)]
@@ -676,10 +699,7 @@ async fn meta_audit_handler(
     Query(q): Query<AdminQuery>,
     claims: Option<axum::Extension<JwtClaims>>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
-    let ctx = extract_ctx_from_query_with_claims(
-        q,
-        claims.as_ref().map(|axum::Extension(c)| c),
-    );
+    let ctx = extract_ctx_from_query_with_claims(q, claims.as_ref().map(|axum::Extension(c)| c));
     ctx.require_persona(Persona::PlatformAdmin)
         .map_err(err_to_response)?;
     meta_audit::render(&ctx)
@@ -693,10 +713,7 @@ async fn meta_audit_json_handler(
     Query(q): Query<AdminQuery>,
     claims: Option<axum::Extension<JwtClaims>>,
 ) -> Result<axum::Json<meta_audit::AuditSummary>, (StatusCode, Html<String>)> {
-    let ctx = extract_ctx_from_query_with_claims(
-        q,
-        claims.as_ref().map(|axum::Extension(c)| c),
-    );
+    let ctx = extract_ctx_from_query_with_claims(q, claims.as_ref().map(|axum::Extension(c)| c));
     ctx.require_persona(Persona::PlatformAdmin)
         .map_err(err_to_response)?;
     meta_audit::render_json(&ctx)
@@ -704,9 +721,7 @@ async fn meta_audit_json_handler(
         .map_err(meta_audit_err_to_response)
 }
 
-fn meta_audit_err_to_response(
-    e: meta_audit::AuditViewError,
-) -> (StatusCode, Html<String>) {
+fn meta_audit_err_to_response(e: meta_audit::AuditViewError) -> (StatusCode, Html<String>) {
     use meta_audit::AuditViewError as E;
     match e {
         E::PersonaRequired => (
@@ -738,7 +753,9 @@ async fn compliance_handler(
             .unwrap_or_default(),
     };
     let ctx = extract_ctx_from_query_with_claims(
-        AdminQuery { tenant_id: q.tenant_id },
+        AdminQuery {
+            tenant_id: q.tenant_id,
+        },
         claims.as_ref().map(|axum::Extension(c)| c),
     );
     // Platform-only gate — Charter compliance is cross-tenant.
@@ -755,15 +772,12 @@ async fn compliance_detail_handler(
     axum::extract::Path(crate_name): axum::extract::Path<String>,
     claims: Option<axum::Extension<JwtClaims>>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
-    let ctx = extract_ctx_from_query_with_claims(
-        q,
-        claims.as_ref().map(|axum::Extension(c)| c),
-    );
+    let ctx = extract_ctx_from_query_with_claims(q, claims.as_ref().map(|axum::Extension(c)| c));
     ctx.require_persona(Persona::PlatformAdmin)
         .map_err(err_to_response)?;
     let root = compliance::workspace_root();
-    let detail = compliance::build_crate_detail(&root, &crate_name)
-        .map_err(|e| err_to_response(e))?;
+    let detail =
+        compliance::build_crate_detail(&root, &crate_name).map_err(|e| err_to_response(e))?;
     compliance::render_detail(&detail, &ctx)
         .map(Html)
         .map_err(err_to_response)
@@ -773,13 +787,12 @@ async fn compliance_refresh_handler(
     Query(q): Query<AdminQuery>,
     claims: Option<axum::Extension<JwtClaims>>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
-    let ctx = extract_ctx_from_query_with_claims(
-        q,
-        claims.as_ref().map(|axum::Extension(c)| c),
-    );
+    let ctx = extract_ctx_from_query_with_claims(q, claims.as_ref().map(|axum::Extension(c)| c));
     ctx.require_persona(Persona::PlatformAdmin)
         .map_err(err_to_response)?;
-    compliance::handle_refresh(&ctx).map(Html).map_err(err_to_response)
+    compliance::handle_refresh(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 // 2026-05-13 portal-persona fix: ADR Browser. Platform-only — the
@@ -790,10 +803,7 @@ async fn adr_handler(
     Query(q): Query<AdminQuery>,
     claims: Option<axum::Extension<JwtClaims>>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
-    let ctx = extract_ctx_from_query_with_claims(
-        q,
-        claims.as_ref().map(|axum::Extension(c)| c),
-    );
+    let ctx = extract_ctx_from_query_with_claims(q, claims.as_ref().map(|axum::Extension(c)| c));
     ctx.require_persona(Persona::PlatformAdmin)
         .map_err(err_to_response)?;
     adr::render(&ctx).map(Html).map_err(err_to_response)
@@ -804,10 +814,7 @@ async fn adr_detail_handler(
     axum::extract::Path(stem): axum::extract::Path<String>,
     claims: Option<axum::Extension<JwtClaims>>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
-    let ctx = extract_ctx_from_query_with_claims(
-        q,
-        claims.as_ref().map(|axum::Extension(c)| c),
-    );
+    let ctx = extract_ctx_from_query_with_claims(q, claims.as_ref().map(|axum::Extension(c)| c));
     ctx.require_persona(Persona::PlatformAdmin)
         .map_err(err_to_response)?;
     adr::render_detail(&ctx, &stem)
@@ -826,7 +833,9 @@ async fn policy_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    policy::render(&state, &ctx).map(Html).map_err(err_to_response)
+    policy::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn artifacts_handler(
@@ -834,7 +843,9 @@ async fn artifacts_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    artifacts::render(&state, &ctx).map(Html).map_err(err_to_response)
+    artifacts::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn alerts_handler(
@@ -842,7 +853,9 @@ async fn alerts_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    alerts::render(&state, &ctx).map(Html).map_err(err_to_response)
+    alerts::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn backup_handler(
@@ -850,7 +863,9 @@ async fn backup_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    backup::render(&state, &ctx).map(Html).map_err(err_to_response)
+    backup::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn incidents_handler(
@@ -858,7 +873,9 @@ async fn incidents_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    incidents::render(&state, &ctx).map(Html).map_err(err_to_response)
+    incidents::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn vulns_handler(
@@ -866,7 +883,9 @@ async fn vulns_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    vulns::render(&state, &ctx).map(Html).map_err(err_to_response)
+    vulns::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn workflows_handler(
@@ -874,7 +893,9 @@ async fn workflows_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    workflows::render(&state, &ctx).map(Html).map_err(err_to_response)
+    workflows::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn chaos_handler(
@@ -882,7 +903,9 @@ async fn chaos_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    chaos::render(&state, &ctx).map(Html).map_err(err_to_response)
+    chaos::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn slo_handler(
@@ -893,75 +916,430 @@ async fn slo_handler(
     slo::render(&state, &ctx).map(Html).map_err(err_to_response)
 }
 
-async fn ai_obs_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); ai_obs::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn chat_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); chat::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn cost_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); cost::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn dast_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); dast::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn devlake_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); devlake::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn forensics_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); forensics::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn gateway_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); gateway::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn infra_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); infra::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn pam_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); pam::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn sbom_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); sbom::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn scan_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); scan::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn scan_trivy_images_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); scan_trivy::render(&s, &ctx, scan_trivy::Tab::Images).map(Html).map_err(err_to_response_scan_trivy) }
-async fn scan_trivy_fs_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); scan_trivy::render(&s, &ctx, scan_trivy::Tab::Filesystems).map(Html).map_err(err_to_response_scan_trivy) }
-async fn scan_trivy_iac_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); scan_trivy::render(&s, &ctx, scan_trivy::Tab::Iac).map(Html).map_err(err_to_response_scan_trivy) }
-async fn scan_trivy_secrets_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); scan_trivy::render(&s, &ctx, scan_trivy::Tab::Secrets).map(Html).map_err(err_to_response_scan_trivy) }
-fn err_to_response_scan_trivy(e: scan_trivy::ScanTrivyError) -> (StatusCode, Html<String>) {
-    match e { scan_trivy::ScanTrivyError::Auth(_) => (StatusCode::FORBIDDEN, Html("<h1>403</h1>".to_string())) }
+async fn ai_obs_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    ai_obs::render(&s, &ctx).map(Html).map_err(err_to_response)
 }
-async fn secrets_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); secrets::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn uptime_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); uptime::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn cluster_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); cluster::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn kube_proxy_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); kube_proxy::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn store_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); store::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn metrics_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); metrics::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn trace_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); trace::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn auth_sessions_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); auth::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn dashboard_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); dashboard::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn dns_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); dns::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn logs_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); logs::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn security_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); security::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn ha_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); ha::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn erp_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); erp::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn deploy_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); deploy::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn pipelines_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); pipelines::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn rollouts_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); rollouts::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn knative_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); knative::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn llm_gateway_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); llm_gateway::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn local_llm_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); local_llm::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn tracker_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); tracker::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn chat_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    chat::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn cost_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    cost::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn dast_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    dast::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn devlake_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    devlake::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn forensics_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    forensics::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn gateway_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    gateway::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn infra_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    infra::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn pam_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    pam::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn sbom_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    sbom::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn scan_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    scan::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn scan_trivy_images_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    scan_trivy::render(&s, &ctx, scan_trivy::Tab::Images)
+        .map(Html)
+        .map_err(err_to_response_scan_trivy)
+}
+async fn scan_trivy_fs_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    scan_trivy::render(&s, &ctx, scan_trivy::Tab::Filesystems)
+        .map(Html)
+        .map_err(err_to_response_scan_trivy)
+}
+async fn scan_trivy_iac_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    scan_trivy::render(&s, &ctx, scan_trivy::Tab::Iac)
+        .map(Html)
+        .map_err(err_to_response_scan_trivy)
+}
+async fn scan_trivy_secrets_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    scan_trivy::render(&s, &ctx, scan_trivy::Tab::Secrets)
+        .map(Html)
+        .map_err(err_to_response_scan_trivy)
+}
+fn err_to_response_scan_trivy(e: scan_trivy::ScanTrivyError) -> (StatusCode, Html<String>) {
+    match e {
+        scan_trivy::ScanTrivyError::Auth(_) => {
+            (StatusCode::FORBIDDEN, Html("<h1>403</h1>".to_string()))
+        }
+    }
+}
+async fn secrets_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    secrets::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn uptime_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    uptime::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn cluster_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    cluster::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn kube_proxy_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    kube_proxy::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn store_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    store::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn metrics_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    metrics::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn trace_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    trace::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn auth_sessions_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn dashboard_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    dashboard::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn dns_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    dns::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn logs_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    logs::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn security_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    security::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn ha_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    ha::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn erp_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    erp::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn deploy_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    deploy::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn pipelines_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    pipelines::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn rollouts_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    rollouts::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn knative_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    knative::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn llm_gateway_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    llm_gateway::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn local_llm_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    local_llm::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn tracker_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    tracker::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
 async fn upstream_handler(
     AxumState(s): AxumState<Arc<AdminState>>,
     Query(q): Query<AdminQuery>,
     claims: Option<axum::Extension<JwtClaims>>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
-    let ctx = extract_ctx_from_query_with_claims(
-        q,
-        claims.as_ref().map(|axum::Extension(c)| c),
-    );
+    let ctx = extract_ctx_from_query_with_claims(q, claims.as_ref().map(|axum::Extension(c)| c));
     // Platform-only — upstream parity is a cross-tenant control-plane view.
     ctx.require_persona(Persona::PlatformAdmin)
         .map_err(err_to_response)?;
-    upstream::render(&s, &ctx).map(Html).map_err(err_to_response)
+    upstream::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn container_scan_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); container_scan::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn admission_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); admission::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn cdc_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); cdc::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn certs_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); certs::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn crm_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); crm::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn crossplane_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); crossplane::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn gitops_config_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); gitops_config::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn karpenter_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); karpenter::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn kubevirt_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); kubevirt::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn ledger_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); ledger::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn oncall_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); oncall::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn search_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); search::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn grafana_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); grafana::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn prometheus_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); prometheus::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn loki_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); loki::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn k8s_dashboard_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); k8s_dashboard::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn container_scan_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    container_scan::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn admission_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    admission::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn cdc_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    cdc::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn certs_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    certs::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn crm_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    crm::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn crossplane_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    crossplane::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn gitops_config_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    gitops_config::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn karpenter_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    karpenter::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn kubevirt_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    kubevirt::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn ledger_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    ledger::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn oncall_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    oncall::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn search_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    search::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn grafana_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    grafana::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn prometheus_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    prometheus::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn loki_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    loki::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn k8s_dashboard_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    k8s_dashboard::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
 /// 2026-05-14 consolidation: `/admin/kiali` 308-redirects into the
 /// unified `/admin/mesh` page. Topology / Traffic / Validations /
 /// Workloads / Services are composed into mesh; anchor IDs
@@ -985,15 +1363,14 @@ async fn kiali_handler(
 // K8sDashboardRead gate (for the parent surface) and the per-tab
 // upstream permission (KubeletRead / SchedulerRead).
 
-fn k8s_dash_section(
-    ctx: &RequestCtx,
-    title: &str,
-    section: String,
-) -> Html<String> {
+fn k8s_dash_section(ctx: &RequestCtx, title: &str, section: String) -> Html<String> {
     Html(render::page_shell_full(
         ctx,
         "/admin/k8s-dashboard",
-        &format!("k8s-dashboard / {title} · {}", render::escape(ctx.tenant.as_str())),
+        &format!(
+            "k8s-dashboard / {title} · {}",
+            render::escape(ctx.tenant.as_str())
+        ),
         &section,
     ))
 }
@@ -1003,7 +1380,8 @@ async fn k8s_dash_pods_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    ctx.authorise(Permission::K8sDashboardRead)
+        .map_err(err_to_response)?;
     if let Err(e) = s.materialise_kubelet_pods(&ctx.tenant).await {
         tracing::warn!(error = %e, "kubelet materialise failed; falling back to cached rows");
     }
@@ -1016,7 +1394,8 @@ async fn k8s_dash_nodes_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    ctx.authorise(Permission::K8sDashboardRead)
+        .map_err(err_to_response)?;
     let section = kubelet::nodes::render_section(&s, &ctx).map_err(err_to_response)?;
     Ok(k8s_dash_section(&ctx, "nodes", section))
 }
@@ -1026,7 +1405,8 @@ async fn k8s_dash_volumes_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    ctx.authorise(Permission::K8sDashboardRead)
+        .map_err(err_to_response)?;
     let section = kubelet::volumes::render_section(&s, &ctx).map_err(err_to_response)?;
     Ok(k8s_dash_section(&ctx, "volumes", section))
 }
@@ -1036,7 +1416,8 @@ async fn k8s_dash_events_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    ctx.authorise(Permission::K8sDashboardRead)
+        .map_err(err_to_response)?;
     let section = kubelet::events::render_section(&s, &ctx).map_err(err_to_response)?;
     Ok(k8s_dash_section(&ctx, "events", section))
 }
@@ -1046,7 +1427,8 @@ async fn k8s_dash_metrics_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    ctx.authorise(Permission::K8sDashboardRead)
+        .map_err(err_to_response)?;
     let section = kubelet::metrics::render_section(&s, &ctx).map_err(err_to_response)?;
     Ok(k8s_dash_section(&ctx, "metrics", section))
 }
@@ -1056,7 +1438,8 @@ async fn k8s_dash_queue_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    ctx.authorise(Permission::K8sDashboardRead)
+        .map_err(err_to_response)?;
     if let Err(e) = s.materialise_scheduler_nodes(&ctx.tenant).await {
         tracing::warn!(error = %e, "scheduler materialise failed; falling back to cached rows");
     }
@@ -1069,7 +1452,8 @@ async fn k8s_dash_sched_plugins_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    ctx.authorise(Permission::K8sDashboardRead)
+        .map_err(err_to_response)?;
     let section = scheduler::plugins::render_section(&s, &ctx).map_err(err_to_response)?;
     Ok(k8s_dash_section(&ctx, "scheduler-plugins", section))
 }
@@ -1079,7 +1463,8 @@ async fn k8s_dash_sched_bindings_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    ctx.authorise(Permission::K8sDashboardRead)
+        .map_err(err_to_response)?;
     let section = scheduler::bindings::render_section(&s, &ctx).map_err(err_to_response)?;
     Ok(k8s_dash_section(&ctx, "scheduler-bindings", section))
 }
@@ -1089,7 +1474,8 @@ async fn k8s_dash_sched_nodescores_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    ctx.authorise(Permission::K8sDashboardRead)
+        .map_err(err_to_response)?;
     let section = scheduler::nodescores::render_section(&s, &ctx).map_err(err_to_response)?;
     Ok(k8s_dash_section(&ctx, "scheduler-nodescores", section))
 }
@@ -1099,7 +1485,8 @@ async fn k8s_dash_sched_events_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    ctx.authorise(Permission::K8sDashboardRead)
+        .map_err(err_to_response)?;
     let section = scheduler::events::render_section(&s, &ctx).map_err(err_to_response)?;
     Ok(k8s_dash_section(&ctx, "scheduler-events", section))
 }
@@ -1119,7 +1506,10 @@ fn redirect_308(target: String) -> Result<axum::response::Response, (StatusCode,
     Ok(resp)
 }
 
-fn redirect_with_tenant(target_path: &str, q: &AdminQuery) -> Result<axum::response::Response, (StatusCode, Html<String>)> {
+fn redirect_with_tenant(
+    target_path: &str,
+    q: &AdminQuery,
+) -> Result<axum::response::Response, (StatusCode, Html<String>)> {
     redirect_308(format!("{target_path}?tenant_id={}", q.tenant_id))
 }
 
@@ -1167,7 +1557,9 @@ async fn audit_page_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
     Query(q): Query<AuditQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
-    let ctx = extract_ctx_from_query(AdminQuery { tenant_id: q.tenant_id.clone() });
+    let ctx = extract_ctx_from_query(AdminQuery {
+        tenant_id: q.tenant_id.clone(),
+    });
     let filter = audit_filter_from(&q);
     audit::render(state.audit_store.clone(), &ctx, &filter)
         .map(Html)
@@ -1178,7 +1570,9 @@ async fn audit_csv_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
     Query(q): Query<AuditQuery>,
 ) -> Result<axum::response::Response, (StatusCode, Html<String>)> {
-    let ctx = extract_ctx_from_query(AdminQuery { tenant_id: q.tenant_id.clone() });
+    let ctx = extract_ctx_from_query(AdminQuery {
+        tenant_id: q.tenant_id.clone(),
+    });
     let filter = audit_filter_from(&q);
     let body = audit::export_csv(&state.audit_store, &ctx, &filter).map_err(err_to_response)?;
     let mut resp = axum::response::Response::new(axum::body::Body::from(body));
@@ -1217,10 +1611,7 @@ async fn onboard_handler(
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
     let progress = state.onboarding.read(&ctx).map_err(err_to_response)?;
-    let next = state
-        .onboarding
-        .next_step(&ctx)
-        .map_err(err_to_response)?;
+    let next = state.onboarding.next_step(&ctx).map_err(err_to_response)?;
     let pct = progress.percent_complete(ctx.persona);
     let next_html = match next {
         Some(s) => format!(
@@ -1255,7 +1646,9 @@ async fn global_search_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
     Query(q): Query<GlobalSearchQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
-    let ctx = extract_ctx_from_query(AdminQuery { tenant_id: q.tenant_id.clone() });
+    let ctx = extract_ctx_from_query(AdminQuery {
+        tenant_id: q.tenant_id.clone(),
+    });
     let query = q.q.unwrap_or_default();
     let hits = state
         .global_search
@@ -1294,7 +1687,12 @@ async fn global_search_handler(
 async fn events_stream_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
     Query(q): Query<AdminQuery>,
-) -> Result<axum::response::sse::Sse<impl futures::Stream<Item = Result<axum::response::sse::Event, std::convert::Infallible>>>, (StatusCode, Html<String>)> {
+) -> Result<
+    axum::response::sse::Sse<
+        impl futures::Stream<Item = Result<axum::response::sse::Event, std::convert::Infallible>>,
+    >,
+    (StatusCode, Html<String>),
+> {
     use axum::response::sse::{Event as SseEvent, KeepAlive, Sse};
     let ctx = extract_ctx_from_query(q);
     let sub = state.event_bus.subscribe(ctx).map_err(err_to_response)?;
@@ -1339,33 +1737,176 @@ async fn bulk_submit_handler(
         } else {
             audit::AuditResult::Error
         },
-        format!("targets={} ok={} fail={}", req.targets.len(), result.ok_count, result.fail_count),
+        format!(
+            "targets={} ok={} fail={}",
+            req.targets.len(),
+            result.ok_count,
+            result.fail_count
+        ),
     );
     Ok(axum::Json(result))
 }
 
 // ── 2026-05-13 P1 scratch handlers ──────────────────────────────────
 
-async fn iceberg_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); iceberg::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn iceberg_tables_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); iceberg::tables::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn iceberg_snapshots_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); iceberg::snapshots::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn iceberg_partitions_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); iceberg::partitions::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn iceberg_schemas_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); iceberg::schemas::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn iceberg_manifests_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); iceberg::manifests::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn iceberg_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    iceberg::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn iceberg_tables_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    iceberg::tables::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn iceberg_snapshots_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    iceberg::snapshots::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn iceberg_partitions_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    iceberg::partitions::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn iceberg_schemas_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    iceberg::schemas::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn iceberg_manifests_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    iceberg::manifests::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
 
-async fn mlflow_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); mlflow::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn mlflow_experiments_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); mlflow::experiments::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn mlflow_runs_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); mlflow::runs::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn mlflow_models_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); mlflow::models::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn mlflow_registered_models_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); mlflow::registered_models::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn mlflow_deployments_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); mlflow::deployments::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn mlflow_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    mlflow::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn mlflow_experiments_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    mlflow::experiments::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn mlflow_runs_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    mlflow::runs::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn mlflow_models_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    mlflow::models::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn mlflow_registered_models_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    mlflow::registered_models::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn mlflow_deployments_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    mlflow::deployments::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
 
-async fn litellm_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); litellm::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn litellm_models_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); litellm::models::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn litellm_routes_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); litellm::routes::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn litellm_api_keys_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); litellm::api_keys::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn litellm_budgets_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); litellm::budgets::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn litellm_monitoring_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); litellm::monitoring::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn litellm_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    litellm::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+async fn litellm_models_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    litellm::models::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn litellm_routes_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    litellm::routes::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn litellm_api_keys_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    litellm::api_keys::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn litellm_budgets_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    litellm::budgets::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+async fn litellm_monitoring_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    litellm::monitoring::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
 
 async fn tenant_dashboard_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
@@ -1421,95 +1962,184 @@ async fn contributions_leaderboard_handler(
 }
 
 // ── 2026-05-15 Account console (A6) ─────────────────────────────────
-async fn account_profile_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn account_profile_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    account::profile::render(&ctx).map(Html).map_err(err_to_response)
+    account::profile::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn account_password_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn account_password_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    account::password::render(&ctx).map(Html).map_err(err_to_response)
+    account::password::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn account_two_factor_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn account_two_factor_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    account::two_factor::render(&ctx).map(Html).map_err(err_to_response)
+    account::two_factor::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn account_applications_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn account_applications_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    account::applications::render(&ctx).map(Html).map_err(err_to_response)
+    account::applications::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn account_sessions_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn account_sessions_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    account::sessions::render(&s, &ctx).map(Html).map_err(err_to_response)
+    account::sessions::render(&s, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 // ── 2026-05-15 Auth Admin console (A6) ──────────────────────────────
-async fn auth_admin_realms_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn auth_admin_realms_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    auth_admin::realms::render(&ctx).map(Html).map_err(err_to_response)
+    auth_admin::realms::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn auth_admin_clients_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn auth_admin_clients_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    auth_admin::clients::render(&ctx).map(Html).map_err(err_to_response)
+    auth_admin::clients::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn auth_admin_users_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn auth_admin_users_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    auth_admin::users::render(&ctx).map(Html).map_err(err_to_response)
+    auth_admin::users::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn auth_admin_roles_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn auth_admin_roles_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    auth_admin::roles::render(&ctx).map(Html).map_err(err_to_response)
+    auth_admin::roles::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn auth_admin_groups_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn auth_admin_groups_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    auth_admin::groups::render(&ctx).map(Html).map_err(err_to_response)
+    auth_admin::groups::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn auth_admin_idp_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn auth_admin_idp_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    auth_admin::idp::render(&ctx).map(Html).map_err(err_to_response)
+    auth_admin::idp::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn auth_admin_flows_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn auth_admin_flows_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    auth_admin::flows::render(&ctx).map(Html).map_err(err_to_response)
+    auth_admin::flows::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn auth_admin_events_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn auth_admin_events_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    auth_admin::events::render(&ctx).map(Html).map_err(err_to_response)
+    auth_admin::events::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn auth_admin_saml_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn auth_admin_saml_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    auth_admin::saml::render(&ctx).map(Html).map_err(err_to_response)
+    auth_admin::saml::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn auth_admin_webauthn_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn auth_admin_webauthn_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    auth_admin::webauthn::render(&ctx).map(Html).map_err(err_to_response)
+    auth_admin::webauthn::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn auth_admin_ldap_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn auth_admin_ldap_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    auth_admin::ldap::render(&ctx).map(Html).map_err(err_to_response)
+    auth_admin::ldap::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn auth_admin_kerberos_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn auth_admin_kerberos_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    auth_admin::kerberos::render(&ctx).map(Html).map_err(err_to_response)
+    auth_admin::kerberos::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn auth_admin_uma_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn auth_admin_uma_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    auth_admin::uma::render(&ctx).map(Html).map_err(err_to_response)
+    auth_admin::uma::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn auth_admin_token_exchange_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn auth_admin_token_exchange_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    auth_admin::token_exchange::render(&ctx).map(Html).map_err(err_to_response)
+    auth_admin::token_exchange::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn auth_admin_dpop_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn auth_admin_dpop_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    auth_admin::dpop::render(&ctx).map(Html).map_err(err_to_response)
+    auth_admin::dpop::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn auth_admin_jwe_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn auth_admin_jwe_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    auth_admin::jwe::render(&ctx).map(Html).map_err(err_to_response)
+    auth_admin::jwe::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
-async fn auth_admin_oauth_endpoints_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+async fn auth_admin_oauth_endpoints_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    auth_admin::oauth_endpoints::render(&ctx).map(Html).map_err(err_to_response)
+    auth_admin::oauth_endpoints::render(&ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 /// Build the admin router. Mount as `app.merge(admin::router(state))`.
@@ -1523,8 +2153,14 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/pg", get(pg_handler))
         .route("/admin/vault", get(vault_handler))
         .route("/admin/keda", get(keda_handler))
-        .route("/admin/keda/scaledobjects", get(keda_scaledobjects_list_handler))
-        .route("/admin/keda/scaledobjects/new", get(keda_scaledobjects_new_handler))
+        .route(
+            "/admin/keda/scaledobjects",
+            get(keda_scaledobjects_list_handler),
+        )
+        .route(
+            "/admin/keda/scaledobjects/new",
+            get(keda_scaledobjects_new_handler),
+        )
         .route(
             "/admin/keda/scaledobjects/{ns}/{name}",
             get(keda_scaledobjects_detail_handler),
@@ -1551,7 +2187,10 @@ pub fn router(state: Arc<AdminState>) -> Router {
             get(keda_triggerauth_detail_handler),
         )
         .route("/admin/keda/scalers", get(keda_scalers_list_handler))
-        .route("/admin/keda/scalers/{kind}", get(keda_scalers_detail_handler))
+        .route(
+            "/admin/keda/scalers/{kind}",
+            get(keda_scalers_detail_handler),
+        )
         .route("/admin/keda/metrics", get(keda_metrics_handler))
         // 2026-05-14 consolidation: legacy top-level routes redirect 308
         // to the canonical /admin/k8s-dashboard/ landing tabs.
@@ -1571,7 +2210,10 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/_audit.json", get(meta_audit_json_handler))
         .route("/admin/compliance", get(compliance_handler))
         .route("/admin/compliance/refresh", get(compliance_refresh_handler))
-        .route("/admin/compliance/{crate_name}", get(compliance_detail_handler))
+        .route(
+            "/admin/compliance/{crate_name}",
+            get(compliance_detail_handler),
+        )
         // 2026-05-13 portal-persona fix: ADR Browser (Platform-only).
         .route("/admin/adr", get(adr_handler))
         .route("/admin/adr/{stem}", get(adr_detail_handler))
@@ -1643,21 +2285,50 @@ pub fn router(state: Arc<AdminState>) -> Router {
         // /admin/kubelet/* and /admin/scheduler/*.
         .route("/admin/k8s-dashboard/pods", get(k8s_dash_pods_handler))
         .route("/admin/k8s-dashboard/nodes", get(k8s_dash_nodes_handler))
-        .route("/admin/k8s-dashboard/volumes", get(k8s_dash_volumes_handler))
+        .route(
+            "/admin/k8s-dashboard/volumes",
+            get(k8s_dash_volumes_handler),
+        )
         .route("/admin/k8s-dashboard/events", get(k8s_dash_events_handler))
-        .route("/admin/k8s-dashboard/metrics", get(k8s_dash_metrics_handler))
-        .route("/admin/k8s-dashboard/scheduler/queue", get(k8s_dash_queue_handler))
-        .route("/admin/k8s-dashboard/scheduler/plugins", get(k8s_dash_sched_plugins_handler))
-        .route("/admin/k8s-dashboard/scheduler/bindings", get(k8s_dash_sched_bindings_handler))
-        .route("/admin/k8s-dashboard/scheduler/nodescores", get(k8s_dash_sched_nodescores_handler))
-        .route("/admin/k8s-dashboard/scheduler/events", get(k8s_dash_sched_events_handler))
+        .route(
+            "/admin/k8s-dashboard/metrics",
+            get(k8s_dash_metrics_handler),
+        )
+        .route(
+            "/admin/k8s-dashboard/scheduler/queue",
+            get(k8s_dash_queue_handler),
+        )
+        .route(
+            "/admin/k8s-dashboard/scheduler/plugins",
+            get(k8s_dash_sched_plugins_handler),
+        )
+        .route(
+            "/admin/k8s-dashboard/scheduler/bindings",
+            get(k8s_dash_sched_bindings_handler),
+        )
+        .route(
+            "/admin/k8s-dashboard/scheduler/nodescores",
+            get(k8s_dash_sched_nodescores_handler),
+        )
+        .route(
+            "/admin/k8s-dashboard/scheduler/events",
+            get(k8s_dash_sched_events_handler),
+        )
         .route("/admin/kiali", get(kiali_handler))
         .route("/admin/contributions", get(contributions_overview_handler))
-        .route("/admin/contributions/timeline", get(contributions_timeline_handler))
-        .route("/admin/contributions/leaderboard", get(contributions_leaderboard_handler))
-        .route("/admin/contributions/{worker_id}", get(contributions_worker_handler))
+        .route(
+            "/admin/contributions/timeline",
+            get(contributions_timeline_handler),
+        )
+        .route(
+            "/admin/contributions/leaderboard",
+            get(contributions_leaderboard_handler),
+        )
+        .route(
+            "/admin/contributions/{worker_id}",
+            get(contributions_worker_handler),
+        )
         .route("/t/{tenant}/dashboard", get(tenant_dashboard_handler))
-
         .route("/admin/audit", get(audit_page_handler))
         .route("/admin/audit.csv", get(audit_csv_handler))
         .route("/admin/cluster/live", get(cluster_live_handler))
@@ -1676,7 +2347,10 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/mlflow/experiments", get(mlflow_experiments_handler))
         .route("/admin/mlflow/runs", get(mlflow_runs_handler))
         .route("/admin/mlflow/models", get(mlflow_models_handler))
-        .route("/admin/mlflow/registered-models", get(mlflow_registered_models_handler))
+        .route(
+            "/admin/mlflow/registered-models",
+            get(mlflow_registered_models_handler),
+        )
         .route("/admin/mlflow/deployments", get(mlflow_deployments_handler))
         .route("/admin/litellm", get(litellm_handler))
         .route("/admin/litellm/models", get(litellm_models_handler))
@@ -1704,10 +2378,16 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/auth/ldap", get(auth_admin_ldap_handler))
         .route("/admin/auth/kerberos", get(auth_admin_kerberos_handler))
         .route("/admin/auth/uma", get(auth_admin_uma_handler))
-        .route("/admin/auth/token-exchange", get(auth_admin_token_exchange_handler))
+        .route(
+            "/admin/auth/token-exchange",
+            get(auth_admin_token_exchange_handler),
+        )
         .route("/admin/auth/dpop", get(auth_admin_dpop_handler))
         .route("/admin/auth/jwe", get(auth_admin_jwe_handler))
-        .route("/admin/auth/oauth-endpoints", get(auth_admin_oauth_endpoints_handler))
+        .route(
+            "/admin/auth/oauth-endpoints",
+            get(auth_admin_oauth_endpoints_handler),
+        )
         .with_state(state)
 }
 
@@ -1715,8 +2395,8 @@ pub fn router(state: Arc<AdminState>) -> Router {
 mod router_tests {
     use super::*;
     use crate::portal_test_ctx;
-    use axum::body::to_bytes;
     use axum::body::Body;
+    use axum::body::to_bytes;
     use axum::http::Request;
     use tower::util::ServiceExt;
 

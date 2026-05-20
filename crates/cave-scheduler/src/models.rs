@@ -33,8 +33,7 @@ pub struct ResourceCapacity {
 
 impl ResourceCapacity {
     pub fn has_room_for(&self, request: &ResourceRequest) -> bool {
-        self.cpu_millicores >= request.cpu_millicores
-            && self.memory_bytes >= request.memory_bytes
+        self.cpu_millicores >= request.cpu_millicores && self.memory_bytes >= request.memory_bytes
     }
 
     pub fn subtract(&mut self, request: &ResourceRequest) {
@@ -142,22 +141,49 @@ mod tests {
 
     #[test]
     fn test_resource_capacity_has_room() {
-        let cap = ResourceCapacity { cpu_millicores: 4000, memory_bytes: 8_000_000_000, pods: 110, ephemeral_storage_bytes: 0 };
-        let req = ResourceRequest { cpu_millicores: 500, memory_bytes: 1_000_000_000, ..Default::default() };
+        let cap = ResourceCapacity {
+            cpu_millicores: 4000,
+            memory_bytes: 8_000_000_000,
+            pods: 110,
+            ephemeral_storage_bytes: 0,
+        };
+        let req = ResourceRequest {
+            cpu_millicores: 500,
+            memory_bytes: 1_000_000_000,
+            ..Default::default()
+        };
         assert!(cap.has_room_for(&req));
     }
 
     #[test]
     fn test_resource_capacity_no_room() {
-        let cap = ResourceCapacity { cpu_millicores: 100, memory_bytes: 500, pods: 1, ephemeral_storage_bytes: 0 };
-        let req = ResourceRequest { cpu_millicores: 500, memory_bytes: 1000, ..Default::default() };
+        let cap = ResourceCapacity {
+            cpu_millicores: 100,
+            memory_bytes: 500,
+            pods: 1,
+            ephemeral_storage_bytes: 0,
+        };
+        let req = ResourceRequest {
+            cpu_millicores: 500,
+            memory_bytes: 1000,
+            ..Default::default()
+        };
         assert!(!cap.has_room_for(&req));
     }
 
     #[test]
     fn test_subtract_and_add() {
-        let mut cap = ResourceCapacity { cpu_millicores: 4000, memory_bytes: 8000, pods: 10, ephemeral_storage_bytes: 0 };
-        let req = ResourceRequest { cpu_millicores: 1000, memory_bytes: 2000, ..Default::default() };
+        let mut cap = ResourceCapacity {
+            cpu_millicores: 4000,
+            memory_bytes: 8000,
+            pods: 10,
+            ephemeral_storage_bytes: 0,
+        };
+        let req = ResourceRequest {
+            cpu_millicores: 1000,
+            memory_bytes: 2000,
+            ..Default::default()
+        };
         cap.subtract(&req);
         assert_eq!(cap.cpu_millicores, 3000);
         assert_eq!(cap.pods, 9);

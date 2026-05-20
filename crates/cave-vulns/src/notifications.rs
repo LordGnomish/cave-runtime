@@ -63,9 +63,14 @@ pub struct InMemorySink {
 }
 
 impl InMemorySink {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
     pub fn drain(&self) -> Vec<NotificationEvent> {
-        self.events.lock().map(|mut g| std::mem::take(&mut *g)).unwrap_or_default()
+        self.events
+            .lock()
+            .map(|mut g| std::mem::take(&mut *g))
+            .unwrap_or_default()
     }
     pub fn snapshot(&self) -> Vec<NotificationEvent> {
         self.events.lock().map(|g| g.clone()).unwrap_or_default()
@@ -75,7 +80,10 @@ impl InMemorySink {
 #[async_trait]
 impl NotificationSink for InMemorySink {
     async fn send(&self, event: &NotificationEvent) -> Result<(), NotifyError> {
-        self.events.lock().map_err(|_| NotifyError::Poisoned)?.push(event.clone());
+        self.events
+            .lock()
+            .map_err(|_| NotifyError::Poisoned)?
+            .push(event.clone());
         Ok(())
     }
 }
@@ -106,7 +114,11 @@ impl WebhookSink {
         style: WebhookStyle,
         sender: Arc<dyn Fn(String, String) -> Result<(), NotifyError> + Send + Sync>,
     ) -> Self {
-        Self { url: url.into(), style, sender }
+        Self {
+            url: url.into(),
+            style,
+            sender,
+        }
     }
 
     fn payload(&self, event: &NotificationEvent) -> String {
@@ -162,11 +174,18 @@ pub fn event_for(kind: EventKind, finding: &Finding, product: Option<&str>) -> N
         product: product.map(String::from),
         url: None,
         message: match kind {
-            EventKind::FindingCreated => format!("New {:?} finding: {}", finding.severity, finding.title),
-            EventKind::SeverityIncreased => format!("Severity promoted to {:?}: {}", finding.severity, finding.title),
+            EventKind::FindingCreated => {
+                format!("New {:?} finding: {}", finding.severity, finding.title)
+            }
+            EventKind::SeverityIncreased => format!(
+                "Severity promoted to {:?}: {}",
+                finding.severity, finding.title
+            ),
             EventKind::SlaBreached => format!("SLA breached: {}", finding.title),
             EventKind::SlaBreachImminent => format!("SLA breach imminent: {}", finding.title),
-            EventKind::RiskAcceptanceExpired => format!("Risk acceptance expired: {}", finding.title),
+            EventKind::RiskAcceptanceExpired => {
+                format!("Risk acceptance expired: {}", finding.title)
+            }
             EventKind::ScanFailed => format!("Scan failed for: {}", finding.title),
             EventKind::ScanCompleted => format!("Scan completed for: {}", finding.title),
         },
@@ -175,11 +194,16 @@ pub fn event_for(kind: EventKind, finding: &Finding, product: Option<&str>) -> N
 
 /// Fan out a single event to many sinks. Returns the first error,
 /// but every sink is still invoked.
-pub async fn fanout(sinks: &[Arc<dyn NotificationSink>], event: &NotificationEvent) -> Result<(), NotifyError> {
+pub async fn fanout(
+    sinks: &[Arc<dyn NotificationSink>],
+    event: &NotificationEvent,
+) -> Result<(), NotifyError> {
     let mut first_err = None;
     for s in sinks {
         if let Err(e) = s.send(event).await {
-            if first_err.is_none() { first_err = Some(e); }
+            if first_err.is_none() {
+                first_err = Some(e);
+            }
         }
     }
     match first_err {
@@ -200,7 +224,11 @@ mod tests {
     #[tokio::test]
     async fn in_memory_sink_captures_events() {
         let sink = InMemorySink::new();
-        let event = event_for(EventKind::FindingCreated, &fin(FindingSeverity::Critical), Some("acme"));
+        let event = event_for(
+            EventKind::FindingCreated,
+            &fin(FindingSeverity::Critical),
+            Some("acme"),
+        );
         sink.send(&event).await.unwrap();
         let snapshot = sink.snapshot();
         assert_eq!(snapshot.len(), 1);
@@ -221,7 +249,9 @@ mod tests {
             }),
         );
         let f = fin(FindingSeverity::High);
-        sink.send(&event_for(EventKind::FindingCreated, &f, Some("p"))).await.unwrap();
+        sink.send(&event_for(EventKind::FindingCreated, &f, Some("p")))
+            .await
+            .unwrap();
         let body = captured.lock().unwrap().clone();
         assert!(body.contains("High"));
         assert!(body.contains("SQLi"));
@@ -235,9 +265,18 @@ mod tests {
         let sink = WebhookSink::with_sender(
             "https://example.com/hook",
             WebhookStyle::Raw,
-            Arc::new(move |_, body| { *cap.lock().unwrap() = body; Ok(()) }),
+            Arc::new(move |_, body| {
+                *cap.lock().unwrap() = body;
+                Ok(())
+            }),
         );
-        sink.send(&event_for(EventKind::SlaBreached, &fin(FindingSeverity::Medium), None)).await.unwrap();
+        sink.send(&event_for(
+            EventKind::SlaBreached,
+            &fin(FindingSeverity::Medium),
+            None,
+        ))
+        .await
+        .unwrap();
         let body = captured.lock().unwrap().clone();
         let v: serde_json::Value = serde_json::from_str(&body).unwrap();
         assert_eq!(v["kind"], "sla_breached");
@@ -245,14 +284,22 @@ mod tests {
 
     #[tokio::test]
     async fn log_sink_returns_ok() {
-        LogSink::default().send(&event_for(EventKind::ScanCompleted, &fin(FindingSeverity::Info), None)).await.unwrap();
+        LogSink::default()
+            .send(&event_for(
+                EventKind::ScanCompleted,
+                &fin(FindingSeverity::Info),
+                None,
+            ))
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
     async fn fanout_to_multiple_sinks() {
         let s1 = InMemorySink::new();
         let s2 = InMemorySink::new();
-        let sinks: Vec<Arc<dyn NotificationSink>> = vec![Arc::new(s1.clone()), Arc::new(s2.clone())];
+        let sinks: Vec<Arc<dyn NotificationSink>> =
+            vec![Arc::new(s1.clone()), Arc::new(s2.clone())];
         let event = event_for(EventKind::FindingCreated, &fin(FindingSeverity::Low), None);
         fanout(&sinks, &event).await.unwrap();
         assert_eq!(s1.snapshot().len(), 1);
@@ -289,7 +336,13 @@ mod tests {
     #[tokio::test]
     async fn in_memory_sink_drain_empties_buffer() {
         let sink = InMemorySink::new();
-        sink.send(&event_for(EventKind::FindingCreated, &fin(FindingSeverity::Low), None)).await.unwrap();
+        sink.send(&event_for(
+            EventKind::FindingCreated,
+            &fin(FindingSeverity::Low),
+            None,
+        ))
+        .await
+        .unwrap();
         assert_eq!(sink.drain().len(), 1);
         assert_eq!(sink.snapshot().len(), 0);
         let _ = Uuid::new_v4();

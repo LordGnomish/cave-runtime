@@ -52,9 +52,5 @@ pub trait Publisher: Send + Sync {
     /// Read a static file from the published docs.
     ///
     /// Upstream: migrateDocsCase / fetchStaticFile in local.ts
-    async fn read_file(
-        &self,
-        entity: &EntityName,
-        path: &str,
-    ) -> Result<Vec<u8>, TechDocsError>;
+    async fn read_file(&self, entity: &EntityName, path: &str) -> Result<Vec<u8>, TechDocsError>;
 }

@@ -18,14 +18,14 @@
 // it out is a contained refactor).
 
 use axum::{
+    Json,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::sync::Arc;
 
 /// Keycloak `IdentityProviderRepresentation` — minimal subset that the
@@ -52,7 +52,11 @@ pub struct IdentityProvider {
     #[serde(default)]
     pub config: Map<String, Value>,
     /// Display name (optional) — used by the login page.
-    #[serde(default, rename = "displayName", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "displayName",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub display_name: Option<String>,
 }
 
@@ -64,7 +68,9 @@ pub struct IdentityProviderStore {
 
 impl IdentityProviderStore {
     pub fn new() -> Self {
-        Self { inner: DashMap::new() }
+        Self {
+            inner: DashMap::new(),
+        }
     }
 
     /// List all IdPs in a realm, sorted by alias (deterministic for tests).
@@ -131,7 +137,10 @@ pub async fn create_instance(
         )
             .into_response();
     }
-    let location = format!("/admin/realms/{realm}/identity-provider/instances/{}", idp.alias);
+    let location = format!(
+        "/admin/realms/{realm}/identity-provider/instances/{}",
+        idp.alias
+    );
     store.put(&realm, idp);
     (
         StatusCode::CREATED,

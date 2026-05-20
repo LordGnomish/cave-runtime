@@ -333,7 +333,10 @@ mod tests {
     fn load_items_keeps_in_range_selection() {
         let mut s = with_items(5);
         s.selected = 2;
-        let s = reduce(s, Action::LoadItems(vec!["a".into(), "b".into(), "c".into()]));
+        let s = reduce(
+            s,
+            Action::LoadItems(vec!["a".into(), "b".into(), "c".into()]),
+        );
         assert_eq!(s.selected, 2);
     }
 

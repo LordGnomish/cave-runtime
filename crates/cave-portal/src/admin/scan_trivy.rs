@@ -8,7 +8,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, ScanResult};
+use crate::admin::state::{AdminState, ScanResult, scope};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ScanTrivyError {
@@ -54,7 +54,11 @@ impl Tab {
 fn tabs_html(active: Tab) -> String {
     let mut out = String::from(r#"<nav class="flex gap-2 mb-4" aria-label="scan tabs">"#);
     for t in [Tab::Images, Tab::Filesystems, Tab::Iac, Tab::Secrets] {
-        let aria = if t == active { r#" aria-current="page""# } else { "" };
+        let aria = if t == active {
+            r#" aria-current="page""#
+        } else {
+            ""
+        };
         let cls = if t == active {
             "px-3 py-1 bg-blue-600 text-white rounded"
         } else {
@@ -86,11 +90,7 @@ pub fn list_records(
         .collect())
 }
 
-pub fn render(
-    state: &AdminState,
-    ctx: &RequestCtx,
-    tab: Tab,
-) -> Result<String, ScanTrivyError> {
+pub fn render(state: &AdminState, ctx: &RequestCtx, tab: Tab) -> Result<String, ScanTrivyError> {
     let rows = list_records(state, ctx, tab)?;
     let table_rows: Vec<Vec<String>> = rows
         .iter()
@@ -120,10 +120,7 @@ pub fn render(
         n = rows.len(),
         tenant = escape(ctx.tenant.as_str()),
         kind = tab.scanner_filter(),
-        tbl = table(
-            &["scan_id", "scanner", "findings", "worst"],
-            &table_rows
-        ),
+        tbl = table(&["scan_id", "scanner", "findings", "worst"], &table_rows),
     );
     Ok(page_shell_full(
         ctx,

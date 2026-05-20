@@ -76,8 +76,8 @@ pub fn decompress(codec: Codec, data: &[u8]) -> StreamsResult<Bytes> {
 // ── gzip ──────────────────────────────────────────────────────────────────────
 
 fn compress_gzip(data: &[u8]) -> StreamsResult<Bytes> {
-    use flate2::write::GzEncoder;
     use flate2::Compression;
+    use flate2::write::GzEncoder;
     let mut enc = GzEncoder::new(Vec::new(), Compression::default());
     enc.write_all(data).map_err(|e| StreamsError::Compression {
         codec: "gzip".into(),
@@ -94,10 +94,11 @@ fn decompress_gzip(data: &[u8]) -> StreamsResult<Bytes> {
     use flate2::read::GzDecoder;
     let mut dec = GzDecoder::new(data);
     let mut out = Vec::new();
-    dec.read_to_end(&mut out).map_err(|e| StreamsError::Compression {
-        codec: "gzip".into(),
-        message: e.to_string(),
-    })?;
+    dec.read_to_end(&mut out)
+        .map_err(|e| StreamsError::Compression {
+            codec: "gzip".into(),
+            message: e.to_string(),
+        })?;
     Ok(Bytes::from(out))
 }
 
@@ -119,10 +120,11 @@ fn compress_snappy(data: &[u8]) -> StreamsResult<Bytes> {
 fn decompress_snappy(data: &[u8]) -> StreamsResult<Bytes> {
     let mut dec = snap::read::FrameDecoder::new(data);
     let mut out = Vec::new();
-    dec.read_to_end(&mut out).map_err(|e| StreamsError::Compression {
-        codec: "snappy".into(),
-        message: e.to_string(),
-    })?;
+    dec.read_to_end(&mut out)
+        .map_err(|e| StreamsError::Compression {
+            codec: "snappy".into(),
+            message: e.to_string(),
+        })?;
     Ok(Bytes::from(out))
 }
 
@@ -134,11 +136,9 @@ fn compress_lz4(data: &[u8]) -> StreamsResult<Bytes> {
 }
 
 fn decompress_lz4(data: &[u8]) -> StreamsResult<Bytes> {
-    let out = lz4_flex::decompress_size_prepended(data).map_err(|e| {
-        StreamsError::Compression {
-            codec: "lz4".into(),
-            message: e.to_string(),
-        }
+    let out = lz4_flex::decompress_size_prepended(data).map_err(|e| StreamsError::Compression {
+        codec: "lz4".into(),
+        message: e.to_string(),
     })?;
     Ok(Bytes::from(out))
 }
@@ -165,7 +165,8 @@ fn decompress_zstd(data: &[u8]) -> StreamsResult<Bytes> {
 mod tests {
     use super::*;
 
-    const PAYLOAD: &[u8] = b"The quick brown fox jumps over the lazy dog. Kafka message compression test.";
+    const PAYLOAD: &[u8] =
+        b"The quick brown fox jumps over the lazy dog. Kafka message compression test.";
 
     fn roundtrip(codec: Codec) {
         let compressed = compress(codec, PAYLOAD).unwrap();

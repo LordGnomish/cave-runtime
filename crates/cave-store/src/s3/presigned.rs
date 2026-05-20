@@ -25,11 +25,7 @@ pub struct PresignedUrl {
 }
 
 /// Generate a presigned URL.
-pub fn generate(
-    base_url: &str,
-    params: &PresignedUrlParams,
-    secret_key: &[u8],
-) -> PresignedUrl {
+pub fn generate(base_url: &str, params: &PresignedUrlParams, secret_key: &[u8]) -> PresignedUrl {
     let now = Utc::now().timestamp();
     let expires_at = now + params.expires_in_secs as i64;
 
@@ -70,7 +66,10 @@ pub fn verify(
         return Err(StoreError::RequestExpired);
     }
 
-    let canonical = format!("{}\n{}\n{}\n{}\n{}", method, bucket, key, expires_at, access_key);
+    let canonical = format!(
+        "{}\n{}\n{}\n{}\n{}",
+        method, bucket, key, expires_at, access_key
+    );
     let signing_key = hmac::Key::new(hmac::HMAC_SHA256, secret_key);
     let expected = hmac::sign(&signing_key, canonical.as_bytes());
     let expected_hex = hex::encode(expected.as_ref());

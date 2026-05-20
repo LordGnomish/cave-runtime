@@ -17,9 +17,7 @@ pub mod schedule;
 pub mod storage;
 
 use axum::Router;
-use models::{
-    BackupStorageLocation, BslAccessMode, BslPhase, StorageProvider,
-};
+use models::{BackupStorageLocation, BslAccessMode, BslPhase, StorageProvider};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;

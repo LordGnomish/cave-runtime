@@ -8,4 +8,4 @@ pub mod manager;
 pub mod target;
 
 pub use manager::ScrapeManager;
-pub use target::{ScrapeTarget, ScrapeConfig};
+pub use target::{ScrapeConfig, ScrapeTarget};

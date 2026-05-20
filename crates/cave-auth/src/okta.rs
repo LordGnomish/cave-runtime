@@ -17,11 +17,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::get,
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
@@ -259,10 +259,7 @@ impl OktaAuthServer {
         api_token: &str,
         group_id: &str,
     ) -> Result<Vec<OktaUser>, String> {
-        let url = format!(
-            "{}/api/v1/groups/{}/users",
-            self.config.domain, group_id
-        );
+        let url = format!("{}/api/v1/groups/{}/users", self.config.domain, group_id);
         let resp = self
             .client
             .get(&url)
@@ -310,14 +307,9 @@ impl OktaAuthServer {
     }
 
     /// Start a background task that syncs groups every `interval_secs` seconds.
-    pub fn start_group_sync(
-        self: Arc<Self>,
-        api_token: String,
-        interval_secs: u64,
-    ) {
+    pub fn start_group_sync(self: Arc<Self>, api_token: String, interval_secs: u64) {
         tokio::spawn(async move {
-            let mut interval =
-                tokio::time::interval(std::time::Duration::from_secs(interval_secs));
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(interval_secs));
             loop {
                 interval.tick().await;
                 match self.sync_groups(&api_token).await {
@@ -438,7 +430,11 @@ async fn scim_get_user(
     let users = state.users.read().await;
     match users.get(&id) {
         Some(user) => (StatusCode::OK, Json(user.clone())).into_response(),
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "User not found" }))).into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "User not found" })),
+        )
+            .into_response(),
     }
 }
 
@@ -459,7 +455,11 @@ async fn scim_patch_user(
 ) -> impl IntoResponse {
     let mut users = state.users.write().await;
     let Some(user) = users.get_mut(&id) else {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "User not found" }))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "User not found" })),
+        )
+            .into_response();
     };
 
     // Handle "active: false" deactivation from Okta
@@ -502,7 +502,11 @@ async fn scim_delete_user(
         }
         StatusCode::NO_CONTENT.into_response()
     } else {
-        (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "User not found" }))).into_response()
+        (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "User not found" })),
+        )
+            .into_response()
     }
 }
 

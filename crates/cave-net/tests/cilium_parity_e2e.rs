@@ -13,55 +13,74 @@ use std::collections::BTreeMap;
 use std::net::{IpAddr, Ipv4Addr};
 
 use cave_net::cilium::{
-    arp_announce::{ArpAnnouncer, AnnounceProto},
-    auth::{AuthMode, AuthVerdict, AuthManager, Svid},
-    bandwidth::{BandwidthManager, CongestionControl, parse_bandwidth_annotation},
+    arp_announce::{AnnounceProto, ArpAnnouncer},
+    auth::{AuthManager, AuthMode, AuthVerdict, Svid},
+    bandwidth::{parse_bandwidth_annotation, BandwidthManager, CongestionControl},
     bgp::{BgpInstance, PeerConfig as BgpPeerConfig, PeerEvent, PeerState},
-    bpf_dump::{BpfMapKind, BpfMapRegistry, BpfDumpEntry},
-    bpfmaps::{HashMapBpf, LruMap, LpmTrie},
-    cilium_node::{CiliumNodeSpec, CiliumNodeStore, NodeAddress, AddressKind, NodeIpamSpec},
+    bpf_dump::{BpfDumpEntry, BpfMapKind, BpfMapRegistry},
+    bpfmaps::{HashMapBpf, LpmTrie, LruMap},
+    cilium_node::{AddressKind, CiliumNodeSpec, CiliumNodeStore, NodeAddress, NodeIpamSpec},
     cluster_pool_refill::{NodeWatermarkSpec, RefillController, RefillKind},
-    clustermesh_ext::{KvStore, RemoteClusterStatus, RemoteClusterState, ServiceAffinity, GlobalService, GlobalServiceEndpoint},
+    clustermesh_ext::{
+        GlobalService, GlobalServiceEndpoint, KvStore, RemoteClusterState, RemoteClusterStatus,
+        ServiceAffinity,
+    },
     config_watcher::{ChangeAction, ConfigWatcher},
-    conn_test::{ConnectivitySuite, ExpectedVerdict, ActualOutcome, Test as CtTest, TestKind},
-    conntrack::{ConntrackTable, Direction as CtDirection, Tuple, TcpFlag, TcpState},
-    dns_proxy::{DnsMode, DnsProxy, DnsQuestion, QType, AllowList, DnsRcode, DnsResponse, DnsAnswer, AnswerData, DnsVerdict},
+    conn_test::{ActualOutcome, ConnectivitySuite, ExpectedVerdict, Test as CtTest, TestKind},
+    conntrack::{ConntrackTable, Direction as CtDirection, TcpFlag, TcpState, Tuple},
+    dns_proxy::{
+        AllowList, AnswerData, DnsAnswer, DnsMode, DnsProxy, DnsQuestion, DnsRcode, DnsResponse,
+        DnsVerdict, QType,
+    },
     egress::{EgressGatewayPolicy, EgressManager, GatewayNode},
-    endpoint::{EndpointManager, EndpointState, BpfProgram as EndpointBpfProgram, canonical_egress_chain},
+    endpoint::{
+        canonical_egress_chain, BpfProgram as EndpointBpfProgram, EndpointManager, EndpointState,
+    },
     endpoint_regen::{RegenController, RegenLevel, RegenRequest},
     external_workload::{ExternalWorkloadManager, ExternalWorkloadSpec, WorkloadState},
-    fqdn::{FqdnCache, match_pattern},
-    hubble::{Verdict as HubbleVerdict, FlowLog, DropReason, TopologyGraph},
-    hubble_ext::{Observer, GetFlowsRequest, FlowFilter, Relay},
+    fqdn::{match_pattern, FqdnCache},
+    hubble::{DropReason, FlowLog, TopologyGraph, Verdict as HubbleVerdict},
+    hubble_ext::{FlowFilter, GetFlowsRequest, Observer, Relay},
     hubble_metrics::{MetricRegistry, MonitorEvent, NodeAggregator},
     id_coord::IdentityLockCoordinator,
     identity::{LabelSet, LocalIdentityCache, MIN_LOCAL_IDENTITY},
     ipam::{Ipam, IpamMode, PodIpPool},
     ipcache::{Ipcache, IpcacheEntry, IpcacheSource},
-    k8s_handlers::{EndpointSlice, SliceEndpoint, SlicePort, EndpointCondition, EndpointSliceHandler, ServiceCidrSpec, ServiceCidrRegistry},
+    k8s_handlers::{
+        EndpointCondition, EndpointSlice, EndpointSliceHandler, ServiceCidrRegistry,
+        ServiceCidrSpec, SliceEndpoint, SlicePort,
+    },
     key_rotation::{KeyRotationController, RotationPhase},
     kv_identity::{KvIdentityAllocator, MIN_GLOBAL_IDENTITY},
-    l2_announce::{L2Announcer, L2AnnouncementPolicy, ServiceSelector, InterfaceMatcher, ServiceFrontends},
-    lb::{Algorithm, Backend as LbBackend, LoadBalancer, FlowKey},
-    lb_ext::{LbMode, KubeProxyReplacementMode, KubeProxyReplacementStatus, ServiceTrafficConfig, TrafficPolicy},
-    lrp::{L4Proto, LocalBackend, LrpManager, make_node_local_dns_lrp},
-    maglev::{MaglevTable, Backend as MaglevBackend, hash_5tuple, DEFAULT_M},
+    l2_announce::{
+        InterfaceMatcher, L2AnnouncementPolicy, L2Announcer, ServiceFrontends, ServiceSelector,
+    },
+    lb::{Algorithm, Backend as LbBackend, FlowKey, LoadBalancer},
+    lb_ext::{
+        KubeProxyReplacementMode, KubeProxyReplacementStatus, LbMode, ServiceTrafficConfig,
+        TrafficPolicy,
+    },
+    lrp::{make_node_local_dns_lrp, L4Proto, LocalBackend, LrpManager},
+    maglev::{hash_5tuple, Backend as MaglevBackend, MaglevTable, DEFAULT_M},
     maps_gc::{GcSweepReport, GcTarget, MapsGcController},
     nat::{DnatEntry, DnatTable, SnatKey, SnatTable},
-    operator::{IdentityGc, CesManager, CiliumEndpoint},
+    operator::{CesManager, CiliumEndpoint, IdentityGc},
     policy::{
-        distill, Direction, EndpointSelector, IngressRule, InMemoryIdentityResolver, L4Protocol,
-        PolicyEnforcementMode, PolicyRepository, PortProtocol, PortRule, Rule, Verdict as PolicyVerdict,
+        distill, Direction, EndpointSelector, InMemoryIdentityResolver, IngressRule, L4Protocol,
+        PolicyEnforcementMode, PolicyRepository, PortProtocol, PortRule, Rule,
+        Verdict as PolicyVerdict,
     },
     policy_trace::trace,
     proxy_health::{ProxyHealthChecker, ProxyProbe, ProxyState},
-    readiness::{ReadinessGateController, GateStatus},
+    readiness::{GateStatus, ReadinessGateController},
     recorder::{Recorder, RecorderPolicy, RecorderProto, RecorderTuple},
-    reserved_ids::{ReservedIdentity, full_table, is_reserved_range},
+    reserved_ids::{full_table, is_reserved_range, ReservedIdentity},
     selector_cache::SelectorCache,
     services::{Service, ServiceRegistry, ServiceType},
-    sock_lb::{CgroupHook, SockLbConfig, SockLbDecision, SockLbManager, ServiceFrontend, ServiceBackend},
-    srv6::{Srv6Manager, Srv6Behavior, Locator, Sid},
+    sock_lb::{
+        CgroupHook, ServiceBackend, ServiceFrontend, SockLbConfig, SockLbDecision, SockLbManager,
+    },
+    srv6::{Locator, Sid, Srv6Behavior, Srv6Manager},
     status::{ComponentName, ComponentStatus, DaemonState, StatusBoard},
     tunnel::{EncapDecision, TunnelEndpoint, TunnelManager, TunnelMode},
     types::TenantId,
@@ -78,7 +97,10 @@ fn ls(pairs: &[(&str, &str)]) -> LabelSet {
 
 fn endpoint_sel(pairs: &[(&str, &str)]) -> EndpointSelector {
     EndpointSelector {
-        match_labels: pairs.iter().map(|(k, v)| ((*k).into(), (*v).into())).collect(),
+        match_labels: pairs
+            .iter()
+            .map(|(k, v)| ((*k).into(), (*v).into()))
+            .collect(),
         match_expressions: Vec::new(),
     }
 }
@@ -95,7 +117,11 @@ fn e2e_identity_allocation_drives_policy_verdict() {
     assert!(client_id >= MIN_LOCAL_IDENTITY);
 
     let mut repo = PolicyRepository::new();
-    let mut rule = Rule::new("allow-client-to-web", tenant.clone(), endpoint_sel(&[("app", "web")]));
+    let mut rule = Rule::new(
+        "allow-client-to-web",
+        tenant.clone(),
+        endpoint_sel(&[("app", "web")]),
+    );
     rule.ingress.push(IngressRule {
         from_endpoints: vec![endpoint_sel(&[("app", "client")])],
         to_ports: vec![PortRule {
@@ -109,13 +135,31 @@ fn e2e_identity_allocation_drives_policy_verdict() {
     let mut resolver = InMemoryIdentityResolver::new();
     resolver.insert(client_id, ls(&[("app", "client")]));
     resolver.insert(web_id, ls(&[("app", "web")]));
-    let map = distill(&repo, &tenant, &ls(&[("app", "web")]),
-        PolicyEnforcementMode::Default, &resolver).unwrap();
+    let map = distill(
+        &repo,
+        &tenant,
+        &ls(&[("app", "web")]),
+        PolicyEnforcementMode::Default,
+        &resolver,
+    )
+    .unwrap();
 
     assert!(map.ingress_enforced);
-    assert_eq!(map.lookup(client_id, 80, L4Protocol::TCP, Direction::Ingress).verdict, PolicyVerdict::Allow);
-    assert_eq!(map.lookup(client_id, 8080, L4Protocol::TCP, Direction::Ingress).verdict, PolicyVerdict::Deny);
-    assert_eq!(map.lookup(web_id, 80, L4Protocol::TCP, Direction::Ingress).verdict, PolicyVerdict::Deny);
+    assert_eq!(
+        map.lookup(client_id, 80, L4Protocol::TCP, Direction::Ingress)
+            .verdict,
+        PolicyVerdict::Allow
+    );
+    assert_eq!(
+        map.lookup(client_id, 8080, L4Protocol::TCP, Direction::Ingress)
+            .verdict,
+        PolicyVerdict::Deny
+    );
+    assert_eq!(
+        map.lookup(web_id, 80, L4Protocol::TCP, Direction::Ingress)
+            .verdict,
+        PolicyVerdict::Deny
+    );
 }
 
 // ── E2E #2: Service registration → LB → conntrack ──────────────────────────
@@ -133,12 +177,24 @@ fn e2e_service_lb_and_conntrack_round_trip() {
     reg.upsert(svc).unwrap();
 
     let lb = reg.lb_for("default/api", "default").unwrap();
-    let key = FlowKey { src_ip: ip4(10, 0, 0, 5), src_port: 1234, dst_ip: ip4(10, 96, 0, 1), dst_port: 80, proto: 6 };
+    let key = FlowKey {
+        src_ip: ip4(10, 0, 0, 5),
+        src_port: 1234,
+        dst_ip: ip4(10, 96, 0, 1),
+        dst_port: 80,
+        proto: 6,
+    };
     let backend = lb.select(key, 100).unwrap().clone();
     assert!(["a", "b"].contains(&backend.name.as_str()));
 
     let mut ct = ConntrackTable::new(tenant, 1024);
-    let tup = Tuple::new(ip4(10, 0, 0, 5), 1234, ip4(10, 96, 0, 1), 80, L4Protocol::TCP);
+    let tup = Tuple::new(
+        ip4(10, 0, 0, 5),
+        1234,
+        ip4(10, 96, 0, 1),
+        80,
+        L4Protocol::TCP,
+    );
     ct.upsert(tup, CtDirection::Egress, 100, 64, Some(1));
     ct.apply_tcp_flag(tup, CtDirection::Egress, TcpFlag::SynAck, 110);
     ct.apply_tcp_flag(tup, CtDirection::Egress, TcpFlag::Ack, 111);
@@ -152,8 +208,12 @@ fn e2e_service_lb_and_conntrack_round_trip() {
 #[test]
 fn e2e_maglev_consistent_under_backend_addition() {
     let tenant = TenantId::new("e2e-3").expect("test fixture");
-    let backs_before: Vec<MaglevBackend> = (0..5).map(|i| MaglevBackend::new(format!("b-{i}"), 1)).collect();
-    let backs_after: Vec<MaglevBackend> = (0..6).map(|i| MaglevBackend::new(format!("b-{i}"), 1)).collect();
+    let backs_before: Vec<MaglevBackend> = (0..5)
+        .map(|i| MaglevBackend::new(format!("b-{i}"), 1))
+        .collect();
+    let backs_after: Vec<MaglevBackend> = (0..6)
+        .map(|i| MaglevBackend::new(format!("b-{i}"), 1))
+        .collect();
     let m = 1009usize;
     let before = MaglevTable::build(tenant.clone(), m, backs_before).unwrap();
     let after = MaglevTable::build(tenant, m, backs_after).unwrap();
@@ -186,14 +246,27 @@ fn e2e_maglev_default_table_size_is_prime() {
 fn e2e_nat_snat_dnat_round_trip() {
     let tenant = TenantId::new("e2e-4").expect("test fixture");
     let mut snat = SnatTable::new(tenant.clone(), ip4(192, 168, 1, 1));
-    let key = SnatKey { src_ip: ip4(10, 0, 0, 1), src_port: 1234, dst_ip: ip4(8, 8, 8, 8), dst_port: 53 };
+    let key = SnatKey {
+        src_ip: ip4(10, 0, 0, 1),
+        src_port: 1234,
+        dst_ip: ip4(8, 8, 8, 8),
+        dst_port: 53,
+    };
     let entry = snat.allocate(key, 100).unwrap();
     assert_eq!(entry.new_src_ip, ip4(192, 168, 1, 1));
-    let rev_key = SnatKey { src_ip: entry.new_src_ip, src_port: entry.new_src_port, dst_ip: key.dst_ip, dst_port: key.dst_port };
+    let rev_key = SnatKey {
+        src_ip: entry.new_src_ip,
+        src_port: entry.new_src_port,
+        dst_ip: key.dst_ip,
+        dst_port: key.dst_port,
+    };
     assert_eq!(snat.lookup_reverse(&rev_key), Some(key));
 
     let mut dnat = DnatTable::new(tenant);
-    let backend = DnatEntry { backend_ip: ip4(10, 0, 1, 5), backend_port: 8080 };
+    let backend = DnatEntry {
+        backend_ip: ip4(10, 0, 1, 5),
+        backend_port: 8080,
+    };
     let idx = dnat.install(backend).unwrap();
     assert_eq!(dnat.lookup(idx), Some(backend));
 }
@@ -204,7 +277,8 @@ fn e2e_nat_snat_dnat_round_trip() {
 fn e2e_ipam_cluster_pool_idempotent_per_owner() {
     let tenant = TenantId::new("e2e-5").expect("test fixture");
     let mut ipam = Ipam::new(IpamMode::ClusterPool);
-    ipam.upsert_pool(PodIpPool::ipv4("default", tenant, "10.0.0.0/24")).unwrap();
+    ipam.upsert_pool(PodIpPool::ipv4("default", tenant, "10.0.0.0/24"))
+        .unwrap();
     let ip_a = ipam.allocate_v4("default", "ns/p1").unwrap();
     let ip_b = ipam.allocate_v4("default", "ns/p1").unwrap();
     assert_eq!(ip_a, ip_b, "same owner must receive same IP (idempotent)");
@@ -219,12 +293,27 @@ fn e2e_ipam_cluster_pool_idempotent_per_owner() {
 fn e2e_ipcache_source_priority_resolution() {
     let tenant = TenantId::new("e2e-6").expect("test fixture");
     let mut cache = Ipcache::new(tenant);
-    let kv_entry = IpcacheEntry { identity: 999, source: IpcacheSource::Kvstore, encryption_key: 0, tunnel_endpoint: None };
-    let local_entry = IpcacheEntry { identity: 256, source: IpcacheSource::Local, encryption_key: 0, tunnel_endpoint: None };
+    let kv_entry = IpcacheEntry {
+        identity: 999,
+        source: IpcacheSource::Kvstore,
+        encryption_key: 0,
+        tunnel_endpoint: None,
+    };
+    let local_entry = IpcacheEntry {
+        identity: 256,
+        source: IpcacheSource::Local,
+        encryption_key: 0,
+        tunnel_endpoint: None,
+    };
     cache.upsert(ip4(10, 0, 1, 5), kv_entry).unwrap();
     cache.upsert(ip4(10, 0, 1, 5), local_entry).unwrap();
     assert_eq!(cache.identity_of(ip4(10, 0, 1, 5)), Some(256));
-    let kv2 = IpcacheEntry { identity: 1234, source: IpcacheSource::Kvstore, encryption_key: 0, tunnel_endpoint: None };
+    let kv2 = IpcacheEntry {
+        identity: 1234,
+        source: IpcacheSource::Kvstore,
+        encryption_key: 0,
+        tunnel_endpoint: None,
+    };
     assert!(cache.upsert(ip4(10, 0, 1, 5), kv2).is_err());
     assert_eq!(cache.identity_of(ip4(10, 0, 1, 5)), Some(256));
 }
@@ -256,7 +345,10 @@ fn e2e_hubble_observer_relay_aggregation() {
     relay.add_cluster("eu-west", b);
 
     let req = GetFlowsRequest {
-        whitelist: vec![FlowFilter { verdict: Some(HubbleVerdict::Dropped), ..Default::default() }],
+        whitelist: vec![FlowFilter {
+            verdict: Some(HubbleVerdict::Dropped),
+            ..Default::default()
+        }],
         ..Default::default()
     };
     let dropped = relay.get_flows(&req);
@@ -278,11 +370,20 @@ fn e2e_auth_full_mtls_handshake() {
     m.register_svid(256, svid_a).unwrap();
     m.register_svid(257, svid_b).unwrap();
 
-    assert_eq!(m.resolve(256, 257, AuthMode::Required, 200), AuthVerdict::NeedsAuth);
+    assert_eq!(
+        m.resolve(256, 257, AuthMode::Required, 200),
+        AuthVerdict::NeedsAuth
+    );
     let entry = m.handshake(256, 257, AuthMode::Required, 200).unwrap();
     assert_eq!(entry.src_spiffe, "spiffe://cluster.local/client");
-    assert_eq!(m.resolve(256, 257, AuthMode::Required, 300), AuthVerdict::Authorized);
-    assert_eq!(m.resolve(257, 256, AuthMode::Required, 300), AuthVerdict::NeedsAuth);
+    assert_eq!(
+        m.resolve(256, 257, AuthMode::Required, 300),
+        AuthVerdict::Authorized
+    );
+    assert_eq!(
+        m.resolve(257, 256, AuthMode::Required, 300),
+        AuthVerdict::NeedsAuth
+    );
     assert!(m.revoke_svid(256));
     assert_eq!(m.auth_count(), 0);
 }
@@ -293,14 +394,23 @@ fn e2e_auth_full_mtls_handshake() {
 fn e2e_bgp_full_session_lifecycle() {
     let tenant = TenantId::new("e2e-9").expect("test fixture");
     let mut bgp = BgpInstance::new(tenant, 65000, ip4(10, 0, 0, 1));
-    bgp.upsert_peer(BgpPeerConfig::defaults("ext", ip4(10, 0, 0, 2), 64999, 65000));
+    bgp.upsert_peer(BgpPeerConfig::defaults(
+        "ext",
+        ip4(10, 0, 0, 2),
+        64999,
+        65000,
+    ));
     assert_eq!(bgp.peer_status("ext").unwrap().state, PeerState::Idle);
     bgp.handle_event("ext", PeerEvent::Start).unwrap();
     bgp.handle_event("ext", PeerEvent::TcpConnected).unwrap();
     bgp.handle_event("ext", PeerEvent::OpenReceived).unwrap();
-    let s = bgp.handle_event("ext", PeerEvent::KeepaliveReceived).unwrap();
+    let s = bgp
+        .handle_event("ext", PeerEvent::KeepaliveReceived)
+        .unwrap();
     assert_eq!(s, PeerState::Established);
-    let s2 = bgp.handle_event("ext", PeerEvent::NotificationReceived).unwrap();
+    let s2 = bgp
+        .handle_event("ext", PeerEvent::NotificationReceived)
+        .unwrap();
     assert_eq!(s2, PeerState::Idle);
 }
 
@@ -311,10 +421,16 @@ fn e2e_l2_announcer_with_arp_burst() {
     let tenant = TenantId::new("e2e-10").expect("test fixture");
     let mut l2 = L2Announcer::new(tenant.clone(), "node-a", 60);
     l2.upsert_policy(L2AnnouncementPolicy {
-        name: "lb".into(), tenant: tenant.clone(),
-        service_selector: ServiceSelector { match_labels: vec![("type".into(), "public".into())] },
-        interfaces: InterfaceMatcher { patterns: vec!["eth*".into()] },
-        load_balancer_ips: true, external_ips: false,
+        name: "lb".into(),
+        tenant: tenant.clone(),
+        service_selector: ServiceSelector {
+            match_labels: vec![("type".into(), "public".into())],
+        },
+        interfaces: InterfaceMatcher {
+            patterns: vec!["eth*".into()],
+        },
+        load_balancer_ips: true,
+        external_ips: false,
     });
     l2.upsert_service(ServiceFrontends {
         key: "ns/svc".into(),
@@ -330,7 +446,9 @@ fn e2e_l2_announcer_with_arp_burst() {
     let mut arp = ArpAnnouncer::new(tenant, [0x02, 0, 0, 0, 0, 0xAA], 1);
     arp.enable_interface("eth0");
     arp.register_vip(ip4(203, 0, 113, 5));
-    let n = arp.announce_burst(ip4(203, 0, 113, 5), "eth0", 5, 0).unwrap();
+    let n = arp
+        .announce_burst(ip4(203, 0, 113, 5), "eth0", 5, 0)
+        .unwrap();
     assert_eq!(n, 5);
     assert_eq!(arp.sent_count(), 5);
     let frame = &arp.drain_sent()[0];
@@ -342,15 +460,23 @@ fn e2e_l2_announcer_with_arp_burst() {
 #[test]
 fn e2e_tunnel_native_routing_overrides_endpoint() {
     let tenant = TenantId::new("e2e-11").expect("test fixture");
-    let mut m = TunnelManager::new(tenant, TunnelMode::Vxlan, Some("10.244.0.0/16".into())).unwrap();
+    let mut m =
+        TunnelManager::new(tenant, TunnelMode::Vxlan, Some("10.244.0.0/16".into())).unwrap();
     m.upsert_endpoint(TunnelEndpoint {
         node_name: "node-a".into(),
         node_ip: ip4(10, 0, 0, 2),
         pod_cidr: "10.244.1.0/24".into(),
         vni: 0,
-    }).unwrap();
-    assert_eq!(m.lookup_encap(ip4(10, 244, 1, 5)).unwrap(), EncapDecision::Native);
-    assert_eq!(m.lookup_encap(ip4(192, 168, 1, 1)).unwrap(), EncapDecision::Unknown);
+    })
+    .unwrap();
+    assert_eq!(
+        m.lookup_encap(ip4(10, 244, 1, 5)).unwrap(),
+        EncapDecision::Native
+    );
+    assert_eq!(
+        m.lookup_encap(ip4(192, 168, 1, 1)).unwrap(),
+        EncapDecision::Unknown
+    );
 }
 
 // ── E2E #12: SocketLB connect/recv reverse round-trip ──────────────────────
@@ -359,13 +485,27 @@ fn e2e_tunnel_native_routing_overrides_endpoint() {
 fn e2e_sock_lb_connect_recv_roundtrip() {
     let tenant = TenantId::new("e2e-12").expect("test fixture");
     let mut m = SockLbManager::new(tenant, SockLbConfig::default());
-    let id = m.register_service(
-        ServiceFrontend { cluster_ip: ip4(10, 96, 0, 1), port: 80, protocol: 6 },
-        vec![ServiceBackend { backend_id: 1, backend_ip: ip4(10, 0, 1, 1), backend_port: 8080 }],
-    ).unwrap();
+    let id = m
+        .register_service(
+            ServiceFrontend {
+                cluster_ip: ip4(10, 96, 0, 1),
+                port: 80,
+                protocol: 6,
+            },
+            vec![ServiceBackend {
+                backend_id: 1,
+                backend_ip: ip4(10, 0, 1, 1),
+                backend_port: 8080,
+            }],
+        )
+        .unwrap();
     let d = m.on_connect(ip4(10, 96, 0, 1), 80, 6, false, 0);
     match d {
-        SockLbDecision::Rewrite { revnat_id, backend_ip, .. } => {
+        SockLbDecision::Rewrite {
+            revnat_id,
+            backend_ip,
+            ..
+        } => {
             assert_eq!(revnat_id, id);
             assert_eq!(backend_ip, ip4(10, 0, 1, 1));
         }
@@ -395,7 +535,11 @@ fn e2e_clustermesh_kvstore_watch() {
 #[test]
 fn e2e_clustermesh_local_affinity_falls_through_to_remote() {
     let mut svc = GlobalService::new("api", "default", ServiceAffinity::Local);
-    svc.remote_endpoints.push(GlobalServiceEndpoint { cluster: "us-east".into(), address: "10.0.2.1".into(), port: 80 });
+    svc.remote_endpoints.push(GlobalServiceEndpoint {
+        cluster: "us-east".into(),
+        address: "10.0.2.1".into(),
+        port: 80,
+    });
     let r = svc.resolve();
     assert_eq!(r.len(), 1);
     assert_eq!(r[0].cluster, "us-east");
@@ -408,18 +552,26 @@ fn e2e_egress_gateway_ha_failover() {
     let tenant = TenantId::new("e2e-15").expect("test fixture");
     let mut mgr = EgressManager::new();
     let mut p = EgressGatewayPolicy::new(
-        "egw", tenant,
+        "egw",
+        tenant,
         endpoint_sel(&[("app", "billing")]),
         ip4(192, 0, 2, 100),
     );
     p.destination_cidrs = vec!["1.0.0.0/8".into()];
     p.gateway_nodes = vec![
-        GatewayNode { name: "gw1".into(), node_ip: ip4(10, 0, 0, 1), state: cave_net::cilium::egress::GatewayState::Unhealthy },
+        GatewayNode {
+            name: "gw1".into(),
+            node_ip: ip4(10, 0, 0, 1),
+            state: cave_net::cilium::egress::GatewayState::Unhealthy,
+        },
         GatewayNode::new("gw2", ip4(10, 0, 0, 2)),
     ];
     mgr.upsert(p).unwrap();
     for h in 0..10u64 {
-        let dec = mgr.evaluate(&ls(&[("app", "billing")]), &ls(&[]), ip4(1, 1, 1, 1), h).unwrap().unwrap();
+        let dec = mgr
+            .evaluate(&ls(&[("app", "billing")]), &ls(&[]), ip4(1, 1, 1, 1), h)
+            .unwrap()
+            .unwrap();
         assert_eq!(dec.gateway_node, "gw2");
     }
 }
@@ -438,7 +590,15 @@ fn e2e_lrp_node_local_dns_redirect() {
         pod_ip: ip4(169, 254, 20, 10),
         labels: vec![("k8s-app".into(), "node-local-dns".into())],
     });
-    let r = m.resolve("node-a", ip4(10, 96, 0, 10), 53, L4Proto::UDP, Some(("kube-system", "kube-dns"))).unwrap();
+    let r = m
+        .resolve(
+            "node-a",
+            ip4(10, 96, 0, 10),
+            53,
+            L4Proto::UDP,
+            Some(("kube-system", "kube-dns")),
+        )
+        .unwrap();
     assert_eq!(r.target_port, 53);
     assert_eq!(r.backend_ip, ip4(169, 254, 20, 10));
 }
@@ -449,15 +609,25 @@ fn e2e_lrp_node_local_dns_redirect() {
 fn e2e_dns_proxy_intercept_updates_resolved() {
     let tenant = TenantId::new("e2e-17").expect("test fixture");
     let mut p = DnsProxy::new(tenant.clone(), DnsMode::Intercept);
-    p.set_allow_list(1, AllowList { patterns: vec!["*.example.com".into()] });
-    let q = DnsQuestion { qname: "api.example.com".into(), qtype: QType::A };
+    p.set_allow_list(
+        1,
+        AllowList {
+            patterns: vec!["*.example.com".into()],
+        },
+    );
+    let q = DnsQuestion {
+        qname: "api.example.com".into(),
+        qtype: QType::A,
+    };
     let v = p.on_query(1, &q, 100).unwrap();
     assert_eq!(v, DnsVerdict::Allow);
     let resp = DnsResponse {
         rcode: DnsRcode::NoError,
         answers: vec![DnsAnswer {
-            name: "api.example.com".into(), qtype: QType::A,
-            ttl_seconds: 60, data: AnswerData::A(Ipv4Addr::new(1, 2, 3, 4)),
+            name: "api.example.com".into(),
+            qtype: QType::A,
+            ttl_seconds: 60,
+            data: AnswerData::A(Ipv4Addr::new(1, 2, 3, 4)),
         }],
     };
     p.on_response(&q, &resp, 200);
@@ -465,7 +635,9 @@ fn e2e_dns_proxy_intercept_updates_resolved() {
     assert_eq!(resolved, vec![ip4(1, 2, 3, 4)]);
 
     let mut fc = FqdnCache::new(tenant);
-    let id = fc.resolve("*.example.com", "api.example.com", ip4(1, 2, 3, 4), 60, 200).unwrap();
+    let id = fc
+        .resolve("*.example.com", "api.example.com", ip4(1, 2, 3, 4), 60, 200)
+        .unwrap();
     assert!(id >= 16_777_216);
 }
 
@@ -539,7 +711,9 @@ fn e2e_srv6_locator_longest_prefix() {
         prefix_len: 32,
         behavior: Srv6Behavior::EndDt4 { vrf_id: 7 },
     });
-    let l = m.lookup_locator(Sid("fd00:db8::1234".parse().unwrap())).unwrap();
+    let l = m
+        .lookup_locator(Sid("fd00:db8::1234".parse().unwrap()))
+        .unwrap();
     assert!(matches!(l.behavior, Srv6Behavior::EndDt4 { vrf_id: 7 }));
 }
 
@@ -547,13 +721,24 @@ fn e2e_srv6_locator_longest_prefix() {
 
 #[test]
 fn e2e_bgp_no_export_filter() {
-    use cave_net::cilium::bgp::{Advertisement, AdvertisementKind, PathAttributes, PathOrigin, COMMUNITY_NO_EXPORT};
+    use cave_net::cilium::bgp::{
+        Advertisement, AdvertisementKind, PathAttributes, PathOrigin, COMMUNITY_NO_EXPORT,
+    };
     let tenant = TenantId::new("e2e-22").expect("test fixture");
     let mut bgp = BgpInstance::new(tenant, 65000, ip4(10, 0, 0, 1));
-    bgp.upsert_peer(BgpPeerConfig::defaults("ext", ip4(10, 0, 0, 2), 65001, 65000));
+    bgp.upsert_peer(BgpPeerConfig::defaults(
+        "ext",
+        ip4(10, 0, 0, 2),
+        65001,
+        65000,
+    ));
     let attrs = PathAttributes {
-        origin: PathOrigin::Igp, as_path: vec![65000], next_hop: ip4(10, 0, 0, 1),
-        local_pref: 100, med: 0, communities: vec![COMMUNITY_NO_EXPORT],
+        origin: PathOrigin::Igp,
+        as_path: vec![65000],
+        next_hop: ip4(10, 0, 0, 1),
+        local_pref: 100,
+        med: 0,
+        communities: vec![COMMUNITY_NO_EXPORT],
     };
     bgp.advertise(Advertisement {
         name: "internal".into(),
@@ -563,7 +748,12 @@ fn e2e_bgp_no_export_filter() {
     });
     let r = bgp.effective_advertisements_for("ext").unwrap();
     assert!(r.is_empty(), "NO_EXPORT must filter cross-AS advertisement");
-    bgp.upsert_peer(BgpPeerConfig::defaults("intra", ip4(10, 0, 0, 3), 65000, 65000));
+    bgp.upsert_peer(BgpPeerConfig::defaults(
+        "intra",
+        ip4(10, 0, 0, 3),
+        65000,
+        65000,
+    ));
     let r2 = bgp.effective_advertisements_for("intra").unwrap();
     assert_eq!(r2.len(), 1);
 }
@@ -577,15 +767,20 @@ fn e2e_hubble_metrics_drop_aggregation() {
     let make_flow = |verdict: HubbleVerdict, reason: DropReason| FlowLog {
         tenant: tenant.clone(),
         time: chrono::Utc::now(),
-        source_identity: 256, destination_identity: 257,
-        source_pod: "ns/a".into(), destination_pod: "ns/b".into(),
-        verdict, drop_reason: reason, bytes: 100,
+        source_identity: 256,
+        destination_identity: 257,
+        source_pod: "ns/a".into(),
+        destination_pod: "ns/b".into(),
+        verdict,
+        drop_reason: reason,
+        bytes: 100,
     };
     r.process_flow(&make_flow(HubbleVerdict::Forwarded, DropReason::None));
     r.process_flow(&make_flow(HubbleVerdict::Dropped, DropReason::PolicyDeny));
     r.process_flow(&make_flow(HubbleVerdict::Dropped, DropReason::PolicyDeny));
     let samples = r.samples();
-    let drop_count: u64 = samples.iter()
+    let drop_count: u64 = samples
+        .iter()
         .filter(|s| s.name == "hubble_drop_total")
         .map(|s| s.value as u64)
         .sum();
@@ -614,8 +809,10 @@ fn e2e_operator_ces_batching() {
     let mut m = CesManager::new(tenant, 3);
     for i in 0..7u32 {
         m.upsert(CiliumEndpoint {
-            name: format!("p-{i}"), namespace: "default".into(),
-            identity: 256 + i, pod_name: format!("p-{i}"),
+            name: format!("p-{i}"),
+            namespace: "default".into(),
+            identity: 256 + i,
+            pod_name: format!("p-{i}"),
         });
     }
     assert_eq!(m.endpoint_count(), 7);
@@ -668,7 +865,10 @@ fn e2e_reserved_identity_table() {
     let table = full_table();
     assert_eq!(table.get(&1).copied(), Some(ReservedIdentity::Host));
     assert_eq!(table.get(&2).copied(), Some(ReservedIdentity::World));
-    assert_eq!(table.get(&7).copied(), Some(ReservedIdentity::KubeApiServer));
+    assert_eq!(
+        table.get(&7).copied(),
+        Some(ReservedIdentity::KubeApiServer)
+    );
     assert_eq!(table.get(&8).copied(), Some(ReservedIdentity::Ingress));
     assert!(is_reserved_range(255));
     assert!(!is_reserved_range(256));
@@ -681,11 +881,18 @@ fn e2e_reserved_identity_table() {
 fn e2e_cluster_pool_refill_lifecycle() {
     let tenant = TenantId::new("e2e-29").expect("test fixture");
     let mut c = RefillController::new(tenant);
-    c.seed_pool(vec!["10.244.0.0/24".into(), "10.244.1.0/24".into(), "10.244.2.0/24".into()]);
+    c.seed_pool(vec![
+        "10.244.0.0/24".into(),
+        "10.244.1.0/24".into(),
+        "10.244.2.0/24".into(),
+    ]);
     c.upsert_node(NodeWatermarkSpec {
         node: "node-a".into(),
-        pre_allocate: 8, max_above_watermark: 16,
-        allocated: vec![], used_ips: 0, capacity_per_subnet: 256,
+        pre_allocate: 8,
+        max_above_watermark: 16,
+        allocated: vec![],
+        used_ips: 0,
+        capacity_per_subnet: 256,
     });
     let actions = c.reconcile();
     assert_eq!(actions.len(), 1);
@@ -698,7 +905,10 @@ fn e2e_cluster_pool_refill_lifecycle() {
 #[test]
 fn e2e_bandwidth_edt_paces_packets() {
     assert_eq!(parse_bandwidth_annotation("10M").unwrap(), 10_000_000);
-    assert_eq!(parse_bandwidth_annotation("1Gi").unwrap(), 1024 * 1024 * 1024);
+    assert_eq!(
+        parse_bandwidth_annotation("1Gi").unwrap(),
+        1024 * 1024 * 1024
+    );
 
     let tenant = TenantId::new("e2e-30").expect("test fixture");
     let mut m = BandwidthManager::new(tenant, CongestionControl::Bbr);
@@ -719,18 +929,41 @@ fn e2e_bandwidth_edt_paces_packets() {
 fn e2e_policy_trace_explains_allow() {
     let tenant = TenantId::new("e2e-31").expect("test fixture");
     let mut repo = PolicyRepository::new();
-    let mut rule = Rule::new("allow-client", tenant.clone(), endpoint_sel(&[("app", "web")]));
+    let mut rule = Rule::new(
+        "allow-client",
+        tenant.clone(),
+        endpoint_sel(&[("app", "web")]),
+    );
     rule.ingress.push(IngressRule {
         from_endpoints: vec![endpoint_sel(&[("app", "client")])],
-        to_ports: vec![PortRule { ports: vec![PortProtocol::new(80, L4Protocol::TCP)], l7_redirect_port: None }],
+        to_ports: vec![PortRule {
+            ports: vec![PortProtocol::new(80, L4Protocol::TCP)],
+            l7_redirect_port: None,
+        }],
         ..Default::default()
     });
     repo.add(rule);
     let mut resolver = InMemoryIdentityResolver::new();
     resolver.insert(MIN_LOCAL_IDENTITY, ls(&[("app", "client")]));
-    let map = distill(&repo, &tenant, &ls(&[("app", "web")]),
-        PolicyEnforcementMode::Default, &resolver).unwrap();
-    let t = trace(&tenant, &repo, &map, MIN_LOCAL_IDENTITY, 999, 80, L4Protocol::TCP, Direction::Ingress).unwrap();
+    let map = distill(
+        &repo,
+        &tenant,
+        &ls(&[("app", "web")]),
+        PolicyEnforcementMode::Default,
+        &resolver,
+    )
+    .unwrap();
+    let t = trace(
+        &tenant,
+        &repo,
+        &map,
+        MIN_LOCAL_IDENTITY,
+        999,
+        80,
+        L4Protocol::TCP,
+        Direction::Ingress,
+    )
+    .unwrap();
     assert_eq!(t.final_verdict, PolicyVerdict::Allow);
     assert!(t.enforcement);
     assert_eq!(t.steps.len(), 1);
@@ -765,15 +998,22 @@ fn e2e_config_watcher_restart_required_signal() {
 fn e2e_k8s_endpoint_slice_ready_backends() {
     let mut h = EndpointSliceHandler::new();
     let mut slice = EndpointSlice {
-        name: "api-abc".into(), namespace: "default".into(),
-        service_name: "api".into(), address_type: "IPv4".into(),
+        name: "api-abc".into(),
+        namespace: "default".into(),
+        service_name: "api".into(),
+        address_type: "IPv4".into(),
         endpoints: vec![SliceEndpoint {
             addresses: vec![ip4(10, 0, 1, 1), ip4(10, 0, 1, 2)],
             condition: EndpointCondition::Ready,
             node_name: Some("node-a".into()),
-            target_ref: Some("default/p1".into()), zone: None,
+            target_ref: Some("default/p1".into()),
+            zone: None,
         }],
-        ports: vec![SlicePort { name: "http".into(), port: 80, protocol: "TCP".into() }],
+        ports: vec![SlicePort {
+            name: "http".into(),
+            port: 80,
+            protocol: "TCP".into(),
+        }],
     };
     h.upsert(slice.clone());
     let ready = h.ready_backends("default", "api");
@@ -786,7 +1026,11 @@ fn e2e_k8s_endpoint_slice_ready_backends() {
     assert!(ready_after.is_empty());
 
     let mut sc = ServiceCidrRegistry::new();
-    sc.upsert(ServiceCidrSpec { name: "default".into(), cidrs: vec!["10.96.0.0/12".into()] }).unwrap();
+    sc.upsert(ServiceCidrSpec {
+        name: "default".into(),
+        cidrs: vec!["10.96.0.0/12".into()],
+    })
+    .unwrap();
     assert!(sc.contains(ip4(10, 96, 0, 1)).unwrap());
 }
 
@@ -797,10 +1041,22 @@ fn e2e_bpf_map_registry_dump_lifecycle() {
     let tenant = TenantId::new("e2e-34").expect("test fixture");
     let mut r = BpfMapRegistry::new(tenant);
     r.register("cilium_ipcache", BpfMapKind::Ipcache, 65536);
-    r.upsert_entry("cilium_ipcache",
-        BpfDumpEntry { key_pretty: "10.0.1.5".into(), value_pretty: "id=256 key=0".into() }).unwrap();
-    r.upsert_entry("cilium_ipcache",
-        BpfDumpEntry { key_pretty: "10.0.1.5".into(), value_pretty: "id=999 key=0".into() }).unwrap();
+    r.upsert_entry(
+        "cilium_ipcache",
+        BpfDumpEntry {
+            key_pretty: "10.0.1.5".into(),
+            value_pretty: "id=256 key=0".into(),
+        },
+    )
+    .unwrap();
+    r.upsert_entry(
+        "cilium_ipcache",
+        BpfDumpEntry {
+            key_pretty: "10.0.1.5".into(),
+            value_pretty: "id=999 key=0".into(),
+        },
+    )
+    .unwrap();
     let dump = r.dump("cilium_ipcache").unwrap();
     assert_eq!(dump.entries.len(), 1);
     assert_eq!(dump.entries[0].value_pretty, "id=999 key=0");
@@ -840,10 +1096,14 @@ fn e2e_external_workload_lifecycle() {
     let tenant = TenantId::new("e2e-36").expect("test fixture");
     let mut m = ExternalWorkloadManager::new(tenant.clone(), 30);
     m.register(ExternalWorkloadSpec {
-        name: "vm-1".into(), tenant,
-        ipv4: Some(ip4(192, 168, 1, 10)), ipv6: None,
-        labels: BTreeMap::new(), trust_domain: "cluster.local".into(),
-    }).unwrap();
+        name: "vm-1".into(),
+        tenant,
+        ipv4: Some(ip4(192, 168, 1, 10)),
+        ipv6: None,
+        labels: BTreeMap::new(),
+        trust_domain: "cluster.local".into(),
+    })
+    .unwrap();
     m.transition("vm-1", WorkloadState::Connected).unwrap();
     m.transition("vm-1", WorkloadState::Ready).unwrap();
     m.heartbeat("vm-1", 0).unwrap();
@@ -860,15 +1120,25 @@ fn e2e_cilium_node_crd_and_cidr_alloc() {
     let tenant = TenantId::new("e2e-37").expect("test fixture");
     let mut store = CiliumNodeStore::new(tenant.clone());
     store.configure_cluster_pool("10.244.0.0/16", 24).unwrap();
-    store.register(CiliumNodeSpec {
-        name: "node-a".into(), tenant,
-        addresses: vec![NodeAddress { ip: ip4(10, 0, 0, 1), kind: AddressKind::InternalIP }],
-        ipam: NodeIpamSpec {
-            pod_cidrs: vec![], used_ipv4: 0, used_ipv6: 0,
-            pre_allocate: 8, max_above_watermark: 16,
-        },
-        encryption_key: 0, cluster_id: 1,
-    }).unwrap();
+    store
+        .register(CiliumNodeSpec {
+            name: "node-a".into(),
+            tenant,
+            addresses: vec![NodeAddress {
+                ip: ip4(10, 0, 0, 1),
+                kind: AddressKind::InternalIP,
+            }],
+            ipam: NodeIpamSpec {
+                pod_cidrs: vec![],
+                used_ipv4: 0,
+                used_ipv6: 0,
+                pre_allocate: 8,
+                max_above_watermark: 16,
+            },
+            encryption_key: 0,
+            cluster_id: 1,
+        })
+        .unwrap();
     let subnet = store.allocate_pod_cidr("node-a").unwrap();
     assert_eq!(subnet, "10.244.0.0/24");
     let (sp, _st) = store.lookup("node-a").unwrap();
@@ -881,8 +1151,16 @@ fn e2e_cilium_node_crd_and_cidr_alloc() {
 fn e2e_status_board_worst_state_wins() {
     let tenant = TenantId::new("e2e-38").expect("test fixture");
     let mut b = StatusBoard::new(tenant, 30);
-    b.report(ComponentName::Kvstore, ComponentStatus::ok("connected"), 100);
-    b.report(ComponentName::IPAM, ComponentStatus::degraded("low pool"), 100);
+    b.report(
+        ComponentName::Kvstore,
+        ComponentStatus::ok("connected"),
+        100,
+    );
+    b.report(
+        ComponentName::IPAM,
+        ComponentStatus::degraded("low pool"),
+        100,
+    );
     b.report(ComponentName::Encryption, ComponentStatus::disabled(), 100);
     let agg = b.aggregate(100);
     assert_eq!(agg.overall, DaemonState::Degraded);
@@ -896,8 +1174,18 @@ fn e2e_status_board_worst_state_wins() {
 fn e2e_endpoint_regen_coalesce_and_pipeline() {
     let tenant = TenantId::new("e2e-39").expect("test fixture");
     let mut c = RegenController::new(tenant);
-    c.enqueue(RegenRequest { endpoint_id: 1, level: RegenLevel::Maps, reason: "ip change".into(), enqueued_ns: 0 });
-    let merged = c.enqueue(RegenRequest { endpoint_id: 1, level: RegenLevel::PolicyRecompute, reason: "policy".into(), enqueued_ns: 100 });
+    c.enqueue(RegenRequest {
+        endpoint_id: 1,
+        level: RegenLevel::Maps,
+        reason: "ip change".into(),
+        enqueued_ns: 0,
+    });
+    let merged = c.enqueue(RegenRequest {
+        endpoint_id: 1,
+        level: RegenLevel::PolicyRecompute,
+        reason: "policy".into(),
+        enqueued_ns: 100,
+    });
     assert_eq!(merged.level, RegenLevel::PolicyRecompute);
     let popped = c.pop_for_processing(200).unwrap();
     assert_eq!(popped.endpoint_id, 1);
@@ -912,14 +1200,28 @@ fn e2e_recorder_5tuple_capture() {
     let tenant = TenantId::new("e2e-40").expect("test fixture");
     let mut r = Recorder::new(tenant, 100);
     r.upsert_policy(RecorderPolicy {
-        id: 1, priority: 100,
+        id: 1,
+        priority: 100,
         tuple: RecorderTuple {
-            src_ip: None, dst_ip: Some(ip4(10, 96, 0, 1)),
-            src_port: 0, dst_port: 80, protocol: RecorderProto::Tcp,
+            src_ip: None,
+            dst_ip: Some(ip4(10, 96, 0, 1)),
+            src_port: 0,
+            dst_port: 80,
+            protocol: RecorderProto::Tcp,
         },
-        capture_length: 64, sample_one_in_n: 1,
-    }).unwrap();
-    let captured = r.capture(ip4(10, 0, 0, 1), ip4(10, 96, 0, 1), 1234, 80, 6, 100, &[0xAB; 1500]);
+        capture_length: 64,
+        sample_one_in_n: 1,
+    })
+    .unwrap();
+    let captured = r.capture(
+        ip4(10, 0, 0, 1),
+        ip4(10, 96, 0, 1),
+        1234,
+        80,
+        6,
+        100,
+        &[0xAB; 1500],
+    );
     assert_eq!(captured, Some(1));
     let pkts = r.drain(1).unwrap();
     assert_eq!(pkts.len(), 1);
@@ -936,7 +1238,13 @@ fn e2e_maps_gc_dispatch() {
     c.schedule(GcTarget::Nat, 30).unwrap();
     let due = c.due(0);
     assert_eq!(due.len(), 2);
-    c.record(GcSweepReport { target: GcTarget::Conntrack, scanned: 100, deleted: 5, duration_us: 50, timestamp_ns: 0 });
+    c.record(GcSweepReport {
+        target: GcTarget::Conntrack,
+        scanned: 100,
+        deleted: 5,
+        duration_us: 50,
+        timestamp_ns: 0,
+    });
     let due_after = c.due(31_000_000_000);
     assert_eq!(due_after, vec![GcTarget::Nat]);
 }
@@ -949,12 +1257,39 @@ fn e2e_proxy_health_failure_threshold() {
     let mut c = ProxyHealthChecker::new(tenant, 3);
     c.register("envoy");
     for ts in 0..2u64 {
-        c.record("envoy", ProxyProbe { timestamp_ns: ts, success: false, status_code: 500, latency_us: 50 }).unwrap();
+        c.record(
+            "envoy",
+            ProxyProbe {
+                timestamp_ns: ts,
+                success: false,
+                status_code: 500,
+                latency_us: 50,
+            },
+        )
+        .unwrap();
     }
     assert_eq!(c.status("envoy").unwrap().state, ProxyState::Degraded);
-    c.record("envoy", ProxyProbe { timestamp_ns: 3, success: false, status_code: 500, latency_us: 50 }).unwrap();
+    c.record(
+        "envoy",
+        ProxyProbe {
+            timestamp_ns: 3,
+            success: false,
+            status_code: 500,
+            latency_us: 50,
+        },
+    )
+    .unwrap();
     assert_eq!(c.status("envoy").unwrap().state, ProxyState::Down);
-    c.record("envoy", ProxyProbe { timestamp_ns: 4, success: true, status_code: 200, latency_us: 10 }).unwrap();
+    c.record(
+        "envoy",
+        ProxyProbe {
+            timestamp_ns: 4,
+            success: true,
+            status_code: 200,
+            latency_us: 10,
+        },
+    )
+    .unwrap();
     assert_eq!(c.status("envoy").unwrap().state, ProxyState::Live);
 }
 
@@ -965,7 +1300,10 @@ fn e2e_readiness_gate_flip_to_ready() {
     let tenant = TenantId::new("e2e-43").expect("test fixture");
     let mut g = ReadinessGateController::new(tenant);
     g.register("default", "p1", 100);
-    assert_eq!(g.status("default", "p1").unwrap().status, GateStatus::Pending);
+    assert_eq!(
+        g.status("default", "p1").unwrap().status,
+        GateStatus::Pending
+    );
     g.set_ready("default", "p1", 200).unwrap();
     assert_eq!(g.status("default", "p1").unwrap().status, GateStatus::Ready);
 }
@@ -988,17 +1326,30 @@ fn e2e_connectivity_test_suite_report() {
     let tenant = TenantId::new("e2e-45").expect("test fixture");
     let mut s = ConnectivitySuite::new(tenant, "default-suite");
     s.add(CtTest {
-        name: "client→api allowed".into(), kind: TestKind::PodToPod,
-        source: "client".into(), destination: "api".into(),
-        expected: ExpectedVerdict::Allow, actual: None,
-    }).unwrap();
+        name: "client→api allowed".into(),
+        kind: TestKind::PodToPod,
+        source: "client".into(),
+        destination: "api".into(),
+        expected: ExpectedVerdict::Allow,
+        actual: None,
+    })
+    .unwrap();
     s.add(CtTest {
-        name: "client→world denied".into(), kind: TestKind::PodToWorld,
-        source: "client".into(), destination: "8.8.8.8".into(),
-        expected: ExpectedVerdict::Deny, actual: None,
-    }).unwrap();
-    s.record("client→api allowed", ActualOutcome::Allowed { duration_ms: 5 }).unwrap();
-    s.record("client→world denied", ActualOutcome::Denied).unwrap();
+        name: "client→world denied".into(),
+        kind: TestKind::PodToWorld,
+        source: "client".into(),
+        destination: "8.8.8.8".into(),
+        expected: ExpectedVerdict::Deny,
+        actual: None,
+    })
+    .unwrap();
+    s.record(
+        "client→api allowed",
+        ActualOutcome::Allowed { duration_ms: 5 },
+    )
+    .unwrap();
+    s.record("client→world denied", ActualOutcome::Denied)
+        .unwrap();
     let r = s.report();
     assert_eq!(r.total, 2);
     assert_eq!(r.passed, 2);
@@ -1012,7 +1363,8 @@ fn e2e_endpoint_lifecycle_with_canonical_program_chain() {
     let tenant = TenantId::new("e2e-46").expect("test fixture");
     let mut mgr = EndpointManager::new();
     let id = mgr.create(tenant, "client", "default", ip4(10, 0, 1, 5));
-    mgr.transition(id, EndpointState::WaitingForIdentity).unwrap();
+    mgr.transition(id, EndpointState::WaitingForIdentity)
+        .unwrap();
     mgr.transition(id, EndpointState::Ready).unwrap();
     mgr.set_program_chain(id, canonical_egress_chain()).unwrap();
     let ep = mgr.lookup(id).unwrap();
@@ -1027,15 +1379,19 @@ fn e2e_endpoint_lifecycle_with_canonical_program_chain() {
 #[test]
 fn e2e_hubble_topology_graph() {
     let tenant = TenantId::new("e2e-47").expect("test fixture");
-    let flows: Vec<FlowLog> = (0..5).map(|_| FlowLog {
-        tenant: tenant.clone(),
-        time: chrono::Utc::now(),
-        source_identity: 256, destination_identity: 257,
-        source_pod: "ns/client".into(), destination_pod: "ns/api".into(),
-        verdict: HubbleVerdict::Forwarded,
-        drop_reason: DropReason::None,
-        bytes: 100,
-    }).collect();
+    let flows: Vec<FlowLog> = (0..5)
+        .map(|_| FlowLog {
+            tenant: tenant.clone(),
+            time: chrono::Utc::now(),
+            source_identity: 256,
+            destination_identity: 257,
+            source_pod: "ns/client".into(),
+            destination_pod: "ns/api".into(),
+            verdict: HubbleVerdict::Forwarded,
+            drop_reason: DropReason::None,
+            bytes: 100,
+        })
+        .collect();
     let g = TopologyGraph::build(&tenant, &flows);
     let edge = g.edge(256, 257).unwrap();
     assert_eq!(edge.forwarded, 5);
@@ -1049,20 +1405,34 @@ fn e2e_hubble_topology_graph() {
 fn e2e_hubble_node_aggregator_filters_cross_tenant() {
     let tenant = TenantId::new("e2e-48").expect("test fixture");
     let mut agg = NodeAggregator::new(tenant.clone());
-    agg.ingest("node-a", &FlowLog {
-        tenant: tenant.clone(), time: chrono::Utc::now(),
-        source_identity: 1, destination_identity: 2,
-        source_pod: "ns/a".into(), destination_pod: "ns/b".into(),
-        verdict: HubbleVerdict::Forwarded,
-        drop_reason: DropReason::None, bytes: 100,
-    });
-    agg.ingest("node-a", &FlowLog {
-        tenant: TenantId::new("other").expect("test fixture"), time: chrono::Utc::now(),
-        source_identity: 1, destination_identity: 2,
-        source_pod: "ns/a".into(), destination_pod: "ns/b".into(),
-        verdict: HubbleVerdict::Forwarded,
-        drop_reason: DropReason::None, bytes: 100,
-    });
+    agg.ingest(
+        "node-a",
+        &FlowLog {
+            tenant: tenant.clone(),
+            time: chrono::Utc::now(),
+            source_identity: 1,
+            destination_identity: 2,
+            source_pod: "ns/a".into(),
+            destination_pod: "ns/b".into(),
+            verdict: HubbleVerdict::Forwarded,
+            drop_reason: DropReason::None,
+            bytes: 100,
+        },
+    );
+    agg.ingest(
+        "node-a",
+        &FlowLog {
+            tenant: TenantId::new("other").expect("test fixture"),
+            time: chrono::Utc::now(),
+            source_identity: 1,
+            destination_identity: 2,
+            source_pod: "ns/a".into(),
+            destination_pod: "ns/b".into(),
+            verdict: HubbleVerdict::Forwarded,
+            drop_reason: DropReason::None,
+            bytes: 100,
+        },
+    );
     let s = agg.summary("node-a").unwrap();
     assert_eq!(s.flows_total, 1);
 }
@@ -1095,7 +1465,10 @@ fn e2e_bpfmaps_mapid_taxonomy() {
 fn e2e_sock_lb_cgroup_hook_names() {
     assert_eq!(CgroupHook::InetConnect4.name(), "BPF_CGROUP_INET4_CONNECT");
     assert_eq!(CgroupHook::UdpRecvmsg4.name(), "BPF_CGROUP_UDP4_RECVMSG");
-    assert_eq!(CgroupHook::InetGetpeername4.name(), "BPF_CGROUP_INET4_GETPEERNAME");
+    assert_eq!(
+        CgroupHook::InetGetpeername4.name(),
+        "BPF_CGROUP_INET4_GETPEERNAME"
+    );
 }
 
 // ── E2E #52: ServiceRegistry NodePort range guard ────────────────────────
@@ -1118,11 +1491,19 @@ fn e2e_service_nodeport_out_of_range_rejected() {
 fn e2e_egress_decision_has_distinct_egress_ip() {
     let tenant = TenantId::new("e2e-53").expect("test fixture");
     let mut mgr = EgressManager::new();
-    let mut p = EgressGatewayPolicy::new("p", tenant, endpoint_sel(&[("app", "web")]), ip4(192, 0, 2, 1));
+    let mut p = EgressGatewayPolicy::new(
+        "p",
+        tenant,
+        endpoint_sel(&[("app", "web")]),
+        ip4(192, 0, 2, 1),
+    );
     p.destination_cidrs = vec!["1.0.0.0/8".into()];
     p.gateway_nodes = vec![GatewayNode::new("gw", ip4(10, 0, 0, 5))];
     mgr.upsert(p).unwrap();
-    let dec = mgr.evaluate(&ls(&[("app", "web")]), &ls(&[]), ip4(1, 1, 1, 1), 0).unwrap().unwrap();
+    let dec = mgr
+        .evaluate(&ls(&[("app", "web")]), &ls(&[]), ip4(1, 1, 1, 1), 0)
+        .unwrap()
+        .unwrap();
     assert_eq!(dec.egress_ip, ip4(192, 0, 2, 1));
     assert_eq!(dec.gateway_node_ip, ip4(10, 0, 0, 5));
 }
@@ -1133,7 +1514,12 @@ fn e2e_egress_decision_has_distinct_egress_ip() {
 fn e2e_snat_idempotent_for_same_5tuple() {
     let tenant = TenantId::new("e2e-54").expect("test fixture");
     let mut t = SnatTable::new(tenant, ip4(192, 168, 1, 1));
-    let key = SnatKey { src_ip: ip4(10, 0, 0, 1), src_port: 12345, dst_ip: ip4(8, 8, 8, 8), dst_port: 53 };
+    let key = SnatKey {
+        src_ip: ip4(10, 0, 0, 1),
+        src_port: 12345,
+        dst_ip: ip4(8, 8, 8, 8),
+        dst_port: 53,
+    };
     let a = t.allocate(key, 100).unwrap();
     let b = t.allocate(key, 200).unwrap();
     assert_eq!(a.new_src_port, b.new_src_port);
@@ -1145,7 +1531,13 @@ fn e2e_snat_idempotent_for_same_5tuple() {
 fn e2e_conntrack_purge_idle_udp() {
     let tenant = TenantId::new("e2e-55").expect("test fixture");
     let mut ct = ConntrackTable::new(tenant, 1024);
-    let tup = Tuple::new(ip4(10, 0, 0, 1), 5353, ip4(10, 96, 0, 10), 53, L4Protocol::UDP);
+    let tup = Tuple::new(
+        ip4(10, 0, 0, 1),
+        5353,
+        ip4(10, 96, 0, 10),
+        53,
+        L4Protocol::UDP,
+    );
     ct.upsert(tup, CtDirection::Egress, 0, 64, None);
     assert_eq!(ct.len(), 1);
     let purged = ct.purge_idle(60 * 1_000_000_000);

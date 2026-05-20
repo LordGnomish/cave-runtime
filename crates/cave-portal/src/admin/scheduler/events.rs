@@ -53,10 +53,7 @@ pub fn warning_count(rows: &[EventRow]) -> usize {
     rows.iter().filter(|r| r.kind == "Warning").count()
 }
 
-pub fn render_section(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, SchedulerViewError> {
+pub fn render_section(state: &AdminState, ctx: &RequestCtx) -> Result<String, SchedulerViewError> {
     let events = list_events(state, ctx)?;
     let rows: Vec<Vec<String>> = events
         .iter()
@@ -77,10 +74,7 @@ pub fn render_section(
 </section>"#,
         n = events.len(),
         w = warning_count(&events),
-        tbl = table(
-            &["time", "pod", "type", "reason", "message"],
-            &rows
-        ),
+        tbl = table(&["time", "pod", "type", "reason", "message"], &rows),
     ))
 }
 

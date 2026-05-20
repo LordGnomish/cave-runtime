@@ -200,14 +200,22 @@ pub struct ManagedCluster {
 
 impl ManagedCluster {
     pub fn validate(&self) -> Result<(), CloudError> {
-        if !self.kubernetes_version.starts_with('v') && !self.kubernetes_version.starts_with(char::is_numeric)
+        if !self.kubernetes_version.starts_with('v')
+            && !self.kubernetes_version.starts_with(char::is_numeric)
         {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Azure,
-                reason: format!("kubernetes_version {:?} not in vX.Y.Z form", self.kubernetes_version),
+                reason: format!(
+                    "kubernetes_version {:?} not in vX.Y.Z form",
+                    self.kubernetes_version
+                ),
             });
         }
-        if !self.node_pools.iter().any(|p| p.mode == AgentPoolMode::System) {
+        if !self
+            .node_pools
+            .iter()
+            .any(|p| p.mode == AgentPoolMode::System)
+        {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Azure,
                 reason: format!("managed cluster {} has no System node pool", self.name),
@@ -327,8 +335,13 @@ pub struct StandardLoadBalancer {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ManagedIdentity {
-    SystemAssigned { principal_id: String },
-    UserAssigned { resource_id: String, client_id: String },
+    SystemAssigned {
+        principal_id: String,
+    },
+    UserAssigned {
+        resource_id: String,
+        client_id: String,
+    },
 }
 
 impl ManagedIdentity {
@@ -413,7 +426,11 @@ impl AzureInventory {
         }
         self.resource_groups.insert(
             name.to_string(),
-            ResourceGroup { name: name.into(), location: location.into(), tags },
+            ResourceGroup {
+                name: name.into(),
+                location: location.into(),
+                tags,
+            },
         );
         Ok(())
     }
@@ -425,8 +442,10 @@ impl AzureInventory {
     ) -> Result<(), CloudError> {
         self.check_tenant(caller, "ResourceGroup", name)?;
         self.public_ips.retain(|_, ip| ip.resource_group != name);
-        self.load_balancers.retain(|_, lb| lb.resource_group != name);
-        self.managed_clusters.retain(|_, c| c.resource_group != name);
+        self.load_balancers
+            .retain(|_, lb| lb.resource_group != name);
+        self.managed_clusters
+            .retain(|_, c| c.resource_group != name);
         self.resource_groups.remove(name);
         Ok(())
     }
@@ -478,11 +497,7 @@ impl AzureInventory {
 
     // NSG rules
 
-    pub fn add_nsg_rule(
-        &mut self,
-        caller: &TenantId,
-        rule: NsgRuleSpec,
-    ) -> Result<(), CloudError> {
+    pub fn add_nsg_rule(&mut self, caller: &TenantId, rule: NsgRuleSpec) -> Result<(), CloudError> {
         self.check_tenant(caller, "NsgRule", &rule.name)?;
         rule.validate()?;
         if self.nsg_rules.values().any(|r| r.priority == rule.priority) {
@@ -530,10 +545,13 @@ impl AzureInventory {
         node_count: u32,
     ) -> Result<(), CloudError> {
         self.check_tenant(caller, "AgentPool", pool)?;
-        let c = self.managed_clusters.get_mut(cluster).ok_or_else(|| CloudError::Upstream {
-            provider: ProviderName::Azure,
-            reason: format!("managed cluster {cluster} not found"),
-        })?;
+        let c = self
+            .managed_clusters
+            .get_mut(cluster)
+            .ok_or_else(|| CloudError::Upstream {
+                provider: ProviderName::Azure,
+                reason: format!("managed cluster {cluster} not found"),
+            })?;
         let p = c
             .node_pools
             .iter_mut()
@@ -646,7 +664,8 @@ mod tests {
     }
 
     fn rg_with(inv: &mut AzureInventory, tenant: &TenantId, name: &str) {
-        inv.create_resource_group(tenant, name, "westeurope", BTreeMap::new()).unwrap();
+        inv.create_resource_group(tenant, name, "westeurope", BTreeMap::new())
+            .unwrap();
     }
 
     // ─── VM SKU tests ────────────────────────────────────────────────────────
@@ -654,7 +673,11 @@ mod tests {
     #[test]
     fn d_series_is_general_purpose() {
         let _ = tenant_ctx("acme", "pkg/provider/azure_vmss.go", "VMSize");
-        for sku in [VmSku::StandardD2sV5, VmSku::StandardD4sV5, VmSku::StandardD8sV5] {
+        for sku in [
+            VmSku::StandardD2sV5,
+            VmSku::StandardD4sV5,
+            VmSku::StandardD8sV5,
+        ] {
             assert_eq!(sku.family(), SkuFamily::GeneralPurpose);
         }
     }
@@ -723,38 +746,79 @@ mod tests {
     #[test]
     fn agent_pool_node_count_must_lie_within_min_max() {
         let _ = tenant_ctx("acme", "pkg/provider/azure_managedclusters.go", "AgentPool");
-        let mut p = pool("system", AgentPoolMode::System, VmTier::Standard, VmSku::StandardD2sV5);
+        let mut p = pool(
+            "system",
+            AgentPoolMode::System,
+            VmTier::Standard,
+            VmSku::StandardD2sV5,
+        );
         p.node_count = 5;
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn agent_pool_min_must_be_lte_max() {
         let _ = tenant_ctx("acme", "pkg/provider/azure_managedclusters.go", "AgentPool");
-        let mut p = pool("system", AgentPoolMode::System, VmTier::Standard, VmSku::StandardD2sV5);
+        let mut p = pool(
+            "system",
+            AgentPoolMode::System,
+            VmTier::Standard,
+            VmSku::StandardD2sV5,
+        );
         p.min_count = 8;
         p.max_count = 4;
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn system_pool_cannot_use_spot_tier() {
-        let _ = tenant_ctx("acme", "pkg/provider/azure_managedclusters.go", "AgentPoolMode");
-        let p = pool("system", AgentPoolMode::System, VmTier::Spot, VmSku::StandardD2sV5);
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        let _ = tenant_ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "AgentPoolMode",
+        );
+        let p = pool(
+            "system",
+            AgentPoolMode::System,
+            VmTier::Spot,
+            VmSku::StandardD2sV5,
+        );
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn user_pool_with_burstable_sku_rejects_spot_tier() {
         let _ = tenant_ctx("acme", "pkg/provider/azure_managedclusters.go", "AgentPool");
-        let p = pool("workers", AgentPoolMode::User, VmTier::Spot, VmSku::StandardB2s);
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        let p = pool(
+            "workers",
+            AgentPoolMode::User,
+            VmTier::Spot,
+            VmSku::StandardB2s,
+        );
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn user_pool_with_d_series_accepts_spot_tier() {
         let _ = tenant_ctx("acme", "pkg/provider/azure_managedclusters.go", "AgentPool");
-        let p = pool("spot-workers", AgentPoolMode::User, VmTier::Spot, VmSku::StandardD4sV5);
+        let p = pool(
+            "spot-workers",
+            AgentPoolMode::User,
+            VmTier::Spot,
+            VmSku::StandardD4sV5,
+        );
         assert!(p.validate().is_ok());
     }
 
@@ -786,14 +850,25 @@ mod tests {
 
     #[test]
     fn managed_cluster_requires_system_pool() {
-        let _ = tenant_ctx("acme", "pkg/provider/azure_managedclusters.go", "ManagedCluster");
+        let _ = tenant_ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "ManagedCluster",
+        );
         let c = make_cluster("aks-acme", "rg-aks", false);
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn managed_cluster_with_system_pool_validates() {
-        let _ = tenant_ctx("acme", "pkg/provider/azure_managedclusters.go", "ManagedCluster");
+        let _ = tenant_ctx(
+            "acme",
+            "pkg/provider/azure_managedclusters.go",
+            "ManagedCluster",
+        );
         let c = make_cluster("aks-acme", "rg-aks", true);
         assert!(c.validate().is_ok());
     }
@@ -825,7 +900,10 @@ mod tests {
         let c = make_cluster("aks-acme", "rg-aks", true);
         inv.create_managed_cluster(&tenant, c).unwrap();
         assert_eq!(inv.managed_cluster_count(), 1);
-        assert_eq!(inv.managed_cluster("aks-acme").unwrap().location, "westeurope");
+        assert_eq!(
+            inv.managed_cluster("aks-acme").unwrap().location,
+            "westeurope"
+        );
     }
 
     #[test]
@@ -833,8 +911,10 @@ mod tests {
         let tenant = tenant_ctx("acme", "pkg/provider/azure_managedclusters.go", "Scale");
         let mut inv = AzureInventory::for_tenant(tenant.clone());
         rg_with(&mut inv, &tenant, "rg-aks");
-        inv.create_managed_cluster(&tenant, make_cluster("aks-acme", "rg-aks", true)).unwrap();
-        inv.scale_node_pool(&tenant, "aks-acme", "workers", 4).unwrap();
+        inv.create_managed_cluster(&tenant, make_cluster("aks-acme", "rg-aks", true))
+            .unwrap();
+        inv.scale_node_pool(&tenant, "aks-acme", "workers", 4)
+            .unwrap();
         let c = inv.managed_cluster("aks-acme").unwrap();
         let p = c.node_pools.iter().find(|p| p.name == "workers").unwrap();
         assert_eq!(p.node_count, 4);
@@ -845,8 +925,11 @@ mod tests {
         let tenant = tenant_ctx("acme", "pkg/provider/azure_managedclusters.go", "Scale");
         let mut inv = AzureInventory::for_tenant(tenant.clone());
         rg_with(&mut inv, &tenant, "rg-aks");
-        inv.create_managed_cluster(&tenant, make_cluster("aks-acme", "rg-aks", true)).unwrap();
-        let err = inv.scale_node_pool(&tenant, "aks-acme", "workers", 99).unwrap_err();
+        inv.create_managed_cluster(&tenant, make_cluster("aks-acme", "rg-aks", true))
+            .unwrap();
+        let err = inv
+            .scale_node_pool(&tenant, "aks-acme", "workers", 99)
+            .unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
     }
 
@@ -871,7 +954,10 @@ mod tests {
             "pkg/provider/azure_securitygroup_repo.go",
             "ReconcileSecurityGroup",
         );
-        assert!(matches!(nsg("low", 50).validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            nsg("low", 50).validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         assert!(matches!(
             nsg("high", 5000).validate().unwrap_err(),
             CloudError::InvalidConfig { .. }
@@ -888,10 +974,16 @@ mod tests {
         );
         let mut r = nsg("r", 200);
         r.source_prefix = String::new();
-        assert!(matches!(r.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            r.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         let mut r = nsg("r", 200);
         r.dest_port = String::new();
-        assert!(matches!(r.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            r.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -911,22 +1003,42 @@ mod tests {
 
     #[test]
     fn standard_sku_public_ip_requires_static_allocation() {
-        let tenant = tenant_ctx("acme", "pkg/provider/azure_publicipaddressclient.go", "Create");
+        let tenant = tenant_ctx(
+            "acme",
+            "pkg/provider/azure_publicipaddressclient.go",
+            "Create",
+        );
         let mut inv = AzureInventory::for_tenant(tenant.clone());
         rg_with(&mut inv, &tenant, "rg-net");
         let err = inv
-            .allocate_public_ip(&tenant, "ip-web", "rg-net", LbSku::Standard, AllocationMethod::Dynamic)
+            .allocate_public_ip(
+                &tenant,
+                "ip-web",
+                "rg-net",
+                LbSku::Standard,
+                AllocationMethod::Dynamic,
+            )
             .unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
     }
 
     #[test]
     fn standard_static_public_ip_returns_address() {
-        let tenant = tenant_ctx("acme", "pkg/provider/azure_publicipaddressclient.go", "Create");
+        let tenant = tenant_ctx(
+            "acme",
+            "pkg/provider/azure_publicipaddressclient.go",
+            "Create",
+        );
         let mut inv = AzureInventory::for_tenant(tenant.clone());
         rg_with(&mut inv, &tenant, "rg-net");
         let addr = inv
-            .allocate_public_ip(&tenant, "ip-web", "rg-net", LbSku::Standard, AllocationMethod::Static)
+            .allocate_public_ip(
+                &tenant,
+                "ip-web",
+                "rg-net",
+                LbSku::Standard,
+                AllocationMethod::Static,
+            )
             .unwrap();
         assert!(addr.starts_with("203.0.115."));
         assert_eq!(inv.public_ip("ip-web").unwrap().resource_group, "rg-net");
@@ -934,10 +1046,20 @@ mod tests {
 
     #[test]
     fn public_ip_creation_requires_existing_rg() {
-        let tenant = tenant_ctx("acme", "pkg/provider/azure_publicipaddressclient.go", "Create");
+        let tenant = tenant_ctx(
+            "acme",
+            "pkg/provider/azure_publicipaddressclient.go",
+            "Create",
+        );
         let mut inv = AzureInventory::for_tenant(tenant.clone());
         let err = inv
-            .allocate_public_ip(&tenant, "ip", "rg-missing", LbSku::Standard, AllocationMethod::Static)
+            .allocate_public_ip(
+                &tenant,
+                "ip",
+                "rg-missing",
+                LbSku::Standard,
+                AllocationMethod::Static,
+            )
             .unwrap_err();
         assert!(matches!(err, CloudError::Upstream { .. }));
     }
@@ -946,7 +1068,11 @@ mod tests {
 
     #[test]
     fn resource_group_cannot_be_created_twice() {
-        let tenant = tenant_ctx("acme", "pkg/provider/azure_resourcegroupclient.go", "CreateOrUpdate");
+        let tenant = tenant_ctx(
+            "acme",
+            "pkg/provider/azure_resourcegroupclient.go",
+            "CreateOrUpdate",
+        );
         let mut inv = AzureInventory::for_tenant(tenant.clone());
         rg_with(&mut inv, &tenant, "rg-aks");
         let err = inv
@@ -957,12 +1083,23 @@ mod tests {
 
     #[test]
     fn resource_group_delete_cascades_owned_resources() {
-        let tenant = tenant_ctx("acme", "pkg/provider/azure_resourcegroupclient.go", "Delete");
+        let tenant = tenant_ctx(
+            "acme",
+            "pkg/provider/azure_resourcegroupclient.go",
+            "Delete",
+        );
         let mut inv = AzureInventory::for_tenant(tenant.clone());
         rg_with(&mut inv, &tenant, "rg-aks");
-        inv.allocate_public_ip(&tenant, "ip", "rg-aks", LbSku::Standard, AllocationMethod::Static)
+        inv.allocate_public_ip(
+            &tenant,
+            "ip",
+            "rg-aks",
+            LbSku::Standard,
+            AllocationMethod::Static,
+        )
+        .unwrap();
+        inv.create_managed_cluster(&tenant, make_cluster("aks-acme", "rg-aks", true))
             .unwrap();
-        inv.create_managed_cluster(&tenant, make_cluster("aks-acme", "rg-aks", true)).unwrap();
         inv.delete_resource_group(&tenant, "rg-aks").unwrap();
         assert_eq!(inv.public_ip_count(), 0);
         assert_eq!(inv.managed_cluster_count(), 0);
@@ -971,7 +1108,11 @@ mod tests {
 
     #[test]
     fn resource_group_cross_tenant_create_is_refused() {
-        let tenant = tenant_ctx("acme", "pkg/provider/azure_resourcegroupclient.go", "CreateOrUpdate");
+        let tenant = tenant_ctx(
+            "acme",
+            "pkg/provider/azure_resourcegroupclient.go",
+            "CreateOrUpdate",
+        );
         let attacker = TenantId::new("attacker").expect("test fixture");
         let mut inv = AzureInventory::for_tenant(tenant);
         let err = inv
@@ -982,12 +1123,17 @@ mod tests {
 
     #[test]
     fn resource_group_tags_round_trip() {
-        let tenant = tenant_ctx("acme", "pkg/provider/azure_resourcegroupclient.go", "CreateOrUpdate");
+        let tenant = tenant_ctx(
+            "acme",
+            "pkg/provider/azure_resourcegroupclient.go",
+            "CreateOrUpdate",
+        );
         let mut inv = AzureInventory::for_tenant(tenant.clone());
         let mut tags = BTreeMap::new();
         tags.insert("env".into(), "prod".into());
         tags.insert("owner".into(), "platform".into());
-        inv.create_resource_group(&tenant, "rg-aks", "westeurope", tags).unwrap();
+        inv.create_resource_group(&tenant, "rg-aks", "westeurope", tags)
+            .unwrap();
         let rg = inv.resource_group("rg-aks").unwrap();
         assert_eq!(rg.tags.get("env").map(String::as_str), Some("prod"));
         assert_eq!(rg.tags.get("owner").map(String::as_str), Some("platform"));
@@ -997,7 +1143,11 @@ mod tests {
 
     #[test]
     fn user_assigned_identity_round_trips() {
-        let tenant = tenant_ctx("acme", "pkg/provider/azure_identity.go", "UserAssignedIdentity");
+        let tenant = tenant_ctx(
+            "acme",
+            "pkg/provider/azure_identity.go",
+            "UserAssignedIdentity",
+        );
         let mut inv = AzureInventory::for_tenant(tenant.clone());
         inv.create_user_identity(
             &tenant,
@@ -1018,14 +1168,24 @@ mod tests {
 
     #[test]
     fn system_assigned_identity_reports_kind() {
-        let _ = tenant_ctx("acme", "pkg/provider/azure_identity.go", "SystemAssignedIdentity");
-        let id = ManagedIdentity::SystemAssigned { principal_id: "pid".into() };
+        let _ = tenant_ctx(
+            "acme",
+            "pkg/provider/azure_identity.go",
+            "SystemAssignedIdentity",
+        );
+        let id = ManagedIdentity::SystemAssigned {
+            principal_id: "pid".into(),
+        };
         assert_eq!(id.kind(), "SystemAssigned");
     }
 
     #[test]
     fn managed_identity_cross_tenant_create_is_refused() {
-        let tenant = tenant_ctx("acme", "pkg/provider/azure_identity.go", "UserAssignedIdentity");
+        let tenant = tenant_ctx(
+            "acme",
+            "pkg/provider/azure_identity.go",
+            "UserAssignedIdentity",
+        );
         let attacker = TenantId::new("attacker").expect("test fixture");
         let mut inv = AzureInventory::for_tenant(tenant);
         let err = inv
@@ -1038,14 +1198,21 @@ mod tests {
 
     #[test]
     fn standard_lb_requires_existing_frontend_ip() {
-        let tenant = tenant_ctx("acme", "pkg/provider/azure_loadbalancer.go", "EnsureLoadBalancer");
+        let tenant = tenant_ctx(
+            "acme",
+            "pkg/provider/azure_loadbalancer.go",
+            "EnsureLoadBalancer",
+        );
         let mut inv = AzureInventory::for_tenant(tenant.clone());
         rg_with(&mut inv, &tenant, "rg-net");
         let lb = StandardLoadBalancer {
             name: "lb-web".into(),
             resource_group: "rg-net".into(),
             frontend_ip_id: "ip-missing".into(),
-            backend_pools: vec![LbBackendPool { name: "bp".into(), members: vec![] }],
+            backend_pools: vec![LbBackendPool {
+                name: "bp".into(),
+                members: vec![],
+            }],
             rules: vec![LbRule {
                 name: "r".into(),
                 frontend_port: 443,
@@ -1059,11 +1226,21 @@ mod tests {
 
     #[test]
     fn standard_lb_with_full_chain_succeeds() {
-        let tenant = tenant_ctx("acme", "pkg/provider/azure_loadbalancer.go", "EnsureLoadBalancer");
+        let tenant = tenant_ctx(
+            "acme",
+            "pkg/provider/azure_loadbalancer.go",
+            "EnsureLoadBalancer",
+        );
         let mut inv = AzureInventory::for_tenant(tenant.clone());
         rg_with(&mut inv, &tenant, "rg-net");
-        inv.allocate_public_ip(&tenant, "ip-web", "rg-net", LbSku::Standard, AllocationMethod::Static)
-            .unwrap();
+        inv.allocate_public_ip(
+            &tenant,
+            "ip-web",
+            "rg-net",
+            LbSku::Standard,
+            AllocationMethod::Static,
+        )
+        .unwrap();
         let lb = StandardLoadBalancer {
             name: "lb-web".into(),
             resource_group: "rg-net".into(),
@@ -1092,10 +1269,17 @@ mod tests {
         let tenant = tenant_ctx("acme", "pkg/provider/azure.go", "Cloud");
         let mut inv = AzureInventory::for_tenant(tenant.clone());
         rg_with(&mut inv, &tenant, "rg-net");
-        inv.allocate_public_ip(&tenant, "ip", "rg-net", LbSku::Standard, AllocationMethod::Static)
-            .unwrap();
+        inv.allocate_public_ip(
+            &tenant,
+            "ip",
+            "rg-net",
+            LbSku::Standard,
+            AllocationMethod::Static,
+        )
+        .unwrap();
         inv.add_nsg_rule(&tenant, nsg("r1", 200)).unwrap();
-        inv.create_user_identity(&tenant, "uami", "rid", "cid").unwrap();
+        inv.create_user_identity(&tenant, "uami", "rid", "cid")
+            .unwrap();
         assert_eq!(inv.resource_group_count(), 1);
         assert_eq!(inv.public_ip_count(), 1);
         assert_eq!(inv.nsg_rule_count(), 1);

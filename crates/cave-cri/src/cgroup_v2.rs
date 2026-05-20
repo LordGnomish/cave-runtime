@@ -66,10 +66,18 @@ pub struct IoMaxEntry {
 impl IoMaxEntry {
     pub fn render(&self) -> String {
         let mut parts = vec![format!("{}:{}", self.major, self.minor)];
-        if let Some(v) = self.rbps  { parts.push(format!("rbps={}", v)); }
-        if let Some(v) = self.wbps  { parts.push(format!("wbps={}", v)); }
-        if let Some(v) = self.riops { parts.push(format!("riops={}", v)); }
-        if let Some(v) = self.wiops { parts.push(format!("wiops={}", v)); }
+        if let Some(v) = self.rbps {
+            parts.push(format!("rbps={}", v));
+        }
+        if let Some(v) = self.wbps {
+            parts.push(format!("wbps={}", v));
+        }
+        if let Some(v) = self.riops {
+            parts.push(format!("riops={}", v));
+        }
+        if let Some(v) = self.wiops {
+            parts.push(format!("wiops={}", v));
+        }
         parts.join(" ")
     }
 }
@@ -89,9 +97,9 @@ pub enum DeviceType {
 impl DeviceType {
     pub fn as_char(self) -> char {
         match self {
-            DeviceType::All   => 'a',
+            DeviceType::All => 'a',
             DeviceType::Block => 'b',
-            DeviceType::Char  => 'c',
+            DeviceType::Char => 'c',
         }
     }
 }
@@ -130,23 +138,77 @@ impl DeviceRule {
     pub fn default_allowlist() -> Vec<DeviceRule> {
         vec![
             // /dev/null
-            DeviceRule { kind: DeviceType::Char, major: Some(1), minor: Some(3), access: "rwm".into(), allow: true },
+            DeviceRule {
+                kind: DeviceType::Char,
+                major: Some(1),
+                minor: Some(3),
+                access: "rwm".into(),
+                allow: true,
+            },
             // /dev/zero
-            DeviceRule { kind: DeviceType::Char, major: Some(1), minor: Some(5), access: "rwm".into(), allow: true },
+            DeviceRule {
+                kind: DeviceType::Char,
+                major: Some(1),
+                minor: Some(5),
+                access: "rwm".into(),
+                allow: true,
+            },
             // /dev/full
-            DeviceRule { kind: DeviceType::Char, major: Some(1), minor: Some(7), access: "rwm".into(), allow: true },
+            DeviceRule {
+                kind: DeviceType::Char,
+                major: Some(1),
+                minor: Some(7),
+                access: "rwm".into(),
+                allow: true,
+            },
             // /dev/random
-            DeviceRule { kind: DeviceType::Char, major: Some(1), minor: Some(8), access: "rwm".into(), allow: true },
+            DeviceRule {
+                kind: DeviceType::Char,
+                major: Some(1),
+                minor: Some(8),
+                access: "rwm".into(),
+                allow: true,
+            },
             // /dev/urandom
-            DeviceRule { kind: DeviceType::Char, major: Some(1), minor: Some(9), access: "rwm".into(), allow: true },
+            DeviceRule {
+                kind: DeviceType::Char,
+                major: Some(1),
+                minor: Some(9),
+                access: "rwm".into(),
+                allow: true,
+            },
             // /dev/tty
-            DeviceRule { kind: DeviceType::Char, major: Some(5), minor: Some(0), access: "rwm".into(), allow: true },
+            DeviceRule {
+                kind: DeviceType::Char,
+                major: Some(5),
+                minor: Some(0),
+                access: "rwm".into(),
+                allow: true,
+            },
             // /dev/console
-            DeviceRule { kind: DeviceType::Char, major: Some(5), minor: Some(1), access: "rwm".into(), allow: true },
+            DeviceRule {
+                kind: DeviceType::Char,
+                major: Some(5),
+                minor: Some(1),
+                access: "rwm".into(),
+                allow: true,
+            },
             // /dev/ptmx
-            DeviceRule { kind: DeviceType::Char, major: Some(5), minor: Some(2), access: "rwm".into(), allow: true },
+            DeviceRule {
+                kind: DeviceType::Char,
+                major: Some(5),
+                minor: Some(2),
+                access: "rwm".into(),
+                allow: true,
+            },
             // PTY slaves (major 136, any minor)
-            DeviceRule { kind: DeviceType::Char, major: Some(136), minor: None, access: "rwm".into(), allow: true },
+            DeviceRule {
+                kind: DeviceType::Char,
+                major: Some(136),
+                minor: None,
+                access: "rwm".into(),
+                allow: true,
+            },
         ]
     }
 }
@@ -191,7 +253,11 @@ pub fn assemble_device_program(rules: &[DeviceRule]) -> Vec<BpfInstruction> {
         comment: "load access mask into R5".into(),
     });
     for rule in rules {
-        let action = if rule.allow { "return 1 (allow)" } else { "return 0 (deny)" };
+        let action = if rule.allow {
+            "return 1 (allow)"
+        } else {
+            "return 0 (deny)"
+        };
         prog.push(BpfInstruction {
             op: format!(
                 "CMP type={}, major={:?}, minor={:?}, access={:?} JMP_TO {}",
@@ -205,8 +271,14 @@ pub fn assemble_device_program(rules: &[DeviceRule]) -> Vec<BpfInstruction> {
                 "{} {}{}{}",
                 if rule.allow { "allow" } else { "deny" },
                 rule.kind.as_char(),
-                match rule.major { Some(m) => format!(" {}", m), None => " *".into() },
-                match rule.minor { Some(m) => format!(":{}", m), None => ":*".into() },
+                match rule.major {
+                    Some(m) => format!(" {}", m),
+                    None => " *".into(),
+                },
+                match rule.minor {
+                    Some(m) => format!(":{}", m),
+                    None => ":*".into(),
+                },
             ),
         });
     }
@@ -236,19 +308,28 @@ pub fn apply_v2(cgroup_dir: &Path, limits: &CgroupV2Limits) -> CriResult<()> {
     }
     if let Some(weight) = limits.cpu_weight {
         if !(1..=10_000).contains(&weight) {
-            return Err(CriError::Cgroup(format!("cpu.weight {} out of range 1..=10000", weight)));
+            return Err(CriError::Cgroup(format!(
+                "cpu.weight {} out of range 1..=10000",
+                weight
+            )));
         }
         write_file(&cgroup_dir.join("cpu.weight"), &weight.to_string())?;
     }
     if let Some(nice) = limits.cpu_weight_nice {
         if !(-20..=19).contains(&nice) {
-            return Err(CriError::Cgroup(format!("cpu.weight.nice {} out of range -20..=19", nice)));
+            return Err(CriError::Cgroup(format!(
+                "cpu.weight.nice {} out of range -20..=19",
+                nice
+            )));
         }
         write_file(&cgroup_dir.join("cpu.weight.nice"), &nice.to_string())?;
     }
     if let Some(weight) = limits.io_weight {
         if !(1..=10_000).contains(&weight) {
-            return Err(CriError::Cgroup(format!("io.weight {} out of range 1..=10000", weight)));
+            return Err(CriError::Cgroup(format!(
+                "io.weight {} out of range 1..=10000",
+                weight
+            )));
         }
         write_file(&cgroup_dir.join("io.weight"), &weight.to_string())?;
     }
@@ -278,10 +359,7 @@ pub fn check_unified_hierarchy(root: &Path) -> CriResult<Vec<String>> {
         )));
     }
     let content = std::fs::read_to_string(&controllers_path).map_err(CriError::Io)?;
-    Ok(content
-        .split_whitespace()
-        .map(|s| s.to_string())
-        .collect())
+    Ok(content.split_whitespace().map(|s| s.to_string()).collect())
 }
 
 /// Enable a controller in `cgroup.subtree_control` (e.g. "+cpu", "+memory").
@@ -291,9 +369,8 @@ pub fn enable_controller(cgroup_dir: &Path, controller: &str) -> CriResult<()> {
 }
 
 fn write_file(path: &Path, content: &str) -> CriResult<()> {
-    std::fs::write(path, content).map_err(|e| {
-        CriError::Cgroup(format!("write {} failed: {}", path.display(), e))
-    })
+    std::fs::write(path, content)
+        .map_err(|e| CriError::Cgroup(format!("write {} failed: {}", path.display(), e)))
 }
 
 #[cfg(test)]
@@ -305,7 +382,14 @@ mod tests {
 
     #[test]
     fn io_max_renders_with_present_caps_only() {
-        let e = IoMaxEntry { major: 8, minor: 0, rbps: Some(1_000_000), wbps: None, riops: None, wiops: Some(500) };
+        let e = IoMaxEntry {
+            major: 8,
+            minor: 0,
+            rbps: Some(1_000_000),
+            wbps: None,
+            riops: None,
+            wiops: Some(500),
+        };
         let s = e.render();
         assert!(s.starts_with("8:0"));
         assert!(s.contains("rbps=1000000"));
@@ -315,7 +399,14 @@ mod tests {
 
     #[test]
     fn io_max_renders_only_device_when_no_caps() {
-        let e = IoMaxEntry { major: 1, minor: 2, rbps: None, wbps: None, riops: None, wiops: None };
+        let e = IoMaxEntry {
+            major: 1,
+            minor: 2,
+            rbps: None,
+            wbps: None,
+            riops: None,
+            wiops: None,
+        };
         assert_eq!(e.render(), "1:2");
     }
 
@@ -323,9 +414,9 @@ mod tests {
 
     #[test]
     fn device_type_chars() {
-        assert_eq!(DeviceType::All.as_char(),   'a');
+        assert_eq!(DeviceType::All.as_char(), 'a');
         assert_eq!(DeviceType::Block.as_char(), 'b');
-        assert_eq!(DeviceType::Char.as_char(),  'c');
+        assert_eq!(DeviceType::Char.as_char(), 'c');
     }
 
     // ── DeviceRule ───────────────────────────────────────────────────────────
@@ -400,11 +491,24 @@ mod tests {
     #[test]
     fn program_compare_includes_allow_or_deny_action() {
         let rules = vec![
-            DeviceRule { kind: DeviceType::Char, major: Some(1), minor: Some(3), access: "rwm".into(), allow: true },
-            DeviceRule { kind: DeviceType::Block, major: None, minor: None, access: "rwm".into(), allow: false },
+            DeviceRule {
+                kind: DeviceType::Char,
+                major: Some(1),
+                minor: Some(3),
+                access: "rwm".into(),
+                allow: true,
+            },
+            DeviceRule {
+                kind: DeviceType::Block,
+                major: None,
+                minor: None,
+                access: "rwm".into(),
+                allow: false,
+            },
         ];
         let prog = assemble_device_program(&rules);
-        let actions: Vec<&str> = prog.iter()
+        let actions: Vec<&str> = prog
+            .iter()
             .filter(|i| i.op.starts_with("CMP"))
             .map(|i| i.op.as_str())
             .collect();
@@ -418,7 +522,10 @@ mod tests {
     fn apply_v2_writes_memory_high() {
         let dir = tempdir().unwrap();
         let cg = dir.path().join("cg");
-        let limits = CgroupV2Limits { memory_high: Some(512 * 1024 * 1024), ..Default::default() };
+        let limits = CgroupV2Limits {
+            memory_high: Some(512 * 1024 * 1024),
+            ..Default::default()
+        };
         apply_v2(&cg, &limits).unwrap();
         let content = std::fs::read_to_string(cg.join("memory.high")).unwrap();
         assert_eq!(content.trim(), "536870912");
@@ -428,24 +535,51 @@ mod tests {
     fn apply_v2_writes_memory_swap_max() {
         let dir = tempdir().unwrap();
         let cg = dir.path().join("cg");
-        let limits = CgroupV2Limits { memory_swap_max: Some(0), ..Default::default() };
+        let limits = CgroupV2Limits {
+            memory_swap_max: Some(0),
+            ..Default::default()
+        };
         apply_v2(&cg, &limits).unwrap();
-        assert_eq!(std::fs::read_to_string(cg.join("memory.swap.max")).unwrap().trim(), "0");
+        assert_eq!(
+            std::fs::read_to_string(cg.join("memory.swap.max"))
+                .unwrap()
+                .trim(),
+            "0"
+        );
     }
 
     #[test]
     fn apply_v2_writes_cpu_weight_in_range() {
         let dir = tempdir().unwrap();
         let cg = dir.path().join("cg");
-        apply_v2(&cg, &CgroupV2Limits { cpu_weight: Some(2500), ..Default::default() }).unwrap();
-        assert_eq!(std::fs::read_to_string(cg.join("cpu.weight")).unwrap().trim(), "2500");
+        apply_v2(
+            &cg,
+            &CgroupV2Limits {
+                cpu_weight: Some(2500),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(cg.join("cpu.weight"))
+                .unwrap()
+                .trim(),
+            "2500"
+        );
     }
 
     #[test]
     fn apply_v2_rejects_cpu_weight_out_of_range() {
         let dir = tempdir().unwrap();
         let cg = dir.path().join("cg");
-        let err = apply_v2(&cg, &CgroupV2Limits { cpu_weight: Some(20_000), ..Default::default() }).unwrap_err();
+        let err = apply_v2(
+            &cg,
+            &CgroupV2Limits {
+                cpu_weight: Some(20_000),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
         assert!(err.to_string().contains("out of range"));
     }
 
@@ -453,15 +587,34 @@ mod tests {
     fn apply_v2_writes_cpu_weight_nice() {
         let dir = tempdir().unwrap();
         let cg = dir.path().join("cg");
-        apply_v2(&cg, &CgroupV2Limits { cpu_weight_nice: Some(-5), ..Default::default() }).unwrap();
-        assert_eq!(std::fs::read_to_string(cg.join("cpu.weight.nice")).unwrap().trim(), "-5");
+        apply_v2(
+            &cg,
+            &CgroupV2Limits {
+                cpu_weight_nice: Some(-5),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(cg.join("cpu.weight.nice"))
+                .unwrap()
+                .trim(),
+            "-5"
+        );
     }
 
     #[test]
     fn apply_v2_rejects_cpu_weight_nice_out_of_range() {
         let dir = tempdir().unwrap();
         let cg = dir.path().join("cg");
-        let err = apply_v2(&cg, &CgroupV2Limits { cpu_weight_nice: Some(50), ..Default::default() }).unwrap_err();
+        let err = apply_v2(
+            &cg,
+            &CgroupV2Limits {
+                cpu_weight_nice: Some(50),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
         assert!(err.to_string().contains("out of range"));
     }
 
@@ -469,15 +622,34 @@ mod tests {
     fn apply_v2_writes_io_weight() {
         let dir = tempdir().unwrap();
         let cg = dir.path().join("cg");
-        apply_v2(&cg, &CgroupV2Limits { io_weight: Some(500), ..Default::default() }).unwrap();
-        assert_eq!(std::fs::read_to_string(cg.join("io.weight")).unwrap().trim(), "500");
+        apply_v2(
+            &cg,
+            &CgroupV2Limits {
+                io_weight: Some(500),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(cg.join("io.weight"))
+                .unwrap()
+                .trim(),
+            "500"
+        );
     }
 
     #[test]
     fn apply_v2_rejects_io_weight_out_of_range() {
         let dir = tempdir().unwrap();
         let cg = dir.path().join("cg");
-        let err = apply_v2(&cg, &CgroupV2Limits { io_weight: Some(0), ..Default::default() }).unwrap_err();
+        let err = apply_v2(
+            &cg,
+            &CgroupV2Limits {
+                io_weight: Some(0),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
         assert!(err.to_string().contains("out of range"));
     }
 
@@ -486,7 +658,14 @@ mod tests {
         let dir = tempdir().unwrap();
         let cg = dir.path().join("cg");
         let limits = CgroupV2Limits {
-            io_max: vec![IoMaxEntry { major: 8, minor: 0, rbps: Some(1_000_000), wbps: Some(500_000), riops: None, wiops: None }],
+            io_max: vec![IoMaxEntry {
+                major: 8,
+                minor: 0,
+                rbps: Some(1_000_000),
+                wbps: Some(500_000),
+                riops: None,
+                wiops: None,
+            }],
             ..Default::default()
         };
         apply_v2(&cg, &limits).unwrap();
@@ -545,7 +724,11 @@ mod tests {
     #[test]
     fn check_unified_hierarchy_handles_extra_whitespace() {
         let dir = tempdir().unwrap();
-        std::fs::write(dir.path().join("cgroup.controllers"), "  cpu \t memory \n pids ").unwrap();
+        std::fs::write(
+            dir.path().join("cgroup.controllers"),
+            "  cpu \t memory \n pids ",
+        )
+        .unwrap();
         let controllers = check_unified_hierarchy(dir.path()).unwrap();
         assert_eq!(controllers, vec!["cpu", "memory", "pids"]);
     }
@@ -570,7 +753,14 @@ mod tests {
             cpu_weight: Some(500),
             cpu_weight_nice: Some(0),
             io_weight: Some(200),
-            io_max: vec![IoMaxEntry { major: 8, minor: 0, rbps: Some(1), wbps: None, riops: None, wiops: None }],
+            io_max: vec![IoMaxEntry {
+                major: 8,
+                minor: 0,
+                rbps: Some(1),
+                wbps: None,
+                riops: None,
+                wiops: None,
+            }],
             devices: vec![DeviceRule::default_deny_all()],
         };
         let json = serde_json::to_string(&limits).unwrap();
@@ -580,7 +770,13 @@ mod tests {
 
     #[test]
     fn device_rule_roundtrip_through_json() {
-        let r = DeviceRule { kind: DeviceType::Char, major: Some(1), minor: Some(3), access: "rwm".into(), allow: true };
+        let r = DeviceRule {
+            kind: DeviceType::Char,
+            major: Some(1),
+            minor: Some(3),
+            access: "rwm".into(),
+            allow: true,
+        };
         let json = serde_json::to_string(&r).unwrap();
         let back: DeviceRule = serde_json::from_str(&json).unwrap();
         assert_eq!(r, back);

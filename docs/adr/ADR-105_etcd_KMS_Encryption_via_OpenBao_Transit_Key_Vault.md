@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Universal
+**Scope:** Hyperscaler, Sovereign, Universal
 
 **Category:** Security
 
@@ -29,7 +29,7 @@ etcd encryption at rest mandatory on all profiles. Talos/Hetzner: OpenBao Transi
 
 - **Unencrypted etcd:** K8s Secrets visible in etcd dumps. Any etcd backup or snapshot contains plaintext secrets. Compliance failure.
 - **Static key encryption only:** No automatic rotation. Manual key management. Key compromise requires re-encryption of all etcd data.
-- **AWS KMS:** Not available on Hetzner. Cloud-specific lock-in.
+- **AWS KMS:** Not available on the sovereign profile. Cloud-specific lock-in.
 
 ## Consequences
 

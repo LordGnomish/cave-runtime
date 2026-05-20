@@ -107,11 +107,18 @@ pub enum L7Error {
 /// `pkg/proxy/proxy.go::canAccessRule`.
 pub fn evaluate(rule: &CnpRule, tenant: &TenantId, req: &L7Request) -> Result<L4Verdict, L7Error> {
     if &rule.tenant != tenant {
-        return Err(L7Error::TenantDenied { tenant: tenant.clone() });
+        return Err(L7Error::TenantDenied {
+            tenant: tenant.clone(),
+        });
     }
     let port = &rule.port;
     match req {
-        L7Request::Http { method, path, host, headers } => {
+        L7Request::Http {
+            method,
+            path,
+            host,
+            headers,
+        } => {
             if port.http.is_empty() {
                 return Ok(if !port.grpc.is_empty() || !port.dns.is_empty() {
                     L4Verdict::Deny
@@ -224,8 +231,8 @@ fn re_match(pat: &[u8], s: &[u8]) -> bool {
 #[derive(Debug, Clone)]
 enum Tok {
     Lit(u8),
-    AnyChar,        // `.`
-    Digit,          // `\d`
+    AnyChar, // `.`
+    Digit,   // `\d`
     Class(Vec<(u8, u8)>),
     Star(Box<Tok>), // greedy `*`
 }
@@ -357,7 +364,11 @@ mod tests {
     use crate::cilium_test_ctx;
 
     fn rule(tenant: &str, port: PortRule) -> CnpRule {
-        CnpRule { name: "policy-1".into(), tenant: TenantId::new(tenant).expect("test fixture"), port }
+        CnpRule {
+            name: "policy-1".into(),
+            tenant: TenantId::new(tenant).expect("test fixture"),
+            port,
+        }
     }
 
     #[test]
@@ -526,10 +537,22 @@ mod tests {
             host: "x".into(),
             headers: vec![],
         };
-        assert_eq!(evaluate(&r, &tenant, &req("/v1/users/alice")).unwrap(), L4Verdict::Allow);
-        assert_eq!(evaluate(&r, &tenant, &req("/v2/users/bob")).unwrap(), L4Verdict::Allow);
-        assert_eq!(evaluate(&r, &tenant, &req("/v1/users/Alice")).unwrap(), L4Verdict::Deny);
-        assert_eq!(evaluate(&r, &tenant, &req("/users/alice")).unwrap(), L4Verdict::Deny);
+        assert_eq!(
+            evaluate(&r, &tenant, &req("/v1/users/alice")).unwrap(),
+            L4Verdict::Allow
+        );
+        assert_eq!(
+            evaluate(&r, &tenant, &req("/v2/users/bob")).unwrap(),
+            L4Verdict::Allow
+        );
+        assert_eq!(
+            evaluate(&r, &tenant, &req("/v1/users/Alice")).unwrap(),
+            L4Verdict::Deny
+        );
+        assert_eq!(
+            evaluate(&r, &tenant, &req("/users/alice")).unwrap(),
+            L4Verdict::Deny
+        );
     }
 
     #[test]
@@ -583,11 +606,8 @@ mod tests {
 
     #[test]
     fn grpc_service_and_method_match() {
-        let (_cite, tenant) = cilium_test_ctx!(
-            "pkg/policy/api/grpc.go",
-            "PortRuleHTTP",
-            "tenant-l7-grpc"
-        );
+        let (_cite, tenant) =
+            cilium_test_ctx!("pkg/policy/api/grpc.go", "PortRuleHTTP", "tenant-l7-grpc");
         let r = rule(
             "tenant-l7-grpc",
             PortRule {
@@ -599,18 +619,36 @@ mod tests {
             },
         );
         assert_eq!(
-            evaluate(&r, &tenant, &L7Request::Grpc { path: "/myapp.Greeter/SayHello".into() })
-                .unwrap(),
+            evaluate(
+                &r,
+                &tenant,
+                &L7Request::Grpc {
+                    path: "/myapp.Greeter/SayHello".into()
+                }
+            )
+            .unwrap(),
             L4Verdict::Allow
         );
         assert_eq!(
-            evaluate(&r, &tenant, &L7Request::Grpc { path: "/myapp.Greeter/SayBye".into() })
-                .unwrap(),
+            evaluate(
+                &r,
+                &tenant,
+                &L7Request::Grpc {
+                    path: "/myapp.Greeter/SayBye".into()
+                }
+            )
+            .unwrap(),
             L4Verdict::Deny
         );
         assert_eq!(
-            evaluate(&r, &tenant, &L7Request::Grpc { path: "/other.Service/SayHello".into() })
-                .unwrap(),
+            evaluate(
+                &r,
+                &tenant,
+                &L7Request::Grpc {
+                    path: "/other.Service/SayHello".into()
+                }
+            )
+            .unwrap(),
             L4Verdict::Deny
         );
     }
@@ -625,12 +663,22 @@ mod tests {
         let r = rule(
             "tenant-l7-grpc-wildcard",
             PortRule {
-                grpc: vec![GrpcRule { service: "svc.Foo".into(), method: "*".into() }],
+                grpc: vec![GrpcRule {
+                    service: "svc.Foo".into(),
+                    method: "*".into(),
+                }],
                 ..Default::default()
             },
         );
         assert_eq!(
-            evaluate(&r, &tenant, &L7Request::Grpc { path: "/svc.Foo/Anything".into() }).unwrap(),
+            evaluate(
+                &r,
+                &tenant,
+                &L7Request::Grpc {
+                    path: "/svc.Foo/Anything".into()
+                }
+            )
+            .unwrap(),
             L4Verdict::Allow
         );
     }
@@ -661,32 +709,47 @@ mod tests {
         let r = rule(
             "tenant-l7-dns-rule",
             PortRule {
-                dns: vec![DnsRule { pattern: "*.acme.com".into() }],
+                dns: vec![DnsRule {
+                    pattern: "*.acme.com".into(),
+                }],
                 ..Default::default()
             },
         );
         assert_eq!(
-            evaluate(&r, &tenant, &L7Request::Dns { name: "api.acme.com".into() }).unwrap(),
+            evaluate(
+                &r,
+                &tenant,
+                &L7Request::Dns {
+                    name: "api.acme.com".into()
+                }
+            )
+            .unwrap(),
             L4Verdict::Allow
         );
         assert_eq!(
-            evaluate(&r, &tenant, &L7Request::Dns { name: "evil.com".into() }).unwrap(),
+            evaluate(
+                &r,
+                &tenant,
+                &L7Request::Dns {
+                    name: "evil.com".into()
+                }
+            )
+            .unwrap(),
             L4Verdict::Deny
         );
     }
 
     #[test]
     fn cross_tenant_evaluation_is_refused() {
-        let (_cite, attacker) = cilium_test_ctx!(
-            "pkg/policy/api/l7.go",
-            "PortRule",
-            "tenant-attacker"
-        );
+        let (_cite, attacker) =
+            cilium_test_ctx!("pkg/policy/api/l7.go", "PortRule", "tenant-attacker");
         let r = rule("acme", PortRule::default());
         let err = evaluate(
             &r,
             &attacker,
-            &L7Request::Dns { name: "acme.com".into() },
+            &L7Request::Dns {
+                name: "acme.com".into(),
+            },
         )
         .unwrap_err();
         assert!(matches!(err, L7Error::TenantDenied { .. }));

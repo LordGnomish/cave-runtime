@@ -24,7 +24,7 @@ pub enum CheckResult {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HealthCheck {
-    pub kind: String,        // e.g. "Deployment", "StatefulSet", "Service"
+    pub kind: String, // e.g. "Deployment", "StatefulSet", "Service"
     pub name: String,
     pub namespace: String,
     pub result: CheckResult,
@@ -91,9 +91,7 @@ fn is_valid_tz(s: &str) -> bool {
     if parts.len() != 2 {
         return false;
     }
-    let alpha = |s: &&str| {
-        !s.is_empty() && s.chars().all(|c| c.is_ascii_alphabetic() || c == '_')
-    };
+    let alpha = |s: &&str| !s.is_empty() && s.chars().all(|c| c.is_ascii_alphabetic() || c == '_');
     alpha(&parts[0]) && alpha(&parts[1])
 }
 
@@ -500,10 +498,30 @@ mod tests {
     #[test]
     fn app_of_apps_descendants_collects_transitively() {
         let mut t = AppOfAppsTree::new();
-        t.upsert(AppOfAppsNode { name: "root".into(), tenant: "acme".into(), children: vec!["a".into(), "b".into()] }).unwrap();
-        t.upsert(AppOfAppsNode { name: "a".into(), tenant: "acme".into(), children: vec!["c".into()] }).unwrap();
-        t.upsert(AppOfAppsNode { name: "b".into(), tenant: "acme".into(), children: vec![] }).unwrap();
-        t.upsert(AppOfAppsNode { name: "c".into(), tenant: "acme".into(), children: vec![] }).unwrap();
+        t.upsert(AppOfAppsNode {
+            name: "root".into(),
+            tenant: "acme".into(),
+            children: vec!["a".into(), "b".into()],
+        })
+        .unwrap();
+        t.upsert(AppOfAppsNode {
+            name: "a".into(),
+            tenant: "acme".into(),
+            children: vec!["c".into()],
+        })
+        .unwrap();
+        t.upsert(AppOfAppsNode {
+            name: "b".into(),
+            tenant: "acme".into(),
+            children: vec![],
+        })
+        .unwrap();
+        t.upsert(AppOfAppsNode {
+            name: "c".into(),
+            tenant: "acme".into(),
+            children: vec![],
+        })
+        .unwrap();
         let d = t.descendants("root");
         assert_eq!(d, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
     }
@@ -517,8 +535,18 @@ mod tests {
     #[test]
     fn app_of_apps_roots_only_unreferenced() {
         let mut t = AppOfAppsTree::new();
-        t.upsert(AppOfAppsNode { name: "root".into(), tenant: "acme".into(), children: vec!["a".into()] }).unwrap();
-        t.upsert(AppOfAppsNode { name: "a".into(), tenant: "acme".into(), children: vec![] }).unwrap();
+        t.upsert(AppOfAppsNode {
+            name: "root".into(),
+            tenant: "acme".into(),
+            children: vec!["a".into()],
+        })
+        .unwrap();
+        t.upsert(AppOfAppsNode {
+            name: "a".into(),
+            tenant: "acme".into(),
+            children: vec![],
+        })
+        .unwrap();
         let roots = t.roots("acme");
         assert_eq!(roots.len(), 1);
         assert_eq!(roots[0].name, "root");
@@ -527,8 +555,18 @@ mod tests {
     #[test]
     fn app_of_apps_replaces_with_same_name_tenant() {
         let mut t = AppOfAppsTree::new();
-        t.upsert(AppOfAppsNode { name: "x".into(), tenant: "acme".into(), children: vec![] }).unwrap();
-        t.upsert(AppOfAppsNode { name: "x".into(), tenant: "acme".into(), children: vec!["y".into()] }).unwrap();
+        t.upsert(AppOfAppsNode {
+            name: "x".into(),
+            tenant: "acme".into(),
+            children: vec![],
+        })
+        .unwrap();
+        t.upsert(AppOfAppsNode {
+            name: "x".into(),
+            tenant: "acme".into(),
+            children: vec!["y".into()],
+        })
+        .unwrap();
         assert_eq!(t.count(), 1);
     }
 

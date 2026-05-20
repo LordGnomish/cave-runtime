@@ -56,9 +56,10 @@ fn verify_single_image(
     }
 
     // Check if image reference matches any of the imageReferences patterns
-    let matches = spec.image_references.iter().any(|pattern| {
-        image_ref_matches(image_ref, pattern)
-    });
+    let matches = spec
+        .image_references
+        .iter()
+        .any(|pattern| image_ref_matches(image_ref, pattern));
 
     if !matches {
         return Ok(ImageVerificationResult {
@@ -139,7 +140,9 @@ fn extract_images(resource: &Value, image_references: &[String]) -> Vec<String> 
     // Filter by image reference patterns
     if !image_references.is_empty() {
         images.retain(|img| {
-            image_references.iter().any(|pattern| image_ref_matches(img, pattern))
+            image_references
+                .iter()
+                .any(|pattern| image_ref_matches(img, pattern))
         });
     }
 
@@ -153,7 +156,11 @@ fn extract_by_path(resource: &Value, path: &str) -> Vec<String> {
 
 fn extract_recursive(value: &Value, parts: &[&str]) -> Vec<String> {
     if parts.is_empty() {
-        return if let Some(s) = value.as_str() { vec![s.to_string()] } else { vec![] };
+        return if let Some(s) = value.as_str() {
+            vec![s.to_string()]
+        } else {
+            vec![]
+        };
     }
 
     let head = parts[0];
@@ -162,7 +169,10 @@ fn extract_recursive(value: &Value, parts: &[&str]) -> Vec<String> {
     if head.ends_with("[*]") {
         let field = head.trim_end_matches("[*]");
         if let Some(arr) = value.get(field).and_then(|v| v.as_array()) {
-            return arr.iter().flat_map(|item| extract_recursive(item, rest)).collect();
+            return arr
+                .iter()
+                .flat_map(|item| extract_recursive(item, rest))
+                .collect();
         }
     } else {
         if let Some(child) = value.get(head) {
@@ -175,7 +185,9 @@ fn extract_recursive(value: &Value, parts: &[&str]) -> Vec<String> {
 /// Check if an image reference matches a Kyverno image reference pattern.
 /// Patterns support `*` wildcard (matches any characters except `/`).
 fn image_ref_matches(image: &str, pattern: &str) -> bool {
-    if pattern == "*" { return true; }
+    if pattern == "*" {
+        return true;
+    }
     // Convert pattern to regex
     let mut re = String::from("^");
     for c in pattern.chars() {
@@ -190,7 +202,9 @@ fn image_ref_matches(image: &str, pattern: &str) -> bool {
         }
     }
     re.push('$');
-    regex::Regex::new(&re).map(|r| r.is_match(image)).unwrap_or(false)
+    regex::Regex::new(&re)
+        .map(|r| r.is_match(image))
+        .unwrap_or(false)
 }
 
 /// Parsed image reference.
@@ -213,7 +227,10 @@ fn parse_image_ref(image: &str) -> ParsedImageRef {
         // Make sure it's not part of the registry (e.g., registry:5000/image)
         let maybe_tag = &image_without_digest[colon_pos + 1..];
         if !maybe_tag.contains('/') {
-            (&image_without_digest[..colon_pos], Some(maybe_tag.to_string()))
+            (
+                &image_without_digest[..colon_pos],
+                Some(maybe_tag.to_string()),
+            )
         } else {
             (image_without_digest, None)
         }
@@ -225,8 +242,14 @@ fn parse_image_ref(image: &str) -> ParsedImageRef {
     let slash_pos = image_without_tag.find('/');
     let (registry, repository) = if let Some(pos) = slash_pos {
         let first_component = &image_without_tag[..pos];
-        if first_component.contains('.') || first_component.contains(':') || first_component == "localhost" {
-            (Some(first_component.to_string()), image_without_tag[pos + 1..].to_string())
+        if first_component.contains('.')
+            || first_component.contains(':')
+            || first_component == "localhost"
+        {
+            (
+                Some(first_component.to_string()),
+                image_without_tag[pos + 1..].to_string(),
+            )
         } else {
             (None, image_without_tag.to_string())
         }
@@ -234,7 +257,12 @@ fn parse_image_ref(image: &str) -> ParsedImageRef {
         (None, image_without_tag.to_string())
     };
 
-    ParsedImageRef { registry, repository, tag, digest }
+    ParsedImageRef {
+        registry,
+        repository,
+        tag,
+        digest,
+    }
 }
 
 /// Mutate image digest in a resource (for mutateDigest=true).

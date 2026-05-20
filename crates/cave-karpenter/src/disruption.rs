@@ -147,7 +147,9 @@ pub fn expiration_candidates(claims: &[NodeClaim], now: SystemTime) -> Vec<Decis
         if c.terminated {
             continue;
         }
-        let Some(created) = c.created_at else { continue };
+        let Some(created) = c.created_at else {
+            continue;
+        };
         let Some(expire_after) = c.spec.expire_after.as_ref() else {
             continue;
         };
@@ -171,10 +173,7 @@ pub fn expiration_candidates(claims: &[NodeClaim], now: SystemTime) -> Vec<Decis
 /// subset Karpenter accepts in `NodeClaimSpec.ExpireAfter`.
 pub fn parse_duration(spec: &str) -> Result<Duration, String> {
     let s = spec.trim();
-    let (num, unit) = s.split_at(
-        s.find(|c: char| !c.is_ascii_digit())
-            .unwrap_or(s.len()),
-    );
+    let (num, unit) = s.split_at(s.find(|c: char| !c.is_ascii_digit()).unwrap_or(s.len()));
     let n: u64 = num.parse().map_err(|e| format!("bad number {num}: {e}"))?;
     let mul = match unit {
         "s" | "" => 1,

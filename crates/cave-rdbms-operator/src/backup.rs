@@ -20,7 +20,11 @@ impl BackupManager {
         }
     }
 
-    pub fn start_backup(&self, instance_id: &str, backup_type: BackupType) -> PgResult<BackupRecord> {
+    pub fn start_backup(
+        &self,
+        instance_id: &str,
+        backup_type: BackupType,
+    ) -> PgResult<BackupRecord> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now();
         let storage_path = format!("{}/{}/{}", self.wal_archive_path, instance_id, id);
@@ -43,7 +47,12 @@ impl BackupManager {
         Ok(record)
     }
 
-    pub fn complete_backup(&self, backup_id: &str, size_bytes: u64, wal_end_lsn: &str) -> PgResult<()> {
+    pub fn complete_backup(
+        &self,
+        backup_id: &str,
+        size_bytes: u64,
+        wal_end_lsn: &str,
+    ) -> PgResult<()> {
         let mut backups = self.backups.write().unwrap();
         let backup = backups
             .get_mut(backup_id)
@@ -112,13 +121,10 @@ impl BackupManager {
 
     /// Delete backups older than retain_days. Returns count of deleted backups.
     pub fn apply_retention(&self, instance_id: &str, retain_days: u32) -> usize {
-        let cutoff = Utc::now()
-            - chrono::Duration::days(i64::from(retain_days));
+        let cutoff = Utc::now() - chrono::Duration::days(i64::from(retain_days));
         let mut backups = self.backups.write().unwrap();
         let before = backups.len();
-        backups.retain(|_, b| {
-            b.instance_id != instance_id || b.started_at >= cutoff
-        });
+        backups.retain(|_, b| b.instance_id != instance_id || b.started_at >= cutoff);
         before - backups.len()
     }
 

@@ -3,20 +3,21 @@
 use crate::core::{AuditBackend, AuditBackendType};
 use crate::error::{VaultError, VaultResult};
 use crate::response::VaultResponse;
-use crate::{AuthEntry, MountEntry, MountConfig, VaultState};
+use crate::{AuthEntry, MountConfig, MountEntry, VaultState};
 use axum::{
+    Router,
     extract::{Json, Path, State},
     http::HeaderMap,
     routing::{delete, get, post, put},
-    Router,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 fn extract_token(headers: &HeaderMap) -> VaultResult<String> {
-    headers.get("x-vault-token")
+    headers
+        .get("x-vault-token")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or(VaultError::BadToken)
@@ -43,9 +44,7 @@ pub async fn seal_status(
     })))
 }
 
-pub async fn health(
-    State(state): State<Arc<VaultState>>,
-) -> Result<VaultResponse, VaultError> {
+pub async fn health(State(state): State<Arc<VaultState>>) -> Result<VaultResponse, VaultError> {
     let seal = state.seal_state.read().await;
     Ok(VaultResponse::new().with_data(json!({
         "initialized": seal.is_initialized(),
@@ -120,7 +119,9 @@ pub async fn unseal(
         return seal_status(State(state.clone())).await;
     }
 
-    let key = body.key.ok_or_else(|| VaultError::InvalidRequest("key required".into()))?;
+    let key = body
+        .key
+        .ok_or_else(|| VaultError::InvalidRequest("key required".into()))?;
     let unsealed = {
         let mut seal = state.seal_state.write().await;
         seal.unseal(&key)?
@@ -159,7 +160,8 @@ pub async fn list_mounts(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mt = state.mount_table.read().await;
-    let mounts: HashMap<String, &MountEntry> = mt.mounts.iter().map(|(k, v)| (k.clone(), v)).collect();
+    let mounts: HashMap<String, &MountEntry> =
+        mt.mounts.iter().map(|(k, v)| (k.clone(), v)).collect();
     Ok(VaultResponse::new().with_data(serde_json::to_value(mounts).unwrap_or_default()))
 }
 
@@ -180,7 +182,11 @@ pub async fn enable_mount(
     Json(body): Json<MountRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    let path = if path.ends_with('/') { path } else { format!("{}/", path) };
+    let path = if path.ends_with('/') {
+        path
+    } else {
+        format!("{}/", path)
+    };
     let entry = MountEntry {
         path: path.clone(),
         mount_type: body.mount_type,
@@ -203,7 +209,11 @@ pub async fn disable_mount(
     Path(path): Path<String>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    let path = if path.ends_with('/') { path } else { format!("{}/", path) };
+    let path = if path.ends_with('/') {
+        path
+    } else {
+        format!("{}/", path)
+    };
     let mut mt = state.mount_table.write().await;
     mt.mounts.remove(&path);
     Ok(VaultResponse::new())
@@ -216,7 +226,11 @@ pub async fn tune_mount(
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    let path = if path.ends_with('/') { path } else { format!("{}/", path) };
+    let path = if path.ends_with('/') {
+        path
+    } else {
+        format!("{}/", path)
+    };
     let mut mt = state.mount_table.write().await;
     if let Some(entry) = mt.mounts.get_mut(&path) {
         if let Some(ttl) = body.get("default_lease_ttl").and_then(|v| v.as_i64()) {
@@ -254,7 +268,11 @@ pub async fn enable_auth(
     Json(body): Json<AuthRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    let path = if path.ends_with('/') { path } else { format!("{}/", path) };
+    let path = if path.ends_with('/') {
+        path
+    } else {
+        format!("{}/", path)
+    };
     let entry = AuthEntry {
         path: path.clone(),
         auth_type: body.auth_type,
@@ -276,7 +294,11 @@ pub async fn disable_auth(
     Path(path): Path<String>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    let path = if path.ends_with('/') { path } else { format!("{}/", path) };
+    let path = if path.ends_with('/') {
+        path
+    } else {
+        format!("{}/", path)
+    };
     let mut at = state.auth_table.write().await;
     at.methods.remove(&path);
     Ok(VaultResponse::new())
@@ -299,7 +321,8 @@ pub async fn read_policy(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let ps = state.policy_store.read().await;
-    let policy = ps.get(&name)
+    let policy = ps
+        .get(&name)
         .ok_or_else(|| VaultError::PolicyNotFound(name))?;
     Ok(VaultResponse::new().with_data(json!({
         "name": policy.name,
@@ -321,7 +344,9 @@ pub async fn write_policy(
     Json(body): Json<PolicyRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    let hcl = body.policy.or(body.rules)
+    let hcl = body
+        .policy
+        .or(body.rules)
         .ok_or_else(|| VaultError::InvalidRequest("policy required".into()))?;
     let policy = crate::core::Policy::parse(&name, &hcl)?;
     let mut ps = state.policy_store.write().await;
@@ -337,7 +362,10 @@ pub async fn delete_policy(
     let _token = extract_token(&headers)?;
     let mut ps = state.policy_store.write().await;
     if !ps.delete(&name) {
-        return Err(VaultError::InvalidRequest(format!("cannot delete built-in policy: {}", name)));
+        return Err(VaultError::InvalidRequest(format!(
+            "cannot delete built-in policy: {}",
+            name
+        )));
     }
     Ok(VaultResponse::new())
 }
@@ -354,10 +382,14 @@ pub async fn renew_lease(
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    let lease_id = body.get("lease_id")
+    let lease_id = body
+        .get("lease_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| VaultError::InvalidRequest("lease_id required".into()))?;
-    let increment = body.get("increment").and_then(|v| v.as_i64()).unwrap_or(3600);
+    let increment = body
+        .get("increment")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(3600);
     let mut ls = state.lease_store.write().await;
     let lease = ls.renew(lease_id, increment)?;
     Ok(VaultResponse::new().with_data(json!({
@@ -373,7 +405,8 @@ pub async fn revoke_lease(
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    let lease_id = body.get("lease_id")
+    let lease_id = body
+        .get("lease_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| VaultError::InvalidRequest("lease_id required".into()))?;
     let mut ls = state.lease_store.write().await;
@@ -387,11 +420,13 @@ pub async fn list_leases(
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    let prefix = body.get("prefix")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let prefix = body.get("prefix").and_then(|v| v.as_str()).unwrap_or("");
     let ls = state.lease_store.read().await;
-    let leases: Vec<String> = ls.list_by_prefix(prefix).iter().map(|l| l.id.clone()).collect();
+    let leases: Vec<String> = ls
+        .list_by_prefix(prefix)
+        .iter()
+        .map(|l| l.id.clone())
+        .collect();
     Ok(VaultResponse::new().with_data(json!({ "keys": leases })))
 }
 
@@ -424,7 +459,12 @@ pub async fn enable_audit(
         "file" => AuditBackendType::File,
         "syslog" => AuditBackendType::Syslog,
         "socket" => AuditBackendType::Socket,
-        t => return Err(VaultError::InvalidRequest(format!("unknown audit backend type: {}", t))),
+        t => {
+            return Err(VaultError::InvalidRequest(format!(
+                "unknown audit backend type: {}",
+                t
+            )));
+        }
     };
     let backend = AuditBackend {
         path: path.clone(),
@@ -454,7 +494,8 @@ pub async fn wrapping_wrap(
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    let ttl_secs = headers.get("x-vault-wrap-ttl")
+    let ttl_secs = headers
+        .get("x-vault-wrap-ttl")
         .and_then(|v| v.to_str().ok())
         .map(crate::token::parse_duration)
         .unwrap_or(300);
@@ -470,7 +511,8 @@ pub async fn wrapping_unwrap(
     headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
-    let token_str = body.get("token")
+    let token_str = body
+        .get("token")
         .and_then(|v| v.as_str())
         .or_else(|| headers.get("x-vault-token").and_then(|v| v.to_str().ok()))
         .ok_or(VaultError::BadToken)?
@@ -486,7 +528,8 @@ pub async fn wrapping_lookup(
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    let wrap_token = body.get("token")
+    let wrap_token = body
+        .get("token")
         .and_then(|v| v.as_str())
         .ok_or_else(|| VaultError::InvalidRequest("token required".into()))?;
     let ws = state.wrap_store.read().await;
@@ -500,10 +543,12 @@ pub async fn wrapping_rewrap(
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    let wrap_token = body.get("token")
+    let wrap_token = body
+        .get("token")
         .and_then(|v| v.as_str())
         .ok_or_else(|| VaultError::InvalidRequest("token required".into()))?;
-    let ttl_secs = headers.get("x-vault-wrap-ttl")
+    let ttl_secs = headers
+        .get("x-vault-wrap-ttl")
         .and_then(|v| v.to_str().ok())
         .map(crate::token::parse_duration)
         .unwrap_or(300);
@@ -525,9 +570,14 @@ pub async fn capabilities_self(
     let policies = token.policies.clone();
     drop(ts);
 
-    let paths = body.get("paths")
+    let paths = body
+        .get("paths")
         .and_then(|v| v.as_array())
-        .map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect::<Vec<_>>())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect::<Vec<_>>()
+        })
         .unwrap_or_default();
 
     let ps = state.policy_store.read().await;
@@ -557,17 +607,35 @@ pub fn router(state: Arc<VaultState>) -> Router {
         .route("/v1/sys/unseal", post(unseal))
         .route("/v1/sys/seal", post(seal))
         .route("/v1/sys/mounts", get(list_mounts))
-        .route("/v1/sys/mounts/{path}", post(enable_mount).delete(disable_mount))
+        .route(
+            "/v1/sys/mounts/{path}",
+            post(enable_mount).delete(disable_mount),
+        )
         .route("/v1/sys/mounts/{path}/tune", post(tune_mount))
         .route("/v1/sys/auth", get(list_auth))
-        .route("/v1/sys/auth/{path}", post(enable_auth).delete(disable_auth))
+        .route(
+            "/v1/sys/auth/{path}",
+            post(enable_auth).delete(disable_auth),
+        )
         .route("/v1/sys/policies/acl", get(list_policies))
-        .route("/v1/sys/policies/acl/{name}", get(read_policy).put(write_policy).post(write_policy).delete(delete_policy))
+        .route(
+            "/v1/sys/policies/acl/{name}",
+            get(read_policy)
+                .put(write_policy)
+                .post(write_policy)
+                .delete(delete_policy),
+        )
         .route("/v1/sys/leases/renew", put(renew_lease).post(renew_lease))
-        .route("/v1/sys/leases/revoke", put(revoke_lease).post(revoke_lease))
+        .route(
+            "/v1/sys/leases/revoke",
+            put(revoke_lease).post(revoke_lease),
+        )
         .route("/v1/sys/leases/lookup", post(list_leases))
         .route("/v1/sys/audit", get(list_audit))
-        .route("/v1/sys/audit/{path}", put(enable_audit).delete(disable_audit))
+        .route(
+            "/v1/sys/audit/{path}",
+            put(enable_audit).delete(disable_audit),
+        )
         .route("/v1/sys/wrapping/wrap", post(wrapping_wrap))
         .route("/v1/sys/wrapping/unwrap", post(wrapping_unwrap))
         .route("/v1/sys/wrapping/lookup", post(wrapping_lookup))

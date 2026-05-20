@@ -67,7 +67,10 @@ impl MembershipConfig {
     pub fn single(id: NodeId) -> Self {
         let mut voters = BTreeSet::new();
         voters.insert(id);
-        Self { voters, ..Default::default() }
+        Self {
+            voters,
+            ..Default::default()
+        }
     }
 
     /// True if in joint consensus phase.

@@ -71,7 +71,12 @@ pub struct SnatTable {
 
 impl SnatTable {
     pub fn new(tenant: TenantId, node_ip: IpAddr) -> Self {
-        Self { tenant, node_ip, forward: HashMap::new(), reverse: HashMap::new() }
+        Self {
+            tenant,
+            node_ip,
+            forward: HashMap::new(),
+            reverse: HashMap::new(),
+        }
     }
 
     /// Allocate or look up the SNAT mapping for the given original 5-tuple.
@@ -95,7 +100,11 @@ impl SnatTable {
                 dst_port: key.dst_port,
             };
             if !self.reverse.contains_key(&rev_key) {
-                let entry = SnatEntry { new_src_ip: self.node_ip, new_src_port: candidate, created: now };
+                let entry = SnatEntry {
+                    new_src_ip: self.node_ip,
+                    new_src_port: candidate,
+                    created: now,
+                };
                 self.forward.insert(key, entry);
                 self.reverse.insert(rev_key, key);
                 return Ok(entry);
@@ -146,7 +155,12 @@ pub struct DnatTable {
 
 impl DnatTable {
     pub fn new(tenant: TenantId) -> Self {
-        Self { tenant, next_index: 1, by_index: HashMap::new(), by_backend: HashMap::new() }
+        Self {
+            tenant,
+            next_index: 1,
+            by_index: HashMap::new(),
+            by_backend: HashMap::new(),
+        }
     }
 
     pub fn install(&mut self, entry: DnatEntry) -> Result<u16, NatError> {
@@ -195,14 +209,23 @@ mod tests {
     }
 
     fn key(s: (u8, u8, u8, u8), sp: u16, d: (u8, u8, u8, u8), dp: u16) -> SnatKey {
-        SnatKey { src_ip: ip(s.0, s.1, s.2, s.3), src_port: sp, dst_ip: ip(d.0, d.1, d.2, d.3), dst_port: dp }
+        SnatKey {
+            src_ip: ip(s.0, s.1, s.2, s.3),
+            src_port: sp,
+            dst_ip: ip(d.0, d.1, d.2, d.3),
+            dst_port: dp,
+        }
     }
 
     // ── SNAT ─────────────────────────────────────────────────────────────────
 
     #[test]
     fn snat_allocate_returns_new_port_in_ephemeral_range() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/nat/nat.go", "Map.AllocV4", "tenant-nat-alloc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/nat/nat.go",
+            "Map.AllocV4",
+            "tenant-nat-alloc"
+        );
         let mut nat = SnatTable::new(tenant, ip(192, 168, 1, 1));
         let k = key((10, 0, 0, 1), 1234, (1, 1, 1, 1), 80);
         let e = nat.allocate(k, 100).unwrap();
@@ -212,7 +235,11 @@ mod tests {
 
     #[test]
     fn snat_allocate_is_idempotent_for_same_5tuple() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/nat/nat.go", "Map.AllocV4", "tenant-nat-idem");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/nat/nat.go",
+            "Map.AllocV4",
+            "tenant-nat-idem"
+        );
         let mut nat = SnatTable::new(tenant, ip(192, 168, 1, 1));
         let k = key((10, 0, 0, 1), 1234, (1, 1, 1, 1), 80);
         let a = nat.allocate(k, 100).unwrap();
@@ -222,7 +249,11 @@ mod tests {
 
     #[test]
     fn snat_allocate_two_distinct_5tuples_get_different_ports_when_collision() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/nat/nat.go", "Map.AllocV4.Collision", "tenant-nat-coll");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/nat/nat.go",
+            "Map.AllocV4.Collision",
+            "tenant-nat-coll"
+        );
         let mut nat = SnatTable::new(tenant, ip(192, 168, 1, 1));
         // Two flows that hash to the same starting port (same src_port, same dst).
         let k1 = key((10, 0, 0, 1), 1234, (1, 1, 1, 1), 80);
@@ -234,7 +265,11 @@ mod tests {
 
     #[test]
     fn snat_lookup_returns_existing_entry() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/nat/nat.go", "Map.LookupV4", "tenant-nat-lk");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/nat/nat.go",
+            "Map.LookupV4",
+            "tenant-nat-lk"
+        );
         let mut nat = SnatTable::new(tenant, ip(192, 168, 1, 1));
         let k = key((10, 0, 0, 1), 1234, (1, 1, 1, 1), 80);
         let a = nat.allocate(k, 100).unwrap();
@@ -243,7 +278,11 @@ mod tests {
 
     #[test]
     fn snat_lookup_reverse_finds_original_key() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/nat/nat.go", "Map.LookupV4Reverse", "tenant-nat-revl");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/nat/nat.go",
+            "Map.LookupV4Reverse",
+            "tenant-nat-revl"
+        );
         let mut nat = SnatTable::new(tenant, ip(192, 168, 1, 1));
         let k = key((10, 0, 0, 1), 1234, (1, 1, 1, 1), 80);
         let a = nat.allocate(k, 100).unwrap();
@@ -258,7 +297,11 @@ mod tests {
 
     #[test]
     fn snat_release_frees_mapping() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/nat/nat.go", "Map.DeleteV4", "tenant-nat-rel");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/nat/nat.go",
+            "Map.DeleteV4",
+            "tenant-nat-rel"
+        );
         let mut nat = SnatTable::new(tenant, ip(192, 168, 1, 1));
         let k = key((10, 0, 0, 1), 1234, (1, 1, 1, 1), 80);
         nat.allocate(k, 100).unwrap();
@@ -268,7 +311,11 @@ mod tests {
 
     #[test]
     fn snat_release_unknown_returns_false() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/nat/nat.go", "Map.DeleteV4", "tenant-nat-rel-unk");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/nat/nat.go",
+            "Map.DeleteV4",
+            "tenant-nat-rel-unk"
+        );
         let mut nat = SnatTable::new(tenant, ip(192, 168, 1, 1));
         let k = key((10, 0, 0, 1), 1234, (1, 1, 1, 1), 80);
         assert!(!nat.release(&k));
@@ -276,7 +323,8 @@ mod tests {
 
     #[test]
     fn snat_table_len_tracks_allocations() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/nat/nat.go", "Map.Len", "tenant-nat-len");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/datapath/linux/nat/nat.go", "Map.Len", "tenant-nat-len");
         let mut nat = SnatTable::new(tenant, ip(192, 168, 1, 1));
         for i in 0..10u16 {
             let k = key((10, 0, 0, 1), 1000 + i, (1, 1, 1, 1), 80);
@@ -289,18 +337,39 @@ mod tests {
 
     #[test]
     fn dnat_install_returns_monotonic_index() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/lib/nat.h", "ct_create4_with_rev_nat", "tenant-dnat-mono");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/lib/nat.h",
+            "ct_create4_with_rev_nat",
+            "tenant-dnat-mono"
+        );
         let mut dnat = DnatTable::new(tenant);
-        let a = dnat.install(DnatEntry { backend_ip: ip(10, 0, 1, 1), backend_port: 8080 }).unwrap();
-        let b = dnat.install(DnatEntry { backend_ip: ip(10, 0, 1, 2), backend_port: 8080 }).unwrap();
+        let a = dnat
+            .install(DnatEntry {
+                backend_ip: ip(10, 0, 1, 1),
+                backend_port: 8080,
+            })
+            .unwrap();
+        let b = dnat
+            .install(DnatEntry {
+                backend_ip: ip(10, 0, 1, 2),
+                backend_port: 8080,
+            })
+            .unwrap();
         assert_eq!(b, a + 1);
     }
 
     #[test]
     fn dnat_install_same_backend_is_idempotent() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/lib/nat.h", "ct_create4_with_rev_nat", "tenant-dnat-idem");
+        let (_c, tenant) = cilium_test_ctx!(
+            "bpf/lib/nat.h",
+            "ct_create4_with_rev_nat",
+            "tenant-dnat-idem"
+        );
         let mut dnat = DnatTable::new(tenant);
-        let e = DnatEntry { backend_ip: ip(10, 0, 1, 1), backend_port: 8080 };
+        let e = DnatEntry {
+            backend_ip: ip(10, 0, 1, 1),
+            backend_port: 8080,
+        };
         let a = dnat.install(e).unwrap();
         let b = dnat.install(e).unwrap();
         assert_eq!(a, b);
@@ -308,9 +377,13 @@ mod tests {
 
     #[test]
     fn dnat_lookup_round_trip() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/lib/nat.h", "snat_v4_track_lookup", "tenant-dnat-rt");
+        let (_c, tenant) =
+            cilium_test_ctx!("bpf/lib/nat.h", "snat_v4_track_lookup", "tenant-dnat-rt");
         let mut dnat = DnatTable::new(tenant);
-        let e = DnatEntry { backend_ip: ip(10, 0, 1, 1), backend_port: 8080 };
+        let e = DnatEntry {
+            backend_ip: ip(10, 0, 1, 1),
+            backend_port: 8080,
+        };
         let idx = dnat.install(e).unwrap();
         assert_eq!(dnat.lookup(idx), Some(e));
     }
@@ -319,7 +392,10 @@ mod tests {
     fn dnat_remove_drops_entry() {
         let (_c, tenant) = cilium_test_ctx!("bpf/lib/nat.h", "snat_v4_delete", "tenant-dnat-rm");
         let mut dnat = DnatTable::new(tenant);
-        let e = DnatEntry { backend_ip: ip(10, 0, 1, 1), backend_port: 8080 };
+        let e = DnatEntry {
+            backend_ip: ip(10, 0, 1, 1),
+            backend_port: 8080,
+        };
         let idx = dnat.install(e).unwrap();
         assert!(dnat.remove(idx));
         assert_eq!(dnat.lookup(idx), None);
@@ -334,10 +410,18 @@ mod tests {
 
     #[test]
     fn dnat_len_tracks_inserts() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/datapath/linux/nat/nat.go", "Map.Len", "tenant-dnat-len");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/datapath/linux/nat/nat.go",
+            "Map.Len",
+            "tenant-dnat-len"
+        );
         let mut dnat = DnatTable::new(tenant);
         for p in 8000..8005u16 {
-            dnat.install(DnatEntry { backend_ip: ip(10, 0, 1, 1), backend_port: p }).unwrap();
+            dnat.install(DnatEntry {
+                backend_ip: ip(10, 0, 1, 1),
+                backend_port: p,
+            })
+            .unwrap();
         }
         assert_eq!(dnat.len(), 5);
     }

@@ -75,11 +75,22 @@ pub struct NotificationRule {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind")]
 pub enum PublisherKind {
-    Webhook { url: String },
-    Slack { webhook_url: String },
-    Teams { webhook_url: String },
-    Email { to: String },
-    Jira { base_url: String, project_key: String },
+    Webhook {
+        url: String,
+    },
+    Slack {
+        webhook_url: String,
+    },
+    Teams {
+        webhook_url: String,
+    },
+    Email {
+        to: String,
+    },
+    Jira {
+        base_url: String,
+        project_key: String,
+    },
     Console,
 }
 
@@ -104,7 +115,9 @@ pub struct ConsolePublisher {
 
 impl Default for ConsolePublisher {
     fn default() -> Self {
-        Self { seen: Mutex::new(Vec::new()) }
+        Self {
+            seen: Mutex::new(Vec::new()),
+        }
     }
 }
 

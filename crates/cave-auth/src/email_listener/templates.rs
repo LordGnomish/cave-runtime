@@ -8,8 +8,8 @@
 use handlebars::Handlebars;
 use serde::Serialize;
 
-use super::events::AuthEvent;
 use super::EmailError;
+use super::events::AuthEvent;
 
 /// Registry of compiled templates for the five auth events. One renderer
 /// per cave-auth instance — cheap to clone.
@@ -30,21 +30,31 @@ impl Templates {
         hb.set_strict_mode(true);
         for ev in AuthEvent::all() {
             let (html, text) = default_bodies(*ev);
-            hb.register_template_string(&format!("{}_html", ev.as_key()), html).unwrap();
-            hb.register_template_string(&format!("{}_text", ev.as_key()), text).unwrap();
+            hb.register_template_string(&format!("{}_html", ev.as_key()), html)
+                .unwrap();
+            hb.register_template_string(&format!("{}_text", ev.as_key()), text)
+                .unwrap();
         }
         Self { hb }
     }
 
     /// Render the HTML body for `event`.
-    pub fn render_html<P: Serialize>(&self, event: AuthEvent, payload: &P) -> Result<String, EmailError> {
+    pub fn render_html<P: Serialize>(
+        &self,
+        event: AuthEvent,
+        payload: &P,
+    ) -> Result<String, EmailError> {
         self.hb
             .render(&format!("{}_html", event.as_key()), payload)
             .map_err(|e| EmailError::Render(format!("{e}")))
     }
 
     /// Render the plain-text body for `event`.
-    pub fn render_text<P: Serialize>(&self, event: AuthEvent, payload: &P) -> Result<String, EmailError> {
+    pub fn render_text<P: Serialize>(
+        &self,
+        event: AuthEvent,
+        payload: &P,
+    ) -> Result<String, EmailError> {
         self.hb
             .render(&format!("{}_text", event.as_key()), payload)
             .map_err(|e| EmailError::Render(format!("{e}")))
@@ -135,8 +145,8 @@ The link is valid for 7 days.
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::events::*;
+    use super::*;
 
     fn login_payload() -> LoginAlertPayload {
         LoginAlertPayload {
@@ -152,7 +162,9 @@ mod tests {
     #[test]
     fn login_alert_html_renders_payload_vars() {
         let t = Templates::default();
-        let body = t.render_html(AuthEvent::LoginAlert, &login_payload()).unwrap();
+        let body = t
+            .render_html(AuthEvent::LoginAlert, &login_payload())
+            .unwrap();
         assert!(body.contains("Alice"));
         assert!(body.contains("Berlin, DE"));
         assert!(body.contains("1.2.3.4"));
@@ -162,7 +174,9 @@ mod tests {
     #[test]
     fn login_alert_text_renders_payload_vars() {
         let t = Templates::default();
-        let body = t.render_text(AuthEvent::LoginAlert, &login_payload()).unwrap();
+        let body = t
+            .render_text(AuthEvent::LoginAlert, &login_payload())
+            .unwrap();
         assert!(body.contains("Alice"));
         assert!(body.contains("Berlin, DE"));
         assert!(!body.contains("<html>"));
@@ -249,7 +263,8 @@ mod tests {
             assert!(!s.is_empty(), "subject empty for {:?}", ev);
         }
         // Distinct
-        let mut subjects: Vec<&'static str> = AuthEvent::all().iter().map(|ev| t.subject(*ev)).collect();
+        let mut subjects: Vec<&'static str> =
+            AuthEvent::all().iter().map(|ev| t.subject(*ev)).collect();
         subjects.sort();
         let dedup_len = {
             let mut s = subjects.clone();

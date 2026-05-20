@@ -72,10 +72,7 @@ pub fn warning_count(events: &[EventRow]) -> usize {
     events.iter().filter(|e| e.event_type == "Warning").count()
 }
 
-pub fn render_section(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, KubeletViewError> {
+pub fn render_section(state: &AdminState, ctx: &RequestCtx) -> Result<String, KubeletViewError> {
     let events = list_events(state, ctx)?;
     let rows: Vec<Vec<String>> = events
         .iter()
@@ -96,10 +93,7 @@ pub fn render_section(
 </section>"#,
         n = events.len(),
         w = warning_count(&events),
-        tbl = table(
-            &["time", "source", "type", "reason", "message"],
-            &rows
-        ),
+        tbl = table(&["time", "source", "type", "reason", "message"], &rows),
     ))
 }
 

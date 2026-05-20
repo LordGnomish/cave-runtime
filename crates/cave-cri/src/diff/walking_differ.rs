@@ -43,10 +43,7 @@ pub struct ApplyStats {
 /// Apply a gzipped layer tarball into `target_dir`. The caller is
 /// expected to have already created `target_dir`. Returns stats on
 /// what was applied.
-pub fn apply_layer(
-    gzipped_tar: &[u8],
-    target_dir: &Path,
-) -> Result<ApplyStats, ApplyError> {
+pub fn apply_layer(gzipped_tar: &[u8], target_dir: &Path) -> Result<ApplyStats, ApplyError> {
     let uncompressed = decompress_gzip(gzipped_tar)?;
     apply_uncompressed_tar(&uncompressed, target_dir)
 }
@@ -246,7 +243,10 @@ mod tests {
         let stats = apply_layer(&gz, tmp.path()).unwrap();
         assert_eq!(stats.files_written, 2);
         assert_eq!(fs::read(tmp.path().join("hello.txt")).unwrap(), b"hi!");
-        assert_eq!(fs::read(tmp.path().join("nested/inner.bin")).unwrap(), b"bytes");
+        assert_eq!(
+            fs::read(tmp.path().join("nested/inner.bin")).unwrap(),
+            b"bytes"
+        );
     }
 
     #[test]

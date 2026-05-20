@@ -70,7 +70,9 @@ pub struct ExploreController {
 }
 
 impl ExploreController {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn push(mut self, q: ExploreQuery) -> Self {
         self.queries.push(q);
@@ -87,7 +89,10 @@ impl ExploreController {
     pub fn plan(&self) -> HashMap<String, Vec<String>> {
         let mut groups: HashMap<String, Vec<String>> = HashMap::new();
         for q in &self.queries {
-            groups.entry(q.datasource.clone()).or_default().push(q.ref_id.clone());
+            groups
+                .entry(q.datasource.clone())
+                .or_default()
+                .push(q.ref_id.clone());
         }
         groups
     }
@@ -103,10 +108,13 @@ impl ExploreController {
                     for f in frames {
                         for p in &f.points {
                             if let Some(tid) = &p.trace_id {
-                                let row = by_trace.entry(tid.clone()).or_insert_with(|| CorrelatedRow {
-                                    pivot: format!("trace={}", tid),
-                                    points: Vec::new(),
-                                });
+                                let row =
+                                    by_trace
+                                        .entry(tid.clone())
+                                        .or_insert_with(|| CorrelatedRow {
+                                            pivot: format!("trace={}", tid),
+                                            points: Vec::new(),
+                                        });
                                 row.points.push((f.ref_id.clone(), p.clone()));
                             }
                         }
@@ -117,10 +125,13 @@ impl ExploreController {
                     let mut by_ts: HashMap<i64, CorrelatedRow> = HashMap::new();
                     for f in frames {
                         for p in &f.points {
-                            let row = by_ts.entry(p.timestamp_ms).or_insert_with(|| CorrelatedRow {
-                                pivot: format!("ts={}", p.timestamp_ms),
-                                points: Vec::new(),
-                            });
+                            let row =
+                                by_ts
+                                    .entry(p.timestamp_ms)
+                                    .or_insert_with(|| CorrelatedRow {
+                                        pivot: format!("ts={}", p.timestamp_ms),
+                                        points: Vec::new(),
+                                    });
                             row.points.push((f.ref_id.clone(), p.clone()));
                         }
                     }
@@ -323,7 +334,10 @@ mod tests {
             .push(query("C", "tempo", SourceKind::Tempo));
         assert_eq!(ctrl.plan().len(), 3);
         assert_eq!(
-            ctrl.queries.iter().map(|q| q.kind.clone()).collect::<Vec<_>>(),
+            ctrl.queries
+                .iter()
+                .map(|q| q.kind.clone())
+                .collect::<Vec<_>>(),
             vec![SourceKind::Prometheus, SourceKind::Loki, SourceKind::Tempo]
         );
     }

@@ -13,7 +13,7 @@
 Passwords are the leading attack vector for enterprise breaches. Phishing, credential stuffing, password reuse, and brute force attacks account for over 80% of identity-related incidents (Verizon DBIR 2024-2025). The industry is converging on passwordless authentication via FIDO2/WebAuthn/passkeys as the replacement.
 
 CAVE operates across two identity stacks:
-- **Hetzner:** Keycloak (self-hosted, ADR-006) with WebAuthn support
+- **Sovereign:** Keycloak (self-hosted, ADR-006) with WebAuthn support
 - **Azure:** Okta Workforce (ADR-007) with FastPass + Entra ID with Microsoft passkeys
 
 A unified passwordless strategy must work across both profiles, support tenant BYOID federation (ADR-129), and provide a migration path for existing password-based users.
@@ -50,21 +50,21 @@ A unified passwordless strategy must work across both profiles, support tenant B
 - All platform users: password + MFA (TOTP, push, or FIDO2)
 - Encourage FIDO2 registration at every login
 - Track passkey adoption metrics per tenant
-- **Hetzner:** Keycloak WebAuthn authentication policy (required action: configure FIDO2)
+- **Sovereign:** Keycloak WebAuthn authentication policy (required action: configure FIDO2)
 - **Azure:** Okta Verify push + FIDO2 enrollment prompt, Entra Conditional Access (require MFA for Azure Portal)
 
 ### Phase 2: Passkey-Preferred (Q4 2026 → Q2 2027)
 - Default login flow: passkey first, password as fallback
 - New user onboarding: passkey registration mandatory, password optional
 - Admin accounts: passkey-only (no password fallback) — enforced via policy
-- **Hetzner:** Keycloak authentication flow configured as WebAuthn-preferred
+- **Sovereign:** Keycloak authentication flow configured as WebAuthn-preferred
 - **Azure:** Okta FastPass as primary, Entra passwordless phone sign-in
 
 ### Phase 3: Password-Optional (Q3 2027 → 2028)
 - Users with registered passkeys can delete their passwords
 - New tenants: passwordless-by-default option in tenant onboarding
 - Password retention only for: break-glass admin accounts, legacy system integrations, BYOID tenants whose IdP requires passwords
-- **Hetzner:** Keycloak credential management allows password removal for users with 2+ FIDO2 keys
+- **Sovereign:** Keycloak credential management allows password removal for users with 2+ FIDO2 keys
 - **Azure:** Okta passwordless policy, Entra TAP (Temporary Access Pass) for recovery
 
 ### Implementation Details

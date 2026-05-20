@@ -9,18 +9,23 @@
 //! (Sessions are managed via the Users + Realms endpoints in
 //! the REST API — the UI exposes them as a dedicated tab.)
 
+use super::AuthViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, AuthSession};
-use super::AuthViewError;
+use crate::admin::state::{AdminState, AuthSession, scope};
 
-pub fn list_sessions(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<AuthSession>, AuthViewError> {
+pub fn list_sessions(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<AuthSession>, AuthViewError> {
     ctx.authorise(Permission::AuthSessionsRead)?;
     let mut rows: Vec<AuthSession> =
-        scope(&state.auth_sessions.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-            .into_iter()
-            .cloned()
-            .collect();
+        scope(&state.auth_sessions.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| a.expires_unix.cmp(&b.expires_unix));
     Ok(rows)
 }
@@ -75,19 +80,22 @@ mod tests {
 
     #[test]
     fn list_returns_seeded_rows_for_tenant() {
-        let rows = list_sessions(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
+        let rows =
+            list_sessions(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
         assert!(rows.iter().any(|s| s.session_id == "sess-aaa"));
     }
 
     #[test]
     fn list_excludes_other_tenants() {
-        let rows = list_sessions(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
+        let rows =
+            list_sessions(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
         assert!(rows.iter().all(|s| s.session_id != "sess-evil"));
     }
 
     #[test]
     fn list_sorts_by_expiry_ascending() {
-        let rows = list_sessions(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
+        let rows =
+            list_sessions(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
         for w in rows.windows(2) {
             assert!(w[0].expires_unix <= w[1].expires_unix);
         }
@@ -95,7 +103,8 @@ mod tests {
 
     #[test]
     fn expiring_within_window_finds_sessions() {
-        let rows = list_sessions(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
+        let rows =
+            list_sessions(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
         // Window large enough to include every seeded session.
         let near = expiring_within(&rows, 0, i64::MAX);
         assert_eq!(near.len(), rows.len());

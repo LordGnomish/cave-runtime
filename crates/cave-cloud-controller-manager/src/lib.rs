@@ -17,9 +17,9 @@
 
 #![allow(clippy::needless_doctest_main)]
 
-pub mod types;
 pub mod provider;
 pub mod provider_runtime;
+pub mod types;
 
 pub mod node_controller;
 pub mod node_lifecycle;
@@ -60,10 +60,7 @@ pub const CLOUD_CONTROLLERS: &[&str] = &[
 
 /// Stable list of cloud providers compiled into this binary. Order is
 /// alphabetical for deterministic CLI/portal output.
-pub const PROVIDERS: &[&str] = &[
-    "azure",
-    "hetzner",
-];
+pub const PROVIDERS: &[&str] = &["azure", "hetzner"];
 
 /// Calculate parity against the local source tree at compile-time crate root.
 pub fn calculate_parity() -> Result<cave_kernel::parity::ParityReport, String> {

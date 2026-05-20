@@ -5,9 +5,9 @@
 //! cave-auth surfaces. Visual port of
 //! `js/apps/admin-ui/src/clients/authorization/AuthorizationSection.tsx`.
 
+use super::{AuthAdminError, render_admin_nav, require_platform};
 use crate::admin::permission::RequestCtx;
 use crate::admin::render::{escape, page_shell_full, table_html};
-use super::{render_admin_nav, require_platform, AuthAdminError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UmaResource {

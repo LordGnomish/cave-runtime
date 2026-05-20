@@ -1,25 +1,26 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+use crate::VaultState;
 use crate::error::{VaultError, VaultResult};
 use crate::response::VaultResponse;
-use crate::VaultState;
 use axum::{
+    Router,
     extract::{Json, Path, State},
     http::HeaderMap,
     routing::{delete, get, post},
-    Router,
 };
 use base64::Engine as _;
 use ring::hmac;
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn extract_token(headers: &HeaderMap) -> VaultResult<String> {
-    headers.get("x-vault-token")
+    headers
+        .get("x-vault-token")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or(VaultError::BadToken)
@@ -138,20 +139,37 @@ pub async fn create_key(
 
     let mut key = TotpKey {
         name: key_name.clone(),
-        issuer: body.get("issuer").and_then(|v| v.as_str()).unwrap_or("Vault").to_string(),
-        account_name: body.get("account_name").and_then(|v| v.as_str())
-            .unwrap_or(&key_name).to_string(),
+        issuer: body
+            .get("issuer")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Vault")
+            .to_string(),
+        account_name: body
+            .get("account_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or(&key_name)
+            .to_string(),
         digits: body.get("digits").and_then(|v| v.as_u64()).unwrap_or(6) as u32,
         period: body.get("period").and_then(|v| v.as_u64()).unwrap_or(30),
         skew: body.get("skew").and_then(|v| v.as_u64()).unwrap_or(1) as u32,
         key_size: body.get("key_size").and_then(|v| v.as_u64()).unwrap_or(20) as u32,
-        algorithm: match body.get("algorithm").and_then(|v| v.as_str()).unwrap_or("SHA1") {
+        algorithm: match body
+            .get("algorithm")
+            .and_then(|v| v.as_str())
+            .unwrap_or("SHA1")
+        {
             "SHA256" => TotpAlgorithm::SHA256,
             "SHA512" => TotpAlgorithm::SHA512,
             _ => TotpAlgorithm::SHA1,
         },
-        generated: body.get("generate").and_then(|v| v.as_bool()).unwrap_or(true),
-        exported: body.get("exported").and_then(|v| v.as_bool()).unwrap_or(true),
+        generated: body
+            .get("generate")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true),
+        exported: body
+            .get("exported")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true),
         ..Default::default()
     };
 
@@ -159,26 +177,33 @@ pub async fn create_key(
     if let Some(url) = body.get("url").and_then(|v| v.as_str()) {
         // Parse otpauth URL: otpauth://totp/issuer:account?secret=BASE32_SECRET&...
         key.url = url.to_string();
-        if let Some(secret_b32) = url.split("secret=").nth(1).map(|s| s.split('&').next().unwrap_or(s)) {
+        if let Some(secret_b32) = url
+            .split("secret=")
+            .nth(1)
+            .map(|s| s.split('&').next().unwrap_or(s))
+        {
             // Decode base32 (simplified: use base64 as fallback)
             if let Ok(secret_bytes) = base32_decode(secret_b32) {
                 key.secret = secret_bytes;
             }
         }
     } else if let Some(key_b64) = body.get("key").and_then(|v| v.as_str()) {
-        key.secret = base64::engine::general_purpose::STANDARD.decode(key_b64)
+        key.secret = base64::engine::general_purpose::STANDARD
+            .decode(key_b64)
             .map_err(|_| VaultError::InvalidRequest("invalid base64 key".into()))?;
     } else {
         // Generate random secret
         let rng = SystemRandom::new();
         let mut secret = vec![0u8; key.key_size as usize];
-        rng.fill(&mut secret).map_err(|_| VaultError::Crypto("rng failure".into()))?;
+        rng.fill(&mut secret)
+            .map_err(|_| VaultError::Crypto("rng failure".into()))?;
         key.secret = secret;
     }
 
     // Build TOTP URL
     let secret_b32 = base32_encode(&key.secret);
-    key.url = format!("otpauth://totp/{}:{}?secret={}&issuer={}&algorithm={}&digits={}&period={}",
+    key.url = format!(
+        "otpauth://totp/{}:{}?secret={}&issuer={}&algorithm={}&digits={}&period={}",
         urlencoding_simple(&key.issuer),
         urlencoding_simple(&key.account_name),
         secret_b32,
@@ -211,7 +236,9 @@ pub async fn read_key(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.totp_store.read().await;
-    let key = store.keys.get(&key_name)
+    let key = store
+        .keys
+        .get(&key_name)
         .ok_or_else(|| VaultError::KeyNotFound(key_name))?;
     Ok(VaultResponse::new().with_data(json!({
         "name": key.name,
@@ -256,7 +283,9 @@ pub async fn generate_code_handler(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.totp_store.read().await;
-    let key = store.keys.get(&key_name)
+    let key = store
+        .keys
+        .get(&key_name)
         .ok_or_else(|| VaultError::KeyNotFound(key_name))?;
     let code = generate_code(key);
     Ok(VaultResponse::new().with_data(json!({
@@ -277,9 +306,13 @@ pub async fn validate_code_handler(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.totp_store.read().await;
-    let key = store.keys.get(&key_name)
+    let key = store
+        .keys
+        .get(&key_name)
         .ok_or_else(|| VaultError::KeyNotFound(key_name))?;
-    let code_num: u32 = body.code.parse()
+    let code_num: u32 = body
+        .code
+        .parse()
         .map_err(|_| VaultError::InvalidRequest("invalid code".into()))?;
     let valid = validate_code(key, code_num);
     Ok(VaultResponse::new().with_data(json!({ "valid": valid })))
@@ -332,57 +365,83 @@ fn urlencoding_simple(s: &str) -> String {
 pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
     let m = mount.to_string();
     Router::new()
-        .route(&format!("/v1/{}/keys", mount), get({
-            let s = state.clone();
-            let mount = m.clone();
-            move |headers: HeaderMap| {
-                let state = s.clone();
-                let mount = mount.clone();
-                async move { list_keys(State(state), headers, Path(mount)).await }
-            }
-        }))
-        .route(&format!("/v1/{}/keys/{{key_name}}", mount), post({
-            let s = state.clone();
-            let mount = m.clone();
-            move |headers: HeaderMap, Path(key_name): Path<String>, Json(body): Json<Value>| {
-                let state = s.clone();
-                let mount = mount.clone();
-                async move { create_key(State(state), headers, Path((mount, key_name)), Json(body)).await }
-            }
-        }).get({
-            let s = state.clone();
-            let mount = m.clone();
-            move |headers: HeaderMap, Path(key_name): Path<String>| {
-                let state = s.clone();
-                let mount = mount.clone();
-                async move { read_key(State(state), headers, Path((mount, key_name))).await }
-            }
-        }).delete({
-            let s = state.clone();
-            let mount = m.clone();
-            move |headers: HeaderMap, Path(key_name): Path<String>| {
-                let state = s.clone();
-                let mount = mount.clone();
-                async move { delete_key(State(state), headers, Path((mount, key_name))).await }
-            }
-        }))
-        .route(&format!("/v1/{}/code/{{key_name}}", mount), get({
-            let s = state.clone();
-            let mount = m.clone();
-            move |headers: HeaderMap, Path(key_name): Path<String>| {
-                let state = s.clone();
-                let mount = mount.clone();
-                async move { generate_code_handler(State(state), headers, Path((mount, key_name))).await }
-            }
-        }).post({
-            let s = state.clone();
-            let mount = m.clone();
-            move |headers: HeaderMap, Path(key_name): Path<String>, Json(body): Json<ValidateCodeRequest>| {
-                let state = s.clone();
-                let mount = mount.clone();
-                async move { validate_code_handler(State(state), headers, Path((mount, key_name)), Json(body)).await }
-            }
-        }))
+        .route(
+            &format!("/v1/{}/keys", mount),
+            get({
+                let s = state.clone();
+                let mount = m.clone();
+                move |headers: HeaderMap| {
+                    let state = s.clone();
+                    let mount = mount.clone();
+                    async move { list_keys(State(state), headers, Path(mount)).await }
+                }
+            }),
+        )
+        .route(
+            &format!("/v1/{}/keys/{{key_name}}", mount),
+            post({
+                let s = state.clone();
+                let mount = m.clone();
+                move |headers: HeaderMap, Path(key_name): Path<String>, Json(body): Json<Value>| {
+                    let state = s.clone();
+                    let mount = mount.clone();
+                    async move {
+                        create_key(State(state), headers, Path((mount, key_name)), Json(body)).await
+                    }
+                }
+            })
+            .get({
+                let s = state.clone();
+                let mount = m.clone();
+                move |headers: HeaderMap, Path(key_name): Path<String>| {
+                    let state = s.clone();
+                    let mount = mount.clone();
+                    async move { read_key(State(state), headers, Path((mount, key_name))).await }
+                }
+            })
+            .delete({
+                let s = state.clone();
+                let mount = m.clone();
+                move |headers: HeaderMap, Path(key_name): Path<String>| {
+                    let state = s.clone();
+                    let mount = mount.clone();
+                    async move { delete_key(State(state), headers, Path((mount, key_name))).await }
+                }
+            }),
+        )
+        .route(
+            &format!("/v1/{}/code/{{key_name}}", mount),
+            get({
+                let s = state.clone();
+                let mount = m.clone();
+                move |headers: HeaderMap, Path(key_name): Path<String>| {
+                    let state = s.clone();
+                    let mount = mount.clone();
+                    async move {
+                        generate_code_handler(State(state), headers, Path((mount, key_name))).await
+                    }
+                }
+            })
+            .post({
+                let s = state.clone();
+                let mount = m.clone();
+                move |headers: HeaderMap,
+                      Path(key_name): Path<String>,
+                      Json(body): Json<ValidateCodeRequest>| {
+                    let state = s.clone();
+                    let mount = mount.clone();
+                    async move {
+                        validate_code_handler(
+                            State(state),
+                            headers,
+                            Path((mount, key_name)),
+                            Json(body),
+                        )
+                        .await
+                    }
+                }
+            }),
+        )
         .with_state(state)
 }
 

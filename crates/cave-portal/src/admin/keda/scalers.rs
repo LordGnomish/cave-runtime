@@ -133,7 +133,12 @@ pub fn render(
         }
         body.push_str("</tbody></table>");
     }
-    Ok(page_shell_full(ctx, "/admin/keda/scalers", "keda · scaler catalog", &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/keda/scalers",
+        "keda · scaler catalog",
+        &body,
+    ))
 }
 
 /// Render a single-scaler detail page. Returns 404-shaped Error when the
@@ -168,13 +173,22 @@ pub fn render_detail(
         tenant = escape(ctx.tenant.as_str()),
         kind = escape(e.kind),
         cat = e.category.as_str(),
-        auth = if e.requires_auth { "yes (needs TriggerAuthentication)" } else { "no (env / inline)" },
+        auth = if e.requires_auth {
+            "yes (needs TriggerAuthentication)"
+        } else {
+            "no (env / inline)"
+        },
         u = escape(e.docs_url),
         summary = escape(e.summary),
         md = metadata_list,
         example = escape(&example_trigger_yaml(e)),
     );
-    Ok(page_shell_full(ctx, "/admin/keda/scalers", &format!("keda · scaler · {}", e.kind), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/keda/scalers",
+        &format!("keda · scaler · {}", e.kind),
+        &body,
+    ))
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -189,7 +203,12 @@ fn example_trigger_yaml(e: &ScalerEntry) -> String {
     let mut out = format!("- type: {}\n  metadata:\n", e.kind);
     for k in e.metadata_keys {
         let placeholder = match *k {
-            "threshold" | "value" | "targetValue" | "queueLength" | "lagThreshold" | "msgBacklogThreshold" => "10",
+            "threshold"
+            | "value"
+            | "targetValue"
+            | "queueLength"
+            | "lagThreshold"
+            | "msgBacklogThreshold" => "10",
             "awsRegion" => "eu-west-1",
             _ => "<value>",
         };
@@ -258,7 +277,13 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::AwsCloud,
         summary: "Scale on a CloudWatch Logs Insights query result.",
         docs_url: "https://keda.sh/docs/2.14/scalers/aws-cloudwatch-logs/",
-        metadata_keys: &["logGroupName", "logStreamName", "awsRegion", "query", "targetValue"],
+        metadata_keys: &[
+            "logGroupName",
+            "logStreamName",
+            "awsRegion",
+            "query",
+            "targetValue",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -345,7 +370,14 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::AzureCloud,
         summary: "Scale on an Azure Data Explorer (Kusto) query.",
         docs_url: "https://keda.sh/docs/2.14/scalers/azure-data-explorer/",
-        metadata_keys: &["endpoint", "databaseName", "query", "threshold", "tenantId", "clientId"],
+        metadata_keys: &[
+            "endpoint",
+            "databaseName",
+            "query",
+            "threshold",
+            "tenantId",
+            "clientId",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -412,7 +444,13 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::AzureCloud,
         summary: "Scale on an Azure Storage Queue's message count.",
         docs_url: "https://keda.sh/docs/2.14/scalers/azure-storage-queue/",
-        metadata_keys: &["queueName", "queueLength", "connectionFromEnv", "accountName", "cloud"],
+        metadata_keys: &[
+            "queueName",
+            "queueLength",
+            "connectionFromEnv",
+            "accountName",
+            "cloud",
+        ],
         requires_auth: false,
     },
     ScalerEntry {
@@ -478,7 +516,12 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Messaging,
         summary: "Scale on ActiveMQ destination queue depth.",
         docs_url: "https://keda.sh/docs/2.14/scalers/activemq/",
-        metadata_keys: &["managementEndpoint", "destinationName", "brokerName", "targetQueueSize"],
+        metadata_keys: &[
+            "managementEndpoint",
+            "destinationName",
+            "brokerName",
+            "targetQueueSize",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -528,7 +571,13 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Messaging,
         summary: "Scale on NATS JetStream pending message count.",
         docs_url: "https://keda.sh/docs/2.14/scalers/nats-jetstream/",
-        metadata_keys: &["natsServerMonitoringEndpoint", "account", "stream", "consumer", "lagThreshold"],
+        metadata_keys: &[
+            "natsServerMonitoringEndpoint",
+            "account",
+            "stream",
+            "consumer",
+            "lagThreshold",
+        ],
         requires_auth: false,
     },
     ScalerEntry {
@@ -536,7 +585,13 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Messaging,
         summary: "Scale on NATS Streaming queue depth.",
         docs_url: "https://keda.sh/docs/2.14/scalers/nats-streaming/",
-        metadata_keys: &["natsServerMonitoringEndpoint", "queueGroup", "durableName", "subject", "lagThreshold"],
+        metadata_keys: &[
+            "natsServerMonitoringEndpoint",
+            "queueGroup",
+            "durableName",
+            "subject",
+            "lagThreshold",
+        ],
         requires_auth: false,
     },
     ScalerEntry {
@@ -544,7 +599,13 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Messaging,
         summary: "Scale on Apache Pulsar subscription backlog.",
         docs_url: "https://keda.sh/docs/2.14/scalers/pulsar/",
-        metadata_keys: &["adminURL", "topic", "subscription", "msgBacklogThreshold", "isPartitionedTopic"],
+        metadata_keys: &[
+            "adminURL",
+            "topic",
+            "subscription",
+            "msgBacklogThreshold",
+            "isPartitionedTopic",
+        ],
         requires_auth: false,
     },
     ScalerEntry {
@@ -570,7 +631,13 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Messaging,
         summary: "Scale on Redis Stream consumer-group pending count.",
         docs_url: "https://keda.sh/docs/2.14/scalers/redis-streams/",
-        metadata_keys: &["address", "stream", "consumerGroup", "pendingEntriesCount", "streamLength"],
+        metadata_keys: &[
+            "address",
+            "stream",
+            "consumerGroup",
+            "pendingEntriesCount",
+            "streamLength",
+        ],
         requires_auth: false,
     },
     ScalerEntry {
@@ -578,7 +645,13 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Messaging,
         summary: "Like `redis-streams` but for a Redis cluster.",
         docs_url: "https://keda.sh/docs/2.14/scalers/redis-cluster-streams/",
-        metadata_keys: &["addresses", "stream", "consumerGroup", "pendingEntriesCount", "streamLength"],
+        metadata_keys: &[
+            "addresses",
+            "stream",
+            "consumerGroup",
+            "pendingEntriesCount",
+            "streamLength",
+        ],
         requires_auth: false,
     },
     ScalerEntry {
@@ -586,7 +659,13 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Messaging,
         summary: "Like `redis-streams` but routed through Redis Sentinel.",
         docs_url: "https://keda.sh/docs/2.14/scalers/redis-sentinel-streams/",
-        metadata_keys: &["addresses", "sentinelMaster", "stream", "consumerGroup", "pendingEntriesCount"],
+        metadata_keys: &[
+            "addresses",
+            "sentinelMaster",
+            "stream",
+            "consumerGroup",
+            "pendingEntriesCount",
+        ],
         requires_auth: false,
     },
     ScalerEntry {
@@ -594,7 +673,13 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Messaging,
         summary: "Scale on a Solace PubSub+ event queue's spool size.",
         docs_url: "https://keda.sh/docs/2.14/scalers/solace-pub-sub/",
-        metadata_keys: &["solaceSempBaseURL", "messageVpn", "queueName", "messageCountTarget", "messageSpoolUsageTarget"],
+        metadata_keys: &[
+            "solaceSempBaseURL",
+            "messageVpn",
+            "queueName",
+            "messageCountTarget",
+            "messageSpoolUsageTarget",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -602,7 +687,12 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Messaging,
         summary: "Scale on NATS Streaming (legacy STAN) lag.",
         docs_url: "https://keda.sh/docs/2.14/scalers/stan/",
-        metadata_keys: &["natsServerMonitoringEndpoint", "queueGroup", "subject", "lagThreshold"],
+        metadata_keys: &[
+            "natsServerMonitoringEndpoint",
+            "queueGroup",
+            "subject",
+            "lagThreshold",
+        ],
         requires_auth: false,
     },
     // ── Database ──────────────────────────────────────────────────────
@@ -611,7 +701,15 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Database,
         summary: "Scale on a CQL query result against Cassandra.",
         docs_url: "https://keda.sh/docs/2.14/scalers/cassandra/",
-        metadata_keys: &["username", "clusterIPAddress", "port", "consistency", "protocolVersion", "query", "targetQueryValue"],
+        metadata_keys: &[
+            "username",
+            "clusterIPAddress",
+            "port",
+            "consistency",
+            "protocolVersion",
+            "query",
+            "targetQueryValue",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -619,7 +717,14 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Database,
         summary: "Scale on a CouchDB Mango query.",
         docs_url: "https://keda.sh/docs/2.14/scalers/couchdb/",
-        metadata_keys: &["connectionStringFromEnv", "host", "port", "dbName", "query", "queryValue"],
+        metadata_keys: &[
+            "connectionStringFromEnv",
+            "host",
+            "port",
+            "dbName",
+            "query",
+            "queryValue",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -627,7 +732,14 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Database,
         summary: "Scale on an Elasticsearch/OpenSearch search-template result.",
         docs_url: "https://keda.sh/docs/2.14/scalers/elasticsearch/",
-        metadata_keys: &["addresses", "username", "index", "searchTemplateName", "valueLocation", "targetValue"],
+        metadata_keys: &[
+            "addresses",
+            "username",
+            "index",
+            "searchTemplateName",
+            "valueLocation",
+            "targetValue",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -635,7 +747,12 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Database,
         summary: "Scale on an etcd key value (typical: queue counter).",
         docs_url: "https://keda.sh/docs/2.14/scalers/etcd/",
-        metadata_keys: &["endpoints", "watchKey", "value", "watchProgressNotifyInterval"],
+        metadata_keys: &[
+            "endpoints",
+            "watchKey",
+            "value",
+            "watchProgressNotifyInterval",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -643,7 +760,13 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Database,
         summary: "Scale on an InfluxDB Flux query result.",
         docs_url: "https://keda.sh/docs/2.14/scalers/influxdb/",
-        metadata_keys: &["serverURL", "organizationName", "query", "thresholdValue", "authTokenFromEnv"],
+        metadata_keys: &[
+            "serverURL",
+            "organizationName",
+            "query",
+            "thresholdValue",
+            "authTokenFromEnv",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -651,7 +774,13 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Database,
         summary: "Scale on a MongoDB aggregation pipeline result count.",
         docs_url: "https://keda.sh/docs/2.14/scalers/mongodb/",
-        metadata_keys: &["connectionStringFromEnv", "dbName", "collection", "query", "queryValue"],
+        metadata_keys: &[
+            "connectionStringFromEnv",
+            "dbName",
+            "collection",
+            "query",
+            "queryValue",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -659,7 +788,12 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Database,
         summary: "Scale on a Microsoft SQL Server SELECT-result.",
         docs_url: "https://keda.sh/docs/2.14/scalers/mssql/",
-        metadata_keys: &["connectionStringFromEnv", "query", "targetValue", "activationTargetValue"],
+        metadata_keys: &[
+            "connectionStringFromEnv",
+            "query",
+            "targetValue",
+            "activationTargetValue",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -667,7 +801,14 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Database,
         summary: "Scale on a MySQL SELECT-result.",
         docs_url: "https://keda.sh/docs/2.14/scalers/mysql/",
-        metadata_keys: &["connectionStringFromEnv", "host", "port", "dbName", "query", "queryValue"],
+        metadata_keys: &[
+            "connectionStringFromEnv",
+            "host",
+            "port",
+            "dbName",
+            "query",
+            "queryValue",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -675,7 +816,14 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Database,
         summary: "Scale on a Postgres SELECT-result.",
         docs_url: "https://keda.sh/docs/2.14/scalers/postgresql/",
-        metadata_keys: &["connectionFromEnv", "host", "port", "dbName", "query", "targetQueryValue"],
+        metadata_keys: &[
+            "connectionFromEnv",
+            "host",
+            "port",
+            "dbName",
+            "query",
+            "targetQueryValue",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -683,7 +831,13 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Database,
         summary: "Scale on Redis list length.",
         docs_url: "https://keda.sh/docs/2.14/scalers/redis-lists/",
-        metadata_keys: &["address", "listName", "listLength", "enableTLS", "databaseIndex"],
+        metadata_keys: &[
+            "address",
+            "listName",
+            "listLength",
+            "enableTLS",
+            "databaseIndex",
+        ],
         requires_auth: false,
     },
     ScalerEntry {
@@ -708,7 +862,14 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Observability,
         summary: "Scale on a Datadog metric query.",
         docs_url: "https://keda.sh/docs/2.14/scalers/datadog/",
-        metadata_keys: &["query", "queryValue", "queryAggregator", "type", "age", "timeWindowOffset"],
+        metadata_keys: &[
+            "query",
+            "queryValue",
+            "queryAggregator",
+            "type",
+            "age",
+            "timeWindowOffset",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -775,7 +936,13 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::CiCd,
         summary: "Scale GitHub Actions Runner Scale Set workers.",
         docs_url: "https://keda.sh/docs/2.14/scalers/github-runner/",
-        metadata_keys: &["runnerScaleSetName", "githubAPIURL", "labels", "applicationID", "installationID"],
+        metadata_keys: &[
+            "runnerScaleSetName",
+            "githubAPIURL",
+            "labels",
+            "applicationID",
+            "installationID",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -783,7 +950,13 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::CiCd,
         summary: "Scale self-hosted GitHub Actions runners.",
         docs_url: "https://keda.sh/docs/2.14/scalers/github-runner/",
-        metadata_keys: &["owner", "runnerScope", "githubAPIURL", "labels", "noDefaultLabels"],
+        metadata_keys: &[
+            "owner",
+            "runnerScope",
+            "githubAPIURL",
+            "labels",
+            "noDefaultLabels",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -791,7 +964,12 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::CiCd,
         summary: "Scale GitLab runners based on pending jobs.",
         docs_url: "https://keda.sh/docs/2.14/scalers/gitlab-runner/",
-        metadata_keys: &["projectID", "gitlabAPIURL", "targetPipelinesQueueLength", "labels"],
+        metadata_keys: &[
+            "projectID",
+            "gitlabAPIURL",
+            "targetPipelinesQueueLength",
+            "labels",
+        ],
         requires_auth: true,
     },
     // ── Workload / Kubernetes-native ──────────────────────────────────
@@ -856,7 +1034,13 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Runtime,
         summary: "Predictive scaling using PredictKube ML model.",
         docs_url: "https://keda.sh/docs/2.14/scalers/predictkube/",
-        metadata_keys: &["prometheusAddress", "query", "predictHorizon", "queryStep", "threshold"],
+        metadata_keys: &[
+            "prometheusAddress",
+            "query",
+            "predictHorizon",
+            "queryStep",
+            "threshold",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -864,7 +1048,13 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Runtime,
         summary: "Scale Selenium Grid nodes based on pending session requests.",
         docs_url: "https://keda.sh/docs/2.14/scalers/selenium-grid-scaler/",
-        metadata_keys: &["url", "browserName", "browserVersion", "platformName", "sessionRequestLength"],
+        metadata_keys: &[
+            "url",
+            "browserName",
+            "browserVersion",
+            "platformName",
+            "sessionRequestLength",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -897,7 +1087,12 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Other,
         summary: "Scale on a Huawei Cloud CloudEye metric.",
         docs_url: "https://keda.sh/docs/2.14/scalers/huawei-cloudeye/",
-        metadata_keys: &["namespace", "metricName", "dimensionName", "targetMetricValue"],
+        metadata_keys: &[
+            "namespace",
+            "metricName",
+            "dimensionName",
+            "targetMetricValue",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -905,7 +1100,13 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::Other,
         summary: "Scale on a Gnocchi/OpenStack Telemetry metric.",
         docs_url: "https://keda.sh/docs/2.14/scalers/openstack-metric/",
-        metadata_keys: &["metricsURL", "metricID", "aggregationMethod", "granularity", "threshold"],
+        metadata_keys: &[
+            "metricsURL",
+            "metricID",
+            "aggregationMethod",
+            "granularity",
+            "threshold",
+        ],
         requires_auth: true,
     },
     ScalerEntry {
@@ -945,7 +1146,12 @@ const CATALOG: &[ScalerEntry] = &[
         category: ScalerCategory::AzureCloud,
         summary: "Scale on Azure Event Grid topic backlog.",
         docs_url: "https://keda.sh/docs/2.14/scalers/azure-eventgrid/",
-        metadata_keys: &["topicName", "resourceGroup", "subscriptionId", "messageCount"],
+        metadata_keys: &[
+            "topicName",
+            "resourceGroup",
+            "subscriptionId",
+            "messageCount",
+        ],
         requires_auth: true,
     },
 ];
@@ -968,7 +1174,13 @@ mod tests {
 
     #[test]
     fn lookup_finds_well_known_scalers() {
-        for k in ["kafka", "prometheus", "cron", "aws-sqs-queue", "azure-servicebus"] {
+        for k in [
+            "kafka",
+            "prometheus",
+            "cron",
+            "aws-sqs-queue",
+            "azure-servicebus",
+        ] {
             assert!(lookup(k).is_some(), "expected catalog entry for `{k}`");
         }
     }
@@ -994,8 +1206,16 @@ mod tests {
     #[test]
     fn every_entry_has_docs_url_and_keys() {
         for e in CATALOG {
-            assert!(e.docs_url.starts_with("https://keda.sh/docs/"), "{}", e.kind);
-            assert!(!e.metadata_keys.is_empty(), "{}: empty metadata_keys", e.kind);
+            assert!(
+                e.docs_url.starts_with("https://keda.sh/docs/"),
+                "{}",
+                e.kind
+            );
+            assert!(
+                !e.metadata_keys.is_empty(),
+                "{}: empty metadata_keys",
+                e.kind
+            );
             assert!(!e.summary.is_empty(), "{}: empty summary", e.kind);
         }
     }

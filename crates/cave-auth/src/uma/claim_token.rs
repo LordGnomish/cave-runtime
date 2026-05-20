@@ -22,8 +22,7 @@ use base64::Engine;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-pub const FORMAT_JWT: &str =
-    "urn:ietf:params:oauth:token-type:jwt";
+pub const FORMAT_JWT: &str = "urn:ietf:params:oauth:token-type:jwt";
 pub const FORMAT_OIDC_ID_TOKEN: &str =
     "http://openid.net/specs/openid-connect-core-1_0.html#IDToken";
 pub const FORMAT_FORM: &str = "application/x-www-form-urlencoded";

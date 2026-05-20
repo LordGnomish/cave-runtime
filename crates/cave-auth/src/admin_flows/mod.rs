@@ -14,8 +14,8 @@ pub mod flows;
 pub mod required_actions;
 
 use axum::{
-    routing::{get, post},
     Router,
+    routing::{get, post},
 };
 use std::sync::Arc;
 

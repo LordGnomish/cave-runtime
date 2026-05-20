@@ -11,20 +11,20 @@
 //!   Health / Metrics     /api/mesh/health, /api/mesh/metrics
 
 use crate::{
+    MeshState,
     models::{
-        AuthorizationPolicy, DestinationRule, Gateway, HealthStatus,
-        PeerAuthentication, RateLimitPolicy, RequestAuthentication, ServiceEntry, ServiceMeta,
-        Telemetry, VirtualService,
+        AuthorizationPolicy, DestinationRule, Gateway, HealthStatus, PeerAuthentication,
+        RateLimitPolicy, RequestAuthentication, ServiceEntry, ServiceMeta, Telemetry,
+        VirtualService,
     },
     multicluster::{RemoteCluster, TrustDomainFederation},
-    MeshState,
 };
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, put},
-    Json, Router,
 };
 use serde::Deserialize;
 use std::sync::Arc;
@@ -40,9 +40,18 @@ pub fn create_router(state: Arc<MeshState>) -> Router {
         .route("/api/mesh/health", get(health))
         .route("/api/mesh/metrics", get(metrics_handler))
         // ── Service Registry ─────────────────────────────────
-        .route("/api/mesh/services", get(list_services).post(register_service))
-        .route("/api/mesh/services/{ns}/{name}", get(get_service).delete(deregister_service))
-        .route("/api/mesh/services/{ns}/{name}/health/{addr}/{port}", put(update_health))
+        .route(
+            "/api/mesh/services",
+            get(list_services).post(register_service),
+        )
+        .route(
+            "/api/mesh/services/{ns}/{name}",
+            get(get_service).delete(deregister_service),
+        )
+        .route(
+            "/api/mesh/services/{ns}/{name}/health/{addr}/{port}",
+            put(update_health),
+        )
         // ── VirtualServices ──────────────────────────────────
         .route(
             "/api/mesh/virtualservices",
@@ -62,8 +71,14 @@ pub fn create_router(state: Arc<MeshState>) -> Router {
             get(get_destination_rule).delete(delete_destination_rule),
         )
         // ── Gateways ─────────────────────────────────────────
-        .route("/api/mesh/gateways", get(list_gateways).post(upsert_gateway))
-        .route("/api/mesh/gateways/{ns}/{name}", get(get_gateway).delete(delete_gateway))
+        .route(
+            "/api/mesh/gateways",
+            get(list_gateways).post(upsert_gateway),
+        )
+        .route(
+            "/api/mesh/gateways/{ns}/{name}",
+            get(get_gateway).delete(delete_gateway),
+        )
         // ── ServiceEntries ───────────────────────────────────
         .route(
             "/api/mesh/serviceentries",
@@ -101,12 +116,18 @@ pub fn create_router(state: Arc<MeshState>) -> Router {
             delete(delete_authz_policy),
         )
         // ── RateLimit ────────────────────────────────────────
-        .route("/api/mesh/ratelimits", get(list_rate_limits).post(upsert_rate_limit))
+        .route(
+            "/api/mesh/ratelimits",
+            get(list_rate_limits).post(upsert_rate_limit),
+        )
         .route("/api/mesh/ratelimits/{name}", delete(delete_rate_limit))
         // ── Circuit Breakers ─────────────────────────────────
         .route("/api/mesh/circuitbreakers", get(list_circuit_breakers))
         // ── Telemetry ────────────────────────────────────────
-        .route("/api/mesh/telemetries", get(list_telemetries).post(upsert_telemetry))
+        .route(
+            "/api/mesh/telemetries",
+            get(list_telemetries).post(upsert_telemetry),
+        )
         .route(
             "/api/mesh/telemetries/{ns}/{name}",
             get(get_telemetry).delete(delete_telemetry),
@@ -144,11 +165,17 @@ fn created<T: serde::Serialize>(v: T) -> impl IntoResponse {
 }
 
 fn not_found(msg: impl Into<String>) -> impl IntoResponse {
-    (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": msg.into() })))
+    (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({ "error": msg.into() })),
+    )
 }
 
 fn bad_request(msg: impl Into<String>) -> impl IntoResponse {
-    (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": msg.into() })))
+    (
+        StatusCode::BAD_REQUEST,
+        Json(serde_json::json!({ "error": msg.into() })),
+    )
 }
 
 // ─── Health / Metrics ────────────────────────────────────────
@@ -160,7 +187,10 @@ async fn health() -> impl IntoResponse {
 async fn metrics_handler(State(s): State<Arc<MeshState>>) -> impl IntoResponse {
     (
         StatusCode::OK,
-        [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; version=0.0.4",
+        )],
         s.metrics.export(),
     )
 }
@@ -217,7 +247,11 @@ async fn update_health(
     Path((ns, name, addr, port)): Path<(String, String, String, u16)>,
     Json(req): Json<UpdateHealthReq>,
 ) -> impl IntoResponse {
-    let status = if req.healthy { HealthStatus::Healthy } else { HealthStatus::Unhealthy };
+    let status = if req.healthy {
+        HealthStatus::Healthy
+    } else {
+        HealthStatus::Unhealthy
+    };
     s.registry.update_health(&ns, &name, &addr, port, status);
     ok(serde_json::json!({ "ok": true }))
 }
@@ -325,7 +359,13 @@ async fn delete_gateway(
 // ─── ServiceEntry ─────────────────────────────────────────────
 
 async fn list_service_entries(State(s): State<Arc<MeshState>>) -> impl IntoResponse {
-    let ses: Vec<ServiceEntry> = s.service_entries.read().unwrap().values().cloned().collect();
+    let ses: Vec<ServiceEntry> = s
+        .service_entries
+        .read()
+        .unwrap()
+        .values()
+        .cloned()
+        .collect();
     ok(ses)
 }
 
@@ -544,20 +584,14 @@ async fn multicluster_status(State(s): State<Arc<MeshState>>) -> impl IntoRespon
 
 // ─── Observability ───────────────────────────────────────────
 
-async fn obs_metrics(
-    State(s): State<Arc<MeshState>>,
-    Path(id): Path<Uuid>,
-) -> impl IntoResponse {
+async fn obs_metrics(State(s): State<Arc<MeshState>>, Path(id): Path<Uuid>) -> impl IntoResponse {
     match s.obs.request_metrics(id) {
         Some(m) => ok(m).into_response(),
         None => not_found(id.to_string()).into_response(),
     }
 }
 
-async fn obs_golden(
-    State(s): State<Arc<MeshState>>,
-    Path(id): Path<Uuid>,
-) -> impl IntoResponse {
+async fn obs_golden(State(s): State<Arc<MeshState>>, Path(id): Path<Uuid>) -> impl IntoResponse {
     ok(s.obs.golden_signals(id))
 }
 

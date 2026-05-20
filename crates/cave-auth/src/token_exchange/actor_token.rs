@@ -40,9 +40,7 @@ pub fn parse_actor(
     if actor_token_type.is_empty() {
         return Err(ActorTokenError::TypeRequired);
     }
-    let t: SubjectTokenType = actor_token_type
-        .parse()
-        .map_err(ActorTokenError::Parse)?;
+    let t: SubjectTokenType = actor_token_type.parse().map_err(ActorTokenError::Parse)?;
     let parsed = SubjectToken::parse(actor_token, t).map_err(ActorTokenError::Parse)?;
     Ok(ActorClaim {
         sub: parsed.subject,
@@ -71,7 +69,12 @@ mod tests {
     }
 
     fn jwt(body: &str) -> String {
-        format!("{}.{}.{}", b64u(r#"{"alg":"none"}"#), b64u(body), b64u("sig"))
+        format!(
+            "{}.{}.{}",
+            b64u(r#"{"alg":"none"}"#),
+            b64u(body),
+            b64u("sig")
+        )
     }
 
     #[test]

@@ -15,7 +15,7 @@ CAVE needs a DNS provider for caveplatform.dev and all tenant subdomains. Must s
 
 ## Candidates
 
-| Criteria | Cloudflare | AWS Route 53 | Azure DNS | Hetzner DNS |
+| Criteria | Cloudflare | AWS Route 53 | Azure DNS | sovereign DNS |
 |---|---|---|---|---|
 | DNS-01 ACME | ✅ cert-manager Cloudflare solver | ✅ | ✅ | ⚠️ Limited API |
 | Geographic failover | ✅ Load balancing + health checks | ✅ | ✅ Traffic Manager | ❌ |
@@ -27,24 +27,24 @@ CAVE needs a DNS provider for caveplatform.dev and all tenant subdomains. Must s
 
 ## Decision
 
-**Cloudflare** for DNS, DDoS protection, and geographic failover. Provider-independent (not coupled to Hetzner or Azure). Supports cert-manager DNS-01 challenge. OpenTofu manages DNS records (Day 0). TTL reduced to 60s before cross-provider migration cutover.
+**Cloudflare** for DNS, DDoS protection, and geographic failover. Provider-independent (not coupled to sovereign cloud or hyperscaler). Supports cert-manager DNS-01 challenge. OpenTofu manages DNS records (Day 0). TTL reduced to 60s before cross-provider migration cutover.
 
 
 ## Rejected Options
 
 ### AWS Route 53 — Rejected
 
-**Primary:** AWS-coupled. Route 53 requires an AWS account and IAM credentials. CAVE runs on Hetzner and Azure — introducing AWS solely for DNS creates a third cloud dependency with its own billing, IAM, and operational surface. Cloudflare is genuinely provider-independent.
+**Primary:** AWS-coupled. Route 53 requires an AWS account and IAM credentials. CAVE runs on sovereign cloud and hyperscaler — introducing AWS solely for DNS creates a third cloud dependency with its own billing, IAM, and operational surface. Cloudflare is genuinely provider-independent.
 
 **Secondary:** Per-query pricing. Route 53 charges per million DNS queries. Cloudflare's unlimited DNS queries (free tier) is more predictable for a platform with many tenant subdomains.
 
 ### Azure DNS — Rejected
 
-**Primary:** Azure-coupled. Same reasoning as Route 53 — DNS should be independent of compute providers so that Hetzner ↔ Azure failover is controlled by a neutral third party, not by one of the providers being failed-over from.
+**Primary:** Azure-coupled. Same reasoning as Route 53 — DNS should be independent of compute providers so that sovereign ↔ hyperscaler failover is controlled by a neutral third party, not by one of the providers being failed-over from.
 
-### Hetzner DNS — Rejected
+### sovereign DNS — Rejected
 
-**Primary:** Limited API and no geographic failover. Hetzner DNS has no health check or geographic routing capability. Cannot automatically redirect traffic from Hetzner to Azure during a Hetzner outage. Also no DDoS protection — critical for public-facing platform endpoints.
+**Primary:** Limited API and no geographic failover. sovereign DNS has no health check or geographic routing capability. Cannot automatically redirect traffic from the sovereign profile to Azure during a sovereign-cloud outage. Also no DDoS protection — critical for public-facing platform endpoints.
 
 
 ## Consequences
@@ -52,7 +52,7 @@ CAVE needs a DNS provider for caveplatform.dev and all tenant subdomains. Must s
 **Positive:**
 - Provider-independent DNS — no cloud-vendor coupling.
 - Free DDoS protection for all CAVE endpoints.
-- Geographic health checks enable Hetzner ↔ Azure failover.
+- Geographic health checks enable sovereign ↔ hyperscaler failover.
 - cert-manager integration proven and stable.
 - Fast global anycast resolution.
 
@@ -106,5 +106,5 @@ Standard LoadBalancer on Both Providers
 
 Decision:
 
-Ingress parity: standard LoadBalancer on both providers (Hetzner LB + Azure LB). Kong behind standard LB delivers identical routing model regardless of provider.
+Ingress parity: standard LoadBalancer on both providers (sovereign-cloud LB + Azure LB). Kong behind standard LB delivers identical routing model regardless of provider.
 

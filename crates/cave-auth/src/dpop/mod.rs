@@ -23,7 +23,7 @@ pub mod proof;
 pub mod replay_guard;
 pub mod verify;
 
-pub use binding::{jkt_thumbprint, Jwk};
+pub use binding::{Jwk, jkt_thumbprint};
 pub use proof::{DpopHeader, DpopPayload, DpopProof, DpopProofError};
 pub use replay_guard::ReplayGuard;
-pub use verify::{verify_proof, DpopVerifyError};
+pub use verify::{DpopVerifyError, verify_proof};

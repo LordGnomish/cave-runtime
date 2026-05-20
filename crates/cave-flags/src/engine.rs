@@ -180,7 +180,11 @@ fn evaluate_strategy(
         "default" => true,
 
         "userWithId" => {
-            let user_ids = strategy.parameters.get("userIds").map(|s| s.as_str()).unwrap_or("");
+            let user_ids = strategy
+                .parameters
+                .get("userIds")
+                .map(|s| s.as_str())
+                .unwrap_or("");
             ctx.user_id
                 .as_deref()
                 .map(|uid| user_ids.split(',').map(|s| s.trim()).any(|id| id == uid))
@@ -188,7 +192,11 @@ fn evaluate_strategy(
         }
 
         "remoteAddress" => {
-            let ips = strategy.parameters.get("IPs").map(|s| s.as_str()).unwrap_or("");
+            let ips = strategy
+                .parameters
+                .get("IPs")
+                .map(|s| s.as_str())
+                .unwrap_or("");
             ctx.remote_address
                 .as_deref()
                 .map(|addr| ips.split(',').map(|s| s.trim()).any(|ip| ip == addr))
@@ -217,7 +225,8 @@ fn evaluate_strategy(
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .subsec_nanos()
-                % 100) + 1;
+                % 100)
+                + 1;
             random_val <= pct
         }
 
@@ -279,7 +288,8 @@ fn evaluate_strategy(
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap_or_default()
                         .subsec_nanos()
-                        % 100) + 1;
+                        % 100)
+                        + 1;
                     r <= rollout
                 }
             }
@@ -316,57 +326,67 @@ fn evaluate_constraint(c: &Constraint, ctx: &UnleashContext) -> bool {
 
 fn check_constraint(c: &Constraint, value: Option<&str>) -> bool {
     match &c.operator {
-        ConstraintOperator::In => value.map(|v| {
-            if c.case_insensitive {
-                let vl = v.to_lowercase();
-                c.values.iter().any(|s| s.to_lowercase() == vl)
-            } else {
-                c.values.iter().any(|s| s == v)
-            }
-        }).unwrap_or(false),
-
-        ConstraintOperator::NotIn => value.map(|v| {
-            if c.case_insensitive {
-                let vl = v.to_lowercase();
-                !c.values.iter().any(|s| s.to_lowercase() == vl)
-            } else {
-                !c.values.iter().any(|s| s == v)
-            }
-        }).unwrap_or(true),
-
-        ConstraintOperator::StrStartsWith => value.map(|v| {
-            c.values.iter().any(|p| {
+        ConstraintOperator::In => value
+            .map(|v| {
                 if c.case_insensitive {
-                    v.to_lowercase().starts_with(&p.to_lowercase())
+                    let vl = v.to_lowercase();
+                    c.values.iter().any(|s| s.to_lowercase() == vl)
                 } else {
-                    v.starts_with(p.as_str())
+                    c.values.iter().any(|s| s == v)
                 }
             })
-        }).unwrap_or(false),
+            .unwrap_or(false),
 
-        ConstraintOperator::StrEndsWith => value.map(|v| {
-            c.values.iter().any(|p| {
+        ConstraintOperator::NotIn => value
+            .map(|v| {
                 if c.case_insensitive {
-                    v.to_lowercase().ends_with(&p.to_lowercase())
+                    let vl = v.to_lowercase();
+                    !c.values.iter().any(|s| s.to_lowercase() == vl)
                 } else {
-                    v.ends_with(p.as_str())
+                    !c.values.iter().any(|s| s == v)
                 }
             })
-        }).unwrap_or(false),
+            .unwrap_or(true),
 
-        ConstraintOperator::StrContains => value.map(|v| {
-            c.values.iter().any(|p| {
-                if c.case_insensitive {
-                    v.to_lowercase().contains(&p.to_lowercase())
-                } else {
-                    v.contains(p.as_str())
-                }
+        ConstraintOperator::StrStartsWith => value
+            .map(|v| {
+                c.values.iter().any(|p| {
+                    if c.case_insensitive {
+                        v.to_lowercase().starts_with(&p.to_lowercase())
+                    } else {
+                        v.starts_with(p.as_str())
+                    }
+                })
             })
-        }).unwrap_or(false),
+            .unwrap_or(false),
 
-        ConstraintOperator::NumEq => {
-            compare_f64(value, c.value.as_deref(), |a, b| (a - b).abs() < f64::EPSILON)
-        }
+        ConstraintOperator::StrEndsWith => value
+            .map(|v| {
+                c.values.iter().any(|p| {
+                    if c.case_insensitive {
+                        v.to_lowercase().ends_with(&p.to_lowercase())
+                    } else {
+                        v.ends_with(p.as_str())
+                    }
+                })
+            })
+            .unwrap_or(false),
+
+        ConstraintOperator::StrContains => value
+            .map(|v| {
+                c.values.iter().any(|p| {
+                    if c.case_insensitive {
+                        v.to_lowercase().contains(&p.to_lowercase())
+                    } else {
+                        v.contains(p.as_str())
+                    }
+                })
+            })
+            .unwrap_or(false),
+
+        ConstraintOperator::NumEq => compare_f64(value, c.value.as_deref(), |a, b| {
+            (a - b).abs() < f64::EPSILON
+        }),
         ConstraintOperator::NumGt => compare_f64(value, c.value.as_deref(), |a, b| a > b),
         ConstraintOperator::NumGte => compare_f64(value, c.value.as_deref(), |a, b| a >= b),
         ConstraintOperator::NumLt => compare_f64(value, c.value.as_deref(), |a, b| a < b),
@@ -473,7 +493,10 @@ pub fn select_variant(
     }
 
     // Stickiness
-    let stickiness = variants.first().map(|v| v.stickiness.as_str()).unwrap_or("default");
+    let stickiness = variants
+        .first()
+        .map(|v| v.stickiness.as_str())
+        .unwrap_or("default");
     let norm = match resolve_stickiness(stickiness, ctx) {
         Some(val) => normalized_value_1000(&val, feature_name),
         None => {
@@ -481,7 +504,8 @@ pub fn select_variant(
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .subsec_nanos()
-                % 1000) + 1
+                % 1000)
+                + 1
         }
     };
 
@@ -578,7 +602,11 @@ mod tests {
             "f",
             vec![make_strategy(
                 "flexibleRollout",
-                vec![("rollout", "100"), ("stickiness", "userId"), ("groupId", "g")],
+                vec![
+                    ("rollout", "100"),
+                    ("stickiness", "userId"),
+                    ("groupId", "g"),
+                ],
             )],
         );
         assert!(evaluate_flag(&flag, "production", &ctx("any"), &HashMap::new()).enabled);
@@ -672,11 +700,15 @@ mod tests {
         let flag = make_flag("f", vec![strat]);
 
         let mut c_high = UnleashContext::default();
-        c_high.properties.insert("score".to_string(), "150".to_string());
+        c_high
+            .properties
+            .insert("score".to_string(), "150".to_string());
         assert!(evaluate_flag(&flag, "production", &c_high, &HashMap::new()).enabled);
 
         let mut c_low = UnleashContext::default();
-        c_low.properties.insert("score".to_string(), "50".to_string());
+        c_low
+            .properties
+            .insert("score".to_string(), "50".to_string());
         assert!(!evaluate_flag(&flag, "production", &c_low, &HashMap::new()).enabled);
     }
 
@@ -694,11 +726,15 @@ mod tests {
         let flag = make_flag("f", vec![strat]);
 
         let mut c_new = UnleashContext::default();
-        c_new.properties.insert("appVersion".to_string(), "2.1.0".to_string());
+        c_new
+            .properties
+            .insert("appVersion".to_string(), "2.1.0".to_string());
         assert!(evaluate_flag(&flag, "production", &c_new, &HashMap::new()).enabled);
 
         let mut c_old = UnleashContext::default();
-        c_old.properties.insert("appVersion".to_string(), "1.9.0".to_string());
+        c_old
+            .properties
+            .insert("appVersion".to_string(), "1.9.0".to_string());
         assert!(!evaluate_flag(&flag, "production", &c_old, &HashMap::new()).enabled);
     }
 

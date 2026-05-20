@@ -45,13 +45,19 @@ fn namespace_rejects_reserved_paths() {
 #[test]
 fn store_round_trips_namespace_by_id_and_path() {
     let mut store = NamespaceStore::default();
-    store.create(Namespace::new("ns-prod", "prod", "tenant-acme")).unwrap();
-    store.create(Namespace::new("ns-stage", "stage", "tenant-acme")).unwrap();
+    store
+        .create(Namespace::new("ns-prod", "prod", "tenant-acme"))
+        .unwrap();
+    store
+        .create(Namespace::new("ns-stage", "stage", "tenant-acme"))
+        .unwrap();
 
     let by_id = store.get("ns-prod").expect("by id");
     assert_eq!(by_id.path, "prod/");
 
-    let by_path = store.get_by_path("stage").expect("by path; trailing slash inferred");
+    let by_path = store
+        .get_by_path("stage")
+        .expect("by path; trailing slash inferred");
     assert_eq!(by_path.id, "ns-stage");
 
     let none = store.get_by_path("does-not-exist");
@@ -64,9 +70,15 @@ fn store_round_trips_namespace_by_id_and_path() {
 #[test]
 fn for_tenant_filters_and_sorts_namespaces() {
     let mut store = NamespaceStore::default();
-    store.create(Namespace::new("a-prod", "alpha-prod", "tenant-alpha")).unwrap();
-    store.create(Namespace::new("a-stage", "alpha-stage", "tenant-alpha")).unwrap();
-    store.create(Namespace::new("b-prod", "beta-prod", "tenant-beta")).unwrap();
+    store
+        .create(Namespace::new("a-prod", "alpha-prod", "tenant-alpha"))
+        .unwrap();
+    store
+        .create(Namespace::new("a-stage", "alpha-stage", "tenant-alpha"))
+        .unwrap();
+    store
+        .create(Namespace::new("b-prod", "beta-prod", "tenant-beta"))
+        .unwrap();
 
     let alpha = store.for_tenant("tenant-alpha");
     assert_eq!(alpha.len(), 2);

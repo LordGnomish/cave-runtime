@@ -68,7 +68,10 @@ pub fn edns_payload_size(msg: &Message) -> u16 {
 
 /// Return true when the DNSSEC OK bit is set in the request.
 pub fn dnssec_ok(msg: &Message) -> bool {
-    msg.extensions().as_ref().map(|e| e.dnssec_ok()).unwrap_or(false)
+    msg.extensions()
+        .as_ref()
+        .map(|e| e.dnssec_ok())
+        .unwrap_or(false)
 }
 
 /// Build a simple A record.
@@ -103,9 +106,7 @@ pub fn txt_record(name: &str, ttl: u32, texts: Vec<String>) -> DnsResult<Record>
     r.set_ttl(ttl);
     r.set_record_type(RecordType::TXT);
     r.set_dns_class(DNSClass::IN);
-    r.set_data(Some(RData::TXT(
-        hickory_proto::rr::rdata::TXT::new(texts),
-    )));
+    r.set_data(Some(RData::TXT(hickory_proto::rr::rdata::TXT::new(texts))));
     Ok(r)
 }
 

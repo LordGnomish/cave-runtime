@@ -27,11 +27,11 @@ const INTERNAL_PAYLOADS: &[&str] = &[
 ];
 
 const INTERNAL_FINGERPRINTS: &[&str] = &[
-    "ami-id",         // AWS IMDS prefix.
-    "instance-id",    // AWS IMDS.
+    "ami-id",          // AWS IMDS prefix.
+    "instance-id",     // AWS IMDS.
     "Metadata-Flavor", // GCP IMDS header echo.
-    "root:x:0:0:",    // file:///etc/passwd leak.
-    "Apache/",        // internal http server banner often unfiltered.
+    "root:x:0:0:",     // file:///etc/passwd leak.
+    "Apache/",         // internal http server banner often unfiltered.
     "nginx/",
 ];
 
@@ -141,10 +141,7 @@ mod tests {
         let r = SsrfRule;
         let probe = Probe {
             original: HttpRequest::new(HttpMethod::Get, "http://x/f?dest=http://y"),
-            mutated: HttpRequest::new(
-                HttpMethod::Get,
-                "http://x/f?dest=http://169.254.169.254/",
-            ),
+            mutated: HttpRequest::new(HttpMethod::Get, "http://x/f?dest=http://169.254.169.254/"),
             plugin_id: r.id(),
             note: "p".to_string(),
         };

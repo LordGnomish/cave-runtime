@@ -144,7 +144,9 @@ impl SubjectConfirmationMethod {
     pub fn as_urn(self) -> &'static str {
         match self {
             SubjectConfirmationMethod::Bearer => "urn:oasis:names:tc:SAML:2.0:cm:bearer",
-            SubjectConfirmationMethod::HolderOfKey => "urn:oasis:names:tc:SAML:2.0:cm:holder-of-key",
+            SubjectConfirmationMethod::HolderOfKey => {
+                "urn:oasis:names:tc:SAML:2.0:cm:holder-of-key"
+            }
             SubjectConfirmationMethod::SenderVouches => {
                 "urn:oasis:names:tc:SAML:2.0:cm:sender-vouches"
             }

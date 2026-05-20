@@ -145,7 +145,11 @@ mod tests {
 
     #[test]
     fn numeric_matches_upstream_constants() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/numericidentity.go", "Numeric.Constants", "tenant-rid-n");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/numericidentity.go",
+            "Numeric.Constants",
+            "tenant-rid-n"
+        );
         assert_eq!(ReservedIdentity::Host.numeric(), 1);
         assert_eq!(ReservedIdentity::World.numeric(), 2);
         assert_eq!(ReservedIdentity::Unmanaged.numeric(), 3);
@@ -161,11 +165,18 @@ mod tests {
 
     #[test]
     fn from_numeric_round_trip_for_known() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/numericidentity.go", "FromNumeric.RoundTrip", "tenant-rid-fnr");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/numericidentity.go",
+            "FromNumeric.RoundTrip",
+            "tenant-rid-fnr"
+        );
         for r in [
-            ReservedIdentity::Host, ReservedIdentity::World,
-            ReservedIdentity::KubeApiServer, ReservedIdentity::Ingress,
-            ReservedIdentity::WorldIPv4, ReservedIdentity::WorldIPv6,
+            ReservedIdentity::Host,
+            ReservedIdentity::World,
+            ReservedIdentity::KubeApiServer,
+            ReservedIdentity::Ingress,
+            ReservedIdentity::WorldIPv4,
+            ReservedIdentity::WorldIPv6,
             ReservedIdentity::EncryptedOverlay,
         ] {
             assert_eq!(ReservedIdentity::from_numeric(r.numeric()), Some(r));
@@ -174,7 +185,11 @@ mod tests {
 
     #[test]
     fn from_numeric_unknown_returns_none() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/numericidentity.go", "FromNumeric.Unknown", "tenant-rid-fnu");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/numericidentity.go",
+            "FromNumeric.Unknown",
+            "tenant-rid-fnu"
+        );
         assert!(ReservedIdentity::from_numeric(99).is_none());
         assert!(ReservedIdentity::from_numeric(255).is_none());
     }
@@ -183,21 +198,38 @@ mod tests {
 
     #[test]
     fn label_format_is_reserved_colon_name() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/numericidentity.go", "Label.Format", "tenant-rid-l");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/numericidentity.go",
+            "Label.Format",
+            "tenant-rid-l"
+        );
         assert_eq!(ReservedIdentity::Host.label(), "reserved:host");
         assert_eq!(ReservedIdentity::World.label(), "reserved:world");
-        assert_eq!(ReservedIdentity::KubeApiServer.label(), "reserved:kube-apiserver");
+        assert_eq!(
+            ReservedIdentity::KubeApiServer.label(),
+            "reserved:kube-apiserver"
+        );
         assert_eq!(ReservedIdentity::WorldIPv4.label(), "reserved:world-ipv4");
-        assert_eq!(ReservedIdentity::EncryptedOverlay.label(), "reserved:encrypted-overlay");
+        assert_eq!(
+            ReservedIdentity::EncryptedOverlay.label(),
+            "reserved:encrypted-overlay"
+        );
     }
 
     #[test]
     fn from_label_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/numericidentity.go", "FromLabel.RoundTrip", "tenant-rid-flr");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/numericidentity.go",
+            "FromLabel.RoundTrip",
+            "tenant-rid-flr"
+        );
         for r in [
-            ReservedIdentity::Host, ReservedIdentity::World,
-            ReservedIdentity::KubeApiServer, ReservedIdentity::Ingress,
-            ReservedIdentity::WorldIPv4, ReservedIdentity::WorldIPv6,
+            ReservedIdentity::Host,
+            ReservedIdentity::World,
+            ReservedIdentity::KubeApiServer,
+            ReservedIdentity::Ingress,
+            ReservedIdentity::WorldIPv4,
+            ReservedIdentity::WorldIPv6,
         ] {
             assert_eq!(ReservedIdentity::from_label(r.label()), Some(r));
         }
@@ -205,7 +237,11 @@ mod tests {
 
     #[test]
     fn from_label_unknown_returns_none() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/numericidentity.go", "FromLabel.Unknown", "tenant-rid-flu");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/numericidentity.go",
+            "FromLabel.Unknown",
+            "tenant-rid-flu"
+        );
         assert!(ReservedIdentity::from_label("reserved:nope").is_none());
         assert!(ReservedIdentity::from_label("nonsense").is_none());
     }
@@ -214,7 +250,11 @@ mod tests {
 
     #[test]
     fn full_table_contains_all_known_identities() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/numericidentity.go", "FullTable", "tenant-rid-ft");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/numericidentity.go",
+            "FullTable",
+            "tenant-rid-ft"
+        );
         let t = full_table();
         assert!(t.contains_key(&1));
         assert!(t.contains_key(&7));
@@ -224,24 +264,39 @@ mod tests {
 
     #[test]
     fn full_table_count_is_twelve() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/numericidentity.go", "FullTable.Count", "tenant-rid-ftc");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/numericidentity.go",
+            "FullTable.Count",
+            "tenant-rid-ftc"
+        );
         let t = full_table();
         assert_eq!(t.len(), 12); // unknown + 11 named
     }
 
     #[test]
     fn full_table_keys_distinct() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/numericidentity.go", "FullTable.Distinct", "tenant-rid-ftd");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/numericidentity.go",
+            "FullTable.Distinct",
+            "tenant-rid-ftd"
+        );
         let t = full_table();
         let n = t.len();
-        assert_eq!(t.values().collect::<std::collections::BTreeSet<_>>().len(), n);
+        assert_eq!(
+            t.values().collect::<std::collections::BTreeSet<_>>().len(),
+            n
+        );
     }
 
     // ── is_reserved_range ──────────────────────────────────────────────────
 
     #[test]
     fn is_reserved_range_below_256() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/numericidentity.go", "Range.Reserved", "tenant-rid-rr");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/numericidentity.go",
+            "Range.Reserved",
+            "tenant-rid-rr"
+        );
         assert!(is_reserved_range(0));
         assert!(is_reserved_range(1));
         assert!(is_reserved_range(255));
@@ -249,7 +304,11 @@ mod tests {
 
     #[test]
     fn is_reserved_range_above_256_is_false() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/numericidentity.go", "Range.Local", "tenant-rid-rl");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/numericidentity.go",
+            "Range.Local",
+            "tenant-rid-rl"
+        );
         assert!(!is_reserved_range(256));
         assert!(!is_reserved_range(1024));
     }
@@ -258,7 +317,11 @@ mod tests {
 
     #[test]
     fn reserved_identity_ordered_by_numeric_value() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/numericidentity.go", "Ordering", "tenant-rid-o");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/numericidentity.go",
+            "Ordering",
+            "tenant-rid-o"
+        );
         // Verify the enum ordering matches numeric ordering.
         let mut all = vec![
             ReservedIdentity::EncryptedOverlay,
@@ -275,10 +338,16 @@ mod tests {
 
     #[test]
     fn reserved_identity_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/numericidentity.go", "Serde", "tenant-rid-serde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/numericidentity.go",
+            "Serde",
+            "tenant-rid-serde"
+        );
         for r in [
-            ReservedIdentity::Host, ReservedIdentity::World,
-            ReservedIdentity::KubeApiServer, ReservedIdentity::Ingress,
+            ReservedIdentity::Host,
+            ReservedIdentity::World,
+            ReservedIdentity::KubeApiServer,
+            ReservedIdentity::Ingress,
             ReservedIdentity::EncryptedOverlay,
         ] {
             let s = serde_json::to_string(&r).unwrap();
@@ -291,21 +360,36 @@ mod tests {
 
     #[test]
     fn ingress_identity_is_eight() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/numericidentity.go", "Ingress", "tenant-rid-ing");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/numericidentity.go",
+            "Ingress",
+            "tenant-rid-ing"
+        );
         assert_eq!(ReservedIdentity::Ingress.numeric(), 8);
         assert_eq!(ReservedIdentity::Ingress.label(), "reserved:ingress");
     }
 
     #[test]
     fn kube_apiserver_identity_is_seven() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/numericidentity.go", "KubeAPIServer", "tenant-rid-kas");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/numericidentity.go",
+            "KubeAPIServer",
+            "tenant-rid-kas"
+        );
         assert_eq!(ReservedIdentity::KubeApiServer.numeric(), 7);
-        assert_eq!(ReservedIdentity::KubeApiServer.label(), "reserved:kube-apiserver");
+        assert_eq!(
+            ReservedIdentity::KubeApiServer.label(),
+            "reserved:kube-apiserver"
+        );
     }
 
     #[test]
     fn world_split_into_v4_and_v6() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/numericidentity.go", "WorldSplit", "tenant-rid-ws");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/numericidentity.go",
+            "WorldSplit",
+            "tenant-rid-ws"
+        );
         assert_eq!(ReservedIdentity::WorldIPv4.numeric(), 9);
         assert_eq!(ReservedIdentity::WorldIPv6.numeric(), 10);
         assert_eq!(ReservedIdentity::WorldIPv4.label(), "reserved:world-ipv4");
@@ -314,7 +398,11 @@ mod tests {
 
     #[test]
     fn encrypted_overlay_identity_is_eleven() {
-        let (_c, _t) = cilium_test_ctx!("pkg/identity/numericidentity.go", "EncryptedOverlay", "tenant-rid-eo");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/identity/numericidentity.go",
+            "EncryptedOverlay",
+            "tenant-rid-eo"
+        );
         assert_eq!(ReservedIdentity::EncryptedOverlay.numeric(), 11);
     }
 }

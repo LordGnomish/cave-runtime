@@ -81,7 +81,10 @@ pub struct AuthRequest {
 
 impl AuthRequest {
     pub fn jwt_claim(&self, key: &str) -> Option<&str> {
-        self.jwt_claims.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+        self.jwt_claims
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
     }
 }
 
@@ -125,9 +128,14 @@ impl Rule {
 /// Evaluate an entire policy set against a request. Mirrors
 /// `authzPolicies.GetAuthorizationPolicies` + the Envoy RBAC evaluation order
 /// described in upstream's `security/proto/authorization/v1beta1/policy.proto`.
-pub fn evaluate(policies: &[AuthorizationPolicy], tenant: &TenantId, req: &AuthRequest) -> Decision {
+pub fn evaluate(
+    policies: &[AuthorizationPolicy],
+    tenant: &TenantId,
+    req: &AuthRequest,
+) -> Decision {
     // Tenant-scope: only consider policies owned by `tenant`.
-    let scoped: Vec<&AuthorizationPolicy> = policies.iter().filter(|p| &p.tenant == tenant).collect();
+    let scoped: Vec<&AuthorizationPolicy> =
+        policies.iter().filter(|p| &p.tenant == tenant).collect();
 
     // Pass 1 — DENYs.
     for p in &scoped {
@@ -195,7 +203,10 @@ mod tests {
             "allow-web",
             Action::Allow,
             vec![Rule {
-                from: From { principal: Some("spiffe://cluster.local/ns/acme/sa/web".into()), ..Default::default() },
+                from: From {
+                    principal: Some("spiffe://cluster.local/ns/acme/sa/web".into()),
+                    ..Default::default()
+                },
                 ..Default::default()
             }],
         );
@@ -209,16 +220,15 @@ mod tests {
             "buildDenyPolicy",
             "acme"
         );
-        let allow = policy(
-            "allow-all",
-            Action::Allow,
-            vec![Rule::default()],
-        );
+        let allow = policy("allow-all", Action::Allow, vec![Rule::default()]);
         let deny = policy(
             "deny-writes",
             Action::Deny,
             vec![Rule {
-                to: ToL7 { method: Some("POST".into()), ..Default::default() },
+                to: ToL7 {
+                    method: Some("POST".into()),
+                    ..Default::default()
+                },
                 ..Default::default()
             }],
         );
@@ -237,7 +247,13 @@ mod tests {
         let p = policy(
             "allow-get",
             Action::Allow,
-            vec![Rule { to: ToL7 { method: Some("get".into()), ..Default::default() }, ..Default::default() }],
+            vec![Rule {
+                to: ToL7 {
+                    method: Some("get".into()),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }],
         );
         assert_eq!(evaluate(&[p], &tenant, &req()), Decision::Allow);
     }
@@ -252,7 +268,13 @@ mod tests {
         let p = policy(
             "allow-api",
             Action::Allow,
-            vec![Rule { to: ToL7 { path_prefix: Some("/api".into()), ..Default::default() }, ..Default::default() }],
+            vec![Rule {
+                to: ToL7 {
+                    path_prefix: Some("/api".into()),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }],
         );
         assert_eq!(evaluate(&[p.clone()], &tenant, &req()), Decision::Allow);
         let mut r = req();
@@ -271,7 +293,10 @@ mod tests {
             "allow-admins",
             Action::Allow,
             vec![Rule {
-                when: Some(WhenJwt { claim: "group".into(), equals: "admins".into() }),
+                when: Some(WhenJwt {
+                    claim: "group".into(),
+                    equals: "admins".into(),
+                }),
                 ..Default::default()
             }],
         );
@@ -294,7 +319,10 @@ mod tests {
             "allow-empty",
             Action::Allow,
             vec![Rule {
-                to: ToL7 { method: Some("DELETE".into()), ..Default::default() },
+                to: ToL7 {
+                    method: Some("DELETE".into()),
+                    ..Default::default()
+                },
                 ..Default::default()
             }],
         );
@@ -313,7 +341,10 @@ mod tests {
             "deny-bots",
             Action::Deny,
             vec![Rule {
-                from: From { namespace: Some("bots".into()), ..Default::default() },
+                from: From {
+                    namespace: Some("bots".into()),
+                    ..Default::default()
+                },
                 ..Default::default()
             }],
         );
@@ -327,11 +358,7 @@ mod tests {
             "tenantScope",
             "acme"
         );
-        let mut p = policy(
-            "allow-all",
-            Action::Allow,
-            vec![Rule::default()],
-        );
+        let mut p = policy("allow-all", Action::Allow, vec![Rule::default()]);
         // Reassign ownership to a different tenant.
         p.tenant = TenantId::new("evil").expect("test fixture");
         // The acme tenant sees an empty policy set → default ALLOW.

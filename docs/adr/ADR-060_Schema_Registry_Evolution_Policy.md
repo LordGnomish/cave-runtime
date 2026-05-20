@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Universal
+**Scope:** Hyperscaler, Sovereign, Universal
 
 **Category:** Data & Messaging
 
@@ -25,7 +25,7 @@ Event-driven architecture requires schema management to prevent breaking changes
 
 ## Decision
 
-**Apicurio Registry** (Apache 2.0) on Hetzner. **Confluent Schema Registry** on Azure (included with Confluent Cloud). Default compatibility mode: BACKWARD (consumers can read data produced with older schema). CI validates schema compatibility before topic deployment. Schema evolution blocked during cross-provider migration freeze.
+**Apicurio Registry** (Apache 2.0) on the sovereign profile. **Confluent Schema Registry** on Azure (included with Confluent Cloud). Default compatibility mode: BACKWARD (consumers can read data produced with older schema). CI validates schema compatibility before topic deployment. Schema evolution blocked during cross-provider migration freeze.
 
 ## Rejected
 

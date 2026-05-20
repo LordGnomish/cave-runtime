@@ -51,7 +51,10 @@ impl RecommendationHistory {
     }
 
     pub fn with_capacity(max_entries: usize) -> Self {
-        Self { by_key: HashMap::new(), max_entries }
+        Self {
+            by_key: HashMap::new(),
+            max_entries,
+        }
     }
 
     pub fn record(&mut self, key: &str, rec: Recommendation) {
@@ -142,7 +145,13 @@ mod tests {
             "tenant-hpa-stab-zero-window"
         );
         let mut h = h();
-        h.record("web", Recommendation { replicas: 99, timestamp_sec: 100 });
+        h.record(
+            "web",
+            Recommendation {
+                replicas: 99,
+                timestamp_sec: 100,
+            },
+        );
         assert_eq!(stabilize(&h, "web", Direction::Up, 4, 0, 100), 4);
     }
 
@@ -155,9 +164,27 @@ mod tests {
         );
         let mut h = h();
         // Three recent recs: 5, 4, 6 — min is 4 — proposed 8 is dampened.
-        h.record("web", Recommendation { replicas: 5, timestamp_sec: 90 });
-        h.record("web", Recommendation { replicas: 4, timestamp_sec: 95 });
-        h.record("web", Recommendation { replicas: 6, timestamp_sec: 99 });
+        h.record(
+            "web",
+            Recommendation {
+                replicas: 5,
+                timestamp_sec: 90,
+            },
+        );
+        h.record(
+            "web",
+            Recommendation {
+                replicas: 4,
+                timestamp_sec: 95,
+            },
+        );
+        h.record(
+            "web",
+            Recommendation {
+                replicas: 6,
+                timestamp_sec: 99,
+            },
+        );
         assert_eq!(stabilize(&h, "web", Direction::Up, 8, 30, 100), 4);
     }
 
@@ -169,9 +196,27 @@ mod tests {
             "tenant-hpa-stab-down-max"
         );
         let mut h = h();
-        h.record("api", Recommendation { replicas: 5, timestamp_sec: 95 });
-        h.record("api", Recommendation { replicas: 9, timestamp_sec: 96 });
-        h.record("api", Recommendation { replicas: 6, timestamp_sec: 99 });
+        h.record(
+            "api",
+            Recommendation {
+                replicas: 5,
+                timestamp_sec: 95,
+            },
+        );
+        h.record(
+            "api",
+            Recommendation {
+                replicas: 9,
+                timestamp_sec: 96,
+            },
+        );
+        h.record(
+            "api",
+            Recommendation {
+                replicas: 6,
+                timestamp_sec: 99,
+            },
+        );
         // Proposed scale-down to 2; max in window is 9 → keep 9.
         assert_eq!(stabilize(&h, "api", Direction::Down, 2, 60, 100), 9);
     }
@@ -185,8 +230,20 @@ mod tests {
         );
         let mut h = h();
         // Aged out: ts=10, window=20, now=100 → 10+20=30 < 100 → ignored.
-        h.record("api", Recommendation { replicas: 99, timestamp_sec: 10 });
-        h.record("api", Recommendation { replicas: 7, timestamp_sec: 95 });
+        h.record(
+            "api",
+            Recommendation {
+                replicas: 99,
+                timestamp_sec: 10,
+            },
+        );
+        h.record(
+            "api",
+            Recommendation {
+                replicas: 7,
+                timestamp_sec: 95,
+            },
+        );
         assert_eq!(stabilize(&h, "api", Direction::Down, 3, 20, 100), 7);
     }
 
@@ -199,7 +256,13 @@ mod tests {
         );
         let mut h = h();
         // ts=80, window=20, now=100 → 80+20=100 >= 100 → included.
-        h.record("api", Recommendation { replicas: 12, timestamp_sec: 80 });
+        h.record(
+            "api",
+            Recommendation {
+                replicas: 12,
+                timestamp_sec: 80,
+            },
+        );
         assert_eq!(stabilize(&h, "api", Direction::Down, 3, 20, 100), 12);
     }
 
@@ -211,8 +274,20 @@ mod tests {
             "tenant-hpa-stab-separate-keys"
         );
         let mut h = h();
-        h.record("web", Recommendation { replicas: 20, timestamp_sec: 99 });
-        h.record("api", Recommendation { replicas: 4, timestamp_sec: 99 });
+        h.record(
+            "web",
+            Recommendation {
+                replicas: 20,
+                timestamp_sec: 99,
+            },
+        );
+        h.record(
+            "api",
+            Recommendation {
+                replicas: 4,
+                timestamp_sec: 99,
+            },
+        );
         // "web" history doesn't influence "api" stabilization.
         assert_eq!(stabilize(&h, "api", Direction::Down, 2, 60, 100), 4);
     }
@@ -226,7 +301,13 @@ mod tests {
         );
         let mut h = RecommendationHistory::with_capacity(3);
         for i in 1..=5u32 {
-            h.record("web", Recommendation { replicas: i, timestamp_sec: i as u64 });
+            h.record(
+                "web",
+                Recommendation {
+                    replicas: i,
+                    timestamp_sec: i as u64,
+                },
+            );
         }
         let entries = h.entries("web");
         assert_eq!(entries.len(), 3);
@@ -242,7 +323,13 @@ mod tests {
             "tenant-hpa-stab-proposed-extreme"
         );
         let mut h = h();
-        h.record("web", Recommendation { replicas: 5, timestamp_sec: 99 });
+        h.record(
+            "web",
+            Recommendation {
+                replicas: 5,
+                timestamp_sec: 99,
+            },
+        );
         // Scale-down direction: max(2, 5) = 5; 2 doesn't win because 5 is larger.
         // But if proposed=10 (scale-up direction): we use Up branch → min(10, 5) = 5.
         assert_eq!(stabilize(&h, "web", Direction::Up, 10, 30, 100), 5);

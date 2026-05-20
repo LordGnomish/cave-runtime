@@ -6,14 +6,14 @@
 use crate::claims::RawClaims;
 use crate::jwks::JwksCache;
 use axum::{
+    Json,
     body::Body,
     extract::Request,
-    http::{header, StatusCode},
+    http::{StatusCode, header},
     middleware::Next,
     response::{IntoResponse, Response},
-    Json,
 };
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 use serde_json::json;
 use std::sync::Arc;
 use tracing::{debug, warn};

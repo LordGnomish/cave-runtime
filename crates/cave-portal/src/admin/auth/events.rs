@@ -8,10 +8,10 @@
 //!
 //! Upstream: <https://www.keycloak.org/docs-api/latest/rest-api/index.html#_events_resource>
 
+use super::AuthViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
-use super::AuthViewError;
+use crate::admin::state::{AdminState, scope};
 
 /// One audit-log row as the operator sees it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,7 +26,9 @@ pub struct EventRow {
 pub fn list_events(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<EventRow>, AuthViewError> {
     ctx.authorise(Permission::AuthSessionsRead)?;
     let mut events: Vec<EventRow> = Vec::new();
-    for s in scope(&state.auth_sessions.read().unwrap(), &ctx.tenant, |r| &r.tenant) {
+    for s in scope(&state.auth_sessions.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    }) {
         events.push(EventRow {
             realm: s.realm.clone(),
             event_type: "LOGIN",
@@ -116,13 +118,15 @@ mod tests {
 
     #[test]
     fn list_excludes_other_tenants() {
-        let evs = list_events(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
+        let evs =
+            list_events(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
         assert!(evs.iter().all(|e| e.session_id != "sess-evil"));
     }
 
     #[test]
     fn list_sorts_by_unix_descending() {
-        let evs = list_events(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
+        let evs =
+            list_events(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
         for w in evs.windows(2) {
             assert!(w[0].unix >= w[1].unix);
         }
@@ -130,7 +134,8 @@ mod tests {
 
     #[test]
     fn count_by_type_groups_events() {
-        let evs = list_events(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
+        let evs =
+            list_events(&AdminState::seeded(), &ctx(&[Permission::AuthSessionsRead])).unwrap();
         let by_type = count_by_type(&evs);
         assert_eq!(by_type.get("LOGIN").copied(), Some(2));
     }

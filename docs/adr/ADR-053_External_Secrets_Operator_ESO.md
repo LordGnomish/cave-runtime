@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Universal
+**Scope:** Hyperscaler, Sovereign, Universal
 
 **Category:** Identity & Secrets
 
@@ -10,7 +10,7 @@
 
 ## Context
 
-Kubernetes workloads need secrets from OpenBao (Hetzner) and Azure Key Vault (Azure) delivered as native K8s Secrets. A standard operator must work across both providers without requiring application changes.
+Kubernetes workloads need secrets from OpenBao (sovereign) and Azure Key Vault (Azure) delivered as native K8s Secrets. A standard operator must work across both providers without requiring application changes.
 
 ## Candidates
 
@@ -26,7 +26,7 @@ Kubernetes workloads need secrets from OpenBao (Hetzner) and Azure Key Vault (Az
 
 ## Decision
 
-**External Secrets Operator (ESO)** for all profiles. Single operator syncs secrets from OpenBao (Hetzner) and Key Vault (Azure) to native K8s Secrets. SecretStore and ExternalSecret CRDs managed in Git via ArgoCD — no secrets in Git, only references.
+**External Secrets Operator (ESO)** for all profiles. Single operator syncs secrets from OpenBao (sovereign) and Key Vault (Azure) to native K8s Secrets. SecretStore and ExternalSecret CRDs managed in Git via ArgoCD — no secrets in Git, only references.
 
 ## Rejected
 
@@ -63,4 +63,4 @@ SOC2 CC6.7 (credential lifecycle management). ISO A.8.24 (use of cryptography �
 
 Crossplane Credentials via External Secret Store
 
-**Decision:** Crossplane provider credentials stored in OpenBao (Hetzner) / Key Vault (Azure), retrieved via ESO. Never plain K8s Secrets for provider auth — prevents credential sprawl.
+**Decision:** Crossplane provider credentials stored in OpenBao (sovereign) / Key Vault (Azure), retrieved via ESO. Never plain K8s Secrets for provider auth — prevents credential sprawl.

@@ -3,11 +3,11 @@
 use crate::models::*;
 use crate::store::ErpStore;
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -97,7 +97,13 @@ async fn create_purchase_order(
 }
 
 async fn list_purchase_orders(State(store): State<Arc<ErpStore>>) -> impl IntoResponse {
-    let pos: Vec<_> = store.purchase_orders.read().await.values().cloned().collect();
+    let pos: Vec<_> = store
+        .purchase_orders
+        .read()
+        .await
+        .values()
+        .cloned()
+        .collect();
     Json(pos)
 }
 
@@ -110,17 +116,20 @@ async fn confirm_purchase_order(
         po.state = PurchaseOrderState::Confirmed;
         (StatusCode::OK, Json(po.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(PurchaseOrder {
-            id: Uuid::nil(),
-            number: String::new(),
-            supplier_id: Uuid::nil(),
-            lines: vec![],
-            state: PurchaseOrderState::Draft,
-            created_at: Utc::now(),
-            received_at: None,
-            amount_total: 0.0,
-            currency: String::new(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(PurchaseOrder {
+                id: Uuid::nil(),
+                number: String::new(),
+                supplier_id: Uuid::nil(),
+                lines: vec![],
+                state: PurchaseOrderState::Draft,
+                created_at: Utc::now(),
+                received_at: None,
+                amount_total: 0.0,
+                currency: String::new(),
+            }),
+        )
     }
 }
 
@@ -151,16 +160,23 @@ async fn receive_purchase_order(
         };
 
         let receipt_id = receipt.id;
-        store.receipts.write().await.insert(receipt_id, receipt.clone());
+        store
+            .receipts
+            .write()
+            .await
+            .insert(receipt_id, receipt.clone());
         (StatusCode::CREATED, Json(receipt))
     } else {
-        (StatusCode::NOT_FOUND, Json(Receipt {
-            id: Uuid::nil(),
-            po_id: Uuid::nil(),
-            lines: vec![],
-            received_at: Utc::now(),
-            receiver_id: Uuid::nil(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(Receipt {
+                id: Uuid::nil(),
+                po_id: Uuid::nil(),
+                lines: vec![],
+                received_at: Utc::now(),
+                receiver_id: Uuid::nil(),
+            }),
+        )
     }
 }
 
@@ -196,24 +212,24 @@ async fn list_rfqs(State(store): State<Arc<ErpStore>>) -> impl IntoResponse {
     Json(rfqs)
 }
 
-async fn send_rfq(
-    State(store): State<Arc<ErpStore>>,
-    Path(id): Path<Uuid>,
-) -> impl IntoResponse {
+async fn send_rfq(State(store): State<Arc<ErpStore>>, Path(id): Path<Uuid>) -> impl IntoResponse {
     let mut rfqs = store.rfqs.write().await;
     if let Some(rfq) = rfqs.get_mut(&id) {
         rfq.state = RfqState::Sent;
         (StatusCode::OK, Json(rfq.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(Rfq {
-            id: Uuid::nil(),
-            supplier_id: Uuid::nil(),
-            lines: vec![],
-            state: RfqState::Draft,
-            requested_by: Uuid::nil(),
-            expires_at: Utc::now(),
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(Rfq {
+                id: Uuid::nil(),
+                supplier_id: Uuid::nil(),
+                lines: vec![],
+                state: RfqState::Draft,
+                requested_by: Uuid::nil(),
+                expires_at: Utc::now(),
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -228,8 +244,14 @@ pub fn create_router(state: Arc<ErpStore>) -> Router {
             "/api/erp/purchase/orders",
             post(create_purchase_order).get(list_purchase_orders),
         )
-        .route("/api/erp/purchase/orders/{id}/confirm", post(confirm_purchase_order))
-        .route("/api/erp/purchase/orders/{id}/receive", post(receive_purchase_order))
+        .route(
+            "/api/erp/purchase/orders/{id}/confirm",
+            post(confirm_purchase_order),
+        )
+        .route(
+            "/api/erp/purchase/orders/{id}/receive",
+            post(receive_purchase_order),
+        )
         .route("/api/erp/purchase/rfqs", post(create_rfq).get(list_rfqs))
         .route("/api/erp/purchase/rfqs/{id}/send", post(send_rfq))
         .route("/api/erp/purchase/receipts", get(list_receipts))

@@ -8,15 +8,15 @@
 // `saml::signature::{sign, verify}` against real serialised SAML
 // XML produced by each message type's `to_xml()` builder.
 
-use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD as B64;
 use cave_auth::saml::authn_request::AuthnRequest;
 use cave_auth::saml::metadata::EntityDescriptor;
 use cave_auth::saml::response::{Assertion, Response};
 use cave_auth::saml::signature::{
-    sign, verify, Algorithm, SignedDocument, SigningMaterial, VerifyingMaterial,
+    Algorithm, SignedDocument, SigningMaterial, VerifyingMaterial, sign, verify,
 };
-use cave_auth::saml::signing_ecdsa::{generate_keypair, EcdsaCurve};
+use cave_auth::saml::signing_ecdsa::{EcdsaCurve, generate_keypair};
 
 // Same RSA test material as `saml::signature::tests` — repeated here
 // because the test there is `mod tests {}` private; an extra ~3KiB of
@@ -70,11 +70,14 @@ fn verify_with(alg: Algorithm, xml_bytes: &[u8], sig: &str, holder: &KeyHolder) 
     let mat = match (alg, holder) {
         (Algorithm::RsaSha256, KeyHolder::Rsa) => {
             pub_der = rsa_pub_der();
-            VerifyingMaterial::Rsa { rsa_pub_der: &pub_der }
+            VerifyingMaterial::Rsa {
+                rsa_pub_der: &pub_der,
+            }
         }
-        (Algorithm::EcdsaSha256 | Algorithm::EcdsaSha384 | Algorithm::EcdsaSha512, KeyHolder::Ecdsa(kp)) => {
-            VerifyingMaterial::Ecdsa { key: &kp.verifying }
-        }
+        (
+            Algorithm::EcdsaSha256 | Algorithm::EcdsaSha384 | Algorithm::EcdsaSha512,
+            KeyHolder::Ecdsa(kp),
+        ) => VerifyingMaterial::Ecdsa { key: &kp.verifying },
         _ => panic!("test setup mismatch: {alg:?}"),
     };
     verify(&doc, alg, sig, &mat).unwrap();
@@ -94,7 +97,10 @@ fn authn_request_signs_and_verifies_all_algorithms() {
     let req = AuthnRequest::new("https://sp.example.com", "https://idp.example.com/sso")
         .with_acs_url("https://sp.example.com/saml/acs");
     let xml = req.to_xml().unwrap();
-    assert!(xml.windows(b"AuthnRequest".len()).any(|w| w == b"AuthnRequest"));
+    assert!(
+        xml.windows(b"AuthnRequest".len())
+            .any(|w| w == b"AuthnRequest")
+    );
     for alg in ALL_ALGS {
         let (sig, holder) = sign_with(alg, &xml);
         verify_with(alg, &xml, &sig, &holder);
@@ -115,7 +121,10 @@ fn response_signs_and_verifies_all_algorithms() {
         assertion,
     );
     let xml = resp.to_xml().unwrap();
-    assert!(xml.windows(b"samlp:Response".len()).any(|w| w == b"samlp:Response"));
+    assert!(
+        xml.windows(b"samlp:Response".len())
+            .any(|w| w == b"samlp:Response")
+    );
     for alg in ALL_ALGS {
         let (sig, holder) = sign_with(alg, &xml);
         verify_with(alg, &xml, &sig, &holder);
@@ -164,15 +173,15 @@ fn assertion_inner_signs_and_verifies_all_algorithms() {
 
 #[test]
 fn metadata_idp_signs_and_verifies_all_algorithms() {
-    let md = EntityDescriptor::new_idp("https://idp.example.com")
-        .add_endpoint(
-            "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
-            "https://idp.example.com/sso",
-        );
+    let md = EntityDescriptor::new_idp("https://idp.example.com").add_endpoint(
+        "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
+        "https://idp.example.com/sso",
+    );
     let xml = md.to_xml().unwrap();
-    assert!(xml
-        .windows(b"IDPSSODescriptor".len())
-        .any(|w| w == b"IDPSSODescriptor"));
+    assert!(
+        xml.windows(b"IDPSSODescriptor".len())
+            .any(|w| w == b"IDPSSODescriptor")
+    );
     for alg in ALL_ALGS {
         let (sig, holder) = sign_with(alg, &xml);
         verify_with(alg, &xml, &sig, &holder);
@@ -186,9 +195,10 @@ fn metadata_sp_signs_and_verifies_all_algorithms() {
         "https://sp.example.com/saml/acs",
     );
     let xml = md.to_xml().unwrap();
-    assert!(xml
-        .windows(b"SPSSODescriptor".len())
-        .any(|w| w == b"SPSSODescriptor"));
+    assert!(
+        xml.windows(b"SPSSODescriptor".len())
+            .any(|w| w == b"SPSSODescriptor")
+    );
     for alg in ALL_ALGS {
         let (sig, holder) = sign_with(alg, &xml);
         verify_with(alg, &xml, &sig, &holder);
@@ -216,7 +226,9 @@ fn tampered_authn_request_rejected_by_every_algorithm() {
                     &doc,
                     alg,
                     &sig,
-                    &VerifyingMaterial::Rsa { rsa_pub_der: &pub_der },
+                    &VerifyingMaterial::Rsa {
+                        rsa_pub_der: &pub_der,
+                    },
                 );
                 assert!(res.is_err(), "{alg:?}: tampered request must be rejected");
                 continue;

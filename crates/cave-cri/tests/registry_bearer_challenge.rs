@@ -17,10 +17,10 @@ const TENANT: &str = "tenant-acme-prod";
 fn parses_canonical_docker_hub_challenge() {
     let header = r#"Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:library/nginx:pull""#;
     let c = BearerChallenge::parse(header).unwrap();
-    assert_eq!(c.realm,   "https://auth.docker.io/token");
+    assert_eq!(c.realm, "https://auth.docker.io/token");
     assert_eq!(c.service, Some("registry.docker.io".into()));
-    assert_eq!(c.scope,   Some("repository:library/nginx:pull".into()));
-    assert_eq!(c.error,   None);
+    assert_eq!(c.scope, Some("repository:library/nginx:pull".into()));
+    assert_eq!(c.error, None);
 }
 
 /// Cite: distribution-spec v1.1 §4.4 — `realm` is the only required
@@ -40,10 +40,10 @@ fn realm_only_challenge_is_accepted() {
 fn parses_error_hint_and_extra_whitespace() {
     let header = r#"  Bearer  realm="https://r/t" , service="reg" , scope="repo:foo:push" , error="insufficient_scope"  "#;
     let c = BearerChallenge::parse(header).unwrap();
-    assert_eq!(c.realm,   "https://r/t");
+    assert_eq!(c.realm, "https://r/t");
     assert_eq!(c.service, Some("reg".into()));
-    assert_eq!(c.scope,   Some("repo:foo:push".into()));
-    assert_eq!(c.error,   Some("insufficient_scope".into()));
+    assert_eq!(c.scope, Some("repo:foo:push".into()));
+    assert_eq!(c.error, Some("insufficient_scope".into()));
 }
 
 /// Cite: containerd `core/remotes/docker/auth/parse.go` (`ParseAuthHeader`)
@@ -51,10 +51,14 @@ fn parses_error_hint_and_extra_whitespace() {
 /// being silently treated as anonymous access.
 #[test]
 fn rejects_non_bearer_scheme_and_missing_realm() {
-    assert!(BearerChallenge::parse(r#"Basic realm="x""#).is_err(),
-        "non-Bearer scheme rejected");
-    assert!(BearerChallenge::parse(r#"Bearer service="x""#).is_err(),
-        "missing realm rejected");
+    assert!(
+        BearerChallenge::parse(r#"Basic realm="x""#).is_err(),
+        "non-Bearer scheme rejected"
+    );
+    assert!(
+        BearerChallenge::parse(r#"Bearer service="x""#).is_err(),
+        "missing realm rejected"
+    );
     assert!(BearerChallenge::parse("").is_err());
 }
 
@@ -100,12 +104,21 @@ fn tenant_token_cache_isolates_keys_and_honours_ttl() {
 
     cache.put("docker.io", "library/nginx", "pull", "tok-A", 60);
     cache.put("docker.io", "library/redis", "pull", "tok-B", 60);
-    cache.put("ghcr.io",   "org/app",       "pull", "tok-C", 60);
+    cache.put("ghcr.io", "org/app", "pull", "tok-C", 60);
     assert_eq!(cache.len(), 3);
 
-    assert_eq!(cache.get("docker.io", "library/nginx", "pull").as_deref(), Some("tok-A"));
-    assert_eq!(cache.get("docker.io", "library/redis", "pull").as_deref(), Some("tok-B"));
-    assert_eq!(cache.get("ghcr.io",   "org/app",       "pull").as_deref(), Some("tok-C"));
+    assert_eq!(
+        cache.get("docker.io", "library/nginx", "pull").as_deref(),
+        Some("tok-A")
+    );
+    assert_eq!(
+        cache.get("docker.io", "library/redis", "pull").as_deref(),
+        Some("tok-B")
+    );
+    assert_eq!(
+        cache.get("ghcr.io", "org/app", "pull").as_deref(),
+        Some("tok-C")
+    );
 
     // Cache miss for a different scope (push vs. pull)
     assert!(cache.get("docker.io", "library/nginx", "push").is_none());
@@ -114,7 +127,9 @@ fn tenant_token_cache_isolates_keys_and_honours_ttl() {
     // but evicting forces a miss immediately.
     assert!(cache.evict("docker.io", "library/nginx", "pull"));
     assert!(cache.get("docker.io", "library/nginx", "pull").is_none());
-    assert!(!cache.evict("docker.io", "library/nginx", "pull"),
-        "second evict is a no-op");
+    assert!(
+        !cache.evict("docker.io", "library/nginx", "pull"),
+        "second evict is a no-op"
+    );
     assert_eq!(cache.len(), 2);
 }

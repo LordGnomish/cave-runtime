@@ -94,76 +94,356 @@ pub struct IdiomMapping {
 /// crate / another cave-net module.
 pub fn mappings() -> &'static [IdiomMapping] {
     &[
-        IdiomMapping { upstream_pkg: "pkg/byteorder/",       rust_replacement: "stdlib u32::to_be_bytes / from_be_bytes",           note: "byte-order helpers" },
-        IdiomMapping { upstream_pkg: "pkg/cidr/",            rust_replacement: "ipnet crate",                                       note: "CIDR parsing/iteration" },
-        IdiomMapping { upstream_pkg: "pkg/mac/",             rust_replacement: "cilium::net_types::MACAddr",                        note: "MAC formatting" },
-        IdiomMapping { upstream_pkg: "pkg/ip/",              rust_replacement: "std::net::IpAddr",                                  note: "IP helpers" },
-        IdiomMapping { upstream_pkg: "pkg/lock/",            rust_replacement: "tokio::sync::Mutex + std::sync::Mutex",             note: "mutex / rwlock" },
-        IdiomMapping { upstream_pkg: "pkg/promise/",         rust_replacement: "tokio::sync::oneshot",                              note: "single-producer single-consumer one-shot" },
-        IdiomMapping { upstream_pkg: "pkg/eventqueue/",      rust_replacement: "tokio::sync::mpsc::channel",                        note: "FIFO event queue" },
-        IdiomMapping { upstream_pkg: "pkg/trigger/",         rust_replacement: "tokio::sync::Notify",                               note: "edge-trigger" },
-        IdiomMapping { upstream_pkg: "pkg/rate/",            rust_replacement: "governor crate",                                    note: "token-bucket rate limiter" },
-        IdiomMapping { upstream_pkg: "pkg/backoff/",         rust_replacement: "tokio::time::sleep + Duration::mul_f64",            note: "exponential backoff" },
-        IdiomMapping { upstream_pkg: "pkg/time/",            rust_replacement: "std::time::Duration + chrono::DateTime",            note: "duration / datetime helpers" },
-        IdiomMapping { upstream_pkg: "pkg/safetime/",        rust_replacement: "std::time::Instant",                                note: "monotonic time" },
-        IdiomMapping { upstream_pkg: "pkg/safeio/",          rust_replacement: "std::io::Read / Write",                             note: "io with timeout" },
-        IdiomMapping { upstream_pkg: "pkg/slices/",          rust_replacement: "Vec<T> + itertools",                                note: "slice helpers" },
-        IdiomMapping { upstream_pkg: "pkg/container/",       rust_replacement: "std::collections::{HashMap, BTreeMap}",             note: "collection helpers" },
-        IdiomMapping { upstream_pkg: "pkg/counter/",         rust_replacement: "std::sync::atomic::AtomicU64",                      note: "atomic counter" },
-        IdiomMapping { upstream_pkg: "pkg/comparator/",      rust_replacement: "PartialOrd / Ord",                                  note: "ordering helpers" },
-        IdiomMapping { upstream_pkg: "pkg/cleanup/",         rust_replacement: "Drop trait",                                        note: "cleanup hook" },
-        IdiomMapping { upstream_pkg: "pkg/idpool/",          rust_replacement: "cilium::id_coord::Allocator",                       note: "id pool" },
-        IdiomMapping { upstream_pkg: "pkg/ipalloc/",         rust_replacement: "cilium::ipam allocator",                            note: "ip allocator" },
-        IdiomMapping { upstream_pkg: "pkg/tuple/",           rust_replacement: "cilium::conntrack::FiveTuple",                      note: "5-tuple" },
-        IdiomMapping { upstream_pkg: "pkg/source/",          rust_replacement: "cilium::node_mgr::NodeSource",                      note: "value-provenance enum" },
-        IdiomMapping { upstream_pkg: "pkg/labelsfilter/",    rust_replacement: "cilium::label_resolver",                            note: "label-prefix filter" },
-        IdiomMapping { upstream_pkg: "pkg/iana/",            rust_replacement: "small enum mapping",                                note: "IANA port/protocol names" },
-        IdiomMapping { upstream_pkg: "pkg/u8proto/",         rust_replacement: "u8 → &str enum",                                    note: "single-byte protocol enum" },
-        IdiomMapping { upstream_pkg: "pkg/annotation/",      rust_replacement: "const string table",                                note: "pod-annotation keys" },
-        IdiomMapping { upstream_pkg: "pkg/components/",      rust_replacement: "const string table",                                note: "component-name strings" },
-        IdiomMapping { upstream_pkg: "pkg/version/",         rust_replacement: "env!(\"CARGO_PKG_VERSION\")",                       note: "build-time version stamp" },
-        IdiomMapping { upstream_pkg: "pkg/versioncheck/",    rust_replacement: "semver crate",                                      note: "semver compare" },
-        IdiomMapping { upstream_pkg: "pkg/util/",            rust_replacement: "stdlib + small helpers",                            note: "miscellaneous" },
-        IdiomMapping { upstream_pkg: "pkg/spanstat/",        rust_replacement: "cilium::status histograms",                         note: "span statistics" },
-        IdiomMapping { upstream_pkg: "pkg/revert/",          rust_replacement: "Result + transactional undo closure",               note: "undo stack" },
-        IdiomMapping { upstream_pkg: "pkg/resiliency/",      rust_replacement: "tokio::time::timeout + retry",                      note: "retry primitives" },
-        IdiomMapping { upstream_pkg: "pkg/loadinfo/",        rust_replacement: "sysinfo crate",                                     note: "load-average reader" },
-        IdiomMapping { upstream_pkg: "pkg/flowdebug/",       rust_replacement: "tracing::debug!",                                   note: "flow-debug print" },
-        IdiomMapping { upstream_pkg: "pkg/debug/",           rust_replacement: "tracing::debug!",                                   note: "debug print" },
-        IdiomMapping { upstream_pkg: "pkg/dial/",            rust_replacement: "tokio::net::TcpStream",                             note: "TCP dial" },
-        IdiomMapping { upstream_pkg: "pkg/shortener/",       rust_replacement: "stdlib str truncation",                             note: "name shortener" },
-        IdiomMapping { upstream_pkg: "pkg/dynamicconfig/",   rust_replacement: "cilium::config_watcher",                            note: "dynamic config" },
-        IdiomMapping { upstream_pkg: "pkg/dynamiclifecycle/",rust_replacement: "cilium::config_watcher",                            note: "dynamic lifecycle" },
-        IdiomMapping { upstream_pkg: "pkg/driftchecker/",    rust_replacement: "cilium::config_watcher",                            note: "config-drift checker" },
-        IdiomMapping { upstream_pkg: "pkg/endpointstate/",   rust_replacement: "cilium::endpoint_mgr::EndpointState",               note: "endpoint state enum" },
-        IdiomMapping { upstream_pkg: "pkg/endpointcleanup/", rust_replacement: "cilium::endpoint_regen",                            note: "endpoint cleanup" },
-        IdiomMapping { upstream_pkg: "pkg/healthconfig/",    rust_replacement: "cilium::health config",                             note: "health config" },
-        IdiomMapping { upstream_pkg: "pkg/lbipamconfig/",    rust_replacement: "cilium::ipam config",                               note: "LB-IPAM config" },
-        IdiomMapping { upstream_pkg: "pkg/nodeipamconfig/",  rust_replacement: "cilium::ipam config",                               note: "node-IPAM config" },
-        IdiomMapping { upstream_pkg: "pkg/svcrouteconfig/",  rust_replacement: "cilium::services config",                           note: "service-route config" },
-        IdiomMapping { upstream_pkg: "pkg/wal/",             rust_replacement: "cave-etcd persistence layer",                       note: "write-ahead log" },
-        IdiomMapping { upstream_pkg: "pkg/signal/",          rust_replacement: "orchestrator (cave-runtime) signal handler",        note: "OS-signal handler" },
-        IdiomMapping { upstream_pkg: "pkg/pidfile/",         rust_replacement: "orchestrator (cave-runtime) pidfile",               note: "pidfile" },
-        IdiomMapping { upstream_pkg: "pkg/pprof/",           rust_replacement: "pprof-rs crate (opt-in)",                           note: "pprof endpoint" },
-        IdiomMapping { upstream_pkg: "pkg/fswatcher/",       rust_replacement: "notify crate",                                      note: "fsnotify wrapper" },
-        IdiomMapping { upstream_pkg: "pkg/bufuuid/",         rust_replacement: "uuid crate",                                        note: "buffered uuid" },
-        IdiomMapping { upstream_pkg: "pkg/murmur3/",         rust_replacement: "murmur3 crate (Maglev)",                            note: "MurmurHash3" },
-        IdiomMapping { upstream_pkg: "pkg/hive/",            rust_replacement: "module composition (no DI framework)",              note: "Cell DI" },
-        IdiomMapping { upstream_pkg: "pkg/logging/",         rust_replacement: "tracing crate",                                     note: "structured logging" },
-        IdiomMapping { upstream_pkg: "pkg/completion/",      rust_replacement: "tokio::sync::Semaphore",                            note: "completion latch" },
-        IdiomMapping { upstream_pkg: "pkg/crypto/",          rust_replacement: "ring + rustls crates",                              note: "low-level crypto" },
-        IdiomMapping { upstream_pkg: "pkg/multicast/",       rust_replacement: "(unimplemented — kernel-side)",                     note: "multicast helpers" },
-        IdiomMapping { upstream_pkg: "pkg/mcastmanager/",    rust_replacement: "(unimplemented — kernel-side)",                     note: "multicast manager" },
-        IdiomMapping { upstream_pkg: "pkg/cgroups/",         rust_replacement: "(unimplemented — kernel-side)",                     note: "cgroup discovery" },
-        IdiomMapping { upstream_pkg: "pkg/mountinfo/",       rust_replacement: "(unimplemented — kernel-side)",                     note: "mountinfo parser" },
-        IdiomMapping { upstream_pkg: "pkg/netns/",           rust_replacement: "(unimplemented — kernel-side)",                     note: "setns wrapper" },
-        IdiomMapping { upstream_pkg: "pkg/alignchecker/",    rust_replacement: "cilium::bpf_loader (alignment check)",              note: "BPF struct alignment" },
-        IdiomMapping { upstream_pkg: "pkg/bpf/",             rust_replacement: "cilium::bpf_loader (simulation)",                   note: "libbpf bindings" },
-        IdiomMapping { upstream_pkg: "pkg/ebpf/",            rust_replacement: "cilium::bpf_loader (simulation)",                   note: "cilium/ebpf bindings" },
-        IdiomMapping { upstream_pkg: "pkg/aws/",             rust_replacement: "(unimplemented — cloud SDK)",                       note: "AWS ENI IPAM" },
-        IdiomMapping { upstream_pkg: "pkg/azure/",           rust_replacement: "(unimplemented — cloud SDK)",                       note: "Azure IPAM" },
-        IdiomMapping { upstream_pkg: "pkg/alibabacloud/",    rust_replacement: "(unimplemented — cloud SDK)",                       note: "Alibaba IPAM" },
-        IdiomMapping { upstream_pkg: "pkg/testutils/",       rust_replacement: "cilium_test_ctx! macro",                            note: "test fixtures" },
+        IdiomMapping {
+            upstream_pkg: "pkg/byteorder/",
+            rust_replacement: "stdlib u32::to_be_bytes / from_be_bytes",
+            note: "byte-order helpers",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/cidr/",
+            rust_replacement: "ipnet crate",
+            note: "CIDR parsing/iteration",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/mac/",
+            rust_replacement: "cilium::net_types::MACAddr",
+            note: "MAC formatting",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/ip/",
+            rust_replacement: "std::net::IpAddr",
+            note: "IP helpers",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/lock/",
+            rust_replacement: "tokio::sync::Mutex + std::sync::Mutex",
+            note: "mutex / rwlock",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/promise/",
+            rust_replacement: "tokio::sync::oneshot",
+            note: "single-producer single-consumer one-shot",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/eventqueue/",
+            rust_replacement: "tokio::sync::mpsc::channel",
+            note: "FIFO event queue",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/trigger/",
+            rust_replacement: "tokio::sync::Notify",
+            note: "edge-trigger",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/rate/",
+            rust_replacement: "governor crate",
+            note: "token-bucket rate limiter",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/backoff/",
+            rust_replacement: "tokio::time::sleep + Duration::mul_f64",
+            note: "exponential backoff",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/time/",
+            rust_replacement: "std::time::Duration + chrono::DateTime",
+            note: "duration / datetime helpers",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/safetime/",
+            rust_replacement: "std::time::Instant",
+            note: "monotonic time",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/safeio/",
+            rust_replacement: "std::io::Read / Write",
+            note: "io with timeout",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/slices/",
+            rust_replacement: "Vec<T> + itertools",
+            note: "slice helpers",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/container/",
+            rust_replacement: "std::collections::{HashMap, BTreeMap}",
+            note: "collection helpers",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/counter/",
+            rust_replacement: "std::sync::atomic::AtomicU64",
+            note: "atomic counter",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/comparator/",
+            rust_replacement: "PartialOrd / Ord",
+            note: "ordering helpers",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/cleanup/",
+            rust_replacement: "Drop trait",
+            note: "cleanup hook",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/idpool/",
+            rust_replacement: "cilium::id_coord::Allocator",
+            note: "id pool",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/ipalloc/",
+            rust_replacement: "cilium::ipam allocator",
+            note: "ip allocator",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/tuple/",
+            rust_replacement: "cilium::conntrack::FiveTuple",
+            note: "5-tuple",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/source/",
+            rust_replacement: "cilium::node_mgr::NodeSource",
+            note: "value-provenance enum",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/labelsfilter/",
+            rust_replacement: "cilium::label_resolver",
+            note: "label-prefix filter",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/iana/",
+            rust_replacement: "small enum mapping",
+            note: "IANA port/protocol names",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/u8proto/",
+            rust_replacement: "u8 → &str enum",
+            note: "single-byte protocol enum",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/annotation/",
+            rust_replacement: "const string table",
+            note: "pod-annotation keys",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/components/",
+            rust_replacement: "const string table",
+            note: "component-name strings",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/version/",
+            rust_replacement: "env!(\"CARGO_PKG_VERSION\")",
+            note: "build-time version stamp",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/versioncheck/",
+            rust_replacement: "semver crate",
+            note: "semver compare",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/util/",
+            rust_replacement: "stdlib + small helpers",
+            note: "miscellaneous",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/spanstat/",
+            rust_replacement: "cilium::status histograms",
+            note: "span statistics",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/revert/",
+            rust_replacement: "Result + transactional undo closure",
+            note: "undo stack",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/resiliency/",
+            rust_replacement: "tokio::time::timeout + retry",
+            note: "retry primitives",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/loadinfo/",
+            rust_replacement: "sysinfo crate",
+            note: "load-average reader",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/flowdebug/",
+            rust_replacement: "tracing::debug!",
+            note: "flow-debug print",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/debug/",
+            rust_replacement: "tracing::debug!",
+            note: "debug print",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/dial/",
+            rust_replacement: "tokio::net::TcpStream",
+            note: "TCP dial",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/shortener/",
+            rust_replacement: "stdlib str truncation",
+            note: "name shortener",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/dynamicconfig/",
+            rust_replacement: "cilium::config_watcher",
+            note: "dynamic config",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/dynamiclifecycle/",
+            rust_replacement: "cilium::config_watcher",
+            note: "dynamic lifecycle",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/driftchecker/",
+            rust_replacement: "cilium::config_watcher",
+            note: "config-drift checker",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/endpointstate/",
+            rust_replacement: "cilium::endpoint_mgr::EndpointState",
+            note: "endpoint state enum",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/endpointcleanup/",
+            rust_replacement: "cilium::endpoint_regen",
+            note: "endpoint cleanup",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/healthconfig/",
+            rust_replacement: "cilium::health config",
+            note: "health config",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/lbipamconfig/",
+            rust_replacement: "cilium::ipam config",
+            note: "LB-IPAM config",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/nodeipamconfig/",
+            rust_replacement: "cilium::ipam config",
+            note: "node-IPAM config",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/svcrouteconfig/",
+            rust_replacement: "cilium::services config",
+            note: "service-route config",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/wal/",
+            rust_replacement: "cave-etcd persistence layer",
+            note: "write-ahead log",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/signal/",
+            rust_replacement: "orchestrator (cave-runtime) signal handler",
+            note: "OS-signal handler",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/pidfile/",
+            rust_replacement: "orchestrator (cave-runtime) pidfile",
+            note: "pidfile",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/pprof/",
+            rust_replacement: "pprof-rs crate (opt-in)",
+            note: "pprof endpoint",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/fswatcher/",
+            rust_replacement: "notify crate",
+            note: "fsnotify wrapper",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/bufuuid/",
+            rust_replacement: "uuid crate",
+            note: "buffered uuid",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/murmur3/",
+            rust_replacement: "murmur3 crate (Maglev)",
+            note: "MurmurHash3",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/hive/",
+            rust_replacement: "module composition (no DI framework)",
+            note: "Cell DI",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/logging/",
+            rust_replacement: "tracing crate",
+            note: "structured logging",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/completion/",
+            rust_replacement: "tokio::sync::Semaphore",
+            note: "completion latch",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/crypto/",
+            rust_replacement: "ring + rustls crates",
+            note: "low-level crypto",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/multicast/",
+            rust_replacement: "(unimplemented — kernel-side)",
+            note: "multicast helpers",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/mcastmanager/",
+            rust_replacement: "(unimplemented — kernel-side)",
+            note: "multicast manager",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/cgroups/",
+            rust_replacement: "(unimplemented — kernel-side)",
+            note: "cgroup discovery",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/mountinfo/",
+            rust_replacement: "(unimplemented — kernel-side)",
+            note: "mountinfo parser",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/netns/",
+            rust_replacement: "(unimplemented — kernel-side)",
+            note: "setns wrapper",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/alignchecker/",
+            rust_replacement: "cilium::bpf_loader (alignment check)",
+            note: "BPF struct alignment",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/bpf/",
+            rust_replacement: "cilium::bpf_loader (simulation)",
+            note: "libbpf bindings",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/ebpf/",
+            rust_replacement: "cilium::bpf_loader (simulation)",
+            note: "cilium/ebpf bindings",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/aws/",
+            rust_replacement: "(unimplemented — cloud SDK)",
+            note: "AWS ENI IPAM",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/azure/",
+            rust_replacement: "(unimplemented — cloud SDK)",
+            note: "Azure IPAM",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/alibabacloud/",
+            rust_replacement: "(unimplemented — cloud SDK)",
+            note: "Alibaba IPAM",
+        },
+        IdiomMapping {
+            upstream_pkg: "pkg/testutils/",
+            rust_replacement: "cilium_test_ctx! macro",
+            note: "test fixtures",
+        },
     ]
 }
 
@@ -193,14 +473,23 @@ mod tests {
     fn every_upstream_uses_pkg_prefix() {
         let (_c, _t) = cilium_test_ctx!("pkg/", "IdiomMappings.Prefix", "tenant-im-p");
         for m in mappings() {
-            assert!(m.upstream_pkg.starts_with("pkg/"), "{} missing pkg/ prefix", m.upstream_pkg);
-            assert!(m.upstream_pkg.ends_with('/'), "{} missing trailing /", m.upstream_pkg);
+            assert!(
+                m.upstream_pkg.starts_with("pkg/"),
+                "{} missing pkg/ prefix",
+                m.upstream_pkg
+            );
+            assert!(
+                m.upstream_pkg.ends_with('/'),
+                "{} missing trailing /",
+                m.upstream_pkg
+            );
         }
     }
 
     #[test]
     fn every_mapping_has_replacement_text() {
-        let (_c, _t) = cilium_test_ctx!("pkg/", "IdiomMappings.NonEmpty.Replacement", "tenant-im-nr");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/", "IdiomMappings.NonEmpty.Replacement", "tenant-im-nr");
         for m in mappings() {
             assert!(!m.rust_replacement.is_empty());
             assert!(!m.note.is_empty());
@@ -210,10 +499,21 @@ mod tests {
     #[test]
     fn kernel_side_packages_marked_unimplemented() {
         let (_c, _t) = cilium_test_ctx!("pkg/", "IdiomMappings.Kernel", "tenant-im-k");
-        let kernel = ["pkg/multicast/", "pkg/mcastmanager/", "pkg/cgroups/", "pkg/mountinfo/", "pkg/netns/"];
+        let kernel = [
+            "pkg/multicast/",
+            "pkg/mcastmanager/",
+            "pkg/cgroups/",
+            "pkg/mountinfo/",
+            "pkg/netns/",
+        ];
         for k in kernel {
             let m = mappings().iter().find(|m| m.upstream_pkg == k).unwrap();
-            assert!(m.rust_replacement.contains("kernel-side"), "{}: {}", k, m.rust_replacement);
+            assert!(
+                m.rust_replacement.contains("kernel-side"),
+                "{}: {}",
+                k,
+                m.rust_replacement
+            );
         }
     }
 
@@ -223,21 +523,32 @@ mod tests {
         let cloud = ["pkg/aws/", "pkg/azure/", "pkg/alibabacloud/"];
         for c in cloud {
             let m = mappings().iter().find(|m| m.upstream_pkg == c).unwrap();
-            assert!(m.rust_replacement.contains("cloud SDK"), "{}: {}", c, m.rust_replacement);
+            assert!(
+                m.rust_replacement.contains("cloud SDK"),
+                "{}: {}",
+                c,
+                m.rust_replacement
+            );
         }
     }
 
     #[test]
     fn lookup_known_packages_returns_replacement() {
         let (_c, _t) = cilium_test_ctx!("pkg/", "IdiomMappings.Lookup", "tenant-im-l");
-        let m = mappings().iter().find(|m| m.upstream_pkg == "pkg/byteorder/").unwrap();
+        let m = mappings()
+            .iter()
+            .find(|m| m.upstream_pkg == "pkg/byteorder/")
+            .unwrap();
         assert!(m.rust_replacement.contains("be_bytes"));
     }
 
     #[test]
     fn ipnet_crate_is_referenced_for_cidr() {
         let (_c, _t) = cilium_test_ctx!("pkg/", "IdiomMappings.CIDR", "tenant-im-cd");
-        let m = mappings().iter().find(|m| m.upstream_pkg == "pkg/cidr/").unwrap();
+        let m = mappings()
+            .iter()
+            .find(|m| m.upstream_pkg == "pkg/cidr/")
+            .unwrap();
         assert!(m.rust_replacement.contains("ipnet"));
     }
 }

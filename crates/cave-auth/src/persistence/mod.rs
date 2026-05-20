@@ -35,7 +35,7 @@ pub use entities::{
 };
 pub use in_memory_backend::{InMemoryBackend, InMemoryTxn};
 pub use migration::{
-    baseline_migrations, fnv1a_64, AppliedMigration, Migration, MigrationExecutor,
+    AppliedMigration, Migration, MigrationExecutor, baseline_migrations, fnv1a_64,
 };
 pub use rdbms_backend::RdbmsBackend;
 pub use txn::Transaction;

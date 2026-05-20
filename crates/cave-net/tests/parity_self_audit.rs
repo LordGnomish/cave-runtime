@@ -39,8 +39,7 @@ fn extract_after(text: &str, needle: &str) -> Option<String> {
 #[test]
 fn upstream_version_is_pinned_v1_19_3() {
     let m = manifest_text();
-    let v =
-        extract_after(&m, "\nversion ").or_else(|| extract_after(&m, "\nversion="));
+    let v = extract_after(&m, "\nversion ").or_else(|| extract_after(&m, "\nversion="));
     assert_eq!(
         v.as_deref(),
         Some("v1.19.3"),
@@ -52,8 +51,7 @@ fn upstream_version_is_pinned_v1_19_3() {
 #[test]
 fn upstream_source_sha_is_present_and_matches_version() {
     let m = manifest_text();
-    let sha = extract_after(&m, "\nsource_sha ")
-        .or_else(|| extract_after(&m, "\nsource_sha="));
+    let sha = extract_after(&m, "\nsource_sha ").or_else(|| extract_after(&m, "\nsource_sha="));
     assert!(
         sha.is_some() && !sha.as_deref().unwrap().is_empty(),
         "manifest [upstream] source_sha must be set for reproducibility \
@@ -72,8 +70,7 @@ fn upstream_source_sha_is_present_and_matches_version() {
 #[test]
 fn parity_fill_ratio_is_measured_and_at_least_0_9() {
     let m = manifest_text();
-    let raw = extract_after(&m, "\nfill_ratio ")
-        .or_else(|| extract_after(&m, "\nfill_ratio="));
+    let raw = extract_after(&m, "\nfill_ratio ").or_else(|| extract_after(&m, "\nfill_ratio="));
     let ratio: f64 = raw
         .as_deref()
         .expect("[parity] fill_ratio must be present")
@@ -113,8 +110,7 @@ fn parity_honest_ratio_matches_fill_ratio() {
 #[test]
 fn parity_last_audit_is_2026_05_19() {
     let m = manifest_text();
-    let when = extract_after(&m, "\nlast_audit ")
-        .or_else(|| extract_after(&m, "\nlast_audit="));
+    let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert_eq!(
         when.as_deref(),
         Some("2026-05-19"),
@@ -125,8 +121,7 @@ fn parity_last_audit_is_2026_05_19() {
 #[test]
 fn parity_infra_only_is_false() {
     let m = manifest_text();
-    let v = extract_after(&m, "\ninfra_only ")
-        .or_else(|| extract_after(&m, "\ninfra_only="));
+    let v = extract_after(&m, "\ninfra_only ").or_else(|| extract_after(&m, "\ninfra_only="));
     assert_eq!(
         v.as_deref(),
         Some("false"),
@@ -189,16 +184,25 @@ fn every_rs_file_carries_agpl_spdx() {
         total,
         missing
     );
-    assert!(total >= 100, "expected >= 100 .rs files in cave-net; got {}", total);
+    assert!(
+        total >= 100,
+        "expected >= 100 .rs files in cave-net; got {}",
+        total
+    );
 }
 
 fn walk(dir: &PathBuf, cb: &mut dyn FnMut(&PathBuf)) {
-    let Ok(entries) = fs::read_dir(dir) else { return };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
     for e in entries.flatten() {
         let p = e.path();
         if p.is_dir() {
             // Skip target/ and any hidden dirs.
-            if p.file_name().map(|n| n.to_string_lossy().starts_with('.')).unwrap_or(false) {
+            if p.file_name()
+                .map(|n| n.to_string_lossy().starts_with('.'))
+                .unwrap_or(false)
+            {
                 continue;
             }
             if p.file_name().map(|n| n == "target").unwrap_or(false) {

@@ -56,25 +56,36 @@ pub struct ProxyHealthChecker {
 
 impl ProxyHealthChecker {
     pub fn new(tenant: TenantId, down_threshold: u32) -> Self {
-        Self { tenant, down_threshold, proxies: BTreeMap::new() }
+        Self {
+            tenant,
+            down_threshold,
+            proxies: BTreeMap::new(),
+        }
     }
 
     pub fn register(&mut self, name: impl Into<String>) {
         self.proxies.entry(name.into()).or_insert(ProxyStatus {
             state: ProxyState::Live,
-            last_success_ns: 0, last_failure_ns: 0,
+            last_success_ns: 0,
+            last_failure_ns: 0,
             consecutive_failures: 0,
-            probes_total: 0, probes_success: 0,
+            probes_total: 0,
+            probes_success: 0,
         });
     }
 
     pub fn unregister(&mut self, name: &str) -> Result<(), HealthError> {
-        self.proxies.remove(name).ok_or_else(|| HealthError::NotRegistered(name.to_string()))?;
+        self.proxies
+            .remove(name)
+            .ok_or_else(|| HealthError::NotRegistered(name.to_string()))?;
         Ok(())
     }
 
     pub fn record(&mut self, name: &str, probe: ProxyProbe) -> Result<(), HealthError> {
-        let s = self.proxies.get_mut(name).ok_or_else(|| HealthError::NotRegistered(name.to_string()))?;
+        let s = self
+            .proxies
+            .get_mut(name)
+            .ok_or_else(|| HealthError::NotRegistered(name.to_string()))?;
         s.probes_total += 1;
         if probe.success {
             s.last_success_ns = probe.timestamp_ns;
@@ -102,7 +113,10 @@ impl ProxyHealthChecker {
     }
 
     pub fn live_count(&self) -> usize {
-        self.proxies.values().filter(|s| matches!(s.state, ProxyState::Live)).count()
+        self.proxies
+            .values()
+            .filter(|s| matches!(s.state, ProxyState::Live))
+            .count()
     }
 }
 
@@ -119,7 +133,12 @@ mod tests {
     }
 
     fn probe(success: bool, status: u16, ts: u64) -> ProxyProbe {
-        ProxyProbe { timestamp_ns: ts, success, status_code: status, latency_us: 100 }
+        ProxyProbe {
+            timestamp_ns: ts,
+            success,
+            status_code: status,
+            latency_us: 100,
+        }
     }
 
     // ── Register / unregister ──────────────────────────────────────────────
@@ -134,7 +153,8 @@ mod tests {
 
     #[test]
     fn unregister_drops_proxy() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/healthcheck.go", "Unregister", "tenant-ph-u");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/proxy/healthcheck.go", "Unregister", "tenant-ph-u");
         let mut c = checker(tenant);
         c.register("envoy-1");
         c.unregister("envoy-1").unwrap();
@@ -143,7 +163,11 @@ mod tests {
 
     #[test]
     fn unregister_unknown_returns_not_registered() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/healthcheck.go", "Unregister.NotFound", "tenant-ph-unf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/healthcheck.go",
+            "Unregister.NotFound",
+            "tenant-ph-unf"
+        );
         let mut c = checker(tenant);
         let err = c.unregister("ghost").unwrap_err();
         assert!(matches!(err, HealthError::NotRegistered(_)));
@@ -153,7 +177,8 @@ mod tests {
 
     #[test]
     fn success_probe_keeps_state_live() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/healthcheck.go", "Record.Success", "tenant-ph-rs");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/proxy/healthcheck.go", "Record.Success", "tenant-ph-rs");
         let mut c = checker(tenant);
         c.register("envoy-1");
         c.record("envoy-1", probe(true, 200, 100)).unwrap();
@@ -165,7 +190,11 @@ mod tests {
 
     #[test]
     fn first_failure_moves_state_to_degraded() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/healthcheck.go", "Record.Degraded", "tenant-ph-rd");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/healthcheck.go",
+            "Record.Degraded",
+            "tenant-ph-rd"
+        );
         let mut c = checker(tenant);
         c.register("envoy-1");
         c.record("envoy-1", probe(false, 500, 100)).unwrap();
@@ -176,7 +205,8 @@ mod tests {
 
     #[test]
     fn threshold_consecutive_failures_moves_state_to_down() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/healthcheck.go", "Record.Down", "tenant-ph-rdn");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/proxy/healthcheck.go", "Record.Down", "tenant-ph-rdn");
         let mut c = checker(tenant);
         c.register("envoy-1");
         for i in 0..3u64 {
@@ -187,7 +217,11 @@ mod tests {
 
     #[test]
     fn success_after_failure_resets_to_live_and_clears_failures() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/healthcheck.go", "Record.RecoverLive", "tenant-ph-rrl");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/healthcheck.go",
+            "Record.RecoverLive",
+            "tenant-ph-rrl"
+        );
         let mut c = checker(tenant);
         c.register("envoy-1");
         c.record("envoy-1", probe(false, 500, 100)).unwrap();
@@ -200,7 +234,11 @@ mod tests {
 
     #[test]
     fn record_unknown_proxy_returns_not_registered() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/healthcheck.go", "Record.NotRegistered", "tenant-ph-rnr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/healthcheck.go",
+            "Record.NotRegistered",
+            "tenant-ph-rnr"
+        );
         let mut c = checker(tenant);
         let err = c.record("ghost", probe(true, 200, 0)).unwrap_err();
         assert!(matches!(err, HealthError::NotRegistered(_)));
@@ -208,7 +246,11 @@ mod tests {
 
     #[test]
     fn record_failure_increments_total_and_records_timestamp() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/healthcheck.go", "Record.Failure.Counter", "tenant-ph-rfc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/healthcheck.go",
+            "Record.Failure.Counter",
+            "tenant-ph-rfc"
+        );
         let mut c = checker(tenant);
         c.register("envoy-1");
         c.record("envoy-1", probe(false, 500, 100)).unwrap();
@@ -232,11 +274,13 @@ mod tests {
 
     #[test]
     fn live_count_only_counts_live_proxies() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/healthcheck.go", "LiveCount", "tenant-ph-lc");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/proxy/healthcheck.go", "LiveCount", "tenant-ph-lc");
         let mut c = checker(tenant);
         for i in 0..3 {
             c.register(format!("envoy-{i}"));
-            c.record(&format!("envoy-{i}"), probe(true, 200, 0)).unwrap();
+            c.record(&format!("envoy-{i}"), probe(true, 200, 0))
+                .unwrap();
         }
         c.register("dead");
         for ts in 0..3u64 {
@@ -249,7 +293,11 @@ mod tests {
 
     #[test]
     fn re_register_does_not_reset_state() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/healthcheck.go", "Register.Idempotent", "tenant-ph-rri");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/healthcheck.go",
+            "Register.Idempotent",
+            "tenant-ph-rri"
+        );
         let mut c = checker(tenant);
         c.register("envoy-1");
         c.record("envoy-1", probe(false, 500, 100)).unwrap();
@@ -262,7 +310,8 @@ mod tests {
 
     #[test]
     fn custom_threshold_controls_down_transition() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/healthcheck.go", "DownThreshold", "tenant-ph-dt");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/proxy/healthcheck.go", "DownThreshold", "tenant-ph-dt");
         let mut c = ProxyHealthChecker::new(tenant, 5);
         c.register("envoy-1");
         for i in 0..4u64 {
@@ -277,7 +326,11 @@ mod tests {
 
     #[test]
     fn status_unknown_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/healthcheck.go", "Status.NotFound", "tenant-ph-snf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/healthcheck.go",
+            "Status.NotFound",
+            "tenant-ph-snf"
+        );
         let c = checker(tenant);
         assert!(c.status("ghost").is_none());
     }
@@ -286,7 +339,11 @@ mod tests {
 
     #[test]
     fn proxy_state_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/healthcheck.go", "State.Serde", "tenant-ph-sserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/healthcheck.go",
+            "State.Serde",
+            "tenant-ph-sserde"
+        );
         for s in [ProxyState::Live, ProxyState::Degraded, ProxyState::Down] {
             let j = serde_json::to_string(&s).unwrap();
             let back: ProxyState = serde_json::from_str(&j).unwrap();
@@ -296,7 +353,11 @@ mod tests {
 
     #[test]
     fn proxy_probe_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/proxy/healthcheck.go", "Probe.Serde", "tenant-ph-pserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/proxy/healthcheck.go",
+            "Probe.Serde",
+            "tenant-ph-pserde"
+        );
         let p = probe(true, 200, 100);
         let s = serde_json::to_string(&p).unwrap();
         let back: ProxyProbe = serde_json::from_str(&s).unwrap();
@@ -305,7 +366,11 @@ mod tests {
 
     #[test]
     fn proxy_status_serde_round_trip() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/healthcheck.go", "Status.Serde", "tenant-ph-stserde");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/proxy/healthcheck.go",
+            "Status.Serde",
+            "tenant-ph-stserde"
+        );
         let mut c = checker(tenant);
         c.register("envoy-1");
         c.record("envoy-1", probe(true, 200, 100)).unwrap();
@@ -319,7 +384,8 @@ mod tests {
 
     #[test]
     fn alternating_success_failure_does_not_reach_down() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/proxy/healthcheck.go", "Alternating", "tenant-ph-alt");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/proxy/healthcheck.go", "Alternating", "tenant-ph-alt");
         let mut c = checker(tenant);
         c.register("envoy-1");
         for i in 0..6u64 {

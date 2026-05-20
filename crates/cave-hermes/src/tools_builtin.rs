@@ -14,7 +14,7 @@ use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::tool::{ToolEntry, ToolRegistry, ToolResult};
 
@@ -110,13 +110,12 @@ pub fn file_read_entry() -> ToolEntry {
 }
 
 fn run_file_read(args: &Value) -> crate::error::Result<ToolResult> {
-    let path = args
-        .get("path")
-        .and_then(Value::as_str)
-        .ok_or_else(|| crate::error::HermesError::ToolArguments {
+    let path = args.get("path").and_then(Value::as_str).ok_or_else(|| {
+        crate::error::HermesError::ToolArguments {
             name: "file_read".into(),
             reason: "`path` (string) is required".into(),
-        })?;
+        }
+    })?;
     let body = fs::read_to_string(Path::new(path))?;
     let bytes = body.len();
     Ok(ToolResult::ok(body).with_meta("bytes", bytes.to_string()))
@@ -142,20 +141,18 @@ pub fn file_write_entry() -> ToolEntry {
 }
 
 fn run_file_write(args: &Value) -> crate::error::Result<ToolResult> {
-    let path = args
-        .get("path")
-        .and_then(Value::as_str)
-        .ok_or_else(|| crate::error::HermesError::ToolArguments {
+    let path = args.get("path").and_then(Value::as_str).ok_or_else(|| {
+        crate::error::HermesError::ToolArguments {
             name: "file_write".into(),
             reason: "`path` (string) is required".into(),
-        })?;
-    let content = args
-        .get("content")
-        .and_then(Value::as_str)
-        .ok_or_else(|| crate::error::HermesError::ToolArguments {
+        }
+    })?;
+    let content = args.get("content").and_then(Value::as_str).ok_or_else(|| {
+        crate::error::HermesError::ToolArguments {
             name: "file_write".into(),
             reason: "`content` (string) is required".into(),
-        })?;
+        }
+    })?;
     let p = Path::new(path);
     if let Some(parent) = p.parent()
         && !parent.as_os_str().is_empty()
@@ -163,8 +160,10 @@ fn run_file_write(args: &Value) -> crate::error::Result<ToolResult> {
         fs::create_dir_all(parent)?;
     }
     fs::write(p, content)?;
-    Ok(ToolResult::ok(format!("wrote {} bytes to {path}", content.len()))
-        .with_meta("bytes", content.len().to_string()))
+    Ok(
+        ToolResult::ok(format!("wrote {} bytes to {path}", content.len()))
+            .with_meta("bytes", content.len().to_string()),
+    )
 }
 
 // ─── web_fetch ────────────────────────────────────────────────────────────
@@ -174,8 +173,7 @@ fn run_file_write(args: &Value) -> crate::error::Result<ToolResult> {
 /// downstream callers wire `reqwest` or any other client in the runtime
 /// where the credentials live. This mirrors Hermes' approach: the tool
 /// surface is part of cave-hermes; the I/O policy lives in the binary.
-pub type FetchFn =
-    Arc<dyn Fn(&str) -> std::result::Result<String, String> + Send + Sync>;
+pub type FetchFn = Arc<dyn Fn(&str) -> std::result::Result<String, String> + Send + Sync>;
 
 static FETCHER: parking_lot::RwLock<Option<FetchFn>> = parking_lot::RwLock::new(None);
 
@@ -252,9 +250,7 @@ mod tests {
     fn bash_echo_succeeds() {
         let mut r = ToolRegistry::new();
         register_all(&mut r);
-        let out = r
-            .invoke("bash", &json!({"command": "echo hi"}))
-            .unwrap();
+        let out = r.invoke("bash", &json!({"command": "echo hi"})).unwrap();
         assert!(out.ok, "bash echo failed: {out:?}");
         assert!(out.output.contains("hi"));
         assert_eq!(out.meta.get("exit_code").map(String::as_str), Some("0"));
@@ -264,9 +260,7 @@ mod tests {
     fn bash_non_zero_exit_reports_failure() {
         let mut r = ToolRegistry::new();
         register_all(&mut r);
-        let out = r
-            .invoke("bash", &json!({"command": "exit 7"}))
-            .unwrap();
+        let out = r.invoke("bash", &json!({"command": "exit 7"})).unwrap();
         assert!(!out.ok);
         assert_eq!(out.meta.get("exit_code").map(String::as_str), Some("7"));
     }

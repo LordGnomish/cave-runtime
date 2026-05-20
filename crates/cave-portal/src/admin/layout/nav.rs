@@ -49,11 +49,8 @@ pub fn nav_items_for_persona(persona: Persona) -> Vec<NavSection> {
     SECTIONS
         .iter()
         .filter_map(|s| {
-            let visible: Vec<&'static NavItem> = s
-                .items
-                .iter()
-                .filter(|i| is_visible(i, persona))
-                .collect();
+            let visible: Vec<&'static NavItem> =
+                s.items.iter().filter(|i| is_visible(i, persona)).collect();
             if visible.is_empty() {
                 None
             } else {
@@ -95,17 +92,17 @@ pub fn sidebar(persona: Persona, current_path: &str, tenant_id: &str) -> String 
                 continue;
             }
             let active = current_path.starts_with(item.href);
-            let aria = if active { r#" aria-current="page""# } else { "" };
+            let aria = if active {
+                r#" aria-current="page""#
+            } else {
+                ""
+            };
             let class = if active {
                 "flex items-center gap-2 px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-200 font-medium"
             } else {
                 "flex items-center gap-2 px-2 py-1 rounded text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
             };
-            let href = format!(
-                "{}?tenant_id={}",
-                item.href,
-                urlencode_minimal(tenant_id),
-            );
+            let href = format!("{}?tenant_id={}", item.href, urlencode_minimal(tenant_id),);
             out.push_str(&format!(
                 r#"<a href="{href}"{aria} class="{class}"><span aria-hidden="true">{glyph}</span><span>{label}</span></a>"#,
                 href = escape(&href),
@@ -143,8 +140,18 @@ fn urlencode_minimal(s: &str) -> String {
 // ── Static section data ────────────────────────────────────────────────────
 
 /// Helper to keep the section definitions readable.
-const fn item(label: &'static str, href: &'static str, glyph: &'static str, visible_to: &'static [Persona]) -> NavItem {
-    NavItem { label, href, glyph, visible_to }
+const fn item(
+    label: &'static str,
+    href: &'static str,
+    glyph: &'static str,
+    visible_to: &'static [Persona],
+) -> NavItem {
+    NavItem {
+        label,
+        href,
+        glyph,
+        visible_to,
+    }
 }
 
 const TENANT_AND_PLATFORM: &[Persona] = &[Persona::TenantAdmin, Persona::PlatformAdmin];
@@ -176,8 +183,18 @@ const SECTIONS: &[NavSection] = &[
             // 2026-05-14 consolidation: Scheduler + Kubelet folded into
             // the single K8s Dashboard surface — sub-tabs live under
             // /admin/k8s-dashboard/{pods,nodes,scheduler/queue,...}.
-            item("K8s Dashboard", "/admin/k8s-dashboard", "☸", TENANT_AND_PLATFORM),
-            item("Controller Manager", "/admin/controller-manager", "⚙", PLATFORM_ONLY),
+            item(
+                "K8s Dashboard",
+                "/admin/k8s-dashboard",
+                "☸",
+                TENANT_AND_PLATFORM,
+            ),
+            item(
+                "Controller Manager",
+                "/admin/controller-manager",
+                "⚙",
+                PLATFORM_ONLY,
+            ),
             item("Cloud Controller", "/admin/ccm", "☁", PLATFORM_ONLY),
             item("API Server", "/admin/apiserver", "🛰", PLATFORM_ONLY),
             item("etcd", "/admin/etcd", "🗄", PLATFORM_ONLY),
@@ -215,7 +232,12 @@ const SECTIONS: &[NavSection] = &[
         items: &[
             item("ADR Browser", "/admin/adr", "📜", PLATFORM_ONLY),
             item("MLflow", "/admin/mlflow", "🧪", TENANT_AND_PLATFORM),
-            item("Backstage", "/admin/contributions", "📚", TENANT_AND_PLATFORM),
+            item(
+                "Backstage",
+                "/admin/contributions",
+                "📚",
+                TENANT_AND_PLATFORM,
+            ),
             item("Pipelines", "/admin/pipelines", "🔧", TENANT_AND_PLATFORM),
             item("LiteLLM", "/admin/litellm", "🤖", TENANT_AND_PLATFORM),
             item("Local LLM", "/admin/local-llm", "🧠", PLATFORM_ONLY),
@@ -240,7 +262,12 @@ const SECTIONS: &[NavSection] = &[
         label: "Security",
         items: &[
             item("Vulns", "/admin/vulns", "🐛", PLATFORM_ONLY),
-            item("Container Scan", "/admin/container-scan", "🔬", TENANT_AND_PLATFORM),
+            item(
+                "Container Scan",
+                "/admin/container-scan",
+                "🔬",
+                TENANT_AND_PLATFORM,
+            ),
             item("DAST", "/admin/dast", "🕷", TENANT_AND_PLATFORM),
             item("SBOM", "/admin/sbom", "📦", TENANT_AND_PLATFORM),
             item("Policy", "/admin/policy", "📐", PLATFORM_ONLY),

@@ -9,7 +9,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, LogStream};
+use crate::admin::state::{AdminState, LogStream, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -20,16 +20,26 @@ pub enum LogsViewError {
 
 pub fn list_records(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<LogStream>, LogsViewError> {
     ctx.authorise(Permission::LogsRead)?;
-    let mut rows: Vec<LogStream> = scope(&state.log_streams.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter().cloned().collect();
-    rows.sort_by(|a, b| b.ingest_rate_per_sec.cmp(&a.ingest_rate_per_sec).then(a.name.cmp(&b.name)));
+    let mut rows: Vec<LogStream> = scope(&state.log_streams.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
+    .into_iter()
+    .cloned()
+    .collect();
+    rows.sort_by(|a, b| {
+        b.ingest_rate_per_sec
+            .cmp(&a.ingest_rate_per_sec)
+            .then(a.name.cmp(&b.name))
+    });
     Ok(rows)
 }
 
 pub fn group_by_sink(rows: &[LogStream]) -> Vec<(String, usize)> {
     use std::collections::BTreeMap;
     let mut acc: BTreeMap<String, usize> = BTreeMap::new();
-    for r in rows { *acc.entry(r.sink.clone()).or_insert(0) += 1; }
+    for r in rows {
+        *acc.entry(r.sink.clone()).or_insert(0) += 1;
+    }
     let mut out: Vec<(String, usize)> = acc.into_iter().collect();
     out.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
     out
@@ -51,9 +61,17 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LogsViewEr
         r#"<span class="px-2 py-1 mr-2 rounded bg-gray-200 text-sm">{s} <strong>×{n}</strong></span>"#,
         s = escape(s), n = n
     )).collect();
-    let table_rows: Vec<Vec<String>> = rows.iter().map(|r| vec![
-        escape(&r.name), escape(&r.sink), r.ingest_rate_per_sec.to_string(), r.retention_days.to_string(),
-    ]).collect();
+    let table_rows: Vec<Vec<String>> = rows
+        .iter()
+        .map(|r| {
+            vec![
+                escape(&r.name),
+                escape(&r.sink),
+                r.ingest_rate_per_sec.to_string(),
+                r.retention_days.to_string(),
+            ]
+        })
+        .collect();
     let body = format!(
         r#"<section>
   <p class="text-sm text-gray-600 mb-3">Loki streams (cave-logs). Upstream: <a class="text-blue-700 underline" href="https://grafana.com/docs/loki/">grafana.com/docs/loki</a>.</p>
@@ -70,24 +88,38 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LogsViewEr
         chips = chips,
         tbl = table(&["name", "sink", "ingest/s", "retention_days"], &table_rows),
     );
-    Ok(page_shell_full(ctx, "/admin/logs", &format!("logs · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/logs",
+        &format!("logs · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::backstage("plugins/logs/src/components/StreamsList.tsx", "StreamsList");
+const FILE_CITE: Cite =
+    Cite::backstage("plugins/logs/src/components/StreamsList.tsx", "StreamsList");
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::portal_test_ctx;
-    fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
+    fn ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer("acme", perms)
+    }
 
     #[test]
     fn list_filters_to_owner_and_sorts_by_ingest_desc() {
-        let (_c, _t) = portal_test_ctx!("plugins/logs/src/components/StreamsList.tsx", "StreamsList", "acme");
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/logs/src/components/StreamsList.tsx",
+            "StreamsList",
+            "acme"
+        );
         let r = list_records(&AdminState::seeded(), &ctx(&[Permission::LogsRead])).unwrap();
         assert_eq!(r.len(), 2);
-        for w in r.windows(2) { assert!(w[0].ingest_rate_per_sec >= w[1].ingest_rate_per_sec); }
+        for w in r.windows(2) {
+            assert!(w[0].ingest_rate_per_sec >= w[1].ingest_rate_per_sec);
+        }
     }
 
     #[test]

@@ -113,7 +113,11 @@ pub fn replicas_for_metric(
     let ready_sum: u64 = ready.iter().map(|p| p.value.unwrap_or(0)).sum();
     // Naive ratio over the ready set:
     let ratio = ready_sum as f64 / (target_per_pod as f64 * ready.len() as f64);
-    let direction = if ratio > 1.0 { ScaleDirection::Up } else { ScaleDirection::Down };
+    let direction = if ratio > 1.0 {
+        ScaleDirection::Up
+    } else {
+        ScaleDirection::Down
+    };
 
     // Add missing/unready into the per-pod denominator according to direction.
     let total = match direction {
@@ -150,7 +154,11 @@ mod tests {
     use crate::test_ctx;
 
     fn pm(name: &str, ready: bool, value: Option<u64>) -> PodMetric {
-        PodMetric { name: name.into(), ready, value }
+        PodMetric {
+            name: name.into(),
+            ready,
+            value,
+        }
     }
 
     #[test]
@@ -182,8 +190,8 @@ mod tests {
         let pods = vec![
             pm("a", true, Some(40)),
             pm("b", true, Some(60)),
-            pm("c", false, Some(200)),  // unready — excluded
-            pm("d", true, None),         // missing — excluded
+            pm("c", false, Some(200)), // unready — excluded
+            pm("d", true, None),       // missing — excluded
         ];
         assert_eq!(ready_average(&pods), Some(50.0));
     }
@@ -195,10 +203,7 @@ mod tests {
             "calculatePodRequests",
             "tenant-hpa-metric-avg-none"
         );
-        let pods = vec![
-            pm("a", false, Some(10)),
-            pm("b", true, None),
-        ];
+        let pods = vec![pm("a", false, Some(10)), pm("b", true, None)];
         assert_eq!(ready_average(&pods), None);
     }
 
@@ -231,10 +236,7 @@ mod tests {
             "GetResourceReplicas",
             "tenant-hpa-metric-all-unready"
         );
-        let pods = vec![
-            pm("a", false, Some(50)),
-            pm("b", false, Some(60)),
-        ];
+        let pods = vec![pm("a", false, Some(50)), pm("b", false, Some(60))];
         assert_eq!(replicas_for_metric(&pods, 50, 4).unwrap(), 4);
     }
 
@@ -246,7 +248,9 @@ mod tests {
             "tenant-hpa-metric-scale-up"
         );
         // 4 pods at 100 each, target 50 → ratio=2 → 4*2=8.
-        let pods: Vec<_> = (0..4).map(|i| pm(&format!("p{i}"), true, Some(100))).collect();
+        let pods: Vec<_> = (0..4)
+            .map(|i| pm(&format!("p{i}"), true, Some(100)))
+            .collect();
         assert_eq!(replicas_for_metric(&pods, 50, 4).unwrap(), 8);
     }
 
@@ -258,7 +262,9 @@ mod tests {
             "tenant-hpa-metric-scale-down"
         );
         // 8 pods at 25 each, target 100 → ratio=0.25 → 8*0.25=2.
-        let pods: Vec<_> = (0..8).map(|i| pm(&format!("p{i}"), true, Some(25))).collect();
+        let pods: Vec<_> = (0..8)
+            .map(|i| pm(&format!("p{i}"), true, Some(25)))
+            .collect();
         assert_eq!(replicas_for_metric(&pods, 100, 8).unwrap(), 2);
     }
 
@@ -279,7 +285,10 @@ mod tests {
             pm("d", true, None),
         ];
         let got = replicas_for_metric(&pods, 50, 4).unwrap();
-        assert_eq!(got, 4, "missing pods at 0% should bring scale-up factor to 1.0");
+        assert_eq!(
+            got, 4,
+            "missing pods at 0% should bring scale-up factor to 1.0"
+        );
     }
 
     #[test]
@@ -299,7 +308,10 @@ mod tests {
             pm("d", true, None),
         ];
         let got = replicas_for_metric(&pods, 100, 4).unwrap();
-        assert_eq!(got, 3, "missing pods at 100% target should resist scale-down");
+        assert_eq!(
+            got, 3,
+            "missing pods at 100% target should resist scale-down"
+        );
     }
 
     #[test]

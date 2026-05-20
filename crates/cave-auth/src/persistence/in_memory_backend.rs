@@ -191,9 +191,11 @@ impl PersistenceBackend for InMemoryBackend {
     }
     async fn create_user(&self, u: UserEntity) -> Result<UserEntity> {
         let mut guard = self.inner.write().expect("rwlock poisoned");
-        if guard.users.values().any(|x| {
-            x.realm_id == u.realm_id && x.username == u.username && !x.audit.is_deleted()
-        }) {
+        if guard
+            .users
+            .values()
+            .any(|x| x.realm_id == u.realm_id && x.username == u.username && !x.audit.is_deleted())
+        {
             return Err(PersistenceError::conflict(
                 "user",
                 format!("username `{}` already exists in realm", u.username),
@@ -471,10 +473,7 @@ impl PersistenceBackend for InMemoryBackend {
         guard.idps.insert(i.id, i.clone());
         Ok(i)
     }
-    async fn update_idp(
-        &self,
-        mut i: IdentityProviderEntity,
-    ) -> Result<IdentityProviderEntity> {
+    async fn update_idp(&self, mut i: IdentityProviderEntity) -> Result<IdentityProviderEntity> {
         i.audit.updated_at = Utc::now();
         let mut guard = self.inner.write().expect("rwlock poisoned");
         if !guard.idps.contains_key(&i.id) {
@@ -634,15 +633,15 @@ mod tests {
         let b = InMemoryBackend::new();
         let r1 = b.create_realm(RealmEntity::new("r1")).await.unwrap();
         let r2 = b.create_realm(RealmEntity::new("r2")).await.unwrap();
-        b.create_user(UserEntity::new(r1.id, "alice")).await.unwrap();
-        b.create_user(UserEntity::new(r2.id, "alice")).await.unwrap();
+        b.create_user(UserEntity::new(r1.id, "alice"))
+            .await
+            .unwrap();
+        b.create_user(UserEntity::new(r2.id, "alice"))
+            .await
+            .unwrap();
         assert_eq!(b.count_users(r1.id).await.unwrap(), 1);
         assert_eq!(b.count_users(r2.id).await.unwrap(), 1);
-        assert!(b
-            .get_user_by_name(r1.id, "alice")
-            .await
-            .unwrap()
-            .is_some());
+        assert!(b.get_user_by_name(r1.id, "alice").await.unwrap().is_some());
     }
 
     #[tokio::test]
@@ -658,10 +657,17 @@ mod tests {
     async fn client_crud_full_cycle() {
         let b = InMemoryBackend::new();
         let r = b.create_realm(RealmEntity::new("r")).await.unwrap();
-        let c = b.create_client(ClientEntity::new(r.id, "frontend")).await.unwrap();
+        let c = b
+            .create_client(ClientEntity::new(r.id, "frontend"))
+            .await
+            .unwrap();
         assert_eq!(b.list_clients_in_realm(r.id).await.unwrap().len(), 1);
         assert_eq!(
-            b.get_client_by_name(r.id, "frontend").await.unwrap().unwrap().id,
+            b.get_client_by_name(r.id, "frontend")
+                .await
+                .unwrap()
+                .unwrap()
+                .id,
             c.id
         );
         b.delete_client(c.id).await.unwrap();
@@ -720,10 +726,7 @@ mod tests {
     async fn group_supports_nesting_persistence() {
         let b = InMemoryBackend::new();
         let r = b.create_realm(RealmEntity::new("r")).await.unwrap();
-        let parent = b
-            .create_group(GroupEntity::new(r.id, "eng"))
-            .await
-            .unwrap();
+        let parent = b.create_group(GroupEntity::new(r.id, "eng")).await.unwrap();
         let mut child = GroupEntity::new(r.id, "backend");
         child.parent_id = Some(parent.id);
         let child = b.create_group(child).await.unwrap();
@@ -757,16 +760,18 @@ mod tests {
         assert_eq!(b.count_users(r.id).await.unwrap(), 2);
         txn.rollback().await.unwrap();
         assert_eq!(b.count_users(r.id).await.unwrap(), 1);
-        assert!(b
-            .get_user_by_name(r.id, "preexisting")
-            .await
-            .unwrap()
-            .is_some());
-        assert!(b
-            .get_user_by_name(r.id, "transient")
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            b.get_user_by_name(r.id, "preexisting")
+                .await
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            b.get_user_by_name(r.id, "transient")
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[tokio::test]

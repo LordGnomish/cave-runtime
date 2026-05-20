@@ -6,9 +6,9 @@
 //! `js/apps/account-ui/src/account-security/SigningIn.tsx` →
 //! `CredentialsListRow` and `js/apps/account-ui/src/account-security/SetUpAuthentication.tsx`.
 
+use super::{AccountError, account_chrome::render_account_nav, require_account_user};
 use crate::admin::permission::RequestCtx;
 use crate::admin::render::{escape, page_shell_full, table_html};
-use super::{account_chrome::render_account_nav, require_account_user, AccountError};
 
 /// One credential row as shown in Keycloak's credentials list.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -122,7 +122,11 @@ mod tests {
     use crate::admin::permission::{Permission, Persona, RequestCtx};
 
     fn user_ctx() -> RequestCtx {
-        RequestCtx::developer_as("acme", &[Permission::AuthSessionsRead], Persona::TenantAdmin)
+        RequestCtx::developer_as(
+            "acme",
+            &[Permission::AuthSessionsRead],
+            Persona::TenantAdmin,
+        )
     }
 
     #[test]

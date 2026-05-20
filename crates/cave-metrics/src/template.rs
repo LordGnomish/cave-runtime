@@ -33,7 +33,9 @@ pub struct TemplateContext {
 }
 
 impl TemplateContext {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn set_var(mut self, k: &str, v: &str) -> Self {
         self.vars.insert(k.to_string(), v.to_string());
@@ -101,7 +103,10 @@ fn expand_directive(inner: &str, ctx: &TemplateContext, rest: &str) -> Option<Ex
         });
     }
     if inner == "end" || inner == "else" {
-        return Some(ExpandedDirective { expanded: String::new(), consumed_extra: 0 });
+        return Some(ExpandedDirective {
+            expanded: String::new(),
+            consumed_extra: 0,
+        });
     }
     // ──── range $k, $v := list ────
     if let Some(stripped) = inner.strip_prefix("range ") {
@@ -116,25 +121,31 @@ fn expand_directive(inner: &str, ctx: &TemplateContext, rest: &str) -> Option<Ex
                 child.vars.insert("_v".into(), v.clone());
                 buf.push_str(&render(body, &child));
             }
-            return Some(ExpandedDirective { expanded: buf, consumed_extra });
+            return Some(ExpandedDirective {
+                expanded: buf,
+                consumed_extra,
+            });
         }
     }
     // ──── printf "..." args ────
     if let Some(stripped) = inner.strip_prefix("printf ") {
         let formatted = printf_render(stripped.trim(), ctx);
-        return Some(ExpandedDirective { expanded: formatted, consumed_extra: 0 });
+        return Some(ExpandedDirective {
+            expanded: formatted,
+            consumed_extra: 0,
+        });
     }
     // ──── $var ────
     if let Some(name) = inner.strip_prefix('$') {
         if let Some(v) = ctx.vars.get(name) {
-            return Some(ExpandedDirective { expanded: v.clone(), consumed_extra: 0 });
+            return Some(ExpandedDirective {
+                expanded: v.clone(),
+                consumed_extra: 0,
+            });
         }
         if name == "value" {
             return Some(ExpandedDirective {
-                expanded: ctx
-                    .value
-                    .map(|v| format_float(v))
-                    .unwrap_or_default(),
+                expanded: ctx.value.map(|v| format_float(v)).unwrap_or_default(),
                 consumed_extra: 0,
             });
         }
@@ -149,18 +160,21 @@ fn expand_directive(inner: &str, ctx: &TemplateContext, rest: &str) -> Option<Ex
         }
         if field == "Value" {
             return Some(ExpandedDirective {
-                expanded: ctx
-                    .value
-                    .map(|v| format_float(v))
-                    .unwrap_or_default(),
+                expanded: ctx.value.map(|v| format_float(v)).unwrap_or_default(),
                 consumed_extra: 0,
             });
         }
         if let Some(v) = ctx.labels.get(field) {
-            return Some(ExpandedDirective { expanded: v.clone(), consumed_extra: 0 });
+            return Some(ExpandedDirective {
+                expanded: v.clone(),
+                consumed_extra: 0,
+            });
         }
         if let Some(v) = ctx.vars.get(field) {
-            return Some(ExpandedDirective { expanded: v.clone(), consumed_extra: 0 });
+            return Some(ExpandedDirective {
+                expanded: v.clone(),
+                consumed_extra: 0,
+            });
         }
     }
     None
@@ -254,7 +268,11 @@ fn eval_truthy(cond: &str, ctx: &TemplateContext) -> bool {
             return ctx.value.unwrap_or(0.0) != 0.0;
         }
         if let Some(label) = field.strip_prefix("Labels.") {
-            return ctx.labels.get(label).map(|v| !v.is_empty()).unwrap_or(false);
+            return ctx
+                .labels
+                .get(label)
+                .map(|v| !v.is_empty())
+                .unwrap_or(false);
         }
     }
     // numeric literal
@@ -321,13 +339,19 @@ fn apply_printf(fmt: &str, args: &mut Vec<&str>, ctx: &TemplateContext) -> Strin
                 if name == "value" {
                     ctx.value.unwrap_or(0.0)
                 } else {
-                    ctx.vars.get(name).and_then(|s| s.parse().ok()).unwrap_or(0.0)
+                    ctx.vars
+                        .get(name)
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(0.0)
                 }
             } else if let Some(field) = raw.strip_prefix('.') {
                 if field == "Value" {
                     ctx.value.unwrap_or(0.0)
                 } else {
-                    ctx.labels.get(field).and_then(|s| s.parse().ok()).unwrap_or(0.0)
+                    ctx.labels
+                        .get(field)
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(0.0)
                 }
             } else {
                 raw.parse().unwrap_or(0.0)
@@ -404,10 +428,7 @@ mod tests {
     #[test]
     fn printf_format_float() {
         let ctx = TemplateContext::new().with_value(3.14159);
-        assert_eq!(
-            render("{{ printf \"%.2f\" $value }}", &ctx),
-            "3.14"
-        );
+        assert_eq!(render("{{ printf \"%.2f\" $value }}", &ctx), "3.14");
     }
 
     #[test]

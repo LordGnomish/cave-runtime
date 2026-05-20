@@ -77,7 +77,8 @@ impl ProxyEngine {
         let healthy_endpoints: Vec<Endpoint> = targets
             .iter()
             .filter(|t| {
-                t.weight > 0 && self.health.is_healthy(upstream.id, t.id)
+                t.weight > 0
+                    && self.health.is_healthy(upstream.id, t.id)
                     && self.circuit_breakers.allow(t.id)
             })
             .map(Endpoint::from)
@@ -176,7 +177,13 @@ impl ProxyEngine {
 
         for attempt in 0..=retries {
             match self
-                .proxy_http(upstream_url, method.clone(), headers.clone(), body.clone(), target_id)
+                .proxy_http(
+                    upstream_url,
+                    method.clone(),
+                    headers.clone(),
+                    body.clone(),
+                    target_id,
+                )
                 .await
             {
                 Ok(resp) => {
@@ -244,9 +251,14 @@ pub async fn proxy_websocket(
                     ClientMsg::Binary(b) => UpMsg::Binary(b.to_vec().into()),
                     ClientMsg::Ping(p) => UpMsg::Ping(p.to_vec().into()),
                     ClientMsg::Pong(p) => UpMsg::Pong(p.to_vec().into()),
-                    ClientMsg::Close(_) => { let _ = up_sink.send(UpMsg::Close(None)).await; break; }
+                    ClientMsg::Close(_) => {
+                        let _ = up_sink.send(UpMsg::Close(None)).await;
+                        break;
+                    }
                 };
-                if up_sink.send(up_msg).await.is_err() { break; }
+                if up_sink.send(up_msg).await.is_err() {
+                    break;
+                }
             }
         };
 
@@ -260,7 +272,9 @@ pub async fn proxy_websocket(
                     UpMsg::Pong(p) => ClientMsg::Pong(p.to_vec().into()),
                     UpMsg::Close(_) | UpMsg::Frame(_) => break,
                 };
-                if client_sink.send(client_msg).await.is_err() { break; }
+                if client_sink.send(client_msg).await.is_err() {
+                    break;
+                }
             }
         };
 
@@ -305,7 +319,8 @@ pub async fn proxy_grpc(
             }
             let b = resp.bytes().await.unwrap_or_default();
             engine.circuit_breakers.on_success(target_id);
-            rb.body(Body::from(b)).unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
+            rb.body(Body::from(b))
+                .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
         }
         Err(e) => {
             engine.circuit_breakers.on_failure(target_id);

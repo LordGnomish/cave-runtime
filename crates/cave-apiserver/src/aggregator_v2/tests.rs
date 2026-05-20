@@ -14,8 +14,10 @@ use std::cmp::Ordering;
 fn local_apiservice_is_always_available() {
     let i = AvailabilityInput {
         api_service_name: "v1.".into(),
-        local: true, service_resolved: false,
-        endpoints_count: 0, probe: None,
+        local: true,
+        service_resolved: false,
+        endpoints_count: 0,
+        probe: None,
     };
     let c = compute_condition(&i);
     assert_eq!(c.status, ConditionStatus::True);
@@ -26,8 +28,10 @@ fn local_apiservice_is_always_available() {
 fn unresolved_service_yields_failure_with_reason() {
     let i = AvailabilityInput {
         api_service_name: "v1beta1.metrics.k8s.io".into(),
-        local: false, service_resolved: false,
-        endpoints_count: 0, probe: None,
+        local: false,
+        service_resolved: false,
+        endpoints_count: 0,
+        probe: None,
     };
     let c = compute_condition(&i);
     assert_eq!(c.status, ConditionStatus::False);
@@ -38,8 +42,10 @@ fn unresolved_service_yields_failure_with_reason() {
 fn missing_endpoints_yields_failure() {
     let i = AvailabilityInput {
         api_service_name: "v1beta1.metrics.k8s.io".into(),
-        local: false, service_resolved: true,
-        endpoints_count: 0, probe: None,
+        local: false,
+        service_resolved: true,
+        endpoints_count: 0,
+        probe: None,
     };
     let c = compute_condition(&i);
     assert_eq!(c.status, ConditionStatus::False);
@@ -50,8 +56,10 @@ fn missing_endpoints_yields_failure() {
 fn pending_probe_is_unknown() {
     let i = AvailabilityInput {
         api_service_name: "x".into(),
-        local: false, service_resolved: true,
-        endpoints_count: 1, probe: None,
+        local: false,
+        service_resolved: true,
+        endpoints_count: 1,
+        probe: None,
     };
     let c = compute_condition(&i);
     assert_eq!(c.status, ConditionStatus::Unknown);
@@ -62,8 +70,10 @@ fn pending_probe_is_unknown() {
 fn reachable_probe_yields_available() {
     let i = AvailabilityInput {
         api_service_name: "x".into(),
-        local: false, service_resolved: true,
-        endpoints_count: 1, probe: Some(ProbeOutcome::Reachable),
+        local: false,
+        service_resolved: true,
+        endpoints_count: 1,
+        probe: Some(ProbeOutcome::Reachable),
     };
     let c = compute_condition(&i);
     assert_eq!(c.status, ConditionStatus::True);
@@ -73,8 +83,10 @@ fn reachable_probe_yields_available() {
 fn unreachable_probe_yields_failure() {
     let i = AvailabilityInput {
         api_service_name: "x".into(),
-        local: false, service_resolved: true,
-        endpoints_count: 1, probe: Some(ProbeOutcome::Unreachable("connection refused".into())),
+        local: false,
+        service_resolved: true,
+        endpoints_count: 1,
+        probe: Some(ProbeOutcome::Unreachable("connection refused".into())),
     };
     let c = compute_condition(&i);
     assert_eq!(c.status, ConditionStatus::False);
@@ -86,8 +98,10 @@ fn unreachable_probe_yields_failure() {
 fn invalid_cert_probe_yields_failure_with_message() {
     let i = AvailabilityInput {
         api_service_name: "x".into(),
-        local: false, service_resolved: true,
-        endpoints_count: 1, probe: Some(ProbeOutcome::InvalidCertificate("CN=evil".into())),
+        local: false,
+        service_resolved: true,
+        endpoints_count: 1,
+        probe: Some(ProbeOutcome::InvalidCertificate("CN=evil".into())),
     };
     let c = compute_condition(&i);
     assert_eq!(c.status, ConditionStatus::False);
@@ -98,8 +112,10 @@ fn invalid_cert_probe_yields_failure_with_message() {
 fn dns_failure_probe_yields_failure() {
     let i = AvailabilityInput {
         api_service_name: "x".into(),
-        local: false, service_resolved: true,
-        endpoints_count: 1, probe: Some(ProbeOutcome::DnsFailure("NXDOMAIN".into())),
+        local: false,
+        service_resolved: true,
+        endpoints_count: 1,
+        probe: Some(ProbeOutcome::DnsFailure("NXDOMAIN".into())),
     };
     let c = compute_condition(&i);
     assert_eq!(c.status, ConditionStatus::False);
@@ -110,8 +126,10 @@ fn dns_failure_probe_yields_failure() {
 fn timeout_probe_yields_failure() {
     let i = AvailabilityInput {
         api_service_name: "x".into(),
-        local: false, service_resolved: true,
-        endpoints_count: 1, probe: Some(ProbeOutcome::Timeout),
+        local: false,
+        service_resolved: true,
+        endpoints_count: 1,
+        probe: Some(ProbeOutcome::Timeout),
     };
     let c = compute_condition(&i);
     assert_eq!(c.status, ConditionStatus::False);
@@ -144,8 +162,7 @@ fn proxy_503_carries_reason() {
     let cond = APIServiceCondition::failure("ServiceNotFound", "no svc");
     let d = evaluate_proxy(&cond, false, true);
     match d {
-        ProxyDecision::ServiceUnavailable { reason, .. } =>
-            assert_eq!(reason, "ServiceNotFound"),
+        ProxyDecision::ServiceUnavailable { reason, .. } => assert_eq!(reason, "ServiceNotFound"),
         _ => panic!(),
     }
 }
@@ -155,8 +172,9 @@ fn proxy_503_appends_no_endpoints_marker() {
     let cond = APIServiceCondition::failure("MissingEndpoints", "boom");
     let d = evaluate_proxy(&cond, false, false);
     match d {
-        ProxyDecision::ServiceUnavailable { message, .. } =>
-            assert!(message.contains("no endpoints")),
+        ProxyDecision::ServiceUnavailable { message, .. } => {
+            assert!(message.contains("no endpoints"))
+        }
         _ => panic!(),
     }
 }
@@ -166,8 +184,7 @@ fn proxy_503_dry_run_is_marked() {
     let cond = APIServiceCondition::failure("X", "boom");
     let d = evaluate_proxy(&cond, true, true);
     match d {
-        ProxyDecision::ServiceUnavailable { message, .. } =>
-            assert!(message.contains("[dry_run]")),
+        ProxyDecision::ServiceUnavailable { message, .. } => assert!(message.contains("[dry_run]")),
         _ => panic!(),
     }
 }
@@ -186,9 +203,12 @@ fn proxy_unknown_condition_is_unavailable() {
 fn idx(entries: &[(&str, &str)]) -> OpenApiIndex {
     let mut paths = BTreeMap::new();
     for (k, v) in entries {
-        paths.insert(k.to_string(), OpenApiIndexEntry {
-            server_relative_url: v.to_string(),
-        });
+        paths.insert(
+            k.to_string(),
+            OpenApiIndexEntry {
+                server_relative_url: v.to_string(),
+            },
+        );
     }
     OpenApiIndex { paths }
 }
@@ -206,17 +226,16 @@ fn merge_child_overrides_parent_on_collision() {
     let parent = idx(&[("api/v1", "/openapi/v3/api/v1?hash=parent")]);
     let child = idx(&[("api/v1", "/openapi/v3/api/v1?hash=child")]);
     let m = merge_openapi_indexes(&parent, &child);
-    assert_eq!(m.paths["api/v1"].server_relative_url,
-        "/openapi/v3/api/v1?hash=child");
+    assert_eq!(
+        m.paths["api/v1"].server_relative_url,
+        "/openapi/v3/api/v1?hash=child"
+    );
 }
 
 #[test]
 fn merge_preserves_child_only_paths() {
     let parent = idx(&[("api/v1", "/v1?hash=a")]);
-    let child = idx(&[
-        ("api/v1", "/v1?hash=b"),
-        ("apis/x/v1", "/x?hash=c"),
-    ]);
+    let child = idx(&[("api/v1", "/v1?hash=b"), ("apis/x/v1", "/x?hash=c")]);
     let m = merge_openapi_indexes(&parent, &child);
     assert_eq!(m.paths.len(), 2);
 }
@@ -234,28 +253,47 @@ fn merge_empty_child_is_identity() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn pk(g: i32, v: i32, n: &str) -> PriorityKey {
-    PriorityKey { group_priority: g, version_priority: v, name: n.into() }
+    PriorityKey {
+        group_priority: g,
+        version_priority: v,
+        name: n.into(),
+    }
 }
 
 #[test]
 fn priority_lower_group_wins() {
-    assert_eq!(priority_compare(&pk(10, 0, "a"), &pk(20, 0, "b")), Ordering::Less);
-    assert_eq!(priority_compare(&pk(20, 0, "a"), &pk(10, 0, "b")), Ordering::Greater);
+    assert_eq!(
+        priority_compare(&pk(10, 0, "a"), &pk(20, 0, "b")),
+        Ordering::Less
+    );
+    assert_eq!(
+        priority_compare(&pk(20, 0, "a"), &pk(10, 0, "b")),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn priority_ties_broken_by_version_priority() {
-    assert_eq!(priority_compare(&pk(10, 5, "a"), &pk(10, 10, "a")), Ordering::Less);
+    assert_eq!(
+        priority_compare(&pk(10, 5, "a"), &pk(10, 10, "a")),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn priority_full_tie_broken_by_name() {
-    assert_eq!(priority_compare(&pk(10, 0, "alpha"), &pk(10, 0, "beta")), Ordering::Less);
+    assert_eq!(
+        priority_compare(&pk(10, 0, "alpha"), &pk(10, 0, "beta")),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn priority_equal_keys_equal_ordering() {
-    assert_eq!(priority_compare(&pk(10, 0, "a"), &pk(10, 0, "a")), Ordering::Equal);
+    assert_eq!(
+        priority_compare(&pk(10, 0, "a"), &pk(10, 0, "a")),
+        Ordering::Equal
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -288,22 +326,26 @@ fn condition_unknown_carries_reason_and_message() {
 // `#[ignore]` — gated on real network probe / real openapi spec merger
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn real_https_probe_against_fixture_apiservice() {
     // pending: requires fixture HTTPS apiservice + rustls dial
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn openapi_v3_full_spec_merger_with_components_dedup() {
     // pending: requires kube-openapi-style component-table walker + dedup
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn proxy_websocket_upgrade_passthrough() {
     // pending: requires hyper upgrade + websocket frame routing
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn proxy_streams_response_chunked() {
     // pending: requires async streaming wire — hyper / axum integration
 }

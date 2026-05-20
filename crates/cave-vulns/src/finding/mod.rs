@@ -207,7 +207,10 @@ mod tests {
 
     #[test]
     fn severity_parse_titlecase() {
-        assert_eq!(FindingSeverity::parse("Critical"), Some(FindingSeverity::Critical));
+        assert_eq!(
+            FindingSeverity::parse("Critical"),
+            Some(FindingSeverity::Critical)
+        );
         assert_eq!(FindingSeverity::parse("HIGH"), Some(FindingSeverity::High));
         assert_eq!(FindingSeverity::parse("low"), Some(FindingSeverity::Low));
     }
@@ -216,9 +219,18 @@ mod tests {
     fn severity_parse_aliases() {
         // DefectDojo accepts ERROR/WARNING from many SAST tools.
         assert_eq!(FindingSeverity::parse("ERROR"), Some(FindingSeverity::High));
-        assert_eq!(FindingSeverity::parse("warning"), Some(FindingSeverity::Medium));
-        assert_eq!(FindingSeverity::parse("Moderate"), Some(FindingSeverity::Medium));
-        assert_eq!(FindingSeverity::parse("Unknown"), Some(FindingSeverity::Info));
+        assert_eq!(
+            FindingSeverity::parse("warning"),
+            Some(FindingSeverity::Medium)
+        );
+        assert_eq!(
+            FindingSeverity::parse("Moderate"),
+            Some(FindingSeverity::Medium)
+        );
+        assert_eq!(
+            FindingSeverity::parse("Unknown"),
+            Some(FindingSeverity::Info)
+        );
     }
 
     #[test]

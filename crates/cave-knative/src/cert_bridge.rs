@@ -12,8 +12,8 @@
 //! takes the cert-manager status and projects it back onto the Knative
 //! Certificate's conditions.
 
-use std::collections::HashMap;
 use crate::meta::ObjectMeta;
+use std::collections::HashMap;
 
 #[derive(Default, Debug, Clone)]
 pub struct KnativeCertificate {
@@ -32,8 +32,8 @@ pub struct KnativeCertificateSpec {
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct IssuerRef {
     pub name: String,
-    pub kind: String,    // "ClusterIssuer" | "Issuer"
-    pub group: String,   // typically "cert-manager.io"
+    pub kind: String,  // "ClusterIssuer" | "Issuer"
+    pub group: String, // typically "cert-manager.io"
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
@@ -102,7 +102,11 @@ pub fn to_cert_manager(knative: &KnativeCertificate) -> Result<CertManagerCertif
         dns_names: knative.spec.dns_names.clone(),
         secret_name: knative.spec.secret_name.clone(),
         issuer_ref: issuer,
-        usages: vec!["server auth".into(), "digital signature".into(), "key encipherment".into()],
+        usages: vec![
+            "server auth".into(),
+            "digital signature".into(),
+            "key encipherment".into(),
+        ],
     })
 }
 
@@ -112,7 +116,11 @@ pub fn project_status_back(cm: &CertManagerStatus) -> KnativeCertificateStatus {
     let mut conditions = HashMap::new();
     conditions.insert(
         "Ready".into(),
-        if cm.ready { "True".to_string() } else { "False".to_string() },
+        if cm.ready {
+            "True".to_string()
+        } else {
+            "False".to_string()
+        },
     );
     if let Some(reason) = &cm.failure_reason {
         conditions.insert("Failed".into(), reason.clone());
@@ -206,6 +214,9 @@ mod tests {
         let s = project_status_back(&cm);
         assert!(!s.ready);
         assert_eq!(s.conditions.get("Ready").map(String::as_str), Some("False"));
-        assert_eq!(s.conditions.get("Failed").map(String::as_str), Some("DNS01-challenge failed"));
+        assert_eq!(
+            s.conditions.get("Failed").map(String::as_str),
+            Some("DNS01-challenge failed")
+        );
     }
 }

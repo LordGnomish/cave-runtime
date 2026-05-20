@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use super::{collect_one_level_children, Backend, StorageError};
+use super::{Backend, StorageError, collect_one_level_children};
 
 /// HashMap-backed `Backend`. `Arc<RwLock<…>>` so the same instance
 /// can be `clone()`-ed across handlers; `&self` on the trait still

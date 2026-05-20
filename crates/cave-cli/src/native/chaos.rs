@@ -2,9 +2,9 @@
 // Copyright 2026 Cave Runtime contributors
 //! `cavectl chaos run/list/abort` — native chaos engineering verb.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Subcommand;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::{HttpVerb, PreparedRequest};
 
@@ -64,8 +64,10 @@ pub fn prepare(cmd: &ChaosCmd) -> Result<PreparedRequest> {
             if let Some(i) = id {
                 body["id"] = json!(i);
             }
-            Ok(PreparedRequest::new(HttpVerb::Post, scoped(tenant.as_deref(), None))
-                .with_body(body))
+            Ok(
+                PreparedRequest::new(HttpVerb::Post, scoped(tenant.as_deref(), None))
+                    .with_body(body),
+            )
         }
         ChaosCmd::List { tenant, status } => {
             let mut path = scoped(tenant.as_deref(), None);
@@ -178,26 +180,30 @@ mod tests {
 
     #[test]
     fn run_rejects_unknown_kind() {
-        assert!(prepare(&ChaosCmd::Run {
-            kind: "wormhole".into(),
-            target: "x".into(),
-            duration: "30s".into(),
-            tenant: None,
-            id: None,
-        })
-        .is_err());
+        assert!(
+            prepare(&ChaosCmd::Run {
+                kind: "wormhole".into(),
+                target: "x".into(),
+                duration: "30s".into(),
+                tenant: None,
+                id: None,
+            })
+            .is_err()
+        );
     }
 
     #[test]
     fn run_rejects_bad_duration() {
-        assert!(prepare(&ChaosCmd::Run {
-            kind: "pod".into(),
-            target: "x".into(),
-            duration: "5x".into(),
-            tenant: None,
-            id: None,
-        })
-        .is_err());
+        assert!(
+            prepare(&ChaosCmd::Run {
+                kind: "pod".into(),
+                target: "x".into(),
+                duration: "5x".into(),
+                tenant: None,
+                id: None,
+            })
+            .is_err()
+        );
     }
 
     #[test]
@@ -259,11 +265,13 @@ mod tests {
 
     #[test]
     fn list_rejects_unknown_status() {
-        assert!(prepare(&ChaosCmd::List {
-            tenant: None,
-            status: Some("zombie".into()),
-        })
-        .is_err());
+        assert!(
+            prepare(&ChaosCmd::List {
+                tenant: None,
+                status: Some("zombie".into()),
+            })
+            .is_err()
+        );
     }
 
     #[test]
@@ -308,11 +316,13 @@ mod tests {
 
     #[test]
     fn abort_rejects_empty_id() {
-        assert!(prepare(&ChaosCmd::Abort {
-            id: "".into(),
-            tenant: None,
-        })
-        .is_err());
+        assert!(
+            prepare(&ChaosCmd::Abort {
+                id: "".into(),
+                tenant: None,
+            })
+            .is_err()
+        );
     }
 
     #[test]

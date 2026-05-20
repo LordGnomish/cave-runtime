@@ -38,7 +38,9 @@ pub struct RoundRobin {
 
 impl RoundRobin {
     pub fn new() -> Self {
-        Self { cursor: AtomicUsize::new(0) }
+        Self {
+            cursor: AtomicUsize::new(0),
+        }
     }
 
     pub fn pick<'a>(&self, endpoints: &'a [Endpoint]) -> Option<&'a Endpoint> {
@@ -67,14 +69,20 @@ pub struct LeastConnections {
 
 impl LeastConnections {
     pub fn new() -> Self {
-        Self { counts: Arc::new(dashmap::DashMap::new()) }
+        Self {
+            counts: Arc::new(dashmap::DashMap::new()),
+        }
     }
 
     pub fn pick<'a>(&self, endpoints: &'a [Endpoint]) -> Option<&'a Endpoint> {
         endpoints.iter().min_by_key(|ep| {
             let c = self.counts.get(&ep.target_id).map(|v| *v).unwrap_or(0);
             // Weighted: divide connections by weight to normalize
-            if ep.weight > 0 { c / ep.weight as usize } else { usize::MAX }
+            if ep.weight > 0 {
+                c / ep.weight as usize
+            } else {
+                usize::MAX
+            }
         })
     }
 
@@ -98,7 +106,10 @@ pub struct ConsistentHash {
 
 impl ConsistentHash {
     pub fn new(replicas: usize) -> Self {
-        Self { ring: Mutex::new(BTreeMap::new()), replicas }
+        Self {
+            ring: Mutex::new(BTreeMap::new()),
+            replicas,
+        }
     }
 
     pub fn rebuild(&self, endpoints: &[Endpoint]) {
@@ -155,16 +166,16 @@ impl Balancer {
             LbAlgorithm::RoundRobin | LbAlgorithm::LatencyAware => {
                 Balancer::RoundRobin(RoundRobin::new())
             }
-            LbAlgorithm::LeastConnections => {
-                Balancer::LeastConnections(LeastConnections::new())
-            }
-            LbAlgorithm::ConsistentHashing => {
-                Balancer::ConsistentHash(ConsistentHash::new(150))
-            }
+            LbAlgorithm::LeastConnections => Balancer::LeastConnections(LeastConnections::new()),
+            LbAlgorithm::ConsistentHashing => Balancer::ConsistentHash(ConsistentHash::new(150)),
         }
     }
 
-    pub fn pick<'a>(&self, endpoints: &'a [Endpoint], hash_key: Option<u64>) -> Option<&'a Endpoint> {
+    pub fn pick<'a>(
+        &self,
+        endpoints: &'a [Endpoint],
+        hash_key: Option<u64>,
+    ) -> Option<&'a Endpoint> {
         match self {
             Balancer::RoundRobin(rr) => rr.pick(endpoints),
             Balancer::LeastConnections(lc) => lc.pick(endpoints),
@@ -191,14 +202,21 @@ mod tests {
     use uuid::Uuid;
 
     fn ep(host: &str, port: u16, weight: u32) -> Endpoint {
-        Endpoint { host: host.into(), port, weight, target_id: Uuid::new_v4() }
+        Endpoint {
+            host: host.into(),
+            port,
+            weight,
+            target_id: Uuid::new_v4(),
+        }
     }
 
     #[test]
     fn round_robin_distributes() {
         let rr = RoundRobin::new();
         let eps = vec![ep("a", 80, 1), ep("b", 80, 1), ep("c", 80, 1)];
-        let picks: Vec<_> = (0..9).map(|_| rr.pick(&eps).unwrap().host.clone()).collect();
+        let picks: Vec<_> = (0..9)
+            .map(|_| rr.pick(&eps).unwrap().host.clone())
+            .collect();
         assert!(picks.contains(&"a".to_string()));
         assert!(picks.contains(&"b".to_string()));
         assert!(picks.contains(&"c".to_string()));
@@ -235,8 +253,18 @@ mod tests {
         let id_a = Uuid::new_v4();
         let id_b = Uuid::new_v4();
         let eps = vec![
-            Endpoint { host: "a".into(), port: 80, weight: 1, target_id: id_a },
-            Endpoint { host: "b".into(), port: 80, weight: 1, target_id: id_b },
+            Endpoint {
+                host: "a".into(),
+                port: 80,
+                weight: 1,
+                target_id: id_a,
+            },
+            Endpoint {
+                host: "b".into(),
+                port: 80,
+                weight: 1,
+                target_id: id_b,
+            },
         ];
         lc.inc(id_a);
         lc.inc(id_a);

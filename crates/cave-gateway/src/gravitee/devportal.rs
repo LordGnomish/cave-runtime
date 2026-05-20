@@ -104,12 +104,7 @@ pub struct Plan {
 
 impl Plan {
     /// Create a new plan.
-    pub fn new(
-        name: String,
-        api_id: Uuid,
-        tier: PlanTier,
-        auth_type: AuthType,
-    ) -> Self {
+    pub fn new(name: String, api_id: Uuid, tier: PlanTier, auth_type: AuthType) -> Self {
         Self {
             id: Uuid::new_v4(),
             name,
@@ -263,7 +258,10 @@ impl DevPortalStore {
 
         // Generate random base64 32 bytes
         use base64::Engine as _;
-        let key = format!("sk_{}", base64::engine::general_purpose::STANDARD.encode(rand::random::<[u8; 32]>()));
+        let key = format!(
+            "sk_{}",
+            base64::engine::general_purpose::STANDARD.encode(rand::random::<[u8; 32]>())
+        );
         self.api_keys.insert(key.clone(), subscription_id);
         Some(key)
     }
@@ -279,7 +277,9 @@ impl DevPortalStore {
     /// Get subscription from API key.
     pub fn get_subscription_from_key(&self, key: &str) -> Option<Subscription> {
         let sub_id = self.api_keys.get(key)?;
-        self.subscriptions.get(sub_id.value()).map(|s| s.value().clone())
+        self.subscriptions
+            .get(sub_id.value())
+            .map(|s| s.value().clone())
     }
 }
 
@@ -301,7 +301,11 @@ mod tests {
     #[test]
     fn test_portal_create_page() {
         let store = DevPortalStore::new();
-        let page = DevPortalPage::new("getting-started".to_string(), "Getting Started".to_string(), PageKind::Guide);
+        let page = DevPortalPage::new(
+            "getting-started".to_string(),
+            "Getting Started".to_string(),
+            PageKind::Guide,
+        );
         let id = page.id;
 
         store.upsert_page(page);

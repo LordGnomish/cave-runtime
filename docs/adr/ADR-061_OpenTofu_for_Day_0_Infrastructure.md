@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Universal (Hetzner + Azure)
+**Scope:** Universal (sovereign cloud + hyperscaler)
 
 **Category:** Infrastructure / IaC
 
@@ -12,12 +12,12 @@
 
 CAVE requires Infrastructure-as-Code for Day 0 provisioning (one-time, not reconciled):
 
-- **Hetzner:** VPC setup, Talos Linux cluster creation, DNS configuration
+- **Sovereign:** VPC setup, Talos Linux cluster creation, DNS configuration
 - **Azure:** Virtual Network, AKS cluster creation, resource groups, managed identity setup
 - **Common:** S3/Blob storage buckets, SSL certificates (route53/Azure DNS), firewall rules
 
 Requirements:
-- **Cloud-agnostic:** Same HCL code with provider-specific variables (Hetzner vs. Azure)
+- **Cloud-agnostic:** Same HCL code with provider-specific variables (sovereign vs hyperscaler)
 - **State management:** Secure state storage + remote locks (prevent concurrent applies)
 - **Plan/Apply model:** Review changes before apply. Git-driven approval workflows.
 - **Diff visibility:** Easy to review infrastructure changes in PR (similar to application code reviews)
@@ -30,7 +30,7 @@ Day 0 IaC differs from Day 1+ (Crossplane, ADR-067). Day 0 = one-shot cluster se
 |---|---|---|---|---|
 | **Cloud-agnostic** | ✅ HCL + multi-provider | ✅ HCL + multi-provider | ✅ Multi-language + multi-provider | ✅ XRDs abstract providers |
 | **License** | ✅ MPL 2.0 (OpenTofu post-split) | ⚠️ Proprietary (Terraform Cloud SaaS features) | Proprietary | Apache 2.0 |
-| **Hetzner support** | ✅ Community provider (active) | ✅ Community provider | ⚠️ Limited | ✅ XRD provider |
+| **sovereign-cloud support** | ✅ Community provider (active) | ✅ Community provider | ⚠️ Limited | ✅ XRD provider |
 | **Azure support** | ✅ Official AzureRM provider | ✅ Official AzureRM provider | ✅ | ✅ XRD provider |
 | **State management** | ✅ Remote state (S3 + locks) | ✅ State backend abstraction | ✅ Pulumi backend | ❌ No state file (K8s CRD is state) |
 | **Plan/Apply workflow** | ✅ Plan → Review → Apply (human-in-loop) | ✅ Same | ✅ Preview/up workflow | ❌ Continuous reconciliation |
@@ -39,10 +39,10 @@ Day 0 IaC differs from Day 1+ (Crossplane, ADR-067). Day 0 = one-shot cluster se
 
 ## Decision
 
-**OpenTofu** (MPL 2.0) for Day 0 infrastructure provisioning on both Hetzner and Azure profiles. Configuration:
+**OpenTofu** (MPL 2.0) for Day 0 infrastructure provisioning on both sovereign cloud and hyperscaler profiles. Configuration:
 
-- **State storage:** S3 (Hetzner) / Azure Blob with encryption + remote locks (prevent concurrent applies)
-- **Modules:** Reusable Hetzner + Azure modules (compute, networking, storage, DNS)
+- **State storage:** S3 (sovereign) / Azure Blob with encryption + remote locks (prevent concurrent applies)
+- **Modules:** Reusable sovereign cloud + hyperscaler modules (compute, networking, storage, DNS)
 - **Approval:** TerraformPlan artifact in PR. Code review of changes before merge. Merge == apply authority.
 - **Git flow:** cave-infra-config Git repo. Changes via PR. ARgoCD is NOT used for Terraform (separate tool: cave-ctl terraform apply)
 - **Separation:** Day 0 (OpenTofu) = cluster setup. Day 1+ (Crossplane, ADR-067) = application infrastructure (databases, caches, queues).
@@ -51,7 +51,7 @@ Day 0 IaC differs from Day 1+ (Crossplane, ADR-067). Day 0 = one-shot cluster se
 
 **Implementation Status:** Production
 
-- **cave-infra** crate: OpenTofu modules for Hetzner + Azure, state management, lock handling
+- **cave-infra** crate: OpenTofu modules for sovereign cloud + hyperscaler, state management, lock handling
 - **Modules:** hetzner-cluster, azure-cluster, shared-networking, dns-setup, s3-storage, etc.
 - **State:** Remote backend with locks. Backup to encrypted storage. Disaster recovery: state reconstruction from IaC.
 
@@ -82,7 +82,7 @@ Day 0 IaC differs from Day 1+ (Crossplane, ADR-067). Day 0 = one-shot cluster se
 
 ### Positive
 
-- **Cloud-agnostic:** Same HCL for Hetzner + Azure. Modules abstract provider differences.
+- **Cloud-agnostic:** Same HCL for sovereign cloud + hyperscaler. Modules abstract provider differences.
 - **Familiar workflow:** Plan/apply is industry standard. Team skills transferable from other Terraform projects.
 - **State management:** Remote state + locks prevent concurrent modifications. Disasters recoverable from IaC + state backup.
 - **Code review integration:** Terraform plan artifact in PR. Reviewers see exact infrastructure changes before apply.
@@ -101,7 +101,7 @@ Day 0 IaC differs from Day 1+ (Crossplane, ADR-067). Day 0 = one-shot cluster se
 | State file corruption/loss | Low | High | Remote state with versioning (S3 versioning). Weekly backups. Disaster recovery: state reconstruction from IaC + cloud API. |
 | Breaking change in provider | Low | High | Provider version pinning in .terraform-lock.hcl (ADR-108). Staging validates before prod. |
 | Concurrent apply causes state conflict | Low | Medium | Remote locks prevent concurrent applies. Runbook for lock recovery (rare). |
-| Hetzner provider abandoned | Low | Medium | Community provider maintained by Hetzner community. If abandoned, fallback: API-based cluster creation scripts + import into IaC. |
+| sovereign-cloud provider abandoned | Low | Medium | Community provider maintained by sovereign-cloud community. If abandoned, fallback: API-based cluster creation scripts + import into IaC. |
 
 ## License
 

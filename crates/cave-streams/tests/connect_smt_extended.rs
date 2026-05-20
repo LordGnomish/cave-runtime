@@ -18,8 +18,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use cave_streams::connect_worker::smt::{
-    flatten::Flatten, regex_router::RegexRouter, replace_field::ReplaceField,
-    timestamp_router::TimestampRouter, RecordEnvelope, Smt, SmtChain, SmtRegistry, Value,
+    RecordEnvelope, Smt, SmtChain, SmtRegistry, Value, flatten::Flatten, regex_router::RegexRouter,
+    replace_field::ReplaceField, timestamp_router::TimestampRouter,
 };
 
 fn obj(kvs: &[(&str, Value)]) -> Value {
@@ -138,10 +138,7 @@ fn flatten_honours_custom_delimiter() {
     let mut cfg = BTreeMap::new();
     cfg.insert("delimiter".into(), "/".into());
     let s = Flatten::from_config(&cfg).unwrap();
-    let nested = obj(&[(
-        "a",
-        obj(&[("b", obj(&[("c", Value::Int(7))]))]),
-    )]);
+    let nested = obj(&[("a", obj(&[("b", obj(&[("c", Value::Int(7))]))]))]);
     let r = RecordEnvelope::new("t", nested);
     let out = s.apply(r).unwrap().unwrap();
     let m = out.value.as_object().unwrap();
@@ -282,8 +279,8 @@ fn chain_predicate_gated_drop_short_circuits_downstream() {
     let mut filter_cfg = BTreeMap::new();
     filter_cfg.insert("predicate".into(), "TopicNameMatches".into());
     filter_cfg.insert("pattern".into(), "drop-me".into());
-    let filter = cave_streams::connect_worker::smt::filter::Filter::from_config(&filter_cfg)
-        .unwrap();
+    let filter =
+        cave_streams::connect_worker::smt::filter::Filter::from_config(&filter_cfg).unwrap();
     chain.push(Arc::new(filter));
     // ReplaceField after — should never run on the dropped record.
     let mut rep_cfg = BTreeMap::new();
@@ -292,5 +289,8 @@ fn chain_predicate_gated_drop_short_circuits_downstream() {
     chain.push(Arc::new(rep));
     let r = RecordEnvelope::new("drop-me", obj(&[("x", Value::Int(1))]));
     let out = chain.apply(r).unwrap();
-    assert!(out.is_none(), "Filter must drop the record before ReplaceField runs");
+    assert!(
+        out.is_none(),
+        "Filter must drop the record before ReplaceField runs"
+    );
 }

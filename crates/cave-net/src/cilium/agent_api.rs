@@ -27,7 +27,7 @@ pub enum HttpMethod {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApiRoute {
     pub method: HttpMethod,
-    pub path: String, // e.g. "/v1/endpoint/{id}"
+    pub path: String,    // e.g. "/v1/endpoint/{id}"
     pub handler: String, // logical handler name
 }
 
@@ -66,12 +66,23 @@ pub struct AgentApi {
 
 impl AgentApi {
     pub fn new(tenant: TenantId) -> Self {
-        Self { tenant, routes: Vec::new(), hits: HashMap::new() }
+        Self {
+            tenant,
+            routes: Vec::new(),
+            hits: HashMap::new(),
+        }
     }
 
     pub fn register(&mut self, route: ApiRoute) -> Result<(), ApiError> {
-        if self.routes.iter().any(|r| r.method == route.method && r.path == route.path) {
-            return Err(ApiError::Conflict { method: route.method, path: route.path });
+        if self
+            .routes
+            .iter()
+            .any(|r| r.method == route.method && r.path == route.path)
+        {
+            return Err(ApiError::Conflict {
+                method: route.method,
+                path: route.path,
+            });
         }
         self.routes.push(route);
         Ok(())
@@ -82,17 +93,25 @@ impl AgentApi {
     }
 
     pub fn route(&self, method: HttpMethod, path: &str) -> Option<&ApiRoute> {
-        self.routes.iter().find(|r| r.method == method && match_path(&r.path, path))
+        self.routes
+            .iter()
+            .find(|r| r.method == method && match_path(&r.path, path))
     }
 
     /// Resolve a request to its handler name, recording a hit and
     /// returning the matched route + extracted path params.
-    pub fn dispatch(&mut self, req: &ApiRequest) -> Result<(String, Vec<(String, String)>), ApiError> {
+    pub fn dispatch(
+        &mut self,
+        req: &ApiRequest,
+    ) -> Result<(String, Vec<(String, String)>), ApiError> {
         let route = self
             .routes
             .iter()
             .find(|r| r.method == req.method && match_path(&r.path, &req.path))
-            .ok_or_else(|| ApiError::NotFound { method: req.method, path: req.path.clone() })?;
+            .ok_or_else(|| ApiError::NotFound {
+                method: req.method,
+                path: req.path.clone(),
+            })?;
         let params = extract_params(&route.path, &req.path);
         let handler = route.handler.clone();
         *self.hits.entry(handler.clone()).or_default() += 1;
@@ -120,31 +139,131 @@ impl AgentApi {
 /// Returns the canonical Cilium agent route table.
 pub fn canonical_routes() -> Vec<ApiRoute> {
     vec![
-        ApiRoute { method: HttpMethod::Get, path: "/v1/endpoint".into(), handler: "GetEndpoint".into() },
-        ApiRoute { method: HttpMethod::Get, path: "/v1/endpoint/{id}".into(), handler: "GetEndpointID".into() },
-        ApiRoute { method: HttpMethod::Put, path: "/v1/endpoint/{id}".into(), handler: "PutEndpointID".into() },
-        ApiRoute { method: HttpMethod::Delete, path: "/v1/endpoint/{id}".into(), handler: "DeleteEndpointID".into() },
-        ApiRoute { method: HttpMethod::Patch, path: "/v1/endpoint/{id}/labels".into(), handler: "PatchEndpointIDLabels".into() },
-        ApiRoute { method: HttpMethod::Get, path: "/v1/policy".into(), handler: "GetPolicy".into() },
-        ApiRoute { method: HttpMethod::Put, path: "/v1/policy".into(), handler: "PutPolicy".into() },
-        ApiRoute { method: HttpMethod::Delete, path: "/v1/policy".into(), handler: "DeletePolicy".into() },
-        ApiRoute { method: HttpMethod::Get, path: "/v1/service".into(), handler: "GetService".into() },
-        ApiRoute { method: HttpMethod::Get, path: "/v1/service/{id}".into(), handler: "GetServiceID".into() },
-        ApiRoute { method: HttpMethod::Put, path: "/v1/service/{id}".into(), handler: "PutServiceID".into() },
-        ApiRoute { method: HttpMethod::Delete, path: "/v1/service/{id}".into(), handler: "DeleteServiceID".into() },
-        ApiRoute { method: HttpMethod::Get, path: "/v1/identity".into(), handler: "GetIdentity".into() },
-        ApiRoute { method: HttpMethod::Get, path: "/v1/identity/{id}".into(), handler: "GetIdentityID".into() },
-        ApiRoute { method: HttpMethod::Get, path: "/v1/healthz".into(), handler: "GetHealthz".into() },
-        ApiRoute { method: HttpMethod::Get, path: "/v1/config".into(), handler: "GetConfig".into() },
-        ApiRoute { method: HttpMethod::Patch, path: "/v1/config".into(), handler: "PatchConfig".into() },
-        ApiRoute { method: HttpMethod::Get, path: "/v1/metrics".into(), handler: "GetMetrics".into() },
-        ApiRoute { method: HttpMethod::Get, path: "/v1/map".into(), handler: "GetMap".into() },
-        ApiRoute { method: HttpMethod::Get, path: "/v1/map/{name}".into(), handler: "GetMapName".into() },
-        ApiRoute { method: HttpMethod::Get, path: "/v1/cluster/nodes".into(), handler: "GetClusterNodes".into() },
-        ApiRoute { method: HttpMethod::Get, path: "/v1/fqdn/cache".into(), handler: "GetFqdnCache".into() },
-        ApiRoute { method: HttpMethod::Get, path: "/v1/ipam".into(), handler: "GetIpam".into() },
-        ApiRoute { method: HttpMethod::Post, path: "/v1/ipam".into(), handler: "PostIpam".into() },
-        ApiRoute { method: HttpMethod::Delete, path: "/v1/ipam/{ip}".into(), handler: "DeleteIpamIP".into() },
+        ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/endpoint".into(),
+            handler: "GetEndpoint".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/endpoint/{id}".into(),
+            handler: "GetEndpointID".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Put,
+            path: "/v1/endpoint/{id}".into(),
+            handler: "PutEndpointID".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Delete,
+            path: "/v1/endpoint/{id}".into(),
+            handler: "DeleteEndpointID".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Patch,
+            path: "/v1/endpoint/{id}/labels".into(),
+            handler: "PatchEndpointIDLabels".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/policy".into(),
+            handler: "GetPolicy".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Put,
+            path: "/v1/policy".into(),
+            handler: "PutPolicy".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Delete,
+            path: "/v1/policy".into(),
+            handler: "DeletePolicy".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/service".into(),
+            handler: "GetService".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/service/{id}".into(),
+            handler: "GetServiceID".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Put,
+            path: "/v1/service/{id}".into(),
+            handler: "PutServiceID".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Delete,
+            path: "/v1/service/{id}".into(),
+            handler: "DeleteServiceID".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/identity".into(),
+            handler: "GetIdentity".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/identity/{id}".into(),
+            handler: "GetIdentityID".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/healthz".into(),
+            handler: "GetHealthz".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/config".into(),
+            handler: "GetConfig".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Patch,
+            path: "/v1/config".into(),
+            handler: "PatchConfig".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/metrics".into(),
+            handler: "GetMetrics".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/map".into(),
+            handler: "GetMap".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/map/{name}".into(),
+            handler: "GetMapName".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/cluster/nodes".into(),
+            handler: "GetClusterNodes".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/fqdn/cache".into(),
+            handler: "GetFqdnCache".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/ipam".into(),
+            handler: "GetIpam".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Post,
+            path: "/v1/ipam".into(),
+            handler: "PostIpam".into(),
+        },
+        ApiRoute {
+            method: HttpMethod::Delete,
+            path: "/v1/ipam/{ip}".into(),
+            handler: "DeleteIpamIP".into(),
+        },
     ]
 }
 
@@ -197,7 +316,12 @@ mod tests {
     }
 
     fn req(method: HttpMethod, path: &str) -> ApiRequest {
-        ApiRequest { method, path: path.into(), query: vec![], body: vec![] }
+        ApiRequest {
+            method,
+            path: path.into(),
+            query: vec![],
+            body: vec![],
+        }
     }
 
     // ── Path matching ───────────────────────────────────────────────────────
@@ -227,7 +351,10 @@ mod tests {
     #[test]
     fn extract_params_multi_segment() {
         let (_c, _t) = cilium_test_ctx!("daemon/cmd/api.go", "Path.MultiParam", "tenant-api-mp");
-        let p = extract_params("/v1/endpoint/{id}/labels/{label}", "/v1/endpoint/42/labels/app");
+        let p = extract_params(
+            "/v1/endpoint/{id}/labels/{label}",
+            "/v1/endpoint/42/labels/app",
+        );
         assert!(p.contains(&("id".to_string(), "42".to_string())));
         assert!(p.contains(&("label".to_string(), "app".to_string())));
     }
@@ -238,26 +365,57 @@ mod tests {
     fn register_and_route_lookup() {
         let (_c, tenant) = cilium_test_ctx!("daemon/cmd/api.go", "Register", "tenant-api-r");
         let mut a = api(tenant);
-        a.register(ApiRoute { method: HttpMethod::Get, path: "/v1/policy".into(), handler: "GetPolicy".into() }).unwrap();
+        a.register(ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/policy".into(),
+            handler: "GetPolicy".into(),
+        })
+        .unwrap();
         let r = a.route(HttpMethod::Get, "/v1/policy").unwrap();
         assert_eq!(r.handler, "GetPolicy");
     }
 
     #[test]
     fn register_duplicate_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("daemon/cmd/api.go", "Register.Conflict", "tenant-api-rc");
+        let (_c, tenant) =
+            cilium_test_ctx!("daemon/cmd/api.go", "Register.Conflict", "tenant-api-rc");
         let mut a = api(tenant);
-        a.register(ApiRoute { method: HttpMethod::Get, path: "/v1/policy".into(), handler: "GetPolicy".into() }).unwrap();
-        let err = a.register(ApiRoute { method: HttpMethod::Get, path: "/v1/policy".into(), handler: "Other".into() }).unwrap_err();
+        a.register(ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/policy".into(),
+            handler: "GetPolicy".into(),
+        })
+        .unwrap();
+        let err = a
+            .register(ApiRoute {
+                method: HttpMethod::Get,
+                path: "/v1/policy".into(),
+                handler: "Other".into(),
+            })
+            .unwrap_err();
         assert!(matches!(err, ApiError::Conflict { .. }));
     }
 
     #[test]
     fn register_same_path_different_method_succeeds() {
-        let (_c, tenant) = cilium_test_ctx!("daemon/cmd/api.go", "Register.MethodDistinct", "tenant-api-rd");
+        let (_c, tenant) = cilium_test_ctx!(
+            "daemon/cmd/api.go",
+            "Register.MethodDistinct",
+            "tenant-api-rd"
+        );
         let mut a = api(tenant);
-        a.register(ApiRoute { method: HttpMethod::Get, path: "/v1/policy".into(), handler: "GetPolicy".into() }).unwrap();
-        a.register(ApiRoute { method: HttpMethod::Put, path: "/v1/policy".into(), handler: "PutPolicy".into() }).unwrap();
+        a.register(ApiRoute {
+            method: HttpMethod::Get,
+            path: "/v1/policy".into(),
+            handler: "GetPolicy".into(),
+        })
+        .unwrap();
+        a.register(ApiRoute {
+            method: HttpMethod::Put,
+            path: "/v1/policy".into(),
+            handler: "PutPolicy".into(),
+        })
+        .unwrap();
         assert_eq!(a.route_count(), 2);
     }
 
@@ -274,30 +432,42 @@ mod tests {
 
     #[test]
     fn dispatch_extracts_params() {
-        let (_c, tenant) = cilium_test_ctx!("daemon/cmd/api.go", "Dispatch.Params", "tenant-api-dp");
+        let (_c, tenant) =
+            cilium_test_ctx!("daemon/cmd/api.go", "Dispatch.Params", "tenant-api-dp");
         let mut a = api(tenant);
         a.install_default_routes().unwrap();
-        let (h, params) = a.dispatch(&req(HttpMethod::Get, "/v1/endpoint/42")).unwrap();
+        let (h, params) = a
+            .dispatch(&req(HttpMethod::Get, "/v1/endpoint/42"))
+            .unwrap();
         assert_eq!(h, "GetEndpointID");
         assert_eq!(params, vec![("id".to_string(), "42".to_string())]);
     }
 
     #[test]
     fn dispatch_unknown_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("daemon/cmd/api.go", "Dispatch.NotFound", "tenant-api-dnf");
+        let (_c, tenant) =
+            cilium_test_ctx!("daemon/cmd/api.go", "Dispatch.NotFound", "tenant-api-dnf");
         let mut a = api(tenant);
         a.install_default_routes().unwrap();
-        let err = a.dispatch(&req(HttpMethod::Get, "/v1/garbage")).unwrap_err();
+        let err = a
+            .dispatch(&req(HttpMethod::Get, "/v1/garbage"))
+            .unwrap_err();
         assert!(matches!(err, ApiError::NotFound { .. }));
     }
 
     #[test]
     fn dispatch_wrong_method_returns_not_found() {
-        let (_c, tenant) = cilium_test_ctx!("daemon/cmd/api.go", "Dispatch.WrongMethod", "tenant-api-dwm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "daemon/cmd/api.go",
+            "Dispatch.WrongMethod",
+            "tenant-api-dwm"
+        );
         let mut a = api(tenant);
         a.install_default_routes().unwrap();
         // /v1/identity is GET-only.
-        let err = a.dispatch(&req(HttpMethod::Delete, "/v1/identity")).unwrap_err();
+        let err = a
+            .dispatch(&req(HttpMethod::Delete, "/v1/identity"))
+            .unwrap_err();
         assert!(matches!(err, ApiError::NotFound { .. }));
     }
 
@@ -349,7 +519,11 @@ mod tests {
 
     #[test]
     fn install_default_routes_is_idempotent_failure_returns_conflict() {
-        let (_c, tenant) = cilium_test_ctx!("daemon/cmd/api.go", "InstallDefault.Idempotent", "tenant-api-iid");
+        let (_c, tenant) = cilium_test_ctx!(
+            "daemon/cmd/api.go",
+            "InstallDefault.Idempotent",
+            "tenant-api-iid"
+        );
         let mut a = api(tenant);
         a.install_default_routes().unwrap();
         let err = a.install_default_routes().unwrap_err();
@@ -360,7 +534,11 @@ mod tests {
 
     #[test]
     fn endpoint_id_supports_get_put_delete() {
-        let (_c, tenant) = cilium_test_ctx!("daemon/cmd/api.go", "Endpoint.MethodCoverage", "tenant-api-emc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "daemon/cmd/api.go",
+            "Endpoint.MethodCoverage",
+            "tenant-api-emc"
+        );
         let mut a = api(tenant);
         a.install_default_routes().unwrap();
         for m in [HttpMethod::Get, HttpMethod::Put, HttpMethod::Delete] {
@@ -373,7 +551,11 @@ mod tests {
     #[test]
     fn api_route_serde_round_trip() {
         let (_c, _t) = cilium_test_ctx!("daemon/cmd/api.go", "Route.Serde", "tenant-api-rserde");
-        let r = ApiRoute { method: HttpMethod::Patch, path: "/v1/endpoint/{id}/labels".into(), handler: "PatchEndpointIDLabels".into() };
+        let r = ApiRoute {
+            method: HttpMethod::Patch,
+            path: "/v1/endpoint/{id}/labels".into(),
+            handler: "PatchEndpointIDLabels".into(),
+        };
         let s = serde_json::to_string(&r).unwrap();
         let back: ApiRoute = serde_json::from_str(&s).unwrap();
         assert_eq!(back, r);
@@ -382,7 +564,13 @@ mod tests {
     #[test]
     fn http_method_serde_round_trip() {
         let (_c, _t) = cilium_test_ctx!("daemon/cmd/api.go", "Method.Serde", "tenant-api-mserde");
-        for m in [HttpMethod::Get, HttpMethod::Post, HttpMethod::Put, HttpMethod::Patch, HttpMethod::Delete] {
+        for m in [
+            HttpMethod::Get,
+            HttpMethod::Post,
+            HttpMethod::Put,
+            HttpMethod::Patch,
+            HttpMethod::Delete,
+        ] {
             let s = serde_json::to_string(&m).unwrap();
             let back: HttpMethod = serde_json::from_str(&s).unwrap();
             assert_eq!(back, m);

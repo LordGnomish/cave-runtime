@@ -7,7 +7,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, RdbmsCluster};
+use crate::admin::state::{AdminState, RdbmsCluster, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -18,12 +18,19 @@ pub enum RdbmsViewError {
     ClusterNotFound(String),
 }
 
-pub fn list_clusters(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<RdbmsCluster>, RdbmsViewError> {
+pub fn list_clusters(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<RdbmsCluster>, RdbmsViewError> {
     ctx.authorise(Permission::RdbmsRead)?;
-    Ok(scope(&state.rdbms_clusters.read().unwrap(), &ctx.tenant, |r| &r.tenant)
+    Ok(
+        scope(&state.rdbms_clusters.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
         .into_iter()
         .cloned()
-        .collect())
+        .collect(),
+    )
 }
 
 pub fn inspect_cluster(

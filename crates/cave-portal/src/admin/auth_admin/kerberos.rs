@@ -5,9 +5,9 @@
 //! cave-auth surfaces. Visual port of
 //! `js/apps/admin-ui/src/user-federation/UserFederationKerberosSettings.tsx`.
 
+use super::{AuthAdminError, render_admin_nav, require_platform};
 use crate::admin::permission::RequestCtx;
 use crate::admin::render::{escape, page_shell_full};
-use super::{render_admin_nav, require_platform, AuthAdminError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KerberosConfig {
@@ -80,8 +80,16 @@ pub fn render(ctx: &RequestCtx) -> Result<String, AuthAdminError> {
         sp = escape(&c.server_principal),
         kt = escape(&c.keytab),
         dbg = if c.debug { "checked" } else { "" },
-        pwd = if c.allow_password_authentication { "checked" } else { "" },
-        upd = if c.update_profile_first_login { "checked" } else { "" },
+        pwd = if c.allow_password_authentication {
+            "checked"
+        } else {
+            ""
+        },
+        upd = if c.update_profile_first_login {
+            "checked"
+        } else {
+            ""
+        },
     );
     Ok(page_shell_full(
         ctx,

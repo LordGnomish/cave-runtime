@@ -22,7 +22,7 @@
 
 use crate::admin::compliance::{self, ComplianceSnapshot, ComplianceViewError};
 use crate::admin::layout::a11y;
-use crate::admin::layout::shell::{shell_v2, ShellOptions};
+use crate::admin::layout::shell::{ShellOptions, shell_v2};
 use crate::admin::permission::{Permission, Persona, RequestCtx};
 use crate::admin::render::{escape, page_shell_full};
 use chrono::{DateTime, Utc};
@@ -431,10 +431,7 @@ mod tests {
 
     #[test]
     fn summary_returns_five_axes_in_canonical_order() {
-        let s = summary_from(
-            &snap(vec![dev_crate("c1", 100, 0.9)]),
-            Utc::now(),
-        );
+        let s = summary_from(&snap(vec![dev_crate("c1", 100, 0.9)]), Utc::now());
         assert_eq!(s.axes.len(), 5);
         let names: Vec<&str> = s.axes.iter().map(|a| a.name.as_str()).collect();
         assert_eq!(
@@ -451,10 +448,7 @@ mod tests {
 
     #[test]
     fn summary_picks_up_structural_score_from_compliance() {
-        let s = summary_from(
-            &snap(vec![dev_crate("c1", 100, 0.9)]),
-            Utc::now(),
-        );
+        let s = summary_from(&snap(vec![dev_crate("c1", 100, 0.9)]), Utc::now());
         let structural = &s.axes[0];
         assert_eq!(structural.name, "structural");
         assert_eq!(structural.score, 100);
@@ -463,10 +457,7 @@ mod tests {
 
     #[test]
     fn summary_picks_up_upstream_parity_from_compliance() {
-        let s = summary_from(
-            &snap(vec![dev_crate("c1", 100, 0.95)]),
-            Utc::now(),
-        );
+        let s = summary_from(&snap(vec![dev_crate("c1", 100, 0.95)]), Utc::now());
         let parity = &s.axes[1];
         assert_eq!(parity.name, "upstream_parity");
         assert_eq!(parity.score, 95);
@@ -474,10 +465,7 @@ mod tests {
 
     #[test]
     fn summary_a11y_axis_is_grade_a_when_chrome_clean() {
-        let s = summary_from(
-            &snap(vec![dev_crate("c1", 100, 0.9)]),
-            Utc::now(),
-        );
+        let s = summary_from(&snap(vec![dev_crate("c1", 100, 0.9)]), Utc::now());
         let a11y = &s.axes[4];
         assert_eq!(a11y.name, "accessibility");
         // shell_v2 chrome has 0 violations (locked in by a11y::tests::shell_v2_passes_full_a11y_audit).
@@ -487,10 +475,7 @@ mod tests {
 
     #[test]
     fn summary_serialises_to_json() {
-        let s = summary_from(
-            &snap(vec![dev_crate("c1", 100, 0.9)]),
-            Utc::now(),
-        );
+        let s = summary_from(&snap(vec![dev_crate("c1", 100, 0.9)]), Utc::now());
         let json = serde_json::to_value(&s).unwrap();
         assert!(json["axes"].is_array());
         assert_eq!(json["axes"].as_array().unwrap().len(), 5);
@@ -557,10 +542,16 @@ mod tests {
     fn sparkline_normalises_y_axis_to_viewport() {
         let svg = sparkline_svg(&[100]);
         // 100 → y near 2 (top of 0..20 viewport).
-        assert!(svg.contains("2.0"), "expected y=2.0 for score=100, got: {svg}");
+        assert!(
+            svg.contains("2.0"),
+            "expected y=2.0 for score=100, got: {svg}"
+        );
         let svg = sparkline_svg(&[0]);
         // 0 → y near 18 (bottom).
-        assert!(svg.contains("18.0"), "expected y=18.0 for score=0, got: {svg}");
+        assert!(
+            svg.contains("18.0"),
+            "expected y=18.0 for score=0, got: {svg}"
+        );
     }
 
     // ── history ring ──────────────────────────────────────────────
@@ -568,10 +559,7 @@ mod tests {
     #[test]
     fn history_keeps_at_most_twelve_samples_per_axis() {
         reset_history_for_tests();
-        let s = summary_from(
-            &snap(vec![dev_crate("c1", 100, 0.9)]),
-            Utc::now(),
-        );
+        let s = summary_from(&snap(vec![dev_crate("c1", 100, 0.9)]), Utc::now());
         for _ in 0..20 {
             push_history(&s);
         }

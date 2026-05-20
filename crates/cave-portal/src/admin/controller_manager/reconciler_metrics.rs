@@ -83,7 +83,9 @@ mod tests {
         );
         let s = AdminState::seeded();
         let metrics = list_metrics(&s, &ctx(&[Permission::ControllerManagerRead])).unwrap();
-        let queues = super::super::queues::list_queues(&s, &ctx(&[Permission::ControllerManagerRead])).unwrap();
+        let queues =
+            super::super::queues::list_queues(&s, &ctx(&[Permission::ControllerManagerRead]))
+                .unwrap();
         assert_eq!(metrics.len(), queues.len());
     }
 

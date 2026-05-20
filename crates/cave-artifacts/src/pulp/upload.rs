@@ -70,7 +70,9 @@ impl Upload {
     }
 
     pub fn progress_pct(&self) -> f64 {
-        if self.size == 0 { return 100.0; }
+        if self.size == 0 {
+            return 100.0;
+        }
         (self.offset as f64 / self.size as f64) * 100.0
     }
 }
@@ -97,12 +99,17 @@ pub struct UploadRegistry {
 
 impl UploadRegistry {
     pub fn new() -> Self {
-        Self { uploads: Mutex::new(HashMap::new()) }
+        Self {
+            uploads: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn create(&self, size: u64) -> Upload {
         let upload = Upload::new(size);
-        self.uploads.lock().unwrap().insert(upload.pulp_id, upload.clone());
+        self.uploads
+            .lock()
+            .unwrap()
+            .insert(upload.pulp_id, upload.clone());
         upload
     }
 
@@ -117,11 +124,18 @@ impl UploadRegistry {
         Ok(upload.clone())
     }
 
-    pub fn finalize(&self, id: &Uuid, artifact_href: impl Into<String>) -> Result<Upload, UploadError> {
+    pub fn finalize(
+        &self,
+        id: &Uuid,
+        artifact_href: impl Into<String>,
+    ) -> Result<Upload, UploadError> {
         let mut uploads = self.uploads.lock().unwrap();
         let upload = uploads.get_mut(id).ok_or(UploadError::NotFound(*id))?;
         if !upload.is_complete() {
-            return Err(UploadError::Incomplete { offset: upload.offset, size: upload.size });
+            return Err(UploadError::Incomplete {
+                offset: upload.offset,
+                size: upload.size,
+            });
         }
         upload.finalize(artifact_href);
         Ok(upload.clone())
@@ -185,14 +199,26 @@ mod tests {
     fn upload_chunk_out_of_order() {
         let mut upload = Upload::new(1024);
         let err = upload.accept_chunk(512, 512).unwrap_err();
-        assert!(matches!(err, UploadError::OutOfOrder { expected: 0, got: 512 }));
+        assert!(matches!(
+            err,
+            UploadError::OutOfOrder {
+                expected: 0,
+                got: 512
+            }
+        ));
     }
 
     #[test]
     fn upload_chunk_exceeds_size() {
         let mut upload = Upload::new(1024);
         let err = upload.accept_chunk(0, 2048).unwrap_err();
-        assert!(matches!(err, UploadError::ExceedsSize { upload_size: 1024, .. }));
+        assert!(matches!(
+            err,
+            UploadError::ExceedsSize {
+                upload_size: 1024,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -220,7 +246,9 @@ mod tests {
         registry.apply_chunk(&id, 0, 512).unwrap();
         registry.apply_chunk(&id, 512, 512).unwrap();
 
-        let finalized = registry.finalize(&id, "/pulp/api/v3/artifacts/xyz/").unwrap();
+        let finalized = registry
+            .finalize(&id, "/pulp/api/v3/artifacts/xyz/")
+            .unwrap();
         assert!(finalized.completed);
         assert!(finalized.artifact.is_some());
     }

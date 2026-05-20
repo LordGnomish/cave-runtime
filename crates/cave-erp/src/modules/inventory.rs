@@ -3,11 +3,11 @@
 use crate::models::*;
 use crate::store::ErpStore;
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -149,12 +149,22 @@ async fn create_stock_location(
         created_at: Utc::now(),
     };
     let id = location.id;
-    store.stock_locations.write().await.insert(id, location.clone());
+    store
+        .stock_locations
+        .write()
+        .await
+        .insert(id, location.clone());
     (StatusCode::CREATED, Json(location))
 }
 
 async fn list_stock_locations(State(store): State<Arc<ErpStore>>) -> impl IntoResponse {
-    let locations: Vec<_> = store.stock_locations.read().await.values().cloned().collect();
+    let locations: Vec<_> = store
+        .stock_locations
+        .read()
+        .await
+        .values()
+        .cloned()
+        .collect();
     Json(locations)
 }
 
@@ -174,7 +184,11 @@ async fn create_stock_move(
         done_at: None,
     };
     let id = stock_move.id;
-    store.stock_moves.write().await.insert(id, stock_move.clone());
+    store
+        .stock_moves
+        .write()
+        .await
+        .insert(id, stock_move.clone());
     (StatusCode::CREATED, Json(stock_move))
 }
 
@@ -193,17 +207,20 @@ async fn confirm_stock_move(
         m.done_at = Some(Utc::now());
         (StatusCode::OK, Json(m.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(StockMove {
-            id: Uuid::nil(),
-            product_id: Uuid::nil(),
-            qty: 0.0,
-            from_location_id: Uuid::nil(),
-            to_location_id: Uuid::nil(),
-            state: StockMoveState::Draft,
-            lot_id: None,
-            created_at: Utc::now(),
-            done_at: None,
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(StockMove {
+                id: Uuid::nil(),
+                product_id: Uuid::nil(),
+                qty: 0.0,
+                from_location_id: Uuid::nil(),
+                to_location_id: Uuid::nil(),
+                state: StockMoveState::Draft,
+                lot_id: None,
+                created_at: Utc::now(),
+                done_at: None,
+            }),
+        )
     }
 }
 
@@ -216,17 +233,20 @@ async fn cancel_stock_move(
         m.state = StockMoveState::Cancelled;
         (StatusCode::OK, Json(m.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(StockMove {
-            id: Uuid::nil(),
-            product_id: Uuid::nil(),
-            qty: 0.0,
-            from_location_id: Uuid::nil(),
-            to_location_id: Uuid::nil(),
-            state: StockMoveState::Draft,
-            lot_id: None,
-            created_at: Utc::now(),
-            done_at: None,
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(StockMove {
+                id: Uuid::nil(),
+                product_id: Uuid::nil(),
+                qty: 0.0,
+                from_location_id: Uuid::nil(),
+                to_location_id: Uuid::nil(),
+                state: StockMoveState::Draft,
+                lot_id: None,
+                created_at: Utc::now(),
+                done_at: None,
+            }),
+        )
     }
 }
 

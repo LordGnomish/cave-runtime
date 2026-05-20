@@ -110,8 +110,7 @@ impl DpkgStatusAnalyzer {
                 "Source" => {
                     if let Some((src, ver)) = value.split_once('(') {
                         cur.source = Some(src.trim().to_string());
-                        cur.source_version =
-                            Some(ver.trim_end_matches(')').trim().to_string());
+                        cur.source_version = Some(ver.trim_end_matches(')').trim().to_string());
                     } else {
                         cur.source = Some(value.to_string());
                     }

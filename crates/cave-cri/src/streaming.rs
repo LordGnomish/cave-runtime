@@ -79,7 +79,10 @@ pub struct Frame {
 
 impl Frame {
     pub fn new(channel: Channel, data: impl Into<Vec<u8>>) -> Self {
-        Self { channel, data: data.into() }
+        Self {
+            channel,
+            data: data.into(),
+        }
     }
 
     /// Encode as a `channel.k8s.io.v5` frame.
@@ -97,7 +100,10 @@ impl Frame {
         }
         let channel = Channel::from_byte(bytes[0])
             .ok_or_else(|| CriError::Runtime(format!("unknown channel byte: {}", bytes[0])))?;
-        Ok(Frame { channel, data: bytes[1..].to_vec() })
+        Ok(Frame {
+            channel,
+            data: bytes[1..].to_vec(),
+        })
     }
 }
 
@@ -251,8 +257,14 @@ mod tests {
 
     #[test]
     fn channel_from_byte_known() {
-        for c in [Channel::Stdin, Channel::Stdout, Channel::Stderr,
-                  Channel::Error, Channel::Resize, Channel::Close] {
+        for c in [
+            Channel::Stdin,
+            Channel::Stdout,
+            Channel::Stderr,
+            Channel::Error,
+            Channel::Resize,
+            Channel::Close,
+        ] {
             assert_eq!(Channel::from_byte(c.as_byte()), Some(c));
         }
     }
@@ -345,15 +357,24 @@ mod tests {
 
     #[test]
     fn subprotocol_strings_are_official() {
-        assert_eq!(StreamProtocol::WebSocketV5.subprotocol(), "v5.channel.k8s.io");
-        assert_eq!(StreamProtocol::SpdyV4.subprotocol(), "v4.streamprotocol.k8s.io");
+        assert_eq!(
+            StreamProtocol::WebSocketV5.subprotocol(),
+            "v5.channel.k8s.io"
+        );
+        assert_eq!(
+            StreamProtocol::SpdyV4.subprotocol(),
+            "v4.streamprotocol.k8s.io"
+        );
     }
 
     // ── TtyWindowSize ─────────────────────────────────────────────────────────
 
     #[test]
     fn tty_window_size_encodes_to_pascal_case_json() {
-        let size = TtyWindowSize { width: 120, height: 40 };
+        let size = TtyWindowSize {
+            width: 120,
+            height: 40,
+        };
         let json = String::from_utf8(size.encode()).unwrap();
         assert!(json.contains("\"Width\":120"));
         assert!(json.contains("\"Height\":40"));
@@ -361,7 +382,10 @@ mod tests {
 
     #[test]
     fn tty_window_size_decode_roundtrip() {
-        let size = TtyWindowSize { width: 80, height: 24 };
+        let size = TtyWindowSize {
+            width: 80,
+            height: 24,
+        };
         let bytes = size.encode();
         let back = TtyWindowSize::decode(&bytes).unwrap();
         assert_eq!(size, back);
@@ -390,7 +414,10 @@ mod tests {
             stdout: true,
             stderr: false,
             tty: true,
-            initial_size: Some(TtyWindowSize { width: 200, height: 60 }),
+            initial_size: Some(TtyWindowSize {
+                width: 200,
+                height: 60,
+            }),
         };
         let json = serde_json::to_string(&s).unwrap();
         let back: ExecStreamSpec = serde_json::from_str(&json).unwrap();

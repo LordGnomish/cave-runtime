@@ -25,8 +25,8 @@
 
 #![allow(clippy::result_large_err)]
 
-use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD as B64;
 
 use super::SamlError;
 
@@ -176,9 +176,8 @@ impl EcdsaSigningKey {
                 // P-521 wrapper doesn't impl EncodePrivateKey directly;
                 // round-trip through `p521::SecretKey` which does.
                 use p521::pkcs8::EncodePrivateKey as _;
-                let sk = p521::SecretKey::from_bytes(&k.to_bytes()).map_err(|e| {
-                    SamlError::InvalidSignature(format!("p521 secretkey: {e}"))
-                })?;
+                let sk = p521::SecretKey::from_bytes(&k.to_bytes())
+                    .map_err(|e| SamlError::InvalidSignature(format!("p521 secretkey: {e}")))?;
                 sk.to_pkcs8_pem(p521::pkcs8::LineEnding::LF)
                     .map(|z| z.to_string())
                     .map_err(|e| SamlError::InvalidSignature(format!("p521 to_pkcs8_pem: {e}")))
@@ -543,7 +542,11 @@ mod tests {
         let kp = generate_keypair(EcdsaCurve::P256);
         let sig_b64 = sign_xml_canonical(b"kat-p256", &kp.signing, HashAlg::Sha256).unwrap();
         let raw = B64.decode(&sig_b64).unwrap();
-        assert_eq!(raw.len(), 64, "P-256 ECDSA signature must be 64 bytes (R||S)");
+        assert_eq!(
+            raw.len(),
+            64,
+            "P-256 ECDSA signature must be 64 bytes (R||S)"
+        );
     }
 
     #[test]
@@ -551,7 +554,11 @@ mod tests {
         let kp = generate_keypair(EcdsaCurve::P384);
         let sig_b64 = sign_xml_canonical(b"kat-p384", &kp.signing, HashAlg::Sha384).unwrap();
         let raw = B64.decode(&sig_b64).unwrap();
-        assert_eq!(raw.len(), 96, "P-384 ECDSA signature must be 96 bytes (R||S)");
+        assert_eq!(
+            raw.len(),
+            96,
+            "P-384 ECDSA signature must be 96 bytes (R||S)"
+        );
     }
 
     #[test]
@@ -653,15 +660,42 @@ mod tests {
         }
     }
 
-    #[test] fn cross_p256_sha256_sha256() { cross_case(EcdsaCurve::P256, HashAlg::Sha256, HashAlg::Sha256); }
-    #[test] fn cross_p256_sha256_sha384() { cross_case(EcdsaCurve::P256, HashAlg::Sha256, HashAlg::Sha384); }
-    #[test] fn cross_p256_sha384_sha512() { cross_case(EcdsaCurve::P256, HashAlg::Sha384, HashAlg::Sha512); }
-    #[test] fn cross_p384_sha384_sha384() { cross_case(EcdsaCurve::P384, HashAlg::Sha384, HashAlg::Sha384); }
-    #[test] fn cross_p384_sha256_sha384() { cross_case(EcdsaCurve::P384, HashAlg::Sha256, HashAlg::Sha384); }
-    #[test] fn cross_p384_sha512_sha256() { cross_case(EcdsaCurve::P384, HashAlg::Sha512, HashAlg::Sha256); }
-    #[test] fn cross_p521_sha512_sha512() { cross_case(EcdsaCurve::P521, HashAlg::Sha512, HashAlg::Sha512); }
-    #[test] fn cross_p521_sha256_sha512() { cross_case(EcdsaCurve::P521, HashAlg::Sha256, HashAlg::Sha512); }
-    #[test] fn cross_p521_sha384_sha256() { cross_case(EcdsaCurve::P521, HashAlg::Sha384, HashAlg::Sha256); }
+    #[test]
+    fn cross_p256_sha256_sha256() {
+        cross_case(EcdsaCurve::P256, HashAlg::Sha256, HashAlg::Sha256);
+    }
+    #[test]
+    fn cross_p256_sha256_sha384() {
+        cross_case(EcdsaCurve::P256, HashAlg::Sha256, HashAlg::Sha384);
+    }
+    #[test]
+    fn cross_p256_sha384_sha512() {
+        cross_case(EcdsaCurve::P256, HashAlg::Sha384, HashAlg::Sha512);
+    }
+    #[test]
+    fn cross_p384_sha384_sha384() {
+        cross_case(EcdsaCurve::P384, HashAlg::Sha384, HashAlg::Sha384);
+    }
+    #[test]
+    fn cross_p384_sha256_sha384() {
+        cross_case(EcdsaCurve::P384, HashAlg::Sha256, HashAlg::Sha384);
+    }
+    #[test]
+    fn cross_p384_sha512_sha256() {
+        cross_case(EcdsaCurve::P384, HashAlg::Sha512, HashAlg::Sha256);
+    }
+    #[test]
+    fn cross_p521_sha512_sha512() {
+        cross_case(EcdsaCurve::P521, HashAlg::Sha512, HashAlg::Sha512);
+    }
+    #[test]
+    fn cross_p521_sha256_sha512() {
+        cross_case(EcdsaCurve::P521, HashAlg::Sha256, HashAlg::Sha512);
+    }
+    #[test]
+    fn cross_p521_sha384_sha256() {
+        cross_case(EcdsaCurve::P521, HashAlg::Sha384, HashAlg::Sha256);
+    }
 
     // ─── 6 PKCS#8 PEM round-trip tests ───
     //   3 curves × {signing_key, verifying_key} = 6
@@ -690,12 +724,30 @@ mod tests {
         verify_xml_canonical(body, &sig, &restored, h).unwrap();
     }
 
-    #[test] fn pkcs8_p256_signing_pem_roundtrip()  { pkcs8_signing_roundtrip(EcdsaCurve::P256); }
-    #[test] fn pkcs8_p384_signing_pem_roundtrip()  { pkcs8_signing_roundtrip(EcdsaCurve::P384); }
-    #[test] fn pkcs8_p521_signing_pem_roundtrip()  { pkcs8_signing_roundtrip(EcdsaCurve::P521); }
-    #[test] fn spki_p256_verifying_pem_roundtrip() { spki_verifying_roundtrip(EcdsaCurve::P256); }
-    #[test] fn spki_p384_verifying_pem_roundtrip() { spki_verifying_roundtrip(EcdsaCurve::P384); }
-    #[test] fn spki_p521_verifying_pem_roundtrip() { spki_verifying_roundtrip(EcdsaCurve::P521); }
+    #[test]
+    fn pkcs8_p256_signing_pem_roundtrip() {
+        pkcs8_signing_roundtrip(EcdsaCurve::P256);
+    }
+    #[test]
+    fn pkcs8_p384_signing_pem_roundtrip() {
+        pkcs8_signing_roundtrip(EcdsaCurve::P384);
+    }
+    #[test]
+    fn pkcs8_p521_signing_pem_roundtrip() {
+        pkcs8_signing_roundtrip(EcdsaCurve::P521);
+    }
+    #[test]
+    fn spki_p256_verifying_pem_roundtrip() {
+        spki_verifying_roundtrip(EcdsaCurve::P256);
+    }
+    #[test]
+    fn spki_p384_verifying_pem_roundtrip() {
+        spki_verifying_roundtrip(EcdsaCurve::P384);
+    }
+    #[test]
+    fn spki_p521_verifying_pem_roundtrip() {
+        spki_verifying_roundtrip(EcdsaCurve::P521);
+    }
 
     // ─── 3 R||S encoding tests: left-padding to curve scalar size ───
     //
@@ -714,7 +766,11 @@ mod tests {
             let body = [b"sample-p256-", &[i][..]].concat();
             let sig_b64 = sign_xml_canonical(&body, &kp.signing, HashAlg::Sha256).unwrap();
             let raw = B64.decode(&sig_b64).unwrap();
-            assert_eq!(raw.len(), 64, "iter {i}: P-256 R||S must always be 64 bytes");
+            assert_eq!(
+                raw.len(),
+                64,
+                "iter {i}: P-256 R||S must always be 64 bytes"
+            );
             // Sanity: neither half is identically zero (vanishing probability).
             assert!(raw[..32].iter().any(|&b| b != 0));
             assert!(raw[32..].iter().any(|&b| b != 0));
@@ -728,7 +784,11 @@ mod tests {
             let body = [b"sample-p384-", &[i][..]].concat();
             let sig_b64 = sign_xml_canonical(&body, &kp.signing, HashAlg::Sha384).unwrap();
             let raw = B64.decode(&sig_b64).unwrap();
-            assert_eq!(raw.len(), 96, "iter {i}: P-384 R||S must always be 96 bytes");
+            assert_eq!(
+                raw.len(),
+                96,
+                "iter {i}: P-384 R||S must always be 96 bytes"
+            );
             assert!(raw[..48].iter().any(|&b| b != 0));
             assert!(raw[48..].iter().any(|&b| b != 0));
         }
@@ -741,7 +801,11 @@ mod tests {
             let body = [b"sample-p521-", &[i][..]].concat();
             let sig_b64 = sign_xml_canonical(&body, &kp.signing, HashAlg::Sha512).unwrap();
             let raw = B64.decode(&sig_b64).unwrap();
-            assert_eq!(raw.len(), 132, "iter {i}: P-521 R||S must always be 132 bytes");
+            assert_eq!(
+                raw.len(),
+                132,
+                "iter {i}: P-521 R||S must always be 132 bytes"
+            );
             assert!(raw[..66].iter().any(|&b| b != 0));
             assert!(raw[66..].iter().any(|&b| b != 0));
         }

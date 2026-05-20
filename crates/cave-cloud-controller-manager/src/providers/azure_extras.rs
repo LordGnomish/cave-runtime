@@ -59,7 +59,11 @@ pub fn zones_for_region(region: &str) -> Vec<AvailabilityZone> {
     match region {
         "westeurope" | "northeurope" | "eastus" | "eastus2" | "westus2" | "westus3"
         | "centralus" | "uksouth" | "southeastasia" | "japaneast" => {
-            vec![AvailabilityZone::Zone1, AvailabilityZone::Zone2, AvailabilityZone::Zone3]
+            vec![
+                AvailabilityZone::Zone1,
+                AvailabilityZone::Zone2,
+                AvailabilityZone::Zone3,
+            ]
         }
         "ukwest" | "japanwest" | "northcentralus" => vec![],
         _ => vec![],
@@ -143,7 +147,10 @@ impl AppGateway {
         if self.backend_pools.is_empty() {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Azure,
-                reason: format!("app gateway {}: at least one backend pool required", self.name),
+                reason: format!(
+                    "app gateway {}: at least one backend pool required",
+                    self.name
+                ),
             });
         }
         for l in &self.listeners {
@@ -153,10 +160,7 @@ impl AppGateway {
             if !self.listeners.iter().any(|l| l.name == r.listener) {
                 return Err(CloudError::InvalidConfig {
                     provider: ProviderName::Azure,
-                    reason: format!(
-                        "rule {} refers to unknown listener {}",
-                        r.name, r.listener
-                    ),
+                    reason: format!("rule {} refers to unknown listener {}", r.name, r.listener),
                 });
             }
             if !self.backend_pools.iter().any(|b| b.name == r.backend_pool) {
@@ -208,7 +212,11 @@ pub fn diff_nsg_rules(current: &[NsgRuleSpec], desired: &[NsgRuleSpec]) -> NsgDi
         .filter(|c| !desired.iter().any(|d| d.name == c.name))
         .map(|c| c.name.clone())
         .collect();
-    NsgDiff { add, remove, update }
+    NsgDiff {
+        add,
+        remove,
+        update,
+    }
 }
 
 // ─── Public IP standard-tier extras ──────────────────────────────────────────
@@ -341,10 +349,7 @@ impl ManagedDisk {
             if existing != node && !self.supports_multi_attach() {
                 return Err(CloudError::InvalidConfig {
                     provider: ProviderName::Azure,
-                    reason: format!(
-                        "disk {} already attached to {}",
-                        self.name, existing
-                    ),
+                    reason: format!("disk {} already attached to {}", self.name, existing),
                 });
             }
         }
@@ -381,16 +386,17 @@ impl WorkloadIdentityFederation {
         Self {
             name: name.into(),
             user_assigned_identity: identity.into(),
-            service_account_subject: format!(
-                "system:serviceaccount:{namespace}:{service_account}"
-            ),
+            service_account_subject: format!("system:serviceaccount:{namespace}:{service_account}"),
             issuer_url: issuer_url.into(),
             audience: "api://AzureADTokenExchange".into(),
         }
     }
 
     pub fn validate(&self) -> Result<(), CloudError> {
-        if !self.service_account_subject.starts_with("system:serviceaccount:") {
+        if !self
+            .service_account_subject
+            .starts_with("system:serviceaccount:")
+        {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Azure,
                 reason: format!(
@@ -412,10 +418,7 @@ impl WorkloadIdentityFederation {
         if !self.issuer_url.starts_with("https://") {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Azure,
-                reason: format!(
-                    "workload identity {}: issuer must be HTTPS",
-                    self.name
-                ),
+                reason: format!("workload identity {}: issuer must be HTTPS", self.name),
             });
         }
         if self.audience.is_empty() {
@@ -470,7 +473,10 @@ mod tests {
         assert_eq!(AvailabilityZone::Zone1.key(), "1");
         assert_eq!(AvailabilityZone::Zone2.key(), "2");
         assert_eq!(AvailabilityZone::Zone3.key(), "3");
-        assert_eq!(AvailabilityZone::from_key("2"), Some(AvailabilityZone::Zone2));
+        assert_eq!(
+            AvailabilityZone::from_key("2"),
+            Some(AvailabilityZone::Zone2)
+        );
         assert!(AvailabilityZone::from_key("5").is_none());
     }
 
@@ -497,7 +503,10 @@ mod tests {
             resource_group: rg.into(),
             sku: AppGatewaySku::WafV2,
             frontend_public_ip_id: "ip-agw".into(),
-            backend_pools: vec![AppGwBackendPool { name: "bp".into(), members: vec![] }],
+            backend_pools: vec![AppGwBackendPool {
+                name: "bp".into(),
+                members: vec![],
+            }],
             listeners: vec![AppGwListener {
                 name: "http".into(),
                 protocol: AppGatewayProtocol::Http,
@@ -516,66 +525,116 @@ mod tests {
 
     #[test]
     fn app_gateway_minimum_config_validates() {
-        let _ = ctx("acme", "pkg/provider/azure_app_gateway.go", "ApplicationGateway");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_app_gateway.go",
+            "ApplicationGateway",
+        );
         assert!(appgw("rg").validate().is_ok());
     }
 
     #[test]
     fn app_gateway_https_listener_requires_tls_ref() {
-        let _ = ctx("acme", "pkg/provider/azure_app_gateway.go", "ApplicationGatewayHttpListener");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_app_gateway.go",
+            "ApplicationGatewayHttpListener",
+        );
         let mut g = appgw("rg");
         g.listeners[0].protocol = AppGatewayProtocol::Https;
-        assert!(matches!(g.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            g.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         g.listeners[0].tls_certificate_ref = Some("cert-id".into());
         assert!(g.validate().is_ok());
     }
 
     #[test]
     fn app_gateway_listener_zero_port_is_rejected() {
-        let _ = ctx("acme", "pkg/provider/azure_app_gateway.go", "ApplicationGatewayHttpListener");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_app_gateway.go",
+            "ApplicationGatewayHttpListener",
+        );
         let mut g = appgw("rg");
         g.listeners[0].port = 0;
-        assert!(matches!(g.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            g.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn app_gateway_rule_must_reference_known_listener() {
-        let _ = ctx("acme", "pkg/provider/azure_app_gateway.go", "ApplicationGatewayRequestRoutingRule");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_app_gateway.go",
+            "ApplicationGatewayRequestRoutingRule",
+        );
         let mut g = appgw("rg");
         g.rules[0].listener = "missing".into();
-        assert!(matches!(g.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            g.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn app_gateway_rule_must_reference_known_backend_pool() {
-        let _ = ctx("acme", "pkg/provider/azure_app_gateway.go", "ApplicationGatewayRequestRoutingRule");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_app_gateway.go",
+            "ApplicationGatewayRequestRoutingRule",
+        );
         let mut g = appgw("rg");
         g.rules[0].backend_pool = "missing".into();
-        assert!(matches!(g.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            g.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn app_gateway_must_have_at_least_one_backend_pool() {
-        let _ = ctx("acme", "pkg/provider/azure_app_gateway.go", "ApplicationGateway");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_app_gateway.go",
+            "ApplicationGateway",
+        );
         let mut g = appgw("rg");
         g.backend_pools.clear();
         g.rules.clear();
-        assert!(matches!(g.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            g.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn app_gateway_must_have_frontend_public_ip() {
-        let _ = ctx("acme", "pkg/provider/azure_app_gateway.go", "ApplicationGateway");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_app_gateway.go",
+            "ApplicationGateway",
+        );
         let mut g = appgw("rg");
         g.frontend_public_ip_id.clear();
-        assert!(matches!(g.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            g.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     // ─── NSG reconcile ───────────────────────────────────────────────────────
 
     #[test]
     fn nsg_diff_returns_empty_for_identical_sets() {
-        let _ = ctx("acme", "pkg/provider/azure_securitygroup_repo.go", "reconcileSecurityGroup");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_securitygroup_repo.go",
+            "reconcileSecurityGroup",
+        );
         let r = vec![nsg("a", 200), nsg("b", 300)];
         let d = diff_nsg_rules(&r, &r);
         assert!(d.is_empty());
@@ -584,7 +643,11 @@ mod tests {
 
     #[test]
     fn nsg_diff_emits_adds_for_new_rules() {
-        let _ = ctx("acme", "pkg/provider/azure_securitygroup_repo.go", "reconcileSecurityGroup");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_securitygroup_repo.go",
+            "reconcileSecurityGroup",
+        );
         let cur = vec![nsg("a", 200)];
         let want = vec![nsg("a", 200), nsg("b", 300)];
         let d = diff_nsg_rules(&cur, &want);
@@ -594,7 +657,11 @@ mod tests {
 
     #[test]
     fn nsg_diff_emits_removes_for_stale_rules() {
-        let _ = ctx("acme", "pkg/provider/azure_securitygroup_repo.go", "reconcileSecurityGroup");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_securitygroup_repo.go",
+            "reconcileSecurityGroup",
+        );
         let cur = vec![nsg("a", 200), nsg("b", 300)];
         let want = vec![nsg("a", 200)];
         let d = diff_nsg_rules(&cur, &want);
@@ -603,7 +670,11 @@ mod tests {
 
     #[test]
     fn nsg_diff_emits_updates_for_priority_change() {
-        let _ = ctx("acme", "pkg/provider/azure_securitygroup_repo.go", "reconcileSecurityGroup");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_securitygroup_repo.go",
+            "reconcileSecurityGroup",
+        );
         let cur = vec![nsg("a", 200)];
         let mut want = vec![nsg("a", 200)];
         want[0].priority = 250;
@@ -614,7 +685,11 @@ mod tests {
 
     #[test]
     fn nsg_diff_write_count_sums_all_three_categories() {
-        let _ = ctx("acme", "pkg/provider/azure_securitygroup_repo.go", "reconcileSecurityGroup");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_securitygroup_repo.go",
+            "reconcileSecurityGroup",
+        );
         let cur = vec![nsg("a", 200), nsg("b", 300)];
         let mut want = vec![nsg("a", 250), nsg("c", 400)];
         let mut x = nsg("a", 250);
@@ -628,7 +703,11 @@ mod tests {
 
     #[test]
     fn standard_public_ip_default_validates() {
-        let _ = ctx("acme", "pkg/provider/azure_publicipaddressclient.go", "PublicIPAddress");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_publicipaddressclient.go",
+            "PublicIPAddress",
+        );
         let p = StandardPublicIpProps::default_for_zonal_region();
         assert!(p.validate().is_ok());
         assert!(p.zone_redundant);
@@ -637,25 +716,46 @@ mod tests {
 
     #[test]
     fn public_ip_idle_timeout_outside_4_to_30_is_rejected() {
-        let _ = ctx("acme", "pkg/provider/azure_publicipaddressclient.go", "PublicIPAddress");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_publicipaddressclient.go",
+            "PublicIPAddress",
+        );
         let mut p = StandardPublicIpProps::default_for_zonal_region();
         p.idle_timeout_minutes = 1;
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         p.idle_timeout_minutes = 60;
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn zone_redundant_public_ip_requires_zones() {
-        let _ = ctx("acme", "pkg/provider/azure_publicipaddressclient.go", "PublicIPAddress");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_publicipaddressclient.go",
+            "PublicIPAddress",
+        );
         let mut p = StandardPublicIpProps::default_for_zonal_region();
         p.zones.clear();
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn lb_sku_helper_recognises_standard() {
-        let _ = ctx("acme", "pkg/provider/azure_loadbalancer.go", "LoadBalancerSku");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_loadbalancer.go",
+            "LoadBalancerSku",
+        );
         assert!(lb_sku_is_standard(LbSku::Standard));
         assert!(!lb_sku_is_standard(LbSku::Basic));
     }
@@ -684,7 +784,10 @@ mod tests {
     fn managed_disk_ultra_ssd_requires_a_zone() {
         let _ = ctx("acme", "pkg/provider/azure_managed_disk.go", "Disk");
         let mut d = ManagedDisk::new("d", "rg", 256, DiskSku::UltraSsdLrs);
-        assert!(matches!(d.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            d.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         d.zone = Some(AvailabilityZone::Zone1);
         assert!(d.validate().is_ok());
     }
@@ -693,9 +796,15 @@ mod tests {
     fn managed_disk_size_outside_range_is_rejected() {
         let _ = ctx("acme", "pkg/provider/azure_managed_disk.go", "Disk");
         let mut d = ManagedDisk::new("d", "rg", 0, DiskSku::PremiumLrs);
-        assert!(matches!(d.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            d.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         d.size_gb = 200_000;
-        assert!(matches!(d.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            d.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -729,7 +838,11 @@ mod tests {
 
     #[test]
     fn workload_identity_for_service_account_builds_subject() {
-        let _ = ctx("acme", "pkg/provider/azure_workload_identity.go", "FederatedIdentityCredential");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_workload_identity.go",
+            "FederatedIdentityCredential",
+        );
         let f = WorkloadIdentityFederation::for_service_account(
             "fed-aks",
             "/subscriptions/.../uami",
@@ -737,14 +850,21 @@ mod tests {
             "ccm",
             "https://oidc.eastus.azurewebsites.net/abc",
         );
-        assert_eq!(f.service_account_subject, "system:serviceaccount:kube-system:ccm");
+        assert_eq!(
+            f.service_account_subject,
+            "system:serviceaccount:kube-system:ccm"
+        );
         assert_eq!(f.audience, "api://AzureADTokenExchange");
         assert!(f.validate().is_ok());
     }
 
     #[test]
     fn workload_identity_subject_must_start_with_correct_prefix() {
-        let _ = ctx("acme", "pkg/provider/azure_workload_identity.go", "FederatedIdentityCredential");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_workload_identity.go",
+            "FederatedIdentityCredential",
+        );
         let mut f = WorkloadIdentityFederation::for_service_account(
             "fed-aks",
             "uami",
@@ -753,12 +873,19 @@ mod tests {
             "https://oidc.example/x",
         );
         f.service_account_subject = "user:alice".into();
-        assert!(matches!(f.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            f.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn workload_identity_issuer_must_be_https() {
-        let _ = ctx("acme", "pkg/provider/azure_workload_identity.go", "FederatedIdentityCredential");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_workload_identity.go",
+            "FederatedIdentityCredential",
+        );
         let mut f = WorkloadIdentityFederation::for_service_account(
             "fed-aks",
             "uami",
@@ -766,14 +893,21 @@ mod tests {
             "sa",
             "http://oidc.example/x",
         );
-        assert!(matches!(f.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            f.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         f.issuer_url = "https://oidc.example/x".into();
         assert!(f.validate().is_ok());
     }
 
     #[test]
     fn workload_identity_audience_must_be_non_empty() {
-        let _ = ctx("acme", "pkg/provider/azure_workload_identity.go", "FederatedIdentityCredential");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_workload_identity.go",
+            "FederatedIdentityCredential",
+        );
         let mut f = WorkloadIdentityFederation::for_service_account(
             "fed-aks",
             "uami",
@@ -782,12 +916,19 @@ mod tests {
             "https://oidc.example/x",
         );
         f.audience.clear();
-        assert!(matches!(f.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            f.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn workload_identity_subject_namespace_must_be_non_empty() {
-        let _ = ctx("acme", "pkg/provider/azure_workload_identity.go", "FederatedIdentityCredential");
+        let _ = ctx(
+            "acme",
+            "pkg/provider/azure_workload_identity.go",
+            "FederatedIdentityCredential",
+        );
         let mut f = WorkloadIdentityFederation::for_service_account(
             "fed-aks",
             "uami",
@@ -796,6 +937,9 @@ mod tests {
             "https://oidc.example/x",
         );
         f.service_account_subject = "system:serviceaccount::sa".into();
-        assert!(matches!(f.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            f.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 }

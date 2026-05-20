@@ -39,7 +39,13 @@ impl GatewayPlugin for RequestSizeLimitingPlugin {
             if let Ok(n) = cl.parse::<usize>() {
                 if n > max_bytes {
                     return PluginResult::Halt(
-                        (StatusCode::PAYLOAD_TOO_LARGE, axum::Json(serde_json::json!({"message": "Request size limit exceeded"}))).into_response(),
+                        (
+                            StatusCode::PAYLOAD_TOO_LARGE,
+                            axum::Json(
+                                serde_json::json!({"message": "Request size limit exceeded"}),
+                            ),
+                        )
+                            .into_response(),
                     );
                 }
             }

@@ -681,10 +681,20 @@ pub struct PipelineRun {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum TriggerSource {
-    Manual { user: String },
-    GitPush { repo: String, branch: String, commit_sha: String },
-    Webhook { endpoint: String },
-    Cron { schedule: String },
+    Manual {
+        user: String,
+    },
+    GitPush {
+        repo: String,
+        branch: String,
+        commit_sha: String,
+    },
+    Webhook {
+        endpoint: String,
+    },
+    Cron {
+        schedule: String,
+    },
 }
 
 // ─── Build status ────────────────────────────────────────────────────────────
@@ -783,8 +793,14 @@ mod tests {
     fn matrix_expand_cartesian_product() {
         let m = Matrix {
             params: vec![
-                MatrixParam { name: "os".to_string(), value: vec!["linux".to_string(), "windows".to_string()] },
-                MatrixParam { name: "arch".to_string(), value: vec!["amd64".to_string(), "arm64".to_string()] },
+                MatrixParam {
+                    name: "os".to_string(),
+                    value: vec!["linux".to_string(), "windows".to_string()],
+                },
+                MatrixParam {
+                    name: "arch".to_string(),
+                    value: vec!["amd64".to_string(), "arm64".to_string()],
+                },
             ],
             include: vec![],
         };
@@ -796,7 +812,10 @@ mod tests {
 
     #[test]
     fn matrix_expand_empty() {
-        let m = Matrix { params: vec![], include: vec![] };
+        let m = Matrix {
+            params: vec![],
+            include: vec![],
+        };
         assert!(m.expand().is_empty());
     }
 

@@ -48,8 +48,11 @@ fn par_form_round_trip_preserves_state() {
 #[test]
 fn par_record_expiry_field_is_future() {
     let rec = super::super::ParRecord {
-        request_uri: "u".into(), client_id: "c".into(), realm: "r".into(),
-        stored_request: "".into(), exp_unix: Utc::now().timestamp() + 60,
+        request_uri: "u".into(),
+        client_id: "c".into(),
+        realm: "r".into(),
+        stored_request: "".into(),
+        exp_unix: Utc::now().timestamp() + 60,
     };
     assert!(rec.exp_unix > Utc::now().timestamp());
 }
@@ -67,11 +70,20 @@ async fn revocation_list_membership_works() {
 #[tokio::test]
 async fn device_store_user_code_roundtrip() {
     let store = super::super::DeviceCodeStore::new();
-    store.put(super::super::DeviceAuthorization {
-        device_code: "dc".into(), user_code: "UC-1".into(), realm: "r".into(), client_id: "c".into(),
-        scope: "openid".into(), exp_unix: Utc::now().timestamp() + 60, interval: 5,
-        status: super::super::DeviceStatus::Pending, approved_user_sub: None, last_poll_unix: 0,
-    }).await;
+    store
+        .put(super::super::DeviceAuthorization {
+            device_code: "dc".into(),
+            user_code: "UC-1".into(),
+            realm: "r".into(),
+            client_id: "c".into(),
+            scope: "openid".into(),
+            exp_unix: Utc::now().timestamp() + 60,
+            interval: 5,
+            status: super::super::DeviceStatus::Pending,
+            approved_user_sub: None,
+            last_poll_unix: 0,
+        })
+        .await;
     assert!(store.get_by_user("UC-1").await.is_some());
     assert!(store.get_by_device("dc").await.is_some());
 }
@@ -81,10 +93,15 @@ async fn device_store_user_code_roundtrip() {
 async fn ciba_store_returns_record_by_id() {
     let store = super::super::CibaStore::new();
     let r = super::super::CibaRequest {
-        auth_req_id: "rid".into(), realm: "r".into(), client_id: "c".into(),
-        user_sub: "s".into(), scope: "openid".into(),
-        exp_unix: Utc::now().timestamp() + 60, interval: 5,
-        status: super::super::CibaStatus::Pending, last_poll_unix: 0,
+        auth_req_id: "rid".into(),
+        realm: "r".into(),
+        client_id: "c".into(),
+        user_sub: "s".into(),
+        scope: "openid".into(),
+        exp_unix: Utc::now().timestamp() + 60,
+        interval: 5,
+        status: super::super::CibaStatus::Pending,
+        last_poll_unix: 0,
     };
     store.put(r).await;
     assert!(store.get("rid").await.is_some());

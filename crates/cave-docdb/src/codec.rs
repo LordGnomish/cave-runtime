@@ -61,7 +61,10 @@ impl FrameCodec<RawWireFrame> for OpMsgCodec {
         // exposes `encode` for trait completeness and to centralize the
         // size check before bytes hit the socket.
         if frame.bytes.len() > self.max_frame_size {
-            return Err(FrameError::Limit { actual: frame.bytes.len(), max: self.max_frame_size });
+            return Err(FrameError::Limit {
+                actual: frame.bytes.len(),
+                max: self.max_frame_size,
+            });
         }
         if frame.bytes.len() < 16 {
             return Err(FrameError::invalid(format!(
@@ -114,7 +117,10 @@ mod tests {
         let frame = codec.decode(&mut buf).unwrap().unwrap();
         // First 4 bytes of the frame is total length.
         let length = u32::from_le_bytes([
-            frame.bytes[0], frame.bytes[1], frame.bytes[2], frame.bytes[3],
+            frame.bytes[0],
+            frame.bytes[1],
+            frame.bytes[2],
+            frame.bytes[3],
         ]);
         assert_eq!(length as usize, frame.bytes.len());
         assert!(buf.is_empty());
@@ -189,7 +195,9 @@ mod tests {
         let mut codec = OpMsgCodec::new();
         let mut buf = BytesMut::new();
         let synth = synth_op_msg(b"payload", 9);
-        let frame = RawWireFrame { bytes: synth.freeze() };
+        let frame = RawWireFrame {
+            bytes: synth.freeze(),
+        };
         codec.encode(frame, &mut buf).unwrap();
         assert_eq!(buf.len(), 16 + b"payload".len());
     }

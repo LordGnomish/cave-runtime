@@ -16,7 +16,7 @@
 //! * **CIDR overlap** detection — used to refuse misconfigured cluster
 //!   CIDRs that would collide with existing routes.
 
-use crate::route_controller::{cidr_family, CidrFamily};
+use crate::route_controller::{CidrFamily, cidr_family};
 use crate::types::{CloudError, ProviderName};
 use serde::{Deserialize, Serialize};
 
@@ -29,7 +29,11 @@ pub const DEFAULT_NODE_CIDR_MASK_V6: u8 = 64;
 
 /// Reject mask sizes upstream's nodeipam controller does. v4 mask must be
 /// in `(parent, 30]`; v6 mask must be in `(parent, 64]`.
-pub fn validate_mask_size(family: CidrFamily, parent_mask: u8, node_mask: u8) -> Result<(), CloudError> {
+pub fn validate_mask_size(
+    family: CidrFamily,
+    parent_mask: u8,
+    node_mask: u8,
+) -> Result<(), CloudError> {
     let max_node = match family {
         CidrFamily::V4 => 30u8,
         CidrFamily::V6 => 64u8,
@@ -47,9 +51,7 @@ pub fn validate_mask_size(family: CidrFamily, parent_mask: u8, node_mask: u8) ->
     if node_mask <= parent_mask {
         return Err(CloudError::InvalidConfig {
             provider: ProviderName::Hetzner,
-            reason: format!(
-                "node mask {node_mask} must be greater than parent mask {parent_mask}"
-            ),
+            reason: format!("node mask {node_mask} must be greater than parent mask {parent_mask}"),
         });
     }
     if node_mask > max_node {
@@ -106,7 +108,11 @@ pub fn cidrs_overlap(a: &str, b: &str) -> bool {
     match (parse_v4_cidr(a), parse_v4_cidr(b)) {
         (Some((aa, am)), Some((ba, bm))) => {
             let common = am.min(bm);
-            let mask: u32 = if common == 0 { 0 } else { (!0u32) << (32 - common) };
+            let mask: u32 = if common == 0 {
+                0
+            } else {
+                (!0u32) << (32 - common)
+            };
             (aa & mask) == (ba & mask)
         }
         // V6 / mixed-family / malformed: report as non-overlapping —
@@ -232,11 +238,18 @@ impl CidrAllocator {
         if mask != self.node_mask {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Hetzner,
-                reason: format!("CIDR mask /{mask} does not match allocator /{}", self.node_mask),
+                reason: format!(
+                    "CIDR mask /{mask} does not match allocator /{}",
+                    self.node_mask
+                ),
             });
         }
         let parent_bits = self.parent_mask as u32;
-        let parent_mask: u32 = if parent_bits == 0 { 0 } else { !0u32 << (32 - parent_bits) };
+        let parent_mask: u32 = if parent_bits == 0 {
+            0
+        } else {
+            !0u32 << (32 - parent_bits)
+        };
         if (addr & parent_mask) != (self.parent_addr & parent_mask) {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Hetzner,
@@ -270,7 +283,12 @@ pub struct BackoffSchedule {
 
 impl BackoffSchedule {
     pub const fn default_route() -> Self {
-        Self { initial_ms: 250, multiplier: 2, max_ms: 30_000, max_retries: 8 }
+        Self {
+            initial_ms: 250,
+            multiplier: 2,
+            max_ms: 30_000,
+            max_retries: 8,
+        }
     }
 
     pub fn validate(&self) -> Result<(), CloudError> {
@@ -332,48 +350,76 @@ mod tests {
 
     #[test]
     fn default_node_cidr_masks_match_upstream_flags() {
-        ctx("acme", "cmd/kube-controller-manager/app/options/options.go", "NodeCIDRMaskSize");
+        ctx(
+            "acme",
+            "cmd/kube-controller-manager/app/options/options.go",
+            "NodeCIDRMaskSize",
+        );
         assert_eq!(DEFAULT_NODE_CIDR_MASK_V4, 24);
         assert_eq!(DEFAULT_NODE_CIDR_MASK_V6, 64);
     }
 
     #[test]
     fn validate_mask_size_accepts_v4_default() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "validateMaskSize");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "validateMaskSize",
+        );
         assert!(validate_mask_size(CidrFamily::V4, 16, 24).is_ok());
         assert!(validate_mask_size(CidrFamily::V4, 8, 30).is_ok());
     }
 
     #[test]
     fn validate_mask_size_rejects_node_mask_smaller_than_parent() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "validateMaskSize");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "validateMaskSize",
+        );
         let err = validate_mask_size(CidrFamily::V4, 24, 16).unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
     }
 
     #[test]
     fn validate_mask_size_rejects_v4_node_mask_above_30() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "validateMaskSize");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "validateMaskSize",
+        );
         let err = validate_mask_size(CidrFamily::V4, 16, 31).unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
     }
 
     #[test]
     fn validate_mask_size_v6_default_validates() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "validateMaskSize");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "validateMaskSize",
+        );
         assert!(validate_mask_size(CidrFamily::V6, 48, 64).is_ok());
     }
 
     #[test]
     fn validate_mask_size_rejects_v6_node_mask_above_64() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "validateMaskSize");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "validateMaskSize",
+        );
         let err = validate_mask_size(CidrFamily::V6, 48, 96).unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
     }
 
     #[test]
     fn validate_mask_size_rejects_full_parent_mask() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "validateMaskSize");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "validateMaskSize",
+        );
         assert!(validate_mask_size(CidrFamily::V4, 32, 24).is_err());
     }
 
@@ -381,26 +427,42 @@ mod tests {
 
     #[test]
     fn cidrs_overlap_detects_identical_cidrs() {
-        ctx("acme", "staging/src/k8s.io/utils/net/ipnet.go", "IsCIDROverlap");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/utils/net/ipnet.go",
+            "IsCIDROverlap",
+        );
         assert!(cidrs_overlap("10.0.0.0/16", "10.0.0.0/16"));
     }
 
     #[test]
     fn cidrs_overlap_detects_supernet_subnet() {
-        ctx("acme", "staging/src/k8s.io/utils/net/ipnet.go", "IsCIDROverlap");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/utils/net/ipnet.go",
+            "IsCIDROverlap",
+        );
         assert!(cidrs_overlap("10.0.0.0/8", "10.1.0.0/16"));
         assert!(cidrs_overlap("10.1.0.0/16", "10.0.0.0/8"));
     }
 
     #[test]
     fn cidrs_overlap_returns_false_for_disjoint() {
-        ctx("acme", "staging/src/k8s.io/utils/net/ipnet.go", "IsCIDROverlap");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/utils/net/ipnet.go",
+            "IsCIDROverlap",
+        );
         assert!(!cidrs_overlap("10.0.0.0/16", "192.168.0.0/16"));
     }
 
     #[test]
     fn cidrs_overlap_handles_zero_mask() {
-        ctx("acme", "staging/src/k8s.io/utils/net/ipnet.go", "IsCIDROverlap");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/utils/net/ipnet.go",
+            "IsCIDROverlap",
+        );
         assert!(cidrs_overlap("0.0.0.0/0", "10.0.0.0/24"));
     }
 
@@ -408,14 +470,22 @@ mod tests {
 
     #[test]
     fn allocator_construction_validates_parent_cidr() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "NewCIDRRangeAllocator");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "NewCIDRRangeAllocator",
+        );
         assert!(CidrAllocator::new("garbage", 24).is_err());
         assert!(CidrAllocator::new("10.0.0.0/16", 24).is_ok());
     }
 
     #[test]
     fn allocator_capacity_matches_2_to_the_diff() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "NewCIDRRangeAllocator");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "NewCIDRRangeAllocator",
+        );
         let a = CidrAllocator::new("10.0.0.0/16", 24).unwrap();
         assert_eq!(a.capacity(), 256);
         assert_eq!(a.used(), 0);
@@ -424,7 +494,11 @@ mod tests {
 
     #[test]
     fn allocator_emits_distinct_consecutive_cidrs() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "AllocateNext");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "AllocateNext",
+        );
         let mut a = CidrAllocator::new("10.0.0.0/16", 24).unwrap();
         assert_eq!(a.allocate().unwrap(), "10.0.0.0/24");
         assert_eq!(a.allocate().unwrap(), "10.0.1.0/24");
@@ -434,7 +508,11 @@ mod tests {
 
     #[test]
     fn allocator_release_returns_cidr_to_pool() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "Release");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "Release",
+        );
         let mut a = CidrAllocator::new("10.0.0.0/16", 24).unwrap();
         a.allocate().unwrap();
         a.allocate().unwrap();
@@ -444,7 +522,11 @@ mod tests {
 
     #[test]
     fn allocator_reserve_records_pre_existing_cidr() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "Occupy");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "Occupy",
+        );
         let mut a = CidrAllocator::new("10.0.0.0/16", 24).unwrap();
         a.reserve("10.0.5.0/24").unwrap();
         assert_eq!(a.used(), 1);
@@ -452,7 +534,11 @@ mod tests {
 
     #[test]
     fn allocator_reserve_rejects_double_allocation() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "Occupy");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "Occupy",
+        );
         let mut a = CidrAllocator::new("10.0.0.0/16", 24).unwrap();
         a.reserve("10.0.5.0/24").unwrap();
         let err = a.reserve("10.0.5.0/24").unwrap_err();
@@ -461,7 +547,11 @@ mod tests {
 
     #[test]
     fn allocator_reserve_rejects_wrong_mask() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "Occupy");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "Occupy",
+        );
         let mut a = CidrAllocator::new("10.0.0.0/16", 24).unwrap();
         let err = a.reserve("10.0.5.0/25").unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
@@ -469,7 +559,11 @@ mod tests {
 
     #[test]
     fn allocator_reserve_rejects_outside_parent() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "Occupy");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "Occupy",
+        );
         let mut a = CidrAllocator::new("10.0.0.0/16", 24).unwrap();
         let err = a.reserve("192.168.0.0/24").unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
@@ -477,7 +571,11 @@ mod tests {
 
     #[test]
     fn allocator_exhaustion_returns_upstream_error() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "AllocateNext");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "AllocateNext",
+        );
         let mut a = CidrAllocator::new("10.0.0.0/28", 30).unwrap();
         // /28 → /30 = 4 entries
         for _ in 0..4 {
@@ -489,7 +587,11 @@ mod tests {
 
     #[test]
     fn allocator_skips_already_reserved_indices() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "AllocateNext");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "AllocateNext",
+        );
         let mut a = CidrAllocator::new("10.0.0.0/16", 24).unwrap();
         a.reserve("10.0.0.0/24").unwrap();
         // Next free index is 1 (10.0.1.0/24).
@@ -498,7 +600,11 @@ mod tests {
 
     #[test]
     fn allocator_v6_construction_is_unimplemented_for_now() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "NewCIDRRangeAllocator");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "NewCIDRRangeAllocator",
+        );
         let err = CidrAllocator::new("2001:db8::/48", 64).unwrap_err();
         assert!(matches!(err, CloudError::Unimplemented(_)));
     }
@@ -507,13 +613,21 @@ mod tests {
 
     #[test]
     fn default_backoff_schedule_validates() {
-        ctx("acme", "staging/src/k8s.io/client-go/util/retry/util.go", "DefaultBackoff");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/client-go/util/retry/util.go",
+            "DefaultBackoff",
+        );
         assert!(BackoffSchedule::default_route().validate().is_ok());
     }
 
     #[test]
     fn backoff_delay_grows_exponentially_then_caps() {
-        ctx("acme", "staging/src/k8s.io/apimachinery/pkg/util/wait/backoff.go", "Step");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/apimachinery/pkg/util/wait/backoff.go",
+            "Step",
+        );
         let s = BackoffSchedule::default_route();
         assert_eq!(s.delay_ms(0), 250);
         assert_eq!(s.delay_ms(1), 500);
@@ -524,7 +638,11 @@ mod tests {
 
     #[test]
     fn backoff_should_retry_respects_max_retries() {
-        ctx("acme", "staging/src/k8s.io/apimachinery/pkg/util/wait/backoff.go", "Step");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/apimachinery/pkg/util/wait/backoff.go",
+            "Step",
+        );
         let s = BackoffSchedule::default_route();
         assert!(s.should_retry(0));
         assert!(s.should_retry(7));
@@ -534,33 +652,61 @@ mod tests {
 
     #[test]
     fn backoff_validate_rejects_zero_initial() {
-        ctx("acme", "staging/src/k8s.io/apimachinery/pkg/util/wait/backoff.go", "Step");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/apimachinery/pkg/util/wait/backoff.go",
+            "Step",
+        );
         let mut s = BackoffSchedule::default_route();
         s.initial_ms = 0;
-        assert!(matches!(s.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            s.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn backoff_validate_rejects_multiplier_below_2() {
-        ctx("acme", "staging/src/k8s.io/apimachinery/pkg/util/wait/backoff.go", "Step");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/apimachinery/pkg/util/wait/backoff.go",
+            "Step",
+        );
         let mut s = BackoffSchedule::default_route();
         s.multiplier = 1;
-        assert!(matches!(s.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            s.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn backoff_validate_rejects_max_below_initial() {
-        ctx("acme", "staging/src/k8s.io/apimachinery/pkg/util/wait/backoff.go", "Step");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/apimachinery/pkg/util/wait/backoff.go",
+            "Step",
+        );
         let mut s = BackoffSchedule::default_route();
         s.max_ms = s.initial_ms - 1;
-        assert!(matches!(s.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            s.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn backoff_validate_rejects_zero_max_retries() {
-        ctx("acme", "staging/src/k8s.io/apimachinery/pkg/util/wait/backoff.go", "Step");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/apimachinery/pkg/util/wait/backoff.go",
+            "Step",
+        );
         let mut s = BackoffSchedule::default_route();
         s.max_retries = 0;
-        assert!(matches!(s.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            s.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 }

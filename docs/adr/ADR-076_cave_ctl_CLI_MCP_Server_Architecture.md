@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Hetzner, Runtime
+**Scope:** Sovereign, Runtime
 
 **Category:** Platform
 

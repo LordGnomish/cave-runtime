@@ -66,7 +66,8 @@ pub struct ArpAnnouncer {
 impl ArpAnnouncer {
     pub fn new(tenant: TenantId, local_mac: [u8; 6], min_interval_seconds: u64) -> Self {
         Self {
-            tenant, local_mac,
+            tenant,
+            local_mac,
             min_interval_ns: min_interval_seconds * 1_000_000_000,
             interfaces: BTreeMap::new(),
             state: BTreeMap::new(),
@@ -80,7 +81,9 @@ impl ArpAnnouncer {
 
     pub fn register_vip(&mut self, vip: IpAddr) {
         self.state.entry(vip).or_insert(VipAnnounceState {
-            vip, last_announce_ns: 0, announce_count: 0,
+            vip,
+            last_announce_ns: 0,
+            announce_count: 0,
         });
     }
 
@@ -93,11 +96,19 @@ impl ArpAnnouncer {
     }
 
     /// Send an announce frame for `vip` on `interface`. Rate-limited per VIP.
-    pub fn announce(&mut self, vip: IpAddr, interface: &str, now_ns: u64) -> Result<AnnounceFrame, AnnounceError> {
+    pub fn announce(
+        &mut self,
+        vip: IpAddr,
+        interface: &str,
+        now_ns: u64,
+    ) -> Result<AnnounceFrame, AnnounceError> {
         if !self.interfaces.contains_key(interface) {
             return Err(AnnounceError::InterfaceNotConfigured(interface.to_string()));
         }
-        let state = self.state.get_mut(&vip).ok_or(AnnounceError::NotRegistered(vip))?;
+        let state = self
+            .state
+            .get_mut(&vip)
+            .ok_or(AnnounceError::NotRegistered(vip))?;
         if state.announce_count > 0
             && now_ns.saturating_sub(state.last_announce_ns) < self.min_interval_ns
         {
@@ -107,7 +118,11 @@ impl ArpAnnouncer {
             vip,
             source_mac: self.local_mac,
             interface: interface.to_string(),
-            proto: if vip.is_ipv4() { AnnounceProto::GratuitousArp } else { AnnounceProto::UnsolicitedNa },
+            proto: if vip.is_ipv4() {
+                AnnounceProto::GratuitousArp
+            } else {
+                AnnounceProto::UnsolicitedNa
+            },
             timestamp_ns: now_ns,
         };
         state.last_announce_ns = now_ns;
@@ -119,7 +134,13 @@ impl ArpAnnouncer {
     /// Send a burst of `count` announces (used after a lease takeover);
     /// rate-limit only applies to the first frame, subsequent frames in
     /// the burst share the same timestamp window.
-    pub fn announce_burst(&mut self, vip: IpAddr, interface: &str, count: u32, now_ns: u64) -> Result<u32, AnnounceError> {
+    pub fn announce_burst(
+        &mut self,
+        vip: IpAddr,
+        interface: &str,
+        count: u32,
+        now_ns: u64,
+    ) -> Result<u32, AnnounceError> {
         if !self.interfaces.contains_key(interface) {
             return Err(AnnounceError::InterfaceNotConfigured(interface.to_string()));
         }
@@ -128,13 +149,22 @@ impl ArpAnnouncer {
         }
         // First frame respects rate limit.
         self.announce(vip, interface, now_ns)?;
-        let proto = if vip.is_ipv4() { AnnounceProto::GratuitousArp } else { AnnounceProto::UnsolicitedNa };
-        let state = self.state.get_mut(&vip).ok_or(AnnounceError::NotRegistered(vip))?;
+        let proto = if vip.is_ipv4() {
+            AnnounceProto::GratuitousArp
+        } else {
+            AnnounceProto::UnsolicitedNa
+        };
+        let state = self
+            .state
+            .get_mut(&vip)
+            .ok_or(AnnounceError::NotRegistered(vip))?;
         for _ in 1..count {
             let frame = AnnounceFrame {
-                vip, source_mac: self.local_mac,
+                vip,
+                source_mac: self.local_mac,
                 interface: interface.to_string(),
-                proto, timestamp_ns: now_ns,
+                proto,
+                timestamp_ns: now_ns,
             };
             state.announce_count += 1;
             self.sent.push(frame);
@@ -176,7 +206,11 @@ mod tests {
 
     #[test]
     fn announce_on_unconfigured_interface_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Announce.UnconfiguredIface", "tenant-arp-uif");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "Announce.UnconfiguredIface",
+            "tenant-arp-uif"
+        );
         let mut a = announcer(tenant);
         a.register_vip(ip(203, 0, 113, 5));
         let err = a.announce(ip(203, 0, 113, 5), "eth0", 0).unwrap_err();
@@ -185,7 +219,11 @@ mod tests {
 
     #[test]
     fn announce_on_enabled_interface_succeeds() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Announce.OnEnabled", "tenant-arp-en");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "Announce.OnEnabled",
+            "tenant-arp-en"
+        );
         let mut a = announcer(tenant);
         a.enable_interface("eth0");
         a.register_vip(ip(203, 0, 113, 5));
@@ -197,7 +235,11 @@ mod tests {
 
     #[test]
     fn announce_unregistered_vip_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Announce.NotRegistered", "tenant-arp-nr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "Announce.NotRegistered",
+            "tenant-arp-nr"
+        );
         let mut a = announcer(tenant);
         a.enable_interface("eth0");
         let err = a.announce(ip(203, 0, 113, 5), "eth0", 0).unwrap_err();
@@ -206,7 +248,11 @@ mod tests {
 
     #[test]
     fn deregister_drops_vip() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Deregister", "tenant-arp-dr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "Deregister",
+            "tenant-arp-dr"
+        );
         let mut a = announcer(tenant);
         a.register_vip(ip(203, 0, 113, 5));
         assert!(a.deregister_vip(ip(203, 0, 113, 5)));
@@ -215,7 +261,8 @@ mod tests {
 
     #[test]
     fn registered_count_tracks_register() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Count", "tenant-arp-c");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Count", "tenant-arp-c");
         let mut a = announcer(tenant);
         for i in 1..=3u8 {
             a.register_vip(ip(203, 0, 113, i));
@@ -227,23 +274,34 @@ mod tests {
 
     #[test]
     fn second_announce_within_interval_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Announce.RateLimit", "tenant-arp-rl");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "Announce.RateLimit",
+            "tenant-arp-rl"
+        );
         let mut a = announcer(tenant);
         a.enable_interface("eth0");
         a.register_vip(ip(203, 0, 113, 5));
         a.announce(ip(203, 0, 113, 5), "eth0", 0).unwrap();
-        let err = a.announce(ip(203, 0, 113, 5), "eth0", 500_000_000).unwrap_err();
+        let err = a
+            .announce(ip(203, 0, 113, 5), "eth0", 500_000_000)
+            .unwrap_err();
         assert!(matches!(err, AnnounceError::RateLimited(_, _)));
     }
 
     #[test]
     fn announce_after_interval_succeeds() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Announce.AfterInterval", "tenant-arp-ai");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "Announce.AfterInterval",
+            "tenant-arp-ai"
+        );
         let mut a = announcer(tenant);
         a.enable_interface("eth0");
         a.register_vip(ip(203, 0, 113, 5));
         a.announce(ip(203, 0, 113, 5), "eth0", 0).unwrap();
-        a.announce(ip(203, 0, 113, 5), "eth0", 1_500_000_000).unwrap();
+        a.announce(ip(203, 0, 113, 5), "eth0", 1_500_000_000)
+            .unwrap();
         assert_eq!(a.state_for(ip(203, 0, 113, 5)).unwrap().announce_count, 2);
     }
 
@@ -251,7 +309,11 @@ mod tests {
 
     #[test]
     fn announce_v4_uses_gratuitous_arp() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Announce.V4Proto", "tenant-arp-v4");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "Announce.V4Proto",
+            "tenant-arp-v4"
+        );
         let mut a = announcer(tenant);
         a.enable_interface("eth0");
         a.register_vip(ip(203, 0, 113, 5));
@@ -261,7 +323,11 @@ mod tests {
 
     #[test]
     fn announce_v6_uses_unsolicited_na() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Announce.V6Proto", "tenant-arp-v6");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "Announce.V6Proto",
+            "tenant-arp-v6"
+        );
         let mut a = announcer(tenant);
         a.enable_interface("eth0");
         let v6: IpAddr = "2001:db8::5".parse().unwrap();
@@ -274,7 +340,11 @@ mod tests {
 
     #[test]
     fn announce_uses_local_node_mac() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Announce.SourceMac", "tenant-arp-sm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "Announce.SourceMac",
+            "tenant-arp-sm"
+        );
         let mut a = announcer(tenant);
         a.enable_interface("eth0");
         a.register_vip(ip(203, 0, 113, 5));
@@ -286,7 +356,11 @@ mod tests {
 
     #[test]
     fn announce_burst_emits_n_frames() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Announce.Burst", "tenant-arp-b");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "Announce.Burst",
+            "tenant-arp-b"
+        );
         let mut a = announcer(tenant);
         a.enable_interface("eth0");
         a.register_vip(ip(203, 0, 113, 5));
@@ -297,18 +371,28 @@ mod tests {
 
     #[test]
     fn announce_burst_respects_first_frame_rate_limit() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Burst.RateLimit", "tenant-arp-brl");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "Burst.RateLimit",
+            "tenant-arp-brl"
+        );
         let mut a = announcer(tenant);
         a.enable_interface("eth0");
         a.register_vip(ip(203, 0, 113, 5));
         a.announce(ip(203, 0, 113, 5), "eth0", 0).unwrap();
-        let err = a.announce_burst(ip(203, 0, 113, 5), "eth0", 5, 100_000_000).unwrap_err();
+        let err = a
+            .announce_burst(ip(203, 0, 113, 5), "eth0", 5, 100_000_000)
+            .unwrap_err();
         assert!(matches!(err, AnnounceError::RateLimited(_, _)));
     }
 
     #[test]
     fn announce_burst_zero_returns_zero() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Burst.Zero", "tenant-arp-bz");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "Burst.Zero",
+            "tenant-arp-bz"
+        );
         let mut a = announcer(tenant);
         a.enable_interface("eth0");
         a.register_vip(ip(203, 0, 113, 5));
@@ -320,7 +404,8 @@ mod tests {
 
     #[test]
     fn drain_sent_returns_recorded_frames() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Drain", "tenant-arp-d");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Drain", "tenant-arp-d");
         let mut a = announcer(tenant);
         a.enable_interface("eth0");
         a.register_vip(ip(203, 0, 113, 5));
@@ -334,18 +419,27 @@ mod tests {
 
     #[test]
     fn announce_increments_per_vip_counter() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "State.Counter", "tenant-arp-cnt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "State.Counter",
+            "tenant-arp-cnt"
+        );
         let mut a = announcer(tenant);
         a.enable_interface("eth0");
         a.register_vip(ip(203, 0, 113, 5));
         a.announce(ip(203, 0, 113, 5), "eth0", 0).unwrap();
-        a.announce(ip(203, 0, 113, 5), "eth0", 2_000_000_000).unwrap();
+        a.announce(ip(203, 0, 113, 5), "eth0", 2_000_000_000)
+            .unwrap();
         assert_eq!(a.state_for(ip(203, 0, 113, 5)).unwrap().announce_count, 2);
     }
 
     #[test]
     fn state_for_unknown_vip_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "State.NotFound", "tenant-arp-snf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "State.NotFound",
+            "tenant-arp-snf"
+        );
         let a = announcer(tenant);
         assert!(a.state_for(ip(1, 2, 3, 4)).is_none());
     }
@@ -354,14 +448,20 @@ mod tests {
 
     #[test]
     fn multiple_interfaces_announce_per_iface() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "MultiIface", "tenant-arp-mi");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "MultiIface",
+            "tenant-arp-mi"
+        );
         let mut a = announcer(tenant);
         a.enable_interface("eth0");
         a.enable_interface("eth1");
         a.register_vip(ip(203, 0, 113, 5));
         a.announce(ip(203, 0, 113, 5), "eth0", 0).unwrap();
         // Rate-limited per VIP regardless of interface.
-        let err = a.announce(ip(203, 0, 113, 5), "eth1", 100_000_000).unwrap_err();
+        let err = a
+            .announce(ip(203, 0, 113, 5), "eth1", 100_000_000)
+            .unwrap_err();
         assert!(matches!(err, AnnounceError::RateLimited(_, _)));
     }
 
@@ -369,7 +469,11 @@ mod tests {
 
     #[test]
     fn announce_frame_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Frame.Serde", "tenant-arp-fserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "Frame.Serde",
+            "tenant-arp-fserde"
+        );
         let f = AnnounceFrame {
             vip: ip(203, 0, 113, 5),
             source_mac: [1, 2, 3, 4, 5, 6],
@@ -384,8 +488,16 @@ mod tests {
 
     #[test]
     fn vip_state_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "State.Serde", "tenant-arp-sserde");
-        let s = VipAnnounceState { vip: ip(203, 0, 113, 5), last_announce_ns: 100, announce_count: 5 };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "State.Serde",
+            "tenant-arp-sserde"
+        );
+        let s = VipAnnounceState {
+            vip: ip(203, 0, 113, 5),
+            last_announce_ns: 100,
+            announce_count: 5,
+        };
         let j = serde_json::to_string(&s).unwrap();
         let back: VipAnnounceState = serde_json::from_str(&j).unwrap();
         assert_eq!(back, s);
@@ -393,7 +505,11 @@ mod tests {
 
     #[test]
     fn announce_proto_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/l2announcer/arp_announce.go", "Proto.Serde", "tenant-arp-pserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/l2announcer/arp_announce.go",
+            "Proto.Serde",
+            "tenant-arp-pserde"
+        );
         for p in [AnnounceProto::GratuitousArp, AnnounceProto::UnsolicitedNa] {
             let s = serde_json::to_string(&p).unwrap();
             let back: AnnounceProto = serde_json::from_str(&s).unwrap();

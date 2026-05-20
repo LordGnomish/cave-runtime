@@ -43,7 +43,11 @@ pub struct PortMatcher {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LrpFrontend {
     /// Match a Kubernetes Service by namespace/name.
-    Service { namespace: String, name: String, ports: Vec<PortMatcher> },
+    Service {
+        namespace: String,
+        name: String,
+        ports: Vec<PortMatcher>,
+    },
     /// Match traffic to specific (ip, port, proto) tuples.
     Address { ip: IpAddr, ports: Vec<PortMatcher> },
 }
@@ -128,7 +132,9 @@ impl LrpManager {
     }
 
     pub fn remove_policy(&mut self, key: &str) -> Result<(), LrpError> {
-        self.policies.remove(key).ok_or_else(|| LrpError::PolicyNotFound(key.to_string()))?;
+        self.policies
+            .remove(key)
+            .ok_or_else(|| LrpError::PolicyNotFound(key.to_string()))?;
         Ok(())
     }
 
@@ -143,14 +149,16 @@ impl LrpManager {
     pub fn upsert_backend(&mut self, b: LocalBackend) {
         // Replace if pod already known.
         let key = format!("{}/{}", b.pod_namespace, b.pod_name);
-        self.backends.retain(|x| format!("{}/{}", x.pod_namespace, x.pod_name) != key);
+        self.backends
+            .retain(|x| format!("{}/{}", x.pod_namespace, x.pod_name) != key);
         self.backends.push(b);
     }
 
     pub fn remove_backend(&mut self, namespace: &str, name: &str) -> bool {
         let key = format!("{namespace}/{name}");
         let before = self.backends.len();
-        self.backends.retain(|x| format!("{}/{}", x.pod_namespace, x.pod_name) != key);
+        self.backends
+            .retain(|x| format!("{}/{}", x.pod_namespace, x.pod_name) != key);
         before != self.backends.len()
     }
 
@@ -185,7 +193,11 @@ impl LrpManager {
                         None => continue,
                     }
                 }
-                LrpFrontend::Service { namespace, name, ports } => {
+                LrpFrontend::Service {
+                    namespace,
+                    name,
+                    ports,
+                } => {
                     let (svc_ns, svc_name) = match service_lookup {
                         Some(x) => x,
                         None => continue,
@@ -220,7 +232,10 @@ impl LrpManager {
         self.backends.iter().find(|b| {
             b.node_name == node
                 && b.pod_namespace == sel.namespace
-                && sel.match_labels.iter().all(|(k, v)| b.labels.iter().any(|(bk, bv)| bk == k && bv == v))
+                && sel
+                    .match_labels
+                    .iter()
+                    .all(|(k, v)| b.labels.iter().any(|(bk, bv)| bk == k && bv == v))
         })
     }
 }
@@ -252,16 +267,32 @@ pub fn make_node_local_dns_lrp(tenant: TenantId) -> LocalRedirectPolicy {
             namespace: "kube-system".into(),
             name: "kube-dns".into(),
             ports: vec![
-                PortMatcher { port: 53, protocol: L4Proto::UDP, target_port: Some(53) },
-                PortMatcher { port: 53, protocol: L4Proto::TCP, target_port: Some(53) },
+                PortMatcher {
+                    port: 53,
+                    protocol: L4Proto::UDP,
+                    target_port: Some(53),
+                },
+                PortMatcher {
+                    port: 53,
+                    protocol: L4Proto::TCP,
+                    target_port: Some(53),
+                },
             ],
         },
         backend: LocalBackendSelector {
             match_labels: vec![("k8s-app".into(), "node-local-dns".into())],
             namespace: "kube-system".into(),
             ports: vec![
-                PortMatcher { port: 53, protocol: L4Proto::UDP, target_port: None },
-                PortMatcher { port: 53, protocol: L4Proto::TCP, target_port: None },
+                PortMatcher {
+                    port: 53,
+                    protocol: L4Proto::UDP,
+                    target_port: None,
+                },
+                PortMatcher {
+                    port: 53,
+                    protocol: L4Proto::TCP,
+                    target_port: None,
+                },
             ],
         },
         skip_redirect_no_match: false,
@@ -295,14 +326,24 @@ mod tests {
 
     #[test]
     fn lrp_upsert_with_empty_frontend_ports_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Validate.EmptyPorts", "tenant-lrp-empports");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Validate.EmptyPorts",
+            "tenant-lrp-empports"
+        );
         let mut m = LrpManager::new();
         let p = LocalRedirectPolicy {
-            name: "x".into(), namespace: "ns".into(), tenant,
-            frontend: LrpFrontend::Address { ip: ip(10, 0, 0, 1), ports: vec![] },
+            name: "x".into(),
+            namespace: "ns".into(),
+            tenant,
+            frontend: LrpFrontend::Address {
+                ip: ip(10, 0, 0, 1),
+                ports: vec![],
+            },
             backend: LocalBackendSelector {
                 match_labels: vec![("a".into(), "b".into())],
-                namespace: "ns".into(), ports: vec![],
+                namespace: "ns".into(),
+                ports: vec![],
             },
             skip_redirect_no_match: false,
         };
@@ -312,15 +353,29 @@ mod tests {
 
     #[test]
     fn lrp_upsert_with_empty_backend_selector_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Validate.EmptyBackend", "tenant-lrp-empback");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Validate.EmptyBackend",
+            "tenant-lrp-empback"
+        );
         let mut m = LrpManager::new();
         let p = LocalRedirectPolicy {
-            name: "x".into(), namespace: "ns".into(), tenant,
+            name: "x".into(),
+            namespace: "ns".into(),
+            tenant,
             frontend: LrpFrontend::Address {
                 ip: ip(10, 0, 0, 1),
-                ports: vec![PortMatcher { port: 80, protocol: L4Proto::TCP, target_port: None }],
+                ports: vec![PortMatcher {
+                    port: 80,
+                    protocol: L4Proto::TCP,
+                    target_port: None,
+                }],
             },
-            backend: LocalBackendSelector { match_labels: vec![], namespace: "".into(), ports: vec![] },
+            backend: LocalBackendSelector {
+                match_labels: vec![],
+                namespace: "".into(),
+                ports: vec![],
+            },
             skip_redirect_no_match: false,
         };
         let err = m.upsert_policy(p).unwrap_err();
@@ -329,7 +384,11 @@ mod tests {
 
     #[test]
     fn lrp_remove_unknown_returns_not_found() {
-        let (_c, _t) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Remove.NotFound", "tenant-lrp-rmnf");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Remove.NotFound",
+            "tenant-lrp-rmnf"
+        );
         let mut m = LrpManager::new();
         let err = m.remove_policy("ns/x").unwrap_err();
         assert_eq!(err, LrpError::PolicyNotFound("ns/x".into()));
@@ -339,13 +398,23 @@ mod tests {
 
     #[test]
     fn lrp_address_matcher_redirects_to_local_backend() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Resolve.AddressMatcher", "tenant-lrp-addr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Resolve.AddressMatcher",
+            "tenant-lrp-addr"
+        );
         let mut m = LrpManager::new();
         let p = LocalRedirectPolicy {
-            name: "to-local".into(), namespace: "ns".into(), tenant,
+            name: "to-local".into(),
+            namespace: "ns".into(),
+            tenant,
             frontend: LrpFrontend::Address {
                 ip: ip(10, 96, 0, 53),
-                ports: vec![PortMatcher { port: 53, protocol: L4Proto::UDP, target_port: None }],
+                ports: vec![PortMatcher {
+                    port: 53,
+                    protocol: L4Proto::UDP,
+                    target_port: None,
+                }],
             },
             backend: LocalBackendSelector {
                 match_labels: vec![("k8s-app".into(), "node-local-dns".into())],
@@ -356,19 +425,31 @@ mod tests {
         };
         m.upsert_policy(p).unwrap();
         m.upsert_backend(dns_backend("node-a"));
-        let r = m.resolve("node-a", ip(10, 96, 0, 53), 53, L4Proto::UDP, None).unwrap();
+        let r = m
+            .resolve("node-a", ip(10, 96, 0, 53), 53, L4Proto::UDP, None)
+            .unwrap();
         assert_eq!(r.backend_pod, "kube-system/nldns-node-a");
     }
 
     #[test]
     fn lrp_address_matcher_other_ip_passthrough() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Resolve.NoMatch", "tenant-lrp-pt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Resolve.NoMatch",
+            "tenant-lrp-pt"
+        );
         let mut m = LrpManager::new();
         let p = LocalRedirectPolicy {
-            name: "to-local".into(), namespace: "ns".into(), tenant,
+            name: "to-local".into(),
+            namespace: "ns".into(),
+            tenant,
             frontend: LrpFrontend::Address {
                 ip: ip(10, 96, 0, 53),
-                ports: vec![PortMatcher { port: 53, protocol: L4Proto::UDP, target_port: None }],
+                ports: vec![PortMatcher {
+                    port: 53,
+                    protocol: L4Proto::UDP,
+                    target_port: None,
+                }],
             },
             backend: LocalBackendSelector {
                 match_labels: vec![("k8s-app".into(), "x".into())],
@@ -384,13 +465,23 @@ mod tests {
 
     #[test]
     fn lrp_address_matcher_other_port_passthrough() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Resolve.WrongPort", "tenant-lrp-wp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Resolve.WrongPort",
+            "tenant-lrp-wp"
+        );
         let mut m = LrpManager::new();
         let p = LocalRedirectPolicy {
-            name: "to-local".into(), namespace: "ns".into(), tenant,
+            name: "to-local".into(),
+            namespace: "ns".into(),
+            tenant,
             frontend: LrpFrontend::Address {
                 ip: ip(10, 96, 0, 53),
-                ports: vec![PortMatcher { port: 53, protocol: L4Proto::UDP, target_port: None }],
+                ports: vec![PortMatcher {
+                    port: 53,
+                    protocol: L4Proto::UDP,
+                    target_port: None,
+                }],
             },
             backend: LocalBackendSelector {
                 match_labels: vec![("k8s-app".into(), "x".into())],
@@ -406,13 +497,23 @@ mod tests {
 
     #[test]
     fn lrp_address_matcher_proto_must_match() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Resolve.WrongProto", "tenant-lrp-wproto");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Resolve.WrongProto",
+            "tenant-lrp-wproto"
+        );
         let mut m = LrpManager::new();
         let p = LocalRedirectPolicy {
-            name: "to-local".into(), namespace: "ns".into(), tenant,
+            name: "to-local".into(),
+            namespace: "ns".into(),
+            tenant,
             frontend: LrpFrontend::Address {
                 ip: ip(10, 96, 0, 53),
-                ports: vec![PortMatcher { port: 53, protocol: L4Proto::UDP, target_port: None }],
+                ports: vec![PortMatcher {
+                    port: 53,
+                    protocol: L4Proto::UDP,
+                    target_port: None,
+                }],
             },
             backend: LocalBackendSelector {
                 match_labels: vec![("k8s-app".into(), "node-local-dns".into())],
@@ -431,27 +532,51 @@ mod tests {
 
     #[test]
     fn lrp_service_matcher_redirects_for_matching_service() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Resolve.ServiceMatcher", "tenant-lrp-svc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Resolve.ServiceMatcher",
+            "tenant-lrp-svc"
+        );
         let mut m = LrpManager::new();
         m.upsert_policy(make_node_local_dns_lrp(tenant)).unwrap();
         m.upsert_backend(dns_backend("node-a"));
-        let r = m.resolve("node-a", ip(10, 96, 0, 10), 53, L4Proto::UDP, Some(("kube-system", "kube-dns")));
+        let r = m.resolve(
+            "node-a",
+            ip(10, 96, 0, 10),
+            53,
+            L4Proto::UDP,
+            Some(("kube-system", "kube-dns")),
+        );
         assert!(r.is_some());
     }
 
     #[test]
     fn lrp_service_matcher_wrong_service_passthrough() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Resolve.ServiceMismatch", "tenant-lrp-svcm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Resolve.ServiceMismatch",
+            "tenant-lrp-svcm"
+        );
         let mut m = LrpManager::new();
         m.upsert_policy(make_node_local_dns_lrp(tenant)).unwrap();
         m.upsert_backend(dns_backend("node-a"));
-        let r = m.resolve("node-a", ip(10, 96, 0, 10), 53, L4Proto::UDP, Some(("default", "other-svc")));
+        let r = m.resolve(
+            "node-a",
+            ip(10, 96, 0, 10),
+            53,
+            L4Proto::UDP,
+            Some(("default", "other-svc")),
+        );
         assert!(r.is_none());
     }
 
     #[test]
     fn lrp_service_matcher_without_service_lookup_passthrough() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Resolve.NoServiceLookup", "tenant-lrp-svcnone");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Resolve.NoServiceLookup",
+            "tenant-lrp-svcnone"
+        );
         let mut m = LrpManager::new();
         m.upsert_policy(make_node_local_dns_lrp(tenant)).unwrap();
         m.upsert_backend(dns_backend("node-a"));
@@ -463,46 +588,88 @@ mod tests {
 
     #[test]
     fn lrp_backend_on_different_node_skipped() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Resolve.LocalOnly", "tenant-lrp-loc");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Resolve.LocalOnly",
+            "tenant-lrp-loc"
+        );
         let mut m = LrpManager::new();
         m.upsert_policy(make_node_local_dns_lrp(tenant)).unwrap();
         m.upsert_backend(dns_backend("node-b"));
-        let r = m.resolve("node-a", ip(10, 96, 0, 10), 53, L4Proto::UDP, Some(("kube-system", "kube-dns")));
+        let r = m.resolve(
+            "node-a",
+            ip(10, 96, 0, 10),
+            53,
+            L4Proto::UDP,
+            Some(("kube-system", "kube-dns")),
+        );
         assert!(r.is_none());
     }
 
     #[test]
     fn lrp_backend_on_correct_node_selected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Resolve.LocalNodeMatch", "tenant-lrp-locm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Resolve.LocalNodeMatch",
+            "tenant-lrp-locm"
+        );
         let mut m = LrpManager::new();
         m.upsert_policy(make_node_local_dns_lrp(tenant)).unwrap();
         m.upsert_backend(dns_backend("node-a"));
         m.upsert_backend(dns_backend("node-b"));
-        let r = m.resolve("node-a", ip(10, 96, 0, 10), 53, L4Proto::UDP, Some(("kube-system", "kube-dns"))).unwrap();
+        let r = m
+            .resolve(
+                "node-a",
+                ip(10, 96, 0, 10),
+                53,
+                L4Proto::UDP,
+                Some(("kube-system", "kube-dns")),
+            )
+            .unwrap();
         assert!(r.backend_pod.contains("node-a"));
     }
 
     #[test]
     fn lrp_backend_label_mismatch_no_redirect() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Resolve.LabelMismatch", "tenant-lrp-lbl");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Resolve.LabelMismatch",
+            "tenant-lrp-lbl"
+        );
         let mut m = LrpManager::new();
         m.upsert_policy(make_node_local_dns_lrp(tenant)).unwrap();
         let mut bad = dns_backend("node-a");
         bad.labels = vec![("k8s-app".into(), "other".into())];
         m.upsert_backend(bad);
-        let r = m.resolve("node-a", ip(10, 96, 0, 10), 53, L4Proto::UDP, Some(("kube-system", "kube-dns")));
+        let r = m.resolve(
+            "node-a",
+            ip(10, 96, 0, 10),
+            53,
+            L4Proto::UDP,
+            Some(("kube-system", "kube-dns")),
+        );
         assert!(r.is_none());
     }
 
     #[test]
     fn lrp_backend_namespace_mismatch_no_redirect() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Resolve.NamespaceMismatch", "tenant-lrp-ns");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Resolve.NamespaceMismatch",
+            "tenant-lrp-ns"
+        );
         let mut m = LrpManager::new();
         m.upsert_policy(make_node_local_dns_lrp(tenant)).unwrap();
         let mut bad = dns_backend("node-a");
         bad.pod_namespace = "default".into();
         m.upsert_backend(bad);
-        let r = m.resolve("node-a", ip(10, 96, 0, 10), 53, L4Proto::UDP, Some(("kube-system", "kube-dns")));
+        let r = m.resolve(
+            "node-a",
+            ip(10, 96, 0, 10),
+            53,
+            L4Proto::UDP,
+            Some(("kube-system", "kube-dns")),
+        );
         assert!(r.is_none());
     }
 
@@ -510,36 +677,64 @@ mod tests {
 
     #[test]
     fn lrp_remove_policy_drops_redirect() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "RemovePolicy", "tenant-lrp-rmp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "RemovePolicy",
+            "tenant-lrp-rmp"
+        );
         let mut m = LrpManager::new();
         m.upsert_policy(make_node_local_dns_lrp(tenant)).unwrap();
         m.upsert_backend(dns_backend("node-a"));
         m.remove_policy("kube-system/nodelocaldns").unwrap();
-        let r = m.resolve("node-a", ip(10, 96, 0, 10), 53, L4Proto::UDP, Some(("kube-system", "kube-dns")));
+        let r = m.resolve(
+            "node-a",
+            ip(10, 96, 0, 10),
+            53,
+            L4Proto::UDP,
+            Some(("kube-system", "kube-dns")),
+        );
         assert!(r.is_none());
     }
 
     #[test]
     fn lrp_remove_backend_drops_redirect() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "RemoveBackend", "tenant-lrp-rmb");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "RemoveBackend",
+            "tenant-lrp-rmb"
+        );
         let mut m = LrpManager::new();
         m.upsert_policy(make_node_local_dns_lrp(tenant)).unwrap();
         m.upsert_backend(dns_backend("node-a"));
         m.remove_backend("kube-system", "nldns-node-a");
-        let r = m.resolve("node-a", ip(10, 96, 0, 10), 53, L4Proto::UDP, Some(("kube-system", "kube-dns")));
+        let r = m.resolve(
+            "node-a",
+            ip(10, 96, 0, 10),
+            53,
+            L4Proto::UDP,
+            Some(("kube-system", "kube-dns")),
+        );
         assert!(r.is_none());
     }
 
     #[test]
     fn lrp_remove_unknown_backend_returns_false() {
-        let (_c, _t) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "RemoveBackend.NotFound", "tenant-lrp-rmbnf");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "RemoveBackend.NotFound",
+            "tenant-lrp-rmbnf"
+        );
         let mut m = LrpManager::new();
         assert!(!m.remove_backend("kube-system", "nope"));
     }
 
     #[test]
     fn lrp_upsert_backend_replaces_in_place() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "UpsertBackend.Replace", "tenant-lrp-upb");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "UpsertBackend.Replace",
+            "tenant-lrp-upb"
+        );
         let mut m = LrpManager::new();
         m.upsert_policy(make_node_local_dns_lrp(tenant)).unwrap();
         m.upsert_backend(dns_backend("node-a"));
@@ -547,7 +742,15 @@ mod tests {
         updated.pod_ip = ip(10, 0, 1, 99);
         m.upsert_backend(updated);
         assert_eq!(m.backend_count(), 1);
-        let r = m.resolve("node-a", ip(10, 96, 0, 10), 53, L4Proto::UDP, Some(("kube-system", "kube-dns"))).unwrap();
+        let r = m
+            .resolve(
+                "node-a",
+                ip(10, 96, 0, 10),
+                53,
+                L4Proto::UDP,
+                Some(("kube-system", "kube-dns")),
+            )
+            .unwrap();
         assert_eq!(r.backend_ip, ip(10, 0, 1, 99));
     }
 
@@ -555,53 +758,83 @@ mod tests {
 
     #[test]
     fn lrp_port_renaming_uses_target_port() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "PortRename", "tenant-lrp-rename");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "PortRename",
+            "tenant-lrp-rename"
+        );
         let mut m = LrpManager::new();
         let p = LocalRedirectPolicy {
-            name: "rename".into(), namespace: "ns".into(), tenant,
+            name: "rename".into(),
+            namespace: "ns".into(),
+            tenant,
             frontend: LrpFrontend::Address {
                 ip: ip(10, 96, 0, 1),
-                ports: vec![PortMatcher { port: 80, protocol: L4Proto::TCP, target_port: Some(8080) }],
+                ports: vec![PortMatcher {
+                    port: 80,
+                    protocol: L4Proto::TCP,
+                    target_port: Some(8080),
+                }],
             },
             backend: LocalBackendSelector {
                 match_labels: vec![("app".into(), "api".into())],
-                namespace: "ns".into(), ports: vec![],
+                namespace: "ns".into(),
+                ports: vec![],
             },
             skip_redirect_no_match: false,
         };
         m.upsert_policy(p).unwrap();
         m.upsert_backend(LocalBackend {
-            pod_name: "api".into(), pod_namespace: "ns".into(),
-            node_name: "node-a".into(), pod_ip: ip(10, 0, 1, 5),
+            pod_name: "api".into(),
+            pod_namespace: "ns".into(),
+            node_name: "node-a".into(),
+            pod_ip: ip(10, 0, 1, 5),
             labels: vec![("app".into(), "api".into())],
         });
-        let r = m.resolve("node-a", ip(10, 96, 0, 1), 80, L4Proto::TCP, None).unwrap();
+        let r = m
+            .resolve("node-a", ip(10, 96, 0, 1), 80, L4Proto::TCP, None)
+            .unwrap();
         assert_eq!(r.target_port, 8080);
     }
 
     #[test]
     fn lrp_port_no_target_keeps_original() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "PortNoRename", "tenant-lrp-norename");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "PortNoRename",
+            "tenant-lrp-norename"
+        );
         let mut m = LrpManager::new();
         let p = LocalRedirectPolicy {
-            name: "rename".into(), namespace: "ns".into(), tenant,
+            name: "rename".into(),
+            namespace: "ns".into(),
+            tenant,
             frontend: LrpFrontend::Address {
                 ip: ip(10, 96, 0, 1),
-                ports: vec![PortMatcher { port: 80, protocol: L4Proto::TCP, target_port: None }],
+                ports: vec![PortMatcher {
+                    port: 80,
+                    protocol: L4Proto::TCP,
+                    target_port: None,
+                }],
             },
             backend: LocalBackendSelector {
                 match_labels: vec![("app".into(), "api".into())],
-                namespace: "ns".into(), ports: vec![],
+                namespace: "ns".into(),
+                ports: vec![],
             },
             skip_redirect_no_match: false,
         };
         m.upsert_policy(p).unwrap();
         m.upsert_backend(LocalBackend {
-            pod_name: "api".into(), pod_namespace: "ns".into(),
-            node_name: "node-a".into(), pod_ip: ip(10, 0, 1, 5),
+            pod_name: "api".into(),
+            pod_namespace: "ns".into(),
+            node_name: "node-a".into(),
+            pod_ip: ip(10, 0, 1, 5),
             labels: vec![("app".into(), "api".into())],
         });
-        let r = m.resolve("node-a", ip(10, 96, 0, 1), 80, L4Proto::TCP, None).unwrap();
+        let r = m
+            .resolve("node-a", ip(10, 96, 0, 1), 80, L4Proto::TCP, None)
+            .unwrap();
         assert_eq!(r.target_port, 80);
     }
 
@@ -609,31 +842,65 @@ mod tests {
 
     #[test]
     fn lrp_node_local_dns_redirects_udp_53() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "NodeLocalDNS.UDP", "tenant-lrp-nldns-udp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "NodeLocalDNS.UDP",
+            "tenant-lrp-nldns-udp"
+        );
         let mut m = LrpManager::new();
         m.upsert_policy(make_node_local_dns_lrp(tenant)).unwrap();
         m.upsert_backend(dns_backend("node-a"));
-        let r = m.resolve("node-a", ip(10, 96, 0, 10), 53, L4Proto::UDP, Some(("kube-system", "kube-dns"))).unwrap();
+        let r = m
+            .resolve(
+                "node-a",
+                ip(10, 96, 0, 10),
+                53,
+                L4Proto::UDP,
+                Some(("kube-system", "kube-dns")),
+            )
+            .unwrap();
         assert_eq!(r.target_port, 53);
     }
 
     #[test]
     fn lrp_node_local_dns_redirects_tcp_53() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "NodeLocalDNS.TCP", "tenant-lrp-nldns-tcp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "NodeLocalDNS.TCP",
+            "tenant-lrp-nldns-tcp"
+        );
         let mut m = LrpManager::new();
         m.upsert_policy(make_node_local_dns_lrp(tenant)).unwrap();
         m.upsert_backend(dns_backend("node-a"));
-        let r = m.resolve("node-a", ip(10, 96, 0, 10), 53, L4Proto::TCP, Some(("kube-system", "kube-dns"))).unwrap();
+        let r = m
+            .resolve(
+                "node-a",
+                ip(10, 96, 0, 10),
+                53,
+                L4Proto::TCP,
+                Some(("kube-system", "kube-dns")),
+            )
+            .unwrap();
         assert_eq!(r.target_port, 53);
     }
 
     #[test]
     fn lrp_node_local_dns_passthrough_other_ports() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "NodeLocalDNS.OtherPort", "tenant-lrp-nldns-op");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "NodeLocalDNS.OtherPort",
+            "tenant-lrp-nldns-op"
+        );
         let mut m = LrpManager::new();
         m.upsert_policy(make_node_local_dns_lrp(tenant)).unwrap();
         m.upsert_backend(dns_backend("node-a"));
-        let r = m.resolve("node-a", ip(10, 96, 0, 10), 9153, L4Proto::TCP, Some(("kube-system", "kube-dns")));
+        let r = m.resolve(
+            "node-a",
+            ip(10, 96, 0, 10),
+            9153,
+            L4Proto::TCP,
+            Some(("kube-system", "kube-dns")),
+        );
         assert!(r.is_none());
     }
 
@@ -641,17 +908,28 @@ mod tests {
 
     #[test]
     fn lrp_first_matching_policy_wins() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Resolve.MultiPolicy", "tenant-lrp-mp");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Resolve.MultiPolicy",
+            "tenant-lrp-mp"
+        );
         let mut m = LrpManager::new();
         let p1 = LocalRedirectPolicy {
-            name: "p1".into(), namespace: "ns".into(), tenant: tenant.clone(),
+            name: "p1".into(),
+            namespace: "ns".into(),
+            tenant: tenant.clone(),
             frontend: LrpFrontend::Address {
                 ip: ip(10, 96, 0, 1),
-                ports: vec![PortMatcher { port: 80, protocol: L4Proto::TCP, target_port: None }],
+                ports: vec![PortMatcher {
+                    port: 80,
+                    protocol: L4Proto::TCP,
+                    target_port: None,
+                }],
             },
             backend: LocalBackendSelector {
                 match_labels: vec![("app".into(), "x".into())],
-                namespace: "ns".into(), ports: vec![],
+                namespace: "ns".into(),
+                ports: vec![],
             },
             skip_redirect_no_match: false,
         };
@@ -660,8 +938,10 @@ mod tests {
         m.upsert_policy(p1).unwrap();
         m.upsert_policy(p2).unwrap();
         m.upsert_backend(LocalBackend {
-            pod_name: "x".into(), pod_namespace: "ns".into(),
-            node_name: "node-a".into(), pod_ip: ip(10, 0, 1, 5),
+            pod_name: "x".into(),
+            pod_namespace: "ns".into(),
+            node_name: "node-a".into(),
+            pod_ip: ip(10, 0, 1, 5),
             labels: vec![("app".into(), "x".into())],
         });
         let r = m.resolve("node-a", ip(10, 96, 0, 1), 80, L4Proto::TCP, None);
@@ -670,18 +950,26 @@ mod tests {
 
     #[test]
     fn lrp_count_tracks_upserts() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Count", "tenant-lrp-cnt");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Count", "tenant-lrp-cnt");
         let mut m = LrpManager::new();
         for i in 0..3u8 {
             let p = LocalRedirectPolicy {
-                name: format!("p-{i}"), namespace: "ns".into(), tenant: tenant.clone(),
+                name: format!("p-{i}"),
+                namespace: "ns".into(),
+                tenant: tenant.clone(),
                 frontend: LrpFrontend::Address {
                     ip: ip(10, 96, 0, i),
-                    ports: vec![PortMatcher { port: 80, protocol: L4Proto::TCP, target_port: None }],
+                    ports: vec![PortMatcher {
+                        port: 80,
+                        protocol: L4Proto::TCP,
+                        target_port: None,
+                    }],
                 },
                 backend: LocalBackendSelector {
                     match_labels: vec![("app".into(), "x".into())],
-                    namespace: "ns".into(), ports: vec![],
+                    namespace: "ns".into(),
+                    ports: vec![],
                 },
                 skip_redirect_no_match: false,
             };
@@ -692,7 +980,11 @@ mod tests {
 
     #[test]
     fn lrp_backend_count_tracks_upserts() {
-        let (_c, _t) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "BackendCount", "tenant-lrp-bcnt");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "BackendCount",
+            "tenant-lrp-bcnt"
+        );
         let mut m = LrpManager::new();
         for n in ["node-a", "node-b", "node-c"] {
             m.upsert_backend(dns_backend(n));
@@ -704,7 +996,11 @@ mod tests {
 
     #[test]
     fn lrp_policy_serde_round_trip() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/k8s/apis/cilium.io/v2/ciliumlocalredirectpolicy_types.go", "LRP.Serde", "tenant-lrp-ps");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/k8s/apis/cilium.io/v2/ciliumlocalredirectpolicy_types.go",
+            "LRP.Serde",
+            "tenant-lrp-ps"
+        );
         let p = make_node_local_dns_lrp(tenant);
         let json = serde_json::to_string(&p).unwrap();
         let back: LocalRedirectPolicy = serde_json::from_str(&json).unwrap();
@@ -713,10 +1009,16 @@ mod tests {
 
     #[test]
     fn lrp_decision_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Decision.Serde", "tenant-lrp-ds");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Decision.Serde",
+            "tenant-lrp-ds"
+        );
         let d = RedirectDecision {
-            policy_name: "p".into(), backend_ip: ip(10, 0, 1, 9),
-            backend_pod: "kube-system/nldns".into(), target_port: 53,
+            policy_name: "p".into(),
+            backend_ip: ip(10, 0, 1, 9),
+            backend_pod: "kube-system/nldns".into(),
+            target_port: 53,
         };
         let json = serde_json::to_string(&d).unwrap();
         let back: RedirectDecision = serde_json::from_str(&json).unwrap();
@@ -725,10 +1027,18 @@ mod tests {
 
     #[test]
     fn lrp_frontend_serde_address_variant() {
-        let (_c, _t) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Frontend.Address.Serde", "tenant-lrp-fas");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Frontend.Address.Serde",
+            "tenant-lrp-fas"
+        );
         let f = LrpFrontend::Address {
             ip: ip(10, 96, 0, 1),
-            ports: vec![PortMatcher { port: 80, protocol: L4Proto::TCP, target_port: Some(8080) }],
+            ports: vec![PortMatcher {
+                port: 80,
+                protocol: L4Proto::TCP,
+                target_port: Some(8080),
+            }],
         };
         let json = serde_json::to_string(&f).unwrap();
         let back: LrpFrontend = serde_json::from_str(&json).unwrap();
@@ -737,10 +1047,19 @@ mod tests {
 
     #[test]
     fn lrp_frontend_serde_service_variant() {
-        let (_c, _t) = cilium_test_ctx!("pkg/redirectpolicy/manager.go", "Frontend.Service.Serde", "tenant-lrp-fss");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/redirectpolicy/manager.go",
+            "Frontend.Service.Serde",
+            "tenant-lrp-fss"
+        );
         let f = LrpFrontend::Service {
-            namespace: "kube-system".into(), name: "kube-dns".into(),
-            ports: vec![PortMatcher { port: 53, protocol: L4Proto::UDP, target_port: None }],
+            namespace: "kube-system".into(),
+            name: "kube-dns".into(),
+            ports: vec![PortMatcher {
+                port: 53,
+                protocol: L4Proto::UDP,
+                target_port: None,
+            }],
         };
         let json = serde_json::to_string(&f).unwrap();
         let back: LrpFrontend = serde_json::from_str(&json).unwrap();

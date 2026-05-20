@@ -121,10 +121,19 @@ fn any_or_contains(list: &[String], val: &str) -> bool {
     list.is_empty() || list.iter().any(|x| x == val)
 }
 
-fn group_resources_match(res: &[GroupResources], group: &str, resource: &str, subresource: &str) -> bool {
-    if res.is_empty() { return true; }
+fn group_resources_match(
+    res: &[GroupResources],
+    group: &str,
+    resource: &str,
+    subresource: &str,
+) -> bool {
+    if res.is_empty() {
+        return true;
+    }
     for r in res {
-        if r.group != group { continue; }
+        if r.group != group {
+            continue;
+        }
         // resources empty == any
         if !r.resources.is_empty() && !r.resources.iter().any(|x| x == resource || x == "*") {
             continue;
@@ -160,28 +169,39 @@ pub fn rule_matches(rule: &PolicyRule, input: &PolicyEvaluationInput) -> bool {
             return false;
         }
     } else {
-        if !group_resources_match(&rule.resources, input.group, input.resource, input.subresource) {
+        if !group_resources_match(
+            &rule.resources,
+            input.group,
+            input.resource,
+            input.subresource,
+        ) {
             return false;
         }
-        if !rule.namespaces.is_empty()
-            && !rule.namespaces.iter().any(|n| n == input.namespace)
-        {
+        if !rule.namespaces.is_empty() && !rule.namespaces.iter().any(|n| n == input.namespace) {
             return false;
         }
     }
-    if !any_or_contains(&rule.users, input.user) { return false; }
+    if !any_or_contains(&rule.users, input.user) {
+        return false;
+    }
     if !rule.user_groups.is_empty() {
         let want: HashSet<&String> = rule.user_groups.iter().collect();
         let have: HashSet<&String> = input.user_groups.iter().collect();
-        if want.is_disjoint(&have) { return false; }
+        if want.is_disjoint(&have) {
+            return false;
+        }
     }
-    if !any_or_contains(&rule.verbs, input.verb) { return false; }
+    if !any_or_contains(&rule.verbs, input.verb) {
+        return false;
+    }
     true
 }
 
 /// `*` is a single-level wildcard (matches any path segment but not `/`).
 fn nrurl_matches(pattern: &str, url: &str) -> bool {
-    if pattern == url { return true; }
+    if pattern == url {
+        return true;
+    }
     if let Some(prefix) = pattern.strip_suffix("/*") {
         if url.starts_with(prefix) {
             let rest = &url[prefix.len()..];
@@ -210,7 +230,12 @@ pub struct StageEmitter {
 
 impl StageEmitter {
     pub fn new(audit_id: String, decision: PolicyDecision, tenant_id: String) -> Self {
-        Self { audit_id, decision, tenant_id, emitted: HashSet::new() }
+        Self {
+            audit_id,
+            decision,
+            tenant_id,
+            emitted: HashSet::new(),
+        }
     }
 
     fn stage_id(s: AuditStage) -> u8 {
@@ -238,19 +263,31 @@ impl StageEmitter {
         response_object: Option<serde_json::Value>,
     ) -> Option<AuditEvent> {
         // Level=None drops everything.
-        if self.decision.level == AuditLevel::None { return None; }
+        if self.decision.level == AuditLevel::None {
+            return None;
+        }
         // Drop omit_stages.
-        if self.decision.omit_stages.contains(&stage) { return None; }
+        if self.decision.omit_stages.contains(&stage) {
+            return None;
+        }
         // Suppress duplicates.
         let id = Self::stage_id(stage);
-        if !self.emitted.insert(id) { return None; }
+        if !self.emitted.insert(id) {
+            return None;
+        }
 
         let mut ev = AuditEvent::new(
             self.audit_id.clone(),
             self.decision.level,
             stage,
-            user, self.tenant_id.clone(), namespace,
-            verb, resource, name, request_uri, response_code,
+            user,
+            self.tenant_id.clone(),
+            namespace,
+            verb,
+            resource,
+            name,
+            request_uri,
+            response_code,
         );
         ev.request_object = request_object;
         ev.response_object = response_object;

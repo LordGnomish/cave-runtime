@@ -7,7 +7,7 @@
 //! mümkün. State machine: Pending → (Approved | Cancelled). Approved sonrası
 //! ek approve idempotent (no-op).
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
@@ -52,7 +52,11 @@ pub trait ApprovalBackend: Send + Sync {
         requested_by: &str,
         quorum: usize,
     ) -> Result<ApprovalRecord>;
-    async fn list(&self, tenant_id: &str, state: Option<ApprovalState>) -> Result<Vec<ApprovalRecord>>;
+    async fn list(
+        &self,
+        tenant_id: &str,
+        state: Option<ApprovalState>,
+    ) -> Result<Vec<ApprovalRecord>>;
     async fn show(&self, tenant_id: &str, approval_id: &str) -> Result<ApprovalRecord>;
     async fn approve(
         &self,
@@ -195,7 +199,10 @@ mod tests {
     async fn approval_acme_create_starts_pending() {
         let tenant_id = "acme";
         let b = InMemoryApprovals::new();
-        let rec = b.create(tenant_id, "rotate-prod-key", "alice", 2).await.unwrap();
+        let rec = b
+            .create(tenant_id, "rotate-prod-key", "alice", 2)
+            .await
+            .unwrap();
         assert_eq!(rec.state, ApprovalState::Pending);
         assert_eq!(rec.approvers.len(), 0);
         assert_eq!(rec.remaining(), 2);
@@ -206,7 +213,10 @@ mod tests {
     async fn approval_globex_quorum_zero_rejected() {
         let tenant_id = "globex";
         let b = InMemoryApprovals::new();
-        let err = b.create(tenant_id, "drop-table", "alice", 0).await.unwrap_err();
+        let err = b
+            .create(tenant_id, "drop-table", "alice", 0)
+            .await
+            .unwrap_err();
         assert!(err.to_string().contains("quorum"));
     }
 
@@ -215,8 +225,14 @@ mod tests {
     async fn approval_acme_self_approve_rejected() {
         let tenant_id = "acme";
         let b = InMemoryApprovals::new();
-        let rec = b.create(tenant_id, "rotate-prod-key", "alice", 2).await.unwrap();
-        let err = b.approve(tenant_id, &rec.approval_id, "alice").await.unwrap_err();
+        let rec = b
+            .create(tenant_id, "rotate-prod-key", "alice", 2)
+            .await
+            .unwrap();
+        let err = b
+            .approve(tenant_id, &rec.approval_id, "alice")
+            .await
+            .unwrap_err();
         assert!(err.to_string().contains("two-person rule"));
     }
 
@@ -225,7 +241,10 @@ mod tests {
     async fn approval_acme_single_approver_stays_pending() {
         let tenant_id = "acme";
         let b = InMemoryApprovals::new();
-        let rec = b.create(tenant_id, "rotate-prod-key", "alice", 2).await.unwrap();
+        let rec = b
+            .create(tenant_id, "rotate-prod-key", "alice", 2)
+            .await
+            .unwrap();
         let after = b.approve(tenant_id, &rec.approval_id, "bob").await.unwrap();
         assert_eq!(after.state, ApprovalState::Pending);
         assert_eq!(after.remaining(), 1);
@@ -236,9 +255,15 @@ mod tests {
     async fn approval_acme_quorum_reached_approves() {
         let tenant_id = "acme";
         let b = InMemoryApprovals::new();
-        let rec = b.create(tenant_id, "rotate-prod-key", "alice", 2).await.unwrap();
+        let rec = b
+            .create(tenant_id, "rotate-prod-key", "alice", 2)
+            .await
+            .unwrap();
         b.approve(tenant_id, &rec.approval_id, "bob").await.unwrap();
-        let after = b.approve(tenant_id, &rec.approval_id, "carol").await.unwrap();
+        let after = b
+            .approve(tenant_id, &rec.approval_id, "carol")
+            .await
+            .unwrap();
         assert_eq!(after.state, ApprovalState::Approved);
         assert!(after.closed_at.is_some());
     }
@@ -260,10 +285,18 @@ mod tests {
     async fn approval_acme_post_approve_is_noop() {
         let tenant_id = "acme";
         let b = InMemoryApprovals::new();
-        let rec = b.create(tenant_id, "rotate-prod-key", "alice", 2).await.unwrap();
+        let rec = b
+            .create(tenant_id, "rotate-prod-key", "alice", 2)
+            .await
+            .unwrap();
         b.approve(tenant_id, &rec.approval_id, "bob").await.unwrap();
-        b.approve(tenant_id, &rec.approval_id, "carol").await.unwrap();
-        let after = b.approve(tenant_id, &rec.approval_id, "dave").await.unwrap();
+        b.approve(tenant_id, &rec.approval_id, "carol")
+            .await
+            .unwrap();
+        let after = b
+            .approve(tenant_id, &rec.approval_id, "dave")
+            .await
+            .unwrap();
         assert_eq!(after.state, ApprovalState::Approved);
         assert_eq!(after.approvers.len(), 2);
     }
@@ -273,8 +306,14 @@ mod tests {
     async fn approval_acme_cancel_transitions_state() {
         let tenant_id = "acme";
         let b = InMemoryApprovals::new();
-        let rec = b.create(tenant_id, "rotate-prod-key", "alice", 2).await.unwrap();
-        let after = b.cancel(tenant_id, &rec.approval_id, "alice").await.unwrap();
+        let rec = b
+            .create(tenant_id, "rotate-prod-key", "alice", 2)
+            .await
+            .unwrap();
+        let after = b
+            .cancel(tenant_id, &rec.approval_id, "alice")
+            .await
+            .unwrap();
         assert_eq!(after.state, ApprovalState::Cancelled);
     }
 
@@ -285,8 +324,13 @@ mod tests {
         let b = InMemoryApprovals::new();
         let rec = b.create(tenant_id, "drop-table", "alice", 2).await.unwrap();
         b.approve(tenant_id, &rec.approval_id, "bob").await.unwrap();
-        b.approve(tenant_id, &rec.approval_id, "carol").await.unwrap();
-        let err = b.cancel(tenant_id, &rec.approval_id, "alice").await.unwrap_err();
+        b.approve(tenant_id, &rec.approval_id, "carol")
+            .await
+            .unwrap();
+        let err = b
+            .cancel(tenant_id, &rec.approval_id, "alice")
+            .await
+            .unwrap_err();
         assert!(err.to_string().contains("approved"));
     }
 
@@ -296,8 +340,13 @@ mod tests {
         let tenant_id = "initech";
         let b = InMemoryApprovals::new();
         let rec = b.create(tenant_id, "drop-pii", "alice", 2).await.unwrap();
-        b.cancel(tenant_id, &rec.approval_id, "alice").await.unwrap();
-        let err = b.approve(tenant_id, &rec.approval_id, "bob").await.unwrap_err();
+        b.cancel(tenant_id, &rec.approval_id, "alice")
+            .await
+            .unwrap();
+        let err = b
+            .approve(tenant_id, &rec.approval_id, "bob")
+            .await
+            .unwrap_err();
         assert!(err.to_string().contains("cancelled"));
     }
 
@@ -309,8 +358,13 @@ mod tests {
         let r1 = b.create(tenant_id, "rotate-key", "alice", 2).await.unwrap();
         let _r2 = b.create(tenant_id, "drop-table", "alice", 2).await.unwrap();
         b.approve(tenant_id, &r1.approval_id, "bob").await.unwrap();
-        b.approve(tenant_id, &r1.approval_id, "carol").await.unwrap();
-        let pending = b.list(tenant_id, Some(ApprovalState::Pending)).await.unwrap();
+        b.approve(tenant_id, &r1.approval_id, "carol")
+            .await
+            .unwrap();
+        let pending = b
+            .list(tenant_id, Some(ApprovalState::Pending))
+            .await
+            .unwrap();
         assert_eq!(pending.len(), 1);
         assert!(pending.iter().all(|r| r.state == ApprovalState::Pending));
     }

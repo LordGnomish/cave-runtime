@@ -3,7 +3,7 @@
 //! Knative Route — traffic routing to Revisions.
 //! upstream: knative/serving v1.18.x — pkg/apis/serving/v1/route_types.go
 
-use crate::meta::{validate_traffic, ObjectMeta, TrafficTarget};
+use crate::meta::{ObjectMeta, TrafficTarget, validate_traffic};
 
 #[derive(Default, Debug, Clone)]
 pub struct Route {
@@ -62,7 +62,10 @@ impl Route {
                 return t.revision_name.as_deref();
             }
         }
-        self.status.traffic.last().and_then(|t| t.revision_name.as_deref())
+        self.status
+            .traffic
+            .last()
+            .and_then(|t| t.revision_name.as_deref())
     }
 
     /// Promote a revision to 100% traffic.

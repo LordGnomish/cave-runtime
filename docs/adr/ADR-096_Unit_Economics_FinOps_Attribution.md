@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Hetzner, Universal
+**Scope:** Sovereign, Universal
 
 **Category:** FinOps
 

@@ -329,17 +329,15 @@ pub trait AuthClient: Send + Sync + std::fmt::Debug {
         realm: &str,
         idp: &IdentityProvider,
     ) -> Result<IdentityProvider, ClientError>;
-    async fn delete_identity_provider(
-        &self,
-        realm: &str,
-        alias: &str,
-    ) -> Result<(), ClientError>;
+    async fn delete_identity_provider(&self, realm: &str, alias: &str) -> Result<(), ClientError>;
 
     // auth flows — /admin/realms/{realm}/authentication/flows
     async fn list_auth_flows(&self, realm: &str) -> Result<Vec<AuthFlow>, ClientError>;
     async fn get_auth_flow(&self, realm: &str, id: &str) -> Result<AuthFlow, ClientError>;
-    async fn create_auth_flow(&self, realm: &str, flow: &AuthFlow) -> Result<AuthFlow, ClientError>;
-    async fn update_auth_flow(&self, realm: &str, flow: &AuthFlow) -> Result<AuthFlow, ClientError>;
+    async fn create_auth_flow(&self, realm: &str, flow: &AuthFlow)
+    -> Result<AuthFlow, ClientError>;
+    async fn update_auth_flow(&self, realm: &str, flow: &AuthFlow)
+    -> Result<AuthFlow, ClientError>;
     async fn delete_auth_flow(&self, realm: &str, id: &str) -> Result<(), ClientError>;
 
     // events — /admin/realms/{realm}/events
@@ -602,7 +600,10 @@ impl AuthClient for AuthMockClient {
         let mut w = self.clients.write().unwrap();
         let key = (realm.to_string(), client.id.clone());
         if w.contains_key(&key) {
-            return Err(ClientError::Conflict(format!("client/{realm}/{}", client.id)));
+            return Err(ClientError::Conflict(format!(
+                "client/{realm}/{}",
+                client.id
+            )));
         }
         let mut stored = client.clone();
         stored.realm = realm.to_string();
@@ -617,7 +618,10 @@ impl AuthClient for AuthMockClient {
         let mut w = self.clients.write().unwrap();
         let key = (realm.to_string(), client.id.clone());
         if !w.contains_key(&key) {
-            return Err(ClientError::NotFound(format!("client/{realm}/{}", client.id)));
+            return Err(ClientError::NotFound(format!(
+                "client/{realm}/{}",
+                client.id
+            )));
         }
         let mut stored = client.clone();
         stored.realm = realm.to_string();
@@ -843,11 +847,7 @@ impl AuthClient for AuthMockClient {
         w.insert(key, stored.clone());
         Ok(stored)
     }
-    async fn delete_identity_provider(
-        &self,
-        realm: &str,
-        alias: &str,
-    ) -> Result<(), ClientError> {
+    async fn delete_identity_provider(&self, realm: &str, alias: &str) -> Result<(), ClientError> {
         self.idps
             .write()
             .unwrap()
@@ -1205,7 +1205,8 @@ impl AuthClient for AuthApiClient {
         self.post_json("/admin/realms", realm).await
     }
     async fn update_realm(&self, realm: &Realm) -> Result<Realm, ClientError> {
-        self.put_json(&format!("/admin/realms/{}", realm.id), realm).await
+        self.put_json(&format!("/admin/realms/{}", realm.id), realm)
+            .await
     }
     async fn delete_realm(&self, name: &str) -> Result<(), ClientError> {
         self.delete_path(&format!("/admin/realms/{name}")).await
@@ -1215,28 +1216,35 @@ impl AuthClient for AuthApiClient {
     /// Source: keycloak/keycloak@v22.0.0
     ///         services/src/main/java/org/keycloak/services/resources/admin/ClientsResource.java
     async fn list_clients(&self, realm: &str) -> Result<Vec<ClientApp>, ClientError> {
-        self.get_json(&format!("/admin/realms/{realm}/clients")).await
+        self.get_json(&format!("/admin/realms/{realm}/clients"))
+            .await
     }
     async fn get_client(&self, realm: &str, id: &str) -> Result<ClientApp, ClientError> {
-        self.get_json(&format!("/admin/realms/{realm}/clients/{id}")).await
+        self.get_json(&format!("/admin/realms/{realm}/clients/{id}"))
+            .await
     }
     async fn create_client(
         &self,
         realm: &str,
         client: &ClientApp,
     ) -> Result<ClientApp, ClientError> {
-        self.post_json(&format!("/admin/realms/{realm}/clients"), client).await
+        self.post_json(&format!("/admin/realms/{realm}/clients"), client)
+            .await
     }
     async fn update_client(
         &self,
         realm: &str,
         client: &ClientApp,
     ) -> Result<ClientApp, ClientError> {
-        self.put_json(&format!("/admin/realms/{realm}/clients/{}", client.id), client)
-            .await
+        self.put_json(
+            &format!("/admin/realms/{realm}/clients/{}", client.id),
+            client,
+        )
+        .await
     }
     async fn delete_client(&self, realm: &str, id: &str) -> Result<(), ClientError> {
-        self.delete_path(&format!("/admin/realms/{realm}/clients/{id}")).await
+        self.delete_path(&format!("/admin/realms/{realm}/clients/{id}"))
+            .await
     }
 
     // users
@@ -1246,16 +1254,20 @@ impl AuthClient for AuthApiClient {
         self.get_json(&format!("/admin/realms/{realm}/users")).await
     }
     async fn get_user(&self, realm: &str, id: &str) -> Result<User, ClientError> {
-        self.get_json(&format!("/admin/realms/{realm}/users/{id}")).await
+        self.get_json(&format!("/admin/realms/{realm}/users/{id}"))
+            .await
     }
     async fn create_user(&self, realm: &str, user: &User) -> Result<User, ClientError> {
-        self.post_json(&format!("/admin/realms/{realm}/users"), user).await
+        self.post_json(&format!("/admin/realms/{realm}/users"), user)
+            .await
     }
     async fn update_user(&self, realm: &str, user: &User) -> Result<User, ClientError> {
-        self.put_json(&format!("/admin/realms/{realm}/users/{}", user.id), user).await
+        self.put_json(&format!("/admin/realms/{realm}/users/{}", user.id), user)
+            .await
     }
     async fn delete_user(&self, realm: &str, id: &str) -> Result<(), ClientError> {
-        self.delete_path(&format!("/admin/realms/{realm}/users/{id}")).await
+        self.delete_path(&format!("/admin/realms/{realm}/users/{id}"))
+            .await
     }
 
     // roles
@@ -1265,37 +1277,44 @@ impl AuthClient for AuthApiClient {
         self.get_json(&format!("/admin/realms/{realm}/roles")).await
     }
     async fn get_role(&self, realm: &str, name: &str) -> Result<Role, ClientError> {
-        self.get_json(&format!("/admin/realms/{realm}/roles/{name}")).await
+        self.get_json(&format!("/admin/realms/{realm}/roles/{name}"))
+            .await
     }
     async fn create_role(&self, realm: &str, role: &Role) -> Result<Role, ClientError> {
-        self.post_json(&format!("/admin/realms/{realm}/roles"), role).await
+        self.post_json(&format!("/admin/realms/{realm}/roles"), role)
+            .await
     }
     async fn update_role(&self, realm: &str, role: &Role) -> Result<Role, ClientError> {
         self.put_json(&format!("/admin/realms/{realm}/roles/{}", role.name), role)
             .await
     }
     async fn delete_role(&self, realm: &str, name: &str) -> Result<(), ClientError> {
-        self.delete_path(&format!("/admin/realms/{realm}/roles/{name}")).await
+        self.delete_path(&format!("/admin/realms/{realm}/roles/{name}"))
+            .await
     }
 
     // groups
     /// Source: keycloak/keycloak@v22.0.0
     ///         services/src/main/java/org/keycloak/services/resources/admin/GroupsResource.java
     async fn list_groups(&self, realm: &str) -> Result<Vec<Group>, ClientError> {
-        self.get_json(&format!("/admin/realms/{realm}/groups")).await
+        self.get_json(&format!("/admin/realms/{realm}/groups"))
+            .await
     }
     async fn get_group(&self, realm: &str, id: &str) -> Result<Group, ClientError> {
-        self.get_json(&format!("/admin/realms/{realm}/groups/{id}")).await
+        self.get_json(&format!("/admin/realms/{realm}/groups/{id}"))
+            .await
     }
     async fn create_group(&self, realm: &str, group: &Group) -> Result<Group, ClientError> {
-        self.post_json(&format!("/admin/realms/{realm}/groups"), group).await
+        self.post_json(&format!("/admin/realms/{realm}/groups"), group)
+            .await
     }
     async fn update_group(&self, realm: &str, group: &Group) -> Result<Group, ClientError> {
         self.put_json(&format!("/admin/realms/{realm}/groups/{}", group.id), group)
             .await
     }
     async fn delete_group(&self, realm: &str, id: &str) -> Result<(), ClientError> {
-        self.delete_path(&format!("/admin/realms/{realm}/groups/{id}")).await
+        self.delete_path(&format!("/admin/realms/{realm}/groups/{id}"))
+            .await
     }
 
     // identity providers
@@ -1345,11 +1364,7 @@ impl AuthClient for AuthApiClient {
         )
         .await
     }
-    async fn delete_identity_provider(
-        &self,
-        realm: &str,
-        alias: &str,
-    ) -> Result<(), ClientError> {
+    async fn delete_identity_provider(&self, realm: &str, alias: &str) -> Result<(), ClientError> {
         self.delete_path(&format!(
             "/admin/realms/{realm}/identity-provider/instances/{alias}"
         ))
@@ -1364,21 +1379,16 @@ impl AuthClient for AuthApiClient {
             .await
     }
     async fn get_auth_flow(&self, realm: &str, id: &str) -> Result<AuthFlow, ClientError> {
-        self.get_json(&format!(
-            "/admin/realms/{realm}/authentication/flows/{id}"
-        ))
-        .await
+        self.get_json(&format!("/admin/realms/{realm}/authentication/flows/{id}"))
+            .await
     }
     async fn create_auth_flow(
         &self,
         realm: &str,
         flow: &AuthFlow,
     ) -> Result<AuthFlow, ClientError> {
-        self.post_json(
-            &format!("/admin/realms/{realm}/authentication/flows"),
-            flow,
-        )
-        .await
+        self.post_json(&format!("/admin/realms/{realm}/authentication/flows"), flow)
+            .await
     }
     async fn update_auth_flow(
         &self,
@@ -1392,10 +1402,8 @@ impl AuthClient for AuthApiClient {
         .await
     }
     async fn delete_auth_flow(&self, realm: &str, id: &str) -> Result<(), ClientError> {
-        self.delete_path(&format!(
-            "/admin/realms/{realm}/authentication/flows/{id}"
-        ))
-        .await
+        self.delete_path(&format!("/admin/realms/{realm}/authentication/flows/{id}"))
+            .await
     }
 
     // events
@@ -1453,7 +1461,8 @@ impl AuthClient for AuthApiClient {
         _username: &str,
         profile: &AccountProfile,
     ) -> Result<AccountProfile, ClientError> {
-        self.put_json(&format!("/realms/{realm}/account"), profile).await
+        self.put_json(&format!("/realms/{realm}/account"), profile)
+            .await
     }
     async fn list_account_sessions(
         &self,
@@ -1508,11 +1517,7 @@ impl AuthClient for AuthApiClient {
     ) -> Result<tokio::sync::mpsc::Receiver<EventPayload>, ClientError> {
         let url = self.url(&format!("/admin/realms/{realm}/events/stream"));
         let resp = self
-            .auth(
-                self.client
-                    .get(&url)
-                    .header("accept", "text/event-stream"),
-            )
+            .auth(self.client.get(&url).header("accept", "text/event-stream"))
             .send()
             .await?;
         if !resp.status().is_success() {
@@ -1528,7 +1533,9 @@ impl AuthClient for AuthApiClient {
             // without the optional `stream` feature on reqwest; each
             // chunk is parsed line-by-line as Server-Sent-Events.
             while let Ok(Some(bytes)) = resp.chunk().await {
-                let Ok(text) = std::str::from_utf8(&bytes) else { continue };
+                let Ok(text) = std::str::from_utf8(&bytes) else {
+                    continue;
+                };
                 buf.push_str(text);
                 while let Some(idx) = buf.find('\n') {
                     let line = buf[..idx].trim_start_matches("data:").trim().to_string();
@@ -1827,9 +1834,7 @@ mod tests {
             when.method(GET).path("/admin/realms/acme-realm/users");
             then.status(200)
                 .header("content-type", "application/json")
-                .body(
-                    r#"[{"id":"u-1","username":"alice"},{"id":"u-2","username":"bob"}]"#,
-                );
+                .body(r#"[{"id":"u-1","username":"alice"},{"id":"u-2","username":"bob"}]"#);
         });
         let c = AuthApiClient::test_against(server.base_url());
         let v = c.list_users("acme-realm").await.unwrap();
@@ -1867,7 +1872,8 @@ mod tests {
     async fn api_delete_client_returns_unit_on_204() {
         let server = MockServer::start();
         let _m = server.mock(|when, then| {
-            when.method(DELETE).path("/admin/realms/acme-realm/clients/c-1");
+            when.method(DELETE)
+                .path("/admin/realms/acme-realm/clients/c-1");
             then.status(204);
         });
         let c = AuthApiClient::test_against(server.base_url());

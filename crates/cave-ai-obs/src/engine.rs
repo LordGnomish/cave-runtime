@@ -20,8 +20,11 @@ pub fn calculate_stats(model: &str, traces: &[LlmTrace]) -> LlmStats {
         .map(|t| (t.prompt_tokens + t.completion_tokens) as u64)
         .sum();
     let total_cost: f64 = model_traces.iter().map(|t| t.cost_usd).sum();
-    let avg_latency =
-        model_traces.iter().map(|t| t.latency_ms as f64).sum::<f64>() / total as f64;
+    let avg_latency = model_traces
+        .iter()
+        .map(|t| t.latency_ms as f64)
+        .sum::<f64>()
+        / total as f64;
     let errors = model_traces.iter().filter(|t| !t.success).count() as f64;
     LlmStats {
         model: model.to_string(),
@@ -57,7 +60,14 @@ mod tests {
     use std::collections::HashMap;
     use uuid::Uuid;
 
-    fn make_trace(model: &str, prompt: u32, completion: u32, latency: u64, cost: f64, success: bool) -> LlmTrace {
+    fn make_trace(
+        model: &str,
+        prompt: u32,
+        completion: u32,
+        latency: u64,
+        cost: f64,
+        success: bool,
+    ) -> LlmTrace {
         LlmTrace {
             id: Uuid::new_v4(),
             model: model.to_string(),

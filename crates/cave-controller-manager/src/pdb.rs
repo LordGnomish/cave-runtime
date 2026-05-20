@@ -134,7 +134,10 @@ pub fn admit_eviction(status: &PdbStatus, dry_run: bool) -> EvictionDecision {
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::new("pkg/controller/disruption/disruption.go", "DisruptionController");
+const FILE_CITE: Cite = Cite::new(
+    "pkg/controller/disruption/disruption.go",
+    "DisruptionController",
+);
 
 #[cfg(test)]
 mod tests {
@@ -159,7 +162,11 @@ mod tests {
         );
         let _ = tenant;
         let s = pdb_min(Threshold::Count(2));
-        let st = PdbStatus { current_healthy: 5, expected_pods: 5, disruptions_allowed: 0 };
+        let st = PdbStatus {
+            current_healthy: 5,
+            expected_pods: 5,
+            disruptions_allowed: 0,
+        };
         // healthy - min_available = 5 - 2 = 3
         assert_eq!(disruptions_allowed(&s, &st).unwrap(), 3);
     }
@@ -173,7 +180,11 @@ mod tests {
         );
         let _ = tenant;
         let s = pdb_min(Threshold::Percent(60));
-        let st = PdbStatus { current_healthy: 10, expected_pods: 10, disruptions_allowed: 0 };
+        let st = PdbStatus {
+            current_healthy: 10,
+            expected_pods: 10,
+            disruptions_allowed: 0,
+        };
         // need = 60% of 10 = 6 → allowed = 10 - 6 = 4
         assert_eq!(disruptions_allowed(&s, &st).unwrap(), 4);
     }
@@ -192,7 +203,11 @@ mod tests {
             min_available: None,
             max_unavailable: Some(Threshold::Count(2)),
         };
-        let st = PdbStatus { current_healthy: 9, expected_pods: 10, disruptions_allowed: 0 };
+        let st = PdbStatus {
+            current_healthy: 9,
+            expected_pods: 10,
+            disruptions_allowed: 0,
+        };
         // unavail = 1, cap = 2, allowed = 1
         assert_eq!(disruptions_allowed(&spec, &st).unwrap(), 1);
     }
@@ -227,7 +242,11 @@ mod tests {
             "tenant-pdb-evict-allow"
         );
         let _ = tenant;
-        let st = PdbStatus { current_healthy: 5, expected_pods: 5, disruptions_allowed: 2 };
+        let st = PdbStatus {
+            current_healthy: 5,
+            expected_pods: 5,
+            disruptions_allowed: 2,
+        };
         assert_eq!(admit_eviction(&st, false), EvictionDecision::Allow);
     }
 
@@ -242,11 +261,17 @@ mod tests {
             "tenant-pdb-evict-deny"
         );
         let _ = tenant;
-        let st = PdbStatus { current_healthy: 3, expected_pods: 5, disruptions_allowed: 0 };
+        let st = PdbStatus {
+            current_healthy: 3,
+            expected_pods: 5,
+            disruptions_allowed: 0,
+        };
         match admit_eviction(&st, false) {
             EvictionDecision::Deny { reason } => {
-                assert_eq!(reason,
-                    "Cannot evict pod as it would violate the pod's disruption budget.");
+                assert_eq!(
+                    reason,
+                    "Cannot evict pod as it would violate the pod's disruption budget."
+                );
             }
             EvictionDecision::Allow => panic!("expected Deny when budget exhausted"),
         }
@@ -262,8 +287,15 @@ mod tests {
             "tenant-pdb-evict-dryrun"
         );
         let _ = tenant;
-        let st = PdbStatus { current_healthy: 1, expected_pods: 5, disruptions_allowed: 0 };
-        assert_eq!(admit_eviction(&st, /*dry_run=*/ true), EvictionDecision::Allow);
+        let st = PdbStatus {
+            current_healthy: 1,
+            expected_pods: 5,
+            disruptions_allowed: 0,
+        };
+        assert_eq!(
+            admit_eviction(&st, /*dry_run=*/ true),
+            EvictionDecision::Allow
+        );
     }
 
     /// Upstream parity: `TestPDB_ResolveScaleTargetSameNamespace`
@@ -306,7 +338,15 @@ mod tests {
             spec_replicas: 4,
         };
         let err = resolve_scale_target(&spec, &target).unwrap_err();
-        assert!(matches!(err, ControllerError::InvalidSpec { kind: "PodDisruptionBudget", .. }),
-            "tenant_id invariant: cross-namespace target rejected");
+        assert!(
+            matches!(
+                err,
+                ControllerError::InvalidSpec {
+                    kind: "PodDisruptionBudget",
+                    ..
+                }
+            ),
+            "tenant_id invariant: cross-namespace target rejected"
+        );
     }
 }

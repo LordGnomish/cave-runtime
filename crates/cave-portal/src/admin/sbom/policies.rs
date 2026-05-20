@@ -5,10 +5,10 @@
 //!
 //! Upstream: <https://dependencytrack.org/docs/usage/policy-compliance/>
 
+use super::SbomViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, SbomComponent};
-use super::SbomViewError;
+use crate::admin::state::{AdminState, SbomComponent, scope};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PolicyRow {
@@ -20,19 +20,23 @@ pub struct PolicyRow {
 
 pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<PolicyRow>, SbomViewError> {
     ctx.authorise(Permission::SbomRead)?;
-    let rows: Vec<SbomComponent> = scope(
-        &state.sbom_components.read().unwrap(),
-        &ctx.tenant,
-        |r| &r.tenant,
-    )
-    .into_iter()
-    .cloned()
-    .collect();
+    let rows: Vec<SbomComponent> =
+        scope(&state.sbom_components.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     let copyleft_hits = rows
         .iter()
-        .filter(|r| r.license.eq_ignore_ascii_case("GPL-3.0") || r.license.eq_ignore_ascii_case("AGPL-3.0"))
+        .filter(|r| {
+            r.license.eq_ignore_ascii_case("GPL-3.0") || r.license.eq_ignore_ascii_case("AGPL-3.0")
+        })
         .count();
-    let unknown_license_hits = rows.iter().filter(|r| r.license.eq_ignore_ascii_case("Unknown")).count();
+    let unknown_license_hits = rows
+        .iter()
+        .filter(|r| r.license.eq_ignore_ascii_case("Unknown"))
+        .count();
     Ok(vec![
         PolicyRow {
             name: "Block copyleft",
@@ -65,12 +69,14 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SbomViewEr
     let rows = list(state, ctx)?;
     let table_rows: Vec<Vec<String>> = rows
         .iter()
-        .map(|r| vec![
-            r.name.to_string(),
-            r.kind.to_string(),
-            r.state.to_string(),
-            r.matches.to_string(),
-        ])
+        .map(|r| {
+            vec![
+                r.name.to_string(),
+                r.kind.to_string(),
+                r.state.to_string(),
+                r.matches.to_string(),
+            ]
+        })
         .collect();
     let body = format!(
         r#"<section>
@@ -92,7 +98,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SbomViewEr
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
+    fn ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer("acme", perms)
+    }
 
     #[test]
     fn list_rejects_no_perm() {

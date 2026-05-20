@@ -58,9 +58,7 @@ impl FindingStatus {
     pub fn is_closed(&self) -> bool {
         matches!(
             self,
-            FindingStatus::FalsePositive
-                | FindingStatus::Mitigated
-                | FindingStatus::OutOfScope
+            FindingStatus::FalsePositive | FindingStatus::Mitigated | FindingStatus::OutOfScope
         )
     }
 }
@@ -78,8 +76,8 @@ pub struct Finding {
     pub component: Option<String>,
     pub file_path: Option<String>,
     pub line: Option<u32>,
-    pub created_day: String,    // YYYY-MM-DD
-    pub last_seen_day: String,  // YYYY-MM-DD
+    pub created_day: String,   // YYYY-MM-DD
+    pub last_seen_day: String, // YYYY-MM-DD
     pub closed_day: Option<String>,
     pub assigned_to: Option<String>,
     pub tags: Vec<String>,
@@ -223,11 +221,15 @@ impl DefectDojoPlugin {
             .filter(|f| q.product.as_deref().map_or(true, |p| f.product == p))
             .filter(|f| q.severity.map_or(true, |s| f.severity == s))
             .filter(|f| q.status.map_or(true, |s| f.status == s))
-            .filter(|f| q.cve.as_deref().map_or(true, |c| f.cve.as_deref() == Some(c)))
             .filter(|f| {
-                q.assigned_to.as_deref().map_or(true, |u| {
-                    f.assigned_to.as_deref() == Some(u)
-                })
+                q.cve
+                    .as_deref()
+                    .map_or(true, |c| f.cve.as_deref() == Some(c))
+            })
+            .filter(|f| {
+                q.assigned_to
+                    .as_deref()
+                    .map_or(true, |u| f.assigned_to.as_deref() == Some(u))
             })
             .take(limit)
             .collect();
@@ -456,12 +458,15 @@ mod tests {
 
     fn populated() -> DefectDojoPlugin {
         let mut p = DefectDojoPlugin::new();
-        p.upsert(finding("a-1", Severity::Critical, "2026-04-01")).unwrap();
-        p.upsert(finding("a-2", Severity::High, "2026-04-15")).unwrap();
+        p.upsert(finding("a-1", Severity::Critical, "2026-04-01"))
+            .unwrap();
+        p.upsert(finding("a-2", Severity::High, "2026-04-15"))
+            .unwrap();
         let mut m = finding("a-3", Severity::Medium, "2026-04-20");
         m.product = "api".into();
         p.upsert(m).unwrap();
-        p.upsert(finding("a-4", Severity::Low, "2026-04-25")).unwrap();
+        p.upsert(finding("a-4", Severity::Low, "2026-04-25"))
+            .unwrap();
         p
     }
 
@@ -563,7 +568,14 @@ mod tests {
     #[test]
     fn query_filters_by_status() {
         let mut p = populated();
-        p.transition("acme", "a-2", FindingStatus::Mitigated, "alice", "2026-04-26").unwrap();
+        p.transition(
+            "acme",
+            "a-2",
+            FindingStatus::Mitigated,
+            "alice",
+            "2026-04-26",
+        )
+        .unwrap();
         let q = FindingQuery {
             tenant: "acme".into(),
             status: Some(FindingStatus::Mitigated),
@@ -575,7 +587,10 @@ mod tests {
     #[test]
     fn query_returns_descending_severity() {
         let p = populated();
-        let q = FindingQuery { tenant: "acme".into(), ..Default::default() };
+        let q = FindingQuery {
+            tenant: "acme".into(),
+            ..Default::default()
+        };
         let out = p.query(&q);
         let sevs: Vec<Severity> = out.iter().map(|f| f.severity).collect();
         let mut sorted = sevs.clone();
@@ -589,7 +604,10 @@ mod tests {
         let mut g = finding("g-1", Severity::High, "2026-04-01");
         g.tenant = "globex".into();
         p.upsert(g).unwrap();
-        let q = FindingQuery { tenant: "globex".into(), ..Default::default() };
+        let q = FindingQuery {
+            tenant: "globex".into(),
+            ..Default::default()
+        };
         let out = p.query(&q);
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].tenant, "globex");
@@ -598,7 +616,11 @@ mod tests {
     #[test]
     fn query_respects_limit() {
         let p = populated();
-        let q = FindingQuery { tenant: "acme".into(), limit: Some(2), ..Default::default() };
+        let q = FindingQuery {
+            tenant: "acme".into(),
+            limit: Some(2),
+            ..Default::default()
+        };
         let out = p.query(&q);
         assert_eq!(out.len(), 2);
     }
@@ -620,7 +642,14 @@ mod tests {
     #[test]
     fn query_filters_by_assignee() {
         let mut p = populated();
-        p.transition("acme", "a-2", FindingStatus::Confirmed, "alice", "2026-04-26").unwrap();
+        p.transition(
+            "acme",
+            "a-2",
+            FindingStatus::Confirmed,
+            "alice",
+            "2026-04-26",
+        )
+        .unwrap();
         let q = FindingQuery {
             tenant: "acme".into(),
             assigned_to: Some("alice".into()),
@@ -634,7 +663,15 @@ mod tests {
     #[test]
     fn transition_to_mitigated_records_closed_day() {
         let mut p = populated();
-        let f = p.transition("acme", "a-1", FindingStatus::Mitigated, "alice", "2026-04-26").unwrap();
+        let f = p
+            .transition(
+                "acme",
+                "a-1",
+                FindingStatus::Mitigated,
+                "alice",
+                "2026-04-26",
+            )
+            .unwrap();
         assert_eq!(f.status, FindingStatus::Mitigated);
         assert_eq!(f.closed_day.as_deref(), Some("2026-04-26"));
     }
@@ -642,25 +679,34 @@ mod tests {
     #[test]
     fn transition_unknown_finding() {
         let mut p = DefectDojoPlugin::new();
-        let err = p.transition("acme", "ghost", FindingStatus::Open, "x", "2026-04-26").unwrap_err();
+        let err = p
+            .transition("acme", "ghost", FindingStatus::Open, "x", "2026-04-26")
+            .unwrap_err();
         assert!(matches!(err, DefectError::NotFound(_)));
     }
 
     #[test]
     fn transition_invalid_today() {
         let mut p = populated();
-        let err = p.transition("acme", "a-1", FindingStatus::Confirmed, "x", "bad").unwrap_err();
+        let err = p
+            .transition("acme", "a-1", FindingStatus::Confirmed, "x", "bad")
+            .unwrap_err();
         assert!(matches!(err, DefectError::InvalidDay(_)));
     }
 
     #[test]
     fn transition_closed_can_only_reopen() {
         let mut p = populated();
-        p.transition("acme", "a-1", FindingStatus::Mitigated, "x", "2026-04-26").unwrap();
-        let err = p.transition("acme", "a-1", FindingStatus::Confirmed, "x", "2026-04-26").unwrap_err();
+        p.transition("acme", "a-1", FindingStatus::Mitigated, "x", "2026-04-26")
+            .unwrap();
+        let err = p
+            .transition("acme", "a-1", FindingStatus::Confirmed, "x", "2026-04-26")
+            .unwrap_err();
         assert!(matches!(err, DefectError::AlreadyClosed(_)));
         // reopening is allowed
-        let f = p.transition("acme", "a-1", FindingStatus::Open, "x", "2026-04-27").unwrap();
+        let f = p
+            .transition("acme", "a-1", FindingStatus::Open, "x", "2026-04-27")
+            .unwrap();
         assert_eq!(f.status, FindingStatus::Open);
         assert!(f.closed_day.is_none());
     }
@@ -668,10 +714,17 @@ mod tests {
     #[test]
     fn accept_risk_critical_requires_admin() {
         let mut p = populated();
-        let err = p.accept_risk(
-            ViewPersona::Tenant, "acme", "a-1", "alice", "fp", "2026-04-26", "2026-05-26",
-        )
-        .unwrap_err();
+        let err = p
+            .accept_risk(
+                ViewPersona::Tenant,
+                "acme",
+                "a-1",
+                "alice",
+                "fp",
+                "2026-04-26",
+                "2026-05-26",
+            )
+            .unwrap_err();
         assert!(matches!(err, DefectError::AdminOnlyAcceptance(_)));
     }
 
@@ -680,7 +733,13 @@ mod tests {
         let mut p = populated();
         let acc = p
             .accept_risk(
-                ViewPersona::Admin, "acme", "a-1", "alice", "compensating ctrl", "2026-04-26", "2026-05-26",
+                ViewPersona::Admin,
+                "acme",
+                "a-1",
+                "alice",
+                "compensating ctrl",
+                "2026-04-26",
+                "2026-05-26",
             )
             .unwrap();
         assert_eq!(acc.accepted_by, "alice");
@@ -689,51 +748,138 @@ mod tests {
     #[test]
     fn accept_risk_changes_status() {
         let mut p = populated();
-        p.accept_risk(ViewPersona::Tenant, "acme", "a-2", "alice", "r", "2026-04-26", "2026-05-26").unwrap();
-        assert_eq!(p.find("acme", "a-2").unwrap().status, FindingStatus::RiskAccepted);
+        p.accept_risk(
+            ViewPersona::Tenant,
+            "acme",
+            "a-2",
+            "alice",
+            "r",
+            "2026-04-26",
+            "2026-05-26",
+        )
+        .unwrap();
+        assert_eq!(
+            p.find("acme", "a-2").unwrap().status,
+            FindingStatus::RiskAccepted
+        );
     }
 
     #[test]
     fn accept_risk_duplicate_rejected() {
         let mut p = populated();
-        p.accept_risk(ViewPersona::Tenant, "acme", "a-2", "alice", "r", "2026-04-26", "2026-05-26").unwrap();
-        let err = p.accept_risk(ViewPersona::Tenant, "acme", "a-2", "bob", "r", "2026-04-26", "2026-05-26").unwrap_err();
+        p.accept_risk(
+            ViewPersona::Tenant,
+            "acme",
+            "a-2",
+            "alice",
+            "r",
+            "2026-04-26",
+            "2026-05-26",
+        )
+        .unwrap();
+        let err = p
+            .accept_risk(
+                ViewPersona::Tenant,
+                "acme",
+                "a-2",
+                "bob",
+                "r",
+                "2026-04-26",
+                "2026-05-26",
+            )
+            .unwrap_err();
         assert!(matches!(err, DefectError::AlreadyAccepted(_)));
     }
 
     #[test]
     fn accept_risk_invalid_day() {
         let mut p = populated();
-        let err = p.accept_risk(ViewPersona::Tenant, "acme", "a-2", "x", "r", "bad", "2026-05-26").unwrap_err();
+        let err = p
+            .accept_risk(
+                ViewPersona::Tenant,
+                "acme",
+                "a-2",
+                "x",
+                "r",
+                "bad",
+                "2026-05-26",
+            )
+            .unwrap_err();
         assert!(matches!(err, DefectError::InvalidDay(_)));
     }
 
     #[test]
     fn accept_risk_expiry_must_be_after_acceptance() {
         let mut p = populated();
-        let err = p.accept_risk(ViewPersona::Tenant, "acme", "a-2", "x", "r", "2026-04-26", "2026-04-26").unwrap_err();
+        let err = p
+            .accept_risk(
+                ViewPersona::Tenant,
+                "acme",
+                "a-2",
+                "x",
+                "r",
+                "2026-04-26",
+                "2026-04-26",
+            )
+            .unwrap_err();
         assert_eq!(err, DefectError::BadExpiry);
     }
 
     #[test]
     fn accept_risk_unknown_finding() {
         let mut p = populated();
-        let err = p.accept_risk(ViewPersona::Tenant, "acme", "ghost", "x", "r", "2026-04-26", "2026-05-26").unwrap_err();
+        let err = p
+            .accept_risk(
+                ViewPersona::Tenant,
+                "acme",
+                "ghost",
+                "x",
+                "r",
+                "2026-04-26",
+                "2026-05-26",
+            )
+            .unwrap_err();
         assert!(matches!(err, DefectError::NotFound(_)));
     }
 
     #[test]
     fn accept_risk_closed_finding_rejected() {
         let mut p = populated();
-        p.transition("acme", "a-2", FindingStatus::Mitigated, "alice", "2026-04-26").unwrap();
-        let err = p.accept_risk(ViewPersona::Tenant, "acme", "a-2", "x", "r", "2026-04-26", "2026-05-26").unwrap_err();
+        p.transition(
+            "acme",
+            "a-2",
+            FindingStatus::Mitigated,
+            "alice",
+            "2026-04-26",
+        )
+        .unwrap();
+        let err = p
+            .accept_risk(
+                ViewPersona::Tenant,
+                "acme",
+                "a-2",
+                "x",
+                "r",
+                "2026-04-26",
+                "2026-05-26",
+            )
+            .unwrap_err();
         assert!(matches!(err, DefectError::AlreadyClosed(_)));
     }
 
     #[test]
     fn acceptance_lookup() {
         let mut p = populated();
-        p.accept_risk(ViewPersona::Tenant, "acme", "a-2", "alice", "r", "2026-04-26", "2026-05-26").unwrap();
+        p.accept_risk(
+            ViewPersona::Tenant,
+            "acme",
+            "a-2",
+            "alice",
+            "r",
+            "2026-04-26",
+            "2026-05-26",
+        )
+        .unwrap();
         assert!(p.acceptance("a-2").is_some());
         assert!(p.acceptance("ghost").is_none());
     }
@@ -741,7 +887,16 @@ mod tests {
     #[test]
     fn expire_acceptances_reopens_finding() {
         let mut p = populated();
-        p.accept_risk(ViewPersona::Tenant, "acme", "a-2", "alice", "r", "2026-04-01", "2026-04-15").unwrap();
+        p.accept_risk(
+            ViewPersona::Tenant,
+            "acme",
+            "a-2",
+            "alice",
+            "r",
+            "2026-04-01",
+            "2026-04-15",
+        )
+        .unwrap();
         let n = p.expire_acceptances("2026-04-26");
         assert_eq!(n, 1);
         assert_eq!(p.find("acme", "a-2").unwrap().status, FindingStatus::Open);
@@ -750,7 +905,16 @@ mod tests {
     #[test]
     fn expire_acceptances_keeps_unexpired() {
         let mut p = populated();
-        p.accept_risk(ViewPersona::Tenant, "acme", "a-2", "alice", "r", "2026-04-26", "2026-06-26").unwrap();
+        p.accept_risk(
+            ViewPersona::Tenant,
+            "acme",
+            "a-2",
+            "alice",
+            "r",
+            "2026-04-26",
+            "2026-06-26",
+        )
+        .unwrap();
         let n = p.expire_acceptances("2026-04-27");
         assert_eq!(n, 0);
     }
@@ -758,7 +922,16 @@ mod tests {
     #[test]
     fn expire_acceptances_invalid_today_noop() {
         let mut p = populated();
-        p.accept_risk(ViewPersona::Tenant, "acme", "a-2", "x", "r", "2026-04-26", "2026-06-26").unwrap();
+        p.accept_risk(
+            ViewPersona::Tenant,
+            "acme",
+            "a-2",
+            "x",
+            "r",
+            "2026-04-26",
+            "2026-06-26",
+        )
+        .unwrap();
         assert_eq!(p.expire_acceptances("bad"), 0);
     }
 
@@ -793,7 +966,8 @@ mod tests {
     #[test]
     fn sla_report_skips_closed() {
         let mut p = populated();
-        p.transition("acme", "a-1", FindingStatus::Mitigated, "x", "2026-04-26").unwrap();
+        p.transition("acme", "a-1", FindingStatus::Mitigated, "x", "2026-04-26")
+            .unwrap();
         let r = p.sla_report("acme", "2026-04-27");
         let crit = r.iter().find(|x| x.severity == Severity::Critical);
         assert!(crit.is_none());
@@ -821,7 +995,8 @@ mod tests {
     #[test]
     fn by_product_aggregates_open_and_closed() {
         let mut p = populated();
-        p.transition("acme", "a-1", FindingStatus::Mitigated, "x", "2026-04-26").unwrap();
+        p.transition("acme", "a-1", FindingStatus::Mitigated, "x", "2026-04-26")
+            .unwrap();
         let by = p.by_product("acme");
         let web = &by["web"];
         assert_eq!(web.closed, 1);

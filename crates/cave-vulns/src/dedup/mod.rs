@@ -20,8 +20,10 @@ use std::collections::HashMap;
 
 pub mod legacy;
 pub mod scanner_fields;
-pub use legacy::{deduplicate, dedup_key as legacy_vuln_dedup_key, is_sla_breached, sla_days, sla_deadline};
-pub use scanner_fields::{fields_for_scanner, HashField, HASHCODE_FIELDS_PER_SCANNER};
+pub use legacy::{
+    dedup_key as legacy_vuln_dedup_key, deduplicate, is_sla_breached, sla_days, sla_deadline,
+};
+pub use scanner_fields::{HASHCODE_FIELDS_PER_SCANNER, HashField, fields_for_scanner};
 
 /// DefectDojo's four canonical dedup algorithms.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -109,7 +111,9 @@ pub fn dedup_key(f: &Finding, algo: DedupAlgorithm, scanner: Option<&str>) -> Op
         DedupAlgorithm::Legacy => Some(legacy_key(f)),
         DedupAlgorithm::HashCode => Some(hash_code_for(f, scanner)),
         DedupAlgorithm::UniqueIdFromTool => unique_id_key(f),
-        DedupAlgorithm::UniqueIdFromToolOrHashCode => unique_id_key(f).or_else(|| Some(hash_code_for(f, scanner))),
+        DedupAlgorithm::UniqueIdFromToolOrHashCode => {
+            unique_id_key(f).or_else(|| Some(hash_code_for(f, scanner)))
+        }
     }
 }
 
@@ -152,7 +156,10 @@ pub fn deduplicate_batch(
             }
         }
     }
-    order.into_iter().filter_map(|k| by_key.remove(&k)).collect()
+    order
+        .into_iter()
+        .filter_map(|k| by_key.remove(&k))
+        .collect()
 }
 
 #[cfg(test)]
@@ -171,9 +178,18 @@ mod tests {
 
     #[test]
     fn algorithm_parse_roundtrip() {
-        assert_eq!(DedupAlgorithm::parse("legacy"), Some(DedupAlgorithm::Legacy));
-        assert_eq!(DedupAlgorithm::parse("hash_code"), Some(DedupAlgorithm::HashCode));
-        assert_eq!(DedupAlgorithm::parse("unique_id_from_tool"), Some(DedupAlgorithm::UniqueIdFromTool));
+        assert_eq!(
+            DedupAlgorithm::parse("legacy"),
+            Some(DedupAlgorithm::Legacy)
+        );
+        assert_eq!(
+            DedupAlgorithm::parse("hash_code"),
+            Some(DedupAlgorithm::HashCode)
+        );
+        assert_eq!(
+            DedupAlgorithm::parse("unique_id_from_tool"),
+            Some(DedupAlgorithm::UniqueIdFromTool)
+        );
         assert_eq!(
             DedupAlgorithm::parse("unique_id_from_tool_or_hash_code"),
             Some(DedupAlgorithm::UniqueIdFromToolOrHashCode)
@@ -208,7 +224,10 @@ mod tests {
         let a = mk("X", 79, FindingSeverity::Low);
         let mut b = mk("X", 79, FindingSeverity::Low);
         b.line = Some(99);
-        assert_ne!(hash_code_for(&a, Some("Bandit Scan")), hash_code_for(&b, Some("Bandit Scan")));
+        assert_ne!(
+            hash_code_for(&a, Some("Bandit Scan")),
+            hash_code_for(&b, Some("Bandit Scan"))
+        );
     }
 
     #[test]
@@ -217,7 +236,10 @@ mod tests {
         // Same finding hashed against two scanners → different keys.
         let mut f = mk("X", 79, FindingSeverity::Low);
         f.vuln_id_from_tool = Some("B101".into());
-        assert_ne!(hash_code_for(&f, Some("Bandit Scan")), hash_code_for(&f, Some("ZAP Scan")));
+        assert_ne!(
+            hash_code_for(&f, Some("Bandit Scan")),
+            hash_code_for(&f, Some("ZAP Scan"))
+        );
     }
 
     #[test]
@@ -234,14 +256,24 @@ mod tests {
     fn uid_or_hash_prefers_uid_when_present() {
         let mut f = mk("X", 79, FindingSeverity::Low);
         f.unique_id_from_tool = Some("xyz".into());
-        let key = dedup_key(&f, DedupAlgorithm::UniqueIdFromToolOrHashCode, Some("Bandit Scan")).unwrap();
+        let key = dedup_key(
+            &f,
+            DedupAlgorithm::UniqueIdFromToolOrHashCode,
+            Some("Bandit Scan"),
+        )
+        .unwrap();
         assert!(key.starts_with("uid|"));
     }
 
     #[test]
     fn uid_or_hash_falls_back_to_hash_when_uid_missing() {
         let f = mk("X", 79, FindingSeverity::Low);
-        let key = dedup_key(&f, DedupAlgorithm::UniqueIdFromToolOrHashCode, Some("Bandit Scan")).unwrap();
+        let key = dedup_key(
+            &f,
+            DedupAlgorithm::UniqueIdFromToolOrHashCode,
+            Some("Bandit Scan"),
+        )
+        .unwrap();
         assert!(!key.starts_with("uid|"));
         assert_eq!(key.len(), 64); // sha256
     }
@@ -252,7 +284,11 @@ mod tests {
         let a = mk("X", 79, FindingSeverity::High);
         let b = mk("X", 79, FindingSeverity::Critical);
         let c = mk("X", 79, FindingSeverity::Medium);
-        let out = deduplicate_batch(vec![a, b, c], DedupAlgorithm::HashCode, Some("Semgrep JSON Report"));
+        let out = deduplicate_batch(
+            vec![a, b, c],
+            DedupAlgorithm::HashCode,
+            Some("Semgrep JSON Report"),
+        );
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].severity, FindingSeverity::Critical);
         assert_eq!(out[0].nb_occurences, 3);
@@ -262,7 +298,11 @@ mod tests {
     fn deduplicate_batch_keeps_distinct_findings_apart() {
         let a = mk("X", 79, FindingSeverity::High);
         let b = mk("Y", 89, FindingSeverity::High);
-        let out = deduplicate_batch(vec![a, b], DedupAlgorithm::HashCode, Some("Semgrep JSON Report"));
+        let out = deduplicate_batch(
+            vec![a, b],
+            DedupAlgorithm::HashCode,
+            Some("Semgrep JSON Report"),
+        );
         assert_eq!(out.len(), 2);
     }
 
@@ -270,7 +310,11 @@ mod tests {
     fn deduplicate_batch_preserves_first_seen_order() {
         let z = mk("Zebra", 79, FindingSeverity::High);
         let a = mk("Alpha", 89, FindingSeverity::High);
-        let out = deduplicate_batch(vec![z, a], DedupAlgorithm::HashCode, Some("Semgrep JSON Report"));
+        let out = deduplicate_batch(
+            vec![z, a],
+            DedupAlgorithm::HashCode,
+            Some("Semgrep JSON Report"),
+        );
         assert_eq!(out[0].title, "Zebra");
         assert_eq!(out[1].title, "Alpha");
     }

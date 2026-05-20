@@ -36,10 +36,17 @@ fn put_version(secret: &mut Kv2Secret, kv: &[(&str, &str)]) -> u64 {
 #[test]
 fn put_first_write_creates_version_1() {
     let mut store = Kv2Store::default();
-    let secret = store.data.entry("kv".into()).or_default()
-        .entry("api/db".into()).or_default();
+    let secret = store
+        .data
+        .entry("kv".into())
+        .or_default()
+        .entry("api/db".into())
+        .or_default();
 
-    assert_eq!(secret.current_version, 0, "fresh secret starts at version 0");
+    assert_eq!(
+        secret.current_version, 0,
+        "fresh secret starts at version 0"
+    );
     let v = put_version(secret, &[("user", "alice"), ("pass", "hunter2")]);
     assert_eq!(v, 1);
     assert_eq!(secret.current_version, 1);
@@ -52,8 +59,12 @@ fn put_first_write_creates_version_1() {
 #[test]
 fn get_returns_current_version() {
     let mut store = Kv2Store::default();
-    let secret = store.data.entry("kv".into()).or_default()
-        .entry("svc/token".into()).or_default();
+    let secret = store
+        .data
+        .entry("kv".into())
+        .or_default()
+        .entry("svc/token".into())
+        .or_default();
     put_version(secret, &[("token", "v1")]);
     put_version(secret, &[("token", "v2")]);
     put_version(secret, &[("token", "v3")]);
@@ -61,7 +72,11 @@ fn get_returns_current_version() {
     let cur = secret.current().expect("current version exists");
     assert_eq!(cur.version, 3);
     assert_eq!(
-        cur.data.as_ref().unwrap().get("token").and_then(|v| v.as_str()),
+        cur.data
+            .as_ref()
+            .unwrap()
+            .get("token")
+            .and_then(|v| v.as_str()),
         Some("v3"),
     );
 }
@@ -72,14 +87,22 @@ fn get_returns_current_version() {
 #[test]
 fn get_specific_version_returns_historical_data() {
     let mut store = Kv2Store::default();
-    let secret = store.data.entry("kv".into()).or_default()
-        .entry("svc/token".into()).or_default();
+    let secret = store
+        .data
+        .entry("kv".into())
+        .or_default()
+        .entry("svc/token".into())
+        .or_default();
     put_version(secret, &[("token", "old")]);
     put_version(secret, &[("token", "new")]);
 
     let v1 = secret.get_version(1).expect("v1 still accessible");
     assert_eq!(
-        v1.data.as_ref().unwrap().get("token").and_then(|v| v.as_str()),
+        v1.data
+            .as_ref()
+            .unwrap()
+            .get("token")
+            .and_then(|v| v.as_str()),
         Some("old"),
     );
 }
@@ -90,8 +113,12 @@ fn get_specific_version_returns_historical_data() {
 #[test]
 fn soft_delete_marks_deletion_time_but_keeps_data() {
     let mut store = Kv2Store::default();
-    let secret = store.data.entry("kv".into()).or_default()
-        .entry("svc/k".into()).or_default();
+    let secret = store
+        .data
+        .entry("kv".into())
+        .or_default()
+        .entry("svc/k".into())
+        .or_default();
     put_version(secret, &[("k", "v")]);
     let cv = secret.current_version;
 
@@ -109,8 +136,12 @@ fn soft_delete_marks_deletion_time_but_keeps_data() {
 #[test]
 fn undelete_clears_deletion_time() {
     let mut store = Kv2Store::default();
-    let secret = store.data.entry("kv".into()).or_default()
-        .entry("svc/k".into()).or_default();
+    let secret = store
+        .data
+        .entry("kv".into())
+        .or_default()
+        .entry("svc/k".into())
+        .or_default();
     put_version(secret, &[("k", "v")]);
     let v = secret.get_version_mut(1).unwrap();
     v.deletion_time = Some(Utc::now());
@@ -132,8 +163,12 @@ fn undelete_clears_deletion_time() {
 #[test]
 fn destroy_purges_data_irreversibly() {
     let mut store = Kv2Store::default();
-    let secret = store.data.entry("kv".into()).or_default()
-        .entry("svc/k".into()).or_default();
+    let secret = store
+        .data
+        .entry("kv".into())
+        .or_default()
+        .entry("svc/k".into())
+        .or_default();
     put_version(secret, &[("k", "v")]);
 
     {
@@ -162,8 +197,12 @@ fn destroy_purges_data_irreversibly() {
 #[test]
 fn max_versions_evicts_oldest() {
     let mut store = Kv2Store::default();
-    let secret = store.data.entry("kv".into()).or_default()
-        .entry("svc/rolling".into()).or_default();
+    let secret = store
+        .data
+        .entry("kv".into())
+        .or_default()
+        .entry("svc/rolling".into())
+        .or_default();
     secret.max_versions = 3;
 
     for i in 1..=5 {
@@ -178,7 +217,10 @@ fn max_versions_evicts_oldest() {
 
     assert_eq!(secret.current_version, 5);
     assert_eq!(secret.versions.len(), 3);
-    assert_eq!(secret.oldest_version, 3, "oldest_version advances past evicted ones");
+    assert_eq!(
+        secret.oldest_version, 3,
+        "oldest_version advances past evicted ones"
+    );
     assert!(secret.get_version(1).is_none());
     assert!(secret.get_version(3).is_some());
     assert!(secret.get_version(5).is_some());
@@ -208,7 +250,10 @@ fn list_returns_directory_style_keys() {
         }
     }
     let keys: Vec<String> = seen.into_iter().collect();
-    assert_eq!(keys, vec!["api/".to_string(), "standalone".into(), "web/".into()]);
+    assert_eq!(
+        keys,
+        vec!["api/".to_string(), "standalone".into(), "web/".into()]
+    );
 }
 
 /// Cite: openbao `builtin/logical/kv/path_metadata.go:334` (pathMetadataRead)
@@ -218,8 +263,12 @@ fn list_returns_directory_style_keys() {
 #[test]
 fn metadata_includes_per_version_map() {
     let mut store = Kv2Store::default();
-    let secret = store.data.entry("kv".into()).or_default()
-        .entry("a".into()).or_default();
+    let secret = store
+        .data
+        .entry("kv".into())
+        .or_default()
+        .entry("a".into())
+        .or_default();
     put_version(secret, &[("k", "v1")]);
     put_version(secret, &[("k", "v2")]);
 
@@ -240,14 +289,21 @@ fn metadata_includes_per_version_map() {
 #[test]
 fn cas_mismatch_blocks_write() {
     let mut store = Kv2Store::default();
-    let secret = store.data.entry("kv".into()).or_default()
-        .entry("svc/cas".into()).or_default();
+    let secret = store
+        .data
+        .entry("kv".into())
+        .or_default()
+        .entry("svc/cas".into())
+        .or_default();
     put_version(secret, &[("v", "1")]);
     assert_eq!(secret.current_version, 1);
 
     // attempt CAS=0 (would only succeed against an empty path)
     let cas: u64 = 0;
-    assert_ne!(cas, secret.current_version, "CAS must match — this would fail in handler");
+    assert_ne!(
+        cas, secret.current_version,
+        "CAS must match — this would fail in handler"
+    );
 
     // CAS that matches advances version
     let cas: u64 = 1;

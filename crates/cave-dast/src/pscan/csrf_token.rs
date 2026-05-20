@@ -47,10 +47,9 @@ impl PassiveScanRule for CsrfTokenAbsenceRule {
         let body = resp.body_str().unwrap_or("");
         let mut alerts = Vec::new();
         for (idx, form) in find_forms(body).iter().enumerate() {
-            let method_state_changing =
-                form.method.eq_ignore_ascii_case("post")
-                    || form.method.eq_ignore_ascii_case("put")
-                    || form.method.eq_ignore_ascii_case("delete");
+            let method_state_changing = form.method.eq_ignore_ascii_case("post")
+                || form.method.eq_ignore_ascii_case("put")
+                || form.method.eq_ignore_ascii_case("delete");
             if !method_state_changing {
                 continue;
             }
@@ -122,7 +121,9 @@ fn extract_attr(tag: &str, name: &str) -> Option<String> {
     let val = match after.chars().next() {
         Some('"') => after[1..].split('"').next()?,
         Some('\'') => after[1..].split('\'').next()?,
-        _ => after.split(|c: char| c.is_whitespace() || c == '>').next()?,
+        _ => after
+            .split(|c: char| c.is_whitespace() || c == '>')
+            .next()?,
     };
     Some(val.to_string())
 }

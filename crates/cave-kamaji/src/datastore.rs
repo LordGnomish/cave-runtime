@@ -36,7 +36,10 @@ impl DataStore {
     /// alignment with the chosen kind.
     pub fn validate(&self) -> Result<(), String> {
         if self.spec.endpoints.is_empty() {
-            return Err(format!("datastore {}: endpoints must not be empty", self.name));
+            return Err(format!(
+                "datastore {}: endpoints must not be empty",
+                self.name
+            ));
         }
         match self.spec.kind {
             DataStoreKind::Postgres if self.spec.kine_driver != Some(KineDriver::Postgres) => {

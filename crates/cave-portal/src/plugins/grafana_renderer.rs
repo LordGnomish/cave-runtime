@@ -106,7 +106,12 @@ pub fn referenced_variables(query: &str) -> Vec<String> {
 
 /// Render a series as a minimal inline SVG. Width/height are in user units;
 /// the SVG includes a viewport, axes, polyline path, and a label.
-pub fn render_timeseries_svg(panel: &PanelDef, series: &[Series], width: u32, height: u32) -> Result<String, RendererError> {
+pub fn render_timeseries_svg(
+    panel: &PanelDef,
+    series: &[Series],
+    width: u32,
+    height: u32,
+) -> Result<String, RendererError> {
     if !matches!(panel.kind, PanelKind::Timeseries) {
         return Err(RendererError::Unsupported(panel.kind));
     }
@@ -117,19 +122,34 @@ pub fn render_timeseries_svg(panel: &PanelDef, series: &[Series], width: u32, he
     let unit = escape_xml(&panel.unit);
     let mut paths = String::new();
 
-    let (mut min_x, mut max_x, mut min_y, mut max_y) =
-        (f64::INFINITY, f64::NEG_INFINITY, f64::INFINITY, f64::NEG_INFINITY);
+    let (mut min_x, mut max_x, mut min_y, mut max_y) = (
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+    );
     for s in series {
         for (x, y) in &s.points {
-            if *x < min_x { min_x = *x; }
-            if *x > max_x { max_x = *x; }
-            if *y < min_y { min_y = *y; }
-            if *y > max_y { max_y = *y; }
+            if *x < min_x {
+                min_x = *x;
+            }
+            if *x > max_x {
+                max_x = *x;
+            }
+            if *y < min_y {
+                min_y = *y;
+            }
+            if *y > max_y {
+                max_y = *y;
+            }
         }
     }
     if min_x.is_infinite() {
         // empty
-        min_x = 0.0; max_x = 1.0; min_y = 0.0; max_y = 1.0;
+        min_x = 0.0;
+        max_x = 1.0;
+        min_y = 0.0;
+        max_y = 1.0;
     }
     if (max_x - min_x).abs() < f64::EPSILON {
         max_x = min_x + 1.0;
@@ -250,11 +270,14 @@ pub fn render_dashboard_resolved(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::grafana::PanelDef;
+    use super::*;
 
     fn vars(pairs: &[(&str, &str)]) -> HashMap<String, String> {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
     fn panel(kind: PanelKind, title: &str, query: &str) -> PanelDef {
@@ -337,7 +360,10 @@ mod tests {
     #[test]
     fn render_timeseries_includes_dimensions() {
         let p = panel(PanelKind::Timeseries, "T", "x");
-        let s = vec![Series { label: "a".into(), points: vec![(0.0, 0.0), (1.0, 1.0)] }];
+        let s = vec![Series {
+            label: "a".into(),
+            points: vec![(0.0, 0.0), (1.0, 1.0)],
+        }];
         let svg = render_timeseries_svg(&p, &s, 200, 100).unwrap();
         assert!(svg.contains("width=\"200\""));
         assert!(svg.contains("height=\"100\""));
@@ -346,7 +372,10 @@ mod tests {
     #[test]
     fn render_timeseries_includes_path() {
         let p = panel(PanelKind::Timeseries, "T", "x");
-        let s = vec![Series { label: "a".into(), points: vec![(0.0, 0.0), (1.0, 1.0)] }];
+        let s = vec![Series {
+            label: "a".into(),
+            points: vec![(0.0, 0.0), (1.0, 1.0)],
+        }];
         let svg = render_timeseries_svg(&p, &s, 200, 100).unwrap();
         assert!(svg.contains("<path d=\""));
     }
@@ -398,7 +427,10 @@ mod tests {
     #[test]
     fn render_timeseries_constant_y_no_div_zero() {
         let p = panel(PanelKind::Timeseries, "T", "x");
-        let s = vec![Series { label: "a".into(), points: vec![(0.0, 5.0), (1.0, 5.0)] }];
+        let s = vec![Series {
+            label: "a".into(),
+            points: vec![(0.0, 5.0), (1.0, 5.0)],
+        }];
         let svg = render_timeseries_svg(&p, &s, 200, 100).unwrap();
         assert!(svg.contains("<svg"));
     }
@@ -457,8 +489,15 @@ mod tests {
     #[test]
     fn render_dashboard_resolved_substitutes_all() {
         let mut d = DashboardDef::new("d1", "acme", "T");
-        d.add_panel(PanelDef::new("p1", "p", PanelKind::Timeseries, "up{env=$env}")).unwrap();
-        d.add_panel(PanelDef::new("p2", "p", PanelKind::Stat, "$svc.req")).unwrap();
+        d.add_panel(PanelDef::new(
+            "p1",
+            "p",
+            PanelKind::Timeseries,
+            "up{env=$env}",
+        ))
+        .unwrap();
+        d.add_panel(PanelDef::new("p2", "p", PanelKind::Stat, "$svc.req"))
+            .unwrap();
         let v = vars(&[("env", "prod"), ("svc", "web")]);
         let resolved = render_dashboard_resolved(&d, &v).unwrap();
         assert_eq!(resolved.panels[0].query, "up{env=prod}");
@@ -468,7 +507,8 @@ mod tests {
     #[test]
     fn render_dashboard_resolved_propagates_missing_var() {
         let mut d = DashboardDef::new("d1", "acme", "T");
-        d.add_panel(PanelDef::new("p1", "p", PanelKind::Timeseries, "$ghost")).unwrap();
+        d.add_panel(PanelDef::new("p1", "p", PanelKind::Timeseries, "$ghost"))
+            .unwrap();
         let v = HashMap::new();
         let err = render_dashboard_resolved(&d, &v).unwrap_err();
         assert!(matches!(err, RendererError::MissingVariable(_)));

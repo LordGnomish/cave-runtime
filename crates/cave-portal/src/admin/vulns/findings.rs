@@ -3,34 +3,61 @@
 //!
 //! Source: DefectDojo/django-DefectDojo@6eab8738 templates/dojo/findings_list.html
 
-use crate::admin::layout::shell::{shell_v2, ShellOptions};
+use crate::admin::layout::shell::{ShellOptions, shell_v2};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, table};
-use crate::admin::state::{scope, AdminState, VulnRecord};
+use crate::admin::state::{AdminState, VulnRecord, scope};
 use crate::admin::vulns::VulnsViewError;
 
-pub fn list_findings(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<VulnRecord>, VulnsViewError> {
+pub fn list_findings(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<VulnRecord>, VulnsViewError> {
     ctx.authorise(Permission::VulnsRead)?;
-    Ok(scope(&state.vuln_records.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter().cloned().collect())
+    Ok(
+        scope(&state.vuln_records.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect(),
+    )
 }
 
-pub fn list_by_state(state: &AdminState, ctx: &RequestCtx, only_unfixed: bool) -> Result<Vec<VulnRecord>, VulnsViewError> {
+pub fn list_by_state(
+    state: &AdminState,
+    ctx: &RequestCtx,
+    only_unfixed: bool,
+) -> Result<Vec<VulnRecord>, VulnsViewError> {
     let mut all = list_findings(state, ctx)?;
-    if only_unfixed { all.retain(|f| f.fixed_version.is_none()); }
+    if only_unfixed {
+        all.retain(|f| f.fixed_version.is_none());
+    }
     Ok(all)
 }
 
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, VulnsViewError> {
     let findings = list_findings(state, ctx)?;
-    let rows: Vec<Vec<String>> = findings.iter().map(|f| vec![
-        escape(&f.cve_id),
-        escape(&f.package),
-        escape(&f.installed_version),
-        f.fixed_version.as_deref().map(escape).unwrap_or_else(|| "—".to_string()),
-        f.severity.to_string(),
-        if f.fixed_version.is_some() { "fixed_available".into() } else { "active".into() },
-    ]).collect();
+    let rows: Vec<Vec<String>> = findings
+        .iter()
+        .map(|f| {
+            vec![
+                escape(&f.cve_id),
+                escape(&f.package),
+                escape(&f.installed_version),
+                f.fixed_version
+                    .as_deref()
+                    .map(escape)
+                    .unwrap_or_else(|| "—".to_string()),
+                f.severity.to_string(),
+                if f.fixed_version.is_some() {
+                    "fixed_available".into()
+                } else {
+                    "active".into()
+                },
+            ]
+        })
+        .collect();
     let body = format!(
         r#"<section>
   <h2>Findings ({n})</h2>
@@ -38,7 +65,10 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, VulnsViewE
   {tbl}
 </section>"#,
         n = findings.len(),
-        tbl = table(&["cve", "package", "installed", "fixed", "severity", "state"], &rows),
+        tbl = table(
+            &["cve", "package", "installed", "fixed", "severity", "state"],
+            &rows
+        ),
     );
     Ok(shell_v2(ShellOptions {
         title: "vulns · findings",
@@ -53,7 +83,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, VulnsViewE
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
+    fn ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer("acme", perms)
+    }
 
     #[test]
     fn list_filters_to_tenant() {

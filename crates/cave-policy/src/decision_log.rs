@@ -87,11 +87,15 @@ impl DecisionLog {
     }
 
     /// Check if logging is enabled.
-    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
 }
 
 impl Default for DecisionLog {
-    fn default() -> Self { Self::new(1000) }
+    fn default() -> Self {
+        Self::new(1000)
+    }
 }
 
 /// Mask sensitive fields in a decision log entry before storage.
@@ -116,7 +120,9 @@ fn mask_json(v: &mut serde_json::Value, fields: &[&str]) {
             }
         }
         serde_json::Value::Array(a) => {
-            for item in a { mask_json(item, fields); }
+            for item in a {
+                mask_json(item, fields);
+            }
         }
         _ => {}
     }

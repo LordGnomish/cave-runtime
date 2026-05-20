@@ -112,10 +112,22 @@ pub struct KeyValue {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub enum AnyValue {
-    String { #[serde(rename = "stringValue")] string_value: String },
-    Bool { #[serde(rename = "boolValue")] bool_value: bool },
-    Int { #[serde(rename = "intValue")] int_value: serde_json::Value },
-    Double { #[serde(rename = "doubleValue")] double_value: f64 },
+    String {
+        #[serde(rename = "stringValue")]
+        string_value: String,
+    },
+    Bool {
+        #[serde(rename = "boolValue")]
+        bool_value: bool,
+    },
+    Int {
+        #[serde(rename = "intValue")]
+        int_value: serde_json::Value,
+    },
+    Double {
+        #[serde(rename = "doubleValue")]
+        double_value: f64,
+    },
     Object(serde_json::Value),
 }
 
@@ -133,7 +145,9 @@ impl AnyValue {
 
 /// Convert a `KeyValue` slice into a flat `HashMap<String, String>`.
 fn kv_to_map(kvs: &[KeyValue]) -> HashMap<String, String> {
-    kvs.iter().map(|kv| (kv.key.clone(), kv.value.as_string())).collect()
+    kvs.iter()
+        .map(|kv| (kv.key.clone(), kv.value.as_string()))
+        .collect()
 }
 
 // ── Ingestion ─────────────────────────────────────────────────────────────────
@@ -155,10 +169,14 @@ pub fn ingest_otlp_json(body: &[u8], tenant: &str, store: &Arc<LogStore>) -> any
             let mut stream_labels = resource_attrs.clone();
             if let Some(scope) = &scope_log.scope {
                 if let Some(name) = &scope.name {
-                    if !name.is_empty() { stream_labels.insert("otel_scope_name".into(), name.clone()); }
+                    if !name.is_empty() {
+                        stream_labels.insert("otel_scope_name".into(), name.clone());
+                    }
                 }
                 if let Some(version) = &scope.version {
-                    if !version.is_empty() { stream_labels.insert("otel_scope_version".into(), version.clone()); }
+                    if !version.is_empty() {
+                        stream_labels.insert("otel_scope_version".into(), version.clone());
+                    }
                 }
             }
 
@@ -177,7 +195,9 @@ pub fn ingest_otlp_json(body: &[u8], tenant: &str, store: &Arc<LogStore>) -> any
                 // Per-record attributes become entry metadata.
                 let mut meta = kv_to_map(&record.attributes);
                 if let Some(sev_text) = record.severity_text {
-                    if !sev_text.is_empty() { meta.insert("severity".into(), sev_text); }
+                    if !sev_text.is_empty() {
+                        meta.insert("severity".into(), sev_text);
+                    }
                 }
                 if let Some(sev_num) = record.severity_number {
                     meta.insert("severity_number".into(), sev_num.to_string());
@@ -193,7 +213,11 @@ pub fn ingest_otlp_json(body: &[u8], tenant: &str, store: &Arc<LogStore>) -> any
                     }
                 }
 
-                entries.push(LogEntry { ts: ts_ns, line, metadata: meta });
+                entries.push(LogEntry {
+                    ts: ts_ns,
+                    line,
+                    metadata: meta,
+                });
             }
 
             total += entries.len();
@@ -209,8 +233,8 @@ pub fn ingest_otlp_json(body: &[u8], tenant: &str, store: &Arc<LogStore>) -> any
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::store::LogStore;
     use crate::models::Direction;
+    use crate::store::LogStore;
 
     #[test]
     fn ingest_otlp_json_basic() {
@@ -244,7 +268,16 @@ mod tests {
         assert_eq!(fps.len(), 1);
         let results = store.query_entries("tenant", &fps, 0, i64::MAX, 10, Direction::Forward);
         assert_eq!(results[0].2[0].line, "hello from otlp");
-        assert_eq!(results[0].2[0].metadata.get("http.method").map(|s| s.as_str()), Some("GET"));
-        assert_eq!(results[0].2[0].metadata.get("severity").map(|s| s.as_str()), Some("INFO"));
+        assert_eq!(
+            results[0].2[0]
+                .metadata
+                .get("http.method")
+                .map(|s| s.as_str()),
+            Some("GET")
+        );
+        assert_eq!(
+            results[0].2[0].metadata.get("severity").map(|s| s.as_str()),
+            Some("INFO")
+        );
     }
 }

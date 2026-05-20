@@ -3,9 +3,9 @@
 //! Falco rule engine — evaluates events against the loaded rule set.
 
 use crate::falco::{
-    condition::{eval, parse_condition, Expr, EvalContext},
+    condition::{EvalContext, Expr, eval, parse_condition},
     fields::EventContext,
-    rule::{FalcoList, FalcoMacro, FalcoRule, Priority, RuleSet, BUILTIN_RULES_YAML},
+    rule::{BUILTIN_RULES_YAML, FalcoList, FalcoMacro, FalcoRule, Priority, RuleSet},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -29,11 +29,7 @@ pub struct Alert {
 }
 
 impl Alert {
-    pub fn new(
-        rule: &FalcoRule,
-        output: String,
-        fields: HashMap<String, String>,
-    ) -> Self {
+    pub fn new(rule: &FalcoRule, output: String, fields: HashMap<String, String>) -> Self {
         Alert {
             id: Uuid::new_v4(),
             rule_name: rule.name.clone(),
@@ -64,8 +60,7 @@ pub struct RuleStore {
 
 impl Default for RuleStore {
     fn default() -> Self {
-        let rule_set = RuleSet::from_yaml(BUILTIN_RULES_YAML)
-            .expect("builtin rules must parse");
+        let rule_set = RuleSet::from_yaml(BUILTIN_RULES_YAML).expect("builtin rules must parse");
         Self::from_ruleset(rule_set)
     }
 }
@@ -222,7 +217,11 @@ mod tests {
         let ctx = EventContext::syscall_execve("bash", "bash -i", "root", 0, "abc123");
         let alerts = engine.evaluate(&ctx);
         // Should fire "Terminal shell in container"
-        assert!(alerts.iter().any(|a| a.rule_name.contains("shell") || a.rule_name.contains("Shell")));
+        assert!(
+            alerts
+                .iter()
+                .any(|a| a.rule_name.contains("shell") || a.rule_name.contains("Shell"))
+        );
     }
 
     #[test]

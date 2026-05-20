@@ -5,10 +5,10 @@
 use crate::models::{HealthCheck, UpstreamAlert, UpstreamService, UpstreamStats};
 use crate::store::UpstreamStore;
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     routing::{get, post},
-    Json, Router,
 };
 use std::sync::Arc;
 use uuid::Uuid;
@@ -28,13 +28,21 @@ pub fn create_router() -> Router {
 
     Router::new()
         .route("/api/upstream/health", get(health))
-        .route("/api/upstream/upstreams", get(list_upstreams).post(create_upstream))
+        .route(
+            "/api/upstream/upstreams",
+            get(list_upstreams).post(create_upstream),
+        )
         .route(
             "/api/upstream/upstreams/{id}",
-            get(get_upstream).put(update_upstream).delete(delete_upstream),
+            get(get_upstream)
+                .put(update_upstream)
+                .delete(delete_upstream),
         )
         .route("/api/upstream/upstreams/{id}/check", post(check_upstream))
-        .route("/api/upstream/upstreams/{id}/health-history", get(health_history))
+        .route(
+            "/api/upstream/upstreams/{id}/health-history",
+            get(health_history),
+        )
         .route("/api/upstream/upstreams/{id}/alerts", get(service_alerts))
         .route("/api/upstream/alerts", get(all_alerts))
         .route("/api/upstream/attention", get(attention))

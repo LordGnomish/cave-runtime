@@ -12,9 +12,9 @@
 //! creation. No actual pod is launched here — that is the job of the
 //! data-plane components — but the env injection is exhaustive.
 
-use std::collections::HashMap;
 use crate::meta::ObjectMeta;
 use crate::meta::{Container, EnvVar, PodSpec};
+use std::collections::HashMap;
 
 #[derive(Default, Debug, Clone)]
 pub struct ContainerSource {
@@ -85,7 +85,10 @@ fn inject_or_replace_env(c: &mut Container, key: &str, value: &str) {
             return;
         }
     }
-    c.env.push(EnvVar { name: key.to_string(), value: Some(value.to_string()) });
+    c.env.push(EnvVar {
+        name: key.to_string(),
+        value: Some(value.to_string()),
+    });
 }
 
 /// Encode `ce_overrides` as the JSON object the upstream Go adapter expects:
@@ -150,8 +153,12 @@ mod tests {
     #[test]
     fn project_injects_k_ce_overrides_as_json_object() {
         let mut s = cs("watcher", "emitter:1");
-        s.spec.ce_overrides.insert("tenant".to_string(), "alpha".to_string());
-        s.spec.ce_overrides.insert("region".to_string(), "eu-1".to_string());
+        s.spec
+            .ce_overrides
+            .insert("tenant".to_string(), "alpha".to_string());
+        s.spec
+            .ce_overrides
+            .insert("region".to_string(), "eu-1".to_string());
         let pod = s.project();
         let json = pod.containers[0]
             .env
@@ -174,7 +181,11 @@ mod tests {
             value: Some("stale".to_string()),
         });
         let pod = s.project();
-        let k_sink: Vec<&EnvVar> = pod.containers[0].env.iter().filter(|e| e.name == "K_SINK").collect();
+        let k_sink: Vec<&EnvVar> = pod.containers[0]
+            .env
+            .iter()
+            .filter(|e| e.name == "K_SINK")
+            .collect();
         assert_eq!(k_sink.len(), 1);
         assert_eq!(k_sink[0].value.as_deref(), Some("https://sink.example/in"));
     }
@@ -213,7 +224,9 @@ mod tests {
     #[test]
     fn ce_overrides_escape_quotes() {
         let mut s = cs("w", "img:1");
-        s.spec.ce_overrides.insert("k".to_string(), "\"v\"".to_string());
+        s.spec
+            .ce_overrides
+            .insert("k".to_string(), "\"v\"".to_string());
         let pod = s.project();
         let json = pod.containers[0]
             .env

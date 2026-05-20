@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-use crate::models::{Finding, ScanKind, ScanRequest, ScanResult, ScanStatus, ScanVerdict, Severity, VerdictDecision};
+use crate::models::{
+    Finding, ScanKind, ScanRequest, ScanResult, ScanStatus, ScanVerdict, Severity, VerdictDecision,
+};
 use chrono::Utc;
 use std::collections::HashMap;
 use thiserror::Error;
@@ -61,7 +63,9 @@ pub fn aggregate_verdict(findings: &[Finding], floor: Option<Severity>) -> ScanV
     let floor = floor.unwrap_or(Severity::Low);
 
     // Check severity levels
-    let has_critical_or_high = findings.iter().any(|f| f.severity == Severity::Critical || f.severity == Severity::High);
+    let has_critical_or_high = findings
+        .iter()
+        .any(|f| f.severity == Severity::Critical || f.severity == Severity::High);
     let has_medium = findings.iter().any(|f| f.severity == Severity::Medium);
 
     let decision = if has_critical_or_high {
@@ -75,9 +79,18 @@ pub fn aggregate_verdict(findings: &[Finding], floor: Option<Severity>) -> ScanV
     let finding_ids: Vec<Uuid> = findings.iter().map(|f| f.id).collect();
     let reasons = match decision {
         VerdictDecision::Fail => {
-            let critical = findings.iter().filter(|f| f.severity == Severity::Critical).count();
-            let high = findings.iter().filter(|f| f.severity == Severity::High).count();
-            vec![format!("Found {} critical and {} high severity issues", critical, high)]
+            let critical = findings
+                .iter()
+                .filter(|f| f.severity == Severity::Critical)
+                .count();
+            let high = findings
+                .iter()
+                .filter(|f| f.severity == Severity::High)
+                .count();
+            vec![format!(
+                "Found {} critical and {} high severity issues",
+                critical, high
+            )]
         }
         VerdictDecision::Warn => {
             vec!["Found medium severity issues".to_string()]
@@ -115,15 +128,13 @@ impl ScanOrchestrator {
         let scanner = self.scanners.iter().find(|s| s.kind() == req.kind);
 
         let (findings, status) = match scanner {
-            Some(s) => {
-                match s.scan(req).await {
-                    Ok(findings) => {
-                        let deduped = dedupe_findings(findings);
-                        (deduped, ScanStatus::Completed)
-                    }
-                    Err(_e) => (vec![], ScanStatus::Failed),
+            Some(s) => match s.scan(req).await {
+                Ok(findings) => {
+                    let deduped = dedupe_findings(findings);
+                    (deduped, ScanStatus::Completed)
                 }
-            }
+                Err(_e) => (vec![], ScanStatus::Failed),
+            },
             None => (vec![], ScanStatus::Failed),
         };
 
@@ -148,7 +159,7 @@ impl ScanOrchestrator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{FindingCategory, Confidence};
+    use crate::models::{Confidence, FindingCategory};
 
     fn sample_finding(severity: Severity) -> Finding {
         let mut f = Finding::new(
@@ -177,7 +188,10 @@ mod tests {
 
     #[test]
     fn test_aggregate_verdict_fail() {
-        let findings = vec![sample_finding(Severity::Critical), sample_finding(Severity::Medium)];
+        let findings = vec![
+            sample_finding(Severity::Critical),
+            sample_finding(Severity::Medium),
+        ];
         let verdict = aggregate_verdict(&findings, None);
         assert_eq!(verdict.decision, VerdictDecision::Fail);
         assert!(verdict.reasons[0].contains("critical"));
@@ -185,14 +199,20 @@ mod tests {
 
     #[test]
     fn test_aggregate_verdict_warn() {
-        let findings = vec![sample_finding(Severity::Medium), sample_finding(Severity::Low)];
+        let findings = vec![
+            sample_finding(Severity::Medium),
+            sample_finding(Severity::Low),
+        ];
         let verdict = aggregate_verdict(&findings, None);
         assert_eq!(verdict.decision, VerdictDecision::Warn);
     }
 
     #[test]
     fn test_aggregate_verdict_pass() {
-        let findings = vec![sample_finding(Severity::Low), sample_finding(Severity::Info)];
+        let findings = vec![
+            sample_finding(Severity::Low),
+            sample_finding(Severity::Info),
+        ];
         let verdict = aggregate_verdict(&findings, None);
         assert_eq!(verdict.decision, VerdictDecision::Pass);
     }

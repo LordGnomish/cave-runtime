@@ -2,19 +2,19 @@
 // Copyright 2026 Cave Runtime contributors
 //! HTTP routes for cave-infra.
 
+use crate::InfraState;
 use crate::mcp::{JsonRpcRequest, McpServer};
 use crate::nlp::parse_intent;
 use crate::plan::generate_plan;
 use crate::provider::ProviderRegistry;
 use crate::resource::{ResourceKind, ResourceSpec, ResourceState};
 use crate::templates::TemplateRegistry;
-use crate::InfraState;
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, post, put},
-    Json, Router,
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -48,16 +48,28 @@ pub fn create_router(state: Arc<InfraState>) -> Router {
         .route("/api/infra/health", get(health))
         // Resources
         .route("/api/infra/resources", get(list_resources))
-        .route("/api/infra/resources/{kind}/{name}", get(get_resource).delete(delete_resource))
+        .route(
+            "/api/infra/resources/{kind}/{name}",
+            get(get_resource).delete(delete_resource),
+        )
         // Plan + Apply
         .route("/api/infra/plan", post(plan_resources))
         .route("/api/infra/apply", post(apply_resources))
         // Drift
         .route("/api/infra/drift", get(drift_report))
-        .route("/api/infra/resources/{kind}/{name}/reconcile", post(reconcile_resource))
+        .route(
+            "/api/infra/resources/{kind}/{name}/reconcile",
+            post(reconcile_resource),
+        )
         // Rollback
-        .route("/api/infra/resources/{kind}/{name}/rollback", post(rollback_resource))
-        .route("/api/infra/resources/{kind}/{name}/history", get(resource_history))
+        .route(
+            "/api/infra/resources/{kind}/{name}/rollback",
+            post(rollback_resource),
+        )
+        .route(
+            "/api/infra/resources/{kind}/{name}/history",
+            get(resource_history),
+        )
         // Templates
         .route("/api/infra/templates", get(list_templates))
         .route("/api/infra/templates/{name}", get(get_template))
@@ -76,14 +88,23 @@ async fn health() -> Json<serde_json::Value> {
 }
 
 async fn list_resources(State(s): State<AppState>) -> Json<Vec<serde_json::Value>> {
-    Json(s.infra.store.list().into_iter().map(|r| json!({
-        "key": r.key(),
-        "kind": r.spec.kind.as_str(),
-        "name": r.spec.name,
-        "provider": r.spec.provider,
-        "status": format!("{:?}", r.status),
-        "provider_id": r.provider_id,
-    })).collect())
+    Json(
+        s.infra
+            .store
+            .list()
+            .into_iter()
+            .map(|r| {
+                json!({
+                    "key": r.key(),
+                    "kind": r.spec.kind.as_str(),
+                    "name": r.spec.name,
+                    "provider": r.spec.provider,
+                    "status": format!("{:?}", r.status),
+                    "provider_id": r.provider_id,
+                })
+            })
+            .collect(),
+    )
 }
 
 async fn get_resource(
@@ -99,7 +120,8 @@ async fn get_resource(
             "outputs": r.outputs,
             "provider_id": r.provider_id,
             "version": r.version,
-        })).into_response(),
+        }))
+        .into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
 }
@@ -155,8 +177,13 @@ async fn plan_resources(
             "has_changes": plan.has_changes(),
             "summary": plan.summary,
             "changes": plan.changes,
-        })).into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response(),
+        }))
+        .into_response(),
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -169,7 +196,13 @@ async fn apply_resources(
     // Validate and order
     let ordered = match crate::graph::apply_order(&specs) {
         Ok(o) => o,
-        Err(e) => return (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response(),
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": e.to_string()})),
+            )
+                .into_response();
+        }
     };
 
     let mut applied = Vec::new();
@@ -183,10 +216,14 @@ async fn apply_resources(
                 applied.push(key);
             }
             Err(e) => {
-                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({
-                    "error": e.to_string(),
-                    "applied_so_far": applied,
-                }))).into_response();
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({
+                        "error": e.to_string(),
+                        "applied_so_far": applied,
+                    })),
+                )
+                    .into_response();
             }
         }
     }
@@ -212,7 +249,11 @@ async fn reconcile_resource(
     let key = format!("{kind}/{name}");
     match crate::drift::reconcile(&s.infra.store, &s.registry, &key).await {
         Ok(r) => Json(json!({"key": r.key(), "status": format!("{:?}", r.status)})).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -226,8 +267,13 @@ async fn rollback_resource(
             "success": record.success,
             "from_version": record.from_version,
             "to_version": record.to_version,
-        })).into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response(),
+        }))
+        .into_response(),
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -236,11 +282,20 @@ async fn resource_history(
     Path((kind, name)): Path<(String, String)>,
 ) -> Json<Vec<serde_json::Value>> {
     let key = format!("{kind}/{name}");
-    Json(s.infra.store.history(&key).into_iter().map(|r| json!({
-        "version": r.version,
-        "status": format!("{:?}", r.status),
-        "updated_at": r.updated_at,
-    })).collect())
+    Json(
+        s.infra
+            .store
+            .history(&key)
+            .into_iter()
+            .map(|r| {
+                json!({
+                    "version": r.version,
+                    "status": format!("{:?}", r.status),
+                    "updated_at": r.updated_at,
+                })
+            })
+            .collect(),
+    )
 }
 
 async fn list_templates(State(s): State<AppState>) -> Json<Vec<serde_json::Value>> {
@@ -254,7 +309,8 @@ async fn list_templates(State(s): State<AppState>) -> Json<Vec<serde_json::Value
 
 async fn get_template(State(s): State<AppState>, Path(name): Path<String>) -> impl IntoResponse {
     match s.templates.get(&name) {
-        Ok(t) => Json(json!({"name": t.name, "description": t.description, "params": t.params})).into_response(),
+        Ok(t) => Json(json!({"name": t.name, "description": t.description, "params": t.params}))
+            .into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
 }
@@ -273,8 +329,13 @@ async fn render_template(
                 "provider": s.provider,
                 "depends_on": s.depends_on,
             })).collect::<Vec<_>>(),
-        })).into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response(),
+        }))
+        .into_response(),
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 

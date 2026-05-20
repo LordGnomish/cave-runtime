@@ -7,8 +7,8 @@
 //! computation = `<token>.<jwk-thumbprint-base64url>`).
 
 use crate::error::{AcmeError, AcmeResult};
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -17,7 +17,11 @@ use std::collections::BTreeMap;
 /// Cite: RFC 8555 §7.1.2 (Account.status).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum AccountStatus { Valid, Deactivated, Revoked }
+pub enum AccountStatus {
+    Valid,
+    Deactivated,
+    Revoked,
+}
 
 /// Minimal JWK shape covering the two key types ACME servers MUST support
 /// (RFC 8555 §6.2). We only carry the fields used for the JWK thumbprint
@@ -29,21 +33,11 @@ pub enum AccountStatus { Valid, Deactivated, Revoked }
 #[serde(tag = "kty")]
 pub enum Jwk {
     /// EC keys: `kty=EC`, required members are crv, x, y.
-    EC {
-        crv: String,
-        x: String,
-        y: String,
-    },
+    EC { crv: String, x: String, y: String },
     /// RSA keys: `kty=RSA`, required members are e, n.
-    RSA {
-        e: String,
-        n: String,
-    },
+    RSA { e: String, n: String },
     /// Ed25519 keys: `kty=OKP`, `crv=Ed25519`, `x=...`.
-    OKP {
-        crv: String,
-        x: String,
-    },
+    OKP { crv: String, x: String },
 }
 
 impl Jwk {
@@ -55,18 +49,18 @@ impl Jwk {
             Jwk::EC { crv, x, y } => {
                 map.insert("crv", crv.clone());
                 map.insert("kty", "EC".into());
-                map.insert("x",   x.clone());
-                map.insert("y",   y.clone());
+                map.insert("x", x.clone());
+                map.insert("y", y.clone());
             }
             Jwk::RSA { e, n } => {
-                map.insert("e",   e.clone());
+                map.insert("e", e.clone());
                 map.insert("kty", "RSA".into());
-                map.insert("n",   n.clone());
+                map.insert("n", n.clone());
             }
             Jwk::OKP { crv, x } => {
                 map.insert("crv", crv.clone());
                 map.insert("kty", "OKP".into());
-                map.insert("x",   x.clone());
+                map.insert("x", x.clone());
             }
         }
         let canonical = serde_json::to_string(&map).expect("BTreeMap serialises");
@@ -141,7 +135,9 @@ impl Account {
             }
         }
         if !self.terms_of_service_agreed {
-            return Err(AcmeError::Malformed("terms of service must be agreed".into()));
+            return Err(AcmeError::Malformed(
+                "terms of service must be agreed".into(),
+            ));
         }
         if let Some(eab) = &self.eab {
             eab.validate_algorithm()?;

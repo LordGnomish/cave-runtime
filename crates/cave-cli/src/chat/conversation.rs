@@ -7,7 +7,7 @@
 //!          one if none exists.
 //! `<id>` — load by exact id; error if missing.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
@@ -100,9 +100,10 @@ impl InMemoryConversationStore {
 impl ConversationStore for InMemoryConversationStore {
     async fn create(&self, tenant_id: &str) -> Result<Conversation> {
         let c = Conversation::new(tenant_id);
-        self.inner
-            .write()
-            .insert((tenant_id.to_string(), c.conversation_id.clone()), c.clone());
+        self.inner.write().insert(
+            (tenant_id.to_string(), c.conversation_id.clone()),
+            c.clone(),
+        );
         Ok(c)
     }
 
@@ -119,9 +120,7 @@ impl ConversationStore for InMemoryConversationStore {
             .read()
             .get(&(tenant_id.to_string(), conversation_id.to_string()))
             .cloned()
-            .ok_or_else(|| {
-                anyhow!("conversation not found: {tenant_id}/{conversation_id}")
-            })
+            .ok_or_else(|| anyhow!("conversation not found: {tenant_id}/{conversation_id}"))
     }
 
     async fn append(
@@ -133,9 +132,7 @@ impl ConversationStore for InMemoryConversationStore {
         let mut s = self.inner.write();
         let c = s
             .get_mut(&(tenant_id.to_string(), conversation_id.to_string()))
-            .ok_or_else(|| {
-                anyhow!("conversation not found: {tenant_id}/{conversation_id}")
-            })?;
+            .ok_or_else(|| anyhow!("conversation not found: {tenant_id}/{conversation_id}"))?;
         c.messages.push(msg);
         c.last_active_at = Utc::now();
         Ok(c.clone())
@@ -224,7 +221,10 @@ mod tests {
         let tenant_id = "initech";
         let s = InMemoryConversationStore::new();
         let created = s.create(tenant_id).await.unwrap();
-        let loaded = s.resolve(tenant_id, &created.conversation_id).await.unwrap();
+        let loaded = s
+            .resolve(tenant_id, &created.conversation_id)
+            .await
+            .unwrap();
         assert_eq!(loaded.conversation_id, created.conversation_id);
     }
 

@@ -59,10 +59,7 @@ pub fn lxc_map_update(
     map.update((info.ifindex, info.lxc_id), info, flag)
 }
 
-pub fn lxc_map_delete(
-    map: &mut LxcMap,
-    key: LxcKey,
-) -> Result<(), crate::ebpf_sim::map::MapError> {
+pub fn lxc_map_delete(map: &mut LxcMap, key: LxcKey) -> Result<(), crate::ebpf_sim::map::MapError> {
     map.delete(&key)
 }
 

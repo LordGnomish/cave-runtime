@@ -314,7 +314,10 @@ mod tests {
     fn freebsd_new_starts_in_ready_state_with_jail_path() {
         let f = FreeBsdJail::new(&spec("nginx"), now()).unwrap();
         assert_eq!(f.state, SandboxState::Ready);
-        assert!(f.jail_path.to_string_lossy().contains(&f.sandbox_id.to_string()));
+        assert!(f
+            .jail_path
+            .to_string_lossy()
+            .contains(&f.sandbox_id.to_string()));
         assert_eq!(f.hostname, "nginx");
         assert!(f.jid.is_none()); // jid filled by real syscall path
     }

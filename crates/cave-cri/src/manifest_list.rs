@@ -31,7 +31,11 @@ pub struct Platform {
 
 impl Platform {
     pub fn linux_amd64() -> Self {
-        Self { architecture: "amd64".into(), os: "linux".into(), ..Default::default() }
+        Self {
+            architecture: "amd64".into(),
+            os: "linux".into(),
+            ..Default::default()
+        }
     }
     pub fn linux_arm64() -> Self {
         Self {
@@ -42,7 +46,11 @@ impl Platform {
         }
     }
     pub fn windows_amd64() -> Self {
-        Self { architecture: "amd64".into(), os: "windows".into(), ..Default::default() }
+        Self {
+            architecture: "amd64".into(),
+            os: "windows".into(),
+            ..Default::default()
+        }
     }
     pub fn current_host() -> Self {
         // Runtime-detected platform of the cave-cri process.
@@ -86,13 +94,15 @@ impl ManifestList {
             .manifests
             .iter()
             .filter(|m| {
-                m.platform.architecture == target.architecture
-                    && m.platform.os == target.os
+                m.platform.architecture == target.architecture && m.platform.os == target.os
             })
             .collect();
         // Exact variant first.
         if let Some(target_variant) = target.variant.as_ref() {
-            if let Some(m) = arch_match.iter().find(|m| m.platform.variant.as_ref() == Some(target_variant)) {
+            if let Some(m) = arch_match
+                .iter()
+                .find(|m| m.platform.variant.as_ref() == Some(target_variant))
+            {
                 return Some(*m);
             }
         }
@@ -205,7 +215,11 @@ mod tests {
     #[test]
     fn select_unknown_platform_returns_none() {
         let list = sample_list();
-        let p = Platform { architecture: "riscv64".into(), os: "linux".into(), ..Default::default() };
+        let p = Platform {
+            architecture: "riscv64".into(),
+            os: "linux".into(),
+            ..Default::default()
+        };
         assert!(list.select(&p).is_none());
     }
 
@@ -220,7 +234,12 @@ mod tests {
                 entry("sha256:v7", "arm", "linux", Some("v7")),
             ],
         };
-        let target = Platform { architecture: "arm".into(), os: "linux".into(), variant: Some("v7".into()), ..Default::default() };
+        let target = Platform {
+            architecture: "arm".into(),
+            os: "linux".into(),
+            variant: Some("v7".into()),
+            ..Default::default()
+        };
         let m = list.select(&target).unwrap();
         assert_eq!(m.digest, "sha256:v7");
     }
@@ -232,7 +251,12 @@ mod tests {
             media_type: OCI_INDEX_MEDIA_TYPE.into(),
             manifests: vec![entry("sha256:bare", "arm", "linux", None)],
         };
-        let target = Platform { architecture: "arm".into(), os: "linux".into(), variant: Some("v7".into()), ..Default::default() };
+        let target = Platform {
+            architecture: "arm".into(),
+            os: "linux".into(),
+            variant: Some("v7".into()),
+            ..Default::default()
+        };
         let m = list.select(&target).unwrap();
         assert_eq!(m.digest, "sha256:bare");
     }
@@ -267,7 +291,9 @@ mod tests {
     fn is_index_media_type_recognises_oci_and_docker() {
         assert!(is_index_media_type(OCI_INDEX_MEDIA_TYPE));
         assert!(is_index_media_type(DOCKER_MANIFEST_LIST_MEDIA_TYPE));
-        assert!(!is_index_media_type("application/vnd.oci.image.manifest.v1+json"));
+        assert!(!is_index_media_type(
+            "application/vnd.oci.image.manifest.v1+json"
+        ));
     }
 
     // ── Serde ───────────────────────────────────────────────────────────────

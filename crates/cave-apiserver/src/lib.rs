@@ -16,52 +16,52 @@
 //! /apis/apps/v1/namespaces/{ns}/deployments — Deployment CRUD
 //! ```
 
-pub mod error;
-pub mod resources;
-pub mod store;
-pub mod routes;
 pub mod admission;
-pub mod watch_cache;
-pub mod conversion;
-pub mod server_side_apply;
-pub mod audit;
-pub mod rbac;
 pub mod aggregated_apiserver;
-pub mod endpointslice_mirror;
-pub mod etcd_backend;
-pub mod discovery;
-pub mod crd_controller;
-pub mod storage_version;
-pub mod selectors;
-pub mod priority_fairness;
-pub mod validating_admission_policy;
-pub mod vap_advanced;
-pub mod cel_eval;
-pub mod mutating_admission_policy;
-pub mod webhook_admission;
-pub mod builtin_admission;
-pub mod audit_policy_v2;
-pub mod discovery_v2;
-pub mod conversion_v1;
 pub mod aggregator_v2;
+pub mod audit;
+pub mod audit_policy_v2;
+pub mod audit_worm;
+pub mod auth_review;
+pub mod beta_apis;
+pub mod builtin_admission;
+pub mod cel_eval;
+pub mod conversion;
+pub mod conversion_v1;
+pub mod crd_controller;
+pub mod discovery;
+pub mod discovery_v2;
+pub mod encryption_provider;
+pub mod endpointslice_mirror;
+pub mod error;
+pub mod etcd_backend;
+pub mod field_rbac;
+pub mod kep_v1_34;
+pub mod map_v2;
+pub mod mutating_admission_policy;
 pub mod node_restriction;
 pub mod pod_security;
-pub mod storage_registry;
-pub mod kep_v1_34;
-pub mod auth_review;
-pub mod map_v2;
-pub mod beta_apis;
-pub mod storage_migration;
+pub mod priority_fairness;
+pub mod rbac;
+pub mod resources;
+pub mod routes;
+pub mod selectors;
+pub mod server_side_apply;
 pub mod service_account_token;
-pub mod encryption_provider;
-pub mod audit_worm;
-pub mod field_rbac;
+pub mod storage_migration;
+pub mod storage_registry;
+pub mod storage_version;
+pub mod store;
+pub mod validating_admission_policy;
+pub mod vap_advanced;
+pub mod watch_cache;
+pub mod webhook_admission;
 
 #[cfg(test)]
 mod parity_tests;
 
-use store::ResourceStore;
 use std::sync::Arc;
+use store::ResourceStore;
 
 pub fn new_state() -> Arc<ResourceStore> {
     Arc::new(ResourceStore::new())

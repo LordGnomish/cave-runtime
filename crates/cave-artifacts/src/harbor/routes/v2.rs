@@ -8,23 +8,23 @@
 //! of a path (e.g. `/v2/{*name}/manifests/{ref}` is not legal).
 
 use axum::{
+    Router,
     body::Bytes,
     extract::{Path, Query, State},
-    http::{header, Method, StatusCode},
+    http::{Method, StatusCode, header},
     response::Response,
     routing::{any, get},
-    Router,
 };
 use std::{collections::HashMap, sync::Arc};
 
 use crate::harbor::{
+    RegistryState,
     models::{
-        classify_v2_path, Catalog, ReferrersResponse, RegistryErrors, TagList, V2Op,
-        ERR_BLOB_UNKNOWN, ERR_BLOB_UPLOAD_INVALID, ERR_BLOB_UPLOAD_UNKNOWN,
+        Catalog, ERR_BLOB_UNKNOWN, ERR_BLOB_UPLOAD_INVALID, ERR_BLOB_UPLOAD_UNKNOWN,
         ERR_DIGEST_INVALID, ERR_MANIFEST_UNKNOWN, ERR_NAME_UNKNOWN, ERR_UNSUPPORTED,
+        ReferrersResponse, RegistryErrors, TagList, V2Op, classify_v2_path,
     },
     storage::RegistryStorage,
-    RegistryState,
 };
 
 // ── Router ────────────────────────────────────────────────────────────────────
@@ -52,7 +52,11 @@ fn registry_error(status: StatusCode, code: &str, message: &str) -> Response {
 }
 
 fn method_not_allowed() -> Response {
-    registry_error(StatusCode::METHOD_NOT_ALLOWED, ERR_UNSUPPORTED, "method not allowed")
+    registry_error(
+        StatusCode::METHOD_NOT_ALLOWED,
+        ERR_UNSUPPORTED,
+        "method not allowed",
+    )
 }
 
 // ── Version check ─────────────────────────────────────────────────────────────
@@ -93,7 +97,9 @@ async fn catalog(
         repos.truncate(n);
     }
 
-    let cat = Catalog { repositories: repos };
+    let cat = Catalog {
+        repositories: repos,
+    };
     json_response(StatusCode::OK, serde_json::to_string(&cat).unwrap())
 }
 
@@ -140,7 +146,11 @@ async fn dispatch(
             get_referrers(state, &name, &digest, &query).await
         }
 
-        _ => registry_error(StatusCode::NOT_FOUND, ERR_NAME_UNKNOWN, "resource not found"),
+        _ => registry_error(
+            StatusCode::NOT_FOUND,
+            ERR_NAME_UNKNOWN,
+            "resource not found",
+        ),
     }
 }
 
@@ -176,7 +186,11 @@ async fn get_manifest(
     head_only: bool,
 ) -> Response {
     match state.storage.get_manifest(name, reference).await {
-        None => registry_error(StatusCode::NOT_FOUND, ERR_MANIFEST_UNKNOWN, "manifest unknown"),
+        None => registry_error(
+            StatusCode::NOT_FOUND,
+            ERR_MANIFEST_UNKNOWN,
+            "manifest unknown",
+        ),
         Some(entry) => {
             let size = entry.data.len();
             let builder = Response::builder()
@@ -213,30 +227,40 @@ async fn put_manifest(
 
     let digest = state
         .storage
-        .store_manifest(name, reference, content_type, body, subject_digest, artifact_type)
+        .store_manifest(
+            name,
+            reference,
+            content_type,
+            body,
+            subject_digest,
+            artifact_type,
+        )
         .await;
 
     Response::builder()
         .status(StatusCode::CREATED)
-        .header(header::LOCATION, format!("/v2/{}/manifests/{}", name, reference))
+        .header(
+            header::LOCATION,
+            format!("/v2/{}/manifests/{}", name, reference),
+        )
         .header("Docker-Content-Digest", &digest)
         .header(header::CONTENT_LENGTH, 0)
         .body(axum::body::Body::empty())
         .unwrap()
 }
 
-async fn delete_manifest(
-    state: Arc<RegistryState>,
-    name: &str,
-    reference: &str,
-) -> Response {
+async fn delete_manifest(state: Arc<RegistryState>, name: &str, reference: &str) -> Response {
     if state.storage.delete_manifest(name, reference).await {
         Response::builder()
             .status(StatusCode::ACCEPTED)
             .body(axum::body::Body::empty())
             .unwrap()
     } else {
-        registry_error(StatusCode::NOT_FOUND, ERR_MANIFEST_UNKNOWN, "manifest unknown")
+        registry_error(
+            StatusCode::NOT_FOUND,
+            ERR_MANIFEST_UNKNOWN,
+            "manifest unknown",
+        )
     }
 }
 
@@ -285,11 +309,7 @@ async fn get_blob(
     }
 }
 
-async fn delete_blob(
-    state: Arc<RegistryState>,
-    name: &str,
-    digest: &str,
-) -> Response {
+async fn delete_blob(state: Arc<RegistryState>, name: &str, digest: &str) -> Response {
     if state.storage.delete_blob(digest, name).await {
         Response::builder()
             .status(StatusCode::ACCEPTED)
@@ -312,10 +332,7 @@ async fn initiate_upload(
         if state.storage.mount_blob(mount, from, name).await {
             return Response::builder()
                 .status(StatusCode::CREATED)
-                .header(
-                    header::LOCATION,
-                    format!("/v2/{}/blobs/{}", name, mount),
-                )
+                .header(header::LOCATION, format!("/v2/{}/blobs/{}", name, mount))
                 .header("Docker-Content-Digest", mount.as_str())
                 .header(header::CONTENT_LENGTH, 0)
                 .body(axum::body::Body::empty())
@@ -379,7 +396,7 @@ async fn complete_upload(
                 StatusCode::BAD_REQUEST,
                 ERR_DIGEST_INVALID,
                 "digest query parameter required",
-            )
+            );
         }
     };
 
@@ -407,11 +424,7 @@ async fn complete_upload(
     }
 }
 
-async fn cancel_upload(
-    state: Arc<RegistryState>,
-    _name: &str,
-    uuid: &str,
-) -> Response {
+async fn cancel_upload(state: Arc<RegistryState>, _name: &str, uuid: &str) -> Response {
     state.storage.cancel_upload(uuid).await;
     Response::builder()
         .status(StatusCode::NO_CONTENT)
@@ -435,9 +448,14 @@ async fn get_referrers(
     let resp = ReferrersResponse::new(manifests);
     Response::builder()
         .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, "application/vnd.oci.image.index.v1+json")
+        .header(
+            header::CONTENT_TYPE,
+            "application/vnd.oci.image.index.v1+json",
+        )
         .header("OCI-Referrers-State", "enabled")
-        .body(axum::body::Body::from(serde_json::to_string(&resp).unwrap()))
+        .body(axum::body::Body::from(
+            serde_json::to_string(&resp).unwrap(),
+        ))
         .unwrap()
 }
 
@@ -456,7 +474,9 @@ mod tests {
         let resp = version_check().await;
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(
-            resp.headers().get("docker-distribution-api-version").unwrap(),
+            resp.headers()
+                .get("docker-distribution-api-version")
+                .unwrap(),
             "registry/2.0"
         );
     }
@@ -466,7 +486,10 @@ mod tests {
         let state = make_state();
         let resp = catalog(
             State(state),
-            Query(PaginationQuery { n: None, last: None }),
+            Query(PaginationQuery {
+                n: None,
+                last: None,
+            }),
         )
         .await;
         assert_eq!(resp.status(), StatusCode::OK);
@@ -477,7 +500,10 @@ mod tests {
         let state = make_state();
         let data = Bytes::from_static(b"hello blob");
         let digest = compute_digest(&data);
-        state.storage.store_blob(digest.clone(), data.clone(), "testrepo").await;
+        state
+            .storage
+            .store_blob(digest.clone(), data.clone(), "testrepo")
+            .await;
 
         let resp = get_blob(Arc::clone(&state), "testrepo", &digest, false).await;
         assert_eq!(resp.status(), StatusCode::OK);

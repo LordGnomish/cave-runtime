@@ -28,22 +28,32 @@ pub struct BindDecision {
 }
 
 impl Default for DefaultBinder {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DefaultBinder {
     pub fn new() -> Self {
-        Self { decisions: Mutex::new(Vec::new()) }
+        Self {
+            decisions: Mutex::new(Vec::new()),
+        }
     }
 
     /// Snapshot every Bind decision recorded so far. Returned in registration
     /// order (chronological).
     pub fn bound_decisions(&self) -> Vec<BindDecision> {
-        self.decisions.lock().expect("DefaultBinder poisoned").clone()
+        self.decisions
+            .lock()
+            .expect("DefaultBinder poisoned")
+            .clone()
     }
 
     pub fn clear(&self) {
-        self.decisions.lock().expect("DefaultBinder poisoned").clear();
+        self.decisions
+            .lock()
+            .expect("DefaultBinder poisoned")
+            .clear();
     }
 
     pub fn count(&self) -> usize {
@@ -52,7 +62,9 @@ impl DefaultBinder {
 }
 
 impl BindPlugin for DefaultBinder {
-    fn name(&self) -> &str { "DefaultBinder" }
+    fn name(&self) -> &str {
+        "DefaultBinder"
+    }
     fn bind(&self, pod: &Pod, node: &str, _state: &CycleState) -> Status {
         if node.is_empty() {
             return Status::error("DefaultBinder", "empty node name");
@@ -77,11 +89,17 @@ pub struct SkipBinder {
 }
 
 impl SkipBinder {
-    pub fn new(name: impl Into<String>) -> Self { Self { plugin_name: name.into() } }
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            plugin_name: name.into(),
+        }
+    }
 }
 
 impl BindPlugin for SkipBinder {
-    fn name(&self) -> &str { &self.plugin_name }
+    fn name(&self) -> &str {
+        &self.plugin_name
+    }
     fn bind(&self, _pod: &Pod, _node: &str, _state: &CycleState) -> Status {
         Status::skip(&self.plugin_name)
     }
@@ -94,20 +112,30 @@ pub struct PostBindLogger {
 }
 
 impl Default for PostBindLogger {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PostBindLogger {
-    pub fn new() -> Self { Self { events: Mutex::new(Vec::new()) } }
+    pub fn new() -> Self {
+        Self {
+            events: Mutex::new(Vec::new()),
+        }
+    }
     pub fn events(&self) -> Vec<(String, String)> {
         self.events.lock().expect("PostBindLogger poisoned").clone()
     }
 }
 
 impl PostBindPlugin for PostBindLogger {
-    fn name(&self) -> &str { "PostBindLogger" }
+    fn name(&self) -> &str {
+        "PostBindLogger"
+    }
     fn post_bind(&self, pod: &Pod, node: &str, _state: &CycleState) {
-        self.events.lock().expect("PostBindLogger poisoned")
+        self.events
+            .lock()
+            .expect("PostBindLogger poisoned")
             .push((pod.uid.clone(), node.into()));
     }
 }
@@ -117,7 +145,9 @@ impl PostBindPlugin for PostBindLogger {
 pub struct NoopPreBinder;
 
 impl PreBindPlugin for NoopPreBinder {
-    fn name(&self) -> &str { "NoopPreBinder" }
+    fn name(&self) -> &str {
+        "NoopPreBinder"
+    }
     fn pre_bind(&self, _pod: &Pod, _node: &str, _state: &CycleState) -> Status {
         Status::success("NoopPreBinder")
     }
@@ -162,7 +192,11 @@ mod tests {
     fn default_binder_preserves_order() {
         let b = DefaultBinder::new();
         for i in 0..5 {
-            b.bind(&Pod::new("t", "ns", &format!("p{}", i)), "n1", &CycleState::new());
+            b.bind(
+                &Pod::new("t", "ns", &format!("p{}", i)),
+                "n1",
+                &CycleState::new(),
+            );
         }
         let d = b.bound_decisions();
         for (i, dec) in d.iter().enumerate() {
@@ -195,7 +229,11 @@ mod tests {
     #[test]
     fn default_binder_carries_tenant_id() {
         let b = DefaultBinder::new();
-        b.bind(&Pod::new("acme", "default", "web"), "node-1", &CycleState::new());
+        b.bind(
+            &Pod::new("acme", "default", "web"),
+            "node-1",
+            &CycleState::new(),
+        );
         let d = b.bound_decisions();
         assert_eq!(d[0].tenant_id, "acme");
         assert_eq!(d[0].namespace, "default");

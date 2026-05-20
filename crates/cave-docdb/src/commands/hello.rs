@@ -8,11 +8,20 @@ use serde_json::Value;
 pub async fn hello(_cmd_doc: &Document) -> Result<Document, String> {
     let mut resp = Document::new();
     resp.insert("ismaster".to_string(), Value::Bool(true));
-    resp.insert("maxBsonObjectSize".to_string(), Value::Number(16777216.into()));
-    resp.insert("maxMessageSizeBytes".to_string(), Value::Number(48000000.into()));
+    resp.insert(
+        "maxBsonObjectSize".to_string(),
+        Value::Number(16777216.into()),
+    );
+    resp.insert(
+        "maxMessageSizeBytes".to_string(),
+        Value::Number(48000000.into()),
+    );
     resp.insert("minWireVersion".to_string(), Value::Number(0.into()));
     resp.insert("maxWireVersion".to_string(), Value::Number(17.into()));
-    resp.insert("logicalSessionTimeoutMinutes".to_string(), Value::Number(30.into()));
+    resp.insert(
+        "logicalSessionTimeoutMinutes".to_string(),
+        Value::Number(30.into()),
+    );
     resp.insert("ok".to_string(), Value::Number(1.into()));
     Ok(resp)
 }

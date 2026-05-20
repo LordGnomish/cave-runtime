@@ -71,7 +71,10 @@ pub struct ValidatingAdmissionPolicyBinding {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PolicyDecision {
     Admit,
-    Deny { policy_name: String, message: String },
+    Deny {
+        policy_name: String,
+        message: String,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -96,17 +99,24 @@ struct PolicyInner {
 
 impl PolicyRegistry {
     pub fn new() -> Self {
-        Self { inner: Mutex::new(PolicyInner::default()) }
+        Self {
+            inner: Mutex::new(PolicyInner::default()),
+        }
     }
 
     pub fn upsert_policy(&self, p: ValidatingAdmissionPolicy) {
-        self.inner.lock().unwrap().policies.insert(
-            (p.tenant_id.clone(), p.name.clone()), p);
+        self.inner
+            .lock()
+            .unwrap()
+            .policies
+            .insert((p.tenant_id.clone(), p.name.clone()), p);
     }
 
     pub fn upsert_binding(&self, b: ValidatingAdmissionPolicyBinding) {
         let mut inner = self.inner.lock().unwrap();
-        inner.bindings.retain(|x| !(x.tenant_id == b.tenant_id && x.name == b.name));
+        inner
+            .bindings
+            .retain(|x| !(x.tenant_id == b.tenant_id && x.name == b.name));
         inner.bindings.push(b);
     }
 
@@ -118,18 +128,24 @@ impl PolicyRegistry {
         let inner = self.inner.lock().unwrap();
         let mut bound: Vec<&ValidatingAdmissionPolicy> = vec![];
         for b in inner.bindings.iter() {
-            if b.tenant_id != req.tenant_id { continue; }
-            if !b.namespaces.is_empty()
-                && !b.namespaces.iter().any(|n| n == &req.namespace) {
+            if b.tenant_id != req.tenant_id {
                 continue;
             }
-            if let Some(p) = inner.policies.get(&(b.tenant_id.clone(), b.policy_name.clone())) {
+            if !b.namespaces.is_empty() && !b.namespaces.iter().any(|n| n == &req.namespace) {
+                continue;
+            }
+            if let Some(p) = inner
+                .policies
+                .get(&(b.tenant_id.clone(), b.policy_name.clone()))
+            {
                 bound.push(p);
             }
         }
         bound.sort_by(|a, b| a.name.cmp(&b.name));
         for policy in bound {
-            if !policy_matches(policy, req) { continue; }
+            if !policy_matches(policy, req) {
+                continue;
+            }
             for rule in &policy.validations {
                 match evaluate_expression(&rule.expression, &req.object) {
                     Ok(true) => continue,
@@ -144,7 +160,9 @@ impl PolicyRegistry {
                             return PolicyDecision::Deny {
                                 policy_name: policy.name.clone(),
                                 message: format!(
-                                    "expression evaluation error: `{}`", rule.expression),
+                                    "expression evaluation error: `{}`",
+                                    rule.expression
+                                ),
                             };
                         }
                         FailurePolicy::Ignore => continue,
@@ -157,13 +175,23 @@ impl PolicyRegistry {
 }
 
 impl Default for PolicyRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn policy_matches(p: &ValidatingAdmissionPolicy, r: &PolicyRequest) -> bool {
-    let group_ok = p.matches.api_groups.iter().any(|g| g == "*" || g == &r.group);
-    let res_ok   = p.matches.resources.iter().any(|x| x == "*" || x == &r.resource);
-    let verb_ok  = p.matches.verbs.iter().any(|v| v == "*" || v == &r.verb);
+    let group_ok = p
+        .matches
+        .api_groups
+        .iter()
+        .any(|g| g == "*" || g == &r.group);
+    let res_ok = p
+        .matches
+        .resources
+        .iter()
+        .any(|x| x == "*" || x == &r.resource);
+    let verb_ok = p.matches.verbs.iter().any(|v| v == "*" || v == &r.verb);
     group_ok && res_ok && verb_ok
 }
 
@@ -181,8 +209,9 @@ pub fn evaluate_expression(
         return Ok(json_path(object, path).is_some());
     }
     if let Some((path, lit)) = split_op(expr, ".startsWith(") {
-        let lit = lit.strip_suffix(')').ok_or_else(||
-            EvalError(format!("unterminated startsWith: `{}`", expression)))?;
+        let lit = lit
+            .strip_suffix(')')
+            .ok_or_else(|| EvalError(format!("unterminated startsWith: `{}`", expression)))?;
         let value = json_path(object, path.trim())
             .and_then(|v| v.as_str().map(String::from))
             .ok_or_else(|| EvalError(format!("path missing or non-string: `{}`", path)))?;
@@ -203,7 +232,10 @@ pub fn evaluate_expression(
         let rhs_v = trim_quotes(rhs.trim())?;
         return Ok(lhs_v == rhs_v);
     }
-    Err(EvalError(format!("unsupported expression: `{}`", expression)))
+    Err(EvalError(format!(
+        "unsupported expression: `{}`",
+        expression
+    )))
 }
 
 fn split_op<'a>(s: &'a str, op: &str) -> Option<(&'a str, &'a str)> {
@@ -213,11 +245,14 @@ fn split_op<'a>(s: &'a str, op: &str) -> Option<(&'a str, &'a str)> {
 fn trim_quotes(s: &str) -> Result<String, EvalError> {
     let t = s.trim();
     if t.len() >= 2 && t.starts_with('"') && t.ends_with('"') {
-        Ok(t[1..t.len()-1].to_string())
+        Ok(t[1..t.len() - 1].to_string())
     } else if t.len() >= 2 && t.starts_with('\'') && t.ends_with('\'') {
-        Ok(t[1..t.len()-1].to_string())
+        Ok(t[1..t.len() - 1].to_string())
     } else {
-        Err(EvalError(format!("expected quoted string literal, got `{}`", s)))
+        Err(EvalError(format!(
+            "expected quoted string literal, got `{}`",
+            s
+        )))
     }
 }
 
@@ -225,7 +260,9 @@ fn json_path<'a>(obj: &'a serde_json::Value, path: &str) -> Option<&'a serde_jso
     let mut cur = obj;
     for seg in path.split('.') {
         let s = seg.trim();
-        if s.is_empty() { continue; }
+        if s.is_empty() {
+            continue;
+        }
         cur = cur.get(s)?;
     }
     Some(cur)
@@ -236,9 +273,15 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn pol(tenant: &str, name: &str, fp: FailurePolicy, rules: Vec<ValidationRule>) -> ValidatingAdmissionPolicy {
+    fn pol(
+        tenant: &str,
+        name: &str,
+        fp: FailurePolicy,
+        rules: Vec<ValidationRule>,
+    ) -> ValidatingAdmissionPolicy {
         ValidatingAdmissionPolicy {
-            tenant_id: tenant.into(), name: name.into(),
+            tenant_id: tenant.into(),
+            name: name.into(),
             failure_policy: fp,
             matches: MatchResources {
                 api_groups: vec!["*".into()],
@@ -249,9 +292,15 @@ mod tests {
         }
     }
 
-    fn bind(tenant: &str, name: &str, policy: &str, namespaces: Vec<&str>) -> ValidatingAdmissionPolicyBinding {
+    fn bind(
+        tenant: &str,
+        name: &str,
+        policy: &str,
+        namespaces: Vec<&str>,
+    ) -> ValidatingAdmissionPolicyBinding {
         ValidatingAdmissionPolicyBinding {
-            tenant_id: tenant.into(), name: name.into(),
+            tenant_id: tenant.into(),
+            name: name.into(),
             policy_name: policy.into(),
             namespaces: namespaces.into_iter().map(String::from).collect(),
         }
@@ -259,9 +308,12 @@ mod tests {
 
     fn req(tenant: &str, ns: &str, obj: serde_json::Value) -> PolicyRequest {
         PolicyRequest {
-            tenant_id: tenant.into(), namespace: ns.into(),
-            group: "".into(), resource: "configmaps".into(),
-            verb: "create".into(), object: obj,
+            tenant_id: tenant.into(),
+            namespace: ns.into(),
+            group: "".into(),
+            resource: "configmaps".into(),
+            verb: "create".into(),
+            object: obj,
         }
     }
 
@@ -271,16 +323,23 @@ mod tests {
     #[test]
     fn test_policy_admits_when_all_validations_pass() {
         let r = PolicyRegistry::new();
-        r.upsert_policy(pol("acme", "no-latest", FailurePolicy::Fail, vec![
-            ValidationRule {
+        r.upsert_policy(pol(
+            "acme",
+            "no-latest",
+            FailurePolicy::Fail,
+            vec![ValidationRule {
                 expression: "spec.image != \"latest\"".into(),
                 message: "image MUST NOT be 'latest'".into(),
-            },
-        ]));
+            }],
+        ));
         r.upsert_binding(bind("acme", "bind-1", "no-latest", vec![]));
-        let dec = r.evaluate(&req("acme", "default", json!({
-            "spec": { "image": "nginx:1.27" }
-        })));
+        let dec = r.evaluate(&req(
+            "acme",
+            "default",
+            json!({
+                "spec": { "image": "nginx:1.27" }
+            }),
+        ));
         assert_eq!(dec, PolicyDecision::Admit);
     }
 
@@ -289,18 +348,28 @@ mod tests {
     #[test]
     fn test_policy_denies_with_rule_message_when_validation_fails() {
         let r = PolicyRegistry::new();
-        r.upsert_policy(pol("acme", "no-latest", FailurePolicy::Fail, vec![
-            ValidationRule {
+        r.upsert_policy(pol(
+            "acme",
+            "no-latest",
+            FailurePolicy::Fail,
+            vec![ValidationRule {
                 expression: "spec.image != \"latest\"".into(),
                 message: "image MUST NOT be 'latest'".into(),
-            },
-        ]));
+            }],
+        ));
         r.upsert_binding(bind("acme", "bind-1", "no-latest", vec![]));
-        let dec = r.evaluate(&req("acme", "default", json!({
-            "spec": { "image": "latest" }
-        })));
+        let dec = r.evaluate(&req(
+            "acme",
+            "default",
+            json!({
+                "spec": { "image": "latest" }
+            }),
+        ));
         match dec {
-            PolicyDecision::Deny { policy_name, message } => {
+            PolicyDecision::Deny {
+                policy_name,
+                message,
+            } => {
                 assert_eq!(policy_name, "no-latest");
                 assert!(message.contains("'latest'"));
             }
@@ -315,19 +384,29 @@ mod tests {
     fn test_policy_evaluation_does_not_cross_tenant_boundaries() {
         let r = PolicyRegistry::new();
         // acme's strict policy.
-        r.upsert_policy(pol("acme", "no-latest", FailurePolicy::Fail, vec![
-            ValidationRule {
+        r.upsert_policy(pol(
+            "acme",
+            "no-latest",
+            FailurePolicy::Fail,
+            vec![ValidationRule {
                 expression: "spec.image != \"latest\"".into(),
                 message: "image MUST NOT be 'latest'".into(),
-            },
-        ]));
+            }],
+        ));
         r.upsert_binding(bind("acme", "bind-1", "no-latest", vec![]));
         // globex has no policies at all — request must Admit.
-        let dec = r.evaluate(&req("globex", "default", json!({
-            "spec": { "image": "latest" }
-        })));
-        assert_eq!(dec, PolicyDecision::Admit,
-            "tenant_id invariant: globex unaffected by acme's deny policy");
+        let dec = r.evaluate(&req(
+            "globex",
+            "default",
+            json!({
+                "spec": { "image": "latest" }
+            }),
+        ));
+        assert_eq!(
+            dec,
+            PolicyDecision::Admit,
+            "tenant_id invariant: globex unaffected by acme's deny policy"
+        );
     }
 
     /// Upstream parity: `TestVAP_FailurePolicyIgnoreSwallowsEvalError`
@@ -335,16 +414,22 @@ mod tests {
     #[test]
     fn test_failure_policy_ignore_admits_when_expression_errors() {
         let r = PolicyRegistry::new();
-        r.upsert_policy(pol("acme", "broken", FailurePolicy::Ignore, vec![
-            ValidationRule {
+        r.upsert_policy(pol(
+            "acme",
+            "broken",
+            FailurePolicy::Ignore,
+            vec![ValidationRule {
                 expression: "missing.path == \"x\"".into(),
                 message: "broken rule".into(),
-            },
-        ]));
+            }],
+        ));
         r.upsert_binding(bind("acme", "bind-1", "broken", vec![]));
         let dec = r.evaluate(&req("acme", "default", json!({})));
-        assert_eq!(dec, PolicyDecision::Admit,
-            "failure_policy=Ignore swallows evaluation errors");
+        assert_eq!(
+            dec,
+            PolicyDecision::Admit,
+            "failure_policy=Ignore swallows evaluation errors"
+        );
     }
 
     /// Upstream parity: `TestVAP_FailurePolicyFailDeniesOnEvalError`
@@ -352,16 +437,22 @@ mod tests {
     #[test]
     fn test_failure_policy_fail_denies_when_expression_errors() {
         let r = PolicyRegistry::new();
-        r.upsert_policy(pol("acme", "strict", FailurePolicy::Fail, vec![
-            ValidationRule {
+        r.upsert_policy(pol(
+            "acme",
+            "strict",
+            FailurePolicy::Fail,
+            vec![ValidationRule {
                 expression: "missing.path == \"x\"".into(),
                 message: "uncalled".into(),
-            },
-        ]));
+            }],
+        ));
         r.upsert_binding(bind("acme", "bind-1", "strict", vec![]));
         let dec = r.evaluate(&req("acme", "default", json!({})));
         match dec {
-            PolicyDecision::Deny { policy_name, message } => {
+            PolicyDecision::Deny {
+                policy_name,
+                message,
+            } => {
                 assert_eq!(policy_name, "strict");
                 assert!(message.contains("evaluation error"));
             }
@@ -375,21 +466,32 @@ mod tests {
     #[test]
     fn test_binding_namespace_list_confines_policy_application() {
         let r = PolicyRegistry::new();
-        r.upsert_policy(pol("acme", "p", FailurePolicy::Fail, vec![
-            ValidationRule {
+        r.upsert_policy(pol(
+            "acme",
+            "p",
+            FailurePolicy::Fail,
+            vec![ValidationRule {
                 expression: "spec.image != \"latest\"".into(),
                 message: "no latest".into(),
-            },
-        ]));
+            }],
+        ));
         r.upsert_binding(bind("acme", "b", "p", vec!["default"]));
         // In default namespace, policy applies → Deny.
-        let in_ns = r.evaluate(&req("acme", "default", json!({
-            "spec": { "image": "latest" }
-        })));
+        let in_ns = r.evaluate(&req(
+            "acme",
+            "default",
+            json!({
+                "spec": { "image": "latest" }
+            }),
+        ));
         // In another namespace, binding does not apply → Admit.
-        let out_ns = r.evaluate(&req("acme", "kube-system", json!({
-            "spec": { "image": "latest" }
-        })));
+        let out_ns = r.evaluate(&req(
+            "acme",
+            "kube-system",
+            json!({
+                "spec": { "image": "latest" }
+            }),
+        ));
         assert!(matches!(in_ns, PolicyDecision::Deny { .. }));
         assert_eq!(out_ns, PolicyDecision::Admit);
     }

@@ -7,17 +7,22 @@ use cave_acme::{Challenge, ChallengeStatus, ChallengeType, Jwk};
 const TENANT: &str = "tenant-acme-prod";
 
 fn jwk() -> Jwk {
-    Jwk::EC { crv: "P-256".into(),
+    Jwk::EC {
+        crv: "P-256".into(),
         x: "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU".into(),
-        y: "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0".into() }
+        y: "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0".into(),
+    }
 }
 
 fn challenge(kind: ChallengeType, token: &str) -> Challenge {
     Challenge {
         id: format!("ch-{}-{}", kind.as_str(), token),
-        kind, status: ChallengeStatus::Pending,
+        kind,
+        status: ChallengeStatus::Pending,
         url: format!("/acme/chall/{}/{}", token, kind.as_str()),
-        token: token.into(), validated_at: None, error: None,
+        token: token.into(),
+        validated_at: None,
+        error: None,
     }
 }
 
@@ -27,7 +32,10 @@ fn challenge(kind: ChallengeType, token: &str) -> Challenge {
 #[test]
 fn http01_resource_path_and_body() {
     let ch = challenge(ChallengeType::Http01, "TOK-http-1");
-    assert_eq!(ch.http01_resource_path(), "/.well-known/acme-challenge/TOK-http-1");
+    assert_eq!(
+        ch.http01_resource_path(),
+        "/.well-known/acme-challenge/TOK-http-1"
+    );
     let body = ch.http01_response_body(&jwk());
     assert!(body.starts_with("TOK-http-1."));
     assert!(body.contains(&jwk().thumbprint()));
@@ -40,7 +48,10 @@ fn http01_resource_path_and_body() {
 fn dns01_record_name_and_value() {
     let ch = challenge(ChallengeType::Dns01, "TOK-dns-1");
     let domain = format!("svc.{}.cave-runtime.test", TENANT);
-    assert_eq!(ch.dns01_record_name(&domain), format!("_acme-challenge.{}", domain));
+    assert_eq!(
+        ch.dns01_record_name(&domain),
+        format!("_acme-challenge.{}", domain)
+    );
     let value = ch.dns01_record_value(&jwk());
     // base64url of SHA-256 ⇒ 43 characters, no padding.
     assert_eq!(value.len(), 43);
@@ -58,7 +69,10 @@ fn tls_alpn01_extension_value_is_32_byte_sha256() {
     assert_eq!(ext.len(), 32);
     // Different challenge token ⇒ different extension value
     let ch2 = challenge(ChallengeType::TlsAlpn01, "TOK-alpn-2");
-    assert_ne!(ch.tls_alpn01_extension_value(&jwk()), ch2.tls_alpn01_extension_value(&jwk()));
+    assert_ne!(
+        ch.tls_alpn01_extension_value(&jwk()),
+        ch2.tls_alpn01_extension_value(&jwk())
+    );
 }
 
 /// Cite: RFC 8555 §7.1.6 — challenge status enum + the canonical type

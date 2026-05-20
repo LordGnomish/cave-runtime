@@ -2,8 +2,8 @@
 // Copyright 2026 Cave Runtime contributors
 /// Reload plugin — signal-triggered or timed config hot-reload.
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     Arc,
+    atomic::{AtomicBool, Ordering},
 };
 use std::time::Duration;
 

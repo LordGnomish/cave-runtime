@@ -156,8 +156,7 @@ mod tests {
 
     #[test]
     fn cty_present_for_nested_jwt() {
-        let h =
-            JweHeader::new(KeyAgreementAlg::RsaOaep, ContentEncAlg::A256Gcm).with_cty("JWT");
+        let h = JweHeader::new(KeyAgreementAlg::RsaOaep, ContentEncAlg::A256Gcm).with_cty("JWT");
         let json = h.to_json();
         assert!(json.contains(r#""cty":"JWT""#));
     }

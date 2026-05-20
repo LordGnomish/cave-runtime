@@ -43,8 +43,7 @@ pub fn write_log_entry(
         .open(log_path)
         .map_err(|e| CriError::Io(e))?;
 
-    writeln!(file, "{}", entry)
-        .map_err(|e| CriError::Io(e))?;
+    writeln!(file, "{}", entry).map_err(|e| CriError::Io(e))?;
 
     Ok(())
 }
@@ -62,13 +61,22 @@ pub fn read_log_entries(log_path: &Path, tail: Option<usize>) -> CriResult<Vec<C
 
     for line in reader.lines().flatten() {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) {
-            let timestamp = v["time"].as_str()
+            let timestamp = v["time"]
+                .as_str()
                 .and_then(|t| DateTime::parse_from_rfc3339(t).ok())
                 .map(|t| t.with_timezone(&Utc))
                 .unwrap_or_else(Utc::now);
             let stream = v["stream"].as_str().unwrap_or("stdout").to_string();
-            let message = v["log"].as_str().unwrap_or("").trim_end_matches('\n').to_string();
-            entries.push(ContainerLogEntry { timestamp, stream, message });
+            let message = v["log"]
+                .as_str()
+                .unwrap_or("")
+                .trim_end_matches('\n')
+                .to_string();
+            entries.push(ContainerLogEntry {
+                timestamp,
+                stream,
+                message,
+            });
         } else {
             entries.push(ContainerLogEntry {
                 timestamp: Utc::now(),
@@ -150,7 +158,7 @@ pub fn rotate(log_path: &Path, max_files: u32) -> CriResult<()> {
     // Shift .N-1 → .N, …, .1 → .2
     for i in (1..max_files).rev() {
         let from = PathBuf::from(format!("{}.{}", stem, i));
-        let to   = PathBuf::from(format!("{}.{}", stem, i + 1));
+        let to = PathBuf::from(format!("{}.{}", stem, i + 1));
         if from.exists() {
             std::fs::rename(&from, &to).map_err(CriError::Io)?;
         }
@@ -179,7 +187,15 @@ mod tests {
         let path = dir.path().join("container.log");
         let ts = Utc::now();
 
-        write_log_entry(&path, "stdout", "hello world", ts, DEFAULT_MAX_SIZE, DEFAULT_MAX_FILES).unwrap();
+        write_log_entry(
+            &path,
+            "stdout",
+            "hello world",
+            ts,
+            DEFAULT_MAX_SIZE,
+            DEFAULT_MAX_FILES,
+        )
+        .unwrap();
 
         let entries = read_log_entries(&path, None).unwrap();
         assert_eq!(entries.len(), 1);
@@ -193,7 +209,15 @@ mod tests {
         let path = dir.path().join("container.log");
         let ts = Utc::now();
 
-        write_log_entry(&path, "stderr", "error occurred", ts, DEFAULT_MAX_SIZE, DEFAULT_MAX_FILES).unwrap();
+        write_log_entry(
+            &path,
+            "stderr",
+            "error occurred",
+            ts,
+            DEFAULT_MAX_SIZE,
+            DEFAULT_MAX_FILES,
+        )
+        .unwrap();
 
         let entries = read_log_entries(&path, None).unwrap();
         assert_eq!(entries[0].stream, "stderr");
@@ -206,7 +230,15 @@ mod tests {
         let ts = Utc::now();
 
         for i in 0..5 {
-            write_log_entry(&path, "stdout", &format!("line {}", i), ts, DEFAULT_MAX_SIZE, DEFAULT_MAX_FILES).unwrap();
+            write_log_entry(
+                &path,
+                "stdout",
+                &format!("line {}", i),
+                ts,
+                DEFAULT_MAX_SIZE,
+                DEFAULT_MAX_FILES,
+            )
+            .unwrap();
         }
 
         let entries = read_log_entries(&path, None).unwrap();
@@ -231,7 +263,15 @@ mod tests {
         let path = dir.path().join("container.log");
         let ts = Utc::now();
 
-        write_log_entry(&path, "stdout", "test message", ts, DEFAULT_MAX_SIZE, DEFAULT_MAX_FILES).unwrap();
+        write_log_entry(
+            &path,
+            "stdout",
+            "test message",
+            ts,
+            DEFAULT_MAX_SIZE,
+            DEFAULT_MAX_FILES,
+        )
+        .unwrap();
 
         let content = std::fs::read_to_string(&path).unwrap();
         for line in content.lines() {
@@ -248,7 +288,15 @@ mod tests {
         let path = dir.path().join("container.log");
         let ts = Utc::now();
 
-        write_log_entry(&path, "stdout", "no-newline", ts, DEFAULT_MAX_SIZE, DEFAULT_MAX_FILES).unwrap();
+        write_log_entry(
+            &path,
+            "stdout",
+            "no-newline",
+            ts,
+            DEFAULT_MAX_SIZE,
+            DEFAULT_MAX_FILES,
+        )
+        .unwrap();
 
         let content = std::fs::read_to_string(&path).unwrap();
         let v: serde_json::Value = serde_json::from_str(content.lines().next().unwrap()).unwrap();
@@ -261,7 +309,15 @@ mod tests {
         let path = dir.path().join("container.log");
         let ts = Utc::now();
 
-        write_log_entry(&path, "stdout", "clean", ts, DEFAULT_MAX_SIZE, DEFAULT_MAX_FILES).unwrap();
+        write_log_entry(
+            &path,
+            "stdout",
+            "clean",
+            ts,
+            DEFAULT_MAX_SIZE,
+            DEFAULT_MAX_FILES,
+        )
+        .unwrap();
 
         let entries = read_log_entries(&path, None).unwrap();
         assert!(!entries[0].message.ends_with('\n'));
@@ -271,9 +327,19 @@ mod tests {
     fn timestamp_is_preserved_in_rfc3339() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("container.log");
-        let ts = chrono::DateTime::parse_from_rfc3339("2024-06-15T12:00:00Z").unwrap().with_timezone(&Utc);
+        let ts = chrono::DateTime::parse_from_rfc3339("2024-06-15T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
 
-        write_log_entry(&path, "stdout", "ts-test", ts, DEFAULT_MAX_SIZE, DEFAULT_MAX_FILES).unwrap();
+        write_log_entry(
+            &path,
+            "stdout",
+            "ts-test",
+            ts,
+            DEFAULT_MAX_SIZE,
+            DEFAULT_MAX_FILES,
+        )
+        .unwrap();
 
         let entries = read_log_entries(&path, None).unwrap();
         assert_eq!(entries[0].timestamp.timestamp(), ts.timestamp());
@@ -288,7 +354,15 @@ mod tests {
         let ts = Utc::now();
 
         for i in 0..10 {
-            write_log_entry(&path, "stdout", &format!("line {}", i), ts, DEFAULT_MAX_SIZE, DEFAULT_MAX_FILES).unwrap();
+            write_log_entry(
+                &path,
+                "stdout",
+                &format!("line {}", i),
+                ts,
+                DEFAULT_MAX_SIZE,
+                DEFAULT_MAX_FILES,
+            )
+            .unwrap();
         }
 
         let entries = read_log_entries(&path, Some(3)).unwrap();
@@ -304,7 +378,15 @@ mod tests {
         let ts = Utc::now();
 
         for i in 0..3 {
-            write_log_entry(&path, "stdout", &format!("line {}", i), ts, DEFAULT_MAX_SIZE, DEFAULT_MAX_FILES).unwrap();
+            write_log_entry(
+                &path,
+                "stdout",
+                &format!("line {}", i),
+                ts,
+                DEFAULT_MAX_SIZE,
+                DEFAULT_MAX_FILES,
+            )
+            .unwrap();
         }
 
         let entries = read_log_entries(&path, Some(100)).unwrap();
@@ -317,7 +399,15 @@ mod tests {
         let path = dir.path().join("container.log");
         let ts = Utc::now();
 
-        write_log_entry(&path, "stdout", "line", ts, DEFAULT_MAX_SIZE, DEFAULT_MAX_FILES).unwrap();
+        write_log_entry(
+            &path,
+            "stdout",
+            "line",
+            ts,
+            DEFAULT_MAX_SIZE,
+            DEFAULT_MAX_FILES,
+        )
+        .unwrap();
 
         let entries = read_log_entries(&path, Some(0)).unwrap();
         assert!(entries.is_empty());
@@ -360,7 +450,11 @@ mod tests {
         std::fs::write(&path, "active").unwrap();
         // Fill up to max
         for i in 1..=5 {
-            std::fs::write(dir.path().join(format!("container.log.{}", i)), format!("old-{}", i)).unwrap();
+            std::fs::write(
+                dir.path().join(format!("container.log.{}", i)),
+                format!("old-{}", i),
+            )
+            .unwrap();
         }
 
         rotate(&path, 5).unwrap();
@@ -399,7 +493,15 @@ mod tests {
         let path = dir.path().join("container.log");
         let ts = Utc::now();
 
-        write_log_entry(&path, "stdout", "small", ts, DEFAULT_MAX_SIZE, DEFAULT_MAX_FILES).unwrap();
+        write_log_entry(
+            &path,
+            "stdout",
+            "small",
+            ts,
+            DEFAULT_MAX_SIZE,
+            DEFAULT_MAX_FILES,
+        )
+        .unwrap();
 
         // .1 should not exist
         let archived = dir.path().join("container.log.1");

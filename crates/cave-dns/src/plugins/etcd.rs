@@ -74,20 +74,13 @@ impl EtcdPlugin {
 
             // Convert etcd key path to DNS name:
             // /skydns/local/cluster/svc → svc.cluster.local.
-            let relative = key
-                .strip_prefix(&self.config.prefix)
-                .unwrap_or(&key);
+            let relative = key.strip_prefix(&self.config.prefix).unwrap_or(&key);
             let labels: Vec<&str> = relative
                 .trim_matches('/')
                 .split('/')
                 .filter(|s| !s.is_empty())
                 .collect();
-            let dns_name: String = labels
-                .into_iter()
-                .rev()
-                .collect::<Vec<_>>()
-                .join(".")
-                + ".";
+            let dns_name: String = labels.into_iter().rev().collect::<Vec<_>>().join(".") + ".";
 
             let name: Name = match dns_name.parse() {
                 Ok(n) => n,
@@ -102,10 +95,9 @@ impl EtcdPlugin {
                     Err(_) => continue,
                 };
                 let (rdata, rtype) = match ip {
-                    std::net::IpAddr::V4(v4) => (
-                        RData::A(hickory_proto::rr::rdata::A(v4)),
-                        RecordType::A,
-                    ),
+                    std::net::IpAddr::V4(v4) => {
+                        (RData::A(hickory_proto::rr::rdata::A(v4)), RecordType::A)
+                    }
                     std::net::IpAddr::V6(v6) => (
                         RData::AAAA(hickory_proto::rr::rdata::AAAA(v6)),
                         RecordType::AAAA,
@@ -129,10 +121,7 @@ impl EtcdPlugin {
                 r.set_record_type(RecordType::CNAME);
                 r.set_dns_class(DNSClass::IN);
                 r.set_data(Some(RData::CNAME(hickory_proto::rr::rdata::CNAME(target))));
-                store
-                    .entry((name, RecordType::CNAME))
-                    .or_default()
-                    .push(r);
+                store.entry((name, RecordType::CNAME)).or_default().push(r);
             }
         }
         Ok(store)

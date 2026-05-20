@@ -71,9 +71,9 @@ pub fn validate_logql(query: &str) -> Result<(), String> {
     if !trimmed.starts_with('{') {
         return Err("LogQL queries must start with a stream selector `{...}`".into());
     }
-    let close = trimmed.find('}').ok_or_else(|| {
-        "stream selector `{...}` is unclosed".to_string()
-    })?;
+    let close = trimmed
+        .find('}')
+        .ok_or_else(|| "stream selector `{...}` is unclosed".to_string())?;
     let selector = &trimmed[1..close];
     if selector.trim().is_empty() {
         return Err("stream selector must contain at least one label matcher".into());
@@ -90,12 +90,11 @@ pub fn validate_logql(query: &str) -> Result<(), String> {
 
 /// Filter streams to those matching a substring (Grafana Explore's
 /// quick-filter chip).
-pub fn filter_by_name<'a>(
-    rows: &'a [LokiStreamRow],
-    needle: &str,
-) -> Vec<&'a LokiStreamRow> {
+pub fn filter_by_name<'a>(rows: &'a [LokiStreamRow], needle: &str) -> Vec<&'a LokiStreamRow> {
     let lc = needle.to_lowercase();
-    rows.iter().filter(|r| r.name.to_lowercase().contains(&lc)).collect()
+    rows.iter()
+        .filter(|r| r.name.to_lowercase().contains(&lc))
+        .collect()
 }
 
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LokiViewError> {
@@ -219,8 +218,18 @@ mod tests {
     #[test]
     fn total_ingest_rate_sums_rates() {
         let rows = vec![
-            LokiStreamRow { name: "a".into(), sink: "loki".into(), ingest_rate_per_sec: 100, retention_days: 7 },
-            LokiStreamRow { name: "b".into(), sink: "loki".into(), ingest_rate_per_sec: 250, retention_days: 7 },
+            LokiStreamRow {
+                name: "a".into(),
+                sink: "loki".into(),
+                ingest_rate_per_sec: 100,
+                retention_days: 7,
+            },
+            LokiStreamRow {
+                name: "b".into(),
+                sink: "loki".into(),
+                ingest_rate_per_sec: 250,
+                retention_days: 7,
+            },
         ];
         assert_eq!(total_ingest_rate(&rows), 350);
         assert_eq!(total_ingest_rate(&[]), 0);
@@ -229,9 +238,24 @@ mod tests {
     #[test]
     fn filter_by_name_substring_match() {
         let rows = vec![
-            LokiStreamRow { name: "web-stdout".into(), sink: "loki".into(), ingest_rate_per_sec: 100, retention_days: 7 },
-            LokiStreamRow { name: "api-stdout".into(), sink: "loki".into(), ingest_rate_per_sec: 100, retention_days: 7 },
-            LokiStreamRow { name: "auth-trace".into(), sink: "loki".into(), ingest_rate_per_sec: 100, retention_days: 7 },
+            LokiStreamRow {
+                name: "web-stdout".into(),
+                sink: "loki".into(),
+                ingest_rate_per_sec: 100,
+                retention_days: 7,
+            },
+            LokiStreamRow {
+                name: "api-stdout".into(),
+                sink: "loki".into(),
+                ingest_rate_per_sec: 100,
+                retention_days: 7,
+            },
+            LokiStreamRow {
+                name: "auth-trace".into(),
+                sink: "loki".into(),
+                ingest_rate_per_sec: 100,
+                retention_days: 7,
+            },
         ];
         let matches = filter_by_name(&rows, "stdout");
         assert_eq!(matches.len(), 2);

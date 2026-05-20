@@ -41,10 +41,16 @@ fn make_store_for_tenant(tenant: &str) -> Kv2Store {
 fn prune_to_max_versions_drops_oldest_only() {
     let mut store = make_store_for_tenant(TENANT);
     let mount = format!("{}/kv", TENANT);
-    let secret = store.data.get_mut(&mount).unwrap()
-        .entry("svc/cfg".into()).or_default();
+    let secret = store
+        .data
+        .get_mut(&mount)
+        .unwrap()
+        .entry("svc/cfg".into())
+        .or_default();
     secret.max_versions = 3;
-    for _ in 1..=6 { put_version(secret, &[("v", "x")]); }
+    for _ in 1..=6 {
+        put_version(secret, &[("v", "x")]);
+    }
 
     let pruned = secret.prune_to_max_versions();
     assert_eq!(pruned, vec![1, 2, 3], "oldest three pruned");
@@ -61,10 +67,16 @@ fn prune_to_max_versions_drops_oldest_only() {
 fn prune_below_max_is_noop() {
     let mut store = make_store_for_tenant(TENANT);
     let mount = format!("{}/kv", TENANT);
-    let secret = store.data.get_mut(&mount).unwrap()
-        .entry("svc/cfg".into()).or_default();
+    let secret = store
+        .data
+        .get_mut(&mount)
+        .unwrap()
+        .entry("svc/cfg".into())
+        .or_default();
     secret.max_versions = 5;
-    for _ in 1..=2 { put_version(secret, &[("v", "x")]); }
+    for _ in 1..=2 {
+        put_version(secret, &[("v", "x")]);
+    }
 
     assert!(secret.prune_to_max_versions().is_empty());
     assert_eq!(secret.versions.len(), 2);
@@ -78,16 +90,24 @@ fn prune_below_max_is_noop() {
 fn delete_version_after_zero_disables_ttl_check() {
     let mut store = make_store_for_tenant(TENANT);
     let mount = format!("{}/kv", TENANT);
-    let secret = store.data.get_mut(&mount).unwrap()
-        .entry("svc/cfg".into()).or_default();
+    let secret = store
+        .data
+        .get_mut(&mount)
+        .unwrap()
+        .entry("svc/cfg".into())
+        .or_default();
     secret.delete_version_after = 0;
     put_version(secret, &[("v", "x")]);
 
     let one_year_later = Utc::now() + Duration::days(365);
-    assert!(!secret.is_version_expired(1, one_year_later),
-        "TTL=0 ⇒ version never expires");
-    assert!(secret.sweep_expired(one_year_later).is_empty(),
-        "TTL=0 ⇒ sweep is a no-op");
+    assert!(
+        !secret.is_version_expired(1, one_year_later),
+        "TTL=0 ⇒ version never expires"
+    );
+    assert!(
+        secret.sweep_expired(one_year_later).is_empty(),
+        "TTL=0 ⇒ sweep is a no-op"
+    );
 }
 
 /// Cite: openbao `builtin/logical/kv/delete_version_after.go` — a
@@ -97,9 +117,13 @@ fn delete_version_after_zero_disables_ttl_check() {
 fn sweep_expired_soft_deletes_old_versions_only() {
     let mut store = make_store_for_tenant(TENANT);
     let mount = format!("{}/kv", TENANT);
-    let secret = store.data.get_mut(&mount).unwrap()
-        .entry("svc/cfg".into()).or_default();
-    secret.delete_version_after = 60;  // 1 minute
+    let secret = store
+        .data
+        .get_mut(&mount)
+        .unwrap()
+        .entry("svc/cfg".into())
+        .or_default();
+    secret.delete_version_after = 60; // 1 minute
 
     // v1 created 2 minutes ago (will be swept)
     secret.versions.push(Kv2Version {
@@ -116,8 +140,10 @@ fn sweep_expired_soft_deletes_old_versions_only() {
     let swept = secret.sweep_expired(Utc::now());
     assert_eq!(swept, vec![1], "only v1 swept");
     assert!(secret.get_version(1).unwrap().deletion_time.is_some());
-    assert!(secret.get_version(1).unwrap().data.is_some(),
-        "soft-delete keeps ciphertext");
+    assert!(
+        secret.get_version(1).unwrap().data.is_some(),
+        "soft-delete keeps ciphertext"
+    );
     assert!(secret.get_version(2).unwrap().deletion_time.is_none());
 }
 
@@ -128,8 +154,12 @@ fn sweep_expired_soft_deletes_old_versions_only() {
 fn sweep_skips_already_destroyed_and_already_deleted_versions() {
     let mut store = make_store_for_tenant(TENANT);
     let mount = format!("{}/kv", TENANT);
-    let secret = store.data.get_mut(&mount).unwrap()
-        .entry("svc/cfg".into()).or_default();
+    let secret = store
+        .data
+        .get_mut(&mount)
+        .unwrap()
+        .entry("svc/cfg".into())
+        .or_default();
     secret.delete_version_after = 60;
 
     // v1 destroyed long ago
@@ -162,8 +192,12 @@ fn sweep_skips_already_destroyed_and_already_deleted_versions() {
 fn cas_zero_only_succeeds_on_first_write() {
     let mut store = make_store_for_tenant(TENANT);
     let mount = format!("{}/kv", TENANT);
-    let secret = store.data.get_mut(&mount).unwrap()
-        .entry("svc/cas".into()).or_default();
+    let secret = store
+        .data
+        .get_mut(&mount)
+        .unwrap()
+        .entry("svc/cas".into())
+        .or_default();
 
     // Empty path: cas=0 matches current_version=0 ⇒ ok
     let cas: u64 = 0;
@@ -172,8 +206,10 @@ fn cas_zero_only_succeeds_on_first_write() {
 
     // Now current_version=1; cas=0 must FAIL the next write
     let cas: u64 = 0;
-    assert_ne!(cas, secret.current_version,
-        "cas=0 only valid for the first write; subsequent writes need cas=N>0");
+    assert_ne!(
+        cas, secret.current_version,
+        "cas=0 only valid for the first write; subsequent writes need cas=N>0"
+    );
 
     // cas=1 succeeds
     let cas: u64 = 1;
@@ -189,8 +225,12 @@ fn cas_zero_only_succeeds_on_first_write() {
 fn cas_required_blocks_writes_without_explicit_cas() {
     let mut store = make_store_for_tenant(TENANT);
     let mount = format!("{}/kv", TENANT);
-    let secret = store.data.get_mut(&mount).unwrap()
-        .entry("svc/strict".into()).or_default();
+    let secret = store
+        .data
+        .get_mut(&mount)
+        .unwrap()
+        .entry("svc/strict".into())
+        .or_default();
     secret.cas_required = true;
 
     // Without supplied cas, the handler would short-circuit ⇒ no write.

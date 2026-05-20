@@ -37,9 +37,8 @@ impl DraftMetrics {
     pub fn new(registry: &mut Registry) -> Self {
         let drafts_generated_total = Counter::default();
         let drafts_failed_total = Counter::default();
-        let draft_duration_seconds = Histogram::new(
-            [0.1_f64, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0].into_iter(),
-        );
+        let draft_duration_seconds =
+            Histogram::new([0.1_f64, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0].into_iter());
 
         registry.register(
             "cave_local_llm_drafts_generated",
@@ -57,7 +56,11 @@ impl DraftMetrics {
             draft_duration_seconds.clone(),
         );
 
-        Self { drafts_generated_total, drafts_failed_total, draft_duration_seconds }
+        Self {
+            drafts_generated_total,
+            drafts_failed_total,
+            draft_duration_seconds,
+        }
     }
 }
 
@@ -71,7 +74,9 @@ pub struct LabelCounter {
 
 impl LabelCounter {
     pub fn new(_metric_name: &'static str, _help: &'static str) -> Self {
-        Self { inner: Mutex::new(HashMap::new()) }
+        Self {
+            inner: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn inc_crate(&self, crate_name: &str) {
@@ -87,7 +92,9 @@ pub struct Label2Counter {
 
 impl Label2Counter {
     pub fn new() -> Self {
-        Self { inner: Mutex::new(HashMap::new()) }
+        Self {
+            inner: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn inc_crate_kind(&self, crate_name: &str, error_kind: &str) {
@@ -147,7 +154,12 @@ impl QueueStatusGauge {
             stuck.clone(),
         );
 
-        Self { pending, in_progress, done, stuck }
+        Self {
+            pending,
+            in_progress,
+            done,
+            stuck,
+        }
     }
 
     pub fn set_pending(&self, v: i64) {
@@ -186,7 +198,10 @@ impl DaemonMetrics {
     pub fn new(registry: &mut Registry) -> Self {
         let daemon_ticks_total = Counter::default();
         let daemon_sleep_duration_seconds = Histogram::new(
-            [0.5_f64, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0].into_iter(),
+            [
+                0.5_f64, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0,
+            ]
+            .into_iter(),
         );
 
         registry.register(
@@ -287,12 +302,18 @@ mod tests {
     fn test_tier2_escalations_per_crate_and_kind() {
         let mut reg = Registry::default();
         let m = DaemonMetrics::new(&mut reg);
-        m.tier2_escalations_total.inc_crate_kind("cave-events", "test_fail");
-        m.tier2_escalations_total.inc_crate_kind("cave-events", "test_fail");
-        m.tier2_escalations_total.inc_crate_kind("cave-events", "timeout");
+        m.tier2_escalations_total
+            .inc_crate_kind("cave-events", "test_fail");
+        m.tier2_escalations_total
+            .inc_crate_kind("cave-events", "test_fail");
+        m.tier2_escalations_total
+            .inc_crate_kind("cave-events", "timeout");
         assert_eq!(m.tier2_escalations_total.get("cave-events", "test_fail"), 2);
         assert_eq!(m.tier2_escalations_total.get("cave-events", "timeout"), 1);
-        assert_eq!(m.tier2_escalations_total.get("cave-events", "compile_fail"), 0);
+        assert_eq!(
+            m.tier2_escalations_total.get("cave-events", "compile_fail"),
+            0
+        );
     }
 
     #[test]

@@ -40,15 +40,24 @@ use uuid::Uuid;
 
 #[derive(Debug, Error)]
 pub enum PulsarError {
-    #[error("tenant `{0}` not found")] TenantNotFound(String),
-    #[error("namespace `{0}` not found")] NamespaceNotFound(String),
-    #[error("topic `{0}` not found")] TopicNotFound(String),
-    #[error("subscription `{0}` not found")] SubscriptionNotFound(String),
-    #[error("topic `{0}` already exists")] TopicAlreadyExists(String),
-    #[error("subscription `{0}` already exists")] SubscriptionAlreadyExists(String),
-    #[error("invalid topic name: {0}")] InvalidTopic(String),
-    #[error("invalid subscription type")] InvalidSubscriptionType,
-    #[error("subscription is at end-of-stream")] EndOfStream,
+    #[error("tenant `{0}` not found")]
+    TenantNotFound(String),
+    #[error("namespace `{0}` not found")]
+    NamespaceNotFound(String),
+    #[error("topic `{0}` not found")]
+    TopicNotFound(String),
+    #[error("subscription `{0}` not found")]
+    SubscriptionNotFound(String),
+    #[error("topic `{0}` already exists")]
+    TopicAlreadyExists(String),
+    #[error("subscription `{0}` already exists")]
+    SubscriptionAlreadyExists(String),
+    #[error("invalid topic name: {0}")]
+    InvalidTopic(String),
+    #[error("invalid subscription type")]
+    InvalidSubscriptionType,
+    #[error("subscription is at end-of-stream")]
+    EndOfStream,
 }
 
 pub type PulsarResult<T> = Result<T, PulsarError>;
@@ -123,7 +132,8 @@ impl Topic {
 
     pub fn parse(fqn: &str) -> PulsarResult<(TopicDomain, String, String, String)> {
         // persistent://tenant/namespace/topic[-partition-N]
-        let (scheme, rest) = fqn.split_once("://")
+        let (scheme, rest) = fqn
+            .split_once("://")
             .ok_or_else(|| PulsarError::InvalidTopic(fqn.to_string()))?;
         let domain = match scheme {
             "persistent" => TopicDomain::Persistent,
@@ -134,7 +144,12 @@ impl Topic {
         if parts.len() != 3 {
             return Err(PulsarError::InvalidTopic(fqn.to_string()));
         }
-        Ok((domain, parts[0].to_string(), parts[1].to_string(), parts[2].to_string()))
+        Ok((
+            domain,
+            parts[0].to_string(),
+            parts[1].to_string(),
+            parts[2].to_string(),
+        ))
     }
 }
 
@@ -174,10 +189,25 @@ pub struct MessageId {
 }
 
 impl MessageId {
-    pub const EARLIEST: MessageId = MessageId { ledger_id: 0, entry_id: 0, partition: -1, batch_index: -1 };
-    pub const LATEST: MessageId = MessageId { ledger_id: u64::MAX, entry_id: u64::MAX, partition: -1, batch_index: -1 };
+    pub const EARLIEST: MessageId = MessageId {
+        ledger_id: 0,
+        entry_id: 0,
+        partition: -1,
+        batch_index: -1,
+    };
+    pub const LATEST: MessageId = MessageId {
+        ledger_id: u64::MAX,
+        entry_id: u64::MAX,
+        partition: -1,
+        batch_index: -1,
+    };
     pub fn from_offset(offset: u64) -> Self {
-        Self { ledger_id: 0, entry_id: offset, partition: -1, batch_index: -1 }
+        Self {
+            ledger_id: 0,
+            entry_id: offset,
+            partition: -1,
+            batch_index: -1,
+        }
     }
     pub fn offset(&self) -> u64 {
         self.entry_id
@@ -282,7 +312,10 @@ impl PulsarAdminCluster {
             allowed_clusters: vec!["standalone".into()],
             created_at: Utc::now(),
         };
-        self.tenants.write().unwrap().insert(name.to_string(), t.clone());
+        self.tenants
+            .write()
+            .unwrap()
+            .insert(name.to_string(), t.clone());
         t
     }
 
@@ -291,14 +324,24 @@ impl PulsarAdminCluster {
     }
 
     pub fn get_tenant(&self, name: &str) -> PulsarResult<Tenant> {
-        self.tenants.read().unwrap().get(name).cloned()
+        self.tenants
+            .read()
+            .unwrap()
+            .get(name)
+            .cloned()
             .ok_or_else(|| PulsarError::TenantNotFound(name.to_string()))
     }
 
     pub fn delete_tenant(&self, name: &str) -> PulsarResult<()> {
         // Cascade: remove tenant's namespaces (and their topics).
-        let names: Vec<String> = self.namespaces.read().unwrap().values()
-            .filter(|ns| ns.tenant == name).map(|ns| ns.fqn()).collect();
+        let names: Vec<String> = self
+            .namespaces
+            .read()
+            .unwrap()
+            .values()
+            .filter(|ns| ns.tenant == name)
+            .map(|ns| ns.fqn())
+            .collect();
         for ns_fqn in names {
             let _ = self.delete_namespace(&ns_fqn);
         }
@@ -325,25 +368,42 @@ impl PulsarAdminCluster {
             max_subscriptions_per_topic: 0,
             created_at: Utc::now(),
         };
-        self.namespaces.write().unwrap().insert(ns.fqn(), ns.clone());
+        self.namespaces
+            .write()
+            .unwrap()
+            .insert(ns.fqn(), ns.clone());
         Ok(ns)
     }
 
     pub fn list_namespaces(&self, tenant: &str) -> Vec<String> {
-        self.namespaces.read().unwrap().values()
+        self.namespaces
+            .read()
+            .unwrap()
+            .values()
             .filter(|ns| ns.tenant == tenant)
             .map(|ns| ns.fqn())
             .collect()
     }
 
     pub fn get_namespace(&self, fqn: &str) -> PulsarResult<Namespace> {
-        self.namespaces.read().unwrap().get(fqn).cloned()
+        self.namespaces
+            .read()
+            .unwrap()
+            .get(fqn)
+            .cloned()
             .ok_or_else(|| PulsarError::NamespaceNotFound(fqn.to_string()))
     }
 
-    pub fn set_namespace_retention(&self, fqn: &str, minutes: u64, size_mb: u64) -> PulsarResult<()> {
+    pub fn set_namespace_retention(
+        &self,
+        fqn: &str,
+        minutes: u64,
+        size_mb: u64,
+    ) -> PulsarResult<()> {
         let mut g = self.namespaces.write().unwrap();
-        let ns = g.get_mut(fqn).ok_or_else(|| PulsarError::NamespaceNotFound(fqn.to_string()))?;
+        let ns = g
+            .get_mut(fqn)
+            .ok_or_else(|| PulsarError::NamespaceNotFound(fqn.to_string()))?;
         ns.retention_minutes = minutes;
         ns.retention_size_mb = size_mb;
         Ok(())
@@ -351,7 +411,9 @@ impl PulsarAdminCluster {
 
     pub fn set_namespace_ttl(&self, fqn: &str, ttl_seconds: u64) -> PulsarResult<()> {
         let mut g = self.namespaces.write().unwrap();
-        let ns = g.get_mut(fqn).ok_or_else(|| PulsarError::NamespaceNotFound(fqn.to_string()))?;
+        let ns = g
+            .get_mut(fqn)
+            .ok_or_else(|| PulsarError::NamespaceNotFound(fqn.to_string()))?;
         ns.message_ttl_seconds = Some(ttl_seconds);
         Ok(())
     }
@@ -360,8 +422,13 @@ impl PulsarAdminCluster {
         // Cascade: delete topics in namespace.
         let topics: Vec<String> = {
             let parts: Vec<&str> = fqn.split('/').collect();
-            self.topics.read().unwrap().values()
-                .filter(|t| parts.len() == 2 && t.topic.tenant == parts[0] && t.topic.namespace == parts[1])
+            self.topics
+                .read()
+                .unwrap()
+                .values()
+                .filter(|t| {
+                    parts.len() == 2 && t.topic.tenant == parts[0] && t.topic.namespace == parts[1]
+                })
                 .map(|t| t.topic.fqn())
                 .collect()
         };
@@ -393,7 +460,10 @@ impl PulsarAdminCluster {
             created_at: Utc::now(),
         };
         topics.insert(fqn.to_string(), Arc::new(TopicMeta { topic: t.clone() }));
-        self.stores.write().unwrap().insert(fqn.to_string(), Arc::new(TopicStore::default()));
+        self.stores
+            .write()
+            .unwrap()
+            .insert(fqn.to_string(), Arc::new(TopicStore::default()));
         Ok(t)
     }
 
@@ -407,8 +477,13 @@ impl PulsarAdminCluster {
 
     pub fn list_topics(&self, namespace_fqn: &str) -> Vec<String> {
         let parts: Vec<&str> = namespace_fqn.split('/').collect();
-        self.topics.read().unwrap().values()
-            .filter(|t| parts.len() == 2 && t.topic.tenant == parts[0] && t.topic.namespace == parts[1])
+        self.topics
+            .read()
+            .unwrap()
+            .values()
+            .filter(|t| {
+                parts.len() == 2 && t.topic.tenant == parts[0] && t.topic.namespace == parts[1]
+            })
             .map(|t| t.topic.fqn())
             .collect()
     }
@@ -418,15 +493,23 @@ impl PulsarAdminCluster {
     }
 
     pub fn topic_stats(&self, fqn: &str) -> PulsarResult<TopicStats> {
-        let store = self.stores.read().unwrap().get(fqn).cloned()
+        let store = self
+            .stores
+            .read()
+            .unwrap()
+            .get(fqn)
+            .cloned()
             .ok_or_else(|| PulsarError::TopicNotFound(fqn.to_string()))?;
         let cursors = store.cursors.read().unwrap();
-        let subs: Vec<SubscriptionStats> = cursors.values().map(|s| SubscriptionStats {
-            name: s.name.clone(),
-            sub_type: s.sub_type,
-            backlog: s.backlog,
-            cursor: s.cursor_pos,
-        }).collect();
+        let subs: Vec<SubscriptionStats> = cursors
+            .values()
+            .map(|s| SubscriptionStats {
+                name: s.name.clone(),
+                sub_type: s.sub_type,
+                backlog: s.backlog,
+                cursor: s.cursor_pos,
+            })
+            .collect();
         Ok(TopicStats {
             topic: fqn.to_string(),
             messages_in: store.len() as i64,
@@ -444,7 +527,12 @@ impl PulsarAdminCluster {
         sub_type: SubscriptionType,
         initial_position: InitialPosition,
     ) -> PulsarResult<Subscription> {
-        let store = self.stores.read().unwrap().get(topic_fqn).cloned()
+        let store = self
+            .stores
+            .read()
+            .unwrap()
+            .get(topic_fqn)
+            .cloned()
             .ok_or_else(|| PulsarError::TopicNotFound(topic_fqn.to_string()))?;
         let cursor_pos = match initial_position {
             InitialPosition::Earliest => 0,
@@ -464,18 +552,32 @@ impl PulsarAdminCluster {
             created_at: Utc::now(),
         };
         cursors.insert(sub_name.to_string(), sub.clone());
-        store.unacked.write().unwrap().insert(sub_name.to_string(), BTreeMap::new());
+        store
+            .unacked
+            .write()
+            .unwrap()
+            .insert(sub_name.to_string(), BTreeMap::new());
         Ok(sub)
     }
 
     pub fn list_subscriptions(&self, topic_fqn: &str) -> PulsarResult<Vec<Subscription>> {
-        let store = self.stores.read().unwrap().get(topic_fqn).cloned()
+        let store = self
+            .stores
+            .read()
+            .unwrap()
+            .get(topic_fqn)
+            .cloned()
             .ok_or_else(|| PulsarError::TopicNotFound(topic_fqn.to_string()))?;
         Ok(store.cursors.read().unwrap().values().cloned().collect())
     }
 
     pub fn delete_subscription(&self, topic_fqn: &str, sub_name: &str) -> PulsarResult<()> {
-        let store = self.stores.read().unwrap().get(topic_fqn).cloned()
+        let store = self
+            .stores
+            .read()
+            .unwrap()
+            .get(topic_fqn)
+            .cloned()
             .ok_or_else(|| PulsarError::TopicNotFound(topic_fqn.to_string()))?;
         if store.cursors.write().unwrap().remove(sub_name).is_none() {
             return Err(PulsarError::SubscriptionNotFound(sub_name.to_string()));
@@ -485,23 +587,40 @@ impl PulsarAdminCluster {
     }
 
     pub fn skip_all(&self, topic_fqn: &str, sub_name: &str) -> PulsarResult<()> {
-        let store = self.stores.read().unwrap().get(topic_fqn).cloned()
+        let store = self
+            .stores
+            .read()
+            .unwrap()
+            .get(topic_fqn)
+            .cloned()
             .ok_or_else(|| PulsarError::TopicNotFound(topic_fqn.to_string()))?;
         let len = store.len() as i64;
         let mut cursors = store.cursors.write().unwrap();
-        let sub = cursors.get_mut(sub_name)
+        let sub = cursors
+            .get_mut(sub_name)
             .ok_or_else(|| PulsarError::SubscriptionNotFound(sub_name.to_string()))?;
         sub.cursor_pos = len;
         sub.backlog = 0;
         Ok(())
     }
 
-    pub fn reset_cursor(&self, topic_fqn: &str, sub_name: &str, position: MessageId) -> PulsarResult<()> {
-        let store = self.stores.read().unwrap().get(topic_fqn).cloned()
+    pub fn reset_cursor(
+        &self,
+        topic_fqn: &str,
+        sub_name: &str,
+        position: MessageId,
+    ) -> PulsarResult<()> {
+        let store = self
+            .stores
+            .read()
+            .unwrap()
+            .get(topic_fqn)
+            .cloned()
             .ok_or_else(|| PulsarError::TopicNotFound(topic_fqn.to_string()))?;
         let len = store.len() as i64;
         let mut cursors = store.cursors.write().unwrap();
-        let sub = cursors.get_mut(sub_name)
+        let sub = cursors
+            .get_mut(sub_name)
             .ok_or_else(|| PulsarError::SubscriptionNotFound(sub_name.to_string()))?;
         let new_pos = if position == MessageId::EARLIEST {
             0
@@ -518,7 +637,12 @@ impl PulsarAdminCluster {
     // ── Producer / publish ───────────────────────────────────────────────
 
     pub fn open_producer(&self, topic_fqn: &str) -> PulsarResult<Producer> {
-        let store = self.stores.read().unwrap().get(topic_fqn).cloned()
+        let store = self
+            .stores
+            .read()
+            .unwrap()
+            .get(topic_fqn)
+            .cloned()
             .ok_or_else(|| PulsarError::TopicNotFound(topic_fqn.to_string()))?;
         store.producer_count.fetch_add(1, Ordering::SeqCst);
         Ok(Producer {
@@ -530,7 +654,12 @@ impl PulsarAdminCluster {
     }
 
     pub fn open_consumer(&self, topic_fqn: &str, sub_name: &str) -> PulsarResult<Consumer> {
-        let store = self.stores.read().unwrap().get(topic_fqn).cloned()
+        let store = self
+            .stores
+            .read()
+            .unwrap()
+            .get(topic_fqn)
+            .cloned()
             .ok_or_else(|| PulsarError::TopicNotFound(topic_fqn.to_string()))?;
         if !store.cursors.read().unwrap().contains_key(sub_name) {
             return Err(PulsarError::SubscriptionNotFound(sub_name.to_string()));
@@ -586,7 +715,8 @@ pub struct Consumer {
 impl Consumer {
     pub fn receive(&self) -> PulsarResult<Option<PulsarMessage>> {
         let mut cursors = self.store.cursors.write().unwrap();
-        let sub = cursors.get_mut(&self.sub_name)
+        let sub = cursors
+            .get_mut(&self.sub_name)
             .ok_or_else(|| PulsarError::SubscriptionNotFound(self.sub_name.clone()))?;
         let log = self.store.log.read().unwrap();
         if (sub.cursor_pos as usize) >= log.len() {
@@ -607,7 +737,8 @@ impl Consumer {
 
     pub fn ack(&self, id: MessageId) -> PulsarResult<()> {
         let mut unacked = self.store.unacked.write().unwrap();
-        let m = unacked.get_mut(&self.sub_name)
+        let m = unacked
+            .get_mut(&self.sub_name)
             .ok_or_else(|| PulsarError::SubscriptionNotFound(self.sub_name.clone()))?;
         m.remove(&id.entry_id);
         Ok(())
@@ -616,7 +747,8 @@ impl Consumer {
     pub fn nack(&self, id: MessageId) -> PulsarResult<()> {
         // Negative ack — for simplicity we move the cursor back to redeliver.
         let mut cursors = self.store.cursors.write().unwrap();
-        let sub = cursors.get_mut(&self.sub_name)
+        let sub = cursors
+            .get_mut(&self.sub_name)
             .ok_or_else(|| PulsarError::SubscriptionNotFound(self.sub_name.clone()))?;
         if (id.entry_id as i64) < sub.cursor_pos {
             sub.cursor_pos = id.entry_id as i64;
@@ -626,17 +758,33 @@ impl Consumer {
     }
 
     pub fn unacked_count(&self) -> usize {
-        self.store.unacked.read().unwrap()
-            .get(&self.sub_name).map(|m| m.len()).unwrap_or(0)
+        self.store
+            .unacked
+            .read()
+            .unwrap()
+            .get(&self.sub_name)
+            .map(|m| m.len())
+            .unwrap_or(0)
     }
 
     pub fn dlq(&self) -> Vec<PulsarMessage> {
-        self.store.dlq.read().unwrap().get(&self.sub_name).cloned().unwrap_or_default()
+        self.store
+            .dlq
+            .read()
+            .unwrap()
+            .get(&self.sub_name)
+            .cloned()
+            .unwrap_or_default()
     }
 
     pub fn send_to_dlq(&self, msg: PulsarMessage) {
-        self.store.dlq.write().unwrap()
-            .entry(self.sub_name.clone()).or_default().push(msg);
+        self.store
+            .dlq
+            .write()
+            .unwrap()
+            .entry(self.sub_name.clone())
+            .or_default()
+            .push(msg);
     }
 }
 
@@ -730,17 +878,30 @@ mod tests {
         assert_eq!(ns, "default");
         assert_eq!(n, "logs");
         let topic = Topic {
-            domain, tenant: t, namespace: ns, name: n,
-            partitions: 0, created_at: Utc::now(),
+            domain,
+            tenant: t,
+            namespace: ns,
+            name: n,
+            partitions: 0,
+            created_at: Utc::now(),
         };
         assert_eq!(topic.fqn(), "persistent://acme/default/logs");
     }
 
     #[test]
     fn topic_parse_rejects_garbage() {
-        assert!(matches!(Topic::parse("not-a-topic"), Err(PulsarError::InvalidTopic(_))));
-        assert!(matches!(Topic::parse("foo://bar"), Err(PulsarError::InvalidTopic(_))));
-        assert!(matches!(Topic::parse("persistent://only-one-segment"), Err(PulsarError::InvalidTopic(_))));
+        assert!(matches!(
+            Topic::parse("not-a-topic"),
+            Err(PulsarError::InvalidTopic(_))
+        ));
+        assert!(matches!(
+            Topic::parse("foo://bar"),
+            Err(PulsarError::InvalidTopic(_))
+        ));
+        assert!(matches!(
+            Topic::parse("persistent://only-one-segment"),
+            Err(PulsarError::InvalidTopic(_))
+        ));
     }
 
     #[test]
@@ -755,7 +916,9 @@ mod tests {
     fn create_topic_requires_namespace() {
         let c = PulsarAdminCluster::new();
         c.create_tenant("acme");
-        let err = c.create_topic("persistent://acme/no-such/topic", 0).unwrap_err();
+        let err = c
+            .create_topic("persistent://acme/no-such/topic", 0)
+            .unwrap_err();
         assert!(matches!(err, PulsarError::NamespaceNotFound(_)));
     }
 
@@ -763,7 +926,9 @@ mod tests {
     fn create_duplicate_topic_errors() {
         let (c, _, _) = cluster_with_ns();
         let _ = make_topic(&c, "a");
-        let err = c.create_topic("persistent://acme/default/a", 0).unwrap_err();
+        let err = c
+            .create_topic("persistent://acme/default/a", 0)
+            .unwrap_err();
         assert!(matches!(err, PulsarError::TopicAlreadyExists(_)));
     }
 
@@ -781,7 +946,8 @@ mod tests {
         let (c, _, _) = cluster_with_ns();
         c.create_namespace("acme", "other").unwrap();
         let _ = make_topic(&c, "in-default");
-        c.create_topic("persistent://acme/other/in-other", 0).unwrap();
+        c.create_topic("persistent://acme/other/in-other", 0)
+            .unwrap();
         let default_topics = c.list_topics("acme/default");
         let other_topics = c.list_topics("acme/other");
         assert_eq!(default_topics.len(), 1);
@@ -792,7 +958,13 @@ mod tests {
     fn produce_and_consume_one_message() {
         let (c, _, _) = cluster_with_ns();
         let fqn = make_topic(&c, "q");
-        c.create_subscription(&fqn, "s1", SubscriptionType::Exclusive, InitialPosition::Earliest).unwrap();
+        c.create_subscription(
+            &fqn,
+            "s1",
+            SubscriptionType::Exclusive,
+            InitialPosition::Earliest,
+        )
+        .unwrap();
         let p = c.open_producer(&fqn).unwrap();
         let id = p.send(PulsarMessage::new(b"hello".to_vec()));
         let cons = c.open_consumer(&fqn, "s1").unwrap();
@@ -805,7 +977,13 @@ mod tests {
     fn fifo_order_preserved() {
         let (c, _, _) = cluster_with_ns();
         let fqn = make_topic(&c, "q");
-        c.create_subscription(&fqn, "s1", SubscriptionType::Exclusive, InitialPosition::Earliest).unwrap();
+        c.create_subscription(
+            &fqn,
+            "s1",
+            SubscriptionType::Exclusive,
+            InitialPosition::Earliest,
+        )
+        .unwrap();
         let p = c.open_producer(&fqn).unwrap();
         for i in 0..5 {
             p.send(PulsarMessage::new(vec![i]));
@@ -825,9 +1003,18 @@ mod tests {
         let p = c.open_producer(&fqn).unwrap();
         p.send(PulsarMessage::new(b"old1".to_vec()));
         p.send(PulsarMessage::new(b"old2".to_vec()));
-        c.create_subscription(&fqn, "s1", SubscriptionType::Exclusive, InitialPosition::Latest).unwrap();
+        c.create_subscription(
+            &fqn,
+            "s1",
+            SubscriptionType::Exclusive,
+            InitialPosition::Latest,
+        )
+        .unwrap();
         let cons = c.open_consumer(&fqn, "s1").unwrap();
-        assert!(cons.receive().unwrap().is_none(), "latest should skip past existing entries");
+        assert!(
+            cons.receive().unwrap().is_none(),
+            "latest should skip past existing entries"
+        );
         // New message after the subscription is delivered.
         p.send(PulsarMessage::new(b"new".to_vec()));
         let m = cons.receive().unwrap().unwrap();
@@ -838,7 +1025,13 @@ mod tests {
     fn ack_clears_unacked_count() {
         let (c, _, _) = cluster_with_ns();
         let fqn = make_topic(&c, "q");
-        c.create_subscription(&fqn, "s", SubscriptionType::Shared, InitialPosition::Earliest).unwrap();
+        c.create_subscription(
+            &fqn,
+            "s",
+            SubscriptionType::Shared,
+            InitialPosition::Earliest,
+        )
+        .unwrap();
         let p = c.open_producer(&fqn).unwrap();
         p.send(PulsarMessage::new(b"a".to_vec()));
         p.send(PulsarMessage::new(b"b".to_vec()));
@@ -855,7 +1048,13 @@ mod tests {
     fn nack_redelivers_message() {
         let (c, _, _) = cluster_with_ns();
         let fqn = make_topic(&c, "q");
-        c.create_subscription(&fqn, "s", SubscriptionType::Exclusive, InitialPosition::Earliest).unwrap();
+        c.create_subscription(
+            &fqn,
+            "s",
+            SubscriptionType::Exclusive,
+            InitialPosition::Earliest,
+        )
+        .unwrap();
         let p = c.open_producer(&fqn).unwrap();
         p.send(PulsarMessage::new(b"a".to_vec()));
         p.send(PulsarMessage::new(b"b".to_vec()));
@@ -871,9 +1070,17 @@ mod tests {
     fn skip_all_clears_backlog() {
         let (c, _, _) = cluster_with_ns();
         let fqn = make_topic(&c, "q");
-        c.create_subscription(&fqn, "s", SubscriptionType::Exclusive, InitialPosition::Earliest).unwrap();
+        c.create_subscription(
+            &fqn,
+            "s",
+            SubscriptionType::Exclusive,
+            InitialPosition::Earliest,
+        )
+        .unwrap();
         let p = c.open_producer(&fqn).unwrap();
-        for _ in 0..10 { p.send(PulsarMessage::new(b"x".to_vec())); }
+        for _ in 0..10 {
+            p.send(PulsarMessage::new(b"x".to_vec()));
+        }
         c.skip_all(&fqn, "s").unwrap();
         let cons = c.open_consumer(&fqn, "s").unwrap();
         assert!(cons.receive().unwrap().is_none());
@@ -884,14 +1091,24 @@ mod tests {
         let (c, _, _) = cluster_with_ns();
         let fqn = make_topic(&c, "q");
         let p = c.open_producer(&fqn).unwrap();
-        for _ in 0..3 { p.send(PulsarMessage::new(b"x".to_vec())); }
+        for _ in 0..3 {
+            p.send(PulsarMessage::new(b"x".to_vec()));
+        }
         // Subscription created at Latest after messages exist → cursor is past them.
-        c.create_subscription(&fqn, "s", SubscriptionType::Exclusive, InitialPosition::Latest).unwrap();
+        c.create_subscription(
+            &fqn,
+            "s",
+            SubscriptionType::Exclusive,
+            InitialPosition::Latest,
+        )
+        .unwrap();
         let cons = c.open_consumer(&fqn, "s").unwrap();
         assert!(cons.receive().unwrap().is_none(), "latest skips existing");
         c.reset_cursor(&fqn, "s", MessageId::EARLIEST).unwrap();
         let mut count = 0;
-        while cons.receive().unwrap().is_some() { count += 1; }
+        while cons.receive().unwrap().is_some() {
+            count += 1;
+        }
         assert_eq!(count, 3);
     }
 
@@ -899,10 +1116,19 @@ mod tests {
     fn reset_cursor_to_specific_offset() {
         let (c, _, _) = cluster_with_ns();
         let fqn = make_topic(&c, "q");
-        c.create_subscription(&fqn, "s", SubscriptionType::Exclusive, InitialPosition::Earliest).unwrap();
+        c.create_subscription(
+            &fqn,
+            "s",
+            SubscriptionType::Exclusive,
+            InitialPosition::Earliest,
+        )
+        .unwrap();
         let p = c.open_producer(&fqn).unwrap();
-        for i in 0..5 { p.send(PulsarMessage::new(vec![i])); }
-        c.reset_cursor(&fqn, "s", MessageId::from_offset(3)).unwrap();
+        for i in 0..5 {
+            p.send(PulsarMessage::new(vec![i]));
+        }
+        c.reset_cursor(&fqn, "s", MessageId::from_offset(3))
+            .unwrap();
         let cons = c.open_consumer(&fqn, "s").unwrap();
         let m = cons.receive().unwrap().unwrap();
         assert_eq!(m.value, vec![3]);
@@ -912,8 +1138,21 @@ mod tests {
     fn duplicate_subscription_errors() {
         let (c, _, _) = cluster_with_ns();
         let fqn = make_topic(&c, "q");
-        c.create_subscription(&fqn, "s", SubscriptionType::Exclusive, InitialPosition::Earliest).unwrap();
-        let err = c.create_subscription(&fqn, "s", SubscriptionType::Exclusive, InitialPosition::Earliest).unwrap_err();
+        c.create_subscription(
+            &fqn,
+            "s",
+            SubscriptionType::Exclusive,
+            InitialPosition::Earliest,
+        )
+        .unwrap();
+        let err = c
+            .create_subscription(
+                &fqn,
+                "s",
+                SubscriptionType::Exclusive,
+                InitialPosition::Earliest,
+            )
+            .unwrap_err();
         assert!(matches!(err, PulsarError::SubscriptionAlreadyExists(_)));
     }
 
@@ -921,7 +1160,13 @@ mod tests {
     fn delete_subscription_removes_it() {
         let (c, _, _) = cluster_with_ns();
         let fqn = make_topic(&c, "q");
-        c.create_subscription(&fqn, "s", SubscriptionType::Exclusive, InitialPosition::Earliest).unwrap();
+        c.create_subscription(
+            &fqn,
+            "s",
+            SubscriptionType::Exclusive,
+            InitialPosition::Earliest,
+        )
+        .unwrap();
         c.delete_subscription(&fqn, "s").unwrap();
         assert!(c.list_subscriptions(&fqn).unwrap().is_empty());
     }
@@ -938,8 +1183,20 @@ mod tests {
     fn topic_stats_counts_messages_and_subs() {
         let (c, _, _) = cluster_with_ns();
         let fqn = make_topic(&c, "q");
-        c.create_subscription(&fqn, "s1", SubscriptionType::Exclusive, InitialPosition::Earliest).unwrap();
-        c.create_subscription(&fqn, "s2", SubscriptionType::Shared, InitialPosition::Earliest).unwrap();
+        c.create_subscription(
+            &fqn,
+            "s1",
+            SubscriptionType::Exclusive,
+            InitialPosition::Earliest,
+        )
+        .unwrap();
+        c.create_subscription(
+            &fqn,
+            "s2",
+            SubscriptionType::Shared,
+            InitialPosition::Earliest,
+        )
+        .unwrap();
         let p = c.open_producer(&fqn).unwrap();
         p.send(PulsarMessage::new(b"1".to_vec()));
         p.send(PulsarMessage::new(b"2".to_vec()));
@@ -955,15 +1212,26 @@ mod tests {
     fn properties_and_keys_round_trip() {
         let (c, _, _) = cluster_with_ns();
         let fqn = make_topic(&c, "q");
-        c.create_subscription(&fqn, "s", SubscriptionType::Exclusive, InitialPosition::Earliest).unwrap();
+        c.create_subscription(
+            &fqn,
+            "s",
+            SubscriptionType::Exclusive,
+            InitialPosition::Earliest,
+        )
+        .unwrap();
         let p = c.open_producer(&fqn).unwrap();
-        p.send(PulsarMessage::new(b"v".to_vec())
-            .with_key("k1")
-            .with_property("trace_id", "abc"));
+        p.send(
+            PulsarMessage::new(b"v".to_vec())
+                .with_key("k1")
+                .with_property("trace_id", "abc"),
+        );
         let cons = c.open_consumer(&fqn, "s").unwrap();
         let m = cons.receive().unwrap().unwrap();
         assert_eq!(m.key.as_deref(), Some("k1"));
-        assert_eq!(m.properties.get("trace_id").map(|s| s.as_str()), Some("abc"));
+        assert_eq!(
+            m.properties.get("trace_id").map(|s| s.as_str()),
+            Some("abc")
+        );
         assert_eq!(m.producer_name.as_deref(), Some(p.name.as_str()));
     }
 
@@ -971,7 +1239,13 @@ mod tests {
     fn dlq_send_and_read() {
         let (c, _, _) = cluster_with_ns();
         let fqn = make_topic(&c, "q");
-        c.create_subscription(&fqn, "s", SubscriptionType::Exclusive, InitialPosition::Earliest).unwrap();
+        c.create_subscription(
+            &fqn,
+            "s",
+            SubscriptionType::Exclusive,
+            InitialPosition::Earliest,
+        )
+        .unwrap();
         let cons = c.open_consumer(&fqn, "s").unwrap();
         cons.send_to_dlq(PulsarMessage::new(b"poison".to_vec()));
         let dlq = cons.dlq();
@@ -1017,7 +1291,13 @@ mod tests {
         // Two consumers on a Shared subscription should each receive distinct messages.
         let (c, _, _) = cluster_with_ns();
         let fqn = make_topic(&c, "q");
-        c.create_subscription(&fqn, "s", SubscriptionType::Shared, InitialPosition::Earliest).unwrap();
+        c.create_subscription(
+            &fqn,
+            "s",
+            SubscriptionType::Shared,
+            InitialPosition::Earliest,
+        )
+        .unwrap();
         let p = c.open_producer(&fqn).unwrap();
         p.send(PulsarMessage::new(b"1".to_vec()));
         p.send(PulsarMessage::new(b"2".to_vec()));

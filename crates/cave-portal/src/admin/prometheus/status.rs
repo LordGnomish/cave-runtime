@@ -31,7 +31,8 @@ pub fn list_service_discovery(
     ctx: &RequestCtx,
 ) -> Result<Vec<ServiceDiscoveryRow>, PrometheusViewError> {
     let targets = super::targets::list_targets(state, ctx)?;
-    let mut counts: std::collections::BTreeMap<&'static str, u32> = std::collections::BTreeMap::new();
+    let mut counts: std::collections::BTreeMap<&'static str, u32> =
+        std::collections::BTreeMap::new();
     for t in &targets {
         let kind = if t.scraper.contains("kube") {
             "kubernetes_sd"
@@ -83,13 +84,7 @@ pub(super) fn render_section(
         .collect();
     let am_rows: Vec<Vec<String>> = am
         .iter()
-        .map(|r| {
-            vec![
-                r.url.into(),
-                r.api_version.into(),
-                r.state.into(),
-            ]
-        })
+        .map(|r| vec![r.url.into(), r.api_version.into(), r.state.into()])
         .collect();
     Ok(format!(
         r#"<section id="prometheus-status" class="mt-6">
@@ -124,8 +119,7 @@ mod tests {
         let s = AdminState::seeded();
         let rows = list_service_discovery(&s, &ctx(&[Permission::PrometheusRead])).unwrap();
         let total: u32 = rows.iter().map(|r| r.target_count).sum();
-        let targets =
-            targets::list_targets(&s, &ctx(&[Permission::PrometheusRead])).unwrap();
+        let targets = targets::list_targets(&s, &ctx(&[Permission::PrometheusRead])).unwrap();
         assert_eq!(total, targets.len() as u32);
     }
 

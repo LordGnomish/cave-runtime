@@ -59,7 +59,10 @@ impl StreamFormat {
     pub fn render(self, value: &serde_json::Value) -> String {
         match self {
             StreamFormat::NdJson => serde_json::to_string(value).unwrap_or_default(),
-            StreamFormat::Sse => format!("data: {}\n", serde_json::to_string(value).unwrap_or_default()),
+            StreamFormat::Sse => format!(
+                "data: {}\n",
+                serde_json::to_string(value).unwrap_or_default()
+            ),
             StreamFormat::Text => match value {
                 serde_json::Value::String(s) => s.clone(),
                 other => other.to_string(),

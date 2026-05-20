@@ -19,7 +19,7 @@
 //! and MUST set the standard `kubernetes.io/service-name` label so consumers
 //! can locate the slice for the owning Service.
 
-use crate::resources::{Endpoints, EndpointSubset, ObjectReference};
+use crate::resources::{EndpointSubset, Endpoints, ObjectReference};
 use serde::{Deserialize, Serialize};
 
 /// Address family for a slice. Upstream `discovery.AddressType`.
@@ -84,8 +84,13 @@ pub struct MirrorReconciler {
 
 impl MirrorReconciler {
     pub fn new(max_endpoints_per_slice: usize) -> Self {
-        assert!(max_endpoints_per_slice > 0, "max_endpoints_per_slice must be > 0");
-        Self { max_endpoints_per_slice }
+        assert!(
+            max_endpoints_per_slice > 0,
+            "max_endpoints_per_slice must be > 0"
+        );
+        Self {
+            max_endpoints_per_slice,
+        }
     }
 
     /// Mirror an `Endpoints` (scoped to `tenant_id`) into `EndpointSlice`s.
@@ -114,13 +119,13 @@ impl MirrorReconciler {
                     port: sp.port,
                     protocol: sp.protocol.clone(),
                 };
-                if !canonical_ports.iter().any(|p|
+                if !canonical_ports.iter().any(|p| {
                     p.name == port.name && p.port == port.port && p.protocol == port.protocol
-                ) {
+                }) {
                     canonical_ports.push(port);
                 }
             }
-            push_addresses(subset, /*ready=*/ true,  &mut v4, &mut v6, &mut fqdn);
+            push_addresses(subset, /*ready=*/ true, &mut v4, &mut v6, &mut fqdn);
         }
         // Not-ready subsets: still mirrored, but with ready=false.
         for subset in &ep.subsets {
@@ -128,12 +133,36 @@ impl MirrorReconciler {
         }
 
         let mut out: Vec<EndpointSlice> = vec![];
-        self.emit_chunks(tenant_id, &svc_name, &ns, &owner_ref,
-            AddressType::IPv4, &v4, &canonical_ports, &mut out);
-        self.emit_chunks(tenant_id, &svc_name, &ns, &owner_ref,
-            AddressType::IPv6, &v6, &canonical_ports, &mut out);
-        self.emit_chunks(tenant_id, &svc_name, &ns, &owner_ref,
-            AddressType::FQDN, &fqdn, &canonical_ports, &mut out);
+        self.emit_chunks(
+            tenant_id,
+            &svc_name,
+            &ns,
+            &owner_ref,
+            AddressType::IPv4,
+            &v4,
+            &canonical_ports,
+            &mut out,
+        );
+        self.emit_chunks(
+            tenant_id,
+            &svc_name,
+            &ns,
+            &owner_ref,
+            AddressType::IPv6,
+            &v6,
+            &canonical_ports,
+            &mut out,
+        );
+        self.emit_chunks(
+            tenant_id,
+            &svc_name,
+            &ns,
+            &owner_ref,
+            AddressType::FQDN,
+            &fqdn,
+            &canonical_ports,
+            &mut out,
+        );
         out
     }
 
@@ -153,11 +182,7 @@ impl MirrorReconciler {
             return;
         }
         for (chunk_idx, chunk) in entries.chunks(self.max_endpoints_per_slice).enumerate() {
-            let slice_name = format!("{}-{}-{}",
-                svc_name,
-                family_suffix(family),
-                chunk_idx,
-            );
+            let slice_name = format!("{}-{}-{}", svc_name, family_suffix(family), chunk_idx,);
             out.push(EndpointSlice {
                 api_version: "discovery.k8s.io/v1".into(),
                 kind: "EndpointSlice".into(),
@@ -177,7 +202,9 @@ impl MirrorReconciler {
 
 impl Default for MirrorReconciler {
     fn default() -> Self {
-        Self { max_endpoints_per_slice: DEFAULT_MAX_ENDPOINTS_PER_SLICE }
+        Self {
+            max_endpoints_per_slice: DEFAULT_MAX_ENDPOINTS_PER_SLICE,
+        }
     }
 }
 
@@ -192,7 +219,11 @@ fn family_suffix(f: AddressType) -> &'static str {
 fn classify(addr: &str) -> AddressType {
     if addr.contains(':') {
         AddressType::IPv6
-    } else if addr.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false)
+    } else if addr
+        .chars()
+        .next()
+        .map(|c| c.is_ascii_digit())
+        .unwrap_or(false)
         && addr.split('.').count() == 4
     {
         AddressType::IPv4
@@ -208,7 +239,11 @@ fn push_addresses(
     v6: &mut Vec<EndpointEntry>,
     fqdn: &mut Vec<EndpointEntry>,
 ) {
-    let raw = if ready { &subset.addresses } else { &subset.not_ready_addresses };
+    let raw = if ready {
+        &subset.addresses
+    } else {
+        &subset.not_ready_addresses
+    };
     for a in raw {
         let entry = EndpointEntry {
             addresses: vec![a.ip.clone()],
@@ -243,11 +278,19 @@ mod tests {
     }
 
     fn addr(ip: &str) -> EndpointAddress {
-        EndpointAddress { ip: ip.into(), hostname: None, target_ref: None }
+        EndpointAddress {
+            ip: ip.into(),
+            hostname: None,
+            target_ref: None,
+        }
     }
 
     fn port(name: &str, p: u16) -> EndpointPort {
-        EndpointPort { name: Some(name.into()), port: p, protocol: "TCP".into() }
+        EndpointPort {
+            name: Some(name.into()),
+            port: p,
+            protocol: "TCP".into(),
+        }
     }
 
     /// Upstream parity: `TestReconciler_BasicMirrorOneSubsetOneSlice`
@@ -268,8 +311,10 @@ mod tests {
         assert_eq!(s.endpoints.len(), 2);
         assert_eq!(s.service_name, "svc-a");
         assert_eq!(s.managed_by, MIRROR_MANAGED_BY);
-        assert_eq!(s.tenant_id, "acme",
-            "tenant_id invariant: mirrored slice carries source Endpoints' tenant");
+        assert_eq!(
+            s.tenant_id, "acme",
+            "tenant_id invariant: mirrored slice carries source Endpoints' tenant"
+        );
     }
 
     /// Upstream parity: `TestReconciler_OwnerReferenceSet`
@@ -289,8 +334,10 @@ mod tests {
         assert_eq!(s.owner_endpoints.kind, "Endpoints");
         assert_eq!(s.owner_endpoints.name, "svc-a");
         assert_eq!(s.owner_endpoints.uid, Some(source_uid));
-        assert_eq!(s.tenant_id, "acme",
-            "tenant_id invariant: owner-ref tagged slice still carries tenant");
+        assert_eq!(
+            s.tenant_id, "acme",
+            "tenant_id invariant: owner-ref tagged slice still carries tenant"
+        );
     }
 
     /// Upstream parity: `TestReconciler_AddressFamiliesSplit`
@@ -307,12 +354,20 @@ mod tests {
         let r = MirrorReconciler::default();
         let slices = r.reconcile("acme", &e);
         assert_eq!(slices.len(), 2, "IPv4 + IPv6 → exactly two slices");
-        let v4 = slices.iter().find(|s| s.address_type == AddressType::IPv4).unwrap();
-        let v6 = slices.iter().find(|s| s.address_type == AddressType::IPv6).unwrap();
+        let v4 = slices
+            .iter()
+            .find(|s| s.address_type == AddressType::IPv4)
+            .unwrap();
+        let v6 = slices
+            .iter()
+            .find(|s| s.address_type == AddressType::IPv6)
+            .unwrap();
         assert_eq!(v4.endpoints.len(), 2);
         assert_eq!(v6.endpoints.len(), 1);
-        assert!(slices.iter().all(|s| s.tenant_id == "acme"),
-            "tenant_id invariant: per-family slices all carry source tenant");
+        assert!(
+            slices.iter().all(|s| s.tenant_id == "acme"),
+            "tenant_id invariant: per-family slices all carry source tenant"
+        );
     }
 
     /// Upstream parity: `TestReconciler_MaxEndpointsPerSliceSplits`
@@ -320,8 +375,8 @@ mod tests {
     #[test]
     fn test_chunking_respects_max_endpoints_per_slice() {
         let mut e = ep("svc-big", "default");
-        let addrs: Vec<EndpointAddress> = (0..7)
-            .map(|i| addr(&format!("10.0.0.{}", i + 1))).collect();
+        let addrs: Vec<EndpointAddress> =
+            (0..7).map(|i| addr(&format!("10.0.0.{}", i + 1))).collect();
         e.subsets.push(EndpointSubset {
             addresses: addrs,
             not_ready_addresses: vec![],
@@ -333,8 +388,10 @@ mod tests {
         assert_eq!(slices[0].endpoints.len(), 3);
         assert_eq!(slices[1].endpoints.len(), 3);
         assert_eq!(slices[2].endpoints.len(), 1);
-        assert!(slices.iter().all(|s| s.tenant_id == "acme"),
-            "tenant_id invariant: every chunk carries source tenant");
+        assert!(
+            slices.iter().all(|s| s.tenant_id == "acme"),
+            "tenant_id invariant: every chunk carries source tenant"
+        );
         // Chunk names are deterministic + distinct.
         let names: Vec<_> = slices.iter().map(|s| s.name.clone()).collect();
         assert_eq!(names[0], "svc-big-ipv4-0");
@@ -359,8 +416,10 @@ mod tests {
         let not_ready = s.endpoints.iter().filter(|e| !e.conditions.ready).count();
         assert_eq!(ready, 1, "the .1 address is ready");
         assert_eq!(not_ready, 1, "the .99 address is not-ready");
-        assert_eq!(s.tenant_id, "acme",
-            "tenant_id invariant: not-ready entries still scoped to source tenant");
+        assert_eq!(
+            s.tenant_id, "acme",
+            "tenant_id invariant: not-ready entries still scoped to source tenant"
+        );
     }
 
     /// Upstream parity: `TestReconciler_EmptyEndpointsProducesNoSlices`
@@ -370,8 +429,10 @@ mod tests {
         let e = ep("svc-empty", "default");
         let r = MirrorReconciler::default();
         let slices = r.reconcile("acme", &e);
-        assert!(slices.is_empty(),
-            "no subsets → no slices (upstream avoids empty-slice churn)");
+        assert!(
+            slices.is_empty(),
+            "no subsets → no slices (upstream avoids empty-slice churn)"
+        );
         // tenant_id invariant smoke: a parallel call for another tenant is
         // also empty and disjoint.
         let other = r.reconcile("globex", &e);
@@ -391,12 +452,16 @@ mod tests {
             ports: vec![port("http", 80)],
         });
         let r = MirrorReconciler::default();
-        let acme_out   = r.reconcile("acme", &e);
+        let acme_out = r.reconcile("acme", &e);
         let globex_out = r.reconcile("globex", &e);
-        assert!(acme_out.iter().all(|s| s.tenant_id == "acme"),
-            "tenant_id invariant: acme call stamps acme on every slice");
-        assert!(globex_out.iter().all(|s| s.tenant_id == "globex"),
-            "tenant_id invariant: globex call stamps globex on every slice");
+        assert!(
+            acme_out.iter().all(|s| s.tenant_id == "acme"),
+            "tenant_id invariant: acme call stamps acme on every slice"
+        );
+        assert!(
+            globex_out.iter().all(|s| s.tenant_id == "globex"),
+            "tenant_id invariant: globex call stamps globex on every slice"
+        );
         // Same slice content, different tenants — proves no shared mutable state.
         assert_eq!(acme_out[0].endpoints.len(), globex_out[0].endpoints.len());
     }

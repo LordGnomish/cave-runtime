@@ -46,8 +46,7 @@ impl ZoneManager {
         };
 
         info!(zone = %origin, "loaded zone");
-        self.zones
-            .insert(origin, Arc::new(RwLock::new(zone)));
+        self.zones.insert(origin, Arc::new(RwLock::new(zone)));
         Ok(())
     }
 
@@ -55,8 +54,7 @@ impl ZoneManager {
     pub async fn add_zone(&self, zone: Zone) -> DnsResult<()> {
         let name = zone.origin.clone();
         info!(zone = %name, "adding zone");
-        self.zones
-            .insert(name, Arc::new(RwLock::new(zone)));
+        self.zones.insert(name, Arc::new(RwLock::new(zone)));
         Ok(())
     }
 

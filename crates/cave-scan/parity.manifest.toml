@@ -5,22 +5,45 @@
 # Issue / Severity taxonomy.
 
 [upstream]
-org     = "SonarSource"
-repo    = "sonarqube"
-version = "v10.4.1"
-name    = "SonarQube"
-license = "LGPL-3.0"
-language= "Java"
-url     = "https://github.com/SonarSource/sonarqube"
+org        = "SonarSource"
+repo       = "sonarqube"
+version    = "v10.4.1"
+name       = "SonarQube"
+license    = "LGPL-3.0"
+language   = "Java"
+url        = "https://github.com/SonarSource/sonarqube"
+source_sha = { sonarqube = "v10.4.1", trivy = "v0.70.0" }
+
+# ── Secondary upstream (cave-scan is dual-upstream — declared explicitly) ────
+
+[[secondary_upstreams]]
+org     = "aquasecurity"
+repo    = "trivy"
+version = "v0.70.0"
+purpose = "Vulnerability / IaC / secrets / license scanning packets — see [parity_s2..s4]"
 
 [parity]
-# MEASURED 2026-05-15: counted by tomllib from this file:
+# Charter v2 8-gate close-out 2026-05-19.
+# MEASURED 2026-05-15 by tomllib against this manifest, refreshed 2026-05-19:
 #   files=44, functions=24, tests=50, upstream_test=21, surfaces=7, missings=16
-#   ratio = (44+24+50+21+7) / (44+24+50+21+7+16) = 146/162 = 0.9012
-ratio        = 0.9012
-last_audit   = "2026-05-15"
-infra_only   = false
-notes        = "Dual upstream: SonarQube v10.4.1 (legacy SAST) + Trivy v0.70.0 (vuln/iac/secrets/license). See [parity_s1..s4] for per-packet breakdown."
+# Charter v2 counts treat each port artifact (file/function/test/upstream_test/
+# surface) as a mapped subsystem; [[missings]] entries are unmapped.
+#   mapped   = 44 + 24 + 50 + 21 + 7 = 146
+#   unmapped = 16
+#   total    = 162
+#   fill_ratio = (mapped + partial + skipped) / total = 146 / 162 = 0.9012
+mapped_count   = 146
+partial_count  = 0
+skipped_count  = 0
+unmapped_count = 16
+total          = 162
+ratio          = 0.9012
+fill_ratio     = 0.9012
+honest_ratio   = 0.9012   # mapped/total = 146/162
+parity_ratio_source = "manifest"
+last_audit     = "2026-05-19"
+infra_only     = false
+notes          = "Dual upstream: SonarQube v10.4.1 (legacy SAST) + Trivy v0.70.0 (vuln/iac/secrets/license). See [parity_s1..s4] for per-packet breakdown."
 [module]
 name        = "cave-scan"
 description = "Code quality & SAST scanner — SonarQube-compatible findings, rules and coverage import"

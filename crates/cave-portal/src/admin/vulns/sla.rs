@@ -3,24 +3,22 @@
 //!
 //! Source: DefectDojo/django-DefectDojo@6eab8738 dojo/models.py:999
 
-use crate::admin::layout::shell::{shell_v2, ShellOptions};
+use crate::admin::layout::shell::{ShellOptions, shell_v2};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::table;
 use crate::admin::state::AdminState;
 use crate::admin::vulns::VulnsViewError;
 
 /// Default SLA window in days per severity. Source: ADR-035.
-pub const DEFAULT_SLA: &[(&str, u32)] = &[
-    ("Critical", 7),
-    ("High", 30),
-    ("Medium", 90),
-    ("Low", 180),
-];
+pub const DEFAULT_SLA: &[(&str, u32)] =
+    &[("Critical", 7), ("High", 30), ("Medium", 90), ("Low", 180)];
 
 pub fn render(_state: &AdminState, ctx: &RequestCtx) -> Result<String, VulnsViewError> {
     ctx.authorise(Permission::VulnsRead)?;
-    let rows: Vec<Vec<String>> = DEFAULT_SLA.iter()
-        .map(|(s, d)| vec![s.to_string(), format!("{d}d")]).collect();
+    let rows: Vec<Vec<String>> = DEFAULT_SLA
+        .iter()
+        .map(|(s, d)| vec![s.to_string(), format!("{d}d")])
+        .collect();
     let body = format!(
         r#"<section>
   <h2>SLA configuration</h2>
@@ -52,7 +50,10 @@ mod tests {
     use super::*;
     #[test]
     fn default_sla_matches_charter() {
-        assert_eq!(DEFAULT_SLA, &[("Critical",7),("High",30),("Medium",90),("Low",180)]);
+        assert_eq!(
+            DEFAULT_SLA,
+            &[("Critical", 7), ("High", 30), ("Medium", 90), ("Low", 180)]
+        );
     }
     #[test]
     fn render_includes_breach_definition() {

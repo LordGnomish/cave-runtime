@@ -47,10 +47,10 @@ pub use gateway::{
 pub use memory::{FileStore, InMemoryStore, MemoryProvider, MemoryRecord, SqliteStore};
 pub use planner::{HeuristicPlanner, Plan, PlanStep, Planner};
 pub use prompt::{
-    AnthropicPrompt, OllamaPrompt, OpenAiPrompt, OpenRouterPrompt, ProviderKind, ProviderPrompt,
-    PromptContext, ToolDescriptor,
+    AnthropicPrompt, OllamaPrompt, OpenAiPrompt, OpenRouterPrompt, PromptContext, ProviderKind,
+    ProviderPrompt, ToolDescriptor,
 };
-pub use recall::{EmbeddingRecall, Embedder, HashEmbedder, HashRecall, RecallEngine, RecallHit};
+pub use recall::{Embedder, EmbeddingRecall, HashEmbedder, HashRecall, RecallEngine, RecallHit};
 pub use router::{ModelRouter, ModelTier, RouteDecision, TaskComplexity};
 pub use session::{Event, EventKind, SessionStore};
 pub use tool::{ToolEntry, ToolRegistry, ToolResult};

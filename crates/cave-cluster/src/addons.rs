@@ -38,8 +38,14 @@ pub fn available_addons() -> Vec<(&'static str, &'static str)> {
         ("ingress-nginx", "NGINX Ingress Controller"),
         ("metrics-server", "Resource metrics API server"),
         ("cluster-autoscaler", "Automatic node scaling"),
-        ("external-dns", "Automates DNS records from Kubernetes resources"),
-        ("velero", "Backup and restore for Kubernetes resources and volumes"),
+        (
+            "external-dns",
+            "Automates DNS records from Kubernetes resources",
+        ),
+        (
+            "velero",
+            "Backup and restore for Kubernetes resources and volumes",
+        ),
         ("keda", "Kubernetes Event-driven Autoscaling"),
         ("prometheus-stack", "Prometheus + Grafana monitoring stack"),
         ("loki", "Log aggregation system"),
@@ -167,7 +173,10 @@ impl AddonManager {
             .map(|(name, desc)| AddonInfo {
                 name: name.to_string(),
                 description: desc.to_string(),
-                latest_version: addon_versions(name).last().cloned().unwrap_or_else(|| "latest".into()),
+                latest_version: addon_versions(name)
+                    .last()
+                    .cloned()
+                    .unwrap_or_else(|| "latest".into()),
             })
             .collect()
     }
@@ -191,7 +200,9 @@ mod tests {
     #[test]
     fn install_and_get_addon() {
         let m = mgr();
-        let addon = m.install("prod", "cert-manager", None, HashMap::new()).unwrap();
+        let addon = m
+            .install("prod", "cert-manager", None, HashMap::new())
+            .unwrap();
         assert_eq!(addon.status, AddonStatus::Running);
         assert!(!addon.current_version.is_empty());
         let got = m.get("prod", "cert-manager").unwrap();
@@ -210,7 +221,8 @@ mod tests {
     #[test]
     fn upgrade_addon() {
         let m = mgr();
-        m.install("c1", "metrics-server", Some("0.6.4".into()), HashMap::new()).unwrap();
+        m.install("c1", "metrics-server", Some("0.6.4".into()), HashMap::new())
+            .unwrap();
         let upgraded = m.upgrade("c1", "metrics-server", "0.7.1".into()).unwrap();
         assert_eq!(upgraded.current_version, "0.7.1");
         assert_eq!(upgraded.status, AddonStatus::Running);
@@ -219,7 +231,8 @@ mod tests {
     #[test]
     fn uninstall_addon() {
         let m = mgr();
-        m.install("c1", "ingress-nginx", None, HashMap::new()).unwrap();
+        m.install("c1", "ingress-nginx", None, HashMap::new())
+            .unwrap();
         m.uninstall("c1", "ingress-nginx").unwrap();
         assert!(m.get("c1", "ingress-nginx").is_err());
     }

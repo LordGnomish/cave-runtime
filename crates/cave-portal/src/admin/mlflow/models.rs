@@ -5,20 +5,30 @@
 use super::types::{MlflowViewError, RegisteredModel};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
+use crate::admin::state::{AdminState, scope};
 
 pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<RegisteredModel>, MlflowViewError> {
     ctx.authorise(Permission::MlflowRead)?;
     let mut rows: Vec<RegisteredModel> =
-        scope(&state.mlflow_models.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-            .into_iter()
-            .cloned()
-            .collect();
-    rows.sort_by(|a, b| b.last_updated_ms.cmp(&a.last_updated_ms).then(a.name.cmp(&b.name)));
+        scope(&state.mlflow_models.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
+    rows.sort_by(|a, b| {
+        b.last_updated_ms
+            .cmp(&a.last_updated_ms)
+            .then(a.name.cmp(&b.name))
+    });
     Ok(rows)
 }
 
-pub fn get(state: &AdminState, ctx: &RequestCtx, name: &str) -> Result<RegisteredModel, MlflowViewError> {
+pub fn get(
+    state: &AdminState,
+    ctx: &RequestCtx,
+    name: &str,
+) -> Result<RegisteredModel, MlflowViewError> {
     list(state, ctx)?
         .into_iter()
         .find(|m| m.name == name)
@@ -46,7 +56,10 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, MlflowView
     let body = format!(
         r#"<section><div class="mb-3 text-sm">total model versions across registry: <strong>{total}</strong></div>{tbl}</section>"#,
         total = total,
-        tbl = table(&["name", "latest_version", "updated", "description"], &rows_html),
+        tbl = table(
+            &["name", "latest_version", "updated", "description"],
+            &rows_html
+        ),
     );
     Ok(page_shell_full(
         ctx,
@@ -105,7 +118,10 @@ mod tests {
         let s = seeded();
         let c = ctx(&[Permission::MlflowRead]);
         assert_eq!(get(&s, &c, "fraud-detector").unwrap().latest_version, 5);
-        assert!(matches!(get(&s, &c, "nope").unwrap_err(), MlflowViewError::ModelNotFound(_)));
+        assert!(matches!(
+            get(&s, &c, "nope").unwrap_err(),
+            MlflowViewError::ModelNotFound(_)
+        ));
     }
 
     #[test]

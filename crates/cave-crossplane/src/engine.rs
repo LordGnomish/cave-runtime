@@ -2,12 +2,12 @@
 // Copyright 2026 Cave Runtime contributors
 //! Composition engine — renders composed resources from a Composition + claim spec.
 
-use std::collections::HashMap;
 use crate::error::{CrossplaneError, CrossplaneResult};
 use crate::models::{
     Composition, ConvertTransform, MatchTransform, MatchType, MathTransform, Patch, PatchType,
     StringTransform, StringTransformType, Transform, TransformType,
 };
+use std::collections::HashMap;
 
 pub struct CompositionEngine;
 
@@ -47,20 +47,15 @@ impl CompositionEngine {
     ) -> CrossplaneResult<()> {
         match patch.patch_type {
             PatchType::FromCompositeFieldPath => {
-                if let (Some(from), Some(to)) =
-                    (&patch.from_field_path, &patch.to_field_path)
-                {
+                if let (Some(from), Some(to)) = (&patch.from_field_path, &patch.to_field_path) {
                     if let Some(value) = get_field_path(claim_spec, from) {
-                        let transformed =
-                            Self::apply_transforms(value, &patch.transforms)?;
+                        let transformed = Self::apply_transforms(value, &patch.transforms)?;
                         set_field_path(base, to, transformed);
                     }
                 }
             }
             PatchType::ToCompositeFieldPath => {
-                if let (Some(from), Some(_to)) =
-                    (&patch.from_field_path, &patch.to_field_path)
-                {
+                if let (Some(from), Some(_to)) = (&patch.from_field_path, &patch.to_field_path) {
                     // Read from composed resource back to composite — no-op in render phase
                     let _ = get_field_path(base, from);
                 }
@@ -168,10 +163,7 @@ impl CompositionEngine {
         }
     }
 
-    pub fn apply_math_transform(
-        v: serde_json::Value,
-        math: &MathTransform,
-    ) -> serde_json::Value {
+    pub fn apply_math_transform(v: serde_json::Value, math: &MathTransform) -> serde_json::Value {
         let num = match &v {
             serde_json::Value::Number(n) => n.as_f64().unwrap_or(0.0),
             serde_json::Value::String(s) => s.parse::<f64>().unwrap_or(0.0),
@@ -246,8 +238,10 @@ impl CompositionEngine {
             }
             StringTransformType::Regexp => {
                 if let Some(re_cfg) = &st.regexp {
-                    let re = regex::Regex::new(&re_cfg.match_pattern)
-                        .map_err(|e: regex::Error| CrossplaneError::PatchTransform(e.to_string()))?;
+                    let re =
+                        regex::Regex::new(&re_cfg.match_pattern).map_err(|e: regex::Error| {
+                            CrossplaneError::PatchTransform(e.to_string())
+                        })?;
                     if let Some(caps) = re.captures(&s) {
                         let group_idx = re_cfg.group.unwrap_or(0) as usize;
                         caps.get(group_idx)
@@ -303,7 +297,9 @@ impl CompositionEngine {
             "bool" | "boolean" => {
                 let b = match &v {
                     serde_json::Value::Bool(b) => *b,
-                    serde_json::Value::String(s) => matches!(s.to_lowercase().as_str(), "true" | "1" | "yes"),
+                    serde_json::Value::String(s) => {
+                        matches!(s.to_lowercase().as_str(), "true" | "1" | "yes")
+                    }
                     serde_json::Value::Number(n) => n.as_f64().unwrap_or(0.0) != 0.0,
                     _ => false,
                 };
@@ -313,19 +309,12 @@ impl CompositionEngine {
         }
     }
 
-    pub fn apply_match_transform(
-        v: serde_json::Value,
-        mt: &MatchTransform,
-    ) -> serde_json::Value {
+    pub fn apply_match_transform(v: serde_json::Value, mt: &MatchTransform) -> serde_json::Value {
         let s = value_to_string(&v);
 
         for pattern in &mt.patterns {
             let matched = match pattern.match_type {
-                MatchType::Literal => pattern
-                    .literal
-                    .as_ref()
-                    .map(|l| l == &s)
-                    .unwrap_or(false),
+                MatchType::Literal => pattern.literal.as_ref().map(|l| l == &s).unwrap_or(false),
                 MatchType::Regexp => {
                     if let Some(re_str) = &pattern.regexp {
                         regex::Regex::new(re_str)

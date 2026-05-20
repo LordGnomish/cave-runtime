@@ -19,7 +19,10 @@ pub struct EvictionConfig {
 
 impl Default for EvictionConfig {
     fn default() -> Self {
-        Self { primary_qps: 0.1, secondary_qps: 0.01 }
+        Self {
+            primary_qps: 0.1,
+            secondary_qps: 0.01,
+        }
     }
 }
 

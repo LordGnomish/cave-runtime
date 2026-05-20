@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+use crate::VaultState;
 use crate::error::{VaultError, VaultResult};
 use crate::response::VaultResponse;
 use crate::token::CreateTokenParams;
-use crate::VaultState;
 use axum::{
+    Router,
     extract::{Json, Path, State},
     http::HeaderMap,
     routing::{delete, get, post},
-    Router,
 };
 use ring::digest;
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 fn extract_token(headers: &HeaderMap) -> VaultResult<String> {
-    headers.get("x-vault-token")
+    headers
+        .get("x-vault-token")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or(VaultError::BadToken)
@@ -64,10 +65,16 @@ pub async fn create_user(
         username: username.clone(),
         password_hash: hash_password(&body.password),
         policies: body.policies.unwrap_or_else(|| vec!["default".to_string()]),
-        token_ttl: body.token_ttl.as_deref()
-            .map(crate::token::parse_duration).unwrap_or(3600),
-        token_max_ttl: body.token_max_ttl.as_deref()
-            .map(crate::token::parse_duration).unwrap_or(0),
+        token_ttl: body
+            .token_ttl
+            .as_deref()
+            .map(crate::token::parse_duration)
+            .unwrap_or(3600),
+        token_max_ttl: body
+            .token_max_ttl
+            .as_deref()
+            .map(crate::token::parse_duration)
+            .unwrap_or(0),
         token_bound_cidrs: body.token_bound_cidrs.unwrap_or_default(),
     };
     store.users.insert(username, entry);
@@ -81,7 +88,9 @@ pub async fn read_user(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.userpass_store.read().await;
-    let user = store.users.get(&username)
+    let user = store
+        .users
+        .get(&username)
         .ok_or_else(|| VaultError::NotFound(format!("user {} not found", username)))?;
     Ok(VaultResponse::new().with_data(json!({
         "username": user.username,
@@ -106,11 +115,19 @@ pub async fn update_user(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.userpass_store.write().await;
-    let user = store.users.get_mut(&username)
+    let user = store
+        .users
+        .get_mut(&username)
         .ok_or_else(|| VaultError::NotFound(format!("user {} not found", username)))?;
-    if let Some(pw) = body.password { user.password_hash = hash_password(&pw); }
-    if let Some(p) = body.policies { user.policies = p; }
-    if let Some(ttl) = body.token_ttl { user.token_ttl = crate::token::parse_duration(&ttl); }
+    if let Some(pw) = body.password {
+        user.password_hash = hash_password(&pw);
+    }
+    if let Some(p) = body.policies {
+        user.policies = p;
+    }
+    if let Some(ttl) = body.token_ttl {
+        user.token_ttl = crate::token::parse_duration(&ttl);
+    }
     Ok(VaultResponse::new())
 }
 
@@ -146,7 +163,9 @@ pub async fn login(
     Json(body): Json<LoginRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let store = state.userpass_store.read().await;
-    let user = store.users.get(&username)
+    let user = store
+        .users
+        .get(&username)
         .ok_or_else(|| VaultError::Auth("invalid credentials".into()))?;
 
     let provided_hash = hash_password(&body.password);
@@ -178,8 +197,14 @@ pub async fn login(
 pub fn router(state: Arc<VaultState>) -> Router {
     Router::new()
         .route("/v1/auth/userpass/users", get(list_users))
-        .route("/v1/auth/userpass/users/{username}", post(create_user).get(read_user).delete(delete_user))
-        .route("/v1/auth/userpass/users/{username}/password", post(update_user))
+        .route(
+            "/v1/auth/userpass/users/{username}",
+            post(create_user).get(read_user).delete(delete_user),
+        )
+        .route(
+            "/v1/auth/userpass/users/{username}/password",
+            post(update_user),
+        )
         .route("/v1/auth/userpass/login/{username}", post(login))
         .with_state(state)
 }

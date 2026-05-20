@@ -209,7 +209,9 @@ impl ModelRouter {
             desired = match desired {
                 ModelTier::Top => ModelTier::Mid,
                 ModelTier::Mid => ModelTier::Local,
-                ModelTier::Local => return Err(HermesError::RouterEmpty(complexity_to_tier(complexity))),
+                ModelTier::Local => {
+                    return Err(HermesError::RouterEmpty(complexity_to_tier(complexity)));
+                }
             };
         }
     }
@@ -271,18 +273,13 @@ mod tests {
     fn estimate_buckets_match_intuition() {
         assert_eq!(TaskComplexity::estimate("hi"), TaskComplexity::Trivial);
         assert_eq!(
-            TaskComplexity::estimate(
-                "Please write a fn that does X. fn foo() { let bar = 1; }"
-            ),
+            TaskComplexity::estimate("Please write a fn that does X. fn foo() { let bar = 1; }"),
             TaskComplexity::Complex,
             "code blocks should promote to Complex"
         );
         // Mid-length narrative (no code, single line) → Standard.
         let medium = "Tell me about the history of compilers and how the field evolved from early FORTRAN compilers in the late nineteen-fifties through the LALR family popularised by Yacc and the GLR variants that handle ambiguous grammars; cover the rise of LLVM and its impact on backend portability, but explain it as prose without showing code or pseudocode at all please.";
-        assert_eq!(
-            TaskComplexity::estimate(medium),
-            TaskComplexity::Standard
-        );
+        assert_eq!(TaskComplexity::estimate(medium), TaskComplexity::Standard);
     }
 
     #[test]
@@ -316,9 +313,7 @@ mod tests {
         let r = ModelRouter::tiered_default();
         r.mark_throttled("claude-opus-4-7");
         let d = r
-            .route(
-                "Build a Raft state machine.\n```rust\nfn foo() {}\n```",
-            )
+            .route("Build a Raft state machine.\n```rust\nfn foo() {}\n```")
             .unwrap();
         assert_ne!(d.model.tier, ModelTier::Top);
     }

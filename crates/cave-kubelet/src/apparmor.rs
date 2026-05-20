@@ -227,12 +227,18 @@ mod tests {
 
     #[test]
     fn parse_annotation_runtime_default() {
-        assert_eq!(parse_annotation("runtime/default").unwrap(), AppArmorProfile::RuntimeDefault);
+        assert_eq!(
+            parse_annotation("runtime/default").unwrap(),
+            AppArmorProfile::RuntimeDefault
+        );
     }
 
     #[test]
     fn parse_annotation_unconfined() {
-        assert_eq!(parse_annotation("unconfined").unwrap(), AppArmorProfile::Unconfined);
+        assert_eq!(
+            parse_annotation("unconfined").unwrap(),
+            AppArmorProfile::Unconfined
+        );
     }
 
     #[test]
@@ -272,7 +278,10 @@ mod tests {
     fn type_str_matches_kind() {
         assert_eq!(AppArmorProfile::Unconfined.type_str(), "Unconfined");
         assert_eq!(AppArmorProfile::RuntimeDefault.type_str(), "RuntimeDefault");
-        assert_eq!(AppArmorProfile::Localhost("x".into()).type_str(), "Localhost");
+        assert_eq!(
+            AppArmorProfile::Localhost("x".into()).type_str(),
+            "Localhost"
+        );
     }
 
     #[test]
@@ -389,20 +398,29 @@ mod tests {
     #[test]
     fn reconcile_only_annotation() {
         let a = AppArmorProfile::RuntimeDefault;
-        assert_eq!(reconcile_annotation_and_spec(Some(&a), None).unwrap(), Some(a));
+        assert_eq!(
+            reconcile_annotation_and_spec(Some(&a), None).unwrap(),
+            Some(a)
+        );
     }
 
     #[test]
     fn reconcile_only_spec() {
         let s = AppArmorProfile::Unconfined;
-        assert_eq!(reconcile_annotation_and_spec(None, Some(&s)).unwrap(), Some(s));
+        assert_eq!(
+            reconcile_annotation_and_spec(None, Some(&s)).unwrap(),
+            Some(s)
+        );
     }
 
     #[test]
     fn reconcile_agreeing_pair() {
         let a = AppArmorProfile::Localhost("strict".into());
         let s = AppArmorProfile::Localhost("strict".into());
-        assert_eq!(reconcile_annotation_and_spec(Some(&a), Some(&s)).unwrap(), Some(a));
+        assert_eq!(
+            reconcile_annotation_and_spec(Some(&a), Some(&s)).unwrap(),
+            Some(a)
+        );
     }
 
     #[test]
@@ -464,11 +482,9 @@ mod tests {
     fn localhost_with_invalid_chars_rejected_at_parse_and_validate() {
         assert!(parse_annotation("localhost/with space").is_err());
         let l = LoadedProfiles::enabled();
-        assert!(validate_against_loaded(
-            &AppArmorProfile::Localhost("with space".into()),
-            &l
-        )
-        .is_err());
+        assert!(
+            validate_against_loaded(&AppArmorProfile::Localhost("with space".into()), &l).is_err()
+        );
     }
 
     #[test]

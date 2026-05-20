@@ -18,7 +18,7 @@ use super::{GatewayPlugin, PluginCtx, PluginResult};
 use async_trait::async_trait;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use hmac::{Hmac, Mac};
 use serde_json::Value;
 use sha1::Sha1;
@@ -35,7 +35,10 @@ type HmacSha512 = Hmac<Sha512>;
 fn parse_authorization_header(value: &str) -> HashMap<String, String> {
     let mut result = HashMap::new();
     let value = value.trim();
-    let rest = value.strip_prefix("hmac ").or_else(|| value.strip_prefix("HMAC ")).unwrap_or(value);
+    let rest = value
+        .strip_prefix("hmac ")
+        .or_else(|| value.strip_prefix("HMAC "))
+        .unwrap_or(value);
     for part in rest.split(',') {
         let part = part.trim();
         if let Some(eq_pos) = part.find('=') {
@@ -86,7 +89,12 @@ pub fn build_signing_string(ctx: &PluginCtx, header_list: &[&str]) -> String {
     parts.join("\n")
 }
 
-pub fn verify_hmac(signing_string: &str, signature_b64: &str, algorithm: &str, secret: &[u8]) -> bool {
+pub fn verify_hmac(
+    signing_string: &str,
+    signature_b64: &str,
+    algorithm: &str,
+    secret: &[u8],
+) -> bool {
     let expected = match compute_hmac(algorithm, secret, signing_string.as_bytes()) {
         Some(v) => v,
         None => return false,
@@ -113,7 +121,11 @@ impl GatewayPlugin for HmacAuthPlugin {
                     return PluginResult::Continue;
                 }
                 return PluginResult::Halt(
-                    (StatusCode::UNAUTHORIZED, axum::Json(serde_json::json!({"message": "Unauthorized"}))).into_response(),
+                    (
+                        StatusCode::UNAUTHORIZED,
+                        axum::Json(serde_json::json!({"message": "Unauthorized"})),
+                    )
+                        .into_response(),
                 );
             }
         };
@@ -124,17 +136,28 @@ impl GatewayPlugin for HmacAuthPlugin {
             Some(u) => u.clone(),
             None => {
                 return PluginResult::Halt(
-                    (StatusCode::UNAUTHORIZED, axum::Json(serde_json::json!({"message": "HMAC missing username"}))).into_response(),
+                    (
+                        StatusCode::UNAUTHORIZED,
+                        axum::Json(serde_json::json!({"message": "HMAC missing username"})),
+                    )
+                        .into_response(),
                 );
             }
         };
 
-        let algorithm = params.get("algorithm").cloned().unwrap_or_else(|| "hmac-sha256".to_string());
+        let algorithm = params
+            .get("algorithm")
+            .cloned()
+            .unwrap_or_else(|| "hmac-sha256".to_string());
         let signature = match params.get("signature") {
             Some(s) => s.clone(),
             None => {
                 return PluginResult::Halt(
-                    (StatusCode::UNAUTHORIZED, axum::Json(serde_json::json!({"message": "HMAC missing signature"}))).into_response(),
+                    (
+                        StatusCode::UNAUTHORIZED,
+                        axum::Json(serde_json::json!({"message": "HMAC missing signature"})),
+                    )
+                        .into_response(),
                 );
             }
         };
@@ -145,13 +168,25 @@ impl GatewayPlugin for HmacAuthPlugin {
             .unwrap_or_else(|| vec!["date"]);
 
         // Store for handler-side credential lookup and verification
-        ctx.ctx.insert("hmac_username".to_string(), Value::String(username));
-        ctx.ctx.insert("hmac_algorithm".to_string(), Value::String(algorithm));
-        ctx.ctx.insert("hmac_signature".to_string(), Value::String(signature));
-        ctx.ctx.insert("hmac_header_list".to_string(), Value::Array(
-            header_list.iter().map(|h| Value::String(h.to_string())).collect(),
-        ));
-        ctx.ctx.insert("hmac_signing_string".to_string(), Value::String(build_signing_string(ctx, &header_list)));
+        ctx.ctx
+            .insert("hmac_username".to_string(), Value::String(username));
+        ctx.ctx
+            .insert("hmac_algorithm".to_string(), Value::String(algorithm));
+        ctx.ctx
+            .insert("hmac_signature".to_string(), Value::String(signature));
+        ctx.ctx.insert(
+            "hmac_header_list".to_string(),
+            Value::Array(
+                header_list
+                    .iter()
+                    .map(|h| Value::String(h.to_string()))
+                    .collect(),
+            ),
+        );
+        ctx.ctx.insert(
+            "hmac_signing_string".to_string(),
+            Value::String(build_signing_string(ctx, &header_list)),
+        );
 
         PluginResult::Continue
     }
@@ -166,7 +201,10 @@ mod tests {
         let h = r#"hmac username="bob", algorithm="hmac-sha256", headers="date host", signature="abc==""#;
         let params = parse_authorization_header(h);
         assert_eq!(params.get("username").map(String::as_str), Some("bob"));
-        assert_eq!(params.get("algorithm").map(String::as_str), Some("hmac-sha256"));
+        assert_eq!(
+            params.get("algorithm").map(String::as_str),
+            Some("hmac-sha256")
+        );
     }
 
     #[test]

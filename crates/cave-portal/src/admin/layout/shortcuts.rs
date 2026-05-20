@@ -36,26 +36,106 @@ pub struct ShortcutBinding {
 }
 
 pub const DEFAULT_BINDINGS: &[ShortcutBinding] = &[
-    ShortcutBinding { keys: "?",     description: "Show this help",                       href: None,                                              min_persona: Persona::Anonymous },
-    ShortcutBinding { keys: "cmd k", description: "Open command palette",                 href: None,                                              min_persona: Persona::Anonymous },
-    ShortcutBinding { keys: "g h",   description: "Go to home",                           href: Some("/"),                                         min_persona: Persona::Anonymous },
-    ShortcutBinding { keys: "g c",   description: "Go to Compliance",                     href: Some("/admin/compliance"),                         min_persona: Persona::PlatformAdmin },
+    ShortcutBinding {
+        keys: "?",
+        description: "Show this help",
+        href: None,
+        min_persona: Persona::Anonymous,
+    },
+    ShortcutBinding {
+        keys: "cmd k",
+        description: "Open command palette",
+        href: None,
+        min_persona: Persona::Anonymous,
+    },
+    ShortcutBinding {
+        keys: "g h",
+        description: "Go to home",
+        href: Some("/"),
+        min_persona: Persona::Anonymous,
+    },
+    ShortcutBinding {
+        keys: "g c",
+        description: "Go to Compliance",
+        href: Some("/admin/compliance"),
+        min_persona: Persona::PlatformAdmin,
+    },
     // 2026-05-14 discoverability fix — Cluster Status had no leader-
     // key shortcut despite being the canonical Raft live view.
-    ShortcutBinding { keys: "g l",   description: "Go to Cluster Status (live)",          href: Some("/admin/cluster/live"),                       min_persona: Persona::PlatformAdmin },
-    ShortcutBinding { keys: "g k",   description: "Go to KEDA",                           href: Some("/admin/keda"),                               min_persona: Persona::Anonymous },
-    ShortcutBinding { keys: "g v",   description: "Go to Vault",                          href: Some("/admin/vault"),                              min_persona: Persona::Anonymous },
-    ShortcutBinding { keys: "g u",   description: "Go to Upstream",                       href: Some("/admin/upstream"),                           min_persona: Persona::PlatformAdmin },
-    ShortcutBinding { keys: "g a",   description: "Go to ADR Browser",                    href: Some("/admin/adr"),                                min_persona: Persona::PlatformAdmin },
+    ShortcutBinding {
+        keys: "g l",
+        description: "Go to Cluster Status (live)",
+        href: Some("/admin/cluster/live"),
+        min_persona: Persona::PlatformAdmin,
+    },
+    ShortcutBinding {
+        keys: "g k",
+        description: "Go to KEDA",
+        href: Some("/admin/keda"),
+        min_persona: Persona::Anonymous,
+    },
+    ShortcutBinding {
+        keys: "g v",
+        description: "Go to Vault",
+        href: Some("/admin/vault"),
+        min_persona: Persona::Anonymous,
+    },
+    ShortcutBinding {
+        keys: "g u",
+        description: "Go to Upstream",
+        href: Some("/admin/upstream"),
+        min_persona: Persona::PlatformAdmin,
+    },
+    ShortcutBinding {
+        keys: "g a",
+        description: "Go to ADR Browser",
+        href: Some("/admin/adr"),
+        min_persona: Persona::PlatformAdmin,
+    },
     // 2026-05-15 polish: /admin/_audit roll-up.
-    ShortcutBinding { keys: "g _",   description: "Go to Audit roll-up",                  href: Some("/admin/_audit"),                             min_persona: Persona::PlatformAdmin },
+    ShortcutBinding {
+        keys: "g _",
+        description: "Go to Audit roll-up",
+        href: Some("/admin/_audit"),
+        min_persona: Persona::PlatformAdmin,
+    },
     // 2026-05-14 consolidation: Scheduler folded into K8s Dashboard.
-    ShortcutBinding { keys: "g s",   description: "Go to K8s · Scheduler Queue",          href: Some("/admin/k8s-dashboard/scheduler/queue"),      min_persona: Persona::Anonymous },
-    ShortcutBinding { keys: "/",     description: "Focus search (where present)",         href: None,                                              min_persona: Persona::Anonymous },
-    ShortcutBinding { keys: "j",     description: "Next row (list pages)",                href: None,                                              min_persona: Persona::Anonymous },
-    ShortcutBinding { keys: "k",     description: "Previous row (list pages)",            href: None,                                              min_persona: Persona::Anonymous },
-    ShortcutBinding { keys: "enter", description: "Open highlighted row",                 href: None,                                              min_persona: Persona::Anonymous },
-    ShortcutBinding { keys: "esc",   description: "Close modal / cancel",                 href: None,                                              min_persona: Persona::Anonymous },
+    ShortcutBinding {
+        keys: "g s",
+        description: "Go to K8s · Scheduler Queue",
+        href: Some("/admin/k8s-dashboard/scheduler/queue"),
+        min_persona: Persona::Anonymous,
+    },
+    ShortcutBinding {
+        keys: "/",
+        description: "Focus search (where present)",
+        href: None,
+        min_persona: Persona::Anonymous,
+    },
+    ShortcutBinding {
+        keys: "j",
+        description: "Next row (list pages)",
+        href: None,
+        min_persona: Persona::Anonymous,
+    },
+    ShortcutBinding {
+        keys: "k",
+        description: "Previous row (list pages)",
+        href: None,
+        min_persona: Persona::Anonymous,
+    },
+    ShortcutBinding {
+        keys: "enter",
+        description: "Open highlighted row",
+        href: None,
+        min_persona: Persona::Anonymous,
+    },
+    ShortcutBinding {
+        keys: "esc",
+        description: "Close modal / cancel",
+        href: None,
+        min_persona: Persona::Anonymous,
+    },
 ];
 
 impl ShortcutBinding {
@@ -86,7 +166,11 @@ pub fn shortcuts_help_modal(
     let mut rows = String::new();
     for b in bindings {
         let enabled = b.enabled_for(persona);
-        let row_attr = if enabled { "" } else { r#" data-disabled="true""# };
+        let row_attr = if enabled {
+            ""
+        } else {
+            r#" data-disabled="true""#
+        };
         let row_cls = if enabled {
             "border-t dark:border-zinc-800"
         } else {
@@ -245,7 +329,9 @@ fn urlencode_minimal(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
         match b {
-            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
+            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
             _ => out.push_str(&format!("%{:02X}", b)),
         }
     }

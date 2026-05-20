@@ -34,12 +34,42 @@ pub fn list_command_stats(
     let entries = super::keyspace::list_entries(state, ctx)?;
     let n = entries.len() as u64;
     Ok(vec![
-        CommandStat { command: "GET",    calls: n * 100, usec_total: n * 1500,  usec_per_call: 15 },
-        CommandStat { command: "SET",    calls: n * 20,  usec_total: n * 800,   usec_per_call: 40 },
-        CommandStat { command: "DEL",    calls: n * 3,   usec_total: n * 30,    usec_per_call: 10 },
-        CommandStat { command: "EXPIRE", calls: n * 5,   usec_total: n * 60,    usec_per_call: 12 },
-        CommandStat { command: "MGET",   calls: n,       usec_total: n * 25,    usec_per_call: 25 },
-        CommandStat { command: "HGETALL",calls: n / 2,   usec_total: n * 30,    usec_per_call: 60 },
+        CommandStat {
+            command: "GET",
+            calls: n * 100,
+            usec_total: n * 1500,
+            usec_per_call: 15,
+        },
+        CommandStat {
+            command: "SET",
+            calls: n * 20,
+            usec_total: n * 800,
+            usec_per_call: 40,
+        },
+        CommandStat {
+            command: "DEL",
+            calls: n * 3,
+            usec_total: n * 30,
+            usec_per_call: 10,
+        },
+        CommandStat {
+            command: "EXPIRE",
+            calls: n * 5,
+            usec_total: n * 60,
+            usec_per_call: 12,
+        },
+        CommandStat {
+            command: "MGET",
+            calls: n,
+            usec_total: n * 25,
+            usec_per_call: 25,
+        },
+        CommandStat {
+            command: "HGETALL",
+            calls: n / 2,
+            usec_total: n * 30,
+            usec_per_call: 60,
+        },
     ])
 }
 
@@ -101,10 +131,7 @@ pub(super) fn render_section(
             &["command", "calls", "usec total", "usec / call"],
             &stat_rows
         ),
-        slow_tbl = table(
-            &["id", "time", "duration", "command"],
-            &slow_rows
-        ),
+        slow_tbl = table(&["id", "time", "duration", "command"], &slow_rows),
     ))
 }
 
@@ -125,7 +152,8 @@ mod tests {
             "CommandStats",
             "acme"
         );
-        let stats = list_command_stats(&AdminState::seeded(), &ctx(&[Permission::CacheRead])).unwrap();
+        let stats =
+            list_command_stats(&AdminState::seeded(), &ctx(&[Permission::CacheRead])).unwrap();
         let cmds: Vec<_> = stats.iter().map(|s| s.command).collect();
         for c in ["GET", "SET", "DEL", "EXPIRE", "MGET", "HGETALL"] {
             assert!(cmds.contains(&c));
@@ -148,8 +176,7 @@ mod tests {
 
     #[test]
     fn render_section_emits_both_subsections() {
-        let html =
-            render_section(&AdminState::seeded(), &ctx(&[Permission::CacheRead])).unwrap();
+        let html = render_section(&AdminState::seeded(), &ctx(&[Permission::CacheRead])).unwrap();
         assert!(html.contains("INFO commandstats"));
         assert!(html.contains("SLOWLOG"));
     }

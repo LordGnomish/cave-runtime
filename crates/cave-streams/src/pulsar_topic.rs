@@ -192,9 +192,9 @@ fn split_partition(s: &str) -> StreamsResult<(String, Option<i32>)> {
     if let Some(idx) = s.rfind("-partition-") {
         let (left, right) = s.split_at(idx);
         let suffix = &right["-partition-".len()..];
-        let n: i32 = suffix
-            .parse()
-            .map_err(|_| StreamsError::InvalidTopicName(format!("bad partition suffix: {right}")))?;
+        let n: i32 = suffix.parse().map_err(|_| {
+            StreamsError::InvalidTopicName(format!("bad partition suffix: {right}"))
+        })?;
         if n < 0 {
             return Err(StreamsError::InvalidTopicName(
                 "partition index must be ≥ 0".into(),
@@ -217,9 +217,10 @@ fn validate_segment(label: &str, s: &str) -> StreamsResult<()> {
             "{label} must not contain '/'"
         )));
     }
-    if !s.chars().all(|c| {
-        c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' || c == ':'
-    }) {
+    if !s
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' || c == ':')
+    {
         return Err(StreamsError::InvalidTopicName(format!(
             "{label} contains illegal character: {s:?}"
         )));

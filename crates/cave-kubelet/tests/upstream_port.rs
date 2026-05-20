@@ -13,14 +13,15 @@
 //! upstream case it ports.
 
 use cave_kubelet::lifecycle::{
-    HookExecution, HookHandler, HookOutcome, HookSample, HookStage, HttpScheme, evaluate,
+    evaluate, HookExecution, HookHandler, HookOutcome, HookSample, HookStage, HttpScheme,
 };
 use cave_kubelet::preemption::{
-    CandidatePod, PreemptionDecision, PreemptionRequest, ResourceRequest, evaluate as preempt_evaluate,
+    evaluate as preempt_evaluate, CandidatePod, PreemptionDecision, PreemptionRequest,
+    ResourceRequest,
 };
 use cave_kubelet::probe::{
-    GrpcServingStatus, ProbeKind, ProbeOutcome, ProbeResult, ProbeSpec, ProbeWorkerState,
-    ProberAction, decide, exec_exit_to_result, grpc_status_to_result, http_status_to_result,
+    decide, exec_exit_to_result, grpc_status_to_result, http_status_to_result, GrpcServingStatus,
+    ProbeKind, ProbeOutcome, ProbeResult, ProbeSpec, ProbeWorkerState, ProberAction,
 };
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use std::time::Duration;
@@ -89,11 +90,23 @@ fn upstream_probe_worker_failure_threshold_flips_to_failure() {
         ..ProbeSpec::http_get(8080, "/healthz")
     };
     let mut state = ProbeWorkerState::new(t0());
-    state.record(&spec, ProbeResult::Failure, t0() + ChronoDuration::seconds(10));
-    state.record(&spec, ProbeResult::Failure, t0() + ChronoDuration::seconds(20));
+    state.record(
+        &spec,
+        ProbeResult::Failure,
+        t0() + ChronoDuration::seconds(10),
+    );
+    state.record(
+        &spec,
+        ProbeResult::Failure,
+        t0() + ChronoDuration::seconds(20),
+    );
     // Two failures: still success (default-success liveness pre-threshold).
     assert_eq!(state.effective_outcome(&spec), ProbeOutcome::Success);
-    state.record(&spec, ProbeResult::Failure, t0() + ChronoDuration::seconds(30));
+    state.record(
+        &spec,
+        ProbeResult::Failure,
+        t0() + ChronoDuration::seconds(30),
+    );
     assert_eq!(state.effective_outcome(&spec), ProbeOutcome::Failure);
 }
 
@@ -105,9 +118,21 @@ fn upstream_probe_worker_success_resets_failure_counter() {
         ..ProbeSpec::http_get(8080, "/healthz")
     };
     let mut state = ProbeWorkerState::new(t0());
-    state.record(&spec, ProbeResult::Failure, t0() + ChronoDuration::seconds(10));
-    state.record(&spec, ProbeResult::Failure, t0() + ChronoDuration::seconds(20));
-    state.record(&spec, ProbeResult::Success, t0() + ChronoDuration::seconds(30));
+    state.record(
+        &spec,
+        ProbeResult::Failure,
+        t0() + ChronoDuration::seconds(10),
+    );
+    state.record(
+        &spec,
+        ProbeResult::Failure,
+        t0() + ChronoDuration::seconds(20),
+    );
+    state.record(
+        &spec,
+        ProbeResult::Success,
+        t0() + ChronoDuration::seconds(30),
+    );
     assert_eq!(state.consecutive_failure, 0);
     assert_eq!(state.consecutive_success, 1);
 }

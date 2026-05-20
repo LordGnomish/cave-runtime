@@ -31,10 +31,7 @@ mod cycle_1778427170_a2 {
         Uuid::nil()
     }
 
-    fn fixture_table_stat(
-        bloat_ratio: f64,
-        last_vacuum_days_ago: Option<i64>,
-    ) -> TableStat {
+    fn fixture_table_stat(bloat_ratio: f64, last_vacuum_days_ago: Option<i64>) -> TableStat {
         TableStat {
             id: Uuid::new_v4(),
             database_id: fixture_db_id(),
@@ -222,9 +219,7 @@ mod cycle_1778427170_a2 {
     fn test_pg_error_enum_exists() {
         // Concrete instance of the most common variant — exercises the
         // Display impl that thiserror generates.
-        let err = cave_rdbms_operator::error::PgError::InstanceNotFound(
-            "test-instance".into(),
-        );
+        let err = cave_rdbms_operator::error::PgError::InstanceNotFound("test-instance".into());
         assert!(format!("{err}").contains("test-instance"));
     }
 
@@ -242,7 +237,11 @@ mod cycle_1778427170_a2 {
 
     #[test]
     fn test_pool_mode_enum_exists() {
-        let modes = [PoolMode::Session, PoolMode::Transaction, PoolMode::Statement];
+        let modes = [
+            PoolMode::Session,
+            PoolMode::Transaction,
+            PoolMode::Statement,
+        ];
         // All three variants are distinct + Debug-printable.
         let names: Vec<String> = modes.iter().map(|m| format!("{m:?}")).collect();
         assert_eq!(names, vec!["Session", "Transaction", "Statement"]);

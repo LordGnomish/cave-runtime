@@ -12,7 +12,10 @@ pub struct Table {
 
 impl Table {
     pub fn new(columns: Vec<String>) -> Self {
-        Self { columns, rows: Vec::new() }
+        Self {
+            columns,
+            rows: Vec::new(),
+        }
     }
 
     pub fn push_row(&mut self, row: Vec<String>) {

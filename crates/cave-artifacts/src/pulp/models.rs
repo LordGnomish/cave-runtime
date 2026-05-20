@@ -123,7 +123,13 @@ impl RepositoryVersion {
     pub fn new(repo_href: &str, number: u64) -> Self {
         let id = Uuid::new_v4();
         Self {
-            pulp_href: format!("{}{}/", repo_href.trim_end_matches('/').replace("repositories", "versions"), number),
+            pulp_href: format!(
+                "{}{}/",
+                repo_href
+                    .trim_end_matches('/')
+                    .replace("repositories", "versions"),
+                number
+            ),
             pulp_id: id,
             pulp_created: Utc::now(),
             number,
@@ -265,7 +271,11 @@ pub struct Distribution {
 }
 
 impl Distribution {
-    pub fn new(name: impl Into<String>, base_path: impl Into<String>, content_type: ContentType) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        base_path: impl Into<String>,
+        content_type: ContentType,
+    ) -> Self {
         let id = Uuid::new_v4();
         let bp = base_path.into();
         Self {
@@ -306,7 +316,10 @@ pub enum ContentGuardType {
     /// Require RBAC for content access.
     Rbac,
     /// Require a specific header value.
-    Header { header_name: String, header_value: String },
+    Header {
+        header_name: String,
+        header_value: String,
+    },
     /// Require X.509 client certificate.
     X509 { ca_certificate: String },
     /// Content URL signing (pre-signed URLs).
@@ -363,7 +376,10 @@ pub struct RpmPackage {
 
 impl RpmPackage {
     pub fn nevra(&self) -> String {
-        format!("{}-{}-{}.{}.rpm", self.name, self.version, self.release, self.arch)
+        format!(
+            "{}-{}-{}.{}.rpm",
+            self.name, self.version, self.release, self.arch
+        )
     }
 }
 

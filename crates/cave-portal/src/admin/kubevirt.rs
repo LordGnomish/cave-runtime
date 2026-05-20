@@ -10,7 +10,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, VirtualMachine};
+use crate::admin::state::{AdminState, VirtualMachine, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -24,14 +24,13 @@ pub fn list_records(
     ctx: &RequestCtx,
 ) -> Result<Vec<VirtualMachine>, KubevirtViewError> {
     ctx.authorise(Permission::KubevirtRead)?;
-    let mut rows: Vec<VirtualMachine> = scope(
-        &state.virtual_machines.read().unwrap(),
-        &ctx.tenant,
-        |r| &r.tenant,
-    )
-    .into_iter()
-    .cloned()
-    .collect();
+    let mut rows: Vec<VirtualMachine> =
+        scope(&state.virtual_machines.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(rows)
 }
@@ -130,8 +129,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, KubevirtVi
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite =
-    Cite::backstage("plugins/kubevirt/src/components/VmsList.tsx", "VmsList");
+const FILE_CITE: Cite = Cite::backstage("plugins/kubevirt/src/components/VmsList.tsx", "VmsList");
 
 #[cfg(test)]
 mod tests {

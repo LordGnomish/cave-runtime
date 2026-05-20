@@ -126,11 +126,7 @@ impl TokenManager {
     }
 
     /// Revoke a token via the IdP endpoint (RFC 7009).
-    pub async fn revoke(
-        &self,
-        token: &str,
-        token_type_hint: TokenTypeHint,
-    ) -> Result<(), String> {
+    pub async fn revoke(&self, token: &str, token_type_hint: TokenTypeHint) -> Result<(), String> {
         let mut form = vec![
             ("token", token.to_string()),
             ("token_type_hint", token_type_hint.as_str().to_string()),

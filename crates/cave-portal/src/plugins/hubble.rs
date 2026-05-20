@@ -52,7 +52,12 @@ pub struct Endpoint {
 }
 
 impl Endpoint {
-    pub fn new(workload: impl Into<String>, ns: impl Into<String>, ip: impl Into<String>, port: u16) -> Self {
+    pub fn new(
+        workload: impl Into<String>,
+        ns: impl Into<String>,
+        ip: impl Into<String>,
+        port: u16,
+    ) -> Self {
         Self {
             workload: workload.into(),
             namespace: ns.into(),
@@ -251,7 +256,11 @@ impl HubblePlugin {
         true
     }
 
-    pub fn query(&self, persona: ViewPersona, q: &FlowQuery) -> Result<Vec<FlowRecord>, HubbleError> {
+    pub fn query(
+        &self,
+        persona: ViewPersona,
+        q: &FlowQuery,
+    ) -> Result<Vec<FlowRecord>, HubbleError> {
         if matches!(persona, ViewPersona::Tenant) && q.workload.is_none() && q.namespace.is_none() {
             return Err(HubbleError::Forbidden(
                 "tenant persona must scope by namespace or workload",
@@ -436,8 +445,30 @@ mod tests {
     #[test]
     fn record_assigns_increasing_ids() {
         let mut p = HubblePlugin::new();
-        let id1 = p.record("a", 0, Verdict::Forwarded, ep("a", "n", 0), ep("b", "n", 0), L4Protocol::Tcp, L7Kind::None, 0).id;
-        let id2 = p.record("a", 0, Verdict::Forwarded, ep("a", "n", 0), ep("b", "n", 0), L4Protocol::Tcp, L7Kind::None, 0).id;
+        let id1 = p
+            .record(
+                "a",
+                0,
+                Verdict::Forwarded,
+                ep("a", "n", 0),
+                ep("b", "n", 0),
+                L4Protocol::Tcp,
+                L7Kind::None,
+                0,
+            )
+            .id;
+        let id2 = p
+            .record(
+                "a",
+                0,
+                Verdict::Forwarded,
+                ep("a", "n", 0),
+                ep("b", "n", 0),
+                L4Protocol::Tcp,
+                L7Kind::None,
+                0,
+            )
+            .id;
         assert_eq!(id2, id1 + 1);
     }
 
@@ -445,9 +476,15 @@ mod tests {
     fn record_http_sets_l7_fields() {
         let mut p = HubblePlugin::new();
         let f = p.record_http(
-            "a", 0, Verdict::Forwarded,
-            ep("c", "n", 0), ep("s", "n", 80),
-            "GET", "/v1/users", 200, 256,
+            "a",
+            0,
+            Verdict::Forwarded,
+            ep("c", "n", 0),
+            ep("s", "n", 80),
+            "GET",
+            "/v1/users",
+            200,
+            256,
         );
         assert_eq!(f.l7, L7Kind::Http);
         assert_eq!(f.http_method.as_deref(), Some("GET"));
@@ -466,9 +503,14 @@ mod tests {
         let mut p = HubblePlugin::new();
         for _ in 0..(RING_CAPACITY + 50) {
             p.record(
-                "a", 0, Verdict::Forwarded,
-                ep("a", "n", 0), ep("b", "n", 0),
-                L4Protocol::Tcp, L7Kind::None, 1,
+                "a",
+                0,
+                Verdict::Forwarded,
+                ep("a", "n", 0),
+                ep("b", "n", 0),
+                L4Protocol::Tcp,
+                L7Kind::None,
+                1,
             );
         }
         assert_eq!(p.count(), RING_CAPACITY);
@@ -479,9 +521,14 @@ mod tests {
         let mut p = HubblePlugin::new();
         let id = p
             .record(
-                "a", 0, Verdict::Dropped,
-                ep("c", "n", 0), ep("s", "n", 0),
-                L4Protocol::Tcp, L7Kind::None, 0,
+                "a",
+                0,
+                Verdict::Dropped,
+                ep("c", "n", 0),
+                ep("s", "n", 0),
+                L4Protocol::Tcp,
+                L7Kind::None,
+                0,
             )
             .id;
         assert!(p.annotate_policy(id, "deny-egress"));
@@ -586,12 +633,20 @@ mod tests {
         let mut p = HubblePlugin::new();
         for ts in 0..5 {
             p.record(
-                "acme", ts, Verdict::Forwarded,
-                ep("a", "n", 0), ep("b", "n", 0),
-                L4Protocol::Tcp, L7Kind::None, 0,
+                "acme",
+                ts,
+                Verdict::Forwarded,
+                ep("a", "n", 0),
+                ep("b", "n", 0),
+                L4Protocol::Tcp,
+                L7Kind::None,
+                0,
             );
         }
-        let q = FlowQuery { tenant: "acme".into(), ..Default::default() };
+        let q = FlowQuery {
+            tenant: "acme".into(),
+            ..Default::default()
+        };
         let out = p.query(ViewPersona::Operator, &q).unwrap();
         let ids: Vec<u64> = out.iter().map(|f| f.id).collect();
         let mut desc = ids.clone();
@@ -602,7 +657,10 @@ mod tests {
     #[test]
     fn query_tenant_persona_must_scope() {
         let p = populated_plugin();
-        let q = FlowQuery { tenant: "acme".into(), ..Default::default() };
+        let q = FlowQuery {
+            tenant: "acme".into(),
+            ..Default::default()
+        };
         let err = p.query(ViewPersona::Tenant, &q).unwrap_err();
         assert!(matches!(err, HubbleError::Forbidden(_)));
     }
@@ -632,7 +690,11 @@ mod tests {
     #[test]
     fn query_filters_by_tenant_id() {
         let p = populated_plugin();
-        let q = FlowQuery { tenant: "globex".into(), workload: Some("web".into()), ..Default::default() };
+        let q = FlowQuery {
+            tenant: "globex".into(),
+            workload: Some("web".into()),
+            ..Default::default()
+        };
         let out = p.query(ViewPersona::Tenant, &q).unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].tenant, "globex");
@@ -642,7 +704,17 @@ mod tests {
     fn query_filter_http_status_range() {
         let mut p = HubblePlugin::new();
         for status in [200, 404, 500] {
-            p.record_http("a", 0, Verdict::Forwarded, ep("c", "n", 0), ep("s", "n", 80), "GET", "/x", status, 0);
+            p.record_http(
+                "a",
+                0,
+                Verdict::Forwarded,
+                ep("c", "n", 0),
+                ep("s", "n", 80),
+                "GET",
+                "/x",
+                status,
+                0,
+            );
         }
         let q = FlowQuery {
             tenant: "a".into(),
@@ -717,10 +789,28 @@ mod tests {
     fn top_noisy_by_total_flows() {
         let mut p = HubblePlugin::new();
         for _ in 0..3 {
-            p.record("a", 0, Verdict::Forwarded, ep("noisy", "n", 0), ep("x", "n", 0), L4Protocol::Tcp, L7Kind::None, 0);
+            p.record(
+                "a",
+                0,
+                Verdict::Forwarded,
+                ep("noisy", "n", 0),
+                ep("x", "n", 0),
+                L4Protocol::Tcp,
+                L7Kind::None,
+                0,
+            );
         }
         for _ in 0..1 {
-            p.record("a", 0, Verdict::Forwarded, ep("quiet", "n", 0), ep("x", "n", 0), L4Protocol::Tcp, L7Kind::None, 0);
+            p.record(
+                "a",
+                0,
+                Verdict::Forwarded,
+                ep("quiet", "n", 0),
+                ep("x", "n", 0),
+                L4Protocol::Tcp,
+                L7Kind::None,
+                0,
+            );
         }
         let top = p.top_noisy("a", false, 5);
         assert_eq!(top[0].0, "n/noisy");
@@ -731,10 +821,28 @@ mod tests {
     fn top_noisy_by_drops_only_counts_dropped() {
         let mut p = HubblePlugin::new();
         for _ in 0..3 {
-            p.record("a", 0, Verdict::Forwarded, ep("ok", "n", 0), ep("x", "n", 0), L4Protocol::Tcp, L7Kind::None, 0);
+            p.record(
+                "a",
+                0,
+                Verdict::Forwarded,
+                ep("ok", "n", 0),
+                ep("x", "n", 0),
+                L4Protocol::Tcp,
+                L7Kind::None,
+                0,
+            );
         }
         for _ in 0..2 {
-            p.record("a", 0, Verdict::Dropped, ep("bad", "n", 0), ep("x", "n", 0), L4Protocol::Tcp, L7Kind::None, 0);
+            p.record(
+                "a",
+                0,
+                Verdict::Dropped,
+                ep("bad", "n", 0),
+                ep("x", "n", 0),
+                L4Protocol::Tcp,
+                L7Kind::None,
+                0,
+            );
         }
         let top = p.top_noisy("a", true, 5);
         assert_eq!(top.len(), 1);
@@ -746,7 +854,16 @@ mod tests {
     fn top_noisy_respects_n() {
         let mut p = HubblePlugin::new();
         for w in ["a", "b", "c", "d"] {
-            p.record("t", 0, Verdict::Forwarded, ep(w, "n", 0), ep("x", "n", 0), L4Protocol::Tcp, L7Kind::None, 0);
+            p.record(
+                "t",
+                0,
+                Verdict::Forwarded,
+                ep(w, "n", 0),
+                ep("x", "n", 0),
+                L4Protocol::Tcp,
+                L7Kind::None,
+                0,
+            );
         }
         let top = p.top_noisy("t", false, 2);
         assert_eq!(top.len(), 2);
@@ -756,7 +873,17 @@ mod tests {
     fn http_status_histogram_buckets_correctly() {
         let mut p = HubblePlugin::new();
         for s in [200, 201, 304, 404, 500, 502] {
-            p.record_http("a", 0, Verdict::Forwarded, ep("c", "n", 0), ep("s", "n", 80), "GET", "/x", s, 0);
+            p.record_http(
+                "a",
+                0,
+                Verdict::Forwarded,
+                ep("c", "n", 0),
+                ep("s", "n", 80),
+                "GET",
+                "/x",
+                s,
+                0,
+            );
         }
         let h = p.http_status_histogram("a");
         // 0:1xx, 1:2xx, 2:3xx, 3:4xx, 4:5xx
@@ -766,7 +893,16 @@ mod tests {
     #[test]
     fn http_status_histogram_ignores_non_http() {
         let mut p = HubblePlugin::new();
-        p.record("a", 0, Verdict::Forwarded, ep("c", "n", 0), ep("s", "n", 0), L4Protocol::Tcp, L7Kind::None, 0);
+        p.record(
+            "a",
+            0,
+            Verdict::Forwarded,
+            ep("c", "n", 0),
+            ep("s", "n", 0),
+            L4Protocol::Tcp,
+            L7Kind::None,
+            0,
+        );
         let h = p.http_status_histogram("a");
         assert_eq!(h, [0, 0, 0, 0, 0]);
     }
@@ -786,7 +922,19 @@ mod tests {
     #[test]
     fn flow_record_round_trips_json() {
         let mut p = HubblePlugin::new();
-        let f = p.record_http("a", 1, Verdict::Forwarded, ep("c", "n", 0), ep("s", "n", 80), "GET", "/x", 200, 100).clone();
+        let f = p
+            .record_http(
+                "a",
+                1,
+                Verdict::Forwarded,
+                ep("c", "n", 0),
+                ep("s", "n", 80),
+                "GET",
+                "/x",
+                200,
+                100,
+            )
+            .clone();
         let s = serde_json::to_string(&f).unwrap();
         let back: FlowRecord = serde_json::from_str(&s).unwrap();
         assert_eq!(back, f);

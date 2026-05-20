@@ -38,8 +38,7 @@ pub struct ModulePermission {
 
 impl ModulePermission {
     fn allows(&self, module: &str, action: &str) -> bool {
-        self.module == module
-            && (self.actions.iter().any(|a| a == action || a == "*"))
+        self.module == module && (self.actions.iter().any(|a| a == action || a == "*"))
     }
 }
 
@@ -104,13 +103,39 @@ pub struct ResourcePolicy {
 
 /// All CAVE module slugs (mirrored from claims.rs for RBAC population).
 const MODULES: &[&str] = &[
-    "cave-flags", "cave-secrets", "cave-lint", "cave-docs", "cave-status",
-    "cave-changelog", "cave-certs", "cave-vulns", "cave-sbom", "cave-uptime",
-    "cave-cost", "cave-sign", "cave-forensics", "cave-devlake", "cave-ai-obs",
-    "cave-pii", "cave-incidents", "cave-chat", "cave-slo", "cave-alerts",
-    "cave-profiler", "cave-registry", "cave-workflows", "cave-scan",
-    "cave-portal", "cave-scaffold", "cave-chaos", "cave-policy", "cave-dast",
-    "cave-backup", "cave-pam", "cave-logs", "cave-auth",
+    "cave-flags",
+    "cave-secrets",
+    "cave-lint",
+    "cave-docs",
+    "cave-status",
+    "cave-changelog",
+    "cave-certs",
+    "cave-vulns",
+    "cave-sbom",
+    "cave-uptime",
+    "cave-cost",
+    "cave-sign",
+    "cave-forensics",
+    "cave-devlake",
+    "cave-ai-obs",
+    "cave-pii",
+    "cave-incidents",
+    "cave-chat",
+    "cave-slo",
+    "cave-alerts",
+    "cave-profiler",
+    "cave-registry",
+    "cave-workflows",
+    "cave-scan",
+    "cave-portal",
+    "cave-scaffold",
+    "cave-chaos",
+    "cave-policy",
+    "cave-dast",
+    "cave-backup",
+    "cave-pam",
+    "cave-logs",
+    "cave-auth",
 ];
 
 fn all_module_perms(actions: &[&str]) -> Vec<ModulePermission> {
@@ -134,13 +159,15 @@ pub fn predefined_roles() -> Vec<Role> {
         },
         Role {
             name: "module-admin".to_string(),
-            description: "Admin access to a specific module (set via RoleBinding scope)".to_string(),
+            description: "Admin access to a specific module (set via RoleBinding scope)"
+                .to_string(),
             permissions: all_module_perms(&["read", "write", "manage", "admin"]),
             parent: Some("developer".to_string()),
         },
         Role {
             name: "developer".to_string(),
-            description: "Read + write access across all modules, no destructive admin ops".to_string(),
+            description: "Read + write access across all modules, no destructive admin ops"
+                .to_string(),
             permissions: all_module_perms(&["read", "write"]),
             parent: Some("viewer".to_string()),
         },
@@ -154,11 +181,26 @@ pub fn predefined_roles() -> Vec<Role> {
             name: "auditor".to_string(),
             description: "Read-only access to audit logs and security events".to_string(),
             permissions: vec![
-                ModulePermission { module: "cave-logs".to_string(), actions: vec!["read".to_string(), "list".to_string()] },
-                ModulePermission { module: "cave-auth".to_string(), actions: vec!["audit".to_string(), "read".to_string()] },
-                ModulePermission { module: "cave-vulns".to_string(), actions: vec!["read".to_string(), "list".to_string()] },
-                ModulePermission { module: "cave-incidents".to_string(), actions: vec!["read".to_string(), "list".to_string()] },
-                ModulePermission { module: "cave-pii".to_string(), actions: vec!["read".to_string()] },
+                ModulePermission {
+                    module: "cave-logs".to_string(),
+                    actions: vec!["read".to_string(), "list".to_string()],
+                },
+                ModulePermission {
+                    module: "cave-auth".to_string(),
+                    actions: vec!["audit".to_string(), "read".to_string()],
+                },
+                ModulePermission {
+                    module: "cave-vulns".to_string(),
+                    actions: vec!["read".to_string(), "list".to_string()],
+                },
+                ModulePermission {
+                    module: "cave-incidents".to_string(),
+                    actions: vec!["read".to_string(), "list".to_string()],
+                },
+                ModulePermission {
+                    module: "cave-pii".to_string(),
+                    actions: vec!["read".to_string()],
+                },
             ],
             parent: None,
         },
@@ -255,7 +297,11 @@ impl RbacEngine {
             }
             for binding in &policy.bindings {
                 if binding.cave_uid == cave_uid {
-                    if binding.permissions.iter().any(|p| p == permission || p == "*") {
+                    if binding
+                        .permissions
+                        .iter()
+                        .any(|p| p == permission || p == "*")
+                    {
                         return true;
                     }
                 }
@@ -266,11 +312,7 @@ impl RbacEngine {
 
     /// Get all effective permissions for a user across all their role bindings
     /// at a given scope.
-    pub async fn effective_permissions(
-        &self,
-        cave_uid: Uuid,
-        scope: &BindingScope,
-    ) -> Vec<String> {
+    pub async fn effective_permissions(&self, cave_uid: Uuid, scope: &BindingScope) -> Vec<String> {
         let mut perms = Vec::new();
         let bindings = self.bindings.read().await;
 

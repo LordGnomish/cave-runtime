@@ -17,11 +17,11 @@
 //! Either way the result is one self-contained HTML document.
 
 use crate::admin::layout::{
-    breadcrumb::{breadcrumb_for_path, render as render_breadcrumb, Crumb},
-    command_palette::{command_palette_modal, default_commands_for_persona, CommandItem},
+    breadcrumb::{Crumb, breadcrumb_for_path, render as render_breadcrumb},
+    command_palette::{CommandItem, command_palette_modal, default_commands_for_persona},
     footer::footer,
     nav::sidebar,
-    shortcuts::{shortcuts_help_modal, DEFAULT_BINDINGS},
+    shortcuts::{DEFAULT_BINDINGS, shortcuts_help_modal},
     theme::theme_class_for_cookie,
     toast::toast_container,
 };
@@ -81,7 +81,10 @@ pub fn shell_v2(opts: ShellOptions<'_>) -> String {
     let title_e = escape(opts.title);
     let theme_class = theme_class_for_cookie(opts.theme_cookie);
 
-    let crumbs = opts.breadcrumb.clone().unwrap_or_else(|| breadcrumb_for_path(opts.current_path));
+    let crumbs = opts
+        .breadcrumb
+        .clone()
+        .unwrap_or_else(|| breadcrumb_for_path(opts.current_path));
     let crumbs_html = render_breadcrumb(&crumbs);
 
     // Persona-filter the default commands so TenantAdmin doesn't see
@@ -162,7 +165,9 @@ fn persona_label(p: Persona) -> &'static str {
 
 fn persona_badge_class(p: Persona) -> &'static str {
     match p {
-        Persona::PlatformAdmin => "bg-purple-100 dark:bg-purple-900/50 text-purple-900 dark:text-purple-100",
+        Persona::PlatformAdmin => {
+            "bg-purple-100 dark:bg-purple-900/50 text-purple-900 dark:text-purple-100"
+        }
         Persona::TenantAdmin => "bg-blue-100 dark:bg-blue-900/50 text-blue-900 dark:text-blue-100",
         Persona::Anonymous => "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300",
     }
@@ -225,7 +230,12 @@ mod tests {
     use super::*;
     use crate::admin::permission::Persona;
 
-    fn opts<'a>(persona: Persona, path: &'a str, tenant: &'a str, body: &'a str) -> ShellOptions<'a> {
+    fn opts<'a>(
+        persona: Persona,
+        path: &'a str,
+        tenant: &'a str,
+        body: &'a str,
+    ) -> ShellOptions<'a> {
         ShellOptions {
             title: "Test page",
             persona,
@@ -242,7 +252,12 @@ mod tests {
 
     #[test]
     fn shell_v2_includes_viewport_meta_and_lang_attribute() {
-        let html = shell_v2(opts(Persona::PlatformAdmin, "/admin/keda", "acme", "<p>hi</p>"));
+        let html = shell_v2(opts(
+            Persona::PlatformAdmin,
+            "/admin/keda",
+            "acme",
+            "<p>hi</p>",
+        ));
         assert!(html.contains(r#"lang="en""#));
         assert!(html.contains(r#"name="viewport""#));
         assert!(html.contains("initial-scale=1"));
@@ -310,7 +325,10 @@ mod tests {
     #[test]
     fn shell_v2_extra_commands_appear_in_palette_json() {
         let mut o = opts(Persona::PlatformAdmin, "/admin/keda", "acme", "");
-        o.extra_commands = vec![CommandItem::action("Pause all ScaledObjects", "/admin/keda/pause")];
+        o.extra_commands = vec![CommandItem::action(
+            "Pause all ScaledObjects",
+            "/admin/keda/pause",
+        )];
         let html = shell_v2(o);
         assert!(html.contains("Pause all ScaledObjects"));
     }

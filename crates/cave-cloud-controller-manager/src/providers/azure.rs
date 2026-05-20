@@ -138,10 +138,13 @@ impl InstancesIface for AzureProvider {
     }
     fn zone_for(&self, tenant: &TenantId, node_name: &str) -> Result<(String, String), CloudError> {
         self.authorise(tenant, "VMSSInstance", node_name)?;
-        let n = self.nodes.get(node_name).ok_or_else(|| CloudError::Upstream {
-            provider: ProviderName::Azure,
-            reason: format!("vmss instance {node_name} not found"),
-        })?;
+        let n = self
+            .nodes
+            .get(node_name)
+            .ok_or_else(|| CloudError::Upstream {
+                provider: ProviderName::Azure,
+                reason: format!("vmss instance {node_name} not found"),
+            })?;
         Ok((n.zone.clone(), n.location.clone()))
     }
 }
@@ -240,7 +243,10 @@ mod tests {
         );
         let mut p = AzureProvider::new(cfg("acme")).unwrap();
         p.upsert_node(node("vmss-app_0", "aks-app-0"));
-        assert_eq!(p.provider_id(&tenant, "aks-app-0").unwrap(), "azure://vmss-app_0");
+        assert_eq!(
+            p.provider_id(&tenant, "aks-app-0").unwrap(),
+            "azure://vmss-app_0"
+        );
     }
 
     #[test]
@@ -301,8 +307,15 @@ mod tests {
         );
         let p = AzureProvider::new(cfg("acme")).unwrap();
         p.ensure_lb(&tenant, "web").unwrap();
-        p.open_nsg_rule(&tenant, NsgRule { service: "web".into(), port: 443, protocol: "tcp" })
-            .unwrap();
+        p.open_nsg_rule(
+            &tenant,
+            NsgRule {
+                service: "web".into(),
+                port: 443,
+                protocol: "tcp",
+            },
+        )
+        .unwrap();
         assert_eq!(p.nsg_rules().len(), 1);
         p.delete_lb(&tenant, "web").unwrap();
         assert!(p.public_ips.borrow().get("web").is_none());
@@ -322,7 +335,11 @@ mod tests {
         let err = p
             .open_nsg_rule(
                 &attacker,
-                NsgRule { service: "web".into(), port: 443, protocol: "tcp" },
+                NsgRule {
+                    service: "web".into(),
+                    port: 443,
+                    protocol: "tcp",
+                },
             )
             .unwrap_err();
         assert!(matches!(err, CloudError::TenantDenied { .. }));

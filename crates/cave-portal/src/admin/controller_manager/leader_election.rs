@@ -6,21 +6,20 @@
 use super::ControllerManagerViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::table;
-use crate::admin::state::{scope, AdminState, ControllerLease};
+use crate::admin::state::{AdminState, ControllerLease, scope};
 
 pub fn list_leases(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<Vec<ControllerLease>, ControllerManagerViewError> {
     ctx.authorise(Permission::ControllerManagerRead)?;
-    let mut rows: Vec<ControllerLease> = scope(
-        &state.controller_leases.read().unwrap(),
-        &ctx.tenant,
-        |r| &r.tenant,
-    )
-    .into_iter()
-    .cloned()
-    .collect();
+    let mut rows: Vec<ControllerLease> =
+        scope(&state.controller_leases.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| a.controller.cmp(&b.controller));
     Ok(rows)
 }

@@ -4,7 +4,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, MeshAuthzPolicy, MeshFlow};
+use crate::admin::state::{AdminState, MeshAuthzPolicy, MeshFlow, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -26,18 +26,22 @@ pub fn list_policies(
     ctx: &RequestCtx,
 ) -> Result<Vec<MeshAuthzPolicy>, MeshViewError> {
     ctx.authorise(Permission::MeshRead)?;
-    Ok(scope(&state.mesh_authz.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter()
-        .cloned()
-        .collect())
+    Ok(scope(&state.mesh_authz.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
+    .into_iter()
+    .cloned()
+    .collect())
 }
 
 pub fn list_flows(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<MeshFlow>, MeshViewError> {
     ctx.authorise(Permission::MeshRead)?;
-    Ok(scope(&state.mesh_flows.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter()
-        .cloned()
-        .collect())
+    Ok(scope(&state.mesh_flows.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
+    .into_iter()
+    .cloned()
+    .collect())
 }
 
 /// Create-or-update an AuthorizationPolicy. Mirrors the editor's Save action.
@@ -85,14 +89,21 @@ pub fn create_policy(
     ctx.authorise(Permission::MeshWrite)?;
     {
         let policies = state.mesh_authz.read().unwrap();
-        if policies.iter().any(|p| p.tenant == ctx.tenant && p.name == name) {
+        if policies
+            .iter()
+            .any(|p| p.tenant == ctx.tenant && p.name == name)
+        {
             return Err(MeshViewError::DuplicatePolicy(name.into()));
         }
     }
     upsert_policy(state, ctx, name, action, principal_glob)
 }
 
-pub fn delete_policy(state: &AdminState, ctx: &RequestCtx, name: &str) -> Result<(), MeshViewError> {
+pub fn delete_policy(
+    state: &AdminState,
+    ctx: &RequestCtx,
+    name: &str,
+) -> Result<(), MeshViewError> {
     ctx.authorise(Permission::MeshWrite)?;
     let mut policies = state.mesh_authz.write().unwrap();
     let before = policies.len();
@@ -213,26 +224,37 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, MeshViewEr
         .collect();
     let f_rows: Vec<Vec<String>> = flows
         .iter()
-        .map(|f| vec![f.source.clone(), f.destination.clone(), f.verdict.into(), f.bytes.to_string()])
+        .map(|f| {
+            vec![
+                f.source.clone(),
+                f.destination.clone(),
+                f.verdict.into(),
+                f.bytes.to_string(),
+            ]
+        })
         .collect();
     let w_rows: Vec<Vec<String>> = workloads
         .iter()
-        .map(|w| vec![
-            w.name.clone(),
-            w.outgoing_edges.to_string(),
-            w.bytes_out.to_string(),
-            w.bytes_dropped.to_string(),
-        ])
+        .map(|w| {
+            vec![
+                w.name.clone(),
+                w.outgoing_edges.to_string(),
+                w.bytes_out.to_string(),
+                w.bytes_dropped.to_string(),
+            ]
+        })
         .collect();
     let s_rows: Vec<Vec<String>> = services
         .iter()
-        .map(|s| vec![
-            s.name.clone(),
-            s.incoming_edges.to_string(),
-            s.bytes_in.to_string(),
-            s.bytes_dropped.to_string(),
-            service_health(s).into(),
-        ])
+        .map(|s| {
+            vec![
+                s.name.clone(),
+                s.incoming_edges.to_string(),
+                s.bytes_in.to_string(),
+                s.bytes_dropped.to_string(),
+                service_health(s).into(),
+            ]
+        })
         .collect();
     // 2026-05-14 consolidation: pull in kiali's exclusive sections
     // (Topology, Traffic, Validations) + net's exclusive sections
@@ -241,20 +263,17 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, MeshViewEr
     // corresponding render_section returns an Auth error which we
     // silently swallow so the page still renders the parts the
     // caller can see (matches the dashboard pattern elsewhere).
-    let topology_html = crate::admin::kiali::topology::render_section(state, ctx)
-        .unwrap_or_default();
-    let traffic_html = crate::admin::kiali::traffic::render_section(state, ctx)
-        .unwrap_or_default();
-    let validations_html = crate::admin::kiali::validations::render_section(state, ctx)
-        .unwrap_or_default();
-    let net_flows_html = crate::admin::net::flows::render_section(state, ctx)
-        .unwrap_or_default();
-    let net_policies_html = crate::admin::net::policies::render_section(state, ctx)
-        .unwrap_or_default();
-    let net_nodes_html = crate::admin::net::nodes::render_section(state, ctx)
-        .unwrap_or_default();
-    let net_identities_html = crate::admin::net::identities::render_section(state, ctx)
-        .unwrap_or_default();
+    let topology_html =
+        crate::admin::kiali::topology::render_section(state, ctx).unwrap_or_default();
+    let traffic_html = crate::admin::kiali::traffic::render_section(state, ctx).unwrap_or_default();
+    let validations_html =
+        crate::admin::kiali::validations::render_section(state, ctx).unwrap_or_default();
+    let net_flows_html = crate::admin::net::flows::render_section(state, ctx).unwrap_or_default();
+    let net_policies_html =
+        crate::admin::net::policies::render_section(state, ctx).unwrap_or_default();
+    let net_nodes_html = crate::admin::net::nodes::render_section(state, ctx).unwrap_or_default();
+    let net_identities_html =
+        crate::admin::net::identities::render_section(state, ctx).unwrap_or_default();
 
     let body = format!(
         r##"<section class="mb-4 p-3 bg-blue-50 rounded text-sm text-blue-900">
@@ -294,8 +313,14 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, MeshViewEr
         n_s = services.len(),
         p_tbl = table(&["name", "action", "principal_glob"], &p_rows),
         f_tbl = table(&["src", "dst", "verdict", "bytes"], &f_rows),
-        w_tbl = table(&["workload", "edges", "bytes out", "bytes dropped"], &w_rows),
-        s_tbl = table(&["service", "edges", "bytes in", "bytes dropped", "health"], &s_rows),
+        w_tbl = table(
+            &["workload", "edges", "bytes out", "bytes dropped"],
+            &w_rows
+        ),
+        s_tbl = table(
+            &["service", "edges", "bytes in", "bytes dropped", "health"],
+            &s_rows
+        ),
         topology = topology_html,
         traffic = traffic_html,
         validations = validations_html,
@@ -497,11 +522,7 @@ mod tests {
             "TabsRender",
             "acme"
         );
-        let html = render(
-            &AdminState::seeded(),
-            &ctx(&[Permission::MeshRead]),
-        )
-        .unwrap();
+        let html = render(&AdminState::seeded(), &ctx(&[Permission::MeshRead])).unwrap();
         assert!(html.contains("#mesh-workloads"));
         assert!(html.contains("#mesh-services"));
         assert!(html.contains("#mesh-authz"));
@@ -522,10 +543,7 @@ mod tests {
         );
         let html = render(
             &AdminState::seeded(),
-            &ctx(&[
-                Permission::MeshRead,
-                Permission::KialiRead,
-            ]),
+            &ctx(&[Permission::MeshRead, Permission::KialiRead]),
         )
         .unwrap();
         for anchor in [
@@ -550,10 +568,7 @@ mod tests {
         );
         let html = render(
             &AdminState::seeded(),
-            &ctx(&[
-                Permission::MeshRead,
-                Permission::NetRead,
-            ]),
+            &ctx(&[Permission::MeshRead, Permission::NetRead]),
         )
         .unwrap();
         for anchor in [
@@ -572,11 +587,7 @@ mod tests {
         // Operators visiting /admin/mesh deserve to know that
         // /admin/kiali and /admin/net 308 here. The intro section
         // calls this out.
-        let html = render(
-            &AdminState::seeded(),
-            &ctx(&[Permission::MeshRead]),
-        )
-        .unwrap();
+        let html = render(&AdminState::seeded(), &ctx(&[Permission::MeshRead])).unwrap();
         assert!(html.contains("/admin/kiali"));
         assert!(html.contains("/admin/net"));
         assert!(html.contains("308"));
@@ -601,11 +612,7 @@ mod tests {
         // permission-gated bodies. The mesh-native sections remain;
         // the kiali/net data sections (#kiali-topology body,
         // #net-flows body) are absent.
-        let html = render(
-            &AdminState::seeded(),
-            &ctx(&[Permission::MeshRead]),
-        )
-        .unwrap();
+        let html = render(&AdminState::seeded(), &ctx(&[Permission::MeshRead])).unwrap();
         assert!(html.contains("Workloads"));
         assert!(html.contains("AuthZ"));
         // No KialiRead → topology section content absent. The

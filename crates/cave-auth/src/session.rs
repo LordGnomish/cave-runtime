@@ -116,7 +116,10 @@ impl SessionManager {
         if let Some(ttl) = req.ttl_minutes {
             session.expires_at = session.created_at + Duration::minutes(ttl);
         }
-        self.sessions.write().await.insert(session.id, session.clone());
+        self.sessions
+            .write()
+            .await
+            .insert(session.id, session.clone());
         session
     }
 

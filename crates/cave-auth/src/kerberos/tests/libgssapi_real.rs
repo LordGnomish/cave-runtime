@@ -17,9 +17,9 @@
 //! `KeyTabReaderTest`.
 
 use crate::kerberos::{
-    gssapi::{wrap_initial_context_token, OID_KRB5, OID_SPNEGO},
-    gssapi_real::{accept_security_context, AcceptOutcome, AcceptedContext, GssapiError},
-    keytab::{encode_test_keytab, parse_keytab, KeyBlock, KeytabEntry, KrbPrincipal, KEYTAB_MAGIC},
+    gssapi::{OID_KRB5, OID_SPNEGO, wrap_initial_context_token},
+    gssapi_real::{AcceptOutcome, AcceptedContext, GssapiError, accept_security_context},
+    keytab::{KEYTAB_MAGIC, KeyBlock, KeytabEntry, KrbPrincipal, encode_test_keytab, parse_keytab},
     negotiate::NegotiateHandler,
     spnego::build_neg_token_init,
 };
@@ -98,7 +98,7 @@ fn keytab_edge_expired_key_entry_timestamp_round_trips() {
 
 #[test]
 fn negotiate_header_valid_signals_known_mech() {
-    use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+    use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
     let inner = build_neg_token_init(&[OID_KRB5], Some(&[0xab, 0xcd]));
     let wrapped = wrap_initial_context_token(OID_SPNEGO, &inner);
     let header = format!("Negotiate {}", B64.encode(&wrapped));
@@ -115,14 +115,18 @@ fn negotiate_header_malformed_base64_rejected() {
 
 #[test]
 fn negotiate_header_empty_token_rejected() {
-    assert!(NegotiateHandler::new().decode_request("Negotiate ").is_err());
+    assert!(
+        NegotiateHandler::new()
+            .decode_request("Negotiate ")
+            .is_err()
+    );
 }
 
 #[test]
 fn negotiate_header_oversized_token_rejected() {
     // 64 KiB + 1 of base64 — `decode_request` must refuse payloads beyond the
     // upstream Keycloak limit (`KerberosUtil.MAX_TOKEN_SIZE = 65536`).
-    use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+    use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
     let huge = vec![0xffu8; 65 * 1024];
     let header = format!("Negotiate {}", B64.encode(&huge));
     let err = NegotiateHandler::new().decode_request(&header).unwrap_err();
@@ -131,7 +135,7 @@ fn negotiate_header_oversized_token_rejected() {
 
 #[test]
 fn negotiate_header_missing_scheme_treats_payload_as_bare_b64() {
-    use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+    use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
     let inner = build_neg_token_init(&[OID_KRB5], None);
     let wrapped = wrap_initial_context_token(OID_SPNEGO, &inner);
     let header = B64.encode(&wrapped); // no "Negotiate " prefix
@@ -141,7 +145,7 @@ fn negotiate_header_missing_scheme_treats_payload_as_bare_b64() {
 
 #[test]
 fn negotiate_header_mixed_case_scheme_accepted() {
-    use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+    use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
     let inner = build_neg_token_init(&[OID_KRB5], None);
     let wrapped = wrap_initial_context_token(OID_SPNEGO, &inner);
     // Per RFC 7235 §2.1 the scheme is case-insensitive.
@@ -152,7 +156,7 @@ fn negotiate_header_mixed_case_scheme_accepted() {
 
 #[test]
 fn negotiate_header_trailing_whitespace_trimmed() {
-    use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+    use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
     let inner = build_neg_token_init(&[OID_KRB5], None);
     let wrapped = wrap_initial_context_token(OID_SPNEGO, &inner);
     let header = format!("Negotiate {}   ", B64.encode(&wrapped));
@@ -163,7 +167,7 @@ fn negotiate_header_trailing_whitespace_trimmed() {
 #[test]
 fn negotiate_header_garbage_outer_tag_rejected() {
     // SEQUENCE not GSS-wrapped, not NegTokenInit choice — must reject.
-    use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+    use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
     let header = format!("Negotiate {}", B64.encode([0x30, 0x00]));
     assert!(NegotiateHandler::new().decode_request(&header).is_err());
 }
@@ -177,12 +181,15 @@ fn gssapi_accept_round_trips_with_real_kdc() {
     // Real ticket bytes are obtained at runtime from a Kerberos client. The
     // test is `#[ignore]`d so CI can compile but skip the network call.
     let token = std::env::var("CAVE_TEST_AP_REQ_B64").unwrap();
-    use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+    use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
     let bytes = B64.decode(token).unwrap();
     let res = accept_security_context(&bytes, None).unwrap();
     match res {
         AcceptOutcome::Established(ctx) => {
-            assert!(!ctx.peer_principal.is_empty(), "principal must be extracted");
+            assert!(
+                !ctx.peer_principal.is_empty(),
+                "principal must be extracted"
+            );
         }
         AcceptOutcome::ContinueNeeded { .. } => {
             panic!("real KDC handshake must complete in one round")
@@ -215,7 +222,7 @@ fn gssapi_accept_with_explicit_keytab_path() {
         std::env::var("CAVE_TEST_KEYTAB").unwrap_or_else(|_| "/etc/cave/cave.keytab".into()),
     );
     let token = std::env::var("CAVE_TEST_AP_REQ_B64").unwrap();
-    use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+    use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
     let bytes = B64.decode(token).unwrap();
     let res = accept_security_context(&bytes, Some(&kt)).unwrap();
     assert!(matches!(
@@ -243,12 +250,15 @@ fn gssapi_init_then_accept_round_trip() {
 #[ignore = "mutual auth — requires live KDC"]
 fn gssapi_accept_mutual_auth_returns_reply_token() {
     let token = std::env::var("CAVE_TEST_AP_REQ_MUTUAL_B64").unwrap();
-    use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+    use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
     let bytes = B64.decode(token).unwrap();
     let outcome = accept_security_context(&bytes, None).unwrap();
     match outcome {
         AcceptOutcome::Established(ctx) => {
-            assert!(ctx.output_token.is_some(), "mutual-auth requires reply token");
+            assert!(
+                ctx.output_token.is_some(),
+                "mutual-auth requires reply token"
+            );
         }
         AcceptOutcome::ContinueNeeded { output_token } => {
             assert!(!output_token.is_empty());
@@ -262,7 +272,7 @@ fn gssapi_accept_mutual_auth_returns_reply_token() {
 fn negative_tampered_mic_initial_context_token_rejected() {
     // Build a valid InitialContextToken then corrupt the OID byte. The parser
     // must reject — it's the cheapest pre-cryptographic guard.
-    use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+    use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
     let inner = build_neg_token_init(&[OID_KRB5], Some(&[0xaa]));
     let mut wrapped = wrap_initial_context_token(OID_SPNEGO, &inner);
     // Flip the 4th byte (inside OID) — should still parse outer wrapper but
@@ -286,7 +296,10 @@ fn negative_wrong_realm_principal_canonical_form() {
     // Realm fidelity round-trip — when the caller checks against EXAMPLE.COM
     // this entry won't match.
     assert_ne!(parsed[0].principal.realm, "EXAMPLE.COM");
-    assert_eq!(parsed[0].principal.to_canonical(), "HTTP/cave.example.com@BAD.REALM");
+    assert_eq!(
+        parsed[0].principal.to_canonical(),
+        "HTTP/cave.example.com@BAD.REALM"
+    );
 }
 
 #[test]
@@ -298,7 +311,10 @@ fn negative_expired_ticket_timestamp_in_past() {
     let parsed = parse_keytab(&bytes).unwrap();
     let now = 1_700_000_000u32;
     let one_year = 365 * 24 * 3600;
-    assert!(now - parsed[0].timestamp > one_year, "must be flagged expired");
+    assert!(
+        now - parsed[0].timestamp > one_year,
+        "must be flagged expired"
+    );
 }
 
 #[test]
@@ -307,9 +323,7 @@ fn negative_wrong_service_name_keytab_lookup_returns_none() {
     let bytes = encode_test_keytab(&[e.clone()]);
     let parsed = parse_keytab(&bytes).unwrap();
     let lookup = "HTTP/wrong-host.example.com@EXAMPLE.COM";
-    let found = parsed
-        .iter()
-        .find(|p| p.principal.to_canonical() == lookup);
+    let found = parsed.iter().find(|p| p.principal.to_canonical() == lookup);
     assert!(found.is_none());
 }
 

@@ -49,12 +49,11 @@ pub fn cidr_family(s: &str) -> Option<CidrFamily> {
     let (addr, prefix) = s.split_once('/')?;
     let bits: u32 = prefix.parse().ok()?;
     if addr.contains(':') {
-        let ok = bits <= 128 && addr.split(':').all(|seg| seg.is_empty() || seg.chars().all(|c| c.is_ascii_hexdigit()) && seg.len() <= 4);
-        if ok {
-            Some(CidrFamily::V6)
-        } else {
-            None
-        }
+        let ok = bits <= 128
+            && addr.split(':').all(|seg| {
+                seg.is_empty() || seg.chars().all(|c| c.is_ascii_hexdigit()) && seg.len() <= 4
+            });
+        if ok { Some(CidrFamily::V6) } else { None }
     } else if addr.contains('.') {
         let parts: Vec<&str> = addr.split('.').collect();
         if parts.len() != 4 || bits > 32 {
@@ -113,16 +112,27 @@ impl RoutePlan {
 /// Compute the (creates, deletes) required to make `current` match `desired`.
 /// Mirrors `reconcile` in upstream. Only entries with valid CIDRs are
 /// scheduled for creation; malformed CIDRs are dropped silently.
-pub fn diff(cluster: &str, desired: &[DesiredRoute], current: &[String]) -> (Vec<String>, Vec<String>) {
+pub fn diff(
+    cluster: &str,
+    desired: &[DesiredRoute],
+    current: &[String],
+) -> (Vec<String>, Vec<String>) {
     let plan = plan_routes(cluster, desired, current);
-    let creates = plan.creates.into_iter().map(|d| route_name_for(cluster, &d.node_name)).collect();
+    let creates = plan
+        .creates
+        .into_iter()
+        .map(|d| route_name_for(cluster, &d.node_name))
+        .collect();
     (creates, plan.deletes)
 }
 
 /// Pure planner — same shape as upstream `reconcile`, returning a
 /// `RoutePlan`. Skips desired routes with malformed CIDRs.
 pub fn plan_routes(cluster: &str, desired: &[DesiredRoute], current: &[String]) -> RoutePlan {
-    let valid: Vec<&DesiredRoute> = desired.iter().filter(|d| is_valid_cidr(&d.pod_cidr)).collect();
+    let valid: Vec<&DesiredRoute> = desired
+        .iter()
+        .filter(|d| is_valid_cidr(&d.pod_cidr))
+        .collect();
     let want_names: Vec<String> = valid
         .iter()
         .map(|d| route_name_for(cluster, &d.node_name))
@@ -144,7 +154,11 @@ pub fn plan_routes(cluster: &str, desired: &[DesiredRoute], current: &[String]) 
 /// Detect blackhole routes — routes that exist on the cloud but no longer
 /// have a desired node. Mirrors `findBlackholeRoutes` upstream.
 pub fn detect_blackhole(current: &[String], live_route_names: &[String]) -> Vec<String> {
-    current.iter().filter(|n| !live_route_names.contains(n)).cloned().collect()
+    current
+        .iter()
+        .filter(|n| !live_route_names.contains(n))
+        .cloned()
+        .collect()
 }
 
 /// Reject duplicate desired CIDRs — multiple nodes claiming the same CIDR
@@ -182,12 +196,14 @@ pub fn reconcile<P: RoutesIface>(
     for n in &plan.deletes {
         provider.delete_route(tenant, n)?;
     }
-    Ok(match (plan.creates.len() as u32, plan.deletes.len() as u32) {
-        (0, 0) => Reconcile::NoOp,
-        (n, 0) => Reconcile::Update(n),
-        (0, m) => Reconcile::Delete(m),
-        (n, m) => Reconcile::Update(n + m),
-    })
+    Ok(
+        match (plan.creates.len() as u32, plan.deletes.len() as u32) {
+            (0, 0) => Reconcile::NoOp,
+            (n, 0) => Reconcile::Update(n),
+            (0, m) => Reconcile::Delete(m),
+            (n, m) => Reconcile::Update(n + m),
+        },
+    )
 }
 
 #[allow(dead_code)]
@@ -245,7 +261,10 @@ mod tests {
     }
 
     fn dr(node: &str, cidr: &str) -> DesiredRoute {
-        DesiredRoute { node_name: node.into(), pod_cidr: cidr.into() }
+        DesiredRoute {
+            node_name: node.into(),
+            pod_cidr: cidr.into(),
+        }
     }
 
     // ─── Existing v1 tests ───────────────────────────────────────────────────
@@ -312,7 +331,10 @@ mod tests {
         );
         let p = StubRoutes::new("acme", vec!["acme-n1"]);
         let desired = vec![dr("n1", "10.0.0.0/24")];
-        assert_eq!(reconcile(&p, "acme", &desired, &tenant).unwrap(), Reconcile::NoOp);
+        assert_eq!(
+            reconcile(&p, "acme", &desired, &tenant).unwrap(),
+            Reconcile::NoOp
+        );
     }
 
     // ─── CIDR validation ─────────────────────────────────────────────────────
@@ -372,8 +394,11 @@ mod tests {
             "reconcile",
             "tenant-cidr-split"
         );
-        let desired =
-            vec![dr("n1", "10.0.0.0/24"), dr("n2", "2001:db8::/64"), dr("bad", "garbage")];
+        let desired = vec![
+            dr("n1", "10.0.0.0/24"),
+            dr("n2", "2001:db8::/64"),
+            dr("bad", "garbage"),
+        ];
         let (v4, v6) = split_by_family(&desired);
         assert_eq!(v4.len(), 1);
         assert_eq!(v6.len(), 1);
@@ -511,7 +536,11 @@ mod tests {
             "acme"
         );
         let p = StubRoutes::new("acme", vec![]);
-        let desired = vec![dr("a", "10.0.0.0/24"), dr("b", "10.0.1.0/24"), dr("c", "10.0.2.0/24")];
+        let desired = vec![
+            dr("a", "10.0.0.0/24"),
+            dr("b", "10.0.1.0/24"),
+            dr("c", "10.0.2.0/24"),
+        ];
         let r = reconcile(&p, "acme", &desired, &tenant).unwrap();
         assert_eq!(r, Reconcile::Update(3));
         assert_eq!(p.table.borrow().len(), 3);
@@ -579,7 +608,10 @@ mod tests {
             "reconcile",
             "tenant-plan-empty"
         );
-        let plan = RoutePlan { creates: vec![], deletes: vec![] };
+        let plan = RoutePlan {
+            creates: vec![],
+            deletes: vec![],
+        };
         assert!(plan.is_empty());
         assert_eq!(plan.write_count(), 0);
     }

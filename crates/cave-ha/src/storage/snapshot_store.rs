@@ -28,8 +28,12 @@ impl SnapshotStore {
 
     /// Persist a snapshot. Atomically compatible with the previous snapshot.
     pub async fn save(&self, snapshot: &Snapshot) -> HaResult<()> {
-        let tmp_path = self.dir.join(format!("snapshot-{}.tmp", snapshot.meta.index));
-        let final_path = self.dir.join(format!("snapshot-{}.snap", snapshot.meta.index));
+        let tmp_path = self
+            .dir
+            .join(format!("snapshot-{}.tmp", snapshot.meta.index));
+        let final_path = self
+            .dir
+            .join(format!("snapshot-{}.snap", snapshot.meta.index));
 
         // Write metadata + data as a single JSON envelope.
         let envelope = SnapshotEnvelope {
@@ -65,11 +69,14 @@ impl SnapshotStore {
     /// Load a specific snapshot by log index.
     pub async fn load(&self, index: LogIndex) -> HaResult<Snapshot> {
         let path = self.dir.join(format!("snapshot-{index}.snap"));
-        let bytes = fs::read(&path).await.map_err(|e| {
-            HaError::Snapshot(format!("read snapshot-{index}: {e}"))
-        })?;
+        let bytes = fs::read(&path)
+            .await
+            .map_err(|e| HaError::Snapshot(format!("read snapshot-{index}: {e}")))?;
         let envelope: SnapshotEnvelope = serde_json::from_slice(&bytes)?;
-        Ok(Snapshot { meta: envelope.meta, data: envelope.data })
+        Ok(Snapshot {
+            meta: envelope.meta,
+            data: envelope.data,
+        })
     }
 
     /// Find the index of the most recent snapshot file.
@@ -105,7 +112,9 @@ impl SnapshotStore {
         }
     }
 
-    pub fn dir(&self) -> &Path { &self.dir }
+    pub fn dir(&self) -> &Path {
+        &self.dir
+    }
 }
 
 fn parse_snap_index(name: &str) -> Option<LogIndex> {

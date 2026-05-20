@@ -2,11 +2,11 @@
 // Copyright 2026 Cave Runtime contributors
 //! `/admin/litellm` — LiteLLM gateway admin views.
 
-pub mod models;
-pub mod routes;
 pub mod api_keys;
 pub mod budgets;
+pub mod models;
 pub mod monitoring;
+pub mod routes;
 pub mod types;
 
 pub use types::{

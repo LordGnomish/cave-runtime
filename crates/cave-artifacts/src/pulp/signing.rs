@@ -87,15 +87,23 @@ pub fn verify_gpg_signature(
     // In production this would use gpgme or sequoia-pgp.
     // Simplified: check non-empty and valid base64 length.
     if signature_b64.is_empty() {
-        return VerificationResult::Invalid { reason: "Empty signature".to_string() };
+        return VerificationResult::Invalid {
+            reason: "Empty signature".to_string(),
+        };
     }
     if signature_b64.len() < 64 {
-        return VerificationResult::Invalid { reason: "Signature too short".to_string() };
+        return VerificationResult::Invalid {
+            reason: "Signature too short".to_string(),
+        };
     }
     if data.is_empty() {
-        return VerificationResult::Invalid { reason: "Empty data".to_string() };
+        return VerificationResult::Invalid {
+            reason: "Empty data".to_string(),
+        };
     }
-    VerificationResult::Valid { key_id: "MOCK_KEY_ID".to_string() }
+    VerificationResult::Valid {
+        key_id: "MOCK_KEY_ID".to_string(),
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -185,9 +193,13 @@ mod tests {
 
     #[test]
     fn verification_result_is_valid() {
-        let v = VerificationResult::Valid { key_id: "KEY1".to_string() };
+        let v = VerificationResult::Valid {
+            key_id: "KEY1".to_string(),
+        };
         assert!(v.is_valid());
-        let inv = VerificationResult::Invalid { reason: "Bad sig".to_string() };
+        let inv = VerificationResult::Invalid {
+            reason: "Bad sig".to_string(),
+        };
         assert!(!inv.is_valid());
     }
 }

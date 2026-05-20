@@ -143,9 +143,11 @@ pub enum ProjectViolation {
 
 /// Check if a source repository is allowed by the project.
 pub fn is_source_allowed(project: &AppProject, repo_url: &str) -> bool {
-    project.spec.source_repos.iter().any(|pattern| {
-        glob_match(pattern, repo_url)
-    })
+    project
+        .spec
+        .source_repos
+        .iter()
+        .any(|pattern| glob_match(pattern, repo_url))
 }
 
 /// Check if a destination is allowed by the project.
@@ -160,32 +162,42 @@ pub fn is_destination_allowed(project: &AppProject, dest: &Destination) -> bool 
 /// Check if a cluster resource (non-namespaced) is allowed.
 pub fn is_cluster_resource_allowed(project: &AppProject, group: &str, kind: &str) -> bool {
     // Blacklist takes priority
-    if project.spec.cluster_resource_blacklist.iter().any(|gk| {
-        (gk.group == "*" || gk.group == group) && (gk.kind == "*" || gk.kind == kind)
-    }) {
+    if project
+        .spec
+        .cluster_resource_blacklist
+        .iter()
+        .any(|gk| (gk.group == "*" || gk.group == group) && (gk.kind == "*" || gk.kind == kind))
+    {
         return false;
     }
     // Whitelist
-    project.spec.cluster_resource_whitelist.iter().any(|gk| {
-        (gk.group == "*" || gk.group == group) && (gk.kind == "*" || gk.kind == kind)
-    })
+    project
+        .spec
+        .cluster_resource_whitelist
+        .iter()
+        .any(|gk| (gk.group == "*" || gk.group == group) && (gk.kind == "*" || gk.kind == kind))
 }
 
 /// Check if a namespaced resource is allowed.
 pub fn is_namespaced_resource_allowed(project: &AppProject, group: &str, kind: &str) -> bool {
     // Blacklist takes priority
-    if project.spec.namespace_resource_blacklist.iter().any(|gk| {
-        (gk.group == "*" || gk.group == group) && (gk.kind == "*" || gk.kind == kind)
-    }) {
+    if project
+        .spec
+        .namespace_resource_blacklist
+        .iter()
+        .any(|gk| (gk.group == "*" || gk.group == group) && (gk.kind == "*" || gk.kind == kind))
+    {
         return false;
     }
     // If whitelist is empty → allow all
     if project.spec.namespace_resource_whitelist.is_empty() {
         return true;
     }
-    project.spec.namespace_resource_whitelist.iter().any(|gk| {
-        (gk.group == "*" || gk.group == group) && (gk.kind == "*" || gk.kind == kind)
-    })
+    project
+        .spec
+        .namespace_resource_whitelist
+        .iter()
+        .any(|gk| (gk.group == "*" || gk.group == group) && (gk.kind == "*" || gk.kind == kind))
 }
 
 /// Validate all constraints for an application deployment.
@@ -197,7 +209,9 @@ pub fn validate_application(
     let mut violations = Vec::new();
 
     if !is_source_allowed(project, repo_url) {
-        violations.push(ProjectViolation::SourceRepoNotAllowed { repo: repo_url.to_string() });
+        violations.push(ProjectViolation::SourceRepoNotAllowed {
+            repo: repo_url.to_string(),
+        });
     }
 
     if !is_destination_allowed(project, dest) {
@@ -211,8 +225,12 @@ pub fn validate_application(
 }
 
 fn glob_match(pattern: &str, value: &str) -> bool {
-    if pattern == "*" { return true; }
-    if pattern == value { return true; }
+    if pattern == "*" {
+        return true;
+    }
+    if pattern == value {
+        return true;
+    }
     if pattern.ends_with("/*") {
         let prefix = &pattern[..pattern.len() - 2];
         return value.starts_with(prefix);
@@ -222,7 +240,9 @@ fn glob_match(pattern: &str, value: &str) -> bool {
         let parts: Vec<&str> = pattern.split('*').collect();
         let mut pos = 0;
         for part in &parts {
-            if part.is_empty() { continue; }
+            if part.is_empty() {
+                continue;
+            }
             if let Some(idx) = value[pos..].find(part) {
                 pos += idx + part.len();
             } else {
@@ -267,14 +287,17 @@ pub fn has_permission(
 
     for role in &project.spec.roles {
         let subject_in_role = role.groups.iter().any(|g| g == subject) || role.name == subject;
-        if !subject_in_role { continue; }
+        if !subject_in_role {
+            continue;
+        }
 
         for policy in &role.policies {
             // Format: "p, role:name, resource, action, allow"
             let parts: Vec<&str> = policy.split(',').map(|s| s.trim()).collect();
             if parts.len() >= 4 {
                 let _effect = if parts.len() >= 5 { parts[4] } else { "allow" };
-                let res_match = parts[2] == "*" || parts[2] == resource || resource.starts_with(parts[2]);
+                let res_match =
+                    parts[2] == "*" || parts[2] == resource || resource.starts_with(parts[2]);
                 let act_match = parts[3] == "*" || parts[3] == action_str;
                 if res_match && act_match {
                     return true;
@@ -313,10 +336,16 @@ mod tests {
                         name: None,
                     },
                 ],
-                cluster_resource_whitelist: vec![GroupKind { group: "".to_string(), kind: "Namespace".to_string() }],
+                cluster_resource_whitelist: vec![GroupKind {
+                    group: "".to_string(),
+                    kind: "Namespace".to_string(),
+                }],
                 cluster_resource_blacklist: vec![],
                 namespace_resource_whitelist: vec![],
-                namespace_resource_blacklist: vec![GroupKind { group: "".to_string(), kind: "ResourceQuota".to_string() }],
+                namespace_resource_blacklist: vec![GroupKind {
+                    group: "".to_string(),
+                    kind: "ResourceQuota".to_string(),
+                }],
                 roles: vec![ProjectRole {
                     name: "deploy-role".to_string(),
                     description: None,
@@ -345,14 +374,22 @@ mod tests {
     #[test]
     fn destination_allowed() {
         let project = make_project();
-        let dest = Destination { server: "https://kubernetes.default.svc".to_string(), name: None, namespace: "production".to_string() };
+        let dest = Destination {
+            server: "https://kubernetes.default.svc".to_string(),
+            name: None,
+            namespace: "production".to_string(),
+        };
         assert!(is_destination_allowed(&project, &dest));
     }
 
     #[test]
     fn destination_not_allowed_namespace() {
         let project = make_project();
-        let dest = Destination { server: "https://kubernetes.default.svc".to_string(), name: None, namespace: "kube-system".to_string() };
+        let dest = Destination {
+            server: "https://kubernetes.default.svc".to_string(),
+            name: None,
+            namespace: "kube-system".to_string(),
+        };
         assert!(!is_destination_allowed(&project, &dest));
     }
 
@@ -360,30 +397,53 @@ mod tests {
     fn cluster_resource_allowed() {
         let project = make_project();
         assert!(is_cluster_resource_allowed(&project, "", "Namespace"));
-        assert!(!is_cluster_resource_allowed(&project, "rbac.authorization.k8s.io", "ClusterRole"));
+        assert!(!is_cluster_resource_allowed(
+            &project,
+            "rbac.authorization.k8s.io",
+            "ClusterRole"
+        ));
     }
 
     #[test]
     fn namespace_resource_blacklist() {
         let project = make_project();
-        assert!(!is_namespaced_resource_allowed(&project, "", "ResourceQuota"));
+        assert!(!is_namespaced_resource_allowed(
+            &project,
+            "",
+            "ResourceQuota"
+        ));
         // Deployment not in blacklist, whitelist empty → allowed
-        assert!(is_namespaced_resource_allowed(&project, "apps", "Deployment"));
+        assert!(is_namespaced_resource_allowed(
+            &project,
+            "apps",
+            "Deployment"
+        ));
     }
 
     #[test]
     fn validate_application_source_violation() {
         let project = make_project();
-        let dest = Destination { server: "https://kubernetes.default.svc".to_string(), name: None, namespace: "production".to_string() };
+        let dest = Destination {
+            server: "https://kubernetes.default.svc".to_string(),
+            name: None,
+            namespace: "production".to_string(),
+        };
         let violations = validate_application(&project, "https://evil.com/repo", &dest);
         assert_eq!(violations.len(), 1);
-        assert!(matches!(violations[0], ProjectViolation::SourceRepoNotAllowed { .. }));
+        assert!(matches!(
+            violations[0],
+            ProjectViolation::SourceRepoNotAllowed { .. }
+        ));
     }
 
     #[test]
     fn validate_application_both_valid() {
         let project = make_project();
-        let dest = Destination { server: "https://kubernetes.default.svc".to_string(), name: None, namespace: "staging".to_string() };
+        let dest = Destination {
+            server: "https://kubernetes.default.svc".to_string(),
+            name: None,
+            namespace: "staging".to_string(),
+        };
         let violations = validate_application(&project, "https://github.com/myorg/backend", &dest);
         assert!(violations.is_empty());
     }
@@ -391,20 +451,46 @@ mod tests {
     #[test]
     fn has_permission_sync() {
         let project = make_project();
-        assert!(has_permission(&project, "deploy-team", "applications", &RbacAction::Sync));
-        assert!(has_permission(&project, "deploy-team", "applications", &RbacAction::Get));
+        assert!(has_permission(
+            &project,
+            "deploy-team",
+            "applications",
+            &RbacAction::Sync
+        ));
+        assert!(has_permission(
+            &project,
+            "deploy-team",
+            "applications",
+            &RbacAction::Get
+        ));
     }
 
     #[test]
     fn has_permission_denied() {
         let project = make_project();
-        assert!(!has_permission(&project, "deploy-team", "applications", &RbacAction::Delete));
-        assert!(!has_permission(&project, "other-team", "applications", &RbacAction::Sync));
+        assert!(!has_permission(
+            &project,
+            "deploy-team",
+            "applications",
+            &RbacAction::Delete
+        ));
+        assert!(!has_permission(
+            &project,
+            "other-team",
+            "applications",
+            &RbacAction::Sync
+        ));
     }
 
     #[test]
     fn glob_match_wildcard() {
-        assert!(glob_match("https://github.com/myorg/*", "https://github.com/myorg/app"));
-        assert!(!glob_match("https://github.com/myorg/*", "https://github.com/other/app"));
+        assert!(glob_match(
+            "https://github.com/myorg/*",
+            "https://github.com/myorg/app"
+        ));
+        assert!(!glob_match(
+            "https://github.com/myorg/*",
+            "https://github.com/other/app"
+        ));
     }
 }

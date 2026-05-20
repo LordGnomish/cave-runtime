@@ -71,8 +71,7 @@ impl AdrStatus {
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite =
-    Cite::backstage("plugins/adr/src/components/AdrList.tsx", "AdrList");
+const FILE_CITE: Cite = Cite::backstage("plugins/adr/src/components/AdrList.tsx", "AdrList");
 
 /// Resolve the workspace's `docs/adr/` directory. Returns the path
 /// even if it doesn't exist on disk so error messages stay
@@ -171,10 +170,7 @@ pub fn load_body(ctx: &RequestCtx, stem: &str) -> Result<String, AdrViewError> {
     // If the path resolves into internal/ via a relative traversal
     // the canonicalise would catch it; reject anyway by enforcing
     // direct parent match.
-    if let (Ok(cp), Ok(cd)) = (
-        std::fs::canonicalize(&path),
-        std::fs::canonicalize(&dir),
-    ) {
+    if let (Ok(cp), Ok(cd)) = (std::fs::canonicalize(&path), std::fs::canonicalize(&dir)) {
         if cp.parent() != Some(&cd) {
             return Err(AdrViewError::Forbidden(stem.to_string()));
         }
@@ -211,10 +207,7 @@ fn extract_title(body: &str, fallback_stem: &str) -> String {
     }
     // Fall back to a humanised stem ("ADR-014_Zero_Trust_Network…"
     // → "Zero Trust Network…").
-    let after_id = fallback_stem
-        .splitn(2, '_')
-        .nth(1)
-        .unwrap_or(fallback_stem);
+    let after_id = fallback_stem.splitn(2, '_').nth(1).unwrap_or(fallback_stem);
     after_id.replace('_', " ")
 }
 
@@ -459,13 +452,19 @@ mod tests {
         // list_records before the directory is even consulted, so
         // env-var fixture isn't needed.
         let err = list_records(&tenant_ctx()).unwrap_err();
-        assert!(matches!(err, AdrViewError::Auth(AuthError::PersonaForbidden { .. })));
+        assert!(matches!(
+            err,
+            AdrViewError::Auth(AuthError::PersonaForbidden { .. })
+        ));
     }
 
     #[test]
     fn list_records_persona_gate_rejects_anonymous() {
         let err = list_records(&anon_ctx()).unwrap_err();
-        assert!(matches!(err, AdrViewError::Auth(AuthError::PersonaForbidden { .. })));
+        assert!(matches!(
+            err,
+            AdrViewError::Auth(AuthError::PersonaForbidden { .. })
+        ));
     }
 
     #[test]
@@ -504,7 +503,10 @@ mod tests {
     #[test]
     fn extract_id_handles_underscore_and_dash_separators() {
         assert_eq!(extract_id("ADR-014_Zero_Trust"), "ADR-014");
-        assert_eq!(extract_id("ADR-001-sovereign-bare-metal-hosting"), "ADR-001");
+        assert_eq!(
+            extract_id("ADR-001-sovereign-bare-metal-hosting"),
+            "ADR-001"
+        );
         assert_eq!(extract_id("ADR-100"), "ADR-100");
     }
 

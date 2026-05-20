@@ -658,11 +658,11 @@ pub struct MemberPromoteResponse {
 /// Mirrors etcd's `raftpb.ConfState` joint fields.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct JointConfig {
-     /// Voters in the *outgoing* (current) configuration (Cold).
+    /// Voters in the *outgoing* (current) configuration (Cold).
     pub outgoing: Vec<u64>,
-     /// Voters in the *incoming* (next) configuration (Cnew).
+    /// Voters in the *incoming* (next) configuration (Cnew).
     pub incoming: Vec<u64>,
-     /// Learners (non-voting) in either configuration.
+    /// Learners (non-voting) in either configuration.
     pub learners: Vec<u64>,
 }
 
@@ -670,15 +670,15 @@ impl JointConfig {
     /// Checks if the joint configuration is empty.
     pub fn is_empty(&self) -> bool {
         self.outgoing.is_empty() && self.incoming.is_empty()
-     }
+    }
 }
 
 /// Request to enter joint consensus.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnterJointRequest {
-     /// Members to add (transition to learner first if `is_learner=true`).
+    /// Members to add (transition to learner first if `is_learner=true`).
     pub adds: Vec<MemberAddRequest>,
-     /// Member IDs to remove on commit.
+    /// Member IDs to remove on commit.
     pub removes: Vec<u64>,
 }
 
@@ -704,12 +704,12 @@ pub struct LeaveJointResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SnapshotChunk {
     pub header: ResponseHeader,
-     /// Bytes still to be sent after this chunk (0 on the last chunk).
+    /// Bytes still to be sent after this chunk (0 on the last chunk).
     pub remaining_bytes: u64,
-     /// Chunk payload bytes.
+    /// Chunk payload bytes.
     pub blob: Vec<u8>,
-     /// Hex-encoded sha256 of the *complete* snapshot. Same on every chunk
-     /// so the receiver can verify after assembly.
+    /// Hex-encoded sha256 of the *complete* snapshot. Same on every chunk
+    /// so the receiver can verify after assembly.
     pub checksum: String,
 }
 
@@ -743,8 +743,8 @@ pub enum RaftRole {
     Leader,
     Follower,
     Candidate,
-     /// Pre-candidate state introduced by Ongaro §9.6 to avoid disruptive
-     /// elections from partitioned nodes.
+    /// Pre-candidate state introduced by Ongaro §9.6 to avoid disruptive
+    /// elections from partitioned nodes.
     PreCandidate,
     Learner,
 }
@@ -775,7 +775,7 @@ pub struct SnapshotSenderState {
     pub total_bytes: u64,
     pub sent_bytes: u64,
     pub checksum: String,
-     /// Number of chunks emitted so far.
+    /// Number of chunks emitted so far.
     pub chunks_sent: u64,
     pub completed: bool,
 }
@@ -807,7 +807,14 @@ mod tests {
     use super::*;
 
     fn kv(key: &[u8], value: &[u8]) -> KeyValue {
-        KeyValue { key: key.to_vec(), value: value.to_vec(), create_revision: 1, mod_revision: 1, version: 1, lease: None }
+        KeyValue {
+            key: key.to_vec(),
+            value: value.to_vec(),
+            create_revision: 1,
+            mod_revision: 1,
+            version: 1,
+            lease: None,
+        }
     }
 
     fn roundtrip<T: serde::Serialize + serde::de::DeserializeOwned>(val: &T) -> T {
@@ -879,7 +886,12 @@ mod tests {
 
     #[test]
     fn test_response_header_roundtrip() {
-        let h = ResponseHeader { cluster_id: 1, member_id: 2, revision: 100, raft_term: 5 };
+        let h = ResponseHeader {
+            cluster_id: 1,
+            member_id: 2,
+            revision: 100,
+            raft_term: 5,
+        };
         let d = roundtrip(&h);
         assert_eq!(d.cluster_id, 1);
         assert_eq!(d.member_id, 2);
@@ -923,7 +935,12 @@ mod tests {
 
     #[test]
     fn test_put_request_roundtrip() {
-        let req = PutRequest { key: "my_key".into(), value: "my_value".into(), lease: Some(42), prev_kv: true };
+        let req = PutRequest {
+            key: "my_key".into(),
+            value: "my_value".into(),
+            lease: Some(42),
+            prev_kv: true,
+        };
         let d = roundtrip(&req);
         assert_eq!(d.key, req.key);
         assert_eq!(d.value, req.value);
@@ -933,7 +950,10 @@ mod tests {
 
     #[test]
     fn test_put_response_roundtrip() {
-        let resp = PutResponse { header: ResponseHeader::default(), prev_kv: Some(kv(b"k", b"old")) };
+        let resp = PutResponse {
+            header: ResponseHeader::default(),
+            prev_kv: Some(kv(b"k", b"old")),
+        };
         let d = roundtrip(&resp);
         assert!(d.prev_kv.is_some());
         assert_eq!(d.prev_kv.unwrap().value_str(), "old");
@@ -943,7 +963,11 @@ mod tests {
 
     #[test]
     fn test_delete_range_request_roundtrip() {
-        let req = DeleteRangeRequest { key: "/prefix/".into(), range_end: Some("/prefix0".into()), prev_kv: true };
+        let req = DeleteRangeRequest {
+            key: "/prefix/".into(),
+            range_end: Some("/prefix0".into()),
+            prev_kv: true,
+        };
         let d = roundtrip(&req);
         assert_eq!(d.key, req.key);
         assert_eq!(d.range_end, req.range_end);
@@ -952,7 +976,11 @@ mod tests {
 
     #[test]
     fn test_delete_range_response_roundtrip() {
-        let resp = DeleteRangeResponse { header: ResponseHeader::default(), deleted: 3, prev_kvs: vec![kv(b"k", b"v")] };
+        let resp = DeleteRangeResponse {
+            header: ResponseHeader::default(),
+            deleted: 3,
+            prev_kvs: vec![kv(b"k", b"v")],
+        };
         let d = roundtrip(&resp);
         assert_eq!(d.deleted, 3);
         assert_eq!(d.prev_kvs.len(), 1);
@@ -971,7 +999,12 @@ mod tests {
                 version: Some(1),
                 mod_revision: None,
             }],
-            success: vec![RequestOp::Put(PutRequest { key: "k".into(), value: "new".into(), lease: None, prev_kv: false })],
+            success: vec![RequestOp::Put(PutRequest {
+                key: "k".into(),
+                value: "new".into(),
+                lease: None,
+                prev_kv: false,
+            })],
             failure: vec![],
         };
         let d = roundtrip(&req);
@@ -982,7 +1015,10 @@ mod tests {
 
     #[test]
     fn test_txn_response_roundtrip() {
-        let resp = TxnResponse { header: ResponseHeader::default(), succeeded: true };
+        let resp = TxnResponse {
+            header: ResponseHeader::default(),
+            succeeded: true,
+        };
         let d = roundtrip(&resp);
         assert!(d.succeeded);
     }
@@ -991,7 +1027,12 @@ mod tests {
 
     #[test]
     fn test_compare_target_all_variants() {
-        for target in [CompareTarget::Version, CompareTarget::Create, CompareTarget::Mod, CompareTarget::Value] {
+        for target in [
+            CompareTarget::Version,
+            CompareTarget::Create,
+            CompareTarget::Mod,
+            CompareTarget::Value,
+        ] {
             let json = serde_json::to_string(&target).unwrap();
             let _: CompareTarget = serde_json::from_str(&json).unwrap();
         }
@@ -999,7 +1040,12 @@ mod tests {
 
     #[test]
     fn test_compare_result_all_variants() {
-        for result in [CompareResult::Equal, CompareResult::Greater, CompareResult::Less, CompareResult::NotEqual] {
+        for result in [
+            CompareResult::Equal,
+            CompareResult::Greater,
+            CompareResult::Less,
+            CompareResult::NotEqual,
+        ] {
             let json = serde_json::to_string(&result).unwrap();
             let _: CompareResult = serde_json::from_str(&json).unwrap();
         }
@@ -1010,7 +1056,12 @@ mod tests {
     #[test]
     fn test_request_op_range_roundtrip() {
         let op = RequestOp::Range(RangeRequest {
-            key: "k".into(), range_end: None, limit: None, revision: None, keys_only: false, count_only: false,
+            key: "k".into(),
+            range_end: None,
+            limit: None,
+            revision: None,
+            keys_only: false,
+            count_only: false,
         });
         let json = serde_json::to_string(&op).unwrap();
         let _: RequestOp = serde_json::from_str(&json).unwrap();
@@ -1018,14 +1069,23 @@ mod tests {
 
     #[test]
     fn test_request_op_put_roundtrip() {
-        let op = RequestOp::Put(PutRequest { key: "k".into(), value: "v".into(), lease: None, prev_kv: false });
+        let op = RequestOp::Put(PutRequest {
+            key: "k".into(),
+            value: "v".into(),
+            lease: None,
+            prev_kv: false,
+        });
         let json = serde_json::to_string(&op).unwrap();
         let _: RequestOp = serde_json::from_str(&json).unwrap();
     }
 
     #[test]
     fn test_request_op_delete_range_roundtrip() {
-        let op = RequestOp::DeleteRange(DeleteRangeRequest { key: "k".into(), range_end: None, prev_kv: false });
+        let op = RequestOp::DeleteRange(DeleteRangeRequest {
+            key: "k".into(),
+            range_end: None,
+            prev_kv: false,
+        });
         let json = serde_json::to_string(&op).unwrap();
         let _: RequestOp = serde_json::from_str(&json).unwrap();
     }
@@ -1051,7 +1111,11 @@ mod tests {
 
     #[test]
     fn test_lease_grant_response_rename_annotations() {
-        let resp = LeaseGrantResponse { header: ResponseHeader::default(), id: 100, ttl: 30 };
+        let resp = LeaseGrantResponse {
+            header: ResponseHeader::default(),
+            id: 100,
+            ttl: 30,
+        };
         let json = serde_json::to_string(&resp).unwrap();
         assert!(json.contains(r#""ID":100"#));
         assert!(json.contains(r#""TTL":30"#));
@@ -1059,7 +1123,11 @@ mod tests {
 
     #[test]
     fn test_lease_grant_response_roundtrip() {
-        let resp = LeaseGrantResponse { header: ResponseHeader::default(), id: 42, ttl: 120 };
+        let resp = LeaseGrantResponse {
+            header: ResponseHeader::default(),
+            id: 42,
+            ttl: 120,
+        };
         let d = roundtrip(&resp);
         assert_eq!(d.id, 42);
         assert_eq!(d.ttl, 120);
@@ -1069,7 +1137,11 @@ mod tests {
 
     #[test]
     fn test_watch_event_put_roundtrip() {
-        let event = WatchEvent { event_type: EventType::Put, kv: kv(b"k", b"v"), prev_kv: None };
+        let event = WatchEvent {
+            event_type: EventType::Put,
+            kv: kv(b"k", b"v"),
+            prev_kv: None,
+        };
         let d = roundtrip(&event);
         assert!(matches!(d.event_type, EventType::Put));
         assert_eq!(d.kv.key_str(), "k");
@@ -1090,8 +1162,12 @@ mod tests {
 
     #[test]
     fn test_event_type_serialized_values() {
-        assert!(serde_json::to_string(&EventType::Put).unwrap().contains("Put"));
-        assert!(serde_json::to_string(&EventType::Delete).unwrap().contains("Delete"));
+        assert!(serde_json::to_string(&EventType::Put)
+            .unwrap()
+            .contains("Put"));
+        assert!(serde_json::to_string(&EventType::Delete)
+            .unwrap()
+            .contains("Delete"));
     }
 
     // --- Member ---
@@ -1115,7 +1191,13 @@ mod tests {
 
     #[test]
     fn test_member_learner_roundtrip() {
-        let member = Member { id: 2, name: "learner".into(), peer_urls: vec![], client_urls: vec![], is_learner: true };
+        let member = Member {
+            id: 2,
+            name: "learner".into(),
+            peer_urls: vec![],
+            client_urls: vec![],
+            is_learner: true,
+        };
         let d = roundtrip(&member);
         assert!(d.is_learner);
     }
@@ -1124,7 +1206,12 @@ mod tests {
 
     #[test]
     fn test_lease_roundtrip() {
-        let lease = Lease { id: 7, ttl: 60, granted_at: chrono::Utc::now(), keys: vec!["k1".into(), "k2".into()] };
+        let lease = Lease {
+            id: 7,
+            ttl: 60,
+            granted_at: chrono::Utc::now(),
+            keys: vec!["k1".into(), "k2".into()],
+        };
         let d = roundtrip(&lease);
         assert_eq!(d.id, 7);
         assert_eq!(d.ttl, 60);
@@ -1144,7 +1231,9 @@ mod tests {
 
     #[test]
     fn test_auth_role_add_request_roundtrip() {
-        let req = AuthRoleAddRequest { name: "admin".into() };
+        let req = AuthRoleAddRequest {
+            name: "admin".into(),
+        };
         let json = serde_json::to_string(&req).unwrap();
         let back: AuthRoleAddRequest = serde_json::from_str(&json).unwrap();
         assert_eq!(back.name, "admin");
@@ -1199,7 +1288,10 @@ mod tests {
 
     #[test]
     fn test_compaction_request_roundtrip() {
-        let req = CompactionRequest { revision: 100, physical: true };
+        let req = CompactionRequest {
+            revision: 100,
+            physical: true,
+        };
         let json = serde_json::to_string(&req).unwrap();
         let back: CompactionRequest = serde_json::from_str(&json).unwrap();
         assert_eq!(back.revision, 100);
@@ -1230,7 +1322,10 @@ mod tests {
 
     #[test]
     fn test_authenticate_request_roundtrip() {
-        let req = AuthenticateRequest { name: "root".into(), password: "pass".into() };
+        let req = AuthenticateRequest {
+            name: "root".into(),
+            password: "pass".into(),
+        };
         let json = serde_json::to_string(&req).unwrap();
         let back: AuthenticateRequest = serde_json::from_str(&json).unwrap();
         assert_eq!(back.name, "root");

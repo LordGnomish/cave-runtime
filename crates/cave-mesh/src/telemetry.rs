@@ -32,7 +32,9 @@ impl Default for TelemetryManager {
 
 impl TelemetryManager {
     pub fn new() -> Self {
-        Self { resources: Arc::new(RwLock::new(HashMap::new())) }
+        Self {
+            resources: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 
     pub fn upsert(&self, t: Telemetry) {
@@ -70,14 +72,13 @@ impl TelemetryManager {
 
         for t in map.values() {
             if t.namespace == namespace {
-                let is_namespace_wide =
-                    t.selector.as_ref().map(|s| s.is_empty()).unwrap_or(true);
+                let is_namespace_wide = t.selector.as_ref().map(|s| s.is_empty()).unwrap_or(true);
                 if is_namespace_wide {
                     namespace_match = Some(t.clone());
                 } else if let Some(sel) = &t.selector {
-                    let matches = sel.iter().all(|(k, v)| {
-                        workload_labels.get(k).map(|vv| vv == v).unwrap_or(false)
-                    });
+                    let matches = sel
+                        .iter()
+                        .all(|(k, v)| workload_labels.get(k).map(|vv| vv == v).unwrap_or(false));
                     if matches {
                         workload_match = Some(t.clone());
                     }
@@ -116,7 +117,11 @@ impl TelemetryManager {
         workload_labels: &HashMap<String, String>,
     ) -> Option<f64> {
         self.effective_telemetry(namespace, workload_labels)
-            .and_then(|t| t.tracing.first().and_then(|tr| tr.random_sampling_percentage))
+            .and_then(|t| {
+                t.tracing
+                    .first()
+                    .and_then(|tr| tr.random_sampling_percentage)
+            })
     }
 
     /// Snapshot of all Telemetry resources for observability.
@@ -125,7 +130,10 @@ impl TelemetryManager {
         let count = resources.len();
         let namespaces: std::collections::HashSet<_> =
             resources.values().map(|t| t.namespace.clone()).collect();
-        TelemetrySnapshot { total_resources: count, namespaces: namespaces.into_iter().collect() }
+        TelemetrySnapshot {
+            total_resources: count,
+            namespaces: namespaces.into_iter().collect(),
+        }
     }
 }
 
@@ -183,7 +191,9 @@ impl AccessLogFormat {
                 },
                 AccessLogField {
                     name: "path".to_string(),
-                    value: AccessLogFieldValue::EnvoyOperator("%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%".to_string()),
+                    value: AccessLogFieldValue::EnvoyOperator(
+                        "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%".to_string(),
+                    ),
                 },
                 AccessLogField {
                     name: "protocol".to_string(),
@@ -217,9 +227,7 @@ impl AccessLogFormat {
                 },
                 AccessLogField {
                     name: "x_forwarded_for".to_string(),
-                    value: AccessLogFieldValue::EnvoyOperator(
-                        "%REQ(X-FORWARDED-FOR)%".to_string(),
-                    ),
+                    value: AccessLogFieldValue::EnvoyOperator("%REQ(X-FORWARDED-FOR)%".to_string()),
                 },
                 AccessLogField {
                     name: "user_agent".to_string(),
@@ -261,9 +269,7 @@ impl AccessLogFormat {
                 },
                 AccessLogField {
                     name: "trace_id".to_string(),
-                    value: AccessLogFieldValue::EnvoyOperator(
-                        "%REQ(X-B3-TRACEID)%".to_string(),
-                    ),
+                    value: AccessLogFieldValue::EnvoyOperator("%REQ(X-B3-TRACEID)%".to_string()),
                 },
             ],
         }

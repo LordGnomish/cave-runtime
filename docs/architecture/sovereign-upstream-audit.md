@@ -1,14 +1,14 @@
-# Hetzner-Profile → Cave Runtime Upstream Audit
+# Sovereign-Cloud-Profile → Cave Runtime Upstream Audit
 
-**Framing.** Cave Runtime is **not** a separate third deployment profile of the Platform. Cave Runtime is the **Rust reimplementation track of the OSS products that the Hetzner profile actually uses**. The Hetzner-deployed products are this project's *upstreams*. Vocabulary: "upstream" is runtime-side terminology only — on the Platform side the right words are "OSS product used", "stack component", or "deployment decision".
+**Framing.** Cave Runtime is **not** a separate third deployment profile of the Platform. Cave Runtime is the **Rust reimplementation track of the OSS products that the sovereign-cloud profile actually uses**. The sovereign-cloud-deployed products are this project's *upstreams*. Vocabulary: "upstream" is runtime-side terminology only — on the Platform side the right words are "OSS product used", "stack component", or "deployment decision".
 
-This audit cross-checks each Hetzner stack component against (a) `crates/cave-upstream/src/projects.rs` and (b) the actual cave-* crate scaffolds.
+This audit cross-checks each sovereign-cloud stack component against (a) `crates/cave-upstream/src/projects.rs` and (b) the actual cave-* crate scaffolds.
 
 ## Diff table
 
 Legend: ✅ tracked / scaffolded · ❌ missing · ⚠ mismatch (mapping inconsistency)
 
-| Hetzner OSS product used | Cave Runtime upstream | In tracker? | Cave-side crate | Notes |
+| sovereign OSS product used | Cave Runtime upstream | In tracker? | Cave-side crate | Notes |
 |---|---|---|---|---|
 | Talos Linux | Talos | ❌ | ❌ | not tracked; OS layer |
 | Kubernetes (apiserver, scheduler, kubelet) | kubernetes/kubernetes | ✅ | cave-apiserver, cave-scheduler, cave-kubelet | |
@@ -83,15 +83,15 @@ Legend: ✅ tracked / scaffolded · ❌ missing · ⚠ mismatch (mapping inconsi
 
 ## Crates with no Hetzner-product mapping (review)
 
-These crates exist in `crates/` but have no clear Hetzner-deployed-product upstream — they may be custom CAVE components, premature scaffolds, or mappings that need correction:
+These crates exist in `crates/` but have no clear sovereign-cloud-deployed-product upstream — they may be custom CAVE components, premature scaffolds, or mappings that need correction:
 
 `cave-alerts`, `cave-artifacts`, `cave-changelog`, `cave-compliance`, `cave-container-scan`, `cave-cost-alloc`, `cave-datafusion`, `cave-db`, `cave-docdb`, `cave-docs-site`, `cave-erp`, `cave-gitops-config`, `cave-iceberg`, `cave-kamaji`, `cave-kernel`, `cave-ledger`, `cave-lint`, `cave-pam`, `cave-permission`, `cave-pipelines`, `cave-portal-api`, `cave-rdbms`, `cave-runbook`, `cave-scaffold`, `cave-secrets`, `cave-security`, `cave-spire`, `cave-status`, `cave-techdocs`, `cave-tracker`.
 
-Notable: `cave-iceberg` and `cave-datafusion` are pre-built but Hetzner profile has no lakehouse/query-engine deployment decision yet — likely speculative. `cave-kamaji` exists but Hetzner picked **vcluster** for multi-tenancy, not Kamaji — this scaffold is dead unless the profile changes.
+Notable: `cave-iceberg` and `cave-datafusion` are pre-built but sovereign-cloud profile has no lakehouse/query-engine deployment decision yet — likely speculative. `cave-kamaji` exists but Hetzner picked **vcluster** for multi-tenancy, not Kamaji — this scaffold is dead unless the profile changes.
 
 ## Summary
 
-- Hetzner stack components inventoried: **~60**
+- sovereign-cloud stack components inventoried: **~60**
 - ✅ Tracked + scaffolded: **51**
 - ❌ Missing from `cave-upstream/src/projects.rs` (tracker): **8** — Talos, Buildah, OpenTofu, Spark Operator, JupyterHub, Renovate, Gitleaks, n8n
 - ❌ Missing crate scaffold: **7** — `cave-build` (Buildah), `cave-iac`/`cave-tofu` (OpenTofu), `cave-spark`, `cave-jupyter`, `cave-renovate`, `cave-secret-scan` (Gitleaks), `cave-automation` (n8n). Teleport target appears to be `cave-pam` (scaffold exists, tracker entry missing).
@@ -100,6 +100,6 @@ Notable: `cave-iceberg` and `cave-datafusion` are pre-built but Hetzner profile 
 
 ## Memory note: corrected framing
 
-> **Cave Runtime is NOT a third Platform profile.** Platform has two profiles (Azure managed-default + OSS opt-in / Hetzner sovereign OSS). Cave Runtime is a separate project that takes the **OSS products used** by the Hetzner profile and reimplements them line-by-line in Rust. The word "upstream" is reserved for runtime-side terminology — never used for Platform stack components.
+> **Cave Runtime is NOT a third Platform profile.** Platform has two profiles (Azure managed-default + OSS opt-in / sovereign OSS). Cave Runtime is a separate project that takes the **OSS products used** by the sovereign-cloud profile and reimplements them line-by-line in Rust. The word "upstream" is reserved for runtime-side terminology — never used for Platform stack components.
 
 No file in `cave-runtime/.claude/`, `cave-runtime/docs/`, `platform/docs/`, or any auto-memory directory currently defines Cave Runtime as a "third profile" or "trinity". This note is recorded here as the canonical framing.

@@ -70,10 +70,16 @@ mod tests {
     use crate::test_ctx;
 
     fn ns(name: &str, phase: NamespacePhase) -> Namespace {
-        Namespace { name: name.into(), phase }
+        Namespace {
+            name: name.into(),
+            phase,
+        }
     }
     fn sa(ns_name: &str, name: &str) -> ObservedSa {
-        ObservedSa { namespace: ns_name.into(), name: name.into() }
+        ObservedSa {
+            namespace: ns_name.into(),
+            name: name.into(),
+        }
     }
 
     #[test]

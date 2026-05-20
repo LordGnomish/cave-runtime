@@ -14,7 +14,7 @@
 //! * `appProtocol` (per-port).
 //! * Port name uniqueness.
 
-use crate::route_controller::{cidr_family, is_valid_cidr, CidrFamily};
+use crate::route_controller::{CidrFamily, cidr_family, is_valid_cidr};
 use crate::types::{CloudError, ProviderName};
 use serde::{Deserialize, Serialize};
 
@@ -124,11 +124,17 @@ pub struct SessionAffinityConfig {
 
 impl SessionAffinityConfig {
     pub fn none() -> Self {
-        Self { kind: SessionAffinity::None, timeout_seconds: None }
+        Self {
+            kind: SessionAffinity::None,
+            timeout_seconds: None,
+        }
     }
 
     pub fn client_ip(timeout_seconds: u32) -> Self {
-        Self { kind: SessionAffinity::ClientIP, timeout_seconds: Some(timeout_seconds) }
+        Self {
+            kind: SessionAffinity::ClientIP,
+            timeout_seconds: Some(timeout_seconds),
+        }
     }
 
     pub fn validate(&self) -> Result<(), CloudError> {
@@ -153,7 +159,8 @@ impl SessionAffinityConfig {
 
 /// Annotation key for the Azure internal-LB toggle. Mirrors
 /// `consts.ServiceAnnotationLoadBalancerInternal`.
-pub const AZURE_INTERNAL_LB_ANNOTATION: &str = "service.beta.kubernetes.io/azure-load-balancer-internal";
+pub const AZURE_INTERNAL_LB_ANNOTATION: &str =
+    "service.beta.kubernetes.io/azure-load-balancer-internal";
 
 /// Annotation key for the Hetzner private LB toggle. Mirrors
 /// the `load-balancer.hetzner.cloud/private-ipv4` knob in
@@ -181,11 +188,19 @@ pub struct NodePortAllocator {
 
 impl NodePortAllocator {
     pub fn default_range() -> Self {
-        Self { min: 30_000, max: 32_767, in_use: Vec::new() }
+        Self {
+            min: 30_000,
+            max: 32_767,
+            in_use: Vec::new(),
+        }
     }
 
     pub fn with_range(min: u16, max: u16) -> Self {
-        Self { min, max, in_use: Vec::new() }
+        Self {
+            min,
+            max,
+            in_use: Vec::new(),
+        }
     }
 
     pub fn capacity(&self) -> u32 {
@@ -296,7 +311,10 @@ pub fn validate_port_names(names: &[String]) -> Result<(), CloudError> {
                 reason: format!("port name {n:?} exceeds 15 characters"),
             });
         }
-        if !n.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+        if !n
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Hetzner,
                 reason: format!("port name {n:?} must be DNS-1123 lowercase"),
@@ -338,22 +356,37 @@ mod tests {
 
     #[test]
     fn empty_source_range_list_validates() {
-        ctx("acme", "pkg/api/service/util.go", "GetLoadBalancerSourceRanges");
+        ctx(
+            "acme",
+            "pkg/api/service/util.go",
+            "GetLoadBalancerSourceRanges",
+        );
         assert!(validate_source_ranges(&[]).is_ok());
     }
 
     #[test]
     fn source_ranges_must_all_be_valid_cidrs() {
-        ctx("acme", "pkg/api/service/util.go", "GetLoadBalancerSourceRanges");
+        ctx(
+            "acme",
+            "pkg/api/service/util.go",
+            "GetLoadBalancerSourceRanges",
+        );
         let good: Vec<String> = vec!["10.0.0.0/8".into(), "192.168.0.0/16".into()];
         assert!(validate_source_ranges(&good).is_ok());
         let bad: Vec<String> = vec!["10.0.0.0/8".into(), "garbage".into()];
-        assert!(matches!(validate_source_ranges(&bad).unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            validate_source_ranges(&bad).unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn source_range_families_detects_dual_stack_input() {
-        ctx("acme", "pkg/api/service/util.go", "GetLoadBalancerSourceRanges");
+        ctx(
+            "acme",
+            "pkg/api/service/util.go",
+            "GetLoadBalancerSourceRanges",
+        );
         let r = vec!["10.0.0.0/8".into(), "2001:db8::/32".into()];
         let (v4, v6) = source_range_families(&r);
         assert!(v4 && v6);
@@ -361,7 +394,11 @@ mod tests {
 
     #[test]
     fn source_range_families_v4_only() {
-        ctx("acme", "pkg/api/service/util.go", "GetLoadBalancerSourceRanges");
+        ctx(
+            "acme",
+            "pkg/api/service/util.go",
+            "GetLoadBalancerSourceRanges",
+        );
         let r = vec!["10.0.0.0/8".into()];
         let (v4, v6) = source_range_families(&r);
         assert!(v4 && !v6);
@@ -371,21 +408,33 @@ mod tests {
 
     #[test]
     fn external_ip_loopback_is_rejected() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateExternalIPs");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateExternalIPs",
+        );
         let err = validate_external_ips(&["127.0.0.1".into()]).unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
     }
 
     #[test]
     fn external_ip_link_local_is_rejected() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateExternalIPs");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateExternalIPs",
+        );
         let err = validate_external_ips(&["169.254.169.254".into()]).unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
     }
 
     #[test]
     fn external_ip_multicast_is_rejected() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateExternalIPs");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateExternalIPs",
+        );
         let err = validate_external_ips(&["224.0.0.1".into()]).unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
         let err = validate_external_ips(&["239.0.0.1".into()]).unwrap_err();
@@ -394,13 +443,21 @@ mod tests {
 
     #[test]
     fn external_ip_global_unicast_is_accepted() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateExternalIPs");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateExternalIPs",
+        );
         assert!(validate_external_ips(&["203.0.113.1".into(), "198.51.100.5".into()]).is_ok());
     }
 
     #[test]
     fn external_ip_empty_string_is_rejected() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateExternalIPs");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateExternalIPs",
+        );
         let err = validate_external_ips(&["".into()]).unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
     }
@@ -413,49 +470,85 @@ mod tests {
             "198.51.100.5".into(),
             "203.0.113.1".into(),
         ]);
-        assert_eq!(out, vec!["203.0.113.1".to_string(), "198.51.100.5".to_string()]);
+        assert_eq!(
+            out,
+            vec!["203.0.113.1".to_string(), "198.51.100.5".to_string()]
+        );
     }
 
     // ─── Session affinity ────────────────────────────────────────────────────
 
     #[test]
     fn session_affinity_keys_match_upstream() {
-        ctx("acme", "staging/src/k8s.io/api/core/v1/types.go", "ServiceAffinity");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/api/core/v1/types.go",
+            "ServiceAffinity",
+        );
         assert_eq!(SessionAffinity::None.key(), "None");
         assert_eq!(SessionAffinity::ClientIP.key(), "ClientIP");
     }
 
     #[test]
     fn none_affinity_does_not_require_timeout() {
-        ctx("acme", "staging/src/k8s.io/api/core/v1/types.go", "ServiceAffinity");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/api/core/v1/types.go",
+            "ServiceAffinity",
+        );
         assert!(SessionAffinityConfig::none().validate().is_ok());
     }
 
     #[test]
     fn client_ip_affinity_requires_timeout_seconds() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateSessionAffinityConfig");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateSessionAffinityConfig",
+        );
         let mut c = SessionAffinityConfig::client_ip(60);
         c.timeout_seconds = None;
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn client_ip_affinity_caps_timeout_at_24_hours() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateSessionAffinityConfig");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateSessionAffinityConfig",
+        );
         let c = SessionAffinityConfig::client_ip(86_401);
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn client_ip_affinity_zero_timeout_is_rejected() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateSessionAffinityConfig");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateSessionAffinityConfig",
+        );
         let c = SessionAffinityConfig::client_ip(0);
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn client_ip_affinity_within_bounds_validates() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateSessionAffinityConfig");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateSessionAffinityConfig",
+        );
         assert!(SessionAffinityConfig::client_ip(60).validate().is_ok());
         assert!(SessionAffinityConfig::client_ip(86_400).validate().is_ok());
     }
@@ -464,38 +557,61 @@ mod tests {
 
     #[test]
     fn azure_internal_lb_annotation_matches_upstream_constant() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/api/well_known_annotations.go", "ServiceAnnotation");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/api/well_known_annotations.go",
+            "ServiceAnnotation",
+        );
         assert_eq!(
             AZURE_INTERNAL_LB_ANNOTATION,
             "service.beta.kubernetes.io/azure-load-balancer-internal"
         );
-        assert_eq!(HCLOUD_PRIVATE_LB_ANNOTATION, "load-balancer.hetzner.cloud/private-ipv4");
+        assert_eq!(
+            HCLOUD_PRIVATE_LB_ANNOTATION,
+            "load-balancer.hetzner.cloud/private-ipv4"
+        );
     }
 
     #[test]
     fn is_internal_lb_recognises_azure_annotation() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/api/well_known_annotations.go", "ServiceAnnotation");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/api/well_known_annotations.go",
+            "ServiceAnnotation",
+        );
         let ann = vec![(AZURE_INTERNAL_LB_ANNOTATION.into(), "true".into())];
         assert!(is_internal_lb(&ann));
     }
 
     #[test]
     fn is_internal_lb_ignores_false_value() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/api/well_known_annotations.go", "ServiceAnnotation");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/api/well_known_annotations.go",
+            "ServiceAnnotation",
+        );
         let ann = vec![(AZURE_INTERNAL_LB_ANNOTATION.into(), "false".into())];
         assert!(!is_internal_lb(&ann));
     }
 
     #[test]
     fn is_internal_lb_recognises_hcloud_private_annotation() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/api/well_known_annotations.go", "ServiceAnnotation");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/api/well_known_annotations.go",
+            "ServiceAnnotation",
+        );
         let ann = vec![(HCLOUD_PRIVATE_LB_ANNOTATION.into(), "10.0.0.1".into())];
         assert!(is_internal_lb(&ann));
     }
 
     #[test]
     fn is_internal_lb_returns_false_when_no_annotation() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/api/well_known_annotations.go", "ServiceAnnotation");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/api/well_known_annotations.go",
+            "ServiceAnnotation",
+        );
         assert!(!is_internal_lb(&[]));
     }
 
@@ -503,7 +619,11 @@ mod tests {
 
     #[test]
     fn node_port_allocator_default_range_matches_upstream() {
-        ctx("acme", "pkg/registry/core/service/portallocator/allocator.go", "NewPortAllocator");
+        ctx(
+            "acme",
+            "pkg/registry/core/service/portallocator/allocator.go",
+            "NewPortAllocator",
+        );
         let a = NodePortAllocator::default_range();
         assert_eq!(a.min, 30_000);
         assert_eq!(a.max, 32_767);
@@ -512,7 +632,11 @@ mod tests {
 
     #[test]
     fn node_port_allocate_returns_distinct_ports_in_order() {
-        ctx("acme", "pkg/registry/core/service/portallocator/allocator.go", "AllocateNext");
+        ctx(
+            "acme",
+            "pkg/registry/core/service/portallocator/allocator.go",
+            "AllocateNext",
+        );
         let mut a = NodePortAllocator::with_range(30_000, 30_002);
         assert_eq!(a.allocate().unwrap(), 30_000);
         assert_eq!(a.allocate().unwrap(), 30_001);
@@ -522,7 +646,11 @@ mod tests {
 
     #[test]
     fn node_port_allocator_returns_error_when_range_exhausted() {
-        ctx("acme", "pkg/registry/core/service/portallocator/allocator.go", "AllocateNext");
+        ctx(
+            "acme",
+            "pkg/registry/core/service/portallocator/allocator.go",
+            "AllocateNext",
+        );
         let mut a = NodePortAllocator::with_range(30_000, 30_001);
         a.allocate().unwrap();
         a.allocate().unwrap();
@@ -532,7 +660,11 @@ mod tests {
 
     #[test]
     fn node_port_release_returns_port_to_pool() {
-        ctx("acme", "pkg/registry/core/service/portallocator/allocator.go", "Release");
+        ctx(
+            "acme",
+            "pkg/registry/core/service/portallocator/allocator.go",
+            "Release",
+        );
         let mut a = NodePortAllocator::with_range(30_000, 30_001);
         let p = a.allocate().unwrap();
         a.release(p);
@@ -542,7 +674,11 @@ mod tests {
 
     #[test]
     fn node_port_reserve_takes_specific_port() {
-        ctx("acme", "pkg/registry/core/service/portallocator/allocator.go", "Allocate");
+        ctx(
+            "acme",
+            "pkg/registry/core/service/portallocator/allocator.go",
+            "Allocate",
+        );
         let mut a = NodePortAllocator::with_range(30_000, 30_010);
         a.reserve(30_005).unwrap();
         assert!(a.allocate().is_ok());
@@ -550,7 +686,11 @@ mod tests {
 
     #[test]
     fn node_port_reserve_rejects_out_of_range() {
-        ctx("acme", "pkg/registry/core/service/portallocator/allocator.go", "Allocate");
+        ctx(
+            "acme",
+            "pkg/registry/core/service/portallocator/allocator.go",
+            "Allocate",
+        );
         let mut a = NodePortAllocator::with_range(30_000, 30_010);
         let err = a.reserve(40_000).unwrap_err();
         assert!(matches!(err, CloudError::InvalidConfig { .. }));
@@ -558,7 +698,11 @@ mod tests {
 
     #[test]
     fn node_port_reserve_rejects_double_reservation() {
-        ctx("acme", "pkg/registry/core/service/portallocator/allocator.go", "Allocate");
+        ctx(
+            "acme",
+            "pkg/registry/core/service/portallocator/allocator.go",
+            "Allocate",
+        );
         let mut a = NodePortAllocator::with_range(30_000, 30_010);
         a.reserve(30_005).unwrap();
         let err = a.reserve(30_005).unwrap_err();
@@ -569,7 +713,11 @@ mod tests {
 
     #[test]
     fn app_protocol_keys_match_well_known_strings() {
-        ctx("acme", "staging/src/k8s.io/api/core/v1/types.go", "AppProtocol");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/api/core/v1/types.go",
+            "AppProtocol",
+        );
         assert_eq!(AppProtocol::Http.key(), "http");
         assert_eq!(AppProtocol::Https.key(), "https");
         assert_eq!(AppProtocol::Http2.key(), "http2");
@@ -580,7 +728,11 @@ mod tests {
 
     #[test]
     fn app_protocol_round_trips_through_from_key() {
-        ctx("acme", "staging/src/k8s.io/api/core/v1/types.go", "AppProtocol");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/api/core/v1/types.go",
+            "AppProtocol",
+        );
         for p in [
             AppProtocol::Http,
             AppProtocol::Https,
@@ -598,21 +750,36 @@ mod tests {
 
     #[test]
     fn port_names_validate_with_distinct_dns1123_lowercase() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateServicePortName");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateServicePortName",
+        );
         let names: Vec<String> = vec!["http".into(), "https".into(), "tcp-1".into()];
         assert!(validate_port_names(&names).is_ok());
     }
 
     #[test]
     fn port_name_must_not_be_empty() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateServicePortName");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateServicePortName",
+        );
         let names: Vec<String> = vec!["".into()];
-        assert!(matches!(validate_port_names(&names).unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            validate_port_names(&names).unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn port_name_must_not_exceed_15_characters() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateServicePortName");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateServicePortName",
+        );
         let long = "abcdefghijklmnop".to_string(); // 16 chars
         assert!(matches!(
             validate_port_names(&[long]).unwrap_err(),
@@ -622,7 +789,11 @@ mod tests {
 
     #[test]
     fn port_names_reject_uppercase_and_underscores() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateServicePortName");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateServicePortName",
+        );
         assert!(matches!(
             validate_port_names(&["HTTP".into()]).unwrap_err(),
             CloudError::InvalidConfig { .. }
@@ -635,16 +806,27 @@ mod tests {
 
     #[test]
     fn duplicate_port_names_are_rejected() {
-        ctx("acme", "pkg/apis/core/validation/validation.go", "validateServicePortName");
+        ctx(
+            "acme",
+            "pkg/apis/core/validation/validation.go",
+            "validateServicePortName",
+        );
         let names: Vec<String> = vec!["http".into(), "http".into()];
-        assert!(matches!(validate_port_names(&names).unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            validate_port_names(&names).unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     // ─── allocates_node_ports ────────────────────────────────────────────────
 
     #[test]
     fn allocates_node_ports_defaults_to_true() {
-        ctx("acme", "staging/src/k8s.io/api/core/v1/types.go", "AllocateLoadBalancerNodePorts");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/api/core/v1/types.go",
+            "AllocateLoadBalancerNodePorts",
+        );
         assert!(allocates_node_ports(None));
         assert!(allocates_node_ports(Some(true)));
         assert!(!allocates_node_ports(Some(false)));

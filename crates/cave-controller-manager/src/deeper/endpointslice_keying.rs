@@ -128,13 +128,23 @@ mod tests {
     use crate::test_ctx;
 
     fn svc(name: &str, tenant: &str) -> ServiceSpec {
-        ServiceSpec { name: name.into(), namespace: "default".into(), tenant: TenantId::new(tenant).expect("test fixture") }
+        ServiceSpec {
+            name: name.into(),
+            namespace: "default".into(),
+            tenant: TenantId::new(tenant).expect("test fixture"),
+        }
     }
 
     fn ep(addr: &str, ports: &[(&'static str, u16)]) -> EndpointAddr {
         EndpointAddr {
             address: addr.into(),
-            ports: ports.iter().map(|(p, n)| ServicePort { protocol: p, port: *n }).collect(),
+            ports: ports
+                .iter()
+                .map(|(p, n)| ServicePort {
+                    protocol: p,
+                    port: *n,
+                })
+                .collect(),
         }
     }
 
@@ -146,12 +156,24 @@ mod tests {
             "tenant-eps-hash-stable"
         );
         let a = vec![
-            ServicePort { protocol: "TCP", port: 80 },
-            ServicePort { protocol: "TCP", port: 443 },
+            ServicePort {
+                protocol: "TCP",
+                port: 80,
+            },
+            ServicePort {
+                protocol: "TCP",
+                port: 443,
+            },
         ];
         let b = vec![
-            ServicePort { protocol: "TCP", port: 443 },
-            ServicePort { protocol: "TCP", port: 80 },
+            ServicePort {
+                protocol: "TCP",
+                port: 443,
+            },
+            ServicePort {
+                protocol: "TCP",
+                port: 80,
+            },
         ];
         assert_eq!(port_set_hash(&a), port_set_hash(&b));
     }
@@ -163,8 +185,14 @@ mod tests {
             "generateSliceNameSuffix",
             "tenant-eps-hash-diff"
         );
-        let a = vec![ServicePort { protocol: "TCP", port: 80 }];
-        let b = vec![ServicePort { protocol: "TCP", port: 81 }];
+        let a = vec![ServicePort {
+            protocol: "TCP",
+            port: 80,
+        }];
+        let b = vec![ServicePort {
+            protocol: "TCP",
+            port: 81,
+        }];
         assert_ne!(port_set_hash(&a), port_set_hash(&b));
     }
 
@@ -248,7 +276,10 @@ mod tests {
         );
         let s = svc("web", "acme");
         let eps_v1 = vec![ep("10.0.0.1", &[("TCP", 80)])];
-        let eps_v2 = vec![ep("10.0.0.1", &[("TCP", 80)]), ep("10.0.0.2", &[("TCP", 80)])];
+        let eps_v2 = vec![
+            ep("10.0.0.1", &[("TCP", 80)]),
+            ep("10.0.0.2", &[("TCP", 80)]),
+        ];
         let s_v1 = allocate_slices(&s, &eps_v1, &tenant).unwrap();
         let s_v2 = allocate_slices(&s, &eps_v2, &tenant).unwrap();
         assert_eq!(s_v1[0].name, s_v2[0].name);

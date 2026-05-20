@@ -18,11 +18,11 @@
 //! - `authorization_pending`, `slow_down`, `expired_token`, `access_denied`.
 
 use axum::{
+    Json, Router,
     extract::{Form, Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::post,
-    Json, Router,
 };
 use chrono::Utc;
 use rand::Rng;
@@ -56,10 +56,23 @@ pub async fn device_auth(
     Form(form): Form<DeviceAuthForm>,
 ) -> impl IntoResponse {
     if state.realms.get(&realm).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"invalid_request"}))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"invalid_request"})),
+        )
+            .into_response();
     }
-    if state.clients.get_by_client_id(&realm, &form.client_id).await.is_none() {
-        return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"invalid_client"}))).into_response();
+    if state
+        .clients
+        .get_by_client_id(&realm, &form.client_id)
+        .await
+        .is_none()
+    {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error":"invalid_client"})),
+        )
+            .into_response();
     }
 
     let device_code = Uuid::new_v4().to_string();
@@ -67,18 +80,21 @@ pub async fn device_auth(
     let now = Utc::now().timestamp();
     let scope = form.scope.unwrap_or_else(|| "openid".into());
 
-    state.devices.put(DeviceAuthorization {
-        device_code: device_code.clone(),
-        user_code: user_code.clone(),
-        realm: realm.clone(),
-        client_id: form.client_id.clone(),
-        scope: scope.clone(),
-        exp_unix: now + DEVICE_CODE_TTL,
-        interval: DEFAULT_INTERVAL,
-        status: DeviceStatus::Pending,
-        approved_user_sub: None,
-        last_poll_unix: 0,
-    }).await;
+    state
+        .devices
+        .put(DeviceAuthorization {
+            device_code: device_code.clone(),
+            user_code: user_code.clone(),
+            realm: realm.clone(),
+            client_id: form.client_id.clone(),
+            scope: scope.clone(),
+            exp_unix: now + DEVICE_CODE_TTL,
+            interval: DEFAULT_INTERVAL,
+            status: DeviceStatus::Pending,
+            approved_user_sub: None,
+            last_poll_unix: 0,
+        })
+        .await;
 
     let verification_uri = format!("http://localhost:8080/realms/{}/device", realm);
     let resp = DeviceAuthResponse {
@@ -106,17 +122,41 @@ pub async fn device_approve(
 ) -> impl IntoResponse {
     let mut auth = match state.devices.get_by_user(&form.user_code).await {
         Some(a) => a,
-        None => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"unknown user_code"}))).into_response(),
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error":"unknown user_code"})),
+            )
+                .into_response();
+        }
     };
     if auth.realm != realm {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"realm_mismatch"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"realm_mismatch"})),
+        )
+            .into_response();
     }
     let user = match state.users.get_by_username(&realm, &form.username).await {
         Some(u) => u,
-        None => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"invalid_credentials"}))).into_response(),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error":"invalid_credentials"})),
+            )
+                .into_response();
+        }
     };
-    if !state.users.verify_password(&realm, user.id, &form.password).await {
-        return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"invalid_credentials"}))).into_response();
+    if !state
+        .users
+        .verify_password(&realm, user.id, &form.password)
+        .await
+    {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error":"invalid_credentials"})),
+        )
+            .into_response();
     }
     auth.status = DeviceStatus::Approved;
     auth.approved_user_sub = Some(user.id.to_string());
@@ -147,34 +187,68 @@ pub async fn device_token(
     Form(form): Form<DeviceTokenForm>,
 ) -> impl IntoResponse {
     if form.grant_type != "urn:ietf:params:oauth:grant-type:device_code" {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"unsupported_grant_type"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"unsupported_grant_type"})),
+        )
+            .into_response();
     }
     let mut auth = match state.devices.get_by_device(&form.device_code).await {
         Some(a) => a,
-        None => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"invalid_grant"}))).into_response(),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error":"invalid_grant"})),
+            )
+                .into_response();
+        }
     };
     if auth.realm != realm || auth.client_id != form.client_id {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"invalid_grant"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"invalid_grant"})),
+        )
+            .into_response();
     }
     let now = Utc::now().timestamp();
     if now > auth.exp_unix {
         auth.status = DeviceStatus::Expired;
         state.devices.update(auth).await;
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"expired_token"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"expired_token"})),
+        )
+            .into_response();
     }
     // slow_down: poll faster than `interval` seconds.
     if auth.last_poll_unix > 0 && (now - auth.last_poll_unix) < auth.interval {
         auth.last_poll_unix = now;
         state.devices.update(auth).await;
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"slow_down"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"slow_down"})),
+        )
+            .into_response();
     }
     auth.last_poll_unix = now;
     state.devices.update(auth.clone()).await;
 
     match auth.status {
-        DeviceStatus::Pending => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"authorization_pending"}))).into_response(),
-        DeviceStatus::Denied => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"access_denied"}))).into_response(),
-        DeviceStatus::Expired => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"expired_token"}))).into_response(),
+        DeviceStatus::Pending => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"authorization_pending"})),
+        )
+            .into_response(),
+        DeviceStatus::Denied => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"access_denied"})),
+        )
+            .into_response(),
+        DeviceStatus::Expired => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"expired_token"})),
+        )
+            .into_response(),
         DeviceStatus::Approved => {
             // Mint a minimal token response — the access_token is a static
             // string in this MVP; production wiring delegates to
@@ -204,9 +278,18 @@ fn gen_user_code() -> String {
 
 pub fn router(state: OAuthEndpointsState) -> Router {
     Router::new()
-        .route("/realms/{realm}/protocol/openid-connect/auth/device", post(device_auth))
-        .route("/realms/{realm}/protocol/openid-connect/auth/device/approve", post(device_approve))
-        .route("/realms/{realm}/protocol/openid-connect/token/device", post(device_token))
+        .route(
+            "/realms/{realm}/protocol/openid-connect/auth/device",
+            post(device_auth),
+        )
+        .route(
+            "/realms/{realm}/protocol/openid-connect/auth/device/approve",
+            post(device_approve),
+        )
+        .route(
+            "/realms/{realm}/protocol/openid-connect/token/device",
+            post(device_token),
+        )
         .with_state(state)
 }
 
@@ -224,18 +307,64 @@ mod tests {
 
     async fn setup() -> (Router, OAuthEndpointsState) {
         let realms = RealmStore::new();
-        realms.create(RealmRequest { id: "r".into(), display_name: None, enabled: None, ssl_required: None, registration_allowed: None, login_with_email_allowed: None, duplicate_emails_allowed: None, access_token_lifespan: None, sso_session_idle_timeout: None }).await.unwrap();
+        realms
+            .create(RealmRequest {
+                id: "r".into(),
+                display_name: None,
+                enabled: None,
+                ssl_required: None,
+                registration_allowed: None,
+                login_with_email_allowed: None,
+                duplicate_emails_allowed: None,
+                access_token_lifespan: None,
+                sso_session_idle_timeout: None,
+            })
+            .await
+            .unwrap();
         let users = UserStore::new();
-        users.create("r", CreateUserRequest { username: "bob".into(), email: None, email_verified: None, first_name: None, last_name: None, enabled: Some(true), attributes: None, password: Some("pw".into()) }).await.unwrap();
+        users
+            .create(
+                "r",
+                CreateUserRequest {
+                    username: "bob".into(),
+                    email: None,
+                    email_verified: None,
+                    first_name: None,
+                    last_name: None,
+                    enabled: Some(true),
+                    attributes: None,
+                    password: Some("pw".into()),
+                },
+            )
+            .await
+            .unwrap();
         let clients = ClientStore::new();
-        clients.create("r", CreateClientRequest { client_id: "dev".into(), name: None, description: None, enabled: Some(true), public_client: Some(true), secret: None, redirect_uris: None, web_origins: None, protocol: None }).await.unwrap();
+        clients
+            .create(
+                "r",
+                CreateClientRequest {
+                    client_id: "dev".into(),
+                    name: None,
+                    description: None,
+                    enabled: Some(true),
+                    public_client: Some(true),
+                    secret: None,
+                    redirect_uris: None,
+                    web_origins: None,
+                    protocol: None,
+                },
+            )
+            .await
+            .unwrap();
         let state = OAuthEndpointsState::new(realms, clients, users);
         let app = router(state.clone());
         (app, state)
     }
 
     async fn body(resp: axum::response::Response) -> Value {
-        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         serde_json::from_slice(&bytes).unwrap_or(Value::Null)
     }
 
@@ -243,9 +372,17 @@ mod tests {
     #[tokio::test]
     async fn device_auth_issues_codes() {
         let (app, _) = setup().await;
-        let resp = app.oneshot(Request::builder().method("POST").uri("/realms/r/protocol/openid-connect/auth/device")
-            .header("content-type", "application/x-www-form-urlencoded")
-            .body(Body::from("client_id=dev&scope=openid")).unwrap()).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/r/protocol/openid-connect/auth/device")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from("client_id=dev&scope=openid"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let b = body(resp).await;
         assert!(b["device_code"].is_string());
@@ -257,9 +394,17 @@ mod tests {
     #[tokio::test]
     async fn device_auth_unknown_client_rejected() {
         let (app, _) = setup().await;
-        let resp = app.oneshot(Request::builder().method("POST").uri("/realms/r/protocol/openid-connect/auth/device")
-            .header("content-type", "application/x-www-form-urlencoded")
-            .body(Body::from("client_id=ghost")).unwrap()).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/r/protocol/openid-connect/auth/device")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from("client_id=ghost"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
@@ -268,11 +413,21 @@ mod tests {
     async fn poll_pending_returns_authorization_pending() {
         let (_, state) = setup().await;
         // Seed a pending device authorization directly.
-        state.devices.put(DeviceAuthorization {
-            device_code: "dc1".into(), user_code: "U-1".into(), realm: "r".into(), client_id: "dev".into(),
-            scope: "openid".into(), exp_unix: Utc::now().timestamp() + 600, interval: 5,
-            status: DeviceStatus::Pending, approved_user_sub: None, last_poll_unix: 0,
-        }).await;
+        state
+            .devices
+            .put(DeviceAuthorization {
+                device_code: "dc1".into(),
+                user_code: "U-1".into(),
+                realm: "r".into(),
+                client_id: "dev".into(),
+                scope: "openid".into(),
+                exp_unix: Utc::now().timestamp() + 600,
+                interval: 5,
+                status: DeviceStatus::Pending,
+                approved_user_sub: None,
+                last_poll_unix: 0,
+            })
+            .await;
         let app = router(state.clone());
         let resp = app.oneshot(Request::builder().method("POST").uri("/realms/r/protocol/openid-connect/token/device")
             .header("content-type", "application/x-www-form-urlencoded")
@@ -285,16 +440,35 @@ mod tests {
     #[tokio::test]
     async fn approve_then_poll_issues_token() {
         let (_, state) = setup().await;
-        state.devices.put(DeviceAuthorization {
-            device_code: "dc2".into(), user_code: "U-2".into(), realm: "r".into(), client_id: "dev".into(),
-            scope: "openid".into(), exp_unix: Utc::now().timestamp() + 600, interval: 0,
-            status: DeviceStatus::Pending, approved_user_sub: None, last_poll_unix: 0,
-        }).await;
+        state
+            .devices
+            .put(DeviceAuthorization {
+                device_code: "dc2".into(),
+                user_code: "U-2".into(),
+                realm: "r".into(),
+                client_id: "dev".into(),
+                scope: "openid".into(),
+                exp_unix: Utc::now().timestamp() + 600,
+                interval: 0,
+                status: DeviceStatus::Pending,
+                approved_user_sub: None,
+                last_poll_unix: 0,
+            })
+            .await;
         let app = router(state.clone());
         // Approve.
-        let resp = app.clone().oneshot(Request::builder().method("POST").uri("/realms/r/protocol/openid-connect/auth/device/approve")
-            .header("content-type", "application/x-www-form-urlencoded")
-            .body(Body::from("user_code=U-2&username=bob&password=pw")).unwrap()).await.unwrap();
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/r/protocol/openid-connect/auth/device/approve")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from("user_code=U-2&username=bob&password=pw"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         // Poll.
         let resp = app.oneshot(Request::builder().method("POST").uri("/realms/r/protocol/openid-connect/token/device")
@@ -309,11 +483,21 @@ mod tests {
     #[tokio::test]
     async fn expired_device_code_rejected() {
         let (_, state) = setup().await;
-        state.devices.put(DeviceAuthorization {
-            device_code: "dc3".into(), user_code: "U-3".into(), realm: "r".into(), client_id: "dev".into(),
-            scope: "openid".into(), exp_unix: Utc::now().timestamp() - 10, interval: 0,
-            status: DeviceStatus::Pending, approved_user_sub: None, last_poll_unix: 0,
-        }).await;
+        state
+            .devices
+            .put(DeviceAuthorization {
+                device_code: "dc3".into(),
+                user_code: "U-3".into(),
+                realm: "r".into(),
+                client_id: "dev".into(),
+                scope: "openid".into(),
+                exp_unix: Utc::now().timestamp() - 10,
+                interval: 0,
+                status: DeviceStatus::Pending,
+                approved_user_sub: None,
+                last_poll_unix: 0,
+            })
+            .await;
         let app = router(state.clone());
         let resp = app.oneshot(Request::builder().method("POST").uri("/realms/r/protocol/openid-connect/token/device")
             .header("content-type", "application/x-www-form-urlencoded")
@@ -327,11 +511,21 @@ mod tests {
     async fn slow_down_enforced_when_poll_too_fast() {
         let (_, state) = setup().await;
         let now = Utc::now().timestamp();
-        state.devices.put(DeviceAuthorization {
-            device_code: "dc4".into(), user_code: "U-4".into(), realm: "r".into(), client_id: "dev".into(),
-            scope: "openid".into(), exp_unix: now + 600, interval: 5,
-            status: DeviceStatus::Pending, approved_user_sub: None, last_poll_unix: now,
-        }).await;
+        state
+            .devices
+            .put(DeviceAuthorization {
+                device_code: "dc4".into(),
+                user_code: "U-4".into(),
+                realm: "r".into(),
+                client_id: "dev".into(),
+                scope: "openid".into(),
+                exp_unix: now + 600,
+                interval: 5,
+                status: DeviceStatus::Pending,
+                approved_user_sub: None,
+                last_poll_unix: now,
+            })
+            .await;
         let app = router(state.clone());
         let resp = app.oneshot(Request::builder().method("POST").uri("/realms/r/protocol/openid-connect/token/device")
             .header("content-type", "application/x-www-form-urlencoded")
@@ -343,9 +537,19 @@ mod tests {
     #[tokio::test]
     async fn unsupported_grant_type_rejected() {
         let (app, _) = setup().await;
-        let resp = app.oneshot(Request::builder().method("POST").uri("/realms/r/protocol/openid-connect/token/device")
-            .header("content-type", "application/x-www-form-urlencoded")
-            .body(Body::from("grant_type=password&device_code=x&client_id=dev")).unwrap()).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/r/protocol/openid-connect/token/device")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from(
+                        "grant_type=password&device_code=x&client_id=dev",
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(body(resp).await["error"], "unsupported_grant_type");
     }
 }

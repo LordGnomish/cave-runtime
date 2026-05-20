@@ -232,16 +232,9 @@ impl VolumeManager {
         Self::default()
     }
 
-    pub fn register_driver(
-        &self,
-        driver: &str,
-        policy: FsGroupPolicy,
-        modes: Vec<AccessMode>,
-    ) {
-        self.fs_group_policies
-            .insert(driver.to_string(), policy);
-        self.driver_access_modes
-            .insert(driver.to_string(), modes);
+    pub fn register_driver(&self, driver: &str, policy: FsGroupPolicy, modes: Vec<AccessMode>) {
+        self.fs_group_policies.insert(driver.to_string(), policy);
+        self.driver_access_modes.insert(driver.to_string(), modes);
     }
 
     pub fn driver_supports_access_mode(&self, driver: &str, mode: AccessMode) -> bool {
@@ -271,7 +264,11 @@ impl VolumeManager {
         }
         // Block-mode volumes ignore mount options / fsType but everything else is shared.
         if capability.volume_mode == VolumeMode::Filesystem
-            && capability.fs_type.as_deref().map(str::is_empty).unwrap_or(true)
+            && capability
+                .fs_type
+                .as_deref()
+                .map(str::is_empty)
+                .unwrap_or(true)
         {
             return Err(CsiError::InvalidArgument(
                 "fsType required for filesystem volume mode".into(),
@@ -311,11 +308,7 @@ impl VolumeManager {
     }
 
     /// CSI NodeUnstageVolume. Idempotent: missing volume → ok.
-    pub fn node_unstage_volume(
-        &self,
-        volume_id: &str,
-        staging_target_path: &str,
-    ) -> CsiResult<()> {
+    pub fn node_unstage_volume(&self, volume_id: &str, staging_target_path: &str) -> CsiResult<()> {
         if volume_id.is_empty() || staging_target_path.is_empty() {
             return Err(CsiError::InvalidArgument(
                 "volume_id and staging_target_path required".into(),
@@ -324,9 +317,7 @@ impl VolumeManager {
         match self.staged.get(volume_id) {
             Some(v) => {
                 if v.staging_target_path != staging_target_path {
-                    return Err(CsiError::FailedPrecondition(
-                        "staging path mismatch".into(),
-                    ));
+                    return Err(CsiError::FailedPrecondition("staging path mismatch".into()));
                 }
                 if !v.published_targets.is_empty() {
                     return Err(CsiError::FailedPrecondition(format!(
@@ -363,9 +354,7 @@ impl VolumeManager {
             ))
         })?;
         if entry.staging_target_path != staging_target_path {
-            return Err(CsiError::FailedPrecondition(
-                "staging path mismatch".into(),
-            ));
+            return Err(CsiError::FailedPrecondition("staging path mismatch".into()));
         }
         // RWOP: only one pod allowed.
         if entry.capability.access_mode == AccessMode::ReadWriteOncePod {
@@ -381,7 +370,8 @@ impl VolumeManager {
             }
         }
         // Read-only on volume forces all publish-readonly.
-        let effective_ro = readonly || entry.readonly || entry.capability.access_mode.is_read_only();
+        let effective_ro =
+            readonly || entry.readonly || entry.capability.access_mode.is_read_only();
         // Idempotency on (pod_uid, target_path).
         if let Some(existing) = entry
             .published_targets
@@ -406,11 +396,7 @@ impl VolumeManager {
     }
 
     /// CSI NodeUnpublishVolume — unbind target path. Idempotent.
-    pub fn node_unpublish_volume(
-        &self,
-        volume_id: &str,
-        target_path: &str,
-    ) -> CsiResult<()> {
+    pub fn node_unpublish_volume(&self, volume_id: &str, target_path: &str) -> CsiResult<()> {
         let mut entry = match self.staged.get_mut(volume_id) {
             Some(e) => e,
             None => return Ok(()),
@@ -457,7 +443,11 @@ impl VolumeManager {
         fs_type: Option<String>,
         target_path: &str,
     ) -> CsiResult<()> {
-        if pod_uid.is_empty() || volume_name.is_empty() || driver.is_empty() || target_path.is_empty() {
+        if pod_uid.is_empty()
+            || volume_name.is_empty()
+            || driver.is_empty()
+            || target_path.is_empty()
+        {
             return Err(CsiError::InvalidArgument("required field empty".into()));
         }
         let key = ephemeral_key(pod_uid, volume_name);
@@ -479,11 +469,7 @@ impl VolumeManager {
         Ok(())
     }
 
-    pub fn unpublish_inline_ephemeral(
-        &self,
-        pod_uid: &str,
-        volume_name: &str,
-    ) -> CsiResult<()> {
+    pub fn unpublish_inline_ephemeral(&self, pod_uid: &str, volume_name: &str) -> CsiResult<()> {
         let key = ephemeral_key(pod_uid, volume_name);
         self.inline_ephemeral.remove(&key);
         Ok(())
@@ -563,7 +549,9 @@ impl VolumeManager {
         // Existing attachment check.
         for r in self.attachments.iter() {
             let rec = r.value();
-            if rec.volume_id == volume_id && rec.attached && rec.node_name != node_name
+            if rec.volume_id == volume_id
+                && rec.attached
+                && rec.node_name != node_name
                 && !access_mode.allows_multi_node()
             {
                 return Err(CsiError::FailedPrecondition(format!(
@@ -617,10 +605,7 @@ pub fn validate_fs_type(fs_type: &str) -> CsiResult<()> {
 
 /// Mount option scrub: kubelet drops options the kernel will reject and
 /// flags that conflict with read-only semantics.
-pub fn normalize_mount_options(
-    requested: &[String],
-    readonly: bool,
-) -> Vec<String> {
+pub fn normalize_mount_options(requested: &[String], readonly: bool) -> Vec<String> {
     let mut out: Vec<String> = requested
         .iter()
         .filter(|o| !o.is_empty())
@@ -647,11 +632,19 @@ mod tests {
     #[test]
     fn stage_then_publish_then_unpublish_then_unstage_happy_path() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/stage/v1", fs_cap(AccessMode::ReadWriteOnce), BTreeMap::new(), false, 1024)
-            .unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/stage/v1",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            1024,
+        )
+        .unwrap();
         assert_eq!(m.stage_state("v1"), VolumeStage::Staged);
 
-        m.node_publish_volume("v1", "/stage/v1", "/pods/p1/v1", "p1", false).unwrap();
+        m.node_publish_volume("v1", "/stage/v1", "/pods/p1/v1", "p1", false)
+            .unwrap();
         assert_eq!(m.stage_state("v1"), VolumeStage::Published);
         assert_eq!(m.published_count("v1"), 1);
 
@@ -666,8 +659,10 @@ mod tests {
     fn stage_is_idempotent_with_same_args() {
         let m = VolumeManager::new();
         let cap = fs_cap(AccessMode::ReadWriteOnce);
-        m.node_stage_volume("v1", "/s", cap.clone(), BTreeMap::new(), false, 1024).unwrap();
-        m.node_stage_volume("v1", "/s", cap, BTreeMap::new(), false, 1024).unwrap();
+        m.node_stage_volume("v1", "/s", cap.clone(), BTreeMap::new(), false, 1024)
+            .unwrap();
+        m.node_stage_volume("v1", "/s", cap, BTreeMap::new(), false, 1024)
+            .unwrap();
         assert_eq!(m.stage_state("v1"), VolumeStage::Staged);
     }
 
@@ -675,7 +670,8 @@ mod tests {
     fn stage_idempotency_rejects_different_path() {
         let m = VolumeManager::new();
         let cap = fs_cap(AccessMode::ReadWriteOnce);
-        m.node_stage_volume("v1", "/s", cap.clone(), BTreeMap::new(), false, 0).unwrap();
+        m.node_stage_volume("v1", "/s", cap.clone(), BTreeMap::new(), false, 0)
+            .unwrap();
         let err = m
             .node_stage_volume("v1", "/other", cap, BTreeMap::new(), false, 0)
             .unwrap_err();
@@ -685,9 +681,24 @@ mod tests {
     #[test]
     fn stage_idempotency_rejects_different_capability() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteOnce), BTreeMap::new(), false, 0).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            0,
+        )
+        .unwrap();
         let err = m
-            .node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteMany), BTreeMap::new(), false, 0)
+            .node_stage_volume(
+                "v1",
+                "/s",
+                fs_cap(AccessMode::ReadWriteMany),
+                BTreeMap::new(),
+                false,
+                0,
+            )
             .unwrap_err();
         assert!(matches!(err, CsiError::AlreadyExists(_)));
     }
@@ -696,7 +707,14 @@ mod tests {
     fn stage_rejects_empty_volume_id() {
         let m = VolumeManager::new();
         let err = m
-            .node_stage_volume("", "/s", fs_cap(AccessMode::ReadWriteOnce), BTreeMap::new(), false, 0)
+            .node_stage_volume(
+                "",
+                "/s",
+                fs_cap(AccessMode::ReadWriteOnce),
+                BTreeMap::new(),
+                false,
+                0,
+            )
             .unwrap_err();
         assert!(matches!(err, CsiError::InvalidArgument(_)));
     }
@@ -705,7 +723,14 @@ mod tests {
     fn stage_rejects_empty_staging_path() {
         let m = VolumeManager::new();
         let err = m
-            .node_stage_volume("v1", "", fs_cap(AccessMode::ReadWriteOnce), BTreeMap::new(), false, 0)
+            .node_stage_volume(
+                "v1",
+                "",
+                fs_cap(AccessMode::ReadWriteOnce),
+                BTreeMap::new(),
+                false,
+                0,
+            )
             .unwrap_err();
         assert!(matches!(err, CsiError::InvalidArgument(_)));
     }
@@ -729,7 +754,8 @@ mod tests {
     fn stage_block_mode_does_not_require_fs_type() {
         let m = VolumeManager::new();
         let cap = VolumeCapability::block(AccessMode::ReadWriteOnce);
-        m.node_stage_volume("v1", "/s", cap, BTreeMap::new(), false, 0).unwrap();
+        m.node_stage_volume("v1", "/s", cap, BTreeMap::new(), false, 0)
+            .unwrap();
         assert_eq!(m.stage_state("v1"), VolumeStage::Staged);
     }
 
@@ -745,7 +771,15 @@ mod tests {
     #[test]
     fn publish_rejects_staging_path_mismatch() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteOnce), BTreeMap::new(), false, 0).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            0,
+        )
+        .unwrap();
         let err = m
             .node_publish_volume("v1", "/wrong", "/t", "p1", false)
             .unwrap_err();
@@ -755,17 +789,36 @@ mod tests {
     #[test]
     fn publish_is_idempotent_for_same_pod_target() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteMany), BTreeMap::new(), false, 0).unwrap();
-        m.node_publish_volume("v1", "/s", "/t", "p1", false).unwrap();
-        m.node_publish_volume("v1", "/s", "/t", "p1", false).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteMany),
+            BTreeMap::new(),
+            false,
+            0,
+        )
+        .unwrap();
+        m.node_publish_volume("v1", "/s", "/t", "p1", false)
+            .unwrap();
+        m.node_publish_volume("v1", "/s", "/t", "p1", false)
+            .unwrap();
         assert_eq!(m.published_count("v1"), 1);
     }
 
     #[test]
     fn publish_idempotency_detects_readonly_mismatch() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteOnce), BTreeMap::new(), false, 0).unwrap();
-        m.node_publish_volume("v1", "/s", "/t", "p1", false).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            0,
+        )
+        .unwrap();
+        m.node_publish_volume("v1", "/s", "/t", "p1", false)
+            .unwrap();
         let err = m
             .node_publish_volume("v1", "/s", "/t", "p1", true)
             .unwrap_err();
@@ -775,8 +828,17 @@ mod tests {
     #[test]
     fn rwop_rejects_second_pod_on_same_node() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteOncePod), BTreeMap::new(), false, 0).unwrap();
-        m.node_publish_volume("v1", "/s", "/t1", "podA", false).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOncePod),
+            BTreeMap::new(),
+            false,
+            0,
+        )
+        .unwrap();
+        m.node_publish_volume("v1", "/s", "/t1", "podA", false)
+            .unwrap();
         let err = m
             .node_publish_volume("v1", "/s", "/t2", "podB", false)
             .unwrap_err();
@@ -786,20 +848,41 @@ mod tests {
     #[test]
     fn rwop_releases_holder_after_last_unpublish() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteOncePod), BTreeMap::new(), false, 0).unwrap();
-        m.node_publish_volume("v1", "/s", "/t1", "podA", false).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOncePod),
+            BTreeMap::new(),
+            false,
+            0,
+        )
+        .unwrap();
+        m.node_publish_volume("v1", "/s", "/t1", "podA", false)
+            .unwrap();
         m.node_unpublish_volume("v1", "/t1").unwrap();
-        m.node_publish_volume("v1", "/s", "/t2", "podB", false).unwrap();
+        m.node_publish_volume("v1", "/s", "/t2", "podB", false)
+            .unwrap();
         assert_eq!(m.published_count("v1"), 1);
     }
 
     #[test]
     fn rwx_allows_multiple_pods() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteMany), BTreeMap::new(), false, 0).unwrap();
-        m.node_publish_volume("v1", "/s", "/t1", "podA", false).unwrap();
-        m.node_publish_volume("v1", "/s", "/t2", "podB", false).unwrap();
-        m.node_publish_volume("v1", "/s", "/t3", "podC", false).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteMany),
+            BTreeMap::new(),
+            false,
+            0,
+        )
+        .unwrap();
+        m.node_publish_volume("v1", "/s", "/t1", "podA", false)
+            .unwrap();
+        m.node_publish_volume("v1", "/s", "/t2", "podB", false)
+            .unwrap();
+        m.node_publish_volume("v1", "/s", "/t3", "podC", false)
+            .unwrap();
         assert_eq!(m.published_count("v1"), 3);
     }
 
@@ -812,9 +895,19 @@ mod tests {
     #[test]
     fn unpublish_removes_only_matching_target() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteMany), BTreeMap::new(), false, 0).unwrap();
-        m.node_publish_volume("v1", "/s", "/t1", "podA", false).unwrap();
-        m.node_publish_volume("v1", "/s", "/t2", "podB", false).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteMany),
+            BTreeMap::new(),
+            false,
+            0,
+        )
+        .unwrap();
+        m.node_publish_volume("v1", "/s", "/t1", "podA", false)
+            .unwrap();
+        m.node_publish_volume("v1", "/s", "/t2", "podB", false)
+            .unwrap();
         m.node_unpublish_volume("v1", "/t1").unwrap();
         assert_eq!(m.published_count("v1"), 1);
     }
@@ -822,8 +915,17 @@ mod tests {
     #[test]
     fn unstage_blocked_when_published_targets_remain() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteOnce), BTreeMap::new(), false, 0).unwrap();
-        m.node_publish_volume("v1", "/s", "/t", "p1", false).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            0,
+        )
+        .unwrap();
+        m.node_publish_volume("v1", "/s", "/t", "p1", false)
+            .unwrap();
         let err = m.node_unstage_volume("v1", "/s").unwrap_err();
         assert!(matches!(err, CsiError::FailedPrecondition(_)));
     }
@@ -831,7 +933,15 @@ mod tests {
     #[test]
     fn unstage_rejects_path_mismatch() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteOnce), BTreeMap::new(), false, 0).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            0,
+        )
+        .unwrap();
         let err = m.node_unstage_volume("v1", "/wrong").unwrap_err();
         assert!(matches!(err, CsiError::FailedPrecondition(_)));
     }
@@ -845,8 +955,17 @@ mod tests {
     #[test]
     fn read_only_volume_forces_publish_readonly() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadOnlyMany), BTreeMap::new(), true, 0).unwrap();
-        m.node_publish_volume("v1", "/s", "/t1", "p1", false).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadOnlyMany),
+            BTreeMap::new(),
+            true,
+            0,
+        )
+        .unwrap();
+        m.node_publish_volume("v1", "/s", "/t1", "p1", false)
+            .unwrap();
         let v = m.staged.get("v1").unwrap();
         assert!(v.published_targets[0].readonly);
     }
@@ -854,31 +973,68 @@ mod tests {
     #[test]
     fn rox_access_mode_forces_readonly_even_when_publish_says_rw() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadOnlyMany), BTreeMap::new(), false, 0).unwrap();
-        m.node_publish_volume("v1", "/s", "/t1", "p1", false).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadOnlyMany),
+            BTreeMap::new(),
+            false,
+            0,
+        )
+        .unwrap();
+        m.node_publish_volume("v1", "/s", "/t1", "p1", false)
+            .unwrap();
         let v = m.staged.get("v1").unwrap();
         assert!(v.published_targets[0].readonly);
     }
 
     #[test]
     fn fs_group_policy_none_skips_application() {
-        assert!(!should_apply_fs_group(FsGroupPolicy::None, AccessMode::ReadWriteOnce, Some("ext4")));
+        assert!(!should_apply_fs_group(
+            FsGroupPolicy::None,
+            AccessMode::ReadWriteOnce,
+            Some("ext4")
+        ));
     }
 
     #[test]
     fn fs_group_policy_file_always_applies() {
-        assert!(should_apply_fs_group(FsGroupPolicy::File, AccessMode::ReadWriteOnce, Some("ext4")));
-        assert!(should_apply_fs_group(FsGroupPolicy::File, AccessMode::ReadWriteMany, Some("ext4")));
-        assert!(should_apply_fs_group(FsGroupPolicy::File, AccessMode::ReadOnlyMany, None));
+        assert!(should_apply_fs_group(
+            FsGroupPolicy::File,
+            AccessMode::ReadWriteOnce,
+            Some("ext4")
+        ));
+        assert!(should_apply_fs_group(
+            FsGroupPolicy::File,
+            AccessMode::ReadWriteMany,
+            Some("ext4")
+        ));
+        assert!(should_apply_fs_group(
+            FsGroupPolicy::File,
+            AccessMode::ReadOnlyMany,
+            None
+        ));
     }
 
     #[test]
     fn fs_group_policy_rwo_with_fstype_only_applies_for_rwo_fs() {
         let p = FsGroupPolicy::ReadWriteOnceWithFSType;
-        assert!(should_apply_fs_group(p, AccessMode::ReadWriteOnce, Some("ext4")));
-        assert!(!should_apply_fs_group(p, AccessMode::ReadWriteMany, Some("ext4")));
+        assert!(should_apply_fs_group(
+            p,
+            AccessMode::ReadWriteOnce,
+            Some("ext4")
+        ));
+        assert!(!should_apply_fs_group(
+            p,
+            AccessMode::ReadWriteMany,
+            Some("ext4")
+        ));
         assert!(!should_apply_fs_group(p, AccessMode::ReadWriteOnce, None));
-        assert!(!should_apply_fs_group(p, AccessMode::ReadWriteOnce, Some("")));
+        assert!(!should_apply_fs_group(
+            p,
+            AccessMode::ReadWriteOnce,
+            Some("")
+        ));
     }
 
     #[test]
@@ -904,7 +1060,11 @@ mod tests {
 
     #[test]
     fn validate_access_mode_set_rejects_rwop_with_others() {
-        assert!(validate_access_mode_set(&[AccessMode::ReadWriteOncePod, AccessMode::ReadWriteOnce]).is_err());
+        assert!(validate_access_mode_set(&[
+            AccessMode::ReadWriteOncePod,
+            AccessMode::ReadWriteOnce
+        ])
+        .is_err());
     }
 
     #[test]
@@ -914,7 +1074,10 @@ mod tests {
 
     #[test]
     fn validate_access_mode_set_accepts_combined_non_rwop() {
-        assert!(validate_access_mode_set(&[AccessMode::ReadOnlyMany, AccessMode::ReadWriteMany]).is_ok());
+        assert!(
+            validate_access_mode_set(&[AccessMode::ReadOnlyMany, AccessMode::ReadWriteMany])
+                .is_ok()
+        );
     }
 
     #[test]
@@ -935,15 +1098,18 @@ mod tests {
     #[test]
     fn inline_ephemeral_publish_idempotent() {
         let m = VolumeManager::new();
-        m.publish_inline_ephemeral("podA", "tmp", "csi", BTreeMap::new(), None, "/t").unwrap();
-        m.publish_inline_ephemeral("podA", "tmp", "csi", BTreeMap::new(), None, "/t").unwrap();
+        m.publish_inline_ephemeral("podA", "tmp", "csi", BTreeMap::new(), None, "/t")
+            .unwrap();
+        m.publish_inline_ephemeral("podA", "tmp", "csi", BTreeMap::new(), None, "/t")
+            .unwrap();
         assert_eq!(m.inline_ephemeral.len(), 1);
     }
 
     #[test]
     fn inline_ephemeral_unpublish_clears_state() {
         let m = VolumeManager::new();
-        m.publish_inline_ephemeral("podA", "tmp", "csi", BTreeMap::new(), None, "/t").unwrap();
+        m.publish_inline_ephemeral("podA", "tmp", "csi", BTreeMap::new(), None, "/t")
+            .unwrap();
         m.unpublish_inline_ephemeral("podA", "tmp").unwrap();
         assert!(!m.inline_ephemeral.contains_key("podA/tmp"));
     }
@@ -958,7 +1124,15 @@ mod tests {
     #[test]
     fn create_snapshot_records_size_from_source() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteOnce), BTreeMap::new(), false, 4096).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            4096,
+        )
+        .unwrap();
         let snap = m.create_snapshot("snap1", "v1").unwrap();
         assert_eq!(snap.size_bytes, 4096);
         assert!(snap.ready_to_use);
@@ -967,7 +1141,15 @@ mod tests {
     #[test]
     fn create_snapshot_idempotent_for_same_source() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteOnce), BTreeMap::new(), false, 1).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            1,
+        )
+        .unwrap();
         let s1 = m.create_snapshot("snap1", "v1").unwrap();
         let s2 = m.create_snapshot("snap1", "v1").unwrap();
         assert_eq!(s1.snapshot_id, s2.snapshot_id);
@@ -976,8 +1158,24 @@ mod tests {
     #[test]
     fn create_snapshot_rejects_collision_with_different_source() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteOnce), BTreeMap::new(), false, 1).unwrap();
-        m.node_stage_volume("v2", "/s2", fs_cap(AccessMode::ReadWriteOnce), BTreeMap::new(), false, 2).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            1,
+        )
+        .unwrap();
+        m.node_stage_volume(
+            "v2",
+            "/s2",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            2,
+        )
+        .unwrap();
         m.create_snapshot("snap1", "v1").unwrap();
         let err = m.create_snapshot("snap1", "v2").unwrap_err();
         assert!(matches!(err, CsiError::AlreadyExists(_)));
@@ -992,9 +1190,18 @@ mod tests {
     #[test]
     fn restore_snapshot_creates_new_volume_with_size() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteOnce), BTreeMap::new(), false, 8192).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            8192,
+        )
+        .unwrap();
         m.create_snapshot("snap1", "v1").unwrap();
-        m.restore_snapshot("snap1", "v2", "/s2", fs_cap(AccessMode::ReadWriteOnce)).unwrap();
+        m.restore_snapshot("snap1", "v2", "/s2", fs_cap(AccessMode::ReadWriteOnce))
+            .unwrap();
         assert_eq!(m.staged.get("v2").unwrap().size_bytes, 8192);
     }
 
@@ -1010,7 +1217,15 @@ mod tests {
     #[test]
     fn restore_snapshot_rejects_not_ready() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteOnce), BTreeMap::new(), false, 1).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            1,
+        )
+        .unwrap();
         m.create_snapshot("snap1", "v1").unwrap();
         m.snapshots.get_mut("snap1").unwrap().ready_to_use = false;
         let err = m
@@ -1022,29 +1237,37 @@ mod tests {
     #[test]
     fn record_attachment_rejects_rwo_dual_node() {
         let m = VolumeManager::new();
-        m.record_attachment("v1", "nodeA", AccessMode::ReadWriteOnce).unwrap();
-        let err = m.record_attachment("v1", "nodeB", AccessMode::ReadWriteOnce).unwrap_err();
+        m.record_attachment("v1", "nodeA", AccessMode::ReadWriteOnce)
+            .unwrap();
+        let err = m
+            .record_attachment("v1", "nodeB", AccessMode::ReadWriteOnce)
+            .unwrap_err();
         assert!(matches!(err, CsiError::FailedPrecondition(_)));
     }
 
     #[test]
     fn record_attachment_allows_rwx_dual_node() {
         let m = VolumeManager::new();
-        m.record_attachment("v1", "nodeA", AccessMode::ReadWriteMany).unwrap();
-        m.record_attachment("v1", "nodeB", AccessMode::ReadWriteMany).unwrap();
+        m.record_attachment("v1", "nodeA", AccessMode::ReadWriteMany)
+            .unwrap();
+        m.record_attachment("v1", "nodeB", AccessMode::ReadWriteMany)
+            .unwrap();
     }
 
     #[test]
     fn record_attachment_allows_rox_dual_node() {
         let m = VolumeManager::new();
-        m.record_attachment("v1", "nodeA", AccessMode::ReadOnlyMany).unwrap();
-        m.record_attachment("v1", "nodeB", AccessMode::ReadOnlyMany).unwrap();
+        m.record_attachment("v1", "nodeA", AccessMode::ReadOnlyMany)
+            .unwrap();
+        m.record_attachment("v1", "nodeB", AccessMode::ReadOnlyMany)
+            .unwrap();
     }
 
     #[test]
     fn record_attachment_rejects_rwop_dual_node() {
         let m = VolumeManager::new();
-        m.record_attachment("v1", "nodeA", AccessMode::ReadWriteOncePod).unwrap();
+        m.record_attachment("v1", "nodeA", AccessMode::ReadWriteOncePod)
+            .unwrap();
         let err = m
             .record_attachment("v1", "nodeB", AccessMode::ReadWriteOncePod)
             .unwrap_err();
@@ -1054,9 +1277,11 @@ mod tests {
     #[test]
     fn detach_clears_attachment_record() {
         let m = VolumeManager::new();
-        m.record_attachment("v1", "nodeA", AccessMode::ReadWriteOnce).unwrap();
+        m.record_attachment("v1", "nodeA", AccessMode::ReadWriteOnce)
+            .unwrap();
         m.detach("v1", "nodeA");
-        m.record_attachment("v1", "nodeB", AccessMode::ReadWriteOnce).unwrap();
+        m.record_attachment("v1", "nodeB", AccessMode::ReadWriteOnce)
+            .unwrap();
     }
 
     #[test]
@@ -1141,7 +1366,15 @@ mod tests {
     #[test]
     fn snapshot_with_zero_size_is_valid() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteOnce), BTreeMap::new(), false, 0).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            0,
+        )
+        .unwrap();
         let snap = m.create_snapshot("snap1", "v1").unwrap();
         assert_eq!(snap.size_bytes, 0);
     }
@@ -1149,17 +1382,42 @@ mod tests {
     #[test]
     fn unstage_then_restage_yields_new_record() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteOnce), BTreeMap::new(), false, 1).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            1,
+        )
+        .unwrap();
         m.node_unstage_volume("v1", "/s").unwrap();
-        m.node_stage_volume("v1", "/s2", fs_cap(AccessMode::ReadWriteOnce), BTreeMap::new(), false, 2).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s2",
+            fs_cap(AccessMode::ReadWriteOnce),
+            BTreeMap::new(),
+            false,
+            2,
+        )
+        .unwrap();
         assert_eq!(m.staged.get("v1").unwrap().staging_target_path, "/s2");
     }
 
     #[test]
     fn publish_records_pod_uid_on_mount() {
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteMany), BTreeMap::new(), false, 0).unwrap();
-        m.node_publish_volume("v1", "/s", "/t", "podZ", false).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteMany),
+            BTreeMap::new(),
+            false,
+            0,
+        )
+        .unwrap();
+        m.node_publish_volume("v1", "/s", "/t", "podZ", false)
+            .unwrap();
         let v = m.staged.get("v1").unwrap();
         assert_eq!(v.published_targets[0].pod_uid, "podZ");
     }
@@ -1168,9 +1426,19 @@ mod tests {
     fn unpublish_releases_rwop_holder_only_when_no_remaining_targets() {
         // Same pod with two targets — RWOP allowed for one pod across multiple mounts.
         let m = VolumeManager::new();
-        m.node_stage_volume("v1", "/s", fs_cap(AccessMode::ReadWriteOncePod), BTreeMap::new(), false, 0).unwrap();
-        m.node_publish_volume("v1", "/s", "/t1", "podA", false).unwrap();
-        m.node_publish_volume("v1", "/s", "/t2", "podA", false).unwrap();
+        m.node_stage_volume(
+            "v1",
+            "/s",
+            fs_cap(AccessMode::ReadWriteOncePod),
+            BTreeMap::new(),
+            false,
+            0,
+        )
+        .unwrap();
+        m.node_publish_volume("v1", "/s", "/t1", "podA", false)
+            .unwrap();
+        m.node_publish_volume("v1", "/s", "/t2", "podA", false)
+            .unwrap();
         m.node_unpublish_volume("v1", "/t1").unwrap();
         // Holder should still be podA.
         let err = m
@@ -1179,6 +1447,7 @@ mod tests {
         assert!(matches!(err, CsiError::FailedPrecondition(_)));
         // Release after the last target is gone.
         m.node_unpublish_volume("v1", "/t2").unwrap();
-        m.node_publish_volume("v1", "/s", "/t3", "podB", false).unwrap();
+        m.node_publish_volume("v1", "/s", "/t3", "podB", false)
+            .unwrap();
     }
 }

@@ -71,7 +71,8 @@ mod tests {
 
     #[test]
     fn at_least_one_target_required() {
-        let err = AudienceRequest::new(vec![], vec![], SubjectTokenType::AccessToken, vec![]).unwrap_err();
+        let err = AudienceRequest::new(vec![], vec![], SubjectTokenType::AccessToken, vec![])
+            .unwrap_err();
         assert_eq!(err, AudienceError::NoTarget);
     }
 
@@ -126,13 +127,8 @@ mod tests {
 
     #[test]
     fn requested_type_round_trips() {
-        let r = AudienceRequest::new(
-            vec!["a".into()],
-            vec![],
-            SubjectTokenType::IdToken,
-            vec![],
-        )
-        .unwrap();
+        let r = AudienceRequest::new(vec!["a".into()], vec![], SubjectTokenType::IdToken, vec![])
+            .unwrap();
         assert_eq!(r.requested_type, SubjectTokenType::IdToken);
     }
 }

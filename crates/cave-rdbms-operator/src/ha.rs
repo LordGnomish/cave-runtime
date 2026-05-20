@@ -60,9 +60,9 @@ impl HaController {
         lag_seconds: f64,
     ) -> PgResult<()> {
         let mut replicas = self.replicas.write().unwrap();
-        let replica = replicas
-            .get_mut(instance_id)
-            .ok_or_else(|| PgError::ReplicationError(format!("replica not found: {}", instance_id)))?;
+        let replica = replicas.get_mut(instance_id).ok_or_else(|| {
+            PgError::ReplicationError(format!("replica not found: {}", instance_id))
+        })?;
         replica.lag_bytes = lag_bytes;
         replica.lag_seconds = lag_seconds;
         Ok(())
@@ -92,10 +92,7 @@ impl HaController {
 
         let best_replica = replicas
             .values()
-            .filter(|r| {
-                r.primary_id == primary_id
-                    && r.state == ReplicationState::Streaming
-            })
+            .filter(|r| r.primary_id == primary_id && r.state == ReplicationState::Streaming)
             .min_by_key(|r| r.lag_bytes);
 
         let new_primary_id = match best_replica {
@@ -153,11 +150,7 @@ impl HaController {
             .filter(|r| r.state == ReplicationState::Streaming)
             .count();
 
-        let max_lag_bytes = replica_list
-            .iter()
-            .map(|r| r.lag_bytes)
-            .max()
-            .unwrap_or(0);
+        let max_lag_bytes = replica_list.iter().map(|r| r.lag_bytes).max().unwrap_or(0);
         let max_lag_seconds = replica_list
             .iter()
             .map(|r| r.lag_seconds)

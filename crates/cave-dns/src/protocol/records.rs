@@ -5,8 +5,8 @@
 /// This module re-exports the hickory_proto rdata types used throughout
 /// cave-dns so callers only need one import.
 pub use hickory_proto::rr::{
-    rdata::{A, AAAA, CNAME, MX, NS, PTR, SOA, SRV, TXT},
     DNSClass, Name, RData, Record, RecordType,
+    rdata::{A, AAAA, CNAME, MX, NS, PTR, SOA, SRV, TXT},
 };
 
 use crate::error::{DnsError, DnsResult};
@@ -70,12 +70,7 @@ mod tests {
     fn decrement_ttl_clamps() {
         let addr = Ipv4Addr::new(1, 2, 3, 4);
         let name: Name = "example.com.".parse().unwrap();
-        let rec = build_record(
-            name,
-            10,
-            DNSClass::IN,
-            RData::A(A(addr)),
-        );
+        let rec = build_record(name, 10, DNSClass::IN, RData::A(A(addr)));
         let decremented = decrement_ttl(&[rec], 5);
         assert_eq!(decremented[0].ttl(), 5);
 

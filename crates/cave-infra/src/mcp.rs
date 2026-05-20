@@ -6,9 +6,9 @@
 //!   POST /mcp  →  { jsonrpc: "2.0", method: "tools/call", params: { name, arguments } }
 
 use crate::error::{InfraError, InfraResult};
-use crate::resource::{ResourceKind, ResourceSpec, ResourceState, ResourceStore};
 use crate::plan::generate_plan;
 use crate::provider::ProviderRegistry;
+use crate::resource::{ResourceKind, ResourceSpec, ResourceState, ResourceStore};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -44,7 +44,12 @@ pub struct JsonRpcError {
 
 impl JsonRpcResponse {
     pub fn ok(id: Value, result: Value) -> Self {
-        Self { jsonrpc: "2.0".into(), id, result: Some(result), error: None }
+        Self {
+            jsonrpc: "2.0".into(),
+            id,
+            result: Some(result),
+            error: None,
+        }
     }
 
     pub fn err(id: Value, code: i32, message: String) -> Self {
@@ -52,7 +57,11 @@ impl JsonRpcResponse {
             jsonrpc: "2.0".into(),
             id,
             result: None,
-            error: Some(JsonRpcError { code, message, data: None }),
+            error: Some(JsonRpcError {
+                code,
+                message,
+                data: None,
+            }),
         }
     }
 }
@@ -163,33 +172,38 @@ impl McpServer {
 
     pub async fn handle(&self, req: JsonRpcRequest) -> JsonRpcResponse {
         match req.method.as_str() {
-            "initialize" => JsonRpcResponse::ok(req.id, serde_json::json!({
-                "protocolVersion": "2024-11-05",
-                "capabilities": {"tools": {}},
-                "serverInfo": {"name": "cave-infra", "version": "1.0.0"}
-            })),
+            "initialize" => JsonRpcResponse::ok(
+                req.id,
+                serde_json::json!({
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {"tools": {}},
+                    "serverInfo": {"name": "cave-infra", "version": "1.0.0"}
+                }),
+            ),
 
-            "tools/list" => JsonRpcResponse::ok(req.id, serde_json::json!({
-                "tools": all_tools()
-            })),
+            "tools/list" => JsonRpcResponse::ok(
+                req.id,
+                serde_json::json!({
+                    "tools": all_tools()
+                }),
+            ),
 
             "tools/call" => {
                 let params = req.params.unwrap_or(Value::Null);
                 let tool_name = params["name"].as_str().unwrap_or("").to_string();
                 let args = &params["arguments"];
                 match self.call_tool(&tool_name, args).await {
-                    Ok(result) => JsonRpcResponse::ok(req.id, serde_json::json!({
-                        "content": [{"type": "text", "text": result.to_string()}]
-                    })),
+                    Ok(result) => JsonRpcResponse::ok(
+                        req.id,
+                        serde_json::json!({
+                            "content": [{"type": "text", "text": result.to_string()}]
+                        }),
+                    ),
                     Err(e) => JsonRpcResponse::err(req.id, -32603, e.to_string()),
                 }
             }
 
-            other => JsonRpcResponse::err(
-                req.id,
-                -32601,
-                format!("method not found: {other}"),
-            ),
+            other => JsonRpcResponse::err(req.id, -32601, format!("method not found: {other}")),
         }
     }
 
@@ -197,12 +211,17 @@ impl McpServer {
         match name {
             "infra_list_resources" => {
                 let resources = self.store.list();
-                Ok(serde_json::json!(resources.iter().map(|r| serde_json::json!({
-                    "key": r.key(),
-                    "status": format!("{:?}", r.status),
-                    "provider": r.spec.provider,
-                    "provider_id": r.provider_id,
-                })).collect::<Vec<_>>()))
+                Ok(serde_json::json!(
+                    resources
+                        .iter()
+                        .map(|r| serde_json::json!({
+                            "key": r.key(),
+                            "status": format!("{:?}", r.status),
+                            "provider": r.spec.provider,
+                            "provider_id": r.provider_id,
+                        }))
+                        .collect::<Vec<_>>()
+                ))
             }
 
             "infra_get_resource" => {
@@ -295,9 +314,7 @@ impl McpServer {
                 }))
             }
 
-            "infra_list_providers" => {
-                Ok(serde_json::json!(self.registry.list_names()))
-            }
+            "infra_list_providers" => Ok(serde_json::json!(self.registry.list_names())),
 
             other => Err(InfraError::McpToolNotFound(other.to_string())),
         }
@@ -342,25 +359,35 @@ mod tests {
     #[tokio::test]
     async fn provision_resource() {
         let s = server();
-        let resp = s.handle(rpc("tools/call", serde_json::json!({
-            "name": "infra_provision",
-            "arguments": {
-                "kind": "Server",
-                "name": "test-server",
-                "provider": "noop",
-                "properties": {"cpu": 4}
-            }
-        }))).await;
+        let resp = s
+            .handle(rpc(
+                "tools/call",
+                serde_json::json!({
+                    "name": "infra_provision",
+                    "arguments": {
+                        "kind": "Server",
+                        "name": "test-server",
+                        "provider": "noop",
+                        "properties": {"cpu": 4}
+                    }
+                }),
+            ))
+            .await;
         assert!(resp.error.is_none());
     }
 
     #[tokio::test]
     async fn list_resources_empty() {
         let s = server();
-        let resp = s.handle(rpc("tools/call", serde_json::json!({
-            "name": "infra_list_resources",
-            "arguments": {}
-        }))).await;
+        let resp = s
+            .handle(rpc(
+                "tools/call",
+                serde_json::json!({
+                    "name": "infra_list_resources",
+                    "arguments": {}
+                }),
+            ))
+            .await;
         assert!(resp.error.is_none());
     }
 

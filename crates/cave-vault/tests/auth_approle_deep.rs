@@ -30,7 +30,11 @@ fn secret_id(role_name: &str, ttl_secs: i64, num_uses: i64) -> (String, SecretId
         secret_id: sid.clone(),
         accessor: acc,
         created_at: Utc::now(),
-        expires_at: if ttl_secs > 0 { Some(Utc::now() + Duration::seconds(ttl_secs)) } else { None },
+        expires_at: if ttl_secs > 0 {
+            Some(Utc::now() + Duration::seconds(ttl_secs))
+        } else {
+            None
+        },
         num_uses,
         uses_remaining: num_uses,
         metadata: HashMap::new(),
@@ -50,8 +54,10 @@ fn bind_secret_id_false_allows_role_id_only_login() {
     // Login flow: the handler doesn't require entry.secret_id.
     let supplied_secret_id: Option<&str> = None;
     let needs_secret = r.bind_secret_id;
-    assert!(!needs_secret || supplied_secret_id.is_some(),
-        "bind_secret_id=false ⇒ no secret_id needed");
+    assert!(
+        !needs_secret || supplied_secret_id.is_some(),
+        "bind_secret_id=false ⇒ no secret_id needed"
+    );
 }
 
 /// Cite: openbao `builtin/credential/approle/path_login.go:432`
@@ -75,10 +81,16 @@ fn token_ttl_max_ttl_and_policies_propagate_from_role() {
     assert_eq!(tok.ttl, 3600);
     assert_eq!(tok.max_ttl, 7200);
     // TokenStore guarantees the issued token carries every role policy.
-    assert!(tok.policies.iter().any(|p| p == "default"),
-        "default policy injected by TokenStore.create");
-    assert!(tok.policies.iter().any(|p| p == &format!("{}-policy", TENANT)),
-        "tenant-scoped policy preserved verbatim");
+    assert!(
+        tok.policies.iter().any(|p| p == "default"),
+        "default policy injected by TokenStore.create"
+    );
+    assert!(
+        tok.policies
+            .iter()
+            .any(|p| p == &format!("{}-policy", TENANT)),
+        "tenant-scoped policy preserved verbatim"
+    );
     assert_eq!(tok.metadata.get("tenant_id"), Some(&TENANT.to_string()));
     assert!(tok.renewable);
 }
@@ -93,8 +105,13 @@ fn destroy_secret_id_drops_both_index_and_accessor_entries() {
     store.roles.insert(role_name.clone(), role("svc", true));
     let (sid, entry) = secret_id(&role_name, 0, 0);
     let acc = entry.accessor.clone();
-    store.secret_id_by_id.insert(sid.clone(), (role_name.clone(), acc.clone()));
-    store.secret_ids.entry(role_name.clone()).or_default()
+    store
+        .secret_id_by_id
+        .insert(sid.clone(), (role_name.clone(), acc.clone()));
+    store
+        .secret_ids
+        .entry(role_name.clone())
+        .or_default()
         .insert(acc.clone(), entry);
 
     // Simulated destroy
@@ -103,8 +120,15 @@ fn destroy_secret_id_drops_both_index_and_accessor_entries() {
     }
 
     assert!(store.secret_id_by_id.get(&sid).is_none());
-    assert!(store.secret_ids.get(&role_name).unwrap().get(&acc).is_none(),
-        "per-accessor entry also removed");
+    assert!(
+        store
+            .secret_ids
+            .get(&role_name)
+            .unwrap()
+            .get(&acc)
+            .is_none(),
+        "per-accessor entry also removed"
+    );
 }
 
 /// Cite: openbao `builtin/credential/approle/path_role.go::pathRoleRoleIDUpdate`
@@ -157,7 +181,7 @@ fn num_uses_exhaustion_progresses_then_rejects() {
 #[test]
 fn periodic_role_yields_token_with_period_set() {
     let mut r = role("periodic", true);
-    r.period = 1200;  // 20 minute renewal cadence
+    r.period = 1200; // 20 minute renewal cadence
 
     let mut ts = TokenStore::default();
     let params = CreateTokenParams {

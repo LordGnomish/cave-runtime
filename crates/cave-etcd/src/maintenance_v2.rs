@@ -38,7 +38,12 @@ pub struct FullStatus {
 }
 
 impl FullStatus {
-    pub fn from_member(m: &MemberStatus, cluster_id: u64, raft_applied_index: u64, errors: Vec<String>) -> Self {
+    pub fn from_member(
+        m: &MemberStatus,
+        cluster_id: u64,
+        raft_applied_index: u64,
+        errors: Vec<String>,
+    ) -> Self {
         Self {
             version: m.version.clone(),
             db_size: m.db_size,
@@ -62,7 +67,9 @@ impl FullStatus {
     }
 
     /// True if the member is the cluster leader.
-    pub fn is_leader(&self) -> bool { self.leader == self.member_id }
+    pub fn is_leader(&self) -> bool {
+        self.leader == self.member_id
+    }
 }
 
 // ── AlarmList ─────────────────────────────────────────────────────────────
@@ -88,13 +95,19 @@ pub struct AlarmRegistry {
 }
 
 impl AlarmRegistry {
-    pub fn new() -> Self { Self { inner: RwLock::new(Vec::new()) } }
+    pub fn new() -> Self {
+        Self {
+            inner: RwLock::new(Vec::new()),
+        }
+    }
 
     /// Activate an alarm.  Idempotent — re-activating an existing alarm
     /// is a no-op.  Returns `true` when the alarm is newly added.
     pub fn activate(&self, e: AlarmEntry) -> bool {
         let mut g = self.inner.write().unwrap();
-        if g.iter().any(|x| x == &e) { return false; }
+        if g.iter().any(|x| x == &e) {
+            return false;
+        }
         g.push(e);
         true
     }
@@ -114,12 +127,22 @@ impl AlarmRegistry {
 
     /// Alarms scoped to a single member.
     pub fn list_for(&self, member_id: u64) -> Vec<AlarmEntry> {
-        self.inner.read().unwrap().iter().filter(|e| e.member_id == member_id).cloned().collect()
+        self.inner
+            .read()
+            .unwrap()
+            .iter()
+            .filter(|e| e.member_id == member_id)
+            .cloned()
+            .collect()
     }
 
     /// Whether a specific alarm is active for a member.
     pub fn is_active(&self, member_id: u64, alarm: AlarmType) -> bool {
-        self.inner.read().unwrap().iter().any(|e| e.member_id == member_id && e.alarm == alarm)
+        self.inner
+            .read()
+            .unwrap()
+            .iter()
+            .any(|e| e.member_id == member_id && e.alarm == alarm)
     }
 
     /// Wipe everything — used by tests.
@@ -127,12 +150,18 @@ impl AlarmRegistry {
         self.inner.write().unwrap().clear();
     }
 
-    pub fn len(&self) -> usize { self.inner.read().unwrap().len() }
-    pub fn is_empty(&self) -> bool { self.len() == 0 }
+    pub fn len(&self) -> usize {
+        self.inner.read().unwrap().len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl Default for AlarmRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── Revision-bounded hash ─────────────────────────────────────────────────
@@ -169,7 +198,8 @@ pub struct RevisionRecord<'a> {
 pub fn hash_range(records: &[RevisionRecord<'_>], req: &HashRangeRequest) -> HashRangeResponse {
     let mut h: u64 = 0xcbf29ce484222325;
     let mut count = 0u64;
-    let mut filtered: Vec<&RevisionRecord<'_>> = records.iter()
+    let mut filtered: Vec<&RevisionRecord<'_>> = records
+        .iter()
         .filter(|r| r.revision >= req.revision_lower && r.revision <= req.revision_upper)
         .collect();
     filtered.sort_by_key(|r| (r.revision, r.key));
@@ -199,10 +229,16 @@ mod tests {
 
     fn member_status(id: u64, leader: u64, db: u64, rev: u64, learner: bool) -> MemberStatus {
         MemberStatus {
-            member_id: id, name: format!("m{id}"), revision: rev,
-            db_size: db, db_size_in_use: db.saturating_sub(10),
-            leader, raft_term: 7, is_learner: learner,
-            health: MemberHealth::Healthy, last_heartbeat_age_secs: Some(0),
+            member_id: id,
+            name: format!("m{id}"),
+            revision: rev,
+            db_size: db,
+            db_size_in_use: db.saturating_sub(10),
+            leader,
+            raft_term: 7,
+            is_learner: learner,
+            health: MemberHealth::Healthy,
+            last_heartbeat_age_secs: Some(0),
             version: "3.6.10".into(),
         }
     }
@@ -278,15 +314,24 @@ mod tests {
     fn test_alarm_activate_returns_true_for_new() {
         // cite: maintenance.go AlarmActivate
         let r = AlarmRegistry::new();
-        assert!(r.activate(AlarmEntry { member_id: 1, alarm: AlarmType::NoSpace }));
+        assert!(r.activate(AlarmEntry {
+            member_id: 1,
+            alarm: AlarmType::NoSpace
+        }));
     }
 
     #[test]
     fn test_alarm_activate_idempotent() {
         // cite: maintenance.go (re-activate is no-op)
         let r = AlarmRegistry::new();
-        r.activate(AlarmEntry { member_id: 1, alarm: AlarmType::NoSpace });
-        assert!(!r.activate(AlarmEntry { member_id: 1, alarm: AlarmType::NoSpace }));
+        r.activate(AlarmEntry {
+            member_id: 1,
+            alarm: AlarmType::NoSpace,
+        });
+        assert!(!r.activate(AlarmEntry {
+            member_id: 1,
+            alarm: AlarmType::NoSpace
+        }));
         assert_eq!(r.len(), 1);
     }
 
@@ -294,7 +339,10 @@ mod tests {
     fn test_alarm_deactivate_returns_true_when_present() {
         // cite: maintenance.go AlarmDeactivate
         let r = AlarmRegistry::new();
-        let e = AlarmEntry { member_id: 1, alarm: AlarmType::Corrupt };
+        let e = AlarmEntry {
+            member_id: 1,
+            alarm: AlarmType::Corrupt,
+        };
         r.activate(e.clone());
         assert!(r.deactivate(&e));
         assert!(r.is_empty());
@@ -303,7 +351,10 @@ mod tests {
     #[test]
     fn test_alarm_deactivate_returns_false_when_absent() {
         let r = AlarmRegistry::new();
-        let e = AlarmEntry { member_id: 1, alarm: AlarmType::Corrupt };
+        let e = AlarmEntry {
+            member_id: 1,
+            alarm: AlarmType::Corrupt,
+        };
         assert!(!r.deactivate(&e));
     }
 
@@ -311,8 +362,14 @@ mod tests {
     fn test_alarm_list_returns_all() {
         // cite: maintenance.go AlarmList
         let r = AlarmRegistry::new();
-        r.activate(AlarmEntry { member_id: 1, alarm: AlarmType::NoSpace });
-        r.activate(AlarmEntry { member_id: 2, alarm: AlarmType::Corrupt });
+        r.activate(AlarmEntry {
+            member_id: 1,
+            alarm: AlarmType::NoSpace,
+        });
+        r.activate(AlarmEntry {
+            member_id: 2,
+            alarm: AlarmType::Corrupt,
+        });
         assert_eq!(r.list().len(), 2);
     }
 
@@ -320,8 +377,14 @@ mod tests {
     fn test_alarm_list_for_member_filters() {
         // cite: maintenance.go (per-member filter)
         let r = AlarmRegistry::new();
-        r.activate(AlarmEntry { member_id: 1, alarm: AlarmType::NoSpace });
-        r.activate(AlarmEntry { member_id: 2, alarm: AlarmType::Corrupt });
+        r.activate(AlarmEntry {
+            member_id: 1,
+            alarm: AlarmType::NoSpace,
+        });
+        r.activate(AlarmEntry {
+            member_id: 2,
+            alarm: AlarmType::Corrupt,
+        });
         let m1 = r.list_for(1);
         assert_eq!(m1.len(), 1);
         assert_eq!(m1[0].alarm, AlarmType::NoSpace);
@@ -331,7 +394,10 @@ mod tests {
     fn test_alarm_is_active_check() {
         // cite: maintenance.go (alarm-state lookup)
         let r = AlarmRegistry::new();
-        r.activate(AlarmEntry { member_id: 1, alarm: AlarmType::NoSpace });
+        r.activate(AlarmEntry {
+            member_id: 1,
+            alarm: AlarmType::NoSpace,
+        });
         assert!(r.is_active(1, AlarmType::NoSpace));
         assert!(!r.is_active(1, AlarmType::Corrupt));
         assert!(!r.is_active(2, AlarmType::NoSpace));
@@ -341,8 +407,14 @@ mod tests {
     fn test_alarm_clear_removes_all() {
         // cite: tests/maintenance — reset between cases
         let r = AlarmRegistry::new();
-        r.activate(AlarmEntry { member_id: 1, alarm: AlarmType::NoSpace });
-        r.activate(AlarmEntry { member_id: 2, alarm: AlarmType::Corrupt });
+        r.activate(AlarmEntry {
+            member_id: 1,
+            alarm: AlarmType::NoSpace,
+        });
+        r.activate(AlarmEntry {
+            member_id: 2,
+            alarm: AlarmType::Corrupt,
+        });
         r.clear();
         assert!(r.is_empty());
     }
@@ -351,8 +423,14 @@ mod tests {
     fn test_alarm_distinct_types_for_same_member_coexist() {
         // cite: maintenance.go (NOSPACE + CORRUPT can coexist)
         let r = AlarmRegistry::new();
-        r.activate(AlarmEntry { member_id: 1, alarm: AlarmType::NoSpace });
-        r.activate(AlarmEntry { member_id: 1, alarm: AlarmType::Corrupt });
+        r.activate(AlarmEntry {
+            member_id: 1,
+            alarm: AlarmType::NoSpace,
+        });
+        r.activate(AlarmEntry {
+            member_id: 1,
+            alarm: AlarmType::Corrupt,
+        });
         assert_eq!(r.list_for(1).len(), 2);
     }
 
@@ -362,21 +440,47 @@ mod tests {
     fn test_hash_range_filters_by_revision() {
         // cite: maintenance.go HashKV (revision bound)
         let recs = vec![
-            RevisionRecord { revision: 1, key: b"a", value: b"1" },
-            RevisionRecord { revision: 5, key: b"b", value: b"2" },
-            RevisionRecord { revision: 10, key: b"c", value: b"3" },
+            RevisionRecord {
+                revision: 1,
+                key: b"a",
+                value: b"1",
+            },
+            RevisionRecord {
+                revision: 5,
+                key: b"b",
+                value: b"2",
+            },
+            RevisionRecord {
+                revision: 10,
+                key: b"c",
+                value: b"3",
+            },
         ];
-        let r1 = hash_range(&recs, &HashRangeRequest { revision_lower: 1, revision_upper: 5 });
+        let r1 = hash_range(
+            &recs,
+            &HashRangeRequest {
+                revision_lower: 1,
+                revision_upper: 5,
+            },
+        );
         assert_eq!(r1.revisions_hashed, 2);
     }
 
     #[test]
     fn test_hash_range_inclusive_upper() {
         // cite: HashKV (inclusive upper bound)
-        let recs = vec![
-            RevisionRecord { revision: 5, key: b"a", value: b"1" },
-        ];
-        let r = hash_range(&recs, &HashRangeRequest { revision_lower: 5, revision_upper: 5 });
+        let recs = vec![RevisionRecord {
+            revision: 5,
+            key: b"a",
+            value: b"1",
+        }];
+        let r = hash_range(
+            &recs,
+            &HashRangeRequest {
+                revision_lower: 5,
+                revision_upper: 5,
+            },
+        );
         assert_eq!(r.revisions_hashed, 1);
     }
 
@@ -384,11 +488,31 @@ mod tests {
     fn test_hash_range_deterministic() {
         // cite: HashKV stable ordering
         let recs = vec![
-            RevisionRecord { revision: 1, key: b"a", value: b"1" },
-            RevisionRecord { revision: 2, key: b"b", value: b"2" },
+            RevisionRecord {
+                revision: 1,
+                key: b"a",
+                value: b"1",
+            },
+            RevisionRecord {
+                revision: 2,
+                key: b"b",
+                value: b"2",
+            },
         ];
-        let r1 = hash_range(&recs, &HashRangeRequest { revision_lower: 1, revision_upper: 100 });
-        let r2 = hash_range(&recs, &HashRangeRequest { revision_lower: 1, revision_upper: 100 });
+        let r1 = hash_range(
+            &recs,
+            &HashRangeRequest {
+                revision_lower: 1,
+                revision_upper: 100,
+            },
+        );
+        let r2 = hash_range(
+            &recs,
+            &HashRangeRequest {
+                revision_lower: 1,
+                revision_upper: 100,
+            },
+        );
         assert_eq!(r1.hash, r2.hash);
     }
 
@@ -396,25 +520,63 @@ mod tests {
     fn test_hash_range_order_independent() {
         // cite: HashKV (sort by (rev,key) ⇒ order-independent)
         let recs = vec![
-            RevisionRecord { revision: 2, key: b"b", value: b"2" },
-            RevisionRecord { revision: 1, key: b"a", value: b"1" },
+            RevisionRecord {
+                revision: 2,
+                key: b"b",
+                value: b"2",
+            },
+            RevisionRecord {
+                revision: 1,
+                key: b"a",
+                value: b"1",
+            },
         ];
         let recs_swapped = vec![
-            RevisionRecord { revision: 1, key: b"a", value: b"1" },
-            RevisionRecord { revision: 2, key: b"b", value: b"2" },
+            RevisionRecord {
+                revision: 1,
+                key: b"a",
+                value: b"1",
+            },
+            RevisionRecord {
+                revision: 2,
+                key: b"b",
+                value: b"2",
+            },
         ];
-        let h1 = hash_range(&recs, &HashRangeRequest { revision_lower: 0, revision_upper: 100 }).hash;
-        let h2 = hash_range(&recs_swapped, &HashRangeRequest { revision_lower: 0, revision_upper: 100 }).hash;
+        let h1 = hash_range(
+            &recs,
+            &HashRangeRequest {
+                revision_lower: 0,
+                revision_upper: 100,
+            },
+        )
+        .hash;
+        let h2 = hash_range(
+            &recs_swapped,
+            &HashRangeRequest {
+                revision_lower: 0,
+                revision_upper: 100,
+            },
+        )
+        .hash;
         assert_eq!(h1, h2);
     }
 
     #[test]
     fn test_hash_range_empty_window() {
         // cite: HashKV (no records in window)
-        let recs = vec![
-            RevisionRecord { revision: 1, key: b"a", value: b"1" },
-        ];
-        let r = hash_range(&recs, &HashRangeRequest { revision_lower: 5, revision_upper: 10 });
+        let recs = vec![RevisionRecord {
+            revision: 1,
+            key: b"a",
+            value: b"1",
+        }];
+        let r = hash_range(
+            &recs,
+            &HashRangeRequest {
+                revision_lower: 5,
+                revision_upper: 10,
+            },
+        );
         assert_eq!(r.revisions_hashed, 0);
     }
 
@@ -422,22 +584,44 @@ mod tests {
     fn test_hash_range_changes_on_value_diff() {
         // cite: HashKV (different values ⇒ different hashes)
         let r1 = hash_range(
-            &[RevisionRecord { revision: 1, key: b"a", value: b"v1" }],
-            &HashRangeRequest { revision_lower: 1, revision_upper: 1 },
+            &[RevisionRecord {
+                revision: 1,
+                key: b"a",
+                value: b"v1",
+            }],
+            &HashRangeRequest {
+                revision_lower: 1,
+                revision_upper: 1,
+            },
         );
         let r2 = hash_range(
-            &[RevisionRecord { revision: 1, key: b"a", value: b"v2" }],
-            &HashRangeRequest { revision_lower: 1, revision_upper: 1 },
+            &[RevisionRecord {
+                revision: 1,
+                key: b"a",
+                value: b"v2",
+            }],
+            &HashRangeRequest {
+                revision_lower: 1,
+                revision_upper: 1,
+            },
         );
         assert_ne!(r1.hash, r2.hash);
     }
 
     #[test]
     fn test_hash_range_records_window() {
-        let recs = vec![
-            RevisionRecord { revision: 7, key: b"a", value: b"v" },
-        ];
-        let r = hash_range(&recs, &HashRangeRequest { revision_lower: 5, revision_upper: 9 });
+        let recs = vec![RevisionRecord {
+            revision: 7,
+            key: b"a",
+            value: b"v",
+        }];
+        let r = hash_range(
+            &recs,
+            &HashRangeRequest {
+                revision_lower: 5,
+                revision_upper: 9,
+            },
+        );
         assert_eq!(r.revision_lower, 5);
         assert_eq!(r.revision_upper, 9);
     }

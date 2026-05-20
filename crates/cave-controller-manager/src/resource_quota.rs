@@ -120,7 +120,10 @@ mod tests {
         }
     }
     fn d(r: &str, v: i64) -> UsageDelta {
-        UsageDelta { resource: r.into(), delta: v }
+        UsageDelta {
+            resource: r.into(),
+            delta: v,
+        }
     }
 
     #[test]
@@ -150,11 +153,7 @@ mod tests {
 
     #[test]
     fn admit_when_under_quota() {
-        let (_cite, _tenant) = test_ctx!(
-            "pkg/quota/v1/evaluator.go",
-            "Mask",
-            "tenant-rq-admit-ok"
-        );
+        let (_cite, _tenant) = test_ctx!("pkg/quota/v1/evaluator.go", "Mask", "tenant-rq-admit-ok");
         let sp = spec(&[("cpu", 4000)]);
         let st = status(&[("cpu", 1000)]);
         assert_eq!(admit(&sp, &st, &[d("cpu", 500)]), AdmissionDecision::Admit);
@@ -162,11 +161,8 @@ mod tests {
 
     #[test]
     fn deny_when_would_exceed_quota() {
-        let (_cite, _tenant) = test_ctx!(
-            "pkg/quota/v1/evaluator.go",
-            "Mask",
-            "tenant-rq-admit-deny"
-        );
+        let (_cite, _tenant) =
+            test_ctx!("pkg/quota/v1/evaluator.go", "Mask", "tenant-rq-admit-deny");
         let sp = spec(&[("cpu", 4000)]);
         let st = status(&[("cpu", 3500)]);
         match admit(&sp, &st, &[d("cpu", 1000)]) {
@@ -216,11 +212,8 @@ mod tests {
 
     #[test]
     fn admit_evaluates_every_delta_independently() {
-        let (_cite, _tenant) = test_ctx!(
-            "pkg/quota/v1/evaluator.go",
-            "Mask",
-            "tenant-rq-admit-multi"
-        );
+        let (_cite, _tenant) =
+            test_ctx!("pkg/quota/v1/evaluator.go", "Mask", "tenant-rq-admit-multi");
         let sp = spec(&[("cpu", 4000), ("memory", 8 * 1024 * 1024)]);
         let st = status(&[("cpu", 1000), ("memory", 1024)]);
         let prop = vec![d("cpu", 500), d("memory", 1024)];

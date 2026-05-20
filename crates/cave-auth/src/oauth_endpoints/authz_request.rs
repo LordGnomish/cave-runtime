@@ -64,7 +64,10 @@ pub struct AuthzError {
 
 impl AuthzError {
     fn new(error: &'static str, desc: impl Into<String>) -> Self {
-        Self { error, error_description: desc.into() }
+        Self {
+            error,
+            error_description: desc.into(),
+        }
     }
 }
 
@@ -81,11 +84,20 @@ pub fn validate(req: AuthzRequest) -> Result<ValidatedAuthzRequest, AuthzError> 
     let kinds = parse_response_type(&req.response_type)?;
 
     // Implicit / hybrid flows require nonce — OIDC Core §3.2.2.10, §3.3.2.11.
-    let has_implicit = kinds.iter().any(|k| matches!(k, ResponseKind::IdToken | ResponseKind::Token));
+    let has_implicit = kinds
+        .iter()
+        .any(|k| matches!(k, ResponseKind::IdToken | ResponseKind::Token));
     if has_implicit {
-        let openid = req.scope.as_deref().map(|s| s.split_whitespace().any(|t| t == "openid")).unwrap_or(false);
+        let openid = req
+            .scope
+            .as_deref()
+            .map(|s| s.split_whitespace().any(|t| t == "openid"))
+            .unwrap_or(false);
         if openid && req.nonce.is_none() {
-            return Err(AuthzError::new("invalid_request", "nonce required for implicit/hybrid flow"));
+            return Err(AuthzError::new(
+                "invalid_request",
+                "nonce required for implicit/hybrid flow",
+            ));
         }
     }
 
@@ -94,7 +106,10 @@ pub fn validate(req: AuthzRequest) -> Result<ValidatedAuthzRequest, AuthzError> 
     if let Some(prompt) = &req.prompt {
         for p in prompt.split_whitespace() {
             if !matches!(p, "none" | "login" | "consent" | "select_account") {
-                return Err(AuthzError::new("invalid_request", format!("unknown prompt: {}", p)));
+                return Err(AuthzError::new(
+                    "invalid_request",
+                    format!("unknown prompt: {}", p),
+                ));
             }
         }
     }
@@ -103,21 +118,33 @@ pub fn validate(req: AuthzRequest) -> Result<ValidatedAuthzRequest, AuthzError> 
         (Some(ch), method) => {
             let m = match method.as_deref() {
                 None | Some("") => PkceMethod::Plain,
-                Some(s) => PkceMethod::parse(s).map_err(|_| AuthzError::new("invalid_request", "invalid code_challenge_method"))?,
+                Some(s) => PkceMethod::parse(s).map_err(|_| {
+                    AuthzError::new("invalid_request", "invalid code_challenge_method")
+                })?,
             };
             let len = ch.len();
             if !(43..=128).contains(&len) {
-                return Err(AuthzError::new("invalid_request", "code_challenge length 43..=128"));
+                return Err(AuthzError::new(
+                    "invalid_request",
+                    "code_challenge length 43..=128",
+                ));
             }
             Some((ch.clone(), m))
         }
         (None, Some(_)) => {
-            return Err(AuthzError::new("invalid_request", "code_challenge_method without code_challenge"));
+            return Err(AuthzError::new(
+                "invalid_request",
+                "code_challenge_method without code_challenge",
+            ));
         }
         (None, None) => None,
     };
 
-    Ok(ValidatedAuthzRequest { raw: req, response_kinds: kinds, challenge })
+    Ok(ValidatedAuthzRequest {
+        raw: req,
+        response_kinds: kinds,
+        challenge,
+    })
 }
 
 /// Parse the OAuth `response_type` token list. Keycloak treats this
@@ -134,7 +161,12 @@ pub fn parse_response_type(rt: &str) -> Result<Vec<ResponseKind>, AuthzError> {
             "id_token" => ResponseKind::IdToken,
             "token" => ResponseKind::Token,
             "none" => ResponseKind::None,
-            other => return Err(AuthzError::new("unsupported_response_type", format!("unsupported response_type: {}", other))),
+            other => {
+                return Err(AuthzError::new(
+                    "unsupported_response_type",
+                    format!("unsupported response_type: {}", other),
+                ));
+            }
         };
         if !out.contains(&kind) {
             out.push(kind);
@@ -142,7 +174,10 @@ pub fn parse_response_type(rt: &str) -> Result<Vec<ResponseKind>, AuthzError> {
     }
     // `none` cannot be combined with anything else (RFC 6749 §4 / OAuth-Multiple-Response-Type).
     if out.contains(&ResponseKind::None) && out.len() > 1 {
-        return Err(AuthzError::new("invalid_request", "'none' cannot be combined"));
+        return Err(AuthzError::new(
+            "invalid_request",
+            "'none' cannot be combined",
+        ));
     }
     Ok(out)
 }

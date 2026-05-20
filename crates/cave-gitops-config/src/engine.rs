@@ -4,8 +4,8 @@
 
 use crate::models::{
     ClusterDestination, ClusterStatus, DestinationSelector, PipelineRun, PipelineRunStatus,
-    PipelineStage, PipelineStageResult, PipelineStageType, Promise, PromiseStatus,
-    ResourceRequest, StageStatus,
+    PipelineStage, PipelineStageResult, PipelineStageType, Promise, PromiseStatus, ResourceRequest,
+    StageStatus,
 };
 use chrono::Utc;
 use uuid::Uuid;
@@ -207,7 +207,9 @@ impl PipelineEngine {
             if let Some(props_obj) = properties.as_object() {
                 for (field_name, field_schema) in props_obj {
                     if let Some(value) = spec_obj.get(field_name) {
-                        if let Some(expected_type) = field_schema.get("type").and_then(|t| t.as_str()) {
+                        if let Some(expected_type) =
+                            field_schema.get("type").and_then(|t| t.as_str())
+                        {
                             let actual_ok = match expected_type {
                                 "string" => value.is_string(),
                                 "integer" | "number" => value.is_number(),
@@ -280,10 +282,7 @@ impl PipelineEngine {
     }
 
     /// Select cluster destinations that match ALL of the promise's destination selectors.
-    pub fn select_destinations(
-        promise: &Promise,
-        clusters: &[ClusterDestination],
-    ) -> Vec<String> {
+    pub fn select_destinations(promise: &Promise, clusters: &[ClusterDestination]) -> Vec<String> {
         clusters
             .iter()
             .filter(|cluster| {
@@ -360,8 +359,7 @@ mod tests {
 
     #[test]
     fn test_state_store_path() {
-        let path =
-            PipelineEngine::state_store_path("prod", "postgresql", "default", "my-db");
+        let path = PipelineEngine::state_store_path("prod", "postgresql", "default", "my-db");
         assert_eq!(path, "clusters/prod/postgresql/default/my-db.yaml");
     }
 
@@ -390,11 +388,7 @@ mod tests {
             order: 0,
         };
         let request = make_request("postgresql");
-        let result = PipelineEngine::execute_stage(
-            &stage,
-            &request,
-            &serde_json::Value::Null,
-        );
+        let result = PipelineEngine::execute_stage(&stage, &request, &serde_json::Value::Null);
         assert_eq!(result.status, StageStatus::Completed);
         // replicas should be in the output since spec didn't have it
         assert_eq!(result.output["replicas"], 3);

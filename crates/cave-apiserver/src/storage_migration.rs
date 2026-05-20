@@ -17,7 +17,7 @@
 //! Tenant invariant: each migration ticket is owned by a tenant_id; the
 //! controller's progress for tenant A MUST NOT be observable by tenant B.
 
-use crate::storage_version::{StorageVersionRegistry, StorageError};
+use crate::storage_version::{StorageError, StorageVersionRegistry};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -53,7 +53,10 @@ pub enum MigrationError {
     Storage(String),
     UnknownTicket,
     /// Ticket is in a phase that cannot progress (e.g. already Succeeded).
-    InvalidTransition { from: MigrationPhase, to: MigrationPhase },
+    InvalidTransition {
+        from: MigrationPhase,
+        to: MigrationPhase,
+    },
 }
 
 impl From<StorageError> for MigrationError {
@@ -76,7 +79,10 @@ pub struct StorageMigrationController<'a> {
 
 impl<'a> StorageMigrationController<'a> {
     pub fn new(storage: &'a StorageVersionRegistry) -> Self {
-        Self { storage, inner: Mutex::new(HashMap::new()) }
+        Self {
+            storage,
+            inner: Mutex::new(HashMap::new()),
+        }
     }
 
     /// Open a migration ticket. The destination version must already be
@@ -96,11 +102,15 @@ impl<'a> StorageMigrationController<'a> {
         let known = self.storage.known_versions(tenant_id, group, kind);
         if !known.iter().any(|v| v == from_version) {
             return Err(MigrationError::Storage(format!(
-                "from_version `{}` not registered", from_version)));
+                "from_version `{}` not registered",
+                from_version
+            )));
         }
         if !known.iter().any(|v| v == to_version) {
             return Err(MigrationError::Storage(format!(
-                "to_version `{}` not registered", to_version)));
+                "to_version `{}` not registered",
+                to_version
+            )));
         }
         let ticket = MigrationTicket {
             tenant_id: tenant_id.into(),
@@ -140,11 +150,12 @@ impl<'a> StorageMigrationController<'a> {
         let ticket = inner.get_mut(&key).ok_or(MigrationError::UnknownTicket)?;
         if ticket.phase != MigrationPhase::Pending {
             return Err(MigrationError::InvalidTransition {
-                from: ticket.phase, to: MigrationPhase::Running,
+                from: ticket.phase,
+                to: MigrationPhase::Running,
             });
         }
-        self.storage.elect_storage_version(
-            tenant_id, group, kind, &ticket.to_version)?;
+        self.storage
+            .elect_storage_version(tenant_id, group, kind, &ticket.to_version)?;
         ticket.phase = MigrationPhase::Running;
         Ok(ticket.clone())
     }
@@ -167,7 +178,8 @@ impl<'a> StorageMigrationController<'a> {
         let ticket = inner.get_mut(&key).ok_or(MigrationError::UnknownTicket)?;
         if ticket.phase != MigrationPhase::Running {
             return Err(MigrationError::InvalidTransition {
-                from: ticket.phase, to: MigrationPhase::Running,
+                from: ticket.phase,
+                to: MigrationPhase::Running,
             });
         }
         ticket.progress = (ticket.progress + n).min(ticket.total);
@@ -194,17 +206,16 @@ impl<'a> StorageMigrationController<'a> {
         Ok(ticket.clone())
     }
 
-    pub fn lookup(
-        &self,
-        tenant_id: &str,
-        group: &str,
-        kind: &str,
-    ) -> Option<MigrationTicket> {
-        self.inner.lock().unwrap().get(&TicketKey {
-            tenant_id: tenant_id.into(),
-            group: group.into(),
-            kind: kind.into(),
-        }).cloned()
+    pub fn lookup(&self, tenant_id: &str, group: &str, kind: &str) -> Option<MigrationTicket> {
+        self.inner
+            .lock()
+            .unwrap()
+            .get(&TicketKey {
+                tenant_id: tenant_id.into(),
+                group: group.into(),
+                kind: kind.into(),
+            })
+            .cloned()
     }
 }
 
@@ -214,9 +225,12 @@ mod tests {
 
     fn fresh() -> StorageVersionRegistry {
         let r = StorageVersionRegistry::new();
-        r.register_version("acme", "acme.io", "Widget", "v1alpha1").unwrap();
-        r.register_version("acme", "acme.io", "Widget", "v1beta1").unwrap();
-        r.register_version("acme", "acme.io", "Widget", "v1").unwrap();
+        r.register_version("acme", "acme.io", "Widget", "v1alpha1")
+            .unwrap();
+        r.register_version("acme", "acme.io", "Widget", "v1beta1")
+            .unwrap();
+        r.register_version("acme", "acme.io", "Widget", "v1")
+            .unwrap();
         r
     }
 
@@ -228,17 +242,23 @@ mod tests {
     fn test_alpha_to_beta_transition_elects_new_storage_version() {
         let storage = fresh();
         let mig = StorageMigrationController::new(&storage);
-        let opened = mig.open_ticket("acme", "acme.io", "Widget",
-            "v1alpha1", "v1beta1", 100).unwrap();
+        let opened = mig
+            .open_ticket("acme", "acme.io", "Widget", "v1alpha1", "v1beta1", 100)
+            .unwrap();
         assert_eq!(opened.phase, MigrationPhase::Pending);
-        assert_eq!(opened.tenant_id, "acme",
-            "tenant_id invariant: ticket carries owning tenant_id");
+        assert_eq!(
+            opened.tenant_id, "acme",
+            "tenant_id invariant: ticket carries owning tenant_id"
+        );
         let started = mig.start("acme", "acme.io", "Widget").unwrap();
         assert_eq!(started.phase, MigrationPhase::Running);
         // Storage version actually changed.
         assert_eq!(
-            storage.storage_version("acme", "acme.io", "Widget").as_deref(),
-            Some("v1beta1"));
+            storage
+                .storage_version("acme", "acme.io", "Widget")
+                .as_deref(),
+            Some("v1beta1")
+        );
     }
 
     /// Upstream parity: `TestMigration_BetaToGAProgressCompletes`
@@ -247,19 +267,24 @@ mod tests {
     fn test_record_progress_auto_succeeds_when_total_reached() {
         let storage = fresh();
         let mig = StorageMigrationController::new(&storage);
-        let _ = mig.open_ticket("acme", "acme.io", "Widget",
-            "v1beta1", "v1", 10).unwrap();
+        let _ = mig
+            .open_ticket("acme", "acme.io", "Widget", "v1beta1", "v1", 10)
+            .unwrap();
         let _ = mig.start("acme", "acme.io", "Widget").unwrap();
         // Two partial chunks then a final chunk.
         let mid = mig.record_progress("acme", "acme.io", "Widget", 4).unwrap();
         assert_eq!(mid.phase, MigrationPhase::Running);
         let almost = mig.record_progress("acme", "acme.io", "Widget", 4).unwrap();
         assert_eq!(almost.phase, MigrationPhase::Running);
-        let done = mig.record_progress("acme", "acme.io", "Widget", 10).unwrap();
+        let done = mig
+            .record_progress("acme", "acme.io", "Widget", 10)
+            .unwrap();
         assert_eq!(done.phase, MigrationPhase::Succeeded);
         assert_eq!(done.progress, 10);
-        assert_eq!(done.tenant_id, "acme",
-            "tenant_id invariant: completion stays scoped to acme");
+        assert_eq!(
+            done.tenant_id, "acme",
+            "tenant_id invariant: completion stays scoped to acme"
+        );
     }
 
     /// Upstream parity: `TestMigration_FailureMarksTicketFailed`
@@ -268,14 +293,17 @@ mod tests {
     fn test_fail_marks_ticket_failed_for_retry() {
         let storage = fresh();
         let mig = StorageMigrationController::new(&storage);
-        let _ = mig.open_ticket("acme", "acme.io", "Widget",
-            "v1alpha1", "v1beta1", 50).unwrap();
+        let _ = mig
+            .open_ticket("acme", "acme.io", "Widget", "v1alpha1", "v1beta1", 50)
+            .unwrap();
         let _ = mig.start("acme", "acme.io", "Widget").unwrap();
         let failed = mig.fail("acme", "acme.io", "Widget").unwrap();
         assert_eq!(failed.phase, MigrationPhase::Failed);
         // tenant_id invariant: globex sees no ticket.
-        assert!(mig.lookup("globex", "acme.io", "Widget").is_none(),
-            "tenant_id invariant: globex never sees acme's ticket");
+        assert!(
+            mig.lookup("globex", "acme.io", "Widget").is_none(),
+            "tenant_id invariant: globex never sees acme's ticket"
+        );
     }
 
     /// Upstream parity: `TestMigration_RejectsUnknownVersion`
@@ -285,8 +313,16 @@ mod tests {
     fn test_open_ticket_rejects_unknown_destination_version() {
         let storage = fresh();
         let mig = StorageMigrationController::new(&storage);
-        let err = mig.open_ticket("acme", "acme.io", "Widget",
-            "v1beta1", "v2-not-registered", 5).unwrap_err();
+        let err = mig
+            .open_ticket(
+                "acme",
+                "acme.io",
+                "Widget",
+                "v1beta1",
+                "v2-not-registered",
+                5,
+            )
+            .unwrap_err();
         match err {
             MigrationError::Storage(msg) => assert!(msg.contains("not registered")),
             other => panic!("unexpected: {:?}", other),
@@ -301,19 +337,30 @@ mod tests {
     fn test_tickets_are_isolated_per_tenant() {
         let storage = StorageVersionRegistry::new();
         for t in ["acme", "globex"] {
-            storage.register_version(t, "acme.io", "Widget", "v1alpha1").unwrap();
-            storage.register_version(t, "acme.io", "Widget", "v1").unwrap();
+            storage
+                .register_version(t, "acme.io", "Widget", "v1alpha1")
+                .unwrap();
+            storage
+                .register_version(t, "acme.io", "Widget", "v1")
+                .unwrap();
         }
         let mig = StorageMigrationController::new(&storage);
-        let _ = mig.open_ticket("acme", "acme.io", "Widget", "v1alpha1", "v1", 5).unwrap();
+        let _ = mig
+            .open_ticket("acme", "acme.io", "Widget", "v1alpha1", "v1", 5)
+            .unwrap();
         let _ = mig.start("acme", "acme.io", "Widget").unwrap();
         // globex's storage version unchanged.
         assert_eq!(
-            storage.storage_version("globex", "acme.io", "Widget").as_deref(),
+            storage
+                .storage_version("globex", "acme.io", "Widget")
+                .as_deref(),
             Some("v1alpha1"),
-            "tenant_id invariant: acme's election does not promote globex");
-        assert!(mig.lookup("globex", "acme.io", "Widget").is_none(),
-            "tenant_id invariant: globex sees no acme ticket");
+            "tenant_id invariant: acme's election does not promote globex"
+        );
+        assert!(
+            mig.lookup("globex", "acme.io", "Widget").is_none(),
+            "tenant_id invariant: globex sees no acme ticket"
+        );
     }
 
     /// Upstream parity: `TestMigration_RejectsDoubleStart`
@@ -323,14 +370,15 @@ mod tests {
     fn test_start_rejects_invalid_transition_from_running() {
         let storage = fresh();
         let mig = StorageMigrationController::new(&storage);
-        let _ = mig.open_ticket("acme", "acme.io", "Widget",
-            "v1alpha1", "v1", 5).unwrap();
+        let _ = mig
+            .open_ticket("acme", "acme.io", "Widget", "v1alpha1", "v1", 5)
+            .unwrap();
         let _ = mig.start("acme", "acme.io", "Widget").unwrap();
         let err = mig.start("acme", "acme.io", "Widget").unwrap_err();
         match err {
             MigrationError::InvalidTransition { from, to } => {
                 assert_eq!(from, MigrationPhase::Running);
-                assert_eq!(to,   MigrationPhase::Running);
+                assert_eq!(to, MigrationPhase::Running);
             }
             other => panic!("unexpected: {:?}", other),
         }

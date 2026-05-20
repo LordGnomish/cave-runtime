@@ -9,7 +9,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, DeployActivity};
+use crate::admin::state::{AdminState, DeployActivity, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -23,14 +23,13 @@ pub fn list_records(
     ctx: &RequestCtx,
 ) -> Result<Vec<DeployActivity>, DeployViewError> {
     ctx.authorise(Permission::DeployRead)?;
-    let mut rows: Vec<DeployActivity> = scope(
-        &state.deploy_activities.read().unwrap(),
-        &ctx.tenant,
-        |r| &r.tenant,
-    )
-    .into_iter()
-    .cloned()
-    .collect();
+    let mut rows: Vec<DeployActivity> =
+        scope(&state.deploy_activities.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| a.service.cmp(&b.service).then(a.id.cmp(&b.id)));
     Ok(rows)
 }
@@ -149,8 +148,10 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, DeployView
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite =
-    Cite::backstage("plugins/deploy/src/components/ActivityList.tsx", "ActivityList");
+const FILE_CITE: Cite = Cite::backstage(
+    "plugins/deploy/src/components/ActivityList.tsx",
+    "ActivityList",
+);
 
 #[cfg(test)]
 mod tests {
@@ -191,7 +192,8 @@ mod tests {
             "Applications",
             "acme"
         );
-        let apps = list_applications(&AdminState::seeded(), &ctx(&[Permission::DeployRead])).unwrap();
+        let apps =
+            list_applications(&AdminState::seeded(), &ctx(&[Permission::DeployRead])).unwrap();
         let mut names: Vec<&str> = apps.iter().map(|a| a.service.as_str()).collect();
         names.sort();
         let len = names.len();
@@ -204,9 +206,27 @@ mod tests {
         use cave_kernel::ns::TenantId;
         let t = TenantId::new("t").unwrap();
         let rows = vec![
-            DeployActivity { tenant: t.clone(), id: "1".into(), service: "a".into(), version: "v1".into(), status: "Synced" },
-            DeployActivity { tenant: t.clone(), id: "2".into(), service: "b".into(), version: "v2".into(), status: "Synced" },
-            DeployActivity { tenant: t.clone(), id: "3".into(), service: "c".into(), version: "v3".into(), status: "Failed" },
+            DeployActivity {
+                tenant: t.clone(),
+                id: "1".into(),
+                service: "a".into(),
+                version: "v1".into(),
+                status: "Synced",
+            },
+            DeployActivity {
+                tenant: t.clone(),
+                id: "2".into(),
+                service: "b".into(),
+                version: "v2".into(),
+                status: "Synced",
+            },
+            DeployActivity {
+                tenant: t.clone(),
+                id: "3".into(),
+                service: "c".into(),
+                version: "v3".into(),
+                status: "Failed",
+            },
         ];
         let counts = status_counts(&rows);
         assert_eq!(counts[0], ("Synced".into(), 2));

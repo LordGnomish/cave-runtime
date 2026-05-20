@@ -3,16 +3,14 @@
 //!
 //! Source: DefectDojo/django-DefectDojo@6eab8738 dojo/models.py:839,1128
 
-use crate::admin::layout::shell::{shell_v2, ShellOptions};
+use crate::admin::layout::shell::{ShellOptions, shell_v2};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::table;
 use crate::admin::state::AdminState;
 use crate::admin::vulns::VulnsViewError;
 
 /// Reference data — DefectDojo Product business_criticality enum.
-pub const BUSINESS_CRITICALITY: &[&str] = &[
-    "VeryHigh", "High", "Medium", "Low", "VeryLow", "None",
-];
+pub const BUSINESS_CRITICALITY: &[&str] = &["VeryHigh", "High", "Medium", "Low", "VeryLow", "None"];
 
 pub const LIFECYCLE: &[&str] = &["Construction", "Production", "Retirement"];
 
@@ -35,8 +33,20 @@ pub fn render(_state: &AdminState, ctx: &RequestCtx) -> Result<String, VulnsView
 </section>"#,
         n_b = BUSINESS_CRITICALITY.len(),
         n_l = LIFECYCLE.len(),
-        bc = table(&["criticality"], &BUSINESS_CRITICALITY.iter().map(|s| vec![s.to_string()]).collect::<Vec<_>>()),
-        lc = table(&["lifecycle"], &LIFECYCLE.iter().map(|s| vec![s.to_string()]).collect::<Vec<_>>()),
+        bc = table(
+            &["criticality"],
+            &BUSINESS_CRITICALITY
+                .iter()
+                .map(|s| vec![s.to_string()])
+                .collect::<Vec<_>>()
+        ),
+        lc = table(
+            &["lifecycle"],
+            &LIFECYCLE
+                .iter()
+                .map(|s| vec![s.to_string()])
+                .collect::<Vec<_>>()
+        ),
     );
     Ok(shell_v2(ShellOptions {
         title: "vulns · products",

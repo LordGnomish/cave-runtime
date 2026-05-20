@@ -49,10 +49,7 @@ pub fn avg_latency_ms(rows: &[BindingRow]) -> u32 {
     sum / rows.len() as u32
 }
 
-pub fn render_section(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, SchedulerViewError> {
+pub fn render_section(state: &AdminState, ctx: &RequestCtx) -> Result<String, SchedulerViewError> {
     let rows = list_bindings(state, ctx)?;
     let table_rows: Vec<Vec<String>> = rows
         .iter()

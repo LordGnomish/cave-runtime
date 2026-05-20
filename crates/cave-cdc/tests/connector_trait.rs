@@ -3,18 +3,20 @@
 //! cave-cdc — SourceConnector trait + ChangeEvent shape tests.
 //! Pinned to debezium v3.5.0.Final.
 
-use cave_cdc::{
-    ChangeOperation, ConnectorState, MySqlConnector, PostgresConnector, SourceConnector,
-    ReplicationSlotConfig,
-};
-use cave_cdc::postgres::DecodingPlugin;
 use cave_cdc::CdcError;
+use cave_cdc::postgres::DecodingPlugin;
+use cave_cdc::{
+    ChangeOperation, ConnectorState, MySqlConnector, PostgresConnector, ReplicationSlotConfig,
+    SourceConnector,
+};
 
 const TENANT: &str = "tenant-acme-prod";
 
 fn pg() -> PostgresConnector {
     PostgresConnector::new(
-        format!("{}-pg", TENANT), TENANT, "billing",
+        format!("{}-pg", TENANT),
+        TENANT,
+        "billing",
         ReplicationSlotConfig {
             slot_name: format!("{}_billing", TENANT.replace('-', "_")),
             publication_name: format!("{}_billing_pub", TENANT.replace('-', "_")),
@@ -29,9 +31,12 @@ fn pg() -> PostgresConnector {
 #[test]
 fn change_operation_wire_codes_round_trip() {
     for (s, op) in [
-        ("c", ChangeOperation::Create), ("u", ChangeOperation::Update),
-        ("d", ChangeOperation::Delete), ("r", ChangeOperation::Read),
-        ("t", ChangeOperation::Truncate), ("m", ChangeOperation::Message),
+        ("c", ChangeOperation::Create),
+        ("u", ChangeOperation::Update),
+        ("d", ChangeOperation::Delete),
+        ("r", ChangeOperation::Read),
+        ("t", ChangeOperation::Truncate),
+        ("m", ChangeOperation::Message),
     ] {
         let parsed = ChangeOperation::from_str(s).unwrap();
         assert_eq!(parsed, op);
@@ -48,11 +53,14 @@ fn change_operation_wire_codes_round_trip() {
 fn connector_state_machine_legal_transitions() {
     use ConnectorState::*;
     assert!(Initial.can_transition_to(Snapshotting));
-    assert!(Initial.can_transition_to(Streaming));   // skip-snapshot mode
+    assert!(Initial.can_transition_to(Streaming)); // skip-snapshot mode
     assert!(Snapshotting.can_transition_to(Streaming));
     assert!(Streaming.can_transition_to(Stopped));
     assert!(Streaming.can_transition_to(Failed));
-    assert!(Streaming.can_transition_to(Streaming), "self-loop is idempotent");
+    assert!(
+        Streaming.can_transition_to(Streaming),
+        "self-loop is idempotent"
+    );
 
     // Forbidden: backward edges + reviving terminals.
     assert!(!Streaming.can_transition_to(Initial));
@@ -87,19 +95,16 @@ fn postgres_connector_lifecycle_start_then_stop() {
 /// non-zero (MySQL replication identity).
 #[test]
 fn mysql_connector_validates_server_id_and_tenant() {
-    let mut bad = MySqlConnector::new(
-        format!("{}-mysql", TENANT), TENANT, "shop", 0);
+    let mut bad = MySqlConnector::new(format!("{}-mysql", TENANT), TENANT, "shop", 0);
     assert!(bad.validate().is_err());
 
     bad.server_id = 1042;
     assert!(bad.validate().is_ok());
 
-    let mut empty_tenant = MySqlConnector::new(
-        "no-tenant", "", "shop", 1042);
+    let mut empty_tenant = MySqlConnector::new("no-tenant", "", "shop", 1042);
     assert!(empty_tenant.validate().is_err());
 
-    let mut good = MySqlConnector::new(
-        format!("{}-mysql", TENANT), TENANT, "shop", 1042);
+    let mut good = MySqlConnector::new(format!("{}-mysql", TENANT), TENANT, "shop", 1042);
     assert!(good.start().is_ok());
     assert_eq!(good.state(), ConnectorState::Streaming);
 }

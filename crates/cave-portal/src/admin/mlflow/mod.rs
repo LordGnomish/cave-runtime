@@ -12,11 +12,11 @@
 //!
 //! Upstream UI: <https://mlflow.org/docs/latest/index.html>
 
+pub mod deployments;
 pub mod experiments;
-pub mod runs;
 pub mod models;
 pub mod registered_models;
-pub mod deployments;
+pub mod runs;
 pub mod types;
 
 pub use types::{
@@ -77,15 +77,18 @@ mod tests {
     fn seeded() -> AdminState {
         let s = AdminState::seeded();
         let acme = TenantId::new("acme").expect("t");
-        s.mlflow_experiments.write().unwrap().push(MlflowExperiment {
-            tenant: acme.clone(),
-            experiment_id: "exp-1".into(),
-            name: "fraud-detection".into(),
-            artifact_location: "s3://artifacts/fraud".into(),
-            lifecycle_stage: "active".into(),
-            creation_time_ms: 0,
-            last_update_time_ms: 0,
-        });
+        s.mlflow_experiments
+            .write()
+            .unwrap()
+            .push(MlflowExperiment {
+                tenant: acme.clone(),
+                experiment_id: "exp-1".into(),
+                name: "fraud-detection".into(),
+                artifact_location: "s3://artifacts/fraud".into(),
+                lifecycle_stage: "active".into(),
+                creation_time_ms: 0,
+                last_update_time_ms: 0,
+            });
         s
     }
 

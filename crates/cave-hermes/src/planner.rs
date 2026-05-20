@@ -87,9 +87,7 @@ impl Planner for HeuristicPlanner {
     fn plan(&self, goal: &str) -> crate::error::Result<Plan> {
         let trimmed = goal.trim();
         if trimmed.is_empty() {
-            return Err(HermesError::PlannerRejected(
-                "empty goal".into(),
-            ));
+            return Err(HermesError::PlannerRejected("empty goal".into()));
         }
         let lower = trimmed.to_lowercase();
         let mut plan = Plan::new(trimmed);
@@ -116,10 +114,8 @@ impl Planner for HeuristicPlanner {
                 PlanStep::new("file_read", "read referenced file")
                     .with_arg("path", serde_json::Value::String(path)),
             );
-            plan.steps.push(PlanStep::new(
-                "respond",
-                "summarise the file contents",
-            ));
+            plan.steps
+                .push(PlanStep::new("respond", "summarise the file contents"));
             return Ok(plan);
         }
 
@@ -127,15 +123,16 @@ impl Planner for HeuristicPlanner {
         // "run X" / "execute X" → bash
         if lower.starts_with("run ") || lower.starts_with("execute ") {
             // Strip the verb and run the rest as a shell command.
-            let cmd = trimmed.split_once(' ').map(|(_, rest)| rest).unwrap_or(trimmed);
+            let cmd = trimmed
+                .split_once(' ')
+                .map(|(_, rest)| rest)
+                .unwrap_or(trimmed);
             plan.steps.push(
                 PlanStep::new("bash", "execute requested shell command")
                     .with_arg("command", serde_json::Value::String(cmd.to_string())),
             );
-            plan.steps.push(PlanStep::new(
-                "respond",
-                "summarise the command output",
-            ));
+            plan.steps
+                .push(PlanStep::new("respond", "summarise the command output"));
             return Ok(plan);
         }
 
@@ -167,22 +164,14 @@ fn pick_path_after(lower: &str, keyword: &str) -> Option<String> {
     let path: String = if first == '"' || first == '\'' {
         chars.take_while(|c| *c != first).collect()
     } else {
-        trimmed
-            .chars()
-            .take_while(|c| !c.is_whitespace())
-            .collect()
+        trimmed.chars().take_while(|c| !c.is_whitespace()).collect()
     };
-    if path.is_empty() {
-        None
-    } else {
-        Some(path)
-    }
+    if path.is_empty() { None } else { Some(path) }
 }
 
 /// Thin wrapper around a caller-supplied completion fn. The fn is given
 /// the user goal and must return a JSON string parseable into [`Plan`].
-pub type LlmCompleteFn =
-    Arc<dyn Fn(&str) -> std::result::Result<String, String> + Send + Sync>;
+pub type LlmCompleteFn = Arc<dyn Fn(&str) -> std::result::Result<String, String> + Send + Sync>;
 
 pub struct LlmPlanner {
     complete: LlmCompleteFn,
@@ -197,9 +186,8 @@ impl LlmPlanner {
 impl Planner for LlmPlanner {
     fn plan(&self, goal: &str) -> crate::error::Result<Plan> {
         let raw = (self.complete)(goal).map_err(HermesError::PlannerRejected)?;
-        let plan: Plan = serde_json::from_str(&raw).map_err(|e| {
-            HermesError::PlannerRejected(format!("invalid plan JSON: {e}"))
-        })?;
+        let plan: Plan = serde_json::from_str(&raw)
+            .map_err(|e| HermesError::PlannerRejected(format!("invalid plan JSON: {e}")))?;
         if plan.steps.is_empty() {
             return Err(HermesError::PlannerRejected(
                 "planner returned zero steps".into(),
@@ -274,9 +262,7 @@ mod tests {
 
     #[test]
     fn llm_planner_rejects_zero_step_plan() {
-        let p = LlmPlanner::new(Arc::new(|_g: &str| {
-            Ok(r#"{"goal":"g","steps":[]}"#.into())
-        }));
+        let p = LlmPlanner::new(Arc::new(|_g: &str| Ok(r#"{"goal":"g","steps":[]}"#.into())));
         let err = p.plan("g").unwrap_err();
         assert!(matches!(err, HermesError::PlannerRejected(_)));
     }

@@ -36,7 +36,11 @@ pub fn default_exec_hook(container: &str, command: Vec<String>) -> ExecHook {
 mod tests {
     use super::*;
 
-    fn make_hook(name: &str, pre_cmd: Option<Vec<String>>, post_cmd: Option<Vec<String>>) -> BackupHook {
+    fn make_hook(
+        name: &str,
+        pre_cmd: Option<Vec<String>>,
+        post_cmd: Option<Vec<String>>,
+    ) -> BackupHook {
         let pre = pre_cmd
             .map(|cmd| vec![default_exec_hook("app", cmd)])
             .unwrap_or_default();

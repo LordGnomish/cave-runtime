@@ -97,7 +97,11 @@ impl CpuTopology {
     /// Build a homogeneous topology: `sockets * cores_per_socket * threads_per_core`.
     /// CPU IDs are assigned sequentially, with hyperthread siblings paired
     /// adjacent (cpu N and N+sockets*cores share core).
-    pub fn make_homogeneous(sockets: usize, cores_per_socket: usize, threads_per_core: usize) -> Self {
+    pub fn make_homogeneous(
+        sockets: usize,
+        cores_per_socket: usize,
+        threads_per_core: usize,
+    ) -> Self {
         let mut cpus = BTreeMap::new();
         let mut id = 0i64;
         for socket_id in 0..sockets {
@@ -290,8 +294,7 @@ impl CpuManager {
         }
         if self.options.full_pcpus_only && !self.is_full_pcpus_aligned(request) {
             return Err(CpuError::Invalid(
-                "full-pcpus-only requires request to be a multiple of threads-per-core"
-                    .into(),
+                "full-pcpus-only requires request to be a multiple of threads-per-core".into(),
             ));
         }
         if self.shared_pool.size() < request {
@@ -336,7 +339,10 @@ impl CpuManager {
         let mut remaining = pool.clone();
         // 1) Full sockets first.
         for socket in 0..self.topology.num_sockets as i64 {
-            let s = self.topology.cpus_in_socket(socket).intersection(&remaining);
+            let s = self
+                .topology
+                .cpus_in_socket(socket)
+                .intersection(&remaining);
             if s.size() == self.topology.cpus_in_socket(socket).size()
                 && s.size() <= (n - chosen.size())
                 && s.size() > 0
@@ -392,9 +398,7 @@ impl CpuManager {
             .cpus
             .values()
             .next()
-            .map(|c| {
-                self.topology.cpus_in_core(c.core_id).size()
-            })
+            .map(|c| self.topology.cpus_in_core(c.core_id).size())
             .unwrap_or(1);
         threads == 0 || request % threads == 0
     }
@@ -481,12 +485,8 @@ mod tests {
     #[test]
     fn manager_shared_pool_excludes_reserved() {
         let t = topo_2s_4c_2t();
-        let m = CpuManager::new(
-            t,
-            CpuManagerPolicy::Static,
-            CpuSet::from_iter(vec![0, 1]),
-        )
-        .unwrap();
+        let m =
+            CpuManager::new(t, CpuManagerPolicy::Static, CpuSet::from_iter(vec![0, 1])).unwrap();
         assert_eq!(m.shared_pool().size(), 14);
         assert!(!m.shared_pool().contains(0));
         assert!(!m.shared_pool().contains(1));

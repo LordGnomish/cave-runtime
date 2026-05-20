@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+use crate::VaultState;
 use crate::error::{VaultError, VaultResult};
 use crate::response::VaultResponse;
 use crate::token::CreateTokenParams;
-use crate::VaultState;
 use axum::{
+    Router,
     extract::{Json, Path, State},
     http::HeaderMap,
     routing::{delete, get, post},
-    Router,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -16,7 +16,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 fn extract_token(headers: &HeaderMap) -> VaultResult<String> {
-    headers.get("x-vault-token")
+    headers
+        .get("x-vault-token")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or(VaultError::BadToken)
@@ -97,10 +98,13 @@ pub async fn create_group(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.ldap_store.write().await;
-    store.groups.insert(group_name.clone(), LdapGroup {
-        name: group_name,
-        policies: body.policies.unwrap_or_default(),
-    });
+    store.groups.insert(
+        group_name.clone(),
+        LdapGroup {
+            name: group_name,
+            policies: body.policies.unwrap_or_default(),
+        },
+    );
     Ok(VaultResponse::new())
 }
 
@@ -111,7 +115,9 @@ pub async fn read_group(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.ldap_store.read().await;
-    let group = store.groups.get(&group_name)
+    let group = store
+        .groups
+        .get(&group_name)
         .ok_or_else(|| VaultError::NotFound(format!("group {} not found", group_name)))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(group).unwrap_or_default()))
 }
@@ -151,11 +157,14 @@ pub async fn create_user_policy(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.ldap_store.write().await;
-    store.users.insert(username.clone(), LdapUser {
-        username: username,
-        policies: body.policies.unwrap_or_default(),
-        groups: body.groups.unwrap_or_default(),
-    });
+    store.users.insert(
+        username.clone(),
+        LdapUser {
+            username: username,
+            policies: body.policies.unwrap_or_default(),
+            groups: body.groups.unwrap_or_default(),
+        },
+    );
     Ok(VaultResponse::new())
 }
 
@@ -226,8 +235,14 @@ pub fn router(state: Arc<VaultState>) -> Router {
     Router::new()
         .route("/v1/auth/ldap/config", post(configure).get(read_config))
         .route("/v1/auth/ldap/groups", get(list_groups))
-        .route("/v1/auth/ldap/groups/{group_name}", post(create_group).get(read_group).delete(delete_group))
-        .route("/v1/auth/ldap/users/{username}", post(create_user_policy).delete(delete_user_policy))
+        .route(
+            "/v1/auth/ldap/groups/{group_name}",
+            post(create_group).get(read_group).delete(delete_group),
+        )
+        .route(
+            "/v1/auth/ldap/users/{username}",
+            post(create_user_policy).delete(delete_user_policy),
+        )
         .route("/v1/auth/ldap/login/{username}", post(login))
         .with_state(state)
 }

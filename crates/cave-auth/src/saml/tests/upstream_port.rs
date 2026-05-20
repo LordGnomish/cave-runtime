@@ -15,14 +15,12 @@
 //! covers the public-only surface); the parity manifest declares
 //! both via `[[tests]]` entries.
 
-use crate::saml::assertion::{
-    AssertionConditions, AuthnContextClass, SubjectConfirmationMethod,
-};
-use crate::saml::bindings::http_artifact::{Artifact, ARTIFACT_LEN, ARTIFACT_TYPE_0004};
+use crate::saml::NameIdFormat;
+use crate::saml::assertion::{AssertionConditions, AuthnContextClass, SubjectConfirmationMethod};
+use crate::saml::bindings::http_artifact::{ARTIFACT_LEN, ARTIFACT_TYPE_0004, Artifact};
 use crate::saml::bindings::http_post;
 use crate::saml::bindings::http_redirect;
 use crate::saml::name_id::{NameId, NameIdPolicy};
-use crate::saml::NameIdFormat;
 use chrono::{DateTime, Duration, Utc};
 
 fn t(offset_secs: i64) -> DateTime<Utc> {
@@ -186,12 +184,7 @@ fn upstream_subject_confirmation_test_test_holder_of_key_method() {
 fn upstream_saml_bindings_test_test_redirect_binding_signing_payload_param_order() {
     // Mirrors `SAMLBindingsTest::testRedirectSigningPayloadOrder`.
     // §3.4.4.1: SAMLRequest=, then RelayState= (if any), then SigAlg=.
-    let p = http_redirect::signing_payload(
-        "SAMLRequest",
-        "ENCODED",
-        Some("RS"),
-        "ALG",
-    );
+    let p = http_redirect::signing_payload("SAMLRequest", "ENCODED", Some("RS"), "ALG");
     assert_eq!(p, "SAMLRequest=ENCODED&RelayState=RS&SigAlg=ALG");
 }
 
@@ -199,12 +192,7 @@ fn upstream_saml_bindings_test_test_redirect_binding_signing_payload_param_order
 fn upstream_saml_bindings_test_test_post_form_has_auto_submit() {
     // Mirrors `SAMLBindingsTest::testPostFormHasAutoSubmit` —
     // form must auto-submit via body onload.
-    let form = http_post::auto_submit_form(
-        "https://sp/acs",
-        "SAMLResponse",
-        "B64",
-        Some("rs"),
-    );
+    let form = http_post::auto_submit_form("https://sp/acs", "SAMLResponse", "B64", Some("rs"));
     assert!(form.contains("onload=\"document.forms[0].submit()\""));
 }
 

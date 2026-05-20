@@ -63,10 +63,7 @@ pub(super) fn render_section(
 </section>"#,
         n = rows.len(),
         p = provisioned_count(&rows),
-        tbl = table(
-            &["name", "namespace", "externalIP", "state"],
-            &table_rows
-        ),
+        tbl = table(&["name", "namespace", "externalIP", "state"], &table_rows),
     ))
 }
 
@@ -89,7 +86,11 @@ mod tests {
         );
         let s = AdminState::seeded();
         let rows = list_load_balancers(&s, &ctx(&[Permission::CloudControllerRead])).unwrap();
-        let vols = super::super::volume_controller::list_volumes(&s, &ctx(&[Permission::CloudControllerRead])).unwrap();
+        let vols = super::super::volume_controller::list_volumes(
+            &s,
+            &ctx(&[Permission::CloudControllerRead]),
+        )
+        .unwrap();
         assert_eq!(rows.len(), vols.len());
     }
 
@@ -103,7 +104,11 @@ mod tests {
     fn state_matches_attached_node_flag() {
         let s = AdminState::seeded();
         let rows = list_load_balancers(&s, &ctx(&[Permission::CloudControllerRead])).unwrap();
-        let vols = super::super::volume_controller::list_volumes(&s, &ctx(&[Permission::CloudControllerRead])).unwrap();
+        let vols = super::super::volume_controller::list_volumes(
+            &s,
+            &ctx(&[Permission::CloudControllerRead]),
+        )
+        .unwrap();
         for (r, v) in rows.iter().zip(vols.iter()) {
             let expected = if v.attached_node.is_some() {
                 "Provisioned"

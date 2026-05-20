@@ -11,7 +11,9 @@ pub struct Index {
 
 impl Index {
     pub fn new(tenant_id: &TenantId) -> Self {
-        Index { _tenant: tenant_id.clone() }
+        Index {
+            _tenant: tenant_id.clone(),
+        }
     }
 
     pub fn id(&self) -> &str {

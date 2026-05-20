@@ -141,8 +141,8 @@ mod tests {
 
     #[tokio::test]
     async fn add_record_via_update() {
-        use crate::zone::file::make_default_soa;
         use crate::config::ZoneType;
+        use crate::zone::file::make_default_soa;
 
         let origin: Name = "example.com.".parse().unwrap();
         let soa = make_default_soa(&origin);

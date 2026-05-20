@@ -15,14 +15,14 @@
 //! We verify the VP signature and return either 200 (with the matched
 //! credentials) or 400 with a structured error.
 
-use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use ed25519_dalek::VerifyingKey;
 use serde::{Deserialize, Serialize};
 
+use super::super::Oid4vcError;
 use super::super::issuance::credential_endpoint::IssuerState;
 use super::super::vc::model::VerifiableCredential;
 use super::super::vc::proof::verify_credential;
-use super::super::Oid4vcError;
 
 /// Wire shape of the wallet's POST body.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,8 +77,12 @@ pub async fn handle_authz_response(
     let pk = st.inner.read().keys.signing_key.verifying_key();
     match verify_vp(&body, &pk) {
         Ok(r) => (StatusCode::OK, Json(r)).into_response(),
-        Err(Oid4vcError::Signature(m)) => (StatusCode::BAD_REQUEST, format!("signature: {m}")).into_response(),
-        Err(Oid4vcError::MissingField(m)) => (StatusCode::BAD_REQUEST, format!("missing: {m}")).into_response(),
+        Err(Oid4vcError::Signature(m)) => {
+            (StatusCode::BAD_REQUEST, format!("signature: {m}")).into_response()
+        }
+        Err(Oid4vcError::MissingField(m)) => {
+            (StatusCode::BAD_REQUEST, format!("missing: {m}")).into_response()
+        }
         Err(e) => (StatusCode::BAD_REQUEST, format!("{e}")).into_response(),
     }
 }
@@ -111,7 +115,7 @@ pub fn verify_vp(
 mod tests {
     use super::*;
     use crate::oid4vc::issuance::credential_endpoint::{
-        IssueRequest, IssuanceTicket, IssuerKeys, IssuerState,
+        IssuanceTicket, IssueRequest, IssuerKeys, IssuerState,
     };
     use serde_json::json;
 
@@ -133,7 +137,8 @@ mod tests {
             credential_configuration_id: None,
             pre_authorized_code: Some("c".into()),
         };
-        crate::oid4vc::issuance::credential_endpoint::issue(st, &axum::http::HeaderMap::new(), &req).unwrap()
+        crate::oid4vc::issuance::credential_endpoint::issue(st, &axum::http::HeaderMap::new(), &req)
+            .unwrap()
     }
 
     #[test]
@@ -170,7 +175,12 @@ mod tests {
             credential_configuration_id: None,
             pre_authorized_code: Some("c2".into()),
         };
-        let vc2 = crate::oid4vc::issuance::credential_endpoint::issue(&st, &axum::http::HeaderMap::new(), &req).unwrap();
+        let vc2 = crate::oid4vc::issuance::credential_endpoint::issue(
+            &st,
+            &axum::http::HeaderMap::new(),
+            &req,
+        )
+        .unwrap();
         let body = AuthzResponse {
             vp_token: VpToken::Multi(vec![vc1, vc2]),
             presentation_submission: serde_json::Value::Null,
@@ -219,13 +229,17 @@ mod tests {
         let st = IssuerState::new(IssuerKeys::test());
         let vc = issued(&st);
         let app = axum::Router::new()
-            .route("/oid4vp/authz_response", axum::routing::post(handle_authz_response))
+            .route(
+                "/oid4vp/authz_response",
+                axum::routing::post(handle_authz_response),
+            )
             .with_state(st);
         let body = serde_json::to_string(&AuthzResponse {
             vp_token: VpToken::Single(vc),
             presentation_submission: serde_json::Value::Null,
             state: Some("xyz".into()),
-        }).unwrap();
+        })
+        .unwrap();
         let req = Request::builder()
             .uri("/oid4vp/authz_response")
             .method("POST")
@@ -234,7 +248,9 @@ mod tests {
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        let body = axum::body::to_bytes(resp.into_body(), 1_000_000).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), 1_000_000)
+            .await
+            .unwrap();
         let r: AuthzResponseResult = serde_json::from_slice(&body).unwrap();
         assert!(r.verified);
         assert_eq!(r.state.as_deref(), Some("xyz"));
@@ -247,15 +263,21 @@ mod tests {
         use tower::ServiceExt;
         let st = IssuerState::new(IssuerKeys::test());
         let mut vc = issued(&st);
-        vc.credential_subject.claims.insert("name".into(), json!("Mallory"));
+        vc.credential_subject
+            .claims
+            .insert("name".into(), json!("Mallory"));
         let app = axum::Router::new()
-            .route("/oid4vp/authz_response", axum::routing::post(handle_authz_response))
+            .route(
+                "/oid4vp/authz_response",
+                axum::routing::post(handle_authz_response),
+            )
             .with_state(st);
         let body = serde_json::to_string(&AuthzResponse {
             vp_token: VpToken::Single(vc),
             presentation_submission: serde_json::Value::Null,
             state: None,
-        }).unwrap();
+        })
+        .unwrap();
         let req = Request::builder()
             .uri("/oid4vp/authz_response")
             .method("POST")

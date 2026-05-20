@@ -3,16 +3,16 @@
 //! HTTP API routes for cave-pipelines.
 
 use crate::{
-    engine::{validate_params, Dag},
+    PipelinesState,
+    engine::{Dag, validate_params},
     models::*,
     triggers::{CronTrigger, EventListener, WebhookEvent, passes_interceptors},
-    PipelinesState,
 };
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     routing::{delete, get, post, put},
-    Json, Router,
 };
 use chrono::Utc;
 use std::sync::Arc;
@@ -22,12 +22,20 @@ pub fn create_router(state: Arc<PipelinesState>) -> Router {
     Router::new()
         // Pipeline CRUD
         .route("/api/pipelines", get(list_pipelines).post(create_pipeline))
-        .route("/api/pipelines/{id}", get(get_pipeline).put(update_pipeline).delete(delete_pipeline))
+        .route(
+            "/api/pipelines/{id}",
+            get(get_pipeline)
+                .put(update_pipeline)
+                .delete(delete_pipeline),
+        )
         // PipelineRun
         .route("/api/pipelines/{id}/runs", post(start_pipeline_run))
         .route("/api/pipeline-runs", get(list_pipeline_runs))
         .route("/api/pipeline-runs/{run_id}", get(get_pipeline_run))
-        .route("/api/pipeline-runs/{run_id}/cancel", post(cancel_pipeline_run))
+        .route(
+            "/api/pipeline-runs/{run_id}/cancel",
+            post(cancel_pipeline_run),
+        )
         // TaskRun
         .route("/api/task-runs/{run_id}", get(get_task_run))
         .route("/api/task-runs/{run_id}/logs", get(get_task_run_logs))
@@ -39,8 +47,14 @@ pub fn create_router(state: Arc<PipelinesState>) -> Router {
         .route("/api/catalog/tasks/{name}", get(get_catalog_task))
         // Triggers
         .route("/api/triggers/webhook", post(handle_webhook))
-        .route("/api/triggers/cron", get(list_cron_triggers).post(create_cron_trigger))
-        .route("/api/event-listeners", get(list_event_listeners).post(create_event_listener))
+        .route(
+            "/api/triggers/cron",
+            get(list_cron_triggers).post(create_cron_trigger),
+        )
+        .route(
+            "/api/event-listeners",
+            get(list_event_listeners).post(create_event_listener),
+        )
         // Jenkins compat
         .route("/api/jenkins/import", post(import_jenkinsfile))
         // Build status
@@ -60,9 +74,7 @@ async fn health() -> Json<serde_json::Value> {
 
 // ─── Pipeline CRUD ────────────────────────────────────────────────────────────
 
-async fn list_pipelines(
-    State(_state): State<Arc<PipelinesState>>,
-) -> Json<serde_json::Value> {
+async fn list_pipelines(State(_state): State<Arc<PipelinesState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({ "pipelines": [], "total": 0 }))
 }
 
@@ -135,7 +147,9 @@ async fn start_pipeline_run(
         name: format!("run-{}", Uuid::new_v4()),
         namespace: None,
         spec: PipelineRunSpec {
-            pipeline_ref: Some(PipelineRef { name: pipeline_id.to_string() }),
+            pipeline_ref: Some(PipelineRef {
+                name: pipeline_id.to_string(),
+            }),
             pipeline_spec: None,
             params: req.params.unwrap_or_default(),
             workspaces: req.workspaces.unwrap_or_default(),
@@ -148,15 +162,15 @@ async fn start_pipeline_run(
         start_time: Some(Utc::now()),
         completion_time: None,
         created_at: Utc::now(),
-        trigger_source: Some(TriggerSource::Manual { user: "api".to_string() }),
+        trigger_source: Some(TriggerSource::Manual {
+            user: "api".to_string(),
+        }),
         labels: Default::default(),
     };
     (StatusCode::CREATED, Json(run))
 }
 
-async fn list_pipeline_runs(
-    State(_state): State<Arc<PipelinesState>>,
-) -> Json<serde_json::Value> {
+async fn list_pipeline_runs(State(_state): State<Arc<PipelinesState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({ "runs": [], "total": 0 }))
 }
 
@@ -208,9 +222,7 @@ async fn get_task_run_logs(
 
 // ─── Task CRUD ────────────────────────────────────────────────────────────────
 
-async fn list_tasks(
-    State(_state): State<Arc<PipelinesState>>,
-) -> Json<serde_json::Value> {
+async fn list_tasks(State(_state): State<Arc<PipelinesState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({ "tasks": [], "total": 0 }))
 }
 
@@ -243,17 +255,20 @@ async fn get_task(
 
 // ─── Catalog ─────────────────────────────────────────────────────────────────
 
-async fn list_catalog(
-    State(state): State<Arc<PipelinesState>>,
-) -> Json<serde_json::Value> {
-    let tasks: Vec<serde_json::Value> = state.catalog.list().iter().map(|e| {
-        serde_json::json!({
-            "name": e.name,
-            "version": e.version,
-            "description": e.description,
-            "tags": e.tags,
+async fn list_catalog(State(state): State<Arc<PipelinesState>>) -> Json<serde_json::Value> {
+    let tasks: Vec<serde_json::Value> = state
+        .catalog
+        .list()
+        .iter()
+        .map(|e| {
+            serde_json::json!({
+                "name": e.name,
+                "version": e.version,
+                "description": e.description,
+                "tags": e.tags,
+            })
         })
-    }).collect();
+        .collect();
     Json(serde_json::json!({ "tasks": tasks, "total": tasks.len() }))
 }
 
@@ -290,9 +305,7 @@ async fn handle_webhook(
     }))
 }
 
-async fn list_cron_triggers(
-    State(_state): State<Arc<PipelinesState>>,
-) -> Json<serde_json::Value> {
+async fn list_cron_triggers(State(_state): State<Arc<PipelinesState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({ "triggers": [] }))
 }
 
@@ -328,16 +341,19 @@ async fn import_jenkinsfile(
     State(_state): State<Arc<PipelinesState>>,
     Json(req): Json<JenkinsfileImport>,
 ) -> Result<(StatusCode, Json<Pipeline>), (StatusCode, Json<serde_json::Value>)> {
-    let jf = crate::jenkins::parse_jenkinsfile(&req.content)
-        .map_err(|e| (
+    let jf = crate::jenkins::parse_jenkinsfile(&req.content).map_err(|e| {
+        (
             StatusCode::UNPROCESSABLE_ENTITY,
             Json(serde_json::json!({ "error": e.to_string() })),
-        ))?;
+        )
+    })?;
 
     let spec = crate::jenkins::to_pipeline_spec(&jf);
     let pipeline = Pipeline {
         id: Uuid::new_v4(),
-        name: req.pipeline_name.unwrap_or_else(|| format!("jenkins-import-{}", Uuid::new_v4())),
+        name: req
+            .pipeline_name
+            .unwrap_or_else(|| format!("jenkins-import-{}", Uuid::new_v4())),
         namespace: None,
         spec,
         created_at: Utc::now(),

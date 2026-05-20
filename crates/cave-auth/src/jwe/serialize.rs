@@ -26,7 +26,10 @@ pub enum JweError {
     #[error("compact JWE must have 5 segments, found {0}")]
     Segments(usize),
     #[error("segment {segment} not base64url: {detail}")]
-    Base64 { segment: &'static str, detail: String },
+    Base64 {
+        segment: &'static str,
+        detail: String,
+    },
     #[error("header error: {0}")]
     Header(#[from] JweHeaderError),
     #[error("JSON serialization failed: {0}")]
@@ -122,8 +125,7 @@ mod tests {
 
     fn sample() -> JweCompact {
         JweCompact {
-            header: JweHeader::new(KeyAgreementAlg::RsaOaep, ContentEncAlg::A256Gcm)
-                .with_kid("k1"),
+            header: JweHeader::new(KeyAgreementAlg::RsaOaep, ContentEncAlg::A256Gcm).with_kid("k1"),
             encrypted_key: vec![1, 2, 3, 4],
             iv: vec![5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
             ciphertext: b"ciphertext-blob".to_vec(),
@@ -150,7 +152,13 @@ mod tests {
     #[test]
     fn compact_rejects_bad_base64() {
         let err = compact_decode("!!!.!!!.!!!.!!!.!!!").unwrap_err();
-        assert!(matches!(err, JweError::Base64 { segment: "header", .. }));
+        assert!(matches!(
+            err,
+            JweError::Base64 {
+                segment: "header",
+                ..
+            }
+        ));
     }
 
     #[test]

@@ -42,7 +42,10 @@ impl<K: Ord + Clone> Allocator<K> {
     pub fn new(tenant: TenantId, min: u64, max: u64) -> Self {
         assert!(min <= max);
         Self {
-            tenant, min, max, next: min,
+            tenant,
+            min,
+            max,
+            next: min,
             by_key: BTreeMap::new(),
             by_id: BTreeMap::new(),
         }
@@ -58,7 +61,10 @@ impl<K: Ord + Clone> Allocator<K> {
             self.next += 1;
         }
         if self.next > self.max {
-            return Err(AllocError::Exhausted { id: self.next, max: self.max });
+            return Err(AllocError::Exhausted {
+                id: self.next,
+                max: self.max,
+            });
         }
         let id = self.next;
         self.next += 1;
@@ -67,18 +73,28 @@ impl<K: Ord + Clone> Allocator<K> {
         Ok(id)
     }
 
-    pub fn lookup_id(&self, key: &K) -> Option<u64> { self.by_key.get(key).copied() }
-    pub fn lookup_key(&self, id: u64) -> Option<&K> { self.by_id.get(&id) }
+    pub fn lookup_id(&self, key: &K) -> Option<u64> {
+        self.by_key.get(key).copied()
+    }
+    pub fn lookup_key(&self, id: u64) -> Option<&K> {
+        self.by_id.get(&id)
+    }
 
     pub fn release(&mut self, key: &K) -> Option<u64> {
         let id = self.by_key.remove(key)?;
         self.by_id.remove(&id);
-        if id < self.next { self.next = id; }
+        if id < self.next {
+            self.next = id;
+        }
         Some(id)
     }
 
-    pub fn len(&self) -> usize { self.by_key.len() }
-    pub fn is_empty(&self) -> bool { self.by_key.is_empty() }
+    pub fn len(&self) -> usize {
+        self.by_key.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.by_key.is_empty()
+    }
 }
 
 #[allow(dead_code)]
@@ -136,7 +152,8 @@ mod tests {
 
     #[test]
     fn allocator_release_frees_id_for_reuse() {
-        let (_c, t) = cilium_test_ctx!("pkg/allocator/allocator.go", "ReleaseReuse", "tenant-al-rr");
+        let (_c, t) =
+            cilium_test_ctx!("pkg/allocator/allocator.go", "ReleaseReuse", "tenant-al-rr");
         let mut a: Allocator<String> = Allocator::new(t, 1, 2);
         let id1 = a.allocate("k1".into()).unwrap();
         a.release(&"k1".into());
@@ -164,7 +181,8 @@ mod tests {
 
     #[test]
     fn allocator_release_unknown_returns_none() {
-        let (_c, t) = cilium_test_ctx!("pkg/allocator/allocator.go", "Release.Miss", "tenant-al-rm");
+        let (_c, t) =
+            cilium_test_ctx!("pkg/allocator/allocator.go", "Release.Miss", "tenant-al-rm");
         let mut a: Allocator<String> = Allocator::new(t, 1024, 65535);
         assert!(a.release(&"ghost".into()).is_none());
     }

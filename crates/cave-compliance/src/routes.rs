@@ -2,14 +2,14 @@
 // Copyright 2026 Cave Runtime contributors
 //! HTTP routes for cave-compliance.
 
-use crate::models::*;
 use crate::ComplianceState;
+use crate::models::*;
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, post},
-    Json, Router,
 };
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -101,29 +101,53 @@ pub struct CreateCustomFrameworkRequest {
 pub fn create_router(state: Arc<ComplianceState>) -> Router {
     Router::new()
         // Frameworks
-        .route("/api/compliance/frameworks", get(list_frameworks).post(create_framework))
+        .route(
+            "/api/compliance/frameworks",
+            get(list_frameworks).post(create_framework),
+        )
         .route("/api/compliance/frameworks/{id}", get(get_framework))
-        .route("/api/compliance/frameworks/{id}/controls", get(list_controls))
+        .route(
+            "/api/compliance/frameworks/{id}/controls",
+            get(list_controls),
+        )
         // Checks & Scans
-        .route("/api/compliance/controls/{id}/check", post(run_control_check))
+        .route(
+            "/api/compliance/controls/{id}/check",
+            post(run_control_check),
+        )
         .route("/api/compliance/scan", post(scan_framework))
         // Findings
-        .route("/api/compliance/findings", get(list_findings).post(create_finding))
+        .route(
+            "/api/compliance/findings",
+            get(list_findings).post(create_finding),
+        )
         .route("/api/compliance/findings/{id}", get(get_finding))
         // Evidence
-        .route("/api/compliance/evidence", get(list_evidence).post(add_evidence))
+        .route(
+            "/api/compliance/evidence",
+            get(list_evidence).post(add_evidence),
+        )
         // Audit
         .route("/api/compliance/audit", get(get_audit_trail))
         // Exceptions
-        .route("/api/compliance/exceptions", get(list_exceptions).post(create_exception))
+        .route(
+            "/api/compliance/exceptions",
+            get(list_exceptions).post(create_exception),
+        )
         .route("/api/compliance/exceptions/{id}", delete(delete_exception))
         // Reports
         .route("/api/compliance/reports", get(list_reports))
         .route("/api/compliance/reports/generate", post(generate_report))
         .route("/api/compliance/reports/{id}", get(get_report))
         // Policy mappings
-        .route("/api/compliance/policy-mappings", get(list_policy_mappings).post(create_policy_mapping))
-        .route("/api/compliance/policy-mappings/suggest/{control_ref}", get(suggest_policy_mappings))
+        .route(
+            "/api/compliance/policy-mappings",
+            get(list_policy_mappings).post(create_policy_mapping),
+        )
+        .route(
+            "/api/compliance/policy-mappings/suggest/{control_ref}",
+            get(suggest_policy_mappings),
+        )
         // Health
         .route("/api/compliance/health", get(health))
         .with_state(state)
@@ -136,7 +160,9 @@ fn build_check_context(req: Option<RunCheckRequest>) -> crate::checks::CheckCont
         None => crate::checks::CheckContext::default(),
         Some(r) => crate::checks::CheckContext {
             cluster_config: r.cluster_config.unwrap_or_else(|| serde_json::json!({})),
-            namespace_list: r.namespace_list.unwrap_or_else(|| vec!["default".to_string(), "kube-system".to_string()]),
+            namespace_list: r
+                .namespace_list
+                .unwrap_or_else(|| vec!["default".to_string(), "kube-system".to_string()]),
             pod_specs: r.pod_specs.unwrap_or_default(),
             network_policies: r.network_policies.unwrap_or_default(),
         },
@@ -145,9 +171,7 @@ fn build_check_context(req: Option<RunCheckRequest>) -> crate::checks::CheckCont
 
 // ── Handlers: Frameworks ─────────────────────────────────────────────────────
 
-async fn list_frameworks(
-    State(state): State<Arc<ComplianceState>>,
-) -> impl IntoResponse {
+async fn list_frameworks(State(state): State<Arc<ComplianceState>>) -> impl IntoResponse {
     let store = state.store.read().await;
     let frameworks: Vec<&ComplianceFramework> = store.frameworks.values().collect();
     Json(serde_json::json!({ "frameworks": frameworks, "total": frameworks.len() }))
@@ -160,7 +184,11 @@ async fn get_framework(
     let store = state.store.read().await;
     match store.frameworks.get(&id) {
         Some(fw) => Json(serde_json::to_value(fw).unwrap()).into_response(),
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "framework not found" }))).into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "framework not found" })),
+        )
+            .into_response(),
     }
 }
 
@@ -179,7 +207,10 @@ async fn create_framework(
     };
     let mut store = state.store.write().await;
     store.frameworks.insert(fw.id, fw.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(&fw).unwrap()))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(&fw).unwrap()),
+    )
 }
 
 async fn list_controls(
@@ -190,9 +221,14 @@ async fn list_controls(
     match store.frameworks.get(&id) {
         Some(fw) => {
             let controls = &fw.controls;
-            Json(serde_json::json!({ "controls": controls, "total": controls.len() })).into_response()
+            Json(serde_json::json!({ "controls": controls, "total": controls.len() }))
+                .into_response()
         }
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "framework not found" }))).into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "framework not found" })),
+        )
+            .into_response(),
     }
 }
 
@@ -206,21 +242,26 @@ async fn run_control_check(
     let ctx = build_check_context(Some(req));
     let store = state.store.read().await;
     match store.controls.get(&id) {
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "control not found" }))).into_response(),
-        Some(ctrl) => {
-            match crate::checks::run_check(ctrl, &ctx) {
-                None => Json(serde_json::json!({ "message": "control is not automated" })).into_response(),
-                Some((finding, evidence)) => {
-                    drop(store);
-                    let mut w = state.store.write().await;
-                    w.findings.insert(finding.id, finding.clone());
-                    if let Some(ev) = &evidence {
-                        w.evidence.insert(ev.id, ev.clone());
-                    }
-                    Json(serde_json::json!({ "finding": finding, "evidence": evidence })).into_response()
-                }
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "control not found" })),
+        )
+            .into_response(),
+        Some(ctrl) => match crate::checks::run_check(ctrl, &ctx) {
+            None => {
+                Json(serde_json::json!({ "message": "control is not automated" })).into_response()
             }
-        }
+            Some((finding, evidence)) => {
+                drop(store);
+                let mut w = state.store.write().await;
+                w.findings.insert(finding.id, finding.clone());
+                if let Some(ev) = &evidence {
+                    w.evidence.insert(ev.id, ev.clone());
+                }
+                Json(serde_json::json!({ "finding": finding, "evidence": evidence }))
+                    .into_response()
+            }
+        },
     }
 }
 
@@ -235,7 +276,13 @@ async fn scan_framework(
     let controls: Vec<Control> = {
         let store = state.store.read().await;
         match store.frameworks.get(&framework_id) {
-            None => return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "framework not found" }))).into_response(),
+            None => {
+                return (
+                    StatusCode::NOT_FOUND,
+                    Json(serde_json::json!({ "error": "framework not found" })),
+                )
+                    .into_response();
+            }
             Some(fw) => fw.controls.clone(),
         }
     };
@@ -271,7 +318,8 @@ async fn scan_framework(
         "framework_id": framework_id,
         "findings": findings,
         "total": findings.len(),
-    })).into_response()
+    }))
+    .into_response()
 }
 
 // ── Handlers: Findings ───────────────────────────────────────────────────────
@@ -281,10 +329,16 @@ async fn list_findings(
     Query(q): Query<FindingsQuery>,
 ) -> impl IntoResponse {
     let store = state.store.read().await;
-    let findings: Vec<&Finding> = store.findings.values()
+    let findings: Vec<&Finding> = store
+        .findings
+        .values()
         .filter(|f| {
-            q.control_ref.as_deref().map_or(true, |cr| f.control_ref == cr) &&
-            q.status.as_deref().map_or(true, |s| format!("{:?}", f.status).to_lowercase() == s.to_lowercase())
+            q.control_ref
+                .as_deref()
+                .map_or(true, |cr| f.control_ref == cr)
+                && q.status.as_deref().map_or(true, |s| {
+                    format!("{:?}", f.status).to_lowercase() == s.to_lowercase()
+                })
         })
         .collect();
     Json(serde_json::json!({ "findings": findings, "total": findings.len() }))
@@ -297,7 +351,11 @@ async fn get_finding(
     let store = state.store.read().await;
     match store.findings.get(&id) {
         Some(f) => Json(serde_json::to_value(f).unwrap()).into_response(),
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "finding not found" }))).into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "finding not found" })),
+        )
+            .into_response(),
     }
 }
 
@@ -318,17 +376,24 @@ async fn create_finding(
         exception_id: None,
     };
     let mut store = state.store.write().await;
-    let event = crate::audit::record_event("api", "create", "finding", &finding.id.to_string(), serde_json::json!({}));
+    let event = crate::audit::record_event(
+        "api",
+        "create",
+        "finding",
+        &finding.id.to_string(),
+        serde_json::json!({}),
+    );
     store.audit_events.push(event);
     store.findings.insert(finding.id, finding.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(&finding).unwrap()))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(&finding).unwrap()),
+    )
 }
 
 // ── Handlers: Evidence ───────────────────────────────────────────────────────
 
-async fn list_evidence(
-    State(state): State<Arc<ComplianceState>>,
-) -> impl IntoResponse {
+async fn list_evidence(State(state): State<Arc<ComplianceState>>) -> impl IntoResponse {
     let store = state.store.read().await;
     let evidence: Vec<&Evidence> = store.evidence.values().collect();
     Json(serde_json::json!({ "evidence": evidence, "total": evidence.len() }))
@@ -356,7 +421,10 @@ async fn add_evidence(
         }
     }
     store.evidence.insert(ev.id, ev.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(&ev).unwrap()))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(&ev).unwrap()),
+    )
 }
 
 // ── Handlers: Audit ──────────────────────────────────────────────────────────
@@ -378,9 +446,7 @@ async fn get_audit_trail(
 
 // ── Handlers: Exceptions ─────────────────────────────────────────────────────
 
-async fn list_exceptions(
-    State(state): State<Arc<ComplianceState>>,
-) -> impl IntoResponse {
+async fn list_exceptions(State(state): State<Arc<ComplianceState>>) -> impl IntoResponse {
     let store = state.store.read().await;
     let exceptions: Vec<&ControlException> = store.exceptions.values().collect();
     Json(serde_json::json!({ "exceptions": exceptions, "total": exceptions.len() }))
@@ -400,10 +466,19 @@ async fn create_exception(
         created_at: Utc::now(),
     };
     let mut store = state.store.write().await;
-    let event = crate::audit::record_event("api", "create", "exception", &exception.id.to_string(), serde_json::json!({}));
+    let event = crate::audit::record_event(
+        "api",
+        "create",
+        "exception",
+        &exception.id.to_string(),
+        serde_json::json!({}),
+    );
     store.audit_events.push(event);
     store.exceptions.insert(exception.id, exception.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(&exception).unwrap()))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(&exception).unwrap()),
+    )
 }
 
 async fn delete_exception(
@@ -413,19 +488,27 @@ async fn delete_exception(
     let mut store = state.store.write().await;
     match store.exceptions.remove(&id) {
         Some(_) => {
-            let event = crate::audit::record_event("api", "delete", "exception", &id.to_string(), serde_json::json!({}));
+            let event = crate::audit::record_event(
+                "api",
+                "delete",
+                "exception",
+                &id.to_string(),
+                serde_json::json!({}),
+            );
             store.audit_events.push(event);
             StatusCode::NO_CONTENT.into_response()
         }
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "exception not found" }))).into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "exception not found" })),
+        )
+            .into_response(),
     }
 }
 
 // ── Handlers: Reports ────────────────────────────────────────────────────────
 
-async fn list_reports(
-    State(state): State<Arc<ComplianceState>>,
-) -> impl IntoResponse {
+async fn list_reports(State(state): State<Arc<ComplianceState>>) -> impl IntoResponse {
     let store = state.store.read().await;
     let reports: Vec<&ComplianceReport> = store.reports.values().collect();
     Json(serde_json::json!({ "reports": reports, "total": reports.len() }))
@@ -438,7 +521,13 @@ async fn generate_report(
     let store = state.store.read().await;
     let framework = match store.frameworks.get(&req.framework_id) {
         Some(fw) => fw.clone(),
-        None => return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "framework not found" }))).into_response(),
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "framework not found" })),
+            )
+                .into_response();
+        }
     };
     let findings: Vec<Finding> = store.findings.values().cloned().collect();
     let exceptions: Vec<ControlException> = store.exceptions.values().cloned().collect();
@@ -446,10 +535,20 @@ async fn generate_report(
 
     let report = crate::reports::generate_report(&framework, &findings, &exceptions);
     let mut store = state.store.write().await;
-    let event = crate::audit::record_event("api", "generate_report", "framework", &req.framework_id.to_string(), serde_json::json!({}));
+    let event = crate::audit::record_event(
+        "api",
+        "generate_report",
+        "framework",
+        &req.framework_id.to_string(),
+        serde_json::json!({}),
+    );
     store.audit_events.push(event);
     store.reports.insert(report.id, report.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(&report).unwrap())).into_response()
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(&report).unwrap()),
+    )
+        .into_response()
 }
 
 async fn get_report(
@@ -459,15 +558,17 @@ async fn get_report(
     let store = state.store.read().await;
     match store.reports.get(&id) {
         Some(r) => Json(serde_json::to_value(r).unwrap()).into_response(),
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "report not found" }))).into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "report not found" })),
+        )
+            .into_response(),
     }
 }
 
 // ── Handlers: Policy Mappings ────────────────────────────────────────────────
 
-async fn list_policy_mappings(
-    State(state): State<Arc<ComplianceState>>,
-) -> impl IntoResponse {
+async fn list_policy_mappings(State(state): State<Arc<ComplianceState>>) -> impl IntoResponse {
     let store = state.store.read().await;
     let mappings: Vec<&PolicyMapping> = store.policy_mappings.values().collect();
     Json(serde_json::json!({ "mappings": mappings, "total": mappings.len() }))
@@ -487,28 +588,29 @@ async fn create_policy_mapping(
     );
     let mut store = state.store.write().await;
     store.policy_mappings.insert(mapping.id, mapping.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(&mapping).unwrap()))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(&mapping).unwrap()),
+    )
 }
 
-async fn suggest_policy_mappings(
-    Path(control_ref): Path<String>,
-) -> impl IntoResponse {
+async fn suggest_policy_mappings(Path(control_ref): Path<String>) -> impl IntoResponse {
     let suggestions: Vec<serde_json::Value> = crate::policy::suggested_mappings(&control_ref)
         .into_iter()
-        .map(|(engine, policy_name, description)| serde_json::json!({
-            "policy_engine": engine,
-            "policy_name": policy_name,
-            "description": description,
-        }))
+        .map(|(engine, policy_name, description)| {
+            serde_json::json!({
+                "policy_engine": engine,
+                "policy_name": policy_name,
+                "description": description,
+            })
+        })
         .collect();
     Json(serde_json::json!({ "control_ref": control_ref, "suggestions": suggestions }))
 }
 
 // ── Health ───────────────────────────────────────────────────────────────────
 
-async fn health(
-    State(state): State<Arc<ComplianceState>>,
-) -> impl IntoResponse {
+async fn health(State(state): State<Arc<ComplianceState>>) -> impl IntoResponse {
     let store = state.store.read().await;
     Json(serde_json::json!({
         "module": "cave-compliance",
@@ -542,7 +644,12 @@ mod tests {
     async fn test_health_endpoint() {
         let app = test_app();
         let resp = app
-            .oneshot(Request::builder().uri("/api/compliance/health").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/api/compliance/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), SC::OK);
@@ -552,11 +659,18 @@ mod tests {
     async fn test_list_frameworks() {
         let app = test_app();
         let resp = app
-            .oneshot(Request::builder().uri("/api/compliance/frameworks").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/api/compliance/frameworks")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), SC::OK);
-        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json["total"].as_u64().unwrap(), 4);
     }
@@ -565,7 +679,12 @@ mod tests {
     async fn test_get_framework_not_found() {
         let app = test_app();
         let resp = app
-            .oneshot(Request::builder().uri(&format!("/api/compliance/frameworks/{}", Uuid::new_v4())).body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri(&format!("/api/compliance/frameworks/{}", Uuid::new_v4()))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), SC::NOT_FOUND);

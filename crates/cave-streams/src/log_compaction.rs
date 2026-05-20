@@ -32,7 +32,8 @@ impl KeyedRecord {
     /// `value_len = -1` denotes a tombstone.
     pub fn encode(&self) -> Vec<u8> {
         let key_len = self.key.len() as u32;
-        let mut out = Vec::with_capacity(8 + self.key.len() + self.value.as_ref().map_or(0, |v| v.len()));
+        let mut out =
+            Vec::with_capacity(8 + self.key.len() + self.value.as_ref().map_or(0, |v| v.len()));
         out.extend_from_slice(&key_len.to_be_bytes());
         out.extend_from_slice(&self.key);
         match &self.value {
@@ -143,10 +144,16 @@ pub struct RetentionPolicy {
 
 impl RetentionPolicy {
     pub fn time_only(ms: u64) -> Self {
-        Self { time_ms: ms, bytes: 0 }
+        Self {
+            time_ms: ms,
+            bytes: 0,
+        }
     }
     pub fn size_only(b: u64) -> Self {
-        Self { time_ms: 0, bytes: b }
+        Self {
+            time_ms: 0,
+            bytes: b,
+        }
     }
 }
 
@@ -175,8 +182,7 @@ pub fn apply_retention(
     let mut current_bytes = total_bytes;
 
     for e in &entries {
-        let too_old = policy.time_ms > 0
-            && (now_ms - e.timestamp_ms) as u64 > policy.time_ms;
+        let too_old = policy.time_ms > 0 && (now_ms - e.timestamp_ms) as u64 > policy.time_ms;
         let too_big = policy.bytes > 0 && current_bytes > policy.bytes;
         if too_old || too_big {
             new_low = e.offset + 1;
@@ -329,12 +335,7 @@ mod tests {
             .unwrap();
         }
         // now is far in the future relative to ts=100.
-        let stats = apply_retention(
-            &log,
-            RetentionPolicy::time_only(50),
-            10_000,
-        )
-        .unwrap();
+        let stats = apply_retention(&log, RetentionPolicy::time_only(50), 10_000).unwrap();
         assert!(stats.entries_dropped >= 1);
         assert_eq!(stats.low_watermark, log.log_start_offset());
     }
@@ -356,12 +357,7 @@ mod tests {
             .unwrap();
         }
         let before = log.total_bytes();
-        let stats = apply_retention(
-            &log,
-            RetentionPolicy::size_only(before / 2),
-            1,
-        )
-        .unwrap();
+        let stats = apply_retention(&log, RetentionPolicy::size_only(before / 2), 1).unwrap();
         assert!(stats.entries_dropped >= 1);
         assert!(log.total_bytes() <= before);
     }

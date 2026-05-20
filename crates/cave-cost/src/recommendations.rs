@@ -35,10 +35,7 @@ pub fn rightsizing_recommendations(costs: &[ResourceCost]) -> Vec<CostRecommenda
                 id: Uuid::new_v4(),
                 kind: RecommendationKind::Rightsizing,
                 namespace: cost.namespace.clone(),
-                resource_name: cost
-                    .pod
-                    .clone()
-                    .unwrap_or_else(|| cost.namespace.clone()),
+                resource_name: cost.pod.clone().unwrap_or_else(|| cost.namespace.clone()),
                 current_cpu_request: Some(cost.cpu_cores),
                 recommended_cpu_request: Some(recommended_cpu),
                 current_memory_request: Some(cost.memory_bytes),
@@ -147,12 +144,7 @@ mod tests {
     #[test]
     fn test_rightsizing_well_utilized_not_flagged() {
         // 80% CPU and 80% memory — above RIGHTSIZING_THRESHOLD of 50%
-        let costs = vec![make_cost(
-            1.0,
-            0.8,
-            1024 * 1024 * 1024,
-            820 * 1024 * 1024,
-        )];
+        let costs = vec![make_cost(1.0, 0.8, 1024 * 1024 * 1024, 820 * 1024 * 1024)];
         let recs = rightsizing_recommendations(&costs);
         assert!(recs.is_empty());
     }

@@ -64,14 +64,7 @@ pub(super) fn render_section(
     let rows = list_datasources(state, ctx)?;
     let table_rows: Vec<Vec<String>> = rows
         .iter()
-        .map(|d| {
-            vec![
-                d.name.into(),
-                d.kind.into(),
-                d.url.into(),
-                d.status.into(),
-            ]
-        })
+        .map(|d| vec![d.name.into(), d.kind.into(), d.url.into(), d.status.into()])
         .collect();
     Ok(format!(
         r#"<section id="grafana-datasources" class="mt-6">

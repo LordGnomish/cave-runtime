@@ -191,16 +191,24 @@ mod tests {
     fn dev(t: &str) -> Principal {
         Principal::new("d", Persona::Tenant).with_tenant(t)
     }
-    fn op() -> Principal { Principal::new("o", Persona::Operator) }
-    fn admin() -> Principal { Principal::new("a", Persona::Admin) }
+    fn op() -> Principal {
+        Principal::new("o", Persona::Operator)
+    }
+    fn admin() -> Principal {
+        Principal::new("a", Persona::Admin)
+    }
 
     fn append(s: &EventStore, t: &str, src: &str, lvl: EventLevel, msg: &str) -> Event {
-        s.append(Some(&admin()), AppendEventRequest {
-            tenant: t.into(),
-            source: src.into(),
-            level: lvl,
-            message: msg.into(),
-        }).unwrap()
+        s.append(
+            Some(&admin()),
+            AppendEventRequest {
+                tenant: t.into(),
+                source: src.into(),
+                level: lvl,
+                message: msg.into(),
+            },
+        )
+        .unwrap()
     }
 
     #[test]
@@ -213,24 +221,34 @@ mod tests {
     #[test]
     fn append_anonymous_denied() {
         let s = EventStore::new();
-        let err = s.append(None, AppendEventRequest {
-            tenant: "acme".into(),
-            source: "x".into(),
-            level: EventLevel::Info,
-            message: "m".into(),
-        }).unwrap_err();
+        let err = s
+            .append(
+                None,
+                AppendEventRequest {
+                    tenant: "acme".into(),
+                    source: "x".into(),
+                    level: EventLevel::Info,
+                    message: "m".into(),
+                },
+            )
+            .unwrap_err();
         assert!(matches!(err, EventsError::Guard(GuardError::Anonymous)));
     }
 
     #[test]
     fn append_empty_message_rejected() {
         let s = EventStore::new();
-        let err = s.append(Some(&admin()), AppendEventRequest {
-            tenant: "acme".into(),
-            source: "x".into(),
-            level: EventLevel::Info,
-            message: "".into(),
-        }).unwrap_err();
+        let err = s
+            .append(
+                Some(&admin()),
+                AppendEventRequest {
+                    tenant: "acme".into(),
+                    source: "x".into(),
+                    level: EventLevel::Info,
+                    message: "".into(),
+                },
+            )
+            .unwrap_err();
         assert!(matches!(err, EventsError::InvalidMessage(_)));
     }
 
@@ -238,12 +256,17 @@ mod tests {
     fn append_huge_message_rejected() {
         let s = EventStore::new();
         let m = "x".repeat(5000);
-        let err = s.append(Some(&admin()), AppendEventRequest {
-            tenant: "acme".into(),
-            source: "x".into(),
-            level: EventLevel::Info,
-            message: m,
-        }).unwrap_err();
+        let err = s
+            .append(
+                Some(&admin()),
+                AppendEventRequest {
+                    tenant: "acme".into(),
+                    source: "x".into(),
+                    level: EventLevel::Info,
+                    message: m,
+                },
+            )
+            .unwrap_err();
         assert!(matches!(err, EventsError::InvalidMessage(_)));
     }
 
@@ -260,7 +283,10 @@ mod tests {
         let s = EventStore::new();
         append(&s, "acme", "x", EventLevel::Info, "m1");
         append(&s, "globex", "x", EventLevel::Info, "m2");
-        let q = EventQuery { tenant: Some("acme".into()), ..Default::default() };
+        let q = EventQuery {
+            tenant: Some("acme".into()),
+            ..Default::default()
+        };
         let out = s.query(Some(&dev("acme")), &q).unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].tenant, "acme");
@@ -280,7 +306,10 @@ mod tests {
         };
         let out = s.query(Some(&dev("acme")), &q).unwrap();
         assert_eq!(out.len(), 2);
-        assert!(out.iter().all(|e| e.level.rank() >= EventLevel::Warn.rank()));
+        assert!(
+            out.iter()
+                .all(|e| e.level.rank() >= EventLevel::Warn.rank())
+        );
     }
 
     #[test]
@@ -334,7 +363,10 @@ mod tests {
         for i in 0..200 {
             append(&s, "acme", "x", EventLevel::Info, &format!("m{i}"));
         }
-        let q = EventQuery { tenant: Some("acme".into()), ..Default::default() };
+        let q = EventQuery {
+            tenant: Some("acme".into()),
+            ..Default::default()
+        };
         let out = s.query(Some(&dev("acme")), &q).unwrap();
         assert_eq!(out.len(), 100);
     }
@@ -357,7 +389,10 @@ mod tests {
         for i in 0..5 {
             append(&s, "acme", "x", EventLevel::Info, &format!("m{i}"));
         }
-        let q = EventQuery { tenant: Some("acme".into()), ..Default::default() };
+        let q = EventQuery {
+            tenant: Some("acme".into()),
+            ..Default::default()
+        };
         let out = s.query(Some(&dev("acme")), &q).unwrap();
         let ids: Vec<u64> = out.iter().map(|e| e.id).collect();
         let mut sorted_desc = ids.clone();
@@ -371,7 +406,10 @@ mod tests {
         append(&s, "acme", "x", EventLevel::Info, "m");
         let q = EventQuery::default();
         let err = s.query(Some(&dev("acme")), &q).unwrap_err();
-        assert!(matches!(err, EventsError::Guard(GuardError::PersonaForbidden { .. })));
+        assert!(matches!(
+            err,
+            EventsError::Guard(GuardError::PersonaForbidden { .. })
+        ));
     }
 
     #[test]
@@ -388,9 +426,15 @@ mod tests {
     fn query_dev_cross_tenant_denied() {
         let s = EventStore::new();
         append(&s, "globex", "x", EventLevel::Info, "m");
-        let q = EventQuery { tenant: Some("globex".into()), ..Default::default() };
+        let q = EventQuery {
+            tenant: Some("globex".into()),
+            ..Default::default()
+        };
         let err = s.query(Some(&dev("acme")), &q).unwrap_err();
-        assert!(matches!(err, EventsError::Guard(GuardError::TenantMismatch { .. })));
+        assert!(matches!(
+            err,
+            EventsError::Guard(GuardError::TenantMismatch { .. })
+        ));
     }
 
     #[test]

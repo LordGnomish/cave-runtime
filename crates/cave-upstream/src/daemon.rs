@@ -35,9 +35,7 @@
 //! cancel it finishes the in-flight tick, saves state, and returns.
 //! Use [`install_signal_handler`] to wire SIGTERM/SIGINT to the token.
 
-use crate::delta::{
-    detect_release_delta, PollConfig, PollOutcome, SurfaceDiffer, TagOnlyDiffer,
-};
+use crate::delta::{PollConfig, PollOutcome, SurfaceDiffer, TagOnlyDiffer, detect_release_delta};
 use crate::projects::TrackedProject;
 use crate::pump::{build_payload, write_payload};
 use crate::state::{ProjectState, WatchState};
@@ -105,17 +103,33 @@ pub struct Config {
     pub max_backoff_ticks: u32,
 }
 
-fn default_tick_interval() -> Duration { Duration::from_secs(60) }
-fn default_tick_jitter() -> Duration { Duration::from_secs(60) }
-fn default_high_priority_cadence() -> Duration { Duration::from_secs(15 * 60) }
-fn default_normal_cadence() -> Duration { Duration::from_secs(60 * 60) }
-fn default_concurrency() -> usize { 8 }
-fn default_github_api_base() -> String { "https://api.github.com".to_string() }
+fn default_tick_interval() -> Duration {
+    Duration::from_secs(60)
+}
+fn default_tick_jitter() -> Duration {
+    Duration::from_secs(60)
+}
+fn default_high_priority_cadence() -> Duration {
+    Duration::from_secs(15 * 60)
+}
+fn default_normal_cadence() -> Duration {
+    Duration::from_secs(60 * 60)
+}
+fn default_concurrency() -> usize {
+    8
+}
+fn default_github_api_base() -> String {
+    "https://api.github.com".to_string()
+}
 fn default_user_agent() -> String {
     format!("cave-upstream-watchd/{}", env!("CARGO_PKG_VERSION"))
 }
-fn default_request_timeout() -> Duration { Duration::from_secs(15) }
-fn default_max_backoff_ticks() -> u32 { 16 }
+fn default_request_timeout() -> Duration {
+    Duration::from_secs(15)
+}
+fn default_max_backoff_ticks() -> u32 {
+    16
+}
 
 impl Default for Config {
     fn default() -> Self {
@@ -221,10 +235,7 @@ impl Daemon {
 
     /// Tick using a caller-provided `WatchState`. Used by tests so they
     /// don't need to roundtrip through the disk between invocations.
-    pub async fn tick_with_state(
-        &self,
-        state: &mut WatchState,
-    ) -> anyhow::Result<TickReport> {
+    pub async fn tick_with_state(&self, state: &mut WatchState) -> anyhow::Result<TickReport> {
         let run_id = Uuid::new_v4().to_string();
         let mut report = TickReport {
             run_id: run_id.clone(),
@@ -395,8 +406,8 @@ pub fn project_is_due(
     } else {
         cfg.normal_cadence
     };
-    let cadence_chrono = ChronoDuration::from_std(cadence)
-        .unwrap_or_else(|_| ChronoDuration::seconds(15 * 60));
+    let cadence_chrono =
+        ChronoDuration::from_std(cadence).unwrap_or_else(|_| ChronoDuration::seconds(15 * 60));
 
     let last_checked = match st.and_then(|s| s.last_checked) {
         None => return true, // never polled
@@ -414,7 +425,9 @@ pub fn backoff_multiplier(consecutive_errors: u32, max_ticks: u32) -> u32 {
     if consecutive_errors == 0 {
         return 1;
     }
-    let raw = 1u32.checked_shl(consecutive_errors.min(31)).unwrap_or(u32::MAX);
+    let raw = 1u32
+        .checked_shl(consecutive_errors.min(31))
+        .unwrap_or(u32::MAX);
     raw.min(max_ticks.max(1))
 }
 
@@ -439,7 +452,7 @@ pub fn jitter_offset(jitter: Duration) -> Duration {
 /// Wire SIGTERM + SIGINT to a `CancellationToken`. Unix-only.
 #[cfg(unix)]
 pub async fn install_signal_handler(token: CancellationToken) {
-    use tokio::signal::unix::{signal, SignalKind};
+    use tokio::signal::unix::{SignalKind, signal};
     let mut sigterm = match signal(SignalKind::terminate()) {
         Ok(s) => s,
         Err(e) => {

@@ -32,11 +32,7 @@ use cave_core::types::CaveRole;
 
 fn sha256_hex(data: &[u8]) -> String {
     let digest = ring::digest::digest(&ring::digest::SHA256, data);
-    digest
-        .as_ref()
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
+    digest.as_ref().iter().map(|b| format!("{b:02x}")).collect()
 }
 
 // ─── Token data models ────────────────────────────────────────────────────────
@@ -264,10 +260,7 @@ impl TokenStore {
             revoked: false,
         };
 
-        self.service_tokens
-            .write()
-            .await
-            .insert(token_hash, entry);
+        self.service_tokens.write().await.insert(token_hash, entry);
         info!(service_name, ttl_hours, "Service token created");
         raw_token
     }

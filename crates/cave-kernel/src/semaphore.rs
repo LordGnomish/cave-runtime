@@ -55,7 +55,9 @@ impl Semaphore {
     }
 
     /// Capacity the semaphore was constructed with — never changes.
-    pub fn capacity(&self) -> usize { self.capacity }
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
 
     /// Number of permits currently held by callers.
     pub fn in_use(&self) -> usize {
@@ -110,7 +112,13 @@ mod tests {
         let _a = s.try_acquire().unwrap();
         let _b = s.try_acquire().unwrap();
         let err = s.try_acquire().unwrap_err();
-        assert!(matches!(err, AcquireError::NoPermits { available: 0, capacity: 2 }));
+        assert!(matches!(
+            err,
+            AcquireError::NoPermits {
+                available: 0,
+                capacity: 2
+            }
+        ));
     }
 
     #[tokio::test]
@@ -142,7 +150,10 @@ mod tests {
     #[tokio::test]
     async fn zero_capacity_semaphore_never_succeeds_try_acquire() {
         let s = Semaphore::new(0);
-        assert!(matches!(s.try_acquire().unwrap_err(), AcquireError::NoPermits { .. }));
+        assert!(matches!(
+            s.try_acquire().unwrap_err(),
+            AcquireError::NoPermits { .. }
+        ));
     }
 
     #[tokio::test]
@@ -168,7 +179,10 @@ mod tests {
         let s = Semaphore::new(1);
         let _held = s.try_acquire().unwrap();
         match s.try_acquire().unwrap_err() {
-            AcquireError::NoPermits { available, capacity } => {
+            AcquireError::NoPermits {
+                available,
+                capacity,
+            } => {
                 assert_eq!(available, 0);
                 assert_eq!(capacity, 1);
             }

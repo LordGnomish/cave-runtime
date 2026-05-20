@@ -26,10 +26,7 @@ pub enum MetricOutcome {
 /// Mirrors the loop in `computeReplicasForMetrics`.
 ///
 /// Returns `(desired, num_failed, succeeded_at_least_once)`.
-pub fn combine(
-    outcomes: &[MetricOutcome],
-    current_replicas: u32,
-) -> (u32, u32, bool) {
+pub fn combine(outcomes: &[MetricOutcome], current_replicas: u32) -> (u32, u32, bool) {
     let mut max_rec: Option<u32> = None;
     let mut failed = 0u32;
     for o in outcomes {

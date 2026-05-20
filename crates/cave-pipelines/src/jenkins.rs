@@ -23,8 +23,14 @@ pub enum AgentDeclaration {
     Any,
     None,
     Label(String),
-    Docker { image: String, args: Option<String> },
-    Kubernetes { yaml: Option<String>, label: Option<String> },
+    Docker {
+        image: String,
+        args: Option<String>,
+    },
+    Kubernetes {
+        yaml: Option<String>,
+        label: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -46,14 +52,32 @@ pub struct JenkinsStep {
 pub enum JenkinsStepKind {
     Sh(String),
     Echo(String),
-    Checkout { repo: Option<String> },
+    Checkout {
+        repo: Option<String>,
+    },
     Script(String),
-    WithCredentials { bindings: Vec<String>, body: Vec<JenkinsStep> },
-    ArchiveArtifacts { pattern: String },
-    JUnit { test_results: String },
-    PublishHTML { report_dir: String, report_files: String },
-    Input { message: String, ok: Option<String> },
-    Custom { name: String, args: HashMap<String, String> },
+    WithCredentials {
+        bindings: Vec<String>,
+        body: Vec<JenkinsStep>,
+    },
+    ArchiveArtifacts {
+        pattern: String,
+    },
+    JUnit {
+        test_results: String,
+    },
+    PublishHTML {
+        report_dir: String,
+        report_files: String,
+    },
+    Input {
+        message: String,
+        ok: Option<String>,
+    },
+    Custom {
+        name: String,
+        args: HashMap<String, String>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -136,7 +160,11 @@ struct Tokenizer<'a> {
 #[allow(dead_code)]
 impl<'a> Tokenizer<'a> {
     fn new(input: &'a str) -> Self {
-        Self { input, pos: 0, line: 1 }
+        Self {
+            input,
+            pos: 0,
+            line: 1,
+        }
     }
 
     fn peek_char(&self) -> Option<char> {
@@ -146,7 +174,9 @@ impl<'a> Tokenizer<'a> {
     fn advance(&mut self) -> Option<char> {
         let c = self.peek_char()?;
         self.pos += c.len_utf8();
-        if c == '\n' { self.line += 1; }
+        if c == '\n' {
+            self.line += 1;
+        }
         Some(c)
     }
 
@@ -163,7 +193,9 @@ impl<'a> Tokenizer<'a> {
     fn skip_comment(&mut self) -> bool {
         if self.input[self.pos..].starts_with("//") {
             while let Some(c) = self.advance() {
-                if c == '\n' { break; }
+                if c == '\n' {
+                    break;
+                }
             }
             return true;
         }
@@ -174,7 +206,9 @@ impl<'a> Tokenizer<'a> {
                     self.pos += 2;
                     break;
                 }
-                if self.advance().is_none() { break; }
+                if self.advance().is_none() {
+                    break;
+                }
             }
             return true;
         }
@@ -218,19 +252,42 @@ impl<'a> Tokenizer<'a> {
     fn next_token(&mut self) -> (Token, usize) {
         loop {
             self.skip_whitespace();
-            if self.skip_comment() { continue; }
+            if self.skip_comment() {
+                continue;
+            }
             break;
         }
         let line = self.line;
         match self.peek_char() {
             None => (Token::EOF, line),
-            Some('\n') => { self.advance(); (Token::Newline, line) },
-            Some('{') => { self.advance(); (Token::LBrace, line) },
-            Some('}') => { self.advance(); (Token::RBrace, line) },
-            Some('(') => { self.advance(); (Token::LParen, line) },
-            Some(')') => { self.advance(); (Token::RParen, line) },
-            Some('=') => { self.advance(); (Token::Equals, line) },
-            Some(',') => { self.advance(); (Token::Comma, line) },
+            Some('\n') => {
+                self.advance();
+                (Token::Newline, line)
+            }
+            Some('{') => {
+                self.advance();
+                (Token::LBrace, line)
+            }
+            Some('}') => {
+                self.advance();
+                (Token::RBrace, line)
+            }
+            Some('(') => {
+                self.advance();
+                (Token::LParen, line)
+            }
+            Some(')') => {
+                self.advance();
+                (Token::RParen, line)
+            }
+            Some('=') => {
+                self.advance();
+                (Token::Equals, line)
+            }
+            Some(',') => {
+                self.advance();
+                (Token::Comma, line)
+            }
             Some('\'') | Some('"') => {
                 let delim = self.advance().unwrap();
                 let s = self.read_string(delim);
@@ -242,15 +299,25 @@ impl<'a> Tokenizer<'a> {
             }
             Some(c) if c.is_ascii_digit() || c == '-' => {
                 let mut n = String::new();
-                if c == '-' { self.advance(); n.push('-'); }
+                if c == '-' {
+                    self.advance();
+                    n.push('-');
+                }
                 while let Some(d) = self.peek_char() {
-                    if d.is_ascii_digit() { n.push(d); self.advance(); }
-                    else { break; }
+                    if d.is_ascii_digit() {
+                        n.push(d);
+                        self.advance();
+                    } else {
+                        break;
+                    }
                 }
                 let num = n.parse().unwrap_or(0);
                 (Token::Number(num), line)
             }
-            Some(_) => { self.advance(); self.next_token() }
+            Some(_) => {
+                self.advance();
+                self.next_token()
+            }
         }
     }
 }
@@ -294,18 +361,37 @@ pub fn parse_jenkinsfile(content: &str) -> Result<JenkinsFile, JenkinsParseError
         i += 1;
     }
 
-    Ok(JenkinsFile { agent, environment, stages, post, options })
+    Ok(JenkinsFile {
+        agent,
+        environment,
+        stages,
+        post,
+        options,
+    })
 }
 
 fn parse_agent_line(line: &str) -> AgentDeclaration {
-    if line.contains("any") { return AgentDeclaration::Any; }
-    if line.contains("none") { return AgentDeclaration::None; }
+    if line.contains("any") {
+        return AgentDeclaration::Any;
+    }
+    if line.contains("none") {
+        return AgentDeclaration::None;
+    }
     if let Some(img_start) = line.find("image:") {
-        let rest = &line[img_start + 6..].trim().trim_matches('\'').trim_matches('"');
-        return AgentDeclaration::Docker { image: rest.to_string(), args: None };
+        let rest = &line[img_start + 6..]
+            .trim()
+            .trim_matches('\'')
+            .trim_matches('"');
+        return AgentDeclaration::Docker {
+            image: rest.to_string(),
+            args: None,
+        };
     }
     if let Some(label_start) = line.find("label:") {
-        let rest = line[label_start + 6..].trim().trim_matches('\'').trim_matches('"');
+        let rest = line[label_start + 6..]
+            .trim()
+            .trim_matches('\'')
+            .trim_matches('"');
         return AgentDeclaration::Label(rest.to_string());
     }
     AgentDeclaration::Any
@@ -317,13 +403,23 @@ fn parse_environment_block(lines: &[&str], start: usize) -> (HashMap<String, Str
     let mut depth = 1;
     while i < lines.len() && depth > 0 {
         let line = lines[i].trim();
-        if line.contains('{') { depth += 1; }
-        if line.contains('}') { depth -= 1; }
+        if line.contains('{') {
+            depth += 1;
+        }
+        if line.contains('}') {
+            depth -= 1;
+        }
         if depth > 0 {
             if let Some(eq_pos) = line.find('=') {
                 let key = line[..eq_pos].trim().to_string();
-                let val = line[eq_pos + 1..].trim().trim_matches('\'').trim_matches('"').to_string();
-                if !key.is_empty() { env.insert(key, val); }
+                let val = line[eq_pos + 1..]
+                    .trim()
+                    .trim_matches('\'')
+                    .trim_matches('"')
+                    .to_string();
+                if !key.is_empty() {
+                    env.insert(key, val);
+                }
             }
         }
         i += 1;
@@ -340,22 +436,39 @@ fn parse_stage_block(lines: &[&str], start: usize) -> (JenkinsStage, usize) {
 
     while i < lines.len() {
         let line = lines[i].trim();
-        if line.contains('{') { depth += 1; }
+        if line.contains('{') {
+            depth += 1;
+        }
         if line.contains('}') {
-            if depth == 0 { break; }
+            if depth == 0 {
+                break;
+            }
             depth -= 1;
         }
         if line.starts_with("sh ") || line.starts_with("sh(") {
-            steps.push(JenkinsStep { kind: JenkinsStepKind::Sh(extract_string_arg(line)) });
+            steps.push(JenkinsStep {
+                kind: JenkinsStepKind::Sh(extract_string_arg(line)),
+            });
         } else if line.starts_with("echo ") {
-            steps.push(JenkinsStep { kind: JenkinsStepKind::Echo(extract_string_arg(line)) });
+            steps.push(JenkinsStep {
+                kind: JenkinsStepKind::Echo(extract_string_arg(line)),
+            });
         } else if line.starts_with("checkout") {
-            steps.push(JenkinsStep { kind: JenkinsStepKind::Checkout { repo: None } });
+            steps.push(JenkinsStep {
+                kind: JenkinsStepKind::Checkout { repo: None },
+            });
         } else if line.starts_with("archiveArtifacts") {
-            let pattern = extract_kwarg(line, "artifacts").unwrap_or_else(|| extract_string_arg(line));
-            steps.push(JenkinsStep { kind: JenkinsStepKind::ArchiveArtifacts { pattern } });
+            let pattern =
+                extract_kwarg(line, "artifacts").unwrap_or_else(|| extract_string_arg(line));
+            steps.push(JenkinsStep {
+                kind: JenkinsStepKind::ArchiveArtifacts { pattern },
+            });
         } else if line.starts_with("junit ") {
-            steps.push(JenkinsStep { kind: JenkinsStepKind::JUnit { test_results: extract_string_arg(line) } });
+            steps.push(JenkinsStep {
+                kind: JenkinsStepKind::JUnit {
+                    test_results: extract_string_arg(line),
+                },
+            });
         } else if line.starts_with("stage(") && i > start {
             let (sub_stage, advance) = parse_stage_block(lines, i);
             parallel_stages.push(sub_stage);
@@ -364,14 +477,17 @@ fn parse_stage_block(lines: &[&str], start: usize) -> (JenkinsStage, usize) {
         i += 1;
     }
 
-    (JenkinsStage {
-        name,
-        steps,
-        parallel: parallel_stages,
-        when: None,
-        environment: HashMap::new(),
-        agent: None,
-    }, i - start)
+    (
+        JenkinsStage {
+            name,
+            steps,
+            parallel: parallel_stages,
+            when: None,
+            environment: HashMap::new(),
+            agent: None,
+        },
+        i - start,
+    )
 }
 
 fn parse_post_block(lines: &[&str], start: usize) -> (Vec<PostAction>, usize) {
@@ -386,7 +502,11 @@ fn parse_post_block(lines: &[&str], start: usize) -> (Vec<PostAction>, usize) {
 
         // Detect condition name BEFORE updating depth
         if depth == 1 && line.contains('{') {
-            let keyword = line.trim_end_matches('{').trim().trim_end_matches('{').trim();
+            let keyword = line
+                .trim_end_matches('{')
+                .trim()
+                .trim_end_matches('{')
+                .trim();
             current_condition = match keyword {
                 "always" => Some(PostCondition::Always),
                 "success" => Some(PostCondition::Success),
@@ -398,22 +518,33 @@ fn parse_post_block(lines: &[&str], start: usize) -> (Vec<PostAction>, usize) {
             };
         }
 
-        if line.contains('{') { depth += 1; }
+        if line.contains('{') {
+            depth += 1;
+        }
         if line.contains('}') {
             depth -= 1;
             if depth == 1 {
                 if let Some(cond) = current_condition.take() {
-                    actions.push(PostAction { condition: cond, steps: current_steps.clone() });
+                    actions.push(PostAction {
+                        condition: cond,
+                        steps: current_steps.clone(),
+                    });
                     current_steps.clear();
                 }
             }
-            if depth == 0 { break; }
+            if depth == 0 {
+                break;
+            }
         }
 
         if depth == 2 && line.starts_with("sh ") {
-            current_steps.push(JenkinsStep { kind: JenkinsStepKind::Sh(extract_string_arg(line)) });
+            current_steps.push(JenkinsStep {
+                kind: JenkinsStepKind::Sh(extract_string_arg(line)),
+            });
         } else if depth == 2 && line.starts_with("echo ") {
-            current_steps.push(JenkinsStep { kind: JenkinsStepKind::Echo(extract_string_arg(line)) });
+            current_steps.push(JenkinsStep {
+                kind: JenkinsStepKind::Echo(extract_string_arg(line)),
+            });
         }
         i += 1;
     }
@@ -426,8 +557,12 @@ fn parse_options_block(lines: &[&str], start: usize) -> (JenkinsOptions, usize) 
     let mut depth = 1;
     while i < lines.len() && depth > 0 {
         let line = lines[i].trim();
-        if line.contains('{') { depth += 1; }
-        if line.contains('}') { depth -= 1; }
+        if line.contains('{') {
+            depth += 1;
+        }
+        if line.contains('}') {
+            depth -= 1;
+        }
         if depth > 0 {
             if line.starts_with("timeout(") {
                 if let Some(mins) = extract_kwarg(line, "time") {
@@ -479,61 +614,97 @@ fn extract_kwarg(line: &str, key: &str) -> Option<String> {
     let search = format!("{}:", key);
     let idx = line.find(&search)?;
     let rest = line[idx + search.len()..].trim();
-    Some(rest.trim_matches('\'').trim_matches('"').trim_end_matches(',').trim_end_matches(')').to_string())
+    Some(
+        rest.trim_matches('\'')
+            .trim_matches('"')
+            .trim_end_matches(',')
+            .trim_end_matches(')')
+            .to_string(),
+    )
 }
 
 fn extract_paren_arg(line: &str) -> Option<String> {
     let start = line.find('(')?;
     let end = line.find(')')?;
-    Some(line[start + 1..end].trim().trim_matches('\'').trim_matches('"').to_string())
+    Some(
+        line[start + 1..end]
+            .trim()
+            .trim_matches('\'')
+            .trim_matches('"')
+            .to_string(),
+    )
 }
 
 // ─── Converter: JenkinsFile → PipelineSpec ────────────────────────────────────
 
 /// Convert a parsed Jenkinsfile into a cave-pipelines PipelineSpec.
 pub fn to_pipeline_spec(jf: &JenkinsFile) -> PipelineSpec {
-    let tasks: Vec<PipelineTask> = jf.stages.iter().enumerate().map(|(idx, stage)| {
-        let run_after = if idx > 0 {
-            vec![slug(&jf.stages[idx - 1].name)]
-        } else {
-            vec![]
-        };
+    let tasks: Vec<PipelineTask> = jf
+        .stages
+        .iter()
+        .enumerate()
+        .map(|(idx, stage)| {
+            let run_after = if idx > 0 {
+                vec![slug(&jf.stages[idx - 1].name)]
+            } else {
+                vec![]
+            };
 
-        let steps: Vec<Step> = stage.steps.iter().map(jenkins_step_to_cave_step).collect();
-        let embedded = EmbeddedTaskSpec {
-            steps,
-            params: vec![],
-            workspaces: vec![],
-            results: vec![],
-        };
+            let steps: Vec<Step> = stage.steps.iter().map(jenkins_step_to_cave_step).collect();
+            let embedded = EmbeddedTaskSpec {
+                steps,
+                params: vec![],
+                workspaces: vec![],
+                results: vec![],
+            };
 
-        PipelineTask {
-            name: slug(&stage.name),
-            task_ref: None,
-            task_spec: Some(embedded),
-            run_after,
-            params: stage.environment.iter().map(|(k, v)| Param {
-                name: k.clone(),
-                value: ParamValue::String(v.clone()),
-            }).collect(),
-            workspaces: vec![],
-            when: stage.when.as_ref().map(jenkins_when_to_cave).unwrap_or_default(),
-            matrix: None,
-            retry_policy: None,
-            timeout: None,
-            custom_task_ref: None,
-        }
-    }).collect();
+            PipelineTask {
+                name: slug(&stage.name),
+                task_ref: None,
+                task_spec: Some(embedded),
+                run_after,
+                params: stage
+                    .environment
+                    .iter()
+                    .map(|(k, v)| Param {
+                        name: k.clone(),
+                        value: ParamValue::String(v.clone()),
+                    })
+                    .collect(),
+                workspaces: vec![],
+                when: stage
+                    .when
+                    .as_ref()
+                    .map(jenkins_when_to_cave)
+                    .unwrap_or_default(),
+                matrix: None,
+                retry_policy: None,
+                timeout: None,
+                custom_task_ref: None,
+            }
+        })
+        .collect();
 
-    let finally: Vec<PipelineTask> = jf.post.iter()
+    let finally: Vec<PipelineTask> = jf
+        .post
+        .iter()
         .filter(|p| p.condition == PostCondition::Always || p.condition == PostCondition::Cleanup)
         .enumerate()
         .map(|(idx, post)| {
             let steps: Vec<Step> = post.steps.iter().map(jenkins_step_to_cave_step).collect();
             PipelineTask {
-                name: format!("post-{}-{}", format!("{:?}", post.condition).to_lowercase(), idx),
+                name: format!(
+                    "post-{}-{}",
+                    format!("{:?}", post.condition).to_lowercase(),
+                    idx
+                ),
                 task_ref: None,
-                task_spec: Some(EmbeddedTaskSpec { steps, params: vec![], workspaces: vec![], results: vec![] }),
+                task_spec: Some(EmbeddedTaskSpec {
+                    steps,
+                    params: vec![],
+                    workspaces: vec![],
+                    results: vec![],
+                }),
                 run_after: vec![],
                 params: vec![],
                 workspaces: vec![],
@@ -546,13 +717,17 @@ pub fn to_pipeline_spec(jf: &JenkinsFile) -> PipelineSpec {
         })
         .collect();
 
-    let env_params: Vec<ParamSpec> = jf.environment.iter().map(|(k, _v)| ParamSpec {
-        name: k.clone(),
-        param_type: ParamType::String,
-        description: None,
-        default: jf.environment.get(k).map(|v| ParamValue::String(v.clone())),
-        enum_values: None,
-    }).collect();
+    let env_params: Vec<ParamSpec> = jf
+        .environment
+        .iter()
+        .map(|(k, _v)| ParamSpec {
+            name: k.clone(),
+            param_type: ParamType::String,
+            description: None,
+            default: jf.environment.get(k).map(|v| ParamValue::String(v.clone())),
+            enum_values: None,
+        })
+        .collect();
 
     PipelineSpec {
         params: env_params,
@@ -613,13 +788,20 @@ fn jenkins_step_to_cave_step(step: &JenkinsStep) -> Step {
             resources: None,
             security_context: None,
             timeout: None,
-            ref_: Some(StepActionRef { name: "git-clone".to_string(), version: None }),
+            ref_: Some(StepActionRef {
+                name: "git-clone".to_string(),
+                version: None,
+            }),
             results: vec![],
         },
         JenkinsStepKind::ArchiveArtifacts { pattern } => Step {
             name: "archive-artifacts".to_string(),
             image: "alpine:3.18".to_string(),
-            command: Some(vec!["tar".to_string(), "-czf".to_string(), "artifacts.tar.gz".to_string()]),
+            command: Some(vec![
+                "tar".to_string(),
+                "-czf".to_string(),
+                "artifacts.tar.gz".to_string(),
+            ]),
             args: vec![pattern.clone()],
             env: vec![],
             volume_mounts: vec![],
@@ -727,7 +909,10 @@ pipeline {
     fn parse_environment() {
         let jf = parse_jenkinsfile(SIMPLE_JENKINSFILE).unwrap();
         assert!(jf.environment.contains_key("APP_NAME"));
-        assert_eq!(jf.environment.get("APP_NAME").map(|s| s.as_str()), Some("my-app"));
+        assert_eq!(
+            jf.environment.get("APP_NAME").map(|s| s.as_str()),
+            Some("my-app")
+        );
     }
 
     #[test]

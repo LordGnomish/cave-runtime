@@ -60,9 +60,9 @@ pub mod signing_ecdsa;
 
 // ── A1 mission additions (Keycloak v22.0.0 SAML broker port) ────────────────
 // Appended-only — never edit the originals above.
-pub mod name_id;
 pub mod assertion;
 pub mod bindings;
+pub mod name_id;
 
 #[cfg(test)]
 mod tests_a1;
@@ -125,9 +125,7 @@ impl NameIdFormat {
     /// SAML 2.0 URN for this format.
     pub fn as_urn(self) -> &'static str {
         match self {
-            NameIdFormat::EmailAddress => {
-                "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"
-            }
+            NameIdFormat::EmailAddress => "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
             NameIdFormat::Persistent => "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
             NameIdFormat::Transient => "urn:oasis:names:tc:SAML:2.0:nameid-format:transient",
             NameIdFormat::Unspecified => "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified",
@@ -144,9 +142,7 @@ impl NameIdFormat {
             "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent" => {
                 Some(NameIdFormat::Persistent)
             }
-            "urn:oasis:names:tc:SAML:2.0:nameid-format:transient" => {
-                Some(NameIdFormat::Transient)
-            }
+            "urn:oasis:names:tc:SAML:2.0:nameid-format:transient" => Some(NameIdFormat::Transient),
             "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified" => {
                 Some(NameIdFormat::Unspecified)
             }

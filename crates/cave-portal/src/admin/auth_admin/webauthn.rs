@@ -5,9 +5,9 @@
 //! cave-auth surfaces. Visual port of
 //! `js/apps/admin-ui/src/realm-settings/WebauthnPolicyTab.tsx`.
 
+use super::{AuthAdminError, render_admin_nav, require_platform};
 use crate::admin::permission::RequestCtx;
 use crate::admin::render::{escape, page_shell_full, table_html};
-use super::{render_admin_nav, require_platform, AuthAdminError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WebauthnPolicy {
@@ -196,7 +196,10 @@ mod tests {
     #[test]
     fn seeded_credentials_includes_yubikey_and_passkey_aaguids() {
         let c = seeded_credentials();
-        assert!(c.iter().any(|x| x.aaguid == "ee882879-721c-4913-9775-3dfcce97072a"));
+        assert!(
+            c.iter()
+                .any(|x| x.aaguid == "ee882879-721c-4913-9775-3dfcce97072a")
+        );
         assert!(c.iter().any(|x| x.label.contains("Passkey")));
     }
 

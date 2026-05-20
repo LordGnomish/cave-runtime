@@ -43,8 +43,7 @@ fn extract_after(text: &str, needle: &str) -> Option<String> {
 #[test]
 fn assertion_1_upstream_version_pinned() {
     let m = manifest_text();
-    let v = extract_after(&m, "\nversion ")
-        .or_else(|| extract_after(&m, "\nversion="));
+    let v = extract_after(&m, "\nversion ").or_else(|| extract_after(&m, "\nversion="));
     assert_eq!(
         v.as_deref(),
         Some(PINNED_VERSION),
@@ -59,8 +58,7 @@ fn assertion_1_upstream_version_pinned() {
 #[test]
 fn assertion_2_source_sha_matches_version() {
     let m = manifest_text();
-    let sha = extract_after(&m, "\nsource_sha ")
-        .or_else(|| extract_after(&m, "\nsource_sha="));
+    let sha = extract_after(&m, "\nsource_sha ").or_else(|| extract_after(&m, "\nsource_sha="));
     assert!(
         sha.is_some() && !sha.as_deref().unwrap().is_empty(),
         "[upstream] source_sha must be set (got {:?})",
@@ -89,7 +87,11 @@ fn assertion_3_fill_ratio_meets_floor() {
         FLOOR_FILL_RATIO,
         ratio
     );
-    assert!(ratio <= 1.0, "fill_ratio must be a fraction (got {})", ratio);
+    assert!(
+        ratio <= 1.0,
+        "fill_ratio must be a fraction (got {})",
+        ratio
+    );
 }
 
 // ─── Assertion 4: parity_ratio_source = "manifest" ──────────────────────────
@@ -112,8 +114,7 @@ fn assertion_4_parity_ratio_source_is_manifest() {
 #[test]
 fn assertion_5_last_audit_is_today() {
     let m = manifest_text();
-    let when = extract_after(&m, "\nlast_audit ")
-        .or_else(|| extract_after(&m, "\nlast_audit="));
+    let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert_eq!(
         when.as_deref(),
         Some(TODAY),
@@ -193,7 +194,9 @@ fn assertion_8_no_stub_macros_in_src() {
         if !p.extension().map(|e| e == "rs").unwrap_or(false) {
             return;
         }
-        let Ok(text) = fs::read_to_string(p) else { return };
+        let Ok(text) = fs::read_to_string(p) else {
+            return;
+        };
         for (lineno, line) in text.lines().enumerate() {
             let trimmed = line.trim_start();
             if trimmed.starts_with("//") {
@@ -248,7 +251,9 @@ fn assertion_9_serving_eventing_surface_intact() {
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 fn walk(dir: &PathBuf, cb: &mut dyn FnMut(&PathBuf)) {
-    let Ok(entries) = fs::read_dir(dir) else { return };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
     for e in entries.flatten() {
         let p = e.path();
         if p.is_dir() {

@@ -93,7 +93,10 @@ impl FlowFilter {
             return false;
         }
         if !self.destination_pods.is_empty()
-            && !self.destination_pods.iter().any(|p| pod_match(p, &f.destination_pod))
+            && !self
+                .destination_pods
+                .iter()
+                .any(|p| pod_match(p, &f.destination_pod))
         {
             return false;
         }
@@ -103,7 +106,9 @@ impl FlowFilter {
             return false;
         }
         if !self.destination_identities.is_empty()
-            && !self.destination_identities.contains(&f.destination_identity)
+            && !self
+                .destination_identities
+                .contains(&f.destination_identity)
         {
             return false;
         }
@@ -170,7 +175,14 @@ pub struct GetFlowsRequest {
 
 impl Default for GetFlowsRequest {
     fn default() -> Self {
-        Self { since: None, until: None, limit: 0, follow: false, whitelist: Vec::new(), blacklist: Vec::new() }
+        Self {
+            since: None,
+            until: None,
+            limit: 0,
+            follow: false,
+            whitelist: Vec::new(),
+            blacklist: Vec::new(),
+        }
     }
 }
 
@@ -194,7 +206,13 @@ pub struct Observer {
 
 impl Observer {
     pub fn new(tenant: TenantId, max_flows: u64, started_ns: u64) -> Self {
-        Self { tenant, max_flows, flows: Vec::new(), seen: 0, started_ns }
+        Self {
+            tenant,
+            max_flows,
+            flows: Vec::new(),
+            seen: 0,
+            started_ns,
+        }
     }
 
     pub fn ingest(&mut self, flow: FlowLog) {
@@ -213,8 +231,7 @@ impl Observer {
     pub fn get_flows(&self, req: &GetFlowsRequest) -> Vec<FlowLog> {
         let mut filtered = apply_filters(&req.whitelist, &req.blacklist, &self.flows);
         filtered.retain(|f| {
-            req.since.map_or(true, |t| f.time >= t)
-                && req.until.map_or(true, |t| f.time <= t)
+            req.since.map_or(true, |t| f.time >= t) && req.until.map_or(true, |t| f.time <= t)
         });
         if req.limit > 0 && (filtered.len() as u64) > req.limit {
             filtered.truncate(req.limit as usize);
@@ -282,7 +299,10 @@ impl PeerService {
     }
     pub fn remove(&mut self, name: &str) -> bool {
         if let Some(peer) = self.peers.remove(name) {
-            self.pending.push(PeerChange { kind: PeerChangeKind::Delete, peer });
+            self.pending.push(PeerChange {
+                kind: PeerChangeKind::Delete,
+                peer,
+            });
             true
         } else {
             false
@@ -311,7 +331,10 @@ pub struct Relay {
 
 impl Relay {
     pub fn new(tenant: TenantId) -> Self {
-        Self { tenant, clusters: BTreeMap::new() }
+        Self {
+            tenant,
+            clusters: BTreeMap::new(),
+        }
     }
     pub fn add_cluster(&mut self, name: impl Into<String>, observer: Observer) {
         self.clusters.insert(name.into(), observer);
@@ -388,7 +411,10 @@ pub fn metrics_by_namespace(flows: &[FlowLog]) -> BTreeMap<String, NamespaceMetr
 
 /// Build a per-namespace summary with top-N talkers (by destination identity).
 pub fn summarize_namespace(namespace: &str, flows: &[FlowLog], top_n: usize) -> NamespaceSummary {
-    let mut s = NamespaceSummary { namespace: namespace.to_string(), ..Default::default() };
+    let mut s = NamespaceSummary {
+        namespace: namespace.to_string(),
+        ..Default::default()
+    };
     let mut talkers: BTreeMap<u32, u64> = BTreeMap::new();
     for f in flows {
         if namespace_of(&f.source_pod) != namespace {
@@ -423,7 +449,16 @@ mod tests {
     use crate::cilium::hubble::DropReason;
     use crate::cilium_test_ctx;
 
-    fn flow(tenant: &str, src_pod: &str, dst_pod: &str, src_id: u32, dst_id: u32, v: Verdict, dr: DropReason, bytes: u64) -> FlowLog {
+    fn flow(
+        tenant: &str,
+        src_pod: &str,
+        dst_pod: &str,
+        src_id: u32,
+        dst_id: u32,
+        v: Verdict,
+        dr: DropReason,
+        bytes: u64,
+    ) -> FlowLog {
         FlowLog {
             tenant: TenantId::new(tenant).expect("test fixture"),
             time: Utc::now(),
@@ -441,25 +476,38 @@ mod tests {
 
     #[test]
     fn drop_class_policy_deny_maps_to_policy() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/drop", "DropClass.Policy", "tenant-hb-dc-pol");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/drop",
+            "DropClass.Policy",
+            "tenant-hb-dc-pol"
+        );
         assert_eq!(drop_class(DropReason::PolicyDeny), DropClass::Policy);
     }
 
     #[test]
     fn drop_class_ct_invalid_maps_to_conntrack() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/drop", "DropClass.CT", "tenant-hb-dc-ct");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/hubble/metrics/drop", "DropClass.CT", "tenant-hb-dc-ct");
         assert_eq!(drop_class(DropReason::CtInvalid), DropClass::Conntrack);
     }
 
     #[test]
     fn drop_class_nat_no_mapping_maps_to_nat() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/drop", "DropClass.NAT", "tenant-hb-dc-nat");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/drop",
+            "DropClass.NAT",
+            "tenant-hb-dc-nat"
+        );
         assert_eq!(drop_class(DropReason::NatNoMapping), DropClass::Nat);
     }
 
     #[test]
     fn drop_class_unknown_codes_bucketed_by_range() {
-        let (_c, _t) = cilium_test_ctx!("bpf/lib/drop_reasons.h", "DropClass.Unknown", "tenant-hb-dc-unk");
+        let (_c, _t) = cilium_test_ctx!(
+            "bpf/lib/drop_reasons.h",
+            "DropClass.Unknown",
+            "tenant-hb-dc-unk"
+        );
         assert_eq!(drop_class(DropReason::Unknown(135)), DropClass::Policy);
         assert_eq!(drop_class(DropReason::Unknown(155)), DropClass::Conntrack);
         assert_eq!(drop_class(DropReason::Unknown(165)), DropClass::Nat);
@@ -471,7 +519,11 @@ mod tests {
 
     #[test]
     fn drop_class_auth_required_maps_to_auth() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/drop", "DropClass.Auth", "tenant-hb-dc-auth");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/drop",
+            "DropClass.Auth",
+            "tenant-hb-dc-auth"
+        );
         assert_eq!(drop_class(DropReason::AuthRequired), DropClass::Auth);
     }
 
@@ -479,66 +531,187 @@ mod tests {
 
     #[test]
     fn flow_filter_by_verdict() {
-        let (_c, _t) = cilium_test_ctx!("api/v1/flow/flow.proto", "FlowFilter.Verdict", "tenant-hb-fv");
-        let f = flow("t", "ns/a", "ns/b", 1, 2, Verdict::Dropped, DropReason::PolicyDeny, 100);
-        let filt = FlowFilter { verdict: Some(Verdict::Dropped), ..Default::default() };
+        let (_c, _t) = cilium_test_ctx!(
+            "api/v1/flow/flow.proto",
+            "FlowFilter.Verdict",
+            "tenant-hb-fv"
+        );
+        let f = flow(
+            "t",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Dropped,
+            DropReason::PolicyDeny,
+            100,
+        );
+        let filt = FlowFilter {
+            verdict: Some(Verdict::Dropped),
+            ..Default::default()
+        };
         assert!(filt.matches(&f));
-        let filt2 = FlowFilter { verdict: Some(Verdict::Forwarded), ..Default::default() };
+        let filt2 = FlowFilter {
+            verdict: Some(Verdict::Forwarded),
+            ..Default::default()
+        };
         assert!(!filt2.matches(&f));
     }
 
     #[test]
     fn flow_filter_by_source_pod_exact() {
-        let (_c, _t) = cilium_test_ctx!("api/v1/flow/flow.proto", "FlowFilter.SourcePod", "tenant-hb-fsp");
-        let f = flow("t", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 100);
-        let filt = FlowFilter { source_pods: vec!["ns/a".into()], ..Default::default() };
+        let (_c, _t) = cilium_test_ctx!(
+            "api/v1/flow/flow.proto",
+            "FlowFilter.SourcePod",
+            "tenant-hb-fsp"
+        );
+        let f = flow(
+            "t",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Forwarded,
+            DropReason::None,
+            100,
+        );
+        let filt = FlowFilter {
+            source_pods: vec!["ns/a".into()],
+            ..Default::default()
+        };
         assert!(filt.matches(&f));
-        let filt2 = FlowFilter { source_pods: vec!["ns/c".into()], ..Default::default() };
+        let filt2 = FlowFilter {
+            source_pods: vec!["ns/c".into()],
+            ..Default::default()
+        };
         assert!(!filt2.matches(&f));
     }
 
     #[test]
     fn flow_filter_by_source_pod_namespace_prefix() {
-        let (_c, _t) = cilium_test_ctx!("api/v1/flow/flow.proto", "FlowFilter.SourcePod.Prefix", "tenant-hb-fspp");
-        let f = flow("t", "ns/a", "other/b", 1, 2, Verdict::Forwarded, DropReason::None, 100);
-        let filt = FlowFilter { source_pods: vec!["ns/".into()], ..Default::default() };
+        let (_c, _t) = cilium_test_ctx!(
+            "api/v1/flow/flow.proto",
+            "FlowFilter.SourcePod.Prefix",
+            "tenant-hb-fspp"
+        );
+        let f = flow(
+            "t",
+            "ns/a",
+            "other/b",
+            1,
+            2,
+            Verdict::Forwarded,
+            DropReason::None,
+            100,
+        );
+        let filt = FlowFilter {
+            source_pods: vec!["ns/".into()],
+            ..Default::default()
+        };
         assert!(filt.matches(&f));
     }
 
     #[test]
     fn flow_filter_by_namespace() {
-        let (_c, _t) = cilium_test_ctx!("api/v1/flow/flow.proto", "FlowFilter.Namespace", "tenant-hb-fns");
-        let f = flow("t", "prod/a", "stage/b", 1, 2, Verdict::Forwarded, DropReason::None, 100);
-        let filt = FlowFilter { destination_namespace: Some("stage".into()), ..Default::default() };
+        let (_c, _t) = cilium_test_ctx!(
+            "api/v1/flow/flow.proto",
+            "FlowFilter.Namespace",
+            "tenant-hb-fns"
+        );
+        let f = flow(
+            "t",
+            "prod/a",
+            "stage/b",
+            1,
+            2,
+            Verdict::Forwarded,
+            DropReason::None,
+            100,
+        );
+        let filt = FlowFilter {
+            destination_namespace: Some("stage".into()),
+            ..Default::default()
+        };
         assert!(filt.matches(&f));
-        let filt2 = FlowFilter { destination_namespace: Some("prod".into()), ..Default::default() };
+        let filt2 = FlowFilter {
+            destination_namespace: Some("prod".into()),
+            ..Default::default()
+        };
         assert!(!filt2.matches(&f));
     }
 
     #[test]
     fn flow_filter_by_identity() {
-        let (_c, _t) = cilium_test_ctx!("api/v1/flow/flow.proto", "FlowFilter.Identity", "tenant-hb-fid");
-        let f = flow("t", "ns/a", "ns/b", 256, 257, Verdict::Forwarded, DropReason::None, 100);
-        let filt = FlowFilter { source_identities: vec![256], ..Default::default() };
+        let (_c, _t) = cilium_test_ctx!(
+            "api/v1/flow/flow.proto",
+            "FlowFilter.Identity",
+            "tenant-hb-fid"
+        );
+        let f = flow(
+            "t",
+            "ns/a",
+            "ns/b",
+            256,
+            257,
+            Verdict::Forwarded,
+            DropReason::None,
+            100,
+        );
+        let filt = FlowFilter {
+            source_identities: vec![256],
+            ..Default::default()
+        };
         assert!(filt.matches(&f));
-        let filt2 = FlowFilter { source_identities: vec![999], ..Default::default() };
+        let filt2 = FlowFilter {
+            source_identities: vec![999],
+            ..Default::default()
+        };
         assert!(!filt2.matches(&f));
     }
 
     #[test]
     fn flow_filter_by_drop_reason() {
-        let (_c, _t) = cilium_test_ctx!("api/v1/flow/flow.proto", "FlowFilter.DropReason", "tenant-hb-fdr");
-        let f = flow("t", "ns/a", "ns/b", 1, 2, Verdict::Dropped, DropReason::PolicyDeny, 100);
-        let filt = FlowFilter { drop_reasons: vec![DropReason::PolicyDeny], ..Default::default() };
+        let (_c, _t) = cilium_test_ctx!(
+            "api/v1/flow/flow.proto",
+            "FlowFilter.DropReason",
+            "tenant-hb-fdr"
+        );
+        let f = flow(
+            "t",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Dropped,
+            DropReason::PolicyDeny,
+            100,
+        );
+        let filt = FlowFilter {
+            drop_reasons: vec![DropReason::PolicyDeny],
+            ..Default::default()
+        };
         assert!(filt.matches(&f));
-        let filt2 = FlowFilter { drop_reasons: vec![DropReason::CtInvalid], ..Default::default() };
+        let filt2 = FlowFilter {
+            drop_reasons: vec![DropReason::CtInvalid],
+            ..Default::default()
+        };
         assert!(!filt2.matches(&f));
     }
 
     #[test]
     fn flow_filter_combined_AND() {
-        let (_c, _t) = cilium_test_ctx!("api/v1/flow/flow.proto", "FlowFilter.AND", "tenant-hb-fand");
-        let f = flow("t", "ns/a", "ns/b", 256, 257, Verdict::Dropped, DropReason::PolicyDeny, 100);
+        let (_c, _t) =
+            cilium_test_ctx!("api/v1/flow/flow.proto", "FlowFilter.AND", "tenant-hb-fand");
+        let f = flow(
+            "t",
+            "ns/a",
+            "ns/b",
+            256,
+            257,
+            Verdict::Dropped,
+            DropReason::PolicyDeny,
+            100,
+        );
         let filt = FlowFilter {
             verdict: Some(Verdict::Dropped),
             source_identities: vec![256],
@@ -550,12 +723,37 @@ mod tests {
 
     #[test]
     fn flow_filter_blacklist_excludes_match() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/observer/observer.go", "ApplyFilters.Blacklist", "tenant-hb-fbl");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/observer/observer.go",
+            "ApplyFilters.Blacklist",
+            "tenant-hb-fbl"
+        );
         let flows = vec![
-            flow("t", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 100),
-            flow("t", "ns/c", "ns/d", 3, 4, Verdict::Dropped, DropReason::PolicyDeny, 50),
+            flow(
+                "t",
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Forwarded,
+                DropReason::None,
+                100,
+            ),
+            flow(
+                "t",
+                "ns/c",
+                "ns/d",
+                3,
+                4,
+                Verdict::Dropped,
+                DropReason::PolicyDeny,
+                50,
+            ),
         ];
-        let bl = vec![FlowFilter { verdict: Some(Verdict::Dropped), ..Default::default() }];
+        let bl = vec![FlowFilter {
+            verdict: Some(Verdict::Dropped),
+            ..Default::default()
+        }];
         let out = apply_filters(&[], &bl, &flows);
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].verdict, Verdict::Forwarded);
@@ -563,15 +761,32 @@ mod tests {
 
     #[test]
     fn flow_filter_whitelist_default_is_pass_all() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/observer/observer.go", "ApplyFilters.Default", "tenant-hb-fwl");
-        let flows = vec![flow("t", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 100)];
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/observer/observer.go",
+            "ApplyFilters.Default",
+            "tenant-hb-fwl"
+        );
+        let flows = vec![flow(
+            "t",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Forwarded,
+            DropReason::None,
+            100,
+        )];
         let out = apply_filters(&[], &[], &flows);
         assert_eq!(out.len(), 1);
     }
 
     #[test]
     fn flow_filter_round_trips_serde() {
-        let (_c, _t) = cilium_test_ctx!("api/v1/flow/flow.proto", "FlowFilter.Serde", "tenant-hb-fserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "api/v1/flow/flow.proto",
+            "FlowFilter.Serde",
+            "tenant-hb-fserde"
+        );
         let f = FlowFilter {
             verdict: Some(Verdict::Dropped),
             source_pods: vec!["ns/a".into()],
@@ -587,10 +802,23 @@ mod tests {
 
     #[test]
     fn observer_get_flows_returns_buffered() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/hubble/observer/observer.go", "Observer.GetFlows", "tenant-hb-obs-gf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/hubble/observer/observer.go",
+            "Observer.GetFlows",
+            "tenant-hb-obs-gf"
+        );
         let mut o = Observer::new(tenant.clone(), 100, 0);
         for i in 0..5u64 {
-            o.ingest(flow("tenant-hb-obs-gf", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, i));
+            o.ingest(flow(
+                "tenant-hb-obs-gf",
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Forwarded,
+                DropReason::None,
+                i,
+            ));
         }
         let req = GetFlowsRequest::default();
         let r = o.get_flows(&req);
@@ -599,23 +827,64 @@ mod tests {
 
     #[test]
     fn observer_get_flows_respects_limit() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/hubble/observer/observer.go", "Observer.GetFlows.Limit", "tenant-hb-obs-lim");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/hubble/observer/observer.go",
+            "Observer.GetFlows.Limit",
+            "tenant-hb-obs-lim"
+        );
         let mut o = Observer::new(tenant.clone(), 100, 0);
         for i in 0..10u64 {
-            o.ingest(flow("tenant-hb-obs-lim", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, i));
+            o.ingest(flow(
+                "tenant-hb-obs-lim",
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Forwarded,
+                DropReason::None,
+                i,
+            ));
         }
-        let req = GetFlowsRequest { limit: 3, ..Default::default() };
+        let req = GetFlowsRequest {
+            limit: 3,
+            ..Default::default()
+        };
         assert_eq!(o.get_flows(&req).len(), 3);
     }
 
     #[test]
     fn observer_get_flows_with_filter() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/hubble/observer/observer.go", "Observer.GetFlows.Filter", "tenant-hb-obs-flt");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/hubble/observer/observer.go",
+            "Observer.GetFlows.Filter",
+            "tenant-hb-obs-flt"
+        );
         let mut o = Observer::new(tenant.clone(), 100, 0);
-        o.ingest(flow("tenant-hb-obs-flt", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 0));
-        o.ingest(flow("tenant-hb-obs-flt", "ns/a", "ns/b", 1, 2, Verdict::Dropped, DropReason::PolicyDeny, 0));
+        o.ingest(flow(
+            "tenant-hb-obs-flt",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Forwarded,
+            DropReason::None,
+            0,
+        ));
+        o.ingest(flow(
+            "tenant-hb-obs-flt",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Dropped,
+            DropReason::PolicyDeny,
+            0,
+        ));
         let req = GetFlowsRequest {
-            whitelist: vec![FlowFilter { verdict: Some(Verdict::Dropped), ..Default::default() }],
+            whitelist: vec![FlowFilter {
+                verdict: Some(Verdict::Dropped),
+                ..Default::default()
+            }],
             ..Default::default()
         };
         assert_eq!(o.get_flows(&req).len(), 1);
@@ -623,10 +892,23 @@ mod tests {
 
     #[test]
     fn observer_evicts_old_flow_when_full() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/hubble/observer/observer.go", "Observer.Eviction", "tenant-hb-obs-evict");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/hubble/observer/observer.go",
+            "Observer.Eviction",
+            "tenant-hb-obs-evict"
+        );
         let mut o = Observer::new(tenant.clone(), 3, 0);
         for _ in 0..5 {
-            o.ingest(flow("tenant-hb-obs-evict", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 0));
+            o.ingest(flow(
+                "tenant-hb-obs-evict",
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Forwarded,
+                DropReason::None,
+                0,
+            ));
         }
         assert_eq!(o.flows.len(), 3);
         assert_eq!(o.seen, 5);
@@ -634,10 +916,23 @@ mod tests {
 
     #[test]
     fn observer_status_reports_counts_and_uptime() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/hubble/observer/observer.go", "Observer.ServerStatus", "tenant-hb-obs-st");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/hubble/observer/observer.go",
+            "Observer.ServerStatus",
+            "tenant-hb-obs-st"
+        );
         let mut o = Observer::new(tenant.clone(), 100, 1_000_000);
         for _ in 0..10 {
-            o.ingest(flow("tenant-hb-obs-st", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 0));
+            o.ingest(flow(
+                "tenant-hb-obs-st",
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Forwarded,
+                DropReason::None,
+                0,
+            ));
         }
         let st = o.status(2_000_000_000);
         assert_eq!(st.num_flows, 10);
@@ -648,9 +943,22 @@ mod tests {
 
     #[test]
     fn observer_filters_cross_tenant_ingest() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/hubble/observer/observer.go", "Observer.Tenant", "tenant-hb-obs-iso");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/hubble/observer/observer.go",
+            "Observer.Tenant",
+            "tenant-hb-obs-iso"
+        );
         let mut o = Observer::new(tenant.clone(), 100, 0);
-        o.ingest(flow("other-tenant", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 0));
+        o.ingest(flow(
+            "other-tenant",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Forwarded,
+            DropReason::None,
+            0,
+        ));
         assert_eq!(o.flows.len(), 0);
         assert_eq!(o.seen, 0);
     }
@@ -659,9 +967,17 @@ mod tests {
 
     #[test]
     fn peer_service_upsert_emits_add_event() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/peer/service.go", "Peer.Upsert", "tenant-hb-peer-up");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/peer/service.go",
+            "Peer.Upsert",
+            "tenant-hb-peer-up"
+        );
         let mut ps = PeerService::new();
-        ps.upsert(PeerInfo { name: "node-a".into(), address: "10.0.0.1:4244".into(), tls: true });
+        ps.upsert(PeerInfo {
+            name: "node-a".into(),
+            address: "10.0.0.1:4244".into(),
+            tls: true,
+        });
         let changes = ps.drain_changes();
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].kind, PeerChangeKind::Add);
@@ -669,20 +985,40 @@ mod tests {
 
     #[test]
     fn peer_service_upsert_existing_emits_update() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/peer/service.go", "Peer.Update", "tenant-hb-peer-upd");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/peer/service.go",
+            "Peer.Update",
+            "tenant-hb-peer-upd"
+        );
         let mut ps = PeerService::new();
-        ps.upsert(PeerInfo { name: "node-a".into(), address: "10.0.0.1:4244".into(), tls: true });
+        ps.upsert(PeerInfo {
+            name: "node-a".into(),
+            address: "10.0.0.1:4244".into(),
+            tls: true,
+        });
         let _ = ps.drain_changes();
-        ps.upsert(PeerInfo { name: "node-a".into(), address: "10.0.0.2:4244".into(), tls: true });
+        ps.upsert(PeerInfo {
+            name: "node-a".into(),
+            address: "10.0.0.2:4244".into(),
+            tls: true,
+        });
         let changes = ps.drain_changes();
         assert_eq!(changes[0].kind, PeerChangeKind::Update);
     }
 
     #[test]
     fn peer_service_remove_emits_delete() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/peer/service.go", "Peer.Remove", "tenant-hb-peer-rm");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/peer/service.go",
+            "Peer.Remove",
+            "tenant-hb-peer-rm"
+        );
         let mut ps = PeerService::new();
-        ps.upsert(PeerInfo { name: "node-a".into(), address: "x".into(), tls: false });
+        ps.upsert(PeerInfo {
+            name: "node-a".into(),
+            address: "x".into(),
+            tls: false,
+        });
         let _ = ps.drain_changes();
         assert!(ps.remove("node-a"));
         let changes = ps.drain_changes();
@@ -691,10 +1027,22 @@ mod tests {
 
     #[test]
     fn peer_service_list_returns_known_peers() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/peer/service.go", "Peer.List", "tenant-hb-peer-list");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/peer/service.go",
+            "Peer.List",
+            "tenant-hb-peer-list"
+        );
         let mut ps = PeerService::new();
-        ps.upsert(PeerInfo { name: "a".into(), address: "x".into(), tls: false });
-        ps.upsert(PeerInfo { name: "b".into(), address: "y".into(), tls: false });
+        ps.upsert(PeerInfo {
+            name: "a".into(),
+            address: "x".into(),
+            tls: false,
+        });
+        ps.upsert(PeerInfo {
+            name: "b".into(),
+            address: "y".into(),
+            tls: false,
+        });
         assert_eq!(ps.count(), 2);
         assert_eq!(ps.list().len(), 2);
     }
@@ -703,11 +1051,33 @@ mod tests {
 
     #[test]
     fn relay_aggregates_flows_from_multiple_clusters() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/hubble/relay/relay.go", "Relay.GetFlows", "tenant-hb-rel-agg");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/hubble/relay/relay.go",
+            "Relay.GetFlows",
+            "tenant-hb-rel-agg"
+        );
         let mut a = Observer::new(tenant.clone(), 100, 0);
         let mut b = Observer::new(tenant.clone(), 100, 0);
-        a.ingest(flow(tenant.as_str(), "ns/x", "ns/y", 1, 2, Verdict::Forwarded, DropReason::None, 1));
-        b.ingest(flow(tenant.as_str(), "ns/p", "ns/q", 3, 4, Verdict::Forwarded, DropReason::None, 2));
+        a.ingest(flow(
+            tenant.as_str(),
+            "ns/x",
+            "ns/y",
+            1,
+            2,
+            Verdict::Forwarded,
+            DropReason::None,
+            1,
+        ));
+        b.ingest(flow(
+            tenant.as_str(),
+            "ns/p",
+            "ns/q",
+            3,
+            4,
+            Verdict::Forwarded,
+            DropReason::None,
+            2,
+        ));
         let mut r = Relay::new(tenant);
         r.add_cluster("us-east", a);
         r.add_cluster("eu-west", b);
@@ -717,11 +1087,33 @@ mod tests {
 
     #[test]
     fn relay_sorts_aggregated_flows_by_time() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/hubble/relay/relay.go", "Relay.GetFlows.Sort", "tenant-hb-rel-sort");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/hubble/relay/relay.go",
+            "Relay.GetFlows.Sort",
+            "tenant-hb-rel-sort"
+        );
         let mut a = Observer::new(tenant.clone(), 100, 0);
         let mut b = Observer::new(tenant.clone(), 100, 0);
-        a.ingest(flow(tenant.as_str(), "ns/x", "ns/y", 1, 2, Verdict::Forwarded, DropReason::None, 0));
-        b.ingest(flow(tenant.as_str(), "ns/p", "ns/q", 3, 4, Verdict::Forwarded, DropReason::None, 0));
+        a.ingest(flow(
+            tenant.as_str(),
+            "ns/x",
+            "ns/y",
+            1,
+            2,
+            Verdict::Forwarded,
+            DropReason::None,
+            0,
+        ));
+        b.ingest(flow(
+            tenant.as_str(),
+            "ns/p",
+            "ns/q",
+            3,
+            4,
+            Verdict::Forwarded,
+            DropReason::None,
+            0,
+        ));
         let mut r = Relay::new(tenant);
         r.add_cluster("us-east", a);
         r.add_cluster("eu-west", b);
@@ -735,7 +1127,11 @@ mod tests {
 
     #[test]
     fn relay_remove_cluster_drops_observer() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/hubble/relay/relay.go", "Relay.RemoveCluster", "tenant-hb-rel-rm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/hubble/relay/relay.go",
+            "Relay.RemoveCluster",
+            "tenant-hb-rel-rm"
+        );
         let mut r = Relay::new(tenant.clone());
         r.add_cluster("us-east", Observer::new(tenant.clone(), 100, 0));
         assert!(r.remove_cluster("us-east"));
@@ -746,11 +1142,42 @@ mod tests {
 
     #[test]
     fn metrics_by_namespace_aggregates_forward_drop_bytes() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/api.go", "MetricsByNamespace", "tenant-hb-mns");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/api.go",
+            "MetricsByNamespace",
+            "tenant-hb-mns"
+        );
         let flows = vec![
-            flow("t", "ns-a/x", "ns-b/y", 1, 2, Verdict::Forwarded, DropReason::None, 100),
-            flow("t", "ns-a/x", "ns-b/y", 1, 2, Verdict::Dropped, DropReason::PolicyDeny, 50),
-            flow("t", "ns-a/x", "ns-b/y", 1, 2, Verdict::Forwarded, DropReason::None, 200),
+            flow(
+                "t",
+                "ns-a/x",
+                "ns-b/y",
+                1,
+                2,
+                Verdict::Forwarded,
+                DropReason::None,
+                100,
+            ),
+            flow(
+                "t",
+                "ns-a/x",
+                "ns-b/y",
+                1,
+                2,
+                Verdict::Dropped,
+                DropReason::PolicyDeny,
+                50,
+            ),
+            flow(
+                "t",
+                "ns-a/x",
+                "ns-b/y",
+                1,
+                2,
+                Verdict::Forwarded,
+                DropReason::None,
+                200,
+            ),
         ];
         let m = metrics_by_namespace(&flows);
         assert_eq!(m["ns-a"].forwarded, 2);
@@ -761,10 +1188,32 @@ mod tests {
 
     #[test]
     fn metrics_by_namespace_drop_class_breakdown() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/api.go", "MetricsByNamespace.DropClass", "tenant-hb-mdc");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/api.go",
+            "MetricsByNamespace.DropClass",
+            "tenant-hb-mdc"
+        );
         let flows = vec![
-            flow("t", "ns/a", "ns/b", 1, 2, Verdict::Dropped, DropReason::PolicyDeny, 50),
-            flow("t", "ns/a", "ns/b", 1, 2, Verdict::Dropped, DropReason::CtInvalid, 50),
+            flow(
+                "t",
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Dropped,
+                DropReason::PolicyDeny,
+                50,
+            ),
+            flow(
+                "t",
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Dropped,
+                DropReason::CtInvalid,
+                50,
+            ),
         ];
         let m = metrics_by_namespace(&flows);
         let dc = &m["ns"].drop_class_counts;
@@ -774,12 +1223,52 @@ mod tests {
 
     #[test]
     fn summarize_namespace_top_talkers_ordered() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/api.go", "Summarize.TopTalkers", "tenant-hb-tt");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/api.go",
+            "Summarize.TopTalkers",
+            "tenant-hb-tt"
+        );
         let flows = vec![
-            flow("t", "ns/a", "ns/b", 1, 100, Verdict::Forwarded, DropReason::None, 10),
-            flow("t", "ns/a", "ns/c", 1, 200, Verdict::Forwarded, DropReason::None, 10),
-            flow("t", "ns/a", "ns/d", 1, 200, Verdict::Forwarded, DropReason::None, 10),
-            flow("t", "ns/a", "ns/e", 1, 200, Verdict::Forwarded, DropReason::None, 10),
+            flow(
+                "t",
+                "ns/a",
+                "ns/b",
+                1,
+                100,
+                Verdict::Forwarded,
+                DropReason::None,
+                10,
+            ),
+            flow(
+                "t",
+                "ns/a",
+                "ns/c",
+                1,
+                200,
+                Verdict::Forwarded,
+                DropReason::None,
+                10,
+            ),
+            flow(
+                "t",
+                "ns/a",
+                "ns/d",
+                1,
+                200,
+                Verdict::Forwarded,
+                DropReason::None,
+                10,
+            ),
+            flow(
+                "t",
+                "ns/a",
+                "ns/e",
+                1,
+                200,
+                Verdict::Forwarded,
+                DropReason::None,
+                10,
+            ),
         ];
         let s = summarize_namespace("ns", &flows, 2);
         assert_eq!(s.top_talkers[0], (200, 3));
@@ -788,11 +1277,42 @@ mod tests {
 
     #[test]
     fn summarize_namespace_unique_destinations() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/api.go", "Summarize.Unique", "tenant-hb-su");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/api.go",
+            "Summarize.Unique",
+            "tenant-hb-su"
+        );
         let flows = vec![
-            flow("t", "ns/a", "ns/b", 1, 100, Verdict::Forwarded, DropReason::None, 10),
-            flow("t", "ns/a", "ns/c", 1, 100, Verdict::Forwarded, DropReason::None, 10),
-            flow("t", "ns/a", "ns/c", 1, 200, Verdict::Forwarded, DropReason::None, 10),
+            flow(
+                "t",
+                "ns/a",
+                "ns/b",
+                1,
+                100,
+                Verdict::Forwarded,
+                DropReason::None,
+                10,
+            ),
+            flow(
+                "t",
+                "ns/a",
+                "ns/c",
+                1,
+                100,
+                Verdict::Forwarded,
+                DropReason::None,
+                10,
+            ),
+            flow(
+                "t",
+                "ns/a",
+                "ns/c",
+                1,
+                200,
+                Verdict::Forwarded,
+                DropReason::None,
+                10,
+            ),
         ];
         let s = summarize_namespace("ns", &flows, 5);
         assert_eq!(s.unique_destinations.len(), 2);
@@ -800,10 +1320,32 @@ mod tests {
 
     #[test]
     fn summarize_namespace_skips_other_namespace_flows() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/api.go", "Summarize.Filter", "tenant-hb-sf");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/api.go",
+            "Summarize.Filter",
+            "tenant-hb-sf"
+        );
         let flows = vec![
-            flow("t", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 10),
-            flow("t", "other/a", "ns/b", 3, 4, Verdict::Forwarded, DropReason::None, 10),
+            flow(
+                "t",
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Forwarded,
+                DropReason::None,
+                10,
+            ),
+            flow(
+                "t",
+                "other/a",
+                "ns/b",
+                3,
+                4,
+                Verdict::Forwarded,
+                DropReason::None,
+                10,
+            ),
         ];
         let s = summarize_namespace("ns", &flows, 5);
         assert_eq!(s.forwarded, 1);
@@ -811,10 +1353,32 @@ mod tests {
 
     #[test]
     fn summarize_namespace_counts_drops() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/api.go", "Summarize.Drops", "tenant-hb-sd");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/api.go",
+            "Summarize.Drops",
+            "tenant-hb-sd"
+        );
         let flows = vec![
-            flow("t", "ns/a", "ns/b", 1, 2, Verdict::Dropped, DropReason::PolicyDeny, 10),
-            flow("t", "ns/a", "ns/b", 1, 2, Verdict::Dropped, DropReason::CtInvalid, 10),
+            flow(
+                "t",
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Dropped,
+                DropReason::PolicyDeny,
+                10,
+            ),
+            flow(
+                "t",
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Dropped,
+                DropReason::CtInvalid,
+                10,
+            ),
         ];
         let s = summarize_namespace("ns", &flows, 5);
         assert_eq!(s.dropped, 2);
@@ -825,8 +1389,18 @@ mod tests {
 
     #[test]
     fn server_status_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/observer/observer.go", "ServerStatus.Serde", "tenant-hb-ss-serde");
-        let s = ServerStatus { num_flows: 10, max_flows: 100, seen_flows: 50, uptime_ns: 1_000_000, flows_rate: 5.0 };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/observer/observer.go",
+            "ServerStatus.Serde",
+            "tenant-hb-ss-serde"
+        );
+        let s = ServerStatus {
+            num_flows: 10,
+            max_flows: 100,
+            seen_flows: 50,
+            uptime_ns: 1_000_000,
+            flows_rate: 5.0,
+        };
         let json = serde_json::to_string(&s).unwrap();
         let back: ServerStatus = serde_json::from_str(&json).unwrap();
         assert_eq!(back, s);
@@ -834,10 +1408,18 @@ mod tests {
 
     #[test]
     fn peer_change_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/peer/service.go", "PeerChange.Serde", "tenant-hb-pc-serde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/peer/service.go",
+            "PeerChange.Serde",
+            "tenant-hb-pc-serde"
+        );
         let pc = PeerChange {
             kind: PeerChangeKind::Add,
-            peer: PeerInfo { name: "node-a".into(), address: "10.0.0.1:4244".into(), tls: true },
+            peer: PeerInfo {
+                name: "node-a".into(),
+                address: "10.0.0.1:4244".into(),
+                tls: true,
+            },
         };
         let json = serde_json::to_string(&pc).unwrap();
         let back: PeerChange = serde_json::from_str(&json).unwrap();
@@ -846,8 +1428,16 @@ mod tests {
 
     #[test]
     fn get_flows_request_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("api/v1/observer/observer.proto", "GetFlowsRequest", "tenant-hb-gfr-serde");
-        let r = GetFlowsRequest { limit: 100, follow: true, ..Default::default() };
+        let (_c, _t) = cilium_test_ctx!(
+            "api/v1/observer/observer.proto",
+            "GetFlowsRequest",
+            "tenant-hb-gfr-serde"
+        );
+        let r = GetFlowsRequest {
+            limit: 100,
+            follow: true,
+            ..Default::default()
+        };
         let json = serde_json::to_string(&r).unwrap();
         let back: GetFlowsRequest = serde_json::from_str(&json).unwrap();
         assert_eq!(back, r);

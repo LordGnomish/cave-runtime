@@ -114,12 +114,16 @@ impl VoteResponse {
 
     pub fn decode(buf: &mut dyn Buf) -> StreamsResult<Self> {
         if buf.remaining() < 2 {
-            return Err(StreamsError::ProtocolDecode("VoteResponse truncated".into()));
+            return Err(StreamsError::ProtocolDecode(
+                "VoteResponse truncated".into(),
+            ));
         }
         let error_code = buf.get_i16();
         let topic_name = decode_string(buf)?;
         if buf.remaining() < 4 + 4 + 4 + 1 {
-            return Err(StreamsError::ProtocolDecode("VoteResponse truncated".into()));
+            return Err(StreamsError::ProtocolDecode(
+                "VoteResponse truncated".into(),
+            ));
         }
         Ok(Self {
             error_code,
@@ -151,7 +155,9 @@ impl BeginQuorumEpochRequest {
     pub fn decode(buf: &mut dyn Buf) -> StreamsResult<Self> {
         let topic_name = decode_string(buf)?;
         if buf.remaining() < 12 {
-            return Err(StreamsError::ProtocolDecode("BeginQuorumEpoch truncated".into()));
+            return Err(StreamsError::ProtocolDecode(
+                "BeginQuorumEpoch truncated".into(),
+            ));
         }
         Ok(Self {
             topic_name,
@@ -177,12 +183,16 @@ impl BeginQuorumEpochResponse {
     }
     pub fn decode(buf: &mut dyn Buf) -> StreamsResult<Self> {
         if buf.remaining() < 2 {
-            return Err(StreamsError::ProtocolDecode("BeginQuorumEpochResponse truncated".into()));
+            return Err(StreamsError::ProtocolDecode(
+                "BeginQuorumEpochResponse truncated".into(),
+            ));
         }
         let error_code = buf.get_i16();
         let topic_name = decode_string(buf)?;
         if buf.remaining() < 4 {
-            return Err(StreamsError::ProtocolDecode("BeginQuorumEpochResponse truncated".into()));
+            return Err(StreamsError::ProtocolDecode(
+                "BeginQuorumEpochResponse truncated".into(),
+            ));
         }
         Ok(Self {
             error_code,
@@ -218,7 +228,9 @@ impl EndQuorumEpochRequest {
     pub fn decode(buf: &mut dyn Buf) -> StreamsResult<Self> {
         let topic_name = decode_string(buf)?;
         if buf.remaining() < 16 {
-            return Err(StreamsError::ProtocolDecode("EndQuorumEpoch truncated".into()));
+            return Err(StreamsError::ProtocolDecode(
+                "EndQuorumEpoch truncated".into(),
+            ));
         }
         let partition_index = buf.get_i32();
         let leader_id = buf.get_i32();
@@ -226,7 +238,9 @@ impl EndQuorumEpochRequest {
         let n = buf.get_i32();
         let n = if n < 0 { 0 } else { n as usize };
         if buf.remaining() < n * 4 {
-            return Err(StreamsError::ProtocolDecode("EndQuorumEpoch successors truncated".into()));
+            return Err(StreamsError::ProtocolDecode(
+                "EndQuorumEpoch successors truncated".into(),
+            ));
         }
         let mut preferred_successors = Vec::with_capacity(n);
         for _ in 0..n {
@@ -257,12 +271,16 @@ impl EndQuorumEpochResponse {
     }
     pub fn decode(buf: &mut dyn Buf) -> StreamsResult<Self> {
         if buf.remaining() < 2 {
-            return Err(StreamsError::ProtocolDecode("EndQuorumEpochResponse truncated".into()));
+            return Err(StreamsError::ProtocolDecode(
+                "EndQuorumEpochResponse truncated".into(),
+            ));
         }
         let error_code = buf.get_i16();
         let topic_name = decode_string(buf)?;
         if buf.remaining() < 4 {
-            return Err(StreamsError::ProtocolDecode("EndQuorumEpochResponse truncated".into()));
+            return Err(StreamsError::ProtocolDecode(
+                "EndQuorumEpochResponse truncated".into(),
+            ));
         }
         Ok(Self {
             error_code,
@@ -288,7 +306,9 @@ impl DescribeQuorumRequest {
     pub fn decode(buf: &mut dyn Buf) -> StreamsResult<Self> {
         let topic_name = decode_string(buf)?;
         if buf.remaining() < 4 {
-            return Err(StreamsError::ProtocolDecode("DescribeQuorum truncated".into()));
+            return Err(StreamsError::ProtocolDecode(
+                "DescribeQuorum truncated".into(),
+            ));
         }
         Ok(Self {
             topic_name,
@@ -328,12 +348,16 @@ impl DescribeQuorumResponse {
     }
     pub fn decode(buf: &mut dyn Buf) -> StreamsResult<Self> {
         if buf.remaining() < 2 {
-            return Err(StreamsError::ProtocolDecode("DescribeQuorumResponse truncated".into()));
+            return Err(StreamsError::ProtocolDecode(
+                "DescribeQuorumResponse truncated".into(),
+            ));
         }
         let error_code = buf.get_i16();
         let topic_name = decode_string(buf)?;
         if buf.remaining() < 4 + 4 + 4 + 8 + 4 {
-            return Err(StreamsError::ProtocolDecode("DescribeQuorumResponse truncated".into()));
+            return Err(StreamsError::ProtocolDecode(
+                "DescribeQuorumResponse truncated".into(),
+            ));
         }
         let partition_index = buf.get_i32();
         let leader_id = buf.get_i32();
@@ -341,7 +365,9 @@ impl DescribeQuorumResponse {
         let high_watermark = buf.get_i64();
         let nv = buf.get_i32().max(0) as usize;
         if buf.remaining() < nv * 4 + 4 {
-            return Err(StreamsError::ProtocolDecode("DescribeQuorumResponse voters truncated".into()));
+            return Err(StreamsError::ProtocolDecode(
+                "DescribeQuorumResponse voters truncated".into(),
+            ));
         }
         let mut current_voters = Vec::with_capacity(nv);
         for _ in 0..nv {
@@ -349,7 +375,9 @@ impl DescribeQuorumResponse {
         }
         let no = buf.get_i32().max(0) as usize;
         if buf.remaining() < no * 4 {
-            return Err(StreamsError::ProtocolDecode("DescribeQuorumResponse observers truncated".into()));
+            return Err(StreamsError::ProtocolDecode(
+                "DescribeQuorumResponse observers truncated".into(),
+            ));
         }
         let mut observers = Vec::with_capacity(no);
         for _ in 0..no {
@@ -507,10 +535,7 @@ impl KraftHandler {
         }
     }
 
-    pub fn handle_end_quorum_epoch(
-        &self,
-        req: &EndQuorumEpochRequest,
-    ) -> EndQuorumEpochResponse {
+    pub fn handle_end_quorum_epoch(&self, req: &EndQuorumEpochRequest) -> EndQuorumEpochResponse {
         let mut v = self.voters.write().expect("poisoned");
         if v.leader() == Some(req.leader_id) && v.epoch().0 as i32 == req.leader_epoch {
             v.step_down();
@@ -522,10 +547,7 @@ impl KraftHandler {
         }
     }
 
-    pub fn handle_describe_quorum(
-        &self,
-        req: &DescribeQuorumRequest,
-    ) -> DescribeQuorumResponse {
+    pub fn handle_describe_quorum(&self, req: &DescribeQuorumRequest) -> DescribeQuorumResponse {
         let v = self.voters.read().expect("poisoned");
         // VoterSet doesn't expose individual ids by index right
         // now — we expose the count via `size()` and accept that

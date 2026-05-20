@@ -2,9 +2,9 @@
 // Copyright 2026 Cave Runtime contributors
 //! AlertManager data model.
 
+use crate::model::Labels;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::model::Labels;
 
 /// An alert sent to AlertManager.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -12,7 +12,7 @@ use crate::model::Labels;
 pub struct Alert {
     pub labels: HashMap<String, String>,
     pub annotations: HashMap<String, String>,
-    pub starts_at: String,      // RFC3339
+    pub starts_at: String, // RFC3339
     pub ends_at: Option<String>,
     pub generator_url: String,
     pub fingerprint: String,
@@ -115,10 +115,12 @@ impl SilenceMatcher {
         let val = labels.get(&self.name).unwrap_or("");
         if self.is_regex {
             let anchored = format!("^(?:{})$", self.value);
-            regex::Regex::new(&anchored).map(|r| {
-                let matched = r.is_match(val);
-                if self.is_equal { matched } else { !matched }
-            }).unwrap_or(false)
+            regex::Regex::new(&anchored)
+                .map(|r| {
+                    let matched = r.is_match(val);
+                    if self.is_equal { matched } else { !matched }
+                })
+                .unwrap_or(false)
         } else if self.is_equal {
             val == self.value
         } else {

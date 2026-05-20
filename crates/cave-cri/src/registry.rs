@@ -36,11 +36,10 @@ impl BearerChallenge {
     /// permissive about whitespace + parameter ordering.
     pub fn parse(header: &str) -> CriResult<Self> {
         let trimmed = header.trim();
-        let rest = trimmed.strip_prefix("Bearer")
+        let rest = trimmed
+            .strip_prefix("Bearer")
             .or_else(|| trimmed.strip_prefix("bearer"))
-            .ok_or_else(|| CriError::Registry(
-                "WWW-Authenticate: missing Bearer scheme".into()
-            ))?;
+            .ok_or_else(|| CriError::Registry("WWW-Authenticate: missing Bearer scheme".into()))?;
         let mut params = HashMap::new();
         for kv in split_csv_respecting_quotes(rest.trim()) {
             let (k, v) = kv.split_once('=').ok_or_else(|| {
@@ -84,15 +83,22 @@ fn split_csv_respecting_quotes(s: &str) -> Vec<String> {
     let mut in_quotes = false;
     for c in s.chars() {
         match c {
-            '"' => { in_quotes = !in_quotes; cur.push(c); }
+            '"' => {
+                in_quotes = !in_quotes;
+                cur.push(c);
+            }
             ',' if !in_quotes => {
-                if !cur.trim().is_empty() { out.push(cur.trim().to_string()); }
+                if !cur.trim().is_empty() {
+                    out.push(cur.trim().to_string());
+                }
                 cur.clear();
             }
             _ => cur.push(c),
         }
     }
-    if !cur.trim().is_empty() { out.push(cur.trim().to_string()); }
+    if !cur.trim().is_empty() {
+        out.push(cur.trim().to_string());
+    }
     out
 }
 
@@ -100,7 +106,9 @@ fn urlencode(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
         match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
             _ => out.push_str(&format!("%{:02X}", b)),
         }
     }
@@ -132,7 +140,10 @@ struct CachedToken {
 
 impl TokenCache {
     pub fn new(tenant_id: impl Into<String>) -> Self {
-        Self { tenant_id: tenant_id.into(), entries: Mutex::new(HashMap::new()) }
+        Self {
+            tenant_id: tenant_id.into(),
+            entries: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn put(&self, registry: &str, repository: &str, scope: &str, token: &str, ttl_secs: i64) {
@@ -171,8 +182,12 @@ impl TokenCache {
         self.entries.lock().unwrap().remove(&key).is_some()
     }
 
-    pub fn len(&self) -> usize { self.entries.lock().unwrap().len() }
-    pub fn is_empty(&self) -> bool { self.len() == 0 }
+    pub fn len(&self) -> usize {
+        self.entries.lock().unwrap().len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 /// Registry client for pulling OCI images.
@@ -197,10 +212,14 @@ impl RegistryClient {
             image_ref.registry, image_ref.repository, tag
         );
 
-        let resp = self.client
+        let resp = self
+            .client
             .get(&url)
             .header("Accept", "application/vnd.oci.image.manifest.v1+json")
-            .header("Accept", "application/vnd.docker.distribution.manifest.v2+json")
+            .header(
+                "Accept",
+                "application/vnd.docker.distribution.manifest.v2+json",
+            )
             .send()
             .await
             .map_err(|e| CriError::Registry(format!("manifest fetch failed: {}", e)))?;
@@ -210,31 +229,44 @@ impl RegistryClient {
             return self.pull_manifest_with_auth(image_ref, tag).await;
         }
 
-        resp.json::<OciManifest>().await
+        resp.json::<OciManifest>()
+            .await
             .map_err(|e| CriError::Registry(format!("manifest parse failed: {}", e)))
     }
 
-    async fn pull_manifest_with_auth(&self, image_ref: &ImageReference, tag: &str) -> CriResult<OciManifest> {
+    async fn pull_manifest_with_auth(
+        &self,
+        image_ref: &ImageReference,
+        tag: &str,
+    ) -> CriResult<OciManifest> {
         let token = self.get_auth_token(image_ref).await?;
         let url = format!(
             "https://{}/v2/{}/manifests/{}",
             image_ref.registry, image_ref.repository, tag
         );
 
-        let resp = self.client
+        let resp = self
+            .client
             .get(&url)
             .header("Accept", "application/vnd.oci.image.manifest.v1+json")
-            .header("Accept", "application/vnd.docker.distribution.manifest.v2+json")
+            .header(
+                "Accept",
+                "application/vnd.docker.distribution.manifest.v2+json",
+            )
             .header("Authorization", format!("Bearer {}", token))
             .send()
             .await
             .map_err(|e| CriError::Registry(format!("manifest fetch with auth failed: {}", e)))?;
 
         if !resp.status().is_success() {
-            return Err(CriError::Registry(format!("manifest fetch returned {}", resp.status())));
+            return Err(CriError::Registry(format!(
+                "manifest fetch returned {}",
+                resp.status()
+            )));
         }
 
-        resp.json::<OciManifest>().await
+        resp.json::<OciManifest>()
+            .await
             .map_err(|e| CriError::Registry(format!("manifest parse failed: {}", e)))
     }
 
@@ -245,7 +277,8 @@ impl RegistryClient {
             image_ref.repository
         );
 
-        let resp: serde_json::Value = self.client
+        let resp: serde_json::Value = self
+            .client
             .get(&url)
             .send()
             .await
@@ -281,13 +314,16 @@ impl RegistryClient {
             image_ref.registry, image_ref.repository, descriptor.digest
         );
 
-        let resp = self.client
+        let resp = self
+            .client
             .get(&url)
             .send()
             .await
             .map_err(|e| CriError::Registry(format!("blob fetch failed: {}", e)))?;
 
-        let data = resp.bytes().await
+        let data = resp
+            .bytes()
+            .await
             .map_err(|e| CriError::Registry(format!("blob download failed: {}", e)))?;
 
         // Verify digest
@@ -296,7 +332,8 @@ impl RegistryClient {
         let computed = format!("sha256:{}", hex::encode(hasher.finalize()));
         if computed != descriptor.digest {
             return Err(CriError::Registry(format!(
-                "digest mismatch: expected {}, got {}", descriptor.digest, computed
+                "digest mismatch: expected {}, got {}",
+                descriptor.digest, computed
             )));
         }
 
@@ -421,7 +458,12 @@ mod tests {
         assert_eq!(r.repository, "org/app");
         assert_eq!(r.tag.as_deref(), Some("v1"));
         // The URL that pull_manifest would build:
-        let url = format!("https://{}/v2/{}/manifests/{}", r.registry, r.repository, r.tag.as_deref().unwrap_or("latest"));
+        let url = format!(
+            "https://{}/v2/{}/manifests/{}",
+            r.registry,
+            r.repository,
+            r.tag.as_deref().unwrap_or("latest")
+        );
         assert_eq!(url, "https://ghcr.io/v2/org/app/manifests/v1");
     }
 

@@ -8,14 +8,14 @@
 
 use crate::jwt_middleware::JwtClaims;
 use axum::{
+    Router,
     extract::Json,
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Router,
 };
 use chrono::Utc;
-use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;

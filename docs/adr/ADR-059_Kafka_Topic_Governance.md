@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Runtime, Universal
+**Scope:** Hyperscaler, Sovereign, Runtime, Universal
 
 **Category:** Data & Messaging
 
@@ -10,7 +10,7 @@
 
 ## Context
 
-CAVE's multi-tenant Kafka (Strimzi on Hetzner, Confluent on Azure) requires strict topic governance. Without it: topic naming sprawl, uncontrolled partition allocation, inconsistent retention, cross-tenant data access, and orphaned topics after tenant offboarding.
+CAVE's multi-tenant Kafka (Strimzi on the sovereign profile, Confluent on Azure) requires strict topic governance. Without it: topic naming sprawl, uncontrolled partition allocation, inconsistent retention, cross-tenant data access, and orphaned topics after tenant offboarding.
 
 ## Candidates
 

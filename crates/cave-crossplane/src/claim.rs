@@ -5,8 +5,8 @@
 use crate::engine::CompositionEngine;
 use crate::error::{CrossplaneError, CrossplaneResult};
 use crate::models::{
-    Claim, ClaimRef, ClaimStatus, ClaimSyncStatus, CompositeResource, CompositeStatus,
-    Composition, CreateClaimRequest, DeletionPolicy, Xrd,
+    Claim, ClaimRef, ClaimStatus, ClaimSyncStatus, CompositeResource, CompositeStatus, Composition,
+    CreateClaimRequest, DeletionPolicy, Xrd,
 };
 use chrono::Utc;
 use dashmap::DashMap;
@@ -107,8 +107,7 @@ impl ClaimStore {
             .insert(composite_key.clone(), composite.clone());
         self.claim_to_composite
             .insert(claim_key.clone(), composite_key.clone());
-        self.composite_to_claim
-            .insert(composite_key, claim_key);
+        self.composite_to_claim.insert(composite_key, claim_key);
 
         Ok((claim, composite))
     }

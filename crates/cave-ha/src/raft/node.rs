@@ -14,27 +14,44 @@ use crate::error::{HaError, HaResult};
 use crate::metrics::Metrics;
 use crate::raft::log::{LogEntry, MemLog};
 use crate::raft::messages::{
-    AppendEntries, AppendEntriesReply, InstallSnapshot, InstallSnapshotReply,
-    RaftMessage, ReadIndexReply, ReadIndexRequest, RequestVote, RequestVoteReply, TimeoutNow,
+    AppendEntries, AppendEntriesReply, InstallSnapshot, InstallSnapshotReply, RaftMessage,
+    ReadIndexReply, ReadIndexRequest, RequestVote, RequestVoteReply, TimeoutNow,
 };
 use crate::raft::read_only::{LeaderLease, ReadMode, ReadOnlyQueue};
 use crate::raft::snapshot::{Snapshot, SnapshotReceiver};
 use crate::raft::state_machine::StateMachine;
 use crate::raft::types::{
-    EntryType, LogIndex, MembershipConfig, NodeId, NodeInfo, NodeStatus, Role,
-    SnapshotMeta, Term,
+    EntryType, LogIndex, MembershipConfig, NodeId, NodeInfo, NodeStatus, Role, SnapshotMeta, Term,
 };
 use crate::transport::Transport;
 
 /// Commands sent to the node actor from external callers.
 pub enum NodeCmd {
-    Propose { data: Vec<u8>, resp: oneshot::Sender<HaResult<LogIndex>> },
-    ReadIndex { resp: oneshot::Sender<HaResult<LogIndex>> },
-    AddNode { node: NodeInfo, resp: oneshot::Sender<HaResult<()>> },
-    RemoveNode { id: NodeId, resp: oneshot::Sender<HaResult<()>> },
-    TransferLeadership { to: NodeId, resp: oneshot::Sender<HaResult<()>> },
-    TriggerSnapshot { resp: oneshot::Sender<HaResult<SnapshotMeta>> },
-    Status { resp: oneshot::Sender<NodeStatus> },
+    Propose {
+        data: Vec<u8>,
+        resp: oneshot::Sender<HaResult<LogIndex>>,
+    },
+    ReadIndex {
+        resp: oneshot::Sender<HaResult<LogIndex>>,
+    },
+    AddNode {
+        node: NodeInfo,
+        resp: oneshot::Sender<HaResult<()>>,
+    },
+    RemoveNode {
+        id: NodeId,
+        resp: oneshot::Sender<HaResult<()>>,
+    },
+    TransferLeadership {
+        to: NodeId,
+        resp: oneshot::Sender<HaResult<()>>,
+    },
+    TriggerSnapshot {
+        resp: oneshot::Sender<HaResult<SnapshotMeta>>,
+    },
+    Status {
+        resp: oneshot::Sender<NodeStatus>,
+    },
     Shutdown,
 }
 
@@ -73,7 +90,8 @@ impl RaftHandle {
 
     pub async fn transfer_leadership(&self, to: NodeId) -> HaResult<()> {
         let (tx, rx) = oneshot::channel();
-        self.cmd_tx.send(NodeCmd::TransferLeadership { to, resp: tx })?;
+        self.cmd_tx
+            .send(NodeCmd::TransferLeadership { to, resp: tx })?;
         rx.await?
     }
 
@@ -207,10 +225,8 @@ impl RaftNode {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
         let id = config.id;
-        let election_timeout = randomized_timeout(
-            config.election_timeout_min,
-            config.election_timeout_max,
-        );
+        let election_timeout =
+            randomized_timeout(config.election_timeout_min, config.election_timeout_max);
         let lease_duration = std::time::Duration::from_millis(
             (config.election_timeout_min as f64
                 * config.tick_duration.as_millis() as f64
@@ -220,9 +236,17 @@ impl RaftNode {
         let mut voters = BTreeSet::new();
         let mut learners = BTreeSet::new();
         for n in &initial_members {
-            if n.is_learner { learners.insert(n.id); } else { voters.insert(n.id); }
+            if n.is_learner {
+                learners.insert(n.id);
+            } else {
+                voters.insert(n.id);
+            }
         }
-        let membership = MembershipConfig { voters, learners, ..Default::default() };
+        let membership = MembershipConfig {
+            voters,
+            learners,
+            ..Default::default()
+        };
 
         let node = Self {
             id,
@@ -268,14 +292,11 @@ impl RaftNode {
     }
 
     async fn run(mut self) {
-        let mut tick_interval =
-            tokio::time::interval(self.config.tick_duration);
+        let mut tick_interval = tokio::time::interval(self.config.tick_duration);
         tick_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
 
         // If single-node, self-elect immediately.
-        if self.membership.voters.len() == 1
-            && self.membership.voters.contains(&self.id)
-        {
+        if self.membership.voters.len() == 1 && self.membership.voters.contains(&self.id) {
             self.campaign(false).await;
         }
 
@@ -348,7 +369,9 @@ impl RaftNode {
 
     /// Initiate a pre-vote round (does not increment term).
     async fn campaign_pre_vote(&mut self) {
-        if self.membership.learners.contains(&self.id) { return; }
+        if self.membership.learners.contains(&self.id) {
+            return;
+        }
         self.role = Role::PreCandidate;
         self.pre_votes_received.clear();
         self.pre_votes_received.insert(self.id);
@@ -363,7 +386,9 @@ impl RaftNode {
             pre_vote: true,
         });
         for peer_id in self.membership.all_voters().clone() {
-            if peer_id != self.id { self.send(peer_id, msg.clone()).await; }
+            if peer_id != self.id {
+                self.send(peer_id, msg.clone()).await;
+            }
         }
         // Single-node: pre-vote trivially won.
         if self.membership.voters.len() == 1 {
@@ -373,10 +398,16 @@ impl RaftNode {
 
     /// Initiate a real election (increments term, votes for self).
     async fn campaign_real(&mut self) {
-        if self.membership.learners.contains(&self.id) { return; }
+        if self.membership.learners.contains(&self.id) {
+            return;
+        }
         let candidate_term = self.current_term + 1;
         self.become_candidate(candidate_term);
-        info!(id = self.id, term = candidate_term, "starting real election");
+        info!(
+            id = self.id,
+            term = candidate_term,
+            "starting real election"
+        );
         let msg = RaftMessage::RequestVote(RequestVote {
             term: candidate_term,
             candidate_id: self.id,
@@ -385,7 +416,9 @@ impl RaftNode {
             pre_vote: false,
         });
         for peer_id in self.membership.all_voters().clone() {
-            if peer_id != self.id { self.send(peer_id, msg.clone()).await; }
+            if peer_id != self.id {
+                self.send(peer_id, msg.clone()).await;
+            }
         }
         // Single-node cluster: immediately win.
         if self.membership.voters.len() == 1 {
@@ -516,7 +549,9 @@ impl RaftNode {
             RaftMessage::AppendEntries(m) => self.handle_append_entries(from, m).await,
             RaftMessage::AppendEntriesReply(m) => self.handle_append_entries_reply(from, m).await,
             RaftMessage::InstallSnapshot(m) => self.handle_install_snapshot(from, m).await,
-            RaftMessage::InstallSnapshotReply(m) => self.handle_install_snapshot_reply(from, m).await,
+            RaftMessage::InstallSnapshotReply(m) => {
+                self.handle_install_snapshot_reply(from, m).await
+            }
             RaftMessage::TimeoutNow(m) => self.handle_timeout_now(from, m).await,
             RaftMessage::ReadIndexRequest(m) => self.handle_read_index_request(from, m).await,
             RaftMessage::ReadIndexReply(m) => self.handle_read_index_reply(from, m).await,
@@ -552,11 +587,15 @@ impl RaftNode {
             "RequestVote"
         );
 
-        self.send(from, RaftMessage::RequestVoteReply(RequestVoteReply {
-            term: self.current_term,
-            vote_granted: grant,
-            pre_vote: msg.pre_vote,
-        })).await;
+        self.send(
+            from,
+            RaftMessage::RequestVoteReply(RequestVoteReply {
+                term: self.current_term,
+                vote_granted: grant,
+                pre_vote: msg.pre_vote,
+            }),
+        )
+        .await;
     }
 
     async fn handle_request_vote_reply(&mut self, from: NodeId, msg: RequestVoteReply) {
@@ -612,14 +651,18 @@ impl RaftNode {
         // Consistency check.
         let (success, conflict_index, conflict_term) = self.check_log_consistency(&msg);
         if !success {
-            self.send(from, RaftMessage::AppendEntriesReply(AppendEntriesReply {
-                term: self.current_term,
-                success: false,
-                conflict_index,
-                conflict_term,
-                last_log_index: self.log.last_index(),
-                seq: msg.seq,
-            })).await;
+            self.send(
+                from,
+                RaftMessage::AppendEntriesReply(AppendEntriesReply {
+                    term: self.current_term,
+                    success: false,
+                    conflict_index,
+                    conflict_term,
+                    last_log_index: self.log.last_index(),
+                    seq: msg.seq,
+                }),
+            )
+            .await;
             return;
         }
 
@@ -634,14 +677,18 @@ impl RaftNode {
             self.advance_commit(new_commit).await;
         }
 
-        self.send(from, RaftMessage::AppendEntriesReply(AppendEntriesReply {
-            term: self.current_term,
-            success: true,
-            conflict_index: 0,
-            conflict_term: None,
-            last_log_index: self.log.last_index(),
-            seq: msg.seq,
-        })).await;
+        self.send(
+            from,
+            RaftMessage::AppendEntriesReply(AppendEntriesReply {
+                term: self.current_term,
+                success: true,
+                conflict_index: 0,
+                conflict_term: None,
+                last_log_index: self.log.last_index(),
+                seq: msg.seq,
+            }),
+        )
+        .await;
     }
 
     fn check_log_consistency(&self, msg: &AppendEntries) -> (bool, LogIndex, Option<Term>) {
@@ -705,8 +752,13 @@ impl RaftNode {
                         let last = self.log.last_index();
                         for i in (first..=last).rev() {
                             if let Ok(t) = self.log.term(i) {
-                                if t == ct { found = Some(i); break; }
-                                if t < ct { break; }
+                                if t == ct {
+                                    found = Some(i);
+                                    break;
+                                }
+                                if t < ct {
+                                    break;
+                                }
                             }
                         }
                         found
@@ -839,7 +891,9 @@ impl RaftNode {
         self.election_elapsed = 0;
         self.leader_id = Some(from);
 
-        let recv = self.snapshot_receiver.get_or_insert_with(SnapshotReceiver::new);
+        let recv = self
+            .snapshot_receiver
+            .get_or_insert_with(SnapshotReceiver::new);
         let chunk = crate::raft::snapshot::SnapshotChunk {
             meta: msg.meta.clone(),
             offset: msg.offset,
@@ -854,11 +908,15 @@ impl RaftNode {
             self.apply_snapshot(snapshot).await;
         }
 
-        self.send(from, RaftMessage::InstallSnapshotReply(InstallSnapshotReply {
-            term: self.current_term,
-            success: true,
-            bytes_stored,
-        })).await;
+        self.send(
+            from,
+            RaftMessage::InstallSnapshotReply(InstallSnapshotReply {
+                term: self.current_term,
+                success: true,
+                bytes_stored,
+            }),
+        )
+        .await;
     }
 
     async fn apply_snapshot(&mut self, snapshot: Snapshot) {
@@ -880,7 +938,9 @@ impl RaftNode {
     }
 
     async fn handle_install_snapshot_reply(&mut self, from: NodeId, msg: InstallSnapshotReply) {
-        if self.role != Role::Leader { return; }
+        if self.role != Role::Leader {
+            return;
+        }
         if let Some(peer) = self.peers.get_mut(&from) {
             peer.snapshot_in_progress = false;
             if msg.success {
@@ -896,8 +956,14 @@ impl RaftNode {
     // ── TimeoutNow ────────────────────────────────────────────────────────
 
     async fn handle_timeout_now(&mut self, _from: NodeId, msg: TimeoutNow) {
-        if self.membership.learners.contains(&self.id) { return; }
-        info!(id = self.id, from = msg.from, "TimeoutNow: starting immediate election");
+        if self.membership.learners.contains(&self.id) {
+            return;
+        }
+        info!(
+            id = self.id,
+            from = msg.from,
+            "TimeoutNow: starting immediate election"
+        );
         self.election_elapsed = self.election_timeout; // Force immediate election.
         self.campaign(self.config.pre_vote).await;
     }
@@ -906,33 +972,45 @@ impl RaftNode {
 
     async fn handle_read_index_request(&mut self, from: NodeId, msg: ReadIndexRequest) {
         if self.role != Role::Leader {
-            self.send(from, RaftMessage::ReadIndexReply(ReadIndexReply {
-                term: self.current_term,
-                id: msg.id,
-                read_index: 0,
-                success: false,
-            })).await;
+            self.send(
+                from,
+                RaftMessage::ReadIndexReply(ReadIndexReply {
+                    term: self.current_term,
+                    id: msg.id,
+                    read_index: 0,
+                    success: false,
+                }),
+            )
+            .await;
             return;
         }
         // LeaseRead: if lease is valid, reply immediately.
         if self.read_only.mode() == ReadMode::LeaseRead && self.lease.is_valid() {
-            self.send(from, RaftMessage::ReadIndexReply(ReadIndexReply {
-                term: self.current_term,
-                id: msg.id,
-                read_index: self.commit_index,
-                success: true,
-            })).await;
+            self.send(
+                from,
+                RaftMessage::ReadIndexReply(ReadIndexReply {
+                    term: self.current_term,
+                    id: msg.id,
+                    read_index: self.commit_index,
+                    success: true,
+                }),
+            )
+            .await;
             return;
         }
         // ReadIndex: respond when heartbeat confirms quorum.
         // Store the request; it'll be resolved in maybe_flush_reads.
         // For cross-node: just reply immediately with current commit (simplified).
-        self.send(from, RaftMessage::ReadIndexReply(ReadIndexReply {
-            term: self.current_term,
-            id: msg.id,
-            read_index: self.commit_index,
-            success: true,
-        })).await;
+        self.send(
+            from,
+            RaftMessage::ReadIndexReply(ReadIndexReply {
+                term: self.current_term,
+                id: msg.id,
+                read_index: self.commit_index,
+                success: true,
+            }),
+        )
+        .await;
     }
 
     async fn handle_read_index_reply(&mut self, _from: NodeId, _msg: ReadIndexReply) {
@@ -942,13 +1020,17 @@ impl RaftNode {
     // ── Commit & apply ────────────────────────────────────────────────────
 
     async fn maybe_advance_commit(&mut self) {
-        if self.role != Role::Leader { return; }
+        if self.role != Role::Leader {
+            return;
+        }
         let last = self.log.last_index();
         let mut new_commit = self.commit_index;
         for idx in (self.commit_index + 1)..=last {
             // Only commit entries from current term (Raft safety).
             if let Ok(term) = self.log.term(idx) {
-                if term != self.current_term { continue; }
+                if term != self.current_term {
+                    continue;
+                }
             } else {
                 continue;
             }
@@ -1011,7 +1093,10 @@ impl RaftNode {
                     if let Ok(new_cfg) = entry.decode_membership() {
                         self.membership = new_cfg;
                         // If joint config with auto_leave, append C_new immediately.
-                        if self.membership.auto_leave && self.membership.is_joint() && self.role == Role::Leader {
+                        if self.membership.auto_leave
+                            && self.membership.is_joint()
+                            && self.role == Role::Leader
+                        {
                             let next_cfg = MembershipConfig {
                                 voters: self.membership.voters.clone(),
                                 learners: self.membership.learners.clone(),
@@ -1035,7 +1120,9 @@ impl RaftNode {
     }
 
     async fn maybe_flush_reads(&mut self) {
-        if self.read_only.is_empty() { return; }
+        if self.read_only.is_empty() {
+            return;
+        }
         let quorum = MembershipConfig::quorum(self.membership.voters.len());
         // Count active peers (including self).
         let active = self.peers.values().filter(|p| p.recent_active).count() + 1;
@@ -1056,7 +1143,9 @@ impl RaftNode {
 
     async fn compact_log(&mut self) {
         let compact_to = self.last_applied;
-        if compact_to <= self.log.snapshot_index() { return; }
+        if compact_to <= self.log.snapshot_index() {
+            return;
+        }
         let term = self.log.term(compact_to).unwrap_or(self.current_term);
         self.log.compact(compact_to, term);
         self.metrics.log_compactions.inc();
@@ -1074,7 +1163,9 @@ impl RaftNode {
     // ── Check quorum ──────────────────────────────────────────────────────
 
     async fn do_check_quorum(&mut self) {
-        if self.role != Role::Leader { return; }
+        if self.role != Role::Leader {
+            return;
+        }
         let quorum = MembershipConfig::quorum(self.membership.voters.len());
         let active = self.peers.values().filter(|p| p.recent_active).count() + 1;
         // Reset activity flags for next round.
@@ -1084,9 +1175,7 @@ impl RaftNode {
         if active < quorum {
             warn!(
                 id = self.id,
-                active,
-                quorum,
-                "check-quorum failed: stepping down"
+                active, quorum, "check-quorum failed: stepping down"
             );
             self.metrics.check_quorum_failures.inc();
             self.become_follower(self.current_term, None);
@@ -1107,7 +1196,9 @@ impl RaftNode {
 
     async fn initiate_transfer(&mut self, to: NodeId) -> HaResult<()> {
         if self.role != Role::Leader {
-            return Err(HaError::NotLeader { leader_id: self.leader_id });
+            return Err(HaError::NotLeader {
+                leader_id: self.leader_id,
+            });
         }
         if !self.membership.voters.contains(&to) {
             return Err(HaError::NodeNotFound(to));
@@ -1119,10 +1210,14 @@ impl RaftNode {
         // Send TimeoutNow if target is caught up.
         let target_match = self.peers.get(&to).map(|p| p.match_index).unwrap_or(0);
         if target_match >= self.log.last_index() {
-            self.send(to, RaftMessage::TimeoutNow(TimeoutNow {
-                term: self.current_term,
-                from: self.id,
-            })).await;
+            self.send(
+                to,
+                RaftMessage::TimeoutNow(TimeoutNow {
+                    term: self.current_term,
+                    from: self.id,
+                }),
+            )
+            .await;
         }
         Ok(())
     }
@@ -1134,7 +1229,9 @@ impl RaftNode {
         match cmd {
             NodeCmd::Propose { data, resp } => {
                 if self.role != Role::Leader {
-                    let _ = resp.send(Err(HaError::NotLeader { leader_id: self.leader_id }));
+                    let _ = resp.send(Err(HaError::NotLeader {
+                        leader_id: self.leader_id,
+                    }));
                     self.metrics.proposals_failed.inc();
                     return false;
                 }
@@ -1155,7 +1252,9 @@ impl RaftNode {
             }
             NodeCmd::ReadIndex { resp } => {
                 if self.role != Role::Leader {
-                    let _ = resp.send(Err(HaError::NotLeader { leader_id: self.leader_id }));
+                    let _ = resp.send(Err(HaError::NotLeader {
+                        leader_id: self.leader_id,
+                    }));
                     return false;
                 }
                 self.metrics.read_index_requests.inc();
@@ -1170,7 +1269,9 @@ impl RaftNode {
             }
             NodeCmd::AddNode { node, resp } => {
                 if self.role != Role::Leader {
-                    let _ = resp.send(Err(HaError::NotLeader { leader_id: self.leader_id }));
+                    let _ = resp.send(Err(HaError::NotLeader {
+                        leader_id: self.leader_id,
+                    }));
                     return false;
                 }
                 // Joint consensus: C_old,new
@@ -1191,12 +1292,16 @@ impl RaftNode {
                 self.append_membership_change(joint_cfg).await;
                 // Add peer state.
                 let next = self.log.last_index() + 1;
-                self.peers.entry(node.id).or_insert_with(|| PeerState::new(next));
+                self.peers
+                    .entry(node.id)
+                    .or_insert_with(|| PeerState::new(next));
                 let _ = resp.send(Ok(()));
             }
             NodeCmd::RemoveNode { id, resp } => {
                 if self.role != Role::Leader {
-                    let _ = resp.send(Err(HaError::NotLeader { leader_id: self.leader_id }));
+                    let _ = resp.send(Err(HaError::NotLeader {
+                        leader_id: self.leader_id,
+                    }));
                     return false;
                 }
                 let mut new_voters = self.membership.voters.clone();

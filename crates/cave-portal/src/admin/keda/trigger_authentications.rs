@@ -12,7 +12,7 @@ use crate::admin::keda::types::{
 };
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
+use crate::admin::state::{AdminState, scope};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum Error {
@@ -24,14 +24,13 @@ pub enum Error {
     Invalid(String),
 }
 
-pub fn list(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<Vec<KedaTriggerAuthentication>, Error> {
+pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<KedaTriggerAuthentication>, Error> {
     ctx.authorise(Permission::KedaTriggerAuthRead)?;
-    Ok(scope(&state.keda_trigger_authentications.read().unwrap(), &ctx.tenant, |r| {
-        &r.tenant
-    })
+    Ok(scope(
+        &state.keda_trigger_authentications.read().unwrap(),
+        &ctx.tenant,
+        |r| &r.tenant,
+    )
     .into_iter()
     .cloned()
     .collect())
@@ -125,12 +124,27 @@ pub fn render_list(state: &AdminState, ctx: &RequestCtx) -> Result<String, Error
             vec![
                 a.namespace.clone(),
                 a.name.clone(),
-                if a.cluster_scoped { "cluster" } else { "namespace" }.into(),
+                if a.cluster_scoped {
+                    "cluster"
+                } else {
+                    "namespace"
+                }
+                .into(),
                 format!("{}", a.secret_refs.len()),
                 format!("{}", a.env_refs.len()),
                 a.pod_identity_provider.clone(),
-                if a.hashicorp_vault.is_some() { "yes" } else { "no" }.into(),
-                if a.azure_key_vault.is_some() { "yes" } else { "no" }.into(),
+                if a.hashicorp_vault.is_some() {
+                    "yes"
+                } else {
+                    "no"
+                }
+                .into(),
+                if a.azure_key_vault.is_some() {
+                    "yes"
+                } else {
+                    "no"
+                }
+                .into(),
             ]
         })
         .collect();
@@ -178,12 +192,24 @@ pub fn render_detail(
         tenant = escape(ctx.tenant.as_str()),
         ns = escape(&a.namespace),
         name = escape(&a.name),
-        scope = if a.cluster_scoped { "ClusterTriggerAuthentication" } else { "TriggerAuthentication (namespaced)" },
+        scope = if a.cluster_scoped {
+            "ClusterTriggerAuthentication"
+        } else {
+            "TriggerAuthentication (namespaced)"
+        },
         secrets = render_secret_refs(&a.secret_refs),
         envs = render_env_refs(&a.env_refs),
         pid = escape(&a.pod_identity_provider),
-        vault = a.hashicorp_vault.as_ref().map(render_vault).unwrap_or_else(|| "<p class=\"text-sm text-gray-500\">—</p>".into()),
-        azure = a.azure_key_vault.as_ref().map(render_azure_kv).unwrap_or_else(|| "<p class=\"text-sm text-gray-500\">—</p>".into()),
+        vault = a
+            .hashicorp_vault
+            .as_ref()
+            .map(render_vault)
+            .unwrap_or_else(|| "<p class=\"text-sm text-gray-500\">—</p>".into()),
+        azure = a
+            .azure_key_vault
+            .as_ref()
+            .map(render_azure_kv)
+            .unwrap_or_else(|| "<p class=\"text-sm text-gray-500\">—</p>".into()),
     );
     Ok(page_shell_full(
         ctx,
@@ -199,13 +225,7 @@ fn render_secret_refs(refs: &[KedaSecretRef]) -> String {
     }
     let rows: Vec<Vec<String>> = refs
         .iter()
-        .map(|r| {
-            vec![
-                r.parameter.clone(),
-                r.secret_name.clone(),
-                r.key.clone(),
-            ]
-        })
+        .map(|r| vec![r.parameter.clone(), r.secret_name.clone(), r.key.clone()])
         .collect();
     table(&["parameter", "secretName", "key"], &rows)
 }
@@ -324,7 +344,10 @@ mod tests {
     #[test]
     fn create_then_delete_roundtrips() {
         let state = AdminState::empty();
-        let c = ctx(&[Permission::KedaTriggerAuthRead, Permission::KedaTriggerAuthWrite]);
+        let c = ctx(&[
+            Permission::KedaTriggerAuthRead,
+            Permission::KedaTriggerAuthWrite,
+        ]);
         create(&state, &c, auth("hello")).unwrap();
         assert_eq!(list(&state, &c).unwrap().len(), 1);
         delete(&state, &c, "ns", "hello").unwrap();
@@ -334,6 +357,9 @@ mod tests {
     #[test]
     fn list_without_permission_refused() {
         let state = AdminState::seeded();
-        assert!(matches!(list(&state, &ctx(&[])).unwrap_err(), Error::Auth(_)));
+        assert!(matches!(
+            list(&state, &ctx(&[])).unwrap_err(),
+            Error::Auth(_)
+        ));
     }
 }

@@ -31,10 +31,7 @@ use std::time::Instant;
 use async_trait::async_trait;
 use hickory_proto::op::Message;
 
-use crate::{
-    error::DnsResult,
-    protocol::edns::EdnsOptions,
-};
+use crate::{error::DnsResult, protocol::edns::EdnsOptions};
 
 // ─── Transport protocol enum ─────────────────────────────────────────────────
 
@@ -109,11 +106,7 @@ impl<'a> Next<'a> {
     pub async fn run(self, ctx: &mut QueryContext) -> DnsResult<()> {
         match self.plugins.split_first() {
             None => Ok(()),
-            Some((first, rest)) => {
-                first
-                    .handle(ctx, Next { plugins: rest })
-                    .await
-            }
+            Some((first, rest)) => first.handle(ctx, Next { plugins: rest }).await,
         }
     }
 }

@@ -107,10 +107,7 @@ impl TenantRegistry {
 
     pub fn delete_tenant(&self, name: &str) -> StreamsResult<()> {
         // Disallow delete while namespaces survive.
-        let in_use = self
-            .namespaces
-            .iter()
-            .any(|e| e.value().tenant == name);
+        let in_use = self.namespaces.iter().any(|e| e.value().tenant == name);
         if in_use {
             return Err(StreamsError::Internal(format!(
                 "tenant {name} still has namespaces"
@@ -181,11 +178,7 @@ impl TenantRegistry {
 
     /// Look up `(tenant, namespace)` and create the public/default pair on
     /// demand if `autocreate_default` is on (matches Pulsar standalone).
-    pub fn ensure_namespace(
-        &self,
-        tenant: &str,
-        namespace: &str,
-    ) -> StreamsResult<Namespace> {
+    pub fn ensure_namespace(&self, tenant: &str, namespace: &str) -> StreamsResult<Namespace> {
         let fqn = format!("{tenant}/{namespace}");
         if let Some(ns) = self.get_namespace(&fqn) {
             return Ok(ns);
@@ -316,8 +309,9 @@ mod tests {
         let _tenant_id = "tenant-008";
         let reg = TenantRegistry::default();
         assert!(reg.get_tenant(DEFAULT_TENANT).is_some());
-        assert!(reg
-            .get_namespace(&format!("{}/{}", DEFAULT_TENANT, DEFAULT_NAMESPACE))
-            .is_some());
+        assert!(
+            reg.get_namespace(&format!("{}/{}", DEFAULT_TENANT, DEFAULT_NAMESPACE))
+                .is_some()
+        );
     }
 }

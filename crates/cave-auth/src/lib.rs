@@ -66,7 +66,7 @@ pub mod webauthn;
 pub use rbac::{BindingScope, RbacEngine, ResourcePolicy, Role, RoleBinding};
 
 /// ABAC policy engine + types.
-pub use abac::{AbacPolicyEngine, AbacPolicy, PolicyDecision};
+pub use abac::{AbacPolicy, AbacPolicyEngine, PolicyDecision};
 
 /// Token management.
 pub use tokens::TokenStore;
@@ -100,7 +100,9 @@ pub fn auth_layer_from_env() -> AuthLayer {
         .unwrap_or(false);
 
     if disabled {
-        tracing::warn!("CAVE_AUTH_DISABLED=true — all requests run as platform-admin. NEVER use in production.");
+        tracing::warn!(
+            "CAVE_AUTH_DISABLED=true — all requests run as platform-admin. NEVER use in production."
+        );
         return AuthLayer::dev_bypass();
     }
 

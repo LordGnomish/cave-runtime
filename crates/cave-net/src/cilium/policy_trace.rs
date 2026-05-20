@@ -57,16 +57,28 @@ pub fn trace(
     let mut steps = Vec::new();
     for rule in &repo.rules {
         if &rule.tenant != tenant {
-            return Err(TraceError::TenantDenied { tenant: tenant.clone() });
+            return Err(TraceError::TenantDenied {
+                tenant: tenant.clone(),
+            });
         }
-        let step = describe_rule(rule, source_identity, destination_identity, port, protocol, direction);
+        let step = describe_rule(
+            rule,
+            source_identity,
+            destination_identity,
+            port,
+            protocol,
+            direction,
+        );
         steps.push(step);
     }
     let entry = map.lookup(source_identity, port, protocol, direction);
     Ok(PolicyTrace {
         tenant: tenant.clone(),
-        source_identity, destination_identity,
-        port, protocol, direction,
+        source_identity,
+        destination_identity,
+        port,
+        protocol,
+        direction,
         steps,
         final_verdict: entry.verdict,
         enforcement: match direction {
@@ -80,16 +92,30 @@ pub fn trace(
 }
 
 fn describe_rule(
-    rule: &Rule, src: u32, dst: u32, port: u16, proto: L4Protocol, dir: Direction,
+    rule: &Rule,
+    src: u32,
+    dst: u32,
+    port: u16,
+    proto: L4Protocol,
+    dir: Direction,
 ) -> TraceStep {
     let _ = (src, dst, port, proto, dir);
     TraceStep {
         rule_name: rule.name.clone(),
         matched_endpoint: !rule.endpoint_selector.match_labels.is_empty()
             || !rule.endpoint_selector.match_expressions.is_empty()
-            || (rule.endpoint_selector.match_labels.is_empty() && rule.endpoint_selector.match_expressions.is_empty()),
-        from_match: if rule.ingress.is_empty() { None } else { Some(format!("{} ingress rule(s)", rule.ingress.len())) },
-        to_ports_match: if rule.egress.is_empty() { None } else { Some(format!("{} egress rule(s)", rule.egress.len())) },
+            || (rule.endpoint_selector.match_labels.is_empty()
+                && rule.endpoint_selector.match_expressions.is_empty()),
+        from_match: if rule.ingress.is_empty() {
+            None
+        } else {
+            Some(format!("{} ingress rule(s)", rule.ingress.len()))
+        },
+        to_ports_match: if rule.egress.is_empty() {
+            None
+        } else {
+            Some(format!("{} egress rule(s)", rule.egress.len()))
+        },
         contributed_verdict: None,
     }
 }
@@ -102,7 +128,7 @@ mod tests {
     use super::*;
     use crate::cilium::identity::LabelSet;
     use crate::cilium::policy::{
-        distill, EndpointSelector, IngressRule, InMemoryIdentityResolver, PolicyEnforcementMode,
+        distill, EndpointSelector, InMemoryIdentityResolver, IngressRule, PolicyEnforcementMode,
         PortProtocol, PortRule, Rule,
     };
     use crate::cilium_test_ctx;
@@ -113,14 +139,21 @@ mod tests {
 
     fn endpoint_sel(pairs: &[(&str, &str)]) -> EndpointSelector {
         EndpointSelector {
-            match_labels: pairs.iter().map(|(k, v)| ((*k).into(), (*v).into())).collect(),
+            match_labels: pairs
+                .iter()
+                .map(|(k, v)| ((*k).into(), (*v).into()))
+                .collect(),
             match_expressions: Vec::new(),
         }
     }
 
     fn make_repo_and_map(tenant: TenantId) -> (PolicyRepository, PolicyMap) {
         let mut repo = PolicyRepository::new();
-        let mut rule = Rule::new("allow-client", tenant.clone(), endpoint_sel(&[("app", "web")]));
+        let mut rule = Rule::new(
+            "allow-client",
+            tenant.clone(),
+            endpoint_sel(&[("app", "web")]),
+        );
         rule.ingress.push(IngressRule {
             from_endpoints: vec![endpoint_sel(&[("app", "client")])],
             to_ports: vec![PortRule {
@@ -138,7 +171,8 @@ mod tests {
             &ls(&[("app", "web")]),
             PolicyEnforcementMode::Default,
             &resolver,
-        ).unwrap();
+        )
+        .unwrap();
         (repo, map)
     }
 
@@ -146,12 +180,20 @@ mod tests {
 
     #[test]
     fn trace_returns_allow_for_known_pair() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/trace.go", "Trace.Allow", "tenant-pt-allow");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/policy/trace.go", "Trace.Allow", "tenant-pt-allow");
         let (repo, map) = make_repo_and_map(tenant.clone());
         let t = trace(
-            &tenant, &repo, &map,
-            256, /* destination identity unused */ 999, 80, L4Protocol::TCP, Direction::Ingress,
-        ).unwrap();
+            &tenant,
+            &repo,
+            &map,
+            256,
+            /* destination identity unused */ 999,
+            80,
+            L4Protocol::TCP,
+            Direction::Ingress,
+        )
+        .unwrap();
         assert_eq!(t.final_verdict, Verdict::Allow);
         assert!(t.enforcement);
     }
@@ -161,35 +203,61 @@ mod tests {
         let (_c, tenant) = cilium_test_ctx!("pkg/policy/trace.go", "Trace.Deny", "tenant-pt-deny");
         let (repo, map) = make_repo_and_map(tenant.clone());
         let t = trace(
-            &tenant, &repo, &map,
-            999 /* unknown peer */, 999, 80, L4Protocol::TCP, Direction::Ingress,
-        ).unwrap();
+            &tenant,
+            &repo,
+            &map,
+            999, /* unknown peer */
+            999,
+            80,
+            L4Protocol::TCP,
+            Direction::Ingress,
+        )
+        .unwrap();
         assert_eq!(t.final_verdict, Verdict::Deny);
     }
 
     #[test]
     fn trace_reports_each_rule_as_step() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/trace.go", "Trace.Steps", "tenant-pt-steps");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/policy/trace.go", "Trace.Steps", "tenant-pt-steps");
         let (repo, map) = make_repo_and_map(tenant.clone());
         let t = trace(
-            &tenant, &repo, &map, 256, 999, 80, L4Protocol::TCP, Direction::Ingress,
-        ).unwrap();
+            &tenant,
+            &repo,
+            &map,
+            256,
+            999,
+            80,
+            L4Protocol::TCP,
+            Direction::Ingress,
+        )
+        .unwrap();
         assert_eq!(t.steps.len(), repo.rules.len());
     }
 
     #[test]
     fn trace_records_enforcement_state() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/trace.go", "Trace.Enforcement", "tenant-pt-enf");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/policy/trace.go", "Trace.Enforcement", "tenant-pt-enf");
         let (repo, map) = make_repo_and_map(tenant.clone());
         let t = trace(
-            &tenant, &repo, &map, 256, 999, 80, L4Protocol::TCP, Direction::Ingress,
-        ).unwrap();
+            &tenant,
+            &repo,
+            &map,
+            256,
+            999,
+            80,
+            L4Protocol::TCP,
+            Direction::Ingress,
+        )
+        .unwrap();
         assert!(t.enforcement);
     }
 
     #[test]
     fn trace_with_no_rules_reports_default_allow() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/trace.go", "Trace.NoRules", "tenant-pt-empty");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/policy/trace.go", "Trace.NoRules", "tenant-pt-empty");
         let resolver = InMemoryIdentityResolver::new();
         let map = distill(
             &PolicyRepository::new(),
@@ -197,11 +265,19 @@ mod tests {
             &ls(&[("app", "web")]),
             PolicyEnforcementMode::Default,
             &resolver,
-        ).unwrap();
+        )
+        .unwrap();
         let t = trace(
-            &tenant, &PolicyRepository::new(), &map,
-            256, 999, 80, L4Protocol::TCP, Direction::Ingress,
-        ).unwrap();
+            &tenant,
+            &PolicyRepository::new(),
+            &map,
+            256,
+            999,
+            80,
+            L4Protocol::TCP,
+            Direction::Ingress,
+        )
+        .unwrap();
         assert_eq!(t.final_verdict, Verdict::Allow);
         assert!(!t.enforcement);
     }
@@ -211,8 +287,16 @@ mod tests {
         let (_c, tenant) = cilium_test_ctx!("pkg/policy/trace.go", "Trace.Input", "tenant-pt-in");
         let (repo, map) = make_repo_and_map(tenant.clone());
         let t = trace(
-            &tenant, &repo, &map, 100, 200, 8080, L4Protocol::UDP, Direction::Egress,
-        ).unwrap();
+            &tenant,
+            &repo,
+            &map,
+            100,
+            200,
+            8080,
+            L4Protocol::UDP,
+            Direction::Egress,
+        )
+        .unwrap();
         assert_eq!(t.source_identity, 100);
         assert_eq!(t.destination_identity, 200);
         assert_eq!(t.port, 8080);
@@ -222,14 +306,23 @@ mod tests {
 
     #[test]
     fn trace_cross_tenant_repository_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/trace.go", "Trace.TenantDenied", "tenant-pt-td");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/policy/trace.go", "Trace.TenantDenied", "tenant-pt-td");
         let other = TenantId::new("tenant-pt-other").expect("test fixture");
         let mut repo = PolicyRepository::new();
         repo.add(Rule::new("foreign", other, EndpointSelector::empty()));
         let map = PolicyMap::new();
         let err = trace(
-            &tenant, &repo, &map, 256, 999, 80, L4Protocol::TCP, Direction::Ingress,
-        ).unwrap_err();
+            &tenant,
+            &repo,
+            &map,
+            256,
+            999,
+            80,
+            L4Protocol::TCP,
+            Direction::Ingress,
+        )
+        .unwrap_err();
         assert!(matches!(err, TraceError::TenantDenied { .. }));
     }
 
@@ -237,21 +330,42 @@ mod tests {
 
     #[test]
     fn trace_step_records_rule_name() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/trace.go", "Trace.StepName", "tenant-pt-rn");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/policy/trace.go", "Trace.StepName", "tenant-pt-rn");
         let (repo, map) = make_repo_and_map(tenant.clone());
         let t = trace(
-            &tenant, &repo, &map, 256, 999, 80, L4Protocol::TCP, Direction::Ingress,
-        ).unwrap();
+            &tenant,
+            &repo,
+            &map,
+            256,
+            999,
+            80,
+            L4Protocol::TCP,
+            Direction::Ingress,
+        )
+        .unwrap();
         assert_eq!(t.steps[0].rule_name, "allow-client");
     }
 
     #[test]
     fn trace_step_reports_ingress_rule_count() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/trace.go", "Trace.StepIngressCount", "tenant-pt-sic");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/trace.go",
+            "Trace.StepIngressCount",
+            "tenant-pt-sic"
+        );
         let (repo, map) = make_repo_and_map(tenant.clone());
         let t = trace(
-            &tenant, &repo, &map, 256, 999, 80, L4Protocol::TCP, Direction::Ingress,
-        ).unwrap();
+            &tenant,
+            &repo,
+            &map,
+            256,
+            999,
+            80,
+            L4Protocol::TCP,
+            Direction::Ingress,
+        )
+        .unwrap();
         assert_eq!(t.steps[0].from_match, Some("1 ingress rule(s)".into()));
     }
 
@@ -259,11 +373,23 @@ mod tests {
 
     #[test]
     fn trace_egress_returns_default_when_no_egress_rule() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/trace.go", "Trace.Egress.NoRule", "tenant-pt-egnr");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/policy/trace.go",
+            "Trace.Egress.NoRule",
+            "tenant-pt-egnr"
+        );
         let (repo, map) = make_repo_and_map(tenant.clone());
         let t = trace(
-            &tenant, &repo, &map, 256, 999, 80, L4Protocol::TCP, Direction::Egress,
-        ).unwrap();
+            &tenant,
+            &repo,
+            &map,
+            256,
+            999,
+            80,
+            L4Protocol::TCP,
+            Direction::Egress,
+        )
+        .unwrap();
         // No egress rule → not enforced → Allow.
         assert_eq!(t.final_verdict, Verdict::Allow);
         assert!(!t.enforcement);
@@ -273,10 +399,15 @@ mod tests {
 
     #[test]
     fn trace_with_multiple_rules_produces_multiple_steps() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/trace.go", "Trace.Multi", "tenant-pt-multi");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/policy/trace.go", "Trace.Multi", "tenant-pt-multi");
         let mut repo = PolicyRepository::new();
         for i in 0..3u8 {
-            let mut rule = Rule::new(format!("rule-{i}"), tenant.clone(), endpoint_sel(&[("app", "web")]));
+            let mut rule = Rule::new(
+                format!("rule-{i}"),
+                tenant.clone(),
+                endpoint_sel(&[("app", "web")]),
+            );
             rule.ingress.push(IngressRule {
                 from_endpoints: vec![endpoint_sel(&[("app", "client")])],
                 ..Default::default()
@@ -286,13 +417,24 @@ mod tests {
         let mut resolver = InMemoryIdentityResolver::new();
         resolver.insert(256, ls(&[("app", "client")]));
         let map = distill(
-            &repo, &tenant,
+            &repo,
+            &tenant,
             &ls(&[("app", "web")]),
-            PolicyEnforcementMode::Default, &resolver,
-        ).unwrap();
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap();
         let t = trace(
-            &tenant, &repo, &map, 256, 999, 80, L4Protocol::TCP, Direction::Ingress,
-        ).unwrap();
+            &tenant,
+            &repo,
+            &map,
+            256,
+            999,
+            80,
+            L4Protocol::TCP,
+            Direction::Ingress,
+        )
+        .unwrap();
         assert_eq!(t.steps.len(), 3);
     }
 
@@ -300,17 +442,28 @@ mod tests {
 
     #[test]
     fn trace_with_always_mode_reports_enforcement_true() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/trace.go", "Trace.AlwaysEnforce", "tenant-pt-ae");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/policy/trace.go", "Trace.AlwaysEnforce", "tenant-pt-ae");
         let resolver = InMemoryIdentityResolver::new();
         let map = distill(
             &PolicyRepository::new(),
-            &tenant, &ls(&[("app", "web")]),
-            PolicyEnforcementMode::Always, &resolver,
-        ).unwrap();
+            &tenant,
+            &ls(&[("app", "web")]),
+            PolicyEnforcementMode::Always,
+            &resolver,
+        )
+        .unwrap();
         let t = trace(
-            &tenant, &PolicyRepository::new(), &map,
-            256, 999, 80, L4Protocol::TCP, Direction::Ingress,
-        ).unwrap();
+            &tenant,
+            &PolicyRepository::new(),
+            &map,
+            256,
+            999,
+            80,
+            L4Protocol::TCP,
+            Direction::Ingress,
+        )
+        .unwrap();
         assert!(t.enforcement);
         assert_eq!(t.final_verdict, Verdict::Deny);
     }
@@ -319,11 +472,20 @@ mod tests {
 
     #[test]
     fn trace_serde_round_trip() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/trace.go", "Trace.Serde", "tenant-pt-serde");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/policy/trace.go", "Trace.Serde", "tenant-pt-serde");
         let (repo, map) = make_repo_and_map(tenant.clone());
         let t = trace(
-            &tenant, &repo, &map, 256, 999, 80, L4Protocol::TCP, Direction::Ingress,
-        ).unwrap();
+            &tenant,
+            &repo,
+            &map,
+            256,
+            999,
+            80,
+            L4Protocol::TCP,
+            Direction::Ingress,
+        )
+        .unwrap();
         let s = serde_json::to_string(&t).unwrap();
         let back: PolicyTrace = serde_json::from_str(&s).unwrap();
         assert_eq!(back, t);
@@ -348,7 +510,8 @@ mod tests {
 
     #[test]
     fn trace_with_id_all_fallback_returns_allow() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/trace.go", "Trace.AllFallback", "tenant-pt-af");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/policy/trace.go", "Trace.AllFallback", "tenant-pt-af");
         let mut repo = PolicyRepository::new();
         let mut rule = Rule::new("allow-all", tenant.clone(), endpoint_sel(&[("app", "web")]));
         rule.ingress.push(IngressRule {
@@ -358,22 +521,43 @@ mod tests {
         repo.add(rule);
         let resolver = InMemoryIdentityResolver::new();
         let map = distill(
-            &repo, &tenant, &ls(&[("app", "web")]),
-            PolicyEnforcementMode::Default, &resolver,
-        ).unwrap();
+            &repo,
+            &tenant,
+            &ls(&[("app", "web")]),
+            PolicyEnforcementMode::Default,
+            &resolver,
+        )
+        .unwrap();
         let t = trace(
-            &tenant, &repo, &map, 999, 256, 80, L4Protocol::TCP, Direction::Ingress,
-        ).unwrap();
+            &tenant,
+            &repo,
+            &map,
+            999,
+            256,
+            80,
+            L4Protocol::TCP,
+            Direction::Ingress,
+        )
+        .unwrap();
         assert_eq!(t.final_verdict, Verdict::Allow);
     }
 
     #[test]
     fn trace_step_count_matches_repo_count() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/policy/trace.go", "Trace.StepCount", "tenant-pt-sc");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/policy/trace.go", "Trace.StepCount", "tenant-pt-sc");
         let (repo, map) = make_repo_and_map(tenant.clone());
         let t = trace(
-            &tenant, &repo, &map, 256, 999, 80, L4Protocol::TCP, Direction::Ingress,
-        ).unwrap();
+            &tenant,
+            &repo,
+            &map,
+            256,
+            999,
+            80,
+            L4Protocol::TCP,
+            Direction::Ingress,
+        )
+        .unwrap();
         assert_eq!(t.steps.len(), repo.len());
     }
 }

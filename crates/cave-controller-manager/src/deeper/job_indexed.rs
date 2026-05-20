@@ -41,7 +41,10 @@ pub struct IndexedJobStatus {
 
 impl IndexedJobStatus {
     pub fn state_of(&self, idx: u32) -> IndexState {
-        self.index_states.get(&idx).copied().unwrap_or(IndexState::Pending)
+        self.index_states
+            .get(&idx)
+            .copied()
+            .unwrap_or(IndexState::Pending)
     }
     pub fn count(&self, want: IndexState) -> u32 {
         self.index_states.values().filter(|s| **s == want).count() as u32
@@ -193,7 +196,11 @@ mod tests {
         );
         let s = spec(5, 3, 6, false);
         let st = status_with(
-            &[(0, IndexState::Succeeded), (1, IndexState::Active), (2, IndexState::Active)],
+            &[
+                (0, IndexState::Succeeded),
+                (1, IndexState::Active),
+                (2, IndexState::Active),
+            ],
             &[],
         );
         // active=2, parallelism=3 → budget=1, lowest pending is 3.
@@ -205,11 +212,8 @@ mod tests {
 
     #[test]
     fn launch_returns_empty_when_parallelism_is_saturated() {
-        let (_cite, tenant) = test_ctx!(
-            "pkg/controller/job/job_controller.go",
-            "manageJob",
-            "acme"
-        );
+        let (_cite, tenant) =
+            test_ctx!("pkg/controller/job/job_controller.go", "manageJob", "acme");
         let s = spec(5, 2, 6, false);
         let st = status_with(&[(0, IndexState::Active), (1, IndexState::Active)], &[]);
         assert_eq!(
@@ -227,10 +231,17 @@ mod tests {
         );
         let s = spec(3, 3, 6, false);
         let st = status_with(
-            &[(0, IndexState::Succeeded), (1, IndexState::Succeeded), (2, IndexState::Succeeded)],
+            &[
+                (0, IndexState::Succeeded),
+                (1, IndexState::Succeeded),
+                (2, IndexState::Succeeded),
+            ],
             &[],
         );
-        assert_eq!(schedule_next(&s, &st, &tenant).unwrap(), IndexedDecision::Done);
+        assert_eq!(
+            schedule_next(&s, &st, &tenant).unwrap(),
+            IndexedDecision::Done
+        );
     }
 
     #[test]

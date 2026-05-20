@@ -63,7 +63,10 @@ fn unregister_returns_removed_entry() {
     let removed = t.unregister("ephemeral/").expect("returns the entry");
     assert_eq!(removed.mount_type, "kv");
     assert!(t.lookup("ephemeral/").is_none());
-    assert!(t.unregister("ephemeral/").is_none(), "second unregister is a no-op");
+    assert!(
+        t.unregister("ephemeral/").is_none(),
+        "second unregister is a no-op"
+    );
 }
 
 /// Cite: openbao `vault/mount.go:328` (MountTable.findAllNamespaceMounts)
@@ -98,5 +101,8 @@ fn list_returns_sorted_paths() {
         t.register(entry(p, "kv"));
     }
     let listed = t.list();
-    assert_eq!(listed, vec!["alpha/".to_string(), "beta/".into(), "zeta/".into()]);
+    assert_eq!(
+        listed,
+        vec!["alpha/".to_string(), "beta/".into(), "zeta/".into()]
+    );
 }

@@ -46,10 +46,17 @@ impl LbStickyCookie {
                 reason: "sticky cookie name must not be empty".into(),
             });
         }
-        if !self.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
+        if !self
+            .name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Hetzner,
-                reason: format!("sticky cookie name {:?} contains illegal characters", self.name),
+                reason: format!(
+                    "sticky cookie name {:?} contains illegal characters",
+                    self.name
+                ),
             });
         }
         if !(60..=86_400).contains(&self.lifetime_seconds) {
@@ -170,10 +177,7 @@ impl ManagedCertRequest {
         if self.status != CertIssuanceStatus::Requested {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Hetzner,
-                reason: format!(
-                    "cert request {} not in Requested state",
-                    self.id
-                ),
+                reason: format!("cert request {} not in Requested state", self.id),
             });
         }
         self.status = CertIssuanceStatus::DnsChallengeIssued;
@@ -202,7 +206,10 @@ impl ManagedCertRequest {
         if self.status != CertIssuanceStatus::Issued {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Hetzner,
-                reason: format!("cert request {} cannot renew from {:?}", self.id, self.status),
+                reason: format!(
+                    "cert request {} cannot renew from {:?}",
+                    self.id, self.status
+                ),
             });
         }
         self.status = CertIssuanceStatus::Renewing;
@@ -225,10 +232,16 @@ pub struct BackendCertVerification {
 
 impl BackendCertVerification {
     pub fn strict(ca_bundle: &str) -> Self {
-        Self { skip_verify: false, ca_bundle: Some(ca_bundle.into()) }
+        Self {
+            skip_verify: false,
+            ca_bundle: Some(ca_bundle.into()),
+        }
     }
     pub fn skip() -> Self {
-        Self { skip_verify: true, ca_bundle: None }
+        Self {
+            skip_verify: true,
+            ca_bundle: None,
+        }
     }
 
     pub fn validate(&self) -> Result<(), CloudError> {
@@ -367,7 +380,10 @@ impl DualStackNetwork {
         if !v6_addr.contains(':') {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Hetzner,
-                reason: format!("v6_subnet {:?} must contain colon-separated IPv6", self.v6_subnet),
+                reason: format!(
+                    "v6_subnet {:?} must contain colon-separated IPv6",
+                    self.v6_subnet
+                ),
             });
         }
         let _: u8 = v6_mask.parse().map_err(|_| CloudError::InvalidConfig {
@@ -398,7 +414,11 @@ mod tests {
     #[test]
     fn sticky_cookie_http_constructor_is_valid() {
         let _ = ctx("acme", "hcloud/load_balancer.go", "StickySessions");
-        assert!(LbStickyCookie::http("HCBALANCERID", 3600).validate().is_ok());
+        assert!(
+            LbStickyCookie::http("HCBALANCERID", 3600)
+                .validate()
+                .is_ok()
+        );
     }
 
     #[test]
@@ -406,7 +426,10 @@ mod tests {
         let _ = ctx("acme", "hcloud/load_balancer.go", "StickySessions");
         let mut c = LbStickyCookie::http("X", 3600);
         c.name.clear();
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -414,18 +437,30 @@ mod tests {
         let _ = ctx("acme", "hcloud/load_balancer.go", "StickySessions");
         let mut c = LbStickyCookie::http("good", 3600);
         c.name = "with space".into();
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         c.name = "with;semi".into();
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn sticky_cookie_lifetime_outside_60_86400_is_rejected() {
         let _ = ctx("acme", "hcloud/load_balancer.go", "StickySessions");
         let c = LbStickyCookie::http("X", 30);
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         let c = LbStickyCookie::http("X", 200_000);
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     // ─── Redirect rules ──────────────────────────────────────────────────────
@@ -456,7 +491,10 @@ mod tests {
             to_url: "https://example.com".into(),
             status: RedirectStatus::MovedPermanently301,
         };
-        assert!(matches!(r.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            r.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -467,7 +505,10 @@ mod tests {
             to_url: "ftp://example.com".into(),
             status: RedirectStatus::MovedPermanently301,
         };
-        assert!(matches!(r.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            r.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         let r = LbRedirectRule {
             from_path: "/old".into(),
             to_url: "https://example.com/new".into(),
@@ -488,7 +529,10 @@ mod tests {
         assert!(cert_req().validate().is_ok());
         let mut bad = cert_req();
         bad.domains = vec![];
-        assert!(matches!(bad.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            bad.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -496,16 +540,23 @@ mod tests {
         let _ = ctx("acme", "hcloud/certificate.go", "CreateManaged");
         let mut bad = cert_req();
         bad.domains = vec!["nodot".into()];
-        assert!(matches!(bad.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            bad.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         bad.domains = vec!["leading.dot.".into()];
-        assert!(matches!(bad.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            bad.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn managed_cert_request_lifecycle_progression() {
         let _ = ctx("acme", "hcloud/certificate.go", "CreateManaged");
         let mut c = cert_req();
-        c.issue_challenge(vec!["_acme-challenge.example.com TXT abc".into()]).unwrap();
+        c.issue_challenge(vec!["_acme-challenge.example.com TXT abc".into()])
+            .unwrap();
         assert_eq!(c.status, CertIssuanceStatus::DnsChallengeIssued);
         c.finalize().unwrap();
         assert_eq!(c.status, CertIssuanceStatus::Issued);
@@ -519,14 +570,20 @@ mod tests {
     fn managed_cert_request_finalize_rejects_unfinalizable_states() {
         let _ = ctx("acme", "hcloud/certificate.go", "FinalizeManaged");
         let mut c = cert_req();
-        assert!(matches!(c.finalize().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.finalize().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn managed_cert_request_renew_only_from_issued() {
         let _ = ctx("acme", "hcloud/certificate.go", "RenewManaged");
         let mut c = cert_req();
-        assert!(matches!(c.begin_renewal().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.begin_renewal().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -543,10 +600,17 @@ mod tests {
     #[test]
     fn backend_cert_verification_strict_requires_ca_bundle() {
         let _ = ctx("acme", "hcloud/load_balancer.go", "BackendVerification");
-        assert!(BackendCertVerification::strict("ca-pem-here").validate().is_ok());
+        assert!(
+            BackendCertVerification::strict("ca-pem-here")
+                .validate()
+                .is_ok()
+        );
         let mut bad = BackendCertVerification::strict("ca-pem-here");
         bad.ca_bundle = Some(String::new());
-        assert!(matches!(bad.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            bad.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -554,7 +618,10 @@ mod tests {
         let _ = ctx("acme", "hcloud/load_balancer.go", "BackendVerification");
         let mut bad = BackendCertVerification::skip();
         bad.ca_bundle = Some("x".into());
-        assert!(matches!(bad.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            bad.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         let good = BackendCertVerification::skip();
         assert!(good.validate().is_ok());
     }
@@ -580,9 +647,20 @@ mod tests {
     #[test]
     fn rescue_mode_request_requires_ssh_key() {
         let _ = ctx("acme", "hcloud/server.go", "EnableRescue");
-        let r = RescueModeRequest { server_id: 7, image: RescueImage::Linux64, ssh_key_ids: vec![] };
-        assert!(matches!(r.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
-        let r = RescueModeRequest { server_id: 7, image: RescueImage::Linux64, ssh_key_ids: vec![1] };
+        let r = RescueModeRequest {
+            server_id: 7,
+            image: RescueImage::Linux64,
+            ssh_key_ids: vec![],
+        };
+        assert!(matches!(
+            r.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
+        let r = RescueModeRequest {
+            server_id: 7,
+            image: RescueImage::Linux64,
+            ssh_key_ids: vec![1],
+        };
         assert!(r.validate().is_ok());
     }
 
@@ -608,7 +686,10 @@ mod tests {
         let _ = ctx("acme", "hcloud/server.go", "RequestConsole");
         let mut c = console();
         c.vnc_url = "ws://insecure".into();
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -616,7 +697,10 @@ mod tests {
         let _ = ctx("acme", "hcloud/server.go", "RequestConsole");
         let mut c = console();
         c.password = "short".into();
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -624,9 +708,15 @@ mod tests {
         let _ = ctx("acme", "hcloud/server.go", "RequestConsole");
         let mut c = console();
         c.expires_in_seconds = 30;
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         c.expires_in_seconds = 7_200;
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     // ─── Dual-stack network ──────────────────────────────────────────────────
@@ -650,7 +740,10 @@ mod tests {
         let _ = ctx("acme", "hcloud/network.go", "DualStack");
         let mut n = dsn();
         n.v4_subnet = "abc/24".into();
-        assert!(matches!(n.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            n.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -658,7 +751,10 @@ mod tests {
         let _ = ctx("acme", "hcloud/network.go", "DualStack");
         let mut n = dsn();
         n.v6_subnet = "10.0.0.0/24".into();
-        assert!(matches!(n.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            n.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -666,10 +762,16 @@ mod tests {
         let _ = ctx("acme", "hcloud/network.go", "DualStack");
         let mut n = dsn();
         n.v4_subnet = "10.0.0.0".into();
-        assert!(matches!(n.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            n.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         let mut n = dsn();
         n.v6_subnet = "2001:db8::".into();
-        assert!(matches!(n.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            n.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -677,6 +779,9 @@ mod tests {
         let _ = ctx("acme", "hcloud/network.go", "DualStack");
         let mut n = dsn();
         n.v4_subnet = "10.0.0.0/twenty-four".into();
-        assert!(matches!(n.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            n.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 }

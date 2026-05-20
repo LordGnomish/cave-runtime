@@ -18,7 +18,9 @@ pub enum LbPolicy {
     LeastRequest,
     Random,
     /// Consistent hash on a header value.
-    RingHash { header: String },
+    RingHash {
+        header: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -175,7 +177,10 @@ mod tests {
         Endpoint {
             address: addr.into(),
             active_requests: active,
-            labels: labels.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            labels: labels
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
         }
     }
 
@@ -210,7 +215,10 @@ mod tests {
         );
         let d = dr(
             LbPolicy::RoundRobin,
-            vec![Subset { name: "v1".into(), labels: vec![] }],
+            vec![Subset {
+                name: "v1".into(),
+                labels: vec![],
+            }],
         );
         assert!(matches!(compile(&d), Err(DrError::EmptySubset(_))));
     }
@@ -248,10 +256,22 @@ mod tests {
             "applyConsistentHashLB",
             "tenant-dr-ring"
         );
-        let cs = compile(&dr(LbPolicy::RingHash { header: "x-user".into() }, vec![])).unwrap();
+        let cs = compile(&dr(
+            LbPolicy::RingHash {
+                header: "x-user".into(),
+            },
+            vec![],
+        ))
+        .unwrap();
         let eps = vec![ep("a", 0, &[]), ep("b", 0, &[]), ep("c", 0, &[])];
-        let one = pick(&cs[0], &eps, 0, &[("x-user", "alice")]).unwrap().address.clone();
-        let two = pick(&cs[0], &eps, 0, &[("x-user", "alice")]).unwrap().address.clone();
+        let one = pick(&cs[0], &eps, 0, &[("x-user", "alice")])
+            .unwrap()
+            .address
+            .clone();
+        let two = pick(&cs[0], &eps, 0, &[("x-user", "alice")])
+            .unwrap()
+            .address
+            .clone();
         assert_eq!(one, two);
     }
 
@@ -264,7 +284,10 @@ mod tests {
         );
         let cs = compile(&dr(
             LbPolicy::RoundRobin,
-            vec![Subset { name: "v1".into(), labels: vec![("version".into(), "v1".into())] }],
+            vec![Subset {
+                name: "v1".into(),
+                labels: vec![("version".into(), "v1".into())],
+            }],
         ))
         .unwrap();
         let eps = vec![
@@ -285,6 +308,9 @@ mod tests {
             "tenant-dr-empty"
         );
         let cs = compile(&dr(LbPolicy::RoundRobin, vec![])).unwrap();
-        assert!(matches!(pick(&cs[0], &[], 0, &[]), Err(DrError::NoEndpoints(_))));
+        assert!(matches!(
+            pick(&cs[0], &[], 0, &[]),
+            Err(DrError::NoEndpoints(_))
+        ));
     }
 }

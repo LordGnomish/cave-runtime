@@ -98,10 +98,10 @@ mod tests {
     fn test_evidence_type_all_variants_serde() {
         let variants = [
             (EvidenceType::NetworkCapture, "network_capture"),
-            (EvidenceType::ProcessDump,    "process_dump"),
-            (EvidenceType::FileSystem,     "file_system"),
-            (EvidenceType::MemoryImage,    "memory_image"),
-            (EvidenceType::LogFile,        "log_file"),
+            (EvidenceType::ProcessDump, "process_dump"),
+            (EvidenceType::FileSystem, "file_system"),
+            (EvidenceType::MemoryImage, "memory_image"),
+            (EvidenceType::LogFile, "log_file"),
         ];
         for (v, expected_str) in variants {
             let json = serde_json::to_string(&v).unwrap();

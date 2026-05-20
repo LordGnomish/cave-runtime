@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
 use crate::engine::{ScanError, Scanner};
-use crate::models::{Finding, FindingCategory, Confidence, ScanKind, ScanRequest, ScanTarget, Severity};
+use crate::models::{
+    Confidence, Finding, FindingCategory, ScanKind, ScanRequest, ScanTarget, Severity,
+};
 use regex::Regex;
 
 pub struct FsScanner;
@@ -47,7 +49,8 @@ impl FsScanner {
                 "Replace directives can redirect imports to malicious packages".to_string(),
             );
             f.location.file = Some("go.mod".to_string());
-            f.remediation = Some("Remove replace directive or verify the target package".to_string());
+            f.remediation =
+                Some("Remove replace directive or verify the target package".to_string());
             f.confidence = Confidence::High;
             findings.push(f);
         }
@@ -119,7 +122,9 @@ impl Scanner for FsScanner {
 
                 Ok(findings)
             }
-            _ => Err(ScanError::InvalidRequest("Expected FsPath or Content target".to_string())),
+            _ => Err(ScanError::InvalidRequest(
+                "Expected FsPath or Content target".to_string(),
+            )),
         }
     }
 }
@@ -145,7 +150,8 @@ mod tests {
     #[tokio::test]
     async fn test_fs_go_mod_suspicious_replace() {
         let scanner = FsScanner;
-        let content = b"module example.com/myapp\n\nreplace google.com/protobuf => evil.com/protobuf v1.0.0";
+        let content =
+            b"module example.com/myapp\n\nreplace google.com/protobuf => evil.com/protobuf v1.0.0";
         let req = ScanRequest {
             kind: ScanKind::Fs,
             target: ScanTarget::Content(content.to_vec()),

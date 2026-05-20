@@ -14,7 +14,7 @@ fn record(topic: &str, key: &[u8], value: &[u8]) -> SourceRecord {
     SourceRecord {
         tenant_id: TENANT.into(),
         topic: topic.into(),
-        partition: 0,                   // overwritten by sink router
+        partition: 0, // overwritten by sink router
         key: key.to_vec(),
         value: value.to_vec(),
         headers: HashMap::new(),
@@ -89,9 +89,11 @@ fn dispatch_batch_short_circuits_on_first_failure() {
     assert!(matches!(err, CdcError::CrossTenantDenied { .. }));
     // First two records were produced; the bad one and anything after
     // were not.
-    assert_eq!(s.backend.count_for(&topic, 0)
-        + s.backend.count_for(&topic, 1)
-        + s.backend.count_for(&topic, 2)
-        + s.backend.count_for(&topic, 3),
-        2);
+    assert_eq!(
+        s.backend.count_for(&topic, 0)
+            + s.backend.count_for(&topic, 1)
+            + s.backend.count_for(&topic, 2)
+            + s.backend.count_for(&topic, 3),
+        2
+    );
 }

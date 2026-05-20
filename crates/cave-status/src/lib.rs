@@ -5,9 +5,9 @@
 //! Upstream tracking: custom
 //! Features: Public/internal status page, auto-generation from probes, incident integration
 
-pub mod routes;
-pub mod models;
 pub mod engine;
+pub mod models;
+pub mod routes;
 
 use axum::Router;
 

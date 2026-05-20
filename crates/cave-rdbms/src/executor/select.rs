@@ -19,7 +19,10 @@ pub fn execute_select(select: &SelectStmt, db: &Database) -> Result<SelectResult
         None => (None, None),
         Some(from) => match from.as_ref() {
             FromClause::Table(name, _alias) => {
-                let t = schema.tables.get(name).ok_or(format!("table {} not found", name))?;
+                let t = schema
+                    .tables
+                    .get(name)
+                    .ok_or(format!("table {} not found", name))?;
                 (Some(name.clone()), Some(t))
             }
             FromClause::Join { .. } => (None, None), // join not yet supported in eval
@@ -76,7 +79,10 @@ pub fn execute_select(select: &SelectStmt, db: &Database) -> Result<SelectResult
     // Ignore unused variable warning for table_name
     let _ = table_name;
 
-    Ok(SelectResult { columns: output_cols, rows: output_rows })
+    Ok(SelectResult {
+        columns: output_cols,
+        rows: output_rows,
+    })
 }
 
 fn project(
@@ -112,22 +118,18 @@ fn project(
                 .columns
                 .iter()
                 .map(|sc| match sc {
-                    SelectColumn::Expr(Expr::Identifier(name), _) => {
-                        col_names
-                            .iter()
-                            .position(|c| c == name)
-                            .and_then(|i| row.get(i))
-                            .cloned()
-                            .unwrap_or(SqlValue::Null)
-                    }
-                    SelectColumn::Expr(Expr::QualifiedIdentifier(_, col), _) => {
-                        col_names
-                            .iter()
-                            .position(|c| c == col)
-                            .and_then(|i| row.get(i))
-                            .cloned()
-                            .unwrap_or(SqlValue::Null)
-                    }
+                    SelectColumn::Expr(Expr::Identifier(name), _) => col_names
+                        .iter()
+                        .position(|c| c == name)
+                        .and_then(|i| row.get(i))
+                        .cloned()
+                        .unwrap_or(SqlValue::Null),
+                    SelectColumn::Expr(Expr::QualifiedIdentifier(_, col), _) => col_names
+                        .iter()
+                        .position(|c| c == col)
+                        .and_then(|i| row.get(i))
+                        .cloned()
+                        .unwrap_or(SqlValue::Null),
                     SelectColumn::Expr(expr, _) => {
                         eval_expr(expr, &row, col_names).unwrap_or(SqlValue::Null)
                     }
@@ -198,13 +200,16 @@ fn eval_binop(left: &SqlValue, op: BinaryOp, right: &SqlValue) -> Result<SqlValu
                     .unwrap_or(false),
             ))
         }
-        (a, BinaryOp::And, b) => {
-            Ok(SqlValue::Bool(a.as_bool().unwrap_or(false) && b.as_bool().unwrap_or(false)))
-        }
-        (a, BinaryOp::Or, b) => {
-            Ok(SqlValue::Bool(a.as_bool().unwrap_or(false) || b.as_bool().unwrap_or(false)))
-        }
-        _ => Err(format!("unsupported binop: {:?} {:?} {:?}", left, op, right)),
+        (a, BinaryOp::And, b) => Ok(SqlValue::Bool(
+            a.as_bool().unwrap_or(false) && b.as_bool().unwrap_or(false),
+        )),
+        (a, BinaryOp::Or, b) => Ok(SqlValue::Bool(
+            a.as_bool().unwrap_or(false) || b.as_bool().unwrap_or(false),
+        )),
+        _ => Err(format!(
+            "unsupported binop: {:?} {:?} {:?}",
+            left, op, right
+        )),
     }
 }
 
@@ -218,14 +223,41 @@ mod tests {
         let mut db = Database::new("test");
         let schema = db.schemas.get_mut("public").unwrap();
         let cols = vec![
-            ColumnDef { name: "id".into(), type_name: "int".into(), not_null: true, primary_key: true },
-            ColumnDef { name: "name".into(), type_name: "text".into(), not_null: false, primary_key: false },
-            ColumnDef { name: "age".into(), type_name: "int".into(), not_null: false, primary_key: false },
+            ColumnDef {
+                name: "id".into(),
+                type_name: "int".into(),
+                not_null: true,
+                primary_key: true,
+            },
+            ColumnDef {
+                name: "name".into(),
+                type_name: "text".into(),
+                not_null: false,
+                primary_key: false,
+            },
+            ColumnDef {
+                name: "age".into(),
+                type_name: "int".into(),
+                not_null: false,
+                primary_key: false,
+            },
         ];
         let mut table = Table::new("users", cols);
-        table.rows.push(vec![SqlValue::Int4(1), SqlValue::Text("alice".into()), SqlValue::Int4(30)]);
-        table.rows.push(vec![SqlValue::Int4(2), SqlValue::Text("bob".into()), SqlValue::Int4(25)]);
-        table.rows.push(vec![SqlValue::Int4(3), SqlValue::Text("carol".into()), SqlValue::Int4(35)]);
+        table.rows.push(vec![
+            SqlValue::Int4(1),
+            SqlValue::Text("alice".into()),
+            SqlValue::Int4(30),
+        ]);
+        table.rows.push(vec![
+            SqlValue::Int4(2),
+            SqlValue::Text("bob".into()),
+            SqlValue::Int4(25),
+        ]);
+        table.rows.push(vec![
+            SqlValue::Int4(3),
+            SqlValue::Text("carol".into()),
+            SqlValue::Int4(35),
+        ]);
         schema.tables.insert("users".into(), table);
         db
     }
@@ -311,14 +343,20 @@ mod tests {
     fn test_eval_binop_int_eq() {
         let a = SqlValue::Int4(5);
         let b = SqlValue::Int4(5);
-        assert_eq!(eval_binop(&a, BinaryOp::Eq, &b).unwrap(), SqlValue::Bool(true));
+        assert_eq!(
+            eval_binop(&a, BinaryOp::Eq, &b).unwrap(),
+            SqlValue::Bool(true)
+        );
     }
 
     #[test]
     fn test_eval_binop_int_lt() {
         let a = SqlValue::Int4(3);
         let b = SqlValue::Int4(5);
-        assert_eq!(eval_binop(&a, BinaryOp::Lt, &b).unwrap(), SqlValue::Bool(true));
+        assert_eq!(
+            eval_binop(&a, BinaryOp::Lt, &b).unwrap(),
+            SqlValue::Bool(true)
+        );
     }
 
     #[test]

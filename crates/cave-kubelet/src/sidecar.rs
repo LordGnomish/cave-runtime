@@ -201,7 +201,10 @@ pub fn init_phase_complete(
     sidecar_ready: &BTreeMap<String, bool>,
 ) -> bool {
     for c in init_containers {
-        let cs = state.get(&c.name).copied().unwrap_or(ContainerLifecycleState::NotStarted);
+        let cs = state
+            .get(&c.name)
+            .copied()
+            .unwrap_or(ContainerLifecycleState::NotStarted);
         if c.is_blocking_init() {
             if cs != ContainerLifecycleState::Completed {
                 return false;
@@ -231,7 +234,10 @@ pub fn next_container_to_start(
 ) -> Option<String> {
     // Walk init containers in declaration order.
     for c in init_containers {
-        let cs = state.get(&c.name).copied().unwrap_or(ContainerLifecycleState::NotStarted);
+        let cs = state
+            .get(&c.name)
+            .copied()
+            .unwrap_or(ContainerLifecycleState::NotStarted);
         match cs {
             ContainerLifecycleState::NotStarted => return Some(c.name.clone()),
             ContainerLifecycleState::Starting => return None, // wait
@@ -240,9 +246,7 @@ pub fn next_container_to_start(
             // Sidecar: if it's not yet ready (when readinessProbe declared),
             // we wait before starting subsequent containers.
             ContainerLifecycleState::Running if c.is_sidecar() => {
-                if c.has_readiness_probe
-                    && !sidecar_ready.get(&c.name).copied().unwrap_or(false)
-                {
+                if c.has_readiness_probe && !sidecar_ready.get(&c.name).copied().unwrap_or(false) {
                     return None;
                 }
             }
@@ -253,7 +257,10 @@ pub fn next_container_to_start(
     }
     // Then main containers in declaration order.
     for c in main_containers {
-        let cs = state.get(&c.name).copied().unwrap_or(ContainerLifecycleState::NotStarted);
+        let cs = state
+            .get(&c.name)
+            .copied()
+            .unwrap_or(ContainerLifecycleState::NotStarted);
         if cs == ContainerLifecycleState::NotStarted {
             return Some(c.name.clone());
         }
@@ -346,11 +353,7 @@ mod tests {
 
     #[test]
     fn validate_rejects_duplicate_names() {
-        assert!(validate_pod_containers(
-            &[init("dup", None)],
-            &[main_c("dup")]
-        )
-        .is_err());
+        assert!(validate_pod_containers(&[init("dup", None)], &[main_c("dup")]).is_err());
     }
 
     #[test]
@@ -409,10 +412,7 @@ mod tests {
 
     #[test]
     fn termination_with_no_sidecars() {
-        let order = compute_termination_order(
-            &[init("i1", None)],
-            &[main_c("m1"), main_c("m2")],
-        );
+        let order = compute_termination_order(&[init("i1", None)], &[main_c("m1"), main_c("m2")]);
         assert_eq!(order, vec!["m2", "m1"]);
     }
 
@@ -420,18 +420,34 @@ mod tests {
     fn init_phase_complete_requires_blocking_completed() {
         let mut state = BTreeMap::new();
         state.insert("i1".into(), ContainerLifecycleState::Running);
-        assert!(!init_phase_complete(&[init("i1", None)], &state, &BTreeMap::new()));
+        assert!(!init_phase_complete(
+            &[init("i1", None)],
+            &state,
+            &BTreeMap::new()
+        ));
         state.insert("i1".into(), ContainerLifecycleState::Completed);
-        assert!(init_phase_complete(&[init("i1", None)], &state, &BTreeMap::new()));
+        assert!(init_phase_complete(
+            &[init("i1", None)],
+            &state,
+            &BTreeMap::new()
+        ));
     }
 
     #[test]
     fn init_phase_requires_sidecar_running() {
         let mut state = BTreeMap::new();
         state.insert("s1".into(), ContainerLifecycleState::Starting);
-        assert!(!init_phase_complete(&[sidecar("s1")], &state, &BTreeMap::new()));
+        assert!(!init_phase_complete(
+            &[sidecar("s1")],
+            &state,
+            &BTreeMap::new()
+        ));
         state.insert("s1".into(), ContainerLifecycleState::Running);
-        assert!(init_phase_complete(&[sidecar("s1")], &state, &BTreeMap::new()));
+        assert!(init_phase_complete(
+            &[sidecar("s1")],
+            &state,
+            &BTreeMap::new()
+        ));
     }
 
     #[test]
@@ -469,12 +485,7 @@ mod tests {
         let mut s = BTreeMap::new();
         s.insert("i1".into(), ContainerLifecycleState::Running);
         let r = BTreeMap::new();
-        let next = next_container_to_start(
-            &[init("i1", None)],
-            &[main_c("m1")],
-            &s,
-            &r,
-        );
+        let next = next_container_to_start(&[init("i1", None)], &[main_c("m1")], &s, &r);
         assert_eq!(next, None);
     }
 
@@ -482,12 +493,8 @@ mod tests {
     fn next_to_start_advances_after_blocking_completed() {
         let mut s = BTreeMap::new();
         s.insert("i1".into(), ContainerLifecycleState::Completed);
-        let next = next_container_to_start(
-            &[init("i1", None)],
-            &[main_c("m1")],
-            &s,
-            &BTreeMap::new(),
-        );
+        let next =
+            next_container_to_start(&[init("i1", None)], &[main_c("m1")], &s, &BTreeMap::new());
         assert_eq!(next, Some("m1".into()));
     }
 
@@ -495,12 +502,7 @@ mod tests {
     fn next_to_start_after_sidecar_running_proceeds_to_main() {
         let mut s = BTreeMap::new();
         s.insert("s1".into(), ContainerLifecycleState::Running);
-        let next = next_container_to_start(
-            &[sidecar("s1")],
-            &[main_c("m1")],
-            &s,
-            &BTreeMap::new(),
-        );
+        let next = next_container_to_start(&[sidecar("s1")], &[main_c("m1")], &s, &BTreeMap::new());
         assert_eq!(next, Some("m1".into()));
     }
 
@@ -538,12 +540,8 @@ mod tests {
     fn next_to_start_starting_blocks_progress() {
         let mut s = BTreeMap::new();
         s.insert("i1".into(), ContainerLifecycleState::Starting);
-        let next = next_container_to_start(
-            &[init("i1", None)],
-            &[main_c("m1")],
-            &s,
-            &BTreeMap::new(),
-        );
+        let next =
+            next_container_to_start(&[init("i1", None)], &[main_c("m1")], &s, &BTreeMap::new());
         assert_eq!(next, None);
     }
 
@@ -551,12 +549,8 @@ mod tests {
     fn next_to_start_failed_blocking_init_blocks_progress() {
         let mut s = BTreeMap::new();
         s.insert("i1".into(), ContainerLifecycleState::Failed);
-        let next = next_container_to_start(
-            &[init("i1", None)],
-            &[main_c("m1")],
-            &s,
-            &BTreeMap::new(),
-        );
+        let next =
+            next_container_to_start(&[init("i1", None)], &[main_c("m1")], &s, &BTreeMap::new());
         assert_eq!(next, None);
     }
 
@@ -694,12 +688,8 @@ mod tests {
     fn next_to_start_proceeds_through_main_sequence() {
         let mut s = BTreeMap::new();
         s.insert("m1".into(), ContainerLifecycleState::Running);
-        let next = next_container_to_start(
-            &[],
-            &[main_c("m1"), main_c("m2")],
-            &s,
-            &BTreeMap::new(),
-        );
+        let next =
+            next_container_to_start(&[], &[main_c("m1"), main_c("m2")], &s, &BTreeMap::new());
         assert_eq!(next, Some("m2".into()));
     }
 }

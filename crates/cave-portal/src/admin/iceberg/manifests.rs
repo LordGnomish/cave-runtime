@@ -103,7 +103,14 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, IcebergVie
         delete = delete,
         total_kb = total_kb,
         tbl = table(
-            &["table", "snapshot", "content", "added_files", "deleted_rows", "path"],
+            &[
+                "table",
+                "snapshot",
+                "content",
+                "added_files",
+                "deleted_rows",
+                "path"
+            ],
             &rows
                 .iter()
                 .map(|m| vec![

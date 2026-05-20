@@ -57,27 +57,27 @@ pub mod task_queue;
 /// supplied, and exposed standalone via the `cave-tdd-check` binary.
 pub mod tdd;
 
-pub use changelog::{parse_release_body, Changelog, ChangelogEntry, ChangeKind};
-pub use diff::{compare_pin_against_latest, Severity, VersionDiff};
-pub use event::{emit, GapEvent, GapEventSink, JsonlSink};
+pub use changelog::{ChangeKind, Changelog, ChangelogEntry, parse_release_body};
+pub use diff::{Severity, VersionDiff, compare_pin_against_latest};
+pub use event::{GapEvent, GapEventSink, JsonlSink, emit};
 pub use persistence::{WatchState, WatchStateEntry};
-pub use poller::{fetch_latest, GitHubClient, PollOutcome};
-pub use tracked::{load_from_workspace, TrackedProject};
+pub use poller::{GitHubClient, PollOutcome, fetch_latest};
+pub use tracked::{TrackedProject, load_from_workspace};
 
 pub use auto_port::{
-    AutoPortDispatcher, AutoPortError, AutoPortStatus, DispatchedRecord, DispatchSummary,
+    AutoPortDispatcher, AutoPortError, AutoPortStatus, DispatchSummary, DispatchedRecord,
     DispatcherConfig, VerifySummary,
 };
 pub use auto_port_gate::{CharterBaseline, CharterGate, CharterV2Gate, VerifyResult};
-pub use prompt::{build_prompt, PortContext};
+pub use prompt::{PortContext, build_prompt};
 pub use task_queue::{
     DryRunTaskQueue, OpusTaskQueue, PumpTaskQueue, TaskId, TaskOutput, TaskQueue, TaskQueueError,
     TaskStatus,
 };
 pub use tdd::{
-    analyze_tdd_compliance, scan_stubs, ClassifiedCommit, CommitKind, FileChange, FileChangeKind,
-    FileKind, GitError, GitInspector, ShellGitInspector, TddAnalyzer, TddCompliance, TddDetails,
-    TddError, TddFinding,
+    ClassifiedCommit, CommitKind, FileChange, FileChangeKind, FileKind, GitError, GitInspector,
+    ShellGitInspector, TddAnalyzer, TddCompliance, TddDetails, TddError, TddFinding,
+    analyze_tdd_compliance, scan_stubs,
 };
 
 #[cfg(test)]

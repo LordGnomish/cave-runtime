@@ -25,12 +25,12 @@ impl std::fmt::Display for Capability {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
             Capability::Create => "create",
-            Capability::Read   => "read",
+            Capability::Read => "read",
             Capability::Update => "update",
             Capability::Delete => "delete",
-            Capability::List   => "list",
-            Capability::Sudo   => "sudo",
-            Capability::Deny   => "deny",
+            Capability::List => "list",
+            Capability::Sudo => "sudo",
+            Capability::Deny => "deny",
         };
         write!(f, "{s}")
     }
@@ -64,7 +64,7 @@ impl Policy {
 
         match best {
             Some(pp) => pp.capabilities.iter().collect(),
-            None     => vec![],
+            None => vec![],
         }
     }
 
@@ -266,7 +266,11 @@ mod tests {
     #[test]
     fn test_root_policy_allows_all() {
         let pe = PolicyEngine::new();
-        pe.check(&["root".to_string()], "arbitrary/path/anything", &Capability::Delete)
-            .unwrap();
+        pe.check(
+            &["root".to_string()],
+            "arbitrary/path/anything",
+            &Capability::Delete,
+        )
+        .unwrap();
     }
 }

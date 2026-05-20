@@ -10,9 +10,15 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum ManifestError {
     #[error("manifest not found at {path}: {source}")]
-    NotFound { path: PathBuf, source: std::io::Error },
+    NotFound {
+        path: PathBuf,
+        source: std::io::Error,
+    },
     #[error("manifest parse error in {path}: {source}")]
-    Parse { path: PathBuf, source: toml::de::Error },
+    Parse {
+        path: PathBuf,
+        source: toml::de::Error,
+    },
 }
 
 pub type ManifestResult<T> = Result<T, ManifestError>;
@@ -29,22 +35,32 @@ pub fn read_crate_manifest(
     let crate_root = workspace_root.join("crates").join(crate_name);
     let manifest_path = crate_root.join("parity.manifest.toml");
 
-    let content = std::fs::read_to_string(&manifest_path)
-        .map_err(|source| ManifestError::NotFound { path: manifest_path.clone(), source })?;
+    let content =
+        std::fs::read_to_string(&manifest_path).map_err(|source| ManifestError::NotFound {
+            path: manifest_path.clone(),
+            source,
+        })?;
 
-    let manifest = toml::from_str::<ParityManifest>(&content)
-        .map_err(|source| ManifestError::Parse { path: manifest_path.clone(), source })?;
+    let manifest =
+        toml::from_str::<ParityManifest>(&content).map_err(|source| ManifestError::Parse {
+            path: manifest_path.clone(),
+            source,
+        })?;
 
     Ok((manifest, crate_root))
 }
 
 /// Reads and parses a `parity.manifest.toml` from an explicit file path.
 pub fn parse_manifest_file(path: &Path) -> ManifestResult<ParityManifest> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|source| ManifestError::NotFound { path: path.to_path_buf(), source })?;
+    let content = std::fs::read_to_string(path).map_err(|source| ManifestError::NotFound {
+        path: path.to_path_buf(),
+        source,
+    })?;
 
-    toml::from_str::<ParityManifest>(&content)
-        .map_err(|source| ManifestError::Parse { path: path.to_path_buf(), source })
+    toml::from_str::<ParityManifest>(&content).map_err(|source| ManifestError::Parse {
+        path: path.to_path_buf(),
+        source,
+    })
 }
 
 /// A `[[functions]]` entry whose `local_name` is absent from the declared source file.
@@ -60,7 +76,10 @@ pub struct MissingFunction {
 /// in the corresponding source file under `crate_root`.
 ///
 /// A file that cannot be read is treated as though the function is absent.
-pub fn find_missing_functions(manifest: &ParityManifest, crate_root: &Path) -> Vec<MissingFunction> {
+pub fn find_missing_functions(
+    manifest: &ParityManifest,
+    crate_root: &Path,
+) -> Vec<MissingFunction> {
     manifest
         .functions
         .iter()

@@ -85,7 +85,10 @@ impl AppShell {
         }
         let resp = r#match.page.authorize_and_render(&req)?;
         let body = render_page(r#match.page, &req, &resp);
-        Ok(ShellResponse { status: resp.status, body })
+        Ok(ShellResponse {
+            status: resp.status,
+            body,
+        })
     }
 
     pub fn page_count(&self) -> usize {
@@ -256,9 +259,8 @@ mod tests {
     #[test]
     fn shell_handle_tenant_scope_without_tenant_errors() {
         let s = shell_with_echo();
-        let req = PageRequest::new("/settings").with_auth(AuthContext::with_identity(
-            Identity::new("u", "U"),
-        ));
+        let req = PageRequest::new("/settings")
+            .with_auth(AuthContext::with_identity(Identity::new("u", "U")));
         let err = s.handle(req).unwrap_err();
         assert!(matches!(err, PageError::Tenant(_)));
     }
@@ -276,9 +278,8 @@ mod tests {
     #[test]
     fn shell_handle_admin_scope_without_role_errors() {
         let s = shell_with_echo();
-        let req = PageRequest::new("/admin").with_auth(AuthContext::with_identity(
-            Identity::new("u", "U"),
-        ));
+        let req = PageRequest::new("/admin")
+            .with_auth(AuthContext::with_identity(Identity::new("u", "U")));
         let err = s.handle(req).unwrap_err();
         assert!(matches!(err, PageError::Auth(_)));
     }

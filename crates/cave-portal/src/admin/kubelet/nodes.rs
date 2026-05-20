@@ -8,7 +8,7 @@
 use super::KubeletViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, table};
-use crate::admin::state::{scope, AdminState, KubeletPod, SchedulerNode};
+use crate::admin::state::{AdminState, KubeletPod, SchedulerNode, scope};
 
 /// One row in the Nodes table — joins SchedulerNode capacity with the
 /// kubelet-side pod count (so the page is self-sufficient).
@@ -25,24 +25,18 @@ pub struct NodeRow {
     pub taints: Vec<String>,
 }
 
-pub fn list_nodes(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<Vec<NodeRow>, KubeletViewError> {
+pub fn list_nodes(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<NodeRow>, KubeletViewError> {
     ctx.authorise(Permission::KubeletRead)?;
-    let nodes: Vec<SchedulerNode> = scope(
-        &state.scheduler_nodes.read().unwrap(),
-        &ctx.tenant,
-        |r| &r.tenant,
-    )
-    .into_iter()
-    .cloned()
-    .collect();
-    let pods: Vec<KubeletPod> = scope(
-        &state.kubelet_pods.read().unwrap(),
-        &ctx.tenant,
-        |r| &r.tenant,
-    )
+    let nodes: Vec<SchedulerNode> =
+        scope(&state.scheduler_nodes.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
+    let pods: Vec<KubeletPod> = scope(&state.kubelet_pods.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
     .into_iter()
     .cloned()
     .collect();
@@ -69,10 +63,7 @@ pub fn ready_count(rows: &[NodeRow]) -> usize {
     rows.iter().filter(|n| n.ready).count()
 }
 
-pub fn render_section(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, KubeletViewError> {
+pub fn render_section(state: &AdminState, ctx: &RequestCtx) -> Result<String, KubeletViewError> {
     let rows = list_nodes(state, ctx)?;
     let table_rows: Vec<Vec<String>> = rows
         .iter()
@@ -102,7 +93,14 @@ pub fn render_section(
         n = rows.len(),
         ready = ready_count(&rows),
         tbl = table(
-            &["name", "status", "cpu allocatable", "mem allocatable", "pods (R/P/F)", "taints"],
+            &[
+                "name",
+                "status",
+                "cpu allocatable",
+                "mem allocatable",
+                "pods (R/P/F)",
+                "taints"
+            ],
             &table_rows
         ),
     ))
@@ -158,7 +156,14 @@ mod tests {
     fn render_section_emits_columns_and_status_summary() {
         let s = AdminState::seeded();
         let html = render_section(&s, &ctx(&[Permission::KubeletRead])).unwrap();
-        for col in ["name", "status", "cpu allocatable", "mem allocatable", "pods (R/P/F)", "taints"] {
+        for col in [
+            "name",
+            "status",
+            "cpu allocatable",
+            "mem allocatable",
+            "pods (R/P/F)",
+            "taints",
+        ] {
             assert!(html.contains(&format!(">{}<", col)));
         }
         assert!(html.contains("Ready)"));

@@ -8,7 +8,7 @@
 //!   cavectl audit log --filter actor=alice --filter action=tenant.suspend
 //!   cavectl audit log --filter target~prod- --since 2026-04-26T00:00:00Z
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
@@ -239,10 +239,13 @@ mod tests {
     async fn audit_acme_filter_actor_eq_matches_alice_only() {
         let tenant_id = "acme";
         let log = InMemoryAuditLog::new();
-        log.append(entry(tenant_id, "alice", "tenant.suspend", "acme")).await.unwrap();
-        log.append(entry(tenant_id, "bob", "tenant.suspend", "acme")).await.unwrap();
-        let q = AuditQuery::new(tenant_id)
-            .with_filter(AuditFilter::parse("actor=alice").unwrap());
+        log.append(entry(tenant_id, "alice", "tenant.suspend", "acme"))
+            .await
+            .unwrap();
+        log.append(entry(tenant_id, "bob", "tenant.suspend", "acme"))
+            .await
+            .unwrap();
+        let q = AuditQuery::new(tenant_id).with_filter(AuditFilter::parse("actor=alice").unwrap());
         let got = log.query(&q).await.unwrap();
         assert_eq!(got.len(), 1);
         assert_eq!(got[0].actor, "alice");
@@ -253,11 +256,16 @@ mod tests {
     async fn audit_acme_filter_target_contains_prod() {
         let tenant_id = "acme";
         let log = InMemoryAuditLog::new();
-        log.append(entry(tenant_id, "alice", "key.rotate", "prod-db")).await.unwrap();
-        log.append(entry(tenant_id, "alice", "key.rotate", "stage-db")).await.unwrap();
-        log.append(entry(tenant_id, "alice", "key.rotate", "prod-cache")).await.unwrap();
-        let q = AuditQuery::new(tenant_id)
-            .with_filter(AuditFilter::parse("target~prod-").unwrap());
+        log.append(entry(tenant_id, "alice", "key.rotate", "prod-db"))
+            .await
+            .unwrap();
+        log.append(entry(tenant_id, "alice", "key.rotate", "stage-db"))
+            .await
+            .unwrap();
+        log.append(entry(tenant_id, "alice", "key.rotate", "prod-cache"))
+            .await
+            .unwrap();
+        let q = AuditQuery::new(tenant_id).with_filter(AuditFilter::parse("target~prod-").unwrap());
         let got = log.query(&q).await.unwrap();
         assert_eq!(got.len(), 2);
         assert!(got.iter().all(|e| e.target.starts_with("prod-")));
@@ -268,9 +276,15 @@ mod tests {
     async fn audit_acme_multiple_filters_and() {
         let tenant_id = "acme";
         let log = InMemoryAuditLog::new();
-        log.append(entry(tenant_id, "alice", "tenant.suspend", "acme")).await.unwrap();
-        log.append(entry(tenant_id, "alice", "key.rotate", "prod-db")).await.unwrap();
-        log.append(entry(tenant_id, "bob", "tenant.suspend", "acme")).await.unwrap();
+        log.append(entry(tenant_id, "alice", "tenant.suspend", "acme"))
+            .await
+            .unwrap();
+        log.append(entry(tenant_id, "alice", "key.rotate", "prod-db"))
+            .await
+            .unwrap();
+        log.append(entry(tenant_id, "bob", "tenant.suspend", "acme"))
+            .await
+            .unwrap();
         let q = AuditQuery::new(tenant_id)
             .with_filter(AuditFilter::parse("actor=alice").unwrap())
             .with_filter(AuditFilter::parse("action=tenant.suspend").unwrap());
@@ -285,7 +299,9 @@ mod tests {
     async fn audit_query_acme_excludes_globex() {
         let log = InMemoryAuditLog::new();
         log.append(entry("acme", "alice", "x", "y")).await.unwrap();
-        log.append(entry("globex", "alice", "x", "y")).await.unwrap();
+        log.append(entry("globex", "alice", "x", "y"))
+            .await
+            .unwrap();
         let q = AuditQuery::new("acme");
         let got = log.query(&q).await.unwrap();
         assert_eq!(got.len(), 1);
@@ -329,9 +345,10 @@ mod tests {
     async fn audit_acme_unknown_filter_key_returns_empty() {
         let tenant_id = "acme";
         let log = InMemoryAuditLog::new();
-        log.append(entry(tenant_id, "alice", "x", "y")).await.unwrap();
-        let q = AuditQuery::new(tenant_id)
-            .with_filter(AuditFilter::parse("ghost=alice").unwrap());
+        log.append(entry(tenant_id, "alice", "x", "y"))
+            .await
+            .unwrap();
+        let q = AuditQuery::new(tenant_id).with_filter(AuditFilter::parse("ghost=alice").unwrap());
         let got = log.query(&q).await.unwrap();
         assert!(got.is_empty());
     }

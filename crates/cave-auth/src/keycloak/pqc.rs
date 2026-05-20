@@ -10,7 +10,7 @@
 //! upstream: https://github.com/keycloak/keycloak/blob/v22.0.0/crypto/default/src/main/java/org/keycloak/crypto/def/DefaultCryptoProvider.java
 
 use ring::rand::SystemRandom;
-use ring::signature::{Ed25519KeyPair, KeyPair, UnparsedPublicKey, ED25519};
+use ring::signature::{ED25519, Ed25519KeyPair, KeyPair, UnparsedPublicKey};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -92,7 +92,11 @@ impl HybridKeypair {
 
         // Ed25519 key in PKCS8 format: seed bytes are at [16..48]
         let pkcs8_ref = pkcs8.as_ref();
-        let seed = if pkcs8_ref.len() >= 48 { &pkcs8_ref[16..48] } else { pkcs8_ref };
+        let seed = if pkcs8_ref.len() >= 48 {
+            &pkcs8_ref[16..48]
+        } else {
+            pkcs8_ref
+        };
 
         let mut ed25519_private = vec![0u8; 64];
         // Store seed in first 32 bytes, public in last 32
@@ -114,8 +118,7 @@ impl HybridKeypair {
 
     /// Sign a message with the hybrid scheme.
     pub fn sign(&self, message: &[u8]) -> Result<HybridSignature, &'static str> {
-        let keypair = Ed25519KeyPair::from_pkcs8(&self.keypair_bytes)
-            .map_err(|_| "sign_error")?;
+        let keypair = Ed25519KeyPair::from_pkcs8(&self.keypair_bytes).map_err(|_| "sign_error")?;
         let ed_sig = keypair.sign(message);
         let ed25519_sig = ed_sig.as_ref().to_vec();
 
@@ -125,7 +128,10 @@ impl HybridKeypair {
             MLDSA_SIG_LEN,
         );
 
-        Ok(HybridSignature { ed25519_sig, mldsa_sig })
+        Ok(HybridSignature {
+            ed25519_sig,
+            mldsa_sig,
+        })
     }
 
     /// Verify a hybrid signature against this keypair's public keys.

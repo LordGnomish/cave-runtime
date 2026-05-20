@@ -42,8 +42,14 @@ pub enum HookStage {
 /// fields cave actually exercises today.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HookHandler {
-    Exec { command: Vec<String> },
-    HttpGet { port: u16, path: String, scheme: HttpScheme },
+    Exec {
+        command: Vec<String>,
+    },
+    HttpGet {
+        port: u16,
+        path: String,
+        scheme: HttpScheme,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -72,7 +78,12 @@ pub struct HookExecution {
 }
 
 impl HookExecution {
-    pub fn new(stage: HookStage, handler: HookHandler, now: DateTime<Utc>, timeout: Duration) -> Self {
+    pub fn new(
+        stage: HookStage,
+        handler: HookHandler,
+        now: DateTime<Utc>,
+        timeout: Duration,
+    ) -> Self {
         Self {
             stage,
             handler,
@@ -123,11 +134,7 @@ pub enum HookSample {
 
 /// Pure reconciler. Given a hook execution + the latest sample
 /// + current time, return the next action.
-pub fn evaluate(
-    exec: &mut HookExecution,
-    sample: HookSample,
-    now: DateTime<Utc>,
-) -> HookOutcome {
+pub fn evaluate(exec: &mut HookExecution, sample: HookSample, now: DateTime<Utc>) -> HookOutcome {
     if exec.completed {
         return HookOutcome::Completed;
     }
@@ -219,7 +226,11 @@ mod tests {
         let out = evaluate(&mut e, HookSample::Success, now());
         assert_eq!(out, HookOutcome::Completed);
         // Sticky: even with NotFiredYet later we stay Completed.
-        let out2 = evaluate(&mut e, HookSample::NotFiredYet, now() + ChronoDuration::seconds(60));
+        let out2 = evaluate(
+            &mut e,
+            HookSample::NotFiredYet,
+            now() + ChronoDuration::seconds(60),
+        );
         assert_eq!(out2, HookOutcome::Completed);
     }
 
@@ -261,7 +272,9 @@ mod tests {
         // Sanity: stage is honoured in error messages.
         let mut e = HookExecution::new(
             HookStage::PostStart,
-            HookHandler::Exec { command: vec!["init".into()] },
+            HookHandler::Exec {
+                command: vec!["init".into()],
+            },
             now(),
             Duration::from_secs(10),
         );

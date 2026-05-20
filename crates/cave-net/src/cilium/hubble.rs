@@ -103,7 +103,12 @@ pub struct FlowBuffer {
 
 impl FlowBuffer {
     pub fn new(tenant: TenantId, capacity: usize) -> Self {
-        Self { tenant, capacity, flows: Vec::with_capacity(capacity.min(1024)), overflow: 0 }
+        Self {
+            tenant,
+            capacity,
+            flows: Vec::with_capacity(capacity.min(1024)),
+            overflow: 0,
+        }
     }
 
     /// Append a flow. If the buffer is full, the oldest record is dropped
@@ -131,7 +136,10 @@ impl FlowBuffer {
 
     /// Return only the dropped flows (for `hubble observe --verdict DROPPED`).
     pub fn drops(&self) -> Vec<&FlowLog> {
-        self.flows.iter().filter(|f| f.verdict == Verdict::Dropped).collect()
+        self.flows
+            .iter()
+            .filter(|f| f.verdict == Verdict::Dropped)
+            .collect()
     }
 }
 
@@ -217,11 +225,8 @@ mod tests {
 
     #[test]
     fn drop_reason_from_known_codes() {
-        let (_cite, _t) = cilium_test_ctx!(
-            "bpf/lib/drop_reasons.h",
-            "DROP_POLICY",
-            "tenant-hub-codes"
-        );
+        let (_cite, _t) =
+            cilium_test_ctx!("bpf/lib/drop_reasons.h", "DROP_POLICY", "tenant-hub-codes");
         assert_eq!(DropReason::from_code(0), DropReason::None);
         assert_eq!(DropReason::from_code(133), DropReason::PolicyDeny);
         assert_eq!(DropReason::from_code(192), DropReason::AuthRequired);
@@ -258,7 +263,14 @@ mod tests {
         );
         let mut buf = FlowBuffer::new(tenant, 3);
         for i in 0..5 {
-            buf.push(flow("tenant-hub-ring", 256, 257 + i, Verdict::Forwarded, DropReason::None, 100));
+            buf.push(flow(
+                "tenant-hub-ring",
+                256,
+                257 + i,
+                Verdict::Forwarded,
+                DropReason::None,
+                100,
+            ));
         }
         assert_eq!(buf.flows().len(), 3);
         assert_eq!(buf.overflow_count(), 2);
@@ -272,22 +284,54 @@ mod tests {
             "tenant-hub-drops"
         );
         let mut buf = FlowBuffer::new(tenant, 16);
-        buf.push(flow("tenant-hub-drops", 256, 257, Verdict::Forwarded, DropReason::None, 100));
-        buf.push(flow("tenant-hub-drops", 256, 258, Verdict::Dropped, DropReason::PolicyDeny, 50));
-        buf.push(flow("tenant-hub-drops", 256, 259, Verdict::Dropped, DropReason::AuthRequired, 0));
+        buf.push(flow(
+            "tenant-hub-drops",
+            256,
+            257,
+            Verdict::Forwarded,
+            DropReason::None,
+            100,
+        ));
+        buf.push(flow(
+            "tenant-hub-drops",
+            256,
+            258,
+            Verdict::Dropped,
+            DropReason::PolicyDeny,
+            50,
+        ));
+        buf.push(flow(
+            "tenant-hub-drops",
+            256,
+            259,
+            Verdict::Dropped,
+            DropReason::AuthRequired,
+            0,
+        ));
         assert_eq!(buf.drops().len(), 2);
     }
 
     #[test]
     fn flow_buffer_filters_cross_tenant_flows() {
-        let (_cite, tenant) = cilium_test_ctx!(
-            "pkg/hubble/observer/observer.go",
-            "tenantScope",
-            "acme"
-        );
+        let (_cite, tenant) =
+            cilium_test_ctx!("pkg/hubble/observer/observer.go", "tenantScope", "acme");
         let mut buf = FlowBuffer::new(tenant, 16);
-        buf.push(flow("acme", 256, 257, Verdict::Forwarded, DropReason::None, 100));
-        buf.push(flow("evil", 256, 257, Verdict::Forwarded, DropReason::None, 100));
+        buf.push(flow(
+            "acme",
+            256,
+            257,
+            Verdict::Forwarded,
+            DropReason::None,
+            100,
+        ));
+        buf.push(flow(
+            "evil",
+            256,
+            257,
+            Verdict::Forwarded,
+            DropReason::None,
+            100,
+        ));
         assert_eq!(buf.flows().len(), 1);
     }
 
@@ -299,10 +343,38 @@ mod tests {
             "tenant-hub-topology"
         );
         let flows = vec![
-            flow("tenant-hub-topology", 256, 257, Verdict::Forwarded, DropReason::None, 100),
-            flow("tenant-hub-topology", 256, 257, Verdict::Forwarded, DropReason::None, 200),
-            flow("tenant-hub-topology", 256, 257, Verdict::Dropped, DropReason::PolicyDeny, 50),
-            flow("tenant-hub-topology", 257, 258, Verdict::Forwarded, DropReason::None, 10),
+            flow(
+                "tenant-hub-topology",
+                256,
+                257,
+                Verdict::Forwarded,
+                DropReason::None,
+                100,
+            ),
+            flow(
+                "tenant-hub-topology",
+                256,
+                257,
+                Verdict::Forwarded,
+                DropReason::None,
+                200,
+            ),
+            flow(
+                "tenant-hub-topology",
+                256,
+                257,
+                Verdict::Dropped,
+                DropReason::PolicyDeny,
+                50,
+            ),
+            flow(
+                "tenant-hub-topology",
+                257,
+                258,
+                Verdict::Forwarded,
+                DropReason::None,
+                10,
+            ),
         ];
         let g = TopologyGraph::build(&tenant, &flows);
         let edge = g.edge(256, 257).unwrap();
@@ -314,11 +386,8 @@ mod tests {
 
     #[test]
     fn topology_graph_skips_other_tenants() {
-        let (_cite, tenant) = cilium_test_ctx!(
-            "pkg/hubble/relay/server.go",
-            "topologyTenantScope",
-            "acme"
-        );
+        let (_cite, tenant) =
+            cilium_test_ctx!("pkg/hubble/relay/server.go", "topologyTenantScope", "acme");
         let flows = vec![
             flow("acme", 256, 257, Verdict::Forwarded, DropReason::None, 100),
             flow("evil", 256, 257, Verdict::Forwarded, DropReason::None, 100),
@@ -335,8 +404,22 @@ mod tests {
             "tenant-hub-directed"
         );
         let flows = vec![
-            flow("tenant-hub-directed", 256, 257, Verdict::Forwarded, DropReason::None, 10),
-            flow("tenant-hub-directed", 257, 256, Verdict::Forwarded, DropReason::None, 20),
+            flow(
+                "tenant-hub-directed",
+                256,
+                257,
+                Verdict::Forwarded,
+                DropReason::None,
+                10,
+            ),
+            flow(
+                "tenant-hub-directed",
+                257,
+                256,
+                Verdict::Forwarded,
+                DropReason::None,
+                20,
+            ),
         ];
         let g = TopologyGraph::build(&tenant, &flows);
         assert_ne!(g.edge(256, 257), g.edge(257, 256));
@@ -373,6 +456,10 @@ mod tests {
         let mut descs: Vec<&'static str> = codes.iter().map(|c| c.description()).collect();
         descs.sort();
         descs.dedup();
-        assert_eq!(descs.len(), codes.len(), "every documented code needs a unique description");
+        assert_eq!(
+            descs.len(),
+            codes.len(),
+            "every documented code needs a unique description"
+        );
     }
 }

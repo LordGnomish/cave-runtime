@@ -60,7 +60,10 @@ pub struct EndpointSliceMap {
 
 impl EndpointSliceMap {
     pub fn new(tenant_id: impl Into<String>) -> Self {
-        Self { tenant_id: tenant_id.into(), slices: HashMap::new() }
+        Self {
+            tenant_id: tenant_id.into(),
+            slices: HashMap::new(),
+        }
     }
 
     /// Cite: `pkg/proxy/endpointslicecache.go:95` (updatePending) — an
@@ -72,7 +75,10 @@ impl EndpointSliceMap {
         slice_name: impl Into<String>,
         endpoints: Vec<EndpointInfo>,
     ) {
-        self.slices.entry(svc).or_default().insert(slice_name.into(), endpoints);
+        self.slices
+            .entry(svc)
+            .or_default()
+            .insert(slice_name.into(), endpoints);
     }
 
     /// Cite: `pkg/proxy/endpointslicecache.go:95` (updatePending,
@@ -92,7 +98,9 @@ impl EndpointSliceMap {
     /// Cite: `pkg/proxy/endpointslicecache.go:162` (getEndpointsMap) —
     /// flatten all slices for a Service into a single endpoint list.
     pub fn endpoints_for(&self, svc: &ServicePortName) -> Vec<&EndpointInfo> {
-        self.slices.get(svc).into_iter()
+        self.slices
+            .get(svc)
+            .into_iter()
             .flat_map(|per_slice| per_slice.values().flatten())
             .collect()
     }
@@ -101,7 +109,10 @@ impl EndpointSliceMap {
     /// + the proxier consumer — only `ready` endpoints are eligible to
     /// receive new connections.
     pub fn ready_endpoints_for(&self, svc: &ServicePortName) -> Vec<&EndpointInfo> {
-        self.endpoints_for(svc).into_iter().filter(|e| e.ready).collect()
+        self.endpoints_for(svc)
+            .into_iter()
+            .filter(|e| e.ready)
+            .collect()
     }
 
     pub fn ready_endpoint_count(&self, svc: &ServicePortName) -> usize {
@@ -111,7 +122,10 @@ impl EndpointSliceMap {
     /// Cite: `pkg/proxy/topology.go:48` (CategorizeEndpoints) — local
     /// endpoints support externalTrafficPolicy=Local + DSR routing.
     pub fn local_ready_endpoints(&self, svc: &ServicePortName, node: &str) -> Vec<&EndpointInfo> {
-        self.ready_endpoints_for(svc).into_iter().filter(|e| e.is_local(node)).collect()
+        self.ready_endpoints_for(svc)
+            .into_iter()
+            .filter(|e| e.is_local(node))
+            .collect()
     }
 
     pub fn services(&self) -> Vec<&ServicePortName> {

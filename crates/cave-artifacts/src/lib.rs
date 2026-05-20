@@ -25,7 +25,7 @@ pub mod integrations;
 pub mod nexus;
 pub mod pulp;
 
-use axum::{routing::get, Json, Router};
+use axum::{Json, Router, routing::get};
 use std::sync::Arc;
 
 /// Combined state graph composing one Arc per upstream sub-module.

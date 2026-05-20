@@ -41,7 +41,10 @@ impl Signal {
     }
 
     pub fn is_memory(self) -> bool {
-        matches!(self, Signal::MemoryAvailable | Signal::AllocatableMemoryAvailable)
+        matches!(
+            self,
+            Signal::MemoryAvailable | Signal::AllocatableMemoryAvailable
+        )
     }
 
     pub fn node_condition(self) -> Option<&'static str> {
@@ -180,11 +183,7 @@ pub struct ThresholdObservations {
 }
 
 impl ThresholdObservations {
-    pub fn record_observation(
-        &mut self,
-        threshold: &EvictionThreshold,
-        obs: &SignalObservation,
-    ) {
+    pub fn record_observation(&mut self, threshold: &EvictionThreshold, obs: &SignalObservation) {
         if signal_crosses(threshold, obs) {
             self.first_seen.entry(threshold.signal).or_insert(obs.time);
         } else {
@@ -279,10 +278,7 @@ pub fn evaluate(
 ///   3. higher memory/disk usage above request first
 ///   4. lower priority first
 ///   5. higher absolute usage first
-pub fn select_pods_to_evict(
-    triggered: &[Signal],
-    pods: &[PodForEviction],
-) -> Vec<String> {
+pub fn select_pods_to_evict(triggered: &[Signal], pods: &[PodForEviction]) -> Vec<String> {
     let mem_pressure = triggered.iter().any(|s| s.is_memory());
     let disk_pressure = triggered.iter().any(|s| s.is_disk());
 
@@ -333,8 +329,16 @@ pub fn select_pods_to_evict(
             b.ephemeral_storage_overage().max(0) as u64
         };
         b_amt.cmp(&a_amt).then_with(|| {
-            let a_abs = if mem_pressure { a.memory_usage } else { a.ephemeral_storage_usage };
-            let b_abs = if mem_pressure { b.memory_usage } else { b.ephemeral_storage_usage };
+            let a_abs = if mem_pressure {
+                a.memory_usage
+            } else {
+                a.ephemeral_storage_usage
+            };
+            let b_abs = if mem_pressure {
+                b.memory_usage
+            } else {
+                b.ephemeral_storage_usage
+            };
             b_abs.cmp(&a_abs)
         })
     });
@@ -386,7 +390,12 @@ pub struct ResourceRequirements {
 
 impl ResourceRequirements {
     pub fn empty() -> Self {
-        Self { cpu_request: 0, cpu_limit: 0, memory_request: 0, memory_limit: 0 }
+        Self {
+            cpu_request: 0,
+            cpu_limit: 0,
+            memory_request: 0,
+            memory_limit: 0,
+        }
     }
 }
 
@@ -394,10 +403,7 @@ impl ResourceRequirements {
 /// the sum of pods' memory/cpu requests must not exceed the node's
 /// allocatable; if it does, the latest-admitted-Burstable/BestEffort pods
 /// are evicted in QoS+priority order.
-pub fn enforce_allocatable(
-    allocatable_memory: u64,
-    pods: &[PodForEviction],
-) -> Vec<String> {
+pub fn enforce_allocatable(allocatable_memory: u64, pods: &[PodForEviction]) -> Vec<String> {
     let total: u64 = pods.iter().map(|p| p.memory_usage).sum();
     if total <= allocatable_memory {
         return Vec::new();
@@ -425,7 +431,12 @@ mod tests {
     use super::*;
 
     fn obs(signal: Signal, available: u64, capacity: u64, t: DateTime<Utc>) -> SignalObservation {
-        SignalObservation { signal, available, capacity, time: t }
+        SignalObservation {
+            signal,
+            available,
+            capacity,
+            time: t,
+        }
     }
 
     fn mk_pod(
@@ -468,17 +479,32 @@ mod tests {
     #[test]
     fn signal_crosses_when_available_below_threshold() {
         let t = EvictionThreshold::hard(Signal::MemoryAvailable, ThresholdValue::Quantity(100));
-        assert!(signal_crosses(&t, &obs(Signal::MemoryAvailable, 50, 1000, Utc::now())));
-        assert!(signal_crosses(&t, &obs(Signal::MemoryAvailable, 100, 1000, Utc::now())));
-        assert!(!signal_crosses(&t, &obs(Signal::MemoryAvailable, 200, 1000, Utc::now())));
+        assert!(signal_crosses(
+            &t,
+            &obs(Signal::MemoryAvailable, 50, 1000, Utc::now())
+        ));
+        assert!(signal_crosses(
+            &t,
+            &obs(Signal::MemoryAvailable, 100, 1000, Utc::now())
+        ));
+        assert!(!signal_crosses(
+            &t,
+            &obs(Signal::MemoryAvailable, 200, 1000, Utc::now())
+        ));
     }
 
     #[test]
     fn signal_crosses_with_percent() {
         let t = EvictionThreshold::hard(Signal::MemoryAvailable, ThresholdValue::Percent(10.0));
         // 10% of 1000 = 100. 99 < 100 → cross.
-        assert!(signal_crosses(&t, &obs(Signal::MemoryAvailable, 99, 1000, Utc::now())));
-        assert!(!signal_crosses(&t, &obs(Signal::MemoryAvailable, 200, 1000, Utc::now())));
+        assert!(signal_crosses(
+            &t,
+            &obs(Signal::MemoryAvailable, 99, 1000, Utc::now())
+        ));
+        assert!(!signal_crosses(
+            &t,
+            &obs(Signal::MemoryAvailable, 200, 1000, Utc::now())
+        ));
     }
 
     #[test]
@@ -487,7 +513,10 @@ mod tests {
         let mut h = ThresholdObservations::default();
         let t = EvictionThreshold::hard(Signal::MemoryAvailable, ThresholdValue::Quantity(100));
         let mut obs_set = SignalSet::new();
-        obs_set.insert(Signal::MemoryAvailable, obs(Signal::MemoryAvailable, 50, 1000, now));
+        obs_set.insert(
+            Signal::MemoryAvailable,
+            obs(Signal::MemoryAvailable, 50, 1000, now),
+        );
         let d = evaluate(&[t], &obs_set, &mut h, &[], now);
         assert_eq!(d.triggered_signals, vec![Signal::MemoryAvailable]);
         assert_eq!(d.node_conditions, vec!["MemoryPressure".to_string()]);
@@ -499,12 +528,21 @@ mod tests {
         let mut h = ThresholdObservations::default();
         let t = EvictionThreshold::soft(Signal::MemoryAvailable, ThresholdValue::Quantity(100), 30);
         let mut obs_set = SignalSet::new();
-        obs_set.insert(Signal::MemoryAvailable, obs(Signal::MemoryAvailable, 50, 1000, start));
+        obs_set.insert(
+            Signal::MemoryAvailable,
+            obs(Signal::MemoryAvailable, 50, 1000, start),
+        );
         let d = evaluate(&[t.clone()], &obs_set, &mut h, &[], start);
-        assert!(d.triggered_signals.is_empty(), "soft threshold should not fire before grace");
+        assert!(
+            d.triggered_signals.is_empty(),
+            "soft threshold should not fire before grace"
+        );
 
         let later = start + Duration::seconds(31);
-        obs_set.insert(Signal::MemoryAvailable, obs(Signal::MemoryAvailable, 50, 1000, later));
+        obs_set.insert(
+            Signal::MemoryAvailable,
+            obs(Signal::MemoryAvailable, 50, 1000, later),
+        );
         let d2 = evaluate(&[t], &obs_set, &mut h, &[], later);
         assert_eq!(d2.triggered_signals, vec![Signal::MemoryAvailable]);
     }
@@ -515,19 +553,38 @@ mod tests {
         let mut h = ThresholdObservations::default();
         let t = EvictionThreshold::soft(Signal::MemoryAvailable, ThresholdValue::Quantity(100), 30);
         let mut obs_set = SignalSet::new();
-        obs_set.insert(Signal::MemoryAvailable, obs(Signal::MemoryAvailable, 50, 1000, start));
+        obs_set.insert(
+            Signal::MemoryAvailable,
+            obs(Signal::MemoryAvailable, 50, 1000, start),
+        );
         evaluate(&[t.clone()], &obs_set, &mut h, &[], start);
         // Recover.
         obs_set.insert(
             Signal::MemoryAvailable,
-            obs(Signal::MemoryAvailable, 500, 1000, start + Duration::seconds(20)),
+            obs(
+                Signal::MemoryAvailable,
+                500,
+                1000,
+                start + Duration::seconds(20),
+            ),
         );
-        evaluate(&[t.clone()], &obs_set, &mut h, &[], start + Duration::seconds(20));
+        evaluate(
+            &[t.clone()],
+            &obs_set,
+            &mut h,
+            &[],
+            start + Duration::seconds(20),
+        );
         assert!(h.first_seen(Signal::MemoryAvailable).is_none());
         // Re-cross — must restart grace.
         obs_set.insert(
             Signal::MemoryAvailable,
-            obs(Signal::MemoryAvailable, 50, 1000, start + Duration::seconds(40)),
+            obs(
+                Signal::MemoryAvailable,
+                50,
+                1000,
+                start + Duration::seconds(40),
+            ),
         );
         let d = evaluate(&[t], &obs_set, &mut h, &[], start + Duration::seconds(40));
         assert!(d.triggered_signals.is_empty(), "grace must restart");
@@ -629,7 +686,10 @@ mod tests {
     fn evaluate_with_no_observations_returns_empty() {
         let mut h = ThresholdObservations::default();
         let d = evaluate(
-            &[EvictionThreshold::hard(Signal::MemoryAvailable, ThresholdValue::Quantity(100))],
+            &[EvictionThreshold::hard(
+                Signal::MemoryAvailable,
+                ThresholdValue::Quantity(100),
+            )],
             &SignalSet::new(),
             &mut h,
             &[],
@@ -648,8 +708,14 @@ mod tests {
             EvictionThreshold::hard(Signal::ImageFsAvailable, ThresholdValue::Quantity(100)),
         ];
         let mut o = SignalSet::new();
-        o.insert(Signal::NodeFsAvailable, obs(Signal::NodeFsAvailable, 50, 1000, now));
-        o.insert(Signal::ImageFsAvailable, obs(Signal::ImageFsAvailable, 50, 1000, now));
+        o.insert(
+            Signal::NodeFsAvailable,
+            obs(Signal::NodeFsAvailable, 50, 1000, now),
+        );
+        o.insert(
+            Signal::ImageFsAvailable,
+            obs(Signal::ImageFsAvailable, 50, 1000, now),
+        );
         let d = evaluate(&ts, &o, &mut h, &[], now);
         assert_eq!(d.node_conditions, vec!["DiskPressure".to_string()]);
         assert_eq!(d.triggered_signals.len(), 2);
@@ -660,9 +726,15 @@ mod tests {
         let now = Utc::now();
         let mut h = ThresholdObservations::default();
         let mut o = SignalSet::new();
-        o.insert(Signal::MemoryAvailable, obs(Signal::MemoryAvailable, 0, 1000, now));
+        o.insert(
+            Signal::MemoryAvailable,
+            obs(Signal::MemoryAvailable, 0, 1000, now),
+        );
         let d = evaluate(
-            &[EvictionThreshold::hard(Signal::MemoryAvailable, ThresholdValue::Quantity(100))],
+            &[EvictionThreshold::hard(
+                Signal::MemoryAvailable,
+                ThresholdValue::Quantity(100),
+            )],
             &o,
             &mut h,
             &[mk_pod("p", QosClass::BestEffort, 0, 0, 100)],
@@ -679,26 +751,51 @@ mod tests {
 
     #[test]
     fn classify_qos_guaranteed_when_request_equals_limit_for_all() {
-        let c = ResourceRequirements { cpu_request: 100, cpu_limit: 100, memory_request: 1024, memory_limit: 1024 };
+        let c = ResourceRequirements {
+            cpu_request: 100,
+            cpu_limit: 100,
+            memory_request: 1024,
+            memory_limit: 1024,
+        };
         assert_eq!(classify_qos(&[c]), QosClass::Guaranteed);
     }
 
     #[test]
     fn classify_qos_burstable_when_request_lt_limit() {
-        let c = ResourceRequirements { cpu_request: 100, cpu_limit: 200, memory_request: 1024, memory_limit: 2048 };
+        let c = ResourceRequirements {
+            cpu_request: 100,
+            cpu_limit: 200,
+            memory_request: 1024,
+            memory_limit: 2048,
+        };
         assert_eq!(classify_qos(&[c]), QosClass::Burstable);
     }
 
     #[test]
     fn classify_qos_burstable_when_only_request_set() {
-        let c = ResourceRequirements { cpu_request: 100, cpu_limit: 0, memory_request: 0, memory_limit: 0 };
+        let c = ResourceRequirements {
+            cpu_request: 100,
+            cpu_limit: 0,
+            memory_request: 0,
+            memory_limit: 0,
+        };
         assert_eq!(classify_qos(&[c]), QosClass::Burstable);
     }
 
     #[test]
     fn classify_qos_burstable_with_mixed_containers() {
-        let g = ResourceRequirements { cpu_request: 100, cpu_limit: 100, memory_request: 1024, memory_limit: 1024 };
-        let b = ResourceRequirements { cpu_request: 100, cpu_limit: 200, memory_request: 0, memory_limit: 0 };
+        let g = ResourceRequirements {
+            cpu_request: 100,
+            cpu_limit: 100,
+            memory_request: 1024,
+            memory_limit: 1024,
+        };
+        let b = ResourceRequirements {
+            cpu_request: 100,
+            cpu_limit: 200,
+            memory_request: 0,
+            memory_limit: 0,
+        };
         assert_eq!(classify_qos(&[g, b]), QosClass::Burstable);
     }
 
@@ -769,17 +866,26 @@ mod tests {
 
     #[test]
     fn allocatable_memory_maps_to_memory_pressure_condition() {
-        assert_eq!(Signal::AllocatableMemoryAvailable.node_condition(), Some("MemoryPressure"));
+        assert_eq!(
+            Signal::AllocatableMemoryAvailable.node_condition(),
+            Some("MemoryPressure")
+        );
     }
 
     #[test]
     fn nodefs_inodes_maps_to_disk_pressure() {
-        assert_eq!(Signal::NodeFsInodesFree.node_condition(), Some("DiskPressure"));
+        assert_eq!(
+            Signal::NodeFsInodesFree.node_condition(),
+            Some("DiskPressure")
+        );
     }
 
     #[test]
     fn imagefs_inodes_maps_to_disk_pressure() {
-        assert_eq!(Signal::ImageFsInodesFree.node_condition(), Some("DiskPressure"));
+        assert_eq!(
+            Signal::ImageFsInodesFree.node_condition(),
+            Some("DiskPressure")
+        );
     }
 
     #[test]
@@ -787,8 +893,14 @@ mod tests {
         let now = Utc::now();
         let mut h = ThresholdObservations::default();
         let mut o = SignalSet::new();
-        o.insert(Signal::MemoryAvailable, obs(Signal::MemoryAvailable, 0, 1000, now));
-        o.insert(Signal::NodeFsAvailable, obs(Signal::NodeFsAvailable, 0, 1000, now));
+        o.insert(
+            Signal::MemoryAvailable,
+            obs(Signal::MemoryAvailable, 0, 1000, now),
+        );
+        o.insert(
+            Signal::NodeFsAvailable,
+            obs(Signal::NodeFsAvailable, 0, 1000, now),
+        );
         let d = evaluate(
             &[
                 EvictionThreshold::hard(Signal::MemoryAvailable, ThresholdValue::Quantity(50)),

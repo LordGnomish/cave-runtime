@@ -6,18 +6,22 @@
 //!
 //! Upstream: <https://docs.erpnext.com/docs/v15/user/manual/en/sales-invoice>
 
+use super::ErpViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, ErpInvoice};
-use super::ErpViewError;
+use crate::admin::state::{AdminState, ErpInvoice, scope};
 
-pub fn list_invoices(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<ErpInvoice>, ErpViewError> {
+pub fn list_invoices(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<ErpInvoice>, ErpViewError> {
     ctx.authorise(Permission::ErpRead)?;
-    let mut rows: Vec<ErpInvoice> =
-        scope(&state.erp_invoices.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-            .into_iter()
-            .cloned()
-            .collect();
+    let mut rows: Vec<ErpInvoice> = scope(&state.erp_invoices.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
+    .into_iter()
+    .cloned()
+    .collect();
     rows.sort_by(|a, b| a.invoice_id.cmp(&b.invoice_id));
     Ok(rows)
 }

@@ -53,7 +53,10 @@ fn node_provider_id_format_is_round_trip_stable() {
         "tenant-ccm-node-pid-rt"
     );
     let formatted = node_controller::format_provider_id("azure", "vm-9");
-    assert_eq!(node_controller::parse_provider_id(&formatted), Some(("azure", "vm-9")));
+    assert_eq!(
+        node_controller::parse_provider_id(&formatted),
+        Some(("azure", "vm-9"))
+    );
 }
 
 #[test]
@@ -63,7 +66,10 @@ fn node_provider_id_scheme_returns_just_scheme() {
         "getInstanceProviderID",
         "tenant-ccm-node-scheme"
     );
-    assert_eq!(node_controller::provider_id_scheme("hcloud://x"), Some("hcloud"));
+    assert_eq!(
+        node_controller::provider_id_scheme("hcloud://x"),
+        Some("hcloud")
+    );
 }
 
 // ── Node controller — initialization & drift ────────────────────────────────
@@ -92,9 +98,7 @@ fn node_label_drift_counts_each_mismatched_field() {
         "tenant-ccm-node-drift"
     );
     let node = node_controller::NodeView::fresh("worker-1");
-    let facts = node_controller::CloudFacts::minimal(
-        "hcloud://1", "fsn1-dc14", "fsn1", "cpx21",
-    );
+    let facts = node_controller::CloudFacts::minimal("hcloud://1", "fsn1-dc14", "fsn1", "cpx21");
     // No labels set yet → all four fields drift.
     assert_eq!(node_controller::label_drift(&node, &facts), 4);
 }
@@ -110,9 +114,15 @@ fn node_address_canonicalisation_dedupes_and_sorts_by_precedence() {
     );
     let input = vec![
         node_controller::NodeAddress::new(node_controller::NodeAddressType::Hostname, "host"),
-        node_controller::NodeAddress::new(node_controller::NodeAddressType::ExternalIP, "203.0.113.5"),
+        node_controller::NodeAddress::new(
+            node_controller::NodeAddressType::ExternalIP,
+            "203.0.113.5",
+        ),
         node_controller::NodeAddress::new(node_controller::NodeAddressType::InternalIP, "10.0.0.7"),
-        node_controller::NodeAddress::new(node_controller::NodeAddressType::ExternalIP, "203.0.113.5"),
+        node_controller::NodeAddress::new(
+            node_controller::NodeAddressType::ExternalIP,
+            "203.0.113.5",
+        ),
     ];
     let canon = node_controller::canonicalize_addresses(&input);
     assert_eq!(canon.len(), 3);
@@ -129,12 +139,14 @@ fn node_address_diff_reports_added_and_removed() {
         "addressDiff",
         "tenant-ccm-node-addr-diff"
     );
-    let have = vec![
-        node_controller::NodeAddress::new(node_controller::NodeAddressType::InternalIP, "10.0.0.1"),
-    ];
-    let want = vec![
-        node_controller::NodeAddress::new(node_controller::NodeAddressType::InternalIP, "10.0.0.2"),
-    ];
+    let have = vec![node_controller::NodeAddress::new(
+        node_controller::NodeAddressType::InternalIP,
+        "10.0.0.1",
+    )];
+    let want = vec![node_controller::NodeAddress::new(
+        node_controller::NodeAddressType::InternalIP,
+        "10.0.0.2",
+    )];
     let (added, removed) = node_controller::address_diff(&have, &want);
     assert_eq!(added.len(), 1);
     assert_eq!(removed.len(), 1);
@@ -179,10 +191,26 @@ fn node_instance_state_failure_taint_only_for_unhealthy_alive() {
         "monitorNode",
         "tenant-ccm-node-taint"
     );
-    assert!(node_controller::InstanceState::Shutdown.failure_taint().is_some());
-    assert!(node_controller::InstanceState::Unreachable.failure_taint().is_some());
-    assert!(node_controller::InstanceState::Running.failure_taint().is_none());
-    assert!(node_controller::InstanceState::Terminated.failure_taint().is_none());
+    assert!(
+        node_controller::InstanceState::Shutdown
+            .failure_taint()
+            .is_some()
+    );
+    assert!(
+        node_controller::InstanceState::Unreachable
+            .failure_taint()
+            .is_some()
+    );
+    assert!(
+        node_controller::InstanceState::Running
+            .failure_taint()
+            .is_none()
+    );
+    assert!(
+        node_controller::InstanceState::Terminated
+            .failure_taint()
+            .is_none()
+    );
 }
 
 // ── Service controller — LB phase machine ───────────────────────────────────
@@ -282,7 +310,9 @@ fn service_lb_drift_detected_when_ports_change() {
     );
     let mut current = service_controller::ServiceSpec::http("web", "default");
     let last = current.clone();
-    current.ports.push(service_controller::ServicePort::tcp("https", 443, 8443, 30443));
+    current.ports.push(service_controller::ServicePort::tcp(
+        "https", 443, 8443, 30443,
+    ));
     assert!(service_controller::lb_spec_drifted(&current, &last));
 }
 
@@ -320,8 +350,14 @@ fn route_cidr_family_detects_v4_and_v6() {
         "IsIPv6CIDR",
         "tenant-ccm-route-fam"
     );
-    assert_eq!(route_controller::cidr_family("10.0.0.0/24"), Some(route_controller::CidrFamily::V4));
-    assert_eq!(route_controller::cidr_family("2001:db8::/64"), Some(route_controller::CidrFamily::V6));
+    assert_eq!(
+        route_controller::cidr_family("10.0.0.0/24"),
+        Some(route_controller::CidrFamily::V4)
+    );
+    assert_eq!(
+        route_controller::cidr_family("2001:db8::/64"),
+        Some(route_controller::CidrFamily::V6)
+    );
     assert_eq!(route_controller::cidr_family("not a cidr"), None);
 }
 
@@ -333,9 +369,18 @@ fn route_split_by_family_partitions_correctly() {
         "tenant-ccm-route-split"
     );
     let desired = vec![
-        route_controller::DesiredRoute { node_name: "n1".into(), pod_cidr: "10.0.1.0/24".into() },
-        route_controller::DesiredRoute { node_name: "n2".into(), pod_cidr: "2001:db8:1::/64".into() },
-        route_controller::DesiredRoute { node_name: "n3".into(), pod_cidr: "10.0.2.0/24".into() },
+        route_controller::DesiredRoute {
+            node_name: "n1".into(),
+            pod_cidr: "10.0.1.0/24".into(),
+        },
+        route_controller::DesiredRoute {
+            node_name: "n2".into(),
+            pod_cidr: "2001:db8:1::/64".into(),
+        },
+        route_controller::DesiredRoute {
+            node_name: "n3".into(),
+            pod_cidr: "10.0.2.0/24".into(),
+        },
     ];
     let (v4, v6) = route_controller::split_by_family(&desired);
     assert_eq!(v4.len(), 2);
@@ -349,9 +394,10 @@ fn route_plan_is_empty_when_current_matches_desired() {
         "reconcile",
         "tenant-ccm-route-noop"
     );
-    let desired = vec![
-        route_controller::DesiredRoute { node_name: "n1".into(), pod_cidr: "10.0.1.0/24".into() },
-    ];
+    let desired = vec![route_controller::DesiredRoute {
+        node_name: "n1".into(),
+        pod_cidr: "10.0.1.0/24".into(),
+    }];
     let current = vec!["cluster-x-n1".into()];
     let plan = route_controller::plan_routes("cluster-x", &desired, &current);
     assert!(plan.is_empty());
@@ -364,9 +410,10 @@ fn route_plan_emits_create_for_missing_route() {
         "reconcile",
         "tenant-ccm-route-create"
     );
-    let desired = vec![
-        route_controller::DesiredRoute { node_name: "n1".into(), pod_cidr: "10.0.1.0/24".into() },
-    ];
+    let desired = vec![route_controller::DesiredRoute {
+        node_name: "n1".into(),
+        pod_cidr: "10.0.1.0/24".into(),
+    }];
     let plan = route_controller::plan_routes("cluster-x", &desired, &[]);
     assert_eq!(plan.creates.len(), 1);
     assert_eq!(plan.deletes.len(), 0);
@@ -379,11 +426,7 @@ fn route_plan_emits_delete_for_stale_route() {
         "reconcile",
         "tenant-ccm-route-delete"
     );
-    let plan = route_controller::plan_routes(
-        "cluster-x",
-        &[],
-        &["cluster-x-orphan".into()],
-    );
+    let plan = route_controller::plan_routes("cluster-x", &[], &["cluster-x-orphan".into()]);
     assert_eq!(plan.creates.len(), 0);
     assert_eq!(plan.deletes.len(), 1);
     assert_eq!(plan.deletes[0], "cluster-x-orphan");
@@ -410,8 +453,14 @@ fn route_collision_detection_flags_duplicate_cidrs() {
         "tenant-ccm-route-collide"
     );
     let desired = vec![
-        route_controller::DesiredRoute { node_name: "n1".into(), pod_cidr: "10.0.1.0/24".into() },
-        route_controller::DesiredRoute { node_name: "n2".into(), pod_cidr: "10.0.1.0/24".into() },
+        route_controller::DesiredRoute {
+            node_name: "n1".into(),
+            pod_cidr: "10.0.1.0/24".into(),
+        },
+        route_controller::DesiredRoute {
+            node_name: "n2".into(),
+            pod_cidr: "10.0.1.0/24".into(),
+        },
     ];
     let dupes = route_controller::detect_cidr_collisions(&desired);
     assert_eq!(dupes.len(), 1);
@@ -424,7 +473,10 @@ fn route_name_for_uses_cluster_prefix() {
         "routeNameFor",
         "tenant-ccm-route-name"
     );
-    assert_eq!(route_controller::route_name_for("clusterX", "node1"), "clusterX-node1");
+    assert_eq!(
+        route_controller::route_name_for("clusterX", "node1"),
+        "clusterX-node1"
+    );
 }
 
 // ── Route IPAM — CidrAllocator ───────────────────────────────────────────────
@@ -541,11 +593,7 @@ fn admin_parity_report_returns_module_metadata() {
 
 #[test]
 fn upstream_version_pinned_to_release() {
-    let (_c, _t) = test_ctx!(
-        "version.go",
-        "RELEASE",
-        "tenant-ccm-pin-ver"
-    );
+    let (_c, _t) = test_ctx!("version.go", "RELEASE", "tenant-ccm-pin-ver");
     assert!(crate::UPSTREAM_VERSION.starts_with('v'));
 }
 

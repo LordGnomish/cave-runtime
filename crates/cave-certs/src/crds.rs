@@ -57,7 +57,11 @@ impl CertificateSpec {
             issuer_ref,
             duration_seconds: Self::DEFAULT_DURATION_SECS,
             renew_before_seconds: Self::DEFAULT_RENEW_BEFORE_SECS,
-            usages: vec![KeyUsage::DigitalSignature, KeyUsage::KeyEncipherment, KeyUsage::ServerAuth],
+            usages: vec![
+                KeyUsage::DigitalSignature,
+                KeyUsage::KeyEncipherment,
+                KeyUsage::ServerAuth,
+            ],
             private_key_algorithm: PrivateKeyAlgorithm::Ecdsa256,
         }
     }
@@ -98,8 +102,10 @@ impl CertificateSpec {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum PrivateKeyAlgorithm {
-    Rsa2048, Rsa4096,
-    Ecdsa256, Ecdsa384,
+    Rsa2048,
+    Rsa4096,
+    Ecdsa256,
+    Ecdsa384,
     Ed25519,
     /// cave PQC extension. Cite: ADR-015 v2.
     HybridMlDsa65Ed25519,
@@ -109,7 +115,11 @@ pub enum PrivateKeyAlgorithm {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum KeyUsage {
-    DigitalSignature, KeyEncipherment, ServerAuth, ClientAuth, CodeSigning,
+    DigitalSignature,
+    KeyEncipherment,
+    ServerAuth,
+    ClientAuth,
+    CodeSigning,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -121,10 +131,18 @@ pub struct IssuerRef {
 
 impl IssuerRef {
     pub fn issuer(name: impl Into<String>) -> Self {
-        Self { name: name.into(), kind: "Issuer".into(), group: "cert-manager.io".into() }
+        Self {
+            name: name.into(),
+            kind: "Issuer".into(),
+            group: "cert-manager.io".into(),
+        }
     }
     pub fn cluster_issuer(name: impl Into<String>) -> Self {
-        Self { name: name.into(), kind: "ClusterIssuer".into(), group: "cert-manager.io".into() }
+        Self {
+            name: name.into(),
+            kind: "ClusterIssuer".into(),
+            group: "cert-manager.io".into(),
+        }
     }
 }
 
@@ -142,7 +160,13 @@ pub struct CertificateStatus {
 
 impl Default for CertificateStatus {
     fn default() -> Self {
-        Self { conditions: Vec::new(), not_before: None, not_after: None, renewal_time: None, revision: 0 }
+        Self {
+            conditions: Vec::new(),
+            not_before: None,
+            not_after: None,
+            renewal_time: None,
+            revision: 0,
+        }
     }
 }
 
@@ -150,7 +174,7 @@ impl Default for CertificateStatus {
 pub struct Condition {
     #[serde(rename = "type")]
     pub kind: String,
-    pub status: String,    // "True" | "False" | "Unknown"
+    pub status: String, // "True" | "False" | "Unknown"
     pub reason: String,
     pub message: String,
     pub last_transition_time: DateTime<Utc>,
@@ -159,8 +183,10 @@ pub struct Condition {
 impl Condition {
     pub fn ready_true(reason: &str, message: &str) -> Self {
         Self {
-            kind: "Ready".into(), status: "True".into(),
-            reason: reason.into(), message: message.into(),
+            kind: "Ready".into(),
+            status: "True".into(),
+            reason: reason.into(),
+            message: message.into(),
             last_transition_time: Utc::now(),
         }
     }
@@ -203,15 +229,20 @@ impl IssuerSpec {
             return Err("tenant_id must be non-empty".into());
         }
         match &self.config {
-            IssuerConfig::Ca { secret_name } if secret_name.trim().is_empty() =>
-                Err("ca.secretName must be non-empty".into()),
-            IssuerConfig::Acme { server, email, .. } if server.trim().is_empty() =>
-                Err("acme.server must be non-empty".into()),
-            IssuerConfig::Acme { email, .. } if !email.contains('@') =>
-                Err(format!("acme.email '{}' is invalid", email)),
-            IssuerConfig::Vault { server, path, role, .. }
-                if server.trim().is_empty() || path.trim().is_empty() || role.trim().is_empty() =>
-                Err("vault.server/path/role must all be non-empty".into()),
+            IssuerConfig::Ca { secret_name } if secret_name.trim().is_empty() => {
+                Err("ca.secretName must be non-empty".into())
+            }
+            IssuerConfig::Acme { server, email, .. } if server.trim().is_empty() => {
+                Err("acme.server must be non-empty".into())
+            }
+            IssuerConfig::Acme { email, .. } if !email.contains('@') => {
+                Err(format!("acme.email '{}' is invalid", email))
+            }
+            IssuerConfig::Vault {
+                server, path, role, ..
+            } if server.trim().is_empty() || path.trim().is_empty() || role.trim().is_empty() => {
+                Err("vault.server/path/role must all be non-empty".into())
+            }
             _ => Ok(()),
         }
     }

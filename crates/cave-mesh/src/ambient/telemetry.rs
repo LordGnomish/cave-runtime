@@ -92,15 +92,26 @@ impl PromRegistry {
     /// Emit the standard Istio metric set for a single request.
     pub fn observe(&mut self, r: &RequestRecord) {
         let labels = Self::labels_for(r);
-        *self.counters.entry((METRIC_REQUESTS_TOTAL.into(), labels.clone())).or_insert(0) += 1;
-        *self.counters.entry((METRIC_REQUEST_DURATION_SUM.into(), labels.clone())).or_insert(0) +=
-            r.duration_ms;
-        *self.counters.entry((METRIC_BYTES_SENT_SUM.into(), labels)).or_insert(0) += r.bytes_sent;
+        *self
+            .counters
+            .entry((METRIC_REQUESTS_TOTAL.into(), labels.clone()))
+            .or_insert(0) += 1;
+        *self
+            .counters
+            .entry((METRIC_REQUEST_DURATION_SUM.into(), labels.clone()))
+            .or_insert(0) += r.duration_ms;
+        *self
+            .counters
+            .entry((METRIC_BYTES_SENT_SUM.into(), labels))
+            .or_insert(0) += r.bytes_sent;
     }
 
     /// Lookup helper used by tests; returns 0 if the cell hasn't been written.
     pub fn get(&self, metric: &str, labels: &BTreeMap<String, String>) -> u64 {
-        *self.counters.get(&(metric.to_string(), labels.clone())).unwrap_or(&0)
+        *self
+            .counters
+            .get(&(metric.to_string(), labels.clone()))
+            .unwrap_or(&0)
     }
 }
 
@@ -139,7 +150,9 @@ pub fn build_span(r: &RequestRecord) -> Option<OtelSpan> {
         ("destination.workload".into(), r.destination.clone()),
     ];
     let status = if r.response_code >= 500 {
-        SpanStatus::Error { http_code: r.response_code }
+        SpanStatus::Error {
+            http_code: r.response_code,
+        }
     } else {
         SpanStatus::Ok
     };
@@ -155,8 +168,10 @@ pub fn build_span(r: &RequestRecord) -> Option<OtelSpan> {
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite =
-    Cite::istio("pilot/pkg/networking/telemetry/telemetry.go", "telemetryFilters");
+const FILE_CITE: Cite = Cite::istio(
+    "pilot/pkg/networking/telemetry/telemetry.go",
+    "telemetryFilters",
+);
 
 #[cfg(test)]
 mod tests {
@@ -240,10 +255,11 @@ mod tests {
         assert_eq!(span.trace_id, "0af7651916cd43dd8448eb211c80319c");
         assert_eq!(span.name, "GET /v1/users");
         assert_eq!(span.status, SpanStatus::Ok);
-        assert!(span
-            .attributes
-            .iter()
-            .any(|(k, v)| k == "http.status_code" && v == "200"));
+        assert!(
+            span.attributes
+                .iter()
+                .any(|(k, v)| k == "http.status_code" && v == "200")
+        );
     }
 
     #[test]

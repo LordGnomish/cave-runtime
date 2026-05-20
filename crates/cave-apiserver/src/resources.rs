@@ -59,7 +59,13 @@ pub struct ObjectReference {
 
 impl Default for ObjectReference {
     fn default() -> Self {
-        Self { kind: String::new(), name: String::new(), namespace: String::new(), api_version: None, uid: None }
+        Self {
+            kind: String::new(),
+            name: String::new(),
+            namespace: String::new(),
+            api_version: None,
+            uid: None,
+        }
     }
 }
 
@@ -189,11 +195,18 @@ pub struct Probe {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HttpGetAction { pub path: String, pub port: u16 }
+pub struct HttpGetAction {
+    pub path: String,
+    pub port: u16,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecAction { pub command: Vec<String> }
+pub struct ExecAction {
+    pub command: Vec<String>,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TcpSocketAction { pub port: u16 }
+pub struct TcpSocketAction {
+    pub port: u16,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Toleration {
@@ -214,15 +227,26 @@ pub struct Volume {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConfigMapVolumeSource { pub name: String }
+pub struct ConfigMapVolumeSource {
+    pub name: String,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SecretVolumeSource { pub secret_name: String }
+pub struct SecretVolumeSource {
+    pub secret_name: String,
+}
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct EmptyDirVolumeSource { pub medium: Option<String> }
+pub struct EmptyDirVolumeSource {
+    pub medium: Option<String>,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HostPathVolumeSource { pub path: String }
+pub struct HostPathVolumeSource {
+    pub path: String,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PersistentVolumeClaimVolumeSource { pub claim_name: String, pub read_only: bool }
+pub struct PersistentVolumeClaimVolumeSource {
+    pub claim_name: String,
+    pub read_only: bool,
+}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PodStatus {
@@ -260,7 +284,10 @@ pub struct PodTemplateSpec {
 
 impl Default for PodTemplateSpec {
     fn default() -> Self {
-        Self { metadata: ObjectMeta::new("", ""), spec: PodSpec::default() }
+        Self {
+            metadata: ObjectMeta::new("", ""),
+            spec: PodSpec::default(),
+        }
     }
 }
 
@@ -291,7 +318,10 @@ impl Default for DeploymentSpec {
             replicas: 1,
             selector: LabelSelector::default(),
             template: PodTemplateSpec::default(),
-            strategy: DeploymentStrategy { strategy_type: "RollingUpdate".into(), rolling_update: None },
+            strategy: DeploymentStrategy {
+                strategy_type: "RollingUpdate".into(),
+                rolling_update: None,
+            },
         }
     }
 }
@@ -339,10 +369,15 @@ pub struct Scale {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ScaleSpec { pub replicas: u32 }
+pub struct ScaleSpec {
+    pub replicas: u32,
+}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ScaleStatus { pub replicas: u32, pub selector: Option<String> }
+pub struct ScaleStatus {
+    pub replicas: u32,
+    pub selector: Option<String>,
+}
 
 // ── StatefulSet ───────────────────────────────────────────────────────────────
 
@@ -413,13 +448,17 @@ impl Default for DaemonSetSpec {
         Self {
             selector: LabelSelector::default(),
             template: PodTemplateSpec::default(),
-            update_strategy: DaemonSetUpdateStrategy { update_strategy_type: "RollingUpdate".into() },
+            update_strategy: DaemonSetUpdateStrategy {
+                update_strategy_type: "RollingUpdate".into(),
+            },
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DaemonSetUpdateStrategy { pub update_strategy_type: String }
+pub struct DaemonSetUpdateStrategy {
+    pub update_strategy_type: String,
+}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DaemonSetStatus {
@@ -452,7 +491,11 @@ pub struct ReplicaSetSpec {
 
 impl Default for ReplicaSetSpec {
     fn default() -> Self {
-        Self { replicas: 1, selector: LabelSelector::default(), template: PodTemplateSpec::default() }
+        Self {
+            replicas: 1,
+            selector: LabelSelector::default(),
+            template: PodTemplateSpec::default(),
+        }
     }
 }
 
@@ -548,7 +591,10 @@ pub struct JobTemplateSpec {
 
 impl Default for JobTemplateSpec {
     fn default() -> Self {
-        Self { metadata: ObjectMeta::new("", ""), spec: JobSpec::default() }
+        Self {
+            metadata: ObjectMeta::new("", ""),
+            spec: JobSpec::default(),
+        }
     }
 }
 
@@ -587,7 +633,9 @@ pub struct IngressRule {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct HTTPIngressRuleValue { pub paths: Vec<HTTPIngressPath> }
+pub struct HTTPIngressRuleValue {
+    pub paths: Vec<HTTPIngressPath>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HTTPIngressPath {
@@ -608,10 +656,16 @@ pub struct IngressServiceBackend {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ServiceBackendPort { pub number: u16, pub name: Option<String> }
+pub struct ServiceBackendPort {
+    pub number: u16,
+    pub name: Option<String>,
+}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct IngressTLS { pub hosts: Vec<String>, pub secret_name: Option<String> }
+pub struct IngressTLS {
+    pub hosts: Vec<String>,
+    pub secret_name: Option<String>,
+}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct IngressStatus {
@@ -619,10 +673,15 @@ pub struct IngressStatus {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct IngressLoadBalancerStatus { pub ingress: Vec<IngressLoadBalancerIngress> }
+pub struct IngressLoadBalancerStatus {
+    pub ingress: Vec<IngressLoadBalancerIngress>,
+}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct IngressLoadBalancerIngress { pub ip: Option<String>, pub hostname: Option<String> }
+pub struct IngressLoadBalancerIngress {
+    pub ip: Option<String>,
+    pub hostname: Option<String>,
+}
 
 // ── NetworkPolicy ─────────────────────────────────────────────────────────────
 
@@ -664,10 +723,16 @@ pub struct NetworkPolicyPeer {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IPBlock { pub cidr: String, pub except: Vec<String> }
+pub struct IPBlock {
+    pub cidr: String,
+    pub except: Vec<String>,
+}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct NetworkPolicyPort { pub port: Option<u16>, pub protocol: Option<String> }
+pub struct NetworkPolicyPort {
+    pub port: Option<u16>,
+    pub protocol: Option<String>,
+}
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 
@@ -714,7 +779,11 @@ pub struct PersistentVolumeStatus {
 
 impl Default for PersistentVolumeStatus {
     fn default() -> Self {
-        Self { phase: "Available".into(), reason: None, message: None }
+        Self {
+            phase: "Available".into(),
+            reason: None,
+            message: None,
+        }
     }
 }
 
@@ -759,7 +828,11 @@ pub struct PersistentVolumeClaimStatus {
 
 impl Default for PersistentVolumeClaimStatus {
     fn default() -> Self {
-        Self { phase: "Pending".into(), access_modes: vec![], capacity: HashMap::new() }
+        Self {
+            phase: "Pending".into(),
+            access_modes: vec![],
+            capacity: HashMap::new(),
+        }
     }
 }
 
@@ -824,7 +897,9 @@ pub struct ClusterRole {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct AggregationRule { pub cluster_role_selectors: Vec<LabelSelector> }
+pub struct AggregationRule {
+    pub cluster_role_selectors: Vec<LabelSelector>,
+}
 
 /// RoleBinding resource (namespaced).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -908,7 +983,9 @@ pub struct Namespace {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct NamespaceStatus { pub phase: String }
+pub struct NamespaceStatus {
+    pub phase: String,
+}
 
 /// ServiceAccount resource.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -979,7 +1056,10 @@ pub struct NodeCondition {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct NodeAddress { pub address_type: String, pub address: String }
+pub struct NodeAddress {
+    pub address_type: String,
+    pub address: String,
+}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct NodeSystemInfo {
@@ -1010,7 +1090,10 @@ pub struct KubeEvent {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct EventSource { pub component: String, pub host: Option<String> }
+pub struct EventSource {
+    pub component: String,
+    pub host: Option<String>,
+}
 
 /// Endpoints resource.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1037,7 +1120,11 @@ pub struct EndpointAddress {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct EndpointPort { pub name: Option<String>, pub port: u16, pub protocol: String }
+pub struct EndpointPort {
+    pub name: Option<String>,
+    pub port: u16,
+    pub protocol: String,
+}
 
 /// ResourceQuota resource.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1057,7 +1144,9 @@ pub struct ResourceQuotaSpec {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ScopeSelector { pub match_expressions: Vec<ScopedResourceSelectorRequirement> }
+pub struct ScopeSelector {
+    pub match_expressions: Vec<ScopedResourceSelectorRequirement>,
+}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ScopedResourceSelectorRequirement {
@@ -1083,7 +1172,9 @@ pub struct LimitRange {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct LimitRangeSpec { pub limits: Vec<LimitRangeItem> }
+pub struct LimitRangeSpec {
+    pub limits: Vec<LimitRangeItem>,
+}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct LimitRangeItem {
@@ -1198,8 +1289,12 @@ impl Resource {
         }
     }
 
-    pub fn name(&self) -> &str { &self.metadata().name }
-    pub fn namespace(&self) -> &str { &self.metadata().namespace }
+    pub fn name(&self) -> &str {
+        &self.metadata().name
+    }
+    pub fn namespace(&self) -> &str {
+        &self.metadata().namespace
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -1232,20 +1327,142 @@ mod tests {
     fn test_resource_kind_all_variants() {
         let meta = || ObjectMeta::new("x", "default");
         let cluster_meta = || ObjectMeta::new("x", "");
-        let role_ref = || RoleRef { api_group: "rbac.authorization.k8s.io".into(), kind: "Role".into(), name: "r".into() };
+        let role_ref = || RoleRef {
+            api_group: "rbac.authorization.k8s.io".into(),
+            kind: "Role".into(),
+            name: "r".into(),
+        };
 
-        assert_eq!(Resource::StatefulSet(StatefulSet { api_version: "apps/v1".into(), kind: "StatefulSet".into(), metadata: meta(), spec: StatefulSetSpec::default(), status: StatefulSetStatus::default() }).kind(), "StatefulSet");
-        assert_eq!(Resource::DaemonSet(DaemonSet { api_version: "apps/v1".into(), kind: "DaemonSet".into(), metadata: meta(), spec: DaemonSetSpec::default(), status: DaemonSetStatus::default() }).kind(), "DaemonSet");
-        assert_eq!(Resource::ReplicaSet(ReplicaSet { api_version: "apps/v1".into(), kind: "ReplicaSet".into(), metadata: meta(), spec: ReplicaSetSpec::default(), status: ReplicaSetStatus::default() }).kind(), "ReplicaSet");
-        assert_eq!(Resource::Job(Job { api_version: "batch/v1".into(), kind: "Job".into(), metadata: meta(), spec: JobSpec::default(), status: JobStatus::default() }).kind(), "Job");
-        assert_eq!(Resource::CronJob(CronJob { api_version: "batch/v1".into(), kind: "CronJob".into(), metadata: meta(), spec: CronJobSpec::default(), status: CronJobStatus::default() }).kind(), "CronJob");
-        assert_eq!(Resource::Ingress(Ingress { api_version: "networking.k8s.io/v1".into(), kind: "Ingress".into(), metadata: meta(), spec: IngressSpec::default(), status: IngressStatus::default() }).kind(), "Ingress");
-        assert_eq!(Resource::NetworkPolicy(NetworkPolicy { api_version: "networking.k8s.io/v1".into(), kind: "NetworkPolicy".into(), metadata: meta(), spec: NetworkPolicySpec::default() }).kind(), "NetworkPolicy");
-        assert_eq!(Resource::Node(Node { api_version: "v1".into(), kind: "Node".into(), metadata: cluster_meta(), spec: NodeSpec::default(), status: NodeStatus::default() }).kind(), "Node");
-        assert_eq!(Resource::Role(Role { api_version: "rbac.authorization.k8s.io/v1".into(), kind: "Role".into(), metadata: meta(), rules: vec![] }).kind(), "Role");
-        assert_eq!(Resource::ClusterRole(ClusterRole { api_version: "rbac.authorization.k8s.io/v1".into(), kind: "ClusterRole".into(), metadata: cluster_meta(), rules: vec![], aggregation_rule: None }).kind(), "ClusterRole");
-        assert_eq!(Resource::RoleBinding(RoleBinding { api_version: "rbac.authorization.k8s.io/v1".into(), kind: "RoleBinding".into(), metadata: meta(), subjects: vec![], role_ref: role_ref() }).kind(), "RoleBinding");
-        assert_eq!(Resource::ClusterRoleBinding(ClusterRoleBinding { api_version: "rbac.authorization.k8s.io/v1".into(), kind: "ClusterRoleBinding".into(), metadata: cluster_meta(), subjects: vec![], role_ref: role_ref() }).kind(), "ClusterRoleBinding");
+        assert_eq!(
+            Resource::StatefulSet(StatefulSet {
+                api_version: "apps/v1".into(),
+                kind: "StatefulSet".into(),
+                metadata: meta(),
+                spec: StatefulSetSpec::default(),
+                status: StatefulSetStatus::default()
+            })
+            .kind(),
+            "StatefulSet"
+        );
+        assert_eq!(
+            Resource::DaemonSet(DaemonSet {
+                api_version: "apps/v1".into(),
+                kind: "DaemonSet".into(),
+                metadata: meta(),
+                spec: DaemonSetSpec::default(),
+                status: DaemonSetStatus::default()
+            })
+            .kind(),
+            "DaemonSet"
+        );
+        assert_eq!(
+            Resource::ReplicaSet(ReplicaSet {
+                api_version: "apps/v1".into(),
+                kind: "ReplicaSet".into(),
+                metadata: meta(),
+                spec: ReplicaSetSpec::default(),
+                status: ReplicaSetStatus::default()
+            })
+            .kind(),
+            "ReplicaSet"
+        );
+        assert_eq!(
+            Resource::Job(Job {
+                api_version: "batch/v1".into(),
+                kind: "Job".into(),
+                metadata: meta(),
+                spec: JobSpec::default(),
+                status: JobStatus::default()
+            })
+            .kind(),
+            "Job"
+        );
+        assert_eq!(
+            Resource::CronJob(CronJob {
+                api_version: "batch/v1".into(),
+                kind: "CronJob".into(),
+                metadata: meta(),
+                spec: CronJobSpec::default(),
+                status: CronJobStatus::default()
+            })
+            .kind(),
+            "CronJob"
+        );
+        assert_eq!(
+            Resource::Ingress(Ingress {
+                api_version: "networking.k8s.io/v1".into(),
+                kind: "Ingress".into(),
+                metadata: meta(),
+                spec: IngressSpec::default(),
+                status: IngressStatus::default()
+            })
+            .kind(),
+            "Ingress"
+        );
+        assert_eq!(
+            Resource::NetworkPolicy(NetworkPolicy {
+                api_version: "networking.k8s.io/v1".into(),
+                kind: "NetworkPolicy".into(),
+                metadata: meta(),
+                spec: NetworkPolicySpec::default()
+            })
+            .kind(),
+            "NetworkPolicy"
+        );
+        assert_eq!(
+            Resource::Node(Node {
+                api_version: "v1".into(),
+                kind: "Node".into(),
+                metadata: cluster_meta(),
+                spec: NodeSpec::default(),
+                status: NodeStatus::default()
+            })
+            .kind(),
+            "Node"
+        );
+        assert_eq!(
+            Resource::Role(Role {
+                api_version: "rbac.authorization.k8s.io/v1".into(),
+                kind: "Role".into(),
+                metadata: meta(),
+                rules: vec![]
+            })
+            .kind(),
+            "Role"
+        );
+        assert_eq!(
+            Resource::ClusterRole(ClusterRole {
+                api_version: "rbac.authorization.k8s.io/v1".into(),
+                kind: "ClusterRole".into(),
+                metadata: cluster_meta(),
+                rules: vec![],
+                aggregation_rule: None
+            })
+            .kind(),
+            "ClusterRole"
+        );
+        assert_eq!(
+            Resource::RoleBinding(RoleBinding {
+                api_version: "rbac.authorization.k8s.io/v1".into(),
+                kind: "RoleBinding".into(),
+                metadata: meta(),
+                subjects: vec![],
+                role_ref: role_ref()
+            })
+            .kind(),
+            "RoleBinding"
+        );
+        assert_eq!(
+            Resource::ClusterRoleBinding(ClusterRoleBinding {
+                api_version: "rbac.authorization.k8s.io/v1".into(),
+                kind: "ClusterRoleBinding".into(),
+                metadata: cluster_meta(),
+                subjects: vec![],
+                role_ref: role_ref()
+            })
+            .kind(),
+            "ClusterRoleBinding"
+        );
     }
 }
 
@@ -1273,7 +1490,8 @@ mod tests_fields {
     #[test]
     fn test_objectmeta_annotations() {
         let mut m = ObjectMeta::new("obj", TENANT);
-        m.annotations.insert("deployment.kubernetes.io/revision".into(), "3".into());
+        m.annotations
+            .insert("deployment.kubernetes.io/revision".into(), "3".into());
         assert_eq!(m.annotations.len(), 1);
     }
 
@@ -1325,21 +1543,23 @@ mod tests_fields {
     #[test]
     fn test_pod_spec_containers() {
         let spec = PodSpec {
-            containers: vec![
-                ContainerDef {
-                    name: "main".into(),
-                    image: "nginx:1.25".into(),
-                    command: vec!["/bin/sh".into()],
-                    args: vec!["-c".into(), "echo hello".into()],
-                    env: vec![],
-                    ports: vec![ContainerPort { name: Some("http".into()), container_port: 80, protocol: "TCP".into() }],
-                    resources: ResourceRequirements::default(),
-                    volume_mounts: vec![],
-                    liveness_probe: None,
-                    readiness_probe: None,
-                    image_pull_policy: "IfNotPresent".into(),
-                }
-            ],
+            containers: vec![ContainerDef {
+                name: "main".into(),
+                image: "nginx:1.25".into(),
+                command: vec!["/bin/sh".into()],
+                args: vec!["-c".into(), "echo hello".into()],
+                env: vec![],
+                ports: vec![ContainerPort {
+                    name: Some("http".into()),
+                    container_port: 80,
+                    protocol: "TCP".into(),
+                }],
+                resources: ResourceRequirements::default(),
+                volume_mounts: vec![],
+                liveness_probe: None,
+                readiness_probe: None,
+                image_pull_policy: "IfNotPresent".into(),
+            }],
             ..PodSpec::default()
         };
         assert_eq!(spec.containers.len(), 1);
@@ -1351,19 +1571,19 @@ mod tests_fields {
     #[test]
     fn test_pod_spec_init_containers() {
         let spec = PodSpec {
-            init_containers: vec![
-                ContainerDef {
-                    name: "init".into(),
-                    image: "busybox".into(),
-                    command: vec!["sh".into()],
-                    args: vec!["-c".into(), "echo init".into()],
-                    env: vec![], ports: vec![],
-                    resources: ResourceRequirements::default(),
-                    volume_mounts: vec![],
-                    liveness_probe: None, readiness_probe: None,
-                    image_pull_policy: "Always".into(),
-                }
-            ],
+            init_containers: vec![ContainerDef {
+                name: "init".into(),
+                image: "busybox".into(),
+                command: vec!["sh".into()],
+                args: vec!["-c".into(), "echo init".into()],
+                env: vec![],
+                ports: vec![],
+                resources: ResourceRequirements::default(),
+                volume_mounts: vec![],
+                liveness_probe: None,
+                readiness_probe: None,
+                image_pull_policy: "Always".into(),
+            }],
             ..PodSpec::default()
         };
         assert_eq!(spec.init_containers.len(), 1);
@@ -1373,7 +1593,11 @@ mod tests_fields {
     // upstream: kubernetes/kubernetes pkg/apis/core/types.go::EnvVar
     #[test]
     fn test_env_var_literal() {
-        let env = EnvVar { name: "DATABASE_URL".into(), value: Some("postgres://localhost/db".into()), value_from: None };
+        let env = EnvVar {
+            name: "DATABASE_URL".into(),
+            value: Some("postgres://localhost/db".into()),
+            value_from: None,
+        };
         assert_eq!(env.value.as_deref(), Some("postgres://localhost/db"));
     }
 
@@ -1385,7 +1609,10 @@ mod tests_fields {
             value: None,
             value_from: Some(EnvVarSource {
                 config_map_key_ref: None,
-                secret_key_ref: Some(KeyRef { name: "db-secret".into(), key: "password".into() }),
+                secret_key_ref: Some(KeyRef {
+                    name: "db-secret".into(),
+                    key: "password".into(),
+                }),
             }),
         };
         let vf = env.value_from.unwrap();
@@ -1399,7 +1626,10 @@ mod tests_fields {
             name: "CONFIG_VAL".into(),
             value: None,
             value_from: Some(EnvVarSource {
-                config_map_key_ref: Some(KeyRef { name: "app-config".into(), key: "setting".into() }),
+                config_map_key_ref: Some(KeyRef {
+                    name: "app-config".into(),
+                    key: "setting".into(),
+                }),
                 secret_key_ref: None,
             }),
         };
@@ -1424,8 +1654,13 @@ mod tests_fields {
     fn test_volume_configmap_source() {
         let vol = Volume {
             name: "config-vol".into(),
-            config_map: Some(ConfigMapVolumeSource { name: "app-config".into() }),
-            secret: None, empty_dir: None, host_path: None, persistent_volume_claim: None,
+            config_map: Some(ConfigMapVolumeSource {
+                name: "app-config".into(),
+            }),
+            secret: None,
+            empty_dir: None,
+            host_path: None,
+            persistent_volume_claim: None,
         };
         assert_eq!(vol.config_map.as_ref().unwrap().name, "app-config");
     }
@@ -1436,8 +1671,12 @@ mod tests_fields {
         let vol = Volume {
             name: "secret-vol".into(),
             config_map: None,
-            secret: Some(SecretVolumeSource { secret_name: "tls-certs".into() }),
-            empty_dir: None, host_path: None, persistent_volume_claim: None,
+            secret: Some(SecretVolumeSource {
+                secret_name: "tls-certs".into(),
+            }),
+            empty_dir: None,
+            host_path: None,
+            persistent_volume_claim: None,
         };
         assert_eq!(vol.secret.as_ref().unwrap().secret_name, "tls-certs");
     }
@@ -1447,11 +1686,18 @@ mod tests_fields {
     fn test_volume_empty_dir() {
         let vol = Volume {
             name: "cache".into(),
-            config_map: None, secret: None,
-            empty_dir: Some(EmptyDirVolumeSource { medium: Some("Memory".into()) }),
-            host_path: None, persistent_volume_claim: None,
+            config_map: None,
+            secret: None,
+            empty_dir: Some(EmptyDirVolumeSource {
+                medium: Some("Memory".into()),
+            }),
+            host_path: None,
+            persistent_volume_claim: None,
         };
-        assert_eq!(vol.empty_dir.as_ref().unwrap().medium.as_deref(), Some("Memory"));
+        assert_eq!(
+            vol.empty_dir.as_ref().unwrap().medium.as_deref(),
+            Some("Memory")
+        );
     }
 
     // upstream: kubernetes/kubernetes pkg/apis/core/types.go::Volume
@@ -1459,10 +1705,19 @@ mod tests_fields {
     fn test_volume_pvc_source() {
         let vol = Volume {
             name: "data".into(),
-            config_map: None, secret: None, empty_dir: None, host_path: None,
-            persistent_volume_claim: Some(PersistentVolumeClaimVolumeSource { claim_name: "data-pvc".into(), read_only: false }),
+            config_map: None,
+            secret: None,
+            empty_dir: None,
+            host_path: None,
+            persistent_volume_claim: Some(PersistentVolumeClaimVolumeSource {
+                claim_name: "data-pvc".into(),
+                read_only: false,
+            }),
         };
-        assert_eq!(vol.persistent_volume_claim.as_ref().unwrap().claim_name, "data-pvc");
+        assert_eq!(
+            vol.persistent_volume_claim.as_ref().unwrap().claim_name,
+            "data-pvc"
+        );
     }
 
     // upstream: kubernetes/kubernetes pkg/apis/core/types.go::Toleration
@@ -1533,7 +1788,12 @@ mod tests_fields {
         let spec = ServiceSpec {
             service_type: "ClusterIP".into(),
             selector: HashMap::from([("app".into(), "web".into())]),
-            ports: vec![ServicePort { name: Some("http".into()), port: 80, target_port: 8080, protocol: "TCP".into() }],
+            ports: vec![ServicePort {
+                name: Some("http".into()),
+                port: 80,
+                target_port: 8080,
+                protocol: "TCP".into(),
+            }],
             cluster_ip: Some("10.96.100.1".into()),
         };
         assert_eq!(spec.service_type, "ClusterIP");
@@ -1547,7 +1807,12 @@ mod tests_fields {
         let spec = ServiceSpec {
             service_type: "NodePort".into(),
             selector: HashMap::new(),
-            ports: vec![ServicePort { name: None, port: 80, target_port: 8080, protocol: "TCP".into() }],
+            ports: vec![ServicePort {
+                name: None,
+                port: 80,
+                target_port: 8080,
+                protocol: "TCP".into(),
+            }],
             cluster_ip: None,
         };
         assert_eq!(spec.service_type, "NodePort");
@@ -1560,8 +1825,18 @@ mod tests_fields {
             service_type: "ClusterIP".into(),
             selector: HashMap::new(),
             ports: vec![
-                ServicePort { name: Some("http".into()), port: 80, target_port: 8080, protocol: "TCP".into() },
-                ServicePort { name: Some("https".into()), port: 443, target_port: 8443, protocol: "TCP".into() },
+                ServicePort {
+                    name: Some("http".into()),
+                    port: 80,
+                    target_port: 8080,
+                    protocol: "TCP".into(),
+                },
+                ServicePort {
+                    name: Some("https".into()),
+                    port: 443,
+                    target_port: 8443,
+                    protocol: "TCP".into(),
+                },
             ],
             cluster_ip: None,
         };
@@ -1583,7 +1858,10 @@ mod tests_fields {
                     namespace_selector: None,
                     ip_block: None,
                 }],
-                ports: vec![NetworkPolicyPort { port: Some(8080), protocol: Some("TCP".into()) }],
+                ports: vec![NetworkPolicyPort {
+                    port: Some(8080),
+                    protocol: Some("TCP".into()),
+                }],
             }],
             egress: vec![],
             policy_types: vec!["Ingress".into()],
@@ -1600,7 +1878,10 @@ mod tests_fields {
             ingress: vec![],
             egress: vec![NetworkPolicyEgressRule {
                 to: vec![],
-                ports: vec![NetworkPolicyPort { port: Some(5432), protocol: Some("TCP".into()) }],
+                ports: vec![NetworkPolicyPort {
+                    port: Some(5432),
+                    protocol: Some("TCP".into()),
+                }],
             }],
             policy_types: vec!["Egress".into()],
         };
@@ -1617,7 +1898,10 @@ mod tests_fields {
                 from: vec![NetworkPolicyPeer {
                     pod_selector: None,
                     namespace_selector: None,
-                    ip_block: Some(IPBlock { cidr: "192.168.0.0/16".into(), except: vec!["192.168.1.0/24".into()] }),
+                    ip_block: Some(IPBlock {
+                        cidr: "192.168.0.0/16".into(),
+                        except: vec!["192.168.1.0/24".into()],
+                    }),
                 }],
                 ports: vec![],
             }],
@@ -1649,7 +1933,15 @@ mod tests_fields {
         let rule = PolicyRule {
             api_groups: vec!["apps".into()],
             resources: vec!["deployments".into()],
-            verbs: vec!["get".into(), "list".into(), "watch".into(), "create".into(), "update".into(), "patch".into(), "delete".into()],
+            verbs: vec![
+                "get".into(),
+                "list".into(),
+                "watch".into(),
+                "create".into(),
+                "update".into(),
+                "patch".into(),
+                "delete".into(),
+            ],
             resource_names: vec![],
         };
         assert_eq!(rule.verbs.len(), 7);
@@ -1659,7 +1951,12 @@ mod tests_fields {
     // upstream: kubernetes/kubernetes pkg/apis/rbac/types.go::Subject
     #[test]
     fn test_subject_user() {
-        let s = Subject { kind: "User".into(), name: "alice".into(), namespace: None, api_group: Some("rbac.authorization.k8s.io".into()) };
+        let s = Subject {
+            kind: "User".into(),
+            name: "alice".into(),
+            namespace: None,
+            api_group: Some("rbac.authorization.k8s.io".into()),
+        };
         assert_eq!(s.kind, "User");
         assert_eq!(s.name, "alice");
     }
@@ -1667,7 +1964,12 @@ mod tests_fields {
     // upstream: kubernetes/kubernetes pkg/apis/rbac/types.go::Subject
     #[test]
     fn test_subject_service_account() {
-        let s = Subject { kind: "ServiceAccount".into(), name: "default".into(), namespace: Some(TENANT.into()), api_group: None };
+        let s = Subject {
+            kind: "ServiceAccount".into(),
+            name: "default".into(),
+            namespace: Some(TENANT.into()),
+            api_group: None,
+        };
         assert_eq!(s.kind, "ServiceAccount");
         assert_eq!(s.namespace.as_deref(), Some(TENANT));
     }
@@ -1676,9 +1978,13 @@ mod tests_fields {
     #[test]
     fn test_aggregation_rule() {
         let ar = AggregationRule {
-            cluster_role_selectors: vec![
-                LabelSelector { match_labels: HashMap::from([("rbac.authorization.k8s.io/aggregate-to-admin".into(), "true".into())]), match_expressions: vec![] },
-            ],
+            cluster_role_selectors: vec![LabelSelector {
+                match_labels: HashMap::from([(
+                    "rbac.authorization.k8s.io/aggregate-to-admin".into(),
+                    "true".into(),
+                )]),
+                match_expressions: vec![],
+            }],
         };
         assert_eq!(ar.cluster_role_selectors.len(), 1);
     }
@@ -1698,7 +2004,10 @@ mod tests_fields {
     fn test_pvc_spec_access_modes() {
         let spec = PersistentVolumeClaimSpec {
             access_modes: vec!["ReadWriteMany".into()],
-            resources: ResourceRequirements { requests: HashMap::from([("storage".into(), "5Gi".into())]), limits: HashMap::new() },
+            resources: ResourceRequirements {
+                requests: HashMap::from([("storage".into(), "5Gi".into())]),
+                limits: HashMap::new(),
+            },
             storage_class_name: Some("fast".into()),
             volume_name: None,
             volume_mode: Some("Filesystem".into()),
@@ -1715,7 +2024,11 @@ mod tests_fields {
             pod_cidr: Some("10.0.1.0/24".into()),
             provider_id: Some("aws:///us-east-1a/i-abc123".into()),
             unschedulable: false,
-            taints: vec![Taint { key: "node-role.kubernetes.io/master".into(), value: None, effect: "NoSchedule".into() }],
+            taints: vec![Taint {
+                key: "node-role.kubernetes.io/master".into(),
+                value: None,
+                effect: "NoSchedule".into(),
+            }],
         };
         assert_eq!(spec.taints.len(), 1);
         assert_eq!(spec.taints[0].effect, "NoSchedule");
@@ -1746,7 +2059,10 @@ mod tests_fields {
         let item = LimitRangeItem {
             limit_type: "Container".into(),
             max: HashMap::from([("cpu".into(), "2".into()), ("memory".into(), "1Gi".into())]),
-            min: HashMap::from([("cpu".into(), "100m".into()), ("memory".into(), "64Mi".into())]),
+            min: HashMap::from([
+                ("cpu".into(), "100m".into()),
+                ("memory".into(), "64Mi".into()),
+            ]),
             default: HashMap::from([("cpu".into(), "500m".into())]),
             default_request: HashMap::from([("cpu".into(), "100m".into())]),
         };
@@ -1771,15 +2087,28 @@ mod tests_fields {
     #[test]
     fn test_endpoints_with_subsets() {
         let ep = Endpoints {
-            api_version: "v1".into(), kind: "Endpoints".into(),
+            api_version: "v1".into(),
+            kind: "Endpoints".into(),
             metadata: ObjectMeta::new("my-svc", TENANT),
             subsets: vec![EndpointSubset {
                 addresses: vec![
-                    EndpointAddress { ip: "10.0.1.5".into(), hostname: Some("pod-a".into()), target_ref: None },
-                    EndpointAddress { ip: "10.0.1.6".into(), hostname: Some("pod-b".into()), target_ref: None },
+                    EndpointAddress {
+                        ip: "10.0.1.5".into(),
+                        hostname: Some("pod-a".into()),
+                        target_ref: None,
+                    },
+                    EndpointAddress {
+                        ip: "10.0.1.6".into(),
+                        hostname: Some("pod-b".into()),
+                        target_ref: None,
+                    },
                 ],
                 not_ready_addresses: vec![],
-                ports: vec![EndpointPort { name: Some("http".into()), port: 8080, protocol: "TCP".into() }],
+                ports: vec![EndpointPort {
+                    name: Some("http".into()),
+                    port: 8080,
+                    protocol: "TCP".into(),
+                }],
             }],
         };
         assert_eq!(ep.subsets[0].addresses.len(), 2);
@@ -1831,17 +2160,26 @@ mod tests_fields {
                         backend: IngressBackend {
                             service: IngressServiceBackend {
                                 name: "web".into(),
-                                port: ServiceBackendPort { number: 80, name: None },
+                                port: ServiceBackendPort {
+                                    number: 80,
+                                    name: None,
+                                },
                             },
                         },
                     }],
                 }),
             }],
-            tls: vec![IngressTLS { hosts: vec!["example.com".into()], secret_name: Some("tls-cert".into()) }],
+            tls: vec![IngressTLS {
+                hosts: vec!["example.com".into()],
+                secret_name: Some("tls-cert".into()),
+            }],
             default_backend: None,
         };
         assert_eq!(spec.rules[0].host.as_deref(), Some("example.com"));
-        assert_eq!(spec.rules[0].http.as_ref().unwrap().paths[0].path_type, "Prefix");
+        assert_eq!(
+            spec.rules[0].http.as_ref().unwrap().paths[0].path_type,
+            "Prefix"
+        );
         assert_eq!(spec.tls[0].secret_name.as_deref(), Some("tls-cert"));
     }
 
@@ -1849,8 +2187,12 @@ mod tests_fields {
     #[test]
     fn test_liveness_probe_http() {
         let probe = Probe {
-            http_get: Some(HttpGetAction { path: "/healthz".into(), port: 8080 }),
-            exec: None, tcp_socket: None,
+            http_get: Some(HttpGetAction {
+                path: "/healthz".into(),
+                port: 8080,
+            }),
+            exec: None,
+            tcp_socket: None,
             initial_delay_seconds: 10,
             period_seconds: 30,
             timeout_seconds: 5,
@@ -1865,7 +2207,9 @@ mod tests_fields {
     fn test_readiness_probe_exec() {
         let probe = Probe {
             http_get: None,
-            exec: Some(ExecAction { command: vec!["cat".into(), "/tmp/ready".into()] }),
+            exec: Some(ExecAction {
+                command: vec!["cat".into(), "/tmp/ready".into()],
+            }),
             tcp_socket: None,
             initial_delay_seconds: 5,
             period_seconds: 10,
@@ -1881,7 +2225,8 @@ mod tests_fields {
     #[test]
     fn test_liveness_probe_tcp_socket() {
         let probe = Probe {
-            http_get: None, exec: None,
+            http_get: None,
+            exec: None,
             tcp_socket: Some(TcpSocketAction { port: 5432 }),
             initial_delay_seconds: 15,
             period_seconds: 20,
@@ -1895,7 +2240,10 @@ mod tests_fields {
     #[test]
     fn test_label_selector_match_labels() {
         let sel = LabelSelector {
-            match_labels: HashMap::from([("app".into(), "web".into()), ("tier".into(), "frontend".into())]),
+            match_labels: HashMap::from([
+                ("app".into(), "web".into()),
+                ("tier".into(), "frontend".into()),
+            ]),
             match_expressions: vec![],
         };
         assert_eq!(sel.match_labels.len(), 2);
@@ -1998,14 +2346,18 @@ mod tests_fields {
     // upstream: kubernetes/kubernetes pkg/apis/core/types.go::NamespaceStatus
     #[test]
     fn test_namespace_status_active() {
-        let status = NamespaceStatus { phase: "Active".into() };
+        let status = NamespaceStatus {
+            phase: "Active".into(),
+        };
         assert_eq!(status.phase, "Active");
     }
 
     // upstream: kubernetes/kubernetes pkg/apis/core/types.go::NamespaceStatus
     #[test]
     fn test_namespace_status_terminating() {
-        let status = NamespaceStatus { phase: "Terminating".into() };
+        let status = NamespaceStatus {
+            phase: "Terminating".into(),
+        };
         assert_eq!(status.phase, "Terminating");
     }
 
@@ -2025,7 +2377,9 @@ mod tests_fields {
     #[test]
     fn test_daemonset_update_strategy() {
         let spec = DaemonSetSpec {
-            update_strategy: DaemonSetUpdateStrategy { update_strategy_type: "OnDelete".into() },
+            update_strategy: DaemonSetUpdateStrategy {
+                update_strategy_type: "OnDelete".into(),
+            },
             ..DaemonSetSpec::default()
         };
         assert_eq!(spec.update_strategy.update_strategy_type, "OnDelete");
@@ -2045,7 +2399,10 @@ mod tests_fields {
     // upstream: kubernetes/kubernetes pkg/apis/core/types.go::KubeEvent
     #[test]
     fn test_event_source() {
-        let src = EventSource { component: "kubelet".into(), host: Some("node1".into()) };
+        let src = EventSource {
+            component: "kubelet".into(),
+            host: Some("node1".into()),
+        };
         assert_eq!(src.component, "kubelet");
         assert_eq!(src.host.as_deref(), Some("node1"));
     }
@@ -2054,10 +2411,13 @@ mod tests_fields {
     #[test]
     fn test_serviceaccount_image_pull_secrets() {
         let sa = ServiceAccount {
-            api_version: "v1".into(), kind: "ServiceAccount".into(),
+            api_version: "v1".into(),
+            kind: "ServiceAccount".into(),
             metadata: ObjectMeta::new("default", TENANT),
             secrets: vec![],
-            image_pull_secrets: vec![LocalObjectReference { name: "registry-creds".into() }],
+            image_pull_secrets: vec![LocalObjectReference {
+                name: "registry-creds".into(),
+            }],
             automount_service_account_token: Some(true),
         };
         assert_eq!(sa.image_pull_secrets.len(), 1);
@@ -2073,7 +2433,10 @@ mod tests_fields {
             kind: "StorageClass".into(),
             metadata: ObjectMeta::new("premium", ""),
             provisioner: "ebs.csi.aws.com".into(),
-            parameters: HashMap::from([("type".into(), "gp3".into()), ("iopsPerGB".into(), "50".into())]),
+            parameters: HashMap::from([
+                ("type".into(), "gp3".into()),
+                ("iopsPerGB".into(), "50".into()),
+            ]),
             reclaim_policy: Some("Delete".into()),
             volume_binding_mode: Some("WaitForFirstConsumer".into()),
             allow_volume_expansion: true,
@@ -2089,10 +2452,18 @@ mod tests_fields {
         let avail = PersistentVolumeStatus::default();
         assert_eq!(avail.phase, "Available");
 
-        let bound = PersistentVolumeStatus { phase: "Bound".into(), reason: None, message: None };
+        let bound = PersistentVolumeStatus {
+            phase: "Bound".into(),
+            reason: None,
+            message: None,
+        };
         assert_eq!(bound.phase, "Bound");
 
-        let released = PersistentVolumeStatus { phase: "Released".into(), reason: Some("CrashLoopEvict".into()), message: None };
+        let released = PersistentVolumeStatus {
+            phase: "Released".into(),
+            reason: Some("CrashLoopEvict".into()),
+            message: None,
+        };
         assert_eq!(released.phase, "Released");
     }
 
@@ -2102,7 +2473,11 @@ mod tests_fields {
         let pending = PersistentVolumeClaimStatus::default();
         assert_eq!(pending.phase, "Pending");
 
-        let bound = PersistentVolumeClaimStatus { phase: "Bound".into(), access_modes: vec!["ReadWriteOnce".into()], capacity: HashMap::new() };
+        let bound = PersistentVolumeClaimStatus {
+            phase: "Bound".into(),
+            access_modes: vec!["ReadWriteOnce".into()],
+            capacity: HashMap::new(),
+        };
         assert_eq!(bound.phase, "Bound");
     }
 

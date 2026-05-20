@@ -172,7 +172,10 @@ fn foreground(graph: &DependencyGraph, root: &ObjectId) -> CascadePlan {
 /// `block_owner_deletion = true`.
 fn dependent_blocks(graph: &DependencyGraph, dep: &ObjectId, owner: &ObjectId) -> bool {
     // We need the raw OwnerReference; expose via graph query.
-    graph.owner_refs_of(dep).iter().any(|r| r.uid == owner.0 && r.block_owner_deletion)
+    graph
+        .owner_refs_of(dep)
+        .iter()
+        .any(|r| r.uid == owner.0 && r.block_owner_deletion)
 }
 
 fn orphan(graph: &DependencyGraph, root: &ObjectId) -> CascadePlan {

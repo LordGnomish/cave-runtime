@@ -23,10 +23,17 @@ pub enum AfiSafi {
 
 impl AfiSafi {
     pub fn afi(self) -> u16 {
-        match self { AfiSafi::Ipv4Unicast => 1, AfiSafi::Ipv6Unicast => 2, AfiSafi::L2vpnEvpn => 25 }
+        match self {
+            AfiSafi::Ipv4Unicast => 1,
+            AfiSafi::Ipv6Unicast => 2,
+            AfiSafi::L2vpnEvpn => 25,
+        }
     }
     pub fn safi(self) -> u8 {
-        match self { AfiSafi::Ipv4Unicast | AfiSafi::Ipv6Unicast => 1, AfiSafi::L2vpnEvpn => 70 }
+        match self {
+            AfiSafi::Ipv4Unicast | AfiSafi::Ipv6Unicast => 1,
+            AfiSafi::L2vpnEvpn => 70,
+        }
     }
     pub fn as_str(self) -> &'static str {
         match self {
@@ -51,7 +58,7 @@ pub struct PeerSpec {
 /// Mirrors the `CiliumBGPAdvertisement` CRD shape from `pkg/bgp/`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Advertisement {
-    pub prefix: String,        // CIDR
+    pub prefix: String, // CIDR
     pub afi_safi: AfiSafi,
     pub local_pref: Option<u32>,
     pub communities: Vec<String>, // standard / large communities
@@ -115,7 +122,11 @@ mod tests {
     #[test]
     fn afi_safi_serde_round_trip() {
         let (_c, _t) = cilium_test_ctx!("pkg/bgp/cell.go", "AfiSafi.Serde", "tenant-bgpr-srd");
-        for v in [AfiSafi::Ipv4Unicast, AfiSafi::Ipv6Unicast, AfiSafi::L2vpnEvpn] {
+        for v in [
+            AfiSafi::Ipv4Unicast,
+            AfiSafi::Ipv6Unicast,
+            AfiSafi::L2vpnEvpn,
+        ] {
             let s = serde_json::to_string(&v).unwrap();
             let back: AfiSafi = serde_json::from_str(&s).unwrap();
             assert_eq!(back, v);
@@ -125,7 +136,12 @@ mod tests {
     #[test]
     fn peer_without_password_is_serializable() {
         let (_c, _t) = cilium_test_ctx!("pkg/bgp/cell.go", "PeerSpec.NoPwd", "tenant-bgpr-pn");
-        let p = PeerSpec { name: "p".into(), asn: 65000, address: "1.1.1.1".into(), password: None };
+        let p = PeerSpec {
+            name: "p".into(),
+            asn: 65000,
+            address: "1.1.1.1".into(),
+            password: None,
+        };
         let s = serde_json::to_string(&p).unwrap();
         assert!(s.contains("\"password\":null"));
     }

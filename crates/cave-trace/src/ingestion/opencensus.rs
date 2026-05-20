@@ -160,7 +160,10 @@ pub fn parse_opencensus_json(body: &[u8], tenant_id: &str) -> Result<Vec<Span>> 
         .unwrap_or_else(|| "unknown".into());
 
     let mut resource_attrs: HashMap<String, TagValue> = HashMap::new();
-    resource_attrs.insert("service.name".into(), TagValue::String(service_name.clone()));
+    resource_attrs.insert(
+        "service.name".into(),
+        TagValue::String(service_name.clone()),
+    );
 
     if let Some(node) = &req.node {
         if let Some(id) = &node.identifier {
@@ -208,7 +211,7 @@ fn convert_oc_span(
     tenant_id: &str,
 ) -> Option<Span> {
     let trace_id = crate::types::parse_trace_id(s.trace_id.as_deref()?).ok()?;
-    let span_id  = crate::types::parse_span_id(s.span_id.as_deref()?).ok()?;
+    let span_id = crate::types::parse_span_id(s.span_id.as_deref()?).ok()?;
 
     let parent_span_id = s
         .parent_span_id
@@ -216,9 +219,17 @@ fn convert_oc_span(
         .filter(|p| !p.is_empty())
         .and_then(|p| crate::types::parse_span_id(p).ok());
 
-    let start_ns = s.start_time.as_deref().and_then(parse_rfc3339_ns).unwrap_or(0);
-    let end_ns   = s.end_time.as_deref().and_then(parse_rfc3339_ns).unwrap_or(start_ns);
-    let dur_ns   = end_ns.saturating_sub(start_ns);
+    let start_ns = s
+        .start_time
+        .as_deref()
+        .and_then(parse_rfc3339_ns)
+        .unwrap_or(0);
+    let end_ns = s
+        .end_time
+        .as_deref()
+        .and_then(parse_rfc3339_ns)
+        .unwrap_or(start_ns);
+    let dur_ns = end_ns.saturating_sub(start_ns);
 
     let operation_name = s.name.map(|n| n.value).unwrap_or_else(|| "unknown".into());
 
@@ -232,7 +243,11 @@ fn convert_oc_span(
         .attributes
         .as_ref()
         .and_then(|a| a.attribute_map.as_ref())
-        .map(|m| m.iter().map(|(k, v)| (k.clone(), oc_attr_to_tag(v))).collect())
+        .map(|m| {
+            m.iter()
+                .map(|(k, v)| (k.clone(), oc_attr_to_tag(v)))
+                .collect()
+        })
         .unwrap_or_default();
 
     let status = match s.status.as_ref().map(|st| st.code.unwrap_or(0)) {
@@ -248,7 +263,11 @@ fn convert_oc_span(
         .unwrap_or(&[])
         .iter()
         .map(|te| SpanEvent {
-            time_unix_nano: te.time.as_deref().and_then(parse_rfc3339_ns).unwrap_or(start_ns),
+            time_unix_nano: te
+                .time
+                .as_deref()
+                .and_then(parse_rfc3339_ns)
+                .unwrap_or(start_ns),
             name: te
                 .annotation
                 .as_ref()
@@ -260,7 +279,11 @@ fn convert_oc_span(
                 .as_ref()
                 .and_then(|a| a.attributes.as_ref())
                 .and_then(|attrs| attrs.attribute_map.as_ref())
-                .map(|m| m.iter().map(|(k, v)| (k.clone(), oc_attr_to_tag(v))).collect())
+                .map(|m| {
+                    m.iter()
+                        .map(|(k, v)| (k.clone(), oc_attr_to_tag(v)))
+                        .collect()
+                })
                 .unwrap_or_default(),
         })
         .collect();
@@ -287,13 +310,23 @@ fn convert_oc_span(
 }
 
 fn oc_attr_to_tag(v: &OcAttributeValue) -> TagValue {
-    if let Some(s) = &v.string_value { return TagValue::String(s.value.clone()); }
-    if let Some(b) = v.bool_value    { return TagValue::Bool(b); }
-    if let Some(d) = v.double_value  { return TagValue::Float(d); }
+    if let Some(s) = &v.string_value {
+        return TagValue::String(s.value.clone());
+    }
+    if let Some(b) = v.bool_value {
+        return TagValue::Bool(b);
+    }
+    if let Some(d) = v.double_value {
+        return TagValue::Float(d);
+    }
     if let Some(n) = &v.int_value {
-        if let Some(i) = n.as_i64() { return TagValue::Int(i); }
+        if let Some(i) = n.as_i64() {
+            return TagValue::Int(i);
+        }
         if let Some(s) = n.as_str() {
-            if let Ok(i) = s.parse::<i64>() { return TagValue::Int(i); }
+            if let Ok(i) = s.parse::<i64>() {
+                return TagValue::Int(i);
+            }
         }
     }
     TagValue::String(String::new())

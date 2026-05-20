@@ -28,25 +28,28 @@ fn renewal_decision_covers_all_four_states() {
 
     // 1. NeedsInitialIssuance — no notAfter
     let status_initial = CertificateStatus::default();
-    assert_eq!(ctl.evaluate(&s, &status_initial, now), RenewalDecision::NeedsInitialIssuance);
+    assert_eq!(
+        ctl.evaluate(&s, &status_initial, now),
+        RenewalDecision::NeedsInitialIssuance
+    );
 
     // 2. NotYet — cert valid, well outside renewal window
     let mut fresh = CertificateStatus::default();
     fresh.not_before = Some(now - Duration::days(1));
-    fresh.not_after = Some(now + Duration::days(89));   // 89d remaining; window = 30d
+    fresh.not_after = Some(now + Duration::days(89)); // 89d remaining; window = 30d
     let dec = ctl.evaluate(&s, &fresh, now);
     assert!(matches!(dec, RenewalDecision::NotYet { .. }));
 
     // 3. Due — inside renewal window
     let mut due = CertificateStatus::default();
     due.not_before = Some(now - Duration::days(60));
-    due.not_after = Some(now + Duration::days(15));     // 15d remaining < 30d ⇒ due
+    due.not_after = Some(now + Duration::days(15)); // 15d remaining < 30d ⇒ due
     assert_eq!(ctl.evaluate(&s, &due, now), RenewalDecision::Due);
 
     // 4. Expired — past notAfter
     let mut expired = CertificateStatus::default();
     expired.not_before = Some(now - Duration::days(120));
-    expired.not_after  = Some(now - Duration::days(1));
+    expired.not_after = Some(now - Duration::days(1));
     assert_eq!(ctl.evaluate(&s, &expired, now), RenewalDecision::Expired);
 }
 

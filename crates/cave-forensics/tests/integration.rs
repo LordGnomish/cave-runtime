@@ -2,12 +2,20 @@
 // Copyright 2026 Cave Runtime contributors
 //! Integration tests for cave-forensics public surface.
 
-use cave_forensics::engine::{evidence_count, has_valid_evidence, highest_severity, open_cases, severity_rank};
-use cave_forensics::models::{CaseStatus, EvidenceItem, EvidenceType, ForensicCase, ForensicSeverity};
+use cave_forensics::engine::{
+    evidence_count, has_valid_evidence, highest_severity, open_cases, severity_rank,
+};
+use cave_forensics::models::{
+    CaseStatus, EvidenceItem, EvidenceType, ForensicCase, ForensicSeverity,
+};
 use chrono::Utc;
 use uuid::Uuid;
 
-fn case(severity: ForensicSeverity, status: CaseStatus, evidence: Vec<EvidenceItem>) -> ForensicCase {
+fn case(
+    severity: ForensicSeverity,
+    status: CaseStatus,
+    evidence: Vec<EvidenceItem>,
+) -> ForensicCase {
     ForensicCase {
         id: Uuid::new_v4(),
         title: "test".to_string(),

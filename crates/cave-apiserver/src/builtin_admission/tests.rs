@@ -10,42 +10,65 @@ use std::sync::Arc;
 
 fn cm_req(op: Operation, ns: &str, tenant: &str) -> AdmissionRequest {
     let cm = Resource::ConfigMap(ConfigMap {
-        api_version: "v1".into(), kind: "ConfigMap".into(),
-        metadata: ObjectMeta::new("cm1", ns), data: HashMap::new(),
+        api_version: "v1".into(),
+        kind: "ConfigMap".into(),
+        metadata: ObjectMeta::new("cm1", ns),
+        data: HashMap::new(),
     });
     AdmissionRequest {
-        uid: "uid".into(), tenant_id: tenant.into(),
-        namespace: ns.into(), kind: "ConfigMap".into(), name: "cm1".into(),
-        operation: op, object: Some(cm), old_object: None,
-        user: "alice".into(), dry_run: false,
+        uid: "uid".into(),
+        tenant_id: tenant.into(),
+        namespace: ns.into(),
+        kind: "ConfigMap".into(),
+        name: "cm1".into(),
+        operation: op,
+        object: Some(cm),
+        old_object: None,
+        user: "alice".into(),
+        dry_run: false,
     }
 }
 
 fn pod_req(op: Operation, ns: &str, tenant: &str) -> AdmissionRequest {
     let pod = Resource::Pod(Pod {
-        api_version: "v1".into(), kind: "Pod".into(),
+        api_version: "v1".into(),
+        kind: "Pod".into(),
         metadata: ObjectMeta::new("p1", ns),
-        spec: PodSpec::default(), status: Default::default(),
+        spec: PodSpec::default(),
+        status: Default::default(),
     });
     AdmissionRequest {
-        uid: "uid".into(), tenant_id: tenant.into(),
-        namespace: ns.into(), kind: "Pod".into(), name: "p1".into(),
-        operation: op, object: Some(pod), old_object: None,
-        user: "alice".into(), dry_run: false,
+        uid: "uid".into(),
+        tenant_id: tenant.into(),
+        namespace: ns.into(),
+        kind: "Pod".into(),
+        name: "p1".into(),
+        operation: op,
+        object: Some(pod),
+        old_object: None,
+        user: "alice".into(),
+        dry_run: false,
     }
 }
 
 fn ns_req(op: Operation, name: &str, tenant: &str) -> AdmissionRequest {
     let ns = Resource::Namespace(Namespace {
-        api_version: "v1".into(), kind: "Namespace".into(),
+        api_version: "v1".into(),
+        kind: "Namespace".into(),
         metadata: ObjectMeta::new(name, ""),
         status: Default::default(),
     });
     AdmissionRequest {
-        uid: "uid".into(), tenant_id: tenant.into(),
-        namespace: "".into(), kind: "Namespace".into(), name: name.into(),
-        operation: op, object: Some(ns), old_object: None,
-        user: "alice".into(), dry_run: false,
+        uid: "uid".into(),
+        tenant_id: tenant.into(),
+        namespace: "".into(),
+        kind: "Namespace".into(),
+        name: name.into(),
+        operation: op,
+        object: Some(ns),
+        old_object: None,
+        user: "alice".into(),
+        dry_run: false,
     }
 }
 
@@ -86,7 +109,10 @@ fn ne_tenant_isolation() {
     let p = NamespaceExists::new(s);
     // tenant `acme` should NOT see `globex`'s default namespace
     let r = p.validate(&cm_req(Operation::Create, "default", "acme"));
-    assert!(!r.allowed, "namespace must be checked against the request's tenant");
+    assert!(
+        !r.allowed,
+        "namespace must be checked against the request's tenant"
+    );
 }
 
 #[test]
@@ -166,7 +192,8 @@ fn container_item_with_default(default_cpu: i64, default_request_cpu: i64) -> Li
         ..Default::default()
     };
     item.default.insert("cpu".into(), default_cpu);
-    item.default_request.insert("cpu".into(), default_request_cpu);
+    item.default_request
+        .insert("cpu".into(), default_request_cpu);
     item
 }
 
@@ -185,7 +212,11 @@ fn lr_apply_default_does_not_overwrite() {
     c.requests.insert("cpu".into(), 50);
     apply_container_defaults(&mut c, &[container_item_with_default(500, 250)]);
     assert_eq!(c.limits.get("cpu"), Some(&100), "explicit limit untouched");
-    assert_eq!(c.requests.get("cpu"), Some(&50), "explicit request untouched");
+    assert_eq!(
+        c.requests.get("cpu"),
+        Some(&50),
+        "explicit request untouched"
+    );
 }
 
 #[test]
@@ -197,7 +228,10 @@ fn lr_apply_default_skips_pod_kind() {
         ..Default::default()
     };
     apply_container_defaults(&mut c, &[item]);
-    assert!(c.limits.is_empty(), "Pod-kind defaults must not apply to a container");
+    assert!(
+        c.limits.is_empty(),
+        "Pod-kind defaults must not apply to a container"
+    );
 }
 
 #[test]
@@ -209,8 +243,14 @@ fn lr_validate_below_min() {
     item.min.insert("cpu".into(), 100);
     let mut c = ContainerResources::default();
     c.requests.insert("cpu".into(), 50);
-    assert_eq!(validate_container(&c, &[item]),
-        Err(LimitRangeError::Below { resource: "cpu".into(), value: 50, min: 100 }));
+    assert_eq!(
+        validate_container(&c, &[item]),
+        Err(LimitRangeError::Below {
+            resource: "cpu".into(),
+            value: 50,
+            min: 100
+        })
+    );
 }
 
 #[test]
@@ -222,8 +262,14 @@ fn lr_validate_above_max() {
     item.max.insert("cpu".into(), 1000);
     let mut c = ContainerResources::default();
     c.limits.insert("cpu".into(), 2000);
-    assert_eq!(validate_container(&c, &[item]),
-        Err(LimitRangeError::Above { resource: "cpu".into(), value: 2000, max: 1000 }));
+    assert_eq!(
+        validate_container(&c, &[item]),
+        Err(LimitRangeError::Above {
+            resource: "cpu".into(),
+            value: 2000,
+            max: 1000
+        })
+    );
 }
 
 #[test]
@@ -250,8 +296,10 @@ fn lr_ratio_exceeded() {
     let mut c = ContainerResources::default();
     c.requests.insert("cpu".into(), 100);
     c.limits.insert("cpu".into(), 500); // 5x — too high
-    matches!(validate_container(&c, &[item]),
-             Err(LimitRangeError::RatioExceeded { .. }));
+    matches!(
+        validate_container(&c, &[item]),
+        Err(LimitRangeError::RatioExceeded { .. })
+    );
 }
 
 #[test]
@@ -276,8 +324,11 @@ fn lr_validate_skips_pod_kind() {
     item.max.insert("cpu".into(), 1);
     let mut c = ContainerResources::default();
     c.limits.insert("cpu".into(), 999_999);
-    assert_eq!(validate_container(&c, &[item]), Ok(()),
-        "Pod-kind ranges must NOT apply to a single container");
+    assert_eq!(
+        validate_container(&c, &[item]),
+        Ok(()),
+        "Pod-kind ranges must NOT apply to a single container"
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -287,10 +338,18 @@ fn lr_validate_skips_pod_kind() {
 #[test]
 fn lr_store_tenant_isolation() {
     let s = LimitRangeStore::new();
-    s.put(LimitRange { tenant_id: "acme".into(), namespace: "default".into(),
-                       name: "lr".into(), items: vec![] });
-    s.put(LimitRange { tenant_id: "globex".into(), namespace: "default".into(),
-                       name: "lr".into(), items: vec![] });
+    s.put(LimitRange {
+        tenant_id: "acme".into(),
+        namespace: "default".into(),
+        name: "lr".into(),
+        items: vec![],
+    });
+    s.put(LimitRange {
+        tenant_id: "globex".into(),
+        namespace: "default".into(),
+        name: "lr".into(),
+        items: vec![],
+    });
     assert_eq!(s.list("acme", "default").len(), 1);
     assert_eq!(s.list("globex", "default").len(), 1);
 }
@@ -300,10 +359,18 @@ fn lr_store_replaces_same_name() {
     let s = LimitRangeStore::new();
     let mut item = LimitRangeItem::default();
     item.kind = Some(LimitRangeItemType::Container);
-    s.put(LimitRange { tenant_id: "acme".into(), namespace: "default".into(),
-                       name: "lr".into(), items: vec![item.clone()] });
-    s.put(LimitRange { tenant_id: "acme".into(), namespace: "default".into(),
-                       name: "lr".into(), items: vec![] });
+    s.put(LimitRange {
+        tenant_id: "acme".into(),
+        namespace: "default".into(),
+        name: "lr".into(),
+        items: vec![item.clone()],
+    });
+    s.put(LimitRange {
+        tenant_id: "acme".into(),
+        namespace: "default".into(),
+        name: "lr".into(),
+        items: vec![],
+    });
     assert_eq!(s.list("acme", "default").len(), 1);
     assert_eq!(s.list("acme", "default")[0].items.len(), 0);
 }
@@ -315,7 +382,9 @@ fn lr_store_replaces_same_name() {
 #[test]
 fn quota_check_passes_when_under_hard() {
     let q = ResourceQuota {
-        tenant_id: "acme".into(), namespace: "default".into(), name: "q".into(),
+        tenant_id: "acme".into(),
+        namespace: "default".into(),
+        name: "q".into(),
         spec: ResourceQuotaSpec {
             hard: HashMap::from([("pods".into(), 10)]),
             scopes: vec![],
@@ -329,7 +398,9 @@ fn quota_check_passes_when_under_hard() {
 #[test]
 fn quota_check_fails_when_at_hard() {
     let q = ResourceQuota {
-        tenant_id: "acme".into(), namespace: "default".into(), name: "q".into(),
+        tenant_id: "acme".into(),
+        namespace: "default".into(),
+        name: "q".into(),
         spec: ResourceQuotaSpec {
             hard: HashMap::from([("pods".into(), 10)]),
             scopes: vec![],
@@ -337,13 +408,18 @@ fn quota_check_fails_when_at_hard() {
         used: HashMap::from([("pods".into(), 10)]),
     };
     let want = HashMap::from([("pods".into(), 1)]);
-    assert!(matches!(check_quota(&[q], &want), Err(QuotaError::Exceeded { .. })));
+    assert!(matches!(
+        check_quota(&[q], &want),
+        Err(QuotaError::Exceeded { .. })
+    ));
 }
 
 #[test]
 fn quota_check_fails_when_delta_pushes_over() {
     let q = ResourceQuota {
-        tenant_id: "acme".into(), namespace: "default".into(), name: "q".into(),
+        tenant_id: "acme".into(),
+        namespace: "default".into(),
+        name: "q".into(),
         spec: ResourceQuotaSpec {
             hard: HashMap::from([("pods".into(), 10)]),
             scopes: vec![],
@@ -351,13 +427,18 @@ fn quota_check_fails_when_delta_pushes_over() {
         used: HashMap::from([("pods".into(), 9)]),
     };
     let want = HashMap::from([("pods".into(), 2)]);
-    assert!(matches!(check_quota(&[q], &want), Err(QuotaError::Exceeded { .. })));
+    assert!(matches!(
+        check_quota(&[q], &want),
+        Err(QuotaError::Exceeded { .. })
+    ));
 }
 
 #[test]
 fn quota_check_ignores_unconstrained_resource() {
     let q = ResourceQuota {
-        tenant_id: "acme".into(), namespace: "default".into(), name: "q".into(),
+        tenant_id: "acme".into(),
+        namespace: "default".into(),
+        name: "q".into(),
         spec: ResourceQuotaSpec {
             hard: HashMap::from([("pods".into(), 10)]),
             scopes: vec![],
@@ -365,16 +446,21 @@ fn quota_check_ignores_unconstrained_resource() {
         used: HashMap::new(),
     };
     let want = HashMap::from([("services".into(), 100)]);
-    assert!(check_quota(&[q], &want).is_ok(),
-        "resources not in hard set are ignored");
+    assert!(
+        check_quota(&[q], &want).is_ok(),
+        "resources not in hard set are ignored"
+    );
 }
 
 #[test]
 fn quota_store_observe_increments() {
     let s = ResourceQuotaStore::new();
     s.put(ResourceQuota {
-        tenant_id: "acme".into(), namespace: "default".into(), name: "q".into(),
-        spec: ResourceQuotaSpec::default(), used: HashMap::new(),
+        tenant_id: "acme".into(),
+        namespace: "default".into(),
+        name: "q".into(),
+        spec: ResourceQuotaSpec::default(),
+        used: HashMap::new(),
     });
     s.observe("acme", "default", "q", "pods", 3);
     s.observe("acme", "default", "q", "pods", 2);
@@ -385,8 +471,11 @@ fn quota_store_observe_increments() {
 fn quota_store_tenant_isolation() {
     let s = ResourceQuotaStore::new();
     s.put(ResourceQuota {
-        tenant_id: "acme".into(), namespace: "default".into(), name: "q".into(),
-        spec: ResourceQuotaSpec::default(), used: HashMap::new(),
+        tenant_id: "acme".into(),
+        namespace: "default".into(),
+        name: "q".into(),
+        spec: ResourceQuotaSpec::default(),
+        used: HashMap::new(),
     });
     assert_eq!(s.list("globex", "default").len(), 0);
     assert_eq!(s.list("acme", "default").len(), 1);
@@ -408,7 +497,9 @@ fn quota_plugin_allows_when_no_quota() {
 fn quota_plugin_allows_when_under_hard() {
     let q = Arc::new(ResourceQuotaStore::new());
     q.put(ResourceQuota {
-        tenant_id: "acme".into(), namespace: "default".into(), name: "q".into(),
+        tenant_id: "acme".into(),
+        namespace: "default".into(),
+        name: "q".into(),
         spec: ResourceQuotaSpec {
             hard: HashMap::from([("pods".into(), 10)]),
             scopes: vec![],
@@ -424,7 +515,9 @@ fn quota_plugin_allows_when_under_hard() {
 fn quota_plugin_denies_when_at_hard() {
     let q = Arc::new(ResourceQuotaStore::new());
     q.put(ResourceQuota {
-        tenant_id: "acme".into(), namespace: "default".into(), name: "q".into(),
+        tenant_id: "acme".into(),
+        namespace: "default".into(),
+        name: "q".into(),
         spec: ResourceQuotaSpec {
             hard: HashMap::from([("pods".into(), 10)]),
             scopes: vec![],
@@ -441,7 +534,9 @@ fn quota_plugin_denies_when_at_hard() {
 fn quota_plugin_other_tenant_quota_is_ignored() {
     let q = Arc::new(ResourceQuotaStore::new());
     q.put(ResourceQuota {
-        tenant_id: "globex".into(), namespace: "default".into(), name: "q".into(),
+        tenant_id: "globex".into(),
+        namespace: "default".into(),
+        name: "q".into(),
         spec: ResourceQuotaSpec {
             hard: HashMap::from([("pods".into(), 0)]),
             scopes: vec![],
@@ -450,15 +545,19 @@ fn quota_plugin_other_tenant_quota_is_ignored() {
     });
     let p = ResourceQuotaPlugin { quotas: q };
     let r = p.validate(&pod_req(Operation::Create, "default", "acme"));
-    assert!(r.allowed,
-        "globex quota with hard=0 must NOT block acme's request");
+    assert!(
+        r.allowed,
+        "globex quota with hard=0 must NOT block acme's request"
+    );
 }
 
 #[test]
 fn quota_plugin_counts_configmap() {
     let q = Arc::new(ResourceQuotaStore::new());
     q.put(ResourceQuota {
-        tenant_id: "acme".into(), namespace: "default".into(), name: "q".into(),
+        tenant_id: "acme".into(),
+        namespace: "default".into(),
+        name: "q".into(),
         spec: ResourceQuotaSpec {
             hard: HashMap::from([("configmaps".into(), 0)]),
             scopes: vec![],
@@ -473,9 +572,11 @@ fn quota_plugin_counts_configmap() {
 #[test]
 fn extract_quota_pod_counts_one() {
     let pod = Resource::Pod(Pod {
-        api_version: "v1".into(), kind: "Pod".into(),
+        api_version: "v1".into(),
+        kind: "Pod".into(),
         metadata: ObjectMeta::new("p", "ns"),
-        spec: PodSpec::default(), status: Default::default(),
+        spec: PodSpec::default(),
+        status: Default::default(),
     });
     let m = extract_quota_requests(&pod);
     assert_eq!(m.get("pods"), Some(&1));
@@ -485,9 +586,11 @@ fn extract_quota_pod_counts_one() {
 fn extract_quota_pvc_counts_one() {
     use crate::resources::PersistentVolumeClaim;
     let pvc = Resource::PersistentVolumeClaim(PersistentVolumeClaim {
-        api_version: "v1".into(), kind: "PersistentVolumeClaim".into(),
+        api_version: "v1".into(),
+        kind: "PersistentVolumeClaim".into(),
         metadata: ObjectMeta::new("pvc", "ns"),
-        spec: Default::default(), status: Default::default(),
+        spec: Default::default(),
+        status: Default::default(),
     });
     let m = extract_quota_requests(&pvc);
     assert_eq!(m.get("persistentvolumeclaims"), Some(&1));
@@ -497,32 +600,38 @@ fn extract_quota_pvc_counts_one() {
 // `#[ignore]` — areas that need richer Resource modelling first.
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn lr_pod_aggregates_container_sums() {
     // pending: requires Pod.spec.containers[].resources — Pod-kind LimitRange sums all containers
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn quota_pod_compute_resource_request() {
     // pending: requires Pod.spec.containers[].resources.requests — quota counts cpu/memory totals
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn quota_scope_terminating_filters_pods() {
     // pending: requires Pod.spec.activeDeadlineSeconds — Terminating scope filters
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn quota_scope_best_effort_filters_pods() {
     // pending: requires Pod.spec.containers[].resources — BestEffort scope filters
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn quota_scope_priority_class() {
     // pending: requires Pod.spec.priorityClassName — PriorityClass scope
 }
 
-#[test] #[cfg(feature = "live-integration")]
+#[test]
+#[cfg(feature = "live-integration")]
 fn lr_pvc_storage_validation() {
     // pending: requires PVC.spec.resources.requests.storage — storage range enforcement
 }

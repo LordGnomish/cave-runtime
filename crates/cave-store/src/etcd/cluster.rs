@@ -47,7 +47,11 @@ impl ClusterManager {
         self.cluster_id
     }
 
-    pub async fn member_add(&self, peer_urls: Vec<String>, is_learner: bool) -> StoreResult<Member> {
+    pub async fn member_add(
+        &self,
+        peer_urls: Vec<String>,
+        is_learner: bool,
+    ) -> StoreResult<Member> {
         let id = rand_member_id();
         let member = Member {
             id,
@@ -71,9 +75,7 @@ impl ClusterManager {
 
     pub async fn member_update(&self, id: u64, peer_urls: Vec<String>) -> StoreResult<Member> {
         let mut members = self.members.write().await;
-        let m = members
-            .get_mut(&id)
-            .ok_or(StoreError::MemberNotFound(id))?;
+        let m = members.get_mut(&id).ok_or(StoreError::MemberNotFound(id))?;
         m.peer_ur_ls = peer_urls;
         Ok(m.clone())
     }
@@ -84,9 +86,7 @@ impl ClusterManager {
 
     pub async fn member_promote(&self, id: u64) -> StoreResult<Member> {
         let mut members = self.members.write().await;
-        let m = members
-            .get_mut(&id)
-            .ok_or(StoreError::MemberNotFound(id))?;
+        let m = members.get_mut(&id).ok_or(StoreError::MemberNotFound(id))?;
         m.is_learner = false;
         Ok(m.clone())
     }

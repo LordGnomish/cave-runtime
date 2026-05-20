@@ -14,7 +14,11 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum SchemaFormat { Avro, Protobuf, Json }
+pub enum SchemaFormat {
+    Avro,
+    Protobuf,
+    Json,
+}
 
 /// Cite: Confluent Schema Registry compatibility levels documentation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -42,7 +46,7 @@ pub struct Schema {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FieldDef {
     pub name: String,
-    pub field_type: String,        // "string", "int64", "bytes", ...
+    pub field_type: String, // "string", "int64", "bytes", ...
     pub nullable: bool,
     pub default: Option<serde_json::Value>,
 }
@@ -117,7 +121,9 @@ pub struct SchemaRegistry {
 }
 
 impl Default for Compatibility {
-    fn default() -> Self { Self::Backward }  // Confluent default.
+    fn default() -> Self {
+        Self::Backward
+    } // Confluent default.
 }
 
 impl SchemaRegistry {
@@ -133,11 +139,15 @@ impl SchemaRegistry {
     /// against an existing subject, the registry checks compatibility
     /// against the latest version.
     pub fn register(&mut self, schema: Schema) -> CdcResult<u32> {
-        let next_version = self.schemas.get(&schema.subject)
+        let next_version = self
+            .schemas
+            .get(&schema.subject)
             .map(|v| v.len() as u32 + 1)
             .unwrap_or(1);
 
-        if let Some(latest) = self.schemas.get(&schema.subject)
+        if let Some(latest) = self
+            .schemas
+            .get(&schema.subject)
             .and_then(|v| v.last())
             .cloned()
         {
@@ -153,10 +163,10 @@ impl SchemaRegistry {
     fn check_compat(&self, prev: &Schema, next: &Schema) -> CdcResult<()> {
         use Compatibility::*;
         match self.compatibility {
-            None                  => Ok(()),
-            Backward | BackwardTransitive   => Schema::check_backward(next, prev),
-            Forward  | ForwardTransitive    => Schema::check_forward(next, prev),
-            Full     | FullTransitive       => Schema::check_full(next, prev),
+            None => Ok(()),
+            Backward | BackwardTransitive => Schema::check_backward(next, prev),
+            Forward | ForwardTransitive => Schema::check_forward(next, prev),
+            Full | FullTransitive => Schema::check_full(next, prev),
         }
     }
 
@@ -165,11 +175,15 @@ impl SchemaRegistry {
     }
 
     pub fn get_version(&self, subject: &str, version: u32) -> Option<&Schema> {
-        self.schemas.get(subject)
+        self.schemas
+            .get(subject)
             .and_then(|v| v.get(version.saturating_sub(1) as usize))
     }
 
     pub fn version_count(&self, subject: &str) -> u32 {
-        self.schemas.get(subject).map(|v| v.len() as u32).unwrap_or(0)
+        self.schemas
+            .get(subject)
+            .map(|v| v.len() as u32)
+            .unwrap_or(0)
     }
 }

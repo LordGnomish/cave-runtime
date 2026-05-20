@@ -261,7 +261,15 @@ impl Default for ActiveHealthCheck {
             https_verify_certificate: true,
             concurrency: 10,
             timeout: 1,
-            healthy: HealthThreshold { successes: 5, failures: 0, http_failures: 0, tcp_failures: 0, timeouts: 0, interval: 0, http_statuses: vec![200, 302] },
+            healthy: HealthThreshold {
+                successes: 5,
+                failures: 0,
+                http_failures: 0,
+                tcp_failures: 0,
+                timeouts: 0,
+                interval: 0,
+                http_statuses: vec![200, 302],
+            },
             unhealthy: HealthThreshold {
                 successes: 0,
                 failures: 5,
@@ -289,7 +297,18 @@ impl Default for PassiveHealthCheck {
         Self {
             enabled: false,
             r#type: HealthCheckType::Http,
-            healthy: HealthThreshold { successes: 0, failures: 0, http_failures: 0, tcp_failures: 0, timeouts: 0, interval: 0, http_statuses: vec![200, 201, 202, 203, 204, 205, 206, 207, 208, 226, 300, 301, 302, 303, 304, 305, 306, 307, 308] },
+            healthy: HealthThreshold {
+                successes: 0,
+                failures: 0,
+                http_failures: 0,
+                tcp_failures: 0,
+                timeouts: 0,
+                interval: 0,
+                http_statuses: vec![
+                    200, 201, 202, 203, 204, 205, 206, 207, 208, 226, 300, 301, 302, 303, 304, 305,
+                    306, 307, 308,
+                ],
+            },
             unhealthy: HealthThreshold {
                 successes: 0,
                 failures: 0,
@@ -422,7 +441,12 @@ impl Plugin {
             consumer_id: None,
             enabled: true,
             config,
-            protocols: vec![Protocol::Http, Protocol::Https, Protocol::Grpc, Protocol::Grpcs],
+            protocols: vec![
+                Protocol::Http,
+                Protocol::Https,
+                Protocol::Grpc,
+                Protocol::Grpcs,
+            ],
             tags: vec![],
             ordering: None,
             created_at: now,
@@ -593,7 +617,11 @@ pub struct PagedResponse<T> {
 
 impl<T> PagedResponse<T> {
     pub fn new(data: Vec<T>) -> Self {
-        Self { data, next: None, offset: None }
+        Self {
+            data,
+            next: None,
+            offset: None,
+        }
     }
 }
 

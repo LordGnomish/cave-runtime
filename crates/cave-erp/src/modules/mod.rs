@@ -2,10 +2,10 @@
 // Copyright 2026 Cave Runtime contributors
 pub mod hr;
 pub mod recruitment;
-pub mod crm;
-pub mod sales;
-pub mod purchase;
-pub mod inventory;
+// crm module deprecated per ADR-145 — see crates/cave-crm/.
 pub mod accounting;
+pub mod inventory;
 pub mod manufacturing;
 pub mod projects;
+pub mod purchase;
+pub mod sales;

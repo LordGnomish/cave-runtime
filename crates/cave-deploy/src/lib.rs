@@ -33,7 +33,9 @@ impl DeployState {
 
 impl Default for DeployState {
     fn default() -> Self {
-        Self { pool: Arc::new(cave_db::CavePool::mock()) }
+        Self {
+            pool: Arc::new(cave_db::CavePool::mock()),
+        }
     }
 }
 

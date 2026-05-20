@@ -2,7 +2,6 @@
 // Copyright 2026 Cave Runtime contributors
 //! Abstract syntax tree for SQL.
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ast {
     pub statement: Statement,
@@ -280,12 +279,7 @@ mod tests {
 
     #[test]
     fn test_binary_op_types() {
-        let ops = vec![
-            BinaryOp::Eq,
-            BinaryOp::Add,
-            BinaryOp::And,
-            BinaryOp::Like,
-        ];
+        let ops = vec![BinaryOp::Eq, BinaryOp::Add, BinaryOp::And, BinaryOp::Like];
         assert_eq!(ops.len(), 4);
     }
 

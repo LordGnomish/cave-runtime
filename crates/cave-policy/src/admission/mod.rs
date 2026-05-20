@@ -80,7 +80,11 @@ pub struct AdmissionResponse {
     pub patch: Option<String>,
     #[serde(rename = "patchType", skip_serializing_if = "Option::is_none")]
     pub patch_type: Option<String>,
-    #[serde(rename = "auditAnnotations", default, skip_serializing_if = "HashMap::is_empty")]
+    #[serde(
+        rename = "auditAnnotations",
+        default,
+        skip_serializing_if = "HashMap::is_empty"
+    )]
     pub audit_annotations: HashMap<String, String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
@@ -206,7 +210,10 @@ impl Default for AdmissionWebhook {
 
 impl AdmissionWebhook {
     pub fn new(fail_open: bool) -> Self {
-        Self { fail_open, timeout_seconds: 10 }
+        Self {
+            fail_open,
+            timeout_seconds: 10,
+        }
     }
 
     /// Process an AdmissionReview request.
@@ -219,7 +226,9 @@ impl AdmissionWebhook {
         let request = match &review.request {
             Some(r) => r,
             None => {
-                return Err(PolicyError::InvalidRequest("AdmissionReview missing request".into()));
+                return Err(PolicyError::InvalidRequest(
+                    "AdmissionReview missing request".into(),
+                ));
             }
         };
 
@@ -244,32 +253,30 @@ impl AdmissionWebhook {
         if let Some(false) = opa_decision {
             return Ok(AdmissionReview::new_response(
                 uid.clone(),
-                AdmissionResponse::deny(
-                    uid,
-                    "Request denied by OPA policy".into(),
-                    403,
-                ),
+                AdmissionResponse::deny(uid, "Request denied by OPA policy".into(), 403),
             ));
         }
 
         // ── Kyverno evaluation ────────────────────────────────────────────────
-        let kyverno_result = kyverno_engine.evaluate(&resource, namespace, &operation, Some(&serde_json::json!({
-            "username": request.user_info.username,
-            "groups": request.user_info.groups,
-        })));
+        let kyverno_result = kyverno_engine.evaluate(
+            &resource,
+            namespace,
+            &operation,
+            Some(&serde_json::json!({
+                "username": request.user_info.username,
+                "groups": request.user_info.groups,
+            })),
+        );
 
         if !kyverno_result.allowed {
-            let messages: Vec<String> = kyverno_result.violations
+            let messages: Vec<String> = kyverno_result
+                .violations
                 .iter()
                 .map(|v| format!("[{}:{}] {}", v.policy, v.rule, v.message))
                 .collect();
             return Ok(AdmissionReview::new_response(
                 uid.clone(),
-                AdmissionResponse::deny(
-                    uid,
-                    messages.join("; "),
-                    403,
-                ),
+                AdmissionResponse::deny(uid, messages.join("; "), 403),
             ));
         }
 
@@ -301,7 +308,12 @@ impl AdmissionWebhook {
     ) -> Option<bool> {
         // Try standard OPA admission paths
         let paths_to_try = [
-            vec!["data".to_string(), "kubernetes".to_string(), "admission".to_string(), "allow".to_string()],
+            vec![
+                "data".to_string(),
+                "kubernetes".to_string(),
+                "admission".to_string(),
+                "allow".to_string(),
+            ],
             vec!["data".to_string(), "authz".to_string(), "allow".to_string()],
             vec!["data".to_string(), "main".to_string(), "allow".to_string()],
         ];

@@ -14,7 +14,10 @@ use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
 
-pub fn list_all(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<PartitionSpec>, IcebergViewError> {
+pub fn list_all(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<PartitionSpec>, IcebergViewError> {
     ctx.authorise(Permission::IcebergRead)?;
     let tbls = tables::list(state, ctx)?;
     Ok(tbls.iter().map(derive_spec).collect())
@@ -98,10 +101,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, IcebergVie
     }
     let body = format!(
         r#"<section>{tbl}</section>"#,
-        tbl = table(
-            &["table", "spec", "field_id", "name", "transform"],
-            &rows
-        )
+        tbl = table(&["table", "spec", "field_id", "name", "transform"], &rows)
     );
     Ok(page_shell_full(
         ctx,
@@ -140,8 +140,14 @@ mod tests {
 
     fn seeded() -> AdminState {
         let s = AdminState::seeded();
-        s.iceberg_tables.write().unwrap().push(t("analytics", "orders", 500_000));
-        s.iceberg_tables.write().unwrap().push(t("raw", "audit", 10));
+        s.iceberg_tables
+            .write()
+            .unwrap()
+            .push(t("analytics", "orders", 500_000));
+        s.iceberg_tables
+            .write()
+            .unwrap()
+            .push(t("raw", "audit", 10));
         s
     }
 
@@ -162,14 +168,23 @@ mod tests {
     fn analytics_namespace_has_bucket_field() {
         let s = seeded();
         let spec = get(&s, &ctx(&[Permission::IcebergRead]), "analytics", "orders").unwrap();
-        assert!(spec.fields.iter().any(|f| f.transform.starts_with("bucket[")));
+        assert!(
+            spec.fields
+                .iter()
+                .any(|f| f.transform.starts_with("bucket["))
+        );
     }
 
     #[test]
     fn raw_namespace_skips_bucket_field() {
         let s = seeded();
         let spec = get(&s, &ctx(&[Permission::IcebergRead]), "raw", "audit").unwrap();
-        assert!(!spec.fields.iter().any(|f| f.transform.starts_with("bucket[")));
+        assert!(
+            !spec
+                .fields
+                .iter()
+                .any(|f| f.transform.starts_with("bucket["))
+        );
     }
 
     #[test]

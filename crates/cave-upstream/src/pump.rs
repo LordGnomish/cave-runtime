@@ -117,16 +117,21 @@ pub fn default_queue_dir() -> PathBuf {
 fn slugify_repo(repo: &str) -> String {
     repo.replace('/', "-")
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '.' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '.' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 
 /// Write the payload atomically. Returns the basename (not the full path)
 /// so it can be stored in [`crate::state::ProjectState::last_pump_payload_id`].
 pub fn write_payload(queue_dir: &Path, payload: &PumpPayload) -> anyhow::Result<String> {
-    std::fs::create_dir_all(queue_dir).map_err(|e| {
-        anyhow::anyhow!("create queue dir {}: {}", queue_dir.display(), e)
-    })?;
+    std::fs::create_dir_all(queue_dir)
+        .map_err(|e| anyhow::anyhow!("create queue dir {}: {}", queue_dir.display(), e))?;
     let ts = payload.created_at.timestamp_millis();
     let slug = slugify_repo(&payload.upstream_repo);
     let basename = format!("upstream-port-{ts}-{slug}.json");
@@ -224,7 +229,10 @@ mod tests {
     #[test]
     fn slugify_handles_normal_repos() {
         assert_eq!(slugify_repo("etcd-io/etcd"), "etcd-io-etcd");
-        assert_eq!(slugify_repo("kubernetes/kubernetes"), "kubernetes-kubernetes");
+        assert_eq!(
+            slugify_repo("kubernetes/kubernetes"),
+            "kubernetes-kubernetes"
+        );
     }
 
     #[test]
@@ -237,9 +245,13 @@ mod tests {
     fn env_var_overrides_default_queue() {
         let tmp = TempDir::new().unwrap();
         // SAFETY: serialised access — no other test in this binary touches this var.
-        unsafe { std::env::set_var("CAVE_QWEN_PUMP_QUEUE", tmp.path()); }
+        unsafe {
+            std::env::set_var("CAVE_QWEN_PUMP_QUEUE", tmp.path());
+        }
         let resolved = default_queue_dir();
-        unsafe { std::env::remove_var("CAVE_QWEN_PUMP_QUEUE"); }
+        unsafe {
+            std::env::remove_var("CAVE_QWEN_PUMP_QUEUE");
+        }
         assert_eq!(resolved, tmp.path());
     }
 

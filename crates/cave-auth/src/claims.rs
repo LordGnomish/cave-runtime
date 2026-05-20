@@ -73,8 +73,7 @@ impl RawClaims {
 
         let permissions = resolve_permissions(&roles, self.scp.as_deref());
 
-        let exp = DateTime::<Utc>::from_timestamp(self.exp, 0)
-            .ok_or("Invalid exp timestamp")?;
+        let exp = DateTime::<Utc>::from_timestamp(self.exp, 0).ok_or("Invalid exp timestamp")?;
 
         Ok(CaveIdentity {
             cave_uid,

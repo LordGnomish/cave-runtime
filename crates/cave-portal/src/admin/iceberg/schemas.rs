@@ -8,7 +8,10 @@ use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
 
-pub fn list_all(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<IcebergSchema>, IcebergViewError> {
+pub fn list_all(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<IcebergSchema>, IcebergViewError> {
     ctx.authorise(Permission::IcebergRead)?;
     let tbls = tables::list(state, ctx)?;
     Ok(tbls.iter().flat_map(history_for_table).collect())
@@ -35,8 +38,18 @@ fn history_for_table(t: &IcebergTable) -> Vec<IcebergSchema> {
         last_updated_ms: t.last_updated_ms - 7 * 24 * 3600 * 1000,
         identifier_field_ids: vec![1],
         fields: vec![
-            SchemaField { id: 1, name: "id".into(), data_type: "long".into(), required: true },
-            SchemaField { id: 2, name: "ts".into(), data_type: "timestamptz".into(), required: true },
+            SchemaField {
+                id: 1,
+                name: "id".into(),
+                data_type: "long".into(),
+                required: true,
+            },
+            SchemaField {
+                id: 2,
+                name: "ts".into(),
+                data_type: "timestamptz".into(),
+                required: true,
+            },
         ],
     });
     // v2: added a payload column.
@@ -49,9 +62,24 @@ fn history_for_table(t: &IcebergTable) -> Vec<IcebergSchema> {
             last_updated_ms: t.last_updated_ms - 24 * 3600 * 1000,
             identifier_field_ids: vec![1],
             fields: vec![
-                SchemaField { id: 1, name: "id".into(), data_type: "long".into(), required: true },
-                SchemaField { id: 2, name: "ts".into(), data_type: "timestamptz".into(), required: true },
-                SchemaField { id: 3, name: "payload".into(), data_type: "string".into(), required: false },
+                SchemaField {
+                    id: 1,
+                    name: "id".into(),
+                    data_type: "long".into(),
+                    required: true,
+                },
+                SchemaField {
+                    id: 2,
+                    name: "ts".into(),
+                    data_type: "timestamptz".into(),
+                    required: true,
+                },
+                SchemaField {
+                    id: 3,
+                    name: "payload".into(),
+                    data_type: "string".into(),
+                    required: false,
+                },
             ],
         });
     }
@@ -65,10 +93,30 @@ fn history_for_table(t: &IcebergTable) -> Vec<IcebergSchema> {
             last_updated_ms: t.last_updated_ms,
             identifier_field_ids: vec![1],
             fields: vec![
-                SchemaField { id: 1, name: "id".into(), data_type: "long".into(), required: true },
-                SchemaField { id: 2, name: "ts".into(), data_type: "timestamptz".into(), required: true },
-                SchemaField { id: 3, name: "payload".into(), data_type: "string".into(), required: false },
-                SchemaField { id: 4, name: "tenant".into(), data_type: "string".into(), required: true },
+                SchemaField {
+                    id: 1,
+                    name: "id".into(),
+                    data_type: "long".into(),
+                    required: true,
+                },
+                SchemaField {
+                    id: 2,
+                    name: "ts".into(),
+                    data_type: "timestamptz".into(),
+                    required: true,
+                },
+                SchemaField {
+                    id: 3,
+                    name: "payload".into(),
+                    data_type: "string".into(),
+                    required: false,
+                },
+                SchemaField {
+                    id: 4,
+                    name: "tenant".into(),
+                    data_type: "string".into(),
+                    required: true,
+                },
             ],
         });
     }
@@ -99,7 +147,11 @@ pub fn drift(prev: &IcebergSchema, next: &IcebergSchema) -> SchemaDrift {
             removed.push(f.clone());
         }
     }
-    SchemaDrift { added, removed, type_changed }
+    SchemaDrift {
+        added,
+        removed,
+        type_changed,
+    }
 }
 
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, IcebergViewError> {
@@ -110,7 +162,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, IcebergVie
             vec![
                 escape(&s.table_fqn),
                 s.schema_id.to_string(),
-                s.previous_schema_id.map(|p| p.to_string()).unwrap_or_else(|| "—".into()),
+                s.previous_schema_id
+                    .map(|p| p.to_string())
+                    .unwrap_or_else(|| "—".into()),
                 s.fields.len().to_string(),
                 s.last_updated_ms.to_string(),
             ]
@@ -118,10 +172,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, IcebergVie
         .collect();
     let body = format!(
         r#"<section>{tbl}</section>"#,
-        tbl = table(
-            &["table", "schema", "prev", "fields", "ts"],
-            &table_rows,
-        ),
+        tbl = table(&["table", "schema", "prev", "fields", "ts"], &table_rows,),
     );
     Ok(page_shell_full(
         ctx,
@@ -160,7 +211,10 @@ mod tests {
 
     fn seeded(schema_id: u32) -> AdminState {
         let s = AdminState::seeded();
-        s.iceberg_tables.write().unwrap().push(table_with_schema(schema_id));
+        s.iceberg_tables
+            .write()
+            .unwrap()
+            .push(table_with_schema(schema_id));
         s
     }
 
@@ -196,12 +250,27 @@ mod tests {
             previous_schema_id: None,
             last_updated_ms: 0,
             identifier_field_ids: vec![1],
-            fields: vec![SchemaField { id: 1, name: "a".into(), data_type: "int".into(), required: true }],
+            fields: vec![SchemaField {
+                id: 1,
+                name: "a".into(),
+                data_type: "int".into(),
+                required: true,
+            }],
         };
         let next = IcebergSchema {
             fields: vec![
-                SchemaField { id: 1, name: "a".into(), data_type: "int".into(), required: true },
-                SchemaField { id: 2, name: "b".into(), data_type: "string".into(), required: false },
+                SchemaField {
+                    id: 1,
+                    name: "a".into(),
+                    data_type: "int".into(),
+                    required: true,
+                },
+                SchemaField {
+                    id: 2,
+                    name: "b".into(),
+                    data_type: "string".into(),
+                    required: false,
+                },
             ],
             schema_id: 2,
             previous_schema_id: Some(1),
@@ -223,12 +292,27 @@ mod tests {
             last_updated_ms: 0,
             identifier_field_ids: vec![1],
             fields: vec![
-                SchemaField { id: 1, name: "a".into(), data_type: "int".into(), required: true },
-                SchemaField { id: 2, name: "b".into(), data_type: "string".into(), required: false },
+                SchemaField {
+                    id: 1,
+                    name: "a".into(),
+                    data_type: "int".into(),
+                    required: true,
+                },
+                SchemaField {
+                    id: 2,
+                    name: "b".into(),
+                    data_type: "string".into(),
+                    required: false,
+                },
             ],
         };
         let next = IcebergSchema {
-            fields: vec![SchemaField { id: 1, name: "a".into(), data_type: "int".into(), required: true }],
+            fields: vec![SchemaField {
+                id: 1,
+                name: "a".into(),
+                data_type: "int".into(),
+                required: true,
+            }],
             ..prev.clone()
         };
         let d = drift(&prev, &next);
@@ -245,10 +329,20 @@ mod tests {
             previous_schema_id: None,
             last_updated_ms: 0,
             identifier_field_ids: vec![1],
-            fields: vec![SchemaField { id: 1, name: "a".into(), data_type: "int".into(), required: true }],
+            fields: vec![SchemaField {
+                id: 1,
+                name: "a".into(),
+                data_type: "int".into(),
+                required: true,
+            }],
         };
         let next = IcebergSchema {
-            fields: vec![SchemaField { id: 1, name: "a".into(), data_type: "long".into(), required: true }],
+            fields: vec![SchemaField {
+                id: 1,
+                name: "a".into(),
+                data_type: "long".into(),
+                required: true,
+            }],
             ..prev.clone()
         };
         let d = drift(&prev, &next);

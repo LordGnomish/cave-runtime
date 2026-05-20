@@ -13,7 +13,9 @@ use crate::models::{Alert, InhibitRule};
 /// under the given rules. Tenant scoping: only sources from the same tenant
 /// can inhibit a target.
 pub fn is_inhibited(target: &Alert, sources: &[Alert], rules: &[InhibitRule]) -> bool {
-    rules.iter().any(|rule| rule_inhibits(rule, target, sources))
+    rules
+        .iter()
+        .any(|rule| rule_inhibits(rule, target, sources))
 }
 
 pub fn rule_inhibits(rule: &InhibitRule, target: &Alert, sources: &[Alert]) -> bool {
@@ -50,9 +52,12 @@ mod tests {
     use uuid::Uuid;
 
     fn alert(name: &str, labels: Vec<(&str, &str)>, fp: &str) -> Alert {
-        let mut map: HashMap<String, String> =
-            labels.into_iter().map(|(k, v)| (k.into(), v.into())).collect();
-        map.entry("alertname".to_string()).or_insert_with(|| name.to_string());
+        let mut map: HashMap<String, String> = labels
+            .into_iter()
+            .map(|(k, v)| (k.into(), v.into()))
+            .collect();
+        map.entry("alertname".to_string())
+            .or_insert_with(|| name.to_string());
         Alert {
             id: Uuid::new_v4(),
             name: name.into(),
@@ -76,7 +81,11 @@ mod tests {
 
     #[test]
     fn test_basic_inhibit_with_equal_label() {
-        let cluster_down = alert("ClusterDown", vec![("cluster", "c1"), ("severity", "critical")], "fp-cd");
+        let cluster_down = alert(
+            "ClusterDown",
+            vec![("cluster", "c1"), ("severity", "critical")],
+            "fp-cd",
+        );
         let pod_high = alert(
             "PodHigh",
             vec![("cluster", "c1"), ("severity", "warning")],
@@ -88,12 +97,20 @@ mod tests {
             vec![Matcher::equal("severity", "warning")],
             vec!["cluster".into()],
         );
-        assert!(is_inhibited(&pod_high, &[cluster_down, pod_high.clone()], &[rule]));
+        assert!(is_inhibited(
+            &pod_high,
+            &[cluster_down, pod_high.clone()],
+            &[rule]
+        ));
     }
 
     #[test]
     fn test_inhibit_blocked_by_unequal_label() {
-        let cluster_down = alert("ClusterDown", vec![("cluster", "c1"), ("severity", "critical")], "fp-cd");
+        let cluster_down = alert(
+            "ClusterDown",
+            vec![("cluster", "c1"), ("severity", "critical")],
+            "fp-cd",
+        );
         let pod_high = alert(
             "PodHigh",
             vec![("cluster", "c2"), ("severity", "warning")],
@@ -105,12 +122,20 @@ mod tests {
             vec![Matcher::equal("severity", "warning")],
             vec!["cluster".into()],
         );
-        assert!(!is_inhibited(&pod_high, &[cluster_down, pod_high.clone()], &[rule]));
+        assert!(!is_inhibited(
+            &pod_high,
+            &[cluster_down, pod_high.clone()],
+            &[rule]
+        ));
     }
 
     #[test]
     fn test_inhibit_target_must_match_target_matchers() {
-        let cluster_down = alert("ClusterDown", vec![("cluster", "c1"), ("severity", "critical")], "fp-cd");
+        let cluster_down = alert(
+            "ClusterDown",
+            vec![("cluster", "c1"), ("severity", "critical")],
+            "fp-cd",
+        );
         let pod_high = alert(
             "PodHigh",
             vec![("cluster", "c1"), ("severity", "info")],
@@ -122,7 +147,11 @@ mod tests {
             vec![Matcher::equal("severity", "warning")], // info ≠ warning
             vec!["cluster".into()],
         );
-        assert!(!is_inhibited(&pod_high, &[cluster_down, pod_high.clone()], &[rule]));
+        assert!(!is_inhibited(
+            &pod_high,
+            &[cluster_down, pod_high.clone()],
+            &[rule]
+        ));
     }
 
     #[test]
@@ -140,8 +169,16 @@ mod tests {
 
     #[test]
     fn test_filter_inhibited_keeps_sources() {
-        let src = alert("ClusterDown", vec![("cluster", "c1"), ("severity", "critical")], "fp-src");
-        let tgt = alert("PodHigh", vec![("cluster", "c1"), ("severity", "warning")], "fp-tgt");
+        let src = alert(
+            "ClusterDown",
+            vec![("cluster", "c1"), ("severity", "critical")],
+            "fp-src",
+        );
+        let tgt = alert(
+            "PodHigh",
+            vec![("cluster", "c1"), ("severity", "warning")],
+            "fp-tgt",
+        );
         let rule = InhibitRule::new(
             "rule",
             vec![Matcher::equal("alertname", "ClusterDown")],
@@ -155,9 +192,17 @@ mod tests {
 
     #[test]
     fn test_tenant_isolation_in_inhibit() {
-        let mut src = alert("ClusterDown", vec![("cluster", "c1"), ("severity", "critical")], "fp-src");
+        let mut src = alert(
+            "ClusterDown",
+            vec![("cluster", "c1"), ("severity", "critical")],
+            "fp-src",
+        );
         src.tenant_id = "acme".into();
-        let mut tgt = alert("PodHigh", vec![("cluster", "c1"), ("severity", "warning")], "fp-tgt");
+        let mut tgt = alert(
+            "PodHigh",
+            vec![("cluster", "c1"), ("severity", "warning")],
+            "fp-tgt",
+        );
         tgt.tenant_id = "globex".into();
         let rule = InhibitRule::new(
             "rule",

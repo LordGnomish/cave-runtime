@@ -7,7 +7,7 @@
 
 ## Override Notice
 
-ADR-027 (Platform) — "Kong API Gateway" — **Platform repo'da değişmiyor**. Burak'ın iş yerinde sovereign Hetzner deployment'ı için Kong OSS deployment kararı geçerliliğini koruyor; Platform Kong'u OSS olarak deploy etmeye devam ediyor.
+ADR-027 (Platform) — "Kong API Gateway" — **Platform repo'da değişmiyor**. Burak'ın iş yerinde sovereign sovereign-cloud deployments'ı için Kong OSS deployment kararı geçerliliğini koruyor; Platform Kong'u OSS olarak deploy etmeye devam ediyor.
 
 Bu ADR **sadece Cave Runtime context'inde** ADR-027'yi override ediyor: Runtime'da `cave-gateway` crate'i Kong + Gravitee'nin **konsolide reimpl'i** olarak doğuyor — Platform'daki Kong-only kararından sapan multi-upstream konsolidasyon vakası.
 

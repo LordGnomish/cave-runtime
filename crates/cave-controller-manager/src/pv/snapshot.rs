@@ -134,7 +134,10 @@ mod tests {
             "tenant-pv-snap-create"
         );
         let v = vs(
-            SnapshotSource::Pvc { name: "pvc".into(), namespace: "default".into() },
+            SnapshotSource::Pvc {
+                name: "pvc".into(),
+                namespace: "default".into(),
+            },
             SnapshotPhase::Pending,
             None,
         );
@@ -149,7 +152,9 @@ mod tests {
             "tenant-pv-snap-bind"
         );
         let v = vs(
-            SnapshotSource::Content { name: "snapcontent-1".into() },
+            SnapshotSource::Content {
+                name: "snapcontent-1".into(),
+            },
             SnapshotPhase::Pending,
             None,
         );
@@ -164,7 +169,10 @@ mod tests {
             "tenant-pv-snap-wait"
         );
         let v = vs(
-            SnapshotSource::Pvc { name: "pvc".into(), namespace: "default".into() },
+            SnapshotSource::Pvc {
+                name: "pvc".into(),
+                namespace: "default".into(),
+            },
             SnapshotPhase::ContentCreated,
             Some("snapcontent-1"),
         );
@@ -180,7 +188,10 @@ mod tests {
             "tenant-pv-snap-noop"
         );
         let v = vs(
-            SnapshotSource::Pvc { name: "pvc".into(), namespace: "default".into() },
+            SnapshotSource::Pvc {
+                name: "pvc".into(),
+                namespace: "default".into(),
+            },
             SnapshotPhase::ReadyToUse,
             Some("snapcontent-1"),
         );
@@ -196,7 +207,10 @@ mod tests {
             "tenant-pv-snap-del-cascade"
         );
         let mut v = vs(
-            SnapshotSource::Pvc { name: "pvc".into(), namespace: "default".into() },
+            SnapshotSource::Pvc {
+                name: "pvc".into(),
+                namespace: "default".into(),
+            },
             SnapshotPhase::ReadyToUse,
             Some("snapcontent-1"),
         );
@@ -213,7 +227,10 @@ mod tests {
             "tenant-pv-snap-retain"
         );
         let mut v = vs(
-            SnapshotSource::Pvc { name: "pvc".into(), namespace: "default".into() },
+            SnapshotSource::Pvc {
+                name: "pvc".into(),
+                namespace: "default".into(),
+            },
             SnapshotPhase::ReadyToUse,
             Some("snapcontent-1"),
         );
@@ -230,7 +247,10 @@ mod tests {
             "tenant-pv-snap-del-no-content"
         );
         let mut v = vs(
-            SnapshotSource::Pvc { name: "pvc".into(), namespace: "default".into() },
+            SnapshotSource::Pvc {
+                name: "pvc".into(),
+                namespace: "default".into(),
+            },
             SnapshotPhase::Pending,
             None,
         );

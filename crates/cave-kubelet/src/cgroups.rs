@@ -54,10 +54,7 @@ pub enum CgroupValue {
     /// `memory.max` — `"max"` or a byte count.
     MemoryMax(MemoryLimit),
     /// `cpu.max` — `quota period` or `max period`.
-    CpuMax {
-        quota: Option<u64>,
-        period_us: u64,
-    },
+    CpuMax { quota: Option<u64>, period_us: u64 },
     /// `cpuset.cpus` / `cpuset.mems` — CSV cpu list.
     CpusetCpus(String),
     /// `pids.max` — process count cap.
@@ -95,7 +92,10 @@ pub fn pod_cgroup_path(qos: QosTier, pod_uid: &str) -> CgroupPath {
 /// Compute the container scope under a pod slice. cri-runtimes
 /// use `cri-containerd-<containerID>.scope`; we mirror that.
 pub fn container_cgroup_path(pod_path: &CgroupPath, container_id: &str) -> CgroupPath {
-    CgroupPath(format!("{}/cri-containerd-{container_id}.scope", pod_path.0))
+    CgroupPath(format!(
+        "{}/cri-containerd-{container_id}.scope",
+        pod_path.0
+    ))
 }
 
 /// Backend trait — the kubelet writes through this. Production
@@ -231,7 +231,10 @@ mod tests {
         b.write(&p, CgroupValue::MemoryMax(MemoryLimit::Bytes(1_000_000)))
             .unwrap();
         let got = b.read(&p, "memory.max").unwrap();
-        assert_eq!(got, Some(CgroupValue::MemoryMax(MemoryLimit::Bytes(1_000_000))));
+        assert_eq!(
+            got,
+            Some(CgroupValue::MemoryMax(MemoryLimit::Bytes(1_000_000)))
+        );
     }
 
     #[test]
@@ -254,9 +257,7 @@ mod tests {
     fn write_cpuset_rejects_empty() {
         let b = InMemoryCgroups::new();
         let p = pod_cgroup_path(QosTier::Guaranteed, "u");
-        assert!(b
-            .write(&p, CgroupValue::CpusetCpus(String::new()))
-            .is_err());
+        assert!(b.write(&p, CgroupValue::CpusetCpus(String::new())).is_err());
     }
 
     #[test]
@@ -292,8 +293,10 @@ mod tests {
         let b = InMemoryCgroups::new();
         let p1 = pod_cgroup_path(QosTier::Guaranteed, "u1");
         let p2 = pod_cgroup_path(QosTier::Burstable, "u2");
-        b.write(&p1, CgroupValue::MemoryMax(MemoryLimit::Bytes(1))).unwrap();
-        b.write(&p2, CgroupValue::MemoryMax(MemoryLimit::Bytes(2))).unwrap();
+        b.write(&p1, CgroupValue::MemoryMax(MemoryLimit::Bytes(1)))
+            .unwrap();
+        b.write(&p2, CgroupValue::MemoryMax(MemoryLimit::Bytes(2)))
+            .unwrap();
         b.remove(&p1).unwrap();
         assert_eq!(b.len(), 1);
         assert_eq!(
@@ -306,8 +309,10 @@ mod tests {
     fn write_overwrites_previous_value_for_same_control() {
         let b = InMemoryCgroups::new();
         let p = pod_cgroup_path(QosTier::Guaranteed, "u");
-        b.write(&p, CgroupValue::MemoryMax(MemoryLimit::Bytes(1))).unwrap();
-        b.write(&p, CgroupValue::MemoryMax(MemoryLimit::Bytes(2))).unwrap();
+        b.write(&p, CgroupValue::MemoryMax(MemoryLimit::Bytes(1)))
+            .unwrap();
+        b.write(&p, CgroupValue::MemoryMax(MemoryLimit::Bytes(2)))
+            .unwrap();
         let got = b.read(&p, "memory.max").unwrap();
         assert_eq!(got, Some(CgroupValue::MemoryMax(MemoryLimit::Bytes(2))));
     }

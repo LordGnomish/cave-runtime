@@ -8,10 +8,10 @@
 //!
 //! Upstream: <https://docs.erpnext.com/docs/v15/user/manual/en/human-resources>
 
+use super::ErpViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
-use super::ErpViewError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EmployeeRow {
@@ -26,7 +26,8 @@ pub fn list_employees(
     ctx: &RequestCtx,
 ) -> Result<Vec<EmployeeRow>, ErpViewError> {
     let invoices = super::invoices::list_invoices(state, ctx)?;
-    let mut acc: std::collections::BTreeMap<String, EmployeeRow> = std::collections::BTreeMap::new();
+    let mut acc: std::collections::BTreeMap<String, EmployeeRow> =
+        std::collections::BTreeMap::new();
     for inv in &invoices {
         let entry = acc
             .entry(inv.customer.clone())
@@ -68,10 +69,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ErpViewErr
 </section>"#,
         n = rows.len(),
         active = active,
-        tbl = table(
-            &["employee_id", "customer", "active_invoices"],
-            &table_rows
-        ),
+        tbl = table(&["employee_id", "customer", "active_invoices"], &table_rows),
     );
     Ok(page_shell_full(
         ctx,
@@ -90,8 +88,13 @@ mod tests {
 
     #[test]
     fn list_returns_one_employee_per_customer() {
-        let invoices = super::super::invoices::list_invoices(&AdminState::seeded(), &ctx(&[Permission::ErpRead])).unwrap();
-        let customers: std::collections::HashSet<_> = invoices.iter().map(|i| i.customer.clone()).collect();
+        let invoices = super::super::invoices::list_invoices(
+            &AdminState::seeded(),
+            &ctx(&[Permission::ErpRead]),
+        )
+        .unwrap();
+        let customers: std::collections::HashSet<_> =
+            invoices.iter().map(|i| i.customer.clone()).collect();
         let rows = list_employees(&AdminState::seeded(), &ctx(&[Permission::ErpRead])).unwrap();
         assert_eq!(rows.len(), customers.len());
     }

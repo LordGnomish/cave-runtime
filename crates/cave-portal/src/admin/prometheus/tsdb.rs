@@ -36,8 +36,7 @@ pub fn tsdb_status(
     let avg_retention_days = if targets.is_empty() {
         0
     } else {
-        (targets.iter().map(|t| t.retention_days as u64).sum::<u64>()
-            / targets.len() as u64) as u32
+        (targets.iter().map(|t| t.retention_days as u64).sum::<u64>() / targets.len() as u64) as u32
     };
     Ok(TsdbStatusRow {
         head_series,
@@ -121,7 +120,13 @@ mod tests {
     fn render_section_emits_all_status_fields() {
         let s = AdminState::seeded();
         let html = render_section(&s, &ctx(&[Permission::PrometheusRead])).unwrap();
-        for label in ["head series", "head chunks", "WAL size", "blocks loaded", "avg retention"] {
+        for label in [
+            "head series",
+            "head chunks",
+            "WAL size",
+            "blocks loaded",
+            "avg retention",
+        ] {
             assert!(html.contains(label));
         }
     }

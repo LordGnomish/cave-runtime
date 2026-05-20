@@ -37,7 +37,9 @@ struct BanditIssue {
 }
 
 impl ScanParser for BanditParser {
-    fn scan_type(&self) -> &'static str { "Bandit Scan" }
+    fn scan_type(&self) -> &'static str {
+        "Bandit Scan"
+    }
 
     // Source: dojo/tools/bandit/parser.py::get_dedupe_fields
     fn dedupe_fields(&self) -> &'static [&'static str] {
@@ -51,8 +53,7 @@ impl ScanParser for BanditParser {
         for item in report.results {
             // Source: dojo/tools/bandit/parser.py:91
             //   severity = item["issue_severity"].title()
-            let sev = FindingSeverity::parse(&item.issue_severity)
-                .unwrap_or(FindingSeverity::Info);
+            let sev = FindingSeverity::parse(&item.issue_severity).unwrap_or(FindingSeverity::Info);
             let vuln_id = format!("{}:{}", item.test_name, item.test_id);
             let mut f = Finding::new(item.issue_text.clone(), sev);
             f.date = now;
@@ -122,8 +123,14 @@ mod tests {
     #[test]
     fn builds_vuln_id_from_tool_as_name_colon_id() {
         let out = BanditParser.parse(SAMPLE).unwrap();
-        assert_eq!(out[0].vuln_id_from_tool.as_deref(), Some("hardcoded_password_string:B105"));
-        assert_eq!(out[1].vuln_id_from_tool.as_deref(), Some("assert_used:B101"));
+        assert_eq!(
+            out[0].vuln_id_from_tool.as_deref(),
+            Some("hardcoded_password_string:B105")
+        );
+        assert_eq!(
+            out[1].vuln_id_from_tool.as_deref(),
+            Some("assert_used:B101")
+        );
     }
 
     #[test]

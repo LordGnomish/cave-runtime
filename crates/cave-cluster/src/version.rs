@@ -95,19 +95,16 @@ pub fn validate_k8s_version(version: &str) -> ClusterResult<()> {
 
 /// Validate an upgrade path: only one minor version at a time.
 pub fn validate_upgrade(from: &str, to: &str) -> ClusterResult<()> {
-    let (from_major, from_minor) = parse_version(from).ok_or_else(|| {
-        ClusterError::InvalidUpgrade {
+    let (from_major, from_minor) =
+        parse_version(from).ok_or_else(|| ClusterError::InvalidUpgrade {
             from: from.to_string(),
             to: to.to_string(),
             reason: "invalid source version".into(),
-        }
-    })?;
-    let (to_major, to_minor) = parse_version(to).ok_or_else(|| {
-        ClusterError::InvalidUpgrade {
-            from: from.to_string(),
-            to: to.to_string(),
-            reason: "invalid target version".into(),
-        }
+        })?;
+    let (to_major, to_minor) = parse_version(to).ok_or_else(|| ClusterError::InvalidUpgrade {
+        from: from.to_string(),
+        to: to.to_string(),
+        reason: "invalid target version".into(),
     })?;
 
     if to_major < from_major || (to_major == from_major && to_minor < from_minor) {

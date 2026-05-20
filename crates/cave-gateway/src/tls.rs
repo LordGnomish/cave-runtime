@@ -65,7 +65,12 @@ impl SniCertResolver {
     }
 
     /// Add a single certificate for the given SNI names.
-    pub fn add_cert(&self, sni_names: &[String], cert_pem: &str, key_pem: &str) -> Result<(), String> {
+    pub fn add_cert(
+        &self,
+        sni_names: &[String],
+        cert_pem: &str,
+        key_pem: &str,
+    ) -> Result<(), String> {
         let ck = parse_certified_key(cert_pem, key_pem)
             .map_err(|e| format!("failed to parse certificate: {}", e))?;
         let ck = Arc::new(ck);
@@ -135,7 +140,9 @@ pub fn parse_certified_key(
 
         if !pkcs8.is_empty() {
             let key = pkcs8.into_iter().next().unwrap();
-            PrivateKeyDer::Pkcs8(rustls::pki_types::PrivatePkcs8KeyDer::from(key.secret_pkcs8_der().to_vec()))
+            PrivateKeyDer::Pkcs8(rustls::pki_types::PrivatePkcs8KeyDer::from(
+                key.secret_pkcs8_der().to_vec(),
+            ))
         } else {
             // Try RSA
             let mut reader = BufReader::new(key_bytes);
@@ -144,7 +151,9 @@ pub fn parse_certified_key(
                 .unwrap_or_default();
             if !rsa.is_empty() {
                 let key = rsa.into_iter().next().unwrap();
-                PrivateKeyDer::Pkcs1(rustls::pki_types::PrivatePkcs1KeyDer::from(key.secret_pkcs1_der().to_vec()))
+                PrivateKeyDer::Pkcs1(rustls::pki_types::PrivatePkcs1KeyDer::from(
+                    key.secret_pkcs1_der().to_vec(),
+                ))
             } else {
                 return Err("no private key found in PEM".into());
             }
@@ -268,7 +277,6 @@ impl AcmeChallengeStore {
         self.tokens.remove(token);
     }
 }
-
 
 /// Axum handler for ACME HTTP-01 challenges.
 pub async fn acme_challenge_handler(

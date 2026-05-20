@@ -33,14 +33,26 @@ fn svc(name: &str) -> ServicePortName {
 fn upsert_slice_overwrites_in_place() {
     let mut m = EndpointSliceMap::new(TENANT);
     let s = svc("api");
-    m.upsert_slice(s.clone(), "slice-1", vec![ep("10.1.0.1", 8080, true, Some("nodeA"))]);
+    m.upsert_slice(
+        s.clone(),
+        "slice-1",
+        vec![ep("10.1.0.1", 8080, true, Some("nodeA"))],
+    );
     assert_eq!(m.endpoints_for(&s).len(), 1);
 
-    m.upsert_slice(s.clone(), "slice-1", vec![
-        ep("10.1.0.1", 8080, true, Some("nodeA")),
-        ep("10.1.0.2", 8080, true, Some("nodeB")),
-    ]);
-    assert_eq!(m.endpoints_for(&s).len(), 2, "old slice contents are replaced, not merged");
+    m.upsert_slice(
+        s.clone(),
+        "slice-1",
+        vec![
+            ep("10.1.0.1", 8080, true, Some("nodeA")),
+            ep("10.1.0.2", 8080, true, Some("nodeB")),
+        ],
+    );
+    assert_eq!(
+        m.endpoints_for(&s).len(),
+        2,
+        "old slice contents are replaced, not merged"
+    );
 }
 
 /// Cite: `pkg/proxy/endpointslicecache.go:162` (getEndpointsMap) —
@@ -50,11 +62,19 @@ fn upsert_slice_overwrites_in_place() {
 fn endpoints_for_flattens_multiple_slices() {
     let mut m = EndpointSliceMap::new(TENANT);
     let s = svc("api");
-    m.upsert_slice(s.clone(), "slice-1", vec![ep("10.1.0.1", 80, true, Some("nodeA"))]);
-    m.upsert_slice(s.clone(), "slice-2", vec![
-        ep("10.1.0.2", 80, true, Some("nodeB")),
-        ep("10.1.0.3", 80, false, Some("nodeC")),
-    ]);
+    m.upsert_slice(
+        s.clone(),
+        "slice-1",
+        vec![ep("10.1.0.1", 80, true, Some("nodeA"))],
+    );
+    m.upsert_slice(
+        s.clone(),
+        "slice-2",
+        vec![
+            ep("10.1.0.2", 80, true, Some("nodeB")),
+            ep("10.1.0.3", 80, false, Some("nodeC")),
+        ],
+    );
     assert_eq!(m.endpoints_for(&s).len(), 3, "flatten across slices");
     assert_eq!(m.ready_endpoints_for(&s).len(), 2, "filter unready");
 }
@@ -66,12 +86,23 @@ fn endpoints_for_flattens_multiple_slices() {
 fn delete_slice_keeps_sibling_slices_intact() {
     let mut m = EndpointSliceMap::new(TENANT);
     let s = svc("api");
-    m.upsert_slice(s.clone(), "slice-1", vec![ep("10.1.0.1", 80, true, Some("nodeA"))]);
-    m.upsert_slice(s.clone(), "slice-2", vec![ep("10.1.0.2", 80, true, Some("nodeB"))]);
+    m.upsert_slice(
+        s.clone(),
+        "slice-1",
+        vec![ep("10.1.0.1", 80, true, Some("nodeA"))],
+    );
+    m.upsert_slice(
+        s.clone(),
+        "slice-2",
+        vec![ep("10.1.0.2", 80, true, Some("nodeB"))],
+    );
 
     assert!(m.delete_slice(&s, "slice-1"));
     assert_eq!(m.endpoints_for(&s).len(), 1);
-    assert_eq!(m.endpoints_for(&s)[0].addresses[0], "10.1.0.2".parse::<IpAddr>().unwrap());
+    assert_eq!(
+        m.endpoints_for(&s)[0].addresses[0],
+        "10.1.0.2".parse::<IpAddr>().unwrap()
+    );
     assert!(!m.delete_slice(&s, "slice-1"), "second delete is a no-op");
 }
 
@@ -82,11 +113,15 @@ fn delete_slice_keeps_sibling_slices_intact() {
 fn local_ready_endpoints_filter_by_node_and_ready() {
     let mut m = EndpointSliceMap::new(TENANT);
     let s = svc("api");
-    m.upsert_slice(s.clone(), "slice-1", vec![
-        ep("10.1.0.1", 80, true,  Some("nodeA")),
-        ep("10.1.0.2", 80, false, Some("nodeA")),  // not ready
-        ep("10.1.0.3", 80, true,  Some("nodeB")),  // wrong node
-    ]);
+    m.upsert_slice(
+        s.clone(),
+        "slice-1",
+        vec![
+            ep("10.1.0.1", 80, true, Some("nodeA")),
+            ep("10.1.0.2", 80, false, Some("nodeA")), // not ready
+            ep("10.1.0.3", 80, true, Some("nodeB")),  // wrong node
+        ],
+    );
     let local = m.local_ready_endpoints(&s, "nodeA");
     assert_eq!(local.len(), 1);
     assert_eq!(local[0].addresses[0], "10.1.0.1".parse::<IpAddr>().unwrap());

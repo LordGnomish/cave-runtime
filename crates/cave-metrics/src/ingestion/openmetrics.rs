@@ -3,9 +3,9 @@
 //! OpenMetrics format parser (text/openmetrics-text; version=1.0.0).
 //! Superset of Prometheus exposition format with EOF marker and additional types.
 
+use super::IngestedBatch;
 use crate::error::Result;
 use crate::model::{Labels, Sample, TimeSeries};
-use super::IngestedBatch;
 
 /// Parse OpenMetrics text format.
 /// Falls back to the Prometheus exposition parser for lines that conform to that format.

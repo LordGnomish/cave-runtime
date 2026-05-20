@@ -25,7 +25,9 @@ pub struct IptablesProxier {
 
 impl IptablesProxier {
     pub fn new(tenant_id: impl Into<String>) -> Self {
-        Self { tenant_id: tenant_id.into() }
+        Self {
+            tenant_id: tenant_id.into(),
+        }
     }
 
     /// Cite: `pkg/proxy/iptables/proxier.go:939–:989` — per-service

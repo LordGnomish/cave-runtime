@@ -5,9 +5,9 @@
 //! protocol mappers. Visual port of
 //! `js/apps/admin-ui/src/clients/ClientsSection.tsx`.
 
+use super::{AuthAdminError, render_admin_nav, require_platform};
 use crate::admin::permission::RequestCtx;
 use crate::admin::render::{escape, page_shell_full, table_html};
-use super::{render_admin_nav, require_platform, AuthAdminError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Protocol {
@@ -112,7 +112,14 @@ pub fn render(ctx: &RequestCtx) -> Result<String, AuthAdminError> {
         nav = render_admin_nav("/admin/auth/clients"),
         n = clients.len(),
         tbl = table_html(
-            &["client_id", "protocol", "status", "access type", "default scopes", "optional scopes"],
+            &[
+                "client_id",
+                "protocol",
+                "status",
+                "access type",
+                "default scopes",
+                "optional scopes"
+            ],
             &rows
         ),
     );

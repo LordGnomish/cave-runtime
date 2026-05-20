@@ -18,7 +18,7 @@ pub mod field {
     pub const EVT_TYPE: &str = "evt.type";
     pub const EVT_DIR: &str = "evt.dir";
     pub const EVT_ARGS: &str = "evt.args";
-    pub const EVT_ARG: &str = "evt.arg";   // evt.arg.0, evt.arg.1 ...
+    pub const EVT_ARG: &str = "evt.arg"; // evt.arg.0, evt.arg.1 ...
     pub const EVT_NUM: &str = "evt.num";
     pub const EVT_TIME: &str = "evt.time";
     pub const EVT_RAWTIME: &str = "evt.rawtime";
@@ -163,12 +163,7 @@ impl EventContext {
     }
 
     /// Convenience: create a k8s audit event context.
-    pub fn k8s_audit(
-        verb: &str,
-        resource: &str,
-        namespace: &str,
-        user: &str,
-    ) -> Self {
+    pub fn k8s_audit(verb: &str, resource: &str, namespace: &str, user: &str) -> Self {
         let mut ctx = Self::new();
         ctx.source = Some(EventSource::K8sAudit);
         ctx.set(field::EVT_TYPE, verb);

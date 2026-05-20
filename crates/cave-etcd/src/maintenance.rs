@@ -56,7 +56,11 @@ pub fn hash_kv(store: &KvStore, req: &HashKvRequest) -> EtcdResult<HashKvRespons
         key: "".into(),
         range_end: Some("\u{ffff}".into()), // anything below U+FFFF
         limit: None,
-        revision: if req.revision == 0 { None } else { Some(target) },
+        revision: if req.revision == 0 {
+            None
+        } else {
+            Some(target)
+        },
         keys_only: false,
         count_only: false,
     })?;
@@ -102,10 +106,7 @@ pub struct MoveLeaderResponse {
 /// flips the local node to `Follower` and records the transition; in
 /// production the caller would forward the equivalent
 /// `LeaderTransferRequest` to the Raft module.
-pub fn move_leader(
-    store: &KvStore,
-    req: &MoveLeaderRequest,
-) -> EtcdResult<MoveLeaderResponse> {
+pub fn move_leader(store: &KvStore, req: &MoveLeaderRequest) -> EtcdResult<MoveLeaderResponse> {
     if !matches!(store.raft_role(), RaftRole::Leader) {
         return Err(EtcdError::NotLeader {
             term: store.current_term(),
@@ -153,12 +154,15 @@ mod tests {
     }
 
     fn pk_put(store: &KvStore, key: &str, value: &str) -> u64 {
-        store.put(&PutRequest {
-            key: key.into(),
-            value: value.into(),
-            lease: None,
-            prev_kv: false,
-        }).header.revision
+        store
+            .put(&PutRequest {
+                key: key.into(),
+                value: value.into(),
+                lease: None,
+                prev_kv: false,
+            })
+            .header
+            .revision
     }
 
     // ── HashKV ──────────────────────────────────────────────────────
@@ -182,7 +186,13 @@ mod tests {
         pk_put(&store, &dt(tenant_id, "k"), "v1");
         let rev_after_v1 = store.current_revision();
         pk_put(&store, &dt(tenant_id, "k"), "v2");
-        let r = hash_kv(&store, &HashKvRequest { revision: rev_after_v1 }).unwrap();
+        let r = hash_kv(
+            &store,
+            &HashKvRequest {
+                revision: rev_after_v1,
+            },
+        )
+        .unwrap();
         assert_eq!(r.hash_revision, rev_after_v1);
     }
 
@@ -207,8 +217,12 @@ mod tests {
         for i in 0..5 {
             pk_put(&store, &dt(tenant_id, &format!("k{i}")), &format!("v{i}"));
         }
-        let h1 = hash_kv(&store, &HashKvRequest { revision: 0 }).unwrap().hash;
-        let h2 = hash_kv(&store, &HashKvRequest { revision: 0 }).unwrap().hash;
+        let h1 = hash_kv(&store, &HashKvRequest { revision: 0 })
+            .unwrap()
+            .hash;
+        let h2 = hash_kv(&store, &HashKvRequest { revision: 0 })
+            .unwrap()
+            .hash;
         assert_eq!(h1, h2);
     }
 
@@ -276,9 +290,12 @@ mod tests {
         let _tenant_id = "mt-009";
         let store = KvStore::new();
         store.set_raft_role(RaftRole::Leader);
-        let err = move_leader(&store, &MoveLeaderRequest {
-            target_id: store.local_member_id(),
-        });
+        let err = move_leader(
+            &store,
+            &MoveLeaderRequest {
+                target_id: store.local_member_id(),
+            },
+        );
         assert!(matches!(err, Err(EtcdError::Internal(_))));
     }
 }

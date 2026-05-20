@@ -37,9 +37,15 @@ pub struct Policy {
     pub status: Option<PolicyStatus>,
 }
 
-fn default_api_version() -> String { "kyverno.io/v1".into() }
-fn default_cluster_policy_kind() -> String { "ClusterPolicy".into() }
-fn default_policy_kind() -> String { "Policy".into() }
+fn default_api_version() -> String {
+    "kyverno.io/v1".into()
+}
+fn default_cluster_policy_kind() -> String {
+    "ClusterPolicy".into()
+}
+fn default_policy_kind() -> String {
+    "Policy".into()
+}
 
 /// Common Kubernetes object metadata.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -65,7 +71,11 @@ pub struct PolicySpec {
     pub rules: Vec<KyvernoRule>,
     #[serde(rename = "validationFailureAction", default)]
     pub validation_failure_action: ValidationFailureAction,
-    #[serde(rename = "validationFailureActionOverrides", default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        rename = "validationFailureActionOverrides",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub validation_failure_action_overrides: Vec<ValidationFailureActionOverride>,
     #[serde(default = "default_true")]
     pub background: bool,
@@ -75,13 +85,18 @@ pub struct PolicySpec {
     pub generate_existing_on_policy_update: bool,
     #[serde(rename = "failurePolicy", default)]
     pub failure_policy: FailurePolicy,
-    #[serde(rename = "webhookTimeoutSeconds", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "webhookTimeoutSeconds",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub webhook_timeout_seconds: Option<u32>,
     #[serde(rename = "mutateExistingOnPolicyUpdate", default)]
     pub mutate_existing_on_policy_update: bool,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -123,17 +138,27 @@ pub struct KyvernoRule {
     pub mutate: Option<Mutation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub generate: Option<Generation>,
-    #[serde(rename = "verifyImages", default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        rename = "verifyImages",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub verify_images: Vec<ImageVerification>,
 }
 
 impl KyvernoRule {
     pub fn rule_type(&self) -> &'static str {
-        if self.validate.is_some() { "validate" }
-        else if self.mutate.is_some() { "mutate" }
-        else if self.generate.is_some() { "generate" }
-        else if !self.verify_images.is_empty() { "verifyImages" }
-        else { "unknown" }
+        if self.validate.is_some() {
+            "validate"
+        } else if self.mutate.is_some() {
+            "mutate"
+        } else if self.generate.is_some() {
+            "generate"
+        } else if !self.verify_images.is_empty() {
+            "verifyImages"
+        } else {
+            "unknown"
+        }
     }
 }
 
@@ -152,7 +177,11 @@ pub struct MatchResources {
     pub subjects: Vec<SubjectReference>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub roles: Vec<String>,
-    #[serde(rename = "clusterRoles", default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        rename = "clusterRoles",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub cluster_roles: Vec<String>,
 }
 
@@ -176,7 +205,11 @@ pub struct ResourceFilter {
     pub subjects: Vec<SubjectReference>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub roles: Vec<String>,
-    #[serde(rename = "clusterRoles", default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        rename = "clusterRoles",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub cluster_roles: Vec<String>,
 }
 
@@ -200,9 +233,17 @@ pub struct ResourceDescription {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LabelSelector {
-    #[serde(rename = "matchLabels", default, skip_serializing_if = "HashMap::is_empty")]
+    #[serde(
+        rename = "matchLabels",
+        default,
+        skip_serializing_if = "HashMap::is_empty"
+    )]
     pub match_labels: HashMap<String, String>,
-    #[serde(rename = "matchExpressions", default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        rename = "matchExpressions",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub match_expressions: Vec<LabelSelectorRequirement>,
 }
 
@@ -347,7 +388,11 @@ pub struct ForEachValidation {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CelValidation {
     pub expressions: Vec<CelExpression>,
-    #[serde(rename = "auditAnnotations", default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        rename = "auditAnnotations",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub audit_annotations: Vec<CelAuditAnnotation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
@@ -392,7 +437,10 @@ pub struct PodSecurityExclusion {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Mutation {
-    #[serde(rename = "patchStrategicMerge", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "patchStrategicMerge",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub patch_strategic_merge: Option<serde_json::Value>,
     #[serde(rename = "patchesJson6902", skip_serializing_if = "Option::is_none")]
     pub patches_json6902: Option<String>,
@@ -405,7 +453,10 @@ pub struct Mutation {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForEachMutation {
     pub list: String,
-    #[serde(rename = "patchStrategicMerge", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "patchStrategicMerge",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub patch_strategic_merge: Option<serde_json::Value>,
     #[serde(rename = "patchesJson6902", skip_serializing_if = "Option::is_none")]
     pub patches_json6902: Option<String>,
@@ -487,7 +538,10 @@ pub struct ImageVerification {
     pub verify_digest: bool,
     #[serde(rename = "required", default = "default_true")]
     pub required: bool,
-    #[serde(rename = "imageRegistryCredentials", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "imageRegistryCredentials",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub image_registry_credentials: Option<ImageRegistryCredentials>,
 }
 

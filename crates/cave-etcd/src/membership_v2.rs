@@ -34,7 +34,9 @@ pub enum ConfChangeTransition {
 }
 
 impl Default for ConfChangeTransition {
-    fn default() -> Self { Self::Auto }
+    fn default() -> Self {
+        Self::Auto
+    }
 }
 
 /// One change inside a [`ConfChangeV2`] batch.
@@ -56,11 +58,18 @@ pub struct ConfChangeV2 {
 
 impl ConfChangeV2 {
     pub fn new(transition: ConfChangeTransition) -> Self {
-        Self { transition, changes: Vec::new(), context: Vec::new() }
+        Self {
+            transition,
+            changes: Vec::new(),
+            context: Vec::new(),
+        }
     }
 
     pub fn add(mut self, kind: ConfChangeType, node_id: u64) -> Self {
-        self.changes.push(ConfChangeSingle { change_type: kind, node_id });
+        self.changes.push(ConfChangeSingle {
+            change_type: kind,
+            node_id,
+        });
         self
     }
 
@@ -72,9 +81,16 @@ impl ConfChangeV2 {
     /// True if this change requires a joint consensus.  Etcd: a change is
     /// "simple" (no joint) only if it touches at most one voter.
     pub fn enters_joint(&self) -> bool {
-        let voter_changes = self.changes.iter().filter(|c| matches!(
-            c.change_type, ConfChangeType::AddNode | ConfChangeType::RemoveNode
-        )).count();
+        let voter_changes = self
+            .changes
+            .iter()
+            .filter(|c| {
+                matches!(
+                    c.change_type,
+                    ConfChangeType::AddNode | ConfChangeType::RemoveNode
+                )
+            })
+            .count();
         voter_changes > 1 || matches!(self.transition, ConfChangeTransition::Explicit)
     }
 
@@ -115,9 +131,15 @@ impl MemberConfig {
         c
     }
 
-    pub fn voter_count(&self) -> usize { self.voters.len() }
-    pub fn learner_count(&self) -> usize { self.learners.len() }
-    pub fn is_joint(&self) -> bool { !self.voters_outgoing.is_empty() }
+    pub fn voter_count(&self) -> usize {
+        self.voters.len()
+    }
+    pub fn learner_count(&self) -> usize {
+        self.learners.len()
+    }
+    pub fn is_joint(&self) -> bool {
+        !self.voters_outgoing.is_empty()
+    }
 
     pub fn quorum(&self) -> usize {
         if self.is_joint() {
@@ -128,12 +150,17 @@ impl MemberConfig {
         }
     }
 
-    pub fn is_voter(&self, id: u64) -> bool { self.voters.contains(&id) }
-    pub fn is_learner(&self, id: u64) -> bool { self.learners.contains(&id) }
+    pub fn is_voter(&self, id: u64) -> bool {
+        self.voters.contains(&id)
+    }
+    pub fn is_learner(&self, id: u64) -> bool {
+        self.learners.contains(&id)
+    }
 
     /// All known node ids (voters + learners + outgoing).
     pub fn all_ids(&self) -> BTreeSet<u64> {
-        self.voters.iter()
+        self.voters
+            .iter()
             .chain(self.learners.iter())
             .chain(self.voters_outgoing.iter())
             .copied()
@@ -142,7 +169,9 @@ impl MemberConfig {
 }
 
 impl Default for MemberConfig {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── Apply errors ──────────────────────────────────────────────────────────
@@ -173,7 +202,9 @@ impl std::fmt::Display for MembershipError {
             Self::UnknownMember(id) => write!(f, "unknown member: {id}"),
             Self::NotInJoint => write!(f, "not in joint consensus"),
             Self::NotALearner(id) => write!(f, "not a learner: {id}"),
-            Self::ClusterIdMismatch { expected, got } => write!(f, "cluster id mismatch: expected {expected}, got {got}"),
+            Self::ClusterIdMismatch { expected, got } => {
+                write!(f, "cluster id mismatch: expected {expected}, got {got}")
+            }
             Self::InvalidClusterId => write!(f, "invalid cluster id (zero)"),
         }
     }
@@ -191,7 +222,9 @@ pub struct MembershipMachine {
 
 impl MembershipMachine {
     pub fn new(initial: MemberConfig) -> Self {
-        Self { state: RwLock::new(initial) }
+        Self {
+            state: RwLock::new(initial),
+        }
     }
 
     pub fn snapshot(&self) -> MemberConfig {
@@ -276,9 +309,14 @@ impl MembershipMachine {
 /// Etcd's wire-protocol guard against accidentally pointing a member at the
 /// wrong cluster.  Mirrors `etcdserver.ValidateClusterAndAssignIDs`.
 pub fn validate_cluster_id(local: u64, remote: u64) -> Result<(), MembershipError> {
-    if local == 0 { return Err(MembershipError::InvalidClusterId); }
+    if local == 0 {
+        return Err(MembershipError::InvalidClusterId);
+    }
     if local != remote {
-        return Err(MembershipError::ClusterIdMismatch { expected: local, got: remote });
+        return Err(MembershipError::ClusterIdMismatch {
+            expected: local,
+            got: remote,
+        });
     }
     Ok(())
 }
@@ -299,10 +337,22 @@ pub fn diff_configs(before: &MemberConfig, after: &MemberConfig) -> MemberDiff {
     let mut d = MemberDiff::default();
     d.voters_added = after.voters.difference(&before.voters).copied().collect();
     d.voters_removed = before.voters.difference(&after.voters).copied().collect();
-    d.learners_added = after.learners.difference(&before.learners).copied().collect();
-    d.learners_removed = before.learners.difference(&after.learners).copied().collect();
+    d.learners_added = after
+        .learners
+        .difference(&before.learners)
+        .copied()
+        .collect();
+    d.learners_removed = before
+        .learners
+        .difference(&after.learners)
+        .copied()
+        .collect();
     // Promotion = was a learner, now a voter.
-    d.promoted = before.learners.intersection(&after.voters).copied().collect();
+    d.promoted = before
+        .learners
+        .intersection(&after.voters)
+        .copied()
+        .collect();
     // A promotion shouldn't double-count as voter_added.
     d.voters_added = d.voters_added.difference(&d.promoted).copied().collect();
     d
@@ -321,7 +371,9 @@ pub fn cluster_id_from_token(s: &str) -> u64 {
 
 // Need this for trait bounds in BTreeMap usage above.
 #[allow(dead_code)]
-fn _force_btreemap_use() -> BTreeMap<u64, u64> { BTreeMap::new() }
+fn _force_btreemap_use() -> BTreeMap<u64, u64> {
+    BTreeMap::new()
+}
 
 // ─────────────────────────────────────────────────────────────────────────
 // Tests — feat/cave-etcd-100-pct-sprint M12
@@ -349,16 +401,14 @@ mod tests {
     #[test]
     fn test_confchange_simple_when_one_voter_change() {
         // cite: confchange.go (single voter change is "simple")
-        let cc = ConfChangeV2::new(ConfChangeTransition::Auto)
-            .add(ConfChangeType::AddNode, 4);
+        let cc = ConfChangeV2::new(ConfChangeTransition::Auto).add(ConfChangeType::AddNode, 4);
         assert!(!cc.enters_joint());
     }
 
     #[test]
     fn test_confchange_explicit_always_enters_joint() {
         // cite: confchange.go (Explicit ⇒ force joint even for one voter)
-        let cc = ConfChangeV2::new(ConfChangeTransition::Explicit)
-            .add(ConfChangeType::AddNode, 4);
+        let cc = ConfChangeV2::new(ConfChangeTransition::Explicit).add(ConfChangeType::AddNode, 4);
         assert!(cc.enters_joint());
     }
 
@@ -381,7 +431,8 @@ mod tests {
     #[test]
     fn test_confchange_with_context() {
         // cite: raft.proto ConfChangeV2.context
-        let cc = ConfChangeV2::new(ConfChangeTransition::Auto).with_context(b"audit-ref-42".to_vec());
+        let cc =
+            ConfChangeV2::new(ConfChangeTransition::Auto).with_context(b"audit-ref-42".to_vec());
         assert_eq!(cc.context, b"audit-ref-42");
     }
 
@@ -408,7 +459,8 @@ mod tests {
     fn test_apply_add_learner() {
         // cite: confchange.go AddLearnerNode
         let m = three_voter_machine();
-        let cc = ConfChangeV2::new(ConfChangeTransition::Auto).add(ConfChangeType::AddLearnerNode, 4);
+        let cc =
+            ConfChangeV2::new(ConfChangeTransition::Auto).add(ConfChangeType::AddLearnerNode, 4);
         m.apply(&cc).unwrap();
         let s = m.snapshot();
         assert!(s.is_learner(4));
@@ -419,7 +471,8 @@ mod tests {
     fn test_apply_add_learner_already_present_errors() {
         // cite: confchange.go (AddLearner for known id ⇒ error)
         let m = three_voter_machine();
-        let cc = ConfChangeV2::new(ConfChangeTransition::Auto).add(ConfChangeType::AddLearnerNode, 1);
+        let cc =
+            ConfChangeV2::new(ConfChangeTransition::Auto).add(ConfChangeType::AddLearnerNode, 1);
         assert_eq!(m.apply(&cc).unwrap_err(), MembershipError::AlreadyMember(1));
     }
 
@@ -437,15 +490,22 @@ mod tests {
         // cite: confchange.go (RemoveNode for unknown ⇒ error)
         let m = three_voter_machine();
         let cc = ConfChangeV2::new(ConfChangeTransition::Auto).add(ConfChangeType::RemoveNode, 99);
-        assert_eq!(m.apply(&cc).unwrap_err(), MembershipError::UnknownMember(99));
+        assert_eq!(
+            m.apply(&cc).unwrap_err(),
+            MembershipError::UnknownMember(99)
+        );
     }
 
     #[test]
     fn test_apply_promote_via_addnode_for_learner() {
         // cite: confchange.go (AddNode of learner ⇒ promotion)
         let m = three_voter_machine();
-        m.apply(&ConfChangeV2::new(ConfChangeTransition::Auto).add(ConfChangeType::AddLearnerNode, 4)).unwrap();
-        m.apply(&ConfChangeV2::new(ConfChangeTransition::Auto).add(ConfChangeType::AddNode, 4)).unwrap();
+        m.apply(
+            &ConfChangeV2::new(ConfChangeTransition::Auto).add(ConfChangeType::AddLearnerNode, 4),
+        )
+        .unwrap();
+        m.apply(&ConfChangeV2::new(ConfChangeTransition::Auto).add(ConfChangeType::AddNode, 4))
+            .unwrap();
         let s = m.snapshot();
         assert!(s.is_voter(4));
         assert!(!s.is_learner(4));
@@ -477,7 +537,10 @@ mod tests {
     fn test_apply_leave_joint_when_not_joint_errors() {
         // cite: confchange.go (LeaveJoint outside joint ⇒ error)
         let m = three_voter_machine();
-        assert_eq!(m.apply(&ConfChangeV2::leave_joint()).unwrap_err(), MembershipError::NotInJoint);
+        assert_eq!(
+            m.apply(&ConfChangeV2::leave_joint()).unwrap_err(),
+            MembershipError::NotInJoint
+        );
     }
 
     // ── promote_learner ────────────────────────────────────────────────
@@ -486,7 +549,10 @@ mod tests {
     fn test_promote_learner_to_voter() {
         // cite: server/etcdserver/server.go promoteMember
         let m = three_voter_machine();
-        m.apply(&ConfChangeV2::new(ConfChangeTransition::Auto).add(ConfChangeType::AddLearnerNode, 4)).unwrap();
+        m.apply(
+            &ConfChangeV2::new(ConfChangeTransition::Auto).add(ConfChangeType::AddLearnerNode, 4),
+        )
+        .unwrap();
         m.promote_learner(4).unwrap();
         let s = m.snapshot();
         assert!(s.is_voter(4));
@@ -497,14 +563,20 @@ mod tests {
     fn test_promote_voter_errors() {
         // cite: promoteMember (already-voter ⇒ error)
         let m = three_voter_machine();
-        assert_eq!(m.promote_learner(1).unwrap_err(), MembershipError::AlreadyVoter(1));
+        assert_eq!(
+            m.promote_learner(1).unwrap_err(),
+            MembershipError::AlreadyVoter(1)
+        );
     }
 
     #[test]
     fn test_promote_unknown_errors() {
         // cite: promoteMember (unknown id ⇒ NotALearner)
         let m = three_voter_machine();
-        assert_eq!(m.promote_learner(99).unwrap_err(), MembershipError::NotALearner(99));
+        assert_eq!(
+            m.promote_learner(99).unwrap_err(),
+            MembershipError::NotALearner(99)
+        );
     }
 
     // ── Quorum + counts ───────────────────────────────────────────────
@@ -531,7 +603,10 @@ mod tests {
     #[test]
     fn test_learner_count_after_add() {
         let m = three_voter_machine();
-        m.apply(&ConfChangeV2::new(ConfChangeTransition::Auto).add(ConfChangeType::AddLearnerNode, 4)).unwrap();
+        m.apply(
+            &ConfChangeV2::new(ConfChangeTransition::Auto).add(ConfChangeType::AddLearnerNode, 4),
+        )
+        .unwrap();
         assert_eq!(m.snapshot().learner_count(), 1);
     }
 
@@ -568,7 +643,10 @@ mod tests {
     #[test]
     fn test_validate_cluster_id_zero_invalid() {
         // cite: ValidateClusterAndAssignIDs (0 ⇒ uninitialised)
-        assert_eq!(validate_cluster_id(0, 0).unwrap_err(), MembershipError::InvalidClusterId);
+        assert_eq!(
+            validate_cluster_id(0, 0).unwrap_err(),
+            MembershipError::InvalidClusterId
+        );
     }
 
     #[test]

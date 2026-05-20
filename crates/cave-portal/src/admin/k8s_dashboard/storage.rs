@@ -48,7 +48,11 @@ pub fn list_storage(
             name: format!("{}-pvc", w.pod_name),
             namespace: "default".into(),
             size_gi: 10,
-            status: if w.status == "Running" { "Bound" } else { "Pending" },
+            status: if w.status == "Running" {
+                "Bound"
+            } else {
+                "Pending"
+            },
         });
         if bound {
             out.push(StorageRow {
@@ -79,7 +83,11 @@ pub(super) fn render_section(
                 r.kind.into(),
                 r.name.clone(),
                 r.namespace.clone(),
-                if r.size_gi == 0 { "—".into() } else { format!("{}Gi", r.size_gi) },
+                if r.size_gi == 0 {
+                    "—".into()
+                } else {
+                    format!("{}Gi", r.size_gi)
+                },
                 r.status.into(),
             ]
         })
@@ -96,7 +104,10 @@ pub(super) fn render_section(
         pv = count_by_kind(&rows, "PersistentVolume"),
         pvc = count_by_kind(&rows, "PersistentVolumeClaim"),
         sc = count_by_kind(&rows, "StorageClass"),
-        tbl = table(&["kind", "name", "namespace", "size", "status"], &table_rows),
+        tbl = table(
+            &["kind", "name", "namespace", "size", "status"],
+            &table_rows
+        ),
     ))
 }
 

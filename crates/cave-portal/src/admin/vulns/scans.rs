@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/vulns/scans` — registered parsers + import surface.
 
-use crate::admin::layout::shell::{shell_v2, ShellOptions};
+use crate::admin::layout::shell::{ShellOptions, shell_v2};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::table;
 use crate::admin::state::AdminState;
@@ -19,8 +19,10 @@ pub const PARSERS: &[(&str, &str, &str)] = &[
 
 pub fn render(_state: &AdminState, ctx: &RequestCtx) -> Result<String, VulnsViewError> {
     ctx.authorise(Permission::VulnsRead)?;
-    let rows: Vec<Vec<String>> = PARSERS.iter()
-        .map(|(s, f, d)| vec![s.to_string(), f.to_string(), d.to_string()]).collect();
+    let rows: Vec<Vec<String>> = PARSERS
+        .iter()
+        .map(|(s, f, d)| vec![s.to_string(), f.to_string(), d.to_string()])
+        .collect();
     let body = format!(
         r#"<section>
   <h2>Registered parsers ({n})</h2>

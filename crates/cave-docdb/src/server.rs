@@ -141,7 +141,10 @@ async fn handle_frame(
             tracing::error!(target: "cave_docdb::wire", "decode error: {}", e);
             let mut resp = Document::new();
             resp.insert("ok".to_string(), Value::Number(0.into()));
-            resp.insert("errmsg".to_string(), Value::String(format!("decode error: {}", e)));
+            resp.insert(
+                "errmsg".to_string(),
+                Value::String(format!("decode error: {}", e)),
+            );
             encode_and_send(socket, resp, 0, 0).await?;
         }
     }

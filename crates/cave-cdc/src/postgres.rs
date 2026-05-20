@@ -19,7 +19,10 @@ use serde::{Deserialize, Serialize};
 /// upstream are `pgoutput` (default) and `wal2json`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum DecodingPlugin { Pgoutput, Wal2json }
+pub enum DecodingPlugin {
+    Pgoutput,
+    Wal2json,
+}
 
 /// Cite: debezium-connector-postgres `PostgresConnectorConfig` slot
 /// + publication options.
@@ -36,10 +39,15 @@ impl ReplicationSlotConfig {
     /// — slot + publication names must be lowercase identifiers
     /// (Postgres folds unquoted names) and ≤ 63 bytes (NAMEDATALEN-1).
     pub fn validate(&self) -> CdcResult<()> {
-        for (label, name) in [("slot_name", &self.slot_name),
-                              ("publication_name", &self.publication_name)] {
+        for (label, name) in [
+            ("slot_name", &self.slot_name),
+            ("publication_name", &self.publication_name),
+        ] {
             if name.is_empty() {
-                return Err(CdcError::InvalidConfig(format!("{} must be non-empty", label)));
+                return Err(CdcError::InvalidConfig(format!(
+                    "{} must be non-empty",
+                    label
+                )));
             }
             if name.len() >= 64 {
                 return Err(CdcError::InvalidConfig(format!(
@@ -167,7 +175,8 @@ impl PostgresConnector {
                 lsn.as_text(),
                 format!(
                     "regression: requested {} < last_flushed {}",
-                    lsn.as_text(), self.last_flushed_lsn.as_text(),
+                    lsn.as_text(),
+                    self.last_flushed_lsn.as_text(),
                 ),
             ));
         }
@@ -175,17 +184,27 @@ impl PostgresConnector {
         Ok(())
     }
 
-    pub fn last_flushed_lsn(&self) -> Lsn { self.last_flushed_lsn }
+    pub fn last_flushed_lsn(&self) -> Lsn {
+        self.last_flushed_lsn
+    }
 }
 
 impl SourceConnector for PostgresConnector {
-    fn name(&self) -> &str { &self.name }
-    fn tenant_id(&self) -> &str { &self.tenant_id }
-    fn state(&self) -> ConnectorState { self.state }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn tenant_id(&self) -> &str {
+        &self.tenant_id
+    }
+    fn state(&self) -> ConnectorState {
+        self.state
+    }
 
     fn validate(&self) -> CdcResult<()> {
         if self.tenant_id.trim().is_empty() {
-            return Err(CdcError::InvalidConfig("tenant_id must be non-empty".into()));
+            return Err(CdcError::InvalidConfig(
+                "tenant_id must be non-empty".into(),
+            ));
         }
         if self.db.trim().is_empty() {
             return Err(CdcError::InvalidConfig("db must be non-empty".into()));
@@ -200,7 +219,8 @@ impl SourceConnector for PostgresConnector {
         self.validate()?;
         if !self.state.can_transition_to(ConnectorState::Snapshotting) {
             return Err(CdcError::InvalidConfig(format!(
-                "cannot transition from {:?} to Snapshotting", self.state,
+                "cannot transition from {:?} to Snapshotting",
+                self.state,
             )));
         }
         self.state = ConnectorState::Snapshotting;

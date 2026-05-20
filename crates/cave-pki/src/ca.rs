@@ -38,19 +38,21 @@ impl KeyAlgorithm {
         match s.trim().to_lowercase().as_str() {
             "ecdsa-p256" | "p256" | "ec256" => Ok(Self::EcdsaP256),
             "ecdsa-p384" | "p384" | "ec384" => Ok(Self::EcdsaP384),
-            "rsa-2048"   | "rsa2048"        => Ok(Self::Rsa2048),
-            "rsa-4096"   | "rsa4096"        => Ok(Self::Rsa4096),
-            "ed25519"                       => Ok(Self::Ed25519),
-            "hybrid-mldsa65-ed25519"
-            | "ml-dsa-65+ed25519"
-            | "pqc-hybrid"                  => Ok(Self::HybridMlDsa65Ed25519),
+            "rsa-2048" | "rsa2048" => Ok(Self::Rsa2048),
+            "rsa-4096" | "rsa4096" => Ok(Self::Rsa4096),
+            "ed25519" => Ok(Self::Ed25519),
+            "hybrid-mldsa65-ed25519" | "ml-dsa-65+ed25519" | "pqc-hybrid" => {
+                Ok(Self::HybridMlDsa65Ed25519)
+            }
             _ => Err(PkiError::UnsupportedKeyAlgorithm(s.to_string())),
         }
     }
 
     /// Hardware-backing requirement: the root CA key MUST live in an
     /// HSM. Cite: NIST SP 800-57 Part 1 Rev. 5 §5.3.4.
-    pub fn requires_hsm_for_root(&self) -> bool { true }
+    pub fn requires_hsm_for_root(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -103,7 +105,9 @@ pub struct Ca {
 }
 
 impl Ca {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Cite: openbao `pki/path_root.go::pathCAGenerateRoot` —
     /// generating a root when one already exists fails with
@@ -145,7 +149,9 @@ impl Ca {
         common_name: impl Into<String>,
         algorithm: KeyAlgorithm,
     ) -> PkiResult<String> {
-        let root_serial = self.root_serial.clone()
+        let root_serial = self
+            .root_serial
+            .clone()
             .ok_or_else(|| PkiError::ParentNotFound("root".into()))?;
         let cn = common_name.into();
         let serial = synth_serial(&cn, "platform");
@@ -177,7 +183,9 @@ impl Ca {
         algorithm: KeyAlgorithm,
     ) -> PkiResult<String> {
         let tenant_id = tenant_id.into();
-        let platform_serial = self.platform_serial.clone()
+        let platform_serial = self
+            .platform_serial
+            .clone()
             .ok_or_else(|| PkiError::ParentNotFound("platform".into()))?;
 
         if let Some(existing) = self.tenant_intermediate.get(&tenant_id).cloned() {
@@ -208,11 +216,17 @@ impl Ca {
     /// RFC 5246 §7.4.2 — TLS handshake expects leaf-first chain order.
     pub fn chain_for(&self, serial: &str) -> PkiResult<Vec<CertHandle>> {
         let mut chain = Vec::new();
-        let mut current = self.by_serial.get(serial).cloned()
+        let mut current = self
+            .by_serial
+            .get(serial)
+            .cloned()
             .ok_or_else(|| PkiError::ParentNotFound(serial.into()))?;
         chain.push(current.clone());
         while let Some(parent_serial) = current.issuer_serial.clone() {
-            let parent = self.by_serial.get(&parent_serial).cloned()
+            let parent = self
+                .by_serial
+                .get(&parent_serial)
+                .cloned()
                 .ok_or_else(|| PkiError::ParentNotFound(parent_serial))?;
             chain.push(parent.clone());
             current = parent;
@@ -224,12 +238,18 @@ impl Ca {
         self.by_serial.get(serial)
     }
 
-    pub fn root_serial(&self) -> Option<&str> { self.root_serial.as_deref() }
-    pub fn platform_serial(&self) -> Option<&str> { self.platform_serial.as_deref() }
+    pub fn root_serial(&self) -> Option<&str> {
+        self.root_serial.as_deref()
+    }
+    pub fn platform_serial(&self) -> Option<&str> {
+        self.platform_serial.as_deref()
+    }
     pub fn tenant_serial(&self, tenant_id: &str) -> Option<&str> {
         self.tenant_intermediate.get(tenant_id).map(String::as_str)
     }
-    pub fn tenant_count(&self) -> usize { self.tenant_intermediate.len() }
+    pub fn tenant_count(&self) -> usize {
+        self.tenant_intermediate.len()
+    }
 }
 
 fn synth_serial(cn: &str, scope: &str) -> String {
@@ -240,7 +260,7 @@ fn synth_serial(cn: &str, scope: &str) -> String {
     h.update([0]);
     h.update(Uuid::new_v4().as_bytes());
     let digest = h.finalize();
-    hex::encode(&digest[..16])  // 16-byte serial, like RFC 5280 §4.1.2.2 (≤ 20 octets).
+    hex::encode(&digest[..16]) // 16-byte serial, like RFC 5280 §4.1.2.2 (≤ 20 octets).
 }
 
 fn synth_spki(cn: &str, alg: KeyAlgorithm) -> String {

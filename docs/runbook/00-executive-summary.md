@@ -16,7 +16,7 @@ The platform operates under a core philosophy: **self-hosted where possible, ope
 
 CAVE operates across **7 deployment profiles**:
 
-- **Hetzner infrastructure**: `dev`, `staging`, `prod` (self-hosted, bare metal)
+- **sovereign-cloud infrastructure**: `dev`, `staging`, `prod` (self-hosted, bare metal)
 - **Azure infrastructure**: `dev`, `staging`, `prod` (managed services where beneficial)
 - **Local development**: Single command—`cave-ctl local up`—spins a fully functional local replica
 
@@ -132,7 +132,7 @@ ArgoCD v3.3+ continuously reconciles cluster state to Git and OCI registry sourc
 
 - **Soft isolation**: Shared cluster, dedicated namespaces. Namespace RBAC controls who can create resources. Network policies isolate traffic. Compute quotas limit resource consumption. Suitable for internal teams with high trust and shared incident response (e.g., microservices from the same company).
 - **Hard isolation**: Dedicated vcluster per tenant. Each vcluster has its own Kubernetes API server, etcd, and control plane, but shares host cluster nodes. Higher isolation, higher resource cost. Suitable for external customers or high-risk internal workloads.
-- **Maximum isolation**: Dedicated cluster per tenant (Hetzner or Azure). Complete infrastructure separation. Suitable for compliance-critical workloads or dedicated SaaS customers.
+- **Maximum isolation**: Dedicated cluster per tenant (sovereign cloud or hyperscaler). Complete infrastructure separation. Suitable for compliance-critical workloads or dedicated SaaS customers.
 
 **Rationale**: Forcing all tenants into one isolation model is either wasteful (paying for maximum isolation when soft isolation suffices) or risky (forcing shared infrastructure when hard isolation is required). CAVE allows operators to select isolation per tenant based on their compliance, trust, and cost posture.
 
@@ -156,7 +156,7 @@ ArgoCD v3.3+ continuously reconciles cluster state to Git and OCI registry sourc
 
 ### 10. Full Observability: Same Dashboards Across All Profiles
 
-**Principle**: The observability stack (metrics, logs, traces, events) is identical across dev, staging, and prod profiles on both Hetzner and Azure. No surprises at production time.
+**Principle**: The observability stack (metrics, logs, traces, events) is identical across dev, staging, and prod profiles on both sovereign cloud and hyperscaler. No surprises at production time.
 
 - **Prometheus**: Metrics collection (infrastructure, applications, custom metrics).
 - **Grafana**: Unified dashboarding. Dashboards reference the same queries and thresholds regardless of profile.
@@ -194,9 +194,9 @@ Every dashboard available on dev is instantly available on prod. SLOs and alert 
 
 **References**: ADR-096 (SLO-Driven Infrastructure), ADR-110 (Per-Tenant Cost Visibility), ADR-126 (Cost-Driven Resource Allocation)
 
-### 13. Immutable Infrastructure: Talos Linux on All Hetzner Clusters
+### 13. Immutable Infrastructure: Talos Linux on All Sovereign-Cloud Clusters
 
-**Principle**: Hetzner nodes run Talos Linux, a minimal, immutable operating system designed for Kubernetes. No SSH access. No package manager. No manual configuration drift.
+**Principle**: sovereign-cloud nodes run Talos Linux, a minimal, immutable operating system designed for Kubernetes. No SSH access. No package manager. No manual configuration drift.
 
 **Rationale**: Traditional Linux nodes are mutable—admins SSH in, edit files, install packages, and create state that is not in version control. Talos is designed to be cattle, not pets: if a node is misconfigured, it is destroyed and replaced. Configuration is declarative (MachineConfig YAML) and GitOps-driven. This eliminates an entire class of production incidents ("node was working yesterday, but we forgot why") and makes cluster state fully auditable.
 
@@ -258,7 +258,7 @@ Every dashboard available on dev is instantly available on prod. SLOs and alert 
 
 ### 17. Exit Strategy Built-In: Every Azure Service Has Hetzner Equivalent
 
-**Principle**: CAVE is designed for portability. At any time, a customer can decide to move from Azure to Hetzner (or vice versa) without losing capability or requiring revalidation.
+**Principle**: CAVE is designed for portability. At any time, a customer can decide to move from Azure to the sovereign profile (or vice versa) without losing capability or requiring revalidation.
 
 Every managed Azure service used in CAVE has a Hetzner equivalent in the self-hosted stack:
 - AKS ↔ Talos Linux + Kubernetes
@@ -269,11 +269,11 @@ Every managed Azure service used in CAVE has a Hetzner equivalent in the self-ho
 - Azure AI Search ↔ OpenSearch or Qdrant
 - Azure Key Vault ↔ OpenBao
 
-**Exit drill**: Annually, the platform team runs a full rehearsal: spin up a Hetzner cluster, migrate all data, validate all functionality. This ensures that the exit strategy is not theoretical—it is tested and operational.
+**Exit drill**: Annually, the platform team runs a full rehearsal: spin up a sovereign-cloud cluster, migrate all data, validate all functionality. This ensures that the exit strategy is not theoretical—it is tested and operational.
 
-**Rationale**: Vendor lock-in is a form of risk. If Azure changes pricing, SLA, or terms, CAVE customers can migrate to Hetzner without reengineering. This optionality is powerful in commercial negotiations and provides peace of mind for sovereign customers.
+**Rationale**: Vendor lock-in is a form of risk. If Azure changes pricing, SLA, or terms, CAVE customers can migrate to the sovereign profile without reengineering. This optionality is powerful in commercial negotiations and provides peace of mind for sovereign customers.
 
-**References**: ADR-066 (Azure ↔ Hetzner Equivalence), ADR-029 (Exit Strategy Validation)
+**References**: ADR-066 (hyperscaler ↔ sovereign Equivalence), ADR-029 (Exit Strategy Validation)
 
 ### 18. ADRs for Every Decision, Constitutional Artifacts with 2-of-3 Multi-Sig
 
@@ -298,7 +298,7 @@ CAVE consists of approximately **73 components** across three categories: infras
 
 ### Infrastructure Provider-Specific Components (14 Total)
 
-| Component | Hetzner | Azure | Has XR? | Notes |
+| Component | Sovereign | Hyperscaler | Has XR? | Notes |
 |-----------|---------|-------|---------|-------|
 | **Kubernetes** | Talos Linux + k3s/kubeadm | AKS | No | OpenTofu provisions both |
 | **PostgreSQL** | CloudNativePG | Azure Database for PostgreSQL Flexible Server | Yes | ADR-067: Crossplane XR abstracts both |
@@ -376,15 +376,15 @@ CAVE deployment follows a structured 4-phase rollout to manage complexity and de
 **Objective**: Establish the Kubernetes foundation, control planes, and identity.
 
 **Components**:
-- Kubernetes cluster (Talos Linux on Hetzner, AKS on Azure)
+- Kubernetes cluster (Talos Linux on the sovereign profile, AKS on Azure)
 - Crossplane (Day 1 infrastructure provisioning)
 - Backstage (Developer portal, static plugin set)
 - ArgoCD (GitOps orchestration of Day 0 and Day 1)
 - Kong (API Gateway, ingress)
 - Cilium (CNI, network policy)
 - Istio ambient (mTLS, zero-trust)
-- Identity layer (Keycloak on Hetzner, Okta/Entra on Azure)
-- Secrets (OpenBao on Hetzner, Key Vault on Azure)
+- Identity layer (Keycloak on the sovereign profile, Okta/Entra on Azure)
+- Secrets (OpenBao on the sovereign profile, Key Vault on Azure)
 - Observability (Prometheus, Grafana, Loki, Tempo)
 - Harbor (OCI registry)
 - OPA Gatekeeper (basic admission policies)
@@ -475,7 +475,7 @@ Service Level Objectives are the "north star" metrics that define platform succe
 
 ### Platform SLA by Infrastructure Provider
 
-| Metric | Hetzner Dedicated Cluster | Azure Managed | Shared Multi-Tenant Hetzner |
+| Metric | Sovereign Dedicated Cluster | Azure Managed | Shared Multi-Tenant Sovereign |
 |--------|---------------------------|---------------|-----------------------------|
 | Availability | 99.95% | 99.95% | 99.5% (best effort) |
 | RTO (Recovery Time Objective) | 4 hours | 2 hours | 4 hours |
@@ -486,9 +486,9 @@ Service Level Objectives are the "north star" metrics that define platform succe
 
 | Profile | Infrastructure | Approx. Cost | CapEx |
 |---------|----------------|--------------|-------|
-| Hetzner dev | 2x Hetzner servers (32 vCPU, 256 GB RAM) + storage | ~$800 | $0 |
-| Hetzner staging | 3x Hetzner servers | ~$1,200 | $0 |
-| Hetzner prod | 5x Hetzner servers + redundancy | ~$2,000 | $0 |
+| Hetzner dev | 2x sovereign-cloud servers (32 vCPU, 256 GB RAM) + storage | ~$800 | $0 |
+| Hetzner staging | 3x sovereign-cloud servers | ~$1,200 | $0 |
+| Hetzner prod | 5x sovereign-cloud servers + redundancy | ~$2,000 | $0 |
 | Azure dev | AKS + managed services | ~$1,200 | $0 |
 | Azure staging | AKS + managed services | ~$2,000 | $0 |
 | Azure prod | AKS + high-availability | ~$3,500 | $0 |

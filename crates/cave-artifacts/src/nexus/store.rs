@@ -259,7 +259,11 @@ impl NexusStore {
             })
             .cloned()
             .collect();
-        out.sort_by(|a, b| a.repository_name.cmp(&b.repository_name).then_with(|| a.path.cmp(&b.path)));
+        out.sort_by(|a, b| {
+            a.repository_name
+                .cmp(&b.repository_name)
+                .then_with(|| a.path.cmp(&b.path))
+        });
         out
     }
 
@@ -315,7 +319,9 @@ impl NexusStore {
 
     pub fn create_cleanup_policy(&self, policy: CleanupPolicy) -> CleanupPolicy {
         let mut inner = self.inner.write().unwrap();
-        inner.cleanup_policies.insert(policy.name.clone(), policy.clone());
+        inner
+            .cleanup_policies
+            .insert(policy.name.clone(), policy.clone());
         policy
     }
 

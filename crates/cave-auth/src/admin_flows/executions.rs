@@ -10,10 +10,10 @@
 // store keeps the same shape so the admin UI handlers can round-trip.
 
 use axum::{
+    Json,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
@@ -61,7 +61,9 @@ pub struct ExecutionStore {
 
 impl ExecutionStore {
     pub fn new() -> Self {
-        Self { inner: DashMap::new() }
+        Self {
+            inner: DashMap::new(),
+        }
     }
 
     pub fn list(&self, realm: &str, flow_alias: &str) -> Vec<AuthenticationExecution> {
@@ -79,7 +81,8 @@ impl ExecutionStore {
         let id = e.id.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
         e.id = Some(id.clone());
         e.parent_flow = flow_alias.to_string();
-        self.inner.insert((realm.into(), flow_alias.into(), id.clone()), e);
+        self.inner
+            .insert((realm.into(), flow_alias.into(), id.clone()), e);
         id
     }
 
@@ -105,9 +108,8 @@ pub async fn add_execution(
     Json(e): Json<AuthenticationExecution>,
 ) -> impl IntoResponse {
     let id = store.create(&realm, &flow_alias, e);
-    let location = format!(
-        "/admin/realms/{realm}/authentication/flows/{flow_alias}/executions/{id}"
-    );
+    let location =
+        format!("/admin/realms/{realm}/authentication/flows/{flow_alias}/executions/{id}");
     (
         StatusCode::CREATED,
         [(axum::http::header::LOCATION, location)],

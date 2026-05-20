@@ -91,9 +91,7 @@ impl Smt for InsertField {
             r.value = Value::Object(BTreeMap::new());
         }
         let obj = r.value.as_object_mut().ok_or_else(|| {
-            StreamsError::Internal(
-                "InsertField: cannot inject into non-object value".into(),
-            )
+            StreamsError::Internal("InsertField: cannot inject into non-object value".into())
         })?;
         for (field, src) in &self.inserts {
             let v = match src {

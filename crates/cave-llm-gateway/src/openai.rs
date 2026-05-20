@@ -68,13 +68,31 @@ pub struct ChatMessage {
 
 impl ChatMessage {
     pub fn system(content: impl Into<String>) -> Self {
-        Self { role: Role::System, content: MessageContent::Text(content.into()), name: None, tool_calls: None, tool_call_id: None }
+        Self {
+            role: Role::System,
+            content: MessageContent::Text(content.into()),
+            name: None,
+            tool_calls: None,
+            tool_call_id: None,
+        }
     }
     pub fn user(content: impl Into<String>) -> Self {
-        Self { role: Role::User, content: MessageContent::Text(content.into()), name: None, tool_calls: None, tool_call_id: None }
+        Self {
+            role: Role::User,
+            content: MessageContent::Text(content.into()),
+            name: None,
+            tool_calls: None,
+            tool_call_id: None,
+        }
     }
     pub fn assistant(content: impl Into<String>) -> Self {
-        Self { role: Role::Assistant, content: MessageContent::Text(content.into()), name: None, tool_calls: None, tool_call_id: None }
+        Self {
+            role: Role::Assistant,
+            content: MessageContent::Text(content.into()),
+            name: None,
+            tool_calls: None,
+            tool_call_id: None,
+        }
     }
 }
 
@@ -162,7 +180,10 @@ pub struct ChatCompletionResponse {
 impl ChatCompletionResponse {
     pub fn simple(model: &str, content: String, usage: Usage) -> Self {
         Self {
-            id: format!("chatcmpl-{}", uuid::Uuid::new_v4().to_string().replace('-', "")),
+            id: format!(
+                "chatcmpl-{}",
+                uuid::Uuid::new_v4().to_string().replace('-', "")
+            ),
             object: "chat.completion".into(),
             created: chrono::Utc::now().timestamp(),
             model: model.to_string(),
@@ -211,7 +232,11 @@ pub struct Usage {
 
 impl Usage {
     pub fn new(prompt: u32, completion: u32) -> Self {
-        Self { prompt_tokens: prompt, completion_tokens: completion, total_tokens: prompt + completion }
+        Self {
+            prompt_tokens: prompt,
+            completion_tokens: completion,
+            total_tokens: prompt + completion,
+        }
     }
 }
 
@@ -236,7 +261,11 @@ impl ChatCompletionChunk {
             choices: vec![Choice {
                 index: 0,
                 message: None,
-                delta: Some(DeltaMessage { role: None, content: Some(content.to_string()), tool_calls: None }),
+                delta: Some(DeltaMessage {
+                    role: None,
+                    content: Some(content.to_string()),
+                    tool_calls: None,
+                }),
                 finish_reason: None,
                 logprobs: None,
             }],
@@ -252,7 +281,11 @@ impl ChatCompletionChunk {
             choices: vec![Choice {
                 index: 0,
                 message: None,
-                delta: Some(DeltaMessage { role: None, content: None, tool_calls: None }),
+                delta: Some(DeltaMessage {
+                    role: None,
+                    content: None,
+                    tool_calls: None,
+                }),
                 finish_reason: Some("stop".into()),
                 logprobs: None,
             }],
@@ -294,15 +327,36 @@ pub struct OpenAIErrorBody {
 
 impl OpenAIError {
     pub fn invalid_request(message: &str) -> Self {
-        Self { error: OpenAIErrorBody { message: message.to_string(), error_type: "invalid_request_error".into(), param: None, code: None } }
+        Self {
+            error: OpenAIErrorBody {
+                message: message.to_string(),
+                error_type: "invalid_request_error".into(),
+                param: None,
+                code: None,
+            },
+        }
     }
 
     pub fn server_error(message: &str) -> Self {
-        Self { error: OpenAIErrorBody { message: message.to_string(), error_type: "server_error".into(), param: None, code: Some("internal_error".into()) } }
+        Self {
+            error: OpenAIErrorBody {
+                message: message.to_string(),
+                error_type: "server_error".into(),
+                param: None,
+                code: Some("internal_error".into()),
+            },
+        }
     }
 
     pub fn rate_limit(message: &str) -> Self {
-        Self { error: OpenAIErrorBody { message: message.to_string(), error_type: "requests".into(), param: None, code: Some("rate_limit_exceeded".into()) } }
+        Self {
+            error: OpenAIErrorBody {
+                message: message.to_string(),
+                error_type: "requests".into(),
+                param: None,
+                code: Some("rate_limit_exceeded".into()),
+            },
+        }
     }
 }
 

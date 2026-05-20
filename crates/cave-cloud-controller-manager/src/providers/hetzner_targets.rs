@@ -112,11 +112,7 @@ impl LbTarget {
 }
 
 /// Mirrors the LB target `set_health()` flow on a target list.
-pub fn set_target_health(
-    targets: &mut [LbTarget],
-    matcher: &str,
-    health: LbTargetHealth,
-) -> u32 {
+pub fn set_target_health(targets: &mut [LbTarget], matcher: &str, health: LbTargetHealth) -> u32 {
     let mut updated = 0u32;
     for t in targets.iter_mut() {
         if t.identifier == matcher {
@@ -158,7 +154,10 @@ impl PlacementGroup {
         if self.server_ids.contains(&server_id) {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Hetzner,
-                reason: format!("server {server_id} already in placement group {}", self.name),
+                reason: format!(
+                    "server {server_id} already in placement group {}",
+                    self.name
+                ),
             });
         }
         if self.server_ids.len() >= Self::SPREAD_MAX_SERVERS {
@@ -264,7 +263,10 @@ impl ReverseDns {
                 reason: "rdns ip must not be empty".into(),
             });
         }
-        if !self.dns_ptr.contains('.') || self.dns_ptr.starts_with('.') || self.dns_ptr.ends_with('.') {
+        if !self.dns_ptr.contains('.')
+            || self.dns_ptr.starts_with('.')
+            || self.dns_ptr.ends_with('.')
+        {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Hetzner,
                 reason: format!("rdns ptr {:?} is not a valid hostname", self.dns_ptr),
@@ -375,7 +377,10 @@ mod tests {
     fn lb_target_constructors_set_kind_and_identifier() {
         let _ = ctx("acme", "hcloud/load_balancer.go", "LoadBalancerTarget");
         assert_eq!(LbTarget::server(7).identifier, "7");
-        assert_eq!(LbTarget::label_selector("role=worker").identifier, "role=worker");
+        assert_eq!(
+            LbTarget::label_selector("role=worker").identifier,
+            "role=worker"
+        );
         assert_eq!(LbTarget::ip("203.0.113.5").identifier, "203.0.113.5");
     }
 
@@ -384,7 +389,10 @@ mod tests {
         let _ = ctx("acme", "hcloud/load_balancer.go", "validateTarget");
         let mut t = LbTarget::server(7);
         t.identifier.clear();
-        assert!(matches!(t.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            t.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -392,7 +400,10 @@ mod tests {
         let _ = ctx("acme", "hcloud/load_balancer.go", "validateTarget");
         let mut t = LbTarget::server(7);
         t.identifier = "not-a-number".into();
-        assert!(matches!(t.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            t.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -400,7 +411,10 @@ mod tests {
         let _ = ctx("acme", "hcloud/load_balancer.go", "validateTarget");
         let mut t = LbTarget::ip("203.0.113.5");
         t.identifier = "no-dots".into();
-        assert!(matches!(t.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            t.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -513,7 +527,10 @@ mod tests {
     #[test]
     fn resource_protection_with_delete_set_rejects_delete() {
         let _ = ctx("acme", "hcloud/server.go", "Protection");
-        let p = ResourceProtection { delete: true, rebuild: false };
+        let p = ResourceProtection {
+            delete: true,
+            rebuild: false,
+        };
         assert!(matches!(
             p.ensure_delete_allowed("Server").unwrap_err(),
             CloudError::InvalidConfig { .. }
@@ -525,41 +542,67 @@ mod tests {
     #[test]
     fn rdns_validate_accepts_well_formed_hostname() {
         let _ = ctx("acme", "hcloud/server.go", "ChangeDNSPtr");
-        assert!(ReverseDns {
-            ip: "203.0.113.5".into(),
-            dns_ptr: "node-1.example.com".into(),
-        }
-        .validate()
-        .is_ok());
+        assert!(
+            ReverseDns {
+                ip: "203.0.113.5".into(),
+                dns_ptr: "node-1.example.com".into(),
+            }
+            .validate()
+            .is_ok()
+        );
     }
 
     #[test]
     fn rdns_validate_rejects_leading_dot() {
         let _ = ctx("acme", "hcloud/server.go", "ChangeDNSPtr");
-        let r = ReverseDns { ip: "203.0.113.5".into(), dns_ptr: ".example.com".into() };
-        assert!(matches!(r.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        let r = ReverseDns {
+            ip: "203.0.113.5".into(),
+            dns_ptr: ".example.com".into(),
+        };
+        assert!(matches!(
+            r.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn rdns_validate_rejects_trailing_dot() {
         let _ = ctx("acme", "hcloud/server.go", "ChangeDNSPtr");
-        let r = ReverseDns { ip: "203.0.113.5".into(), dns_ptr: "example.com.".into() };
-        assert!(matches!(r.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        let r = ReverseDns {
+            ip: "203.0.113.5".into(),
+            dns_ptr: "example.com.".into(),
+        };
+        assert!(matches!(
+            r.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn rdns_validate_rejects_empty_ip() {
         let _ = ctx("acme", "hcloud/server.go", "ChangeDNSPtr");
-        let r = ReverseDns { ip: "".into(), dns_ptr: "h.example.com".into() };
-        assert!(matches!(r.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        let r = ReverseDns {
+            ip: "".into(),
+            dns_ptr: "h.example.com".into(),
+        };
+        assert!(matches!(
+            r.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn rdns_validate_rejects_overlong_hostname() {
         let _ = ctx("acme", "hcloud/server.go", "ChangeDNSPtr");
         let long = "a.".repeat(150) + "example.com";
-        let r = ReverseDns { ip: "203.0.113.5".into(), dns_ptr: long };
-        assert!(matches!(r.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        let r = ReverseDns {
+            ip: "203.0.113.5".into(),
+            dns_ptr: long,
+        };
+        assert!(matches!(
+            r.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     // ─── Action ──────────────────────────────────────────────────────────────

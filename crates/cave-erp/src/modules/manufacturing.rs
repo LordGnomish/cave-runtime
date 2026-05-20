@@ -3,11 +3,11 @@
 use crate::models::*;
 use crate::store::ErpStore;
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -112,7 +112,11 @@ async fn create_manufacturing_order(
         created_at: Utc::now(),
     };
     let id = mo.id;
-    store.manufacturing_orders.write().await.insert(id, mo.clone());
+    store
+        .manufacturing_orders
+        .write()
+        .await
+        .insert(id, mo.clone());
     (StatusCode::CREATED, Json(mo))
 }
 
@@ -171,7 +175,24 @@ async fn confirm_manufacturing_order(
             mo.state = ManufacturingOrderState::Confirmed;
             (StatusCode::OK, Json(mo.clone()))
         } else {
-            (StatusCode::NOT_FOUND, Json(ManufacturingOrder {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ManufacturingOrder {
+                    id: Uuid::nil(),
+                    product_id: Uuid::nil(),
+                    qty: 0.0,
+                    bom_id: Uuid::nil(),
+                    state: ManufacturingOrderState::Draft,
+                    scheduled_start: Utc::now(),
+                    completed_at: None,
+                    created_at: Utc::now(),
+                }),
+            )
+        }
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ManufacturingOrder {
                 id: Uuid::nil(),
                 product_id: Uuid::nil(),
                 qty: 0.0,
@@ -180,19 +201,8 @@ async fn confirm_manufacturing_order(
                 scheduled_start: Utc::now(),
                 completed_at: None,
                 created_at: Utc::now(),
-            }))
-        }
-    } else {
-        (StatusCode::NOT_FOUND, Json(ManufacturingOrder {
-            id: Uuid::nil(),
-            product_id: Uuid::nil(),
-            qty: 0.0,
-            bom_id: Uuid::nil(),
-            state: ManufacturingOrderState::Draft,
-            scheduled_start: Utc::now(),
-            completed_at: None,
-            created_at: Utc::now(),
-        }))
+            }),
+        )
     }
 }
 
@@ -205,16 +215,19 @@ async fn start_manufacturing_order(
         mo.state = ManufacturingOrderState::InProgress;
         (StatusCode::OK, Json(mo.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(ManufacturingOrder {
-            id: Uuid::nil(),
-            product_id: Uuid::nil(),
-            qty: 0.0,
-            bom_id: Uuid::nil(),
-            state: ManufacturingOrderState::Draft,
-            scheduled_start: Utc::now(),
-            completed_at: None,
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(ManufacturingOrder {
+                id: Uuid::nil(),
+                product_id: Uuid::nil(),
+                qty: 0.0,
+                bom_id: Uuid::nil(),
+                state: ManufacturingOrderState::Draft,
+                scheduled_start: Utc::now(),
+                completed_at: None,
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -228,16 +241,19 @@ async fn complete_manufacturing_order(
         mo.completed_at = Some(Utc::now());
         (StatusCode::OK, Json(mo.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(ManufacturingOrder {
-            id: Uuid::nil(),
-            product_id: Uuid::nil(),
-            qty: 0.0,
-            bom_id: Uuid::nil(),
-            state: ManufacturingOrderState::Draft,
-            scheduled_start: Utc::now(),
-            completed_at: None,
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(ManufacturingOrder {
+                id: Uuid::nil(),
+                product_id: Uuid::nil(),
+                qty: 0.0,
+                bom_id: Uuid::nil(),
+                state: ManufacturingOrderState::Draft,
+                scheduled_start: Utc::now(),
+                completed_at: None,
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -293,14 +309,17 @@ async fn start_work_order(
         wo.state = WorkOrderState::InProgress;
         (StatusCode::OK, Json(wo.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(WorkOrder {
-            id: Uuid::nil(),
-            mo_id: Uuid::nil(),
-            workcenter_id: Uuid::nil(),
-            duration_min: 0,
-            state: WorkOrderState::Pending,
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(WorkOrder {
+                id: Uuid::nil(),
+                mo_id: Uuid::nil(),
+                workcenter_id: Uuid::nil(),
+                duration_min: 0,
+                state: WorkOrderState::Pending,
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -313,14 +332,17 @@ async fn complete_work_order(
         wo.state = WorkOrderState::Done;
         (StatusCode::OK, Json(wo.clone()))
     } else {
-        (StatusCode::NOT_FOUND, Json(WorkOrder {
-            id: Uuid::nil(),
-            mo_id: Uuid::nil(),
-            workcenter_id: Uuid::nil(),
-            duration_min: 0,
-            state: WorkOrderState::Pending,
-            created_at: Utc::now(),
-        }))
+        (
+            StatusCode::NOT_FOUND,
+            Json(WorkOrder {
+                id: Uuid::nil(),
+                mo_id: Uuid::nil(),
+                workcenter_id: Uuid::nil(),
+                duration_min: 0,
+                state: WorkOrderState::Pending,
+                created_at: Utc::now(),
+            }),
+        )
     }
 }
 
@@ -367,20 +389,27 @@ async fn get_component_requirements(
             let boms_map: std::collections::HashMap<_, _> =
                 boms.iter().map(|(k, v)| (*k, v.clone())).collect();
             let components = crate::engine::explode_bom(bom, &boms_map, qty);
-            return (StatusCode::OK, Json(ComponentRequirementsResponse { components }))
+            return (
+                StatusCode::OK,
+                Json(ComponentRequirementsResponse { components }),
+            )
                 .into_response();
         }
     }
 
-    (StatusCode::NOT_FOUND, Json(ComponentRequirementsResponse {
-        components: vec![],
-    }))
-    .into_response()
+    (
+        StatusCode::NOT_FOUND,
+        Json(ComponentRequirementsResponse { components: vec![] }),
+    )
+        .into_response()
 }
 
 pub fn create_router(state: Arc<ErpStore>) -> Router {
     Router::new()
-        .route("/api/erp/manufacturing/boms", post(create_bom).get(list_boms))
+        .route(
+            "/api/erp/manufacturing/boms",
+            post(create_bom).get(list_boms),
+        )
         .route(
             "/api/erp/manufacturing/orders",
             post(create_manufacturing_order).get(list_manufacturing_orders),
@@ -482,8 +511,8 @@ mod tests {
             created_at: Utc::now(),
         };
 
-        let boms = std::iter::once((bom.id, bom.clone()))
-            .collect::<std::collections::HashMap<_, _>>();
+        let boms =
+            std::iter::once((bom.id, bom.clone())).collect::<std::collections::HashMap<_, _>>();
 
         let explosion = crate::engine::explode_bom(&bom, &boms, 2.0);
         assert_eq!(explosion.len(), 1);

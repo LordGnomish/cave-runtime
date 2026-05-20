@@ -13,12 +13,16 @@ pub struct SchedulerState {
 
 impl SchedulerState {
     pub fn new() -> Self {
-        Self { nodes: DashMap::new() }
+        Self {
+            nodes: DashMap::new(),
+        }
     }
 }
 
 impl Default for SchedulerState {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Schedule a pod to a node.
@@ -28,36 +32,53 @@ impl Default for SchedulerState {
 /// 2. Score: rank remaining nodes (least-allocated, affinity bonus)
 /// 3. Bind: select highest-scored node
 pub fn schedule(req: &ScheduleRequest, state: &SchedulerState) -> ScheduleResult {
-    let mut candidates: Vec<(String, Node)> = state.nodes.iter()
+    let mut candidates: Vec<(String, Node)> = state
+        .nodes
+        .iter()
         .map(|r| (r.key().clone(), r.value().clone()))
         .collect();
 
     // Phase 1: Filter
     candidates.retain(|(_, node)| {
         // Must be Ready
-        if node.status != NodeStatus::Ready { return false; }
+        if node.status != NodeStatus::Ready {
+            return false;
+        }
 
         // Resource check
         let available = ResourceCapacity {
-            cpu_millicores: node.allocatable.cpu_millicores.saturating_sub(node.allocated.cpu_millicores),
-            memory_bytes: node.allocatable.memory_bytes.saturating_sub(node.allocated.memory_bytes),
+            cpu_millicores: node
+                .allocatable
+                .cpu_millicores
+                .saturating_sub(node.allocated.cpu_millicores),
+            memory_bytes: node
+                .allocatable
+                .memory_bytes
+                .saturating_sub(node.allocated.memory_bytes),
             pods: node.allocatable.pods.saturating_sub(node.allocated.pods),
             ephemeral_storage_bytes: 0,
         };
-        if !available.has_room_for(&req.resources) { return false; }
+        if !available.has_room_for(&req.resources) {
+            return false;
+        }
 
         // Node selector
         for (k, v) in &req.node_selector {
-            if node.labels.get(k) != Some(v) { return false; }
+            if node.labels.get(k) != Some(v) {
+                return false;
+            }
         }
 
         // Taint check
         for taint in &node.taints {
             if taint.effect == TaintEffect::NoSchedule {
-                let tolerated = req.tolerations.iter().any(|t| {
-                    t.key.as_deref() == Some(&taint.key) || t.operator == "Exists"
-                });
-                if !tolerated { return false; }
+                let tolerated = req
+                    .tolerations
+                    .iter()
+                    .any(|t| t.key.as_deref() == Some(&taint.key) || t.operator == "Exists");
+                if !tolerated {
+                    return false;
+                }
             }
         }
 
@@ -75,34 +96,43 @@ pub fn schedule(req: &ScheduleRequest, state: &SchedulerState) -> ScheduleResult
     }
 
     // Phase 2: Score
-    let mut scored: Vec<ScoredNode> = candidates.iter().map(|(name, node)| {
-        let mut score: u64 = 100;
-        let mut reasons = vec![];
+    let mut scored: Vec<ScoredNode> = candidates
+        .iter()
+        .map(|(name, node)| {
+            let mut score: u64 = 100;
+            let mut reasons = vec![];
 
-        // Least-allocated scoring (prefer nodes with more free resources)
-        let cpu_free_pct = if node.allocatable.cpu_millicores > 0 {
-            ((node.allocatable.cpu_millicores - node.allocated.cpu_millicores) * 100)
-                / node.allocatable.cpu_millicores
-        } else { 0 };
-        score += cpu_free_pct;
-        reasons.push(format!("cpu_free={}%", cpu_free_pct));
+            // Least-allocated scoring (prefer nodes with more free resources)
+            let cpu_free_pct = if node.allocatable.cpu_millicores > 0 {
+                ((node.allocatable.cpu_millicores - node.allocated.cpu_millicores) * 100)
+                    / node.allocatable.cpu_millicores
+            } else {
+                0
+            };
+            score += cpu_free_pct;
+            reasons.push(format!("cpu_free={}%", cpu_free_pct));
 
-        // Affinity bonus
-        if let Some(ref affinity) = req.affinity {
-            if affinity.preferred_nodes.contains(name) {
-                score += 50;
-                reasons.push("affinity_preferred".into());
-            }
-            for (k, v) in &affinity.required_labels {
-                if node.labels.get(k) == Some(v) {
-                    score += 10;
-                    reasons.push(format!("label_match={}:{}", k, v));
+            // Affinity bonus
+            if let Some(ref affinity) = req.affinity {
+                if affinity.preferred_nodes.contains(name) {
+                    score += 50;
+                    reasons.push("affinity_preferred".into());
+                }
+                for (k, v) in &affinity.required_labels {
+                    if node.labels.get(k) == Some(v) {
+                        score += 10;
+                        reasons.push(format!("label_match={}:{}", k, v));
+                    }
                 }
             }
-        }
 
-        ScoredNode { name: name.clone(), score, reasons }
-    }).collect();
+            ScoredNode {
+                name: name.clone(),
+                score,
+                reasons,
+            }
+        })
+        .collect();
 
     scored.sort_by(|a, b| b.score.cmp(&a.score));
 
@@ -112,7 +142,11 @@ pub fn schedule(req: &ScheduleRequest, state: &SchedulerState) -> ScheduleResult
 
     // Update allocated resources
     if let Some(mut node) = state.nodes.get_mut(&winner.name) {
-        node.allocated.subtract(&ResourceRequest { cpu_millicores: 0, memory_bytes: 0, ..Default::default() }); // placeholder
+        node.allocated.subtract(&ResourceRequest {
+            cpu_millicores: 0,
+            memory_bytes: 0,
+            ..Default::default()
+        }); // placeholder
         node.allocated.cpu_millicores += req.resources.cpu_millicores;
         node.allocated.memory_bytes += req.resources.memory_bytes;
         node.allocated.pods += 1;
@@ -129,17 +163,27 @@ pub fn schedule(req: &ScheduleRequest, state: &SchedulerState) -> ScheduleResult
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use super::*;
     use chrono::Utc;
+    use std::collections::HashMap;
 
     fn make_node(name: &str, cpu: u64, mem: u64) -> Node {
         Node {
             name: name.into(),
             uid: uuid::Uuid::new_v4(),
             status: NodeStatus::Ready,
-            capacity: ResourceCapacity { cpu_millicores: cpu, memory_bytes: mem, pods: 110, ephemeral_storage_bytes: 0 },
-            allocatable: ResourceCapacity { cpu_millicores: cpu, memory_bytes: mem, pods: 110, ephemeral_storage_bytes: 0 },
+            capacity: ResourceCapacity {
+                cpu_millicores: cpu,
+                memory_bytes: mem,
+                pods: 110,
+                ephemeral_storage_bytes: 0,
+            },
+            allocatable: ResourceCapacity {
+                cpu_millicores: cpu,
+                memory_bytes: mem,
+                pods: 110,
+                ephemeral_storage_bytes: 0,
+            },
             allocated: ResourceCapacity::default(),
             labels: HashMap::new(),
             taints: vec![],
@@ -152,13 +196,21 @@ mod tests {
     #[test]
     fn test_schedule_basic() {
         let state = SchedulerState::new();
-        state.nodes.insert("node1".into(), make_node("node1", 4000, 8_000_000_000));
-        state.nodes.insert("node2".into(), make_node("node2", 8000, 16_000_000_000));
+        state
+            .nodes
+            .insert("node1".into(), make_node("node1", 4000, 8_000_000_000));
+        state
+            .nodes
+            .insert("node2".into(), make_node("node2", 8000, 16_000_000_000));
 
         let req = ScheduleRequest {
             pod_name: "nginx".into(),
             namespace: "default".into(),
-            resources: ResourceRequest { cpu_millicores: 500, memory_bytes: 1_000_000_000, ..Default::default() },
+            resources: ResourceRequest {
+                cpu_millicores: 500,
+                memory_bytes: 1_000_000_000,
+                ..Default::default()
+            },
             node_selector: HashMap::new(),
             tolerations: vec![],
             affinity: None,
@@ -172,12 +224,18 @@ mod tests {
     #[test]
     fn test_schedule_no_capacity() {
         let state = SchedulerState::new();
-        state.nodes.insert("tiny".into(), make_node("tiny", 100, 500));
+        state
+            .nodes
+            .insert("tiny".into(), make_node("tiny", 100, 500));
 
         let req = ScheduleRequest {
             pod_name: "big".into(),
             namespace: "default".into(),
-            resources: ResourceRequest { cpu_millicores: 4000, memory_bytes: 8_000_000_000, ..Default::default() },
+            resources: ResourceRequest {
+                cpu_millicores: 4000,
+                memory_bytes: 8_000_000_000,
+                ..Default::default()
+            },
             node_selector: HashMap::new(),
             tolerations: vec![],
             affinity: None,
@@ -193,7 +251,10 @@ mod tests {
         let mut gpu_node = make_node("gpu-node", 8000, 16_000_000_000);
         gpu_node.labels.insert("gpu".into(), "true".into());
         state.nodes.insert("gpu-node".into(), gpu_node);
-        state.nodes.insert("cpu-node".into(), make_node("cpu-node", 8000, 16_000_000_000));
+        state.nodes.insert(
+            "cpu-node".into(),
+            make_node("cpu-node", 8000, 16_000_000_000),
+        );
 
         let mut selector = HashMap::new();
         selector.insert("gpu".into(), "true".into());
@@ -201,7 +262,11 @@ mod tests {
         let req = ScheduleRequest {
             pod_name: "ml-job".into(),
             namespace: "default".into(),
-            resources: ResourceRequest { cpu_millicores: 1000, memory_bytes: 4_000_000_000, ..Default::default() },
+            resources: ResourceRequest {
+                cpu_millicores: 1000,
+                memory_bytes: 4_000_000_000,
+                ..Default::default()
+            },
             node_selector: selector,
             tolerations: vec![],
             affinity: None,
@@ -215,13 +280,21 @@ mod tests {
     fn test_schedule_taint_no_toleration() {
         let state = SchedulerState::new();
         let mut tainted = make_node("tainted", 8000, 16_000_000_000);
-        tainted.taints.push(Taint { key: "dedicated".into(), value: Some("gpu".into()), effect: TaintEffect::NoSchedule });
+        tainted.taints.push(Taint {
+            key: "dedicated".into(),
+            value: Some("gpu".into()),
+            effect: TaintEffect::NoSchedule,
+        });
         state.nodes.insert("tainted".into(), tainted);
 
         let req = ScheduleRequest {
             pod_name: "normal".into(),
             namespace: "default".into(),
-            resources: ResourceRequest { cpu_millicores: 500, memory_bytes: 1_000_000_000, ..Default::default() },
+            resources: ResourceRequest {
+                cpu_millicores: 500,
+                memory_bytes: 1_000_000_000,
+                ..Default::default()
+            },
             node_selector: HashMap::new(),
             tolerations: vec![],
             affinity: None,
@@ -234,16 +307,27 @@ mod tests {
     #[test]
     fn test_schedule_affinity_bonus() {
         let state = SchedulerState::new();
-        state.nodes.insert("a".into(), make_node("a", 4000, 8_000_000_000));
-        state.nodes.insert("b".into(), make_node("b", 4000, 8_000_000_000));
+        state
+            .nodes
+            .insert("a".into(), make_node("a", 4000, 8_000_000_000));
+        state
+            .nodes
+            .insert("b".into(), make_node("b", 4000, 8_000_000_000));
 
         let req = ScheduleRequest {
             pod_name: "app".into(),
             namespace: "default".into(),
-            resources: ResourceRequest { cpu_millicores: 500, memory_bytes: 1_000_000_000, ..Default::default() },
+            resources: ResourceRequest {
+                cpu_millicores: 500,
+                memory_bytes: 1_000_000_000,
+                ..Default::default()
+            },
             node_selector: HashMap::new(),
             tolerations: vec![],
-            affinity: Some(Affinity { preferred_nodes: vec!["b".into()], required_labels: HashMap::new() }),
+            affinity: Some(Affinity {
+                preferred_nodes: vec!["b".into()],
+                required_labels: HashMap::new(),
+            }),
         };
 
         let result = schedule(&req, &state);
@@ -268,7 +352,11 @@ mod tests {
         let req = ScheduleRequest {
             pod_name: "ml".into(),
             namespace: "default".into(),
-            resources: ResourceRequest { cpu_millicores: 500, memory_bytes: 1_000_000_000, ..Default::default() },
+            resources: ResourceRequest {
+                cpu_millicores: 500,
+                memory_bytes: 1_000_000_000,
+                ..Default::default()
+            },
             node_selector: HashMap::new(),
             tolerations: vec![Toleration {
                 key: Some("dedicated".into()),
@@ -298,7 +386,11 @@ mod tests {
         let req = ScheduleRequest {
             pod_name: "tolerant".into(),
             namespace: "default".into(),
-            resources: ResourceRequest { cpu_millicores: 100, memory_bytes: 100_000_000, ..Default::default() },
+            resources: ResourceRequest {
+                cpu_millicores: 100,
+                memory_bytes: 100_000_000,
+                ..Default::default()
+            },
             node_selector: HashMap::new(),
             tolerations: vec![Toleration {
                 key: None,
@@ -320,12 +412,18 @@ mod tests {
         let mut bad = make_node("dead", 32_000, 64_000_000_000);
         bad.status = NodeStatus::NotReady;
         state.nodes.insert("dead".into(), bad);
-        state.nodes.insert("alive".into(), make_node("alive", 4000, 8_000_000_000));
+        state
+            .nodes
+            .insert("alive".into(), make_node("alive", 4000, 8_000_000_000));
 
         let req = ScheduleRequest {
             pod_name: "app".into(),
             namespace: "default".into(),
-            resources: ResourceRequest { cpu_millicores: 500, memory_bytes: 1_000_000_000, ..Default::default() },
+            resources: ResourceRequest {
+                cpu_millicores: 500,
+                memory_bytes: 1_000_000_000,
+                ..Default::default()
+            },
             node_selector: HashMap::new(),
             tolerations: vec![],
             affinity: None,
@@ -351,7 +449,11 @@ mod tests {
         let req = ScheduleRequest {
             pod_name: "balanced".into(),
             namespace: "default".into(),
-            resources: ResourceRequest { cpu_millicores: 100, memory_bytes: 100_000_000, ..Default::default() },
+            resources: ResourceRequest {
+                cpu_millicores: 100,
+                memory_bytes: 100_000_000,
+                ..Default::default()
+            },
             node_selector: HashMap::new(),
             tolerations: vec![],
             affinity: None,
@@ -369,7 +471,11 @@ mod tests {
         let req = ScheduleRequest {
             pod_name: "lonely".into(),
             namespace: "default".into(),
-            resources: ResourceRequest { cpu_millicores: 100, memory_bytes: 100_000_000, ..Default::default() },
+            resources: ResourceRequest {
+                cpu_millicores: 100,
+                memory_bytes: 100_000_000,
+                ..Default::default()
+            },
             node_selector: HashMap::new(),
             tolerations: vec![],
             affinity: None,
@@ -385,12 +491,18 @@ mod tests {
         // After a successful schedule the winning node's allocated counters
         // must reflect the request (otherwise capacity accounting drifts).
         let state = SchedulerState::new();
-        state.nodes.insert("only".into(), make_node("only", 4000, 8_000_000_000));
+        state
+            .nodes
+            .insert("only".into(), make_node("only", 4000, 8_000_000_000));
 
         let req = ScheduleRequest {
             pod_name: "consumer".into(),
             namespace: "default".into(),
-            resources: ResourceRequest { cpu_millicores: 1500, memory_bytes: 2_000_000_000, ..Default::default() },
+            resources: ResourceRequest {
+                cpu_millicores: 1500,
+                memory_bytes: 2_000_000_000,
+                ..Default::default()
+            },
             node_selector: HashMap::new(),
             tolerations: vec![],
             affinity: None,
@@ -423,10 +535,17 @@ mod tests {
         let req = ScheduleRequest {
             pod_name: "rackaware".into(),
             namespace: "default".into(),
-            resources: ResourceRequest { cpu_millicores: 100, memory_bytes: 100_000_000, ..Default::default() },
+            resources: ResourceRequest {
+                cpu_millicores: 100,
+                memory_bytes: 100_000_000,
+                ..Default::default()
+            },
             node_selector: HashMap::new(),
             tolerations: vec![],
-            affinity: Some(Affinity { preferred_nodes: vec![], required_labels: required }),
+            affinity: Some(Affinity {
+                preferred_nodes: vec![],
+                required_labels: required,
+            }),
         };
 
         let result = schedule(&req, &state);

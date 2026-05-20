@@ -84,7 +84,10 @@ impl Plugin for SecondaryPlugin {
         // Periodic refresh
         let zones_ref = Arc::clone(&self.zones);
         let cfg = self.config.clone();
-        let this = Self { config: cfg, zones: zones_ref };
+        let this = Self {
+            config: cfg,
+            zones: zones_ref,
+        };
         tokio::spawn(async move {
             for zone_cfg in &this.config.zones {
                 let interval = Duration::from_secs(zone_cfg.refresh_interval);

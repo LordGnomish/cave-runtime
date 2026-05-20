@@ -80,7 +80,8 @@ mod tests {
 
     #[test]
     fn detect_cyclonedx_xml() {
-        let bom = br#"<?xml version="1.0"?><bom xmlns="http://cyclonedx.org/schema/bom/1.5"></bom>"#;
+        let bom =
+            br#"<?xml version="1.0"?><bom xmlns="http://cyclonedx.org/schema/bom/1.5"></bom>"#;
         assert_eq!(detect_format(bom), Some(BomFormat::CycloneDxXml));
     }
 

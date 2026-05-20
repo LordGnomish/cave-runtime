@@ -20,11 +20,12 @@ pub fn format_header(state: &AppState, items_total: usize) -> String {
         .as_deref()
         .map(|t| format!("tenant={}", t))
         .unwrap_or_else(|| "tenant=-".to_string());
-    let follow = if state.follow { "follow:on" } else { "follow:off" };
-    format!(
-        "[{}] {} | {} items | {}",
-        view, tenant, items_total, follow
-    )
+    let follow = if state.follow {
+        "follow:on"
+    } else {
+        "follow:off"
+    };
+    format!("[{}] {} | {} items | {}", view, tenant, items_total, follow)
 }
 
 /// Format the status line at the bottom.
@@ -60,7 +61,11 @@ pub fn format_search_bar(filter: &str) -> String {
 ///
 /// Returns `(start_index, slice)` so the caller can render absolute
 /// row numbers if it wants to.
-pub fn paginate<'a, T>(items: &'a [T], viewport_height: usize, selected: usize) -> (usize, &'a [T]) {
+pub fn paginate<'a, T>(
+    items: &'a [T],
+    viewport_height: usize,
+    selected: usize,
+) -> (usize, &'a [T]) {
     if items.is_empty() || viewport_height == 0 {
         return (0, &[]);
     }
@@ -470,7 +475,10 @@ mod tests {
         let row2 = format_item_row(&s.items[2], false, 20);
         let status = format_status_line(&s, Mode::Normal);
         // Concatenated layout still has all the bits we care about.
-        let screen = format!("{}\n{}\n{}\n{}\n{}\n{}", header, tab, row0, row1, row2, status);
+        let screen = format!(
+            "{}\n{}\n{}\n{}\n{}\n{}",
+            header, tab, row0, row1, row2, status
+        );
         assert!(screen.contains("acme"));
         assert!(screen.contains("> b"));
         assert!(screen.contains("press ? for help"));

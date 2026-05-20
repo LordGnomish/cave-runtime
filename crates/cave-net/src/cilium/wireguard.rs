@@ -48,7 +48,8 @@ impl WgKey {
             b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         let mut i = 0;
         while i + 3 <= self.0.len() {
-            let n = ((self.0[i] as u32) << 16) | ((self.0[i + 1] as u32) << 8) | (self.0[i + 2] as u32);
+            let n =
+                ((self.0[i] as u32) << 16) | ((self.0[i + 1] as u32) << 8) | (self.0[i + 2] as u32);
             for shift in [18, 12, 6, 0] {
                 out.push(CHARS[((n >> shift) & 0x3F) as usize] as char);
             }
@@ -161,7 +162,14 @@ impl WgAgent {
         // we approximate with a distinct seed transformation so tests can
         // assert pub != priv without doing real ECC.
         let public_key = WgKey::from_seed(seed.wrapping_mul(0x9E3779B97F4A7C15));
-        Self { tenant, node_name: node_name.into(), mode, private_key, public_key, peers: HashMap::new() }
+        Self {
+            tenant,
+            node_name: node_name.into(),
+            mode,
+            private_key,
+            public_key,
+            peers: HashMap::new(),
+        }
     }
 
     pub fn upsert_peer(&mut self, peer: WgPeer) {
@@ -197,7 +205,11 @@ mod tests {
 
     #[test]
     fn wg_keypair_has_distinct_public_and_private() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/wireguard/agent.go", "Agent.NewKeypair", "tenant-wg-keys");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/wireguard/agent.go",
+            "Agent.NewKeypair",
+            "tenant-wg-keys"
+        );
         let a = WgAgent::new(tenant, "node-a", WgMode::PerNode, 1);
         assert_ne!(a.private_key, a.public_key);
     }
@@ -222,7 +234,11 @@ mod tests {
 
     #[test]
     fn wg_pub_key_serializes_as_base64_string() {
-        let (_c, _t) = cilium_test_ctx!("pkg/wireguard/agent.go", "Key.Serialize", "tenant-wg-serialize");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/wireguard/agent.go",
+            "Key.Serialize",
+            "tenant-wg-serialize"
+        );
         let k = WgKey::from_seed(7);
         let json = serde_json::to_string(&k).unwrap();
         assert!(json.starts_with('"'));
@@ -235,11 +251,18 @@ mod tests {
 
     #[test]
     fn wg_register_peer_with_endpoint_and_allowed_ips() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/wireguard/agent.go", "Agent.UpsertPeer", "tenant-wg-peer");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/wireguard/agent.go",
+            "Agent.UpsertPeer",
+            "tenant-wg-peer"
+        );
         let mut a = WgAgent::new(tenant, "node-a", WgMode::PerNode, 1);
         let p = WgPeer {
-            node: "node-b".into(), public_key: WgKey::from_seed(99),
-            endpoint: endpoint(51820), allowed_ips: vec!["10.244.1.0/24".into()], psk: None,
+            node: "node-b".into(),
+            public_key: WgKey::from_seed(99),
+            endpoint: endpoint(51820),
+            allowed_ips: vec!["10.244.1.0/24".into()],
+            psk: None,
         };
         a.upsert_peer(p.clone());
         assert_eq!(a.peer_count(), 1);
@@ -248,15 +271,25 @@ mod tests {
 
     #[test]
     fn wg_upsert_peer_replaces_existing_entry() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/wireguard/agent.go", "Agent.UpsertPeer.Replace", "tenant-wg-peerup");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/wireguard/agent.go",
+            "Agent.UpsertPeer.Replace",
+            "tenant-wg-peerup"
+        );
         let mut a = WgAgent::new(tenant, "node-a", WgMode::PerNode, 1);
         a.upsert_peer(WgPeer {
-            node: "node-b".into(), public_key: WgKey::from_seed(99),
-            endpoint: endpoint(51820), allowed_ips: vec!["10.244.1.0/24".into()], psk: None,
+            node: "node-b".into(),
+            public_key: WgKey::from_seed(99),
+            endpoint: endpoint(51820),
+            allowed_ips: vec!["10.244.1.0/24".into()],
+            psk: None,
         });
         a.upsert_peer(WgPeer {
-            node: "node-b".into(), public_key: WgKey::from_seed(99),
-            endpoint: endpoint(51821), allowed_ips: vec!["10.244.2.0/24".into()], psk: None,
+            node: "node-b".into(),
+            public_key: WgKey::from_seed(99),
+            endpoint: endpoint(51821),
+            allowed_ips: vec!["10.244.2.0/24".into()],
+            psk: None,
         });
         assert_eq!(a.peer_count(), 1);
         assert_eq!(a.lookup_peer("node-b").unwrap().endpoint.port(), 51821);
@@ -264,11 +297,18 @@ mod tests {
 
     #[test]
     fn wg_remove_peer() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/wireguard/agent.go", "Agent.RemovePeer", "tenant-wg-peerrm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/wireguard/agent.go",
+            "Agent.RemovePeer",
+            "tenant-wg-peerrm"
+        );
         let mut a = WgAgent::new(tenant, "node-a", WgMode::PerNode, 1);
         a.upsert_peer(WgPeer {
-            node: "node-b".into(), public_key: WgKey::from_seed(99),
-            endpoint: endpoint(51820), allowed_ips: vec!["10.244.1.0/24".into()], psk: None,
+            node: "node-b".into(),
+            public_key: WgKey::from_seed(99),
+            endpoint: endpoint(51820),
+            allowed_ips: vec!["10.244.1.0/24".into()],
+            psk: None,
         });
         assert!(a.remove_peer("node-b"));
         assert!(a.lookup_peer("node-b").is_none());
@@ -276,14 +316,22 @@ mod tests {
 
     #[test]
     fn wg_remove_unknown_peer_returns_false() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/wireguard/agent.go", "Agent.RemovePeer.NotFound", "tenant-wg-peerrmnf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/wireguard/agent.go",
+            "Agent.RemovePeer.NotFound",
+            "tenant-wg-peerrmnf"
+        );
         let mut a = WgAgent::new(tenant, "node-a", WgMode::PerNode, 1);
         assert!(!a.remove_peer("ghost"));
     }
 
     #[test]
     fn wg_lookup_unknown_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/wireguard/agent.go", "Agent.LookupPeer", "tenant-wg-peerlk");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/wireguard/agent.go",
+            "Agent.LookupPeer",
+            "tenant-wg-peerlk"
+        );
         let a = WgAgent::new(tenant, "node-a", WgMode::PerNode, 1);
         assert!(a.lookup_peer("ghost").is_none());
     }
@@ -292,11 +340,15 @@ mod tests {
 
     #[test]
     fn wg_per_node_mode_one_peer_per_node_with_pod_cidr() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/wireguard/agent.go", "Agent.PerNode", "tenant-wg-pn");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/wireguard/agent.go", "Agent.PerNode", "tenant-wg-pn");
         let mut a = WgAgent::new(tenant, "node-a", WgMode::PerNode, 1);
         a.upsert_peer(WgPeer {
-            node: "node-b".into(), public_key: WgKey::from_seed(99),
-            endpoint: endpoint(51820), allowed_ips: vec!["10.244.1.0/24".into()], psk: None,
+            node: "node-b".into(),
+            public_key: WgKey::from_seed(99),
+            endpoint: endpoint(51820),
+            allowed_ips: vec!["10.244.1.0/24".into()],
+            psk: None,
         });
         let p = a.lookup_peer("node-b").unwrap();
         assert_eq!(p.allowed_ips, vec!["10.244.1.0/24".to_string()]);
@@ -304,15 +356,22 @@ mod tests {
 
     #[test]
     fn wg_per_pod_mode_separate_peer_per_pod_ip() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/wireguard/agent.go", "Agent.PerPod", "tenant-wg-pp");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/wireguard/agent.go", "Agent.PerPod", "tenant-wg-pp");
         let mut a = WgAgent::new(tenant, "node-a", WgMode::PerPod, 1);
         a.upsert_peer(WgPeer {
-            node: "pod-b1".into(), public_key: WgKey::from_seed(11),
-            endpoint: endpoint(51820), allowed_ips: vec!["10.244.1.5/32".into()], psk: None,
+            node: "pod-b1".into(),
+            public_key: WgKey::from_seed(11),
+            endpoint: endpoint(51820),
+            allowed_ips: vec!["10.244.1.5/32".into()],
+            psk: None,
         });
         a.upsert_peer(WgPeer {
-            node: "pod-b2".into(), public_key: WgKey::from_seed(22),
-            endpoint: endpoint(51820), allowed_ips: vec!["10.244.1.6/32".into()], psk: None,
+            node: "pod-b2".into(),
+            public_key: WgKey::from_seed(22),
+            endpoint: endpoint(51820),
+            allowed_ips: vec!["10.244.1.6/32".into()],
+            psk: None,
         });
         assert_eq!(a.peer_count(), 2);
     }
@@ -324,8 +383,10 @@ mod tests {
         let (_c, tenant) = cilium_test_ctx!("pkg/wireguard/agent.go", "Agent.PSK", "tenant-wg-psk");
         let mut a = WgAgent::new(tenant, "node-a", WgMode::PerNode, 1);
         a.upsert_peer(WgPeer {
-            node: "node-b".into(), public_key: WgKey::from_seed(99),
-            endpoint: endpoint(51820), allowed_ips: vec!["10.244.1.0/24".into()],
+            node: "node-b".into(),
+            public_key: WgKey::from_seed(99),
+            endpoint: endpoint(51820),
+            allowed_ips: vec!["10.244.1.0/24".into()],
             psk: Some(WgKey::from_seed(55)),
         });
         assert!(a.lookup_peer("node-b").unwrap().psk.is_some());
@@ -333,10 +394,16 @@ mod tests {
 
     #[test]
     fn wg_peer_round_trips_through_serde() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/wireguard/agent.go", "Agent.Peer.Serde", "tenant-wg-serde");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/wireguard/agent.go",
+            "Agent.Peer.Serde",
+            "tenant-wg-serde"
+        );
         let p = WgPeer {
-            node: "node-b".into(), public_key: WgKey::from_seed(99),
-            endpoint: endpoint(51820), allowed_ips: vec!["10.244.1.0/24".into()],
+            node: "node-b".into(),
+            public_key: WgKey::from_seed(99),
+            endpoint: endpoint(51820),
+            allowed_ips: vec!["10.244.1.0/24".into()],
             psk: Some(WgKey::from_seed(55)),
         };
         let json = serde_json::to_string(&p).unwrap();

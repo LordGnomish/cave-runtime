@@ -8,7 +8,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, htmx_button, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, CriContainer, CriSandbox};
+use crate::admin::state::{AdminState, CriContainer, CriSandbox, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -19,12 +19,19 @@ pub enum CriViewError {
     NotFound(String),
 }
 
-pub fn list_sandboxes(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<CriSandbox>, CriViewError> {
+pub fn list_sandboxes(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<CriSandbox>, CriViewError> {
     ctx.authorise(Permission::CriRead)?;
-    Ok(scope(&state.cri_sandboxes.read().unwrap(), &ctx.tenant, |r| &r.tenant)
+    Ok(
+        scope(&state.cri_sandboxes.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
         .into_iter()
         .cloned()
-        .collect())
+        .collect(),
+    )
 }
 
 pub fn inspect_sandbox(
@@ -50,7 +57,10 @@ pub fn inspect_sandbox(
 
 /// Render the exec terminal placeholder. The xterm.js client takes over
 /// `<div id="exec-{cid}">` after the page loads.
-pub fn render_exec_placeholder(ctx: &RequestCtx, container_id: &str) -> Result<String, CriViewError> {
+pub fn render_exec_placeholder(
+    ctx: &RequestCtx,
+    container_id: &str,
+) -> Result<String, CriViewError> {
     ctx.authorise(Permission::CriExec)?;
     let cid = escape(container_id);
     Ok(format!(
@@ -68,7 +78,13 @@ pub fn render_list_page(state: &AdminState, ctx: &RequestCtx) -> Result<String, 
     let rows = list_sandboxes(state, ctx)?;
     let table_rows: Vec<Vec<String>> = rows
         .iter()
-        .map(|s| vec![s.sandbox_id.clone(), s.pod_name.clone(), s.state.to_string()])
+        .map(|s| {
+            vec![
+                s.sandbox_id.clone(),
+                s.pod_name.clone(),
+                s.state.to_string(),
+            ]
+        })
         .collect();
     let body = format!(
         r#"<section><h2 class="text-lg font-semibold mb-2">Sandboxes ({n})</h2>{tbl}

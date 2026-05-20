@@ -50,8 +50,12 @@ impl PackageRef {
 /// Splits on `.` and `-`, compares numerically when both sides parse as u64,
 /// otherwise lexically. Returns -1/0/1.
 pub fn version_cmp(a: &str, b: &str) -> i8 {
-    let pa: Vec<&str> = a.split(|c: char| c == '.' || c == '-' || c == '+').collect();
-    let pb: Vec<&str> = b.split(|c: char| c == '.' || c == '-' || c == '+').collect();
+    let pa: Vec<&str> = a
+        .split(|c: char| c == '.' || c == '-' || c == '+')
+        .collect();
+    let pb: Vec<&str> = b
+        .split(|c: char| c == '.' || c == '-' || c == '+')
+        .collect();
     let n = pa.len().max(pb.len());
     for i in 0..n {
         let ai = pa.get(i).copied().unwrap_or("0");

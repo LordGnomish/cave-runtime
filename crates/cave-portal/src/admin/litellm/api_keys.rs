@@ -5,24 +5,36 @@
 use super::types::{LiteLlmApiKey, LiteLlmViewError};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
+use crate::admin::state::{AdminState, scope};
 
 pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<LiteLlmApiKey>, LiteLlmViewError> {
     ctx.authorise(Permission::LiteLlmRead)?;
     let mut rows: Vec<LiteLlmApiKey> =
-        scope(&state.litellm_api_keys.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-            .into_iter()
-            .cloned()
-            .collect();
+        scope(&state.litellm_api_keys.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| b.created_at_unix.cmp(&a.created_at_unix));
     Ok(rows)
 }
 
-pub fn list_active(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<LiteLlmApiKey>, LiteLlmViewError> {
-    Ok(list(state, ctx)?.into_iter().filter(|k| k.status == "active").collect())
+pub fn list_active(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<LiteLlmApiKey>, LiteLlmViewError> {
+    Ok(list(state, ctx)?
+        .into_iter()
+        .filter(|k| k.status == "active")
+        .collect())
 }
 
-pub fn get(state: &AdminState, ctx: &RequestCtx, key_id: &str) -> Result<LiteLlmApiKey, LiteLlmViewError> {
+pub fn get(
+    state: &AdminState,
+    ctx: &RequestCtx,
+    key_id: &str,
+) -> Result<LiteLlmApiKey, LiteLlmViewError> {
     list(state, ctx)?
         .into_iter()
         .find(|k| k.key_id == key_id)
@@ -66,7 +78,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LiteLlmVie
                     .map(|c| format!("${}.{}", c / 100, c % 100))
                     .unwrap_or_else(|| "—".into()),
                 format!("${}.{}", k.spent_usd_cents / 100, k.spent_usd_cents % 100),
-                k.expires_at_unix.map(|t| t.to_string()).unwrap_or_else(|| "never".into()),
+                k.expires_at_unix
+                    .map(|t| t.to_string())
+                    .unwrap_or_else(|| "never".into()),
             ]
         })
         .collect();
@@ -78,7 +92,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LiteLlmVie
         over = over,
         near = near,
         tbl = table(
-            &["key_id", "label", "status", "models", "budget", "spent", "expires"],
+            &[
+                "key_id", "label", "status", "models", "budget", "spent", "expires"
+            ],
             &rows_html,
         ),
     );
@@ -116,9 +132,9 @@ mod tests {
     fn seeded() -> AdminState {
         let s = AdminState::seeded();
         let mut g = s.litellm_api_keys.write().unwrap();
-        g.push(key("acme", "k1", "active", Some(10_000), 500));   // 5%
+        g.push(key("acme", "k1", "active", Some(10_000), 500)); // 5%
         g.push(key("acme", "k2", "active", Some(10_000), 8_500)); // 85%
-        g.push(key("acme", "k3", "active", Some(10_000), 10_500));// over
+        g.push(key("acme", "k3", "active", Some(10_000), 10_500)); // over
         g.push(key("acme", "k4", "revoked", None, 0));
         g.push(key("evil", "k9", "active", None, 0));
         drop(g);
@@ -151,7 +167,10 @@ mod tests {
         let s = seeded();
         let c = ctx(&[Permission::LiteLlmRead]);
         assert_eq!(get(&s, &c, "k1").unwrap().label, "key-k1");
-        assert!(matches!(get(&s, &c, "nope").unwrap_err(), LiteLlmViewError::KeyNotFound(_)));
+        assert!(matches!(
+            get(&s, &c, "nope").unwrap_err(),
+            LiteLlmViewError::KeyNotFound(_)
+        ));
     }
 
     #[test]

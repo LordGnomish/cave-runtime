@@ -57,7 +57,9 @@ pub struct DeploymentStore {
 
 impl Default for DeploymentStore {
     fn default() -> Self {
-        Self { inner: Mutex::new(HashMap::new()) }
+        Self {
+            inner: Mutex::new(HashMap::new()),
+        }
     }
 }
 
@@ -118,8 +120,7 @@ impl DeploymentStore {
         principal: Option<&Principal>,
         req: CreateDeployRequest,
     ) -> Result<Deployment, DeploymentsError> {
-        Guard::cross_persona(Some("deployments:write"))
-            .authorize(principal, Some(&req.tenant))?;
+        Guard::cross_persona(Some("deployments:write")).authorize(principal, Some(&req.tenant))?;
         if req.replicas == 0 || req.replicas > 1000 {
             return Err(DeploymentsError::InvalidReplicas(req.replicas));
         }
@@ -147,8 +148,7 @@ impl DeploymentStore {
         tenant: &str,
         app: &str,
     ) -> Result<Deployment, DeploymentsError> {
-        Guard::cross_persona(Some("deployments:rollout"))
-            .authorize(principal, Some(tenant))?;
+        Guard::cross_persona(Some("deployments:rollout")).authorize(principal, Some(tenant))?;
         let id = Self::make_id(tenant, app);
         let mut guard = self.inner.lock().unwrap();
         let history = guard
@@ -194,13 +194,31 @@ mod tests {
     use super::*;
     use crate::routes::rbac::Persona;
 
-    fn admin() -> Principal { Principal::new("a", Persona::Admin).with_role("deployments:write").with_role("deployments:rollout") }
-    fn dev(t: &str) -> Principal { Principal::new("d", Persona::Tenant).with_tenant(t).with_role("deployments:write").with_role("deployments:rollout") }
-    fn dev_no_role(t: &str) -> Principal { Principal::new("d", Persona::Tenant).with_tenant(t) }
-    fn op() -> Principal { Principal::new("o", Persona::Operator) }
+    fn admin() -> Principal {
+        Principal::new("a", Persona::Admin)
+            .with_role("deployments:write")
+            .with_role("deployments:rollout")
+    }
+    fn dev(t: &str) -> Principal {
+        Principal::new("d", Persona::Tenant)
+            .with_tenant(t)
+            .with_role("deployments:write")
+            .with_role("deployments:rollout")
+    }
+    fn dev_no_role(t: &str) -> Principal {
+        Principal::new("d", Persona::Tenant).with_tenant(t)
+    }
+    fn op() -> Principal {
+        Principal::new("o", Persona::Operator)
+    }
 
     fn req(t: &str, a: &str) -> CreateDeployRequest {
-        CreateDeployRequest { tenant: t.into(), app: a.into(), image: "img:1".into(), replicas: 3 }
+        CreateDeployRequest {
+            tenant: t.into(),
+            app: a.into(),
+            image: "img:1".into(),
+            replicas: 3,
+        }
     }
 
     #[test]
@@ -213,14 +231,22 @@ mod tests {
     fn deploy_anonymous_denied() {
         let s = DeploymentStore::new();
         let err = s.deploy(None, req("acme", "web")).unwrap_err();
-        assert!(matches!(err, DeploymentsError::Guard(GuardError::Anonymous)));
+        assert!(matches!(
+            err,
+            DeploymentsError::Guard(GuardError::Anonymous)
+        ));
     }
 
     #[test]
     fn deploy_without_role_denied() {
         let s = DeploymentStore::new();
-        let err = s.deploy(Some(&dev_no_role("acme")), req("acme", "web")).unwrap_err();
-        assert!(matches!(err, DeploymentsError::Guard(GuardError::MissingRole(_))));
+        let err = s
+            .deploy(Some(&dev_no_role("acme")), req("acme", "web"))
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            DeploymentsError::Guard(GuardError::MissingRole(_))
+        ));
     }
 
     #[test]
@@ -261,8 +287,13 @@ mod tests {
     #[test]
     fn deploy_cross_tenant_denied_for_tenant_persona() {
         let s = DeploymentStore::new();
-        let err = s.deploy(Some(&dev("globex")), req("acme", "web")).unwrap_err();
-        assert!(matches!(err, DeploymentsError::Guard(GuardError::TenantMismatch { .. })));
+        let err = s
+            .deploy(Some(&dev("globex")), req("acme", "web"))
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            DeploymentsError::Guard(GuardError::TenantMismatch { .. })
+        ));
     }
 
     #[test]
@@ -281,7 +312,12 @@ mod tests {
         s.deploy(Some(&admin()), req("acme", "zeta")).unwrap();
         s.deploy(Some(&admin()), req("acme", "alpha")).unwrap();
         s.deploy(Some(&admin()), req("acme", "mu")).unwrap();
-        let apps: Vec<_> = s.list(Some(&admin()), "acme").unwrap().into_iter().map(|d| d.app).collect();
+        let apps: Vec<_> = s
+            .list(Some(&admin()), "acme")
+            .unwrap()
+            .into_iter()
+            .map(|d| d.app)
+            .collect();
         assert_eq!(apps, vec!["alpha", "mu", "zeta"]);
     }
 
@@ -309,7 +345,10 @@ mod tests {
         let s = DeploymentStore::new();
         s.deploy(Some(&admin()), req("acme", "web")).unwrap();
         let err = s.get(Some(&dev("globex")), "acme", "web").unwrap_err();
-        assert!(matches!(err, DeploymentsError::Guard(GuardError::TenantMismatch { .. })));
+        assert!(matches!(
+            err,
+            DeploymentsError::Guard(GuardError::TenantMismatch { .. })
+        ));
     }
 
     #[test]
@@ -360,8 +399,13 @@ mod tests {
     fn mark_healthy_requires_operator() {
         let s = DeploymentStore::new();
         s.deploy(Some(&admin()), req("acme", "web")).unwrap();
-        let err = s.mark_healthy(Some(&dev("acme")), "acme", "web", 3).unwrap_err();
-        assert!(matches!(err, DeploymentsError::Guard(GuardError::PersonaForbidden { .. })));
+        let err = s
+            .mark_healthy(Some(&dev("acme")), "acme", "web", 3)
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            DeploymentsError::Guard(GuardError::PersonaForbidden { .. })
+        ));
     }
 
     #[test]

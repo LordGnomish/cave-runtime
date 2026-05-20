@@ -16,7 +16,7 @@
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
@@ -722,9 +722,8 @@ impl PersistenceBackend for RdbmsBackend {
     // ── User ─────────────────────────────────────────────────────────────
     async fn list_users_in_realm(&self, realm_id: Uuid) -> Result<Vec<UserEntity>> {
         self.with_conn(|c| {
-            let mut stmt = c.prepare(
-                "SELECT * FROM users WHERE realm_id = ?1 AND deleted_at IS NULL",
-            )?;
+            let mut stmt =
+                c.prepare("SELECT * FROM users WHERE realm_id = ?1 AND deleted_at IS NULL")?;
             let rows = stmt
                 .query_map(params![uid_to_str(realm_id)], row_to_user)?
                 .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -818,9 +817,8 @@ impl PersistenceBackend for RdbmsBackend {
     // ── Client ───────────────────────────────────────────────────────────
     async fn list_clients_in_realm(&self, realm_id: Uuid) -> Result<Vec<ClientEntity>> {
         self.with_conn(|c| {
-            let mut stmt = c.prepare(
-                "SELECT * FROM clients WHERE realm_id = ?1 AND deleted_at IS NULL",
-            )?;
+            let mut stmt =
+                c.prepare("SELECT * FROM clients WHERE realm_id = ?1 AND deleted_at IS NULL")?;
             let rows = stmt
                 .query_map(params![uid_to_str(realm_id)], row_to_client)?
                 .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -921,9 +919,8 @@ impl PersistenceBackend for RdbmsBackend {
     // ── Role ─────────────────────────────────────────────────────────────
     async fn list_roles_in_realm(&self, realm_id: Uuid) -> Result<Vec<RoleEntity>> {
         self.with_conn(|c| {
-            let mut stmt = c.prepare(
-                "SELECT * FROM roles WHERE realm_id = ?1 AND deleted_at IS NULL",
-            )?;
+            let mut stmt =
+                c.prepare("SELECT * FROM roles WHERE realm_id = ?1 AND deleted_at IS NULL")?;
             let rows = stmt
                 .query_map(params![uid_to_str(realm_id)], row_to_role)?
                 .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -1023,9 +1020,8 @@ impl PersistenceBackend for RdbmsBackend {
     // ── Group ────────────────────────────────────────────────────────────
     async fn list_groups_in_realm(&self, realm_id: Uuid) -> Result<Vec<GroupEntity>> {
         self.with_conn(|c| {
-            let mut stmt = c.prepare(
-                "SELECT * FROM groups_tbl WHERE realm_id = ?1 AND deleted_at IS NULL",
-            )?;
+            let mut stmt =
+                c.prepare("SELECT * FROM groups_tbl WHERE realm_id = ?1 AND deleted_at IS NULL")?;
             let rows = stmt
                 .query_map(params![uid_to_str(realm_id)], row_to_group)?
                 .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -1160,10 +1156,7 @@ impl PersistenceBackend for RdbmsBackend {
             Ok(i)
         })
     }
-    async fn update_idp(
-        &self,
-        mut i: IdentityProviderEntity,
-    ) -> Result<IdentityProviderEntity> {
+    async fn update_idp(&self, mut i: IdentityProviderEntity) -> Result<IdentityProviderEntity> {
         i.audit.updated_at = Utc::now();
         self.with_conn(|c| {
             let rows = c.execute(
@@ -1465,8 +1458,7 @@ mod tests {
         let b = fresh();
         let r = b.create_realm(RealmEntity::new("r")).await.unwrap();
         let mut i = IdentityProviderEntity::new(r.id, "okta-prod", "oidc");
-        i.config
-            .insert("clientId".into(), "cave-runtime".into());
+        i.config.insert("clientId".into(), "cave-runtime".into());
         i.mappers.push(IdpMapper {
             id: Uuid::new_v4(),
             name: "email-mapper".into(),
@@ -1477,7 +1469,10 @@ mod tests {
         let got = b.get_idp_by_id(saved.id).await.unwrap().unwrap();
         assert_eq!(got.mappers.len(), 1);
         assert_eq!(got.mappers[0].name, "email-mapper");
-        assert_eq!(got.config.get("clientId").map(String::as_str), Some("cave-runtime"));
+        assert_eq!(
+            got.config.get("clientId").map(String::as_str),
+            Some("cave-runtime")
+        );
     }
 
     #[tokio::test]
@@ -1518,11 +1513,12 @@ mod tests {
         assert_eq!(b.count_users(r.id).await.unwrap(), 2);
         txn.rollback().await.unwrap();
         assert_eq!(b.count_users(r.id).await.unwrap(), 1);
-        assert!(b
-            .get_user_by_name(r.id, "transient")
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            b.get_user_by_name(r.id, "transient")
+                .await
+                .unwrap()
+                .is_none()
+        );
         assert!(b.get_user_by_name(r.id, "pre").await.unwrap().is_some());
     }
 
@@ -1531,9 +1527,7 @@ mod tests {
         let b = fresh();
         let r = b.create_realm(RealmEntity::new("r")).await.unwrap();
         let txn = b.begin_txn().await.unwrap();
-        b.create_user(UserEntity::new(r.id, "alice"))
-            .await
-            .unwrap();
+        b.create_user(UserEntity::new(r.id, "alice")).await.unwrap();
         txn.commit().await.unwrap();
         assert_eq!(b.count_users(r.id).await.unwrap(), 1);
     }
@@ -1542,10 +1536,7 @@ mod tests {
     async fn group_role_ids_roundtrip() {
         let b = fresh();
         let r = b.create_realm(RealmEntity::new("r")).await.unwrap();
-        let role = b
-            .create_role(RoleEntity::new(r.id, "admin"))
-            .await
-            .unwrap();
+        let role = b.create_role(RoleEntity::new(r.id, "admin")).await.unwrap();
         let mut g = GroupEntity::new(r.id, "admins");
         g.role_ids.push(role.id);
         let saved = b.create_group(g).await.unwrap();
@@ -1560,9 +1551,7 @@ mod tests {
             std::env::temp_dir().join(format!("cave_auth_rdbms_test_{}.sqlite", Uuid::new_v4()));
         {
             let b = RdbmsBackend::open(&tmp).unwrap();
-            b.create_realm(RealmEntity::new("persisted"))
-                .await
-                .unwrap();
+            b.create_realm(RealmEntity::new("persisted")).await.unwrap();
         }
         let b2 = RdbmsBackend::open(&tmp).unwrap();
         let applied = b2.applied_migrations().unwrap();

@@ -69,7 +69,9 @@ pub struct Deltas {
 }
 
 impl Aggregator {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Feed one raw read for `key`, return deltas vs the previous read.
     /// First sample produces zeros (upstream behaviour: no baseline yet).
@@ -82,13 +84,19 @@ impl Aggregator {
                 failed: current.failed.saturating_sub(prev.failed),
             }
         } else {
-            Deltas { new_conn: 0, closed: 0, failed: 0 }
+            Deltas {
+                new_conn: 0,
+                closed: 0,
+                failed: 0,
+            }
         };
         self.last.insert(key, current);
         deltas
     }
 
-    pub fn known_keys(&self) -> usize { self.last.len() }
+    pub fn known_keys(&self) -> usize {
+        self.last.len()
+    }
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -131,9 +139,18 @@ mod tests {
     fn metric_names_match_upstream_strings() {
         let (_c, _t) = cilium_test_ctx!("pkg/act/act.go", "MetricNames", "tenant-act-mn");
         assert_eq!(metric_name::NEW_CONNECTIONS_TOTAL, "new_connections_total");
-        assert_eq!(metric_name::ACTIVE_CONNECTIONS_TOTAL, "active_connections_total");
-        assert_eq!(metric_name::FAILED_CONNECTIONS_TOTAL, "failed_connections_total");
-        assert_eq!(metric_name::PROCESSING_TIME_SECONDS, "processing_time_seconds");
+        assert_eq!(
+            metric_name::ACTIVE_CONNECTIONS_TOTAL,
+            "active_connections_total"
+        );
+        assert_eq!(
+            metric_name::FAILED_CONNECTIONS_TOTAL,
+            "failed_connections_total"
+        );
+        assert_eq!(
+            metric_name::PROCESSING_TIME_SECONDS,
+            "processing_time_seconds"
+        );
         assert_eq!(metric_name::ERRORS, "errors");
     }
 
@@ -142,29 +159,84 @@ mod tests {
         let (_c, _t) = cilium_test_ctx!("pkg/act/act.go", "Aggr.First", "tenant-act-af");
         let mut a = Aggregator::new();
         let d = a.observe(
-            ZoneServiceKey { zone: "us-east-1a".into(), service: "10.0.0.1:80".into() },
-            Counters { opened: 100, closed: 50, failed: 1 },
+            ZoneServiceKey {
+                zone: "us-east-1a".into(),
+                service: "10.0.0.1:80".into(),
+            },
+            Counters {
+                opened: 100,
+                closed: 50,
+                failed: 1,
+            },
         );
-        assert_eq!(d, Deltas { new_conn: 0, closed: 0, failed: 0 });
+        assert_eq!(
+            d,
+            Deltas {
+                new_conn: 0,
+                closed: 0,
+                failed: 0
+            }
+        );
     }
 
     #[test]
     fn aggregator_second_sample_emits_deltas() {
         let (_c, _t) = cilium_test_ctx!("pkg/act/act.go", "Aggr.Delta", "tenant-act-ad");
         let mut a = Aggregator::new();
-        let k = ZoneServiceKey { zone: "us-east-1a".into(), service: "10.0.0.1:80".into() };
-        let _ = a.observe(k.clone(), Counters { opened: 100, closed: 50, failed: 1 });
-        let d = a.observe(k, Counters { opened: 150, closed: 70, failed: 3 });
-        assert_eq!(d, Deltas { new_conn: 50, closed: 20, failed: 2 });
+        let k = ZoneServiceKey {
+            zone: "us-east-1a".into(),
+            service: "10.0.0.1:80".into(),
+        };
+        let _ = a.observe(
+            k.clone(),
+            Counters {
+                opened: 100,
+                closed: 50,
+                failed: 1,
+            },
+        );
+        let d = a.observe(
+            k,
+            Counters {
+                opened: 150,
+                closed: 70,
+                failed: 3,
+            },
+        );
+        assert_eq!(
+            d,
+            Deltas {
+                new_conn: 50,
+                closed: 20,
+                failed: 2
+            }
+        );
     }
 
     #[test]
     fn aggregator_handles_counter_reset_with_saturation() {
         let (_c, _t) = cilium_test_ctx!("pkg/act/act.go", "Aggr.Reset", "tenant-act-ar");
         let mut a = Aggregator::new();
-        let k = ZoneServiceKey { zone: "z".into(), service: "s".into() };
-        let _ = a.observe(k.clone(), Counters { opened: 1000, closed: 0, failed: 0 });
-        let d = a.observe(k, Counters { opened: 5, closed: 0, failed: 0 });
+        let k = ZoneServiceKey {
+            zone: "z".into(),
+            service: "s".into(),
+        };
+        let _ = a.observe(
+            k.clone(),
+            Counters {
+                opened: 1000,
+                closed: 0,
+                failed: 0,
+            },
+        );
+        let d = a.observe(
+            k,
+            Counters {
+                opened: 5,
+                closed: 0,
+                failed: 0,
+            },
+        );
         // Saturating-sub returns 0 instead of overflow.
         assert_eq!(d.new_conn, 0);
     }
@@ -173,12 +245,39 @@ mod tests {
     fn aggregator_tracks_distinct_keys_separately() {
         let (_c, _t) = cilium_test_ctx!("pkg/act/act.go", "Aggr.MultiKey", "tenant-act-mk");
         let mut a = Aggregator::new();
-        let k1 = ZoneServiceKey { zone: "a".into(), service: "s1".into() };
-        let k2 = ZoneServiceKey { zone: "a".into(), service: "s2".into() };
-        let _ = a.observe(k1.clone(), Counters { opened: 10, closed: 0, failed: 0 });
-        let _ = a.observe(k2.clone(), Counters { opened: 20, closed: 0, failed: 0 });
+        let k1 = ZoneServiceKey {
+            zone: "a".into(),
+            service: "s1".into(),
+        };
+        let k2 = ZoneServiceKey {
+            zone: "a".into(),
+            service: "s2".into(),
+        };
+        let _ = a.observe(
+            k1.clone(),
+            Counters {
+                opened: 10,
+                closed: 0,
+                failed: 0,
+            },
+        );
+        let _ = a.observe(
+            k2.clone(),
+            Counters {
+                opened: 20,
+                closed: 0,
+                failed: 0,
+            },
+        );
         assert_eq!(a.known_keys(), 2);
-        let d = a.observe(k1, Counters { opened: 12, closed: 0, failed: 0 });
+        let d = a.observe(
+            k1,
+            Counters {
+                opened: 12,
+                closed: 0,
+                failed: 0,
+            },
+        );
         assert_eq!(d.new_conn, 2);
     }
 
@@ -187,7 +286,9 @@ mod tests {
         let (_c, _t) = cilium_test_ctx!("pkg/act/act.go", "Errors", "tenant-act-err");
         let e = ActError::SeriesLimit(501, 500);
         assert!(format!("{}", e).contains("501"));
-        let e = ActError::TenantDenied { tenant: TenantId::new("t-x").expect("test fixture") };
+        let e = ActError::TenantDenied {
+            tenant: TenantId::new("t-x").expect("test fixture"),
+        };
         assert!(format!("{}", e).contains("t-x"));
     }
 
@@ -203,8 +304,14 @@ mod tests {
     #[test]
     fn key_ordering_is_stable() {
         let (_c, _t) = cilium_test_ctx!("pkg/act/act.go", "Key.Ord", "tenant-act-ko");
-        let a = ZoneServiceKey { zone: "us-east-1a".into(), service: "s1".into() };
-        let b = ZoneServiceKey { zone: "us-east-1b".into(), service: "s1".into() };
+        let a = ZoneServiceKey {
+            zone: "us-east-1a".into(),
+            service: "s1".into(),
+        };
+        let b = ZoneServiceKey {
+            zone: "us-east-1b".into(),
+            service: "s1".into(),
+        };
         assert!(a < b);
     }
 }

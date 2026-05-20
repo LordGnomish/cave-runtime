@@ -15,7 +15,7 @@ use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 use crc32fast::Hasher as Crc32Hasher;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use thiserror::Error;
 
 // ── Error ────────────────────────────────────────────────────────────────────
@@ -48,7 +48,9 @@ impl AppendLog {
             .create(true)
             .append(true)
             .open(path)?;
-        Ok(Self { writer: BufWriter::new(file) })
+        Ok(Self {
+            writer: BufWriter::new(file),
+        })
     }
 
     /// Append one entry to the log.
@@ -162,8 +164,16 @@ mod tests {
 
         {
             let mut w = AppendLog::open(path).unwrap();
-            w.append(&TestEntry::Sample { ts: 1000, value: 1.5 }).unwrap();
-            w.append(&TestEntry::Sample { ts: 2000, value: 2.5 }).unwrap();
+            w.append(&TestEntry::Sample {
+                ts: 1000,
+                value: 1.5,
+            })
+            .unwrap();
+            w.append(&TestEntry::Sample {
+                ts: 2000,
+                value: 2.5,
+            })
+            .unwrap();
             w.append(&TestEntry::Checkpoint { ts: 2000 }).unwrap();
         }
 
@@ -171,8 +181,20 @@ mod tests {
         replay::<TestEntry, _>(path, |e| entries.push(e)).unwrap();
 
         assert_eq!(entries.len(), 3);
-        assert_eq!(entries[0], TestEntry::Sample { ts: 1000, value: 1.5 });
-        assert_eq!(entries[1], TestEntry::Sample { ts: 2000, value: 2.5 });
+        assert_eq!(
+            entries[0],
+            TestEntry::Sample {
+                ts: 1000,
+                value: 1.5
+            }
+        );
+        assert_eq!(
+            entries[1],
+            TestEntry::Sample {
+                ts: 2000,
+                value: 2.5
+            }
+        );
         assert_eq!(entries[2], TestEntry::Checkpoint { ts: 2000 });
     }
 
@@ -186,8 +208,16 @@ mod tests {
         // Write two valid records then corrupt the second.
         {
             let mut w = AppendLog::open(path).unwrap();
-            w.append(&TestEntry::Sample { ts: 100, value: 1.0 }).unwrap();
-            w.append(&TestEntry::Sample { ts: 200, value: 2.0 }).unwrap();
+            w.append(&TestEntry::Sample {
+                ts: 100,
+                value: 1.0,
+            })
+            .unwrap();
+            w.append(&TestEntry::Sample {
+                ts: 200,
+                value: 2.0,
+            })
+            .unwrap();
         }
 
         // Flip a byte in the middle of the second record's payload.

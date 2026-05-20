@@ -40,13 +40,13 @@
 //! without breaking the existing wire format.
 
 use anyhow::{Context, Result};
+use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::Json;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{debug, info, warn};
 
@@ -220,7 +220,11 @@ pub async fn handle_raft_message(
 ) -> Result<Json<RaftAck>, (StatusCode, String)> {
     let term = state.registry.current_term();
     match msg {
-        RaftMessage::Heartbeat { from, term: peer_term, .. } => {
+        RaftMessage::Heartbeat {
+            from,
+            term: peer_term,
+            ..
+        } => {
             state.registry.note_heartbeat(from);
             // Adopt a higher term observed from a peer (Raft Figure 2).
             if peer_term > term {
@@ -236,7 +240,12 @@ pub async fn handle_raft_message(
                 reason: "heartbeat acked".into(),
             }))
         }
-        RaftMessage::AppendEntries { from, term: peer_term, entries, .. } => {
+        RaftMessage::AppendEntries {
+            from,
+            term: peer_term,
+            entries,
+            ..
+        } => {
             state.registry.note_heartbeat(from);
             if peer_term > term {
                 state
@@ -247,7 +256,11 @@ pub async fn handle_raft_message(
             // Honest: we accept the frame on the wire but do NOT apply the
             // entries to any state machine — log replication is the next
             // deliverable.
-            debug!(from, entries = entries.len(), "AppendEntries received (no-op)");
+            debug!(
+                from,
+                entries = entries.len(),
+                "AppendEntries received (no-op)"
+            );
             Ok(Json(RaftAck {
                 from: state.registry.local_id,
                 term: state.registry.current_term(),
@@ -255,7 +268,11 @@ pub async fn handle_raft_message(
                 reason: "AppendEntries framed but not applied (scaffolding)".into(),
             }))
         }
-        RaftMessage::RequestVote { from, term: peer_term, .. } => {
+        RaftMessage::RequestVote {
+            from,
+            term: peer_term,
+            ..
+        } => {
             if peer_term > term {
                 state
                     .registry
@@ -284,9 +301,7 @@ pub async fn handle_raft_message(
     }
 }
 
-pub async fn handle_members(
-    State(state): State<RaftListenerState>,
-) -> Json<MembersListResponse> {
+pub async fn handle_members(State(state): State<RaftListenerState>) -> Json<MembersListResponse> {
     Json(MembersListResponse {
         cluster_id: 0,
         local_id: state.registry.local_id,
@@ -308,10 +323,7 @@ pub struct MembersListResponse {
 /// Spawn the heartbeat tick: every 1s, fan out a `Heartbeat` to every
 /// known peer except the local node. Errors are logged and discarded —
 /// missing a heartbeat is non-fatal at this scaffolding stage.
-pub async fn heartbeat_loop(
-    registry: Arc<PeerRegistry>,
-    ca_pem: String,
-) -> Result<()> {
+pub async fn heartbeat_loop(registry: Arc<PeerRegistry>, ca_pem: String) -> Result<()> {
     let pinned_cert = if ca_pem.is_empty() {
         None
     } else {
@@ -364,8 +376,7 @@ pub async fn heartbeat_loop(
 /// — it just keeps the term counter alive so a future log-replication
 /// path can observe staleness. Returns when the registry is dropped.
 pub async fn election_timer_loop(registry: Arc<PeerRegistry>, timeout_ms: u64) -> Result<()> {
-    let mut tick =
-        tokio::time::interval(std::time::Duration::from_millis(timeout_ms.max(500)));
+    let mut tick = tokio::time::interval(std::time::Duration::from_millis(timeout_ms.max(500)));
     tick.tick().await;
     loop {
         tick.tick().await;
@@ -385,7 +396,11 @@ pub async fn election_timer_loop(registry: Arc<PeerRegistry>, timeout_ms: u64) -
         let other_peer_count = registry.known_peer_ids().len() - 1;
         if other_peer_count > 0 && !saw_peer_heartbeat {
             let new_term = registry.bump_term();
-            info!(new_term, peers = other_peer_count, "election timeout — term bumped");
+            info!(
+                new_term,
+                peers = other_peer_count,
+                "election timeout — term bumped"
+            );
         }
     }
 }

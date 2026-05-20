@@ -80,13 +80,20 @@ impl Product {
 /// Source: dojo/models.py:1128 — `business_criticality` choices.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum BusinessCriticality {
-    VeryHigh, High, Medium, Low, VeryLow, None,
+    VeryHigh,
+    High,
+    Medium,
+    Low,
+    VeryLow,
+    None,
 }
 
 /// Source: dojo/models.py:1128 — `lifecycle` choices.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Lifecycle {
-    Construction, Production, Retirement,
+    Construction,
+    Production,
+    Retirement,
 }
 
 /// A bounded testing window against a Product.
@@ -128,13 +135,20 @@ impl Engagement {
 /// Source: dojo/models.py:1535 — `engagement_type` choices.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum EngagementType {
-    Interactive, CICD,
+    Interactive,
+    CICD,
 }
 
 /// Source: dojo/models.py:1535 — `status` choices.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum EngagementStatus {
-    NotStarted, Blocked, Cancelled, Completed, InProgress, OnHold, WaitingForResource,
+    NotStarted,
+    Blocked,
+    Cancelled,
+    Completed,
+    InProgress,
+    OnHold,
+    WaitingForResource,
 }
 
 /// A single scan run within an Engagement.

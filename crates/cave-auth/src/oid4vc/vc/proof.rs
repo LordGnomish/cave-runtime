@@ -22,14 +22,14 @@
 //! actual canonicalisation is JCS. Test fixtures verify byte-for-byte
 //! reproducibility on representative inputs.
 
-use base64::engine::general_purpose::STANDARD_NO_PAD as B64URL;
 use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD_NO_PAD as B64URL;
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-use super::model::{Proof, VerifiableCredential};
 use super::super::Oid4vcError;
+use super::model::{Proof, VerifiableCredential};
 
 /// `cryptosuite` identifier on the wire.
 pub const CRYPTOSUITE_EDDSA_RDFC_2022: &str = "eddsa-rdfc-2022";
@@ -82,7 +82,10 @@ pub fn sign_credential(
         cryptosuite: CRYPTOSUITE_EDDSA_RDFC_2022.into(),
         created: proof_options["created"].as_str().unwrap().to_string(),
         proof_purpose: PURPOSE_ASSERTION.into(),
-        verification_method: proof_options["verificationMethod"].as_str().unwrap().to_string(),
+        verification_method: proof_options["verificationMethod"]
+            .as_str()
+            .unwrap()
+            .to_string(),
         proof_value,
     };
     vc.proof = Some(proof);
@@ -228,8 +231,8 @@ fn write_jcs_string(s: &str, out: &mut Vec<u8>) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::model::{CredentialSubject, VerifiableCredential};
+    use super::*;
     use rand::RngCore;
     use rand::rngs::OsRng;
     use serde_json::json;

@@ -131,12 +131,16 @@ pub struct QueueStore {
 impl QueueStore {
     /// Opens the primary runtime queue at `<workspace_root>/queue/runtime-tasks.yaml`.
     pub fn open(workspace_root: &Path) -> Self {
-        Self { path: workspace_root.join("queue").join("runtime-tasks.yaml") }
+        Self {
+            path: workspace_root.join("queue").join("runtime-tasks.yaml"),
+        }
     }
 
     /// Opens a queue at an arbitrary path.
     pub fn open_at(path: &Path) -> Self {
-        Self { path: path.to_path_buf() }
+        Self {
+            path: path.to_path_buf(),
+        }
     }
 
     /// Returns all queue items.  Seeds the file on first call if absent.
@@ -167,7 +171,12 @@ impl QueueStore {
 
     /// Counts items with the given status.
     pub fn count_status(&self, status: &QueueStatus) -> Result<usize, QueueError> {
-        Ok(self.read_locked()?.items.iter().filter(|i| &i.status == status).count())
+        Ok(self
+            .read_locked()?
+            .items
+            .iter()
+            .filter(|i| &i.status == status)
+            .count())
     }
 
     /// Updates status, attempts, and last_error for the item with `id`.
@@ -224,7 +233,8 @@ impl QueueStore {
             .create(true)
             .truncate(false)
             .open(self.lock_path())?;
-        f.lock_exclusive().map_err(|e| QueueError::LockFailed(e.to_string()))?;
+        f.lock_exclusive()
+            .map_err(|e| QueueError::LockFailed(e.to_string()))?;
         Ok(f)
     }
 
@@ -300,7 +310,10 @@ fn seed_queue() -> QueueFile {
         }
     };
     QueueFile {
-        metadata: QueueMeta { version: 1, daily_commits: Default::default() },
+        metadata: QueueMeta {
+            version: 1,
+            daily_commits: Default::default(),
+        },
         items: vec![
             make(
                 "cave-secrets",
@@ -385,7 +398,8 @@ mod tests {
     fn test_second_open_does_not_reseed() {
         let dir = TempDir::new().unwrap();
         let q = store(&dir);
-        q.add(QueueItem::new("extra-crate", "org/repo", "f.go", "Fn", 10)).unwrap();
+        q.add(QueueItem::new("extra-crate", "org/repo", "f.go", "Fn", 10))
+            .unwrap();
         // Re-open — must not wipe the extra item.
         let q2 = store(&dir);
         let items = q2.list().unwrap();
@@ -409,8 +423,16 @@ mod tests {
         item.repo_path = Some(PathBuf::from("/some/repo"));
         item.branch = Some("qwen/auto-2026-W17".into());
         q.add(item.clone()).unwrap();
-        let found = q.list().unwrap().into_iter().find(|i| i.crate_name == "crate").unwrap();
-        assert_eq!(found.repo_path.as_deref(), Some(std::path::Path::new("/some/repo")));
+        let found = q
+            .list()
+            .unwrap()
+            .into_iter()
+            .find(|i| i.crate_name == "crate")
+            .unwrap();
+        assert_eq!(
+            found.repo_path.as_deref(),
+            Some(std::path::Path::new("/some/repo"))
+        );
         assert_eq!(found.branch.as_deref(), Some("qwen/auto-2026-W17"));
     }
 
@@ -420,7 +442,8 @@ mod tests {
     fn test_add_persists_item() {
         let dir = TempDir::new().unwrap();
         let q = store(&dir);
-        q.add(QueueItem::new("cave-test", "org/repo", "f.go", "Fn", 5)).unwrap();
+        q.add(QueueItem::new("cave-test", "org/repo", "f.go", "Fn", 5))
+            .unwrap();
         let items = q.list().unwrap();
         assert!(items.iter().any(|i| i.crate_name == "cave-test"));
     }
@@ -439,7 +462,8 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let q = store(&dir);
         let id = q.list().unwrap()[0].id.clone();
-        q.update_item(&id, QueueStatus::InProgress, 1, None).unwrap();
+        q.update_item(&id, QueueStatus::InProgress, 1, None)
+            .unwrap();
         let item = q.list().unwrap().into_iter().find(|i| i.id == id).unwrap();
         assert_eq!(item.status, QueueStatus::InProgress);
         assert_eq!(item.attempts, 1);
@@ -450,7 +474,8 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let q = store(&dir);
         let id = q.list().unwrap()[0].id.clone();
-        q.update_item(&id, QueueStatus::Stuck, 3, Some("test_fail".into())).unwrap();
+        q.update_item(&id, QueueStatus::Stuck, 3, Some("test_fail".into()))
+            .unwrap();
         let item = q.list().unwrap().into_iter().find(|i| i.id == id).unwrap();
         assert_eq!(item.last_error.as_deref(), Some("test_fail"));
     }
@@ -459,7 +484,9 @@ mod tests {
     fn test_update_item_unknown_id_returns_error() {
         let dir = TempDir::new().unwrap();
         let q = store(&dir);
-        let err = q.update_item("nonexistent", QueueStatus::Done, 0, None).unwrap_err();
+        let err = q
+            .update_item("nonexistent", QueueStatus::Done, 0, None)
+            .unwrap_err();
         assert!(matches!(err, QueueError::ItemNotFound(_)));
     }
 

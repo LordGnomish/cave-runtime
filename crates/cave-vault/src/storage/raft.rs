@@ -29,7 +29,7 @@
 //! the cluster-runtime layer (see ADR-149); this module owns the
 //! state machine + log + apply pipeline.
 
-use super::{validate_path, Backend, StorageError, InMemoryBackend};
+use super::{Backend, InMemoryBackend, StorageError, validate_path};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
@@ -365,7 +365,9 @@ impl Backend for RaftBackend {
 
     fn delete(&self, path: &str) -> Result<(), StorageError> {
         validate_path(path)?;
-        let idx = self.propose(LogOp::Delete { path: path.to_string() });
+        let idx = self.propose(LogOp::Delete {
+            path: path.to_string(),
+        });
         self.mark_committed(idx)
             .map_err(|e| StorageError::Other(format!("commit: {e}")))?;
         self.apply_committed()
@@ -393,13 +395,21 @@ fn walk_all(backend: &dyn Backend, prefix: &str) -> Result<Vec<String>, StorageE
     Ok(out)
 }
 
-fn walk_rec(backend: &dyn Backend, prefix: &str, out: &mut Vec<String>) -> Result<(), StorageError> {
+fn walk_rec(
+    backend: &dyn Backend,
+    prefix: &str,
+    out: &mut Vec<String>,
+) -> Result<(), StorageError> {
     let children = backend.list(prefix)?;
     for child in children {
         let full = if prefix.is_empty() {
             child.trim_end_matches('/').to_string()
         } else {
-            format!("{}/{}", prefix.trim_end_matches('/'), child.trim_end_matches('/'))
+            format!(
+                "{}/{}",
+                prefix.trim_end_matches('/'),
+                child.trim_end_matches('/')
+            )
         };
         if child.ends_with('/') {
             walk_rec(backend, &full, out)?;
@@ -493,8 +503,14 @@ mod tests {
         let b = RaftBackend::new();
         b.bump_term(3);
         // Propose two entries without committing.
-        let i1 = b.propose(LogOp::Put { path: "k/a".into(), value: b"1".to_vec() });
-        let i2 = b.propose(LogOp::Put { path: "k/b".into(), value: b"2".to_vec() });
+        let i1 = b.propose(LogOp::Put {
+            path: "k/a".into(),
+            value: b"1".to_vec(),
+        });
+        let i2 = b.propose(LogOp::Put {
+            path: "k/b".into(),
+            value: b"2".to_vec(),
+        });
         assert_eq!((i1, i2), (1, 2));
         assert_eq!(b.last_applied(), 0);
         // Commit one. Apply that one.
@@ -515,7 +531,10 @@ mod tests {
         b.put("kv/x", b"v".to_vec()).unwrap(); // commits + applies index 1
         assert!(matches!(
             b.mark_committed(0).unwrap_err(),
-            RaftStorageError::CommitBelowApplied { commit: 0, applied: 1 }
+            RaftStorageError::CommitBelowApplied {
+                commit: 0,
+                applied: 1
+            }
         ));
     }
 
@@ -531,9 +550,18 @@ mod tests {
     fn log_truncate_drops_conflicting_entries() {
         let b = RaftBackend::new();
         b.bump_term(1);
-        b.propose(LogOp::Put { path: "k/1".into(), value: b"v".to_vec() });
-        b.propose(LogOp::Put { path: "k/2".into(), value: b"v".to_vec() });
-        b.propose(LogOp::Put { path: "k/3".into(), value: b"v".to_vec() });
+        b.propose(LogOp::Put {
+            path: "k/1".into(),
+            value: b"v".to_vec(),
+        });
+        b.propose(LogOp::Put {
+            path: "k/2".into(),
+            value: b"v".to_vec(),
+        });
+        b.propose(LogOp::Put {
+            path: "k/3".into(),
+            value: b"v".to_vec(),
+        });
         b.log.write().unwrap().truncate(2);
         assert_eq!(b.log_len(), 1);
         assert_eq!(b.last_log_index(), 1);
@@ -577,9 +605,18 @@ mod tests {
     fn entries_after_returns_uncommitted_tail() {
         let b = RaftBackend::new();
         b.bump_term(1);
-        b.propose(LogOp::Put { path: "k/1".into(), value: b"v".to_vec() });
-        b.propose(LogOp::Put { path: "k/2".into(), value: b"v".to_vec() });
-        b.propose(LogOp::Put { path: "k/3".into(), value: b"v".to_vec() });
+        b.propose(LogOp::Put {
+            path: "k/1".into(),
+            value: b"v".to_vec(),
+        });
+        b.propose(LogOp::Put {
+            path: "k/2".into(),
+            value: b"v".to_vec(),
+        });
+        b.propose(LogOp::Put {
+            path: "k/3".into(),
+            value: b"v".to_vec(),
+        });
         let tail = b.log.read().unwrap().entries_after(1);
         assert_eq!(tail.len(), 2);
         assert_eq!(tail[0].index, 2);

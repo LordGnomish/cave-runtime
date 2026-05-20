@@ -227,7 +227,8 @@ impl ProberCoordinator {
     /// Deregister all probes for a container — used on container
     /// teardown so the registry doesn't grow unboundedly.
     pub fn forget_container(&mut self, container: &ContainerRef) {
-        self.manager.deregister(&container.pod_uid, &container.container);
+        self.manager
+            .deregister(&container.pod_uid, &container.container);
         self.ledger.remove(container);
     }
 
@@ -320,7 +321,8 @@ impl ProberCoordinator {
     /// `ProberManager`. Forward to the existing helper so callers
     /// have a single coordinator handle.
     pub fn has_any(&self, container: &ContainerRef) -> bool {
-        self.manager.has_any(&container.pod_uid, &container.container)
+        self.manager
+            .has_any(&container.pod_uid, &container.container)
     }
 
     /// Compose a `ProbeKey` from a `ContainerRef` + kind. Saves
@@ -493,7 +495,10 @@ mod tests {
             ProbeResult::Failure,
             now() + ChronoDuration::seconds(1),
         );
-        assert!(matches!(ev, Some(CoordinatorEvent::RestartContainer { .. })));
+        assert!(matches!(
+            ev,
+            Some(CoordinatorEvent::RestartContainer { .. })
+        ));
     }
 
     #[test]

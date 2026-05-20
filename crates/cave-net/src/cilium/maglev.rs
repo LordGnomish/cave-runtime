@@ -42,7 +42,10 @@ pub struct Backend {
 
 impl Backend {
     pub fn new(name: impl Into<String>, weight: u32) -> Self {
-        Self { name: name.into(), weight }
+        Self {
+            name: name.into(),
+            weight,
+        }
     }
 }
 
@@ -77,14 +80,22 @@ impl MaglevTable {
             return Err(MaglevError::NoBackends);
         }
         let n = backends.len();
-        let permutation: Vec<(usize, usize)> = backends.iter().map(|b| permutation_for(&b.name, m)).collect();
+        let permutation: Vec<(usize, usize)> = backends
+            .iter()
+            .map(|b| permutation_for(&b.name, m))
+            .collect();
         let mut next_idx = vec![0usize; n];
         let mut entry = vec![u32::MAX; m];
         let mut assigned = 0usize;
         loop {
             for (i, b) in backends.iter().enumerate() {
                 if assigned == m {
-                    return Ok(Self { tenant, m, backends, lookup: entry });
+                    return Ok(Self {
+                        tenant,
+                        m,
+                        backends,
+                        lookup: entry,
+                    });
                 }
                 // Honour weights by skipping backends whose share is already saturated.
                 let target_share = if backends.iter().map(|x| x.weight as u64).sum::<u64>() == 0 {
@@ -178,21 +189,33 @@ mod tests {
 
     #[test]
     fn maglev_non_prime_table_size_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maglev/maglev.go", "GetLookupTable.Validate", "tenant-mg-np");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/maglev/maglev.go",
+            "GetLookupTable.Validate",
+            "tenant-mg-np"
+        );
         let err = MaglevTable::build(tenant, 100, make(&["a", "b"])).unwrap_err();
         assert_eq!(err, MaglevError::NotPrime(100));
     }
 
     #[test]
     fn maglev_empty_backends_rejected() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maglev/maglev.go", "GetLookupTable.Validate", "tenant-mg-empty");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/maglev/maglev.go",
+            "GetLookupTable.Validate",
+            "tenant-mg-empty"
+        );
         let err = MaglevTable::build(tenant, 17, vec![]).unwrap_err();
         assert_eq!(err, MaglevError::NoBackends);
     }
 
     #[test]
     fn maglev_single_backend_owns_all_slots() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maglev/maglev.go", "GetLookupTable.Single", "tenant-mg-1");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/maglev/maglev.go",
+            "GetLookupTable.Single",
+            "tenant-mg-1"
+        );
         let table = MaglevTable::build(tenant, 17, make(&["only"])).unwrap();
         assert!(table.lookup.iter().all(|&i| i == 0));
         for h in 0..100u64 {
@@ -202,17 +225,25 @@ mod tests {
 
     #[test]
     fn maglev_table_fully_populated() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maglev/maglev.go", "GetLookupTable", "tenant-mg-full");
+        let (_c, tenant) =
+            cilium_test_ctx!("pkg/maglev/maglev.go", "GetLookupTable", "tenant-mg-full");
         let table = MaglevTable::build(tenant, 17, make(&["a", "b", "c", "d"])).unwrap();
         assert_eq!(table.lookup.len(), 17);
-        assert!(table.lookup.iter().all(|&i| (i as usize) < table.backends.len()));
+        assert!(table
+            .lookup
+            .iter()
+            .all(|&i| (i as usize) < table.backends.len()));
     }
 
     // ── determinism ──────────────────────────────────────────────────────────
 
     #[test]
     fn maglev_deterministic_for_same_backends() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maglev/maglev.go", "GetLookupTable.Deterministic", "tenant-mg-det");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/maglev/maglev.go",
+            "GetLookupTable.Deterministic",
+            "tenant-mg-det"
+        );
         let a = MaglevTable::build(tenant.clone(), 257, make(&["a", "b", "c", "d", "e"])).unwrap();
         let b = MaglevTable::build(tenant, 257, make(&["a", "b", "c", "d", "e"])).unwrap();
         assert_eq!(a.lookup, b.lookup);
@@ -222,7 +253,11 @@ mod tests {
 
     #[test]
     fn maglev_adding_backend_disturbs_at_most_one_over_n_fraction() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maglev/maglev.go", "GetLookupTable.Disruption", "tenant-mg-add");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/maglev/maglev.go",
+            "GetLookupTable.Disruption",
+            "tenant-mg-add"
+        );
         let m = 1009usize;
         let names_before = vec!["a", "b", "c", "d"];
         let names_after = vec!["a", "b", "c", "d", "e"];
@@ -243,9 +278,14 @@ mod tests {
 
     #[test]
     fn maglev_removing_backend_keeps_others_mostly_stable() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maglev/maglev.go", "GetLookupTable.Disruption", "tenant-mg-rm");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/maglev/maglev.go",
+            "GetLookupTable.Disruption",
+            "tenant-mg-rm"
+        );
         let m = 1009usize;
-        let before = MaglevTable::build(tenant.clone(), m, make(&["a", "b", "c", "d", "e"])).unwrap();
+        let before =
+            MaglevTable::build(tenant.clone(), m, make(&["a", "b", "c", "d", "e"])).unwrap();
         let after = MaglevTable::build(tenant, m, make(&["a", "b", "c", "d"])).unwrap();
         let mut moved_for_survivors = 0;
         for slot in 0..m {
@@ -256,16 +296,26 @@ mod tests {
             }
         }
         // Survivor disruption must be ≤ slots originally owned by the removed backend.
-        let removed_slots = before.lookup.iter().filter(|&&i| before.backends[i as usize].name == "e").count();
-        assert!(moved_for_survivors <= removed_slots,
-                "moved_for_survivors={moved_for_survivors} removed_slots={removed_slots}");
+        let removed_slots = before
+            .lookup
+            .iter()
+            .filter(|&&i| before.backends[i as usize].name == "e")
+            .count();
+        assert!(
+            moved_for_survivors <= removed_slots,
+            "moved_for_survivors={moved_for_survivors} removed_slots={removed_slots}"
+        );
     }
 
     // ── distribution ─────────────────────────────────────────────────────────
 
     #[test]
     fn maglev_distribution_is_within_5_percent_of_uniform() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/maglev/maglev.go", "GetLookupTable.Uniform", "tenant-mg-dist");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/maglev/maglev.go",
+            "GetLookupTable.Uniform",
+            "tenant-mg-dist"
+        );
         let m = 1009usize;
         let names: Vec<String> = (0..10).map(|i| format!("backend-{i}")).collect();
         let backs: Vec<Backend> = names.iter().map(|n| Backend::new(n, 1)).collect();
@@ -278,8 +328,10 @@ mod tests {
         for c in counts {
             // Allow ±20% tolerance from the ideal share. Maglev guarantees
             // the *worst* slot is within `(1 + 1/N)` of the target.
-            assert!((c as i64 - target as i64).abs() <= (target as i64) / 2,
-                    "count {c} target {target}");
+            assert!(
+                (c as i64 - target as i64).abs() <= (target as i64) / 2,
+                "count {c} target {target}"
+            );
         }
     }
 
@@ -287,7 +339,8 @@ mod tests {
 
     #[test]
     fn maglev_lookup_uses_hash_modulo_m() {
-        let (_c, tenant) = cilium_test_ctx!("bpf/lib/lb.h", "lb_select_backend_maglev", "tenant-mg-lk");
+        let (_c, tenant) =
+            cilium_test_ctx!("bpf/lib/lb.h", "lb_select_backend_maglev", "tenant-mg-lk");
         let m = 17;
         let table = MaglevTable::build(tenant, m, make(&["a", "b", "c"])).unwrap();
         // Same hash → same backend.

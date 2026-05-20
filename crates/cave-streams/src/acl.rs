@@ -173,10 +173,7 @@ impl AclStore {
 
     pub fn create_acl(&self, binding: AclBinding) {
         let key = Self::key(&binding.resource_type, &binding.resource_name);
-        self.acls
-            .entry(key)
-            .or_default()
-            .push(binding);
+        self.acls.entry(key).or_default().push(binding);
     }
 
     pub fn create_acls(&self, bindings: Vec<AclBinding>) {
@@ -196,8 +193,11 @@ impl AclStore {
     pub fn delete_acls(&self, filter: &AclFilter) -> Vec<AclBinding> {
         let mut deleted = Vec::new();
         for mut entry in self.acls.iter_mut() {
-            let (keep, remove): (Vec<_>, Vec<_>) =
-                entry.value().iter().cloned().partition(|acl| !filter.matches(acl));
+            let (keep, remove): (Vec<_>, Vec<_>) = entry
+                .value()
+                .iter()
+                .cloned()
+                .partition(|acl| !filter.matches(acl));
             deleted.extend(remove);
             *entry.value_mut() = keep;
         }
@@ -303,10 +303,19 @@ mod tests {
         };
         let deleted = store.delete_acls(&filter);
         assert_eq!(deleted.len(), 1);
-        assert!(store.describe_acls(&AclFilter {
-            resource_type: None, resource_name: None, pattern_type: None,
-            principal: None, host: None, operation: None, permission: None
-        }).is_empty());
+        assert!(
+            store
+                .describe_acls(&AclFilter {
+                    resource_type: None,
+                    resource_name: None,
+                    pattern_type: None,
+                    principal: None,
+                    host: None,
+                    operation: None,
+                    permission: None
+                })
+                .is_empty()
+        );
     }
 
     #[test]
@@ -314,7 +323,12 @@ mod tests {
         let store = AclStore::new();
         store.create_acl(AclBinding::allow_topic_read("User:alice", "data"));
         assert!(store.is_allowed("User:alice", &ResourceType::Topic, "data", &Operation::Read));
-        assert!(!store.is_allowed("User:alice", &ResourceType::Topic, "data", &Operation::Write));
+        assert!(!store.is_allowed(
+            "User:alice",
+            &ResourceType::Topic,
+            "data",
+            &Operation::Write
+        ));
         assert!(!store.is_allowed("User:eve", &ResourceType::Topic, "data", &Operation::Read));
     }
 }

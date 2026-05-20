@@ -15,7 +15,9 @@
 //! 3. Honouring pod-level `tolerationSeconds` so pods aren't evicted faster
 //!    than their tolerations allow.
 
-use crate::node_controller::{NOT_READY_TAINT_KEY, OUT_OF_SERVICE_TAINT_KEY, UNREACHABLE_TAINT_KEY};
+use crate::node_controller::{
+    NOT_READY_TAINT_KEY, OUT_OF_SERVICE_TAINT_KEY, UNREACHABLE_TAINT_KEY,
+};
 use crate::types::{Cite, CloudError};
 use serde::{Deserialize, Serialize};
 
@@ -162,10 +164,14 @@ pub struct PodToleration {
 
 impl PodToleration {
     pub fn forever() -> Self {
-        Self { toleration_seconds: None }
+        Self {
+            toleration_seconds: None,
+        }
     }
     pub fn for_seconds(s: u64) -> Self {
-        Self { toleration_seconds: Some(s) }
+        Self {
+            toleration_seconds: Some(s),
+        }
     }
 }
 
@@ -218,7 +224,11 @@ pub struct MonitorOutcome {
 
 impl MonitorOutcome {
     pub const fn noop() -> Self {
-        Self { apply_taint: None, remove_taint: None, delete_node: false }
+        Self {
+            apply_taint: None,
+            remove_taint: None,
+            delete_node: false,
+        }
     }
 }
 
@@ -307,7 +317,10 @@ mod tests {
         assert_eq!(NodeConditionType::MemoryPressure.key(), "MemoryPressure");
         assert_eq!(NodeConditionType::DiskPressure.key(), "DiskPressure");
         assert_eq!(NodeConditionType::PIDPressure.key(), "PIDPressure");
-        assert_eq!(NodeConditionType::NetworkUnavailable.key(), "NetworkUnavailable");
+        assert_eq!(
+            NodeConditionType::NetworkUnavailable.key(),
+            "NetworkUnavailable"
+        );
     }
 
     #[test]
@@ -343,7 +356,10 @@ mod tests {
             "monitorNodeHealth",
             "tenant-hb-fresh"
         );
-        assert!(!is_heartbeat_stale(&ready(ConditionStatus::True, 5), HEARTBEAT_STALE_SECONDS));
+        assert!(!is_heartbeat_stale(
+            &ready(ConditionStatus::True, 5),
+            HEARTBEAT_STALE_SECONDS
+        ));
     }
 
     #[test]
@@ -353,7 +369,10 @@ mod tests {
             "monitorNodeHealth",
             "tenant-hb-stale"
         );
-        assert!(is_heartbeat_stale(&ready(ConditionStatus::True, 120), HEARTBEAT_STALE_SECONDS));
+        assert!(is_heartbeat_stale(
+            &ready(ConditionStatus::True, 120),
+            HEARTBEAT_STALE_SECONDS
+        ));
     }
 
     #[test]
@@ -363,7 +382,10 @@ mod tests {
             "monitorNodeHealth",
             "tenant-hb-exact"
         );
-        assert!(!is_heartbeat_stale(&ready(ConditionStatus::True, 40), HEARTBEAT_STALE_SECONDS));
+        assert!(!is_heartbeat_stale(
+            &ready(ConditionStatus::True, 40),
+            HEARTBEAT_STALE_SECONDS
+        ));
     }
 
     #[test]
@@ -563,7 +585,7 @@ mod tests {
         );
         let pods = vec![
             PodToleration::forever(),
-            PodToleration::for_seconds(60), // evicted
+            PodToleration::for_seconds(60),  // evicted
             PodToleration::for_seconds(600), // tolerated
             PodToleration::for_seconds(0),   // evicted (since unreachable >= 0)
         ];
@@ -590,7 +612,11 @@ mod tests {
             "monitorNodeHealth",
             "tenant-mon-noop"
         );
-        let r = monitor_node(&ready(ConditionStatus::True, 5), None, HEARTBEAT_STALE_SECONDS);
+        let r = monitor_node(
+            &ready(ConditionStatus::True, 5),
+            None,
+            HEARTBEAT_STALE_SECONDS,
+        );
         assert_eq!(r, MonitorOutcome::noop());
     }
 
@@ -601,7 +627,11 @@ mod tests {
             "markNodeAsUnreachable",
             "tenant-mon-unreach"
         );
-        let r = monitor_node(&ready(ConditionStatus::True, 120), None, HEARTBEAT_STALE_SECONDS);
+        let r = monitor_node(
+            &ready(ConditionStatus::True, 120),
+            None,
+            HEARTBEAT_STALE_SECONDS,
+        );
         assert_eq!(r.apply_taint, Some(UNREACHABLE_TAINT_KEY));
     }
 

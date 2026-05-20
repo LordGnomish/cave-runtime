@@ -65,8 +65,12 @@ pub fn reconcile(current: &ClusterInfo, tokens: &[BootstrapToken]) -> Vec<Signer
     out.sort_by(|a, b| match (a, b) {
         (SignerAction::AddSignature(x), SignerAction::AddSignature(y))
         | (SignerAction::RemoveSignature(x), SignerAction::RemoveSignature(y)) => x.cmp(y),
-        (SignerAction::AddSignature(_), SignerAction::RemoveSignature(_)) => std::cmp::Ordering::Less,
-        (SignerAction::RemoveSignature(_), SignerAction::AddSignature(_)) => std::cmp::Ordering::Greater,
+        (SignerAction::AddSignature(_), SignerAction::RemoveSignature(_)) => {
+            std::cmp::Ordering::Less
+        }
+        (SignerAction::RemoveSignature(_), SignerAction::AddSignature(_)) => {
+            std::cmp::Ordering::Greater
+        }
     });
     out
 }
@@ -77,10 +81,7 @@ pub fn kubeconfig_changed(prev: &ClusterInfo, next: &ClusterInfo) -> bool {
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::new(
-    "pkg/controller/bootstrap/bootstrapsigner.go",
-    "Signer",
-);
+const FILE_CITE: Cite = Cite::new("pkg/controller/bootstrap/bootstrapsigner.go", "Signer");
 
 #[cfg(test)]
 mod tests {
@@ -123,11 +124,11 @@ mod tests {
             "signConfigMap",
             "tenant-bs-remove-expired"
         );
-        let actions = reconcile(
-            &ci(&[("abcdef", "sig")]),
-            &[token("abcdef", true, true)],
+        let actions = reconcile(&ci(&[("abcdef", "sig")]), &[token("abcdef", true, true)]);
+        assert_eq!(
+            actions,
+            vec![SignerAction::RemoveSignature("abcdef".into())]
         );
-        assert_eq!(actions, vec![SignerAction::RemoveSignature("abcdef".into())]);
     }
 
     #[test]
@@ -159,10 +160,7 @@ mod tests {
             "signConfigMap",
             "tenant-bs-noop"
         );
-        let actions = reconcile(
-            &ci(&[("abcdef", "sig")]),
-            &[token("abcdef", true, false)],
-        );
+        let actions = reconcile(&ci(&[("abcdef", "sig")]), &[token("abcdef", true, false)]);
         assert!(actions.is_empty());
     }
 
@@ -173,10 +171,7 @@ mod tests {
             "signConfigMap",
             "tenant-bs-add-and-remove"
         );
-        let actions = reconcile(
-            &ci(&[("oldid", "sig")]),
-            &[token("newid", true, false)],
-        );
+        let actions = reconcile(&ci(&[("oldid", "sig")]), &[token("newid", true, false)]);
         assert!(actions.contains(&SignerAction::AddSignature("newid".into())));
         assert!(actions.contains(&SignerAction::RemoveSignature("oldid".into())));
     }

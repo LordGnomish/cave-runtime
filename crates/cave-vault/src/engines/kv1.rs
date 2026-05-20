@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+use crate::VaultState;
 use crate::error::{VaultError, VaultResult};
 use crate::response::VaultResponse;
-use crate::VaultState;
 use axum::{
+    Router,
     extract::{Json, Path, Query, State},
     http::HeaderMap,
     routing::{delete, get, post, put},
-    Router,
 };
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 fn extract_token(headers: &HeaderMap) -> VaultResult<String> {
-    headers.get("x-vault-token")
+    headers
+        .get("x-vault-token")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or(VaultError::BadToken)
@@ -43,7 +44,11 @@ pub async fn read_secret(
     if q.list.as_deref() == Some("true") {
         let store = state.kv1_store.read().await;
         let mount_data = store.data.get(&mount);
-        let prefix = if path.is_empty() { String::new() } else { format!("{}/", path) };
+        let prefix = if path.is_empty() {
+            String::new()
+        } else {
+            format!("{}/", path)
+        };
         let keys: Vec<String> = mount_data
             .map(|m| {
                 let mut seen = std::collections::BTreeSet::new();
@@ -64,7 +69,9 @@ pub async fn read_secret(
     }
 
     let store = state.kv1_store.read().await;
-    let secret = store.data.get(&mount)
+    let secret = store
+        .data
+        .get(&mount)
         .and_then(|m| m.get(&path))
         .ok_or(VaultError::SecretNotFound)?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(secret).unwrap_or_default()))
@@ -103,7 +110,11 @@ pub async fn list_secrets(
     let _token = extract_token(&headers)?;
     let store = state.kv1_store.read().await;
     let mount_data = store.data.get(&mount);
-    let prefix = if path.is_empty() { String::new() } else { format!("{}/", path) };
+    let prefix = if path.is_empty() {
+        String::new()
+    } else {
+        format!("{}/", path)
+    };
     let keys: Vec<String> = mount_data
         .map(|m| {
             let mut seen = std::collections::BTreeSet::new();
@@ -138,18 +149,15 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                     let state = s.clone();
                     let mount = m.clone();
                     async move {
-                        read_secret(
-                            State(state),
-                            headers,
-                            Path((mount, path)),
-                            Query(q),
-                        ).await
+                        read_secret(State(state), headers, Path((mount, path)), Query(q)).await
                     }
                 }
             })
             .put({
                 let s = state.clone();
-                move |headers: HeaderMap, Path(path): Path<String>, Json(body): Json<HashMap<String, Value>>| {
+                move |headers: HeaderMap,
+                      Path(path): Path<String>,
+                      Json(body): Json<HashMap<String, Value>>| {
                     let state = s.clone();
                     let mount = m2.clone();
                     async move {
@@ -159,7 +167,9 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
             })
             .post({
                 let s = state.clone();
-                move |headers: HeaderMap, Path(path): Path<String>, Json(body): Json<HashMap<String, Value>>| {
+                move |headers: HeaderMap,
+                      Path(path): Path<String>,
+                      Json(body): Json<HashMap<String, Value>>| {
                     let state = s.clone();
                     let mount = m3.clone();
                     async move {
@@ -172,9 +182,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                 move |headers: HeaderMap, Path(path): Path<String>| {
                     let state = s.clone();
                     let mount = m4.clone();
-                    async move {
-                        delete_secret(State(state), headers, Path((mount, path))).await
-                    }
+                    async move { delete_secret(State(state), headers, Path((mount, path))).await }
                 }
             }),
         )
@@ -197,13 +205,26 @@ mod tests {
         {
             let mut s = store.write().await;
             let mut data = HashMap::new();
-            data.insert("password".to_string(), Value::String("secret123".to_string()));
-            s.data.entry("secret".to_string()).or_default().insert("myapp/db".to_string(), data);
+            data.insert(
+                "password".to_string(),
+                Value::String("secret123".to_string()),
+            );
+            s.data
+                .entry("secret".to_string())
+                .or_default()
+                .insert("myapp/db".to_string(), data);
         }
         {
             let s = store.read().await;
-            let secret = s.data.get("secret").and_then(|m| m.get("myapp/db")).unwrap();
-            assert_eq!(secret.get("password").and_then(|v| v.as_str()), Some("secret123"));
+            let secret = s
+                .data
+                .get("secret")
+                .and_then(|m| m.get("myapp/db"))
+                .unwrap();
+            assert_eq!(
+                secret.get("password").and_then(|v| v.as_str()),
+                Some("secret123")
+            );
         }
         {
             let mut s = store.write().await;
@@ -213,7 +234,12 @@ mod tests {
         }
         {
             let s = store.read().await;
-            assert!(s.data.get("secret").and_then(|m| m.get("myapp/db")).is_none());
+            assert!(
+                s.data
+                    .get("secret")
+                    .and_then(|m| m.get("myapp/db"))
+                    .is_none()
+            );
         }
     }
 }

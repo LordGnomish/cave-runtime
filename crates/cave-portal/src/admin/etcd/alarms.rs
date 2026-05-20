@@ -15,10 +15,7 @@ pub struct AlarmRow {
     pub message: &'static str,
 }
 
-pub fn list_alarms(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<Vec<AlarmRow>, EtcdViewError> {
+pub fn list_alarms(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<AlarmRow>, EtcdViewError> {
     ctx.authorise(Permission::EtcdRead)?;
     // Derive from KV size: large stores get a synthetic NOSPACE warning.
     let kv = super::keyspace::list_kv(state, ctx)?;

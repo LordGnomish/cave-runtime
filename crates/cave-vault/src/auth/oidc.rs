@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+use crate::VaultState;
 use crate::error::{VaultError, VaultResult};
 use crate::response::VaultResponse;
 use crate::token::CreateTokenParams;
-use crate::VaultState;
 use axum::{
+    Router,
     extract::{Json, Path, State},
     http::HeaderMap,
     routing::{delete, get, post},
-    Router,
 };
 use base64::Engine as _;
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 fn extract_token(headers: &HeaderMap) -> VaultResult<String> {
-    headers.get("x-vault-token")
+    headers
+        .get("x-vault-token")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or(VaultError::BadToken)
@@ -120,19 +121,40 @@ pub async fn create_role(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.oidc_store.write().await;
-    let mut role = store.roles.entry(role_name.clone()).or_insert_with(|| OidcRole {
-        name: role_name.clone(),
-        ..Default::default()
-    });
-    if let Some(rt) = body.role_type { role.role_type = rt; }
-    if let Some(aud) = body.bound_audiences { role.bound_audiences = aud; }
-    if let Some(sub) = body.bound_subject { role.bound_subject = sub; }
-    if let Some(uc) = body.user_claim { role.user_claim = uc; }
-    if let Some(ttl) = body.token_ttl { role.token_ttl = crate::token::parse_duration(&ttl); }
-    if let Some(ttl) = body.token_max_ttl { role.token_max_ttl = crate::token::parse_duration(&ttl); }
-    if let Some(p) = body.token_policies { role.token_policies = p; }
-    if let Some(uris) = body.allowed_redirect_uris { role.allowed_redirect_uris = uris; }
-    if let Some(gc) = body.groups_claim { role.groups_claim = gc; }
+    let mut role = store
+        .roles
+        .entry(role_name.clone())
+        .or_insert_with(|| OidcRole {
+            name: role_name.clone(),
+            ..Default::default()
+        });
+    if let Some(rt) = body.role_type {
+        role.role_type = rt;
+    }
+    if let Some(aud) = body.bound_audiences {
+        role.bound_audiences = aud;
+    }
+    if let Some(sub) = body.bound_subject {
+        role.bound_subject = sub;
+    }
+    if let Some(uc) = body.user_claim {
+        role.user_claim = uc;
+    }
+    if let Some(ttl) = body.token_ttl {
+        role.token_ttl = crate::token::parse_duration(&ttl);
+    }
+    if let Some(ttl) = body.token_max_ttl {
+        role.token_max_ttl = crate::token::parse_duration(&ttl);
+    }
+    if let Some(p) = body.token_policies {
+        role.token_policies = p;
+    }
+    if let Some(uris) = body.allowed_redirect_uris {
+        role.allowed_redirect_uris = uris;
+    }
+    if let Some(gc) = body.groups_claim {
+        role.groups_claim = gc;
+    }
     Ok(VaultResponse::new())
 }
 
@@ -143,7 +165,9 @@ pub async fn read_role(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.oidc_store.read().await;
-    let role = store.roles.get(&role_name)
+    let role = store
+        .roles
+        .get(&role_name)
         .ok_or_else(|| VaultError::RoleNotFound(role_name))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(role).unwrap_or_default()))
 }
@@ -172,8 +196,12 @@ pub async fn list_roles(
 /// Decode JWT without signature verification (for testing/mock purposes).
 fn decode_jwt_claims(jwt: &str) -> Option<serde_json::Value> {
     let parts: Vec<&str> = jwt.splitn(3, '.').collect();
-    if parts.len() < 2 { return None; }
-    let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(parts[1]).ok()?;
+    if parts.len() < 2 {
+        return None;
+    }
+    let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(parts[1])
+        .ok()?;
     serde_json::from_slice(&payload).ok()
 }
 
@@ -188,14 +216,25 @@ pub async fn jwt_login(
     Json(body): Json<JwtLoginRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let store = state.oidc_store.read().await;
-    let role_name = body.role.clone()
-        .or_else(|| if store.config.default_role.is_empty() { None } else { Some(store.config.default_role.clone()) })
+    let role_name = body
+        .role
+        .clone()
+        .or_else(|| {
+            if store.config.default_role.is_empty() {
+                None
+            } else {
+                Some(store.config.default_role.clone())
+            }
+        })
         .ok_or_else(|| VaultError::InvalidRequest("role required".into()))?;
-    let role = store.roles.get(&role_name)
-        .ok_or_else(|| VaultError::RoleNotFound(role_name.clone()))?.clone();
+    let role = store
+        .roles
+        .get(&role_name)
+        .ok_or_else(|| VaultError::RoleNotFound(role_name.clone()))?
+        .clone();
 
-    let claims = decode_jwt_claims(&body.jwt)
-        .ok_or_else(|| VaultError::Auth("invalid JWT".into()))?;
+    let claims =
+        decode_jwt_claims(&body.jwt).ok_or_else(|| VaultError::Auth("invalid JWT".into()))?;
 
     // Validate bound_subject
     if !role.bound_subject.is_empty() {
@@ -210,7 +249,8 @@ pub async fn jwt_login(
         let aud = claims.get("aud");
         let matches = match aud {
             Some(serde_json::Value::String(s)) => role.bound_audiences.contains(s),
-            Some(serde_json::Value::Array(arr)) => arr.iter()
+            Some(serde_json::Value::Array(arr)) => arr
+                .iter()
                 .filter_map(|v| v.as_str())
                 .any(|a| role.bound_audiences.contains(&a.to_string())),
             _ => false,
@@ -220,7 +260,8 @@ pub async fn jwt_login(
         }
     }
 
-    let user_claim_val = claims.get(&role.user_claim)
+    let user_claim_val = claims
+        .get(&role.user_claim)
         .and_then(|v| v.as_str())
         .unwrap_or("unknown");
 
@@ -248,11 +289,17 @@ pub fn router(state: Arc<VaultState>) -> Router {
     Router::new()
         .route("/v1/auth/jwt/config", post(configure).get(read_config))
         .route("/v1/auth/jwt/role", get(list_roles))
-        .route("/v1/auth/jwt/role/{role_name}", post(create_role).get(read_role).delete(delete_role))
+        .route(
+            "/v1/auth/jwt/role/{role_name}",
+            post(create_role).get(read_role).delete(delete_role),
+        )
         .route("/v1/auth/jwt/login", post(jwt_login))
         .route("/v1/auth/oidc/config", post(configure).get(read_config))
         .route("/v1/auth/oidc/role", get(list_roles))
-        .route("/v1/auth/oidc/role/{role_name}", post(create_role).get(read_role).delete(delete_role))
+        .route(
+            "/v1/auth/oidc/role/{role_name}",
+            post(create_role).get(read_role).delete(delete_role),
+        )
         .route("/v1/auth/oidc/login", post(jwt_login))
         .with_state(state)
 }

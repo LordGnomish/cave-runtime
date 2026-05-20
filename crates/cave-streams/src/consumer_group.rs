@@ -68,7 +68,10 @@ impl RebalanceProtocol {
             for (i, member) in sorted_members.iter().enumerate() {
                 let count = partitions_per_member + if (i as i32) < extra { 1 } else { 0 };
                 for p in start..start + count {
-                    assignments.entry(member.clone()).or_default().push((topic.clone(), p));
+                    assignments
+                        .entry(member.clone())
+                        .or_default()
+                        .push((topic.clone(), p));
                 }
                 start += count;
             }
@@ -98,7 +101,10 @@ impl RebalanceProtocol {
         all_partitions.sort();
         for (topic, partition) in all_partitions {
             let member = &sorted_members[idx % sorted_members.len()];
-            assignments.entry(member.clone()).or_default().push((topic, partition));
+            assignments
+                .entry(member.clone())
+                .or_default()
+                .push((topic, partition));
             idx += 1;
         }
         assignments
@@ -329,12 +335,14 @@ impl GroupCoordinator {
                 got: generation_id,
             });
         }
-        let member = group.members.get_mut(member_id).ok_or_else(|| {
-            StreamsError::MemberNotFound {
-                group: group_id.into(),
-                member: member_id.into(),
-            }
-        })?;
+        let member =
+            group
+                .members
+                .get_mut(member_id)
+                .ok_or_else(|| StreamsError::MemberNotFound {
+                    group: group_id.into(),
+                    member: member_id.into(),
+                })?;
         member.last_heartbeat = Utc::now();
 
         let error_code = if group.state == GroupState::PreparingRebalance {

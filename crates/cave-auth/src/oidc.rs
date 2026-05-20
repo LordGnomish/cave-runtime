@@ -5,9 +5,9 @@
 //! Implements RFC 7636 (PKCE) and RFC 6749 (OAuth2 authorization code grant).
 //! The platform acts as an OAuth2 relying party talking to Okta/Keycloak.
 
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use rand::RngCore;
-use ring::digest::{digest, SHA256};
+use ring::digest::{SHA256, digest};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

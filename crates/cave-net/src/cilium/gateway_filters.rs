@@ -100,7 +100,10 @@ pub enum FilterError {
 
 /// Apply a request-side filter chain. The first `RequestRedirect` filter
 /// short-circuits the chain.
-pub fn apply_request_chain(filters: &[HttpFilter], req: HttpRequest) -> Result<FilterOutcome, FilterError> {
+pub fn apply_request_chain(
+    filters: &[HttpFilter],
+    req: HttpRequest,
+) -> Result<FilterOutcome, FilterError> {
     let mut current = req;
     for f in filters {
         match f {
@@ -109,19 +112,31 @@ pub fn apply_request_chain(filters: &[HttpFilter], req: HttpRequest) -> Result<F
                     return Err(FilterError::BadRedirectStatus(r.status_code));
                 }
                 let scheme = r.scheme.unwrap_or(current.scheme);
-                let host = r.hostname.clone().unwrap_or_else(|| current.hostname.clone());
+                let host = r
+                    .hostname
+                    .clone()
+                    .unwrap_or_else(|| current.hostname.clone());
                 let port = r.port.unwrap_or(current.port);
                 let path = if let Some(prefix) = &r.replace_prefix {
                     rewrite_prefix(&current.path, prefix)
                 } else {
                     current.path.clone()
                 };
-                let scheme_str = match scheme { RedirectScheme::Http => "http", RedirectScheme::Https => "https" };
+                let scheme_str = match scheme {
+                    RedirectScheme::Http => "http",
+                    RedirectScheme::Https => "https",
+                };
                 let location = format!("{scheme_str}://{host}:{port}{path}");
-                return Ok(FilterOutcome::Redirect { location, status: r.status_code });
+                return Ok(FilterOutcome::Redirect {
+                    location,
+                    status: r.status_code,
+                });
             }
             HttpFilter::UrlRewrite(rw) => {
-                if rw.hostname.is_none() && rw.replace_prefix.is_none() && rw.replace_full_path.is_none() {
+                if rw.hostname.is_none()
+                    && rw.replace_prefix.is_none()
+                    && rw.replace_full_path.is_none()
+                {
                     return Err(FilterError::EmptyUrlRewrite);
                 }
                 if let Some(h) = &rw.hostname {
@@ -193,15 +208,26 @@ mod tests {
     }
 
     fn resp() -> HttpResponse {
-        HttpResponse { status: 200, headers: vec![("content-type".into(), "text/plain".into())] }
+        HttpResponse {
+            status: 200,
+            headers: vec![("content-type".into(), "text/plain".into())],
+        }
     }
 
     // ── HeaderMutation ───────────────────────────────────────────────────────
 
     #[test]
     fn header_set_replaces_existing_value() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "Header.Set", "tenant-gw-set");
-        let h = HeaderMutation { set: vec![("x-custom".into(), "new".into())], add: vec![], remove: vec![] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "Header.Set",
+            "tenant-gw-set"
+        );
+        let h = HeaderMutation {
+            set: vec![("x-custom".into(), "new".into())],
+            add: vec![],
+            remove: vec![],
+        };
         let mut headers = vec![("x-custom".into(), "old".into())];
         h.apply(&mut headers);
         assert_eq!(headers, vec![("x-custom".to_string(), "new".to_string())]);
@@ -209,8 +235,16 @@ mod tests {
 
     #[test]
     fn header_add_appends_value() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "Header.Add", "tenant-gw-add");
-        let h = HeaderMutation { set: vec![], add: vec![("x-new".into(), "v".into())], remove: vec![] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "Header.Add",
+            "tenant-gw-add"
+        );
+        let h = HeaderMutation {
+            set: vec![],
+            add: vec![("x-new".into(), "v".into())],
+            remove: vec![],
+        };
         let mut headers = vec![("x-existing".into(), "z".into())];
         h.apply(&mut headers);
         assert!(headers.iter().any(|(k, v)| k == "x-new" && v == "v"));
@@ -219,8 +253,16 @@ mod tests {
 
     #[test]
     fn header_remove_drops_existing() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "Header.Remove", "tenant-gw-rm");
-        let h = HeaderMutation { set: vec![], add: vec![], remove: vec!["x-bad".into()] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "Header.Remove",
+            "tenant-gw-rm"
+        );
+        let h = HeaderMutation {
+            set: vec![],
+            add: vec![],
+            remove: vec!["x-bad".into()],
+        };
         let mut headers = vec![("x-bad".into(), "v".into()), ("x-good".into(), "z".into())];
         h.apply(&mut headers);
         assert_eq!(headers, vec![("x-good".to_string(), "z".to_string())]);
@@ -228,8 +270,16 @@ mod tests {
 
     #[test]
     fn header_remove_case_insensitive() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "Header.Remove.Ci", "tenant-gw-rmci");
-        let h = HeaderMutation { set: vec![], add: vec![], remove: vec!["X-Bad".into()] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "Header.Remove.Ci",
+            "tenant-gw-rmci"
+        );
+        let h = HeaderMutation {
+            set: vec![],
+            add: vec![],
+            remove: vec!["X-Bad".into()],
+        };
         let mut headers = vec![("x-bad".into(), "v".into())];
         h.apply(&mut headers);
         assert!(headers.is_empty());
@@ -239,8 +289,16 @@ mod tests {
 
     #[test]
     fn url_rewrite_replaces_hostname() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "URLRewrite.Hostname", "tenant-gw-rwh");
-        let f = HttpFilter::UrlRewrite(UrlRewrite { hostname: Some("upstream.local".into()), replace_prefix: None, replace_full_path: None });
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "URLRewrite.Hostname",
+            "tenant-gw-rwh"
+        );
+        let f = HttpFilter::UrlRewrite(UrlRewrite {
+            hostname: Some("upstream.local".into()),
+            replace_prefix: None,
+            replace_full_path: None,
+        });
         let out = apply_request_chain(&[f], req("/v1/users")).unwrap();
         match out {
             FilterOutcome::Forward(r) => assert_eq!(r.hostname, "upstream.local"),
@@ -250,8 +308,16 @@ mod tests {
 
     #[test]
     fn url_rewrite_replace_full_path() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "URLRewrite.FullPath", "tenant-gw-rwfp");
-        let f = HttpFilter::UrlRewrite(UrlRewrite { hostname: None, replace_prefix: None, replace_full_path: Some("/v2".into()) });
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "URLRewrite.FullPath",
+            "tenant-gw-rwfp"
+        );
+        let f = HttpFilter::UrlRewrite(UrlRewrite {
+            hostname: None,
+            replace_prefix: None,
+            replace_full_path: Some("/v2".into()),
+        });
         let out = apply_request_chain(&[f], req("/v1/users")).unwrap();
         match out {
             FilterOutcome::Forward(r) => assert_eq!(r.path, "/v2"),
@@ -261,8 +327,16 @@ mod tests {
 
     #[test]
     fn url_rewrite_replace_prefix_keeps_suffix() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "URLRewrite.PrefixKeep", "tenant-gw-rwpk");
-        let f = HttpFilter::UrlRewrite(UrlRewrite { hostname: None, replace_prefix: Some("/api".into()), replace_full_path: None });
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "URLRewrite.PrefixKeep",
+            "tenant-gw-rwpk"
+        );
+        let f = HttpFilter::UrlRewrite(UrlRewrite {
+            hostname: None,
+            replace_prefix: Some("/api".into()),
+            replace_full_path: None,
+        });
         let out = apply_request_chain(&[f], req("/v1/users")).unwrap();
         match out {
             FilterOutcome::Forward(r) => assert_eq!(r.path, "/api/users"),
@@ -272,8 +346,16 @@ mod tests {
 
     #[test]
     fn url_rewrite_empty_filter_rejected() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "URLRewrite.Empty", "tenant-gw-rwe");
-        let f = HttpFilter::UrlRewrite(UrlRewrite { hostname: None, replace_prefix: None, replace_full_path: None });
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "URLRewrite.Empty",
+            "tenant-gw-rwe"
+        );
+        let f = HttpFilter::UrlRewrite(UrlRewrite {
+            hostname: None,
+            replace_prefix: None,
+            replace_full_path: None,
+        });
         let err = apply_request_chain(&[f], req("/v1")).unwrap_err();
         assert_eq!(err, FilterError::EmptyUrlRewrite);
     }
@@ -282,7 +364,11 @@ mod tests {
 
     #[test]
     fn redirect_returns_location_with_status() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "Redirect.Basic", "tenant-gw-rdb");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "Redirect.Basic",
+            "tenant-gw-rdb"
+        );
         let f = HttpFilter::RequestRedirect(RequestRedirect {
             scheme: Some(RedirectScheme::Https),
             hostname: Some("secure.example.com".into()),
@@ -303,14 +389,25 @@ mod tests {
 
     #[test]
     fn redirect_short_circuits_subsequent_filters() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "Redirect.ShortCircuit", "tenant-gw-rdsc");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "Redirect.ShortCircuit",
+            "tenant-gw-rdsc"
+        );
         let chain = vec![
             HttpFilter::RequestRedirect(RequestRedirect {
-                scheme: Some(RedirectScheme::Https), hostname: None, port: None,
-                status_code: 308, replace_prefix: None,
+                scheme: Some(RedirectScheme::Https),
+                hostname: None,
+                port: None,
+                status_code: 308,
+                replace_prefix: None,
             }),
             // Should never run.
-            HttpFilter::UrlRewrite(UrlRewrite { hostname: Some("never".into()), replace_prefix: None, replace_full_path: None }),
+            HttpFilter::UrlRewrite(UrlRewrite {
+                hostname: Some("never".into()),
+                replace_prefix: None,
+                replace_full_path: None,
+            }),
         ];
         let out = apply_request_chain(&chain, req("/v1")).unwrap();
         assert!(matches!(out, FilterOutcome::Redirect { .. }));
@@ -318,9 +415,17 @@ mod tests {
 
     #[test]
     fn redirect_with_invalid_status_rejected() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "Redirect.BadStatus", "tenant-gw-rdbs");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "Redirect.BadStatus",
+            "tenant-gw-rdbs"
+        );
         let f = HttpFilter::RequestRedirect(RequestRedirect {
-            scheme: None, hostname: None, port: None, status_code: 200, replace_prefix: None,
+            scheme: None,
+            hostname: None,
+            port: None,
+            status_code: 200,
+            replace_prefix: None,
         });
         let err = apply_request_chain(&[f], req("/v1")).unwrap_err();
         assert_eq!(err, FilterError::BadRedirectStatus(200));
@@ -328,14 +433,23 @@ mod tests {
 
     #[test]
     fn redirect_inherits_request_scheme_when_unset() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "Redirect.SchemeInherit", "tenant-gw-rdsi");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "Redirect.SchemeInherit",
+            "tenant-gw-rdsi"
+        );
         let f = HttpFilter::RequestRedirect(RequestRedirect {
-            scheme: None, hostname: Some("other.example.com".into()), port: Some(8080),
-            status_code: 302, replace_prefix: None,
+            scheme: None,
+            hostname: Some("other.example.com".into()),
+            port: Some(8080),
+            status_code: 302,
+            replace_prefix: None,
         });
         let out = apply_request_chain(&[f], req("/v1")).unwrap();
         match out {
-            FilterOutcome::Redirect { location, .. } => assert!(location.starts_with("http://other.example.com:8080")),
+            FilterOutcome::Redirect { location, .. } => {
+                assert!(location.starts_with("http://other.example.com:8080"))
+            }
             _ => panic!(),
         }
     }
@@ -344,7 +458,11 @@ mod tests {
 
     #[test]
     fn request_header_modifier_modifies_outgoing_headers() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "RequestHeader.Apply", "tenant-gw-rh");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "RequestHeader.Apply",
+            "tenant-gw-rh"
+        );
         let f = HttpFilter::RequestHeaderModifier(HeaderMutation {
             set: vec![("x-tenant".into(), "acme".into())],
             add: vec![],
@@ -353,7 +471,10 @@ mod tests {
         let out = apply_request_chain(&[f], req("/v1")).unwrap();
         match out {
             FilterOutcome::Forward(r) => {
-                assert!(r.headers.iter().any(|(k, v)| k == "x-tenant" && v == "acme"));
+                assert!(r
+                    .headers
+                    .iter()
+                    .any(|(k, v)| k == "x-tenant" && v == "acme"));
                 assert!(!r.headers.iter().any(|(k, _)| k == "user-agent"));
             }
             _ => panic!(),
@@ -364,20 +485,34 @@ mod tests {
 
     #[test]
     fn response_header_modifier_runs_on_response_chain() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "ResponseHeader.Apply", "tenant-gw-rsp");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "ResponseHeader.Apply",
+            "tenant-gw-rsp"
+        );
         let f = HttpFilter::ResponseHeaderModifier(HeaderMutation {
             set: vec![("x-frame-options".into(), "DENY".into())],
-            add: vec![], remove: vec![],
+            add: vec![],
+            remove: vec![],
         });
         let r = apply_response_chain(&[f], resp());
-        assert!(r.headers.iter().any(|(k, v)| k == "x-frame-options" && v == "DENY"));
+        assert!(r
+            .headers
+            .iter()
+            .any(|(k, v)| k == "x-frame-options" && v == "DENY"));
     }
 
     #[test]
     fn response_chain_skipped_in_request_chain() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "ResponseHeader.SkipReq", "tenant-gw-rsr");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "ResponseHeader.SkipReq",
+            "tenant-gw-rsr"
+        );
         let f = HttpFilter::ResponseHeaderModifier(HeaderMutation {
-            set: vec![("never".into(), "v".into())], add: vec![], remove: vec![],
+            set: vec![("never".into(), "v".into())],
+            add: vec![],
+            remove: vec![],
         });
         let out = apply_request_chain(&[f], req("/v1")).unwrap();
         match out {
@@ -388,9 +523,15 @@ mod tests {
 
     #[test]
     fn request_chain_skips_response_header_modifier() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "RequestHeader.SkipRsp", "tenant-gw-rsr2");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "RequestHeader.SkipRsp",
+            "tenant-gw-rsr2"
+        );
         let f = HttpFilter::RequestHeaderModifier(HeaderMutation {
-            set: vec![("x-req".into(), "v".into())], add: vec![], remove: vec![],
+            set: vec![("x-req".into(), "v".into())],
+            add: vec![],
+            remove: vec![],
         });
         let r = apply_response_chain(&[f], resp());
         assert!(!r.headers.iter().any(|(k, _)| k == "x-req"));
@@ -400,22 +541,31 @@ mod tests {
 
     #[test]
     fn composition_url_rewrite_then_header_set() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "Compose.RewriteThenHeader", "tenant-gw-comp");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "Compose.RewriteThenHeader",
+            "tenant-gw-comp"
+        );
         let chain = vec![
             HttpFilter::UrlRewrite(UrlRewrite {
                 hostname: Some("upstream.local".into()),
-                replace_prefix: None, replace_full_path: None,
+                replace_prefix: None,
+                replace_full_path: None,
             }),
             HttpFilter::RequestHeaderModifier(HeaderMutation {
                 set: vec![("x-host".into(), "upstream.local".into())],
-                add: vec![], remove: vec![],
+                add: vec![],
+                remove: vec![],
             }),
         ];
         let out = apply_request_chain(&chain, req("/v1")).unwrap();
         match out {
             FilterOutcome::Forward(r) => {
                 assert_eq!(r.hostname, "upstream.local");
-                assert!(r.headers.iter().any(|(k, v)| k == "x-host" && v == "upstream.local"));
+                assert!(r
+                    .headers
+                    .iter()
+                    .any(|(k, v)| k == "x-host" && v == "upstream.local"));
             }
             _ => panic!(),
         }
@@ -423,14 +573,23 @@ mod tests {
 
     #[test]
     fn composition_redirect_after_url_rewrite_uses_rewritten_url() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "Compose.RewriteThenRedirect", "tenant-gw-cmpr");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "Compose.RewriteThenRedirect",
+            "tenant-gw-cmpr"
+        );
         let chain = vec![
-            HttpFilter::UrlRewrite(UrlRewrite { hostname: None, replace_prefix: None, replace_full_path: Some("/canonical".into()) }),
+            HttpFilter::UrlRewrite(UrlRewrite {
+                hostname: None,
+                replace_prefix: None,
+                replace_full_path: Some("/canonical".into()),
+            }),
             HttpFilter::RequestRedirect(RequestRedirect {
                 scheme: Some(RedirectScheme::Https),
                 hostname: Some("secure.example.com".into()),
                 port: Some(443),
-                status_code: 308, replace_prefix: None,
+                status_code: 308,
+                replace_prefix: None,
             }),
         ];
         let out = apply_request_chain(&chain, req("/v1")).unwrap();
@@ -444,7 +603,11 @@ mod tests {
 
     #[test]
     fn empty_chain_forwards_unchanged() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "EmptyChain", "tenant-gw-empt");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "EmptyChain",
+            "tenant-gw-empt"
+        );
         let r = req("/v1");
         let out = apply_request_chain(&[], r.clone()).unwrap();
         match out {
@@ -455,7 +618,11 @@ mod tests {
 
     #[test]
     fn empty_response_chain_returns_unchanged() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "EmptyResponseChain", "tenant-gw-empr");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "EmptyResponseChain",
+            "tenant-gw-empr"
+        );
         let r = resp();
         let out = apply_response_chain(&[], r.clone());
         assert_eq!(out, r);
@@ -465,8 +632,16 @@ mod tests {
 
     #[test]
     fn header_set_overwrites_case_insensitive_match() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "Header.Set.Ci", "tenant-gw-setci");
-        let h = HeaderMutation { set: vec![("X-Custom".into(), "new".into())], add: vec![], remove: vec![] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "Header.Set.Ci",
+            "tenant-gw-setci"
+        );
+        let h = HeaderMutation {
+            set: vec![("X-Custom".into(), "new".into())],
+            add: vec![],
+            remove: vec![],
+        };
         let mut headers = vec![("x-custom".into(), "old".into())];
         h.apply(&mut headers);
         assert_eq!(headers.len(), 1);
@@ -477,13 +652,23 @@ mod tests {
 
     #[test]
     fn redirect_accepts_all_documented_statuses() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "Redirect.Statuses", "tenant-gw-rds");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "Redirect.Statuses",
+            "tenant-gw-rds"
+        );
         for code in [301u16, 302, 303, 307, 308] {
             let f = HttpFilter::RequestRedirect(RequestRedirect {
-                scheme: None, hostname: None, port: None,
-                status_code: code, replace_prefix: None,
+                scheme: None,
+                hostname: None,
+                port: None,
+                status_code: code,
+                replace_prefix: None,
             });
-            assert!(apply_request_chain(&[f], req("/v1")).is_ok(), "code {code} should be valid");
+            assert!(
+                apply_request_chain(&[f], req("/v1")).is_ok(),
+                "code {code} should be valid"
+            );
         }
     }
 
@@ -491,7 +676,11 @@ mod tests {
 
     #[test]
     fn http_filter_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "HttpFilter.Serde", "tenant-gw-fserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "HttpFilter.Serde",
+            "tenant-gw-fserde"
+        );
         let f = HttpFilter::RequestHeaderModifier(HeaderMutation {
             set: vec![("k".into(), "v".into())],
             add: vec![("a".into(), "b".into())],
@@ -504,7 +693,11 @@ mod tests {
 
     #[test]
     fn url_rewrite_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "URLRewrite.Serde", "tenant-gw-uwserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "URLRewrite.Serde",
+            "tenant-gw-uwserde"
+        );
         let r = UrlRewrite {
             hostname: Some("upstream".into()),
             replace_prefix: Some("/api".into()),
@@ -517,7 +710,11 @@ mod tests {
 
     #[test]
     fn redirect_scheme_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "Scheme.Serde", "tenant-gw-rsserde");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "Scheme.Serde",
+            "tenant-gw-rsserde"
+        );
         for s in [RedirectScheme::Http, RedirectScheme::Https] {
             let j = serde_json::to_string(&s).unwrap();
             let back: RedirectScheme = serde_json::from_str(&j).unwrap();
@@ -527,8 +724,16 @@ mod tests {
 
     #[test]
     fn header_mutation_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/gateway-api/translation/filter.go", "HeaderMutation.Serde", "tenant-gw-hmserde");
-        let h = HeaderMutation { set: vec![("k".into(), "v".into())], add: vec![], remove: vec!["x".into()] };
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/gateway-api/translation/filter.go",
+            "HeaderMutation.Serde",
+            "tenant-gw-hmserde"
+        );
+        let h = HeaderMutation {
+            set: vec![("k".into(), "v".into())],
+            add: vec![],
+            remove: vec!["x".into()],
+        };
         let s = serde_json::to_string(&h).unwrap();
         let back: HeaderMutation = serde_json::from_str(&s).unwrap();
         assert_eq!(back, h);

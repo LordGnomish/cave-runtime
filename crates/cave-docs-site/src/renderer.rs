@@ -2,7 +2,7 @@
 // Copyright 2026 Cave Runtime contributors
 //! Markdown rendering, navigation tree construction, and search index generation.
 
-use crate::models::{DocPage, SearchIndex, SearchEntry};
+use crate::models::{DocPage, SearchEntry, SearchIndex};
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -143,7 +143,11 @@ pub fn generate_search_index(site_id: Uuid, version: &str, pages: &[DocPage]) ->
                 .find(|l| !l.trim().is_empty())
                 .map(|l| {
                     let plain = l.trim_start_matches('#').trim();
-                    if plain.len() > 160 { &plain[..160] } else { plain }
+                    if plain.len() > 160 {
+                        &plain[..160]
+                    } else {
+                        plain
+                    }
                 })
                 .unwrap_or("")
                 .to_string();

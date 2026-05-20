@@ -126,10 +126,7 @@ pub fn leader_step(
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::new(
-    "pkg/kubelet/nodelease/controller.go",
-    "Controller",
-);
+const FILE_CITE: Cite = Cite::new("pkg/kubelet/nodelease/controller.go", "Controller");
 
 #[cfg(test)]
 mod tests {

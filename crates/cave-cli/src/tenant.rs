@@ -5,7 +5,7 @@
 //! ADR-012 v7 destekleyici: tenant operasyonlarında suspend reason zorunlu, audit'e
 //! `LifecycleEvent` kaydı düşer. Two-person rule yok burada (approval modülü ayrı).
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
@@ -180,7 +180,10 @@ mod tests {
         let tenant_id = "acme";
         let b = InMemoryTenantBackend::new();
         b.seed(record(tenant_id, TenantLifecycleState::Active));
-        let after = b.suspend(tenant_id, "burak", "billing-overdue").await.unwrap();
+        let after = b
+            .suspend(tenant_id, "burak", "billing-overdue")
+            .await
+            .unwrap();
         assert_eq!(after.state, TenantLifecycleState::Suspended);
         assert_eq!(after.suspend_reason.as_deref(), Some("billing-overdue"));
     }
@@ -202,7 +205,10 @@ mod tests {
         let b = InMemoryTenantBackend::new();
         b.seed(record(tenant_id, TenantLifecycleState::Active));
         b.suspend(tenant_id, "burak", "audit-hold").await.unwrap();
-        let err = b.suspend(tenant_id, "burak", "audit-hold").await.unwrap_err();
+        let err = b
+            .suspend(tenant_id, "burak", "audit-hold")
+            .await
+            .unwrap_err();
         assert!(err.to_string().contains("already suspended"));
     }
 
@@ -222,7 +228,9 @@ mod tests {
         let tenant_id = "acme";
         let b = InMemoryTenantBackend::new();
         b.seed(record(tenant_id, TenantLifecycleState::Active));
-        b.suspend(tenant_id, "burak", "billing-overdue").await.unwrap();
+        b.suspend(tenant_id, "burak", "billing-overdue")
+            .await
+            .unwrap();
         let after = b.resume(tenant_id, "burak").await.unwrap();
         assert_eq!(after.state, TenantLifecycleState::Active);
         assert!(after.suspend_reason.is_none());

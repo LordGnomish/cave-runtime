@@ -29,7 +29,12 @@ fn gate_1_spdx_full_coverage() {
     let src = crate_root().join("src");
     let (total, spdx) = scan_spdx(&src);
     assert!(total > 0);
-    assert_eq!(spdx, total, "SPDX-License-Identifier missing on {} files", total - spdx);
+    assert_eq!(
+        spdx,
+        total,
+        "SPDX-License-Identifier missing on {} files",
+        total - spdx
+    );
 }
 
 #[test]
@@ -49,7 +54,11 @@ fn gate_3_last_audit_2026_05_19() {
 
 #[test]
 fn gate_4_parity_ratio_source_manifest() {
-    assert!(has_kv(&read_manifest(), "parity_ratio_source", "\"manifest\""));
+    assert!(has_kv(
+        &read_manifest(),
+        "parity_ratio_source",
+        "\"manifest\""
+    ));
 }
 
 #[test]
@@ -76,13 +85,19 @@ fn gate_7_no_stub_macros_in_src() {
     walk_rs(&crate_root().join("src"), &mut |p| {
         let body = fs::read_to_string(p).unwrap_or_default();
         for (i, line) in body.lines().enumerate() {
-            if line.trim_start().starts_with("//") { continue; }
+            if line.trim_start().starts_with("//") {
+                continue;
+            }
             if line.contains("unimplemented!(") || line.contains("todo!(") {
                 offenders.push(format!("{}:{}", p.display(), i + 1));
             }
         }
     });
-    assert!(offenders.is_empty(), "stub macros found:\n{}", offenders.join("\n"));
+    assert!(
+        offenders.is_empty(),
+        "stub macros found:\n{}",
+        offenders.join("\n")
+    );
 }
 
 #[test]
@@ -107,8 +122,10 @@ fn scan_spdx(dir: &Path) -> (usize, usize) {
     let (mut total, mut spdx) = (0usize, 0usize);
     walk_rs(dir, &mut |p| {
         total += 1;
-        if fs::read_to_string(p).unwrap_or_default()
-            .contains("SPDX-License-Identifier: AGPL-3.0-or-later") {
+        if fs::read_to_string(p)
+            .unwrap_or_default()
+            .contains("SPDX-License-Identifier: AGPL-3.0-or-later")
+        {
             spdx += 1;
         }
     });
@@ -116,11 +133,16 @@ fn scan_spdx(dir: &Path) -> (usize, usize) {
 }
 
 fn walk_rs(dir: &Path, f: &mut dyn FnMut(&Path)) {
-    if !dir.is_dir() { return; }
+    if !dir.is_dir() {
+        return;
+    }
     for entry in fs::read_dir(dir).unwrap().flatten() {
         let p = entry.path();
-        if p.is_dir() { walk_rs(&p, f); }
-        else if p.extension().and_then(|s| s.to_str()) == Some("rs") { f(&p); }
+        if p.is_dir() {
+            walk_rs(&p, f);
+        } else if p.extension().and_then(|s| s.to_str()) == Some("rs") {
+            f(&p);
+        }
     }
 }
 
@@ -131,7 +153,9 @@ fn has_kv(s: &str, key: &str, expected: &str) -> bool {
             if let Some(eq) = l.find('=') {
                 let v = l[eq + 1..].trim().trim_end_matches(',');
                 let v = v.split('#').next().unwrap_or(v).trim();
-                if v == expected { return true; }
+                if v == expected {
+                    return true;
+                }
             }
         }
     }
@@ -145,7 +169,9 @@ fn extract_float(s: &str, key: &str) -> Option<f64> {
             if let Some(eq) = l.find('=') {
                 let v = l[eq + 1..].trim().trim_end_matches(',');
                 let v = v.split('#').next().unwrap_or(v).trim();
-                if let Ok(n) = v.parse::<f64>() { return Some(n); }
+                if let Ok(n) = v.parse::<f64>() {
+                    return Some(n);
+                }
             }
         }
     }
@@ -159,7 +185,9 @@ fn extract_int(s: &str, key: &str) -> Option<i64> {
             if let Some(eq) = l.find('=') {
                 let v = l[eq + 1..].trim().trim_end_matches(',');
                 let v = v.split('#').next().unwrap_or(v).trim();
-                if let Ok(n) = v.parse::<i64>() { return Some(n); }
+                if let Ok(n) = v.parse::<i64>() {
+                    return Some(n);
+                }
             }
         }
     }

@@ -53,7 +53,9 @@ pub struct CacheConfig {
 
 impl CacheConfig {
     pub fn defaults() -> Self {
-        Self { assumed_ttl: Duration::seconds(30) }
+        Self {
+            assumed_ttl: Duration::seconds(30),
+        }
     }
 }
 
@@ -95,7 +97,10 @@ impl SchedulerCache {
     /// Mark an assumed pod as confirmed (bind RPC succeeded). Resources stay
     /// reserved; the assumed_at timestamp is cleared.
     pub fn finish_binding(&mut self, uid: Uuid, node_name: &str) -> Result<(), CacheError> {
-        let pod = self.pods.get_mut(&uid).ok_or(CacheError::PodNotFound(uid))?;
+        let pod = self
+            .pods
+            .get_mut(&uid)
+            .ok_or(CacheError::PodNotFound(uid))?;
         if !pod.is_assumed() {
             return Err(CacheError::PodNotAssumed(uid));
         }
@@ -162,7 +167,10 @@ impl SchedulerCache {
     }
 
     pub fn node_pod_count(&self, node_name: &str) -> usize {
-        self.pods.values().filter(|p| p.node_name == node_name).count()
+        self.pods
+            .values()
+            .filter(|p| p.node_name == node_name)
+            .count()
     }
 
     fn add_to_node_reserved(&mut self, node: &str, r: &ResourceRequest) {
@@ -193,8 +201,10 @@ mod tests {
             namespace: "default".into(),
             node_name: node.into(),
             resources: ResourceRequest {
-                cpu_millicores: cpu, memory_bytes: mem,
-                ephemeral_storage_bytes: 0, extended: Default::default(),
+                cpu_millicores: cpu,
+                memory_bytes: mem,
+                ephemeral_storage_bytes: 0,
+                extended: Default::default(),
             },
             assumed_at: None,
         }
@@ -330,7 +340,12 @@ mod tests {
         c.finish_binding(p3_uid, "n1").unwrap();
 
         let now = Utc::now();
-        let reclaimed = c.cleanup_assumed_pods(&now, &CacheConfig { assumed_ttl: Duration::seconds(30) });
+        let reclaimed = c.cleanup_assumed_pods(
+            &now,
+            &CacheConfig {
+                assumed_ttl: Duration::seconds(30),
+            },
+        );
         assert_eq!(reclaimed, vec![p1_uid].into_iter().collect::<Vec<_>>());
         assert!(c.pod(p1_uid).is_none());
         assert!(c.pod(p2_uid).is_some());
@@ -369,7 +384,12 @@ mod tests {
             uids.push(p.uid);
             c.assume_pod(p, t0).unwrap();
         }
-        let reclaimed = c.cleanup_assumed_pods(&Utc::now(), &CacheConfig { assumed_ttl: Duration::seconds(10) });
+        let reclaimed = c.cleanup_assumed_pods(
+            &Utc::now(),
+            &CacheConfig {
+                assumed_ttl: Duration::seconds(10),
+            },
+        );
         let mut sorted = uids.clone();
         sorted.sort();
         assert_eq!(reclaimed, sorted);
@@ -394,7 +414,8 @@ mod tests {
         let ttl = Duration::seconds(30);
         let p = pod("p", "n1", 100, 100);
         let uid = p.uid;
-        c.assume_pod(p, Utc::now() - ttl + Duration::seconds(1)).unwrap();
+        c.assume_pod(p, Utc::now() - ttl + Duration::seconds(1))
+            .unwrap();
         let reclaimed = c.cleanup_assumed_pods(&Utc::now(), &CacheConfig { assumed_ttl: ttl });
         assert!(reclaimed.is_empty());
         assert!(c.pod(uid).is_some());
@@ -406,7 +427,8 @@ mod tests {
     fn reservation_accumulates_across_multiple_pods_on_same_node() {
         let mut c = SchedulerCache::new();
         let now = Utc::now();
-        c.assume_pod(pod("a", "n1", 500, 1_000_000_000), now).unwrap();
+        c.assume_pod(pod("a", "n1", 500, 1_000_000_000), now)
+            .unwrap();
         c.assume_pod(pod("b", "n1", 300, 500_000_000), now).unwrap();
         let r = c.node_reserved("n1");
         assert_eq!(r.cpu_millicores, 800);
@@ -429,7 +451,8 @@ mod tests {
         let now = Utc::now();
         let p1 = pod("a", "n1", 500, 1000);
         let p2 = pod("b", "n1", 300, 500);
-        let u1 = p1.uid; let u2 = p2.uid;
+        let u1 = p1.uid;
+        let u2 = p2.uid;
         c.assume_pod(p1, now).unwrap();
         c.assume_pod(p2, now).unwrap();
         c.forget_pod(u1).unwrap();
@@ -541,7 +564,12 @@ mod tests {
         let now = Utc::now();
         let mut uids = vec![];
         for i in 0..20 {
-            let p = pod(&format!("p{}", i), if i % 2 == 0 { "n1" } else { "n2" }, 100, 100);
+            let p = pod(
+                &format!("p{}", i),
+                if i % 2 == 0 { "n1" } else { "n2" },
+                100,
+                100,
+            );
             uids.push(p.uid);
             c.assume_pod(p, now).unwrap();
         }
@@ -647,7 +675,12 @@ mod tests {
             uids.push(p.uid);
             c.assume_pod(p, t0).unwrap();
         }
-        let r = c.cleanup_assumed_pods(&Utc::now(), &CacheConfig { assumed_ttl: Duration::seconds(10) });
+        let r = c.cleanup_assumed_pods(
+            &Utc::now(),
+            &CacheConfig {
+                assumed_ttl: Duration::seconds(10),
+            },
+        );
         let mut sorted = r.clone();
         sorted.sort();
         assert_eq!(r, sorted);

@@ -14,8 +14,8 @@
 //     credentialPublicKey  CBOR-encoded COSE_Key
 //   extensions              variable CBOR map (only if ED flag)
 
-use super::cbor;
 use super::WebAuthnError;
+use super::cbor;
 
 bitflags::bitflags! {
     /// AuthenticatorData flags byte (W3C §6.1 step 5).
@@ -199,8 +199,7 @@ mod tests {
     #[test]
     fn parse_flag_bits_all_no_attested() {
         // All non-AT flags set, no attested data block, no extensions.
-        let flags =
-            (AuthFlags::UP | AuthFlags::UV | AuthFlags::BE | AuthFlags::BS).bits();
+        let flags = (AuthFlags::UP | AuthFlags::UV | AuthFlags::BE | AuthFlags::BS).bits();
         let raw = minimal(flags, 0);
         let ad = parse(&raw).unwrap();
         assert!(ad.flags.contains(AuthFlags::UP));

@@ -8,7 +8,7 @@
 //! finds, not BOM emission). The shape is what matters here.
 
 use cave_sbom::components::{ComponentRecord, Project};
-use cave_sbom::policy::{evaluate_pipeline, Operator, Policy, PolicyCondition, ViolationState};
+use cave_sbom::policy::{Operator, Policy, PolicyCondition, ViolationState, evaluate_pipeline};
 use cave_sbom::sbom;
 use chrono::Utc;
 use uuid::Uuid;

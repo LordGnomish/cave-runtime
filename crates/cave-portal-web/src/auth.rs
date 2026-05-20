@@ -93,7 +93,9 @@ impl AuthContext {
     }
 
     pub fn with_identity(identity: Identity) -> Self {
-        Self { identity: Some(identity) }
+        Self {
+            identity: Some(identity),
+        }
     }
 
     pub fn set_identity(&mut self, identity: Identity) {

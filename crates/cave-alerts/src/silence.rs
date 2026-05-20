@@ -9,9 +9,11 @@ use chrono::{DateTime, Utc};
 /// Whether the given alert is silenced at `now` by any of the silences.
 /// Tenant scoping: only silences from the same tenant apply.
 pub fn is_silenced(alert: &Alert, silences: &[Silence], now: DateTime<Utc>) -> bool {
-    silences
-        .iter()
-        .any(|s| s.tenant_id == alert.tenant_id && s.is_active_at(now) && all_match(&s.matchers, &alert.labels))
+    silences.iter().any(|s| {
+        s.tenant_id == alert.tenant_id
+            && s.is_active_at(now)
+            && all_match(&s.matchers, &alert.labels)
+    })
 }
 
 /// Annotates each alert's state with `Silenced` if a matching silence is active.
@@ -46,7 +48,10 @@ mod tests {
         Alert {
             id: Uuid::new_v4(),
             name: "X".into(),
-            labels: labels.into_iter().map(|(k, v)| (k.into(), v.into())).collect(),
+            labels: labels
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect(),
             annotations: HashMap::new(),
             severity: AlertSeverity::Warning,
             state: AlertState::Firing,
@@ -126,7 +131,10 @@ mod tests {
             "x",
             "c",
         );
-        let mut alerts = vec![alert(vec![("env", "prod")], "fp1"), alert(vec![("env", "stage")], "fp2")];
+        let mut alerts = vec![
+            alert(vec![("env", "prod")], "fp1"),
+            alert(vec![("env", "stage")], "fp2"),
+        ];
         apply_silences(&mut alerts, &[s], now);
         assert_eq!(alerts[0].state, AlertState::Silenced);
         assert_eq!(alerts[1].state, AlertState::Firing);

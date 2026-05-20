@@ -30,10 +30,10 @@ impl SystemCatalog {
         for (schema_name, schema) in &db.schemas {
             for (table_name, _table) in &schema.tables {
                 rows.push(vec![
-                    "def".to_string(),         // table_catalog
-                    schema_name.clone(),       // table_schema
-                    table_name.clone(),        // table_name
-                    "BASE TABLE".to_string(),  // table_type
+                    "def".to_string(),        // table_catalog
+                    schema_name.clone(),      // table_schema
+                    table_name.clone(),       // table_name
+                    "BASE TABLE".to_string(), // table_type
                 ]);
             }
         }
@@ -47,19 +47,14 @@ impl SystemCatalog {
             for (table_name, table) in &schema.tables {
                 for (ordinal, col) in table.columns.iter().enumerate() {
                     rows.push(vec![
-                        "def".to_string(),           // table_catalog
-                        schema_name.clone(),         // table_schema
-                        table_name.clone(),          // table_name
-                        col.name.clone(),            // column_name
-                        (ordinal + 1).to_string(),   // ordinal_position
-                        "".to_string(),              // column_default
-                        if col.not_null {
-                            "NO"
-                        } else {
-                            "YES"
-                        }
-                        .to_string(), // is_nullable
-                        col.type_name.clone(), // data_type
+                        "def".to_string(),                                   // table_catalog
+                        schema_name.clone(),                                 // table_schema
+                        table_name.clone(),                                  // table_name
+                        col.name.clone(),                                    // column_name
+                        (ordinal + 1).to_string(),                           // ordinal_position
+                        "".to_string(),                                      // column_default
+                        if col.not_null { "NO" } else { "YES" }.to_string(), // is_nullable
+                        col.type_name.clone(),                               // data_type
                     ]);
                 }
             }
@@ -83,7 +78,9 @@ mod tests {
             not_null: true,
             primary_key: true,
         }];
-        schema.tables.insert("users".to_string(), Table::new("users", cols));
+        schema
+            .tables
+            .insert("users".to_string(), Table::new("users", cols));
         db.schemas.insert("public".to_string(), schema);
 
         let rows = SystemCatalog::pg_tables(&db);
@@ -102,7 +99,9 @@ mod tests {
             not_null: true,
             primary_key: true,
         }];
-        schema.tables.insert("users".to_string(), Table::new("users", cols));
+        schema
+            .tables
+            .insert("users".to_string(), Table::new("users", cols));
         db.schemas.insert("public".to_string(), schema);
 
         let rows = SystemCatalog::information_schema_tables(&db);
@@ -119,7 +118,9 @@ mod tests {
             not_null: true,
             primary_key: true,
         }];
-        schema.tables.insert("users".to_string(), Table::new("users", cols));
+        schema
+            .tables
+            .insert("users".to_string(), Table::new("users", cols));
         db.schemas.insert("public".to_string(), schema);
 
         let rows = SystemCatalog::information_schema_columns(&db);

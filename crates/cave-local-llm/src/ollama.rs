@@ -150,7 +150,10 @@ impl OllamaClient {
             .connect_timeout(std::time::Duration::from_secs(5))
             .build()
             .expect("reqwest client build");
-        Self { base_url: base_url.into(), client }
+        Self {
+            base_url: base_url.into(),
+            client,
+        }
     }
 
     /// Cheap liveness probe — `GET /api/version` with a short connect timeout.
@@ -177,7 +180,8 @@ impl OllamaClient {
     /// List available models (GET /api/tags).
     #[instrument(skip(self), fields(base_url = %self.base_url))]
     pub async fn list_models(&self) -> OllamaResult<Vec<ModelInfo>> {
-        let response = self.client
+        let response = self
+            .client
             .get(format!("{}/api/tags", self.base_url))
             .send()
             .await?;
@@ -201,7 +205,8 @@ impl OllamaClient {
             r.keep_alive = Some("24h".to_string());
         }
 
-        let response = self.client
+        let response = self
+            .client
             .post(format!("{}/api/generate", self.base_url))
             .json(&r)
             .send()
@@ -221,14 +226,18 @@ impl OllamaClient {
     /// Returns a stream of NDJSON chunks; each chunk carries a partial `response` token.
     /// The final chunk has `done: true` and optional timing fields.
     #[instrument(skip(self, req), fields(model = %req.model))]
-    pub async fn generate_stream(&self, req: GenerateRequest) -> OllamaResult<OllamaStream<GenerateChunk>> {
+    pub async fn generate_stream(
+        &self,
+        req: GenerateRequest,
+    ) -> OllamaResult<OllamaStream<GenerateChunk>> {
         let mut r = req;
         r.stream = Some(true);
         if r.keep_alive.is_none() {
             r.keep_alive = Some("24h".to_string());
         }
 
-        let response = self.client
+        let response = self
+            .client
             .post(format!("{}/api/generate", self.base_url))
             .json(&r)
             .send()
@@ -250,7 +259,8 @@ impl OllamaClient {
         let mut r = req;
         r.stream = Some(false);
 
-        let response = self.client
+        let response = self
+            .client
             .post(format!("{}/api/chat", self.base_url))
             .json(&r)
             .send()
@@ -271,7 +281,8 @@ impl OllamaClient {
         let mut r = req;
         r.stream = Some(true);
 
-        let response = self.client
+        let response = self
+            .client
             .post(format!("{}/api/chat", self.base_url))
             .json(&r)
             .send()
@@ -325,7 +336,7 @@ mod tests {
             stream: Some(false),
             options: None,
             keep_alive: None,
-};
+        };
         let json = serde_json::to_string(&req).unwrap();
         assert!(json.contains("\"stream\":false"));
         assert!(!json.contains("options"));
@@ -333,7 +344,8 @@ mod tests {
 
     #[test]
     fn test_generate_chunk_deserialises() {
-        let raw = r#"{"model":"m","created_at":"2024-01-01T00:00:00Z","response":"fn ","done":false}"#;
+        let raw =
+            r#"{"model":"m","created_at":"2024-01-01T00:00:00Z","response":"fn ","done":false}"#;
         let chunk: GenerateChunk = serde_json::from_str(raw).unwrap();
         assert_eq!(chunk.response, "fn ");
         assert!(!chunk.done);

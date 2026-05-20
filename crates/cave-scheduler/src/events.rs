@@ -68,35 +68,72 @@ pub struct ClusterEvent {
 }
 
 impl ClusterEvent {
-    pub fn pod_added() -> Self { Self { resource: ResourceType::Pod, action: ActionType::Add, note: None } }
-    pub fn pod_deleted() -> Self { Self { resource: ResourceType::Pod, action: ActionType::Delete, note: None } }
-    pub fn node_added() -> Self { Self { resource: ResourceType::Node, action: ActionType::Add, note: None } }
+    pub fn pod_added() -> Self {
+        Self {
+            resource: ResourceType::Pod,
+            action: ActionType::Add,
+            note: None,
+        }
+    }
+    pub fn pod_deleted() -> Self {
+        Self {
+            resource: ResourceType::Pod,
+            action: ActionType::Delete,
+            note: None,
+        }
+    }
+    pub fn node_added() -> Self {
+        Self {
+            resource: ResourceType::Node,
+            action: ActionType::Add,
+            note: None,
+        }
+    }
     pub fn node_label_updated() -> Self {
-        Self { resource: ResourceType::Node, action: ActionType::UpdateNodeLabel, note: None }
+        Self {
+            resource: ResourceType::Node,
+            action: ActionType::UpdateNodeLabel,
+            note: None,
+        }
     }
     pub fn pv_added() -> Self {
-        Self { resource: ResourceType::PersistentVolume, action: ActionType::Add, note: None }
+        Self {
+            resource: ResourceType::PersistentVolume,
+            action: ActionType::Add,
+            note: None,
+        }
     }
     pub fn resource_claim_updated() -> Self {
-        Self { resource: ResourceType::ResourceClaim, action: ActionType::Update, note: None }
+        Self {
+            resource: ResourceType::ResourceClaim,
+            action: ActionType::Update,
+            note: None,
+        }
     }
 
     /// True when the event matches a hint registration's filter. The filter is
     /// a simpler `(resource, action_or_All)` pair — `All` covers every action
     /// of that resource type, and `Wildcard` covers every event.
     pub fn matches(&self, want_resource: ResourceType, want_action: ActionType) -> bool {
-        if want_resource == ResourceType::Wildcard { return true; }
-        if want_resource != self.resource { return false; }
-        if want_action == ActionType::All { return true; }
+        if want_resource == ResourceType::Wildcard {
+            return true;
+        }
+        if want_resource != self.resource {
+            return false;
+        }
+        if want_action == ActionType::All {
+            return true;
+        }
         // Granular update flavours all roll up under Update.
         if want_action == ActionType::Update {
-            return matches!(self.action,
+            return matches!(
+                self.action,
                 ActionType::Update
-                | ActionType::UpdateNodeLabel
-                | ActionType::UpdateNodeTaint
-                | ActionType::UpdateNodeAllocatable
-                | ActionType::UpdateNodeCondition
-                | ActionType::UpdateNodeAnnotation
+                    | ActionType::UpdateNodeLabel
+                    | ActionType::UpdateNodeTaint
+                    | ActionType::UpdateNodeAllocatable
+                    | ActionType::UpdateNodeCondition
+                    | ActionType::UpdateNodeAnnotation
             );
         }
         self.action == want_action
@@ -154,7 +191,9 @@ pub struct HintRegistry {
 }
 
 impl HintRegistry {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Register a hint. The same plugin may register multiple hints under
     /// different filters.
@@ -162,26 +201,40 @@ impl HintRegistry {
         self.entries.push(reg);
     }
 
-    pub fn len(&self) -> usize { self.entries.len() }
-    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
 
     /// Aggregate verdict for `(pod, event)` across every registration whose
     /// filter matches the event.
     pub fn aggregate_hint(&self, pod: &Pod, event: &ClusterEvent) -> QueueingHint {
         let mut acc = QueueingHint::QueueSkip;
         for reg in &self.entries {
-            if !event.matches(reg.want_resource, reg.want_action) { continue; }
+            if !event.matches(reg.want_resource, reg.want_action) {
+                continue;
+            }
             acc = acc.combine(reg.hint.hint(pod, event));
-            if acc == QueueingHint::QueueImmediately { break; }
+            if acc == QueueingHint::QueueImmediately {
+                break;
+            }
         }
         acc
     }
 
     /// Per-plugin verdict map: `plugin → hint`. Used for diagnostics.
-    pub fn per_plugin_hints(&self, pod: &Pod, event: &ClusterEvent) -> HashMap<String, QueueingHint> {
+    pub fn per_plugin_hints(
+        &self,
+        pod: &Pod,
+        event: &ClusterEvent,
+    ) -> HashMap<String, QueueingHint> {
         let mut map: HashMap<String, QueueingHint> = HashMap::new();
         for reg in &self.entries {
-            if !event.matches(reg.want_resource, reg.want_action) { continue; }
+            if !event.matches(reg.want_resource, reg.want_action) {
+                continue;
+            }
             let h = reg.hint.hint(pod, event);
             map.entry(reg.plugin.clone())
                 .and_modify(|cur| *cur = cur.combine(h))
@@ -195,7 +248,9 @@ impl HintRegistry {
 mod tests {
     use super::*;
 
-    fn pod(name: &str) -> Pod { Pod::new("t", "ns", name) }
+    fn pod(name: &str) -> Pod {
+        Pod::new("t", "ns", name)
+    }
 
     // ── ClusterEvent.matches ──────────────────────────────────────────────
 
@@ -256,7 +311,10 @@ mod tests {
 
     #[test]
     fn combine_skip_skip_is_skip() {
-        assert_eq!(QueueingHint::QueueSkip.combine(QueueingHint::QueueSkip), QueueingHint::QueueSkip);
+        assert_eq!(
+            QueueingHint::QueueSkip.combine(QueueingHint::QueueSkip),
+            QueueingHint::QueueSkip
+        );
     }
 
     // ── HintRegistry.aggregate_hint ──────────────────────────────────────
@@ -264,7 +322,10 @@ mod tests {
     #[test]
     fn aggregate_returns_skip_when_no_registrations() {
         let r = HintRegistry::new();
-        assert_eq!(r.aggregate_hint(&pod("p"), &ClusterEvent::pod_added()), QueueingHint::QueueSkip);
+        assert_eq!(
+            r.aggregate_hint(&pod("p"), &ClusterEvent::pod_added()),
+            QueueingHint::QueueSkip
+        );
     }
 
     #[test]
@@ -288,8 +349,10 @@ mod tests {
             want_action: ActionType::Add,
             hint: Box::new(|_p: &Pod, _e: &ClusterEvent| QueueingHint::QueueSkip),
         });
-        assert_eq!(r.aggregate_hint(&pod("p"), &ClusterEvent::node_added()),
-                   QueueingHint::QueueImmediately);
+        assert_eq!(
+            r.aggregate_hint(&pod("p"), &ClusterEvent::node_added()),
+            QueueingHint::QueueImmediately
+        );
     }
 
     #[test]
@@ -302,9 +365,15 @@ mod tests {
             hint: Box::new(|_p: &Pod, _e: &ClusterEvent| QueueingHint::Queue),
         });
         // Node event → no hint matches → QueueSkip.
-        assert_eq!(r.aggregate_hint(&pod("p"), &ClusterEvent::node_added()), QueueingHint::QueueSkip);
+        assert_eq!(
+            r.aggregate_hint(&pod("p"), &ClusterEvent::node_added()),
+            QueueingHint::QueueSkip
+        );
         // Pod event → hint runs → Queue.
-        assert_eq!(r.aggregate_hint(&pod("p"), &ClusterEvent::pod_added()), QueueingHint::Queue);
+        assert_eq!(
+            r.aggregate_hint(&pod("p"), &ClusterEvent::pod_added()),
+            QueueingHint::Queue
+        );
     }
 
     #[test]
@@ -320,11 +389,15 @@ mod tests {
             plugin: "B-should-not-run".into(),
             want_resource: ResourceType::Wildcard,
             want_action: ActionType::All,
-            hint: Box::new(|_p: &Pod, _e: &ClusterEvent| panic!("must not run after QueueImmediately")),
+            hint: Box::new(|_p: &Pod, _e: &ClusterEvent| {
+                panic!("must not run after QueueImmediately")
+            }),
         });
         // No panic → second hint was skipped.
-        assert_eq!(r.aggregate_hint(&pod("p"), &ClusterEvent::pod_added()),
-                   QueueingHint::QueueImmediately);
+        assert_eq!(
+            r.aggregate_hint(&pod("p"), &ClusterEvent::pod_added()),
+            QueueingHint::QueueImmediately
+        );
     }
 
     // ── Per-plugin hint map ──────────────────────────────────────────────
@@ -395,7 +468,10 @@ mod tests {
             hint: Box::new(|_p: &Pod, _e: &ClusterEvent| QueueingHint::Queue),
         });
         let label_evt = ClusterEvent::node_label_updated();
-        assert_eq!(r.aggregate_hint(&pod("p"), &label_evt), QueueingHint::QueueSkip);
+        assert_eq!(
+            r.aggregate_hint(&pod("p"), &label_evt),
+            QueueingHint::QueueSkip
+        );
         let taint_evt = ClusterEvent {
             resource: ResourceType::Node,
             action: ActionType::UpdateNodeTaint,
@@ -447,8 +523,14 @@ mod tests {
         assert_eq!(ClusterEvent::pod_added().action, ActionType::Add);
         assert_eq!(ClusterEvent::pod_deleted().action, ActionType::Delete);
         assert_eq!(ClusterEvent::node_added().resource, ResourceType::Node);
-        assert_eq!(ClusterEvent::pv_added().resource, ResourceType::PersistentVolume);
-        assert_eq!(ClusterEvent::resource_claim_updated().action, ActionType::Update);
+        assert_eq!(
+            ClusterEvent::pv_added().resource,
+            ResourceType::PersistentVolume
+        );
+        assert_eq!(
+            ClusterEvent::resource_claim_updated().action,
+            ActionType::Update
+        );
     }
 
     #[test]
@@ -478,7 +560,13 @@ mod tests {
             hint: Box::new(|_p: &Pod, _e: &ClusterEvent| QueueingHint::Queue),
         });
         // Any event matches.
-        assert_eq!(r.aggregate_hint(&pod("p"), &ClusterEvent::pv_added()), QueueingHint::Queue);
-        assert_eq!(r.aggregate_hint(&pod("p"), &ClusterEvent::pod_deleted()), QueueingHint::Queue);
+        assert_eq!(
+            r.aggregate_hint(&pod("p"), &ClusterEvent::pv_added()),
+            QueueingHint::Queue
+        );
+        assert_eq!(
+            r.aggregate_hint(&pod("p"), &ClusterEvent::pod_deleted()),
+            QueueingHint::Queue
+        );
     }
 }

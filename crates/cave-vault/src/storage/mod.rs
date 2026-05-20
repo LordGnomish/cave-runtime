@@ -148,15 +148,13 @@ where
 }
 
 #[allow(dead_code)]
-const _NOT_DEAD: &[fn() -> ()] = &[
-    || {
-        let _ = HashMap::<String, Vec<u8>>::new();
-        let _ = RwLock::new(0u32);
-        let _ = PathBuf::new();
-        let _: &Path = std::path::Path::new("/");
-        let _ = fs::metadata(".");
-    },
-];
+const _NOT_DEAD: &[fn() -> ()] = &[|| {
+    let _ = HashMap::<String, Vec<u8>>::new();
+    let _ = RwLock::new(0u32);
+    let _ = PathBuf::new();
+    let _: &Path = std::path::Path::new("/");
+    let _ = fs::metadata(".");
+}];
 
 #[cfg(test)]
 mod tests {

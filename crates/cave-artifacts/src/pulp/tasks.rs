@@ -88,7 +88,10 @@ impl Task {
     }
 
     pub fn is_terminal(&self) -> bool {
-        matches!(self.state, TaskState::Completed | TaskState::Failed | TaskState::Canceled | TaskState::Skipped)
+        matches!(
+            self.state,
+            TaskState::Completed | TaskState::Failed | TaskState::Canceled | TaskState::Skipped
+        )
     }
 
     pub fn mark_running(&mut self) {
@@ -144,7 +147,9 @@ pub struct TaskQueue {
 
 impl TaskQueue {
     pub fn new() -> Self {
-        Self { tasks: Mutex::new(HashMap::new()) }
+        Self {
+            tasks: Mutex::new(HashMap::new()),
+        }
     }
 
     /// Enqueue a new task and return its initial state.
@@ -183,7 +188,11 @@ impl TaskQueue {
 
     pub fn list_by_state(&self, state: &TaskState) -> Vec<Task> {
         let tasks = self.tasks.lock().unwrap();
-        tasks.values().filter(|t| &t.state == state).cloned().collect()
+        tasks
+            .values()
+            .filter(|t| &t.state == state)
+            .cloned()
+            .collect()
     }
 
     pub fn purge_completed(&self) -> usize {
@@ -231,9 +240,7 @@ impl TaskGroup {
     }
 
     pub fn is_complete(&self) -> bool {
-        self.all_tasks_dispatched
-            && self.waiting == 0
-            && self.running == 0
+        self.all_tasks_dispatched && self.waiting == 0 && self.running == 0
     }
 }
 
@@ -250,7 +257,9 @@ mod tests {
         task.mark_running();
         assert_eq!(task.state, TaskState::Running);
 
-        task.mark_completed(vec!["/pulp/api/v3/repositories/abc/versions/1/".to_string()]);
+        task.mark_completed(vec![
+            "/pulp/api/v3/repositories/abc/versions/1/".to_string(),
+        ]);
         assert_eq!(task.state, TaskState::Completed);
         assert!(task.is_terminal());
         assert!(!task.created_resources.is_empty());

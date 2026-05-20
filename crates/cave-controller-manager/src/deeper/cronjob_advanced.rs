@@ -121,11 +121,19 @@ pub fn jobs_to_delete<'a>(
     let mut to_delete: Vec<&String> = Vec::new();
     let s = successful_names_oldest_first.len();
     if s > successful_limit as usize {
-        to_delete.extend(successful_names_oldest_first.iter().take(s - successful_limit as usize));
+        to_delete.extend(
+            successful_names_oldest_first
+                .iter()
+                .take(s - successful_limit as usize),
+        );
     }
     let f = failed_names_oldest_first.len();
     if f > failed_limit as usize {
-        to_delete.extend(failed_names_oldest_first.iter().take(f - failed_limit as usize));
+        to_delete.extend(
+            failed_names_oldest_first
+                .iter()
+                .take(f - failed_limit as usize),
+        );
     }
     to_delete
 }
@@ -274,7 +282,13 @@ mod tests {
             "removeOldestJobs",
             "tenant-cj-history-trim"
         );
-        let succ = vec!["s1".to_string(), "s2".into(), "s3".into(), "s4".into(), "s5".into()];
+        let succ = vec![
+            "s1".to_string(),
+            "s2".into(),
+            "s3".into(),
+            "s4".into(),
+            "s5".into(),
+        ];
         let fail = vec!["f1".to_string(), "f2".into(), "f3".into()];
         let to_del = jobs_to_delete(&succ, &fail, 3, 1);
         // succ has 5, limit 3 → drop "s1", "s2".

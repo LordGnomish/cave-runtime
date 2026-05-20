@@ -154,17 +154,24 @@ pub fn user_has_permission(
             (_, None) => true, // Global assignment applies everywhere
             _ => false,
         };
-        if !object_matches { continue; }
+        if !object_matches {
+            continue;
+        }
 
         // Check subject membership
         let is_member = assignment.users.iter().any(|u| u == user)
             || user_groups.iter().any(|g| assignment.groups.contains(g));
-        if !is_member { continue; }
+        if !is_member {
+            continue;
+        }
 
         // Check permissions via role
         if let Some(role) = roles.iter().find(|r| r.name == assignment.role) {
             for perm in &role.permissions {
-                if *perm == "*.*" || *perm == permission || permission.starts_with(&perm.replace("*", "")) {
+                if *perm == "*.*"
+                    || *perm == permission
+                    || permission.starts_with(&perm.replace("*", ""))
+                {
                     return true;
                 }
             }
@@ -184,7 +191,9 @@ pub fn get_user_permissions(
     for assignment in assignments {
         let is_member = assignment.users.iter().any(|u| u == user)
             || user_groups.iter().any(|g| assignment.groups.contains(g));
-        if !is_member { continue; }
+        if !is_member {
+            continue;
+        }
 
         if let Some(role) = roles.iter().find(|r| r.name == assignment.role) {
             for perm in &role.permissions {
@@ -201,7 +210,12 @@ pub fn get_user_permissions(
 mod tests {
     use super::*;
 
-    fn make_assignment(role: &str, users: &[&str], groups: &[&str], object: Option<&str>) -> RoleAssignment {
+    fn make_assignment(
+        role: &str,
+        users: &[&str],
+        groups: &[&str],
+        object: Option<&str>,
+    ) -> RoleAssignment {
         RoleAssignment {
             role: role.to_string(),
             users: users.iter().map(|s| s.to_string()).collect(),
@@ -222,20 +236,40 @@ mod tests {
         let roles = builtin_roles();
         let assignments = vec![make_assignment("core.viewer", &["alice"], &[], None)];
         assert!(user_has_permission(
-            "alice", &[], "core.view_repository", &assignments, None, &roles
+            "alice",
+            &[],
+            "core.view_repository",
+            &assignments,
+            None,
+            &roles
         ));
         assert!(!user_has_permission(
-            "alice", &[], "core.delete_repository", &assignments, None, &roles
+            "alice",
+            &[],
+            "core.delete_repository",
+            &assignments,
+            None,
+            &roles
         ));
     }
 
     #[test]
     fn user_has_permission_via_group() {
         let roles = builtin_roles();
-        let assignments = vec![make_assignment("core.repository_owner", &[], &["ops-team"], None)];
+        let assignments = vec![make_assignment(
+            "core.repository_owner",
+            &[],
+            &["ops-team"],
+            None,
+        )];
         let user_groups = vec!["ops-team".to_string()];
         assert!(user_has_permission(
-            "bob", &user_groups, "core.sync_repository", &assignments, None, &roles
+            "bob",
+            &user_groups,
+            "core.sync_repository",
+            &assignments,
+            None,
+            &roles
         ));
     }
 
@@ -251,11 +285,21 @@ mod tests {
         )];
         // Permission on the right object
         assert!(user_has_permission(
-            "alice", &[], "core.sync_repository", &assignments, Some(repo_href), &roles
+            "alice",
+            &[],
+            "core.sync_repository",
+            &assignments,
+            Some(repo_href),
+            &roles
         ));
         // Different object — no access
         assert!(!user_has_permission(
-            "alice", &[], "core.sync_repository", &assignments, Some("/pulp/api/v3/repositories/xyz/"), &roles
+            "alice",
+            &[],
+            "core.sync_repository",
+            &assignments,
+            Some("/pulp/api/v3/repositories/xyz/"),
+            &roles
         ));
     }
 
@@ -264,7 +308,12 @@ mod tests {
         let roles = builtin_roles();
         let assignments = vec![make_assignment("core.superuser", &["admin"], &[], None)];
         assert!(user_has_permission(
-            "admin", &[], "core.delete_everything", &assignments, None, &roles
+            "admin",
+            &[],
+            "core.delete_everything",
+            &assignments,
+            None,
+            &roles
         ));
     }
 

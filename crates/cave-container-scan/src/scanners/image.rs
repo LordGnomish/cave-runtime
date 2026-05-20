@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
 use crate::engine::{ScanError, Scanner};
-use crate::models::{Finding, FindingCategory, Confidence, ScanKind, ScanRequest, ScanTarget, Severity};
+use crate::models::{
+    Confidence, Finding, FindingCategory, ScanKind, ScanRequest, ScanTarget, Severity,
+};
 use async_trait::async_trait;
 use regex::Regex;
 
@@ -68,7 +70,9 @@ impl Scanner for ImageScanner {
                 findings.extend(self.scan_for_misconfigs(r#ref));
                 Ok(findings)
             }
-            _ => Err(ScanError::InvalidRequest("Expected ImageRef target".to_string())),
+            _ => Err(ScanError::InvalidRequest(
+                "Expected ImageRef target".to_string(),
+            )),
         }
     }
 }

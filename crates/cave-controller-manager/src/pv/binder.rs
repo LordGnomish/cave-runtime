@@ -132,10 +132,7 @@ pub fn pick_pv<'a>(
 }
 
 /// Decide what to do with the PVC under the binder controller.
-pub fn evaluate(
-    pvc: &PersistentVolumeClaim,
-    pvs: &[PersistentVolume],
-) -> BindAction {
+pub fn evaluate(pvc: &PersistentVolumeClaim, pvs: &[PersistentVolume]) -> BindAction {
     if pvc.phase == PvcPhase::Bound {
         return BindAction::NoOp;
     }
@@ -159,7 +156,13 @@ mod tests {
     use super::*;
     use crate::test_ctx;
 
-    fn pv(name: &str, gi: u64, modes: Vec<AccessMode>, sc: &str, phase: PvPhase) -> PersistentVolume {
+    fn pv(
+        name: &str,
+        gi: u64,
+        modes: Vec<AccessMode>,
+        sc: &str,
+        phase: PvPhase,
+    ) -> PersistentVolume {
         PersistentVolume {
             name: name.into(),
             capacity_gi: gi,
@@ -199,7 +202,13 @@ mod tests {
             "tenant-pv-satisfies"
         );
         let p = pv("pv1", 10, vec![AccessMode::Rwo], "fast", PvPhase::Available);
-        let c = pvc(10, vec![AccessMode::Rwo], "fast", BindingMode::Immediate, PvcPhase::Pending);
+        let c = pvc(
+            10,
+            vec![AccessMode::Rwo],
+            "fast",
+            BindingMode::Immediate,
+            PvcPhase::Pending,
+        );
         assert!(pv_satisfies(&p, &c));
     }
 
@@ -211,7 +220,13 @@ mod tests {
             "tenant-pv-cap-small"
         );
         let p = pv("pv1", 5, vec![AccessMode::Rwo], "fast", PvPhase::Available);
-        let c = pvc(10, vec![AccessMode::Rwo], "fast", BindingMode::Immediate, PvcPhase::Pending);
+        let c = pvc(
+            10,
+            vec![AccessMode::Rwo],
+            "fast",
+            BindingMode::Immediate,
+            PvcPhase::Pending,
+        );
         assert!(!pv_satisfies(&p, &c));
     }
 
@@ -223,7 +238,13 @@ mod tests {
             "tenant-pv-sc-mismatch"
         );
         let p = pv("pv1", 10, vec![AccessMode::Rwo], "slow", PvPhase::Available);
-        let c = pvc(10, vec![AccessMode::Rwo], "fast", BindingMode::Immediate, PvcPhase::Pending);
+        let c = pvc(
+            10,
+            vec![AccessMode::Rwo],
+            "fast",
+            BindingMode::Immediate,
+            PvcPhase::Pending,
+        );
         assert!(!pv_satisfies(&p, &c));
     }
 
@@ -235,7 +256,13 @@ mod tests {
             "tenant-pv-mode-missing"
         );
         let p = pv("pv1", 10, vec![AccessMode::Rwo], "fast", PvPhase::Available);
-        let c = pvc(10, vec![AccessMode::Rwx], "fast", BindingMode::Immediate, PvcPhase::Pending);
+        let c = pvc(
+            10,
+            vec![AccessMode::Rwx],
+            "fast",
+            BindingMode::Immediate,
+            PvcPhase::Pending,
+        );
         assert!(!pv_satisfies(&p, &c));
     }
 
@@ -248,7 +275,13 @@ mod tests {
         );
         let mut p = pv("pv1", 10, vec![AccessMode::Rwo], "fast", PvPhase::Available);
         p.volume_mode = VolumeMode::Block;
-        let c = pvc(10, vec![AccessMode::Rwo], "fast", BindingMode::Immediate, PvcPhase::Pending);
+        let c = pvc(
+            10,
+            vec![AccessMode::Rwo],
+            "fast",
+            BindingMode::Immediate,
+            PvcPhase::Pending,
+        );
         assert!(!pv_satisfies(&p, &c));
     }
 
@@ -260,7 +293,13 @@ mod tests {
             "tenant-pv-bound"
         );
         let p = pv("pv1", 10, vec![AccessMode::Rwo], "fast", PvPhase::Bound);
-        let c = pvc(10, vec![AccessMode::Rwo], "fast", BindingMode::Immediate, PvcPhase::Pending);
+        let c = pvc(
+            10,
+            vec![AccessMode::Rwo],
+            "fast",
+            BindingMode::Immediate,
+            PvcPhase::Pending,
+        );
         assert!(!pv_satisfies(&p, &c));
     }
 
@@ -272,11 +311,35 @@ mod tests {
             "tenant-pv-smallest-fit"
         );
         let pvs = vec![
-            pv("big", 100, vec![AccessMode::Rwo], "fast", PvPhase::Available),
-            pv("medium", 20, vec![AccessMode::Rwo], "fast", PvPhase::Available),
-            pv("just-right", 11, vec![AccessMode::Rwo], "fast", PvPhase::Available),
+            pv(
+                "big",
+                100,
+                vec![AccessMode::Rwo],
+                "fast",
+                PvPhase::Available,
+            ),
+            pv(
+                "medium",
+                20,
+                vec![AccessMode::Rwo],
+                "fast",
+                PvPhase::Available,
+            ),
+            pv(
+                "just-right",
+                11,
+                vec![AccessMode::Rwo],
+                "fast",
+                PvPhase::Available,
+            ),
         ];
-        let c = pvc(10, vec![AccessMode::Rwo], "fast", BindingMode::Immediate, PvcPhase::Pending);
+        let c = pvc(
+            10,
+            vec![AccessMode::Rwo],
+            "fast",
+            BindingMode::Immediate,
+            PvcPhase::Pending,
+        );
         assert_eq!(pick_pv(&c, &pvs).unwrap().name, "just-right");
     }
 
@@ -287,8 +350,20 @@ mod tests {
             "findBestMatchForClaim",
             "tenant-pv-no-match"
         );
-        let pvs = vec![pv("p", 5, vec![AccessMode::Rwo], "slow", PvPhase::Available)];
-        let c = pvc(10, vec![AccessMode::Rwo], "fast", BindingMode::Immediate, PvcPhase::Pending);
+        let pvs = vec![pv(
+            "p",
+            5,
+            vec![AccessMode::Rwo],
+            "slow",
+            PvPhase::Available,
+        )];
+        let c = pvc(
+            10,
+            vec![AccessMode::Rwo],
+            "fast",
+            BindingMode::Immediate,
+            PvcPhase::Pending,
+        );
         assert!(pick_pv(&c, &pvs).is_none());
     }
 
@@ -299,8 +374,20 @@ mod tests {
             "syncClaim",
             "tenant-pv-eval-bind"
         );
-        let pvs = vec![pv("pv1", 10, vec![AccessMode::Rwo], "fast", PvPhase::Available)];
-        let c = pvc(10, vec![AccessMode::Rwo], "fast", BindingMode::Immediate, PvcPhase::Pending);
+        let pvs = vec![pv(
+            "pv1",
+            10,
+            vec![AccessMode::Rwo],
+            "fast",
+            PvPhase::Available,
+        )];
+        let c = pvc(
+            10,
+            vec![AccessMode::Rwo],
+            "fast",
+            BindingMode::Immediate,
+            PvcPhase::Pending,
+        );
         assert_eq!(evaluate(&c, &pvs), BindAction::Bind("pv1".into()));
     }
 
@@ -312,7 +399,13 @@ mod tests {
             "tenant-pv-eval-wait"
         );
         let pvs: Vec<_> = vec![];
-        let c = pvc(10, vec![AccessMode::Rwo], "fast", BindingMode::Immediate, PvcPhase::Pending);
+        let c = pvc(
+            10,
+            vec![AccessMode::Rwo],
+            "fast",
+            BindingMode::Immediate,
+            PvcPhase::Pending,
+        );
         assert_eq!(evaluate(&c, &pvs), BindAction::Wait);
     }
 
@@ -323,7 +416,13 @@ mod tests {
             "syncClaim",
             "tenant-pv-eval-wffc-wait"
         );
-        let pvs = vec![pv("pv1", 10, vec![AccessMode::Rwo], "fast", PvPhase::Available)];
+        let pvs = vec![pv(
+            "pv1",
+            10,
+            vec![AccessMode::Rwo],
+            "fast",
+            PvPhase::Available,
+        )];
         let c = pvc(
             10,
             vec![AccessMode::Rwo],
@@ -342,7 +441,13 @@ mod tests {
             "syncClaim",
             "tenant-pv-eval-wffc-bind"
         );
-        let pvs = vec![pv("pv1", 10, vec![AccessMode::Rwo], "fast", PvPhase::Available)];
+        let pvs = vec![pv(
+            "pv1",
+            10,
+            vec![AccessMode::Rwo],
+            "fast",
+            PvPhase::Available,
+        )];
         let mut c = pvc(
             10,
             vec![AccessMode::Rwo],
@@ -361,8 +466,20 @@ mod tests {
             "syncClaim",
             "tenant-pv-eval-already-bound"
         );
-        let pvs = vec![pv("pv1", 10, vec![AccessMode::Rwo], "fast", PvPhase::Available)];
-        let c = pvc(10, vec![AccessMode::Rwo], "fast", BindingMode::Immediate, PvcPhase::Bound);
+        let pvs = vec![pv(
+            "pv1",
+            10,
+            vec![AccessMode::Rwo],
+            "fast",
+            PvPhase::Available,
+        )];
+        let c = pvc(
+            10,
+            vec![AccessMode::Rwo],
+            "fast",
+            BindingMode::Immediate,
+            PvcPhase::Bound,
+        );
         assert_eq!(evaluate(&c, &pvs), BindAction::NoOp);
     }
 
@@ -377,7 +494,13 @@ mod tests {
             pv("rwo", 10, vec![AccessMode::Rwo], "fast", PvPhase::Available),
             pv("rwx", 10, vec![AccessMode::Rwx], "fast", PvPhase::Available),
         ];
-        let c = pvc(10, vec![AccessMode::Rwx], "fast", BindingMode::Immediate, PvcPhase::Pending);
+        let c = pvc(
+            10,
+            vec![AccessMode::Rwx],
+            "fast",
+            BindingMode::Immediate,
+            PvcPhase::Pending,
+        );
         assert_eq!(pick_pv(&c, &pvs).unwrap().name, "rwx");
     }
 

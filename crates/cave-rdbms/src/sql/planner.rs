@@ -6,26 +6,77 @@ use crate::sql::ast::*;
 
 #[derive(Debug, Clone)]
 pub enum LogicalPlan {
-    TableScan { table: String },
-    Filter { input: Box<LogicalPlan>, predicate: Expr },
-    Project { input: Box<LogicalPlan>, exprs: Vec<Expr> },
-    Limit { input: Box<LogicalPlan>, count: i64 },
-    Sort { input: Box<LogicalPlan>, order_by: Vec<OrderBy> },
-    GroupBy { input: Box<LogicalPlan>, group_exprs: Vec<Expr>, agg_exprs: Vec<(String, Vec<Expr>)> },
-    Join { left: Box<LogicalPlan>, right: Box<LogicalPlan>, kind: JoinKind, condition: Option<Expr> },
-    Values { rows: Vec<Vec<Expr>> },
+    TableScan {
+        table: String,
+    },
+    Filter {
+        input: Box<LogicalPlan>,
+        predicate: Expr,
+    },
+    Project {
+        input: Box<LogicalPlan>,
+        exprs: Vec<Expr>,
+    },
+    Limit {
+        input: Box<LogicalPlan>,
+        count: i64,
+    },
+    Sort {
+        input: Box<LogicalPlan>,
+        order_by: Vec<OrderBy>,
+    },
+    GroupBy {
+        input: Box<LogicalPlan>,
+        group_exprs: Vec<Expr>,
+        agg_exprs: Vec<(String, Vec<Expr>)>,
+    },
+    Join {
+        left: Box<LogicalPlan>,
+        right: Box<LogicalPlan>,
+        kind: JoinKind,
+        condition: Option<Expr>,
+    },
+    Values {
+        rows: Vec<Vec<Expr>>,
+    },
 }
 
 #[derive(Debug, Clone)]
 pub enum PhysicalPlan {
-    TableScan { table: String },
-    Filter { input: Box<PhysicalPlan>, predicate: Expr },
-    Project { input: Box<PhysicalPlan>, exprs: Vec<Expr> },
-    Limit { input: Box<PhysicalPlan>, count: i64, offset: Option<i64> },
-    Sort { input: Box<PhysicalPlan>, order_by: Vec<OrderBy> },
-    GroupBy { input: Box<PhysicalPlan>, group_exprs: Vec<Expr>, agg_exprs: Vec<(String, Vec<Expr>)> },
-    NestedLoopJoin { left: Box<PhysicalPlan>, right: Box<PhysicalPlan>, kind: JoinKind, condition: Option<Expr> },
-    Values { rows: Vec<Vec<Expr>> },
+    TableScan {
+        table: String,
+    },
+    Filter {
+        input: Box<PhysicalPlan>,
+        predicate: Expr,
+    },
+    Project {
+        input: Box<PhysicalPlan>,
+        exprs: Vec<Expr>,
+    },
+    Limit {
+        input: Box<PhysicalPlan>,
+        count: i64,
+        offset: Option<i64>,
+    },
+    Sort {
+        input: Box<PhysicalPlan>,
+        order_by: Vec<OrderBy>,
+    },
+    GroupBy {
+        input: Box<PhysicalPlan>,
+        group_exprs: Vec<Expr>,
+        agg_exprs: Vec<(String, Vec<Expr>)>,
+    },
+    NestedLoopJoin {
+        left: Box<PhysicalPlan>,
+        right: Box<PhysicalPlan>,
+        kind: JoinKind,
+        condition: Option<Expr>,
+    },
+    Values {
+        rows: Vec<Vec<Expr>>,
+    },
 }
 
 pub struct Planner;
@@ -51,9 +102,7 @@ impl Planner {
         let mut plan = if let Some(from) = &select.from {
             Self::plan_from(from)?
         } else {
-            PhysicalPlan::Values {
-                rows: vec![vec![]],
-            }
+            PhysicalPlan::Values { rows: vec![vec![]] }
         };
 
         if let Some(where_clause) = &select.where_clause {

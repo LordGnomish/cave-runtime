@@ -5,15 +5,17 @@
 use super::types::{IcebergTable, IcebergViewError};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
+use crate::admin::state::{AdminState, scope};
 
 pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<IcebergTable>, IcebergViewError> {
     ctx.authorise(Permission::IcebergRead)?;
     let mut rows: Vec<IcebergTable> =
-        scope(&state.iceberg_tables.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-            .into_iter()
-            .cloned()
-            .collect();
+        scope(&state.iceberg_tables.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| a.namespace.cmp(&b.namespace).then(a.name.cmp(&b.name)));
     Ok(rows)
 }
@@ -24,7 +26,10 @@ pub fn list_namespace(
     namespace: &str,
 ) -> Result<Vec<IcebergTable>, IcebergViewError> {
     let all = list(state, ctx)?;
-    Ok(all.into_iter().filter(|t| t.namespace == namespace).collect())
+    Ok(all
+        .into_iter()
+        .filter(|t| t.namespace == namespace)
+        .collect())
 }
 
 pub fn get(

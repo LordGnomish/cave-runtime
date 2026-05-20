@@ -20,8 +20,13 @@ fn ocsp_returns_good_revoked_unknown_per_status_table() {
 
     let resp = OcspResponder::new(&crl, &known);
     assert_eq!(resp.check("AAAA0001"), OcspStatus::Good);
-    assert!(matches!(resp.check("AAAA0002"),
-        OcspStatus::Revoked { reason: RevocationReason::KeyCompromise, .. }));
+    assert!(matches!(
+        resp.check("AAAA0002"),
+        OcspStatus::Revoked {
+            reason: RevocationReason::KeyCompromise,
+            ..
+        }
+    ));
     assert_eq!(resp.check("ZZZZ-not-our-issuer"), OcspStatus::Unknown);
 }
 

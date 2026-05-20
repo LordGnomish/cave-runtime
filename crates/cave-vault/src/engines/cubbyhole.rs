@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+use crate::VaultState;
 use crate::error::{VaultError, VaultResult};
 use crate::response::VaultResponse;
-use crate::VaultState;
 use axum::{
+    Router,
     extract::{Json, Path, Query, State},
     http::HeaderMap,
     routing::{delete, get, post, put},
-    Router,
 };
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 fn extract_token(headers: &HeaderMap) -> VaultResult<String> {
-    headers.get("x-vault-token")
+    headers
+        .get("x-vault-token")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or(VaultError::BadToken)
@@ -47,8 +48,14 @@ pub async fn read_secret(
 
     if q.list.as_deref() == Some("true") {
         let store = state.cubbyhole_store.read().await;
-        let prefix = if path.is_empty() { String::new() } else { format!("{}/", path) };
-        let keys: Vec<String> = store.data.get(&accessor)
+        let prefix = if path.is_empty() {
+            String::new()
+        } else {
+            format!("{}/", path)
+        };
+        let keys: Vec<String> = store
+            .data
+            .get(&accessor)
             .map(|m| {
                 let mut seen = std::collections::BTreeSet::new();
                 for k in m.keys() {
@@ -75,7 +82,9 @@ pub async fn read_secret(
     }
 
     let store = state.cubbyhole_store.read().await;
-    let secret = store.data.get(&accessor)
+    let secret = store
+        .data
+        .get(&accessor)
         .and_then(|m| m.get(&path))
         .ok_or(VaultError::SecretNotFound)?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(secret).unwrap_or_default()))
@@ -128,8 +137,14 @@ pub async fn list_secrets(
     drop(ts);
 
     let store = state.cubbyhole_store.read().await;
-    let prefix = if path.is_empty() { String::new() } else { format!("{}/", path) };
-    let keys: Vec<String> = store.data.get(&accessor)
+    let prefix = if path.is_empty() {
+        String::new()
+    } else {
+        format!("{}/", path)
+    };
+    let keys: Vec<String> = store
+        .data
+        .get(&accessor)
         .map(|m| {
             let mut seen = std::collections::BTreeSet::new();
             for k in m.keys() {
@@ -168,14 +183,18 @@ pub fn router(state: Arc<VaultState>) -> Router {
             })
             .put({
                 let s = state.clone();
-                move |headers: HeaderMap, Path(path): Path<String>, Json(body): Json<HashMap<String, Value>>| {
+                move |headers: HeaderMap,
+                      Path(path): Path<String>,
+                      Json(body): Json<HashMap<String, Value>>| {
                     let state = s.clone();
                     async move { write_secret(State(state), headers, Path(path), Json(body)).await }
                 }
             })
             .post({
                 let s = state.clone();
-                move |headers: HeaderMap, Path(path): Path<String>, Json(body): Json<HashMap<String, Value>>| {
+                move |headers: HeaderMap,
+                      Path(path): Path<String>,
+                      Json(body): Json<HashMap<String, Value>>| {
                     let state = s.clone();
                     async move { write_secret(State(state), headers, Path(path), Json(body)).await }
                 }

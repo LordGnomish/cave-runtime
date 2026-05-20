@@ -238,8 +238,7 @@ impl PartitionLog {
             let cutoff = Utc::now().timestamp_millis() - self.config.retention_ms;
             while let Some(front) = self.batches.front() {
                 if front.max_timestamp < cutoff {
-                    self.log_start_offset =
-                        front.base_offset + front.record_count() as i64;
+                    self.log_start_offset = front.base_offset + front.record_count() as i64;
                     self.batches.pop_front();
                 } else {
                     break;
@@ -274,12 +273,12 @@ impl Topic {
     }
 
     pub fn partition(&self, index: i32) -> StreamsResult<&PartitionLog> {
-        self.partitions.get(index as usize).ok_or_else(|| {
-            StreamsError::UnknownTopicOrPartition {
+        self.partitions
+            .get(index as usize)
+            .ok_or_else(|| StreamsError::UnknownTopicOrPartition {
                 topic: self.name.clone(),
                 partition: index,
-            }
-        })
+            })
     }
 
     pub fn partition_mut(&mut self, index: i32) -> StreamsResult<&mut PartitionLog> {
@@ -301,7 +300,8 @@ impl Topic {
             )));
         }
         for i in current..new_count {
-            self.partitions.push(PartitionLog::new(i, self.config.clone()));
+            self.partitions
+                .push(PartitionLog::new(i, self.config.clone()));
         }
         Ok(())
     }
@@ -385,7 +385,8 @@ impl Broker {
         } else {
             num_partitions
         };
-        self.topics.insert(name.clone(), Topic::new(name, np, topic_config));
+        self.topics
+            .insert(name.clone(), Topic::new(name, np, topic_config));
         Ok(())
     }
 
@@ -418,12 +419,13 @@ impl Broker {
     }
 
     pub fn add_partitions(&self, topic: &str, new_count: i32) -> StreamsResult<()> {
-        let mut t = self.topics.get_mut(topic).ok_or_else(|| {
-            StreamsError::UnknownTopicOrPartition {
-                topic: topic.into(),
-                partition: -1,
-            }
-        })?;
+        let mut t =
+            self.topics
+                .get_mut(topic)
+                .ok_or_else(|| StreamsError::UnknownTopicOrPartition {
+                    topic: topic.into(),
+                    partition: -1,
+                })?;
         t.add_partitions(new_count)
     }
 
@@ -440,14 +442,22 @@ impl Broker {
         is_transactional: bool,
         codec: Codec,
     ) -> StreamsResult<i64> {
-        let mut t = self.topics.get_mut(topic).ok_or_else(|| {
-            StreamsError::UnknownTopicOrPartition {
-                topic: topic.into(),
-                partition,
-            }
-        })?;
+        let mut t =
+            self.topics
+                .get_mut(topic)
+                .ok_or_else(|| StreamsError::UnknownTopicOrPartition {
+                    topic: topic.into(),
+                    partition,
+                })?;
         let log = t.partition_mut(partition)?;
-        log.append(data, producer_id, producer_epoch, base_sequence, is_transactional, codec)
+        log.append(
+            data,
+            producer_id,
+            producer_epoch,
+            base_sequence,
+            is_transactional,
+            codec,
+        )
     }
 
     // ── Fetch ─────────────────────────────────────────────────────────────────
@@ -459,35 +469,42 @@ impl Broker {
         offset: i64,
         max_bytes: i32,
     ) -> StreamsResult<Vec<RecordBatch>> {
-        let t = self.topics.get(topic).ok_or_else(|| {
-            StreamsError::UnknownTopicOrPartition {
+        let t = self
+            .topics
+            .get(topic)
+            .ok_or_else(|| StreamsError::UnknownTopicOrPartition {
                 topic: topic.into(),
                 partition,
-            }
-        })?;
+            })?;
         let log = t.partition(partition)?;
-        Ok(log.fetch(offset, max_bytes)?.iter().map(|b| (*b).clone()).collect())
+        Ok(log
+            .fetch(offset, max_bytes)?
+            .iter()
+            .map(|b| (*b).clone())
+            .collect())
     }
 
     // ── Offset management ─────────────────────────────────────────────────────
 
     pub fn log_end_offset(&self, topic: &str, partition: i32) -> StreamsResult<i64> {
-        let t = self.topics.get(topic).ok_or_else(|| {
-            StreamsError::UnknownTopicOrPartition {
+        let t = self
+            .topics
+            .get(topic)
+            .ok_or_else(|| StreamsError::UnknownTopicOrPartition {
                 topic: topic.into(),
                 partition,
-            }
-        })?;
+            })?;
         Ok(t.partition(partition)?.log_end_offset())
     }
 
     pub fn log_start_offset(&self, topic: &str, partition: i32) -> StreamsResult<i64> {
-        let t = self.topics.get(topic).ok_or_else(|| {
-            StreamsError::UnknownTopicOrPartition {
+        let t = self
+            .topics
+            .get(topic)
+            .ok_or_else(|| StreamsError::UnknownTopicOrPartition {
                 topic: topic.into(),
                 partition,
-            }
-        })?;
+            })?;
         Ok(t.partition(partition)?.log_start_offset())
     }
 
@@ -503,13 +520,19 @@ impl Broker {
             .unwrap_or(-1)
     }
 
-    pub fn delete_records(&self, topic: &str, partition: i32, before_offset: i64) -> StreamsResult<i64> {
-        let mut t = self.topics.get_mut(topic).ok_or_else(|| {
-            StreamsError::UnknownTopicOrPartition {
-                topic: topic.into(),
-                partition,
-            }
-        })?;
+    pub fn delete_records(
+        &self,
+        topic: &str,
+        partition: i32,
+        before_offset: i64,
+    ) -> StreamsResult<i64> {
+        let mut t =
+            self.topics
+                .get_mut(topic)
+                .ok_or_else(|| StreamsError::UnknownTopicOrPartition {
+                    topic: topic.into(),
+                    partition,
+                })?;
         let log = t.partition_mut(partition)?;
         log.delete_records(before_offset);
         Ok(log.log_start_offset())
@@ -572,7 +595,10 @@ impl Broker {
         if name.len() > 249 {
             return Err(StreamsError::InvalidTopicName("name too long".into()));
         }
-        if !name.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.') {
+        if !name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.')
+        {
             return Err(StreamsError::InvalidTopicName(format!(
                 "invalid characters in '{name}'"
             )));
@@ -619,17 +645,27 @@ impl Broker {
     }
 
     pub fn get_topic_configs(&self, topic: &str) -> StreamsResult<HashMap<String, String>> {
-        let t = self.topics.get(topic).ok_or_else(|| {
-            StreamsError::UnknownTopicOrPartition {
+        let t = self
+            .topics
+            .get(topic)
+            .ok_or_else(|| StreamsError::UnknownTopicOrPartition {
                 topic: topic.into(),
                 partition: -1,
-            }
-        })?;
+            })?;
         let mut configs = HashMap::new();
-        configs.insert("cleanup.policy".into(), format!("{:?}", t.config.cleanup_policy).to_lowercase());
+        configs.insert(
+            "cleanup.policy".into(),
+            format!("{:?}", t.config.cleanup_policy).to_lowercase(),
+        );
         configs.insert("retention.ms".into(), t.config.retention_ms.to_string());
-        configs.insert("retention.bytes".into(), t.config.retention_bytes.to_string());
-        configs.insert("max.message.bytes".into(), t.config.max_message_bytes.to_string());
+        configs.insert(
+            "retention.bytes".into(),
+            t.config.retention_bytes.to_string(),
+        );
+        configs.insert(
+            "max.message.bytes".into(),
+            t.config.max_message_bytes.to_string(),
+        );
         for (k, v) in &t.config.extra {
             configs.insert(k.clone(), v.clone());
         }
@@ -641,12 +677,13 @@ impl Broker {
         topic: &str,
         configs: Vec<(String, Option<String>)>,
     ) -> StreamsResult<()> {
-        let mut t = self.topics.get_mut(topic).ok_or_else(|| {
-            StreamsError::UnknownTopicOrPartition {
-                topic: topic.into(),
-                partition: -1,
-            }
-        })?;
+        let mut t =
+            self.topics
+                .get_mut(topic)
+                .ok_or_else(|| StreamsError::UnknownTopicOrPartition {
+                    topic: topic.into(),
+                    partition: -1,
+                })?;
         let mut cfg = t.config.clone();
         for (k, v) in configs {
             self.apply_config(&mut cfg, &k, v.as_deref());
@@ -658,12 +695,13 @@ impl Broker {
     // ── Describe producers ────────────────────────────────────────────────────
     pub fn describe_producers(&self, topic: &str, partition: i32) -> StreamsResult<Vec<i64>> {
         // Return active producer IDs that have written to this partition
-        let t = self.topics.get(topic).ok_or_else(|| {
-            StreamsError::UnknownTopicOrPartition {
+        let t = self
+            .topics
+            .get(topic)
+            .ok_or_else(|| StreamsError::UnknownTopicOrPartition {
                 topic: topic.into(),
                 partition,
-            }
-        })?;
+            })?;
         let log = t.partition(partition)?;
         let pids: std::collections::HashSet<i64> = log
             .batches
@@ -708,7 +746,16 @@ mod tests {
         let b = broker();
         b.create_topic("events".into(), 1, 1, vec![]).unwrap();
         let offset = b
-            .produce("events", 0, Bytes::from("hello"), -1, 0, 0, false, Codec::None)
+            .produce(
+                "events",
+                0,
+                Bytes::from("hello"),
+                -1,
+                0,
+                0,
+                false,
+                Codec::None,
+            )
             .unwrap();
         assert_eq!(offset, 0);
         let batches = b.fetch("events", 0, 0, 1024 * 1024).unwrap();

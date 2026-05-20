@@ -8,14 +8,14 @@
 //! (Ambient-only mandate).
 
 use crate::{
+    MeshState,
     error::{MeshError, MeshResult},
     models::{
-        AuthorizationPolicy, DestinationRule, Gateway, PeerAuthentication,
-        RateLimitPolicy, RequestAuthentication, ServiceEntry, Telemetry, VirtualService,
+        AuthorizationPolicy, DestinationRule, Gateway, PeerAuthentication, RateLimitPolicy,
+        RequestAuthentication, ServiceEntry, Telemetry, VirtualService,
     },
-    MeshState,
 };
-use cave_db::{migrate::run_migrations, CavePool};
+use cave_db::{CavePool, migrate::run_migrations};
 use std::sync::Arc;
 use tracing::{error, info};
 
@@ -48,9 +48,7 @@ pub trait MeshStorage: Send + Sync {
         &self,
         gw: &Gateway,
     ) -> impl std::future::Future<Output = MeshResult<()>> + Send;
-    fn load_gateways(
-        &self,
-    ) -> impl std::future::Future<Output = MeshResult<Vec<Gateway>>> + Send;
+    fn load_gateways(&self) -> impl std::future::Future<Output = MeshResult<Vec<Gateway>>> + Send;
 
     fn save_service_entry(
         &self,
@@ -178,7 +176,12 @@ impl DbMeshStorage {
         Ok(Self { pool })
     }
 
-    async fn upsert<T: serde::Serialize>(&self, table: &str, key: &str, value: &T) -> MeshResult<()> {
+    async fn upsert<T: serde::Serialize>(
+        &self,
+        table: &str,
+        key: &str,
+        value: &T,
+    ) -> MeshResult<()> {
         let data = serde_json::to_value(value)?;
         let client = self
             .pool
@@ -235,7 +238,12 @@ impl DbMeshStorage {
 
 impl MeshStorage for DbMeshStorage {
     async fn save_virtual_service(&self, vs: &VirtualService) -> MeshResult<()> {
-        self.upsert("virtual_services", &format!("{}/{}", vs.namespace, vs.name), vs).await
+        self.upsert(
+            "virtual_services",
+            &format!("{}/{}", vs.namespace, vs.name),
+            vs,
+        )
+        .await
     }
     async fn load_virtual_services(&self) -> MeshResult<Vec<VirtualService>> {
         self.load_all("virtual_services").await
@@ -245,43 +253,68 @@ impl MeshStorage for DbMeshStorage {
     }
 
     async fn save_destination_rule(&self, dr: &DestinationRule) -> MeshResult<()> {
-        self.upsert("destination_rules", &format!("{}/{}", dr.namespace, dr.name), dr).await
+        self.upsert(
+            "destination_rules",
+            &format!("{}/{}", dr.namespace, dr.name),
+            dr,
+        )
+        .await
     }
     async fn load_destination_rules(&self) -> MeshResult<Vec<DestinationRule>> {
         self.load_all("destination_rules").await
     }
 
     async fn save_gateway(&self, gw: &Gateway) -> MeshResult<()> {
-        self.upsert("gateways", &format!("{}/{}", gw.namespace, gw.name), gw).await
+        self.upsert("gateways", &format!("{}/{}", gw.namespace, gw.name), gw)
+            .await
     }
     async fn load_gateways(&self) -> MeshResult<Vec<Gateway>> {
         self.load_all("gateways").await
     }
 
     async fn save_service_entry(&self, se: &ServiceEntry) -> MeshResult<()> {
-        self.upsert("service_entries", &format!("{}/{}", se.namespace, se.name), se).await
+        self.upsert(
+            "service_entries",
+            &format!("{}/{}", se.namespace, se.name),
+            se,
+        )
+        .await
     }
     async fn load_service_entries(&self) -> MeshResult<Vec<ServiceEntry>> {
         self.load_all("service_entries").await
     }
 
     async fn save_peer_authentication(&self, pa: &PeerAuthentication) -> MeshResult<()> {
-        self.upsert("peer_authentications", &format!("{}/{}", pa.namespace, pa.name), pa).await
+        self.upsert(
+            "peer_authentications",
+            &format!("{}/{}", pa.namespace, pa.name),
+            pa,
+        )
+        .await
     }
     async fn load_peer_authentications(&self) -> MeshResult<Vec<PeerAuthentication>> {
         self.load_all("peer_authentications").await
     }
 
     async fn save_request_authentication(&self, ra: &RequestAuthentication) -> MeshResult<()> {
-        self.upsert("request_authentications", &format!("{}/{}", ra.namespace, ra.name), ra).await
+        self.upsert(
+            "request_authentications",
+            &format!("{}/{}", ra.namespace, ra.name),
+            ra,
+        )
+        .await
     }
     async fn load_request_authentications(&self) -> MeshResult<Vec<RequestAuthentication>> {
         self.load_all("request_authentications").await
     }
 
     async fn save_authz_policy(&self, policy: &AuthorizationPolicy) -> MeshResult<()> {
-        self.upsert("authz_policies", &format!("{}/{}", policy.namespace, policy.name), policy)
-            .await
+        self.upsert(
+            "authz_policies",
+            &format!("{}/{}", policy.namespace, policy.name),
+            policy,
+        )
+        .await
     }
     async fn load_authz_policies(&self) -> MeshResult<Vec<AuthorizationPolicy>> {
         self.load_all("authz_policies").await
@@ -300,7 +333,8 @@ impl MeshStorage for DbMeshStorage {
     }
 
     async fn save_telemetry(&self, t: &Telemetry) -> MeshResult<()> {
-        self.upsert("telemetries", &format!("{}/{}", t.namespace, t.name), t).await
+        self.upsert("telemetries", &format!("{}/{}", t.namespace, t.name), t)
+            .await
     }
     async fn load_telemetries(&self) -> MeshResult<Vec<Telemetry>> {
         self.load_all("telemetries").await
@@ -311,10 +345,7 @@ impl MeshStorage for DbMeshStorage {
 // Boot loader
 // ─────────────────────────────────────────────────────────────
 
-pub async fn load_persisted_state<S: MeshStorage>(
-    storage: &S,
-    state: &MeshState,
-) {
+pub async fn load_persisted_state<S: MeshStorage>(storage: &S, state: &MeshState) {
     macro_rules! load_or_warn {
         ($fut:expr, $label:expr) => {
             match $fut.await {
@@ -336,7 +367,10 @@ pub async fn load_persisted_state<S: MeshStorage>(
     for pa in load_or_warn!(storage.load_peer_authentications(), "PeerAuthentications") {
         state.mtls.upsert_policy(pa);
     }
-    for ra in load_or_warn!(storage.load_request_authentications(), "RequestAuthentications") {
+    for ra in load_or_warn!(
+        storage.load_request_authentications(),
+        "RequestAuthentications"
+    ) {
         state.auth.upsert_request_auth(ra);
     }
     for ap in load_or_warn!(storage.load_authz_policies(), "AuthzPolicies") {

@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Runtime, Universal
+**Scope:** Hyperscaler, Sovereign, Runtime, Universal
 
 **Category:** Platform Governance
 
@@ -57,7 +57,7 @@ tuples:
     gatekeeper: "3.17.x - 3.18.x"
     eso: "0.12.x - 0.14.x"
     supported: true
-    profiles: ["dev-hetzner", "staging-hetzner", "prod-hetzner"]
+    profiles: ["dev-sovereign", "staging-sovereign", "prod-sovereign"]
     caveats:
       - "ArgoCD 3.4+ requires Crossplane 2.1+ for SSA drift detection fix"
       - "Cilium 1.17 requires kernel 6.x+ (Talos 1.12 provides 6.18; kernel 7.0 pending — ADR-014)"

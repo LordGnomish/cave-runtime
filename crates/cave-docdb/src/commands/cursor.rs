@@ -25,18 +25,15 @@ pub async fn get_more(cmd_doc: &Document, cursors: Arc<CursorStore>) -> Result<D
     let (batch, has_more, ns) = batch;
 
     let mut cursor = serde_json::Map::new();
-    cursor.insert("id".to_string(), Value::Number(if has_more { cursor_id } else { 0 }.into()));
+    cursor.insert(
+        "id".to_string(),
+        Value::Number(if has_more { cursor_id } else { 0 }.into()),
+    );
     cursor.insert("ns".to_string(), Value::String(ns));
 
     let next_batch: Vec<Value> = batch
         .iter()
-        .map(|doc| {
-            Value::Object(
-                doc.iter()
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect(),
-            )
-        })
+        .map(|doc| Value::Object(doc.iter().map(|(k, v)| (k.clone(), v.clone())).collect()))
         .collect();
     cursor.insert("nextBatch".to_string(), Value::Array(next_batch));
 
@@ -46,7 +43,10 @@ pub async fn get_more(cmd_doc: &Document, cursors: Arc<CursorStore>) -> Result<D
     Ok(resp)
 }
 
-pub async fn kill_cursors(cmd_doc: &Document, cursors: Arc<CursorStore>) -> Result<Document, String> {
+pub async fn kill_cursors(
+    cmd_doc: &Document,
+    cursors: Arc<CursorStore>,
+) -> Result<Document, String> {
     let cursor_ids = cmd_doc
         .get("killCursors")
         .and_then(|v| v.as_array())
@@ -59,9 +59,15 @@ pub async fn kill_cursors(cmd_doc: &Document, cursors: Arc<CursorStore>) -> Resu
     }
 
     let mut resp = Document::new();
-    resp.insert("cursorsKilled".to_string(), Value::Array(
-        cursor_ids.iter().filter_map(|v| v.as_i64().map(|id| Value::Number(id.into()))).collect()
-    ));
+    resp.insert(
+        "cursorsKilled".to_string(),
+        Value::Array(
+            cursor_ids
+                .iter()
+                .filter_map(|v| v.as_i64().map(|id| Value::Number(id.into())))
+                .collect(),
+        ),
+    );
     resp.insert("cursorsNotFound".to_string(), Value::Array(vec![]));
     resp.insert("ok".to_string(), Value::Number(1.into()));
     Ok(resp)

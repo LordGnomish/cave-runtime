@@ -12,7 +12,7 @@ use crate::admin::keda::scalers;
 use crate::admin::keda::types::{KedaScaledJob, KedaTrigger};
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState};
+use crate::admin::state::{AdminState, scope};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum Error {
@@ -26,10 +26,14 @@ pub enum Error {
 
 pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<KedaScaledJob>, Error> {
     ctx.authorise(Permission::KedaScaledJobRead)?;
-    Ok(scope(&state.keda_scaled_jobs.read().unwrap(), &ctx.tenant, |r| &r.tenant)
+    Ok(
+        scope(&state.keda_scaled_jobs.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
         .into_iter()
         .cloned()
-        .collect())
+        .collect(),
+    )
 }
 
 pub fn get(
@@ -56,7 +60,10 @@ fn validate(j: &KedaScaledJob) -> Result<(), Error> {
     if j.name.is_empty() || j.namespace.is_empty() {
         return Err(Error::Invalid("namespace + name required".into()));
     }
-    if !matches!(j.scaling_strategy.as_str(), "default" | "custom" | "accurate") {
+    if !matches!(
+        j.scaling_strategy.as_str(),
+        "default" | "custom" | "accurate"
+    ) {
         return Err(Error::Invalid(format!(
             "scalingStrategy `{}` not in {{default, custom, accurate}}",
             j.scaling_strategy
@@ -125,7 +132,10 @@ pub fn render_list(state: &AdminState, ctx: &RequestCtx) -> Result<String, Error
                 format!("{}", j.max_replica_count),
                 format!("{}", j.running_jobs_label()),
                 format!("{}", j.pending_jobs_label()),
-                format!("{}/{}", j.status.succeeded_jobs_24h, j.status.failed_jobs_24h),
+                format!(
+                    "{}/{}",
+                    j.status.succeeded_jobs_24h, j.status.failed_jobs_24h
+                ),
                 j.triggers
                     .iter()
                     .map(|t| t.kind.clone())
@@ -339,7 +349,10 @@ mod tests {
     #[test]
     fn create_then_delete_roundtrips() {
         let state = AdminState::empty();
-        let c = ctx(&[Permission::KedaScaledJobRead, Permission::KedaScaledJobWrite]);
+        let c = ctx(&[
+            Permission::KedaScaledJobRead,
+            Permission::KedaScaledJobWrite,
+        ]);
         create(&state, &c, job("hello", "accurate")).unwrap();
         assert_eq!(list(&state, &c).unwrap().len(), 1);
         delete(&state, &c, "ns", "hello").unwrap();
@@ -349,6 +362,9 @@ mod tests {
     #[test]
     fn list_without_permission_refused() {
         let state = AdminState::seeded();
-        assert!(matches!(list(&state, &ctx(&[])).unwrap_err(), Error::Auth(_)));
+        assert!(matches!(
+            list(&state, &ctx(&[])).unwrap_err(),
+            Error::Auth(_)
+        ));
     }
 }

@@ -3,11 +3,11 @@
 use crate::models::*;
 use crate::{TrackerState, TrackerStore};
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, post, put},
-    Json, Router,
 };
 use chrono::{DateTime, Utc};
 use std::{collections::HashMap, sync::Arc};
@@ -204,7 +204,8 @@ pub struct CreateFieldRequest {
 // ===== Helper =====
 
 fn next_issue_key(project_key: &str, issues: &HashMap<Uuid, Issue>) -> String {
-    let max_num = issues.values()
+    let max_num = issues
+        .values()
         .filter(|i| i.project_key == project_key)
         .filter_map(|i| i.key.split('-').nth(1).and_then(|n| n.parse::<u64>().ok()))
         .max()
@@ -223,35 +224,74 @@ pub fn create_router(state: Arc<TrackerState>) -> Router {
         // Health
         .route("/api/tracker/health", get(health))
         // Projects
-        .route("/api/tracker/projects", post(create_project).get(list_projects))
-        .route("/api/tracker/projects/{id}", get(get_project).put(update_project).delete(delete_project))
+        .route(
+            "/api/tracker/projects",
+            post(create_project).get(list_projects),
+        )
+        .route(
+            "/api/tracker/projects/{id}",
+            get(get_project).put(update_project).delete(delete_project),
+        )
         .route("/api/tracker/projects/{id}/board", get(get_project_board))
-        .route("/api/tracker/projects/{id}/backlog", get(get_project_backlog))
+        .route(
+            "/api/tracker/projects/{id}/backlog",
+            get(get_project_backlog),
+        )
         .route("/api/tracker/projects/{id}/stats", get(get_project_stats))
         // Issues
         .route("/api/tracker/issues", post(create_issue).get(list_issues))
         .route("/api/tracker/issues/bulk-update", post(bulk_update_issues))
-        .route("/api/tracker/issues/bulk-transition", post(bulk_transition_issues))
-        .route("/api/tracker/issues/{id}", get(get_issue).put(update_issue).delete(delete_issue))
-        .route("/api/tracker/issues/{id}/transition", post(transition_issue))
-        .route("/api/tracker/issues/{id}/transitions", get(list_transitions))
+        .route(
+            "/api/tracker/issues/bulk-transition",
+            post(bulk_transition_issues),
+        )
+        .route(
+            "/api/tracker/issues/{id}",
+            get(get_issue).put(update_issue).delete(delete_issue),
+        )
+        .route(
+            "/api/tracker/issues/{id}/transition",
+            post(transition_issue),
+        )
+        .route(
+            "/api/tracker/issues/{id}/transitions",
+            get(list_transitions),
+        )
         .route("/api/tracker/issues/{id}/assign", post(assign_issue))
         .route("/api/tracker/issues/{id}/watch", post(watch_issue))
         .route("/api/tracker/issues/{id}/vote", post(vote_issue))
         .route("/api/tracker/issues/{id}/rank", post(rank_issue))
         // Comments
-        .route("/api/tracker/issues/{id}/comments", post(add_comment).get(list_comments))
-        .route("/api/tracker/comments/{id}", put(update_comment).delete(delete_comment))
+        .route(
+            "/api/tracker/issues/{id}/comments",
+            post(add_comment).get(list_comments),
+        )
+        .route(
+            "/api/tracker/comments/{id}",
+            put(update_comment).delete(delete_comment),
+        )
         // Attachments
-        .route("/api/tracker/issues/{id}/attachments", post(add_attachment).get(list_attachments))
+        .route(
+            "/api/tracker/issues/{id}/attachments",
+            post(add_attachment).get(list_attachments),
+        )
         .route("/api/tracker/attachments/{id}", delete(delete_attachment))
         // Issue Links
-        .route("/api/tracker/issues/{id}/links", post(create_link).get(list_links))
+        .route(
+            "/api/tracker/issues/{id}/links",
+            post(create_link).get(list_links),
+        )
         .route("/api/tracker/links/{id}", delete(delete_link))
         // Time Tracking
-        .route("/api/tracker/issues/{id}/timelog", post(log_time).get(get_timelogs))
+        .route(
+            "/api/tracker/issues/{id}/timelog",
+            post(log_time).get(get_timelogs),
+        )
         // Sprints
-        .route("/api/tracker/sprints", post(create_sprint).get(list_sprints))
+        .route(
+            "/api/tracker/sprints",
+            post(create_sprint).get(list_sprints),
+        )
         .route("/api/tracker/sprints/{id}", get(get_sprint))
         .route("/api/tracker/sprints/{id}/start", post(start_sprint))
         .route("/api/tracker/sprints/{id}/complete", post(complete_sprint))
@@ -262,8 +302,14 @@ pub fn create_router(state: Arc<TrackerState>) -> Router {
         .route("/api/tracker/boards/{id}", get(get_board))
         .route("/api/tracker/boards/{id}/view", get(get_board_view))
         // Custom Fields
-        .route("/api/tracker/fields", post(create_field_def).get(list_fields))
-        .route("/api/tracker/fields/{id}", get(get_field).delete(delete_field))
+        .route(
+            "/api/tracker/fields",
+            post(create_field_def).get(list_fields),
+        )
+        .route(
+            "/api/tracker/fields/{id}",
+            get(get_field).delete(delete_field),
+        )
         // Workflows
         .route("/api/tracker/workflows", get(list_workflows))
         .route("/api/tracker/workflows/{id}", get(get_workflow))
@@ -272,7 +318,10 @@ pub fn create_router(state: Arc<TrackerState>) -> Router {
         // Activity & Notifications
         .route("/api/tracker/activity", get(get_activity))
         .route("/api/tracker/notifications", get(get_notifications))
-        .route("/api/tracker/notifications/{id}/read", post(mark_notification_read))
+        .route(
+            "/api/tracker/notifications/{id}/read",
+            post(mark_notification_read),
+        )
         .with_state(state)
 }
 
@@ -292,7 +341,9 @@ async fn create_project(
 
     // Find workflow
     let workflow_id = req.workflow_id.unwrap_or_else(|| {
-        store.workflows.values()
+        store
+            .workflows
+            .values()
             .find(|w| w.is_default)
             .map(|w| w.id)
             .unwrap_or(Uuid::new_v4())
@@ -309,7 +360,13 @@ async fn create_project(
         workflow_id,
         lead: req.lead,
         members: vec![],
-        issue_types: vec![IssueType::Epic, IssueType::Story, IssueType::Task, IssueType::Bug, IssueType::Subtask],
+        issue_types: vec![
+            IssueType::Epic,
+            IssueType::Story,
+            IssueType::Task,
+            IssueType::Bug,
+            IssueType::Subtask,
+        ],
         custom_field_ids: vec![],
         created_at: now,
         updated_at: now,
@@ -340,7 +397,10 @@ async fn get_project(
     let store = state.store.read().await;
     match store.projects.get(&id) {
         Some(p) => (StatusCode::OK, Json(serde_json::to_value(p).unwrap())),
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Project not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Project not found" })),
+        ),
     }
 }
 
@@ -352,13 +412,25 @@ async fn update_project(
     let mut store = state.store.write().await;
     match store.projects.get_mut(&id) {
         Some(p) => {
-            if let Some(name) = req.name { p.name = name; }
-            if let Some(desc) = req.description { p.description = desc; }
-            if let Some(lead) = req.lead { p.lead = lead; }
+            if let Some(name) = req.name {
+                p.name = name;
+            }
+            if let Some(desc) = req.description {
+                p.description = desc;
+            }
+            if let Some(lead) = req.lead {
+                p.lead = lead;
+            }
             p.updated_at = Utc::now();
-            (StatusCode::OK, Json(serde_json::to_value(p.clone()).unwrap()))
+            (
+                StatusCode::OK,
+                Json(serde_json::to_value(p.clone()).unwrap()),
+            )
         }
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Project not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Project not found" })),
+        ),
     }
 }
 
@@ -381,16 +453,25 @@ async fn get_project_board(
     let board = store.boards.values().find(|b| b.project_id == id);
     match board {
         Some(board) => {
-            let issue_refs: Vec<&Issue> = store.issues.values()
+            let issue_refs: Vec<&Issue> = store
+                .issues
+                .values()
                 .filter(|i| i.project_id == id)
                 .collect();
             let view = crate::board::board_view(board, &issue_refs);
-            let columns: Vec<serde_json::Value> = view.into_iter().map(|(col, issues)| {
-                serde_json::json!({ "column": col, "issues": issues })
-            }).collect();
-            (StatusCode::OK, Json(serde_json::json!({ "board": board, "columns": columns })))
+            let columns: Vec<serde_json::Value> = view
+                .into_iter()
+                .map(|(col, issues)| serde_json::json!({ "column": col, "issues": issues }))
+                .collect();
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({ "board": board, "columns": columns })),
+            )
         }
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Board not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Board not found" })),
+        ),
     }
 }
 
@@ -400,7 +481,9 @@ async fn get_project_backlog(
 ) -> impl IntoResponse {
     let store = state.store.read().await;
     let backlog: Vec<Issue> = crate::sprint::backlog_issues(store.issues.values(), id)
-        .into_iter().cloned().collect();
+        .into_iter()
+        .cloned()
+        .collect();
     Json(backlog)
 }
 
@@ -409,7 +492,11 @@ async fn get_project_stats(
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
     let store = state.store.read().await;
-    let issues: Vec<&Issue> = store.issues.values().filter(|i| i.project_id == id).collect();
+    let issues: Vec<&Issue> = store
+        .issues
+        .values()
+        .filter(|i| i.project_id == id)
+        .collect();
     let total = issues.len();
 
     let mut by_status: HashMap<&str, usize> = HashMap::new();
@@ -437,11 +524,18 @@ async fn create_issue(
 
     let project = match store.projects.get(&req.project_id) {
         Some(p) => p.clone(),
-        None => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Project not found" }))),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": "Project not found" })),
+            );
+        }
     };
 
     // Get default status from workflow
-    let default_status = store.workflows.get(&project.workflow_id)
+    let default_status = store
+        .workflows
+        .get(&project.workflow_id)
         .and_then(|wf| wf.statuses.first())
         .map(|s| s.name.clone())
         .unwrap_or_else(|| "To Do".to_string());
@@ -496,7 +590,10 @@ async fn create_issue(
     store.issues.insert(issue_id, issue.clone());
     record_activity(&mut store, event);
 
-    (StatusCode::CREATED, Json(serde_json::to_value(issue).unwrap()))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(issue).unwrap()),
+    )
 }
 
 async fn list_issues(
@@ -550,7 +647,10 @@ async fn get_issue(
     let store = state.store.read().await;
     match store.issues.get(&id) {
         Some(i) => (StatusCode::OK, Json(serde_json::to_value(i).unwrap())),
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Issue not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Issue not found" })),
+        ),
     }
 }
 
@@ -564,15 +664,33 @@ async fn update_issue(
 
     match store.issues.get_mut(&id) {
         Some(issue) => {
-            if let Some(summary) = req.summary { issue.summary = summary; }
-            if let Some(description) = req.description { issue.description = Some(description); }
-            if let Some(priority) = req.priority { issue.priority = priority; }
-            if let Some(assignee) = req.assignee.clone() { issue.assignee = Some(assignee); }
-            if let Some(labels) = req.labels { issue.labels = labels; }
-            if let Some(sp) = req.story_points { issue.story_points = Some(sp); }
-            if let Some(sid) = req.sprint_id { issue.sprint_id = Some(sid); }
-            if let Some(cf) = req.custom_fields { issue.custom_fields.extend(cf); }
-            if let Some(dd) = req.due_date { issue.due_date = Some(dd); }
+            if let Some(summary) = req.summary {
+                issue.summary = summary;
+            }
+            if let Some(description) = req.description {
+                issue.description = Some(description);
+            }
+            if let Some(priority) = req.priority {
+                issue.priority = priority;
+            }
+            if let Some(assignee) = req.assignee.clone() {
+                issue.assignee = Some(assignee);
+            }
+            if let Some(labels) = req.labels {
+                issue.labels = labels;
+            }
+            if let Some(sp) = req.story_points {
+                issue.story_points = Some(sp);
+            }
+            if let Some(sid) = req.sprint_id {
+                issue.sprint_id = Some(sid);
+            }
+            if let Some(cf) = req.custom_fields {
+                issue.custom_fields.extend(cf);
+            }
+            if let Some(dd) = req.due_date {
+                issue.due_date = Some(dd);
+            }
             issue.updated_at = Utc::now();
 
             let issue_id = issue.id;
@@ -595,7 +713,10 @@ async fn update_issue(
 
             (StatusCode::OK, Json(issue_val))
         }
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Issue not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Issue not found" })),
+        ),
     }
 }
 
@@ -623,23 +744,45 @@ async fn transition_issue(
             let wf_id = project.map(|p| p.workflow_id).unwrap_or(Uuid::nil());
             (issue.project_id, wf_id, issue.status.clone())
         }
-        None => return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Issue not found" }))),
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Issue not found" })),
+            );
+        }
     };
 
     let workflow = match store.workflows.get(&workflow_id) {
         Some(wf) => wf.clone(),
-        None => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Workflow not found" }))),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": "Workflow not found" })),
+            );
+        }
     };
 
     if !crate::workflow::can_transition(&workflow, &current_status, &req.transition_id) {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({
-            "error": format!("Cannot transition from '{}' with transition '{}'", current_status, req.transition_id)
-        })));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": format!("Cannot transition from '{}' with transition '{}'", current_status, req.transition_id)
+            })),
+        );
     }
 
-    let transition = match workflow.transitions.iter().find(|t| t.id == req.transition_id) {
+    let transition = match workflow
+        .transitions
+        .iter()
+        .find(|t| t.id == req.transition_id)
+    {
         Some(t) => t.clone(),
-        None => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Transition not found" }))),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": "Transition not found" })),
+            );
+        }
     };
 
     let new_status = transition.to_status.clone();
@@ -675,18 +818,36 @@ async fn list_transitions(
     let store = state.store.read().await;
     let issue = match store.issues.get(&id) {
         Some(i) => i,
-        None => return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Issue not found" }))),
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Issue not found" })),
+            );
+        }
     };
     let project = match store.projects.get(&issue.project_id) {
         Some(p) => p,
-        None => return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Project not found" }))),
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Project not found" })),
+            );
+        }
     };
     let workflow = match store.workflows.get(&project.workflow_id) {
         Some(wf) => wf,
-        None => return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Workflow not found" }))),
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Workflow not found" })),
+            );
+        }
     };
     let transitions = crate::workflow::available_transitions(workflow, &issue.status);
-    (StatusCode::OK, Json(serde_json::to_value(transitions).unwrap()))
+    (
+        StatusCode::OK,
+        Json(serde_json::to_value(transitions).unwrap()),
+    )
 }
 
 async fn assign_issue(
@@ -715,7 +876,10 @@ async fn assign_issue(
             record_activity(&mut store, event);
             (StatusCode::OK, Json(issue_val))
         }
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Issue not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Issue not found" })),
+        ),
     }
 }
 
@@ -731,9 +895,15 @@ async fn watch_issue(
                 issue.watchers.push(req.user.clone());
             }
             issue.updated_at = Utc::now();
-            (StatusCode::OK, Json(serde_json::to_value(issue.clone()).unwrap()))
+            (
+                StatusCode::OK,
+                Json(serde_json::to_value(issue.clone()).unwrap()),
+            )
         }
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Issue not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Issue not found" })),
+        ),
     }
 }
 
@@ -746,9 +916,15 @@ async fn vote_issue(
         Some(issue) => {
             issue.votes += 1;
             issue.updated_at = Utc::now();
-            (StatusCode::OK, Json(serde_json::json!({ "votes": issue.votes })))
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({ "votes": issue.votes })),
+            )
         }
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Issue not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Issue not found" })),
+        ),
     }
 }
 
@@ -762,9 +938,15 @@ async fn rank_issue(
         Some(issue) => {
             issue.rank = req.rank;
             issue.updated_at = Utc::now();
-            (StatusCode::OK, Json(serde_json::json!({ "rank": issue.rank })))
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({ "rank": issue.rank })),
+            )
         }
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Issue not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Issue not found" })),
+        ),
     }
 }
 
@@ -777,7 +959,10 @@ async fn add_comment(
 ) -> impl IntoResponse {
     let mut store = state.store.write().await;
     if !store.issues.contains_key(&issue_id) {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Issue not found" })));
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Issue not found" })),
+        );
     }
     let now = Utc::now();
     let comment = Comment {
@@ -800,7 +985,10 @@ async fn add_comment(
     };
     store.comments.insert(comment.id, comment.clone());
     record_activity(&mut store, event);
-    (StatusCode::CREATED, Json(serde_json::to_value(comment).unwrap()))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(comment).unwrap()),
+    )
 }
 
 async fn list_comments(
@@ -808,7 +996,9 @@ async fn list_comments(
     Path(issue_id): Path<Uuid>,
 ) -> impl IntoResponse {
     let store = state.store.read().await;
-    let comments: Vec<Comment> = store.comments.values()
+    let comments: Vec<Comment> = store
+        .comments
+        .values()
         .filter(|c| c.issue_id == issue_id)
         .cloned()
         .collect();
@@ -825,9 +1015,15 @@ async fn update_comment(
         Some(c) => {
             c.body = req.body;
             c.updated_at = Utc::now();
-            (StatusCode::OK, Json(serde_json::to_value(c.clone()).unwrap()))
+            (
+                StatusCode::OK,
+                Json(serde_json::to_value(c.clone()).unwrap()),
+            )
         }
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Comment not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Comment not found" })),
+        ),
     }
 }
 
@@ -851,7 +1047,10 @@ async fn add_attachment(
 ) -> impl IntoResponse {
     let mut store = state.store.write().await;
     if !store.issues.contains_key(&issue_id) {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Issue not found" })));
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Issue not found" })),
+        );
     }
     let now = Utc::now();
     let attachment = Attachment {
@@ -875,7 +1074,10 @@ async fn add_attachment(
     };
     store.attachments.insert(attachment.id, attachment.clone());
     record_activity(&mut store, event);
-    (StatusCode::CREATED, Json(serde_json::to_value(attachment).unwrap()))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(attachment).unwrap()),
+    )
 }
 
 async fn list_attachments(
@@ -883,7 +1085,9 @@ async fn list_attachments(
     Path(issue_id): Path<Uuid>,
 ) -> impl IntoResponse {
     let store = state.store.read().await;
-    let attachments: Vec<Attachment> = store.attachments.values()
+    let attachments: Vec<Attachment> = store
+        .attachments
+        .values()
         .filter(|a| a.issue_id == issue_id)
         .cloned()
         .collect();
@@ -910,10 +1114,16 @@ async fn create_link(
 ) -> impl IntoResponse {
     let mut store = state.store.write().await;
     if !store.issues.contains_key(&issue_id) {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Issue not found" })));
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Issue not found" })),
+        );
     }
     if !store.issues.contains_key(&req.to_issue_id) {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Target issue not found" })));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Target issue not found" })),
+        );
     }
     let now = Utc::now();
     let link = IssueLink {
@@ -934,7 +1144,10 @@ async fn create_link(
     };
     store.issue_links.insert(link.id, link.clone());
     record_activity(&mut store, event);
-    (StatusCode::CREATED, Json(serde_json::to_value(link).unwrap()))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(link).unwrap()),
+    )
 }
 
 async fn list_links(
@@ -942,7 +1155,9 @@ async fn list_links(
     Path(issue_id): Path<Uuid>,
 ) -> impl IntoResponse {
     let store = state.store.read().await;
-    let links: Vec<IssueLink> = store.issue_links.values()
+    let links: Vec<IssueLink> = store
+        .issue_links
+        .values()
         .filter(|l| l.from_issue_id == issue_id || l.to_issue_id == issue_id)
         .cloned()
         .collect();
@@ -969,7 +1184,10 @@ async fn log_time(
 ) -> impl IntoResponse {
     let mut store = state.store.write().await;
     if !store.issues.contains_key(&issue_id) {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Issue not found" })));
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Issue not found" })),
+        );
     }
     let now = Utc::now();
     let log = TimeLog {
@@ -986,7 +1204,10 @@ async fn log_time(
         issue.updated_at = now;
     }
     store.time_logs.insert(log.id, log.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(log).unwrap()))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(log).unwrap()),
+    )
 }
 
 async fn get_timelogs(
@@ -994,7 +1215,9 @@ async fn get_timelogs(
     Path(issue_id): Path<Uuid>,
 ) -> impl IntoResponse {
     let store = state.store.read().await;
-    let logs: Vec<TimeLog> = store.time_logs.values()
+    let logs: Vec<TimeLog> = store
+        .time_logs
+        .values()
         .filter(|l| l.issue_id == issue_id)
         .cloned()
         .collect();
@@ -1022,7 +1245,10 @@ async fn create_sprint(
         created_at: Utc::now(),
     };
     store.sprints.insert(sprint.id, sprint.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(sprint).unwrap()))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(sprint).unwrap()),
+    )
 }
 
 async fn list_sprints(
@@ -1030,9 +1256,15 @@ async fn list_sprints(
     Query(query): Query<SprintQuery>,
 ) -> impl IntoResponse {
     let store = state.store.read().await;
-    let sprints: Vec<Sprint> = store.sprints.values()
+    let sprints: Vec<Sprint> = store
+        .sprints
+        .values()
         .filter(|s| {
-            if let Some(pid) = query.project_id { if s.project_id != pid { return false; } }
+            if let Some(pid) = query.project_id {
+                if s.project_id != pid {
+                    return false;
+                }
+            }
             if let Some(ref st) = query.state {
                 let matches = match st.as_str() {
                     "future" => s.state == SprintState::Future,
@@ -1040,7 +1272,9 @@ async fn list_sprints(
                     "closed" => s.state == SprintState::Closed,
                     _ => true,
                 };
-                if !matches { return false; }
+                if !matches {
+                    return false;
+                }
             }
             true
         })
@@ -1056,7 +1290,10 @@ async fn get_sprint(
     let store = state.store.read().await;
     match store.sprints.get(&id) {
         Some(s) => (StatusCode::OK, Json(serde_json::to_value(s).unwrap())),
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Sprint not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Sprint not found" })),
+        ),
     }
 }
 
@@ -1067,26 +1304,30 @@ async fn start_sprint(
     let mut store = state.store.write().await;
     let project_id = store.sprints.get(&id).map(|s| s.project_id);
     match store.sprints.get_mut(&id) {
-        Some(sprint) => {
-            match crate::sprint::start_sprint(sprint) {
-                Ok(()) => {
-                    let sprint_val = serde_json::to_value(sprint.clone()).unwrap();
-                    let event = ActivityEvent {
-                        id: Uuid::new_v4(),
-                        issue_id: None,
-                        project_id,
-                        actor: "system".to_string(),
-                        event_type: ActivityEventType::SprintStarted,
-                        details: serde_json::json!({ "sprint_id": id }),
-                        occurred_at: Utc::now(),
-                    };
-                    record_activity(&mut store, event);
-                    (StatusCode::OK, Json(sprint_val))
-                }
-                Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": e }))),
+        Some(sprint) => match crate::sprint::start_sprint(sprint) {
+            Ok(()) => {
+                let sprint_val = serde_json::to_value(sprint.clone()).unwrap();
+                let event = ActivityEvent {
+                    id: Uuid::new_v4(),
+                    issue_id: None,
+                    project_id,
+                    actor: "system".to_string(),
+                    event_type: ActivityEventType::SprintStarted,
+                    details: serde_json::json!({ "sprint_id": id }),
+                    occurred_at: Utc::now(),
+                };
+                record_activity(&mut store, event);
+                (StatusCode::OK, Json(sprint_val))
             }
-        }
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Sprint not found" }))),
+            Err(e) => (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": e })),
+            ),
+        },
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Sprint not found" })),
+        ),
     }
 }
 
@@ -1095,7 +1336,9 @@ async fn complete_sprint(
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
     let mut store = state.store.write().await;
-    let sprint_issues: Vec<Issue> = store.issues.values()
+    let sprint_issues: Vec<Issue> = store
+        .issues
+        .values()
         .filter(|i| i.sprint_id == Some(id))
         .cloned()
         .collect();
@@ -1103,26 +1346,30 @@ async fn complete_sprint(
     let project_id = store.sprints.get(&id).map(|s| s.project_id);
 
     match store.sprints.get_mut(&id) {
-        Some(sprint) => {
-            match crate::sprint::complete_sprint(sprint, &issue_refs) {
-                Ok(()) => {
-                    let sprint_val = serde_json::to_value(sprint.clone()).unwrap();
-                    let event = ActivityEvent {
-                        id: Uuid::new_v4(),
-                        issue_id: None,
-                        project_id,
-                        actor: "system".to_string(),
-                        event_type: ActivityEventType::SprintCompleted,
-                        details: serde_json::json!({ "sprint_id": id }),
-                        occurred_at: Utc::now(),
-                    };
-                    record_activity(&mut store, event);
-                    (StatusCode::OK, Json(sprint_val))
-                }
-                Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": e }))),
+        Some(sprint) => match crate::sprint::complete_sprint(sprint, &issue_refs) {
+            Ok(()) => {
+                let sprint_val = serde_json::to_value(sprint.clone()).unwrap();
+                let event = ActivityEvent {
+                    id: Uuid::new_v4(),
+                    issue_id: None,
+                    project_id,
+                    actor: "system".to_string(),
+                    event_type: ActivityEventType::SprintCompleted,
+                    details: serde_json::json!({ "sprint_id": id }),
+                    occurred_at: Utc::now(),
+                };
+                record_activity(&mut store, event);
+                (StatusCode::OK, Json(sprint_val))
             }
-        }
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Sprint not found" }))),
+            Err(e) => (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": e })),
+            ),
+        },
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Sprint not found" })),
+        ),
     }
 }
 
@@ -1131,7 +1378,9 @@ async fn get_sprint_issues(
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
     let store = state.store.read().await;
-    let issues: Vec<Issue> = store.issues.values()
+    let issues: Vec<Issue> = store
+        .issues
+        .values()
         .filter(|i| i.sprint_id == Some(id))
         .cloned()
         .collect();
@@ -1145,9 +1394,16 @@ async fn get_sprint_stats(
     let store = state.store.read().await;
     let sprint = match store.sprints.get(&id) {
         Some(s) => s,
-        None => return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Sprint not found" }))),
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Sprint not found" })),
+            );
+        }
     };
-    let issues: Vec<&Issue> = store.issues.values()
+    let issues: Vec<&Issue> = store
+        .issues
+        .values()
         .filter(|i| i.sprint_id == Some(id))
         .collect();
     let stats = crate::sprint::sprint_stats(sprint, &issues);
@@ -1167,16 +1423,31 @@ async fn create_board(
         name: req.name,
         board_type: req.board_type,
         columns: vec![
-            BoardColumn { name: "To Do".to_string(), statuses: vec!["To Do".to_string()], wip_limit: None },
-            BoardColumn { name: "In Progress".to_string(), statuses: vec!["In Progress".to_string()], wip_limit: None },
-            BoardColumn { name: "Done".to_string(), statuses: vec!["Done".to_string()], wip_limit: None },
+            BoardColumn {
+                name: "To Do".to_string(),
+                statuses: vec!["To Do".to_string()],
+                wip_limit: None,
+            },
+            BoardColumn {
+                name: "In Progress".to_string(),
+                statuses: vec!["In Progress".to_string()],
+                wip_limit: None,
+            },
+            BoardColumn {
+                name: "Done".to_string(),
+                statuses: vec!["Done".to_string()],
+                wip_limit: None,
+            },
         ],
         backlog_enabled: true,
         current_sprint_id: None,
         created_at: Utc::now(),
     };
     store.boards.insert(board.id, board.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(board).unwrap()))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(board).unwrap()),
+    )
 }
 
 async fn get_board(
@@ -1186,7 +1457,10 @@ async fn get_board(
     let store = state.store.read().await;
     match store.boards.get(&id) {
         Some(b) => (StatusCode::OK, Json(serde_json::to_value(b).unwrap())),
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Board not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Board not found" })),
+        ),
     }
 }
 
@@ -1197,21 +1471,32 @@ async fn get_board_view(
     let store = state.store.read().await;
     let board = match store.boards.get(&id) {
         Some(b) => b,
-        None => return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Board not found" }))),
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Board not found" })),
+            );
+        }
     };
-    let issue_refs: Vec<&Issue> = store.issues.values()
+    let issue_refs: Vec<&Issue> = store
+        .issues
+        .values()
         .filter(|i| i.project_id == board.project_id)
         .collect();
     let view = crate::board::board_view(board, &issue_refs);
     let wip_violations = crate::board::check_wip_violations(board, &issue_refs);
-    let columns: Vec<serde_json::Value> = view.into_iter().map(|(col, issues)| {
-        serde_json::json!({ "column": col, "issues": issues })
-    }).collect();
-    (StatusCode::OK, Json(serde_json::json!({
-        "board": board,
-        "columns": columns,
-        "wip_violations": wip_violations,
-    })))
+    let columns: Vec<serde_json::Value> = view
+        .into_iter()
+        .map(|(col, issues)| serde_json::json!({ "column": col, "issues": issues }))
+        .collect();
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "board": board,
+            "columns": columns,
+            "wip_violations": wip_violations,
+        })),
+    )
 }
 
 // ===== Custom Fields =====
@@ -1228,9 +1513,14 @@ async fn create_field_def(
         req.required.unwrap_or(false),
     );
     let mut field = field;
-    if let Some(opts) = req.options { field.options = opts; }
+    if let Some(opts) = req.options {
+        field.options = opts;
+    }
     store.custom_field_defs.insert(field.id, field.clone());
-    (StatusCode::CREATED, Json(serde_json::to_value(field).unwrap()))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::to_value(field).unwrap()),
+    )
 }
 
 async fn list_fields(State(state): State<Arc<TrackerState>>) -> impl IntoResponse {
@@ -1246,7 +1536,10 @@ async fn get_field(
     let store = state.store.read().await;
     match store.custom_field_defs.get(&id) {
         Some(f) => (StatusCode::OK, Json(serde_json::to_value(f).unwrap())),
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Field not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Field not found" })),
+        ),
     }
 }
 
@@ -1276,7 +1569,10 @@ async fn get_workflow(
     let store = state.store.read().await;
     match store.workflows.get(&id) {
         Some(w) => (StatusCode::OK, Json(serde_json::to_value(w).unwrap())),
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Workflow not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Workflow not found" })),
+        ),
     }
 }
 
@@ -1307,10 +1603,18 @@ async fn bulk_update_issues(
     let mut updated = 0usize;
     for id in &req.issue_ids {
         if let Some(issue) = store.issues.get_mut(id) {
-            if let Some(ref a) = req.updates.assignee { issue.assignee = Some(a.clone()); }
-            if let Some(ref p) = req.updates.priority { issue.priority = p.clone(); }
-            if let Some(sid) = req.updates.sprint_id { issue.sprint_id = Some(sid); }
-            if let Some(ref labels) = req.updates.labels { issue.labels = labels.clone(); }
+            if let Some(ref a) = req.updates.assignee {
+                issue.assignee = Some(a.clone());
+            }
+            if let Some(ref p) = req.updates.priority {
+                issue.priority = p.clone();
+            }
+            if let Some(sid) = req.updates.sprint_id {
+                issue.sprint_id = Some(sid);
+            }
+            if let Some(ref labels) = req.updates.labels {
+                issue.labels = labels.clone();
+            }
             issue.updated_at = Utc::now();
             updated += 1;
         }
@@ -1325,7 +1629,9 @@ async fn bulk_transition_issues(
     let mut store = state.store.write().await;
 
     // Collect project->workflow mapping
-    let project_workflows: HashMap<Uuid, Uuid> = store.projects.values()
+    let project_workflows: HashMap<Uuid, Uuid> = store
+        .projects
+        .values()
         .map(|p| (p.id, p.workflow_id))
         .collect();
     let workflows: HashMap<Uuid, Workflow> = store.workflows.clone();
@@ -1335,16 +1641,26 @@ async fn bulk_transition_issues(
 
     for id in &req.issue_ids {
         if let Some(issue) = store.issues.get_mut(id) {
-            let wf_id = project_workflows.get(&issue.project_id).copied().unwrap_or(Uuid::nil());
+            let wf_id = project_workflows
+                .get(&issue.project_id)
+                .copied()
+                .unwrap_or(Uuid::nil());
             if let Some(workflow) = workflows.get(&wf_id) {
                 if crate::workflow::can_transition(workflow, &issue.status, &req.transition_id) {
-                    if let Some(transition) = workflow.transitions.iter().find(|t| t.id == req.transition_id) {
+                    if let Some(transition) = workflow
+                        .transitions
+                        .iter()
+                        .find(|t| t.id == req.transition_id)
+                    {
                         let t = transition.clone();
                         crate::workflow::apply_transition(issue, &t);
                         transitioned += 1;
                     }
                 } else {
-                    errors.push(format!("Issue {} cannot transition from '{}'", issue.key, issue.status));
+                    errors.push(format!(
+                        "Issue {} cannot transition from '{}'",
+                        issue.key, issue.status
+                    ));
                 }
             }
         }
@@ -1361,13 +1677,19 @@ async fn get_activity(
 ) -> impl IntoResponse {
     let store = state.store.read().await;
     let limit = query.limit.unwrap_or(50);
-    let events: Vec<ActivityEvent> = store.activity_events.iter()
+    let events: Vec<ActivityEvent> = store
+        .activity_events
+        .iter()
         .filter(|e| {
             if let Some(pid) = query.project_id {
-                if e.project_id != Some(pid) { return false; }
+                if e.project_id != Some(pid) {
+                    return false;
+                }
             }
             if let Some(iid) = query.issue_id {
-                if e.issue_id != Some(iid) { return false; }
+                if e.issue_id != Some(iid) {
+                    return false;
+                }
             }
             true
         })
@@ -1383,13 +1705,19 @@ async fn get_notifications(
     Query(query): Query<NotificationQuery>,
 ) -> impl IntoResponse {
     let store = state.store.read().await;
-    let notifications: Vec<Notification> = store.notifications.iter()
+    let notifications: Vec<Notification> = store
+        .notifications
+        .iter()
         .filter(|n| {
             if let Some(ref r) = query.recipient {
-                if &n.recipient != r { return false; }
+                if &n.recipient != r {
+                    return false;
+                }
             }
             if let Some(unread_only) = query.unread_only {
-                if unread_only && n.read { return false; }
+                if unread_only && n.read {
+                    return false;
+                }
             }
             true
         })
@@ -1409,7 +1737,10 @@ async fn mark_notification_read(
             n.read = true;
             (StatusCode::OK, Json(serde_json::json!({ "read": true })))
         }
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Notification not found" }))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Notification not found" })),
+        ),
     }
 }
 
@@ -1431,7 +1762,12 @@ mod tests {
     async fn test_health_endpoint() {
         let app = create_router(test_state());
         let response: Response = app
-            .oneshot(Request::builder().uri("/api/tracker/health").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/api/tracker/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -1441,7 +1777,12 @@ mod tests {
     async fn test_list_projects_empty() {
         let app = create_router(test_state());
         let response: Response = app
-            .oneshot(Request::builder().uri("/api/tracker/projects").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/api/tracker/projects")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -1477,7 +1818,12 @@ mod tests {
     async fn test_list_workflows() {
         let app = create_router(test_state());
         let response: Response = app
-            .oneshot(Request::builder().uri("/api/tracker/workflows").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/api/tracker/workflows")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);

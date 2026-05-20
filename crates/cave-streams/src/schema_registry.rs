@@ -319,7 +319,12 @@ impl SchemaRegistry {
                 .filter(|s| s.version <= version)
                 .collect()
         };
-        Ok(check_schema_compatible(compat, schema_type, new_schema, &existing))
+        Ok(check_schema_compatible(
+            compat,
+            schema_type,
+            new_schema,
+            &existing,
+        ))
     }
 
     pub fn get_global_compatibility(&self) -> CompatibilityLevel {
@@ -411,7 +416,14 @@ mod tests {
     #[test]
     fn register_and_lookup_by_id() {
         let r = registry();
-        let id = r.register_schema("user-value", AVRO_SCHEMA_V1.into(), SchemaFormat::Avro, vec![]).unwrap();
+        let id = r
+            .register_schema(
+                "user-value",
+                AVRO_SCHEMA_V1.into(),
+                SchemaFormat::Avro,
+                vec![],
+            )
+            .unwrap();
         let schema = r.get_schema_by_id(id).unwrap();
         assert_eq!(schema.subject, "user-value");
         assert_eq!(schema.version, 1);
@@ -420,16 +432,22 @@ mod tests {
     #[test]
     fn duplicate_schema_returns_same_id() {
         let r = registry();
-        let id1 = r.register_schema("evt", AVRO_SCHEMA_V1.into(), SchemaFormat::Avro, vec![]).unwrap();
-        let id2 = r.register_schema("evt", AVRO_SCHEMA_V1.into(), SchemaFormat::Avro, vec![]).unwrap();
+        let id1 = r
+            .register_schema("evt", AVRO_SCHEMA_V1.into(), SchemaFormat::Avro, vec![])
+            .unwrap();
+        let id2 = r
+            .register_schema("evt", AVRO_SCHEMA_V1.into(), SchemaFormat::Avro, vec![])
+            .unwrap();
         assert_eq!(id1, id2);
     }
 
     #[test]
     fn list_subjects_and_versions() {
         let r = registry();
-        r.register_schema("s1", AVRO_SCHEMA_V1.into(), SchemaFormat::Avro, vec![]).unwrap();
-        r.register_schema("s2", AVRO_SCHEMA_V2.into(), SchemaFormat::Avro, vec![]).unwrap();
+        r.register_schema("s1", AVRO_SCHEMA_V1.into(), SchemaFormat::Avro, vec![])
+            .unwrap();
+        r.register_schema("s2", AVRO_SCHEMA_V2.into(), SchemaFormat::Avro, vec![])
+            .unwrap();
         let subjects = r.list_subjects();
         assert!(subjects.contains(&"s1".to_string()));
         assert!(subjects.contains(&"s2".to_string()));
@@ -439,14 +457,17 @@ mod tests {
     fn json_schema_registration() {
         let r = registry();
         let js = r#"{"type":"object","properties":{"name":{"type":"string"}}}"#;
-        let id = r.register_schema("cfg-value", js.into(), SchemaFormat::JsonSchema, vec![]).unwrap();
+        let id = r
+            .register_schema("cfg-value", js.into(), SchemaFormat::JsonSchema, vec![])
+            .unwrap();
         assert!(id > 0);
     }
 
     #[test]
     fn delete_subject() {
         let r = registry();
-        r.register_schema("temp", AVRO_SCHEMA_V1.into(), SchemaFormat::Avro, vec![]).unwrap();
+        r.register_schema("temp", AVRO_SCHEMA_V1.into(), SchemaFormat::Avro, vec![])
+            .unwrap();
         let versions = r.delete_subject("temp").unwrap();
         assert_eq!(versions, vec![1]);
     }
@@ -455,8 +476,11 @@ mod tests {
     fn compatibility_check() {
         let r = registry();
         r.set_global_compatibility(CompatibilityLevel::None);
-        r.register_schema("any", AVRO_SCHEMA_V1.into(), SchemaFormat::Avro, vec![]).unwrap();
-        let ok = r.check_compatibility("any", -1, AVRO_SCHEMA_V2, SchemaFormat::Avro).unwrap();
+        r.register_schema("any", AVRO_SCHEMA_V1.into(), SchemaFormat::Avro, vec![])
+            .unwrap();
+        let ok = r
+            .check_compatibility("any", -1, AVRO_SCHEMA_V2, SchemaFormat::Avro)
+            .unwrap();
         assert!(ok);
     }
 }

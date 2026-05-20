@@ -7,11 +7,11 @@
 //!   - Tokens refill at `rate` bytes/second.
 //!   - An ingest request consuming `n` bytes is rejected if < n tokens available.
 
+use chrono::Utc;
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use parking_lot::Mutex;
-use chrono::Utc;
 
 use crate::models::{TenantId, TenantLimits};
 
@@ -92,9 +92,9 @@ impl LimitsRegistry {
         }
 
         let mut buckets = self.buckets.lock();
-        let bucket = buckets
-            .entry(tenant.to_owned())
-            .or_insert_with(|| Bucket::new(limits.ingestion_rate_bytes, limits.ingestion_burst_bytes));
+        let bucket = buckets.entry(tenant.to_owned()).or_insert_with(|| {
+            Bucket::new(limits.ingestion_rate_bytes, limits.ingestion_burst_bytes)
+        });
 
         if bucket.try_consume(byte_count as f64) {
             Ok(())
@@ -173,17 +173,34 @@ impl LimitsRegistry {
 /// A limit violation error.
 #[derive(Debug, thiserror::Error)]
 pub enum LimitError {
-    #[error("ingestion rate limit exceeded for tenant {tenant}: limit is {limit_bytes_per_sec} bytes/s")]
-    RateLimited { tenant: String, limit_bytes_per_sec: u64 },
+    #[error(
+        "ingestion rate limit exceeded for tenant {tenant}: limit is {limit_bytes_per_sec} bytes/s"
+    )]
+    RateLimited {
+        tenant: String,
+        limit_bytes_per_sec: u64,
+    },
 
     #[error("log line too long for tenant {tenant}: {len} bytes > {max} bytes limit")]
-    LineTooLong { tenant: String, len: usize, max: usize },
+    LineTooLong {
+        tenant: String,
+        len: usize,
+        max: usize,
+    },
 
     #[error("query range too long for tenant {tenant}: {range_hours}h > {max_hours}h limit")]
-    QueryRangeTooLong { tenant: String, range_hours: u64, max_hours: u64 },
+    QueryRangeTooLong {
+        tenant: String,
+        range_hours: u64,
+        max_hours: u64,
+    },
 
     #[error("too many streams for tenant {tenant}: {count} >= {max} limit")]
-    TooManyStreams { tenant: String, count: u64, max: u64 },
+    TooManyStreams {
+        tenant: String,
+        count: u64,
+        max: u64,
+    },
 }
 
 impl LimitError {
@@ -236,7 +253,9 @@ mod tests {
     fn query_limit_clamped() {
         let reg = LimitsRegistry::with_defaults();
         // Requesting more than the max should be clamped.
-        let effective = reg.check_query_limits("t", 1_000_000, 0, 3_600_000_000_000).unwrap();
+        let effective = reg
+            .check_query_limits("t", 1_000_000, 0, 3_600_000_000_000)
+            .unwrap();
         assert!(effective <= TenantLimits::default().max_entries_per_query);
     }
 

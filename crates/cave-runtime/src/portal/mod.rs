@@ -44,5 +44,4 @@ pub fn workspace_root() -> std::path::PathBuf {
 /// The guard serialises only the env-var-mutating tests; the pure
 /// unit tests above don't take it.
 #[cfg(test)]
-pub(crate) static WORKSPACE_ROOT_TEST_GUARD: std::sync::Mutex<()> =
-    std::sync::Mutex::new(());
+pub(crate) static WORKSPACE_ROOT_TEST_GUARD: std::sync::Mutex<()> = std::sync::Mutex::new(());

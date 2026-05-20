@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
 use crate::engine::{ScanError, Scanner};
-use crate::models::{Finding, FindingCategory, Confidence, ScanKind, ScanRequest, ScanTarget, Severity, IacKind};
+use crate::models::{
+    Confidence, Finding, FindingCategory, IacKind, ScanKind, ScanRequest, ScanTarget, Severity,
+};
 use async_trait::async_trait;
 use regex::Regex;
 
@@ -12,14 +14,18 @@ impl IacScanner {
         let mut findings = vec![];
 
         // DOCK-001: FROM with :latest
-        if Regex::new(r"(?i)FROM\s+.+:latest").unwrap().is_match(content) {
+        if Regex::new(r"(?i)FROM\s+.+:latest")
+            .unwrap()
+            .is_match(content)
+        {
             let mut f = Finding::new(
                 "DOCK-001".to_string(),
                 "Base image uses :latest tag".to_string(),
                 FindingCategory::Misconfig,
                 Severity::Medium,
                 "Dockerfile uses :latest tag for base image".to_string(),
-                "Using :latest tag can lead to unpredictable updates and supply chain risks".to_string(),
+                "Using :latest tag can lead to unpredictable updates and supply chain risks"
+                    .to_string(),
             );
             f.remediation = Some("Pin base image to a specific version digest".to_string());
             f.confidence = Confidence::High;
@@ -44,16 +50,21 @@ impl IacScanner {
         }
 
         // DOCK-003: ADD with network URL
-        if Regex::new(r"(?i)ADD\s+https?://").unwrap().is_match(content) {
+        if Regex::new(r"(?i)ADD\s+https?://")
+            .unwrap()
+            .is_match(content)
+        {
             let mut f = Finding::new(
                 "DOCK-003".to_string(),
                 "ADD used with network URL".to_string(),
                 FindingCategory::Misconfig,
                 Severity::Medium,
                 "Dockerfile uses ADD with HTTP(S) URL".to_string(),
-                "ADD with network URLs can lead to unpredictable caching and supply chain risks".to_string(),
+                "ADD with network URLs can lead to unpredictable caching and supply chain risks"
+                    .to_string(),
             );
-            f.remediation = Some("Use RUN with curl/wget instead of ADD for remote resources".to_string());
+            f.remediation =
+                Some("Use RUN with curl/wget instead of ADD for remote resources".to_string());
             f.confidence = Confidence::High;
             f.location.file = Some("Dockerfile".to_string());
             findings.push(f);
@@ -91,7 +102,9 @@ impl IacScanner {
                 "Kubernetes pod lacks securityContext configuration".to_string(),
                 "securityContext should be defined for all pods".to_string(),
             );
-            f.remediation = Some("Add securityContext with runAsNonRoot: true and other restrictions".to_string());
+            f.remediation = Some(
+                "Add securityContext with runAsNonRoot: true and other restrictions".to_string(),
+            );
             f.confidence = Confidence::High;
             f.location.file = Some("kubernetes.yaml".to_string());
             findings.push(f);
@@ -123,7 +136,8 @@ impl IacScanner {
                 "Pod uses Always pull policy with :latest tag".to_string(),
                 "This can lead to unpredictable image updates".to_string(),
             );
-            f.remediation = Some("Use immutable image digests or specific version tags".to_string());
+            f.remediation =
+                Some("Use immutable image digests or specific version tags".to_string());
             f.confidence = Confidence::High;
             f.location.file = Some("kubernetes.yaml".to_string());
             findings.push(f);
@@ -136,7 +150,8 @@ impl IacScanner {
         let mut findings = vec![];
 
         // TF-001: S3 bucket with public read
-        if (content.contains("s3") || content.contains("aws_s3")) && content.contains("public-read") {
+        if (content.contains("s3") || content.contains("aws_s3")) && content.contains("public-read")
+        {
             let mut f = Finding::new(
                 "TF-001".to_string(),
                 "S3 bucket allows public read".to_string(),
@@ -152,7 +167,9 @@ impl IacScanner {
         }
 
         // TF-002: Unrestricted security group ingress
-        if content.contains("0.0.0.0/0") && (content.contains("ingress") || content.contains("from_port")) {
+        if content.contains("0.0.0.0/0")
+            && (content.contains("ingress") || content.contains("from_port"))
+        {
             let mut f = Finding::new(
                 "TF-002".to_string(),
                 "Unrestricted security group ingress".to_string(),
@@ -161,7 +178,8 @@ impl IacScanner {
                 "Security group allows traffic from 0.0.0.0/0".to_string(),
                 "This allows inbound traffic from any IP address".to_string(),
             );
-            f.remediation = Some("Restrict ingress to specific IPs or use security group IDs".to_string());
+            f.remediation =
+                Some("Restrict ingress to specific IPs or use security group IDs".to_string());
             f.confidence = Confidence::High;
             f.location.file = Some("main.tf".to_string());
             findings.push(f);
@@ -188,7 +206,9 @@ impl Scanner for IacScanner {
                 };
                 Ok(findings)
             }
-            _ => Err(ScanError::InvalidRequest("Expected IacBundle target".to_string())),
+            _ => Err(ScanError::InvalidRequest(
+                "Expected IacBundle target".to_string(),
+            )),
         }
     }
 }

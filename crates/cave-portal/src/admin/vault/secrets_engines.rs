@@ -7,21 +7,20 @@
 use super::VaultViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, table};
-use crate::admin::state::{scope, AdminState, VaultSecretsEngine};
+use crate::admin::state::{AdminState, VaultSecretsEngine, scope};
 
 pub fn list_secrets_engines(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<Vec<VaultSecretsEngine>, VaultViewError> {
     ctx.authorise(Permission::VaultRead)?;
-    let mut rows: Vec<VaultSecretsEngine> = scope(
-        &state.vault_engines.read().unwrap(),
-        &ctx.tenant,
-        |r| &r.tenant,
-    )
-    .into_iter()
-    .cloned()
-    .collect();
+    let mut rows: Vec<VaultSecretsEngine> =
+        scope(&state.vault_engines.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(rows)
 }
@@ -51,7 +50,11 @@ pub(super) fn render_section(
                 escape(&e.engine_type),
                 format!("v{}", e.version),
                 ttl_human(e.default_lease_ttl_s),
-                if e.enabled { "enabled".into() } else { "disabled".into() },
+                if e.enabled {
+                    "enabled".into()
+                } else {
+                    "disabled".into()
+                },
             ]
         })
         .collect();
@@ -138,8 +141,7 @@ mod tests {
             "acme"
         );
         let s = AdminState::seeded();
-        let e = detail(&s, &ctx(&[Permission::VaultRead]), "no-such/")
-            .unwrap();
+        let e = detail(&s, &ctx(&[Permission::VaultRead]), "no-such/").unwrap();
         assert!(e.is_none());
     }
 
@@ -151,11 +153,7 @@ mod tests {
             "DisabledVisible",
             "acme"
         );
-        let html = render_section(
-            &AdminState::seeded(),
-            &ctx(&[Permission::VaultRead]),
-        )
-        .unwrap();
+        let html = render_section(&AdminState::seeded(), &ctx(&[Permission::VaultRead])).unwrap();
         assert!(html.contains("legacy-kv/"));
         assert!(html.contains("disabled"));
     }

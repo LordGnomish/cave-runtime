@@ -51,15 +51,17 @@ pub async fn receive_axfr(stream: &mut TcpStream, origin: &Name) -> DnsResult<Zo
     while !done {
         // TCP DNS: 2-byte length prefix
         let mut len_buf = [0u8; 2];
-        stream.read_exact(&mut len_buf).await.map_err(|e| {
-            DnsError::Transfer(format!("reading length prefix: {e}"))
-        })?;
+        stream
+            .read_exact(&mut len_buf)
+            .await
+            .map_err(|e| DnsError::Transfer(format!("reading length prefix: {e}")))?;
         let len = u16::from_be_bytes(len_buf) as usize;
 
         let mut buf = vec![0u8; len];
-        stream.read_exact(&mut buf).await.map_err(|e| {
-            DnsError::Transfer(format!("reading DNS message: {e}"))
-        })?;
+        stream
+            .read_exact(&mut buf)
+            .await
+            .map_err(|e| DnsError::Transfer(format!("reading DNS message: {e}")))?;
 
         let msg = parse_message(&buf)?;
 
@@ -88,13 +90,10 @@ pub async fn receive_axfr(stream: &mut TcpStream, origin: &Name) -> DnsResult<Zo
 }
 
 /// Check whether a zone needs refresh by comparing SOA serials with the master.
-pub async fn check_serial(
-    zone: &Zone,
-    master: SocketAddr,
-) -> DnsResult<Option<u32>> {
-    let mut stream = TcpStream::connect(master).await.map_err(|e| {
-        DnsError::Transfer(format!("connecting to master {master}: {e}"))
-    })?;
+pub async fn check_serial(zone: &Zone, master: SocketAddr) -> DnsResult<Option<u32>> {
+    let mut stream = TcpStream::connect(master)
+        .await
+        .map_err(|e| DnsError::Transfer(format!("connecting to master {master}: {e}")))?;
 
     // Send SOA query
     let mut query = Message::new();

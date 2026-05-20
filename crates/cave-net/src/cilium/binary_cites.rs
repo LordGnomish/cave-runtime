@@ -97,7 +97,12 @@ mod tests {
     fn binaries_table_lists_all_four_known_binaries() {
         let (_c, _t) = cilium_test_ctx!("bpf/", "Binaries.Count", "tenant-bc-cnt");
         let dirs: Vec<&str> = binaries().iter().map(|b| b.upstream_dir).collect();
-        for expected in ["bpf/", "hubble-relay/", "clustermesh-apiserver/", "standalone-dns-proxy/"] {
+        for expected in [
+            "bpf/",
+            "hubble-relay/",
+            "clustermesh-apiserver/",
+            "standalone-dns-proxy/",
+        ] {
             assert!(dirs.contains(&expected), "missing {}", expected);
         }
     }
@@ -106,38 +111,73 @@ mod tests {
     fn every_binary_lists_at_least_one_agent_side_module() {
         let (_c, _t) = cilium_test_ctx!("bpf/", "Binaries.HaveModules", "tenant-bc-mods");
         for b in binaries() {
-            assert!(!b.agent_side_modules.is_empty(), "{} has no agent-side modules", b.upstream_dir);
+            assert!(
+                !b.agent_side_modules.is_empty(),
+                "{} has no agent-side modules",
+                b.upstream_dir
+            );
         }
     }
 
     #[test]
     fn bpf_dir_cites_all_kernel_state_machines() {
         let (_c, _t) = cilium_test_ctx!("bpf/", "BPF.Modules", "tenant-bc-bpf");
-        let bpf = binaries().iter().find(|b| b.upstream_dir == "bpf/").unwrap();
-        for expected in ["src/cilium/conntrack.rs", "src/cilium/nat.rs", "src/cilium/lb.rs", "src/cilium/srv6.rs", "src/cilium/ipv6.rs"] {
-            assert!(bpf.agent_side_modules.contains(&expected), "bpf/ missing {}", expected);
+        let bpf = binaries()
+            .iter()
+            .find(|b| b.upstream_dir == "bpf/")
+            .unwrap();
+        for expected in [
+            "src/cilium/conntrack.rs",
+            "src/cilium/nat.rs",
+            "src/cilium/lb.rs",
+            "src/cilium/srv6.rs",
+            "src/cilium/ipv6.rs",
+        ] {
+            assert!(
+                bpf.agent_side_modules.contains(&expected),
+                "bpf/ missing {}",
+                expected
+            );
         }
     }
 
     #[test]
     fn hubble_relay_cites_observer_and_metrics() {
         let (_c, _t) = cilium_test_ctx!("hubble-relay/", "Modules", "tenant-bc-hr");
-        let hr = binaries().iter().find(|b| b.upstream_dir == "hubble-relay/").unwrap();
+        let hr = binaries()
+            .iter()
+            .find(|b| b.upstream_dir == "hubble-relay/")
+            .unwrap();
         assert!(hr.agent_side_modules.iter().any(|m| m.contains("hubble")));
-        assert!(hr.agent_side_modules.iter().any(|m| m.contains("hubble_ext")));
+        assert!(hr
+            .agent_side_modules
+            .iter()
+            .any(|m| m.contains("hubble_ext")));
     }
 
     #[test]
     fn clustermesh_apiserver_cites_clustermesh_modules() {
         let (_c, _t) = cilium_test_ctx!("clustermesh-apiserver/", "Modules", "tenant-bc-cm");
-        let cm = binaries().iter().find(|b| b.upstream_dir == "clustermesh-apiserver/").unwrap();
-        assert!(cm.agent_side_modules.iter().any(|m| m.contains("clustermesh")));
+        let cm = binaries()
+            .iter()
+            .find(|b| b.upstream_dir == "clustermesh-apiserver/")
+            .unwrap();
+        assert!(cm
+            .agent_side_modules
+            .iter()
+            .any(|m| m.contains("clustermesh")));
     }
 
     #[test]
     fn standalone_dns_proxy_cites_dns_modules() {
         let (_c, _t) = cilium_test_ctx!("standalone-dns-proxy/", "Modules", "tenant-bc-dns");
-        let dp = binaries().iter().find(|b| b.upstream_dir == "standalone-dns-proxy/").unwrap();
-        assert!(dp.agent_side_modules.iter().any(|m| m.contains("dns_proxy") || m.contains("fqdn")));
+        let dp = binaries()
+            .iter()
+            .find(|b| b.upstream_dir == "standalone-dns-proxy/")
+            .unwrap();
+        assert!(dp
+            .agent_side_modules
+            .iter()
+            .any(|m| m.contains("dns_proxy") || m.contains("fqdn")));
     }
 }

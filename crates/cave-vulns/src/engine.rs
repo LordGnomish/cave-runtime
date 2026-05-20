@@ -27,18 +27,34 @@ pub fn is_affected(vuln: &Vulnerability, component: &str, version: &str) -> bool
 }
 
 /// Filter vulnerabilities matching a component
-pub fn find_for_component<'a>(vulns: &'a [Vulnerability], component: &ComponentVersion) -> Vec<&'a Vulnerability> {
-    vulns.iter()
+pub fn find_for_component<'a>(
+    vulns: &'a [Vulnerability],
+    component: &ComponentVersion,
+) -> Vec<&'a Vulnerability> {
+    vulns
+        .iter()
         .filter(|v| is_affected(v, &component.name, &component.version))
         .collect()
 }
 
 /// Count findings by severity
 pub fn count_by_severity(findings: &[Vulnerability]) -> (usize, usize, usize, usize) {
-    let critical = findings.iter().filter(|v| v.severity == Severity::Critical).count();
-    let high = findings.iter().filter(|v| v.severity == Severity::High).count();
-    let medium = findings.iter().filter(|v| v.severity == Severity::Medium).count();
-    let low = findings.iter().filter(|v| v.severity == Severity::Low).count();
+    let critical = findings
+        .iter()
+        .filter(|v| v.severity == Severity::Critical)
+        .count();
+    let high = findings
+        .iter()
+        .filter(|v| v.severity == Severity::High)
+        .count();
+    let medium = findings
+        .iter()
+        .filter(|v| v.severity == Severity::Medium)
+        .count();
+    let low = findings
+        .iter()
+        .filter(|v| v.severity == Severity::Low)
+        .count();
     (critical, high, medium, low)
 }
 
@@ -60,16 +76,18 @@ pub fn build_scan_result(target: &str, findings: Vec<Vulnerability>) -> VulnScan
 /// Simple version comparison (handles semver like "1.2.3")
 /// Returns true if `current` is less than `fixed_in`
 pub fn version_lt(current: &str, fixed_in: &str) -> bool {
-    let parse = |s: &str| -> Vec<u64> {
-        s.split('.').filter_map(|p| p.parse().ok()).collect()
-    };
+    let parse = |s: &str| -> Vec<u64> { s.split('.').filter_map(|p| p.parse().ok()).collect() };
     let a = parse(current);
     let b = parse(fixed_in);
     for i in 0..a.len().max(b.len()) {
         let x = a.get(i).copied().unwrap_or(0);
         let y = b.get(i).copied().unwrap_or(0);
-        if x < y { return true; }
-        if x > y { return false; }
+        if x < y {
+            return true;
+        }
+        if x > y {
+            return false;
+        }
     }
     false
 }

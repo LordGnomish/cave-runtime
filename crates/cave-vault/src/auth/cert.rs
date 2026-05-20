@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+use crate::VaultState;
 use crate::error::{VaultError, VaultResult};
 use crate::response::VaultResponse;
 use crate::token::CreateTokenParams;
-use crate::VaultState;
 use axum::{
+    Router,
     extract::{Json, Path, State},
     http::HeaderMap,
     routing::{delete, get, post},
-    Router,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -16,7 +16,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 fn extract_token(headers: &HeaderMap) -> VaultResult<String> {
-    headers.get("x-vault-token")
+    headers
+        .get("x-vault-token")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or(VaultError::BadToken)
@@ -89,9 +90,19 @@ pub async fn create_role(
         allowed_email_sans: body.allowed_email_sans.unwrap_or_default(),
         allowed_uri_sans: body.allowed_uri_sans.unwrap_or_default(),
         required_extensions: body.required_extensions.unwrap_or_default(),
-        token_ttl: body.token_ttl.as_deref().map(crate::token::parse_duration).unwrap_or(3600),
-        token_max_ttl: body.token_max_ttl.as_deref().map(crate::token::parse_duration).unwrap_or(0),
-        token_policies: body.token_policies.unwrap_or_else(|| vec!["default".to_string()]),
+        token_ttl: body
+            .token_ttl
+            .as_deref()
+            .map(crate::token::parse_duration)
+            .unwrap_or(3600),
+        token_max_ttl: body
+            .token_max_ttl
+            .as_deref()
+            .map(crate::token::parse_duration)
+            .unwrap_or(0),
+        token_policies: body
+            .token_policies
+            .unwrap_or_else(|| vec!["default".to_string()]),
         display_name: body.display_name.unwrap_or_else(|| role_name.clone()),
     };
     store.roles.insert(role_name, role);
@@ -105,7 +116,9 @@ pub async fn read_role(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.cert_store.read().await;
-    let role = store.roles.get(&role_name)
+    let role = store
+        .roles
+        .get(&role_name)
         .ok_or_else(|| VaultError::RoleNotFound(role_name))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(role).unwrap_or_default()))
 }
@@ -145,12 +158,17 @@ pub async fn login(
     let store = state.cert_store.read().await;
 
     let role = if let Some(ref name) = body.name {
-        store.roles.get(name)
+        store
+            .roles
+            .get(name)
             .ok_or_else(|| VaultError::RoleNotFound(name.clone()))?
             .clone()
     } else {
         // Pick the first available role
-        store.roles.values().next()
+        store
+            .roles
+            .values()
+            .next()
             .cloned()
             .ok_or_else(|| VaultError::Auth("no cert roles configured".into()))?
     };
@@ -173,7 +191,10 @@ pub fn router(state: Arc<VaultState>) -> Router {
     Router::new()
         .route("/v1/auth/cert/config", post(configure))
         .route("/v1/auth/cert/certs", get(list_roles))
-        .route("/v1/auth/cert/certs/{role_name}", post(create_role).get(read_role).delete(delete_role))
+        .route(
+            "/v1/auth/cert/certs/{role_name}",
+            post(create_role).get(read_role).delete(delete_role),
+        )
         .route("/v1/auth/cert/login", post(login))
         .with_state(state)
 }

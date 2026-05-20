@@ -61,7 +61,7 @@ struct GroupVersionKey {
 /// callers actually verify (type, required, properties).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OpenApiV3Schema {
-    pub schema_type: String,           // "object" | "string" | "integer" | …
+    pub schema_type: String, // "object" | "string" | "integer" | …
     pub properties: BTreeMap<String, OpenApiV3Schema>,
     pub required: Vec<String>,
     pub format: Option<String>,
@@ -70,13 +70,22 @@ pub struct OpenApiV3Schema {
 
 impl OpenApiV3Schema {
     pub fn object() -> Self {
-        Self { schema_type: "object".into(), ..Default::default() }
+        Self {
+            schema_type: "object".into(),
+            ..Default::default()
+        }
     }
     pub fn string() -> Self {
-        Self { schema_type: "string".into(), ..Default::default() }
+        Self {
+            schema_type: "string".into(),
+            ..Default::default()
+        }
     }
     pub fn integer() -> Self {
-        Self { schema_type: "integer".into(), ..Default::default() }
+        Self {
+            schema_type: "integer".into(),
+            ..Default::default()
+        }
     }
     pub fn with_property(mut self, name: &str, schema: OpenApiV3Schema) -> Self {
         self.properties.insert(name.into(), schema);
@@ -102,7 +111,9 @@ struct DiscoveryInner {
 
 impl DiscoveryRegistry {
     pub fn new() -> Self {
-        Self { inner: Mutex::new(DiscoveryInner::default()) }
+        Self {
+            inner: Mutex::new(DiscoveryInner::default()),
+        }
     }
 
     /// Register a `(group, version)` discovery list under `tenant_id`.
@@ -138,12 +149,7 @@ impl DiscoveryRegistry {
 
     /// Discovery doc for a given `(group, version)` under `tenant_id`.
     /// Cross-tenant lookups return `None`.
-    pub fn list_for(
-        &self,
-        tenant_id: &str,
-        group: &str,
-        version: &str,
-    ) -> Option<APIResourceList> {
+    pub fn list_for(&self, tenant_id: &str, group: &str, version: &str) -> Option<APIResourceList> {
         let key = GroupVersionKey {
             tenant_id: tenant_id.into(),
             group: group.into(),
@@ -156,13 +162,16 @@ impl DiscoveryRegistry {
     /// to `tenant_id`, sorted for stable JSON output.
     pub fn aggregated_for_tenant(&self, tenant_id: &str) -> Vec<GroupVersion> {
         let inner = self.inner.lock().unwrap();
-        let mut out: Vec<GroupVersion> = inner.resources.keys()
+        let mut out: Vec<GroupVersion> = inner
+            .resources
+            .keys()
             .filter(|k| k.tenant_id == tenant_id)
-            .map(|k| GroupVersion { group: k.group.clone(), version: k.version.clone() })
+            .map(|k| GroupVersion {
+                group: k.group.clone(),
+                version: k.version.clone(),
+            })
             .collect();
-        out.sort_by(|a, b| {
-            a.group.cmp(&b.group).then(a.version.cmp(&b.version))
-        });
+        out.sort_by(|a, b| a.group.cmp(&b.group).then(a.version.cmp(&b.version)));
         out
     }
 
@@ -173,7 +182,9 @@ impl DiscoveryRegistry {
         version: &str,
         kind: &str,
     ) -> Option<OpenApiV3Schema> {
-        self.inner.lock().unwrap()
+        self.inner
+            .lock()
+            .unwrap()
             .schemas
             .get(&(tenant_id.into(), group.into(), version.into(), kind.into()))
             .cloned()
@@ -185,7 +196,9 @@ impl DiscoveryRegistry {
         let inner = self.inner.lock().unwrap();
         let mut out = BTreeMap::new();
         for (t, group, version, _kind) in inner.schemas.keys() {
-            if t != tenant_id { continue; }
+            if t != tenant_id {
+                continue;
+            }
             let path = if group.is_empty() {
                 format!("api/{}", version)
             } else {
@@ -224,19 +237,31 @@ impl DiscoveryRegistry {
                 format!("{}/{}", base, r.name)
             };
             let item = OpenApiV3PathItem {
-                operations: r.verbs.iter().map(|v| (
-                    upstream_verb_to_http(v).to_string(),
-                    OpenApiV3Operation {
-                        operation_id: format!("{}{}",
-                            r.kind, capitalise(&match v.as_str() {
-                                "list"  => "list".to_string(),
-                                "get"   => "read".to_string(),
-                                _       => v.clone(),
-                            })),
-                        tags: vec![if group.is_empty() { "core".into() }
-                                   else { group.into() }],
-                    },
-                )).collect(),
+                operations: r
+                    .verbs
+                    .iter()
+                    .map(|v| {
+                        (
+                            upstream_verb_to_http(v).to_string(),
+                            OpenApiV3Operation {
+                                operation_id: format!(
+                                    "{}{}",
+                                    r.kind,
+                                    capitalise(&match v.as_str() {
+                                        "list" => "list".to_string(),
+                                        "get" => "read".to_string(),
+                                        _ => v.clone(),
+                                    })
+                                ),
+                                tags: vec![if group.is_empty() {
+                                    "core".into()
+                                } else {
+                                    group.into()
+                                }],
+                            },
+                        )
+                    })
+                    .collect(),
             };
             paths.insert(resource_segment, item);
             // Per-kind component if a schema is registered.
@@ -266,7 +291,9 @@ impl DiscoveryRegistry {
     /// Mirrors upstream `apiserver/pkg/endpoints/discovery/group.go::GroupDiscoveryHandler`.
     pub fn group_discovery(&self, tenant_id: &str, group: &str) -> Option<APIGroup> {
         let inner = self.inner.lock().unwrap();
-        let mut versions: Vec<APIGroupVersion> = inner.resources.keys()
+        let mut versions: Vec<APIGroupVersion> = inner
+            .resources
+            .keys()
             .filter(|k| k.tenant_id == tenant_id && k.group == group)
             .map(|k| APIGroupVersion {
                 group_version: if group.is_empty() {
@@ -315,18 +342,21 @@ fn kube_version_rank(v: &str) -> (i64, i64, i64) {
 }
 
 fn take_leading_digits(s: &str) -> (&str, &str) {
-    let idx = s.bytes().position(|b| !b.is_ascii_digit()).unwrap_or(s.len());
+    let idx = s
+        .bytes()
+        .position(|b| !b.is_ascii_digit())
+        .unwrap_or(s.len());
     (&s[..idx], &s[idx..])
 }
 
 fn upstream_verb_to_http(verb: &str) -> &'static str {
     match verb {
         "get" | "list" | "watch" => "get",
-        "create"                 => "post",
-        "update"                 => "put",
-        "patch"                  => "patch",
+        "create" => "post",
+        "update" => "put",
+        "patch" => "patch",
         "delete" | "deletecollection" => "delete",
-        _                        => "get",
+        _ => "get",
     }
 }
 
@@ -380,7 +410,9 @@ pub struct APIGroupVersion {
 }
 
 impl Default for DiscoveryRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -392,8 +424,19 @@ mod tests {
             name: "configmaps".into(),
             kind: "ConfigMap".into(),
             namespaced: true,
-            verbs: vec!["get","list","create","update","patch","delete","deletecollection","watch"]
-                .into_iter().map(String::from).collect(),
+            verbs: vec![
+                "get",
+                "list",
+                "create",
+                "update",
+                "patch",
+                "delete",
+                "deletecollection",
+                "watch",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
             short_names: vec!["cm".into()],
             categories: vec!["all".into()],
         }
@@ -405,10 +448,13 @@ mod tests {
     #[test]
     fn test_register_then_lookup_returns_resource_list() {
         let d = DiscoveryRegistry::new();
-        d.register_resources("acme", APIResourceList {
-            group_version: "v1".into(),
-            resources: vec![cm_resource()],
-        });
+        d.register_resources(
+            "acme",
+            APIResourceList {
+                group_version: "v1".into(),
+                resources: vec![cm_resource()],
+            },
+        );
         let got = d.list_for("acme", "", "v1").expect("registered list found");
         assert_eq!(got.group_version, "v1");
         assert_eq!(got.resources.len(), 1);
@@ -416,8 +462,11 @@ mod tests {
         // tenant_id invariant smoke: aggregated view for acme contains exactly
         // the registered v1 entry.
         let agg = d.aggregated_for_tenant("acme");
-        assert!(agg.iter().any(|gv| gv.group.is_empty() && gv.version == "v1"),
-            "tenant_id invariant: acme's aggregated discovery includes its v1");
+        assert!(
+            agg.iter()
+                .any(|gv| gv.group.is_empty() && gv.version == "v1"),
+            "tenant_id invariant: acme's aggregated discovery includes its v1"
+        );
     }
 
     /// Upstream parity: `TestDiscovery_TenantIsolatedListing`
@@ -426,22 +475,34 @@ mod tests {
     #[test]
     fn test_discovery_does_not_leak_groups_across_tenants() {
         let d = DiscoveryRegistry::new();
-        d.register_resources("acme", APIResourceList {
-            group_version: "widgets.acme.io/v1".into(),
-            resources: vec![APIResource {
-                name: "widgets".into(), kind: "Widget".into(),
-                namespaced: true, verbs: vec!["list".into()],
-                short_names: vec![], categories: vec![],
-            }],
-        });
+        d.register_resources(
+            "acme",
+            APIResourceList {
+                group_version: "widgets.acme.io/v1".into(),
+                resources: vec![APIResource {
+                    name: "widgets".into(),
+                    kind: "Widget".into(),
+                    namespaced: true,
+                    verbs: vec!["list".into()],
+                    short_names: vec![],
+                    categories: vec![],
+                }],
+            },
+        );
         // globex sees nothing via direct list and via aggregated discovery.
-        assert!(d.list_for("globex", "widgets.acme.io", "v1").is_none(),
-            "tenant_id invariant: globex MUST NOT see acme's CRD via list_for");
-        assert!(d.aggregated_for_tenant("globex").is_empty(),
-            "tenant_id invariant: globex's aggregated discovery is empty");
+        assert!(
+            d.list_for("globex", "widgets.acme.io", "v1").is_none(),
+            "tenant_id invariant: globex MUST NOT see acme's CRD via list_for"
+        );
+        assert!(
+            d.aggregated_for_tenant("globex").is_empty(),
+            "tenant_id invariant: globex's aggregated discovery is empty"
+        );
         let acme_agg = d.aggregated_for_tenant("acme");
-        assert!(acme_agg.iter().any(|gv| gv.group == "widgets.acme.io"),
-            "tenant_id invariant: acme still sees its own group");
+        assert!(
+            acme_agg.iter().any(|gv| gv.group == "widgets.acme.io"),
+            "tenant_id invariant: acme still sees its own group"
+        );
     }
 
     /// Upstream parity: `TestDiscovery_NamespacedFlagPreserved`
@@ -450,26 +511,43 @@ mod tests {
     #[test]
     fn test_namespaced_flag_round_trips_in_resource_list() {
         let d = DiscoveryRegistry::new();
-        d.register_resources("acme", APIResourceList {
-            group_version: "v1".into(),
-            resources: vec![
-                cm_resource(),                             // namespaced
-                APIResource {
-                    name: "namespaces".into(), kind: "Namespace".into(),
-                    namespaced: false,
-                    verbs: vec!["get".into(),"list".into(),"create".into()],
-                    short_names: vec!["ns".into()], categories: vec![],
-                },
-            ],
-        });
+        d.register_resources(
+            "acme",
+            APIResourceList {
+                group_version: "v1".into(),
+                resources: vec![
+                    cm_resource(), // namespaced
+                    APIResource {
+                        name: "namespaces".into(),
+                        kind: "Namespace".into(),
+                        namespaced: false,
+                        verbs: vec!["get".into(), "list".into(), "create".into()],
+                        short_names: vec!["ns".into()],
+                        categories: vec![],
+                    },
+                ],
+            },
+        );
         let list = d.list_for("acme", "", "v1").unwrap();
-        let ns = list.resources.iter().find(|r| r.name == "namespaces").unwrap();
-        let cm = list.resources.iter().find(|r| r.name == "configmaps").unwrap();
+        let ns = list
+            .resources
+            .iter()
+            .find(|r| r.name == "namespaces")
+            .unwrap();
+        let cm = list
+            .resources
+            .iter()
+            .find(|r| r.name == "configmaps")
+            .unwrap();
         assert!(!ns.namespaced, "namespaces must be cluster-scoped");
         assert!(cm.namespaced, "configmaps must be namespace-scoped");
         // tenant_id invariant: list scoped to acme.
-        assert!(d.aggregated_for_tenant("acme").iter().any(|gv| gv.version == "v1"),
-            "tenant_id invariant retained");
+        assert!(
+            d.aggregated_for_tenant("acme")
+                .iter()
+                .any(|gv| gv.version == "v1"),
+            "tenant_id invariant retained"
+        );
     }
 
     /// Upstream parity: `TestDiscovery_SubresourceVisible`
@@ -478,37 +556,54 @@ mod tests {
     #[test]
     fn test_subresources_register_as_separate_entries() {
         let d = DiscoveryRegistry::new();
-        d.register_resources("acme", APIResourceList {
-            group_version: "v1".into(),
-            resources: vec![
-                APIResource {
-                    name: "pods".into(), kind: "Pod".into(),
-                    namespaced: true,
-                    verbs: vec!["get".into(),"list".into(),"create".into(),"delete".into()],
-                    short_names: vec!["po".into()], categories: vec!["all".into()],
-                },
-                APIResource {
-                    name: "pods/status".into(), kind: "Pod".into(),
-                    namespaced: true,
-                    verbs: vec!["get".into(),"patch".into(),"update".into()],
-                    short_names: vec![], categories: vec![],
-                },
-                APIResource {
-                    name: "pods/exec".into(), kind: "PodExecOptions".into(),
-                    namespaced: true,
-                    verbs: vec!["create".into()],
-                    short_names: vec![], categories: vec![],
-                },
-            ],
-        });
+        d.register_resources(
+            "acme",
+            APIResourceList {
+                group_version: "v1".into(),
+                resources: vec![
+                    APIResource {
+                        name: "pods".into(),
+                        kind: "Pod".into(),
+                        namespaced: true,
+                        verbs: vec![
+                            "get".into(),
+                            "list".into(),
+                            "create".into(),
+                            "delete".into(),
+                        ],
+                        short_names: vec!["po".into()],
+                        categories: vec!["all".into()],
+                    },
+                    APIResource {
+                        name: "pods/status".into(),
+                        kind: "Pod".into(),
+                        namespaced: true,
+                        verbs: vec!["get".into(), "patch".into(), "update".into()],
+                        short_names: vec![],
+                        categories: vec![],
+                    },
+                    APIResource {
+                        name: "pods/exec".into(),
+                        kind: "PodExecOptions".into(),
+                        namespaced: true,
+                        verbs: vec!["create".into()],
+                        short_names: vec![],
+                        categories: vec![],
+                    },
+                ],
+            },
+        );
         let list = d.list_for("acme", "", "v1").unwrap();
         assert_eq!(list.resources.len(), 3);
         let names: Vec<_> = list.resources.iter().map(|r| r.name.clone()).collect();
         assert!(names.contains(&"pods/status".to_string()));
         assert!(names.contains(&"pods/exec".to_string()));
         // tenant_id invariant smoke.
-        assert_eq!(d.aggregated_for_tenant("acme").len(), 1,
-            "tenant_id invariant: one v1 entry visible to acme");
+        assert_eq!(
+            d.aggregated_for_tenant("acme").len(),
+            1,
+            "tenant_id invariant: one v1 entry visible to acme"
+        );
     }
 
     /// Upstream parity: `TestOpenAPIv3_ConfigMapSchemaShape`
@@ -524,22 +619,22 @@ mod tests {
                 "metadata",
                 OpenApiV3Schema::object().with_property("name", OpenApiV3Schema::string()),
             )
-            .with_property(
-                "data",
-                OpenApiV3Schema::object(),
-            )
+            .with_property("data", OpenApiV3Schema::object())
             .require("apiVersion")
             .require("kind");
         d.register_schema("acme", "", "v1", "ConfigMap", schema);
-        let got = d.schema_for("acme", "", "v1", "ConfigMap")
+        let got = d
+            .schema_for("acme", "", "v1", "ConfigMap")
             .expect("registered schema must be retrievable");
         assert_eq!(got.schema_type, "object");
         assert!(got.properties.contains_key("apiVersion"));
         assert!(got.properties.contains_key("kind"));
         assert!(got.required.contains(&"apiVersion".to_string()));
         // tenant_id invariant: globex sees nothing for the same kind.
-        assert!(d.schema_for("globex", "", "v1", "ConfigMap").is_none(),
-            "tenant_id invariant: schemas are tenant-scoped");
+        assert!(
+            d.schema_for("globex", "", "v1", "ConfigMap").is_none(),
+            "tenant_id invariant: schemas are tenant-scoped"
+        );
     }
 
     /// Upstream parity: `TestOpenAPIv3_IndexReturnsServerRelativePaths`
@@ -549,20 +644,39 @@ mod tests {
     fn test_openapi_v3_index_lists_registered_group_versions_for_tenant() {
         let d = DiscoveryRegistry::new();
         d.register_schema("acme", "", "v1", "ConfigMap", OpenApiV3Schema::object());
-        d.register_schema("acme", "apps", "v1", "Deployment", OpenApiV3Schema::object());
-        d.register_schema("globex", "billing.acme.io", "v1beta1", "Invoice",
-            OpenApiV3Schema::object());
+        d.register_schema(
+            "acme",
+            "apps",
+            "v1",
+            "Deployment",
+            OpenApiV3Schema::object(),
+        );
+        d.register_schema(
+            "globex",
+            "billing.acme.io",
+            "v1beta1",
+            "Invoice",
+            OpenApiV3Schema::object(),
+        );
         let acme_idx = d.openapi_v3_index("acme");
-        assert!(acme_idx.contains_key("api/v1"),
-            "core/v1 surfaces as `api/v1`");
-        assert!(acme_idx.contains_key("apis/apps/v1"),
-            "apps/v1 surfaces as `apis/apps/v1`");
+        assert!(
+            acme_idx.contains_key("api/v1"),
+            "core/v1 surfaces as `api/v1`"
+        );
+        assert!(
+            acme_idx.contains_key("apis/apps/v1"),
+            "apps/v1 surfaces as `apis/apps/v1`"
+        );
         // tenant_id invariant: globex's billing entry MUST NOT be in acme's index.
-        assert!(!acme_idx.keys().any(|k| k.contains("billing.acme.io")),
-            "tenant_id invariant: openapi index does not leak globex schemas to acme");
+        assert!(
+            !acme_idx.keys().any(|k| k.contains("billing.acme.io")),
+            "tenant_id invariant: openapi index does not leak globex schemas to acme"
+        );
         let globex_idx = d.openapi_v3_index("globex");
-        assert!(globex_idx.contains_key("apis/billing.acme.io/v1beta1"),
-            "tenant_id invariant: globex sees its own billing schema");
+        assert!(
+            globex_idx.contains_key("apis/billing.acme.io/v1beta1"),
+            "tenant_id invariant: globex sees its own billing schema"
+        );
     }
 
     // ── Deeper coverage (deeper-005) — OpenAPI v3 + Discovery v2 ──────────────
@@ -574,27 +688,40 @@ mod tests {
     #[test]
     fn test_openapi_v3_generation_produces_paths_and_components() {
         let d = DiscoveryRegistry::new();
-        d.register_resources("acme", APIResourceList {
-            group_version: "apps/v1".into(),
-            resources: vec![APIResource {
-                name: "deployments".into(),
-                kind: "Deployment".into(),
-                namespaced: true,
-                verbs: vec!["get".into(), "list".into(), "create".into()],
-                short_names: vec!["deploy".into()],
-                categories: vec!["all".into()],
-            }],
-        });
-        d.register_schema("acme", "apps", "v1", "Deployment",
-            OpenApiV3Schema::object().with_property("spec", OpenApiV3Schema::object()));
-        let doc = d.generate_openapi_v3_doc("acme", "apps", "v1")
+        d.register_resources(
+            "acme",
+            APIResourceList {
+                group_version: "apps/v1".into(),
+                resources: vec![APIResource {
+                    name: "deployments".into(),
+                    kind: "Deployment".into(),
+                    namespaced: true,
+                    verbs: vec!["get".into(), "list".into(), "create".into()],
+                    short_names: vec!["deploy".into()],
+                    categories: vec!["all".into()],
+                }],
+            },
+        );
+        d.register_schema(
+            "acme",
+            "apps",
+            "v1",
+            "Deployment",
+            OpenApiV3Schema::object().with_property("spec", OpenApiV3Schema::object()),
+        );
+        let doc = d
+            .generate_openapi_v3_doc("acme", "apps", "v1")
             .expect("doc must be generated for registered GV");
         assert_eq!(doc.openapi, "3.0.0");
         assert_eq!(doc.info.version, "apps/v1");
-        assert!(doc.paths.contains_key("/apis/apps/v1/namespaces/{namespace}/deployments"));
+        assert!(doc
+            .paths
+            .contains_key("/apis/apps/v1/namespaces/{namespace}/deployments"));
         assert!(doc.components.contains_key("io.apps.v1.Deployment"));
-        assert_eq!(doc.tenant_id, "acme",
-            "tenant_id invariant: generated doc tagged with owning tenant");
+        assert_eq!(
+            doc.tenant_id, "acme",
+            "tenant_id invariant: generated doc tagged with owning tenant"
+        );
     }
 
     /// Upstream parity: `TestOpenAPIv3_OperationIdsPerVerb`
@@ -603,27 +730,34 @@ mod tests {
     #[test]
     fn test_openapi_v3_operation_ids_match_upstream_verb_mapping() {
         let d = DiscoveryRegistry::new();
-        d.register_resources("acme", APIResourceList {
-            group_version: "v1".into(),
-            resources: vec![APIResource {
-                name: "configmaps".into(),
-                kind: "ConfigMap".into(),
-                namespaced: true,
-                verbs: vec!["get".into(), "list".into(), "create".into()],
-                short_names: vec![],
-                categories: vec![],
-            }],
-        });
+        d.register_resources(
+            "acme",
+            APIResourceList {
+                group_version: "v1".into(),
+                resources: vec![APIResource {
+                    name: "configmaps".into(),
+                    kind: "ConfigMap".into(),
+                    namespaced: true,
+                    verbs: vec!["get".into(), "list".into(), "create".into()],
+                    short_names: vec![],
+                    categories: vec![],
+                }],
+            },
+        );
         let doc = d.generate_openapi_v3_doc("acme", "", "v1").unwrap();
-        let item = doc.paths.get("/api/v1/namespaces/{namespace}/configmaps").unwrap();
+        let item = doc
+            .paths
+            .get("/api/v1/namespaces/{namespace}/configmaps")
+            .unwrap();
         let post = item.operations.get("post").unwrap();
         assert_eq!(post.operation_id, "ConfigMapCreate");
         let get = item.operations.get("get").unwrap();
         // get + list both map to HTTP `get`; the last verb wins in the map,
         // so we just assert the operation_id name is one of the expected.
-        assert!(get.operation_id == "ConfigMapList"
-             || get.operation_id == "ConfigMapRead",
-            "operation_id is verb-derived");
+        assert!(
+            get.operation_id == "ConfigMapList" || get.operation_id == "ConfigMapRead",
+            "operation_id is verb-derived"
+        );
         // tenant_id invariant smoke: doc tagged with tenant.
         assert_eq!(doc.tenant_id, "acme");
     }
@@ -633,17 +767,20 @@ mod tests {
     #[test]
     fn test_openapi_v3_cluster_scoped_omits_namespace_segment() {
         let d = DiscoveryRegistry::new();
-        d.register_resources("acme", APIResourceList {
-            group_version: "v1".into(),
-            resources: vec![APIResource {
-                name: "namespaces".into(),
-                kind: "Namespace".into(),
-                namespaced: false,
-                verbs: vec!["get".into(), "list".into()],
-                short_names: vec!["ns".into()],
-                categories: vec![],
-            }],
-        });
+        d.register_resources(
+            "acme",
+            APIResourceList {
+                group_version: "v1".into(),
+                resources: vec![APIResource {
+                    name: "namespaces".into(),
+                    kind: "Namespace".into(),
+                    namespaced: false,
+                    verbs: vec!["get".into(), "list".into()],
+                    short_names: vec!["ns".into()],
+                    categories: vec![],
+                }],
+            },
+        );
         let doc = d.generate_openapi_v3_doc("acme", "", "v1").unwrap();
         assert!(doc.paths.contains_key("/api/v1/namespaces"));
         assert!(!doc.paths.keys().any(|k| k.contains("/{namespace}/")));
@@ -655,21 +792,30 @@ mod tests {
     #[test]
     fn test_openapi_v3_generation_does_not_cross_tenant_boundaries() {
         let d = DiscoveryRegistry::new();
-        d.register_resources("acme", APIResourceList {
-            group_version: "billing.acme.io/v1".into(),
-            resources: vec![APIResource {
-                name: "invoices".into(),
-                kind: "Invoice".into(),
-                namespaced: true,
-                verbs: vec!["list".into()],
-                short_names: vec![],
-                categories: vec![],
-            }],
-        });
-        assert!(d.generate_openapi_v3_doc("globex", "billing.acme.io", "v1").is_none(),
-            "tenant_id invariant: globex sees no doc for acme's group");
-        assert!(d.generate_openapi_v3_doc("acme", "billing.acme.io", "v1").is_some(),
-            "tenant_id invariant: acme sees its own doc");
+        d.register_resources(
+            "acme",
+            APIResourceList {
+                group_version: "billing.acme.io/v1".into(),
+                resources: vec![APIResource {
+                    name: "invoices".into(),
+                    kind: "Invoice".into(),
+                    namespaced: true,
+                    verbs: vec!["list".into()],
+                    short_names: vec![],
+                    categories: vec![],
+                }],
+            },
+        );
+        assert!(
+            d.generate_openapi_v3_doc("globex", "billing.acme.io", "v1")
+                .is_none(),
+            "tenant_id invariant: globex sees no doc for acme's group"
+        );
+        assert!(
+            d.generate_openapi_v3_doc("acme", "billing.acme.io", "v1")
+                .is_some(),
+            "tenant_id invariant: acme sees its own doc"
+        );
     }
 
     /// Upstream parity: `TestDiscoveryV2_GroupListReturnsVersionsDescending`
@@ -680,22 +826,30 @@ mod tests {
     fn test_group_discovery_returns_versions_descending_with_preferred() {
         let d = DiscoveryRegistry::new();
         for v in ["v1alpha1", "v1beta1", "v1"] {
-            d.register_resources("acme", APIResourceList {
-                group_version: format!("acme.io/{}", v),
-                resources: vec![APIResource {
-                    name: "widgets".into(), kind: "Widget".into(),
-                    namespaced: true, verbs: vec!["list".into()],
-                    short_names: vec![], categories: vec![],
-                }],
-            });
+            d.register_resources(
+                "acme",
+                APIResourceList {
+                    group_version: format!("acme.io/{}", v),
+                    resources: vec![APIResource {
+                        name: "widgets".into(),
+                        kind: "Widget".into(),
+                        namespaced: true,
+                        verbs: vec!["list".into()],
+                        short_names: vec![],
+                        categories: vec![],
+                    }],
+                },
+            );
         }
         let g = d.group_discovery("acme", "acme.io").expect("group exists");
         let versions: Vec<_> = g.versions.iter().map(|v| v.version.clone()).collect();
         assert_eq!(versions, vec!["v1", "v1beta1", "v1alpha1"]);
         assert_eq!(g.preferred_version.version, "v1");
         // tenant_id invariant: globex sees nothing for the same group.
-        assert!(d.group_discovery("globex", "acme.io").is_none(),
-            "tenant_id invariant: globex sees no acme group");
+        assert!(
+            d.group_discovery("globex", "acme.io").is_none(),
+            "tenant_id invariant: globex sees no acme group"
+        );
     }
 
     /// Upstream parity: `TestDiscoveryV2_GroupNotRegisteredReturnsNone`
@@ -704,10 +858,13 @@ mod tests {
     #[test]
     fn test_group_discovery_returns_none_for_unknown_group() {
         let d = DiscoveryRegistry::new();
-        d.register_resources("acme", APIResourceList {
-            group_version: "v1".into(),
-            resources: vec![],
-        });
+        d.register_resources(
+            "acme",
+            APIResourceList {
+                group_version: "v1".into(),
+                resources: vec![],
+            },
+        );
         assert!(d.group_discovery("acme", "unknown.example.com").is_none());
         // tenant_id invariant smoke: known core group still returns Some.
         assert!(d.group_discovery("acme", "").is_some());

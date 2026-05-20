@@ -3,10 +3,10 @@
 //! OTLP metrics ingestion (JSON over HTTP; gRPC support uses the same encoding).
 //! We parse the OTLP JSON representation and convert to our internal model.
 
-use serde::Deserialize;
+use super::IngestedBatch;
 use crate::error::{MetricsError, Result};
 use crate::model::{Labels, Sample, TimeSeries};
-use super::IngestedBatch;
+use serde::Deserialize;
 
 // ─── OTLP JSON schema (minimal subset needed for metrics) ───────────────────
 
@@ -115,7 +115,10 @@ pub struct KeyValue {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub enum AnyValue {
-    Object { #[serde(rename = "stringValue")] string_value: Option<String> },
+    Object {
+        #[serde(rename = "stringValue")]
+        string_value: Option<String>,
+    },
     String(String),
     Number(f64),
     Bool(bool),
@@ -127,7 +130,7 @@ impl AnyValue {
             AnyValue::Object { string_value } => string_value.clone().unwrap_or_default(),
             AnyValue::String(s) => s.clone(),
             AnyValue::Number(n) => n.to_string(),
-            AnyValue::Bool(b)   => b.to_string(),
+            AnyValue::Bool(b) => b.to_string(),
         }
     }
 }
@@ -179,12 +182,23 @@ pub fn convert(req: ExportMetricsServiceRequest) -> IngestedBatch {
 }
 
 fn resource_labels(resource: Option<&Resource>) -> Vec<(String, String)> {
-    resource.map(|r| r.attributes.iter().map(|kv| (kv.key.clone(), kv.value.as_string())).collect())
+    resource
+        .map(|r| {
+            r.attributes
+                .iter()
+                .map(|kv| (kv.key.clone(), kv.value.as_string()))
+                .collect()
+        })
         .unwrap_or_default()
 }
 
 fn attr_labels(attrs: Option<&Vec<KeyValue>>) -> Vec<(String, String)> {
-    attrs.map(|a| a.iter().map(|kv| (kv.key.clone(), kv.value.as_string())).collect())
+    attrs
+        .map(|a| {
+            a.iter()
+                .map(|kv| (kv.key.clone(), kv.value.as_string()))
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -195,20 +209,31 @@ fn nano_to_ms(nano: Option<&String>) -> i64 {
 }
 
 fn dp_to_ts(name: &str, dp: &NumberDataPoint, resource_attrs: &[(String, String)]) -> TimeSeries {
-    let mut labels = Labels::from_pairs(resource_attrs.iter().map(|(k, v)| (k.as_str(), v.as_str())));
+    let mut labels =
+        Labels::from_pairs(resource_attrs.iter().map(|(k, v)| (k.as_str(), v.as_str())));
     for (k, v) in attr_labels(dp.attributes.as_ref()) {
         labels.insert(k, v);
     }
     labels.insert("__name__", name);
 
-    let value = dp.as_double.unwrap_or_else(|| dp.as_int.map(|i| i as f64).unwrap_or(f64::NAN));
+    let value = dp
+        .as_double
+        .unwrap_or_else(|| dp.as_int.map(|i| i as f64).unwrap_or(f64::NAN));
     let ts_ms = nano_to_ms(dp.time_unix_nano.as_ref());
 
-    TimeSeries { labels, samples: vec![Sample::new(ts_ms, value)] }
+    TimeSeries {
+        labels,
+        samples: vec![Sample::new(ts_ms, value)],
+    }
 }
 
-fn hist_dp_to_ts(name: &str, dp: &HistogramDataPoint, resource_attrs: &[(String, String)]) -> Vec<TimeSeries> {
-    let mut base_labels = Labels::from_pairs(resource_attrs.iter().map(|(k, v)| (k.as_str(), v.as_str())));
+fn hist_dp_to_ts(
+    name: &str,
+    dp: &HistogramDataPoint,
+    resource_attrs: &[(String, String)],
+) -> Vec<TimeSeries> {
+    let mut base_labels =
+        Labels::from_pairs(resource_attrs.iter().map(|(k, v)| (k.as_str(), v.as_str())));
     for (k, v) in attr_labels(dp.attributes.as_ref()) {
         base_labels.insert(k, v);
     }
@@ -219,14 +244,20 @@ fn hist_dp_to_ts(name: &str, dp: &HistogramDataPoint, resource_attrs: &[(String,
     if let Some(count) = dp.count {
         let mut l = base_labels.clone();
         l.insert("__name__", format!("{}_count", name));
-        out.push(TimeSeries { labels: l, samples: vec![Sample::new(ts_ms, count as f64)] });
+        out.push(TimeSeries {
+            labels: l,
+            samples: vec![Sample::new(ts_ms, count as f64)],
+        });
     }
 
     // _sum
     if let Some(sum) = dp.sum {
         let mut l = base_labels.clone();
         l.insert("__name__", format!("{}_sum", name));
-        out.push(TimeSeries { labels: l, samples: vec![Sample::new(ts_ms, sum)] });
+        out.push(TimeSeries {
+            labels: l,
+            samples: vec![Sample::new(ts_ms, sum)],
+        });
     }
 
     // _bucket
@@ -237,21 +268,32 @@ fn hist_dp_to_ts(name: &str, dp: &HistogramDataPoint, resource_attrs: &[(String,
             let mut l = base_labels.clone();
             l.insert("__name__", format!("{}_bucket", name));
             l.insert("le", bound.to_string());
-            out.push(TimeSeries { labels: l, samples: vec![Sample::new(ts_ms, cumulative as f64)] });
+            out.push(TimeSeries {
+                labels: l,
+                samples: vec![Sample::new(ts_ms, cumulative as f64)],
+            });
         }
         // +Inf bucket
         cumulative += counts.get(bounds.len()).copied().unwrap_or(0);
         let mut l = base_labels.clone();
         l.insert("__name__", format!("{}_bucket", name));
         l.insert("le", "+Inf");
-        out.push(TimeSeries { labels: l, samples: vec![Sample::new(ts_ms, cumulative as f64)] });
+        out.push(TimeSeries {
+            labels: l,
+            samples: vec![Sample::new(ts_ms, cumulative as f64)],
+        });
     }
 
     out
 }
 
-fn summary_dp_to_ts(name: &str, dp: &SummaryDataPoint, resource_attrs: &[(String, String)]) -> Vec<TimeSeries> {
-    let mut base_labels = Labels::from_pairs(resource_attrs.iter().map(|(k, v)| (k.as_str(), v.as_str())));
+fn summary_dp_to_ts(
+    name: &str,
+    dp: &SummaryDataPoint,
+    resource_attrs: &[(String, String)],
+) -> Vec<TimeSeries> {
+    let mut base_labels =
+        Labels::from_pairs(resource_attrs.iter().map(|(k, v)| (k.as_str(), v.as_str())));
     for (k, v) in attr_labels(dp.attributes.as_ref()) {
         base_labels.insert(k, v);
     }
@@ -261,19 +303,28 @@ fn summary_dp_to_ts(name: &str, dp: &SummaryDataPoint, resource_attrs: &[(String
     if let Some(count) = dp.count {
         let mut l = base_labels.clone();
         l.insert("__name__", format!("{}_count", name));
-        out.push(TimeSeries { labels: l, samples: vec![Sample::new(ts_ms, count as f64)] });
+        out.push(TimeSeries {
+            labels: l,
+            samples: vec![Sample::new(ts_ms, count as f64)],
+        });
     }
     if let Some(sum) = dp.sum {
         let mut l = base_labels.clone();
         l.insert("__name__", format!("{}_sum", name));
-        out.push(TimeSeries { labels: l, samples: vec![Sample::new(ts_ms, sum)] });
+        out.push(TimeSeries {
+            labels: l,
+            samples: vec![Sample::new(ts_ms, sum)],
+        });
     }
     if let Some(qs) = &dp.quantile_values {
         for q in qs {
             let mut l = base_labels.clone();
             l.insert("__name__", name);
             l.insert("quantile", q.quantile.to_string());
-            out.push(TimeSeries { labels: l, samples: vec![Sample::new(ts_ms, q.value)] });
+            out.push(TimeSeries {
+                labels: l,
+                samples: vec![Sample::new(ts_ms, q.value)],
+            });
         }
     }
 

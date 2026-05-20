@@ -69,9 +69,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Critical,
             languages: vec!["Python".to_string()],
             pattern: Some(r"\beval\s*\(".to_string()),
-            message_template: "eval() executes arbitrary code -- severe security risk: {match}".to_string(),
+            message_template: "eval() executes arbitrary code -- severe security risk: {match}"
+                .to_string(),
             effort_mins: 30,
-            tags: vec!["python".to_string(), "security".to_string(), "injection".to_string()],
+            tags: vec![
+                "python".to_string(),
+                "security".to_string(),
+                "injection".to_string(),
+            ],
             cwe: Some(95),
         },
         ScanRule {
@@ -81,9 +86,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Critical,
             languages: vec!["Python".to_string()],
             pattern: Some(r"\bexec\s*\(".to_string()),
-            message_template: "exec() executes arbitrary code -- avoid with untrusted input: {match}".to_string(),
+            message_template:
+                "exec() executes arbitrary code -- avoid with untrusted input: {match}".to_string(),
             effort_mins: 30,
-            tags: vec!["python".to_string(), "security".to_string(), "injection".to_string()],
+            tags: vec![
+                "python".to_string(),
+                "security".to_string(),
+                "injection".to_string(),
+            ],
             cwe: Some(95),
         },
         ScanRule {
@@ -93,9 +103,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Critical,
             languages: vec!["Python".to_string()],
             pattern: Some(r"os\.system\(".to_string()),
-            message_template: "os.system() with untrusted input is shell-injection risk: {match}".to_string(),
+            message_template: "os.system() with untrusted input is shell-injection risk: {match}"
+                .to_string(),
             effort_mins: 40,
-            tags: vec!["python".to_string(), "security".to_string(), "shell-injection".to_string()],
+            tags: vec![
+                "python".to_string(),
+                "security".to_string(),
+                "shell-injection".to_string(),
+            ],
             cwe: Some(78),
         },
         ScanRule {
@@ -105,9 +120,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Critical,
             languages: vec!["Python".to_string()],
             pattern: Some(r"subprocess\.call\(.*shell\s*=\s*True".to_string()),
-            message_template: "subprocess with shell=True enables shell injection: {match}".to_string(),
+            message_template: "subprocess with shell=True enables shell injection: {match}"
+                .to_string(),
             effort_mins: 30,
-            tags: vec!["python".to_string(), "security".to_string(), "shell-injection".to_string()],
+            tags: vec![
+                "python".to_string(),
+                "security".to_string(),
+                "shell-injection".to_string(),
+            ],
             cwe: Some(78),
         },
         ScanRule {
@@ -117,9 +137,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Critical,
             languages: vec!["Python".to_string()],
             pattern: Some(r"pickle\.loads\(".to_string()),
-            message_template: "pickle.loads() with untrusted input allows code execution: {match}".to_string(),
+            message_template: "pickle.loads() with untrusted input allows code execution: {match}"
+                .to_string(),
             effort_mins: 45,
-            tags: vec!["python".to_string(), "security".to_string(), "deserialization".to_string()],
+            tags: vec![
+                "python".to_string(),
+                "security".to_string(),
+                "deserialization".to_string(),
+            ],
             cwe: Some(502),
         },
         // BUG rules
@@ -130,9 +155,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["Python".to_string()],
             pattern: Some(r"^\s*assert\b".to_string()),
-            message_template: "assert statements are stripped in optimized builds: {match}".to_string(),
+            message_template: "assert statements are stripped in optimized builds: {match}"
+                .to_string(),
             effort_mins: 15,
-            tags: vec!["python".to_string(), "bug".to_string(), "testing".to_string()],
+            tags: vec![
+                "python".to_string(),
+                "bug".to_string(),
+                "testing".to_string(),
+            ],
             cwe: None,
         },
         ScanRule {
@@ -142,9 +172,15 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["Python".to_string()],
             pattern: Some(r"except\s*:".to_string()),
-            message_template: "bare except: catches all exceptions including KeyboardInterrupt: {match}".to_string(),
+            message_template:
+                "bare except: catches all exceptions including KeyboardInterrupt: {match}"
+                    .to_string(),
             effort_mins: 10,
-            tags: vec!["python".to_string(), "smell".to_string(), "error-handling".to_string()],
+            tags: vec![
+                "python".to_string(),
+                "smell".to_string(),
+                "error-handling".to_string(),
+            ],
             cwe: Some(396),
         },
         ScanRule {
@@ -154,9 +190,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["Python".to_string()],
             pattern: Some(r"def\s+\w+\([^)]*=[^)]*\[\]".to_string()),
-            message_template: "mutable default arguments are shared across calls: {match}".to_string(),
+            message_template: "mutable default arguments are shared across calls: {match}"
+                .to_string(),
             effort_mins: 20,
-            tags: vec!["python".to_string(), "bug".to_string(), "function-def".to_string()],
+            tags: vec![
+                "python".to_string(),
+                "bug".to_string(),
+                "function-def".to_string(),
+            ],
             cwe: None,
         },
         // SMELL rules
@@ -169,7 +210,11 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             pattern: Some(r"^\s*print\s*\(".to_string()),
             message_template: "Debug print statement -- use logging instead: {match}".to_string(),
             effort_mins: 5,
-            tags: vec!["python".to_string(), "smell".to_string(), "debug".to_string()],
+            tags: vec![
+                "python".to_string(),
+                "smell".to_string(),
+                "debug".to_string(),
+            ],
             cwe: None,
         },
         ScanRule {
@@ -179,12 +224,16 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Critical,
             languages: vec!["Python".to_string()],
             pattern: Some(r#"f["'].*SELECT.*\{.*\}.*["']"#.to_string()),
-            message_template: "f-string SQL injection -- use parameterized queries: {match}".to_string(),
+            message_template: "f-string SQL injection -- use parameterized queries: {match}"
+                .to_string(),
             effort_mins: 30,
-            tags: vec!["python".to_string(), "security".to_string(), "sql-injection".to_string()],
+            tags: vec![
+                "python".to_string(),
+                "security".to_string(),
+                "sql-injection".to_string(),
+            ],
             cwe: Some(89),
         },
-
         // =========================================================================
         // JAVASCRIPT / TYPESCRIPT (10+ rules)
         // =========================================================================
@@ -198,7 +247,11 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             pattern: Some(r"\beval\s*\(".to_string()),
             message_template: "eval() is a severe XSS/injection vector: {match}".to_string(),
             effort_mins: 30,
-            tags: vec!["javascript".to_string(), "security".to_string(), "xss".to_string()],
+            tags: vec![
+                "javascript".to_string(),
+                "security".to_string(),
+                "xss".to_string(),
+            ],
             cwe: Some(95),
         },
         ScanRule {
@@ -208,9 +261,15 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
             pattern: Some(r"\.innerHTML\s*=".to_string()),
-            message_template: "innerHTML assignment is XSS risk -- use textContent or sanitize: {match}".to_string(),
+            message_template:
+                "innerHTML assignment is XSS risk -- use textContent or sanitize: {match}"
+                    .to_string(),
             effort_mins: 20,
-            tags: vec!["javascript".to_string(), "security".to_string(), "xss".to_string()],
+            tags: vec![
+                "javascript".to_string(),
+                "security".to_string(),
+                "xss".to_string(),
+            ],
             cwe: Some(79),
         },
         ScanRule {
@@ -222,7 +281,11 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             pattern: Some(r"document\.write\(".to_string()),
             message_template: "document.write() is deprecated and XSS risk: {match}".to_string(),
             effort_mins: 15,
-            tags: vec!["javascript".to_string(), "xss".to_string(), "deprecated".to_string()],
+            tags: vec![
+                "javascript".to_string(),
+                "xss".to_string(),
+                "deprecated".to_string(),
+            ],
             cwe: Some(79),
         },
         ScanRule {
@@ -232,9 +295,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
             pattern: Some(r#"setTimeout\s*\(\s*['"]"#.to_string()),
-            message_template: "setTimeout with string evaluates code -- use function: {match}".to_string(),
+            message_template: "setTimeout with string evaluates code -- use function: {match}"
+                .to_string(),
             effort_mins: 10,
-            tags: vec!["javascript".to_string(), "security".to_string(), "code-execution".to_string()],
+            tags: vec![
+                "javascript".to_string(),
+                "security".to_string(),
+                "code-execution".to_string(),
+            ],
             cwe: Some(95),
         },
         ScanRule {
@@ -244,9 +312,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
             pattern: Some(r"new\s+Function\s*\(".to_string()),
-            message_template: "new Function() with dynamic strings is code injection: {match}".to_string(),
+            message_template: "new Function() with dynamic strings is code injection: {match}"
+                .to_string(),
             effort_mins: 25,
-            tags: vec!["javascript".to_string(), "security".to_string(), "code-execution".to_string()],
+            tags: vec![
+                "javascript".to_string(),
+                "security".to_string(),
+                "code-execution".to_string(),
+            ],
             cwe: Some(95),
         },
         // SMELL/BUG rules
@@ -259,7 +332,11 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             pattern: Some(r"console\.log\s*\(".to_string()),
             message_template: "Debug console.log() left in code: {match}".to_string(),
             effort_mins: 5,
-            tags: vec!["javascript".to_string(), "smell".to_string(), "debug".to_string()],
+            tags: vec![
+                "javascript".to_string(),
+                "smell".to_string(),
+                "debug".to_string(),
+            ],
             cwe: None,
         },
         ScanRule {
@@ -271,7 +348,11 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             pattern: Some(r"^\s*var\s+\w+".to_string()),
             message_template: "var has function scope -- use let or const: {match}".to_string(),
             effort_mins: 10,
-            tags: vec!["javascript".to_string(), "smell".to_string(), "modernization".to_string()],
+            tags: vec![
+                "javascript".to_string(),
+                "smell".to_string(),
+                "modernization".to_string(),
+            ],
             cwe: None,
         },
         ScanRule {
@@ -281,9 +362,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
             pattern: Some(r"[^=!]==[^=]".to_string()),
-            message_template: "== allows type coercion -- use === for strict equality: {match}".to_string(),
+            message_template: "== allows type coercion -- use === for strict equality: {match}"
+                .to_string(),
             effort_mins: 10,
-            tags: vec!["javascript".to_string(), "bug".to_string(), "comparison".to_string()],
+            tags: vec![
+                "javascript".to_string(),
+                "bug".to_string(),
+                "comparison".to_string(),
+            ],
             cwe: Some(1025),
         },
         ScanRule {
@@ -293,9 +379,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
             pattern: Some(r"const\s+\w+\s*=\s*\w+\([^)]*\);".to_string()),
-            message_template: "Async function called without await -- may return Promise: {match}".to_string(),
+            message_template: "Async function called without await -- may return Promise: {match}"
+                .to_string(),
             effort_mins: 15,
-            tags: vec!["javascript".to_string(), "bug".to_string(), "async".to_string()],
+            tags: vec![
+                "javascript".to_string(),
+                "bug".to_string(),
+                "async".to_string(),
+            ],
             cwe: None,
         },
         ScanRule {
@@ -305,12 +396,16 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Critical,
             languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
             pattern: Some(r#"(?i)jwt.*secret\s*[:=]\s*['"][^'"]{8,}['"]"#.to_string()),
-            message_template: "Hardcoded JWT secret -- use environment variables: {match}".to_string(),
+            message_template: "Hardcoded JWT secret -- use environment variables: {match}"
+                .to_string(),
             effort_mins: 20,
-            tags: vec!["javascript".to_string(), "security".to_string(), "secrets".to_string()],
+            tags: vec![
+                "javascript".to_string(),
+                "security".to_string(),
+                "secrets".to_string(),
+            ],
             cwe: Some(798),
         },
-
         // =========================================================================
         // RUST (8+ rules)
         // =========================================================================
@@ -321,7 +416,8 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Minor,
             languages: vec!["Rust".to_string()],
             pattern: Some(r"\.unwrap\(\)".to_string()),
-            message_template: "unwrap() panics on failure -- use ? or expect() with message: {match}".to_string(),
+            message_template:
+                "unwrap() panics on failure -- use ? or expect() with message: {match}".to_string(),
             effort_mins: 10,
             tags: vec!["rust".to_string(), "error-handling".to_string()],
             cwe: None,
@@ -333,7 +429,8 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["Rust".to_string()],
             pattern: Some(r"panic!\s*\(".to_string()),
-            message_template: "panic!() terminates thread -- prefer returning Result: {match}".to_string(),
+            message_template: "panic!() terminates thread -- prefer returning Result: {match}"
+                .to_string(),
             effort_mins: 20,
             tags: vec!["rust".to_string(), "error-handling".to_string()],
             cwe: None,
@@ -345,9 +442,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["Rust".to_string()],
             pattern: Some(r"\bunsafe\s*\{".to_string()),
-            message_template: "unsafe code -- requires manual memory-safety review: {match}".to_string(),
+            message_template: "unsafe code -- requires manual memory-safety review: {match}"
+                .to_string(),
             effort_mins: 60,
-            tags: vec!["rust".to_string(), "security".to_string(), "memory-safety".to_string()],
+            tags: vec![
+                "rust".to_string(),
+                "security".to_string(),
+                "memory-safety".to_string(),
+            ],
             cwe: Some(119),
         },
         ScanRule {
@@ -357,7 +459,8 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["Rust".to_string()],
             pattern: Some(r"todo!\s*\(".to_string()),
-            message_template: "todo!() macro not implemented -- remove before release: {match}".to_string(),
+            message_template: "todo!() macro not implemented -- remove before release: {match}"
+                .to_string(),
             effort_mins: 30,
             tags: vec!["rust".to_string(), "incomplete".to_string()],
             cwe: None,
@@ -369,7 +472,8 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Minor,
             languages: vec!["Rust".to_string()],
             pattern: Some(r"\.clone\(\)".to_string()),
-            message_template: "clone() may cause performance issues -- consider references: {match}".to_string(),
+            message_template:
+                "clone() may cause performance issues -- consider references: {match}".to_string(),
             effort_mins: 15,
             tags: vec!["rust".to_string(), "performance".to_string()],
             cwe: None,
@@ -381,9 +485,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Critical,
             languages: vec!["Rust".to_string()],
             pattern: Some(r"Command::new".to_string()),
-            message_template: "Command::new() -- ensure input is properly sanitized: {match}".to_string(),
+            message_template: "Command::new() -- ensure input is properly sanitized: {match}"
+                .to_string(),
             effort_mins: 30,
-            tags: vec!["rust".to_string(), "security".to_string(), "command-injection".to_string()],
+            tags: vec![
+                "rust".to_string(),
+                "security".to_string(),
+                "command-injection".to_string(),
+            ],
             cwe: Some(78),
         },
         ScanRule {
@@ -393,9 +502,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["Rust".to_string()],
             pattern: Some(r#"(?i)(password|secret|api_key)\s*=\s*["\']"#.to_string()),
-            message_template: "Hardcoded secret detected -- use environment variables: {match}".to_string(),
+            message_template: "Hardcoded secret detected -- use environment variables: {match}"
+                .to_string(),
             effort_mins: 20,
-            tags: vec!["rust".to_string(), "security".to_string(), "secrets".to_string()],
+            tags: vec![
+                "rust".to_string(),
+                "security".to_string(),
+                "secrets".to_string(),
+            ],
             cwe: Some(798),
         },
         ScanRule {
@@ -405,12 +519,16 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Minor,
             languages: vec!["Rust".to_string()],
             pattern: Some(r"#\[allow\(unused\)".to_string()),
-            message_template: "Blanket allow(unused) suppresses all warnings -- be specific: {match}".to_string(),
+            message_template:
+                "Blanket allow(unused) suppresses all warnings -- be specific: {match}".to_string(),
             effort_mins: 5,
-            tags: vec!["rust".to_string(), "smell".to_string(), "linting".to_string()],
+            tags: vec![
+                "rust".to_string(),
+                "smell".to_string(),
+                "linting".to_string(),
+            ],
             cwe: None,
         },
-
         // =========================================================================
         // GO (8+ rules)
         // =========================================================================
@@ -433,9 +551,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["Go".to_string()],
             pattern: Some(r"_\s*:=\s*\w+\([^)]*\)".to_string()),
-            message_template: "Error ignored with _ -- check and handle errors: {match}".to_string(),
+            message_template: "Error ignored with _ -- check and handle errors: {match}"
+                .to_string(),
             effort_mins: 15,
-            tags: vec!["go".to_string(), "bug".to_string(), "error-handling".to_string()],
+            tags: vec![
+                "go".to_string(),
+                "bug".to_string(),
+                "error-handling".to_string(),
+            ],
             cwe: None,
         },
         ScanRule {
@@ -445,9 +568,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Critical,
             languages: vec!["Go".to_string()],
             pattern: Some(r#"(?i)query\s*\(\s*.*\+.*\)"#.to_string()),
-            message_template: "SQL string concatenation -- use parameterized queries: {match}".to_string(),
+            message_template: "SQL string concatenation -- use parameterized queries: {match}"
+                .to_string(),
             effort_mins: 30,
-            tags: vec!["go".to_string(), "security".to_string(), "sql-injection".to_string()],
+            tags: vec![
+                "go".to_string(),
+                "security".to_string(),
+                "sql-injection".to_string(),
+            ],
             cwe: Some(89),
         },
         ScanRule {
@@ -469,9 +597,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["Go".to_string()],
             pattern: Some(r"crypto/(md5|sha1)".to_string()),
-            message_template: "MD5/SHA1 is cryptographically weak -- use SHA-256+: {match}".to_string(),
+            message_template: "MD5/SHA1 is cryptographically weak -- use SHA-256+: {match}"
+                .to_string(),
             effort_mins: 20,
-            tags: vec!["go".to_string(), "security".to_string(), "cryptography".to_string()],
+            tags: vec![
+                "go".to_string(),
+                "security".to_string(),
+                "cryptography".to_string(),
+            ],
             cwe: Some(327),
         },
         ScanRule {
@@ -481,9 +614,15 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["Go".to_string()],
             pattern: Some(r"(?s)(for|while).*\{.*defer.*\}".to_string()),
-            message_template: "defer in loop -- deferred functions won't run until function exit: {match}".to_string(),
+            message_template:
+                "defer in loop -- deferred functions won't run until function exit: {match}"
+                    .to_string(),
             effort_mins: 25,
-            tags: vec!["go".to_string(), "bug".to_string(), "resource-leak".to_string()],
+            tags: vec![
+                "go".to_string(),
+                "bug".to_string(),
+                "resource-leak".to_string(),
+            ],
             cwe: Some(772),
         },
         ScanRule {
@@ -493,9 +632,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["Go".to_string()],
             pattern: Some(r"go\s+\w+\(".to_string()),
-            message_template: "Goroutine launched -- ensure panic recovery with recover(): {match}".to_string(),
+            message_template: "Goroutine launched -- ensure panic recovery with recover(): {match}"
+                .to_string(),
             effort_mins: 30,
-            tags: vec!["go".to_string(), "bug".to_string(), "concurrency".to_string()],
+            tags: vec![
+                "go".to_string(),
+                "bug".to_string(),
+                "concurrency".to_string(),
+            ],
             cwe: None,
         },
         ScanRule {
@@ -505,12 +649,16 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["Go".to_string()],
             pattern: Some(r#"(?i)(password|api_key|secret)\s*:=\s*["\']"#.to_string()),
-            message_template: "Hardcoded secret -- use environment variables or vaults: {match}".to_string(),
+            message_template: "Hardcoded secret -- use environment variables or vaults: {match}"
+                .to_string(),
             effort_mins: 20,
-            tags: vec!["go".to_string(), "security".to_string(), "secrets".to_string()],
+            tags: vec![
+                "go".to_string(),
+                "security".to_string(),
+                "secrets".to_string(),
+            ],
             cwe: Some(798),
         },
-
         // =========================================================================
         // JAVA (6+ rules)
         // =========================================================================
@@ -523,7 +671,11 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             pattern: Some(r"System\.out\.println".to_string()),
             message_template: "Debug System.out.println() -- use logger: {match}".to_string(),
             effort_mins: 5,
-            tags: vec!["java".to_string(), "smell".to_string(), "logging".to_string()],
+            tags: vec![
+                "java".to_string(),
+                "smell".to_string(),
+                "logging".to_string(),
+            ],
             cwe: None,
         },
         ScanRule {
@@ -533,9 +685,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Critical,
             languages: vec!["Java".to_string()],
             pattern: Some(r"(?i)query.*\+.*select".to_string()),
-            message_template: "SQL string concatenation -- use PreparedStatement: {match}".to_string(),
+            message_template: "SQL string concatenation -- use PreparedStatement: {match}"
+                .to_string(),
             effort_mins: 30,
-            tags: vec!["java".to_string(), "security".to_string(), "sql-injection".to_string()],
+            tags: vec![
+                "java".to_string(),
+                "security".to_string(),
+                "sql-injection".to_string(),
+            ],
             cwe: Some(89),
         },
         ScanRule {
@@ -545,9 +702,15 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["Java".to_string()],
             pattern: Some(r"new\s+Random\s*\(".to_string()),
-            message_template: "java.util.Random is not cryptographically secure -- use SecureRandom: {match}".to_string(),
+            message_template:
+                "java.util.Random is not cryptographically secure -- use SecureRandom: {match}"
+                    .to_string(),
             effort_mins: 15,
-            tags: vec!["java".to_string(), "security".to_string(), "cryptography".to_string()],
+            tags: vec![
+                "java".to_string(),
+                "security".to_string(),
+                "cryptography".to_string(),
+            ],
             cwe: Some(338),
         },
         ScanRule {
@@ -557,9 +720,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["Java".to_string()],
             pattern: Some(r"catch\s*\([^)]+\)\s*\{\s*\}".to_string()),
-            message_template: "Empty catch block -- at least log the exception: {match}".to_string(),
+            message_template: "Empty catch block -- at least log the exception: {match}"
+                .to_string(),
             effort_mins: 15,
-            tags: vec!["java".to_string(), "bug".to_string(), "error-handling".to_string()],
+            tags: vec![
+                "java".to_string(),
+                "bug".to_string(),
+                "error-handling".to_string(),
+            ],
             cwe: Some(390),
         },
         ScanRule {
@@ -571,7 +739,11 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             pattern: Some(r"String.*==".to_string()),
             message_template: "Use .equals() for string comparison, not ==: {match}".to_string(),
             effort_mins: 10,
-            tags: vec!["java".to_string(), "bug".to_string(), "comparison".to_string()],
+            tags: vec![
+                "java".to_string(),
+                "bug".to_string(),
+                "comparison".to_string(),
+            ],
             cwe: Some(1025),
         },
         ScanRule {
@@ -581,12 +753,16 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Major,
             languages: vec!["Java".to_string()],
             pattern: Some(r#"(?i)password\s*=\s*["\'][^"\']{3,}"#.to_string()),
-            message_template: "Hardcoded password -- use configuration management: {match}".to_string(),
+            message_template: "Hardcoded password -- use configuration management: {match}"
+                .to_string(),
             effort_mins: 20,
-            tags: vec!["java".to_string(), "security".to_string(), "secrets".to_string()],
+            tags: vec![
+                "java".to_string(),
+                "security".to_string(),
+                "secrets".to_string(),
+            ],
             cwe: Some(798),
         },
-
         // =========================================================================
         // GENERAL / MULTI-LANGUAGE (8+ rules)
         // =========================================================================
@@ -599,7 +775,11 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             pattern: Some(r"(?i)(TODO|FIXME)".to_string()),
             message_template: "Unresolved TODO/FIXME -- schedule a fix: {match}".to_string(),
             effort_mins: 5,
-            tags: vec!["general".to_string(), "smell".to_string(), "maintenance".to_string()],
+            tags: vec![
+                "general".to_string(),
+                "smell".to_string(),
+                "maintenance".to_string(),
+            ],
             cwe: None,
         },
         ScanRule {
@@ -611,7 +791,11 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             pattern: Some(r"\b(?:\d{1,3}\.){3}\d{1,3}\b".to_string()),
             message_template: "Hardcoded IP address -- use configuration: {match}".to_string(),
             effort_mins: 10,
-            tags: vec!["general".to_string(), "smell".to_string(), "configuration".to_string()],
+            tags: vec![
+                "general".to_string(),
+                "smell".to_string(),
+                "configuration".to_string(),
+            ],
             cwe: None,
         },
         ScanRule {
@@ -620,10 +804,16 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             issue_type: IssueType::Vulnerability,
             severity: IssueSeverity::Critical,
             languages: vec![],
-            pattern: Some(r#"(?i)(api[_-]?key|token|bearer)\s*[:=]\s*['\"][^'\"]{16,}"#.to_string()),
+            pattern: Some(
+                r#"(?i)(api[_-]?key|token|bearer)\s*[:=]\s*['\"][^'\"]{16,}"#.to_string(),
+            ),
             message_template: "Hardcoded API key/token -- rotate immediately: {match}".to_string(),
             effort_mins: 30,
-            tags: vec!["general".to_string(), "security".to_string(), "secrets".to_string()],
+            tags: vec![
+                "general".to_string(),
+                "security".to_string(),
+                "secrets".to_string(),
+            ],
             cwe: Some(798),
         },
         ScanRule {
@@ -632,10 +822,15 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             issue_type: IssueType::CodeSmell,
             severity: IssueSeverity::Minor,
             languages: vec![],
-            pattern: None,      // Handled by complexity analysis
-            message_template: "Function exceeds 200 lines -- consider breaking into smaller functions".to_string(),
+            pattern: None, // Handled by complexity analysis
+            message_template:
+                "Function exceeds 200 lines -- consider breaking into smaller functions".to_string(),
             effort_mins: 90,
-            tags: vec!["general".to_string(), "smell".to_string(), "maintainability".to_string()],
+            tags: vec![
+                "general".to_string(),
+                "smell".to_string(),
+                "maintainability".to_string(),
+            ],
             cwe: None,
         },
         ScanRule {
@@ -644,10 +839,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             issue_type: IssueType::CodeSmell,
             severity: IssueSeverity::Minor,
             languages: vec![],
-            pattern: None,      // Handled by complexity analysis
+            pattern: None, // Handled by complexity analysis
             message_template: "Code nesting exceeds 4 levels -- simplify control flow".to_string(),
             effort_mins: 30,
-            tags: vec!["general".to_string(), "smell".to_string(), "complexity".to_string()],
+            tags: vec![
+                "general".to_string(),
+                "smell".to_string(),
+                "complexity".to_string(),
+            ],
             cwe: None,
         },
         ScanRule {
@@ -659,7 +858,11 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             pattern: Some(r"^[\s]*//.*\w+.*[\s]*//.*\w+".to_string()),
             message_template: "Commented-out code -- delete or restore: {match}".to_string(),
             effort_mins: 5,
-            tags: vec!["general".to_string(), "smell".to_string(), "maintenance".to_string()],
+            tags: vec![
+                "general".to_string(),
+                "smell".to_string(),
+                "maintenance".to_string(),
+            ],
             cwe: None,
         },
         ScanRule {
@@ -671,7 +874,11 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             pattern: Some(r"=\s*[0-9]{2,}(?![0-9])".to_string()),
             message_template: "Magic number -- extract as named constant: {match}".to_string(),
             effort_mins: 10,
-            tags: vec!["general".to_string(), "smell".to_string(), "readability".to_string()],
+            tags: vec![
+                "general".to_string(),
+                "smell".to_string(),
+                "readability".to_string(),
+            ],
             cwe: None,
         },
         ScanRule {
@@ -681,9 +888,14 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             severity: IssueSeverity::Minor,
             languages: vec![],
             pattern: Some(r"(?:def|function|fn)\s+\w+\s*\(\s*\w+.*,.*,.*,.*,.*,".to_string()),
-            message_template: "Function has >5 parameters -- consider object parameter: {match}".to_string(),
+            message_template: "Function has >5 parameters -- consider object parameter: {match}"
+                .to_string(),
             effort_mins: 20,
-            tags: vec!["general".to_string(), "smell".to_string(), "api-design".to_string()],
+            tags: vec![
+                "general".to_string(),
+                "smell".to_string(),
+                "api-design".to_string(),
+            ],
             cwe: None,
         },
     ]

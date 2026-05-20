@@ -47,17 +47,28 @@ fn file_backend_writes_json_line_to_configured_path() {
     let log = logger();
     let mut options = HashMap::new();
     options.insert("file_path".into(), path.to_string_lossy().into_owned());
-    log.enable("file/", AuditBackend {
-        path: "file/".into(),
-        backend_type: AuditBackendType::File,
-        description: "tenant audit log".into(),
-        options,
-        local: false,
-        seal_wrap: false,
-    });
+    log.enable(
+        "file/",
+        AuditBackend {
+            path: "file/".into(),
+            backend_type: AuditBackendType::File,
+            description: "tenant audit log".into(),
+            options,
+            local: false,
+            seal_wrap: false,
+        },
+    );
 
-    log.log(entry("hvs.SECRET", "read", &format!("{}/secret/data/foo", TENANT)));
-    log.log(entry("hvs.SECRET", "update", &format!("{}/secret/data/foo", TENANT)));
+    log.log(entry(
+        "hvs.SECRET",
+        "read",
+        &format!("{}/secret/data/foo", TENANT),
+    ));
+    log.log(entry(
+        "hvs.SECRET",
+        "update",
+        &format!("{}/secret/data/foo", TENANT),
+    ));
 
     let contents = std::fs::read_to_string(&path).expect("file written");
     let lines: Vec<&str> = contents.lines().collect();
@@ -87,8 +98,13 @@ fn syslog_backend_formats_priority_and_tag_correctly() {
         local: false,
         seal_wrap: false,
     };
-    let line = backend.syslog_format(r#"{"audit_type":"request"}"#).unwrap();
-    assert!(line.starts_with("<134> vault: "), "default LOCAL0 priority + tag");
+    let line = backend
+        .syslog_format(r#"{"audit_type":"request"}"#)
+        .unwrap();
+    assert!(
+        line.starts_with("<134> vault: "),
+        "default LOCAL0 priority + tag"
+    );
     assert!(line.contains(r#"{"audit_type":"request"}"#));
 
     // LOCAL5 + custom tag
@@ -104,8 +120,10 @@ fn syslog_backend_formats_priority_and_tag_correctly() {
         seal_wrap: false,
     };
     let line = backend.syslog_format(r#"{"x":1}"#).unwrap();
-    assert!(line.starts_with(&format!("<174> {}-vault: ", TENANT)),
-        "LOCAL5 priority = 174");
+    assert!(
+        line.starts_with(&format!("<174> {}-vault: ", TENANT)),
+        "LOCAL5 priority = 174"
+    );
 
     // Non-syslog backend ⇒ formatter returns None.
     let bad = AuditBackend {
@@ -127,24 +145,34 @@ fn syslog_backend_formats_priority_and_tag_correctly() {
 fn signed_envelope_round_trips_and_detects_tampering() {
     let log = logger();
     let env = log.signed_envelope(&entry(
-        "hvs.SECRET", "read", &format!("{}/secret/data/foo", TENANT),
+        "hvs.SECRET",
+        "read",
+        &format!("{}/secret/data/foo", TENANT),
     ));
     assert!(!env.json.is_empty());
     assert_eq!(env.signature.len(), 64, "SHA-256 HMAC hex");
-    assert!(log.verify_envelope(&env), "freshly signed envelope verifies");
+    assert!(
+        log.verify_envelope(&env),
+        "freshly signed envelope verifies"
+    );
 
     // Tamper with the JSON body — verification fails.
     let tampered = SignedAuditEnvelope {
         json: env.json.replace("read", "delete"),
         signature: env.signature.clone(),
     };
-    assert!(!log.verify_envelope(&tampered),
-        "tampered body invalidates the signature");
+    assert!(
+        !log.verify_envelope(&tampered),
+        "tampered body invalidates the signature"
+    );
 
     // Tamper with the signature — verification fails.
     let mut bad_sig = env.signature.clone();
     bad_sig.replace_range(0..2, "00");
-    let tampered = SignedAuditEnvelope { json: env.json.clone(), signature: bad_sig };
+    let tampered = SignedAuditEnvelope {
+        json: env.json.clone(),
+        signature: bad_sig,
+    };
     assert!(!log.verify_envelope(&tampered));
 }
 
@@ -161,25 +189,37 @@ fn multi_backend_fan_out_writes_to_each_enabled_backend() {
 
     let mut opts_a = HashMap::new();
     opts_a.insert("file_path".into(), path_a.to_string_lossy().into_owned());
-    log.enable("file-a/", AuditBackend {
-        path: "file-a/".into(),
-        backend_type: AuditBackendType::File,
-        description: "primary".into(),
-        options: opts_a,
-        local: false, seal_wrap: false,
-    });
+    log.enable(
+        "file-a/",
+        AuditBackend {
+            path: "file-a/".into(),
+            backend_type: AuditBackendType::File,
+            description: "primary".into(),
+            options: opts_a,
+            local: false,
+            seal_wrap: false,
+        },
+    );
 
     let mut opts_b = HashMap::new();
     opts_b.insert("file_path".into(), path_b.to_string_lossy().into_owned());
-    log.enable("file-b/", AuditBackend {
-        path: "file-b/".into(),
-        backend_type: AuditBackendType::File,
-        description: "secondary".into(),
-        options: opts_b,
-        local: false, seal_wrap: false,
-    });
+    log.enable(
+        "file-b/",
+        AuditBackend {
+            path: "file-b/".into(),
+            backend_type: AuditBackendType::File,
+            description: "secondary".into(),
+            options: opts_b,
+            local: false,
+            seal_wrap: false,
+        },
+    );
 
-    log.log(entry("hvs.X", "update", &format!("{}/secret/data/key", TENANT)));
+    log.log(entry(
+        "hvs.X",
+        "update",
+        &format!("{}/secret/data/key", TENANT),
+    ));
 
     let a = std::fs::read_to_string(&path_a).expect("primary written");
     let b = std::fs::read_to_string(&path_b).expect("secondary written");
@@ -189,9 +229,21 @@ fn multi_backend_fan_out_writes_to_each_enabled_backend() {
 
     // After disabling one backend, only the remaining one receives.
     assert!(log.disable("file-a/"));
-    log.log(entry("hvs.X", "update", &format!("{}/secret/data/key2", TENANT)));
+    log.log(entry(
+        "hvs.X",
+        "update",
+        &format!("{}/secret/data/key2", TENANT),
+    ));
     let a_after = std::fs::read_to_string(&path_a).unwrap();
     let b_after = std::fs::read_to_string(&path_b).unwrap();
-    assert_eq!(a_after.lines().count(), 1, "disabled backend stops receiving");
-    assert_eq!(b_after.lines().count(), 2, "remaining backend keeps receiving");
+    assert_eq!(
+        a_after.lines().count(),
+        1,
+        "disabled backend stops receiving"
+    );
+    assert_eq!(
+        b_after.lines().count(),
+        2,
+        "remaining backend keeps receiving"
+    );
 }

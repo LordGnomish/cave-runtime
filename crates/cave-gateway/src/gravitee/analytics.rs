@@ -8,8 +8,8 @@
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::sync::RwLock;
 use std::sync::Arc;
+use std::sync::RwLock;
 
 /// Individual API metric record.
 #[derive(Debug, Clone, Serialize, Deserialize)]

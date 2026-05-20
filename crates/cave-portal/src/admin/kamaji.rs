@@ -9,7 +9,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, KamajiTcp};
+use crate::admin::state::{AdminState, KamajiTcp, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -24,10 +24,12 @@ pub enum KamajiViewError {
 
 pub fn list_tcps(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<KamajiTcp>, KamajiViewError> {
     ctx.authorise(Permission::KamajiRead)?;
-    Ok(scope(&state.kamaji_tcps.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter()
-        .cloned()
-        .collect())
+    Ok(scope(&state.kamaji_tcps.read().unwrap(), &ctx.tenant, |r| {
+        &r.tenant
+    })
+    .into_iter()
+    .cloned()
+    .collect())
 }
 
 pub fn scale_tcp(

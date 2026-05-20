@@ -61,26 +61,27 @@
 //! GET    /api/cri/network/status
 //! ```
 
-pub mod models;
-pub mod error;
-pub mod paths;
-pub mod namespace;
+pub mod auth;
 pub mod cgroup;
+pub mod cgroup_v2;
+pub mod content;
+pub mod criu;
+pub mod diff;
+pub mod error;
+pub mod health;
+pub mod leases;
+pub mod log_v2;
+pub mod logs;
+pub mod manifest_list;
+pub mod models;
+pub mod namespace;
+pub mod oci_spec;
+pub mod paths;
+pub mod pull_progress;
 pub mod registry;
 pub mod rootfs;
-pub mod runtime;
-pub mod store;
 pub mod routes;
-pub mod state_machine;
-pub mod oci_spec;
-pub mod logs;
-pub mod log_v2;
-pub mod health;
-pub mod auth;
-pub mod cgroup_v2;
-pub mod criu;
-pub mod manifest_list;
-pub mod pull_progress;
+pub mod runtime;
 pub mod runtime_handler;
 pub mod sandbox;
 /// k8s-cri push batch2 2026-05-13: Windows + FreeBSD sandbox
@@ -90,13 +91,12 @@ pub mod sandbox;
 /// (`jail_create` / `CreateJobObjectW` / HCS) belongs to the
 /// runtime backend.
 pub mod sandbox_other;
+pub mod state_machine;
 pub mod stats;
+pub mod store;
 pub mod streaming;
 pub mod transport;
 pub mod userns;
-pub mod content;
-pub mod diff;
-pub mod leases;
 
 #[cfg(test)]
 mod upstream_tests;
@@ -104,11 +104,11 @@ mod upstream_tests;
 #[cfg(test)]
 mod parity_tests;
 
-use routes::CriState;
-use store::{ContainerStore, ImageStore, SandboxStore, SnapshotStore};
-use registry::RegistryClient;
 use dashmap::DashMap;
+use registry::RegistryClient;
+use routes::CriState;
 use std::sync::Arc;
+use store::{ContainerStore, ImageStore, SandboxStore, SnapshotStore};
 use tokio::sync::Mutex;
 
 /// Initialize cave-cri state.

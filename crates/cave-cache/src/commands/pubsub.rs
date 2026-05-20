@@ -22,7 +22,9 @@ pub fn subscribe_response(channel: &[u8], count: usize) -> Resp {
 pub fn unsubscribe_response(channel: Option<&[u8]>, count: usize) -> Resp {
     Resp::Array(Some(vec![
         Resp::BulkString(Some(b"unsubscribe".to_vec())),
-        channel.map(|c| Resp::BulkString(Some(c.to_vec()))).unwrap_or(Resp::nil()),
+        channel
+            .map(|c| Resp::BulkString(Some(c.to_vec())))
+            .unwrap_or(Resp::nil()),
         Resp::Integer(count as i64),
     ]))
 }
@@ -40,7 +42,9 @@ pub fn psubscribe_response(pattern: &[u8], count: usize) -> Resp {
 pub fn punsubscribe_response(pattern: Option<&[u8]>, count: usize) -> Resp {
     Resp::Array(Some(vec![
         Resp::BulkString(Some(b"punsubscribe".to_vec())),
-        pattern.map(|p| Resp::BulkString(Some(p.to_vec()))).unwrap_or(Resp::nil()),
+        pattern
+            .map(|p| Resp::BulkString(Some(p.to_vec())))
+            .unwrap_or(Resp::nil()),
         Resp::Integer(count as i64),
     ]))
 }
@@ -75,7 +79,9 @@ pub fn pmessage_resp(pattern: &[u8], channel: &[u8], message: &[u8]) -> Resp {
 
 /// PUBLISH — returns number of subscribers that received the message.
 pub fn cmd_publish(args: &[Vec<u8>], pubsub: &PubSubRegistry) -> CacheResult<Resp> {
-    if args.len() != 3 { return Err(CacheError::wrong_arity("publish")); }
+    if args.len() != 3 {
+        return Err(CacheError::wrong_arity("publish"));
+    }
     let count = pubsub.publish(&args[1], &args[2]);
     Ok(Resp::Integer(count as i64))
 }
@@ -83,9 +89,14 @@ pub fn cmd_publish(args: &[Vec<u8>], pubsub: &PubSubRegistry) -> CacheResult<Res
 /// PUBSUB CHANNELS [pattern]
 pub fn cmd_pubsub_channels(args: &[Vec<u8>], pubsub: &PubSubRegistry) -> CacheResult<Resp> {
     let pattern = args.get(3).map(|p| p.as_slice());
-    let channels: Vec<Resp> = pubsub.active_channels()
+    let channels: Vec<Resp> = pubsub
+        .active_channels()
         .into_iter()
-        .filter(|ch| pattern.map(|p| crate::db::glob_match(p, ch)).unwrap_or(true))
+        .filter(|ch| {
+            pattern
+                .map(|p| crate::db::glob_match(p, ch))
+                .unwrap_or(true)
+        })
         .map(|ch| Resp::BulkString(Some(ch)))
         .collect();
     Ok(Resp::Array(Some(channels)))
@@ -95,9 +106,10 @@ pub fn cmd_pubsub_channels(args: &[Vec<u8>], pubsub: &PubSubRegistry) -> CacheRe
 pub fn cmd_pubsub_numsub(args: &[Vec<u8>], pubsub: &PubSubRegistry) -> CacheResult<Resp> {
     let channels: Vec<Vec<u8>> = args[3..].to_vec();
     let counts = pubsub.numsub(&channels);
-    let resp: Vec<Resp> = counts.into_iter().flat_map(|(ch, cnt)| {
-        vec![Resp::BulkString(Some(ch)), Resp::Integer(cnt as i64)]
-    }).collect();
+    let resp: Vec<Resp> = counts
+        .into_iter()
+        .flat_map(|(ch, cnt)| vec![Resp::BulkString(Some(ch)), Resp::Integer(cnt as i64)])
+        .collect();
     Ok(Resp::Array(Some(resp)))
 }
 
@@ -109,8 +121,14 @@ pub fn cmd_pubsub_numpat(pubsub: &PubSubRegistry) -> CacheResult<Resp> {
 /// PUBSUB SHARDCHANNELS [pattern]
 pub fn cmd_pubsub_shardchannels(args: &[Vec<u8>], pubsub: &PubSubRegistry) -> CacheResult<Resp> {
     let pattern = args.get(3).map(|p| p.as_slice());
-    let channels: Vec<Resp> = pubsub.shard_channels.keys()
-        .filter(|ch| pattern.map(|p| crate::db::glob_match(p, ch)).unwrap_or(true))
+    let channels: Vec<Resp> = pubsub
+        .shard_channels
+        .keys()
+        .filter(|ch| {
+            pattern
+                .map(|p| crate::db::glob_match(p, ch))
+                .unwrap_or(true)
+        })
         .map(|ch| Resp::BulkString(Some(ch.clone())))
         .collect();
     Ok(Resp::Array(Some(channels)))
@@ -119,9 +137,19 @@ pub fn cmd_pubsub_shardchannels(args: &[Vec<u8>], pubsub: &PubSubRegistry) -> Ca
 /// PUBSUB SHARDNUMSUB [channel ...]
 pub fn cmd_pubsub_shardnumsub(args: &[Vec<u8>], pubsub: &PubSubRegistry) -> CacheResult<Resp> {
     let channels = &args[3..];
-    let resp: Vec<Resp> = channels.iter().flat_map(|ch| {
-        let cnt = pubsub.shard_channels.get(ch.as_slice()).map(|s| s.len()).unwrap_or(0);
-        vec![Resp::BulkString(Some(ch.clone())), Resp::Integer(cnt as i64)]
-    }).collect();
+    let resp: Vec<Resp> = channels
+        .iter()
+        .flat_map(|ch| {
+            let cnt = pubsub
+                .shard_channels
+                .get(ch.as_slice())
+                .map(|s| s.len())
+                .unwrap_or(0);
+            vec![
+                Resp::BulkString(Some(ch.clone())),
+                Resp::Integer(cnt as i64),
+            ]
+        })
+        .collect();
     Ok(Resp::Array(Some(resp)))
 }

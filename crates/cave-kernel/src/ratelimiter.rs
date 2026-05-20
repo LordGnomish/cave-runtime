@@ -379,7 +379,10 @@ mod tests {
         let start = std::time::Instant::now();
         b.acquire(1.0).await;
         let elapsed = start.elapsed();
-        assert!(elapsed.as_millis() < 200, "should refill quickly: {elapsed:?}");
+        assert!(
+            elapsed.as_millis() < 200,
+            "should refill quickly: {elapsed:?}"
+        );
     }
 
     /// cite: leaky bucket pattern — fresh queue is empty, accepts up to queue_size
@@ -453,7 +456,11 @@ mod tests {
         pt.for_tenant("initech");
         assert_eq!(
             pt.known_tenants(),
-            vec!["acme".to_string(), "globex".to_string(), "initech".to_string()]
+            vec![
+                "acme".to_string(),
+                "globex".to_string(),
+                "initech".to_string()
+            ]
         );
     }
 
@@ -528,6 +535,9 @@ mod tests {
         let b = TokenBucket::new(TokenBucketConfig::new(1.0, 1.0));
         assert!(b.try_consume(1.0));
         assert!(b.try_consume_or_retry(0.0).is_ok(), "zero cost is free");
-        assert!(b.try_consume_or_retry(-1.0).is_ok(), "negative cost is free");
+        assert!(
+            b.try_consume_or_retry(-1.0).is_ok(),
+            "negative cost is free"
+        );
     }
 }

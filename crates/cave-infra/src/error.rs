@@ -27,7 +27,10 @@ pub enum InfraError {
     DependencyCycle(String),
 
     #[error("Dependency not met: resource={resource}, depends_on={depends_on}")]
-    DependencyNotMet { resource: String, depends_on: String },
+    DependencyNotMet {
+        resource: String,
+        depends_on: String,
+    },
 
     #[error("Plan conflict: {0}")]
     PlanConflict(String),
@@ -35,7 +38,9 @@ pub enum InfraError {
     #[error("Rollback failed: {0}")]
     RollbackFailed(String),
 
-    #[error("Drift detected: resource={resource}, field={field}, expected={expected}, actual={actual}")]
+    #[error(
+        "Drift detected: resource={resource}, field={field}, expected={expected}, actual={actual}"
+    )]
     DriftDetected {
         resource: String,
         field: String,

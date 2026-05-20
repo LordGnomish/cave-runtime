@@ -7,31 +7,27 @@
 use super::VaultViewError;
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, table};
-use crate::admin::state::{scope, AdminState, VaultAuditEntry};
+use crate::admin::state::{AdminState, VaultAuditEntry, scope};
 
 pub fn list_audit(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<Vec<VaultAuditEntry>, VaultViewError> {
     ctx.authorise(Permission::VaultRead)?;
-    let mut rows: Vec<VaultAuditEntry> = scope(
-        &state.vault_audit.read().unwrap(),
-        &ctx.tenant,
-        |r| &r.tenant,
-    )
-    .into_iter()
-    .cloned()
-    .collect();
+    let mut rows: Vec<VaultAuditEntry> =
+        scope(&state.vault_audit.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| b.time_unix.cmp(&a.time_unix));
     Ok(rows)
 }
 
 /// Filter the audit tail to one operation kind. Mirrors
 /// `vault audit list --op=<op>`.
-pub fn by_op<'a>(
-    entries: &'a [VaultAuditEntry],
-    op: &str,
-) -> Vec<&'a VaultAuditEntry> {
+pub fn by_op<'a>(entries: &'a [VaultAuditEntry], op: &str) -> Vec<&'a VaultAuditEntry> {
     entries.iter().filter(|e| e.op == op).collect()
 }
 

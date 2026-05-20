@@ -17,7 +17,7 @@
 //!   `CidrAllocator` and pin a route to it.
 //! * **Dual-stack table picker** — chooses V4 vs V6 route table.
 
-use crate::route_controller::{cidr_family, CidrFamily, DesiredRoute};
+use crate::route_controller::{CidrFamily, DesiredRoute, cidr_family};
 use crate::types::{CloudError, ProviderName};
 use serde::{Deserialize, Serialize};
 
@@ -35,10 +35,7 @@ impl ReconcileConcurrency {
         if !(1..=32).contains(&self.max_inflight) {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Hetzner,
-                reason: format!(
-                    "max_inflight {} outside [1, 32]",
-                    self.max_inflight
-                ),
+                reason: format!("max_inflight {} outside [1, 32]", self.max_inflight),
             });
         }
         Ok(())
@@ -107,9 +104,7 @@ impl CleanupPolicy {
             if !(1..=3_600).contains(seconds) {
                 return Err(CloudError::InvalidConfig {
                     provider: ProviderName::Hetzner,
-                    reason: format!(
-                        "grace period {seconds} outside [1, 3600] s"
-                    ),
+                    reason: format!("grace period {seconds} outside [1, 3600] s"),
                 });
             }
         }
@@ -156,7 +151,10 @@ impl AllocatorClaim {
         if cidr_family(&self.pod_cidr).is_none() {
             return Err(CloudError::InvalidConfig {
                 provider: ProviderName::Hetzner,
-                reason: format!("allocator claim pod_cidr {:?} is not a valid CIDR", self.pod_cidr),
+                reason: format!(
+                    "allocator claim pod_cidr {:?} is not a valid CIDR",
+                    self.pod_cidr
+                ),
             });
         }
         Ok(())
@@ -235,30 +233,51 @@ mod tests {
     }
 
     fn dr(node: &str, cidr: &str) -> DesiredRoute {
-        DesiredRoute { node_name: node.into(), pod_cidr: cidr.into() }
+        DesiredRoute {
+            node_name: node.into(),
+            pod_cidr: cidr.into(),
+        }
     }
 
     // ─── Concurrency ─────────────────────────────────────────────────────────
 
     #[test]
     fn reconcile_concurrency_default_is_four() {
-        ctx("acme", "cmd/cloud-controller-manager/app/options/options.go", "ConcurrentRouteSyncs");
+        ctx(
+            "acme",
+            "cmd/cloud-controller-manager/app/options/options.go",
+            "ConcurrentRouteSyncs",
+        );
         assert_eq!(ReconcileConcurrency::DEFAULT.max_inflight, 4);
     }
 
     #[test]
     fn reconcile_concurrency_validates_range() {
-        ctx("acme", "cmd/cloud-controller-manager/app/options/options.go", "ConcurrentRouteSyncs");
+        ctx(
+            "acme",
+            "cmd/cloud-controller-manager/app/options/options.go",
+            "ConcurrentRouteSyncs",
+        );
         let mut c = ReconcileConcurrency::DEFAULT;
         c.max_inflight = 0;
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         c.max_inflight = 100;
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn reconcile_concurrency_chunk_count_uses_ceil_division() {
-        ctx("acme", "staging/src/k8s.io/client-go/util/workqueue/rate_limiting_queue.go", "RateLimitingInterface");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/client-go/util/workqueue/rate_limiting_queue.go",
+            "RateLimitingInterface",
+        );
         let c = ReconcileConcurrency { max_inflight: 4 };
         assert_eq!(c.chunk_count(8), 2);
         assert_eq!(c.chunk_count(9), 3);
@@ -270,33 +289,56 @@ mod tests {
 
     #[test]
     fn batch_size_aws_default_is_one_hundred() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider-aws/pkg/cloudprovider/providers/aws/aws_routes.go", "BatchSize");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider-aws/pkg/cloudprovider/providers/aws/aws_routes.go",
+            "BatchSize",
+        );
         assert_eq!(BatchSize::aws_route_table().max_per_call, 100);
     }
 
     #[test]
     fn batch_size_gcp_default_is_fifty() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider-gcp/providers/gce/gce_routes.go", "BatchSize");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider-gcp/providers/gce/gce_routes.go",
+            "BatchSize",
+        );
         assert_eq!(BatchSize::gcp_route_table().max_per_call, 50);
     }
 
     #[test]
     fn batch_size_zero_per_call_is_invalid() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go", "ReconcileBatch");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go",
+            "ReconcileBatch",
+        );
         let bs = BatchSize { max_per_call: 0 };
-        assert!(matches!(bs.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            bs.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn batch_size_split_returns_empty_for_empty_routes() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go", "ReconcileBatch");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go",
+            "ReconcileBatch",
+        );
         let bs = BatchSize::aws_route_table();
         assert!(bs.split(&[]).is_empty());
     }
 
     #[test]
     fn batch_size_split_chunks_into_max_per_call_pieces() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go", "ReconcileBatch");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go",
+            "ReconcileBatch",
+        );
         let bs = BatchSize { max_per_call: 3 };
         let routes: Vec<DesiredRoute> = (0..7)
             .map(|i| dr(&format!("n{i}"), &format!("10.0.{i}.0/24")))
@@ -312,7 +354,11 @@ mod tests {
 
     #[test]
     fn cleanup_policy_default_is_grace_period_60s() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go", "CleanupPolicy");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go",
+            "CleanupPolicy",
+        );
         assert_eq!(
             CleanupPolicy::default_for_route_controller(),
             CleanupPolicy::GracePeriod { seconds: 60 }
@@ -321,23 +367,41 @@ mod tests {
 
     #[test]
     fn cleanup_policy_immediate_validates_and_deletes_at_zero() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go", "CleanupPolicy");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go",
+            "CleanupPolicy",
+        );
         assert!(CleanupPolicy::Immediate.validate().is_ok());
         assert!(CleanupPolicy::Immediate.should_delete_stale(1));
     }
 
     #[test]
     fn cleanup_policy_grace_period_validates_range() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go", "CleanupPolicy");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go",
+            "CleanupPolicy",
+        );
         let p = CleanupPolicy::GracePeriod { seconds: 0 };
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
         let p = CleanupPolicy::GracePeriod { seconds: 4_000 };
-        assert!(matches!(p.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            p.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn cleanup_policy_grace_period_does_not_delete_below_threshold() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go", "CleanupPolicy");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go",
+            "CleanupPolicy",
+        );
         let p = CleanupPolicy::GracePeriod { seconds: 60 };
         assert!(!p.should_delete_stale(30));
         assert!(p.should_delete_stale(60));
@@ -348,7 +412,11 @@ mod tests {
 
     #[test]
     fn allocator_claim_pending_is_unpinned() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "AllocatorClaim");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "AllocatorClaim",
+        );
         let c = AllocatorClaim::pending("n1", "10.0.0.0/24");
         assert!(!c.is_pinned());
         assert!(c.validate().is_ok());
@@ -356,23 +424,41 @@ mod tests {
 
     #[test]
     fn allocator_claim_validate_rejects_empty_node_name() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "AllocatorClaim");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "AllocatorClaim",
+        );
         let mut c = AllocatorClaim::pending("n1", "10.0.0.0/24");
         c.node_name.clear();
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn allocator_claim_validate_rejects_invalid_cidr() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go", "AllocatorClaim");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go",
+            "AllocatorClaim",
+        );
         let mut c = AllocatorClaim::pending("n1", "garbage");
         c.pin("c-1");
-        assert!(matches!(c.validate().unwrap_err(), CloudError::InvalidConfig { .. }));
+        assert!(matches!(
+            c.validate().unwrap_err(),
+            CloudError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
     fn allocator_claim_pin_records_route_name() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go", "createRoute");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go",
+            "createRoute",
+        );
         let mut c = AllocatorClaim::pending("n1", "10.0.0.0/24");
         c.pin("c1-n1");
         assert!(c.is_pinned());
@@ -383,7 +469,11 @@ mod tests {
 
     #[test]
     fn route_table_id_picks_v4_for_ipv4_cidr() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go", "RouteTable");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go",
+            "RouteTable",
+        );
         assert_eq!(
             RouteTableId::for_route(&dr("n", "10.0.0.0/24")),
             Some(RouteTableId::V4)
@@ -392,7 +482,11 @@ mod tests {
 
     #[test]
     fn route_table_id_picks_v6_for_ipv6_cidr() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go", "RouteTable");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go",
+            "RouteTable",
+        );
         assert_eq!(
             RouteTableId::for_route(&dr("n", "2001:db8::/64")),
             Some(RouteTableId::V6)
@@ -401,19 +495,30 @@ mod tests {
 
     #[test]
     fn route_table_id_returns_none_for_invalid_cidr() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go", "RouteTable");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go",
+            "RouteTable",
+        );
         assert!(RouteTableId::for_route(&dr("n", "garbage")).is_none());
     }
 
     // ─── Route age + cleanup pick ────────────────────────────────────────────
 
     fn rec(name: &str, age: u32) -> RouteAgeRecord {
-        RouteAgeRecord { name: name.into(), stale_for_seconds: age }
+        RouteAgeRecord {
+            name: name.into(),
+            stale_for_seconds: age,
+        }
     }
 
     #[test]
     fn age_routes_zeros_currently_desired() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go", "ageRoutes");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go",
+            "ageRoutes",
+        );
         let mut recs = vec![rec("n1", 30), rec("n2", 0)];
         age_routes(&mut recs, 10, &["n1".into()]);
         assert_eq!(recs[0].stale_for_seconds, 0);
@@ -422,7 +527,11 @@ mod tests {
 
     #[test]
     fn age_routes_increments_stale_counters() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go", "ageRoutes");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go",
+            "ageRoutes",
+        );
         let mut recs = vec![rec("n1", 30)];
         age_routes(&mut recs, 15, &[]);
         assert_eq!(recs[0].stale_for_seconds, 45);
@@ -430,7 +539,11 @@ mod tests {
 
     #[test]
     fn select_for_cleanup_returns_only_aged_records() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go", "ageRoutes");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go",
+            "ageRoutes",
+        );
         let recs = vec![rec("n1", 30), rec("n2", 90), rec("n3", 0)];
         let p = CleanupPolicy::GracePeriod { seconds: 60 };
         let pick = select_for_cleanup(&recs, p);
@@ -439,7 +552,11 @@ mod tests {
 
     #[test]
     fn select_for_cleanup_returns_all_aged_under_immediate_policy() {
-        ctx("acme", "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go", "ageRoutes");
+        ctx(
+            "acme",
+            "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go",
+            "ageRoutes",
+        );
         let recs = vec![rec("n1", 1), rec("n2", 30), rec("n3", 0)];
         let pick = select_for_cleanup(&recs, CleanupPolicy::Immediate);
         assert_eq!(pick, vec!["n1", "n2"]);

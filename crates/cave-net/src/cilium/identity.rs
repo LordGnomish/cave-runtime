@@ -176,11 +176,7 @@ mod tests {
 
     #[test]
     fn label_set_normalises_input_order() {
-        let (_cite, _t) = cilium_test_ctx!(
-            "pkg/labels/labels.go",
-            "Labels.Sort",
-            "tenant-id-norm"
-        );
+        let (_cite, _t) = cilium_test_ctx!("pkg/labels/labels.go", "Labels.Sort", "tenant-id-norm");
         let a = ls(&[("app", "web"), ("env", "prod")]);
         let b = ls(&[("env", "prod"), ("app", "web")]);
         assert_eq!(a, b);
@@ -206,8 +202,12 @@ mod tests {
             "tenant-id-stable"
         );
         let mut cache = LocalIdentityCache::new(tenant);
-        let a = cache.lookup_or_allocate(&ls(&[("app", "web"), ("env", "prod")])).unwrap();
-        let b = cache.lookup_or_allocate(&ls(&[("env", "prod"), ("app", "web")])).unwrap();
+        let a = cache
+            .lookup_or_allocate(&ls(&[("app", "web"), ("env", "prod")]))
+            .unwrap();
+        let b = cache
+            .lookup_or_allocate(&ls(&[("env", "prod"), ("app", "web")]))
+            .unwrap();
         assert_eq!(a, b);
         assert_eq!(cache.len(), 1);
     }
@@ -234,7 +234,9 @@ mod tests {
             "tenant-id-reserved"
         );
         let mut cache = LocalIdentityCache::new(tenant);
-        let id = cache.lookup_or_allocate(&ls(&[("reserved", "host")])).unwrap();
+        let id = cache
+            .lookup_or_allocate(&ls(&[("reserved", "host")]))
+            .unwrap();
         assert_eq!(id, ID_HOST);
         // Reserved lookups do not consume a local slot.
         assert_eq!(cache.len(), 0);
@@ -278,7 +280,9 @@ mod tests {
             "tenant-id-empty"
         );
         let mut cache = LocalIdentityCache::new(tenant);
-        let err = cache.lookup_or_allocate(&LabelSet { pairs: vec![] }).unwrap_err();
+        let err = cache
+            .lookup_or_allocate(&LabelSet { pairs: vec![] })
+            .unwrap_err();
         assert!(matches!(err, IdentityError::EmptyLabels));
     }
 
@@ -291,7 +295,9 @@ mod tests {
         );
         let mut cache = LocalIdentityCache::new(tenant);
         // `reserved:custom` is not a known reserved name → local allocation.
-        let id = cache.lookup_or_allocate(&ls(&[("reserved", "custom")])).unwrap();
+        let id = cache
+            .lookup_or_allocate(&ls(&[("reserved", "custom")]))
+            .unwrap();
         assert!(id >= MIN_LOCAL_IDENTITY);
     }
 }

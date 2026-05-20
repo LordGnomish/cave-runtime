@@ -48,11 +48,9 @@ impl Resyncer {
     pub fn resync(&mut self, graph: &mut DependencyGraph, live: &[LiveObject]) -> ResyncDiff {
         let new_real: HashSet<ObjectId> = live.iter().map(|o| o.uid.clone()).collect();
 
-        let mut added: Vec<ObjectId> =
-            new_real.difference(&self.real_uids).cloned().collect();
+        let mut added: Vec<ObjectId> = new_real.difference(&self.real_uids).cloned().collect();
         added.sort();
-        let mut removed: Vec<ObjectId> =
-            self.real_uids.difference(&new_real).cloned().collect();
+        let mut removed: Vec<ObjectId> = self.real_uids.difference(&new_real).cloned().collect();
         removed.sort();
 
         // Apply removals first.
@@ -72,7 +70,11 @@ impl Resyncer {
         virtual_nodes.sort();
 
         self.real_uids = new_real;
-        ResyncDiff { added, removed, virtual_nodes }
+        ResyncDiff {
+            added,
+            removed,
+            virtual_nodes,
+        }
     }
 }
 
@@ -189,9 +191,10 @@ mod tests {
         let mut r = Resyncer::new();
         r.resync(&mut g, &[live("dep", &["owner"]), live("owner", &[])]);
         r.resync(&mut g, &[live("dep", &["owner"]), live("owner", &[])]);
-        assert!(g
-            .dependents_of(&ObjectId::new("owner"))
-            .contains(&ObjectId::new("dep")));
+        assert!(
+            g.dependents_of(&ObjectId::new("owner"))
+                .contains(&ObjectId::new("dep"))
+        );
     }
 
     #[test]
@@ -220,12 +223,19 @@ mod tests {
         );
         let mut g = DependencyGraph::new();
         let mut r = Resyncer::new();
-        r.resync(&mut g, &[live("dep", &["o1"]), live("o1", &[]), live("o2", &[])]);
-        r.resync(&mut g, &[live("dep", &["o2"]), live("o1", &[]), live("o2", &[])]);
+        r.resync(
+            &mut g,
+            &[live("dep", &["o1"]), live("o1", &[]), live("o2", &[])],
+        );
+        r.resync(
+            &mut g,
+            &[live("dep", &["o2"]), live("o1", &[]), live("o2", &[])],
+        );
         assert!(g.dependents_of(&ObjectId::new("o1")).is_empty());
-        assert!(g
-            .dependents_of(&ObjectId::new("o2"))
-            .contains(&ObjectId::new("dep")));
+        assert!(
+            g.dependents_of(&ObjectId::new("o2"))
+                .contains(&ObjectId::new("dep"))
+        );
     }
 
     #[test]

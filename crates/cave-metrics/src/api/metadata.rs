@@ -2,10 +2,13 @@
 // Copyright 2026 Cave Runtime contributors
 //! /api/v1/metadata
 
-use axum::{extract::{Query, State}, Json};
+use crate::state::MetricsState;
+use axum::{
+    Json,
+    extract::{Query, State},
+};
 use serde::Deserialize;
 use std::sync::Arc;
-use crate::state::MetricsState;
 
 #[derive(Debug, Deserialize)]
 pub struct MetadataParams {
@@ -25,7 +28,8 @@ pub async fn metric_metadata(
     };
 
     let limit = params.limit.unwrap_or(u64::MAX) as usize;
-    let data: serde_json::Map<String, serde_json::Value> = names.into_iter()
+    let data: serde_json::Map<String, serde_json::Value> = names
+        .into_iter()
         .take(limit)
         .map(|name| {
             let meta = serde_json::json!([{

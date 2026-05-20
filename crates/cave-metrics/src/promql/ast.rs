@@ -36,10 +36,10 @@ pub enum Expr {
 
 #[derive(Debug, Clone)]
 pub struct VectorSelector {
-    pub name: Option<String>,          // metric name shorthand
+    pub name: Option<String>, // metric name shorthand
     pub matchers: Vec<LabelMatcher>,
-    pub offset: Option<i64>,           // milliseconds
-    pub at: Option<i64>,               // unix ms, from @ modifier
+    pub offset: Option<i64>, // milliseconds
+    pub at: Option<i64>,     // unix ms, from @ modifier
 }
 
 // ─── Matrix selector ─────────────────────────────────────────────────────────
@@ -74,32 +74,84 @@ pub struct UnaryExpr {
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum BinaryOp {
-    Add, Sub, Mul, Div, Mod, Pow,
-    Eql, Neq, Lss, Lte, Gtr, Gte,
-    And, Or, Unless, Atan2,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Pow,
+    Eql,
+    Neq,
+    Lss,
+    Lte,
+    Gtr,
+    Gte,
+    And,
+    Or,
+    Unless,
+    Atan2,
 }
 
 impl BinaryOp {
     pub fn apply(self, l: f64, r: f64) -> f64 {
         match self {
-            Self::Add   => l + r,
-            Self::Sub   => l - r,
-            Self::Mul   => l * r,
-            Self::Div   => l / r,
-            Self::Mod   => l % r,
-            Self::Pow   => l.powf(r),
-            Self::Eql   => if l == r { 1.0 } else { 0.0 },
-            Self::Neq   => if l != r { 1.0 } else { 0.0 },
-            Self::Lss   => if l <  r { 1.0 } else { 0.0 },
-            Self::Lte   => if l <= r { 1.0 } else { 0.0 },
-            Self::Gtr   => if l >  r { 1.0 } else { 0.0 },
-            Self::Gte   => if l >= r { 1.0 } else { 0.0 },
+            Self::Add => l + r,
+            Self::Sub => l - r,
+            Self::Mul => l * r,
+            Self::Div => l / r,
+            Self::Mod => l % r,
+            Self::Pow => l.powf(r),
+            Self::Eql => {
+                if l == r {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            Self::Neq => {
+                if l != r {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            Self::Lss => {
+                if l < r {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            Self::Lte => {
+                if l <= r {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            Self::Gtr => {
+                if l > r {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            Self::Gte => {
+                if l >= r {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
             Self::And | Self::Or | Self::Unless | Self::Atan2 => l.atan2(r),
         }
     }
 
     pub fn is_comparison(self) -> bool {
-        matches!(self, Self::Eql | Self::Neq | Self::Lss | Self::Lte | Self::Gtr | Self::Gte)
+        matches!(
+            self,
+            Self::Eql | Self::Neq | Self::Lss | Self::Lte | Self::Gtr | Self::Gte
+        )
     }
 
     pub fn is_set_op(self) -> bool {
@@ -119,7 +171,7 @@ pub struct BinaryExpr {
 #[derive(Debug, Clone)]
 pub struct VectorMatching {
     pub card: MatchCardinality,
-    pub on: bool,        // true = on(...), false = ignoring(...)
+    pub on: bool, // true = on(...), false = ignoring(...)
     pub labels: Vec<String>,
     pub include: Vec<String>, // group_left/group_right include labels
 }
@@ -135,8 +187,18 @@ pub enum MatchCardinality {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AggregateOp {
-    Sum, Min, Max, Avg, Count, Stddev, Stdvar,
-    Quantile, Topk, Bottomk, CountValues, Group,
+    Sum,
+    Min,
+    Max,
+    Avg,
+    Count,
+    Stddev,
+    Stdvar,
+    Quantile,
+    Topk,
+    Bottomk,
+    CountValues,
+    Group,
 }
 
 #[derive(Debug, Clone)]

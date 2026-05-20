@@ -25,7 +25,7 @@ pub mod plugins;
 pub mod queue;
 
 pub use plugins::{
-    create_policy, delete_policy, list_nodes, list_plugins, list_policies, PluginRow,
+    PluginRow, create_policy, delete_policy, list_nodes, list_plugins, list_policies,
 };
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -103,7 +103,13 @@ mod tests {
     #[test]
     fn render_includes_all_five_tabs() {
         let html = render(&AdminState::seeded(), &ctx(&[Permission::SchedulerRead])).unwrap();
-        for anchor in ["#scheduler-queue", "#scheduler-plugins", "#scheduler-bindings", "#scheduler-nodescores", "#scheduler-events"] {
+        for anchor in [
+            "#scheduler-queue",
+            "#scheduler-plugins",
+            "#scheduler-bindings",
+            "#scheduler-nodescores",
+            "#scheduler-events",
+        ] {
             assert!(html.contains(anchor));
         }
     }

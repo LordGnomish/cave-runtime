@@ -91,11 +91,17 @@ pub struct MetricSample {
 
 impl MetricSample {
     pub fn new(name: impl Into<String>, labels: Vec<(String, String)>, value: f64) -> Self {
-        Self { name: name.into(), labels, value }
+        Self {
+            name: name.into(),
+            labels,
+            value,
+        }
     }
     /// Render in Prometheus exposition format: `name{k="v",...} value`.
     pub fn render(&self) -> String {
-        let label_str = self.labels.iter()
+        let label_str = self
+            .labels
+            .iter()
             .map(|(k, v)| format!("{k}=\"{v}\""))
             .collect::<Vec<_>>()
             .join(",");
@@ -227,12 +233,19 @@ impl MetricRegistry {
         out.extend(self.dns.samples("hubble_dns_queries_total"));
         out.extend(self.http.samples("hubble_http_requests_total"));
         out.extend(self.tcp_flags.samples("hubble_tcp_flags_total"));
-        out.extend(self.port_distribution.samples("hubble_port_distribution_total"));
+        out.extend(
+            self.port_distribution
+                .samples("hubble_port_distribution_total"),
+        );
         out
     }
 
     pub fn render_text(&self) -> String {
-        self.samples().iter().map(|s| s.render()).collect::<Vec<_>>().join("\n")
+        self.samples()
+            .iter()
+            .map(|s| s.render())
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }
 
@@ -274,15 +287,22 @@ pub struct NodeAggregator {
 
 impl NodeAggregator {
     pub fn new(tenant: TenantId) -> Self {
-        Self { tenant, nodes: BTreeMap::new() }
+        Self {
+            tenant,
+            nodes: BTreeMap::new(),
+        }
     }
     pub fn ingest(&mut self, node: &str, flow: &FlowLog) {
         if flow.tenant != self.tenant {
             return;
         }
-        let summary = self.nodes.entry(node.to_string()).or_insert_with(|| NodeSummary {
-            node: node.to_string(), ..Default::default()
-        });
+        let summary = self
+            .nodes
+            .entry(node.to_string())
+            .or_insert_with(|| NodeSummary {
+                node: node.to_string(),
+                ..Default::default()
+            });
         summary.flows_total += 1;
         summary.bytes_out += flow.bytes;
         summary.bytes_in += flow.bytes;
@@ -313,12 +333,26 @@ mod tests {
     use crate::cilium_test_ctx;
     use chrono::Utc;
 
-    fn flow(tenant: &str, src_pod: &str, dst_pod: &str, src_id: u32, dst_id: u32, v: Verdict, dr: DropReason, bytes: u64) -> FlowLog {
+    fn flow(
+        tenant: &str,
+        src_pod: &str,
+        dst_pod: &str,
+        src_id: u32,
+        dst_id: u32,
+        v: Verdict,
+        dr: DropReason,
+        bytes: u64,
+    ) -> FlowLog {
         FlowLog {
-            tenant: TenantId::new(tenant).expect("test fixture"), time: Utc::now(),
-            source_identity: src_id, destination_identity: dst_id,
-            source_pod: src_pod.into(), destination_pod: dst_pod.into(),
-            verdict: v, drop_reason: dr, bytes,
+            tenant: TenantId::new(tenant).expect("test fixture"),
+            time: Utc::now(),
+            source_identity: src_id,
+            destination_identity: dst_id,
+            source_pod: src_pod.into(),
+            destination_pod: dst_pod.into(),
+            verdict: v,
+            drop_reason: dr,
+            bytes,
         }
     }
 
@@ -326,7 +360,8 @@ mod tests {
 
     #[test]
     fn monitor_event_numeric_codes_match_upstream() {
-        let (_c, _t) = cilium_test_ctx!("pkg/monitor/api/types.go", "MessageType", "tenant-mon-num");
+        let (_c, _t) =
+            cilium_test_ctx!("pkg/monitor/api/types.go", "MessageType", "tenant-mon-num");
         assert_eq!(MonitorEvent::Drop.numeric(), 1);
         assert_eq!(MonitorEvent::Debug.numeric(), 2);
         assert_eq!(MonitorEvent::Capture.numeric(), 3);
@@ -340,11 +375,21 @@ mod tests {
 
     #[test]
     fn monitor_event_from_numeric_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/monitor/api/types.go", "MessageType.Parse", "tenant-mon-rt");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/monitor/api/types.go",
+            "MessageType.Parse",
+            "tenant-mon-rt"
+        );
         for e in [
-            MonitorEvent::Drop, MonitorEvent::Debug, MonitorEvent::Capture,
-            MonitorEvent::Trace, MonitorEvent::Agent, MonitorEvent::AccessLog,
-            MonitorEvent::PolicyVerdict, MonitorEvent::Recorder, MonitorEvent::TraceSock,
+            MonitorEvent::Drop,
+            MonitorEvent::Debug,
+            MonitorEvent::Capture,
+            MonitorEvent::Trace,
+            MonitorEvent::Agent,
+            MonitorEvent::AccessLog,
+            MonitorEvent::PolicyVerdict,
+            MonitorEvent::Recorder,
+            MonitorEvent::TraceSock,
         ] {
             assert_eq!(MonitorEvent::from_numeric(e.numeric()), Some(e));
         }
@@ -352,14 +397,26 @@ mod tests {
 
     #[test]
     fn monitor_event_unknown_code_returns_none() {
-        let (_c, _t) = cilium_test_ctx!("pkg/monitor/api/types.go", "MessageType.Unknown", "tenant-mon-unk");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/monitor/api/types.go",
+            "MessageType.Unknown",
+            "tenant-mon-unk"
+        );
         assert!(MonitorEvent::from_numeric(99).is_none());
     }
 
     #[test]
     fn monitor_event_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/monitor/api/types.go", "MessageType.Serde", "tenant-mon-serde");
-        for e in [MonitorEvent::Drop, MonitorEvent::PolicyVerdict, MonitorEvent::Recorder] {
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/monitor/api/types.go",
+            "MessageType.Serde",
+            "tenant-mon-serde"
+        );
+        for e in [
+            MonitorEvent::Drop,
+            MonitorEvent::PolicyVerdict,
+            MonitorEvent::Recorder,
+        ] {
             let s = serde_json::to_string(&e).unwrap();
             let back: MonitorEvent = serde_json::from_str(&s).unwrap();
             assert_eq!(back, e);
@@ -370,18 +427,30 @@ mod tests {
 
     #[test]
     fn metric_sample_renders_no_labels() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/server.go", "Render.NoLabels", "tenant-met-nolab");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/server.go",
+            "Render.NoLabels",
+            "tenant-met-nolab"
+        );
         let s = MetricSample::new("hubble_flows_total", vec![], 42.0);
         assert_eq!(s.render(), "hubble_flows_total 42");
     }
 
     #[test]
     fn metric_sample_renders_with_labels() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/server.go", "Render.Labels", "tenant-met-lab");
-        let s = MetricSample::new("hubble_drop_total", vec![
-            ("namespace".into(), "prod".into()),
-            ("reason".into(), "policy_denied".into()),
-        ], 7.0);
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/server.go",
+            "Render.Labels",
+            "tenant-met-lab"
+        );
+        let s = MetricSample::new(
+            "hubble_drop_total",
+            vec![
+                ("namespace".into(), "prod".into()),
+                ("reason".into(), "policy_denied".into()),
+            ],
+            7.0,
+        );
         assert!(s.render().starts_with("hubble_drop_total{"));
         assert!(s.render().contains("namespace=\"prod\""));
         assert!(s.render().contains("reason=\"policy_denied\""));
@@ -392,33 +461,84 @@ mod tests {
 
     #[test]
     fn metrics_flow_processed_increments_counter() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/api/api.go", "ProcessFlow.FlowsTotal", "tenant-met-fp");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/api/api.go",
+            "ProcessFlow.FlowsTotal",
+            "tenant-met-fp"
+        );
         let mut r = MetricRegistry::new();
-        r.process_flow(&flow("t", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 100));
+        r.process_flow(&flow(
+            "t",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Forwarded,
+            DropReason::None,
+            100,
+        ));
         let samples = r.samples();
-        let flow_sample = samples.iter().find(|s| s.name == "hubble_flows_processed_total").unwrap();
+        let flow_sample = samples
+            .iter()
+            .find(|s| s.name == "hubble_flows_processed_total")
+            .unwrap();
         assert_eq!(flow_sample.value, 1.0);
     }
 
     #[test]
     fn metrics_flow_processed_carries_verdict_label() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/api/api.go", "ProcessFlow.VerdictLabel", "tenant-met-fpv");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/api/api.go",
+            "ProcessFlow.VerdictLabel",
+            "tenant-met-fpv"
+        );
         let mut r = MetricRegistry::new();
-        r.process_flow(&flow("t", "ns/a", "ns/b", 1, 2, Verdict::Dropped, DropReason::PolicyDeny, 100));
+        r.process_flow(&flow(
+            "t",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Dropped,
+            DropReason::PolicyDeny,
+            100,
+        ));
         let samples = r.samples();
-        let flow_sample = samples.iter().find(|s| s.name == "hubble_flows_processed_total").unwrap();
-        assert!(flow_sample.labels.iter().any(|(k, v)| k == "verdict" && v == "DROPPED"));
+        let flow_sample = samples
+            .iter()
+            .find(|s| s.name == "hubble_flows_processed_total")
+            .unwrap();
+        assert!(flow_sample
+            .labels
+            .iter()
+            .any(|(k, v)| k == "verdict" && v == "DROPPED"));
     }
 
     #[test]
     fn metrics_flow_processed_aggregates_repeated_label_sets() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/api/api.go", "ProcessFlow.Aggregate", "tenant-met-fpa");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/api/api.go",
+            "ProcessFlow.Aggregate",
+            "tenant-met-fpa"
+        );
         let mut r = MetricRegistry::new();
         for _ in 0..5 {
-            r.process_flow(&flow("t", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 100));
+            r.process_flow(&flow(
+                "t",
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Forwarded,
+                DropReason::None,
+                100,
+            ));
         }
         let s = r.samples();
-        let flow_sample = s.iter().find(|s| s.name == "hubble_flows_processed_total").unwrap();
+        let flow_sample = s
+            .iter()
+            .find(|s| s.name == "hubble_flows_processed_total")
+            .unwrap();
         assert_eq!(flow_sample.value, 5.0);
     }
 
@@ -426,32 +546,83 @@ mod tests {
 
     #[test]
     fn metrics_drop_only_emitted_for_dropped_flows() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/drop/drop.go", "ProcessFlow.OnlyDropped", "tenant-met-d-only");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/drop/drop.go",
+            "ProcessFlow.OnlyDropped",
+            "tenant-met-d-only"
+        );
         let mut r = MetricRegistry::new();
-        r.process_flow(&flow("t", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 100));
+        r.process_flow(&flow(
+            "t",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Forwarded,
+            DropReason::None,
+            100,
+        ));
         let s = r.samples();
         assert!(!s.iter().any(|s| s.name == "hubble_drop_total"));
     }
 
     #[test]
     fn metrics_drop_carries_reason_label() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/drop/drop.go", "ProcessFlow.ReasonLabel", "tenant-met-dr");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/drop/drop.go",
+            "ProcessFlow.ReasonLabel",
+            "tenant-met-dr"
+        );
         let mut r = MetricRegistry::new();
-        r.process_flow(&flow("t", "ns/a", "ns/b", 1, 2, Verdict::Dropped, DropReason::CtInvalid, 100));
+        r.process_flow(&flow(
+            "t",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Dropped,
+            DropReason::CtInvalid,
+            100,
+        ));
         let s = r.samples();
         let drop_sample = s.iter().find(|s| s.name == "hubble_drop_total").unwrap();
-        assert!(drop_sample.labels.iter().any(|(k, v)| k == "reason" && v == "ct_invalid"));
+        assert!(drop_sample
+            .labels
+            .iter()
+            .any(|(k, v)| k == "reason" && v == "ct_invalid"));
     }
 
     #[test]
     fn metrics_drop_aggregates_by_reason() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/drop/drop.go", "ProcessFlow.AggregateByReason", "tenant-met-dragg");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/drop/drop.go",
+            "ProcessFlow.AggregateByReason",
+            "tenant-met-dragg"
+        );
         let mut r = MetricRegistry::new();
         for _ in 0..3 {
-            r.process_flow(&flow("t", "ns/a", "ns/b", 1, 2, Verdict::Dropped, DropReason::PolicyDeny, 100));
+            r.process_flow(&flow(
+                "t",
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Dropped,
+                DropReason::PolicyDeny,
+                100,
+            ));
         }
         for _ in 0..2 {
-            r.process_flow(&flow("t", "ns/a", "ns/b", 1, 2, Verdict::Dropped, DropReason::CtInvalid, 100));
+            r.process_flow(&flow(
+                "t",
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Dropped,
+                DropReason::CtInvalid,
+                100,
+            ));
         }
         let s = r.samples();
         let drops: Vec<_> = s.iter().filter(|s| s.name == "hubble_drop_total").collect();
@@ -462,26 +633,49 @@ mod tests {
 
     #[test]
     fn metrics_dns_recorded_with_qtype_and_rcode() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/dns/dns.go", "RecordDNS", "tenant-met-dns");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/dns/dns.go",
+            "RecordDNS",
+            "tenant-met-dns"
+        );
         let mut r = MetricRegistry::new();
         r.record_dns("ns", "A", "NOERROR");
         let s = r.samples();
-        let dns_sample = s.iter().find(|s| s.name == "hubble_dns_queries_total").unwrap();
-        assert!(dns_sample.labels.iter().any(|(k, v)| k == "qtype" && v == "A"));
-        assert!(dns_sample.labels.iter().any(|(k, v)| k == "rcode" && v == "NOERROR"));
+        let dns_sample = s
+            .iter()
+            .find(|s| s.name == "hubble_dns_queries_total")
+            .unwrap();
+        assert!(dns_sample
+            .labels
+            .iter()
+            .any(|(k, v)| k == "qtype" && v == "A"));
+        assert!(dns_sample
+            .labels
+            .iter()
+            .any(|(k, v)| k == "rcode" && v == "NOERROR"));
     }
 
     #[test]
     fn metrics_dns_aggregates_by_qtype() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/dns/dns.go", "RecordDNS.Aggregate", "tenant-met-dnsa");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/dns/dns.go",
+            "RecordDNS.Aggregate",
+            "tenant-met-dnsa"
+        );
         let mut r = MetricRegistry::new();
         r.record_dns("ns", "A", "NOERROR");
         r.record_dns("ns", "A", "NOERROR");
         r.record_dns("ns", "AAAA", "NOERROR");
         let s = r.samples();
-        let dns_samples: Vec<_> = s.iter().filter(|s| s.name == "hubble_dns_queries_total").collect();
+        let dns_samples: Vec<_> = s
+            .iter()
+            .filter(|s| s.name == "hubble_dns_queries_total")
+            .collect();
         assert_eq!(dns_samples.len(), 2);
-        let a_sample = dns_samples.iter().find(|s| s.labels.iter().any(|(k, v)| k == "qtype" && v == "A")).unwrap();
+        let a_sample = dns_samples
+            .iter()
+            .find(|s| s.labels.iter().any(|(k, v)| k == "qtype" && v == "A"))
+            .unwrap();
         assert_eq!(a_sample.value, 2.0);
     }
 
@@ -489,24 +683,44 @@ mod tests {
 
     #[test]
     fn metrics_http_recorded_with_method_and_status() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/http/http.go", "RecordHTTP", "tenant-met-http");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/http/http.go",
+            "RecordHTTP",
+            "tenant-met-http"
+        );
         let mut r = MetricRegistry::new();
         r.record_http("ns-a", "ns-b", "GET", 200);
         let s = r.samples();
-        let http_sample = s.iter().find(|s| s.name == "hubble_http_requests_total").unwrap();
-        assert!(http_sample.labels.iter().any(|(k, v)| k == "method" && v == "GET"));
-        assert!(http_sample.labels.iter().any(|(k, v)| k == "status" && v == "200"));
+        let http_sample = s
+            .iter()
+            .find(|s| s.name == "hubble_http_requests_total")
+            .unwrap();
+        assert!(http_sample
+            .labels
+            .iter()
+            .any(|(k, v)| k == "method" && v == "GET"));
+        assert!(http_sample
+            .labels
+            .iter()
+            .any(|(k, v)| k == "status" && v == "200"));
     }
 
     #[test]
     fn metrics_http_aggregates_by_method_status() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/http/http.go", "RecordHTTP.Aggregate", "tenant-met-httpa");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/http/http.go",
+            "RecordHTTP.Aggregate",
+            "tenant-met-httpa"
+        );
         let mut r = MetricRegistry::new();
         r.record_http("ns", "ns", "GET", 200);
         r.record_http("ns", "ns", "POST", 201);
         r.record_http("ns", "ns", "GET", 200);
         let s = r.samples();
-        let http_samples: Vec<_> = s.iter().filter(|s| s.name == "hubble_http_requests_total").collect();
+        let http_samples: Vec<_> = s
+            .iter()
+            .filter(|s| s.name == "hubble_http_requests_total")
+            .collect();
         assert_eq!(http_samples.len(), 2);
     }
 
@@ -514,11 +728,18 @@ mod tests {
 
     #[test]
     fn metrics_tcp_flag_recorded() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/tcp/tcp.go", "RecordTcpFlag", "tenant-met-tcp");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/tcp/tcp.go",
+            "RecordTcpFlag",
+            "tenant-met-tcp"
+        );
         let mut r = MetricRegistry::new();
         r.record_tcp_flag("SYN");
         let s = r.samples();
-        let tcp_sample = s.iter().find(|s| s.name == "hubble_tcp_flags_total").unwrap();
+        let tcp_sample = s
+            .iter()
+            .find(|s| s.name == "hubble_tcp_flags_total")
+            .unwrap();
         assert_eq!(tcp_sample.labels[0], ("flag".into(), "SYN".into()));
     }
 
@@ -526,22 +747,54 @@ mod tests {
 
     #[test]
     fn metrics_port_distribution_recorded() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/port-distribution/port-distribution.go", "Record", "tenant-met-port");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/port-distribution/port-distribution.go",
+            "Record",
+            "tenant-met-port"
+        );
         let mut r = MetricRegistry::new();
         r.record_port("TCP", 80);
         let s = r.samples();
-        let port_sample = s.iter().find(|s| s.name == "hubble_port_distribution_total").unwrap();
-        assert!(port_sample.labels.iter().any(|(k, v)| k == "port" && v == "80"));
+        let port_sample = s
+            .iter()
+            .find(|s| s.name == "hubble_port_distribution_total")
+            .unwrap();
+        assert!(port_sample
+            .labels
+            .iter()
+            .any(|(k, v)| k == "port" && v == "80"));
     }
 
     // ── Render exposition format ────────────────────────────────────────────
 
     #[test]
     fn metrics_render_text_includes_all_families() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/server.go", "RenderText", "tenant-met-render");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/server.go",
+            "RenderText",
+            "tenant-met-render"
+        );
         let mut r = MetricRegistry::new();
-        r.process_flow(&flow("t", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 100));
-        r.process_flow(&flow("t", "ns/a", "ns/b", 1, 2, Verdict::Dropped, DropReason::PolicyDeny, 100));
+        r.process_flow(&flow(
+            "t",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Forwarded,
+            DropReason::None,
+            100,
+        ));
+        r.process_flow(&flow(
+            "t",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Dropped,
+            DropReason::PolicyDeny,
+            100,
+        ));
         r.record_http("ns-a", "ns-b", "GET", 200);
         r.record_dns("ns", "A", "NOERROR");
         let text = r.render_text();
@@ -553,9 +806,22 @@ mod tests {
 
     #[test]
     fn metrics_render_text_well_formed_lines() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/server.go", "RenderText.WellFormed", "tenant-met-rwf");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/server.go",
+            "RenderText.WellFormed",
+            "tenant-met-rwf"
+        );
         let mut r = MetricRegistry::new();
-        r.process_flow(&flow("t", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 100));
+        r.process_flow(&flow(
+            "t",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Forwarded,
+            DropReason::None,
+            100,
+        ));
         for line in r.render_text().lines() {
             assert!(line.contains(' '));
             // The metric name is the first token; values follow after the last space.
@@ -568,13 +834,23 @@ mod tests {
 
     #[test]
     fn drop_reason_label_for_known_codes() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/drop/drop.go", "DropReasonLabel", "tenant-met-drlbl");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/drop/drop.go",
+            "DropReasonLabel",
+            "tenant-met-drlbl"
+        );
         assert_eq!(drop_reason_label(DropReason::None), "none");
         assert_eq!(drop_reason_label(DropReason::PolicyDeny), "policy_denied");
         assert_eq!(drop_reason_label(DropReason::Invalid), "invalid_packet");
         assert_eq!(drop_reason_label(DropReason::CtInvalid), "ct_invalid");
-        assert_eq!(drop_reason_label(DropReason::FragmentationNeeded), "fragmentation_needed");
-        assert_eq!(drop_reason_label(DropReason::NatNoMapping), "nat_no_mapping");
+        assert_eq!(
+            drop_reason_label(DropReason::FragmentationNeeded),
+            "fragmentation_needed"
+        );
+        assert_eq!(
+            drop_reason_label(DropReason::NatNoMapping),
+            "nat_no_mapping"
+        );
         assert_eq!(drop_reason_label(DropReason::AuthRequired), "auth_required");
         assert_eq!(drop_reason_label(DropReason::Unknown(42)), "unknown");
     }
@@ -583,10 +859,38 @@ mod tests {
 
     #[test]
     fn node_aggregator_ingests_flow_per_node() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/hubble/relay/aggregate.go", "NodeAggregator.Ingest", "tenant-na-ing");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/hubble/relay/aggregate.go",
+            "NodeAggregator.Ingest",
+            "tenant-na-ing"
+        );
         let mut a = NodeAggregator::new(tenant.clone());
-        a.ingest("node-a", &flow(tenant.as_str(), "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 100));
-        a.ingest("node-b", &flow(tenant.as_str(), "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 200));
+        a.ingest(
+            "node-a",
+            &flow(
+                tenant.as_str(),
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Forwarded,
+                DropReason::None,
+                100,
+            ),
+        );
+        a.ingest(
+            "node-b",
+            &flow(
+                tenant.as_str(),
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Forwarded,
+                DropReason::None,
+                200,
+            ),
+        );
         assert_eq!(a.node_count(), 2);
         assert_eq!(a.summary("node-a").unwrap().bytes_out, 100);
         assert_eq!(a.summary("node-b").unwrap().bytes_out, 200);
@@ -594,18 +898,62 @@ mod tests {
 
     #[test]
     fn node_aggregator_filters_cross_tenant() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/hubble/relay/aggregate.go", "NodeAggregator.Tenant", "tenant-na-iso");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/hubble/relay/aggregate.go",
+            "NodeAggregator.Tenant",
+            "tenant-na-iso"
+        );
         let mut a = NodeAggregator::new(tenant);
-        a.ingest("node-a", &flow("other", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 100));
+        a.ingest(
+            "node-a",
+            &flow(
+                "other",
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Forwarded,
+                DropReason::None,
+                100,
+            ),
+        );
         assert_eq!(a.node_count(), 0);
     }
 
     #[test]
     fn node_aggregator_tracks_forwarded_and_dropped() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/hubble/relay/aggregate.go", "NodeAggregator.Verdict", "tenant-na-v");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/hubble/relay/aggregate.go",
+            "NodeAggregator.Verdict",
+            "tenant-na-v"
+        );
         let mut a = NodeAggregator::new(tenant.clone());
-        a.ingest("node-a", &flow(tenant.as_str(), "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 100));
-        a.ingest("node-a", &flow(tenant.as_str(), "ns/a", "ns/b", 1, 2, Verdict::Dropped, DropReason::PolicyDeny, 100));
+        a.ingest(
+            "node-a",
+            &flow(
+                tenant.as_str(),
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Forwarded,
+                DropReason::None,
+                100,
+            ),
+        );
+        a.ingest(
+            "node-a",
+            &flow(
+                tenant.as_str(),
+                "ns/a",
+                "ns/b",
+                1,
+                2,
+                Verdict::Dropped,
+                DropReason::PolicyDeny,
+                100,
+            ),
+        );
         let s = a.summary("node-a").unwrap();
         assert_eq!(s.flows_total, 2);
         assert_eq!(s.flows_forwarded, 1);
@@ -614,17 +962,37 @@ mod tests {
 
     #[test]
     fn node_aggregator_summary_unknown_node_returns_none() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/hubble/relay/aggregate.go", "NodeAggregator.NotFound", "tenant-na-nf");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/hubble/relay/aggregate.go",
+            "NodeAggregator.NotFound",
+            "tenant-na-nf"
+        );
         let a = NodeAggregator::new(tenant);
         assert!(a.summary("unknown").is_none());
     }
 
     #[test]
     fn node_aggregator_all_summaries_returns_each_node() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/hubble/relay/aggregate.go", "NodeAggregator.All", "tenant-na-all");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/hubble/relay/aggregate.go",
+            "NodeAggregator.All",
+            "tenant-na-all"
+        );
         let mut a = NodeAggregator::new(tenant.clone());
         for n in ["node-a", "node-b", "node-c"] {
-            a.ingest(n, &flow(tenant.as_str(), "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 100));
+            a.ingest(
+                n,
+                &flow(
+                    tenant.as_str(),
+                    "ns/a",
+                    "ns/b",
+                    1,
+                    2,
+                    Verdict::Forwarded,
+                    DropReason::None,
+                    100,
+                ),
+            );
         }
         assert_eq!(a.all_summaries().len(), 3);
     }
@@ -633,7 +1001,11 @@ mod tests {
 
     #[test]
     fn metric_sample_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/api/api.go", "MetricSample.Serde", "tenant-met-mss");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/api/api.go",
+            "MetricSample.Serde",
+            "tenant-met-mss"
+        );
         let s = MetricSample::new("foo", vec![("k".into(), "v".into())], 42.0);
         let json = serde_json::to_string(&s).unwrap();
         let back: MetricSample = serde_json::from_str(&json).unwrap();
@@ -643,11 +1015,19 @@ mod tests {
 
     #[test]
     fn node_summary_serde_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/relay/aggregate.go", "NodeSummary.Serde", "tenant-na-ss");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/relay/aggregate.go",
+            "NodeSummary.Serde",
+            "tenant-na-ss"
+        );
         let s = NodeSummary {
             node: "node-a".into(),
-            flows_total: 100, flows_forwarded: 80, flows_dropped: 20,
-            bytes_in: 1000, bytes_out: 1000, unique_identities: 5,
+            flows_total: 100,
+            flows_forwarded: 80,
+            flows_dropped: 20,
+            bytes_in: 1000,
+            bytes_out: 1000,
+            unique_identities: 5,
         };
         let json = serde_json::to_string(&s).unwrap();
         let back: NodeSummary = serde_json::from_str(&json).unwrap();
@@ -658,10 +1038,26 @@ mod tests {
 
     #[test]
     fn node_summary_bytes_accumulate_across_flows() {
-        let (_c, tenant) = cilium_test_ctx!("pkg/hubble/relay/aggregate.go", "NodeSummary.Bytes", "tenant-na-bytes");
+        let (_c, tenant) = cilium_test_ctx!(
+            "pkg/hubble/relay/aggregate.go",
+            "NodeSummary.Bytes",
+            "tenant-na-bytes"
+        );
         let mut a = NodeAggregator::new(tenant.clone());
         for i in 1..=5u64 {
-            a.ingest("node-a", &flow(tenant.as_str(), "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, i * 100));
+            a.ingest(
+                "node-a",
+                &flow(
+                    tenant.as_str(),
+                    "ns/a",
+                    "ns/b",
+                    1,
+                    2,
+                    Verdict::Forwarded,
+                    DropReason::None,
+                    i * 100,
+                ),
+            );
         }
         let s = a.summary("node-a").unwrap();
         assert_eq!(s.bytes_out, 100 + 200 + 300 + 400 + 500);
@@ -671,23 +1067,85 @@ mod tests {
 
     #[test]
     fn metrics_registry_label_set_ordering_is_deterministic() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/api/api.go", "ProcessFlow.LabelOrder", "tenant-met-lord");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/api/api.go",
+            "ProcessFlow.LabelOrder",
+            "tenant-met-lord"
+        );
         let mut r1 = MetricRegistry::new();
         let mut r2 = MetricRegistry::new();
         // Process the same flow twice → same key, count = 2.
-        r1.process_flow(&flow("t", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 100));
-        r1.process_flow(&flow("t", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 100));
-        r2.process_flow(&flow("t", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 100));
-        r2.process_flow(&flow("t", "ns/a", "ns/b", 1, 2, Verdict::Forwarded, DropReason::None, 100));
+        r1.process_flow(&flow(
+            "t",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Forwarded,
+            DropReason::None,
+            100,
+        ));
+        r1.process_flow(&flow(
+            "t",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Forwarded,
+            DropReason::None,
+            100,
+        ));
+        r2.process_flow(&flow(
+            "t",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Forwarded,
+            DropReason::None,
+            100,
+        ));
+        r2.process_flow(&flow(
+            "t",
+            "ns/a",
+            "ns/b",
+            1,
+            2,
+            Verdict::Forwarded,
+            DropReason::None,
+            100,
+        ));
         assert_eq!(r1.render_text(), r2.render_text());
     }
 
     #[test]
     fn metrics_drop_aggregates_namespace_label_too() {
-        let (_c, _t) = cilium_test_ctx!("pkg/hubble/metrics/drop/drop.go", "ProcessFlow.NamespaceLabel", "tenant-met-drns");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/hubble/metrics/drop/drop.go",
+            "ProcessFlow.NamespaceLabel",
+            "tenant-met-drns"
+        );
         let mut r = MetricRegistry::new();
-        r.process_flow(&flow("t", "prod/a", "prod/b", 1, 2, Verdict::Dropped, DropReason::PolicyDeny, 100));
-        r.process_flow(&flow("t", "stage/a", "stage/b", 1, 2, Verdict::Dropped, DropReason::PolicyDeny, 100));
+        r.process_flow(&flow(
+            "t",
+            "prod/a",
+            "prod/b",
+            1,
+            2,
+            Verdict::Dropped,
+            DropReason::PolicyDeny,
+            100,
+        ));
+        r.process_flow(&flow(
+            "t",
+            "stage/a",
+            "stage/b",
+            1,
+            2,
+            Verdict::Dropped,
+            DropReason::PolicyDeny,
+            100,
+        ));
         let s = r.samples();
         let drops: Vec<_> = s.iter().filter(|s| s.name == "hubble_drop_total").collect();
         assert_eq!(drops.len(), 2);
@@ -695,7 +1153,11 @@ mod tests {
 
     #[test]
     fn monitor_event_unknown_codes_skip_round_trip() {
-        let (_c, _t) = cilium_test_ctx!("pkg/monitor/api/types.go", "MessageType.UnknownPath", "tenant-mon-unkp");
+        let (_c, _t) = cilium_test_ctx!(
+            "pkg/monitor/api/types.go",
+            "MessageType.UnknownPath",
+            "tenant-mon-unkp"
+        );
         for c in [0u8, 8, 9, 12, 99, 200] {
             assert!(MonitorEvent::from_numeric(c).is_none());
         }

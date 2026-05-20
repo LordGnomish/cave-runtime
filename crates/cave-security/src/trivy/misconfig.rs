@@ -38,9 +38,9 @@ pub fn scan_dockerfile(content: &str, file_path: &str) -> Vec<MisconfigFinding> 
     let mut findings = Vec::new();
     let lines: Vec<&str> = content.lines().collect();
 
-    let has_user_directive = lines.iter().any(|l| l.trim_start().starts_with("USER ")
-        && !l.contains("USER root")
-        && !l.contains("USER 0"));
+    let has_user_directive = lines.iter().any(|l| {
+        l.trim_start().starts_with("USER ") && !l.contains("USER root") && !l.contains("USER 0")
+    });
 
     if !has_user_directive {
         findings.push(MisconfigFinding {
@@ -128,22 +128,30 @@ pub fn scan_dockerfile(content: &str, file_path: &str) -> Vec<MisconfigFinding> 
             findings.push(MisconfigFinding {
                 check_id: "DS015".into(),
                 title: "sudo used in Dockerfile".into(),
-                description: "Using sudo in a Dockerfile is a sign of privilege escalation risk.".into(),
+                description: "Using sudo in a Dockerfile is a sign of privilege escalation risk."
+                    .into(),
                 file_path: file_path.to_string(),
                 line_number: Some(i + 1),
                 severity: MisconfigSeverity::Medium,
                 resource_type: "Dockerfile".into(),
-                resolution: "Run as root during build, then switch to non-root USER, avoiding sudo".into(),
+                resolution: "Run as root during build, then switch to non-root USER, avoiding sudo"
+                    .into(),
                 references: vec![],
             });
         }
 
         // curl | bash / wget | sh pattern
-        if (t.contains("curl") || t.contains("wget")) && (t.contains("| bash") || t.contains("| sh") || t.contains("|bash") || t.contains("|sh")) {
+        if (t.contains("curl") || t.contains("wget"))
+            && (t.contains("| bash")
+                || t.contains("| sh")
+                || t.contains("|bash")
+                || t.contains("|sh"))
+        {
             findings.push(MisconfigFinding {
                 check_id: "DS016".into(),
                 title: "Remote script execution via curl/wget pipe".into(),
-                description: "Executing remote scripts via curl|bash is a supply-chain risk.".into(),
+                description: "Executing remote scripts via curl|bash is a supply-chain risk."
+                    .into(),
                 file_path: file_path.to_string(),
                 line_number: Some(i + 1),
                 severity: MisconfigSeverity::High,
@@ -168,13 +176,19 @@ pub fn scan_k8s_yaml(content: &str, file_path: &str) -> Vec<MisconfigFinding> {
         return findings;
     };
 
-    let kind = docs.get("kind").and_then(|v| v.as_str()).unwrap_or_default();
+    let kind = docs
+        .get("kind")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
 
     // Check containers (Pod, Deployment, DaemonSet, StatefulSet, Job, CronJob)
     let containers = find_containers(&docs);
 
     for (container, path) in &containers {
-        let name = container.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let name = container
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
 
         // Privileged container
         if container
@@ -218,7 +232,8 @@ pub fn scan_k8s_yaml(content: &str, file_path: &str) -> Vec<MisconfigFinding> {
             findings.push(MisconfigFinding {
                 check_id: "KSV011".into(),
                 title: format!("Container '{name}' has no resource limits"),
-                description: "Without resource limits, a container can exhaust node resources.".into(),
+                description: "Without resource limits, a container can exhaust node resources."
+                    .into(),
                 file_path: file_path.to_string(),
                 line_number: None,
                 severity: MisconfigSeverity::Low,
@@ -233,7 +248,11 @@ pub fn scan_k8s_yaml(content: &str, file_path: &str) -> Vec<MisconfigFinding> {
     }
 
     // Pod-level host namespace checks
-    if docs.pointer("/spec/hostNetwork").and_then(|v| v.as_bool()).unwrap_or(false) {
+    if docs
+        .pointer("/spec/hostNetwork")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
         findings.push(MisconfigFinding {
             check_id: "KSV009".into(),
             title: "Pod uses host network".into(),
@@ -247,7 +266,11 @@ pub fn scan_k8s_yaml(content: &str, file_path: &str) -> Vec<MisconfigFinding> {
         });
     }
 
-    if docs.pointer("/spec/hostPID").and_then(|v| v.as_bool()).unwrap_or(false) {
+    if docs
+        .pointer("/spec/hostPID")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
         findings.push(MisconfigFinding {
             check_id: "KSV008".into(),
             title: "Pod shares host PID namespace".into(),
@@ -296,7 +319,9 @@ pub fn scan_terraform(content: &str, file_path: &str) -> Vec<MisconfigFinding> {
         let t = line.trim();
 
         // S3 bucket public access
-        if t.contains("acl") && (t.contains("\"public-read\"") || t.contains("\"public-read-write\"")) {
+        if t.contains("acl")
+            && (t.contains("\"public-read\"") || t.contains("\"public-read-write\""))
+        {
             findings.push(MisconfigFinding {
                 check_id: "AVD-AWS-0086".into(),
                 title: "S3 bucket has public ACL".into(),
@@ -306,7 +331,10 @@ pub fn scan_terraform(content: &str, file_path: &str) -> Vec<MisconfigFinding> {
                 severity: MisconfigSeverity::Critical,
                 resource_type: "aws_s3_bucket".into(),
                 resolution: "Set ACL to private or use bucket policies".into(),
-                references: vec!["https://docs.aws.amazon.com/AmazonS3/latest/userguide/acl-overview.html".into()],
+                references: vec![
+                    "https://docs.aws.amazon.com/AmazonS3/latest/userguide/acl-overview.html"
+                        .into(),
+                ],
             });
         }
 

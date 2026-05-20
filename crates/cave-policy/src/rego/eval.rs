@@ -68,7 +68,9 @@ fn set_nested(target: &mut serde_json::Value, path: &[String], value: serde_json
         if path.len() == 1 {
             m.insert(path[0].clone(), value);
         } else {
-            let entry = m.entry(path[0].clone()).or_insert(serde_json::Value::Object(Default::default()));
+            let entry = m
+                .entry(path[0].clone())
+                .or_insert(serde_json::Value::Object(Default::default()));
             set_nested(entry, &path[1..], value);
         }
     }
@@ -141,9 +143,7 @@ fn eval_expr(expr: &Expr, bindings: &Bindings, ctx: &EvalCtx) -> Vec<Bindings> {
             }
         }
 
-        Expr::Unify(left, right) => {
-            unify(left, right, bindings.clone(), ctx)
-        }
+        Expr::Unify(left, right) => unify(left, right, bindings.clone(), ctx),
 
         Expr::Assign(left, right) => {
             // := always assigns to a new variable; the left must be a var or term
@@ -171,22 +171,28 @@ fn eval_expr(expr: &Expr, bindings: &Bindings, ctx: &EvalCtx) -> Vec<Bindings> {
             }
         }
 
-        Expr::Every { key, value, domain, body } => {
+        Expr::Every {
+            key,
+            value,
+            domain,
+            body,
+        } => {
             let domain_val = eval_term(domain, bindings, ctx);
             let items = match &domain_val {
-                Value::Json(serde_json::Value::Array(a)) => {
-                    a.iter().enumerate()
-                        .map(|(i, v)| (serde_json::json!(i), v.clone()))
-                        .collect::<Vec<_>>()
-                }
-                Value::Json(serde_json::Value::Object(m)) => {
-                    m.iter().map(|(k, v)| (serde_json::json!(k), v.clone())).collect()
-                }
-                Value::Set(s) => {
-                    s.iter().enumerate()
-                        .map(|(i, v)| (serde_json::json!(i), v.clone()))
-                        .collect()
-                }
+                Value::Json(serde_json::Value::Array(a)) => a
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| (serde_json::json!(i), v.clone()))
+                    .collect::<Vec<_>>(),
+                Value::Json(serde_json::Value::Object(m)) => m
+                    .iter()
+                    .map(|(k, v)| (serde_json::json!(k), v.clone()))
+                    .collect(),
+                Value::Set(s) => s
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| (serde_json::json!(i), v.clone()))
+                    .collect(),
                 _ => return vec![],
             };
 
@@ -215,15 +221,20 @@ fn eval_expr(expr: &Expr, bindings: &Bindings, ctx: &EvalCtx) -> Vec<Bindings> {
         Expr::SomeIn { key, value, domain } => {
             let domain_val = eval_term(domain, bindings, ctx);
             let items: Vec<(serde_json::Value, serde_json::Value)> = match &domain_val {
-                Value::Json(serde_json::Value::Array(a)) => {
-                    a.iter().enumerate().map(|(i, v)| (serde_json::json!(i), v.clone())).collect()
-                }
-                Value::Json(serde_json::Value::Object(m)) => {
-                    m.iter().map(|(k, v)| (serde_json::json!(k), v.clone())).collect()
-                }
-                Value::Set(s) => {
-                    s.iter().enumerate().map(|(i, v)| (serde_json::json!(i), v.clone())).collect()
-                }
+                Value::Json(serde_json::Value::Array(a)) => a
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| (serde_json::json!(i), v.clone()))
+                    .collect(),
+                Value::Json(serde_json::Value::Object(m)) => m
+                    .iter()
+                    .map(|(k, v)| (serde_json::json!(k), v.clone()))
+                    .collect(),
+                Value::Set(s) => s
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| (serde_json::json!(i), v.clone()))
+                    .collect(),
                 _ => return vec![],
             };
 
@@ -232,7 +243,9 @@ fn eval_expr(expr: &Expr, bindings: &Bindings, ctx: &EvalCtx) -> Vec<Bindings> {
                 let mut b = bindings.clone();
                 if let Some(key_term) = key {
                     let new_b = unify_value(key_term, Value::Json(k), b, ctx);
-                    if new_b.is_empty() { continue; }
+                    if new_b.is_empty() {
+                        continue;
+                    }
                     b = new_b.into_iter().next().unwrap();
                 }
                 let new_b = unify_value(value, Value::Json(v), b, ctx);
@@ -290,15 +303,15 @@ pub fn eval_term(term: &Term, bindings: &Bindings, ctx: &EvalCtx) -> Value {
             }
         }
 
-        Term::Ref(base, args) => {
-            eval_ref(base, args, bindings, ctx)
-        }
+        Term::Ref(base, args) => eval_ref(base, args, bindings, ctx),
 
         Term::Array(items) => {
             let mut arr = Vec::new();
             for item in items {
                 let v = eval_term(item, bindings, ctx);
-                if v.is_undefined() { return Value::Undefined; }
+                if v.is_undefined() {
+                    return Value::Undefined;
+                }
                 arr.push(v.to_json_lossy());
             }
             Value::array(arr)
@@ -323,9 +336,13 @@ pub fn eval_term(term: &Term, bindings: &Bindings, ctx: &EvalCtx) -> Value {
             let mut set = Vec::new();
             for item in items {
                 let v = eval_term(item, bindings, ctx);
-                if v.is_undefined() { return Value::Undefined; }
+                if v.is_undefined() {
+                    return Value::Undefined;
+                }
                 let j = v.to_json_lossy();
-                if !set.contains(&j) { set.push(j); }
+                if !set.contains(&j) {
+                    set.push(j);
+                }
             }
             Value::Set(set)
         }
@@ -349,7 +366,9 @@ pub fn eval_term(term: &Term, bindings: &Bindings, ctx: &EvalCtx) -> Value {
                 let v = eval_term(term, &sol, ctx);
                 if !v.is_undefined() {
                     let j = v.to_json_lossy();
-                    if !set.contains(&j) { set.push(j); }
+                    if !set.contains(&j) {
+                        set.push(j);
+                    }
                 }
             }
             Value::Set(set)
@@ -373,9 +392,7 @@ pub fn eval_term(term: &Term, bindings: &Bindings, ctx: &EvalCtx) -> Value {
             Value::object(m)
         }
 
-        Term::Call { func, args } => {
-            eval_call(func, args, bindings, ctx)
-        }
+        Term::Call { func, args } => eval_call(func, args, bindings, ctx),
     }
 }
 
@@ -400,26 +417,45 @@ fn eval_ref(base: &Term, ref_args: &[RefArg], bindings: &Bindings, ctx: &EvalCtx
             RefArg::Index(idx_term) => {
                 let idx = eval_term(idx_term, bindings, ctx);
                 match (&current, idx) {
-                    (Value::Json(serde_json::Value::Array(a)), Value::Json(serde_json::Value::Number(n))) => {
+                    (
+                        Value::Json(serde_json::Value::Array(a)),
+                        Value::Json(serde_json::Value::Number(n)),
+                    ) => {
                         if let Some(i) = n.as_u64() {
-                            a.get(i as usize).cloned().map(Value::Json).unwrap_or(Value::Undefined)
+                            a.get(i as usize)
+                                .cloned()
+                                .map(Value::Json)
+                                .unwrap_or(Value::Undefined)
                         } else {
                             Value::Undefined
                         }
                     }
-                    (Value::Json(serde_json::Value::Object(m)), Value::Json(serde_json::Value::String(k))) => {
-                        m.get(&k).cloned().map(Value::Json).unwrap_or(Value::Undefined)
-                    }
-                    (Value::Json(serde_json::Value::Object(m)), Value::Json(serde_json::Value::Number(n))) => {
+                    (
+                        Value::Json(serde_json::Value::Object(m)),
+                        Value::Json(serde_json::Value::String(k)),
+                    ) => m
+                        .get(&k)
+                        .cloned()
+                        .map(Value::Json)
+                        .unwrap_or(Value::Undefined),
+                    (
+                        Value::Json(serde_json::Value::Object(m)),
+                        Value::Json(serde_json::Value::Number(n)),
+                    ) => {
                         let k = n.to_string();
-                        m.get(&k).cloned().map(Value::Json).unwrap_or(Value::Undefined)
+                        m.get(&k)
+                            .cloned()
+                            .map(Value::Json)
+                            .unwrap_or(Value::Undefined)
                     }
                     (_, Value::Undefined) => Value::Undefined, // wildcard iteration
                     _ => Value::Undefined,
                 }
             }
         };
-        if current.is_undefined() { break; }
+        if current.is_undefined() {
+            break;
+        }
     }
     current
 }
@@ -437,7 +473,12 @@ fn eval_call(func: &Term, args: &[Term], bindings: &Bindings, ctx: &EvalCtx) -> 
         "plus" | "+" => return arith_op(&arg_vals, |a, b| a + b),
         "minus" | "-" => return arith_op(&arg_vals, |a, b| a - b),
         "mul" | "*" => return arith_op(&arg_vals, |a, b| a * b),
-        "div" | "/" => return arith_op(&arg_vals, |a, b| if b != 0.0 { a / b } else { f64::INFINITY }),
+        "div" | "/" => {
+            return arith_op(
+                &arg_vals,
+                |a, b| if b != 0.0 { a / b } else { f64::INFINITY },
+            );
+        }
         "rem" | "%" => return arith_op(&arg_vals, |a, b| a % b),
         "lt" | "<" => return compare_op(&arg_vals, std::cmp::Ordering::Less),
         "gt" | ">" => return compare_op(&arg_vals, std::cmp::Ordering::Greater),
@@ -475,21 +516,45 @@ fn arith_op(args: &[Value], op: impl Fn(f64, f64) -> f64) -> Value {
 }
 
 fn compare_op(args: &[Value], expected: std::cmp::Ordering) -> Value {
-    let a = args.first().and_then(|v| v.as_json()).cloned().unwrap_or(serde_json::Value::Null);
-    let b = args.get(1).and_then(|v| v.as_json()).cloned().unwrap_or(serde_json::Value::Null);
+    let a = args
+        .first()
+        .and_then(|v| v.as_json())
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    let b = args
+        .get(1)
+        .and_then(|v| v.as_json())
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
     Value::bool(super::value::json_cmp(&a, &b) == expected)
 }
 
 fn compare_op_le(args: &[Value]) -> Value {
-    let a = args.first().and_then(|v| v.as_json()).cloned().unwrap_or(serde_json::Value::Null);
-    let b = args.get(1).and_then(|v| v.as_json()).cloned().unwrap_or(serde_json::Value::Null);
+    let a = args
+        .first()
+        .and_then(|v| v.as_json())
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    let b = args
+        .get(1)
+        .and_then(|v| v.as_json())
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
     let ord = super::value::json_cmp(&a, &b);
     Value::bool(ord != std::cmp::Ordering::Greater)
 }
 
 fn compare_op_ge(args: &[Value]) -> Value {
-    let a = args.first().and_then(|v| v.as_json()).cloned().unwrap_or(serde_json::Value::Null);
-    let b = args.get(1).and_then(|v| v.as_json()).cloned().unwrap_or(serde_json::Value::Null);
+    let a = args
+        .first()
+        .and_then(|v| v.as_json())
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    let b = args
+        .get(1)
+        .and_then(|v| v.as_json())
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
     let ord = super::value::json_cmp(&a, &b);
     Value::bool(ord != std::cmp::Ordering::Less)
 }
@@ -546,18 +611,27 @@ fn eval_function_rule(
             if rule.head.name != *func_path.last().unwrap_or(&String::new()) {
                 continue;
             }
-            if rule.head.args.is_empty() { continue; }
-            if rule.head.args.len() != arg_vals.len() { continue; }
+            if rule.head.args.is_empty() {
+                continue;
+            }
+            if rule.head.args.len() != arg_vals.len() {
+                continue;
+            }
 
             // Unify function parameters with argument values
             let mut call_bindings = HashMap::new();
             let mut ok = true;
             for (param, arg_val) in rule.head.args.iter().zip(arg_vals.iter()) {
                 let solutions = unify_value(param, arg_val.clone(), call_bindings.clone(), ctx);
-                if solutions.is_empty() { ok = false; break; }
+                if solutions.is_empty() {
+                    ok = false;
+                    break;
+                }
                 call_bindings = solutions.into_iter().next().unwrap();
             }
-            if !ok { continue; }
+            if !ok {
+                continue;
+            }
 
             let mut call_ctx = ctx.clone();
             call_ctx.call_stack.push(call_key.clone());
@@ -603,7 +677,9 @@ fn eval_rule(
                     let v = eval_term(key_term, &sol, ctx);
                     if !v.is_undefined() {
                         let j = v.to_json_lossy();
-                        if !set.contains(&j) { set.push(j); }
+                        if !set.contains(&j) {
+                            set.push(j);
+                        }
                     }
                 }
             }
@@ -676,14 +752,18 @@ pub fn unify(left: &Term, right: &Term, bindings: Bindings, ctx: &EvalCtx) -> Ve
     match (left, right, &lv, &rv) {
         // Left is unbound variable
         (Term::Var(name), _, Value::Undefined, _) if name != "data" && name != "input" => {
-            if rv.is_undefined() { return vec![]; }
+            if rv.is_undefined() {
+                return vec![];
+            }
             let mut b = bindings;
             b.insert(name.clone(), rv);
             vec![b]
         }
         // Right is unbound variable
         (_, Term::Var(name), _, Value::Undefined) if name != "data" && name != "input" => {
-            if lv.is_undefined() { return vec![]; }
+            if lv.is_undefined() {
+                return vec![];
+            }
             let mut b = bindings;
             b.insert(name.clone(), lv);
             vec![b]
@@ -724,7 +804,11 @@ fn unify_value(term: &Term, value: Value, bindings: Bindings, ctx: &EvalCtx) -> 
         Term::Wildcard => vec![bindings],
         _ => {
             let existing = eval_term(term, &bindings, ctx);
-            if existing == value { vec![bindings] } else { vec![] }
+            if existing == value {
+                vec![bindings]
+            } else {
+                vec![]
+            }
         }
     }
 }

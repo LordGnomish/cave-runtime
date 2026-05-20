@@ -10,7 +10,7 @@
 
 ## Context
 
-CAVE needs a mechanism for Day 1+ infrastructure provisioning (databases, caches, message queues, search, storage) that provides continuous reconciliation (not one-shot apply) and works identically across Hetzner and Azure.
+CAVE needs a mechanism for Day 1+ infrastructure provisioning (databases, caches, message queues, search, storage) that provides continuous reconciliation (not one-shot apply) and works identically across sovereign cloud and hyperscaler.
 
 ## Candidates
 
@@ -33,7 +33,7 @@ CAVE needs a mechanism for Day 1+ infrastructure provisioning (databases, caches
 
 - **Terraform/OpenTofu for everything:** OpenTofu is imperative (plan/apply). Day 2+ infrastructure needs continuous reconciliation — if someone manually changes a DB setting, Crossplane auto-reverts. OpenTofu wouldn't detect drift until next apply. OpenTofu is perfect for Day 0 (cluster, network) but wrong for Day 1+ (application infrastructure).
 - **Pulumi:** Powerful language SDKs but creates heterogeneous IaC (TypeScript + Go + Python). Crossplane's declarative K8s-native model is more consistent with ArgoCD GitOps. No namespace-first model.
-- **ACK/ASO:** Single provider only. Cannot abstract Hetzner + Azure behind same API.
+- **ACK/ASO:** Single provider only. Cannot abstract sovereign cloud + hyperscaler behind same API.
 
 ## Consequences
 

@@ -51,9 +51,8 @@ impl PluginVersion {
 /// One connector implementation. The factory takes a fully-namespaced
 /// config map (every key still has the plugin prefix) and yields a
 /// concrete [`ConnectorSpec`] for the runtime to schedule.
-pub type ConnectorFactory = Arc<
-    dyn Fn(&BTreeMap<String, String>) -> StreamsResult<ConnectorSpec> + Send + Sync + 'static,
->;
+pub type ConnectorFactory =
+    Arc<dyn Fn(&BTreeMap<String, String>) -> StreamsResult<ConnectorSpec> + Send + Sync + 'static>;
 
 /// Entry in the registry.
 #[derive(Clone)]
@@ -121,7 +120,8 @@ impl PluginRegistry {
                 )));
             }
         }
-        self.prefixes.insert(entry.config_prefix.clone(), entry.name.clone());
+        self.prefixes
+            .insert(entry.config_prefix.clone(), entry.name.clone());
         let key = (entry.name.clone(), entry.version.clone());
         self.entries.insert(key, entry);
         Ok(())
@@ -259,11 +259,17 @@ mod tests {
     #[test]
     fn register_and_get_round_trips() {
         let mut r = PluginRegistry::new();
-        r.register(entry("cave.connect.JdbcSource", "1.0.0", "jdbc.", TaskKind::Source))
-            .unwrap();
-        assert!(r
-            .get("cave.connect.JdbcSource", &PluginVersion::new("1.0.0"))
-            .is_some());
+        r.register(entry(
+            "cave.connect.JdbcSource",
+            "1.0.0",
+            "jdbc.",
+            TaskKind::Source,
+        ))
+        .unwrap();
+        assert!(
+            r.get("cave.connect.JdbcSource", &PluginVersion::new("1.0.0"))
+                .is_some()
+        );
     }
 
     #[test]
@@ -285,24 +291,33 @@ mod tests {
     #[test]
     fn prefix_collision_between_plugins_rejected() {
         let mut r = PluginRegistry::new();
-        r.register(entry("A", "1", "shared.", TaskKind::Source)).unwrap();
-        assert!(r.register(entry("B", "1", "shared.", TaskKind::Sink)).is_err());
+        r.register(entry("A", "1", "shared.", TaskKind::Source))
+            .unwrap();
+        assert!(
+            r.register(entry("B", "1", "shared.", TaskKind::Sink))
+                .is_err()
+        );
     }
 
     #[test]
     fn same_plugin_different_version_allowed() {
         let mut r = PluginRegistry::new();
-        r.register(entry("p", "1.0.0", "p.", TaskKind::Source)).unwrap();
-        r.register(entry("p", "2.0.0", "p.", TaskKind::Source)).unwrap();
+        r.register(entry("p", "1.0.0", "p.", TaskKind::Source))
+            .unwrap();
+        r.register(entry("p", "2.0.0", "p.", TaskKind::Source))
+            .unwrap();
         assert_eq!(r.len(), 2);
     }
 
     #[test]
     fn newest_picks_latest_version() {
         let mut r = PluginRegistry::new();
-        r.register(entry("p", "1.0.0", "p.", TaskKind::Source)).unwrap();
-        r.register(entry("p", "2.0.0", "p.", TaskKind::Source)).unwrap();
-        r.register(entry("p", "1.5.0", "p.", TaskKind::Source)).unwrap();
+        r.register(entry("p", "1.0.0", "p.", TaskKind::Source))
+            .unwrap();
+        r.register(entry("p", "2.0.0", "p.", TaskKind::Source))
+            .unwrap();
+        r.register(entry("p", "1.5.0", "p.", TaskKind::Source))
+            .unwrap();
         assert_eq!(r.newest("p").unwrap().version.as_str(), "2.0.0");
     }
 
@@ -343,8 +358,10 @@ mod tests {
     #[test]
     fn build_with_version_pin_resolves() {
         let mut r = PluginRegistry::new();
-        r.register(entry("p", "1.0.0", "p.", TaskKind::Source)).unwrap();
-        r.register(entry("p", "2.0.0", "p.", TaskKind::Source)).unwrap();
+        r.register(entry("p", "1.0.0", "p.", TaskKind::Source))
+            .unwrap();
+        r.register(entry("p", "2.0.0", "p.", TaskKind::Source))
+            .unwrap();
         let mut cfg = BTreeMap::new();
         cfg.insert("connector.class".into(), "p".into());
         cfg.insert("connector.version".into(), "1.0.0".into());

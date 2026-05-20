@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Universal
+**Scope:** Hyperscaler, Sovereign, Universal
 
 **Category:** AI
 
@@ -10,7 +10,7 @@
 
 ## Context
 
-CAVE routes LLM inference through LiteLLM gateway (ADR-013) to Ollama (Hetzner) or Azure OpenAI (Azure). Every inference request needs observability: prompt/response content logging, token usage tracking, latency metrics, cost attribution per tenant, model version tracking, and prompt version management. Observability must respect data classification — restricted classification must disable all content logging (ADR-103).
+CAVE routes LLM inference through LiteLLM gateway (ADR-013) to Ollama (sovereign) or Azure OpenAI (Azure). Every inference request needs observability: prompt/response content logging, token usage tracking, latency metrics, cost attribution per tenant, model version tracking, and prompt version management. Observability must respect data classification — restricted classification must disable all content logging (ADR-103).
 
 ## Candidates
 

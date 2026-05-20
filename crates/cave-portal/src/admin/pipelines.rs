@@ -7,7 +7,7 @@
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
-use crate::admin::state::{scope, AdminState, PipelineRun};
+use crate::admin::state::{AdminState, PipelineRun, scope};
 use crate::admin::types::Cite;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -16,10 +16,18 @@ pub enum PipelinesViewError {
     Auth(#[from] crate::admin::permission::AuthError),
 }
 
-pub fn list_records(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<PipelineRun>, PipelinesViewError> {
+pub fn list_records(
+    state: &AdminState,
+    ctx: &RequestCtx,
+) -> Result<Vec<PipelineRun>, PipelinesViewError> {
     ctx.authorise(Permission::PipelinesRead)?;
-    let mut rows: Vec<PipelineRun> = scope(&state.pipeline_runs.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter().cloned().collect();
+    let mut rows: Vec<PipelineRun> =
+        scope(&state.pipeline_runs.read().unwrap(), &ctx.tenant, |r| {
+            &r.tenant
+        })
+        .into_iter()
+        .cloned()
+        .collect();
     rows.sort_by(|a, b| a.pipeline.cmp(&b.pipeline).then(a.run_id.cmp(&b.run_id)));
     Ok(rows)
 }
@@ -34,7 +42,10 @@ pub struct PipelineSummary {
 }
 
 pub fn pipeline_summary(rows: &[PipelineRun]) -> PipelineSummary {
-    let mut s = PipelineSummary { total: rows.len() as u32, ..Default::default() };
+    let mut s = PipelineSummary {
+        total: rows.len() as u32,
+        ..Default::default()
+    };
     for r in rows {
         match r.status {
             "Running" => s.running += 1,
@@ -58,9 +69,17 @@ pub fn by_pipeline<'a>(rows: &'a [PipelineRun], pipeline: &str) -> Vec<&'a Pipel
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, PipelinesViewError> {
     let rows = list_records(state, ctx)?;
     let summary = pipeline_summary(&rows);
-    let table_rows: Vec<Vec<String>> = rows.iter().map(|r| vec![
-        escape(&r.pipeline), escape(&r.run_id), r.status.into(), r.duration_seconds.to_string(),
-    ]).collect();
+    let table_rows: Vec<Vec<String>> = rows
+        .iter()
+        .map(|r| {
+            vec![
+                escape(&r.pipeline),
+                escape(&r.run_id),
+                r.status.into(),
+                r.duration_seconds.to_string(),
+            ]
+        })
+        .collect();
     let body = format!(
         r#"<section>
   <p class="text-sm text-gray-600 mb-3">Tekton Dashboard parity (cave-pipelines). Upstream: <a class="text-blue-700 underline" href="https://tekton.dev/docs/dashboard/">tekton.dev/docs/dashboard</a>.</p>
@@ -80,23 +99,33 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, PipelinesV
         failed = summary.failed,
         tbl = table(&["pipeline", "run_id", "status", "duration_s"], &table_rows),
     );
-    Ok(page_shell_full(ctx, "/admin/pipelines", &format!("pipelines · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(
+        ctx,
+        "/admin/pipelines",
+        &format!("pipelines · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::backstage("plugins/pipelines/src/components/RunsList.tsx", "RunsList");
+const FILE_CITE: Cite =
+    Cite::backstage("plugins/pipelines/src/components/RunsList.tsx", "RunsList");
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::portal_test_ctx;
-    fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
+    fn ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer("acme", perms)
+    }
 
     #[test]
     fn list_filters_to_owner_and_sorts_by_pipeline() {
         let r = list_records(&AdminState::seeded(), &ctx(&[Permission::PipelinesRead])).unwrap();
         assert_eq!(r.len(), 2);
-        for w in r.windows(2) { assert!(w[0].pipeline <= w[1].pipeline); }
+        for w in r.windows(2) {
+            assert!(w[0].pipeline <= w[1].pipeline);
+        }
     }
 
     #[test]

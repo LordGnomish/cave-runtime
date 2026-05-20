@@ -284,9 +284,7 @@ pub async fn run_driver(handle: RaftHandle, ca_pem: String) -> Result<()> {
                                 let mut core = handle_.core.lock().await;
                                 match (reply, ctx) {
                                     (RaftRpcReply::RequestVote(r), OutboundCtx::Vote) => {
-                                        if let Err(e) =
-                                            core.handle_request_vote_reply(to, r, now)
-                                        {
+                                        if let Err(e) = core.handle_request_vote_reply(to, r, now) {
                                             warn!(error = %e, "vote-reply handler");
                                         }
                                     }
@@ -427,11 +425,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let handle = make_handle(1, vec![1, 2, 3], tmp.path());
         let b64 = base64::engine::general_purpose::STANDARD.encode(b"x");
-        let resp = handle_propose(
-            State(handle),
-            Json(ProposeRequest { command_b64: b64 }),
-        )
-        .await;
+        let resp = handle_propose(State(handle), Json(ProposeRequest { command_b64: b64 })).await;
         match resp {
             Err((status, body)) => {
                 assert_eq!(status, StatusCode::CONFLICT);

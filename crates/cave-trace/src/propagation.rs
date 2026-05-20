@@ -20,7 +20,9 @@
 //! API surfaces both `try_parse_*` (returns Result) and `extract_or_new` (lossy)
 //! variants so callers can choose between strict ingest and best-effort propagation.
 
-use crate::types::{format_span_id, format_trace_id, parse_span_id, parse_trace_id, SpanId, TraceId};
+use crate::types::{
+    SpanId, TraceId, format_span_id, format_trace_id, parse_span_id, parse_trace_id,
+};
 use thiserror::Error;
 
 pub const VERSION: u8 = 0x00;
@@ -129,7 +131,12 @@ pub fn parse_traceparent(header: &str) -> PropagationResult<TraceParent> {
     let flags = u8::from_str_radix(parts[3], 16)
         .map_err(|_| PropagationError::InvalidFlags(parts[3].to_string()))?;
 
-    Ok(TraceParent { version, trace_id, span_id, flags })
+    Ok(TraceParent {
+        version,
+        trace_id,
+        span_id,
+        flags,
+    })
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -152,7 +159,10 @@ impl TraceState {
     }
 
     pub fn get(&self, key: &str) -> Option<&str> {
-        self.entries.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+        self.entries
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
     }
 
     pub fn to_header(&self) -> String {
@@ -206,13 +216,17 @@ fn is_valid_value(v: &str) -> bool {
     if v.is_empty() || v.len() > 256 {
         return false;
     }
-    v.bytes().all(|b| (0x20..=0x7e).contains(&b) && b != b',' && b != b'=')
+    v.bytes()
+        .all(|b| (0x20..=0x7e).contains(&b) && b != b',' && b != b'=')
 }
 
 /// Convenience: extract from a header map, returning a fresh trace if missing
 /// or malformed. Useful for the OTLP/HTTP entry-points where we MUST always
 /// produce a span context.
-pub fn extract_or_new(traceparent: Option<&str>, tracestate: Option<&str>) -> (TraceParent, TraceState) {
+pub fn extract_or_new(
+    traceparent: Option<&str>,
+    tracestate: Option<&str>,
+) -> (TraceParent, TraceState) {
     let parent = traceparent
         .and_then(|h| parse_traceparent(h).ok())
         .unwrap_or_else(|| {
@@ -234,7 +248,10 @@ fn rand_u128() -> u128 {
     // tiny non-crypto RNG: time + thread id mixed via FNV. The runtime
     // uses a real RNG when available; this fallback keeps the propagation
     // module dependency-free.
-    let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
+    let t = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
     let id = std::thread::current().id();
     let mix = format!("{:?}-{}", id, t);
     let mut h: u128 = 0xcbf29ce4_84222325_cbf29ce4_84222325;
@@ -276,7 +293,8 @@ mod tests {
 
     #[test]
     fn test_traceparent_unsampled_flag() {
-        let p = parse_traceparent("00-0af7651916cd43dd8448eb211c80319c-b9c7c989f97918e1-00").unwrap();
+        let p =
+            parse_traceparent("00-0af7651916cd43dd8448eb211c80319c-b9c7c989f97918e1-00").unwrap();
         assert!(!p.is_sampled());
     }
 
@@ -303,19 +321,28 @@ mod tests {
     #[test]
     fn test_traceparent_rejects_zero_trace_id() {
         let zero_trace = "00-00000000000000000000000000000000-b9c7c989f97918e1-01";
-        assert_eq!(parse_traceparent(zero_trace).unwrap_err(), PropagationError::ZeroTraceId);
+        assert_eq!(
+            parse_traceparent(zero_trace).unwrap_err(),
+            PropagationError::ZeroTraceId
+        );
     }
 
     #[test]
     fn test_traceparent_rejects_zero_span_id() {
         let zero_span = "00-0af7651916cd43dd8448eb211c80319c-0000000000000000-01";
-        assert_eq!(parse_traceparent(zero_span).unwrap_err(), PropagationError::ZeroSpanId);
+        assert_eq!(
+            parse_traceparent(zero_span).unwrap_err(),
+            PropagationError::ZeroSpanId
+        );
     }
 
     #[test]
     fn test_traceparent_rejects_version_ff() {
         let h = "ff-0af7651916cd43dd8448eb211c80319c-b9c7c989f97918e1-01";
-        assert!(matches!(parse_traceparent(h).unwrap_err(), PropagationError::InvalidVersion(_)));
+        assert!(matches!(
+            parse_traceparent(h).unwrap_err(),
+            PropagationError::InvalidVersion(_)
+        ));
     }
 
     #[test]
@@ -345,7 +372,10 @@ mod tests {
 
     #[test]
     fn test_tracestate_caps_at_32_entries() {
-        let huge: String = (0..40).map(|i| format!("k{}=v{}", i, i)).collect::<Vec<_>>().join(",");
+        let huge: String = (0..40)
+            .map(|i| format!("k{}=v{}", i, i))
+            .collect::<Vec<_>>()
+            .join(",");
         let s = parse_tracestate(&huge);
         assert_eq!(s.entries.len(), MAX_TRACESTATE_ENTRIES);
     }
@@ -458,7 +488,11 @@ mod tests {
 
     #[test]
     fn test_traceparent_round_trip_random_ids() {
-        for (tid, sid) in [(1u128, 1u64), (u128::MAX, u64::MAX), (0xdeadbeefcafebabe, 0x1234)] {
+        for (tid, sid) in [
+            (1u128, 1u64),
+            (u128::MAX, u64::MAX),
+            (0xdeadbeefcafebabe, 0x1234),
+        ] {
             let p = TraceParent::new(tid, sid, true);
             assert_eq!(parse_traceparent(&p.to_header()).unwrap(), p);
         }

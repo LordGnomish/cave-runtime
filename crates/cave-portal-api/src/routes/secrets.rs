@@ -62,7 +62,9 @@ pub struct SecretStore {
 
 impl Default for SecretStore {
     fn default() -> Self {
-        Self { inner: Mutex::new(HashMap::new()) }
+        Self {
+            inner: Mutex::new(HashMap::new()),
+        }
     }
 }
 
@@ -114,7 +116,10 @@ impl SecretStore {
         let stored = guard
             .get(&(tenant.into(), name.into()))
             .ok_or_else(|| SecretsError::NotFound(name.into()))?;
-        Ok(SecretValue { meta: stored.meta.clone(), value: stored.value.clone() })
+        Ok(SecretValue {
+            meta: stored.meta.clone(),
+            value: stored.value.clone(),
+        })
     }
 
     pub fn put(
@@ -122,8 +127,7 @@ impl SecretStore {
         principal: Option<&Principal>,
         req: PutSecretRequest,
     ) -> Result<SecretMeta, SecretsError> {
-        Guard::tenant_only(Some("secrets:write"))
-            .authorize(principal, Some(&req.tenant))?;
+        Guard::tenant_only(Some("secrets:write")).authorize(principal, Some(&req.tenant))?;
         Self::validate_name(&req.name)?;
         if req.value.len() > MAX_SECRET_SIZE {
             return Err(SecretsError::TooLarge(req.value.len(), MAX_SECRET_SIZE));
@@ -140,7 +144,10 @@ impl SecretStore {
         };
         guard.insert(
             key,
-            Stored { meta: meta.clone(), value: req.value },
+            Stored {
+                meta: meta.clone(),
+                value: req.value,
+            },
         );
         Ok(meta)
     }
@@ -172,17 +179,25 @@ mod tests {
             .with_role("secrets:write")
     }
     fn dev_read(t: &str) -> Principal {
-        Principal::new("d", Persona::Tenant).with_tenant(t).with_role("secrets:read")
+        Principal::new("d", Persona::Tenant)
+            .with_tenant(t)
+            .with_role("secrets:read")
     }
     fn dev_no_role(t: &str) -> Principal {
         Principal::new("d", Persona::Tenant).with_tenant(t)
     }
     fn admin() -> Principal {
-        Principal::new("a", Persona::Admin).with_role("secrets:read").with_role("secrets:write")
+        Principal::new("a", Persona::Admin)
+            .with_role("secrets:read")
+            .with_role("secrets:write")
     }
 
     fn put_req(t: &str, n: &str, v: &str) -> PutSecretRequest {
-        PutSecretRequest { tenant: t.into(), name: n.into(), value: v.into() }
+        PutSecretRequest {
+            tenant: t.into(),
+            name: n.into(),
+            value: v.into(),
+        }
     }
 
     #[test]
@@ -195,21 +210,32 @@ mod tests {
     #[test]
     fn put_without_role_denied() {
         let s = SecretStore::new();
-        let err = s.put(Some(&dev_no_role("acme")), put_req("acme", "x", "v")).unwrap_err();
-        assert!(matches!(err, SecretsError::Guard(GuardError::MissingRole(_))));
+        let err = s
+            .put(Some(&dev_no_role("acme")), put_req("acme", "x", "v"))
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            SecretsError::Guard(GuardError::MissingRole(_))
+        ));
     }
 
     #[test]
     fn put_read_role_cannot_write() {
         let s = SecretStore::new();
-        let err = s.put(Some(&dev_read("acme")), put_req("acme", "x", "v")).unwrap_err();
-        assert!(matches!(err, SecretsError::Guard(GuardError::MissingRole(r)) if r == "secrets:write"));
+        let err = s
+            .put(Some(&dev_read("acme")), put_req("acme", "x", "v"))
+            .unwrap_err();
+        assert!(
+            matches!(err, SecretsError::Guard(GuardError::MissingRole(r)) if r == "secrets:write")
+        );
     }
 
     #[test]
     fn put_succeeds_for_dev_with_write() {
         let s = SecretStore::new();
-        let m = s.put(Some(&dev("acme")), put_req("acme", "api-key", "abc")).unwrap();
+        let m = s
+            .put(Some(&dev("acme")), put_req("acme", "api-key", "abc"))
+            .unwrap();
         assert_eq!(m.version, 1);
         assert_eq!(m.byte_size, 3);
     }
@@ -217,16 +243,24 @@ mod tests {
     #[test]
     fn put_increments_version() {
         let s = SecretStore::new();
-        s.put(Some(&dev("acme")), put_req("acme", "k", "v1")).unwrap();
-        let m2 = s.put(Some(&dev("acme")), put_req("acme", "k", "v2-bigger")).unwrap();
+        s.put(Some(&dev("acme")), put_req("acme", "k", "v1"))
+            .unwrap();
+        let m2 = s
+            .put(Some(&dev("acme")), put_req("acme", "k", "v2-bigger"))
+            .unwrap();
         assert_eq!(m2.version, 2);
     }
 
     #[test]
     fn put_cross_tenant_denied() {
         let s = SecretStore::new();
-        let err = s.put(Some(&dev("globex")), put_req("acme", "k", "v")).unwrap_err();
-        assert!(matches!(err, SecretsError::Guard(GuardError::TenantMismatch { .. })));
+        let err = s
+            .put(Some(&dev("globex")), put_req("acme", "k", "v"))
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            SecretsError::Guard(GuardError::TenantMismatch { .. })
+        ));
     }
 
     #[test]
@@ -239,7 +273,9 @@ mod tests {
     #[test]
     fn put_invalid_name_empty() {
         let s = SecretStore::new();
-        let err = s.put(Some(&dev("acme")), put_req("acme", "", "v")).unwrap_err();
+        let err = s
+            .put(Some(&dev("acme")), put_req("acme", "", "v"))
+            .unwrap_err();
         assert!(matches!(err, SecretsError::InvalidName(_)));
     }
 
@@ -247,28 +283,37 @@ mod tests {
     fn put_invalid_name_too_long() {
         let s = SecretStore::new();
         let n = "a".repeat(129);
-        let err = s.put(Some(&dev("acme")), put_req("acme", &n, "v")).unwrap_err();
+        let err = s
+            .put(Some(&dev("acme")), put_req("acme", &n, "v"))
+            .unwrap_err();
         assert!(matches!(err, SecretsError::InvalidName(_)));
     }
 
     #[test]
     fn put_invalid_name_bad_char() {
         let s = SecretStore::new();
-        let err = s.put(Some(&dev("acme")), put_req("acme", "key with space", "v")).unwrap_err();
+        let err = s
+            .put(Some(&dev("acme")), put_req("acme", "key with space", "v"))
+            .unwrap_err();
         assert!(matches!(err, SecretsError::InvalidName(_)));
     }
 
     #[test]
     fn put_accepts_path_like_name() {
         let s = SecretStore::new();
-        assert!(s.put(Some(&dev("acme")), put_req("acme", "db/prod/password", "v")).is_ok());
+        assert!(
+            s.put(Some(&dev("acme")), put_req("acme", "db/prod/password", "v"))
+                .is_ok()
+        );
     }
 
     #[test]
     fn put_too_large_rejected() {
         let s = SecretStore::new();
         let big = "x".repeat(MAX_SECRET_SIZE + 1);
-        let err = s.put(Some(&dev("acme")), put_req("acme", "big", &big)).unwrap_err();
+        let err = s
+            .put(Some(&dev("acme")), put_req("acme", "big", &big))
+            .unwrap_err();
         assert!(matches!(err, SecretsError::TooLarge(_, _)));
     }
 
@@ -276,14 +321,17 @@ mod tests {
     fn put_at_size_limit_accepted() {
         let s = SecretStore::new();
         let v = "x".repeat(MAX_SECRET_SIZE);
-        let m = s.put(Some(&dev("acme")), put_req("acme", "big", &v)).unwrap();
+        let m = s
+            .put(Some(&dev("acme")), put_req("acme", "big", &v))
+            .unwrap();
         assert_eq!(m.byte_size, MAX_SECRET_SIZE);
     }
 
     #[test]
     fn get_returns_value() {
         let s = SecretStore::new();
-        s.put(Some(&dev("acme")), put_req("acme", "k", "secret-v")).unwrap();
+        s.put(Some(&dev("acme")), put_req("acme", "k", "secret-v"))
+            .unwrap();
         let v = s.get(Some(&dev_read("acme")), "acme", "k").unwrap();
         assert_eq!(v.value, "secret-v");
     }
@@ -305,15 +353,20 @@ mod tests {
     #[test]
     fn get_cross_tenant_denied_for_dev() {
         let s = SecretStore::new();
-        s.put(Some(&dev("acme")), put_req("acme", "k", "v")).unwrap();
+        s.put(Some(&dev("acme")), put_req("acme", "k", "v"))
+            .unwrap();
         let err = s.get(Some(&dev("globex")), "acme", "k").unwrap_err();
-        assert!(matches!(err, SecretsError::Guard(GuardError::TenantMismatch { .. })));
+        assert!(matches!(
+            err,
+            SecretsError::Guard(GuardError::TenantMismatch { .. })
+        ));
     }
 
     #[test]
     fn list_does_not_leak_value() {
         let s = SecretStore::new();
-        s.put(Some(&dev("acme")), put_req("acme", "k", "very-secret")).unwrap();
+        s.put(Some(&dev("acme")), put_req("acme", "k", "very-secret"))
+            .unwrap();
         let metas = s.list(Some(&dev("acme")), "acme").unwrap();
         let json = serde_json::to_string(&metas).unwrap();
         assert!(!json.contains("very-secret"));
@@ -335,14 +388,20 @@ mod tests {
         for n in ["zeta", "alpha", "mu"] {
             s.put(Some(&dev("acme")), put_req("acme", n, "v")).unwrap();
         }
-        let names: Vec<String> = s.list(Some(&dev("acme")), "acme").unwrap().into_iter().map(|m| m.name).collect();
+        let names: Vec<String> = s
+            .list(Some(&dev("acme")), "acme")
+            .unwrap()
+            .into_iter()
+            .map(|m| m.name)
+            .collect();
         assert_eq!(names, vec!["alpha", "mu", "zeta"]);
     }
 
     #[test]
     fn delete_removes() {
         let s = SecretStore::new();
-        s.put(Some(&dev("acme")), put_req("acme", "k", "v")).unwrap();
+        s.put(Some(&dev("acme")), put_req("acme", "k", "v"))
+            .unwrap();
         s.delete(Some(&dev("acme")), "acme", "k").unwrap();
         assert!(s.get(Some(&dev("acme")), "acme", "k").is_err());
     }
@@ -357,8 +416,11 @@ mod tests {
     #[test]
     fn delete_requires_write() {
         let s = SecretStore::new();
-        s.put(Some(&dev("acme")), put_req("acme", "k", "v")).unwrap();
+        s.put(Some(&dev("acme")), put_req("acme", "k", "v"))
+            .unwrap();
         let err = s.delete(Some(&dev_read("acme")), "acme", "k").unwrap_err();
-        assert!(matches!(err, SecretsError::Guard(GuardError::MissingRole(r)) if r == "secrets:write"));
+        assert!(
+            matches!(err, SecretsError::Guard(GuardError::MissingRole(r)) if r == "secrets:write")
+        );
     }
 }

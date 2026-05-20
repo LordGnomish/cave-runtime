@@ -26,9 +26,9 @@
 //!   { .http.status_code >= 500 && .service.name = "api" }
 //!   { .http.method =~ "GET|POST" }
 
-use std::collections::HashMap;
 use crate::types::{Span, SpanStatus, TagValue};
 use crate::{Result, TraceError};
+use std::collections::HashMap;
 
 // ─── Token ────────────────────────────────────────────────────────────────
 
@@ -37,10 +37,10 @@ enum Token {
     LBrace,
     RBrace,
     Dot,
-    DotIdent(String),    // .foo or .foo.bar
+    DotIdent(String),      // .foo or .foo.bar
     ResourceIdent(String), // resource.foo
-    SpanIdent(String),   // span.foo
-    Keyword(String),     // duration, status, name
+    SpanIdent(String),     // span.foo
+    Keyword(String),       // duration, status, name
     Eq,
     NotEq,
     Gt,
@@ -53,7 +53,7 @@ enum Token {
     StringLit(String),
     IntLit(i64),
     FloatLit(f64),
-    DurationLit(u64),     // nanoseconds
+    DurationLit(u64), // nanoseconds
     StatusOk,
     StatusError,
     StatusUnset,
@@ -68,9 +68,13 @@ struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    fn new(input: &'a str) -> Self { Lexer { input, pos: 0 } }
+    fn new(input: &'a str) -> Self {
+        Lexer { input, pos: 0 }
+    }
 
-    fn peek(&self) -> Option<char> { self.input[self.pos..].chars().next() }
+    fn peek(&self) -> Option<char> {
+        self.input[self.pos..].chars().next()
+    }
 
     fn advance(&mut self) -> Option<char> {
         let c = self.peek()?;
@@ -98,18 +102,29 @@ impl<'a> Lexer<'a> {
         loop {
             match self.advance() {
                 Some('"') => return Ok(s),
-                Some('\\') => {
-                    match self.advance() {
-                        Some('n') => s.push('\n'),
-                        Some('t') => s.push('\t'),
-                        Some('\\') => s.push('\\'),
-                        Some('"') => s.push('"'),
-                        Some(c) => { s.push('\\'); s.push(c); }
-                        None => return Err(TraceError::TraceQlSyntax { pos: self.pos, msg: "unterminated escape".into() }),
+                Some('\\') => match self.advance() {
+                    Some('n') => s.push('\n'),
+                    Some('t') => s.push('\t'),
+                    Some('\\') => s.push('\\'),
+                    Some('"') => s.push('"'),
+                    Some(c) => {
+                        s.push('\\');
+                        s.push(c);
                     }
-                }
+                    None => {
+                        return Err(TraceError::TraceQlSyntax {
+                            pos: self.pos,
+                            msg: "unterminated escape".into(),
+                        });
+                    }
+                },
                 Some(c) => s.push(c),
-                None => return Err(TraceError::TraceQlSyntax { pos: self.pos, msg: "unterminated string".into() }),
+                None => {
+                    return Err(TraceError::TraceQlSyntax {
+                        pos: self.pos,
+                        msg: "unterminated string".into(),
+                    });
+                }
             }
         }
     }
@@ -123,48 +138,85 @@ impl<'a> Lexer<'a> {
                 break;
             }
             let tok = match self.peek().unwrap() {
-                '{' => { self.advance(); Token::LBrace }
-                '}' => { self.advance(); Token::RBrace }
+                '{' => {
+                    self.advance();
+                    Token::LBrace
+                }
+                '}' => {
+                    self.advance();
+                    Token::RBrace
+                }
                 '=' => {
                     self.advance();
-                    if self.peek() == Some('~') { self.advance(); Token::RegexEq }
-                    else { Token::Eq }
+                    if self.peek() == Some('~') {
+                        self.advance();
+                        Token::RegexEq
+                    } else {
+                        Token::Eq
+                    }
                 }
                 '!' => {
                     self.advance();
                     if self.peek() != Some('=') {
-                        return Err(TraceError::TraceQlSyntax { pos: self.pos, msg: "expected '!='".into() });
+                        return Err(TraceError::TraceQlSyntax {
+                            pos: self.pos,
+                            msg: "expected '!='".into(),
+                        });
                     }
-                    self.advance(); Token::NotEq
+                    self.advance();
+                    Token::NotEq
                 }
                 '>' => {
                     self.advance();
-                    if self.peek() == Some('=') { self.advance(); Token::Gte } else { Token::Gt }
+                    if self.peek() == Some('=') {
+                        self.advance();
+                        Token::Gte
+                    } else {
+                        Token::Gt
+                    }
                 }
                 '<' => {
                     self.advance();
-                    if self.peek() == Some('=') { self.advance(); Token::Lte } else { Token::Lt }
+                    if self.peek() == Some('=') {
+                        self.advance();
+                        Token::Lte
+                    } else {
+                        Token::Lt
+                    }
                 }
                 '&' => {
                     self.advance();
                     if self.peek() != Some('&') {
-                        return Err(TraceError::TraceQlSyntax { pos: self.pos, msg: "expected '&&'".into() });
+                        return Err(TraceError::TraceQlSyntax {
+                            pos: self.pos,
+                            msg: "expected '&&'".into(),
+                        });
                     }
-                    self.advance(); Token::And
+                    self.advance();
+                    Token::And
                 }
                 '|' => {
                     self.advance();
                     if self.peek() != Some('|') {
-                        return Err(TraceError::TraceQlSyntax { pos: self.pos, msg: "expected '||'".into() });
+                        return Err(TraceError::TraceQlSyntax {
+                            pos: self.pos,
+                            msg: "expected '||'".into(),
+                        });
                     }
-                    self.advance(); Token::Or
+                    self.advance();
+                    Token::Or
                 }
-                '"' => { self.advance(); let s = self.read_string()?; Token::StringLit(s) }
+                '"' => {
+                    self.advance();
+                    let s = self.read_string()?;
+                    Token::StringLit(s)
+                }
                 '.' => {
                     self.advance();
                     // read dotted path
                     let start = self.pos;
-                    let ident = self.read_while(|c| c.is_alphanumeric() || c == '_' || c == '.' || c == '-');
+                    let ident = self
+                        .read_while(|c| c.is_alphanumeric() || c == '_' || c == '.' || c == '-');
                     Token::DotIdent(ident.to_owned())
                 }
                 c if c.is_alphabetic() || c == '_' => {
@@ -174,29 +226,39 @@ impl<'a> Lexer<'a> {
                         "resource" | "span" => {
                             let is_resource = first_word == "resource";
                             // consume the dot separator
-                            if self.peek() == Some('.') { self.advance(); }
+                            if self.peek() == Some('.') {
+                                self.advance();
+                            }
                             // read the attribute path (may contain dots like service.name)
-                            let attr = self.read_while(|c| c.is_alphanumeric() || c == '_' || c == '.');
+                            let attr =
+                                self.read_while(|c| c.is_alphanumeric() || c == '_' || c == '.');
                             if is_resource {
                                 Token::ResourceIdent(attr.to_owned())
                             } else {
                                 Token::SpanIdent(attr.to_owned())
                             }
                         }
-                        "ok"    => Token::StatusOk,
+                        "ok" => Token::StatusOk,
                         "error" => Token::StatusError,
                         "unset" => Token::StatusUnset,
-                        other   => {
+                        other => {
                             // It may be a dotted keyword like "duration" — read any remaining dot segments
-                            let rest = self.read_while(|c| c == '.' || c.is_alphanumeric() || c == '_');
+                            let rest =
+                                self.read_while(|c| c == '.' || c.is_alphanumeric() || c == '_');
                             let full = format!("{}{}", other, rest);
                             Token::Keyword(full)
                         }
                     }
                 }
-                c if c.is_ascii_digit() || (c == '-' && self.input[self.pos+1..].starts_with(|d: char| d.is_ascii_digit())) => {
+                c if c.is_ascii_digit()
+                    || (c == '-'
+                        && self.input[self.pos + 1..]
+                            .starts_with(|d: char| d.is_ascii_digit())) =>
+                {
                     let start = self.pos;
-                    if c == '-' { self.advance(); }
+                    if c == '-' {
+                        self.advance();
+                    }
                     let int_part = self.read_while(|c| c.is_ascii_digit());
                     let is_float = self.peek() == Some('.');
                     if is_float {
@@ -209,19 +271,32 @@ impl<'a> Lexer<'a> {
                     let suffix_start = self.pos;
                     let suffix = self.read_while(|c| c.is_alphabetic() || c == 'µ');
                     match suffix {
-                        "ns"  => Token::DurationLit(num_str.parse::<f64>().unwrap_or(0.0) as u64),
-                        "us" | "µs" => Token::DurationLit((num_str.parse::<f64>().unwrap_or(0.0) * 1_000.0) as u64),
-                        "ms"  => Token::DurationLit((num_str.parse::<f64>().unwrap_or(0.0) * 1_000_000.0) as u64),
-                        "s"   => Token::DurationLit((num_str.parse::<f64>().unwrap_or(0.0) * 1_000_000_000.0) as u64),
-                        "m"   => Token::DurationLit((num_str.parse::<f64>().unwrap_or(0.0) * 60_000_000_000.0) as u64),
-                        "h"   => Token::DurationLit((num_str.parse::<f64>().unwrap_or(0.0) * 3_600_000_000_000.0) as u64),
+                        "ns" => Token::DurationLit(num_str.parse::<f64>().unwrap_or(0.0) as u64),
+                        "us" | "µs" => Token::DurationLit(
+                            (num_str.parse::<f64>().unwrap_or(0.0) * 1_000.0) as u64,
+                        ),
+                        "ms" => Token::DurationLit(
+                            (num_str.parse::<f64>().unwrap_or(0.0) * 1_000_000.0) as u64,
+                        ),
+                        "s" => Token::DurationLit(
+                            (num_str.parse::<f64>().unwrap_or(0.0) * 1_000_000_000.0) as u64,
+                        ),
+                        "m" => Token::DurationLit(
+                            (num_str.parse::<f64>().unwrap_or(0.0) * 60_000_000_000.0) as u64,
+                        ),
+                        "h" => Token::DurationLit(
+                            (num_str.parse::<f64>().unwrap_or(0.0) * 3_600_000_000_000.0) as u64,
+                        ),
                         "" if is_float => Token::FloatLit(num_str.parse().unwrap_or(0.0)),
                         "" => Token::IntLit(num_str.parse().unwrap_or(0)),
                         _ => {
                             // Put suffix back
                             self.pos = suffix_start;
-                            if is_float { Token::FloatLit(num_str.parse().unwrap_or(0.0)) }
-                            else { Token::IntLit(num_str.parse().unwrap_or(0)) }
+                            if is_float {
+                                Token::FloatLit(num_str.parse().unwrap_or(0.0))
+                            } else {
+                                Token::IntLit(num_str.parse().unwrap_or(0))
+                            }
                         }
                     }
                 }
@@ -242,17 +317,42 @@ impl<'a> Lexer<'a> {
 
 #[derive(Debug, Clone)]
 pub enum Predicate {
-    SpanAttr    { attr: String, op: CmpOp, value: Value },
-    ResourceAttr { attr: String, op: CmpOp, value: Value },
-    Duration    { op: CmpOp, nanos: u64 },
-    Status      { op: CmpOp, status: SpanStatus },
-    SpanName    { op: CmpOp, pattern: String },
+    SpanAttr {
+        attr: String,
+        op: CmpOp,
+        value: Value,
+    },
+    ResourceAttr {
+        attr: String,
+        op: CmpOp,
+        value: Value,
+    },
+    Duration {
+        op: CmpOp,
+        nanos: u64,
+    },
+    Status {
+        op: CmpOp,
+        status: SpanStatus,
+    },
+    SpanName {
+        op: CmpOp,
+        pattern: String,
+    },
     And(Box<Predicate>, Box<Predicate>),
-    Or(Box<Predicate>,  Box<Predicate>),
+    Or(Box<Predicate>, Box<Predicate>),
 }
 
 #[derive(Debug, Clone)]
-pub enum CmpOp { Eq, NotEq, Gt, Gte, Lt, Lte, Regex }
+pub enum CmpOp {
+    Eq,
+    NotEq,
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+    Regex,
+}
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -270,18 +370,25 @@ struct Parser {
 }
 
 impl Parser {
-    fn new(tokens: Vec<Token>) -> Self { Parser { tokens, pos: 0 } }
+    fn new(tokens: Vec<Token>) -> Self {
+        Parser { tokens, pos: 0 }
+    }
 
-    fn peek(&self) -> &Token { &self.tokens[self.pos] }
+    fn peek(&self) -> &Token {
+        &self.tokens[self.pos]
+    }
 
     fn consume(&mut self) -> &Token {
         let t = &self.tokens[self.pos];
-        if self.pos + 1 < self.tokens.len() { self.pos += 1; }
+        if self.pos + 1 < self.tokens.len() {
+            self.pos += 1;
+        }
         t
     }
 
     fn expect(&mut self, expected: &Token) -> Result<()>
-    where Token: PartialEq
+    where
+        Token: PartialEq,
     {
         if self.peek() == expected {
             self.consume();
@@ -327,80 +434,113 @@ impl Parser {
                 self.consume();
                 let op = self.parse_cmp_op()?;
                 let val = self.parse_value()?;
-                Ok(Predicate::SpanAttr { attr, op, value: val })
+                Ok(Predicate::SpanAttr {
+                    attr,
+                    op,
+                    value: val,
+                })
             }
             Token::ResourceIdent(attr) => {
                 self.consume();
                 let op = self.parse_cmp_op()?;
                 let val = self.parse_value()?;
-                Ok(Predicate::ResourceAttr { attr, op, value: val })
+                Ok(Predicate::ResourceAttr {
+                    attr,
+                    op,
+                    value: val,
+                })
             }
             Token::SpanIdent(attr) => {
                 self.consume();
                 let op = self.parse_cmp_op()?;
                 let val = self.parse_value()?;
-                Ok(Predicate::SpanAttr { attr, op, value: val })
+                Ok(Predicate::SpanAttr {
+                    attr,
+                    op,
+                    value: val,
+                })
             }
-            Token::Keyword(ref kw) => {
-                match kw.as_str() {
-                    "duration" => {
-                        self.consume();
-                        let op = self.parse_cmp_op()?;
-                        if let Token::DurationLit(ns) = self.consume().clone() {
-                            Ok(Predicate::Duration { op, nanos: ns })
-                        } else {
-                            Err(TraceError::TraceQlSyntax { pos: self.pos, msg: "expected duration literal".into() })
-                        }
+            Token::Keyword(ref kw) => match kw.as_str() {
+                "duration" => {
+                    self.consume();
+                    let op = self.parse_cmp_op()?;
+                    if let Token::DurationLit(ns) = self.consume().clone() {
+                        Ok(Predicate::Duration { op, nanos: ns })
+                    } else {
+                        Err(TraceError::TraceQlSyntax {
+                            pos: self.pos,
+                            msg: "expected duration literal".into(),
+                        })
                     }
-                    "status" => {
-                        self.consume();
-                        let op = self.parse_cmp_op()?;
-                        let status = match self.consume().clone() {
-                            Token::StatusOk    => SpanStatus::Ok,
-                            Token::StatusError => SpanStatus::Error,
-                            Token::StatusUnset => SpanStatus::Unset,
-                            other => return Err(TraceError::TraceQlSyntax { pos: self.pos, msg: format!("expected status, got {:?}", other) }),
-                        };
-                        Ok(Predicate::Status { op, status })
-                    }
-                    "name" => {
-                        self.consume();
-                        let op = self.parse_cmp_op()?;
-                        if let Token::StringLit(s) = self.consume().clone() {
-                            Ok(Predicate::SpanName { op, pattern: s })
-                        } else {
-                            Err(TraceError::TraceQlSyntax { pos: self.pos, msg: "expected string after name".into() })
-                        }
-                    }
-                    other => Err(TraceError::TraceQlSyntax { pos: self.pos, msg: format!("unknown keyword: {}", other) }),
                 }
-            }
-            other => Err(TraceError::TraceQlSyntax { pos: self.pos, msg: format!("unexpected token: {:?}", other) }),
+                "status" => {
+                    self.consume();
+                    let op = self.parse_cmp_op()?;
+                    let status = match self.consume().clone() {
+                        Token::StatusOk => SpanStatus::Ok,
+                        Token::StatusError => SpanStatus::Error,
+                        Token::StatusUnset => SpanStatus::Unset,
+                        other => {
+                            return Err(TraceError::TraceQlSyntax {
+                                pos: self.pos,
+                                msg: format!("expected status, got {:?}", other),
+                            });
+                        }
+                    };
+                    Ok(Predicate::Status { op, status })
+                }
+                "name" => {
+                    self.consume();
+                    let op = self.parse_cmp_op()?;
+                    if let Token::StringLit(s) = self.consume().clone() {
+                        Ok(Predicate::SpanName { op, pattern: s })
+                    } else {
+                        Err(TraceError::TraceQlSyntax {
+                            pos: self.pos,
+                            msg: "expected string after name".into(),
+                        })
+                    }
+                }
+                other => Err(TraceError::TraceQlSyntax {
+                    pos: self.pos,
+                    msg: format!("unknown keyword: {}", other),
+                }),
+            },
+            other => Err(TraceError::TraceQlSyntax {
+                pos: self.pos,
+                msg: format!("unexpected token: {:?}", other),
+            }),
         }
     }
 
     fn parse_cmp_op(&mut self) -> Result<CmpOp> {
         match self.consume().clone() {
-            Token::Eq      => Ok(CmpOp::Eq),
-            Token::NotEq   => Ok(CmpOp::NotEq),
-            Token::Gt      => Ok(CmpOp::Gt),
-            Token::Gte     => Ok(CmpOp::Gte),
-            Token::Lt      => Ok(CmpOp::Lt),
-            Token::Lte     => Ok(CmpOp::Lte),
+            Token::Eq => Ok(CmpOp::Eq),
+            Token::NotEq => Ok(CmpOp::NotEq),
+            Token::Gt => Ok(CmpOp::Gt),
+            Token::Gte => Ok(CmpOp::Gte),
+            Token::Lt => Ok(CmpOp::Lt),
+            Token::Lte => Ok(CmpOp::Lte),
             Token::RegexEq => Ok(CmpOp::Regex),
-            other => Err(TraceError::TraceQlSyntax { pos: self.pos, msg: format!("expected comparator, got {:?}", other) }),
+            other => Err(TraceError::TraceQlSyntax {
+                pos: self.pos,
+                msg: format!("expected comparator, got {:?}", other),
+            }),
         }
     }
 
     fn parse_value(&mut self) -> Result<Value> {
         match self.consume().clone() {
             Token::StringLit(s) => Ok(Value::Str(s)),
-            Token::IntLit(i)    => Ok(Value::Int(i)),
-            Token::FloatLit(f)  => Ok(Value::Float(f)),
-            Token::StatusOk     => Ok(Value::Status(SpanStatus::Ok)),
-            Token::StatusError  => Ok(Value::Status(SpanStatus::Error)),
-            Token::StatusUnset  => Ok(Value::Status(SpanStatus::Unset)),
-            other => Err(TraceError::TraceQlSyntax { pos: self.pos, msg: format!("expected value, got {:?}", other) }),
+            Token::IntLit(i) => Ok(Value::Int(i)),
+            Token::FloatLit(f) => Ok(Value::Float(f)),
+            Token::StatusOk => Ok(Value::Status(SpanStatus::Ok)),
+            Token::StatusError => Ok(Value::Status(SpanStatus::Error)),
+            Token::StatusUnset => Ok(Value::Status(SpanStatus::Unset)),
+            other => Err(TraceError::TraceQlSyntax {
+                pos: self.pos,
+                msg: format!("expected value, got {:?}", other),
+            }),
         }
     }
 }
@@ -427,17 +567,11 @@ pub fn eval_span(pred: &Predicate, span: &Span) -> bool {
             let tag_val = span.resource_attributes.get(attr.as_str());
             compare_tag(tag_val, op, value)
         }
-        Predicate::Duration { op, nanos } => {
-            compare_u64(span.duration_ns, op, *nanos)
-        }
-        Predicate::Status { op, status } => {
-            compare_status(span.status, op, *status)
-        }
-        Predicate::SpanName { op, pattern } => {
-            compare_str_val(&span.operation_name, op, pattern)
-        }
+        Predicate::Duration { op, nanos } => compare_u64(span.duration_ns, op, *nanos),
+        Predicate::Status { op, status } => compare_status(span.status, op, *status),
+        Predicate::SpanName { op, pattern } => compare_str_val(&span.operation_name, op, pattern),
         Predicate::And(a, b) => eval_span(a, span) && eval_span(b, span),
-        Predicate::Or(a, b)  => eval_span(a, span) || eval_span(b, span),
+        Predicate::Or(a, b) => eval_span(a, span) || eval_span(b, span),
     }
 }
 
@@ -465,12 +599,18 @@ fn compare_tag(tag: Option<&TagValue>, op: &CmpOp, value: &Value) -> bool {
         (None, _) => matches!(op, CmpOp::NotEq),
         (Some(tv), Value::Str(s)) => compare_str_val(&tv.display(), op, s),
         (Some(tv), Value::Int(i)) => {
-            if let Some(n) = tv.as_i64() { compare_i64(n, op, *i) }
-            else { compare_str_val(&tv.display(), op, &i.to_string()) }
+            if let Some(n) = tv.as_i64() {
+                compare_i64(n, op, *i)
+            } else {
+                compare_str_val(&tv.display(), op, &i.to_string())
+            }
         }
         (Some(tv), Value::Float(f)) => {
-            if let Some(n) = tv.as_f64() { compare_f64(n, op, *f) }
-            else { false }
+            if let Some(n) = tv.as_f64() {
+                compare_f64(n, op, *f)
+            } else {
+                false
+            }
         }
         (Some(_), Value::Status(_)) => false,
     }
@@ -478,55 +618,55 @@ fn compare_tag(tag: Option<&TagValue>, op: &CmpOp, value: &Value) -> bool {
 
 fn compare_str_val(actual: &str, op: &CmpOp, expected: &str) -> bool {
     match op {
-        CmpOp::Eq    => actual == expected,
+        CmpOp::Eq => actual == expected,
         CmpOp::NotEq => actual != expected,
-        CmpOp::Gt    => actual > expected,
-        CmpOp::Gte   => actual >= expected,
-        CmpOp::Lt    => actual < expected,
-        CmpOp::Lte   => actual <= expected,
+        CmpOp::Gt => actual > expected,
+        CmpOp::Gte => actual >= expected,
+        CmpOp::Lt => actual < expected,
+        CmpOp::Lte => actual <= expected,
         CmpOp::Regex => regex_match(actual, expected),
     }
 }
 
 fn compare_u64(actual: u64, op: &CmpOp, expected: u64) -> bool {
     match op {
-        CmpOp::Eq    => actual == expected,
+        CmpOp::Eq => actual == expected,
         CmpOp::NotEq => actual != expected,
-        CmpOp::Gt    => actual >  expected,
-        CmpOp::Gte   => actual >= expected,
-        CmpOp::Lt    => actual <  expected,
-        CmpOp::Lte   => actual <= expected,
+        CmpOp::Gt => actual > expected,
+        CmpOp::Gte => actual >= expected,
+        CmpOp::Lt => actual < expected,
+        CmpOp::Lte => actual <= expected,
         CmpOp::Regex => false,
     }
 }
 
 fn compare_i64(actual: i64, op: &CmpOp, expected: i64) -> bool {
     match op {
-        CmpOp::Eq    => actual == expected,
+        CmpOp::Eq => actual == expected,
         CmpOp::NotEq => actual != expected,
-        CmpOp::Gt    => actual >  expected,
-        CmpOp::Gte   => actual >= expected,
-        CmpOp::Lt    => actual <  expected,
-        CmpOp::Lte   => actual <= expected,
+        CmpOp::Gt => actual > expected,
+        CmpOp::Gte => actual >= expected,
+        CmpOp::Lt => actual < expected,
+        CmpOp::Lte => actual <= expected,
         CmpOp::Regex => false,
     }
 }
 
 fn compare_f64(actual: f64, op: &CmpOp, expected: f64) -> bool {
     match op {
-        CmpOp::Eq    => (actual - expected).abs() < f64::EPSILON,
+        CmpOp::Eq => (actual - expected).abs() < f64::EPSILON,
         CmpOp::NotEq => (actual - expected).abs() >= f64::EPSILON,
-        CmpOp::Gt    => actual >  expected,
-        CmpOp::Gte   => actual >= expected,
-        CmpOp::Lt    => actual <  expected,
-        CmpOp::Lte   => actual <= expected,
+        CmpOp::Gt => actual > expected,
+        CmpOp::Gte => actual >= expected,
+        CmpOp::Lt => actual < expected,
+        CmpOp::Lte => actual <= expected,
         CmpOp::Regex => false,
     }
 }
 
 fn compare_status(actual: SpanStatus, op: &CmpOp, expected: SpanStatus) -> bool {
     match op {
-        CmpOp::Eq    => actual == expected,
+        CmpOp::Eq => actual == expected,
         CmpOp::NotEq => actual != expected,
         _ => false,
     }
@@ -558,7 +698,8 @@ fn glob_match(text: &str, pattern: &str) -> bool {
             star_ti = ti;
             pi += 2;
         } else if pi < pb.len() && pb[pi] != b'.' && (pb[pi] == tb[ti] || pb[pi] == b'?') {
-            ti += 1; pi += 1;
+            ti += 1;
+            pi += 1;
         } else if star_pi != usize::MAX {
             star_ti += 1;
             ti = star_ti;

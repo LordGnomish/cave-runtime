@@ -24,7 +24,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use super::{validate_path, Backend, StorageError};
+use super::{Backend, StorageError, validate_path};
 
 /// On-disk backend rooted at `root`. The `write_lock` serialises
 /// the put/delete critical section so concurrent writers don't

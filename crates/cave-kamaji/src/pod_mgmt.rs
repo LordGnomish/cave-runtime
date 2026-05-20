@@ -37,13 +37,25 @@ pub fn plan_apiserver_pod(tcp: &TenantControlPlane) -> ApiServerPodPlan {
     let mut args = vec![
         "--allow-privileged=true".into(),
         format!("--advertise-address={}", "0.0.0.0"),
-        format!("--etcd-servers={}", default_etcd_endpoint(&tcp.spec.data_store)),
+        format!(
+            "--etcd-servers={}",
+            default_etcd_endpoint(&tcp.spec.data_store)
+        ),
         "--secure-port=6443".into(),
         "--service-cluster-ip-range=10.96.0.0/12".into(),
-        format!("--service-account-issuer=https://kubernetes.default.svc.{}", tcp.name),
+        format!(
+            "--service-account-issuer=https://kubernetes.default.svc.{}",
+            tcp.name
+        ),
         "--authorization-mode=Node,RBAC".into(),
-        format!("--tls-cert-file=/etc/kubernetes/pki/{}/apiserver.crt", tcp.name),
-        format!("--tls-private-key-file=/etc/kubernetes/pki/{}/apiserver.key", tcp.name),
+        format!(
+            "--tls-cert-file=/etc/kubernetes/pki/{}/apiserver.crt",
+            tcp.name
+        ),
+        format!(
+            "--tls-private-key-file=/etc/kubernetes/pki/{}/apiserver.key",
+            tcp.name
+        ),
     ];
     args.sort();
     ApiServerPodPlan {
@@ -51,13 +63,13 @@ pub fn plan_apiserver_pod(tcp: &TenantControlPlane) -> ApiServerPodPlan {
         image,
         command: vec!["kube-apiserver".into()],
         args,
-        volume_mounts: vec![
-            "/etc/kubernetes/pki".into(),
-            "/var/run/kamaji".into(),
-        ],
+        volume_mounts: vec!["/etc/kubernetes/pki".into(), "/var/run/kamaji".into()],
         env: vec![
             ("KAMAJI_TENANT".to_string(), tcp.name.clone()),
-            ("KUBERNETES_VERSION".to_string(), tcp.spec.kubernetes_version.clone()),
+            (
+                "KUBERNETES_VERSION".to_string(),
+                tcp.spec.kubernetes_version.clone(),
+            ),
         ],
     }
 }
@@ -114,10 +126,15 @@ mod tests {
     #[test]
     fn env_carries_tenant_and_version() {
         let plan = plan_apiserver_pod(&base_tcp("shared-etcd"));
-        assert!(plan.env.iter().any(|(k, v)| k == "KAMAJI_TENANT" && v == "t1"));
-        assert!(plan
-            .env
-            .iter()
-            .any(|(k, v)| k == "KUBERNETES_VERSION" && v == "v1.31.0"));
+        assert!(
+            plan.env
+                .iter()
+                .any(|(k, v)| k == "KAMAJI_TENANT" && v == "t1")
+        );
+        assert!(
+            plan.env
+                .iter()
+                .any(|(k, v)| k == "KUBERNETES_VERSION" && v == "v1.31.0")
+        );
     }
 }

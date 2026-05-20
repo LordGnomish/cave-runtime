@@ -50,10 +50,7 @@ pub fn bound_count(volumes: &[VolumeBinding]) -> usize {
     volumes.iter().filter(|v| v.status == "Bound").count()
 }
 
-pub fn render_section(
-    state: &AdminState,
-    ctx: &RequestCtx,
-) -> Result<String, KubeletViewError> {
+pub fn render_section(state: &AdminState, ctx: &RequestCtx) -> Result<String, KubeletViewError> {
     let volumes = list_volumes(state, ctx)?;
     let rows: Vec<Vec<String>> = volumes
         .iter()

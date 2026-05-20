@@ -220,7 +220,13 @@ mod tests {
     fn condition_first_set_records_transition() {
         let now = t0();
         let mut t = NodeConditionTracker::default();
-        let transitioned = t.set("Ready", ConditionStatus::True, "KubeletReady", "kubelet is ready", now);
+        let transitioned = t.set(
+            "Ready",
+            ConditionStatus::True,
+            "KubeletReady",
+            "kubelet is ready",
+            now,
+        );
         assert!(transitioned);
         assert!(t.ready());
     }
@@ -231,7 +237,13 @@ mod tests {
         let mut t = NodeConditionTracker::default();
         t.set("Ready", ConditionStatus::True, "KubeletReady", "ok", now);
         let later = now + Duration::seconds(30);
-        let transitioned = t.set("Ready", ConditionStatus::True, "KubeletReady", "still ok", later);
+        let transitioned = t.set(
+            "Ready",
+            ConditionStatus::True,
+            "KubeletReady",
+            "still ok",
+            later,
+        );
         assert!(!transitioned);
         let rec = t.conditions.get("Ready").unwrap();
         assert_eq!(rec.last_heartbeat_time, later);
@@ -244,7 +256,13 @@ mod tests {
         let mut t = NodeConditionTracker::default();
         t.set("Ready", ConditionStatus::True, "KubeletReady", "", now);
         let later = now + Duration::seconds(60);
-        let transitioned = t.set("Ready", ConditionStatus::False, "KubeletNotReady", "ouch", later);
+        let transitioned = t.set(
+            "Ready",
+            ConditionStatus::False,
+            "KubeletNotReady",
+            "ouch",
+            later,
+        );
         assert!(transitioned);
         let rec = t.conditions.get("Ready").unwrap();
         assert_eq!(rec.last_transition_time, later);
@@ -256,7 +274,13 @@ mod tests {
         let now = t0();
         let mut t = NodeConditionTracker::default();
         t.set("Ready", ConditionStatus::True, "", "", now);
-        t.set("MemoryPressure", ConditionStatus::False, "", "", now - Duration::seconds(120));
+        t.set(
+            "MemoryPressure",
+            ConditionStatus::False,
+            "",
+            "",
+            now - Duration::seconds(120),
+        );
         let lost = t.lost_heartbeat_since(now - Duration::seconds(60));
         assert_eq!(lost, vec!["MemoryPressure".to_string()]);
     }

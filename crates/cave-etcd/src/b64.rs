@@ -5,7 +5,7 @@
 //! etcd v3 JSON API requires keys and values to be base64-encoded
 //! because they are arbitrary byte arrays (not necessarily valid UTF-8).
 
-use base64::{Engine as _, engine::general_purpose::STANDARD};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 
 /// Encode bytes to base64 string.
 pub fn encode(data: &[u8]) -> String {

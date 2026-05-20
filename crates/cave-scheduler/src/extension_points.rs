@@ -40,18 +40,24 @@ impl PreFilterResult {
     }
 
     pub fn restrict(nodes: impl IntoIterator<Item = String>) -> Self {
-        Self { node_names: Some(nodes.into_iter().collect()) }
+        Self {
+            node_names: Some(nodes.into_iter().collect()),
+        }
     }
 
     /// Intersect with another result. `None` (all nodes) is the identity.
     pub fn merge(&self, other: &PreFilterResult) -> PreFilterResult {
         match (&self.node_names, &other.node_names) {
             (None, None) => PreFilterResult::all_nodes(),
-            (Some(a), None) => PreFilterResult { node_names: Some(a.clone()) },
-            (None, Some(b)) => PreFilterResult { node_names: Some(b.clone()) },
-            (Some(a), Some(b)) => {
-                PreFilterResult { node_names: Some(a.intersection(b).cloned().collect()) }
-            }
+            (Some(a), None) => PreFilterResult {
+                node_names: Some(a.clone()),
+            },
+            (None, Some(b)) => PreFilterResult {
+                node_names: Some(b.clone()),
+            },
+            (Some(a), Some(b)) => PreFilterResult {
+                node_names: Some(a.intersection(b).cloned().collect()),
+            },
         }
     }
 }
@@ -63,22 +69,39 @@ pub struct NodeToStatusMap {
 }
 
 impl NodeToStatusMap {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn set(&mut self, node: impl Into<String>, status: Status) {
         self.inner.insert(node.into(), status);
     }
 
-    pub fn get(&self, node: &str) -> Option<&Status> { self.inner.get(node) }
+    pub fn get(&self, node: &str) -> Option<&Status> {
+        self.inner.get(node)
+    }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &Status)> { self.inner.iter() }
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &Status)> {
+        self.inner.iter()
+    }
 
-    pub fn len(&self) -> usize { self.inner.len() }
-    pub fn is_empty(&self) -> bool { self.inner.is_empty() }
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
 
     pub fn rejected_nodes(&self) -> std::collections::BTreeSet<String> {
-        self.inner.iter()
-            .filter_map(|(n, s)| if s.is_rejected() { Some(n.clone()) } else { None })
+        self.inner
+            .iter()
+            .filter_map(|(n, s)| {
+                if s.is_rejected() {
+                    Some(n.clone())
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 }

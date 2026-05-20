@@ -28,7 +28,7 @@ use clap::Parser;
 use serde::Serialize;
 
 use cave_upstream_watchd::tdd::{
-    analyze_tdd_compliance, scan_stubs, CommitKind, ShellGitInspector,
+    CommitKind, ShellGitInspector, analyze_tdd_compliance, scan_stubs,
 };
 
 #[derive(Parser, Debug)]
@@ -96,14 +96,13 @@ fn main() -> ExitCode {
     let args = Args::parse();
     let inspector = ShellGitInspector::new(&args.repo);
 
-    let tdd =
-        match analyze_tdd_compliance(&inspector, &args.base, &args.branch, args.tests_pass) {
-            Ok(t) => t,
-            Err(e) => {
-                eprintln!("cave-tdd-check: tdd analyzer error: {e}");
-                return ExitCode::from(2);
-            }
-        };
+    let tdd = match analyze_tdd_compliance(&inspector, &args.base, &args.branch, args.tests_pass) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("cave-tdd-check: tdd analyzer error: {e}");
+            return ExitCode::from(2);
+        }
+    };
 
     let stub_count = if args.check_stubs {
         match scan_stubs(&inspector, &args.base, &args.branch) {

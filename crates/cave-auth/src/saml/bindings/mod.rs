@@ -53,7 +53,10 @@ mod tests {
             BINDING_REDIRECT,
             "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
         );
-        assert_eq!(BINDING_POST, "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST");
+        assert_eq!(
+            BINDING_POST,
+            "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+        );
         assert_eq!(
             BINDING_ARTIFACT,
             "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact"

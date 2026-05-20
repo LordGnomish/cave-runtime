@@ -109,7 +109,9 @@ mod tests {
             .collect()
     }
     fn sel(pairs: &[(&str, &str)]) -> LabelSelector {
-        LabelSelector { match_labels: lbl(pairs) }
+        LabelSelector {
+            match_labels: lbl(pairs),
+        }
     }
     fn cr(
         name: &str,
@@ -148,7 +150,10 @@ mod tests {
             "view",
             &[],
             vec![],
-            Some(vec![sel(&[("rbac.authorization.k8s.io/aggregate-to-view", "true")])]),
+            Some(vec![sel(&[(
+                "rbac.authorization.k8s.io/aggregate-to-view",
+                "true",
+            )])]),
         );
         let child_a = cr(
             "child-a",
@@ -198,12 +203,7 @@ mod tests {
             "syncClusterRole",
             "tenant-cra-dedup"
         );
-        let parent = cr(
-            "view",
-            &[],
-            vec![],
-            Some(vec![sel(&[("agg", "view")])]),
-        );
+        let parent = cr("view", &[], vec![], Some(vec![sel(&[("agg", "view")])]));
         let a = cr(
             "a",
             &[("agg", "view")],
@@ -296,12 +296,7 @@ mod tests {
             "syncClusterRole",
             "tenant-cra-eval-update"
         );
-        let parent = cr(
-            "view",
-            &[],
-            vec![],
-            Some(vec![sel(&[("agg", "view")])]),
-        );
+        let parent = cr("view", &[], vec![], Some(vec![sel(&[("agg", "view")])]));
         let child = cr(
             "child",
             &[("agg", "view")],

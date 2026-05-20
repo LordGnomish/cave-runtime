@@ -25,9 +25,7 @@
 //! KvStore but tenant data is never inspected — the driver only exposes
 //! tenant-prefixed operations to callers.
 
-use cave_etcd::models::{
-    DeleteRangeRequest, EventType, KeyValue, PutRequest, RangeRequest,
-};
+use cave_etcd::models::{DeleteRangeRequest, EventType, KeyValue, PutRequest, RangeRequest};
 use cave_etcd::store::KvStore;
 use std::sync::Arc;
 
@@ -36,13 +34,7 @@ use std::sync::Arc;
 pub const MAX_TENANT_ID_LEN: usize = 63;
 
 /// Upstream-compatible key encoder.
-pub fn key_for(
-    tenant_id: &str,
-    group: &str,
-    kind: &str,
-    namespace: &str,
-    name: &str,
-) -> String {
+pub fn key_for(tenant_id: &str, group: &str, kind: &str, namespace: &str, name: &str) -> String {
     let g = if group.is_empty() { "core" } else { group };
     if namespace.is_empty() {
         format!("/tenants/{}/registry/{}/{}/{}", tenant_id, g, kind, name)
@@ -56,12 +48,7 @@ pub fn key_for(
 
 /// Prefix used by `list` for a `(tenant, group, kind[, namespace])` scope.
 /// `namespace` empty means cluster-scoped or list-across-namespaces.
-pub fn prefix_for(
-    tenant_id: &str,
-    group: &str,
-    kind: &str,
-    namespace: &str,
-) -> String {
+pub fn prefix_for(tenant_id: &str, group: &str, kind: &str, namespace: &str) -> String {
     let g = if group.is_empty() { "core" } else { group };
     if namespace.is_empty() {
         format!("/tenants/{}/registry/{}/{}/", tenant_id, g, kind)
@@ -111,7 +98,9 @@ impl EtcdBackend {
     /// Build a driver over a fresh in-process `KvStore`. Prod paths can
     /// pass an `Arc<KvStore>` shared with the rest of the platform.
     pub fn new() -> Self {
-        Self { inner: Arc::new(KvStore::new()) }
+        Self {
+            inner: Arc::new(KvStore::new()),
+        }
     }
 
     pub fn from_kv(inner: Arc<KvStore>) -> Self {
@@ -138,7 +127,8 @@ impl EtcdBackend {
     ) -> u64 {
         assert!(
             tenant_id.len() <= MAX_TENANT_ID_LEN,
-            "tenant_id exceeds {} chars", MAX_TENANT_ID_LEN
+            "tenant_id exceeds {} chars",
+            MAX_TENANT_ID_LEN
         );
         let key = key_for(tenant_id, group, kind, namespace, name);
         let req = PutRequest {
@@ -206,7 +196,11 @@ impl EtcdBackend {
         name: &str,
     ) -> bool {
         let key = key_for(tenant_id, group, kind, namespace, name);
-        let req = DeleteRangeRequest { key, range_end: None, prev_kv: false };
+        let req = DeleteRangeRequest {
+            key,
+            range_end: None,
+            prev_kv: false,
+        };
         self.inner.delete_range(&req).deleted > 0
     }
 
@@ -248,7 +242,9 @@ impl EtcdBackend {
 }
 
 impl Default for EtcdBackend {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -264,8 +260,10 @@ mod tests {
         assert_eq!(k, "/tenants/acme/registry/apps/deployments/default/nginx");
         // tenant_id invariant: tenant prefix is the OUTERMOST path segment so
         // any range scan against another tenant cannot collide.
-        assert!(k.starts_with("/tenants/acme/"),
-            "tenant_id invariant: tenant is the root prefix");
+        assert!(
+            k.starts_with("/tenants/acme/"),
+            "tenant_id invariant: tenant is the root prefix"
+        );
         // Cluster-scoped: namespace empty => no namespace segment.
         let k2 = key_for("acme", "", "namespaces", "", "kube-system");
         assert_eq!(k2, "/tenants/acme/registry/core/namespaces/kube-system");
@@ -277,19 +275,37 @@ mod tests {
     #[test]
     fn test_put_then_get_roundtrips_value_and_advances_revision() {
         let be = EtcdBackend::new();
-        let rv1 = be.put("acme", "", "configmaps", "default", "cfg",
-            b"{\"data\":{\"k\":\"v\"}}");
-        let rv2 = be.put("acme", "", "configmaps", "default", "cfg2",
-            b"{\"data\":{\"x\":\"y\"}}");
+        let rv1 = be.put(
+            "acme",
+            "",
+            "configmaps",
+            "default",
+            "cfg",
+            b"{\"data\":{\"k\":\"v\"}}",
+        );
+        let rv2 = be.put(
+            "acme",
+            "",
+            "configmaps",
+            "default",
+            "cfg2",
+            b"{\"data\":{\"x\":\"y\"}}",
+        );
         assert!(rv2 > rv1, "revision strictly monotonic across puts");
-        let got = be.get("acme", "", "configmaps", "default", "cfg")
+        let got = be
+            .get("acme", "", "configmaps", "default", "cfg")
             .expect("get must find the just-put object");
         assert_eq!(got.value, b"{\"data\":{\"k\":\"v\"}}");
-        assert_eq!(got.create_revision, rv1, "create_revision pinned at first put");
+        assert_eq!(
+            got.create_revision, rv1,
+            "create_revision pinned at first put"
+        );
         assert_eq!(got.mod_revision, rv1);
         // tenant_id invariant: returned key is rooted at /tenants/acme/.
-        assert!(got.key.starts_with("/tenants/acme/"),
-            "tenant_id invariant: stored key under acme tenant root");
+        assert!(
+            got.key.starts_with("/tenants/acme/"),
+            "tenant_id invariant: stored key under acme tenant root"
+        );
     }
 
     /// Upstream parity: `TestStore_ListByPrefixSameNamespace`
@@ -303,11 +319,18 @@ mod tests {
         be.put("acme", "", "configmaps", "default", "c", b"{}");
         be.put("acme", "", "configmaps", "kube-system", "d", b"{}");
         let in_default = be.list("acme", "", "configmaps", "default");
-        assert_eq!(in_default.len(), 3,
-            "list scoped to default namespace returns 3");
+        assert_eq!(
+            in_default.len(),
+            3,
+            "list scoped to default namespace returns 3"
+        );
         // tenant_id invariant: all returned keys live under acme tenant root.
-        assert!(in_default.iter().all(|o| o.key.starts_with("/tenants/acme/")),
-            "tenant_id invariant: list never crosses tenant root");
+        assert!(
+            in_default
+                .iter()
+                .all(|o| o.key.starts_with("/tenants/acme/")),
+            "tenant_id invariant: list never crosses tenant root"
+        );
     }
 
     /// Upstream parity: `TestStore_TenantPrefixHardIsolation`
@@ -317,21 +340,45 @@ mod tests {
     #[test]
     fn test_list_does_not_cross_tenant_boundary_even_for_identical_names() {
         let be = EtcdBackend::new();
-        be.put("acme", "", "configmaps", "default", "shared", b"acme-payload");
-        be.put("globex", "", "configmaps", "default", "shared", b"globex-payload");
+        be.put(
+            "acme",
+            "",
+            "configmaps",
+            "default",
+            "shared",
+            b"acme-payload",
+        );
+        be.put(
+            "globex",
+            "",
+            "configmaps",
+            "default",
+            "shared",
+            b"globex-payload",
+        );
         let acme = be.list("acme", "", "configmaps", "default");
         let globex = be.list("globex", "", "configmaps", "default");
         assert_eq!(acme.len(), 1);
         assert_eq!(globex.len(), 1);
-        assert_eq!(acme[0].value, b"acme-payload",
-            "tenant_id invariant: acme list returns acme payload");
-        assert_eq!(globex[0].value, b"globex-payload",
-            "tenant_id invariant: globex list returns globex payload");
+        assert_eq!(
+            acme[0].value, b"acme-payload",
+            "tenant_id invariant: acme list returns acme payload"
+        );
+        assert_eq!(
+            globex[0].value, b"globex-payload",
+            "tenant_id invariant: globex list returns globex payload"
+        );
         // Cross-check: get on each side returns its own data, never the peer's.
-        let g_acme = be.get("acme", "", "configmaps", "default", "shared").unwrap();
-        let g_globex = be.get("globex", "", "configmaps", "default", "shared").unwrap();
-        assert_ne!(g_acme.value, g_globex.value,
-            "tenant_id invariant: same name in different tenants are distinct objects");
+        let g_acme = be
+            .get("acme", "", "configmaps", "default", "shared")
+            .unwrap();
+        let g_globex = be
+            .get("globex", "", "configmaps", "default", "shared")
+            .unwrap();
+        assert_ne!(
+            g_acme.value, g_globex.value,
+            "tenant_id invariant: same name in different tenants are distinct objects"
+        );
     }
 
     /// Upstream parity: `TestStore_DeleteRemovesAndAdvancesRevision`
@@ -343,20 +390,31 @@ mod tests {
         be.put("acme", "", "configmaps", "default", "to-go", b"{}");
         let removed = be.delete("acme", "", "configmaps", "default", "to-go");
         assert!(removed, "delete returns true for existing object");
-        assert!(be.get("acme", "", "configmaps", "default", "to-go").is_none(),
-            "deleted key cannot be Get'd");
+        assert!(
+            be.get("acme", "", "configmaps", "default", "to-go")
+                .is_none(),
+            "deleted key cannot be Get'd"
+        );
         let again = be.delete("acme", "", "configmaps", "default", "to-go");
         assert!(!again, "second delete is a no-op");
         // History contains both Put and Delete events.
         let hist = be.history_for("acme", "", "configmaps", "default", "to-go");
-        let has_put = hist.iter().any(|e| matches!(e, cave_etcd::models::EventType::Put));
-        let has_del = hist.iter().any(|e| matches!(e, cave_etcd::models::EventType::Delete));
-        assert!(has_put && has_del,
-            "history records both Put and Delete for the lifecycle");
+        let has_put = hist
+            .iter()
+            .any(|e| matches!(e, cave_etcd::models::EventType::Put));
+        let has_del = hist
+            .iter()
+            .any(|e| matches!(e, cave_etcd::models::EventType::Delete));
+        assert!(
+            has_put && has_del,
+            "history records both Put and Delete for the lifecycle"
+        );
         // tenant_id invariant: history walk is per-key, never cross-tenant.
         let other = be.history_for("globex", "", "configmaps", "default", "to-go");
-        assert!(other.is_empty(),
-            "tenant_id invariant: globex sees nothing for acme's deleted key");
+        assert!(
+            other.is_empty(),
+            "tenant_id invariant: globex sees nothing for acme's deleted key"
+        );
     }
 
     /// Upstream parity: `TestStore_RevisionCompactionAdvancesCompactedRevision`
@@ -369,15 +427,22 @@ mod tests {
         let rv2 = be.put("acme", "", "configmaps", "default", "b", b"{}");
         be.put("acme", "", "configmaps", "default", "c", b"{}");
         be.compact(rv2);
-        assert!(be.compaction_revision() >= rv2,
-            "compaction floor advanced to (or past) requested revision");
+        assert!(
+            be.compaction_revision() >= rv2,
+            "compaction floor advanced to (or past) requested revision"
+        );
         // tenant_id invariant: compaction is global on the underlying KvStore
         // but tenants only see their own keys via the prefix layout.
         let acme = be.list("acme", "", "configmaps", "default");
-        assert_eq!(acme.len(), 3,
-            "tenant_id invariant: live keys preserved post-compaction for acme");
-        assert!(acme.iter().all(|o| o.key.starts_with("/tenants/acme/")),
-            "tenant_id invariant: list still scoped to acme after compaction");
+        assert_eq!(
+            acme.len(),
+            3,
+            "tenant_id invariant: live keys preserved post-compaction for acme"
+        );
+        assert!(
+            acme.iter().all(|o| o.key.starts_with("/tenants/acme/")),
+            "tenant_id invariant: list still scoped to acme after compaction"
+        );
     }
 
     /// Upstream parity: `TestStore_ListAcrossNamespacesUnderTenant`
@@ -386,17 +451,24 @@ mod tests {
     #[test]
     fn test_list_with_empty_namespace_scans_all_namespaces_for_tenant() {
         let be = EtcdBackend::new();
-        be.put("acme", "", "configmaps", "default",     "x", b"{}");
+        be.put("acme", "", "configmaps", "default", "x", b"{}");
         be.put("acme", "", "configmaps", "kube-system", "y", b"{}");
-        be.put("acme", "", "configmaps", "tenant-tools","z", b"{}");
+        be.put("acme", "", "configmaps", "tenant-tools", "z", b"{}");
         // Cross-tenant decoy.
         be.put("globex", "", "configmaps", "default", "x", b"{}");
         let all = be.list("acme", "", "configmaps", "");
-        assert_eq!(all.len(), 3,
-            "kind-only scan within acme returns all 3 namespaces");
-        assert!(all.iter().all(|o| o.key.starts_with("/tenants/acme/registry/core/configmaps/")),
-            "tenant_id invariant: kind-only scan rooted under acme/configmaps");
-        let names: Vec<_> = all.iter()
+        assert_eq!(
+            all.len(),
+            3,
+            "kind-only scan within acme returns all 3 namespaces"
+        );
+        assert!(
+            all.iter()
+                .all(|o| o.key.starts_with("/tenants/acme/registry/core/configmaps/")),
+            "tenant_id invariant: kind-only scan rooted under acme/configmaps"
+        );
+        let names: Vec<_> = all
+            .iter()
             .map(|o| o.key.rsplit('/').next().unwrap().to_string())
             .collect();
         assert!(names.contains(&"x".to_string()));

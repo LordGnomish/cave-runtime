@@ -598,7 +598,11 @@ impl KvStore {
             }
         }
 
-        let ops = if succeeded { &req.success } else { &req.failure };
+        let ops = if succeeded {
+            &req.success
+        } else {
+            &req.failure
+        };
         for op in ops {
             match op {
                 RequestOp::Put(put) => {
@@ -628,7 +632,10 @@ impl KvStore {
     pub fn txn_checked(&self, req: &TxnRequest) -> EtcdResult<TxnResponse> {
         let ops = req.compare.len() + req.success.len() + req.failure.len();
         if ops > Self::MAX_TXN_OPS {
-            return Err(EtcdError::TooManyTxnOps { ops, max: Self::MAX_TXN_OPS });
+            return Err(EtcdError::TooManyTxnOps {
+                ops,
+                max: Self::MAX_TXN_OPS,
+            });
         }
         Ok(self.txn(req))
     }
@@ -672,9 +679,9 @@ impl KvStore {
 
     /// Grant a lease.
     pub fn lease_grant(&self, req: &LeaseGrantRequest) -> LeaseGrantResponse {
-        let id = req.id.unwrap_or_else(|| {
-            self.lease_counter.fetch_add(1, Ordering::SeqCst) as i64 + 1
-        });
+        let id = req
+            .id
+            .unwrap_or_else(|| self.lease_counter.fetch_add(1, Ordering::SeqCst) as i64 + 1);
         let lease = Lease {
             id,
             ttl: req.ttl,
@@ -834,10 +841,7 @@ impl KvStore {
         })
     }
 
-    pub fn authenticate(
-        &self,
-        req: &AuthenticateRequest,
-    ) -> EtcdResult<AuthenticateResponse> {
+    pub fn authenticate(&self, req: &AuthenticateRequest) -> EtcdResult<AuthenticateResponse> {
         if self.auth_enabled.load(Ordering::SeqCst) {
             let user = self
                 .users
@@ -1052,10 +1056,7 @@ impl KvStore {
             return Ok(());
         }
         let token = token.ok_or(EtcdError::InvalidToken)?;
-        let entry = self
-            .auth_tokens
-            .get(token)
-            .ok_or(EtcdError::InvalidToken)?;
+        let entry = self.auth_tokens.get(token).ok_or(EtcdError::InvalidToken)?;
         let username = entry.clone();
         drop(entry);
 
@@ -1108,8 +1109,7 @@ impl KvStore {
                 }
             }
             AlarmAction::Deactivate => {
-                alarms
-                    .retain(|a| !(a.member_id == req.member_id && a.alarm == req.alarm));
+                alarms.retain(|a| !(a.member_id == req.member_id && a.alarm == req.alarm));
             }
         }
         AlarmResponse {
@@ -1236,10 +1236,7 @@ impl KvStore {
 
     /// Promote a learner to a voting member.
     /// Mirrors etcd v3.6 `etcdserver.MemberPromote`.
-    pub fn member_promote(
-        &self,
-        req: &MemberPromoteRequest,
-    ) -> EtcdResult<MemberPromoteResponse> {
+    pub fn member_promote(&self, req: &MemberPromoteRequest) -> EtcdResult<MemberPromoteResponse> {
         let mut members = self.members.write().unwrap();
         let m = members
             .iter_mut()
@@ -1258,10 +1255,7 @@ impl KvStore {
     /// Begin a joint-consensus configuration change (Cold ∪ Cnew).
     /// During the joint phase, quorum requires a majority in *both* configs.
     /// Mirrors etcd v3.6 `raft/confchange.EnterJoint`.
-    pub fn enter_joint(
-        &self,
-        req: &EnterJointRequest,
-    ) -> EtcdResult<EnterJointResponse> {
+    pub fn enter_joint(&self, req: &EnterJointRequest) -> EtcdResult<EnterJointResponse> {
         let mut joint = self.joint.write().unwrap();
         if joint.is_some() {
             return Err(EtcdError::JointConfigInProgress);
@@ -1278,10 +1272,7 @@ impl KvStore {
         // Apply add operations (allocate IDs, append).
         let mut added_ids: Vec<u64> = Vec::new();
         for add in &req.adds {
-            let new_id = self
-                .lease_counter
-                .fetch_add(1, Ordering::SeqCst)
-                + 100;
+            let new_id = self.lease_counter.fetch_add(1, Ordering::SeqCst) + 100;
             members.push(Member {
                 id: new_id,
                 name: format!("member-{}", new_id),
@@ -1426,10 +1417,7 @@ impl KvStore {
 
     /// Emit a progress notification on a single watch.  Used to advance
     /// watcher's known-revision under `progress_notify=true`.
-    pub fn watch_progress(
-        &self,
-        watch_id: i64,
-    ) -> EtcdResult<WatchProgressEvent> {
+    pub fn watch_progress(&self, watch_id: i64) -> EtcdResult<WatchProgressEvent> {
         if !self.watch_configs.contains_key(&watch_id) {
             return Err(EtcdError::WatchNotFound(watch_id));
         }
@@ -1451,10 +1439,7 @@ impl KvStore {
     ///   * TTL > `MAX_LEASE_TTL_SECS` is silently capped (matches the
     ///     server-side cap `etcdserver.maxLeaseTTL`)
     ///   * explicit ID that already exists is rejected (`LeaseAlreadyExists`)
-    pub fn lease_grant_v2(
-        &self,
-        req: &LeaseGrantRequest,
-    ) -> EtcdResult<LeaseGrantResponse> {
+    pub fn lease_grant_v2(&self, req: &LeaseGrantRequest) -> EtcdResult<LeaseGrantResponse> {
         if req.ttl < 0 {
             return Err(EtcdError::InvalidLeaseTtl(req.ttl));
         }
@@ -1465,9 +1450,7 @@ impl KvStore {
         }
         let ttl = req.ttl.min(MAX_LEASE_TTL_SECS);
         let id = match req.id {
-            Some(0) | None => {
-                self.lease_counter.fetch_add(1, Ordering::SeqCst) as i64 + 1
-            }
+            Some(0) | None => self.lease_counter.fetch_add(1, Ordering::SeqCst) as i64 + 1,
             Some(id) => id,
         };
         let lease = Lease {
@@ -1557,13 +1540,11 @@ impl KvStore {
     /// is JSON: `{ revision, compact_revision, kvs, leases, members }`.
     fn snapshot_blob(&self) -> (Vec<u8>, String, SnapshotMeta) {
         // Collect KVs sorted for determinism.
-        let mut kvs: Vec<KeyValue> =
-            self.current.iter().map(|e| e.value().clone()).collect();
+        let mut kvs: Vec<KeyValue> = self.current.iter().map(|e| e.value().clone()).collect();
         kvs.sort_by(|a, b| a.key.cmp(&b.key));
 
         let leases: Vec<Lease> = {
-            let mut v: Vec<Lease> =
-                self.leases.iter().map(|e| e.value().clone()).collect();
+            let mut v: Vec<Lease> = self.leases.iter().map(|e| e.value().clone()).collect();
             v.sort_by_key(|l| l.id);
             v
         };
@@ -1624,9 +1605,7 @@ impl KvStore {
 
     /// Reassemble the streamed chunks into a (blob, checksum) pair, asserting
     /// every chunk references the same checksum.
-    pub fn assemble_chunks(
-        chunks: &[SnapshotChunk],
-    ) -> EtcdResult<(Vec<u8>, String)> {
+    pub fn assemble_chunks(chunks: &[SnapshotChunk]) -> EtcdResult<(Vec<u8>, String)> {
         if chunks.is_empty() {
             return Err(EtcdError::SnapshotDecode("no chunks".into()));
         }
@@ -1643,10 +1622,7 @@ impl KvStore {
         }
         let actual = sha256_hex(&blob);
         if actual != expected {
-            return Err(EtcdError::SnapshotChecksumMismatch {
-                expected,
-                actual,
-            });
+            return Err(EtcdError::SnapshotChecksumMismatch { expected, actual });
         }
         Ok((blob, expected))
     }
@@ -1662,8 +1638,8 @@ impl KvStore {
                 actual,
             });
         }
-        let v: serde_json::Value = serde_json::from_slice(blob)
-            .map_err(|e| EtcdError::SnapshotDecode(e.to_string()))?;
+        let v: serde_json::Value =
+            serde_json::from_slice(blob).map_err(|e| EtcdError::SnapshotDecode(e.to_string()))?;
 
         let revision = v
             .get("revision")
@@ -1797,9 +1773,7 @@ impl KvStore {
             return PreVoteResult {
                 granted: false,
                 term: cur,
-                reason: format!(
-                    "candidate term {candidate_term} below local term {cur}"
-                ),
+                reason: format!("candidate term {candidate_term} below local term {cur}"),
             };
         }
         if self.leader_lease_active() {
@@ -2006,22 +1980,16 @@ impl KvStore {
         &self,
         snapshot_id: &str,
     ) -> EtcdResult<Option<SnapshotChunk>> {
-        let state_lock = self
-            .snapshot_senders
-            .get(snapshot_id)
-            .ok_or_else(|| EtcdError::SnapshotDecode(format!(
-                "unknown snapshot id {snapshot_id}"
-            )))?;
+        let state_lock = self.snapshot_senders.get(snapshot_id).ok_or_else(|| {
+            EtcdError::SnapshotDecode(format!("unknown snapshot id {snapshot_id}"))
+        })?;
         let mut state = state_lock.write().unwrap();
         if state.completed {
             return Ok(None);
         }
-        let blob = self
-            .snapshot_blobs
-            .get(snapshot_id)
-            .ok_or_else(|| EtcdError::SnapshotDecode(format!(
-                "snapshot blob missing for {snapshot_id}"
-            )))?;
+        let blob = self.snapshot_blobs.get(snapshot_id).ok_or_else(|| {
+            EtcdError::SnapshotDecode(format!("snapshot blob missing for {snapshot_id}"))
+        })?;
         let start = state.sent_bytes as usize;
         let end = (start + SNAPSHOT_SENDER_CHUNK_SIZE).min(blob.len());
         let slice = blob[start..end].to_vec();
@@ -2040,10 +2008,7 @@ impl KvStore {
     }
 
     /// Inspect a sender's current state (lock-light snapshot).
-    pub fn snapshot_sender_state(
-        &self,
-        snapshot_id: &str,
-    ) -> Option<SnapshotSenderState> {
+    pub fn snapshot_sender_state(&self, snapshot_id: &str) -> Option<SnapshotSenderState> {
         self.snapshot_senders
             .get(snapshot_id)
             .map(|r| r.read().unwrap().clone())
@@ -2060,8 +2025,7 @@ impl KvStore {
     /// by tests to verify `snapshot_sender_next_chunk` returns chunks
     /// that, when re-assembled, contain every live key.
     pub fn snapshot_sender_iter_keys(&self) -> Vec<Vec<u8>> {
-        let mut keys: Vec<Vec<u8>> =
-            self.current.iter().map(|e| e.key().clone()).collect();
+        let mut keys: Vec<Vec<u8>> = self.current.iter().map(|e| e.key().clone()).collect();
         keys.sort();
         keys
     }
@@ -2101,8 +2065,7 @@ impl KvStore {
         }
         let bytes_after = self.estimated_db_bytes();
         let bytes_freed = bytes_before.saturating_sub(bytes_after);
-        let fragmented_pages =
-            (bytes_freed + 4095) / 4096; // 4 KiB pages
+        let fragmented_pages = (bytes_freed + 4095) / 4096; // 4 KiB pages
         let status = DefragmentStatus {
             bytes_before,
             bytes_after,
@@ -2144,8 +2107,7 @@ impl KvStore {
                 current: cur,
             });
         }
-        self.compaction_watermark
-            .fetch_max(rev, Ordering::SeqCst);
+        self.compaction_watermark.fetch_max(rev, Ordering::SeqCst);
         Ok(())
     }
 
@@ -2175,10 +2137,7 @@ impl KvStore {
     /// Check whether the named learner has caught up enough to be
     /// promoted.  Returns the readiness snapshot.  Mirrors etcd v3.6
     /// `etcdserver.checkMemberPromote`.
-    pub fn check_learner_promotion(
-        &self,
-        member_id: u64,
-    ) -> EtcdResult<LearnerReadiness> {
+    pub fn check_learner_promotion(&self, member_id: u64) -> EtcdResult<LearnerReadiness> {
         let members = self.members.read().unwrap();
         let m = members
             .iter()
@@ -2189,11 +2148,7 @@ impl KvStore {
         }
         drop(members);
         let leader_index = self.commit_index();
-        let learner_index = self
-            .learner_index
-            .get(&member_id)
-            .map(|r| *r)
-            .unwrap_or(0);
+        let learner_index = self.learner_index.get(&member_id).map(|r| *r).unwrap_or(0);
         let ready_lag = leader_index.saturating_sub(learner_index);
         Ok(LearnerReadiness {
             member_id,
@@ -2258,8 +2213,8 @@ impl Sha256 {
     fn new() -> Self {
         Self {
             state: [
-                0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-                0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+                0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
+                0x5be0cd19,
             ],
             buffer: Vec::with_capacity(64),
             total_len: 0,
@@ -2297,14 +2252,16 @@ impl Sha256 {
 
     fn compress(state: &mut [u32; 8], block: &[u8; 64]) {
         const K: [u32; 64] = [
-            0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-            0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-            0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-            0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-            0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-            0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-            0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-            0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+            0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
+            0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
+            0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
+            0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+            0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
+            0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+            0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
+            0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+            0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
+            0xc67178f2,
         ];
         let mut w = [0u32; 64];
         for i in 0..16 {
@@ -2637,7 +2594,10 @@ mod tests {
     #[test]
     fn test_lease_timetolive_not_found() {
         let store = KvStore::new();
-        let err = store.lease_timetolive(&LeaseTTLRequest { id: 9999, keys: false });
+        let err = store.lease_timetolive(&LeaseTTLRequest {
+            id: 9999,
+            keys: false,
+        });
         assert!(matches!(err, Err(EtcdError::LeaseNotFound(_))));
     }
 
@@ -2724,15 +2684,21 @@ mod tests {
         ));
 
         let get = store
-            .user_get(&AuthUserGetRequest { name: "alice".into() })
+            .user_get(&AuthUserGetRequest {
+                name: "alice".into(),
+            })
             .unwrap();
         assert!(get.roles.is_empty());
 
         store
-            .user_delete(&AuthUserDeleteRequest { name: "alice".into() })
+            .user_delete(&AuthUserDeleteRequest {
+                name: "alice".into(),
+            })
             .unwrap();
         assert!(matches!(
-            store.user_get(&AuthUserGetRequest { name: "alice".into() }),
+            store.user_get(&AuthUserGetRequest {
+                name: "alice".into()
+            }),
             Err(EtcdError::UserNotFound(_))
         ));
     }
@@ -2785,25 +2751,35 @@ mod tests {
     fn test_role_add_get_delete() {
         let store = KvStore::new();
         store
-            .role_add(&AuthRoleAddRequest { name: "admin".into() })
+            .role_add(&AuthRoleAddRequest {
+                name: "admin".into(),
+            })
             .unwrap();
 
         assert!(matches!(
-            store.role_add(&AuthRoleAddRequest { name: "admin".into() }),
+            store.role_add(&AuthRoleAddRequest {
+                name: "admin".into()
+            }),
             Err(EtcdError::RoleAlreadyExists(_))
         ));
 
         let get = store
-            .role_get(&AuthRoleGetRequest { role: "admin".into() })
+            .role_get(&AuthRoleGetRequest {
+                role: "admin".into(),
+            })
             .unwrap();
         assert_eq!(get.name, "admin");
         assert!(get.perm.is_empty());
 
         store
-            .role_delete(&AuthRoleDeleteRequest { role: "admin".into() })
+            .role_delete(&AuthRoleDeleteRequest {
+                role: "admin".into(),
+            })
             .unwrap();
         assert!(matches!(
-            store.role_get(&AuthRoleGetRequest { role: "admin".into() }),
+            store.role_get(&AuthRoleGetRequest {
+                role: "admin".into()
+            }),
             Err(EtcdError::RoleNotFound(_))
         ));
     }
@@ -3052,10 +3028,7 @@ mod tests {
             keys_only: false,
             count_only: false,
         });
-        assert!(matches!(
-            result,
-            Err(EtcdError::RevisionCompacted { .. })
-        ));
+        assert!(matches!(result, Err(EtcdError::RevisionCompacted { .. })));
     }
 
     #[test]
@@ -3114,8 +3087,7 @@ mod tests {
         });
 
         // Events for /w/b and /w/c should be replayed; /other/x ignored.
-        let replayed_keys: Vec<String> =
-            resp.events.iter().map(|e| e.kv.key_str()).collect();
+        let replayed_keys: Vec<String> = resp.events.iter().map(|e| e.kv.key_str()).collect();
         assert!(replayed_keys.contains(&"/w/b".to_string()));
         assert!(replayed_keys.contains(&"/w/c".to_string()));
         assert!(!replayed_keys.contains(&"/other/x".to_string()));
@@ -3182,7 +3154,10 @@ mod tests {
         });
 
         let ttl_resp = store
-            .lease_timetolive(&LeaseTTLRequest { id: lease.id, keys: true })
+            .lease_timetolive(&LeaseTTLRequest {
+                id: lease.id,
+                keys: true,
+            })
             .unwrap();
         assert!(ttl_resp.keys.iter().any(|k| k == b"leased_key"));
     }
@@ -3275,7 +3250,10 @@ mod tests {
     #[test]
     fn test_lease_non_expired_survives() {
         let store = KvStore::new();
-        let lease = store.lease_grant(&LeaseGrantRequest { ttl: 3600, id: None });
+        let lease = store.lease_grant(&LeaseGrantRequest {
+            ttl: 3600,
+            id: None,
+        });
         store.put(&PutRequest {
             key: "alive_key".into(),
             value: "v".into(),
@@ -3352,10 +3330,7 @@ mod tests {
         });
 
         assert!(!result.succeeded);
-        assert_eq!(
-            get(&store, "txn_key2")[0].value_str(),
-            "failure_branch"
-        );
+        assert_eq!(get(&store, "txn_key2")[0].value_str(), "failure_branch");
     }
 
     #[test]
@@ -3583,7 +3558,9 @@ mod tests {
             })
             .unwrap();
         store
-            .role_add(&AuthRoleAddRequest { name: "write_role".into() })
+            .role_add(&AuthRoleAddRequest {
+                name: "write_role".into(),
+            })
             .unwrap();
         store
             .role_grant_permission(&AuthRoleGrantPermissionRequest {
@@ -3730,14 +3707,16 @@ mod tests {
             lease: None,
             prev_kv: false,
         });
-        let resp = store.range(&RangeRequest {
-            key: "foo".into(),
-            range_end: None,
-            limit: None,
-            revision: None,
-            keys_only: false,
-            count_only: false,
-        }).unwrap();
+        let resp = store
+            .range(&RangeRequest {
+                key: "foo".into(),
+                range_end: None,
+                limit: None,
+                revision: None,
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert_eq!(resp.kvs[0].key_str(), "foo");
         assert_eq!(resp.kvs[0].value_str(), "bar");
     }
@@ -3745,19 +3724,45 @@ mod tests {
     #[test]
     fn test_revision_never_decreases() {
         let store = KvStore::new();
-        let r1 = store.put(&PutRequest { key: "a".into(), value: "1".into(), lease: None, prev_kv: false });
-        let r2 = store.put(&PutRequest { key: "b".into(), value: "2".into(), lease: None, prev_kv: false });
-        let r3 = store.put(&PutRequest { key: "a".into(), value: "3".into(), lease: None, prev_kv: false });
+        let r1 = store.put(&PutRequest {
+            key: "a".into(),
+            value: "1".into(),
+            lease: None,
+            prev_kv: false,
+        });
+        let r2 = store.put(&PutRequest {
+            key: "b".into(),
+            value: "2".into(),
+            lease: None,
+            prev_kv: false,
+        });
+        let r3 = store.put(&PutRequest {
+            key: "a".into(),
+            value: "3".into(),
+            lease: None,
+            prev_kv: false,
+        });
         assert!(r2.header.revision > r1.header.revision);
         assert!(r3.header.revision > r2.header.revision);
 
         // After delete, revision still increases
-        let r4_header = store.delete_range(&DeleteRangeRequest { key: "b".into(), range_end: None, prev_kv: false }).header;
+        let r4_header = store
+            .delete_range(&DeleteRangeRequest {
+                key: "b".into(),
+                range_end: None,
+                prev_kv: false,
+            })
+            .header;
         assert!(r4_header.revision > r3.header.revision);
 
         // After compaction, revision still increases
         store.compact(r3.header.revision);
-        let r5 = store.put(&PutRequest { key: "c".into(), value: "4".into(), lease: None, prev_kv: false });
+        let r5 = store.put(&PutRequest {
+            key: "c".into(),
+            value: "4".into(),
+            lease: None,
+            prev_kv: false,
+        });
         assert!(r5.header.revision > r4_header.revision);
     }
 
@@ -3800,9 +3805,24 @@ mod tests {
     #[test]
     fn test_compaction_removes_old_data() {
         let store = KvStore::new();
-        store.put(&PutRequest { key: "old".into(), value: "v1".into(), lease: None, prev_kv: false });
-        let r2 = store.put(&PutRequest { key: "old".into(), value: "v2".into(), lease: None, prev_kv: false });
-        store.put(&PutRequest { key: "old".into(), value: "v3".into(), lease: None, prev_kv: false });
+        store.put(&PutRequest {
+            key: "old".into(),
+            value: "v1".into(),
+            lease: None,
+            prev_kv: false,
+        });
+        let r2 = store.put(&PutRequest {
+            key: "old".into(),
+            value: "v2".into(),
+            lease: None,
+            prev_kv: false,
+        });
+        store.put(&PutRequest {
+            key: "old".into(),
+            value: "v3".into(),
+            lease: None,
+            prev_kv: false,
+        });
 
         // Compact at r2 — revision 1 should be gone
         store.compact(r2.header.revision);
@@ -3822,10 +3842,30 @@ mod tests {
     #[test]
     fn test_delete_returns_correct_count() {
         let store = KvStore::new();
-        store.put(&PutRequest { key: "/a/1".into(), value: "v".into(), lease: None, prev_kv: false });
-        store.put(&PutRequest { key: "/a/2".into(), value: "v".into(), lease: None, prev_kv: false });
-        store.put(&PutRequest { key: "/a/3".into(), value: "v".into(), lease: None, prev_kv: false });
-        store.put(&PutRequest { key: "/b/1".into(), value: "v".into(), lease: None, prev_kv: false });
+        store.put(&PutRequest {
+            key: "/a/1".into(),
+            value: "v".into(),
+            lease: None,
+            prev_kv: false,
+        });
+        store.put(&PutRequest {
+            key: "/a/2".into(),
+            value: "v".into(),
+            lease: None,
+            prev_kv: false,
+        });
+        store.put(&PutRequest {
+            key: "/a/3".into(),
+            value: "v".into(),
+            lease: None,
+            prev_kv: false,
+        });
+        store.put(&PutRequest {
+            key: "/b/1".into(),
+            value: "v".into(),
+            lease: None,
+            prev_kv: false,
+        });
 
         let resp = store.delete_range(&DeleteRangeRequest {
             key: "/a/".into(),
@@ -3839,7 +3879,12 @@ mod tests {
     #[test]
     fn test_txn_atomic_all_or_nothing() {
         let store = KvStore::new();
-        store.put(&PutRequest { key: "counter".into(), value: "10".into(), lease: None, prev_kv: false });
+        store.put(&PutRequest {
+            key: "counter".into(),
+            value: "10".into(),
+            lease: None,
+            prev_kv: false,
+        });
 
         // Txn: if counter version == 1 (true), set counter to 20
         let resp = store.txn(&TxnRequest {
@@ -3862,21 +3907,28 @@ mod tests {
         assert!(resp.succeeded);
 
         // Verify counter is now 20
-        let get = store.range(&RangeRequest {
-            key: "counter".into(),
-            range_end: None,
-            limit: None,
-            revision: None,
-            keys_only: false,
-            count_only: false,
-        }).unwrap();
+        let get = store
+            .range(&RangeRequest {
+                key: "counter".into(),
+                range_end: None,
+                limit: None,
+                revision: None,
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert_eq!(get.kvs[0].value_str(), "20");
     }
 
     #[test]
     fn test_txn_failure_branch() {
         let store = KvStore::new();
-        store.put(&PutRequest { key: "x".into(), value: "1".into(), lease: None, prev_kv: false });
+        store.put(&PutRequest {
+            key: "x".into(),
+            value: "1".into(),
+            lease: None,
+            prev_kv: false,
+        });
 
         // Txn: if x version == 99 (false), failure: set x to "fallback"
         let resp = store.txn(&TxnRequest {
@@ -3898,10 +3950,16 @@ mod tests {
         });
         assert!(!resp.succeeded);
 
-        let get = store.range(&RangeRequest {
-            key: "x".into(), range_end: None, limit: None,
-            revision: None, keys_only: false, count_only: false,
-        }).unwrap();
+        let get = store
+            .range(&RangeRequest {
+                key: "x".into(),
+                range_end: None,
+                limit: None,
+                revision: None,
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert_eq!(get.kvs[0].value_str(), "fallback");
     }
 
@@ -3909,22 +3967,52 @@ mod tests {
     fn test_auth_permission_enforced() {
         let store = KvStore::new();
         // Add user with correct API
-        store.user_add(&AuthUserAddRequest { name: "reader".into(), password: "pass123".into() }).unwrap();
-        store.role_add(&AuthRoleAddRequest { name: "readonly".into() }).unwrap();
-        store.role_grant_permission(&AuthRoleGrantPermissionRequest {
-            name: "readonly".into(),
-            perm: Permission { perm_type: PermType::Read, key: "/public/".into(), range_end: Some("/public0".into()) },
-        }).unwrap();
-        store.user_grant_role(&AuthUserGrantRoleRequest { user: "reader".into(), role: "readonly".into() }).unwrap();
+        store
+            .user_add(&AuthUserAddRequest {
+                name: "reader".into(),
+                password: "pass123".into(),
+            })
+            .unwrap();
+        store
+            .role_add(&AuthRoleAddRequest {
+                name: "readonly".into(),
+            })
+            .unwrap();
+        store
+            .role_grant_permission(&AuthRoleGrantPermissionRequest {
+                name: "readonly".into(),
+                perm: Permission {
+                    perm_type: PermType::Read,
+                    key: "/public/".into(),
+                    range_end: Some("/public0".into()),
+                },
+            })
+            .unwrap();
+        store
+            .user_grant_role(&AuthUserGrantRoleRequest {
+                user: "reader".into(),
+                role: "readonly".into(),
+            })
+            .unwrap();
         store.auth_enable().unwrap();
 
         // Authenticate
-        let resp = store.authenticate(&AuthenticateRequest { name: "reader".into(), password: "pass123".into() }).unwrap();
+        let resp = store
+            .authenticate(&AuthenticateRequest {
+                name: "reader".into(),
+                password: "pass123".into(),
+            })
+            .unwrap();
         let token = &resp.token;
 
         // Put data first (as root bypass since no root user — disable auth for this)
         store.auth_disable().unwrap();
-        store.put(&PutRequest { key: "/public/key".into(), value: "v".into(), lease: None, prev_kv: false });
+        store.put(&PutRequest {
+            key: "/public/key".into(),
+            value: "v".into(),
+            lease: None,
+            prev_kv: false,
+        });
         store.auth_enable().unwrap();
 
         // Read /public/key should work
@@ -3933,21 +4021,26 @@ mod tests {
 
         // Write /public/key should fail (readonly)
         let check = store.check_auth_token(Some(token), b"/public/key", PermType::Write);
-        assert!(check.is_err(), "write /public/key should fail for readonly user");
+        assert!(
+            check.is_err(),
+            "write /public/key should fail for readonly user"
+        );
     }
 
     #[test]
     fn test_key_not_found_returns_empty_kvs() {
         // etcd returns empty kvs array (not error) for missing key
         let store = KvStore::new();
-        let resp = store.range(&RangeRequest {
-            key: "nonexistent".into(),
-            range_end: None,
-            limit: None,
-            revision: None,
-            keys_only: false,
-            count_only: false,
-        }).unwrap();
+        let resp = store
+            .range(&RangeRequest {
+                key: "nonexistent".into(),
+                range_end: None,
+                limit: None,
+                revision: None,
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert_eq!(resp.kvs.len(), 0);
         assert_eq!(resp.count, 0);
     }
@@ -3955,32 +4048,66 @@ mod tests {
     #[test]
     fn test_put_version_increments() {
         let store = KvStore::new();
-        store.put(&PutRequest { key: "ver".into(), value: "a".into(), lease: None, prev_kv: false });
-        store.put(&PutRequest { key: "ver".into(), value: "b".into(), lease: None, prev_kv: false });
-        store.put(&PutRequest { key: "ver".into(), value: "c".into(), lease: None, prev_kv: false });
+        store.put(&PutRequest {
+            key: "ver".into(),
+            value: "a".into(),
+            lease: None,
+            prev_kv: false,
+        });
+        store.put(&PutRequest {
+            key: "ver".into(),
+            value: "b".into(),
+            lease: None,
+            prev_kv: false,
+        });
+        store.put(&PutRequest {
+            key: "ver".into(),
+            value: "c".into(),
+            lease: None,
+            prev_kv: false,
+        });
 
-        let resp = store.range(&RangeRequest {
-            key: "ver".into(), range_end: None, limit: None,
-            revision: None, keys_only: false, count_only: false,
-        }).unwrap();
+        let resp = store
+            .range(&RangeRequest {
+                key: "ver".into(),
+                range_end: None,
+                limit: None,
+                revision: None,
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert_eq!(resp.kvs[0].version, 3);
     }
-
 
     // ═══ Upstream etcd parity tests (ported from etcd/server/storage/mvcc + etcd/clientv3) ═══
 
     fn pk_put(store: &KvStore, key: &str, value: &str) -> u64 {
-        store.put(&PutRequest {
-            key: key.into(), value: value.into(),
-            lease: None, prev_kv: false,
-        }).header.revision
+        store
+            .put(&PutRequest {
+                key: key.into(),
+                value: value.into(),
+                lease: None,
+                prev_kv: false,
+            })
+            .header
+            .revision
     }
 
     fn pk_get(store: &KvStore, key: &str) -> Option<KeyValue> {
-        store.range(&RangeRequest {
-            key: key.into(), range_end: None, limit: None,
-            revision: None, keys_only: false, count_only: false,
-        }).ok()?.kvs.into_iter().next()
+        store
+            .range(&RangeRequest {
+                key: key.into(),
+                range_end: None,
+                limit: None,
+                revision: None,
+                keys_only: false,
+                count_only: false,
+            })
+            .ok()?
+            .kvs
+            .into_iter()
+            .next()
     }
 
     #[test]
@@ -3990,10 +4117,19 @@ mod tests {
         let mod_rev = pk_get(&store, "k").unwrap().mod_revision;
         let resp = store.txn(&TxnRequest {
             compare: vec![Compare {
-                key: "k".into(), target: CompareTarget::Mod, result: CompareResult::Equal,
-                value: None, version: None, mod_revision: Some(mod_rev),
+                key: "k".into(),
+                target: CompareTarget::Mod,
+                result: CompareResult::Equal,
+                value: None,
+                version: None,
+                mod_revision: Some(mod_rev),
             }],
-            success: vec![RequestOp::Put(PutRequest { key: "k".into(), value: "v2".into(), lease: None, prev_kv: false })],
+            success: vec![RequestOp::Put(PutRequest {
+                key: "k".into(),
+                value: "v2".into(),
+                lease: None,
+                prev_kv: false,
+            })],
             failure: vec![],
         });
         assert!(resp.succeeded);
@@ -4008,10 +4144,19 @@ mod tests {
         let cur = pk_get(&store, "k").unwrap().mod_revision;
         let resp = store.txn(&TxnRequest {
             compare: vec![Compare {
-                key: "k".into(), target: CompareTarget::Mod, result: CompareResult::Greater,
-                value: None, version: None, mod_revision: Some(cur.saturating_sub(1)),
+                key: "k".into(),
+                target: CompareTarget::Mod,
+                result: CompareResult::Greater,
+                value: None,
+                version: None,
+                mod_revision: Some(cur.saturating_sub(1)),
             }],
-            success: vec![RequestOp::Put(PutRequest { key: "k".into(), value: "win".into(), lease: None, prev_kv: false })],
+            success: vec![RequestOp::Put(PutRequest {
+                key: "k".into(),
+                value: "win".into(),
+                lease: None,
+                prev_kv: false,
+            })],
             failure: vec![],
         });
         assert!(resp.succeeded);
@@ -4023,10 +4168,19 @@ mod tests {
         pk_put(&store, "k", "hello");
         let resp = store.txn(&TxnRequest {
             compare: vec![Compare {
-                key: "k".into(), target: CompareTarget::Value, result: CompareResult::Equal,
-                value: Some("hello".into()), version: None, mod_revision: None,
+                key: "k".into(),
+                target: CompareTarget::Value,
+                result: CompareResult::Equal,
+                value: Some("hello".into()),
+                version: None,
+                mod_revision: None,
             }],
-            success: vec![RequestOp::Put(PutRequest { key: "k".into(), value: "world".into(), lease: None, prev_kv: false })],
+            success: vec![RequestOp::Put(PutRequest {
+                key: "k".into(),
+                value: "world".into(),
+                lease: None,
+                prev_kv: false,
+            })],
             failure: vec![],
         });
         assert!(resp.succeeded);
@@ -4039,14 +4193,31 @@ mod tests {
         pk_put(&store, "k", "hello");
         let resp = store.txn(&TxnRequest {
             compare: vec![Compare {
-                key: "k".into(), target: CompareTarget::Value, result: CompareResult::Equal,
-                value: Some("goodbye".into()), version: None, mod_revision: None,
+                key: "k".into(),
+                target: CompareTarget::Value,
+                result: CompareResult::Equal,
+                value: Some("goodbye".into()),
+                version: None,
+                mod_revision: None,
             }],
-            success: vec![RequestOp::Put(PutRequest { key: "k".into(), value: "should_not_apply".into(), lease: None, prev_kv: false })],
-            failure: vec![RequestOp::Put(PutRequest { key: "k".into(), value: "applied_on_failure".into(), lease: None, prev_kv: false })],
+            success: vec![RequestOp::Put(PutRequest {
+                key: "k".into(),
+                value: "should_not_apply".into(),
+                lease: None,
+                prev_kv: false,
+            })],
+            failure: vec![RequestOp::Put(PutRequest {
+                key: "k".into(),
+                value: "applied_on_failure".into(),
+                lease: None,
+                prev_kv: false,
+            })],
         });
         assert!(!resp.succeeded);
-        assert_eq!(pk_get(&store, "k").unwrap().value_str(), "applied_on_failure");
+        assert_eq!(
+            pk_get(&store, "k").unwrap().value_str(),
+            "applied_on_failure"
+        );
     }
 
     #[test]
@@ -4055,10 +4226,19 @@ mod tests {
         let store = KvStore::new();
         let resp = store.txn(&TxnRequest {
             compare: vec![Compare {
-                key: "new".into(), target: CompareTarget::Create, result: CompareResult::Equal,
-                value: None, version: Some(0), mod_revision: None,
+                key: "new".into(),
+                target: CompareTarget::Create,
+                result: CompareResult::Equal,
+                value: None,
+                version: Some(0),
+                mod_revision: None,
             }],
-            success: vec![RequestOp::Put(PutRequest { key: "new".into(), value: "first".into(), lease: None, prev_kv: false })],
+            success: vec![RequestOp::Put(PutRequest {
+                key: "new".into(),
+                value: "first".into(),
+                lease: None,
+                prev_kv: false,
+            })],
             failure: vec![],
         });
         assert!(resp.succeeded);
@@ -4070,7 +4250,12 @@ mod tests {
         let store = KvStore::new();
         let resp = store.txn(&TxnRequest {
             compare: vec![],
-            success: vec![RequestOp::Put(PutRequest { key: "k".into(), value: "v".into(), lease: None, prev_kv: false })],
+            success: vec![RequestOp::Put(PutRequest {
+                key: "k".into(),
+                value: "v".into(),
+                lease: None,
+                prev_kv: false,
+            })],
             failure: vec![],
         });
         assert!(resp.succeeded);
@@ -4086,11 +4271,35 @@ mod tests {
         // a=1 AND b=99 (second false) → failure branch
         let resp = store.txn(&TxnRequest {
             compare: vec![
-                Compare { key: "a".into(), target: CompareTarget::Value, result: CompareResult::Equal, value: Some("1".into()), version: None, mod_revision: None },
-                Compare { key: "b".into(), target: CompareTarget::Value, result: CompareResult::Equal, value: Some("99".into()), version: None, mod_revision: None },
+                Compare {
+                    key: "a".into(),
+                    target: CompareTarget::Value,
+                    result: CompareResult::Equal,
+                    value: Some("1".into()),
+                    version: None,
+                    mod_revision: None,
+                },
+                Compare {
+                    key: "b".into(),
+                    target: CompareTarget::Value,
+                    result: CompareResult::Equal,
+                    value: Some("99".into()),
+                    version: None,
+                    mod_revision: None,
+                },
             ],
-            success: vec![RequestOp::Put(PutRequest { key: "out".into(), value: "success".into(), lease: None, prev_kv: false })],
-            failure: vec![RequestOp::Put(PutRequest { key: "out".into(), value: "failure".into(), lease: None, prev_kv: false })],
+            success: vec![RequestOp::Put(PutRequest {
+                key: "out".into(),
+                value: "success".into(),
+                lease: None,
+                prev_kv: false,
+            })],
+            failure: vec![RequestOp::Put(PutRequest {
+                key: "out".into(),
+                value: "failure".into(),
+                lease: None,
+                prev_kv: false,
+            })],
         });
         assert!(!resp.succeeded);
         assert_eq!(pk_get(&store, "out").unwrap().value_str(), "failure");
@@ -4106,10 +4315,16 @@ mod tests {
         pk_put(&store, "/foo/c", "3");
         pk_put(&store, "/other", "99");
 
-        let resp = store.range(&RangeRequest {
-            key: "/foo/".into(), range_end: Some("/foo0".into()),
-            limit: None, revision: None, keys_only: false, count_only: false,
-        }).unwrap();
+        let resp = store
+            .range(&RangeRequest {
+                key: "/foo/".into(),
+                range_end: Some("/foo0".into()),
+                limit: None,
+                revision: None,
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert_eq!(resp.kvs.len(), 3);
         let keys: Vec<String> = resp.kvs.iter().map(|k| k.key_str().to_string()).collect();
         assert!(keys.contains(&"/foo/a".to_string()));
@@ -4121,11 +4336,19 @@ mod tests {
     #[test]
     fn etcd_parity_range_limit_truncates_but_count_is_total() {
         let store = KvStore::new();
-        for i in 0..10 { pk_put(&store, &format!("/x/{:02}", i), "v"); }
-        let resp = store.range(&RangeRequest {
-            key: "/x/".into(), range_end: Some("/x0".into()),
-            limit: Some(3), revision: None, keys_only: false, count_only: false,
-        }).unwrap();
+        for i in 0..10 {
+            pk_put(&store, &format!("/x/{:02}", i), "v");
+        }
+        let resp = store
+            .range(&RangeRequest {
+                key: "/x/".into(),
+                range_end: Some("/x0".into()),
+                limit: Some(3),
+                revision: None,
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert_eq!(resp.kvs.len(), 3);
         assert_eq!(resp.count, 10);
         assert!(resp.more);
@@ -4134,11 +4357,19 @@ mod tests {
     #[test]
     fn etcd_parity_range_count_only_returns_count_without_kvs() {
         let store = KvStore::new();
-        for i in 0..5 { pk_put(&store, &format!("/c/{}", i), "v"); }
-        let resp = store.range(&RangeRequest {
-            key: "/c/".into(), range_end: Some("/c0".into()),
-            limit: None, revision: None, keys_only: false, count_only: true,
-        }).unwrap();
+        for i in 0..5 {
+            pk_put(&store, &format!("/c/{}", i), "v");
+        }
+        let resp = store
+            .range(&RangeRequest {
+                key: "/c/".into(),
+                range_end: Some("/c0".into()),
+                limit: None,
+                revision: None,
+                keys_only: false,
+                count_only: true,
+            })
+            .unwrap();
         assert_eq!(resp.count, 5);
         assert!(resp.kvs.is_empty(), "count_only must not return kvs");
     }
@@ -4147,12 +4378,21 @@ mod tests {
     fn etcd_parity_range_keys_only_omits_values() {
         let store = KvStore::new();
         pk_put(&store, "/k/1", "secret_value");
-        let resp = store.range(&RangeRequest {
-            key: "/k/".into(), range_end: Some("/k0".into()),
-            limit: None, revision: None, keys_only: true, count_only: false,
-        }).unwrap();
+        let resp = store
+            .range(&RangeRequest {
+                key: "/k/".into(),
+                range_end: Some("/k0".into()),
+                limit: None,
+                revision: None,
+                keys_only: true,
+                count_only: false,
+            })
+            .unwrap();
         assert_eq!(resp.kvs.len(), 1);
-        assert!(resp.kvs[0].value.is_empty(), "keys_only must omit value bytes");
+        assert!(
+            resp.kvs[0].value.is_empty(),
+            "keys_only must omit value bytes"
+        );
         assert_eq!(resp.kvs[0].key_str(), "/k/1");
     }
 
@@ -4161,9 +4401,14 @@ mod tests {
         let store = KvStore::new();
         pk_put(&store, "k", "old");
         let resp = store.put(&PutRequest {
-            key: "k".into(), value: "new".into(), lease: None, prev_kv: true,
+            key: "k".into(),
+            value: "new".into(),
+            lease: None,
+            prev_kv: true,
         });
-        let prev = resp.prev_kv.expect("prev_kv must be set when prev_kv=true on overwrite");
+        let prev = resp
+            .prev_kv
+            .expect("prev_kv must be set when prev_kv=true on overwrite");
         assert_eq!(prev.value_str(), "old");
     }
 
@@ -4171,9 +4416,15 @@ mod tests {
     fn etcd_parity_put_prev_kv_none_on_new_key() {
         let store = KvStore::new();
         let resp = store.put(&PutRequest {
-            key: "brand_new".into(), value: "v".into(), lease: None, prev_kv: true,
+            key: "brand_new".into(),
+            value: "v".into(),
+            lease: None,
+            prev_kv: true,
         });
-        assert!(resp.prev_kv.is_none(), "prev_kv must be None when key did not exist");
+        assert!(
+            resp.prev_kv.is_none(),
+            "prev_kv must be None when key did not exist"
+        );
     }
 
     #[test]
@@ -4183,7 +4434,10 @@ mod tests {
         let rev_before = store.current_revision();
         store.compact(0);
         let rev_after = store.current_revision();
-        assert_eq!(rev_before, rev_after, "compact(0) must not advance revision");
+        assert_eq!(
+            rev_before, rev_after,
+            "compact(0) must not advance revision"
+        );
         assert_eq!(pk_get(&store, "k").unwrap().value_str(), "v");
     }
 
@@ -4191,7 +4445,9 @@ mod tests {
     fn etcd_parity_delete_nonexistent_returns_zero_count() {
         let store = KvStore::new();
         let resp = store.delete_range(&DeleteRangeRequest {
-            key: "never_existed".into(), range_end: None, prev_kv: false,
+            key: "never_existed".into(),
+            range_end: None,
+            prev_kv: false,
         });
         assert_eq!(resp.deleted, 0);
     }
@@ -4199,10 +4455,14 @@ mod tests {
     #[test]
     fn etcd_parity_delete_prefix_returns_count_of_deleted() {
         let store = KvStore::new();
-        for i in 0..4 { pk_put(&store, &format!("/d/{}", i), "v"); }
+        for i in 0..4 {
+            pk_put(&store, &format!("/d/{}", i), "v");
+        }
         pk_put(&store, "/other", "keep");
         let resp = store.delete_range(&DeleteRangeRequest {
-            key: "/d/".into(), range_end: Some("/d0".into()), prev_kv: false,
+            key: "/d/".into(),
+            range_end: Some("/d0".into()),
+            prev_kv: false,
         });
         assert_eq!(resp.deleted, 4);
         // Non-matching key is preserved
@@ -4217,7 +4477,11 @@ mod tests {
         pk_put(&store, "k", "2");
         pk_put(&store, "k", "3");
         assert_eq!(pk_get(&store, "k").unwrap().version, 3);
-        store.delete_range(&DeleteRangeRequest { key: "k".into(), range_end: None, prev_kv: false });
+        store.delete_range(&DeleteRangeRequest {
+            key: "k".into(),
+            range_end: None,
+            prev_kv: false,
+        });
         pk_put(&store, "k", "back");
         assert_eq!(pk_get(&store, "k").unwrap().version, 1);
     }
@@ -4229,10 +4493,16 @@ mod tests {
         let r1 = store.current_revision();
         pk_put(&store, "k", "v2");
         // read at r1 should show v1
-        let resp = store.range(&RangeRequest {
-            key: "k".into(), range_end: None, limit: None,
-            revision: Some(r1), keys_only: false, count_only: false,
-        }).unwrap();
+        let resp = store
+            .range(&RangeRequest {
+                key: "k".into(),
+                range_end: None,
+                limit: None,
+                revision: Some(r1),
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert_eq!(resp.kvs.len(), 1);
         assert_eq!(resp.kvs[0].value_str(), "v1");
     }
@@ -4272,9 +4542,7 @@ mod tests {
         // Touch a tenant-scoped key so the snapshot/parity audits see a write.
         pk_put(&store, &tk(tenant_id, "ping"), "1");
         let id = add_member(&store, "http://learner:2380", true);
-        let resp = store
-            .member_promote(&MemberPromoteRequest { id })
-            .unwrap();
+        let resp = store.member_promote(&MemberPromoteRequest { id }).unwrap();
         let m = resp.members.iter().find(|m| m.id == id).unwrap();
         assert!(!m.is_learner, "promoted member must no longer be a learner");
     }
@@ -4478,7 +4746,10 @@ mod tests {
         let store = KvStore::new();
         pk_put(&store, &tk(tenant_id, "ping"), "1");
         let resp = store
-            .lease_grant_v2(&LeaseGrantRequest { ttl: 999_999, id: None })
+            .lease_grant_v2(&LeaseGrantRequest {
+                ttl: 999_999,
+                id: None,
+            })
             .unwrap();
         assert_eq!(resp.ttl, MAX_LEASE_TTL_SECS);
     }
@@ -4490,7 +4761,10 @@ mod tests {
         let store = KvStore::new();
         pk_put(&store, &tk(tenant_id, "ping"), "1");
         let resp = store
-            .lease_grant_v2(&LeaseGrantRequest { ttl: 30, id: Some(42) })
+            .lease_grant_v2(&LeaseGrantRequest {
+                ttl: 30,
+                id: Some(42),
+            })
             .unwrap();
         assert_eq!(resp.id, 42);
     }
@@ -4502,9 +4776,15 @@ mod tests {
         let store = KvStore::new();
         pk_put(&store, &tk(tenant_id, "ping"), "1");
         store
-            .lease_grant_v2(&LeaseGrantRequest { ttl: 30, id: Some(7) })
+            .lease_grant_v2(&LeaseGrantRequest {
+                ttl: 30,
+                id: Some(7),
+            })
             .unwrap();
-        let err = store.lease_grant_v2(&LeaseGrantRequest { ttl: 30, id: Some(7) });
+        let err = store.lease_grant_v2(&LeaseGrantRequest {
+            ttl: 30,
+            id: Some(7),
+        });
         assert!(matches!(err, Err(EtcdError::LeaseAlreadyExists(7))));
     }
 
@@ -4515,10 +4795,16 @@ mod tests {
         let store = KvStore::new();
         pk_put(&store, &tk(tenant_id, "ping"), "1");
         let r1 = store
-            .lease_grant_v2(&LeaseGrantRequest { ttl: 30, id: Some(0) })
+            .lease_grant_v2(&LeaseGrantRequest {
+                ttl: 30,
+                id: Some(0),
+            })
             .unwrap();
         let r2 = store
-            .lease_grant_v2(&LeaseGrantRequest { ttl: 30, id: Some(0) })
+            .lease_grant_v2(&LeaseGrantRequest {
+                ttl: 30,
+                id: Some(0),
+            })
             .unwrap();
         assert_ne!(r1.id, r2.id, "ID=0 must be auto-assigned each call");
     }
@@ -4566,20 +4852,12 @@ mod tests {
             lease: Some(lease.id),
             prev_kv: false,
         });
-        let before = store
-            .leases
-            .get(&lease.id)
-            .map(|l| l.granted_at)
-            .unwrap();
+        let before = store.leases.get(&lease.id).map(|l| l.granted_at).unwrap();
         std::thread::sleep(std::time::Duration::from_millis(10));
         store
             .lease_keepalive(&LeaseKeepAliveRequest { id: lease.id })
             .unwrap();
-        let after = store
-            .leases
-            .get(&lease.id)
-            .map(|l| l.granted_at)
-            .unwrap();
+        let after = store.leases.get(&lease.id).map(|l| l.granted_at).unwrap();
         assert!(after > before, "keepalive must advance granted_at");
     }
 
@@ -4705,8 +4983,14 @@ mod tests {
 
         let ea = ra.try_recv().unwrap();
         let eb = rb.try_recv().unwrap();
-        assert!(ea.kv.key_str().starts_with(&format!("/tenants/{}/", tenant_a)));
-        assert!(eb.kv.key_str().starts_with(&format!("/tenants/{}/", tenant_b)));
+        assert!(ea
+            .kv
+            .key_str()
+            .starts_with(&format!("/tenants/{}/", tenant_a)));
+        assert!(eb
+            .kv
+            .key_str()
+            .starts_with(&format!("/tenants/{}/", tenant_b)));
         // Each inbox saw exactly one event: cross-tenant traffic was filtered.
         assert!(ra.try_recv().is_err());
         assert!(rb.try_recv().is_err());
@@ -4748,7 +5032,10 @@ mod tests {
         });
 
         // Exact saw only "exact"; prefix saw both.
-        assert_eq!(r_exact.try_recv().unwrap().kv.key_str(), tk(tenant_id, "exact"));
+        assert_eq!(
+            r_exact.try_recv().unwrap().kv.key_str(),
+            tk(tenant_id, "exact")
+        );
         assert!(r_exact.try_recv().is_err());
 
         let mut prefix_keys = vec![
@@ -4756,7 +5043,10 @@ mod tests {
             r_prefix.try_recv().unwrap().kv.key_str(),
         ];
         prefix_keys.sort();
-        assert_eq!(prefix_keys, vec![tk(tenant_id, "exact"), tk(tenant_id, "other")]);
+        assert_eq!(
+            prefix_keys,
+            vec![tk(tenant_id, "exact"), tk(tenant_id, "other")]
+        );
     }
 
     #[test]
@@ -5001,9 +5291,17 @@ mod tests {
         for v in 6..10 {
             pk_put(&store, &key, &format!("v{}", v));
         }
-        let revs_before = store.key_index.get(key.as_bytes()).map(|r| r.len()).unwrap();
+        let revs_before = store
+            .key_index
+            .get(key.as_bytes())
+            .map(|r| r.len())
+            .unwrap();
         store.compact_v2(mid).unwrap();
-        let revs_after = store.key_index.get(key.as_bytes()).map(|r| r.len()).unwrap();
+        let revs_after = store
+            .key_index
+            .get(key.as_bytes())
+            .map(|r| r.len())
+            .unwrap();
         // Entries strictly below `mid` are dropped (we keep the latest <= mid).
         assert!(revs_after < revs_before);
         assert!(revs_after >= 1, "must keep latest <= compacted rev");
@@ -5022,14 +5320,16 @@ mod tests {
         // Compact at revision strictly above r1 — v1 is still the head <= r1 so
         // a read at r1 (now == compacted_revision so still allowed) works.
         store.compact_v2(r1).unwrap();
-        let resp = store.range(&RangeRequest {
-            key: key.clone(),
-            range_end: None,
-            limit: None,
-            revision: Some(r1),
-            keys_only: false,
-            count_only: false,
-        }).unwrap();
+        let resp = store
+            .range(&RangeRequest {
+                key: key.clone(),
+                range_end: None,
+                limit: None,
+                revision: Some(r1),
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert_eq!(resp.kvs.len(), 1);
         assert_eq!(resp.kvs[0].value_str(), "v1");
     }
@@ -5057,10 +5357,16 @@ mod tests {
         pk_put(&store, &key, "v2");
         store.compact_v2(r1).unwrap();
         // Reading at r1 (== compacted) is still permitted.
-        let resp = store.range(&RangeRequest {
-            key: key.clone(), range_end: None, limit: None,
-            revision: Some(r1), keys_only: false, count_only: false,
-        }).unwrap();
+        let resp = store
+            .range(&RangeRequest {
+                key: key.clone(),
+                range_end: None,
+                limit: None,
+                revision: Some(r1),
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert_eq!(resp.kvs[0].value_str(), "v1");
     }
 
@@ -5087,8 +5393,12 @@ mod tests {
         let cur = store.current_revision();
         store.compact_v2(cur).unwrap();
         let err = store.range(&RangeRequest {
-            key, range_end: None, limit: None,
-            revision: Some(cur - 1), keys_only: false, count_only: false,
+            key,
+            range_end: None,
+            limit: None,
+            revision: Some(cur - 1),
+            keys_only: false,
+            count_only: false,
         });
         assert!(matches!(err, Err(EtcdError::RevisionCompacted { .. })));
     }
@@ -5114,7 +5424,11 @@ mod tests {
         let store = KvStore::new();
         // Seed enough data to span more than one chunk.
         for i in 0..200 {
-            pk_put(&store, &tk(tenant_id, &format!("k{:04}", i)), &"x".repeat(256));
+            pk_put(
+                &store,
+                &tk(tenant_id, &format!("k{:04}", i)),
+                &"x".repeat(256),
+            );
         }
         let chunks = store.snapshot_stream();
         assert!(chunks.len() >= 2, "large state should span ≥2 chunks");
@@ -5158,7 +5472,10 @@ mod tests {
         let store = KvStore::new();
         pk_put(&store, &tk(tenant_id, "k"), "v");
         store
-            .lease_grant_v2(&LeaseGrantRequest { ttl: 60, id: Some(123) })
+            .lease_grant_v2(&LeaseGrantRequest {
+                ttl: 60,
+                id: Some(123),
+            })
             .unwrap();
         let meta = store.snapshot_meta();
         assert!(meta.size_bytes > 0);
@@ -5190,7 +5507,10 @@ mod tests {
         let mut chunks = store.snapshot_stream();
         chunks[0].checksum = "0".repeat(64);
         let err = KvStore::assemble_chunks(&chunks);
-        assert!(matches!(err, Err(EtcdError::SnapshotChecksumMismatch { .. })));
+        assert!(matches!(
+            err,
+            Err(EtcdError::SnapshotChecksumMismatch { .. })
+        ));
     }
 
     #[test]
@@ -5233,7 +5553,10 @@ mod tests {
 
         let dst = KvStore::new();
         let err = dst.restore_snapshot(&blob, &"0".repeat(64));
-        assert!(matches!(err, Err(EtcdError::SnapshotChecksumMismatch { .. })));
+        assert!(matches!(
+            err,
+            Err(EtcdError::SnapshotChecksumMismatch { .. })
+        ));
     }
 
     #[test]
@@ -5261,8 +5584,11 @@ mod tests {
         let tenant_id = "snap-011";
         let src = KvStore::new();
         pk_put(&src, &tk(tenant_id, "k"), "v");
-        src.lease_grant_v2(&LeaseGrantRequest { ttl: 60, id: Some(77) })
-            .unwrap();
+        src.lease_grant_v2(&LeaseGrantRequest {
+            ttl: 60,
+            id: Some(77),
+        })
+        .unwrap();
         let extra = add_member(&src, "http://extra:2380", false);
 
         let chunks = src.snapshot_stream();
@@ -5346,7 +5672,11 @@ mod tests {
         let store = KvStore::new();
         // Seed enough to span > 1 chunk.
         for i in 0..200 {
-            pk_put(&store, &dt(tenant_id, &format!("k{:04}", i)), &"x".repeat(256));
+            pk_put(
+                &store,
+                &dt(tenant_id, &format!("k{:04}", i)),
+                &"x".repeat(256),
+            );
         }
         let (id, _meta, state) = store.snapshot_sender_open("c");
         let mut total = 0usize;
@@ -5478,7 +5808,10 @@ mod tests {
         let tenant_id = "lex-003";
         let store = Arc::new(KvStore::new());
         let live = store
-            .lease_grant_v2(&LeaseGrantRequest { ttl: 3600, id: None })
+            .lease_grant_v2(&LeaseGrantRequest {
+                ttl: 3600,
+                id: None,
+            })
             .unwrap();
         store.put(&PutRequest {
             key: dt(tenant_id, "k"),
@@ -5573,7 +5906,11 @@ mod tests {
         });
         assert!(!promoted);
         assert_eq!(store.raft_role(), RaftRole::Follower);
-        assert_eq!(store.current_term(), term_before, "term must not bump on failed pre-vote");
+        assert_eq!(
+            store.current_term(),
+            term_before,
+            "term must not bump on failed pre-vote"
+        );
     }
 
     // ── Leader lease ──────────────────────────────────────────────────
@@ -5661,14 +5998,19 @@ mod tests {
         store.set_raft_role(RaftRole::Leader);
         store.refresh_leader_lease();
         pk_put(&store, &dt(tenant_id, "k"), "v");
-        let resp = store.linearizable_read(
-            &RangeRequest {
-                key: dt(tenant_id, "k"),
-                range_end: None, limit: None, revision: None,
-                keys_only: false, count_only: false,
-            },
-            READ_INDEX_TIMEOUT_MS,
-        ).unwrap();
+        let resp = store
+            .linearizable_read(
+                &RangeRequest {
+                    key: dt(tenant_id, "k"),
+                    range_end: None,
+                    limit: None,
+                    revision: None,
+                    keys_only: false,
+                    count_only: false,
+                },
+                READ_INDEX_TIMEOUT_MS,
+            )
+            .unwrap();
         assert_eq!(resp.kvs[0].value_str(), "v");
     }
 
@@ -5689,8 +6031,11 @@ mod tests {
         let err = store.linearizable_read(
             &RangeRequest {
                 key: dt(tenant_id, "k"),
-                range_end: None, limit: None, revision: None,
-                keys_only: false, count_only: false,
+                range_end: None,
+                limit: None,
+                revision: None,
+                keys_only: false,
+                count_only: false,
             },
             READ_INDEX_TIMEOUT_MS,
         );
@@ -5778,13 +6123,15 @@ mod tests {
         let tenant_id = "alj-002";
         let store = KvStore::new();
         pk_put(&store, &dt(tenant_id, "k"), "v");
-        store.enter_joint(&EnterJointRequest {
-            adds: vec![MemberAddRequest {
-                peer_ur_ls: vec!["http://m2:2380".into()],
-                is_learner: false,
-            }],
-            removes: vec![],
-        }).unwrap();
+        store
+            .enter_joint(&EnterJointRequest {
+                adds: vec![MemberAddRequest {
+                    peer_ur_ls: vec!["http://m2:2380".into()],
+                    is_learner: false,
+                }],
+                removes: vec![],
+            })
+            .unwrap();
         store.arm_auto_leave_joint(100);
         store.advance_commit_index(50);
         assert!(store.current_joint().is_some());
@@ -5797,13 +6144,15 @@ mod tests {
         let tenant_id = "alj-003";
         let store = KvStore::new();
         pk_put(&store, &dt(tenant_id, "k"), "v");
-        store.enter_joint(&EnterJointRequest {
-            adds: vec![MemberAddRequest {
-                peer_ur_ls: vec!["http://m2:2380".into()],
-                is_learner: false,
-            }],
-            removes: vec![],
-        }).unwrap();
+        store
+            .enter_joint(&EnterJointRequest {
+                adds: vec![MemberAddRequest {
+                    peer_ur_ls: vec!["http://m2:2380".into()],
+                    is_learner: false,
+                }],
+                removes: vec![],
+            })
+            .unwrap();
         store.arm_auto_leave_joint(100);
         store.advance_commit_index(100);
         assert!(store.current_joint().is_none());
@@ -5890,7 +6239,10 @@ mod tests {
         let store = KvStore::new();
         pk_put(&store, &dt(tenant_id, "k"), "v");
         let err = store.set_compaction_watermark(store.current_revision() + 5);
-        assert!(matches!(err, Err(EtcdError::CompactionFutureRevision { .. })));
+        assert!(matches!(
+            err,
+            Err(EtcdError::CompactionFutureRevision { .. })
+        ));
     }
 
     #[test]
@@ -6051,7 +6403,12 @@ mod tests {
     fn etcd_parity_put_response_header_revision_is_post_put() {
         let store = KvStore::new();
         let pre = store.current_revision();
-        let resp = store.put(&PutRequest { key: "h".into(), value: "v".into(), lease: None, prev_kv: false });
+        let resp = store.put(&PutRequest {
+            key: "h".into(),
+            value: "v".into(),
+            lease: None,
+            prev_kv: false,
+        });
         assert_eq!(resp.header.revision, pre + 1);
     }
 
@@ -6060,7 +6417,9 @@ mod tests {
         let store = KvStore::new();
         let r0 = store.current_revision();
         let resp = store.delete_range(&DeleteRangeRequest {
-            key: "ghost".into(), range_end: None, prev_kv: false,
+            key: "ghost".into(),
+            range_end: None,
+            prev_kv: false,
         });
         assert!(resp.header.revision >= r0);
     }
@@ -6068,9 +6427,32 @@ mod tests {
     #[test]
     fn etcd_parity_revision_strictly_increases_across_kv_ops() {
         let store = KvStore::new();
-        let r1 = store.put(&PutRequest { key: "a".into(), value: "1".into(), lease: None, prev_kv: false }).header.revision;
-        let r2 = store.put(&PutRequest { key: "a".into(), value: "2".into(), lease: None, prev_kv: false }).header.revision;
-        let r3 = store.delete_range(&DeleteRangeRequest { key: "a".into(), range_end: None, prev_kv: false }).header.revision;
+        let r1 = store
+            .put(&PutRequest {
+                key: "a".into(),
+                value: "1".into(),
+                lease: None,
+                prev_kv: false,
+            })
+            .header
+            .revision;
+        let r2 = store
+            .put(&PutRequest {
+                key: "a".into(),
+                value: "2".into(),
+                lease: None,
+                prev_kv: false,
+            })
+            .header
+            .revision;
+        let r3 = store
+            .delete_range(&DeleteRangeRequest {
+                key: "a".into(),
+                range_end: None,
+                prev_kv: false,
+            })
+            .header
+            .revision;
         assert!(r2 > r1);
         assert!(r3 > r2);
     }
@@ -6078,8 +6460,24 @@ mod tests {
     #[test]
     fn etcd_parity_put_creates_then_updates_records_distinct_revs() {
         let store = KvStore::new();
-        let r1 = store.put(&PutRequest { key: "k".into(), value: "v1".into(), lease: None, prev_kv: false }).header.revision;
-        let r2 = store.put(&PutRequest { key: "k".into(), value: "v2".into(), lease: None, prev_kv: false }).header.revision;
+        let r1 = store
+            .put(&PutRequest {
+                key: "k".into(),
+                value: "v1".into(),
+                lease: None,
+                prev_kv: false,
+            })
+            .header
+            .revision;
+        let r2 = store
+            .put(&PutRequest {
+                key: "k".into(),
+                value: "v2".into(),
+                lease: None,
+                prev_kv: false,
+            })
+            .header
+            .revision;
         let kv = pk_get(&store, "k").unwrap();
         assert_eq!(kv.create_revision, r1);
         assert_eq!(kv.mod_revision, r2);
@@ -6091,10 +6489,16 @@ mod tests {
     #[test]
     fn etcd_parity_range_at_future_revision_returns_empty_for_unknown_key() {
         let store = KvStore::new();
-        let resp = store.range(&RangeRequest {
-            key: "ghost".into(), range_end: None, limit: None,
-            revision: Some(99999), keys_only: false, count_only: false,
-        }).unwrap();
+        let resp = store
+            .range(&RangeRequest {
+                key: "ghost".into(),
+                range_end: None,
+                limit: None,
+                revision: Some(99999),
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert!(resp.kvs.is_empty());
     }
 
@@ -6103,10 +6507,16 @@ mod tests {
         let store = KvStore::new();
         pk_put(&store, "single", "v");
         pk_put(&store, "singleton", "x");
-        let resp = store.range(&RangeRequest {
-            key: "single".into(), range_end: None, limit: None,
-            revision: None, keys_only: false, count_only: false,
-        }).unwrap();
+        let resp = store
+            .range(&RangeRequest {
+                key: "single".into(),
+                range_end: None,
+                limit: None,
+                revision: None,
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert_eq!(resp.kvs.len(), 1);
         assert_eq!(resp.kvs[0].key_str(), "single");
     }
@@ -6114,11 +6524,19 @@ mod tests {
     #[test]
     fn etcd_parity_range_limit_zero_means_no_limit() {
         let store = KvStore::new();
-        for i in 0..5 { pk_put(&store, &format!("/u/{}", i), "v"); }
-        let resp = store.range(&RangeRequest {
-            key: "/u/".into(), range_end: Some("/u0".into()),
-            limit: None, revision: None, keys_only: false, count_only: false,
-        }).unwrap();
+        for i in 0..5 {
+            pk_put(&store, &format!("/u/{}", i), "v");
+        }
+        let resp = store
+            .range(&RangeRequest {
+                key: "/u/".into(),
+                range_end: Some("/u0".into()),
+                limit: None,
+                revision: None,
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert_eq!(resp.kvs.len(), 5);
         assert!(!resp.more);
     }
@@ -6126,13 +6544,22 @@ mod tests {
     #[test]
     fn etcd_parity_range_keys_returned_sorted_lexicographically() {
         let store = KvStore::new();
-        for k in &["zeta", "alpha", "mu", "beta"] { pk_put(&store, k, "v"); }
-        let resp = store.range(&RangeRequest {
-            key: "a".into(), range_end: Some("zz".into()),
-            limit: None, revision: None, keys_only: false, count_only: false,
-        }).unwrap();
+        for k in &["zeta", "alpha", "mu", "beta"] {
+            pk_put(&store, k, "v");
+        }
+        let resp = store
+            .range(&RangeRequest {
+                key: "a".into(),
+                range_end: Some("zz".into()),
+                limit: None,
+                revision: None,
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         let keys: Vec<String> = resp.kvs.iter().map(|k| k.key_str()).collect();
-        let mut sorted = keys.clone(); sorted.sort();
+        let mut sorted = keys.clone();
+        sorted.sort();
         assert_eq!(keys, sorted);
     }
 
@@ -6144,9 +6571,24 @@ mod tests {
         let resp = store.txn(&TxnRequest {
             compare: vec![],
             success: vec![
-                RequestOp::Put(PutRequest { key: "a".into(), value: "1".into(), lease: None, prev_kv: false }),
-                RequestOp::Put(PutRequest { key: "b".into(), value: "2".into(), lease: None, prev_kv: false }),
-                RequestOp::Put(PutRequest { key: "c".into(), value: "3".into(), lease: None, prev_kv: false }),
+                RequestOp::Put(PutRequest {
+                    key: "a".into(),
+                    value: "1".into(),
+                    lease: None,
+                    prev_kv: false,
+                }),
+                RequestOp::Put(PutRequest {
+                    key: "b".into(),
+                    value: "2".into(),
+                    lease: None,
+                    prev_kv: false,
+                }),
+                RequestOp::Put(PutRequest {
+                    key: "c".into(),
+                    value: "3".into(),
+                    lease: None,
+                    prev_kv: false,
+                }),
             ],
             failure: vec![],
         });
@@ -6163,8 +6605,17 @@ mod tests {
         let resp = store.txn(&TxnRequest {
             compare: vec![],
             success: vec![
-                RequestOp::Put(PutRequest { key: "new".into(), value: "added".into(), lease: None, prev_kv: false }),
-                RequestOp::DeleteRange(DeleteRangeRequest { key: "old".into(), range_end: None, prev_kv: false }),
+                RequestOp::Put(PutRequest {
+                    key: "new".into(),
+                    value: "added".into(),
+                    lease: None,
+                    prev_kv: false,
+                }),
+                RequestOp::DeleteRange(DeleteRangeRequest {
+                    key: "old".into(),
+                    range_end: None,
+                    prev_kv: false,
+                }),
             ],
             failure: vec![],
         });
@@ -6179,11 +6630,25 @@ mod tests {
         pk_put(&store, "k", "real");
         let resp = store.txn(&TxnRequest {
             compare: vec![Compare {
-                key: "k".into(), target: CompareTarget::Value, result: CompareResult::Equal,
-                value: Some("expected".into()), version: None, mod_revision: None,
+                key: "k".into(),
+                target: CompareTarget::Value,
+                result: CompareResult::Equal,
+                value: Some("expected".into()),
+                version: None,
+                mod_revision: None,
             }],
-            success: vec![RequestOp::Put(PutRequest { key: "succ".into(), value: "ok".into(), lease: None, prev_kv: false })],
-            failure: vec![RequestOp::Put(PutRequest { key: "fail".into(), value: "ran".into(), lease: None, prev_kv: false })],
+            success: vec![RequestOp::Put(PutRequest {
+                key: "succ".into(),
+                value: "ok".into(),
+                lease: None,
+                prev_kv: false,
+            })],
+            failure: vec![RequestOp::Put(PutRequest {
+                key: "fail".into(),
+                value: "ran".into(),
+                lease: None,
+                prev_kv: false,
+            })],
         });
         assert!(!resp.succeeded);
         assert!(pk_get(&store, "succ").is_none());
@@ -6196,11 +6661,25 @@ mod tests {
         pk_put(&store, "k", "v");
         let resp = store.txn(&TxnRequest {
             compare: vec![Compare {
-                key: "k".into(), target: CompareTarget::Value, result: CompareResult::Equal,
-                value: Some("v".into()), version: None, mod_revision: None,
+                key: "k".into(),
+                target: CompareTarget::Value,
+                result: CompareResult::Equal,
+                value: Some("v".into()),
+                version: None,
+                mod_revision: None,
             }],
-            success: vec![RequestOp::Put(PutRequest { key: "out".into(), value: "from_success".into(), lease: None, prev_kv: false })],
-            failure: vec![RequestOp::Put(PutRequest { key: "out".into(), value: "from_failure".into(), lease: None, prev_kv: false })],
+            success: vec![RequestOp::Put(PutRequest {
+                key: "out".into(),
+                value: "from_success".into(),
+                lease: None,
+                prev_kv: false,
+            })],
+            failure: vec![RequestOp::Put(PutRequest {
+                key: "out".into(),
+                value: "from_failure".into(),
+                lease: None,
+                prev_kv: false,
+            })],
         });
         assert!(resp.succeeded);
         assert_eq!(pk_get(&store, "out").unwrap().value_str(), "from_success");
@@ -6212,10 +6691,19 @@ mod tests {
         pk_put(&store, "k", "abc");
         let resp = store.txn(&TxnRequest {
             compare: vec![Compare {
-                key: "k".into(), target: CompareTarget::Value, result: CompareResult::NotEqual,
-                value: Some("xyz".into()), version: None, mod_revision: None,
+                key: "k".into(),
+                target: CompareTarget::Value,
+                result: CompareResult::NotEqual,
+                value: Some("xyz".into()),
+                version: None,
+                mod_revision: None,
             }],
-            success: vec![RequestOp::Put(PutRequest { key: "out".into(), value: "neq".into(), lease: None, prev_kv: false })],
+            success: vec![RequestOp::Put(PutRequest {
+                key: "out".into(),
+                value: "neq".into(),
+                lease: None,
+                prev_kv: false,
+            })],
             failure: vec![],
         });
         assert!(resp.succeeded);
@@ -6226,10 +6714,19 @@ mod tests {
         let store = KvStore::new();
         let resp = store.txn(&TxnRequest {
             compare: vec![Compare {
-                key: "missing".into(), target: CompareTarget::Version, result: CompareResult::Equal,
-                value: None, version: Some(0), mod_revision: None,
+                key: "missing".into(),
+                target: CompareTarget::Version,
+                result: CompareResult::Equal,
+                value: None,
+                version: Some(0),
+                mod_revision: None,
             }],
-            success: vec![RequestOp::Put(PutRequest { key: "missing".into(), value: "created".into(), lease: None, prev_kv: false })],
+            success: vec![RequestOp::Put(PutRequest {
+                key: "missing".into(),
+                value: "created".into(),
+                lease: None,
+                prev_kv: false,
+            })],
             failure: vec![],
         });
         assert!(resp.succeeded);
@@ -6240,7 +6737,12 @@ mod tests {
         use std::sync::Arc;
         use std::thread;
         let store = Arc::new(KvStore::new());
-        store.put(&PutRequest { key: "ctr".into(), value: "0".into(), lease: None, prev_kv: false });
+        store.put(&PutRequest {
+            key: "ctr".into(),
+            value: "0".into(),
+            lease: None,
+            prev_kv: false,
+        });
         let mut handles = vec![];
         let success_counter = Arc::new(std::sync::atomic::AtomicU64::new(0));
         for _ in 0..8 {
@@ -6249,16 +6751,29 @@ mod tests {
             handles.push(thread::spawn(move || {
                 let resp = s.txn(&TxnRequest {
                     compare: vec![Compare {
-                        key: "ctr".into(), target: CompareTarget::Value, result: CompareResult::Equal,
-                        value: Some("0".into()), version: None, mod_revision: None,
+                        key: "ctr".into(),
+                        target: CompareTarget::Value,
+                        result: CompareResult::Equal,
+                        value: Some("0".into()),
+                        version: None,
+                        mod_revision: None,
                     }],
-                    success: vec![RequestOp::Put(PutRequest { key: "ctr".into(), value: "1".into(), lease: None, prev_kv: false })],
+                    success: vec![RequestOp::Put(PutRequest {
+                        key: "ctr".into(),
+                        value: "1".into(),
+                        lease: None,
+                        prev_kv: false,
+                    })],
                     failure: vec![],
                 });
-                if resp.succeeded { cnt.fetch_add(1, std::sync::atomic::Ordering::SeqCst); }
+                if resp.succeeded {
+                    cnt.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                }
             }));
         }
-        for h in handles { h.join().unwrap(); }
+        for h in handles {
+            h.join().unwrap();
+        }
         assert_eq!(success_counter.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 
@@ -6272,8 +6787,11 @@ mod tests {
         pk_put(&store, "/n/b", "2");
         pk_put(&store, "/n/c", "3");
         let resp = store.watch_create(&WatchCreateRequest {
-            key: "/n/".into(), range_end: Some("/n0".into()),
-            start_revision: Some(start + 1), progress_notify: false, prev_kv: false,
+            key: "/n/".into(),
+            range_end: Some("/n0".into()),
+            start_revision: Some(start + 1),
+            progress_notify: false,
+            prev_kv: false,
         });
         assert_eq!(resp.events.len(), 2);
     }
@@ -6287,8 +6805,11 @@ mod tests {
         pk_put(&store, "/in/b", "3");
         pk_put(&store, "/out/b", "4");
         let resp = store.watch_create(&WatchCreateRequest {
-            key: "/in/".into(), range_end: Some("/in0".into()),
-            start_revision: Some(start + 1), progress_notify: false, prev_kv: false,
+            key: "/in/".into(),
+            range_end: Some("/in0".into()),
+            start_revision: Some(start + 1),
+            progress_notify: false,
+            prev_kv: false,
         });
         let keys: Vec<String> = resp.events.iter().map(|e| e.kv.key_str()).collect();
         assert!(keys.contains(&"/in/b".to_string()));
@@ -6302,8 +6823,11 @@ mod tests {
         pk_put(&store, "exact", "v1");
         pk_put(&store, "exactly", "v2");
         let resp = store.watch_create(&WatchCreateRequest {
-            key: "exact".into(), range_end: None,
-            start_revision: Some(start + 1), progress_notify: false, prev_kv: false,
+            key: "exact".into(),
+            range_end: None,
+            start_revision: Some(start + 1),
+            progress_notify: false,
+            prev_kv: false,
         });
         let matched: Vec<String> = resp.events.iter().map(|e| e.kv.key_str()).collect();
         assert_eq!(matched, vec!["exact".to_string()]);
@@ -6315,9 +6839,17 @@ mod tests {
         let mut ids = std::collections::HashSet::new();
         for _ in 0..10 {
             let r = store.watch_create(&WatchCreateRequest {
-                key: "k".into(), range_end: None, start_revision: None, progress_notify: false, prev_kv: false,
+                key: "k".into(),
+                range_end: None,
+                start_revision: None,
+                progress_notify: false,
+                prev_kv: false,
             });
-            assert!(ids.insert(r.watch_id), "watch id {} already issued", r.watch_id);
+            assert!(
+                ids.insert(r.watch_id),
+                "watch id {} already issued",
+                r.watch_id
+            );
         }
     }
 
@@ -6326,10 +6858,17 @@ mod tests {
         let store = KvStore::new();
         pk_put(&store, "k", "v");
         let start = store.current_revision();
-        store.delete_range(&DeleteRangeRequest { key: "k".into(), range_end: None, prev_kv: false });
+        store.delete_range(&DeleteRangeRequest {
+            key: "k".into(),
+            range_end: None,
+            prev_kv: false,
+        });
         let resp = store.watch_create(&WatchCreateRequest {
-            key: "k".into(), range_end: None,
-            start_revision: Some(start + 1), progress_notify: false, prev_kv: false,
+            key: "k".into(),
+            range_end: None,
+            start_revision: Some(start + 1),
+            progress_notify: false,
+            prev_kv: false,
         });
         assert_eq!(resp.events.len(), 1);
         assert!(matches!(resp.events[0].event_type, EventType::Delete));
@@ -6344,10 +6883,15 @@ mod tests {
         pk_put(&store, "k", "v3");
         store.compact(mid + 1);
         let resp = store.watch_create(&WatchCreateRequest {
-            key: "k".into(), range_end: None,
-            start_revision: Some(1), progress_notify: false, prev_kv: false,
+            key: "k".into(),
+            range_end: None,
+            start_revision: Some(1),
+            progress_notify: false,
+            prev_kv: false,
         });
-        for e in &resp.events { assert_eq!(e.kv.value_str(), "v3"); }
+        for e in &resp.events {
+            assert_eq!(e.kv.value_str(), "v3");
+        }
     }
 
     #[test]
@@ -6355,8 +6899,11 @@ mod tests {
         let store = KvStore::new();
         pk_put(&store, "k", "v1");
         let resp = store.watch_create(&WatchCreateRequest {
-            key: "k".into(), range_end: None,
-            start_revision: None, progress_notify: false, prev_kv: false,
+            key: "k".into(),
+            range_end: None,
+            start_revision: None,
+            progress_notify: false,
+            prev_kv: false,
         });
         assert!(resp.events.is_empty());
         assert!(resp.created);
@@ -6367,9 +6914,17 @@ mod tests {
     #[test]
     fn etcd_parity_lease_grant_with_explicit_id_uses_id() {
         let store = KvStore::new();
-        let resp = store.lease_grant(&LeaseGrantRequest { ttl: 30, id: Some(7777) });
+        let resp = store.lease_grant(&LeaseGrantRequest {
+            ttl: 30,
+            id: Some(7777),
+        });
         assert_eq!(resp.id, 7777);
-        let ttl = store.lease_timetolive(&LeaseTTLRequest { id: 7777, keys: false }).unwrap();
+        let ttl = store
+            .lease_timetolive(&LeaseTTLRequest {
+                id: 7777,
+                keys: false,
+            })
+            .unwrap();
         assert_eq!(ttl.granted_ttl, 30);
     }
 
@@ -6391,8 +6946,18 @@ mod tests {
     fn etcd_parity_lease_timetolive_keys_excluded_when_not_requested() {
         let store = KvStore::new();
         let lease = store.lease_grant(&LeaseGrantRequest { ttl: 60, id: None });
-        store.put(&PutRequest { key: "k1".into(), value: "v".into(), lease: Some(lease.id), prev_kv: false });
-        let resp = store.lease_timetolive(&LeaseTTLRequest { id: lease.id, keys: false }).unwrap();
+        store.put(&PutRequest {
+            key: "k1".into(),
+            value: "v".into(),
+            lease: Some(lease.id),
+            prev_kv: false,
+        });
+        let resp = store
+            .lease_timetolive(&LeaseTTLRequest {
+                id: lease.id,
+                keys: false,
+            })
+            .unwrap();
         assert!(resp.keys.is_empty());
     }
 
@@ -6400,9 +6965,24 @@ mod tests {
     fn etcd_parity_lease_timetolive_keys_included_when_requested() {
         let store = KvStore::new();
         let lease = store.lease_grant(&LeaseGrantRequest { ttl: 60, id: None });
-        store.put(&PutRequest { key: "k1".into(), value: "v".into(), lease: Some(lease.id), prev_kv: false });
-        store.put(&PutRequest { key: "k2".into(), value: "v".into(), lease: Some(lease.id), prev_kv: false });
-        let resp = store.lease_timetolive(&LeaseTTLRequest { id: lease.id, keys: true }).unwrap();
+        store.put(&PutRequest {
+            key: "k1".into(),
+            value: "v".into(),
+            lease: Some(lease.id),
+            prev_kv: false,
+        });
+        store.put(&PutRequest {
+            key: "k2".into(),
+            value: "v".into(),
+            lease: Some(lease.id),
+            prev_kv: false,
+        });
+        let resp = store
+            .lease_timetolive(&LeaseTTLRequest {
+                id: lease.id,
+                keys: true,
+            })
+            .unwrap();
         assert_eq!(resp.keys.len(), 2);
     }
 
@@ -6411,10 +6991,32 @@ mod tests {
         let store = KvStore::new();
         let l1 = store.lease_grant(&LeaseGrantRequest { ttl: 60, id: None });
         let l2 = store.lease_grant(&LeaseGrantRequest { ttl: 60, id: None });
-        store.put(&PutRequest { key: "k".into(), value: "v1".into(), lease: Some(l1.id), prev_kv: false });
-        store.put(&PutRequest { key: "k".into(), value: "v2".into(), lease: Some(l2.id), prev_kv: false });
-        let l1_keys = store.lease_timetolive(&LeaseTTLRequest { id: l1.id, keys: true }).unwrap().keys;
-        let l2_keys = store.lease_timetolive(&LeaseTTLRequest { id: l2.id, keys: true }).unwrap().keys;
+        store.put(&PutRequest {
+            key: "k".into(),
+            value: "v1".into(),
+            lease: Some(l1.id),
+            prev_kv: false,
+        });
+        store.put(&PutRequest {
+            key: "k".into(),
+            value: "v2".into(),
+            lease: Some(l2.id),
+            prev_kv: false,
+        });
+        let l1_keys = store
+            .lease_timetolive(&LeaseTTLRequest {
+                id: l1.id,
+                keys: true,
+            })
+            .unwrap()
+            .keys;
+        let l2_keys = store
+            .lease_timetolive(&LeaseTTLRequest {
+                id: l2.id,
+                keys: true,
+            })
+            .unwrap()
+            .keys;
         assert!(l1_keys.is_empty());
         assert_eq!(l2_keys.len(), 1);
     }
@@ -6423,8 +7025,17 @@ mod tests {
     fn etcd_parity_lease_revoke_does_not_panic_on_missing_keys() {
         let store = KvStore::new();
         let lease = store.lease_grant(&LeaseGrantRequest { ttl: 60, id: None });
-        store.put(&PutRequest { key: "k".into(), value: "v".into(), lease: Some(lease.id), prev_kv: false });
-        store.delete_range(&DeleteRangeRequest { key: "k".into(), range_end: None, prev_kv: false });
+        store.put(&PutRequest {
+            key: "k".into(),
+            value: "v".into(),
+            lease: Some(lease.id),
+            prev_kv: false,
+        });
+        store.delete_range(&DeleteRangeRequest {
+            key: "k".into(),
+            range_end: None,
+            prev_kv: false,
+        });
         assert!(store.lease_revoke(lease.id).is_ok());
     }
 
@@ -6445,9 +7056,20 @@ mod tests {
     #[test]
     fn etcd_parity_auth_token_invalidated_after_disable_then_reenable() {
         let store = KvStore::new();
-        store.user_add(&AuthUserAddRequest { name: "u".into(), password: "p1".into() }).unwrap();
+        store
+            .user_add(&AuthUserAddRequest {
+                name: "u".into(),
+                password: "p1".into(),
+            })
+            .unwrap();
         store.auth_enable().unwrap();
-        let t1 = store.authenticate(&AuthenticateRequest { name: "u".into(), password: "p1".into() }).unwrap().token;
+        let t1 = store
+            .authenticate(&AuthenticateRequest {
+                name: "u".into(),
+                password: "p1".into(),
+            })
+            .unwrap()
+            .token;
         store.auth_disable().unwrap();
         store.auth_enable().unwrap();
         let denied = store.check_auth_token(Some(&t1), b"k", PermType::Write);
@@ -6459,7 +7081,11 @@ mod tests {
         let store = KvStore::new();
         let r = store.role_grant_permission(&AuthRoleGrantPermissionRequest {
             name: "ghost_role".into(),
-            perm: Permission { perm_type: PermType::Read, key: "k".into(), range_end: None },
+            perm: Permission {
+                perm_type: PermType::Read,
+                key: "k".into(),
+                range_end: None,
+            },
         });
         assert!(matches!(r, Err(EtcdError::RoleNotFound(_))));
     }
@@ -6467,25 +7093,42 @@ mod tests {
     #[test]
     fn etcd_parity_auth_user_grant_role_to_unknown_role_errors() {
         let store = KvStore::new();
-        store.user_add(&AuthUserAddRequest { name: "u".into(), password: "p".into() }).unwrap();
-        let r = store.user_grant_role(&AuthUserGrantRoleRequest { user: "u".into(), role: "missing".into() });
+        store
+            .user_add(&AuthUserAddRequest {
+                name: "u".into(),
+                password: "p".into(),
+            })
+            .unwrap();
+        let r = store.user_grant_role(&AuthUserGrantRoleRequest {
+            user: "u".into(),
+            role: "missing".into(),
+        });
         assert!(matches!(r, Err(EtcdError::RoleNotFound(_))));
     }
 
     #[test]
     fn etcd_parity_auth_user_grant_role_to_unknown_user_errors() {
         let store = KvStore::new();
-        store.role_add(&AuthRoleAddRequest { name: "r".into() }).unwrap();
-        let res = store.user_grant_role(&AuthUserGrantRoleRequest { user: "missing".into(), role: "r".into() });
+        store
+            .role_add(&AuthRoleAddRequest { name: "r".into() })
+            .unwrap();
+        let res = store.user_grant_role(&AuthUserGrantRoleRequest {
+            user: "missing".into(),
+            role: "r".into(),
+        });
         assert!(matches!(res, Err(EtcdError::UserNotFound(_))));
     }
 
     #[test]
     fn etcd_parity_auth_role_revoke_permission_unknown_returns_error() {
         let store = KvStore::new();
-        store.role_add(&AuthRoleAddRequest { name: "r".into() }).unwrap();
+        store
+            .role_add(&AuthRoleAddRequest { name: "r".into() })
+            .unwrap();
         let res = store.role_revoke_permission(&AuthRoleRevokePermissionRequest {
-            role: "r".into(), key: "k".into(), range_end: None,
+            role: "r".into(),
+            key: "k".into(),
+            range_end: None,
         });
         assert!(matches!(res, Err(EtcdError::PermissionAlreadyGranted)));
     }
@@ -6493,14 +7136,32 @@ mod tests {
     #[test]
     fn etcd_parity_auth_role_grant_permission_replaces_existing_for_same_key() {
         let store = KvStore::new();
-        store.role_add(&AuthRoleAddRequest { name: "r".into() }).unwrap();
-        store.role_grant_permission(&AuthRoleGrantPermissionRequest {
-            name: "r".into(), perm: Permission { perm_type: PermType::Read, key: "k".into(), range_end: None },
-        }).unwrap();
-        store.role_grant_permission(&AuthRoleGrantPermissionRequest {
-            name: "r".into(), perm: Permission { perm_type: PermType::Write, key: "k".into(), range_end: None },
-        }).unwrap();
-        let role = store.role_get(&AuthRoleGetRequest { role: "r".into() }).unwrap();
+        store
+            .role_add(&AuthRoleAddRequest { name: "r".into() })
+            .unwrap();
+        store
+            .role_grant_permission(&AuthRoleGrantPermissionRequest {
+                name: "r".into(),
+                perm: Permission {
+                    perm_type: PermType::Read,
+                    key: "k".into(),
+                    range_end: None,
+                },
+            })
+            .unwrap();
+        store
+            .role_grant_permission(&AuthRoleGrantPermissionRequest {
+                name: "r".into(),
+                perm: Permission {
+                    perm_type: PermType::Write,
+                    key: "k".into(),
+                    range_end: None,
+                },
+            })
+            .unwrap();
+        let role = store
+            .role_get(&AuthRoleGetRequest { role: "r".into() })
+            .unwrap();
         assert_eq!(role.perm.len(), 1);
         assert_eq!(role.perm[0].perm_type, PermType::Write);
     }
@@ -6508,40 +7169,86 @@ mod tests {
     #[test]
     fn etcd_parity_auth_readwrite_permission_covers_both_read_and_write() {
         let store = KvStore::new();
-        store.user_add(&AuthUserAddRequest { name: "rw".into(), password: "p".into() }).unwrap();
-        store.role_add(&AuthRoleAddRequest { name: "rw_role".into() }).unwrap();
-        store.role_grant_permission(&AuthRoleGrantPermissionRequest {
-            name: "rw_role".into(),
-            perm: Permission { perm_type: PermType::Readwrite, key: "/d/".into(), range_end: Some("/d0".into()) },
-        }).unwrap();
-        store.user_grant_role(&AuthUserGrantRoleRequest { user: "rw".into(), role: "rw_role".into() }).unwrap();
+        store
+            .user_add(&AuthUserAddRequest {
+                name: "rw".into(),
+                password: "p".into(),
+            })
+            .unwrap();
+        store
+            .role_add(&AuthRoleAddRequest {
+                name: "rw_role".into(),
+            })
+            .unwrap();
+        store
+            .role_grant_permission(&AuthRoleGrantPermissionRequest {
+                name: "rw_role".into(),
+                perm: Permission {
+                    perm_type: PermType::Readwrite,
+                    key: "/d/".into(),
+                    range_end: Some("/d0".into()),
+                },
+            })
+            .unwrap();
+        store
+            .user_grant_role(&AuthUserGrantRoleRequest {
+                user: "rw".into(),
+                role: "rw_role".into(),
+            })
+            .unwrap();
         store.auth_enable().unwrap();
-        let auth = store.authenticate(&AuthenticateRequest { name: "rw".into(), password: "p".into() }).unwrap();
-        assert!(store.check_auth_token(Some(&auth.token), b"/d/x", PermType::Read).is_ok());
-        assert!(store.check_auth_token(Some(&auth.token), b"/d/x", PermType::Write).is_ok());
+        let auth = store
+            .authenticate(&AuthenticateRequest {
+                name: "rw".into(),
+                password: "p".into(),
+            })
+            .unwrap();
+        assert!(store
+            .check_auth_token(Some(&auth.token), b"/d/x", PermType::Read)
+            .is_ok());
+        assert!(store
+            .check_auth_token(Some(&auth.token), b"/d/x", PermType::Write)
+            .is_ok());
     }
 
     #[test]
     fn etcd_parity_auth_user_changepw_invalidates_old_password() {
         let store = KvStore::new();
-        store.user_add(&AuthUserAddRequest { name: "u".into(), password: "old".into() }).unwrap();
+        store
+            .user_add(&AuthUserAddRequest {
+                name: "u".into(),
+                password: "old".into(),
+            })
+            .unwrap();
         store.auth_enable().unwrap();
-        store.user_change_password(&AuthUserChangePasswordRequest { name: "u".into(), password: "new".into() }).unwrap();
-        let bad = store.authenticate(&AuthenticateRequest { name: "u".into(), password: "old".into() });
+        store
+            .user_change_password(&AuthUserChangePasswordRequest {
+                name: "u".into(),
+                password: "new".into(),
+            })
+            .unwrap();
+        let bad = store.authenticate(&AuthenticateRequest {
+            name: "u".into(),
+            password: "old".into(),
+        });
         assert!(matches!(bad, Err(EtcdError::InvalidPassword)));
     }
 
     #[test]
     fn etcd_parity_auth_user_delete_unknown_errors() {
         let store = KvStore::new();
-        let r = store.user_delete(&AuthUserDeleteRequest { name: "ghost".into() });
+        let r = store.user_delete(&AuthUserDeleteRequest {
+            name: "ghost".into(),
+        });
         assert!(matches!(r, Err(EtcdError::UserNotFound(_))));
     }
 
     #[test]
     fn etcd_parity_auth_role_delete_unknown_errors() {
         let store = KvStore::new();
-        let r = store.role_delete(&AuthRoleDeleteRequest { role: "ghost".into() });
+        let r = store.role_delete(&AuthRoleDeleteRequest {
+            role: "ghost".into(),
+        });
         assert!(matches!(r, Err(EtcdError::RoleNotFound(_))));
     }
 
@@ -6550,17 +7257,37 @@ mod tests {
     #[test]
     fn etcd_parity_alarm_nospace_type_serialises_correctly() {
         let store = KvStore::new();
-        store.alarm(&AlarmRequest { action: AlarmAction::Activate, member_id: 1, alarm: AlarmType::Nospace });
-        let resp = store.alarm(&AlarmRequest { action: AlarmAction::Get, member_id: 0, alarm: AlarmType::None });
+        store.alarm(&AlarmRequest {
+            action: AlarmAction::Activate,
+            member_id: 1,
+            alarm: AlarmType::Nospace,
+        });
+        let resp = store.alarm(&AlarmRequest {
+            action: AlarmAction::Get,
+            member_id: 0,
+            alarm: AlarmType::None,
+        });
         assert_eq!(resp.alarms[0].alarm, AlarmType::Nospace);
     }
 
     #[test]
     fn etcd_parity_alarm_corrupt_type_can_coexist_with_nospace() {
         let store = KvStore::new();
-        store.alarm(&AlarmRequest { action: AlarmAction::Activate, member_id: 1, alarm: AlarmType::Nospace });
-        store.alarm(&AlarmRequest { action: AlarmAction::Activate, member_id: 2, alarm: AlarmType::Corrupt });
-        let resp = store.alarm(&AlarmRequest { action: AlarmAction::Get, member_id: 0, alarm: AlarmType::None });
+        store.alarm(&AlarmRequest {
+            action: AlarmAction::Activate,
+            member_id: 1,
+            alarm: AlarmType::Nospace,
+        });
+        store.alarm(&AlarmRequest {
+            action: AlarmAction::Activate,
+            member_id: 2,
+            alarm: AlarmType::Corrupt,
+        });
+        let resp = store.alarm(&AlarmRequest {
+            action: AlarmAction::Get,
+            member_id: 0,
+            alarm: AlarmType::None,
+        });
         assert_eq!(resp.alarms.len(), 2);
         let types: Vec<_> = resp.alarms.iter().map(|a| a.alarm.clone()).collect();
         assert!(types.contains(&AlarmType::Nospace));
@@ -6570,19 +7297,47 @@ mod tests {
     #[test]
     fn etcd_parity_alarm_activate_is_idempotent_per_member_type() {
         let store = KvStore::new();
-        store.alarm(&AlarmRequest { action: AlarmAction::Activate, member_id: 1, alarm: AlarmType::Nospace });
-        store.alarm(&AlarmRequest { action: AlarmAction::Activate, member_id: 1, alarm: AlarmType::Nospace });
-        let resp = store.alarm(&AlarmRequest { action: AlarmAction::Get, member_id: 0, alarm: AlarmType::None });
+        store.alarm(&AlarmRequest {
+            action: AlarmAction::Activate,
+            member_id: 1,
+            alarm: AlarmType::Nospace,
+        });
+        store.alarm(&AlarmRequest {
+            action: AlarmAction::Activate,
+            member_id: 1,
+            alarm: AlarmType::Nospace,
+        });
+        let resp = store.alarm(&AlarmRequest {
+            action: AlarmAction::Get,
+            member_id: 0,
+            alarm: AlarmType::None,
+        });
         assert_eq!(resp.alarms.len(), 1);
     }
 
     #[test]
     fn etcd_parity_alarm_deactivate_specific_alarm_keeps_others() {
         let store = KvStore::new();
-        store.alarm(&AlarmRequest { action: AlarmAction::Activate, member_id: 1, alarm: AlarmType::Nospace });
-        store.alarm(&AlarmRequest { action: AlarmAction::Activate, member_id: 1, alarm: AlarmType::Corrupt });
-        store.alarm(&AlarmRequest { action: AlarmAction::Deactivate, member_id: 1, alarm: AlarmType::Nospace });
-        let resp = store.alarm(&AlarmRequest { action: AlarmAction::Get, member_id: 0, alarm: AlarmType::None });
+        store.alarm(&AlarmRequest {
+            action: AlarmAction::Activate,
+            member_id: 1,
+            alarm: AlarmType::Nospace,
+        });
+        store.alarm(&AlarmRequest {
+            action: AlarmAction::Activate,
+            member_id: 1,
+            alarm: AlarmType::Corrupt,
+        });
+        store.alarm(&AlarmRequest {
+            action: AlarmAction::Deactivate,
+            member_id: 1,
+            alarm: AlarmType::Nospace,
+        });
+        let resp = store.alarm(&AlarmRequest {
+            action: AlarmAction::Get,
+            member_id: 0,
+            alarm: AlarmType::None,
+        });
         assert_eq!(resp.alarms.len(), 1);
         assert_eq!(resp.alarms[0].alarm, AlarmType::Corrupt);
     }
@@ -6614,7 +7369,10 @@ mod tests {
     fn etcd_parity_compact_response_carries_header() {
         let store = KvStore::new();
         pk_put(&store, "k", "v");
-        let resp = store.compaction(&CompactionRequest { revision: store.current_revision(), physical: false });
+        let resp = store.compaction(&CompactionRequest {
+            revision: store.current_revision(),
+            physical: false,
+        });
         assert_eq!(resp.header.cluster_id, 1);
         assert!(resp.header.revision > 0);
     }
@@ -6627,10 +7385,16 @@ mod tests {
         pk_put(&store, "k", "v2");
         let r2 = store.current_revision();
         store.compact(r1);
-        let resp = store.range(&RangeRequest {
-            key: "k".into(), range_end: None, limit: None,
-            revision: Some(r2), keys_only: false, count_only: false,
-        }).unwrap();
+        let resp = store
+            .range(&RangeRequest {
+                key: "k".into(),
+                range_end: None,
+                limit: None,
+                revision: Some(r2),
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert_eq!(resp.kvs[0].value_str(), "v2");
     }
 
@@ -6639,8 +7403,14 @@ mod tests {
     #[test]
     fn etcd_parity_member_add_assigns_unique_id() {
         let store = KvStore::new();
-        let m1 = store.member_add(&MemberAddRequest { peer_ur_ls: vec!["http://p1:2380".into()], is_learner: false });
-        let m2 = store.member_add(&MemberAddRequest { peer_ur_ls: vec!["http://p2:2380".into()], is_learner: false });
+        let m1 = store.member_add(&MemberAddRequest {
+            peer_ur_ls: vec!["http://p1:2380".into()],
+            is_learner: false,
+        });
+        let m2 = store.member_add(&MemberAddRequest {
+            peer_ur_ls: vec!["http://p2:2380".into()],
+            is_learner: false,
+        });
         assert_ne!(m1.member.id, m2.member.id);
     }
 
@@ -6648,7 +7418,8 @@ mod tests {
     fn etcd_parity_member_add_marks_learner_correctly() {
         let store = KvStore::new();
         let resp = store.member_add(&MemberAddRequest {
-            peer_ur_ls: vec!["http://learner:2380".into()], is_learner: true,
+            peer_ur_ls: vec!["http://learner:2380".into()],
+            is_learner: true,
         });
         assert!(resp.member.is_learner);
     }
@@ -6657,7 +7428,12 @@ mod tests {
     fn etcd_parity_member_update_changes_peer_urls_only() {
         let store = KvStore::new();
         let original = store.member_list().members[0].clone();
-        store.member_update(&MemberUpdateRequest { id: original.id, peer_ur_ls: vec!["http://new:2380".into()] }).unwrap();
+        store
+            .member_update(&MemberUpdateRequest {
+                id: original.id,
+                peer_ur_ls: vec!["http://new:2380".into()],
+            })
+            .unwrap();
         let after = store.member_list().members[0].clone();
         assert_eq!(after.id, original.id);
         assert_eq!(after.name, original.name);
@@ -6669,9 +7445,11 @@ mod tests {
     #[test]
     fn etcd_parity_hash_is_stable_for_identical_state() {
         let s1 = KvStore::new();
-        pk_put(&s1, "a", "1"); pk_put(&s1, "b", "2");
+        pk_put(&s1, "a", "1");
+        pk_put(&s1, "b", "2");
         let s2 = KvStore::new();
-        pk_put(&s2, "a", "1"); pk_put(&s2, "b", "2");
+        pk_put(&s2, "a", "1");
+        pk_put(&s2, "b", "2");
         assert_eq!(s1.hash().hash, s2.hash().hash);
     }
 
@@ -6706,8 +7484,22 @@ mod tests {
     #[test]
     fn etcd_parity_response_header_cluster_id_constant() {
         let store = KvStore::new();
-        let h1 = store.put(&PutRequest { key: "a".into(), value: "1".into(), lease: None, prev_kv: false }).header;
-        let h2 = store.put(&PutRequest { key: "b".into(), value: "2".into(), lease: None, prev_kv: false }).header;
+        let h1 = store
+            .put(&PutRequest {
+                key: "a".into(),
+                value: "1".into(),
+                lease: None,
+                prev_kv: false,
+            })
+            .header;
+        let h2 = store
+            .put(&PutRequest {
+                key: "b".into(),
+                value: "2".into(),
+                lease: None,
+                prev_kv: false,
+            })
+            .header;
         assert_eq!(h1.cluster_id, h2.cluster_id);
         assert_eq!(h1.member_id, h2.member_id);
     }
@@ -6726,9 +7518,16 @@ mod tests {
     fn etcd_parity_put_then_range_empty_key_handled() {
         let store = KvStore::new();
         pk_put(&store, "z", "v");
-        let resp = store.range(&RangeRequest {
-            key: "z".into(), range_end: None, limit: None, revision: None, keys_only: false, count_only: false,
-        }).unwrap();
+        let resp = store
+            .range(&RangeRequest {
+                key: "z".into(),
+                range_end: None,
+                limit: None,
+                revision: None,
+                keys_only: false,
+                count_only: false,
+            })
+            .unwrap();
         assert_eq!(resp.kvs.len(), 1);
     }
 
@@ -6736,14 +7535,22 @@ mod tests {
     fn etcd_parity_put_value_with_special_chars_preserved() {
         let store = KvStore::new();
         pk_put(&store, "weird", "value with\nnewline\tand\ttab");
-        assert_eq!(pk_get(&store, "weird").unwrap().value_str(), "value with\nnewline\tand\ttab");
+        assert_eq!(
+            pk_get(&store, "weird").unwrap().value_str(),
+            "value with\nnewline\tand\ttab"
+        );
     }
 
     #[test]
     fn etcd_parity_put_large_value_handled() {
         let store = KvStore::new();
         let big_val: String = "a".repeat(64 * 1024);
-        store.put(&PutRequest { key: "big".into(), value: big_val.clone(), lease: None, prev_kv: false });
+        store.put(&PutRequest {
+            key: "big".into(),
+            value: big_val.clone(),
+            lease: None,
+            prev_kv: false,
+        });
         assert_eq!(pk_get(&store, "big").unwrap().value.len(), big_val.len());
     }
 
@@ -6757,8 +7564,12 @@ mod tests {
         pk_put(&store, "k", "v2");
         store.compact(r1);
         let resp = store.range(&RangeRequest {
-            key: "k".into(), range_end: None, limit: None,
-            revision: Some(r1), keys_only: false, count_only: false,
+            key: "k".into(),
+            range_end: None,
+            limit: None,
+            revision: Some(r1),
+            keys_only: false,
+            count_only: false,
         });
         if let Ok(r) = resp {
             assert_eq!(r.kvs[0].value_str(), "v1");

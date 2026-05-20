@@ -333,13 +333,10 @@ impl PodStatusManager {
     /// Record what happened on the most recent apiserver round-trip.
     /// `now` is the instant the result is being recorded; backoff
     /// is computed relative to it.
-    pub fn record_attempt(
-        &mut self,
-        pod_uid: &str,
-        outcome: AttemptOutcome,
-        now: DateTime<Utc>,
-    ) {
-        let Some(p) = self.pending.get_mut(pod_uid) else { return; };
+    pub fn record_attempt(&mut self, pod_uid: &str, outcome: AttemptOutcome, now: DateTime<Utc>) {
+        let Some(p) = self.pending.get_mut(pod_uid) else {
+            return;
+        };
         match outcome {
             AttemptOutcome::Success => {
                 let hash = p.hash;
@@ -354,7 +351,10 @@ impl PodStatusManager {
             }
             AttemptOutcome::TransientFailure => {
                 p.failure_count = p.failure_count.saturating_add(1);
-                let delay = self.cfg.backoff.delay_for(p.failure_count.saturating_sub(1));
+                let delay = self
+                    .cfg
+                    .backoff
+                    .delay_for(p.failure_count.saturating_sub(1));
                 let chrono_delay = chrono::Duration::from_std(delay)
                     .unwrap_or_else(|_| chrono::Duration::seconds(i64::MAX));
                 p.ready_at = now + chrono_delay;
@@ -384,8 +384,9 @@ impl PodStatusManager {
         for (uid, p) in &self.pending {
             let take = match &victim {
                 None => true,
-                Some((vid, v_ready)) => p.ready_at < *v_ready
-                    || (p.ready_at == *v_ready && uid < vid),
+                Some((vid, v_ready)) => {
+                    p.ready_at < *v_ready || (p.ready_at == *v_ready && uid < vid)
+                }
             };
             if take {
                 victim = Some((uid.clone(), p.ready_at));
@@ -473,7 +474,10 @@ mod tests {
         assert_eq!(m.pending_len(), 0);
         let r = m.set_status("pod-a", st(PodPhase::Failed, false), t0());
         assert_eq!(r, Some(DropReason::PodDeleted));
-        assert_eq!(m.drop_counts().get(&DropReason::PodDeleted).copied(), Some(2));
+        assert_eq!(
+            m.drop_counts().get(&DropReason::PodDeleted).copied(),
+            Some(2)
+        );
     }
 
     #[test]
@@ -517,7 +521,10 @@ mod tests {
         assert_eq!(m.pop_ready(now), DispatchOutcome::Idle);
         // After enough time (200ms default base for 1st retry).
         let later = now + chrono::Duration::milliseconds(250);
-        assert!(matches!(m.pop_ready(later), DispatchOutcome::Dispatched { .. }));
+        assert!(matches!(
+            m.pop_ready(later),
+            DispatchOutcome::Dispatched { .. }
+        ));
     }
 
     #[test]
@@ -550,16 +557,14 @@ mod tests {
             now = match m.pop_ready(now) {
                 DispatchOutcome::Dispatched { pod_uid, .. } => {
                     m.record_attempt(&pod_uid, AttemptOutcome::TransientFailure, now);
-                    let d =
-                        Backoff::Exponential {
-                            base: Duration::from_millis(200),
-                            cap: Duration::from_secs(30),
-                        }
-                        .delay_for(i);
+                    let d = Backoff::Exponential {
+                        base: Duration::from_millis(200),
+                        cap: Duration::from_secs(30),
+                    }
+                    .delay_for(i);
                     assert!(d >= prev_delay, "backoff should not decrease");
                     prev_delay = d;
-                    now + chrono::Duration::from_std(d).unwrap()
-                        + chrono::Duration::milliseconds(1)
+                    now + chrono::Duration::from_std(d).unwrap() + chrono::Duration::milliseconds(1)
                 }
                 other => panic!("expected Dispatched, got {other:?}"),
             };

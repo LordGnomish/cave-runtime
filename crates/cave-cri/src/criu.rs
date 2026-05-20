@@ -87,11 +87,7 @@ pub const DEFAULT_CRIU_BINARY: &str = "criu";
 /// Build the `criu dump` argv for a container PID and option set. Tests
 /// assert against this string list to lock down the wire format without
 /// actually invoking CRIU (which doesn't exist on macOS).
-pub fn build_dump_argv(
-    pid: u32,
-    images_dir: &Path,
-    options: &CheckpointOptions,
-) -> Vec<String> {
+pub fn build_dump_argv(pid: u32, images_dir: &Path, options: &CheckpointOptions) -> Vec<String> {
     let mut argv = vec![
         DEFAULT_CRIU_BINARY.to_string(),
         "dump".to_string(),
@@ -156,15 +152,16 @@ pub fn write_manifest(images_dir: &Path, manifest: &CheckpointManifest) -> CriRe
 pub fn read_manifest(images_dir: &Path) -> CriResult<CheckpointManifest> {
     let path = images_dir.join(MANIFEST_FILENAME);
     let bytes = std::fs::read(&path).map_err(CriError::Io)?;
-    serde_json::from_slice(&bytes)
-        .map_err(|e| CriError::Runtime(format!("manifest parse: {}", e)))
+    serde_json::from_slice(&bytes).map_err(|e| CriError::Runtime(format!("manifest parse: {}", e)))
 }
 
 /// Total size of all CRIU image files in `dir` (recursive). Used by
 /// `CheckpointContainerResponse.size_bytes`.
 pub fn dir_size_bytes(dir: &Path) -> u64 {
     fn walk(p: &Path) -> u64 {
-        let Ok(entries) = std::fs::read_dir(p) else { return 0 };
+        let Ok(entries) = std::fs::read_dir(p) else {
+            return 0;
+        };
         let mut total = 0u64;
         for e in entries.flatten() {
             let path = e.path();
@@ -192,7 +189,8 @@ pub fn verify_checkpoint(images_dir: &Path) -> CriResult<()> {
     }
     if !images_dir.join(MANIFEST_FILENAME).exists() {
         return Err(CriError::Runtime(format!(
-            "checkpoint manifest missing in {}", images_dir.display()
+            "checkpoint manifest missing in {}",
+            images_dir.display()
         )));
     }
     Ok(())
@@ -245,28 +243,40 @@ mod tests {
 
     #[test]
     fn dump_argv_leave_running_appends_flag() {
-        let opts = CheckpointOptions { leave_running: true, ..Default::default() };
+        let opts = CheckpointOptions {
+            leave_running: true,
+            ..Default::default()
+        };
         let argv = build_dump_argv(1, Path::new("/x"), &opts);
         assert!(argv.iter().any(|a| a == "--leave-running"));
     }
 
     #[test]
     fn dump_argv_tcp_established_appends_flag() {
-        let opts = CheckpointOptions { tcp_established: true, ..Default::default() };
+        let opts = CheckpointOptions {
+            tcp_established: true,
+            ..Default::default()
+        };
         let argv = build_dump_argv(1, Path::new("/x"), &opts);
         assert!(argv.iter().any(|a| a == "--tcp-established"));
     }
 
     #[test]
     fn dump_argv_shell_job_appends_flag() {
-        let opts = CheckpointOptions { shell_job: true, ..Default::default() };
+        let opts = CheckpointOptions {
+            shell_job: true,
+            ..Default::default()
+        };
         let argv = build_dump_argv(1, Path::new("/x"), &opts);
         assert!(argv.iter().any(|a| a == "--shell-job"));
     }
 
     #[test]
     fn dump_argv_external_mounts_appends_flag_and_value() {
-        let opts = CheckpointOptions { external_mounts: true, ..Default::default() };
+        let opts = CheckpointOptions {
+            external_mounts: true,
+            ..Default::default()
+        };
         let argv = build_dump_argv(1, Path::new("/x"), &opts);
         let idx = argv.iter().position(|a| a == "--ext-mount-map").unwrap();
         assert_eq!(argv[idx + 1], "auto");
@@ -289,7 +299,11 @@ mod tests {
 
     #[test]
     fn restore_argv_does_not_include_dump_only_flags() {
-        let opts = CheckpointOptions { leave_running: true, external_mounts: true, ..Default::default() };
+        let opts = CheckpointOptions {
+            leave_running: true,
+            external_mounts: true,
+            ..Default::default()
+        };
         let argv = build_restore_argv(Path::new("/img"), &opts);
         // --leave-running and --ext-mount-map are dump-side only; restore
         // shouldn't propagate them.
@@ -299,7 +313,11 @@ mod tests {
 
     #[test]
     fn restore_argv_propagates_tcp_and_shell_options() {
-        let opts = CheckpointOptions { tcp_established: true, shell_job: true, ..Default::default() };
+        let opts = CheckpointOptions {
+            tcp_established: true,
+            shell_job: true,
+            ..Default::default()
+        };
         let argv = build_restore_argv(Path::new("/img"), &opts);
         assert!(argv.iter().any(|a| a == "--tcp-established"));
         assert!(argv.iter().any(|a| a == "--shell-job"));
@@ -405,7 +423,10 @@ mod tests {
 
     #[test]
     fn checkpoint_options_serializes_with_snake_case() {
-        let o = CheckpointOptions { leave_running: true, ..Default::default() };
+        let o = CheckpointOptions {
+            leave_running: true,
+            ..Default::default()
+        };
         let json = serde_json::to_string(&o).unwrap();
         assert!(json.contains("\"leave_running\":true"));
     }

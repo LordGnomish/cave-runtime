@@ -117,9 +117,8 @@ impl DocdbPlugin {
     pub fn register_collection(&mut self, summary: CollectionSummary) -> Result<(), DocdbError> {
         validate_ident(&summary.database)?;
         validate_ident(&summary.name)?;
-        self.collections.retain(|c| {
-            !(c.database == summary.database && c.name == summary.name)
-        });
+        self.collections
+            .retain(|c| !(c.database == summary.database && c.name == summary.name));
         self.collections.push(summary);
         Ok(())
     }
@@ -342,8 +341,10 @@ mod tests {
     #[test]
     fn register_collection_dedupes_by_db_name() {
         let mut p = DocdbPlugin::new();
-        p.register_collection(coll("app", "users", "acme", 10, 1024)).unwrap();
-        p.register_collection(coll("app", "users", "acme", 20, 2048)).unwrap();
+        p.register_collection(coll("app", "users", "acme", 10, 1024))
+            .unwrap();
+        p.register_collection(coll("app", "users", "acme", 20, 2048))
+            .unwrap();
         let listed = p.list_collections(ViewPersona::Admin, "acme");
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].document_count, 20);
@@ -375,8 +376,10 @@ mod tests {
         ]);
         // MongoDB-style: each tenant has its own database. Same collection name
         // is fine across databases.
-        p.register_collection(coll("acme_app", "users", "acme", 100, 10_000)).unwrap();
-        p.register_collection(coll("globex_app", "users", "globex", 50, 5_000)).unwrap();
+        p.register_collection(coll("acme_app", "users", "acme", 100, 10_000))
+            .unwrap();
+        p.register_collection(coll("globex_app", "users", "globex", 50, 5_000))
+            .unwrap();
         // Tenant view sees only their collection.
         let panel = p.dashboard(ViewPersona::Tenant, "acme");
         assert_eq!(panel.collection_count, 1);
@@ -393,8 +396,10 @@ mod tests {
     #[test]
     fn list_indexes_filters_by_collection() {
         let mut p = DocdbPlugin::new();
-        p.register_collection(coll("app", "users", "acme", 0, 0)).unwrap();
-        p.register_collection(coll("app", "orders", "acme", 0, 0)).unwrap();
+        p.register_collection(coll("app", "users", "acme", 0, 0))
+            .unwrap();
+        p.register_collection(coll("app", "orders", "acme", 0, 0))
+            .unwrap();
         for name in ["ix1", "ix2"] {
             p.register_index(IndexInfo {
                 database: "app".into(),

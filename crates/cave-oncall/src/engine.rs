@@ -205,9 +205,9 @@ pub fn evaluate_silences(alert: &Alert, silences: &[Silence], at: DateTime<Utc>)
             return false;
         }
         // All matchers must match the alert's labels
-        s.matcher.iter().all(|(key, value)| {
-            alert.labels.get(key).map_or(false, |v| v == value)
-        })
+        s.matcher
+            .iter()
+            .all(|(key, value)| alert.labels.get(key).map_or(false, |v| v == value))
     })
 }
 
@@ -230,8 +230,7 @@ pub fn next_escalation_step<'a>(
             .map(|s| s.timeout_seconds)
             .sum();
 
-        elapsed_seconds >= cumulative_timeout
-            && (alert.current_escalation_step <= step.order)
+        elapsed_seconds >= cumulative_timeout && (alert.current_escalation_step <= step.order)
     })
 }
 

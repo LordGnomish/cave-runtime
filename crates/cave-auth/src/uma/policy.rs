@@ -175,7 +175,11 @@ mod tests {
     #[test]
     fn unknown_resource_denies_all() {
         let engine = PolicyEngine::new();
-        let dec = engine.evaluate(&ticket(&[("rs1", &["view"])]), "bob", &PushedClaims::empty());
+        let dec = engine.evaluate(
+            &ticket(&[("rs1", &["view"])]),
+            "bob",
+            &PushedClaims::empty(),
+        );
         assert!(dec.granted.is_empty());
         assert_eq!(dec.denied.len(), 1);
     }
@@ -184,7 +188,11 @@ mod tests {
     fn matching_grant_succeeds() {
         let engine = PolicyEngine::new();
         engine.upsert(policy_grant("rs1", "bob", &["view"], &[]));
-        let dec = engine.evaluate(&ticket(&[("rs1", &["view"])]), "bob", &PushedClaims::empty());
+        let dec = engine.evaluate(
+            &ticket(&[("rs1", &["view"])]),
+            "bob",
+            &PushedClaims::empty(),
+        );
         assert!(dec.is_fully_granted());
     }
 
@@ -192,7 +200,11 @@ mod tests {
     fn missing_scope_denied() {
         let engine = PolicyEngine::new();
         engine.upsert(policy_grant("rs1", "bob", &["view"], &[]));
-        let dec = engine.evaluate(&ticket(&[("rs1", &["edit"])]), "bob", &PushedClaims::empty());
+        let dec = engine.evaluate(
+            &ticket(&[("rs1", &["edit"])]),
+            "bob",
+            &PushedClaims::empty(),
+        );
         assert!(!dec.is_fully_granted());
         assert_eq!(dec.denied.len(), 1);
     }
@@ -201,7 +213,11 @@ mod tests {
     fn different_subject_denied() {
         let engine = PolicyEngine::new();
         engine.upsert(policy_grant("rs1", "bob", &["view"], &[]));
-        let dec = engine.evaluate(&ticket(&[("rs1", &["view"])]), "eve", &PushedClaims::empty());
+        let dec = engine.evaluate(
+            &ticket(&[("rs1", &["view"])]),
+            "eve",
+            &PushedClaims::empty(),
+        );
         assert!(dec.granted.is_empty());
     }
 
@@ -218,7 +234,11 @@ mod tests {
     fn claim_gate_missing_denies() {
         let engine = PolicyEngine::new();
         engine.upsert(policy_grant("rs1", "bob", &["view"], &[("dept", "eng")]));
-        let dec = engine.evaluate(&ticket(&[("rs1", &["view"])]), "bob", &PushedClaims::empty());
+        let dec = engine.evaluate(
+            &ticket(&[("rs1", &["view"])]),
+            "bob",
+            &PushedClaims::empty(),
+        );
         assert!(!dec.is_fully_granted());
     }
 

@@ -32,11 +32,7 @@ fn rules_catalog_meets_charter_minimum() {
 fn every_rule_has_nonempty_id() {
     let rules = extended_scan_rules();
     for rule in &rules {
-        assert!(
-            !rule.id.is_empty(),
-            "rule {:?} has empty id",
-            rule.name
-        );
+        assert!(!rule.id.is_empty(), "rule {:?} has empty id", rule.name);
     }
 }
 
@@ -44,11 +40,7 @@ fn every_rule_has_nonempty_id() {
 fn every_rule_has_nonempty_name() {
     let rules = extended_scan_rules();
     for rule in &rules {
-        assert!(
-            !rule.name.is_empty(),
-            "rule {} has empty name",
-            rule.id
-        );
+        assert!(!rule.name.is_empty(), "rule {} has empty name", rule.id);
     }
 }
 
@@ -130,14 +122,7 @@ fn catalog_covers_six_languages() {
         }
     }
     // Expect at least: Python, JavaScript, TypeScript, Rust, Go, Java
-    for required in [
-        "Python",
-        "JavaScript",
-        "TypeScript",
-        "Rust",
-        "Go",
-        "Java",
-    ] {
+    for required in ["Python", "JavaScript", "TypeScript", "Rust", "Go", "Java"] {
         assert!(
             langs.contains(required),
             "catalog missing required language: {} (got: {:?})",
@@ -159,10 +144,7 @@ fn setTimeout_string_rule_regex_matches_expected_input() {
         .iter()
         .find(|r| r.id == "JS004")
         .expect("JS004 (setTimeout with string) missing");
-    let pat = js004
-        .pattern
-        .as_ref()
-        .expect("JS004 pattern must be Some");
+    let pat = js004.pattern.as_ref().expect("JS004 pattern must be Some");
     let re = regex::Regex::new(pat).expect("JS004 regex must compile");
     assert!(re.is_match(r#"setTimeout("alert(1)", 100)"#));
     assert!(re.is_match(r#"setTimeout('alert(1)', 100)"#));

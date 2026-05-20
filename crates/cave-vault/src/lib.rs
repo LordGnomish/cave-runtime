@@ -24,15 +24,15 @@ pub mod lease;
 pub mod policy;
 pub mod shamir;
 
-use std::sync::Arc;
-use std::collections::HashMap;
-use tokio::sync::RwLock;
 use axum::Router;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
-use crate::core::{AuditLogger, LeaseStore, PolicyStore, StorageBackend, WrapStore};
-use crate::token::TokenStore;
-use crate::engines::{kv1, kv2, transit, pki, database, aws, ssh, totp, cubbyhole, identity};
 use crate::auth::{approle, cert, kubernetes, ldap, oidc, userpass};
+use crate::core::{AuditLogger, LeaseStore, PolicyStore, StorageBackend, WrapStore};
+use crate::engines::{aws, cubbyhole, database, identity, kv1, kv2, pki, ssh, totp, transit};
+use crate::token::TokenStore;
 
 pub struct VaultState {
     // Core
@@ -133,7 +133,10 @@ impl MountTable {
     /// All mounts within a single namespace (tenant). Mirrors openbao
     /// `vault/mount.go:328` (MountTable.findAllNamespaceMounts).
     pub fn for_namespace(&self, ns_id: &str) -> Vec<&MountEntry> {
-        self.mounts.values().filter(|e| e.namespace_id == ns_id).collect()
+        self.mounts
+            .values()
+            .filter(|e| e.namespace_id == ns_id)
+            .collect()
     }
 }
 
@@ -185,7 +188,11 @@ impl Namespace {
     /// Build a namespace bound to a tenant. Path is canonicalised the same way
     /// as openbao `helper/namespace/namespace.go:259` (Canonicalize) — a
     /// trailing `/` is enforced for non-empty paths.
-    pub fn new(id: impl Into<String>, path: impl Into<String>, tenant_id: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        path: impl Into<String>,
+        tenant_id: impl Into<String>,
+    ) -> Self {
         let mut p: String = path.into();
         if !p.is_empty() && !p.ends_with('/') {
             p.push('/');
@@ -245,7 +252,9 @@ impl NamespaceStore {
     /// All namespaces owned by a tenant. Cave extension on top of openbao
     /// `helper/namespace/namespace.go:40` (Namespace).
     pub fn for_tenant(&self, tenant_id: &str) -> Vec<&Namespace> {
-        let mut out: Vec<&Namespace> = self.namespaces.values()
+        let mut out: Vec<&Namespace> = self
+            .namespaces
+            .values()
             .filter(|n| n.tenant_id == tenant_id)
             .collect();
         out.sort_by(|a, b| a.path.cmp(&b.path));
@@ -268,21 +277,28 @@ impl VaultState {
         let mut default_mounts = HashMap::new();
         for (path, mtype, desc) in [
             ("secret/", "kv", "key/value secret storage"),
-            ("cubbyhole/", "cubbyhole", "per-token private secret storage"),
+            (
+                "cubbyhole/",
+                "cubbyhole",
+                "per-token private secret storage",
+            ),
             ("identity/", "identity", "identity store"),
             ("sys/", "system", "system endpoints"),
         ] {
-            default_mounts.insert(path.to_string(), MountEntry {
-                path: path.to_string(),
-                mount_type: mtype.to_string(),
-                description: desc.to_string(),
-                config: MountConfig::default(),
-                local: false,
-                seal_wrap: false,
-                uuid: uuid::Uuid::new_v4().to_string(),
-                accessor: uuid::Uuid::new_v4().to_string(),
-                namespace_id: String::new(),
-            });
+            default_mounts.insert(
+                path.to_string(),
+                MountEntry {
+                    path: path.to_string(),
+                    mount_type: mtype.to_string(),
+                    description: desc.to_string(),
+                    config: MountConfig::default(),
+                    local: false,
+                    seal_wrap: false,
+                    uuid: uuid::Uuid::new_v4().to_string(),
+                    accessor: uuid::Uuid::new_v4().to_string(),
+                    namespace_id: String::new(),
+                },
+            );
         }
 
         // Initialize default auth methods
@@ -292,16 +308,19 @@ impl VaultState {
             ("approle/", "approle", "AppRole credentials"),
             ("userpass/", "userpass", "username and password credentials"),
         ] {
-            default_auth.insert(path.to_string(), AuthEntry {
-                path: path.to_string(),
-                auth_type: atype.to_string(),
-                description: desc.to_string(),
-                config: MountConfig::default(),
-                local: false,
-                seal_wrap: false,
-                uuid: uuid::Uuid::new_v4().to_string(),
-                accessor: uuid::Uuid::new_v4().to_string(),
-            });
+            default_auth.insert(
+                path.to_string(),
+                AuthEntry {
+                    path: path.to_string(),
+                    auth_type: atype.to_string(),
+                    description: desc.to_string(),
+                    config: MountConfig::default(),
+                    local: false,
+                    seal_wrap: false,
+                    uuid: uuid::Uuid::new_v4().to_string(),
+                    accessor: uuid::Uuid::new_v4().to_string(),
+                },
+            );
         }
 
         Arc::new(VaultState {
@@ -311,8 +330,12 @@ impl VaultState {
             policy_store: Arc::new(RwLock::new(PolicyStore::new())),
             lease_store: Arc::new(RwLock::new(LeaseStore::default())),
             audit_logger: Arc::new(AuditLogger::new(hmac_key)),
-            mount_table: Arc::new(RwLock::new(MountTable { mounts: default_mounts })),
-            auth_table: Arc::new(RwLock::new(AuthTable { methods: default_auth })),
+            mount_table: Arc::new(RwLock::new(MountTable {
+                mounts: default_mounts,
+            })),
+            auth_table: Arc::new(RwLock::new(AuthTable {
+                methods: default_auth,
+            })),
             wrap_store: Arc::new(RwLock::new(WrapStore::default())),
             kv1_store: Arc::new(RwLock::new(kv1::Kv1Store::default())),
             kv2_store: Arc::new(RwLock::new(kv2::Kv2Store::default())),
@@ -459,9 +482,12 @@ mod lib_tests {
     #[test]
     fn test_namespace_store_for_tenant_sorted() {
         let mut s = NamespaceStore::default();
-        s.create(Namespace::new("ns-z", "z-team", "tenant-1")).unwrap();
-        s.create(Namespace::new("ns-a", "a-team", "tenant-1")).unwrap();
-        s.create(Namespace::new("ns-other", "x", "tenant-2")).unwrap();
+        s.create(Namespace::new("ns-z", "z-team", "tenant-1"))
+            .unwrap();
+        s.create(Namespace::new("ns-a", "a-team", "tenant-1"))
+            .unwrap();
+        s.create(Namespace::new("ns-other", "x", "tenant-2"))
+            .unwrap();
         let listed = s.for_tenant("tenant-1");
         assert_eq!(listed.len(), 2);
         assert_eq!(listed[0].path, "a-team/");

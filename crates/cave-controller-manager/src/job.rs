@@ -68,11 +68,7 @@ pub fn past_backoff(spec: &JobSpec, status: &JobStatus) -> bool {
 ///
 /// `now` is passed in (rather than calling `Utc::now`) so tests can
 /// pin the clock — same pattern as the upstream `clock.Clock` interface.
-pub fn past_active_deadline(
-    spec: &JobSpec,
-    status: &JobStatus,
-    now: DateTime<Utc>,
-) -> bool {
+pub fn past_active_deadline(spec: &JobSpec, status: &JobStatus, now: DateTime<Utc>) -> bool {
     if spec.suspended {
         return false;
     }
@@ -134,7 +130,9 @@ pub fn reconcile_with_clock(
     if is_complete(spec, status) || past_backoff(spec, status) {
         return Ok(Reconcile::NoOp);
     }
-    let remaining = spec.completions.saturating_sub(status.succeeded + status.active);
+    let remaining = spec
+        .completions
+        .saturating_sub(status.succeeded + status.active);
     let want = remaining.min(spec.parallelism.saturating_sub(status.active));
     if want == 0 {
         Ok(Reconcile::NoOp)
@@ -162,11 +160,15 @@ pub struct IndexedJobStatus {
 
 impl IndexedJobStatus {
     pub fn new_pending(completions: u32) -> Self {
-        Self { indexes: (0..completions).map(|_| IndexState::Pending).collect() }
+        Self {
+            indexes: (0..completions).map(|_| IndexState::Pending).collect(),
+        }
     }
 
     pub fn count(&self, want: &IndexState) -> u32 {
-        self.indexes.iter().filter(|s| std::mem::discriminant(*s) == std::mem::discriminant(want))
+        self.indexes
+            .iter()
+            .filter(|s| std::mem::discriminant(*s) == std::mem::discriminant(want))
             .count() as u32
     }
 }
@@ -186,14 +188,17 @@ pub fn index_status(
             reason: format!(
                 "indexed status length {} does not match completions {}",
                 status.indexes.len(),
-                spec.completions),
+                spec.completions
+            ),
         });
     }
     let active = status.count(&IndexState::Active);
     let want = spec.parallelism.saturating_sub(active);
     let mut out = vec![];
     for (i, s) in status.indexes.iter().enumerate() {
-        if out.len() as u32 >= want { break; }
+        if out.len() as u32 >= want {
+            break;
+        }
         if matches!(s, IndexState::Pending) {
             out.push(i as u32);
         }
@@ -241,7 +246,12 @@ mod tests {
             "tenant-job-complete"
         );
         let s = job(3, 5, 6, false);
-        let st = JobStatus { active: 0, succeeded: 5, failed: 0, start_time: None };
+        let st = JobStatus {
+            active: 0,
+            succeeded: 5,
+            failed: 0,
+            start_time: None,
+        };
         assert!(is_complete(&s, &st));
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::NoOp);
     }
@@ -254,7 +264,12 @@ mod tests {
             "tenant-job-backoff"
         );
         let s = job(2, 10, 3, false);
-        let st = JobStatus { active: 1, succeeded: 0, failed: 4, start_time: None };
+        let st = JobStatus {
+            active: 1,
+            succeeded: 0,
+            failed: 4,
+            start_time: None,
+        };
         assert!(past_backoff(&s, &st));
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::NoOp);
     }
@@ -267,7 +282,12 @@ mod tests {
             "tenant-job-suspended"
         );
         let s = job(4, 10, 6, true);
-        let st = JobStatus { active: 4, succeeded: 0, failed: 0, start_time: None };
+        let st = JobStatus {
+            active: 4,
+            succeeded: 0,
+            failed: 0,
+            start_time: None,
+        };
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::Delete(4));
     }
 
@@ -283,8 +303,15 @@ mod tests {
             "manageJob",
             "tenant-job-remaining-cap"
         );
-        let s = job(/*par=*/ 5, /*compl=*/ 8, /*backoff=*/ 6, /*suspend=*/ false);
-        let st = JobStatus { active: 0, succeeded: 7, failed: 0, start_time: None };
+        let s = job(
+            /*par=*/ 5, /*compl=*/ 8, /*backoff=*/ 6, /*suspend=*/ false,
+        );
+        let st = JobStatus {
+            active: 0,
+            succeeded: 7,
+            failed: 0,
+            start_time: None,
+        };
         // remaining = 8 - 7 = 1, parallelism = 5 → launch 1.
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::Create(1));
     }
@@ -300,9 +327,17 @@ mod tests {
             "tenant-job-at-parallelism"
         );
         let s = job(3, 10, 6, false);
-        let st = JobStatus { active: 3, succeeded: 0, failed: 0, start_time: None };
-        assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::NoOp,
-            "no surge while at parallelism cap");
+        let st = JobStatus {
+            active: 3,
+            succeeded: 0,
+            failed: 0,
+            start_time: None,
+        };
+        assert_eq!(
+            reconcile(&s, &st, &tenant).unwrap(),
+            Reconcile::NoOp,
+            "no surge while at parallelism cap"
+        );
     }
 
     /// Upstream parity: `TestIndexedJob_FirstPendingIndexes`
@@ -316,7 +351,9 @@ mod tests {
             "tenant-job-indexed-pick"
         );
         let _ = tenant;
-        let s = job(/*par=*/ 3, /*compl=*/ 5, /*backoff=*/ 6, /*suspend=*/ false);
+        let s = job(
+            /*par=*/ 3, /*compl=*/ 5, /*backoff=*/ 6, /*suspend=*/ false,
+        );
         let st = IndexedJobStatus {
             indexes: vec![
                 IndexState::Succeeded, // 0
@@ -362,9 +399,17 @@ mod tests {
         );
         let _ = tenant;
         let s = job(3, 5, 6, false);
-        let st = IndexedJobStatus { indexes: vec![IndexState::Pending; 3] }; // 3 != 5
+        let st = IndexedJobStatus {
+            indexes: vec![IndexState::Pending; 3],
+        }; // 3 != 5
         let err = index_status(&s, &st).unwrap_err();
-        assert!(matches!(err, ControllerError::InvalidSpec { kind: "IndexedJob", .. }));
+        assert!(matches!(
+            err,
+            ControllerError::InvalidSpec {
+                kind: "IndexedJob",
+                ..
+            }
+        ));
     }
 
     /// Upstream parity: `TestPastBackoffLimit_BoundaryAtEqual`
@@ -379,10 +424,22 @@ mod tests {
         );
         let _ = tenant;
         let s = job(2, 10, /*backoff=*/ 3, false);
-        let on_edge = JobStatus { active: 0, succeeded: 0, failed: 3, start_time: None };
-        assert!(!past_backoff(&s, &on_edge),
-            "failed == backoff_limit is at the boundary, not past");
-        let over = JobStatus { active: 0, succeeded: 0, failed: 4, start_time: None };
+        let on_edge = JobStatus {
+            active: 0,
+            succeeded: 0,
+            failed: 3,
+            start_time: None,
+        };
+        assert!(
+            !past_backoff(&s, &on_edge),
+            "failed == backoff_limit is at the boundary, not past"
+        );
+        let over = JobStatus {
+            active: 0,
+            succeeded: 0,
+            failed: 4,
+            start_time: None,
+        };
         assert!(past_backoff(&s, &over));
     }
 }

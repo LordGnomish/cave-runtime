@@ -48,11 +48,11 @@ impl CoseKey {
 /// Port of webauthn4j `CredentialPublicKeyConverter`.
 pub fn parse(raw: &[u8]) -> Result<CoseKey, WebAuthnError> {
     let v = cbor::decode(raw)?;
-    let kty = cbor::map_get_int(&v, 1)
-        .ok_or_else(|| WebAuthnError::Cose("missing kty(1)".into()))?;
+    let kty =
+        cbor::map_get_int(&v, 1).ok_or_else(|| WebAuthnError::Cose("missing kty(1)".into()))?;
     let kty = cbor::as_i64(kty)?;
-    let alg_raw = cbor::map_get_int(&v, 3)
-        .ok_or_else(|| WebAuthnError::Cose("missing alg(3)".into()))?;
+    let alg_raw =
+        cbor::map_get_int(&v, 3).ok_or_else(|| WebAuthnError::Cose("missing alg(3)".into()))?;
     let alg = cbor::as_i64(alg_raw)?;
     let alg = CoseAlg::from_i64(alg).ok_or(WebAuthnError::UnsupportedAlgorithm(alg))?;
 
@@ -119,7 +119,10 @@ pub fn encode(key: &CoseKey) -> Result<Vec<u8>, WebAuthnError> {
         ]),
         CoseKey::Rs256 { n, e } => Value::Map(vec![
             (Value::Integer(1i64.into()), Value::Integer(3i64.into())), // kty=RSA
-            (Value::Integer(3i64.into()), Value::Integer((-257i64).into())), // alg=RS256
+            (
+                Value::Integer(3i64.into()),
+                Value::Integer((-257i64).into()),
+            ), // alg=RS256
             (Value::Integer((-1i64).into()), Value::Bytes(n.clone())),
             (Value::Integer((-2i64).into()), Value::Bytes(e.clone())),
         ]),
@@ -152,9 +155,9 @@ fn to_array32(b: &[u8]) -> Result<[u8; 32], WebAuthnError> {
 }
 
 fn verify_es256(x: &[u8; 32], y: &[u8; 32], data: &[u8], sig: &[u8]) -> Result<(), WebAuthnError> {
-    use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
-    use p256::elliptic_curve::sec1::EncodedPoint;
     use p256::NistP256;
+    use p256::ecdsa::{Signature, VerifyingKey, signature::Verifier};
+    use p256::elliptic_curve::sec1::EncodedPoint;
 
     let point = EncodedPoint::<NistP256>::from_affine_coordinates(x.into(), y.into(), false);
     let vk = VerifyingKey::from_encoded_point(&point)
@@ -179,10 +182,10 @@ fn verify_eddsa(x: &[u8; 32], data: &[u8], sig: &[u8]) -> Result<(), WebAuthnErr
 }
 
 fn verify_rs256(n: &[u8], e: &[u8], data: &[u8], sig: &[u8]) -> Result<(), WebAuthnError> {
-    use rsa::pkcs1v15::{Signature, VerifyingKey};
-    use rsa::signature::Verifier;
     use rsa::BigUint;
     use rsa::RsaPublicKey;
+    use rsa::pkcs1v15::{Signature, VerifyingKey};
+    use rsa::signature::Verifier;
     use sha2::Sha256;
 
     let n_bn = BigUint::from_bytes_be(n);
@@ -199,7 +202,7 @@ fn verify_rs256(n: &[u8], e: &[u8], data: &[u8], sig: &[u8]) -> Result<(), WebAu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use p256::ecdsa::{signature::Signer as _, SigningKey};
+    use p256::ecdsa::{SigningKey, signature::Signer as _};
     use rand::rngs::OsRng;
 
     #[test]
@@ -273,10 +276,10 @@ mod tests {
 
     #[test]
     fn rs256_sign_then_verify_succeeds() {
+        use rsa::RsaPrivateKey;
         use rsa::pkcs1v15::SigningKey;
         use rsa::signature::SignatureEncoding as _;
         use rsa::signature::Signer as _;
-        use rsa::RsaPrivateKey;
         use sha2::Sha256;
         let mut rng = OsRng;
         // 2048 RSA keygen is slow — use 1024 only for tests. The verify path

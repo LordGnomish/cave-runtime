@@ -12,19 +12,19 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::{
+    Json,
     extract::State,
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
-    Json,
 };
 use ed25519_dalek::SigningKey;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
-use super::credential_offer::CredentialOffer;
+use super::super::Oid4vcError;
 use super::super::vc::model::{CredentialSubject, VerifiableCredential};
 use super::super::vc::proof::sign_credential;
-use super::super::Oid4vcError;
+use super::credential_offer::CredentialOffer;
 
 /// Issuer-side state shared across the OID4VC routes.
 #[derive(Clone)]
@@ -139,8 +139,12 @@ pub async fn handle_issue(
 ) -> axum::response::Response {
     match issue(&st, &headers, &req) {
         Ok(vc) => (StatusCode::OK, Json(IssueResponse { credential: vc })).into_response(),
-        Err(Oid4vcError::InvalidGrant(m)) => (StatusCode::BAD_REQUEST, format!("invalid_grant: {m}")).into_response(),
-        Err(Oid4vcError::MissingField(m)) => (StatusCode::BAD_REQUEST, format!("missing: {m}")).into_response(),
+        Err(Oid4vcError::InvalidGrant(m)) => {
+            (StatusCode::BAD_REQUEST, format!("invalid_grant: {m}")).into_response()
+        }
+        Err(Oid4vcError::MissingField(m)) => {
+            (StatusCode::BAD_REQUEST, format!("missing: {m}")).into_response()
+        }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{e}")).into_response(),
     }
 }
@@ -160,7 +164,9 @@ pub fn issue(
             .cloned()
             .ok_or_else(|| Oid4vcError::InvalidGrant("pre-auth code not found".into()))?;
         if t.used {
-            return Err(Oid4vcError::InvalidGrant("pre-auth code already used".into()));
+            return Err(Oid4vcError::InvalidGrant(
+                "pre-auth code already used".into(),
+            ));
         }
         // Mark used.
         if let Some(stored) = inner.pre_auth_codes.get_mut(code) {
@@ -176,7 +182,9 @@ pub fn issue(
             .cloned()
             .ok_or_else(|| Oid4vcError::InvalidGrant("bearer token not found".into()))?;
         if t.used {
-            return Err(Oid4vcError::InvalidGrant("bearer token already used".into()));
+            return Err(Oid4vcError::InvalidGrant(
+                "bearer token already used".into(),
+            ));
         }
         if let Some(stored) = inner.bearer_tokens.get_mut(token) {
             stored.used = true;
@@ -228,8 +236,14 @@ mod tests {
         };
         let vc = issue(&st, &HeaderMap::new(), &req).unwrap();
         assert!(vc.proof.is_some());
-        assert_eq!(vc.credential_subject.id.as_deref(), Some("did:example:alice"));
-        assert!(vc.credential_type.contains(&"EmployeeCredential".to_string()));
+        assert_eq!(
+            vc.credential_subject.id.as_deref(),
+            Some("did:example:alice")
+        );
+        assert!(
+            vc.credential_type
+                .contains(&"EmployeeCredential".to_string())
+        );
     }
 
     #[test]
@@ -260,7 +274,10 @@ mod tests {
     fn bearer_token_grant_issues_credential() {
         let st = IssuerState::new(IssuerKeys::test());
         st.add_bearer_token("tok-1", ticket());
-        let req = IssueRequest { credential_configuration_id: None, pre_authorized_code: None };
+        let req = IssueRequest {
+            credential_configuration_id: None,
+            pre_authorized_code: None,
+        };
         let mut h = HeaderMap::new();
         h.insert("authorization", "Bearer tok-1".parse().unwrap());
         let vc = issue(&st, &h, &req).unwrap();
@@ -271,7 +288,10 @@ mod tests {
     fn bearer_token_is_single_use() {
         let st = IssuerState::new(IssuerKeys::test());
         st.add_bearer_token("tok-2", ticket());
-        let req = IssueRequest { credential_configuration_id: None, pre_authorized_code: None };
+        let req = IssueRequest {
+            credential_configuration_id: None,
+            pre_authorized_code: None,
+        };
         let mut h = HeaderMap::new();
         h.insert("authorization", "Bearer tok-2".parse().unwrap());
         assert!(issue(&st, &h, &req).is_ok());
@@ -284,7 +304,10 @@ mod tests {
     #[test]
     fn missing_grant_and_token_rejected() {
         let st = IssuerState::new(IssuerKeys::test());
-        let req = IssueRequest { credential_configuration_id: None, pre_authorized_code: None };
+        let req = IssueRequest {
+            credential_configuration_id: None,
+            pre_authorized_code: None,
+        };
         let err = issue(&st, &HeaderMap::new(), &req).unwrap_err();
         assert!(matches!(err, Oid4vcError::MissingField(_)));
     }
@@ -339,7 +362,9 @@ mod tests {
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        let body = axum::body::to_bytes(resp.into_body(), 1_000_000).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), 1_000_000)
+            .await
+            .unwrap();
         let r: IssueResponse = serde_json::from_slice(&body).unwrap();
         assert!(r.credential.proof.is_some());
     }

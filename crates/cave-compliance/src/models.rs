@@ -6,7 +6,14 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum FrameworkKind { CisKubernetes, Soc2, PciDss, Hipaa, Nist800_53, Custom }
+pub enum FrameworkKind {
+    CisKubernetes,
+    Soc2,
+    PciDss,
+    Hipaa,
+    Nist800_53,
+    Custom,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComplianceFramework {
@@ -23,12 +30,12 @@ pub struct ComplianceFramework {
 pub struct Control {
     pub id: Uuid,
     pub framework_id: Uuid,
-    pub control_id: String,    // e.g., "CIS-1.1.1", "SOC2-CC6.1"
+    pub control_id: String, // e.g., "CIS-1.1.1", "SOC2-CC6.1"
     pub title: String,
     pub description: String,
     pub category: String,
     pub severity: ControlSeverity,
-    pub automated: bool,       // can be auto-checked
+    pub automated: bool,          // can be auto-checked
     pub check_fn: Option<String>, // name of check function
     pub remediation: String,
     pub references: Vec<String>,
@@ -36,19 +43,32 @@ pub struct Control {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ControlSeverity { Critical, High, Medium, Low, Informational }
+pub enum ControlSeverity {
+    Critical,
+    High,
+    Medium,
+    Low,
+    Informational,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum FindingStatus { Pass, Fail, Warn, NotApplicable, Error, Manual }
+pub enum FindingStatus {
+    Pass,
+    Fail,
+    Warn,
+    NotApplicable,
+    Error,
+    Manual,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Finding {
     pub id: Uuid,
     pub control_id: Uuid,
-    pub control_ref: String,   // e.g., "CIS-1.1.1"
+    pub control_ref: String, // e.g., "CIS-1.1.1"
     pub status: FindingStatus,
-    pub target: String,        // resource that was checked
+    pub target: String, // resource that was checked
     pub details: String,
     pub remediation: Option<String>,
     pub evidence_ids: Vec<Uuid>,
@@ -70,7 +90,13 @@ pub struct Evidence {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum EvidenceType { Screenshot, ApiResponse, ConfigSnapshot, LogEntry, Manual }
+pub enum EvidenceType {
+    Screenshot,
+    ApiResponse,
+    ConfigSnapshot,
+    LogEntry,
+    Manual,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditEvent {
@@ -108,7 +134,7 @@ pub struct ComplianceReport {
     pub warned: usize,
     pub not_applicable: usize,
     pub manual: usize,
-    pub compliance_score: f64,   // 0.0-100.0
+    pub compliance_score: f64, // 0.0-100.0
     pub findings: Vec<Finding>,
     pub generated_at: DateTime<Utc>,
 }
@@ -127,5 +153,8 @@ pub struct PolicyMapping {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum PolicyEngine { Opa, Kyverno, Custom }
-
+pub enum PolicyEngine {
+    Opa,
+    Kyverno,
+    Custom,
+}

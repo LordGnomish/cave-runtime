@@ -28,10 +28,10 @@ pub mod stopwords;
 
 pub use baseline::{Baseline, BaselineFile};
 pub use config::{Allowlist, Config, ExtendConfig};
-pub use decoders::{detect_with_decoders, Decoder, DecoderChain};
+pub use decoders::{Decoder, DecoderChain, detect_with_decoders};
 pub use detect::Detector;
-pub use finding::{redact, Finding};
-pub use protect::{protect_staged_blobs, protect_staged_with, ProtectOutcome};
+pub use finding::{Finding, redact};
+pub use protect::{ProtectOutcome, protect_staged_blobs, protect_staged_with};
 pub use report::{write_csv, write_json, write_junit, write_sarif};
-pub use rule::{builtin_rules, Rule};
+pub use rule::{Rule, builtin_rules};
 pub use stopwords::{default_stopwords, filter_with_stopwords};

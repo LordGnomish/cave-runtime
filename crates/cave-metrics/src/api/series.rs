@@ -2,11 +2,14 @@
 // Copyright 2026 Cave Runtime contributors
 //! /api/v1/series
 
-use axum::{extract::{Query, State}, Json};
-use serde::Deserialize;
-use std::sync::Arc;
 use crate::model::LabelMatcher;
 use crate::state::MetricsState;
+use axum::{
+    Json,
+    extract::{Query, State},
+};
+use serde::Deserialize;
+use std::sync::Arc;
 
 #[derive(Debug, Deserialize)]
 pub struct SeriesParams {
@@ -23,7 +26,8 @@ pub async fn list_series(
 ) -> Json<serde_json::Value> {
     let matchers = parse_matchers(params.matchers.as_deref().unwrap_or(&[]));
     let series = state.tsdb.series_for(&matchers);
-    let data: Vec<serde_json::Value> = series.into_iter()
+    let data: Vec<serde_json::Value> = series
+        .into_iter()
         .map(|labels| serde_json::json!(labels.0))
         .collect();
     Json(serde_json::json!({ "status": "success", "data": data }))
@@ -35,10 +39,14 @@ fn parse_matchers(raw: &[String]) -> Vec<LabelMatcher> {
 
 /// Parse a simple `{key="value"}` or `metric_name` matcher expression.
 fn parse_single_matcher(s: &str) -> Vec<LabelMatcher> {
-    use crate::promql::parse;
     use crate::promql::ast::Expr;
+    use crate::promql::parse;
 
-    let expr_str = if s.contains('{') { s.to_string() } else { format!("{}{{__name__=\"{}\"}}", s, s) };
+    let expr_str = if s.contains('{') {
+        s.to_string()
+    } else {
+        format!("{}{{__name__=\"{}\"}}", s, s)
+    };
 
     if let Ok(Expr::VectorSelector(vs)) = parse(&expr_str) {
         vs.matchers

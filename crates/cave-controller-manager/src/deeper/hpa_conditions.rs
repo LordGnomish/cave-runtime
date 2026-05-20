@@ -78,19 +78,39 @@ impl ConditionSet {
         let mut s = Self::new();
         s.set(HpaCondition {
             kind: ConditionType::AbleToScale,
-            status: if able_to_scale { ConditionStatus::True } else { ConditionStatus::False },
-            reason: if able_to_scale { "SucceededGetScale".into() } else { "FailedGetScale".into() },
+            status: if able_to_scale {
+                ConditionStatus::True
+            } else {
+                ConditionStatus::False
+            },
+            reason: if able_to_scale {
+                "SucceededGetScale".into()
+            } else {
+                "FailedGetScale".into()
+            },
             message: String::new(),
         });
         s.set(HpaCondition {
             kind: ConditionType::ScalingActive,
-            status: if scaling_active { ConditionStatus::True } else { ConditionStatus::False },
-            reason: if scaling_active { "ValidMetricFound".into() } else { "FailedGetMetric".into() },
+            status: if scaling_active {
+                ConditionStatus::True
+            } else {
+                ConditionStatus::False
+            },
+            reason: if scaling_active {
+                "ValidMetricFound".into()
+            } else {
+                "FailedGetMetric".into()
+            },
             message: String::new(),
         });
         s.set(HpaCondition {
             kind: ConditionType::ScalingLimited,
-            status: if limited.is_some() { ConditionStatus::True } else { ConditionStatus::False },
+            status: if limited.is_some() {
+                ConditionStatus::True
+            } else {
+                ConditionStatus::False
+            },
             reason: limited.unwrap_or("DesiredWithinRange").into(),
             message: String::new(),
         });
@@ -99,10 +119,7 @@ impl ConditionSet {
 }
 
 #[allow(dead_code)]
-const FILE_CITE: Cite = Cite::new(
-    "pkg/controller/podautoscaler/horizontal.go",
-    "setCondition",
-);
+const FILE_CITE: Cite = Cite::new("pkg/controller/podautoscaler/horizontal.go", "setCondition");
 
 #[cfg(test)]
 mod tests {
@@ -154,7 +171,10 @@ mod tests {
             });
         }
         assert_eq!(s.len(), 1);
-        assert_eq!(s.get(ConditionType::AbleToScale).unwrap().status, ConditionStatus::False);
+        assert_eq!(
+            s.get(ConditionType::AbleToScale).unwrap().status,
+            ConditionStatus::False
+        );
     }
 
     #[test]

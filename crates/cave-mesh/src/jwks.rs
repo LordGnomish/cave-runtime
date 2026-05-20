@@ -63,29 +63,34 @@ impl Jwk {
     pub fn decoding_key(&self) -> MeshResult<DecodingKey> {
         match self.kty.as_str() {
             "RSA" => {
-                let n = self.n.as_deref().ok_or_else(|| {
-                    MeshError::Jwt("RSA JWK missing modulus (n)".into())
-                })?;
-                let e = self.e.as_deref().ok_or_else(|| {
-                    MeshError::Jwt("RSA JWK missing exponent (e)".into())
-                })?;
+                let n = self
+                    .n
+                    .as_deref()
+                    .ok_or_else(|| MeshError::Jwt("RSA JWK missing modulus (n)".into()))?;
+                let e = self
+                    .e
+                    .as_deref()
+                    .ok_or_else(|| MeshError::Jwt("RSA JWK missing exponent (e)".into()))?;
                 DecodingKey::from_rsa_components(n, e)
                     .map_err(|err| MeshError::Jwt(format!("RSA JWK invalid: {err}")))
             }
             "EC" => {
-                let x = self.x.as_deref().ok_or_else(|| {
-                    MeshError::Jwt("EC JWK missing x".into())
-                })?;
-                let y = self.y.as_deref().ok_or_else(|| {
-                    MeshError::Jwt("EC JWK missing y".into())
-                })?;
+                let x = self
+                    .x
+                    .as_deref()
+                    .ok_or_else(|| MeshError::Jwt("EC JWK missing x".into()))?;
+                let y = self
+                    .y
+                    .as_deref()
+                    .ok_or_else(|| MeshError::Jwt("EC JWK missing y".into()))?;
                 DecodingKey::from_ec_components(x, y)
                     .map_err(|err| MeshError::Jwt(format!("EC JWK invalid: {err}")))
             }
             "oct" => {
-                let k = self.k.as_deref().ok_or_else(|| {
-                    MeshError::Jwt("oct JWK missing key material (k)".into())
-                })?;
+                let k = self
+                    .k
+                    .as_deref()
+                    .ok_or_else(|| MeshError::Jwt("oct JWK missing key material (k)".into()))?;
                 Ok(DecodingKey::from_base64_secret(k)
                     .map_err(|err| MeshError::Jwt(format!("oct JWK invalid: {err}")))?)
             }
@@ -94,12 +99,15 @@ impl Jwk {
     }
 
     pub fn algorithm(&self) -> MeshResult<Algorithm> {
-        let alg = self.alg.as_deref().unwrap_or_else(|| match self.kty.as_str() {
-            "RSA" => "RS256",
-            "EC" => "ES256",
-            "oct" => "HS256",
-            _ => "",
-        });
+        let alg = self
+            .alg
+            .as_deref()
+            .unwrap_or_else(|| match self.kty.as_str() {
+                "RSA" => "RS256",
+                "EC" => "ES256",
+                "oct" => "HS256",
+                _ => "",
+            });
         parse_alg(alg)
     }
 }
@@ -125,8 +133,7 @@ pub struct JwkSet {
 
 impl JwkSet {
     pub fn parse(raw: &str) -> MeshResult<Self> {
-        serde_json::from_str(raw)
-            .map_err(|e| MeshError::Jwt(format!("invalid JWKS JSON: {e}")))
+        serde_json::from_str(raw).map_err(|e| MeshError::Jwt(format!("invalid JWKS JSON: {e}")))
     }
 
     /// Lookup a key by `kid`. Returns the first key when `kid` is
@@ -363,7 +370,8 @@ mod tests {
         let set = JwkSet::parse(rsa_jwks_body()).unwrap();
         let k = set.find(Some("key-1")).unwrap();
         // The toy n/e are valid base64url; jsonwebtoken accepts.
-        k.decoding_key().expect("RSA key with valid b64 components should build");
+        k.decoding_key()
+            .expect("RSA key with valid b64 components should build");
     }
 
     #[test]
@@ -371,14 +379,20 @@ mod tests {
         let raw = r#"{"keys":[{"kty":"RSA","e":"AQAB"}]}"#;
         let set = JwkSet::parse(raw).unwrap();
         let k = &set.keys[0];
-        assert!(matches!(k.decoding_key().map(|_| ()).unwrap_err(), MeshError::Jwt(_)));
+        assert!(matches!(
+            k.decoding_key().map(|_| ()).unwrap_err(),
+            MeshError::Jwt(_)
+        ));
     }
 
     #[test]
     fn unsupported_kty_errors() {
         let raw = r#"{"keys":[{"kty":"PGP"}]}"#;
         let set = JwkSet::parse(raw).unwrap();
-        assert!(matches!(set.keys[0].decoding_key().map(|_| ()).unwrap_err(), MeshError::Jwt(_)));
+        assert!(matches!(
+            set.keys[0].decoding_key().map(|_| ()).unwrap_err(),
+            MeshError::Jwt(_)
+        ));
     }
 
     #[test]
@@ -394,7 +408,10 @@ mod tests {
         let stub = Arc::new(StubTransport::new());
         stub.set("https://idp.example/.well-known/jwks.json", rsa_jwks_body());
         let cache = JwksCache::new(stub, Duration::from_secs(60));
-        cache.register_issuer("https://idp.example", "https://idp.example/.well-known/jwks.json");
+        cache.register_issuer(
+            "https://idp.example",
+            "https://idp.example/.well-known/jwks.json",
+        );
         let first = cache.fetch("https://idp.example").unwrap();
         let second = cache.fetch("https://idp.example").unwrap();
         assert_eq!(first, second);
@@ -405,11 +422,17 @@ mod tests {
         let stub = Arc::new(StubTransport::new());
         stub.set("https://idp.example/.well-known/jwks.json", rsa_jwks_body());
         let cache = JwksCache::new(stub.clone(), Duration::from_millis(20));
-        cache.register_issuer("https://idp.example", "https://idp.example/.well-known/jwks.json");
+        cache.register_issuer(
+            "https://idp.example",
+            "https://idp.example/.well-known/jwks.json",
+        );
         let first = cache.fetch("https://idp.example").unwrap();
         assert_eq!(first.keys.len(), 2);
         // Rotate keys
-        stub.set("https://idp.example/.well-known/jwks.json", r#"{"keys":[{"kty":"oct","k":"c2VjcmV0","kid":"newkey"}]}"#);
+        stub.set(
+            "https://idp.example/.well-known/jwks.json",
+            r#"{"keys":[{"kty":"oct","k":"c2VjcmV0","kid":"newkey"}]}"#,
+        );
         std::thread::sleep(Duration::from_millis(30));
         let after = cache.fetch("https://idp.example").unwrap();
         assert_eq!(after.keys.len(), 1);
@@ -421,9 +444,15 @@ mod tests {
         let stub = Arc::new(StubTransport::new());
         stub.set("https://idp.example/.well-known/jwks.json", rsa_jwks_body());
         let cache = JwksCache::new(stub.clone(), Duration::from_secs(3600));
-        cache.register_issuer("https://idp.example", "https://idp.example/.well-known/jwks.json");
+        cache.register_issuer(
+            "https://idp.example",
+            "https://idp.example/.well-known/jwks.json",
+        );
         cache.fetch("https://idp.example").unwrap();
-        stub.set("https://idp.example/.well-known/jwks.json", r#"{"keys":[{"kty":"oct","k":"c2VjcmV0","kid":"forced"}]}"#);
+        stub.set(
+            "https://idp.example/.well-known/jwks.json",
+            r#"{"keys":[{"kty":"oct","k":"c2VjcmV0","kid":"forced"}]}"#,
+        );
         let after = cache.force_refresh("https://idp.example").unwrap();
         assert_eq!(after.keys[0].kid.as_deref(), Some("forced"));
     }
