@@ -16,17 +16,20 @@ url      = "https://github.com/DefectDojo/django-DefectDojo"
 sha      = "6eab87386d504c4bc164f87b6aae58a8e0c1b8d2"
 
 [parity]
-# Charter v2 8-gate close-out 2026-05-19.
-# Honest measured: 14 mapped local subsystems, 14 real-ported, 0 stub.
-# = 14 / (14 mapped + 2 documented missing Phase 2) = 0.875
-mapped_count   = 14
+# Parity-uplift-sec-stack 2026-05-19. Adds 4 mapped subsystems
+# (cyclonedx_vex / notification_rules / lifecycle / engagement_scope),
+# moves "notification fan-out" out of unmapped into scope_cuts
+# (cave-noti owns transport), keeps JIRA bidirectional sync as the
+# single remaining unmapped Phase 2 item.
+# = (18 + 0 + 1) / 20 = 0.95
+mapped_count   = 18
 partial_count  = 0
-skipped_count  = 0
-unmapped_count = 2
-total          = 16
-ratio          = 0.875
-fill_ratio     = 0.875
-honest_ratio   = 0.875
+skipped_count  = 1
+unmapped_count = 1
+total          = 20
+ratio          = 0.95
+fill_ratio     = 0.95
+honest_ratio   = 0.90
 parity_ratio_source = "manifest"
 last_audit     = "2026-05-19"
 infra_only     = false
@@ -97,6 +100,36 @@ local    = "src/notifications.rs"
 [[files]]
 upstream = "dojo/api_v2/views.py"
 local    = "src/routes.rs"
+
+# ── Parity-uplift 2026-05-19 — new mappings ──────────────────────────────────
+
+[[files]]
+upstream = "dt/persistence/CycloneDXVexImporter.java"
+local    = "src/parsers/cyclonedx_vex.rs"
+
+[[files]]
+upstream = "dojo/notifications/views.py"
+local    = "src/notification_rules.rs"
+
+[[files]]
+upstream = "dojo/finding/helper.py (accept/false-positive/mitigate flows)"
+local    = "src/lifecycle.rs"
+
+[[files]]
+upstream = "dojo/finding/views.py (engagement_filter/product_filter)"
+local    = "src/engagement_scope.rs"
+
+# ── Scope cuts — explicit deferred work ─────────────────────────────────────
+
+[[scope_cuts]]
+upstream = "dojo/notifications/helper.py (Slack/Teams/Cisco/Mattermost fan-out)"
+reason   = "cave-noti owns transport — cave-vulns emits the generic NotificationEvent that cave-noti subscribes to; moved from unmapped to scope_cut after parity-uplift-sec-stack-2026-05-19"
+
+# ── Unmapped — real deferred gaps ────────────────────────────────────────────
+
+[[missings]]
+upstream = "dojo/jira_link/views.py (JIRA bidirectional sync)"
+reason   = "Phase 2 — one-way emission works (finding → JIRA ticket); incoming JIRA status reconciliation deferred"
 
 # Parsers
 [[files]]

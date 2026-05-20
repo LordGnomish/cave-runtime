@@ -1,6 +1,6 @@
 # cave-vulns — Charter v2 8-gate Close-out Report
 
-**Audit date**: 2026-05-19
+**Audit date**: 2026-05-19 (parity-uplift-sec-stack)
 **Upstream**: `DefectDojo/django-DefectDojo @ v2.58.2`
               (`6eab87386d504c4bc164f87b6aae58a8e0c1b8d2`, BSD-3-Clause, Python)
 **Secondary**: `DependencyTrack/dependency-track @ v4.11.0` (Apache-2.0, Java)
@@ -10,32 +10,30 @@
 
 cave-vulns is the **vulnerability aggregation hub** — DefectDojo-parity
 finding lifecycle, four deduplication algorithms, CVSS v3 + v4 scoring,
-SLA tracking, multi-tool ingest (7 parsers), and DependencyTrack-style
-SBOM/SCA correlation.
-
-The deep DefectDojo port landed during the **Artifact + Security wave**
-(commits 8227fd8e..b25b4ab4, 2026-05-17). This report stamps the
-Charter v2 close-out that brings cave-vulns' audit shape in line with
-data-persistence and k8s-core closes.
+SLA tracking, multi-tool ingest (7 parsers), DependencyTrack-style
+SBOM/SCA correlation, and after the 2026-05-19 uplift: CycloneDX VEX
+ingest, rule-based notification routing, lifecycle workflow helpers
+(accept/false-positive/mitigate/reactivate), and engagement-scoped
+finding queries.
 
 ## Inventory measurement
 
 Hand-curated 2026-05-19 against `dojo/` tree of upstream v2.58.2.
 
-| Bucket   | Count | Examples                                                                              |
-|----------|------:|---------------------------------------------------------------------------------------|
-| Mapped   |    14 | Finding model + state machine, Dedup (4 algorithms), CVSS v3 + v4 scoring,            |
-|          |       | Product/Engagement/Test hierarchy, Risk acceptance, SLA, 7 parsers,                   |
-|          |       | Routes, Correlation hub                                                                |
-| Partial  |     0 | (every mapped subsystem is a real port — no documented partials)                       |
-| Skipped  |     0 | (none — every upstream subsystem is either mapped or in the unmapped Phase 2 list)     |
-| Unmapped |     2 | Documented Phase 2 deferrals (see below)                                              |
-| **Total**| **16**| |
+| Bucket   | Count | Examples                                                                                |
+|----------|------:|-----------------------------------------------------------------------------------------|
+| Mapped   |    18 | Finding + state machine, Dedup (4 algorithms), CVSS v3+v4, Hierarchy, Risk-accept, SLA, |
+|          |       | 7 parsers, Routes, Correlation, Notifications, **cyclonedx_vex**, **notification_rules**, |
+|          |       | **lifecycle**, **engagement_scope**                                                     |
+| Partial  |     0 | (no partials)                                                                           |
+| Skipped  |     1 | Notification fan-out (Slack/Teams/Cisco/Mattermost) — cave-noti owns transport          |
+| Unmapped |     1 | JIRA bidirectional sync (Phase 2)                                                       |
+| **Total**| **20**| |
 
-- **fill_ratio   = (mapped + partial + skipped) / total = 14 / 16 = 0.875**
-- **honest_ratio = mapped / total                       = 14 / 16 = 0.875**
+- **fill_ratio   = (mapped + partial + skipped) / total = 19 / 20 = 0.95**
+- **honest_ratio = mapped / total                       = 18 / 20 = 0.90**
 
-Charter v2 floor for cave-vulns is `0.80`. We sit at **0.875**, above the floor.
+Charter v2 parity-uplift floor is **0.95**. We sit at **0.95**.
 
 ## 8-gate close-out
 
@@ -45,23 +43,30 @@ Charter v2 floor for cave-vulns is `0.80`. We sit at **0.875**, above the floor.
 | 2 | `source_sha` pinned in manifest   | PASS   | `sha = "6eab87386d504c4bc164f87b6aae58a8e0c1b8d2"` |
 | 3 | `last_audit = "2026-05-19"`       | PASS   | `[parity].last_audit`                          |
 | 4 | `parity_ratio_source = "manifest"`| PASS   | parity-index reads `fill_ratio` directly       |
-| 5 | `fill_ratio >= 0.80`              | PASS   | 0.875 (above 0.80 floor)                       |
-| 6 | mapped+partial+skipped+unmapped == total | PASS | 14 + 0 + 0 + 2 = 16                      |
+| 5 | `fill_ratio >= 0.95`              | PASS   | 0.95                                           |
+| 6 | mapped+partial+skipped+unmapped == total | PASS | 18 + 0 + 1 + 1 = 20                       |
 | 7 | No `unimplemented!()` / `todo!()` | PASS   | 0 stub macros under `src/`                     |
 | 8 | `PARITY_REPORT.md` present        | PASS   | this file                                      |
 
 **Charter v2 verdict: 8/8 PASS.**
 
-## Scope-cut — explicit deferred work
+## What landed in the 2026-05-19 uplift
 
-The two `unmapped` entries are the Phase 2 deferrals carried forward from
-the 2026-05-17 deep-port:
+| Module                            | DefectDojo / DTrack upstream                                  | Tests |
+|-----------------------------------|---------------------------------------------------------------|------:|
+| `src/parsers/cyclonedx_vex.rs`    | `dt/persistence/CycloneDXVexImporter.java`                    | 11    |
+| `src/notification_rules.rs`       | `dojo/notifications/views.py` (per-user/per-product matrix)   |  9    |
+| `src/lifecycle.rs`                | `dojo/finding/helper.py` accept/false-positive/mitigate flows |  9    |
+| `src/engagement_scope.rs`         | `dojo/finding/views.py` engagement/product filters            | 10    |
 
-1. **Notification fan-out (Slack / Teams / Cisco / Mattermost)** — cave-noti
-   owns the transport layer; cave-vulns emits a generic finding-event that
-   cave-noti subscribes to. Will be wired in Phase 2.
-2. **JIRA ticket bidirectional sync** — one-way emission works (finding →
-   JIRA ticket); incoming JIRA status reconciliation deferred to Phase 2.
+## Scope-cut detail
+
+1. **Notification fan-out (Slack/Teams/Cisco/Mattermost)** — cave-noti owns
+   the transport layer. cave-vulns emits a generic `NotificationEvent`
+   plus a `NotificationRuleSet` that routes it to channels; the actual
+   HTTP fan-out is cave-noti's job. Moved from unmapped to scope_cut.
+2. **JIRA bidirectional sync** — one-way emission works (finding → JIRA
+   ticket creation); incoming JIRA status reconciliation deferred.
 
 ## How to verify
 
