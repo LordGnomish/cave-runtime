@@ -114,17 +114,24 @@ pub fn default_queue_dir() -> PathBuf {
 }
 
 /// Slugify `owner/repo` -> `owner-repo` for filename safety.
+///
+/// Replaces `/` with `-` and any other unsafe character with `_`. Also
+/// inserts `_` between a slash-derived `-` and a following `.` so a path
+/// like `foo/../bar` slugifies to `foo-_..-bar` rather than `foo-..-bar`
+/// (which would still look like a path-traversal token to a downstream
+/// consumer that splits on `-`).
 fn slugify_repo(repo: &str) -> String {
-    repo.replace('/', "-")
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '-' || c == '.' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect()
+    let with_slashes = repo.replace('/', "-");
+    let mut out = String::with_capacity(with_slashes.len());
+    for c in with_slashes.chars() {
+        let safe = c.is_ascii_alphanumeric() || c == '-' || c == '.';
+        let ch = if safe { c } else { '_' };
+        if ch == '.' && out.ends_with('-') {
+            out.push('_');
+        }
+        out.push(ch);
+    }
+    out
 }
 
 /// Write the payload atomically. Returns the basename (not the full path)

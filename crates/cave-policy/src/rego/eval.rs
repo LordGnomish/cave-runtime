@@ -155,6 +155,37 @@ fn eval_expr(expr: &Expr, bindings: &Bindings, ctx: &EvalCtx) -> Vec<Bindings> {
             unify_value(left, rval, bindings.clone(), ctx)
         }
 
+        Expr::Compare { op, lhs, rhs } => {
+            let lv = eval_term(lhs, bindings, ctx);
+            let rv = eval_term(rhs, bindings, ctx);
+            if lv.is_undefined() || rv.is_undefined() {
+                return vec![];
+            }
+            let result = match op {
+                CompareOp::Eq => lv == rv,
+                CompareOp::Ne => lv != rv,
+                _ => {
+                    let (la, rb) = match (lv.to_json_lossy(), rv.to_json_lossy()) {
+                        (a, b) => (a, b),
+                    };
+                    let ord = crate::rego::value::json_cmp(&la, &rb);
+                    use std::cmp::Ordering;
+                    match (op, ord) {
+                        (CompareOp::Lt, Ordering::Less) => true,
+                        (CompareOp::Le, Ordering::Less | Ordering::Equal) => true,
+                        (CompareOp::Gt, Ordering::Greater) => true,
+                        (CompareOp::Ge, Ordering::Greater | Ordering::Equal) => true,
+                        _ => false,
+                    }
+                }
+            };
+            if result {
+                vec![bindings.clone()]
+            } else {
+                vec![]
+            }
+        }
+
         Expr::Not(inner_expr) => {
             if eval_expr(inner_expr, bindings, ctx).is_empty() {
                 vec![bindings.clone()]
@@ -397,6 +428,27 @@ pub fn eval_term(term: &Term, bindings: &Bindings, ctx: &EvalCtx) -> Value {
 }
 
 fn eval_ref(base: &Term, ref_args: &[RefArg], bindings: &Bindings, ctx: &EvalCtx) -> Value {
+    // If this is a reference rooted at `data`, try resolving it against
+    // the loaded module rules first. OPA semantics say `data.<pkg>.<rule>`
+    // evaluates the rule, not the static data document.
+    if let Term::Var(name) = base {
+        if name == "data" {
+            let field_path: Option<Vec<String>> = ref_args
+                .iter()
+                .map(|a| match a {
+                    RefArg::Field(f) => Some(f.clone()),
+                    RefArg::Index(Term::String(s)) => Some(s.clone()),
+                    _ => None,
+                })
+                .collect();
+            if let Some(path) = field_path {
+                if let Some(v) = eval_data_path_as_rule(&path, bindings, ctx) {
+                    return v;
+                }
+            }
+        }
+    }
+
     let mut current = eval_term(base, bindings, ctx);
 
     for ref_arg in ref_args {
@@ -592,6 +644,76 @@ fn eval_rule_by_name(name: &str, bindings: &Bindings, ctx: &EvalCtx) -> Value {
         }
     }
     Value::Undefined
+}
+
+/// Resolve `data.<pkg>.<rule>` style references against loaded modules.
+/// Returns `Some(value)` when the path matches a rule (even if the rule's
+/// value is `Undefined`, so we don't fall back to the static data document),
+/// `None` when no matching module/rule is found.
+fn eval_data_path_as_rule(
+    path: &[String],
+    bindings: &Bindings,
+    ctx: &EvalCtx,
+) -> Option<Value> {
+    if path.is_empty() {
+        return None;
+    }
+    let mut default_value: Option<Value> = None;
+    let mut concrete_value: Option<Value> = None;
+    for module in ctx.modules.values() {
+        let pkg_path = &module.package.path;
+        if path.len() <= pkg_path.len() {
+            continue;
+        }
+        if &path[..pkg_path.len()] != pkg_path.as_slice() {
+            continue;
+        }
+        let rule_name = &path[pkg_path.len()];
+        let tail = &path[pkg_path.len() + 1..];
+        for rule in &module.rules {
+            if rule.head.name != *rule_name {
+                continue;
+            }
+            if !rule.head.args.is_empty() {
+                continue; // functions need argument lists, not bare refs
+            }
+            if let Some(v) = eval_rule(rule, pkg_path, bindings, ctx) {
+                let resolved = if tail.is_empty() {
+                    v
+                } else {
+                    let json = v.to_json_lossy();
+                    let mut cur = &json;
+                    let mut ok = true;
+                    for seg in tail {
+                        match cur.get(seg) {
+                            Some(next) => cur = next,
+                            None => {
+                                ok = false;
+                                break;
+                            }
+                        }
+                    }
+                    if ok {
+                        Value::Json(cur.clone())
+                    } else {
+                        Value::Undefined
+                    }
+                };
+                if rule.is_default {
+                    if default_value.is_none() {
+                        default_value = Some(resolved);
+                    }
+                } else if !resolved.is_undefined() {
+                    concrete_value = Some(resolved);
+                    break;
+                }
+            }
+        }
+        if concrete_value.is_some() {
+            break;
+        }
+    }
+    concrete_value.or(default_value)
 }
 
 fn eval_function_rule(

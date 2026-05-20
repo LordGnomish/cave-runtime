@@ -44,7 +44,16 @@ pub fn parse_intent(text: &str) -> InfraIntent {
 }
 
 fn detect_action(text: &str) -> IntentAction {
-    if text.contains("create")
+    // Plan-style framing (hypotheticals / dry runs) takes precedence — these
+    // phrases imply intent to *evaluate* rather than execute, even when the
+    // sentence also contains verbs like "deploy".
+    if text.contains("what would")
+        || text.contains("preview")
+        || text.contains("dry run")
+        || text.contains("plan")
+    {
+        IntentAction::Plan
+    } else if text.contains("create")
         || text.contains("provision")
         || text.contains("spin up")
         || text.contains("deploy")
@@ -77,12 +86,6 @@ fn detect_action(text: &str) -> IntentAction {
         || text.contains("check")
     {
         IntentAction::Inspect
-    } else if text.contains("plan")
-        || text.contains("preview")
-        || text.contains("what would")
-        || text.contains("dry run")
-    {
-        IntentAction::Plan
     } else {
         IntentAction::Unknown
     }

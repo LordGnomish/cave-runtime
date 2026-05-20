@@ -135,11 +135,12 @@ impl Zone {
     }
 
     fn wildcard_lookup(&self, name: &Name, qtype: RecordType) -> Option<Vec<Record>> {
-        // Build wildcard names: *.label.example.com, *.example.com, …
+        // Build wildcard names: *.label.example.com., *.example.com., …
+        // Trailing dot is required so the synthesized name is FQDN and matches stored keys.
         let labels = name.iter().collect::<Vec<_>>();
         for i in 1..labels.len() {
             let wildcard_str = format!(
-                "*.{}",
+                "*.{}.",
                 labels[i..]
                     .iter()
                     .map(|l| String::from_utf8_lossy(l))

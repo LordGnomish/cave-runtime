@@ -67,6 +67,17 @@ pub struct RuleHead {
 /// A rule body: conjunction of expressions.
 pub type Body = Vec<Expr>;
 
+/// Comparison operator: ==, !=, <, <=, >, >=.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompareOp {
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+}
+
 /// A single expression (literal) in a rule body.
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -76,6 +87,12 @@ pub enum Expr {
     Unify(Term, Term),
     /// `x := y` — local assignment
     Assign(Term, Term),
+    /// `x == y`, `x != y`, `x < y`, `x <= y`, `x > y`, `x >= y`
+    Compare {
+        op: CompareOp,
+        lhs: Term,
+        rhs: Term,
+    },
     /// `not expr` — negation as failure
     Not(Box<Expr>),
     /// `not { body }` — negation over a body
