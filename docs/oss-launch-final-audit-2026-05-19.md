@@ -18,7 +18,7 @@ Burak's.
 | `cargo check` workspace        | **exit 0**, 824 warnings, 0 errors, 1m18s         |
 | `cargo test --no-fail-fast`    | **17 660 passed**, 32 failed, 146 ignored, 274 bins |
 | `cargo clippy -D warnings`     | **FAIL** — 83 lint errors block compile           |
-| `cargo fmt --check`            | **FAIL** — 413 lines of diff                       |
+| `cargo fmt --check`            | **clean** (post-merge of OSS-launch fmt sweep)    |
 | `cargo doc --no-deps`          | exit 0, 749 warnings, 0 errors, 1m36s, 108 crates |
 | `build-parity-index.py`         | 112 crates, 99 manifest_filled, 98 manifest-sourced |
 | Charter v2 8/8 PARITY_REPORTs  | **27/28** clear 8/8 stamp (1 backend-only deferral) |
@@ -131,12 +131,12 @@ cave-runtime / cave-cli surfaces (200+ each), cave-streams (137).
 
 ## 5. `cargo fmt --check`
 
-- exit code: **0** *(the `tee` exit; `cargo fmt --check` itself returned diff)*
-- diff: **413 lines** across multiple crates
+- pre-merge against `origin/main@430cd644`: **413 lines of diff**
+- post-merge against `origin/main@54192357` (`style: cargo fmt --all (OSS launch hygiene pass)`): **0 lines of diff** — clean
 
-The diff is small-bore (struct-literal expansion, comment-alignment whitespace)
-and would be auto-fixed by `cargo fmt`. Not run as part of this audit because
-the brief was read-only.
+A parallel OSS-launch ray (`oss-launch-files`) ran `cargo fmt --all` and pushed
+to main while this audit was in flight. After merging that into this branch
+the fmt diff goes to zero; the §1 table reflects the post-merge state.
 
 ---
 
@@ -282,7 +282,7 @@ Self-audit count: 28 `tests/parity_self_audit.rs` files (1:1 with PARITY_REPORT)
 | 11 failing test targets (incl. one hang)        | Burak's call. None are panics on the OSS happy path; they are pre-existing crate-internal failures on `main`. |
 | 824 cargo-check warnings, 749 doc warnings      | Cosmetic; first-impression cost. Recommend a 30-min `cargo fix` sweep pre-orphan. |
 | 83 clippy lint errors (under `-D warnings`)     | Same — `cargo clippy --fix` resolves most. |
-| 413-line fmt diff                                | One `cargo fmt` invocation. |
+| fmt diff (pre-merge)                              | Resolved by OSS-launch-files ray's `cargo fmt --all`. |
 | 71 zero-parity-ratio crates                      | Public day-one signal that the platform is broad-but-thin; documented in tier table. |
 | `cave-ha` replication hang                       | Known concurrency footgun (multi-worktree run); single-machine reproducer should pass. |
 | Force-push window safety                         | Mitigated by `--force-with-lease` and pre-announcement window per ADR-148. |
