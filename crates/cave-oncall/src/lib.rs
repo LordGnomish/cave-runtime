@@ -8,7 +8,10 @@
 use std::sync::Arc;
 pub mod engine;
 pub mod models;
+pub mod pagerduty_migrator;
 pub mod routes;
+pub mod slack;
+pub mod sms_voice;
 
 pub use engine::OnCallError;
 pub use routes::OnCallStore;
