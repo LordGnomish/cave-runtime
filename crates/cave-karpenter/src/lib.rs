@@ -29,6 +29,7 @@
 pub mod batcher;
 pub mod binpack;
 pub mod disruption;
+pub mod drain;
 pub mod models;
 pub mod nodeclaim_lifecycle;
 pub mod provider;
