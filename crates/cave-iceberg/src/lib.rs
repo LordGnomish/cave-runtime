@@ -36,7 +36,9 @@ pub mod snapshot;
 pub mod sort_order;
 pub mod table;
 pub mod table_metadata;
+pub mod transaction;
 pub mod transform;
+pub mod writer;
 
 pub use catalog::Catalog;
 pub use error::{Error, Result};
@@ -55,7 +57,9 @@ pub use snapshot::{Snapshot, SnapshotRef};
 pub use sort_order::{NullOrder, SortDirection, SortField, SortOrder};
 pub use table::{Table, TableIdent};
 pub use table_metadata::{FormatVersion, TableMetadata, TableMetadataBuilder};
+pub use transaction::{rewrite_manifest, Transaction};
 pub use transform::Transform;
+pub use writer::{DataFileWriter, WriteOperation, WritePlan};
 
 pub const UPSTREAM: &str = "apache/iceberg-rust";
 pub const UPSTREAM_VERSION: &str = "v0.9.1";

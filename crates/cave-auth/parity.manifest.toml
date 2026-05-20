@@ -6,13 +6,14 @@
 # (PQC) JWS keys, plus an Okta and a generic OIDC adapter.
 
 [upstream]
-org     = "keycloak"
-repo    = "keycloak"
-version = "v22.0.0"
-name    = "Keycloak"
-license = "Apache-2.0"
-language= "Java"
-url     = "https://github.com/keycloak/keycloak"
+org        = "keycloak"
+repo       = "keycloak"
+version    = "v22.0.0"
+source_sha = "v22.0.0"
+name       = "Keycloak"
+license    = "Apache-2.0"
+language   = "Java"
+url        = "https://github.com/keycloak/keycloak"
 
 [parity]
 # Package-level inventory against keycloak/keycloak v22.0.0 — a
@@ -28,7 +29,8 @@ unmapped_count = 0
 total          = 44
 fill_ratio     = 1.0000
 honest_ratio   = 0.9773
-last_audit     = "2026-05-17"
+last_audit     = "2026-05-19"
+parity_ratio_source = "manifest"
 infra_only     = false
 # 2026-05-17 Phase 3 close-out — 6-parallel-agent 100% run.
 # K1 admin handler mount  : admin_idp + admin_flows routers wired into
@@ -570,16 +572,32 @@ reason       = "test-harness"
 #
 # SAML 2.0 promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
 # UMA / LDAP / Kerberos / SAML-broker / oauth2/granttype all promoted to
-# mapped 2026-05-15 — see new `[[mapped]]` entries below. The remaining two
-# gaps (email listener + JPA persistence) are deliberately out of scope.
+# mapped 2026-05-15 — see new `[[mapped]]` entries below.
+# Email listener + JPA persistence + WS-Fed + OID4VC promoted to mapped
+# 2026-05-17 (K1/K2/K6 close-out) — see new `[[mapped]]` entries below.
+# Zero remaining unmapped subsystems as of 2026-05-19.
 
-[[unmapped]]
+# ── 2026-05-17 K1/K2/K6 promotions ────────────────────────────────────────────
+
+[[mapped]]
 upstream_pkg = "keycloak:services/.../events/email/"
-note         = "Email event listener — password reset / verification mails. Out of scope for v1."
+local_files  = ["src/email_listener/"]
+note         = "Email event listener — password reset / verification mails / SMTP delivery via lettre + handlebars templates + audit-event dispatcher. K6 close-out 2026-05-17."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "keycloak:models/jpa/"
-note         = "JPA persistence layer. cave-auth uses in-memory state; persistent backend is a real gap."
+local_files  = ["src/persistence/"]
+note         = "JPA persistence layer — PersistenceBackend trait + rusqlite RdbmsBackend + InMemoryBackend + 4 Flyway-style migrations. K2 close-out 2026-05-17."
+
+[[mapped]]
+upstream_pkg = "keycloak:services/.../wsfed/ + WS-Fed 1.2 + WS-Trust 1.3"
+local_files  = ["src/wsfed/"]
+note         = "WS-Federation IdP — SAML 1.1 assertions + RST/RSTR + signin/signout endpoints. K6 close-out 2026-05-17."
+
+[[mapped]]
+upstream_pkg = "keycloak:services/.../oid4vci + W3C VC 2.0 + OID4VCI + OID4VP"
+local_files  = ["src/oid4vc/"]
+note         = "OpenID4 Verifiable Credentials — W3C VC 2.0 + Ed25519 DataIntegrityProof + OID4VCI issuance + OID4VP presentation. K6 close-out 2026-05-17. Honest gap: JCS (RFC 8785) used as URDNA2015 substitute."
 
 # ── 2026-05-15 deep push — A1 / A3 / A4 / A5 promotions + new mapped ─────────
 

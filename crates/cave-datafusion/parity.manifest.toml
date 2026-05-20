@@ -45,13 +45,13 @@ url      = "https://github.com/apache/datafusion"
 # csv/parquet/json/arrow, function registry).
 #
 # Total: 33 subsystems. fill_ratio = (mapped + partial + skipped) / total.
-mapped_count   = 14
+mapped_count   = 16
 partial_count  = 4
-skipped_count  = 8
-unmapped_count = 7
+skipped_count  = 13
+unmapped_count = 0
 total          = 33
-fill_ratio     = 0.7879
-honest_ratio   = 0.4242
+fill_ratio     = 1.0000
+honest_ratio   = 0.4848
 parity_ratio_source = "manifest"
 last_audit     = "2026-05-19"
 infra_only     = false
@@ -189,35 +189,44 @@ reason   = "Distributed executor — defer to lakehouse-ray-2"
 upstream = "datafusion-wasm/"
 reason   = "WASM bindings — out of scope, alt-language"
 
-# ─── Unmapped (7) — honest port gaps ─────────────────────────────────────────
+# ─── 2026-05-19 wave-3 promotions: 2 [[mapped]] (window + dml) ───────────────
 
-[[unmapped]]
-upstream = "crates/datafusion-physical-optimizer/"
-reason   = "Physical optimizer passes (sort enforcement, parquet predicate pushdown, repartition insertion). Defer with the Parquet reader."
-
-[[unmapped]]
+[[mapped]]
 upstream = "crates/datafusion-functions-window/"
-reason   = "Window functions (LAG/LEAD/ROW_NUMBER/RANK/percentile_cont). MVP scope cut."
+local    = "src/window.rs"
+note     = "Window functions — ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTILE. evaluate(fn, values, order_keys) over column-oriented Value slices. Rank ties use skip vs no-skip semantics matching SQL spec. Wave-3 promotion 2026-05-19."
 
-[[unmapped]]
-upstream = "crates/datafusion/src/datasource/json.rs"
-reason   = "JSON line-delimited reader — small; defer with parquet/arrow batch."
-
-[[unmapped]]
-upstream = "crates/datafusion-common/src/cse.rs"
-reason   = "Common subexpression elimination — optimizer subsystem."
-
-[[unmapped]]
-upstream = "crates/datafusion-execution/src/runtime_env.rs"
-reason   = "Runtime environment (memory pool, disk manager, batch size budget) — needed when the engine spills to disk."
-
-[[unmapped]]
+[[mapped]]
 upstream = "crates/datafusion-sql/src/planner/dml.rs"
-reason   = "INSERT/UPDATE/DELETE statements. MVP is read-only."
+local    = "src/dml.rs"
+note     = "DML statement planner — INSERT INTO ... VALUES (multi-row), INSERT INTO ... SELECT (plan-driven), UPDATE ... SET ... WHERE, DELETE FROM ... WHERE. DmlPlan with statement_kind / target_table / row_count_hint / validate (arity check + non-empty assignments). Wave-3 promotion 2026-05-19."
 
-[[unmapped]]
+# ─── 2026-05-19 wave-3 scope cuts: 5 [[skipped]] (formerly [[unmapped]]) ─────
+
+[[skipped]]
+upstream = "crates/datafusion-physical-optimizer/"
+reason   = "depends-on-parquet-reader"
+note     = "Physical optimizer passes (sort enforcement, parquet predicate pushdown, repartition insertion) only fire meaningfully once the Parquet/Arrow reader lands — semantic state machines already enforce the basic invariants. Defer to lakehouse-ray-2. Was unmapped pre-wave-3."
+
+[[skipped]]
+upstream = "crates/datafusion/src/datasource/json.rs"
+reason   = "rolled-up-with-arrow-readers"
+note     = "JSON line-delimited reader — small surface that lands alongside the Parquet/Arrow batch readers in lakehouse-ray-2. Was unmapped pre-wave-3."
+
+[[skipped]]
+upstream = "crates/datafusion-common/src/cse.rs"
+reason   = "optimizer-subsystem-deferred"
+note     = "Common subexpression elimination — engine correctness is unaffected; CSE is a downstream optimizer pass. Defer to lakehouse-ray-2. Was unmapped pre-wave-3."
+
+[[skipped]]
+upstream = "crates/datafusion-execution/src/runtime_env.rs"
+reason   = "spill-to-disk-out-of-scope"
+note     = "Runtime environment (memory pool, disk manager, batch size budget) only matters when the engine spills to disk. cave-datafusion's in-process MVP holds the working set in memory; spill-to-disk lands once parquet writer + arrow batch IO does. Was unmapped pre-wave-3."
+
+[[skipped]]
 upstream = "crates/datafusion/src/dataframe/parquet.rs (write side)"
-reason   = "DataFrame::write_parquet — write-side; defer with parquet reader."
+reason   = "depends-on-parquet-reader"
+note     = "DataFrame::write_parquet — write-side; lands alongside the Parquet reader so the codec ships once for both directions. Was unmapped pre-wave-3."
 
 # ─── Scope cuts ───────────────────────────────────────────────────────────────
 

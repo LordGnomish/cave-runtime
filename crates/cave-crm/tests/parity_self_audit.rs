@@ -16,7 +16,7 @@ use std::fs;
 use std::path::PathBuf;
 
 const TODAY: &str = "2026-05-19";
-const FLOOR_FILL_RATIO: f64 = 0.45;
+const FLOOR_FILL_RATIO: f64 = 0.95;
 
 fn workspace_root() -> PathBuf {
     let mut p: PathBuf = [env!("CARGO_MANIFEST_DIR")].iter().collect();

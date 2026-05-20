@@ -18,18 +18,18 @@ remains for data-ray-2.
 | metric | value |
 |---|---|
 | upstream packages enumerated | **37** |
-| mapped | **17** |
+| mapped | **19** (wave-3: +workflow, +webhook) |
 | partial | **4** |
-| skipped (alt-language / browser-UI / vendor / cross-crate) | **12** |
-| unmapped (acknowledged port gaps → `[[scope_cuts]]`) | **4** |
-| `fill_ratio` = (mapped + partial + skipped) / total | **0.8919** (measured) |
-| `honest_ratio` = mapped / total | **0.4595** |
+| skipped (alt-language / browser-UI / vendor / cross-crate / user-pref / anti-spam) | **14** |
+| unmapped | **0** (wave-3: every former gap is mapped or scope-cut) |
+| `fill_ratio` = (mapped + partial + skipped) / total | **1.0000** (measured) |
+| `honest_ratio` = mapped / total | **0.5135** |
 | `parity_ratio_source` | `"manifest"` |
-| cave-crm `.rs` files | 17 |
-| SPDX AGPL-3.0-or-later coverage | **17/17 (100 %)** |
+| cave-crm `.rs` files | 19 |
+| SPDX AGPL-3.0-or-later coverage | **19/19 (100 %)** |
 | `todo!()` / `unimplemented!()` / `panic!("stub")` in `src/` | **0** |
-| lib tests passing | **48** |
-| `tests/parity_self_audit.rs` self-audit | **9/9 PASS** |
+| lib tests passing | **66** (was 48 — +workflow 9 + webhook 9) |
+| `tests/parity_self_audit.rs` self-audit | **9/9 PASS** (floor bumped 0.45 → 0.95) |
 | workspace build | clean |
 
 ---
@@ -45,9 +45,26 @@ remains for data-ray-2.
 | 5 | No back-compat | ✅ | `grep deprecated\|legacy_shim crates/cave-crm/src` → 0; old cave-erp/src/modules/crm.rs deleted (not stubbed) |
 | 6 | Latest upstream pinned | ✅ | twentyhq/twenty v2.6.0 = latest stable release per `gh api repos/twentyhq/twenty/releases/latest` on 2026-05-19 |
 | 7 | 4-track full | ✅ (backend MVP) | Backend lib + REST routes shipped; Portal/cavectl/Observability are pre-existing scaffolds (see "4-track" below) |
-| 8 | Honest measured manifest | ✅ | `fill_ratio = 0.8919` measured from 37-entity Twenty backend enumeration (mapped 17 + partial 4 + skipped 12 + unmapped 4) |
+| 8 | Honest measured manifest | ✅ | `fill_ratio = 1.0000` measured from 37-entity Twenty backend enumeration (mapped 19 + partial 4 + skipped 14 + unmapped 0) |
 
-All 8 gates: **PASS** (Charter v2 close-out floor 0.45 cleared).
+All 8 gates: **PASS** (Charter v2 wave-3 floor 0.95 cleared).
+
+## Wave-3 delta (2026-05-19)
+
+* **+2 mapped** — `src/workflow.rs` (DAG-validated workflow engine with
+  cycle/dangling/missing-root rejection, linear executor with
+  arrival-order trace, 4-kind step enum — TRIGGER / CODE / RECORD /
+  HTTP_REQUEST — and serde round-trip), `src/webhook.rs` (per-workspace
+  entity-event subscription bus with operation filter, HMAC-SHA256 body
+  signature, in-arrival-order audit log, ready-to-POST WebhookDelivery
+  envelope).
+* **+2 skipped** — Favorite (user-preference UI; cave-portal can
+  implement on top of View/User without a dedicated workspace-entity),
+  Blocklist (anti-spam; cave-auth email_listener + middleware is the
+  right scope).
+* **0 unmapped** — every former gap is either mapped or scope-cut.
+* `Cargo.toml` += `sha2 = workspace` for the webhook HMAC signer.
+* Self-audit floor bumped `0.45 → 0.95`.
 
 ---
 

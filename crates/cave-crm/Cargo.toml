@@ -23,6 +23,7 @@ tracing = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v4"] }
 chrono = { workspace = true, features = ["serde"] }
 thiserror = { workspace = true }
+sha2 = { workspace = true }
 
 [dev-dependencies]
 tower = { workspace = true }
