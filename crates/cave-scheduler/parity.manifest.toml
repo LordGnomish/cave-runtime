@@ -1,16 +1,36 @@
 # parity.manifest.toml — cave-scheduler
 # Upstream: kubernetes/kubernetes  https://github.com/kubernetes/kubernetes
 #
+# 2026-05-19 UPLIFT — Charter v2 parity uplift 0.8966 → 0.9655.
+#   * Two [[unmapped]] → [[mapped]] (interpodaffinity soft scoring,
+#     volumezone Filter):
+#       - pkg/scheduler/framework/plugins/interpodaffinity/ →
+#         src/interpodaffinity_scoring.rs (new). PreScore computes the
+#         per-(topology_key, topology_value) weight table once per
+#         cycle; Score sums it for the candidate node; NormalizeScore
+#         linearly maps the range onto [0, framework.MAX_NODE_SCORE].
+#         Symmetric soft anti-affinity subtracts weights. The existing
+#         eager `InterPodAffinityScore` in plugins.rs stays for callers
+#         that want the O(N×M) direct path; the new module is the
+#         framework-shaped Pre/Score/Normalize variant upstream uses.
+#       - pkg/scheduler/framework/plugins/volumezone/ →
+#         src/volumezone_plugin.rs (new). Dedicated module mirroring
+#         upstream's package layout; checks bound-PV `node_affinity`
+#         entries against the candidate node's `topology.kubernetes.io/
+#         {zone,region}` and legacy `failure-domain.beta` labels.
+#         Unbound PVCs skip; PVs with no zone affinity are
+#         unconstrained.
+#   * Counts: mapped 19→21, unmapped 3→1, fill_ratio
+#     (21+0+7)/29 = 0.9655, honest_ratio (21+7)/29 = 0.9655.
+#   * Refreshed `last_audit = "2026-05-19"`.
+#
 # 2026-05-18 FINALIZE — Charter v2 8-gate close-out.
 #   * Added `source_sha = "v1.36.0"` for reproducibility audits — pins
 #     the git tree-ish the manifest was enumerated against.
 #   * Refreshed `last_audit = "2026-05-18"`.
-#   * No code or count delta: mapped 19 / partial 0 / skipped 7 /
-#     unmapped 3 / total 29 / fill_ratio 0.8966 is the measured-audit
-#     baseline from the 2026-05-13 batch2 imagelocality port. The 3
-#     unmapped rows remain honestly scope-cut (CSI volume-binding
-#     plugin, ipam-coordinator scheduler-plugin, …) — see
-#     PARITY_REPORT.md "Unmapped surface".
+#   * Baseline measured fill_ratio 0.8966 (mapped 19 / partial 0 /
+#     skipped 7 / unmapped 3 / total 29) from the 2026-05-13 batch2
+#     imagelocality port.
 #   * SPDX (AGPL-3.0-or-later) coverage: 25/25 .rs files.
 #   * 4-track: Backend cave-scheduler lib + Portal /admin/scheduler/ +
 #     cavectl SchedulerCmd + observability cave-scheduler alerts &
@@ -29,13 +49,13 @@ source_sha = "v1.36.0"
 # measured value: kubernetes/kubernetes v1.31.x pkg/scheduler/* packages
 # enumerated and classified honestly.
 # See docs/parity/cave-scheduler-port-2026-05-12.md for methodology.
-mapped_count   = 19
+mapped_count   = 21
 partial_count  = 0
 skipped_count  = 7
-unmapped_count = 3
+unmapped_count = 1
 total          = 29
-fill_ratio     = 0.8966
-honest_ratio   = 0.8966
+fill_ratio     = 0.9655
+honest_ratio   = 0.9655
 last_audit     = "2026-05-19"
 infra_only     = false
 
@@ -169,17 +189,19 @@ upstream_pkg = "pkg/scheduler/framework/plugins/imagelocality/"
 local_files  = ["src/plugins.rs"]
 note         = "k8s-cri push batch2 2026-05-13: ImageLocality scorer ported with upstream's size-weighted formula. `scaled_image_score = size × (num_nodes_with_image / total_nodes)`; `calculate_priority` linearly maps the sum onto [0, MAX_NODE_SCORE] between min/max thresholds (23 MiB / 1000 MiB × containers). 14 deterministic tests + `update_node_images` / `set_cluster_state` APIs for cave-kubelet image GC or cave-cri ListImages to populate."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/scheduler/framework/plugins/interpodaffinity/"
-note         = "Soft-affinity weighted scoring with anti-affinity topology keys. Filter path implemented; PreScore/Score fall back to neutral 0 — hard-affinity works, soft preferences are no-ops."
+local_files  = ["src/interpodaffinity_scoring.rs", "src/plugins.rs"]
+note         = "2026-05-19 uplift: dedicated PreScore/Score/Normalize module mirroring upstream's `scoring.go`. PreScoreState aggregates ±weight per (topology_key, topology_value) once per cycle; Score is O(1) per node; Normalize maps the raw [min,max] linearly to [0, MAX_NODE_SCORE]. Hard-affinity Filter (`InterPodAffinity` in plugins.rs) remains; this module fills the soft-preferences gap."
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/volumezone/"
+local_files  = ["src/volumezone_plugin.rs", "src/volume.rs"]
+note         = "2026-05-19 uplift: dedicated module mirroring upstream's package layout. Filter rejects nodes whose `topology.kubernetes.io/{zone,region}` (or legacy `failure-domain.beta.*`) label isn't in the pod's bound PV's `node_affinity` allow-list. Unbound PVCs skip; PVs without zone affinity are unconstrained; missing node label is a hard reject."
 
 [[unmapped]]
 upstream_pkg = "pkg/scheduler/framework/preemption/recovery"
 note         = "Preemption-victim restoration after API failure during the victim eviction window. cave preempt.rs aborts and re-queues but does not re-add the would-have-victims, so transient apiserver errors can leak victim state."
-
-[[unmapped]]
-upstream_pkg = "pkg/scheduler/framework/plugins/volumezone/"
-note         = "Forbid pods from binding PVs in a zone that does not include the candidate node. volume.rs handles topology-aware provisioning but does not enforce per-zone restriction at scheduling time."
 
 # ── File mappings ────────────────────────────────────────────────────────────
 
@@ -210,6 +232,14 @@ local    = "src/plugins.rs"
 [[files]]
 upstream = "pkg/scheduler/framework/plugins/interpodaffinity/plugin.go"
 local    = "src/plugins.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/interpodaffinity/scoring.go"
+local    = "src/interpodaffinity_scoring.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/volumezone/volume_zone.go"
+local    = "src/volumezone_plugin.rs"
 
 [[files]]
 upstream = "pkg/scheduler/framework/plugins/nodename/node_name.go"
