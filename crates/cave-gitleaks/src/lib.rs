@@ -15,15 +15,23 @@
 //! - decoded-payload chains (base64 / gzip auto-decode)
 //! - GitHub Action integration
 
+pub mod baseline;
 pub mod config;
+pub mod decoders;
 pub mod detect;
 pub mod finding;
 pub mod git_walker;
+pub mod protect;
 pub mod report;
 pub mod rule;
+pub mod stopwords;
 
-pub use config::{Allowlist, Config};
+pub use baseline::{Baseline, BaselineFile};
+pub use config::{Allowlist, Config, ExtendConfig};
+pub use decoders::{detect_with_decoders, Decoder, DecoderChain};
 pub use detect::Detector;
 pub use finding::{redact, Finding};
-pub use report::{write_json, write_sarif};
+pub use protect::{protect_staged_blobs, protect_staged_with, ProtectOutcome};
+pub use report::{write_csv, write_json, write_junit, write_sarif};
 pub use rule::{builtin_rules, Rule};
+pub use stopwords::{default_stopwords, filter_with_stopwords};

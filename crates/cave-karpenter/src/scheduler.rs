@@ -36,6 +36,12 @@ pub fn schedule_first_match(pools: &[NodePool], pod_reqs: &[(String, String)]) -
                     termination_grace_period: pool.template.spec.termination_grace_period.clone(),
                 },
                 status: None,
+                pool_name: Some(pool.name.clone()),
+                template_hash: pool.template_hash.clone(),
+                utilization: 0.0,
+                created_at: None,
+                terminated: false,
+                drained: false,
             };
             return ScheduleOutcome::Provisioned { pool: pool.name.clone(), claim };
         }

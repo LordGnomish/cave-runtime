@@ -26,6 +26,29 @@ pub struct Config {
     pub allowlist: RawAllowlist,
     #[serde(default, rename = "rules")]
     pub raw_rules: Vec<RawRule>,
+    /// `[extend]` table — config composition over the built-in rule pack.
+    #[serde(default)]
+    pub extend: ExtendConfig,
+    /// `stopwords` array — anti-FP post-match filter applied after detection.
+    #[serde(default)]
+    pub stopwords: Vec<String>,
+}
+
+/// `[extend]` block — controls config composition.
+///
+/// Mirrors `config/config.go::Config.Extend` upstream (`v8.29.1`).
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExtendConfig {
+    /// If true, the built-in rule pack is included alongside the user's
+    /// `[[rules]]`. User rule IDs that collide with built-ins override
+    /// (last-write-wins).
+    #[serde(default, rename = "useDefault")]
+    pub use_default: bool,
+    /// Per-rule disable list — IDs listed here are removed even if
+    /// `use_default = true`.
+    #[serde(default, rename = "disabledRules")]
+    pub disabled_rules: Vec<String>,
 }
 
 /// Allowlist as represented on disk (regex strings, not compiled).
@@ -150,6 +173,37 @@ impl Config {
             });
         }
         Ok((rules, global))
+    }
+
+    /// Compile rules with `[extend]` resolution — when `extend.use_default`
+    /// is true, the built-in rule pack is loaded first, then user rules
+    /// override by id, then `extend.disabled_rules` strips any leftover.
+    ///
+    /// Mirrors upstream `config.Config.Translate` with `Extend.UseDefault`
+    /// set.
+    pub fn into_rules_with_extend(self) -> Result<(Vec<Rule>, Allowlist), ConfigError> {
+        let disabled: std::collections::HashSet<String> =
+            self.extend.disabled_rules.iter().cloned().collect();
+        let use_default = self.extend.use_default;
+        let (user_rules, global) = self.into_rules()?;
+
+        let mut combined: Vec<Rule> = if use_default {
+            crate::rule::builtin_rules()
+        } else {
+            Vec::new()
+        };
+
+        for user_rule in user_rules {
+            // Last-write-wins by id.
+            if let Some(pos) = combined.iter().position(|r| r.id == user_rule.id) {
+                combined[pos] = user_rule;
+            } else {
+                combined.push(user_rule);
+            }
+        }
+
+        combined.retain(|r| !disabled.contains(&r.id));
+        Ok((combined, global))
     }
 }
 
