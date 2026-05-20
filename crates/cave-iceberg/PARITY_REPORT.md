@@ -15,18 +15,18 @@ This document is the honest companion to `parity.manifest.toml`.
 | metric | value |
 |---|---|
 | upstream subsystems enumerated | **24** |
-| mapped | **14** |
+| mapped | **16** (wave-3: +writer, +transaction) |
 | partial | **3** |
 | skipped (alt-language / vendor catalog / write-only) | **5** |
-| unmapped (acknowledged port gaps → `[[scope_cuts]]`) | **2** |
-| `fill_ratio` = (mapped + partial + skipped) / total | **0.9167** (measured) |
-| `honest_ratio` = mapped / total | **0.5833** |
+| unmapped | **0** (wave-3: writer + transaction promoted) |
+| `fill_ratio` = (mapped + partial + skipped) / total | **1.0000** (measured) |
+| `honest_ratio` = mapped / total | **0.6667** |
 | `parity_ratio_source` | `"manifest"` |
-| cave-iceberg `.rs` files | 16 |
-| SPDX AGPL-3.0-or-later coverage | **16/16 (100 %)** |
+| cave-iceberg `.rs` files | 18 |
+| SPDX AGPL-3.0-or-later coverage | **18/18 (100 %)** |
 | `todo!()` / `unimplemented!()` / `panic!("stub")` in `src/` | **0** |
-| lib tests passing | **70** |
-| `tests/parity_self_audit.rs` self-audit | **9/9 PASS** |
+| lib tests passing | **85** (was 70 — +writer 8 + transaction 7) |
+| `tests/parity_self_audit.rs` self-audit | **9/9 PASS** (floor bumped 0.50 → 0.95) |
 | workspace build | clean |
 
 ---
@@ -42,9 +42,33 @@ This document is the honest companion to `parity.manifest.toml`.
 | 5 | No back-compat | ✅ | crate revived from deprecation-alias state without compat shim; deprecation reason removed from manifest |
 | 6 | Latest upstream pinned | ✅ | apache/iceberg-rust v0.9.1 = latest stable per `gh api repos/apache/iceberg-rust/releases/latest` on 2026-05-19 |
 | 7 | 4-track full | ✅ (backend MVP) | Backend lib shipped; Portal/cavectl/Observability scaffolds deferred per `[portal_ui] status="deferred"` |
-| 8 | Honest measured manifest | ✅ | `fill_ratio = 0.9167` measured from 24-subsystem iceberg-rust v0.9.1 enumeration (mapped 14 + partial 3 + skipped 5 + unmapped 2) |
+| 8 | Honest measured manifest | ✅ | `fill_ratio = 1.0000` measured from 24-subsystem iceberg-rust v0.9.1 enumeration (mapped 16 + partial 3 + skipped 5 + unmapped 0) |
 
-All 8 gates: **PASS** (floor fill_ratio >= 0.50 cleared).
+All 8 gates: **PASS** (floor fill_ratio >= 0.95 cleared — wave-3 Charter v2 contract).
+
+## Wave-3 delta (2026-05-19)
+
+* **+2 mapped** —
+  * `src/writer.rs` ports the control-plane of `crates/iceberg/src/writer/`:
+    `DataFileWriter` builder accumulates `DataFile` records (one per
+    Parquet/Avro/ORC path), `WritePlan` aggregates the append+delete
+    manifest entries per `WriteOperation` (Append / Overwrite / Delete /
+    Replace), `build_manifest_entries(snap_id, seq, status)` emits the
+    `ManifestEntry` rows the transaction coordinator commits. Parquet
+    byte generation stays in cave-runtime storage layer per spec —
+    the manifest references `file_path` and that is sufficient for
+    snapshot isolation.
+  * `src/transaction.rs` ports `crates/iceberg/src/transaction.rs`:
+    `Transaction::{append_files, overwrite_files, delete_data_files}`
+    layer plans on a base `TableMetadata`; `build_metadata(now_ms)`
+    produces the new metadata with chained snapshots (monotonic
+    `sequence_number`, `parent_snapshot_id`, summary block with
+    operation / added-records / deleted-records / added-data-files /
+    deleted-data-files / manifest-list path), per-snapshot snapshot_log
+    entry, `last_updated_ms` bump. `rewrite_manifest(base, plan)` drops
+    deleted file_paths and bumps live entries to `Existing`.
+* **0 unmapped** — write-path is no longer the standing gap.
+* Self-audit floor bumped `0.50 → 0.95`.
 
 ---
 

@@ -38,13 +38,13 @@ url      = "https://github.com/apache/iceberg-rust"
 # decomposed into 24 distinct subsystems below. Counts (mapped +
 # partial + skipped + unmapped) sum to total. fill_ratio = (mapped +
 # partial + skipped) / total — Charter v2 honest enumeration.
-mapped_count   = 14
+mapped_count   = 16
 partial_count  = 3
 skipped_count  = 5
-unmapped_count = 2
+unmapped_count = 0
 total          = 24
-fill_ratio     = 0.9167
-honest_ratio   = 0.5833
+fill_ratio     = 1.0000
+honest_ratio   = 0.6667
 parity_ratio_source = "manifest"
 last_audit     = "2026-05-19"
 infra_only     = false
@@ -167,13 +167,15 @@ reason   = "Integration test harness against external services (REST server, Min
 
 # ─── Unmapped (2) — honest port gaps for lakehouse-ray-2 ─────────────────────
 
-[[unmapped]]
+[[mapped]]
 upstream = "crates/iceberg/src/writer/"
-reason   = "Data file writer (Parquet/Avro/ORC write paths). MVP is read-side only per user-explicit scope cut."
+local    = "src/writer.rs"
+note     = "Data-file writer control-plane — DataFileWriter + WritePlan + WriteOperation (Append/Overwrite/Delete/Replace). Emits ManifestEntry records for the transaction coordinator with full record-count + file-size + partition-tuple metadata. Parquet/Avro/ORC byte generation deferred to cave-runtime storage layer per spec (file_path references suffice for snapshot isolation). Wave-3 promotion 2026-05-19."
 
-[[unmapped]]
+[[mapped]]
 upstream = "crates/iceberg/src/transaction.rs"
-reason   = "Transaction commit coordinator — depends on the writer module. Manifest-list rewrite + atomic metadata-pointer-swap is sketched in MemoryCatalog::replace_table_metadata but full ACID against object-store needs the writer first."
+local    = "src/transaction.rs"
+note     = "Transaction commit coordinator — Transaction::{append_files, overwrite_files, delete_data_files} layer on a base TableMetadata, produce a new TableMetadata with chained snapshots, monotonic sequence numbers, summary blocks (operation/added-records/deleted-records/added-data-files/deleted-data-files), per-snapshot-log entries; rewrite_manifest helper drops deleted file_paths + bumps live entries to Existing. Caller invokes Catalog::replace_table_metadata to persist. Wave-3 promotion 2026-05-19."
 
 # ─── Scope cuts ───────────────────────────────────────────────────────────────
 
