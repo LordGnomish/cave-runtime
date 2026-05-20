@@ -68,7 +68,7 @@ fn upstream_source_sha_is_present_and_matches_version() {
 }
 
 #[test]
-fn parity_fill_ratio_is_measured_and_at_least_0_9() {
+fn parity_fill_ratio_is_measured_and_at_least_0_95() {
     let m = manifest_text();
     let raw = extract_after(&m, "\nfill_ratio ").or_else(|| extract_after(&m, "\nfill_ratio="));
     let ratio: f64 = raw
@@ -77,14 +77,26 @@ fn parity_fill_ratio_is_measured_and_at_least_0_9() {
         .parse()
         .expect("fill_ratio must parse as float");
     assert!(
-        ratio >= 0.9,
-        "cave-net measured floor: fill_ratio must be >= 0.9 (got {})",
+        ratio >= 0.95,
+        "cave-net Charter v2 wave-3 floor: fill_ratio must be >= 0.95 (got {})",
         ratio
     );
     assert!(
         ratio <= 1.0,
         "fill_ratio must be a fraction (got {})",
         ratio
+    );
+}
+
+#[test]
+fn parity_ratio_source_is_manifest() {
+    let m = manifest_text();
+    let v = extract_after(&m, "\nparity_ratio_source ")
+        .or_else(|| extract_after(&m, "\nparity_ratio_source="));
+    assert_eq!(
+        v.as_deref(),
+        Some("manifest"),
+        "parity_ratio_source must be \"manifest\""
     );
 }
 
