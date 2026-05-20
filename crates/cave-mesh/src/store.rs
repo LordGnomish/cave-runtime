@@ -3,22 +3,16 @@
 //! Mesh resource store — in-memory with optional cave-db persistence.
 //!
 //! Persists: VS, DR, Gateway, ServiceEntry, PeerAuthentication,
-//! RequestAuthentication, AuthorizationPolicy, RateLimitPolicy,
-//! Sidecar, EnvoyFilter, WorkloadGroup, WorkloadEntry, Telemetry.
+//! RequestAuthentication, AuthorizationPolicy, RateLimitPolicy, Telemetry.
+//! Sidecar/EnvoyFilter/WorkloadGroup CRDs intentionally absent
+//! (Ambient-only mandate).
 
 use crate::{
-    auth::AuthEngine,
     error::{MeshError, MeshResult},
     models::{
-        AuthorizationPolicy, DestinationRule, EnvoyFilter, Gateway, PeerAuthentication,
-        RateLimitPolicy, RequestAuthentication, ServiceEntry, Sidecar, Telemetry, VirtualService,
-        WorkloadEntry, WorkloadGroup,
+        AuthorizationPolicy, DestinationRule, Gateway, PeerAuthentication,
+        RateLimitPolicy, RequestAuthentication, ServiceEntry, Telemetry, VirtualService,
     },
-    mtls::MtlsManager,
-    rate_limit::RateLimiter,
-    sidecar::{EnvoyFilterManager, SidecarManager, WorkloadGroupManager},
-    telemetry::TelemetryManager,
-    traffic::TrafficManager,
     MeshState,
 };
 use cave_db::{migrate::run_migrations, CavePool};
@@ -97,38 +91,6 @@ pub trait MeshStorage: Send + Sync {
     fn load_rate_limit_policies(
         &self,
     ) -> impl std::future::Future<Output = MeshResult<Vec<RateLimitPolicy>>> + Send;
-
-    fn save_sidecar(
-        &self,
-        sc: &Sidecar,
-    ) -> impl std::future::Future<Output = MeshResult<()>> + Send;
-    fn load_sidecars(
-        &self,
-    ) -> impl std::future::Future<Output = MeshResult<Vec<Sidecar>>> + Send;
-
-    fn save_envoy_filter(
-        &self,
-        ef: &EnvoyFilter,
-    ) -> impl std::future::Future<Output = MeshResult<()>> + Send;
-    fn load_envoy_filters(
-        &self,
-    ) -> impl std::future::Future<Output = MeshResult<Vec<EnvoyFilter>>> + Send;
-
-    fn save_workload_group(
-        &self,
-        wg: &WorkloadGroup,
-    ) -> impl std::future::Future<Output = MeshResult<()>> + Send;
-    fn load_workload_groups(
-        &self,
-    ) -> impl std::future::Future<Output = MeshResult<Vec<WorkloadGroup>>> + Send;
-
-    fn save_workload_entry(
-        &self,
-        we: &WorkloadEntry,
-    ) -> impl std::future::Future<Output = MeshResult<()>> + Send;
-    fn load_workload_entries(
-        &self,
-    ) -> impl std::future::Future<Output = MeshResult<Vec<WorkloadEntry>>> + Send;
 
     fn save_telemetry(
         &self,
@@ -337,39 +299,6 @@ impl MeshStorage for DbMeshStorage {
         self.load_all("rate_limit_policies").await
     }
 
-    async fn save_sidecar(&self, sc: &Sidecar) -> MeshResult<()> {
-        self.upsert("sidecars", &format!("{}/{}", sc.namespace, sc.name), sc).await
-    }
-    async fn load_sidecars(&self) -> MeshResult<Vec<Sidecar>> {
-        self.load_all("sidecars").await
-    }
-
-    async fn save_envoy_filter(&self, ef: &EnvoyFilter) -> MeshResult<()> {
-        self.upsert("envoy_filters", &format!("{}/{}", ef.namespace, ef.name), ef).await
-    }
-    async fn load_envoy_filters(&self) -> MeshResult<Vec<EnvoyFilter>> {
-        self.load_all("envoy_filters").await
-    }
-
-    async fn save_workload_group(&self, wg: &WorkloadGroup) -> MeshResult<()> {
-        self.upsert("workload_groups", &format!("{}/{}", wg.namespace, wg.name), wg).await
-    }
-    async fn load_workload_groups(&self) -> MeshResult<Vec<WorkloadGroup>> {
-        self.load_all("workload_groups").await
-    }
-
-    async fn save_workload_entry(&self, we: &WorkloadEntry) -> MeshResult<()> {
-        let key = format!(
-            "{}/{}",
-            we.namespace.as_deref().unwrap_or("default"),
-            we.name.as_deref().unwrap_or(&we.address)
-        );
-        self.upsert("workload_entries", &key, we).await
-    }
-    async fn load_workload_entries(&self) -> MeshResult<Vec<WorkloadEntry>> {
-        self.load_all("workload_entries").await
-    }
-
     async fn save_telemetry(&self, t: &Telemetry) -> MeshResult<()> {
         self.upsert("telemetries", &format!("{}/{}", t.namespace, t.name), t).await
     }
@@ -415,18 +344,6 @@ pub async fn load_persisted_state<S: MeshStorage>(
     }
     for rl in load_or_warn!(storage.load_rate_limit_policies(), "RateLimitPolicies") {
         state.rate_limiter.upsert_policy(rl);
-    }
-    for sc in load_or_warn!(storage.load_sidecars(), "Sidecars") {
-        state.sidecar_mgr.upsert(sc);
-    }
-    for ef in load_or_warn!(storage.load_envoy_filters(), "EnvoyFilters") {
-        state.envoy_filter_mgr.upsert(ef);
-    }
-    for wg in load_or_warn!(storage.load_workload_groups(), "WorkloadGroups") {
-        state.workload_group_mgr.upsert_group(wg);
-    }
-    for we in load_or_warn!(storage.load_workload_entries(), "WorkloadEntries") {
-        state.workload_group_mgr.upsert_entry(we);
     }
     for t in load_or_warn!(storage.load_telemetries(), "Telemetries") {
         state.telemetry_mgr.upsert(t);

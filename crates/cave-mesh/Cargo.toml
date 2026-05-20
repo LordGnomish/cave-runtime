@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-description = "CAVE Service Mesh — full Istio-parity control plane (traffic, security, observability, xDS, SPIFFE, multi-cluster)"
+description = "CAVE Service Mesh — Ambient-only Istio-parity control plane (ztunnel L4 mTLS, waypoint L7, SPIFFE, multi-cluster)"
 authors.workspace = true
 homepage.workspace = true
 documentation = "https://docs.rs/cave-mesh"
@@ -35,5 +35,3 @@ regex              = { workspace = true }
 ring               = { workspace = true }
 rcgen              = "0.13"
 rand               = { workspace = true }
-wasmtime           = { version = "26", default-features = false, features = ["cranelift", "runtime"] }
-wat                = "1.219"

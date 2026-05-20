@@ -1,38 +1,32 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! Admin API — full CRUD for all mesh resources + xDS snapshot + multi-cluster.
+//! Admin API — Ambient-only mesh resources + multi-cluster.
 //!
 //! Base path: /api/mesh/
 //!
 //!   Core mesh resources  (VS, DR, GW, SE, PA, RA, AP, RL, CB)
-//!   Sidecar              /api/mesh/sidecars
-//!   EnvoyFilter          /api/mesh/envoyfilters
-//!   WorkloadGroup        /api/mesh/workloadgroups
-//!   WorkloadEntry        /api/mesh/workloadentries
 //!   Telemetry            /api/mesh/telemetries
-//!   xDS                  /api/mesh/xds/snapshot, /api/mesh/xds/nodes
 //!   Multi-cluster        /api/mesh/multicluster/clusters, /federations
 //!   Observability        /api/mesh/obs/metrics/{id}, /golden/{id}
 //!   Health / Metrics     /api/mesh/health, /api/mesh/metrics
 
 use crate::{
     models::{
-        AuthorizationPolicy, DestinationRule, EnvoyFilter, Gateway, HealthStatus,
+        AuthorizationPolicy, DestinationRule, Gateway, HealthStatus,
         PeerAuthentication, RateLimitPolicy, RequestAuthentication, ServiceEntry, ServiceMeta,
-        Sidecar, Telemetry, VirtualService, WorkloadEntry, WorkloadGroup,
+        Telemetry, VirtualService,
     },
     multicluster::{RemoteCluster, TrustDomainFederation},
-    xds::{NodeInfo, XdsSnapshot},
     MeshState,
 };
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{delete, get, post, put},
+    routing::{delete, get, put},
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -111,43 +105,12 @@ pub fn create_router(state: Arc<MeshState>) -> Router {
         .route("/api/mesh/ratelimits/{name}", delete(delete_rate_limit))
         // ── Circuit Breakers ─────────────────────────────────
         .route("/api/mesh/circuitbreakers", get(list_circuit_breakers))
-        // ── Sidecar ──────────────────────────────────────────
-        .route("/api/mesh/sidecars", get(list_sidecars).post(upsert_sidecar))
-        .route("/api/mesh/sidecars/{ns}/{name}", get(get_sidecar).delete(delete_sidecar))
-        // ── EnvoyFilter ──────────────────────────────────────
-        .route("/api/mesh/envoyfilters", get(list_envoy_filters).post(upsert_envoy_filter))
-        .route(
-            "/api/mesh/envoyfilters/{ns}/{name}",
-            get(get_envoy_filter).delete(delete_envoy_filter),
-        )
-        // ── WorkloadGroup ────────────────────────────────────
-        .route(
-            "/api/mesh/workloadgroups",
-            get(list_workload_groups).post(upsert_workload_group),
-        )
-        .route(
-            "/api/mesh/workloadgroups/{ns}/{name}",
-            get(get_workload_group).delete(delete_workload_group),
-        )
-        // ── WorkloadEntry ────────────────────────────────────
-        .route(
-            "/api/mesh/workloadentries",
-            get(list_workload_entries).post(upsert_workload_entry),
-        )
-        .route(
-            "/api/mesh/workloadentries/{ns}/{name}",
-            delete(delete_workload_entry),
-        )
         // ── Telemetry ────────────────────────────────────────
         .route("/api/mesh/telemetries", get(list_telemetries).post(upsert_telemetry))
         .route(
             "/api/mesh/telemetries/{ns}/{name}",
             get(get_telemetry).delete(delete_telemetry),
         )
-        // ── xDS ──────────────────────────────────────────────
-        .route("/api/mesh/xds/snapshot", get(get_xds_snapshot).post(set_xds_snapshot))
-        .route("/api/mesh/xds/nodes", get(list_xds_nodes))
-        .route("/api/mesh/xds/status", get(xds_sync_status))
         // ── Multi-cluster ────────────────────────────────────
         .route(
             "/api/mesh/multicluster/clusters",
@@ -499,124 +462,6 @@ async fn list_circuit_breakers(State(s): State<Arc<MeshState>>) -> impl IntoResp
     ok(s.circuit.snapshot())
 }
 
-// ─── Sidecar ─────────────────────────────────────────────────
-
-async fn list_sidecars(State(s): State<Arc<MeshState>>) -> impl IntoResponse {
-    ok(s.sidecar_mgr.list())
-}
-
-async fn upsert_sidecar(
-    State(s): State<Arc<MeshState>>,
-    Json(sc): Json<Sidecar>,
-) -> impl IntoResponse {
-    s.sidecar_mgr.upsert(sc);
-    created(serde_json::json!({ "ok": true }))
-}
-
-async fn get_sidecar(
-    State(s): State<Arc<MeshState>>,
-    Path((ns, name)): Path<(String, String)>,
-) -> impl IntoResponse {
-    match s.sidecar_mgr.get(&ns, &name) {
-        Some(sc) => ok(sc).into_response(),
-        None => not_found(format!("{ns}/{name}")).into_response(),
-    }
-}
-
-async fn delete_sidecar(
-    State(s): State<Arc<MeshState>>,
-    Path((ns, name)): Path<(String, String)>,
-) -> impl IntoResponse {
-    s.sidecar_mgr.remove(&ns, &name);
-    ok(serde_json::json!({ "ok": true }))
-}
-
-// ─── EnvoyFilter ─────────────────────────────────────────────
-
-async fn list_envoy_filters(State(s): State<Arc<MeshState>>) -> impl IntoResponse {
-    ok(s.envoy_filter_mgr.list())
-}
-
-async fn upsert_envoy_filter(
-    State(s): State<Arc<MeshState>>,
-    Json(ef): Json<EnvoyFilter>,
-) -> impl IntoResponse {
-    s.envoy_filter_mgr.upsert(ef);
-    created(serde_json::json!({ "ok": true }))
-}
-
-async fn get_envoy_filter(
-    State(s): State<Arc<MeshState>>,
-    Path((ns, name)): Path<(String, String)>,
-) -> impl IntoResponse {
-    match s.envoy_filter_mgr.get(&ns, &name) {
-        Some(ef) => ok(ef).into_response(),
-        None => not_found(format!("{ns}/{name}")).into_response(),
-    }
-}
-
-async fn delete_envoy_filter(
-    State(s): State<Arc<MeshState>>,
-    Path((ns, name)): Path<(String, String)>,
-) -> impl IntoResponse {
-    s.envoy_filter_mgr.remove(&ns, &name);
-    ok(serde_json::json!({ "ok": true }))
-}
-
-// ─── WorkloadGroup ───────────────────────────────────────────
-
-async fn list_workload_groups(State(s): State<Arc<MeshState>>) -> impl IntoResponse {
-    ok(s.workload_group_mgr.list_groups())
-}
-
-async fn upsert_workload_group(
-    State(s): State<Arc<MeshState>>,
-    Json(wg): Json<WorkloadGroup>,
-) -> impl IntoResponse {
-    s.workload_group_mgr.upsert_group(wg);
-    created(serde_json::json!({ "ok": true }))
-}
-
-async fn get_workload_group(
-    State(s): State<Arc<MeshState>>,
-    Path((ns, name)): Path<(String, String)>,
-) -> impl IntoResponse {
-    match s.workload_group_mgr.get_group(&ns, &name) {
-        Some(wg) => ok(wg).into_response(),
-        None => not_found(format!("{ns}/{name}")).into_response(),
-    }
-}
-
-async fn delete_workload_group(
-    State(s): State<Arc<MeshState>>,
-    Path((ns, name)): Path<(String, String)>,
-) -> impl IntoResponse {
-    s.workload_group_mgr.remove_group(&ns, &name);
-    ok(serde_json::json!({ "ok": true }))
-}
-
-// ─── WorkloadEntry ───────────────────────────────────────────
-
-async fn list_workload_entries(State(s): State<Arc<MeshState>>) -> impl IntoResponse {
-    ok(s.workload_group_mgr.list_entries())
-}
-
-async fn upsert_workload_entry(
-    State(s): State<Arc<MeshState>>,
-    Json(we): Json<WorkloadEntry>,
-) -> impl IntoResponse {
-    s.workload_group_mgr.upsert_entry(we);
-    created(serde_json::json!({ "ok": true }))
-}
-
-async fn delete_workload_entry(
-    State(s): State<Arc<MeshState>>,
-    Path((ns, name)): Path<(String, String)>,
-) -> impl IntoResponse {
-    s.workload_group_mgr.remove_entry(&ns, &name);
-    ok(serde_json::json!({ "ok": true }))
-}
-
 // ─── Telemetry ───────────────────────────────────────────────
 
 async fn list_telemetries(State(s): State<Arc<MeshState>>) -> impl IntoResponse {
@@ -647,28 +492,6 @@ async fn delete_telemetry(
 ) -> impl IntoResponse {
     s.telemetry_mgr.remove(&ns, &name);
     ok(serde_json::json!({ "ok": true }))
-}
-
-// ─── xDS ─────────────────────────────────────────────────────
-
-async fn get_xds_snapshot(State(s): State<Arc<MeshState>>) -> impl IntoResponse {
-    ok(s.xds.default_snapshot())
-}
-
-async fn set_xds_snapshot(
-    State(s): State<Arc<MeshState>>,
-    Json(snapshot): Json<XdsSnapshot>,
-) -> impl IntoResponse {
-    s.xds.set_snapshot("_default", snapshot);
-    created(serde_json::json!({ "ok": true }))
-}
-
-async fn list_xds_nodes(State(s): State<Arc<MeshState>>) -> impl IntoResponse {
-    ok(s.xds.list_nodes())
-}
-
-async fn xds_sync_status(State(s): State<Arc<MeshState>>) -> impl IntoResponse {
-    ok(s.xds.list_sync_status())
 }
 
 // ─── Multi-cluster ───────────────────────────────────────────
