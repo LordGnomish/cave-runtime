@@ -1,6 +1,6 @@
 # cave-mesh — Charter v2 8-gate Close-out Report (Ambient-only)
 
-**Audit date**: 2026-05-19
+**Audit date**: 2026-05-19 (Wave-2 close-out)
 **Upstream pin**: `istio/istio @ 1.30.0` (commit `badd809ed7d57954d4c16e12e75e15a7722a7b96`)
 **Crate root**: `crates/cave-mesh/`
 
@@ -15,24 +15,37 @@ no-backcompat mandate.
 
 | metric | value |
 |---|---|
-| upstream Istio top-level dirs covered (pilot/security/telemetry/cni/operator/pkg/wasm + ambient ztunnel/waypoint) | 37 entities |
-| mapped                                  | **14** |
+| upstream Istio top-level dirs covered | 37 entities |
+| mapped                                  | **16** (+2 vs pre-wave-2) |
 | partial                                 | **1** |
-| skipped (UI / spec / orchestrator / **ambient-only cuts**) | **18** |
-| unmapped (acknowledged gaps)            | **4** |
-| `fill_ratio`                            | **0.8919** = (mapped + partial + skipped) / total = 33/37 |
-| `honest_ratio`                          | **0.8649** = (mapped + skipped) / total = 32/37 — partial excluded |
+| skipped (UI / spec / orchestrator / **ambient-only cuts** / vendor-spec) | **20** (+2 vs pre-wave-2) |
+| unmapped (acknowledged gaps)            | **0** (-4 vs pre-wave-2) |
+| `fill_ratio`                            | **1.0** (37/37, +0.1081) |
+| `honest_ratio`                          | **0.9730** (mapped + skipped) / total = 36/37 |
 | `parity_ratio_source`                   | `"manifest"` |
-| `source_sha`                            | `"badd809ed7d57954d4c16e12e75e15a7722a7b96"` (Istio v1.30.0 commit) |
+| `source_sha`                            | `"badd809ed7d57954d4c16e12e75e15a7722a7b96"` |
 | `last_audit`                            | `2026-05-19` |
-| SPDX `AGPL-3.0-or-later` coverage       | 100% (all `.rs` files in `src/` + `tests/`) |
+| SPDX `AGPL-3.0-or-later` coverage       | 100% |
+
+---
+
+## Wave-2 close-out delta (2026-05-19)
+
+| Δ | upstream surface | provenance |
+|---|---|---|
+| → | `pilot/pkg/networking/serviceentry/external` (VM-mesh) | unmapped → mapped · `src/vm_mesh.rs` (WorkloadEntry enrolment + SPIFFE id + per-VM health probes + healthy-endpoint filter) |
+| → | `ztunnel:src/state/policy/L7` | unmapped → mapped · `src/ambient/l7_policy.rs` (canonical filter ordering jwt→authz→rate-limit→fault→route→telemetry + chain evaluator) |
+| → | `telemetry/api/v1/AnalyticsClient` | unmapped → skipped (vendor backend telemetry — cave-metrics owns workspace observability) |
+| → | `istioctl/pkg/{analyze,debug}/` | unmapped → skipped (CLI tooling absorbed by cavectl) |
+
+Net: 14 → **16** mapped, 4 → **0** unmapped, fill_ratio **0.8919 → 1.0**.
 
 ---
 
 ## In-scope (Ambient-only)
 
 * **Ambient data-plane** (`src/ambient/`)
-  * `ztunnel.rs`         — node-local L4 zero-trust tunnel (mTLS, SPIFFE peer-ID)
+  * `ztunnel.rs`         — node-local L4 zero-trust tunnel
   * `waypoint.rs`        — L7 routing tier
   * `hbone.rs`           — HBONE (HTTP/2 CONNECT + mTLS tunnel)
   * `svid.rs`            — SVID issuance for ambient identities
@@ -40,57 +53,50 @@ no-backcompat mandate.
   * `telemetry.rs`       — Ambient-mode telemetry hooks
   * `virtualservice.rs`  — VS routing compiled for waypoint
   * `destinationrule.rs` — DR subsets compiled for waypoint
-* **Control-plane (Pilot subset that survives ambient-only cut)**
-  * VirtualService / DestinationRule / Gateway / ServiceEntry config translation
-  * TrafficPolicy: outlierDetection + connectionPool (batch4)
-  * MultiCluster federation (`pilot/.../federation/`)
-* **Security**
-  * SPIFFE-style workload identity, mTLS root CA, AuthorizationPolicy (allow/deny)
-* **Telemetry**
-  * Prometheus metric facade (request count / latency / connection state)
+  * **`l7_policy.rs`** — Wave-2 close-out: canonical L7 filter ordering + chain evaluator
+* **Control-plane (Pilot subset)** — VS / DR / Gateway / ServiceEntry; TrafficPolicy + outlier + connectionPool; MultiCluster federation
+* **Security** — SPIFFE workload identity, mTLS root CA, AuthorizationPolicy
+* **Telemetry** — Prometheus metric facade
+* **VM mesh** — Wave-2 close-out: `src/vm_mesh.rs` enrols VM/bare-metal workloads under ServiceEntry parents
 
-## Out-of-scope (skipped — 18)
+## Out-of-scope (skipped — 20)
 
-### Ambient-only mandate cuts (5 — new, 2026-05-19)
+### Ambient-only mandate cuts (5)
 
 Per Cave Runtime's no-backcompat policy, the sidecar data plane is **removed**,
-not deferred. The corresponding `src/*.rs` files were deleted in commit
-`d1b4e0c6` (2710 LOC).
+not deferred. Files deleted in commit `d1b4e0c6` (2710 LOC).
 
 | upstream package | deleted file | LOC | reason |
 |---|---|---|---|
-| `pilot/pkg/networking/sidecar`       | `src/sidecar.rs`      |  297 | Sidecar/EnvoyFilter/WorkloadGroup CRDs incompatible with ambient mode |
-| `pilot/pkg/networking/proxy`         | `src/proxy.rs`        |  257 | Envoy sidecar abstraction replaced by ztunnel + waypoint |
-| `pilot/pkg/xds`                      | `src/xds.rs`          | 1095 | xDS v3 LDS/RDS/CDS/EDS/SDS stream replaced by SVID + waypoint config |
-| `pilot/pkg/networking/extension/`    | `src/wasm_plugin.rs`  |  460 | EnvoyFilter direct-patch surface dropped |
-| `pkg/wasm/`                          | `src/wasm_runtime.rs` |  601 | wasmtime-backed proxy-wasm runtime dropped; `wasmtime` + `wat` Cargo deps removed |
+| `pilot/pkg/networking/sidecar`       | `src/sidecar.rs`      |  297 | Sidecar/EnvoyFilter/WorkloadGroup |
+| `pilot/pkg/networking/proxy`         | `src/proxy.rs`        |  257 | Envoy sidecar abstraction |
+| `pilot/pkg/xds`                      | `src/xds.rs`          | 1095 | xDS v3 LDS/RDS/CDS/EDS/SDS |
+| `pilot/pkg/networking/extension/`    | `src/wasm_plugin.rs`  |  460 | EnvoyFilter direct-patch |
+| `pkg/wasm/`                          | `src/wasm_runtime.rs` |  601 | wasmtime-backed proxy-wasm |
 
-### Pre-existing skips (13 — Istio packages outside cave-mesh's scope)
+### Pre-existing skips (13)
 
-* `istioctl/` CLI tooling (cavectl absorbs equivalent UX)
-* `operator/` Helm chart packaging (cave-deploy handles this)
-* `cni/` install-side networking (cave-net + node DaemonSet absorb)
-* `tools/`, `tests/integration`, `tests/e2e` upstream harness
+* `istioctl/` CLI tooling (cavectl absorbs)
+* `operator/` Helm chart packaging (cave-deploy)
+* `cni/` install-side networking (cave-net + node DaemonSet)
+* `tools/`, `tests/integration`, `tests/e2e`
 * `samples/`, `manifests/charts`, `releasenotes/`, `manifests/profiles`
-* `bin/`, `prow/` build/CI tooling
-* `architecture/`, `release/` documentation
-* `pkg/log/` + `pkg/util/` (stdlib analog — Rust uses `tracing` + `std`)
+* `bin/`, `prow/` build/CI
+* `architecture/`, `release/` docs
+* `pkg/log/` + `pkg/util/` (stdlib analog — `tracing` + `std`)
 
-## Unmapped (acknowledged gaps — 4)
+### Wave-2 reclassifications (2 — unmapped → skipped 2026-05-19)
 
-| upstream area | reason | priority |
-|---|---|---|
-| `pilot/pkg/networking/serviceentry/external/` — VM-mesh expansion | non-k8s workload CRDs (VM + WorkloadEntry) not implemented | P2 |
-| `telemetry/api/v1/AnalyticsClient` | backend analytics protocol (Istio team telemetry) — out of scope | P3 |
-| `istioctl/pkg/{analyze,debug}/` | static analysis + diagnose; distinct from runtime mesh | P3 |
-| `ztunnel:src/state/policy/L7` | Ambient L7 policy (waypoint proxy filter chain) — routing stub exists, filter ordering unmapped | P1 |
+* `telemetry/api/v1/AnalyticsClient` — vendor backend usage telemetry; out of cave-mesh scope.
+* `istioctl/pkg/{analyze,debug}/` — CLI static-analysis tooling; cavectl absorbs.
+
+## Unmapped (0)
+
+All four pre-existing unmapped subsystems closed in Wave-2 close-out 2026-05-19 (2 promoted to mapped, 2 reclassified as skipped with explicit reasons).
 
 ## Partial (1)
 
-* `pilot/pkg/networking/federation/` — multi-network federation control plane
-  (MeshNetwork enrolment, EastWestGateway lifecycle, NetworkEndpoint
-  publish/retract). Data-plane forwarding stays in the bound ambient proxy;
-  cross-mesh federation tracked separately.
+* `pilot/pkg/networking/federation/` — MeshNetwork enrolment + EastWestGateway lifecycle covered; cross-mesh data-plane forwarding tracked separately.
 
 ---
 
@@ -110,8 +116,8 @@ not deferred. The corresponding `src/*.rs` files were deleted in commit
 | 2 | `source_sha` pinned to Istio 1.30.0 commit | PASS | `[upstream].source_sha = "badd809e…"` |
 | 3 | `last_audit = "2026-05-19"`           | PASS   | `[parity].last_audit`                     |
 | 4 | `parity_ratio_source = "manifest"`    | PASS   | `[parity].parity_ratio_source`            |
-| 5 | `fill_ratio >= 0.85`                  | PASS   | measured **0.8919** (33/37)               |
-| 6 | counts sum to total (14+1+18+4 == 37) | PASS   | `gate_6_count_invariants`                 |
+| 5 | `fill_ratio >= 0.85`                  | PASS   | measured **1.0** (37/37)                  |
+| 6 | counts sum to total (16+1+20+0 == 37) | PASS   | `gate_6_count_invariants`                 |
 | 7 | no `unimplemented!()` / `todo!()` in `src/` | PASS | `gate_7_no_stub_macros_in_src`        |
 | 8 | `PARITY_REPORT.md` exists with summary | PASS  | this file (`gate_8_parity_report_exists`) |
 
@@ -121,12 +127,6 @@ All nine `tests/parity_self_audit.rs` assertions pass.
 
 ## Notes
 
-* Ztunnel is a separate Rust repo upstream
-  (`https://github.com/istio/ztunnel`); the manifest cites the upstream
-  `release-1.29` branch for parity diffs (1.30 ztunnel cut still tracked
-  on the same branch line at audit time).
-* Cave Charter (4) tracks: this report covers the **Backend** track for
-  cave-mesh. Portal `/admin/mesh/*` + cavectl `mesh` group + obs alert
-  rules are present (see `parity.manifest.toml` `[portal_ui]`).
-* The 2710 LOC removal is **permanent**, not deferred. Re-adding a
-  sidecar plane would require relitigating the no-backcompat mandate.
+* Ztunnel is a separate Rust repo upstream (`https://github.com/istio/ztunnel`); the L7-policy port cites the upstream `release-1.29` branch.
+* Cave Charter (4) tracks: this report covers the **Backend** track. Portal `/admin/mesh/*` + cavectl `mesh` group + obs alert rules are present.
+* The 2710 LOC sidecar removal is **permanent**, not deferred.
