@@ -18,6 +18,9 @@ pub mod metrics;
 /// Re-exports the Ollama client module for communicating with the local LLM server.
 pub mod ollama;
 
+/// Re-exports the Ollama extras client — lifecycle, embedding and running-model APIs.
+pub mod ollama_extras;
+
 /// Re-exports the queue module for managing priority-based task scheduling.
 pub mod queue;
 
