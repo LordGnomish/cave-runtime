@@ -86,7 +86,16 @@ The other four are "manifest fill" tasks similar to Tier C below.
 
 ---
 
-## Tier C — Empty manifest, real implementation already present (58 crates)
+## Tier C — Empty manifest, real implementation already present (53 crates)
+
+> 2026-05-19 cleanup (ADR-151): the prior count was 58; five entries were
+> phantom directories that no longer exist on disk and have been removed
+> from this table — `cave-pg` (renamed to `cave-rdbms-operator` per
+> ADR-147) and the four 5d6a067b orphan-dir deletions (`cave-spire`,
+> `cave-external-secrets`, `cave-hubble`, `cave-vcluster`). Their
+> upstream surfaces are absorbed elsewhere: PgBouncer pool →
+> `cave-rdbms-operator`, External Secrets → `cave-vault`, Hubble →
+> `cave-forensics`, vcluster → `cave-kamaji`, SPIRE → cave-pki (future).
 
 `parity.manifest.toml` exists with `[upstream]` and `[module]` blocks but no
 `[[files]]` / `[[functions]]` / `[[tests]]` / `[[surfaces]]` entries. The
@@ -133,7 +142,6 @@ Sorted by total src LoC (largest first — biggest dashboard wins per hour spent
 | cave-crossplane | 2,328 | crossplane/crossplane @ v1.14.0 |
 | cave-compliance | 2,289 | open-policy-agent/gatekeeper @ v3.14.0 |
 | cave-docs-site | 2,185 | (CAVE internal — re-target) |
-| cave-pg | 2,184 | pgbouncer/pgbouncer @ 1.21.0 |
 | cave-gitops-config | 2,182 | fluxcd/flux2 @ v2.1.0 |
 | cave-core | 1,990 | (CAVE internal — re-target) |
 | cave-cost | 1,965 | opencost/opencost @ v1.108.0 |
@@ -150,13 +158,9 @@ Sorted by total src LoC (largest first — biggest dashboard wins per hour spent
 | cave-incidents | 836 | grafana/oncall @ v1.4.0 |
 | cave-ledger | 821 | (CAVE internal — re-target) |
 | cave-db | 707 | (CAVE internal — re-target) |
-| cave-spire | 705 | spiffe/spire @ v1.9.0 |
 | cave-workflows | 666 | n8n-io/n8n @ v1.0.0 |
-| cave-external-secrets | 652 | external-secrets/external-secrets @ v0.9.0 |
 | cave-secrets | 648 | trufflesecurity/trufflehog @ v3.63.0 |
 | cave-lint | 625 | SonarSource/sonarqube @ v10.3.0 |
-| cave-hubble | 572 | cilium/hubble @ v0.13.0 |
-| cave-vcluster | 532 | loft-sh/vcluster @ v0.19.0 |
 | cave-devlake | 526 | apache/incubator-devlake @ v0.19.0 |
 
 **Note**: a handful of these manifests point at `cave-runtime/cave-runtime @
