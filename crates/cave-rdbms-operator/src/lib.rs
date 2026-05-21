@@ -17,6 +17,7 @@
 //! - Database size monitoring and threshold alerts
 
 pub mod backup;
+pub mod default_queries;
 pub mod error;
 pub mod ha;
 pub mod lifecycle;
@@ -29,6 +30,7 @@ pub mod routes;
 pub mod scheduled_backup;
 pub mod types;
 pub mod user;
+pub mod webserver;
 
 use axum::Router;
 use models::{

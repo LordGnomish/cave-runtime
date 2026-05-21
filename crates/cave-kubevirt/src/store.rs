@@ -51,8 +51,18 @@ impl Store {
         self.vmis.write().unwrap().insert(key, vmi);
     }
 
+    pub fn get_vmi(&self, namespace: &str, name: &str) -> Option<VirtualMachineInstance> {
+        let key = format!("{namespace}/{name}");
+        self.vmis.read().unwrap().get(&key).cloned()
+    }
+
     pub fn list_vmis(&self) -> Vec<VirtualMachineInstance> {
         self.vmis.read().unwrap().values().cloned().collect()
+    }
+
+    pub fn delete_vmi(&self, namespace: &str, name: &str) -> bool {
+        let key = format!("{namespace}/{name}");
+        self.vmis.write().unwrap().remove(&key).is_some()
     }
 
     pub fn put_data_volume(&self, dv: DataVolume) {
@@ -60,7 +70,17 @@ impl Store {
         self.dvs.write().unwrap().insert(key, dv);
     }
 
+    pub fn get_data_volume(&self, namespace: &str, name: &str) -> Option<DataVolume> {
+        let key = format!("{namespace}/{name}");
+        self.dvs.read().unwrap().get(&key).cloned()
+    }
+
     pub fn list_data_volumes(&self) -> Vec<DataVolume> {
         self.dvs.read().unwrap().values().cloned().collect()
+    }
+
+    pub fn delete_data_volume(&self, namespace: &str, name: &str) -> bool {
+        let key = format!("{namespace}/{name}");
+        self.dvs.write().unwrap().remove(&key).is_some()
     }
 }
