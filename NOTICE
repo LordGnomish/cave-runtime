@@ -94,7 +94,7 @@ Apache-2.0:
   - falcosecurity/falco
   - goharbor/harbor          (cave-registry; v2.10)
   - istio/istio              (cave-mesh; 1.30.0, ambient-only)
-  - jaegertracing/jaeger
+  - jaegertracing/jaeger    (cave-trace; v1.52.0)
   - kedacore/keda            (cave-keda; v2.16.1)
   - keycloak/keycloak        (cave-auth; v26.0.0)
   - knative/serving          (cave-knative; v1.22.0)

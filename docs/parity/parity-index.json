@@ -1586,14 +1586,19 @@
     },
     "cave-trace": {
       "cave_src_loc": 8923,
-      "honest_ratio": 0.0,
-      "last_audit_disk": "2026-05-12",
+      "honest_ratio": 0.6053,
+      "last_audit_disk": "2026-05-21",
       "manifest_filled": true,
+      "mapped_count": 21,
       "note": null,
-      "parity_ratio": 0.0,
+      "parity_ratio": 0.9474,
       "parity_ratio_source": "manifest",
+      "partial_count": 2,
+      "skipped_count": 13,
       "stubs": null,
       "tier": "C",
+      "total_count": 38,
+      "unmapped_count": 2,
       "upstream": "jaegertracing/jaeger",
       "upstream_version": "v1.52.0"
     },
@@ -1733,7 +1738,7 @@
     "injected": 9,
     "new_filled": 94,
     "phantoms": 0,
-    "ratio_overrides": 54
+    "ratio_overrides": 55
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
