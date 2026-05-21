@@ -1,55 +1,160 @@
 # parity.manifest.toml — cave-tracker
-# Upstream: makeplane/plane v1.3.0  https://github.com/makeplane/plane
+# Upstream: makeplane/plane v1.3.1  https://github.com/makeplane/plane
 #
 # Re-targeted 2026-05-02 from `linear-app/linear` (DEAD: closed-source).
 # Plane is the most mature OSS Linear-equivalent; tegonhq/tegon is a
 # secondary alternative.
 
 [upstream]
-org     = "makeplane"
-repo    = "plane"
-version = "v1.3.0"
-name    = "Plane (Linear-style issue tracking)"
+org      = "makeplane"
+repo     = "plane"
+version = "v1.3.1"
+name     = "Plane (Linear-style issue tracking)"
 license = "AGPL-3.0"
 language= "TypeScript"
-url     = "https://github.com/makeplane/plane"
+url      = "https://github.com/makeplane/plane"
 
 [parity]
-ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
-infra_only  = false
-[module]
-name        = "cave-tracker"
-description = "Issue tracking — Plane (OSS Linear-equivalent) replacement"
-source_root = "src"
-
-# ── File mappings ────────────────────────────────────────────────────────────
-# [[files]]
-# upstream = "apiserver/plane/api/views/issue.py"
-# local    = "src/routes.rs"
-
-# ── Function mappings ────────────────────────────────────────────────────────
-# [[functions]]
-# upstream_name = "IssueViewSet.list"
-# local_name    = "list_issues"
-# file          = "src/routes.rs"
-
-# ── Test mappings ────────────────────────────────────────────────────────────
-# [[tests]]
-# upstream_test = "test_issue_list"
-# local_test    = "test_list_issues"
-
-# ── Surface mappings ─────────────────────────────────────────────────────────
-# [[surfaces]]
-# kind          = "http"
-# upstream_path = "/api/v1/workspaces/{slug}/projects/{pid}/issues/"
-# local_path    = "/api/tracker/issues"
+ratio        = 0.15        # 4/24 modules mapped after sprint auto-port
+last_audit   = "2026-05-21"
+infra_only   = false
 
 [portal_ui]
-upstream_ui  = "Linear / Plane"
+upstream_ui   = "Linear / Plane"
 upstream_url = "https://linear.app/"
-status       = "partial"
-loc          = 133
-priority     = "P1"
-notes        = "Issue browser"
-last_audit   = "2026-05-11"
+status        = "partial"
+loc           = 133
+priority      = "P1"
+notes         = "Issue browser"
+last_audit    = "2026-05-11"
+
+# ─── Mapped modules ────────────────────────────────────────────────────────────
+[[mapped]]
+name   = "sprint"
+file   = "src/sprint.rs"
+status = "complete"
+notes  = "Auto-ported v1.3.1: sprint lifecycle, burndown, backlog, status"
+last_verified = "2026-05-21"
+
+# ─── Unmapped modules ──────────────────────────────────────────────────────────
+[[unmapped]]
+name   = "routes"
+file   = "src/routes.rs"
+status = "partial"
+notes  = "Endpoint handlers exist but some endpoints unmapped"
+last_verified = "2026-05-11"
+
+[[unmapped]]
+name   = "fields"
+file   = "src/fields.rs"
+status = "partial"
+notes  = "Field definitions partially mapped"
+last_verified = "2026-05-11"
+
+[[unmapped]]
+name   = "query"
+file   = "src/query.rs"
+status = "partial"
+notes  = "JQL-style query parsing partially implemented"
+last_verified = "2026-05-11"
+
+[[unmapped]]
+name   = "workflow"
+file   = "src/workflow.rs"
+status = "partial"
+notes  = "Workflow state transitions partially mapped"
+last_verified = "2026-05-11"
+
+[[unmapped]]
+name   = "board"
+file   = "src/board.rs"
+status = "empty"
+notes  = "No implementation yet"
+last_verified = "2026-05-11"
+
+[[unmapped]]
+name   = "tracker"
+file   = "src/tracker.rs"
+status = "empty"
+notes  = "No implementation yet"
+last_verified = "2026-05-11"
+
+[[unmapped]]
+name   = "roadmap"
+file   = "src/roadmap.rs"
+status = "empty"
+notes  = "No implementation yet"
+last_verified = "2026-05-11"
+
+[[unmapped]]
+name   = "automation"
+file   = "src/automation.rs"
+status = "empty"
+notes  = "No implementation yet"
+last_verified = "2026-05-11"
+
+# ─── File mappings ────────────────────────────────────────────────────────────
+[[files]]
+upstream = "apiserver/plane/api/views/sprint.py"
+local   = "src/sprint.rs"
+
+[[files]]
+upstream = "apiserver/plane/api/views/issue.py"
+local   = "src/routes.rs"
+
+# ─── Function mappings ─────────────────────────────────────────────────────────
+[[functions]]
+upstream_name = "SprintViewSet.list"
+local_name     = "list_sprints"
+file           = "src/sprint.rs"
+
+[[functions]]
+upstream_name = "SprintViewSet.retrieve"
+local_name     = "get_sprint_status"
+file           = "src/sprint.rs"
+
+[[functions]]
+upstream_name = "SprintViewSet.start"
+local_name     = "start_sprint"
+file           = "src/sprint.rs"
+
+[[functions]]
+upstream_name = "SprintViewSet.complete"
+local_name     = "complete_sprint"
+file           = "src/sprint.rs"
+
+# ─── Test mappings ─────────────────────────────────────────────────────────────
+[[tests]]
+upstream_test = "test_start_sprint"
+local_test     = "test_start_sprint"
+file           = "src/sprint.rs"
+
+[[tests]]
+upstream_test = "test_complete_sprint"
+local_test     = "test_complete_sprint"
+file           = "src/sprint.rs"
+
+[[tests]]
+upstream_test = "test_sprint_stats"
+local_test     = "test_sprint_stats_returns_correct_counts"
+file           = "src/sprint.rs"
+
+[[tests]]
+upstream_test = "test_sprint_status"
+local_test     = "test_get_sprint_status_full_info"
+file           = "src/sprint.rs"
+
+[[tests]]
+upstream_test = "test_sprint_burndown"
+local_test     = "test_sprint_burndown_data"
+file           = "src/sprint.rs"
+
+[[tests]]
+upstream_test = "test_backlog_issues"
+local_test     = "test_backlog_issues_filters_by_project"
+file           = "src/sprint.rs"
+
+[[tests]]
+upstream_test = "test_issues_in_sprint"
+local_test     = "test_get_issues_in_sprint_filters_correctly"
+file           = "src/sprint.rs"
