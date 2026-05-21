@@ -3,9 +3,35 @@
 # Pinned to the latest stable release at 2026-04-26 (released 2026-04-22).
 
 [upstream]
-org     = "kubernetes"
-repo    = "kubernetes"
-version = "v1.36.0"
+org        = "kubernetes"
+repo       = "kubernetes"
+version    = "v1.36.0"
+license    = "Apache-2.0"
+source_sha = "v1.36.0"   # latest stable Kubernetes release tag
+
+[parity]
+# 2026-05-19 Charter v2 deep-port — cave-kube-proxy covers the in-scope
+# kube-proxy surface against k8s 1.36.0 pkg/proxy/:
+#   service + endpoints change tracking, iptables + nftables datapath,
+#   nodeport allocator, healthcheck server, topology-aware routing,
+#   sync_runner loop + BoundedFrequencyRunner debounce, ProxyConfig +
+#   ProxyMode + DetectLocal, conntrack flush + sysctls, metrics surface.
+# Out-of-scope (counted as `skipped`): userspace mode (legacy datapath),
+# IPVS direct emission (cave-net eBPF), real iptables-restore / nft
+# subprocess (handed to a backend trait at cave-runtime layer),
+# leader-election main, informer plumbing (cave-apiserver pushes events),
+# winkernel mode, /metrics + /healthz HTTP servers (delegated to
+# cave-metrics + cave-runtime), Service-IP allocator (cave-apiserver).
+mapped_count          = 18
+partial_count         = 2
+skipped_count         = 14
+unmapped_count        = 0
+total                 = 34
+fill_ratio            = 0.9412
+honest_ratio          = 0.8235
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-19"
+infra_only            = false
 
 [module]
 name        = "cave-kube-proxy"

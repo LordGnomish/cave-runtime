@@ -873,12 +873,19 @@
     },
     "cave-kube-proxy": {
       "cave_src_loc": null,
+      "honest_ratio": 0.8235,
+      "last_audit_disk": "2026-05-19",
       "manifest_filled": true,
+      "mapped_count": 18,
       "note": "10/10 files; **8 fn missing, 4 surfaces missing**",
-      "parity_ratio": 0.25,
-      "parity_ratio_source": "audit",
+      "parity_ratio": 0.9412,
+      "parity_ratio_source": "manifest",
+      "partial_count": 2,
+      "skipped_count": 14,
       "stubs": null,
       "tier": "B",
+      "total_count": 34,
+      "unmapped_count": 0,
       "upstream": "kubernetes/kubernetes",
       "upstream_version": "v1.28.0"
     },
@@ -1719,7 +1726,7 @@
     "injected": 9,
     "new_filled": 94,
     "phantoms": 0,
-    "ratio_overrides": 52
+    "ratio_overrides": 53
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
