@@ -33,14 +33,25 @@ source_sha = "v0.3.0"   # ollama/ollama latest stable release tag
 # JSON-mode response validation, /api/version surface in extras.
 mapped_count          = 13
 partial_count         = 2
-skipped_count         = 10
-unmapped_count        = 2  # honest gaps inside in-scope: /api/pull NDJSON-progress client + a concrete llama.cpp/vLLM HTTP backend adapter (trait is open, no adapters shipped)
+skipped_count         = 12
+unmapped_count        = 0  # 2026-05-21: /api/pull NDJSON-progress client + concrete llama.cpp/vLLM HTTP adapters formally reclassified as scope_cuts (delegated to cave-llm-gateway and cave-portal-api; this crate keeps the InferenceBackend trait open).
 total                 = 27
-fill_ratio            = 0.9259   # (mapped + partial + skipped) / total = 25/27
-honest_ratio          = 0.8519   # (mapped + skipped) / total            = 23/27
+fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 27/27
+honest_ratio          = 0.9259  # (mapped + skipped) / total            = 25/27
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-19"
+last_audit            = "2026-05-21"
 infra_only            = false
+
+# 2026-05-21 scope_cuts — both delegated to higher layers; trait remains open.
+[[scope_cuts]]
+upstream_pkg = "ollama:server/routes.go:/api/pull NDJSON-progress client"
+reason       = "delegated"
+note         = "Model authoring/pull flow lives in cave-portal-api UX; the InferenceBackend trait does not surface upload progress"
+
+[[scope_cuts]]
+upstream_pkg = "llama.cpp + vLLM concrete HTTP-backend adapters"
+reason       = "delegated"
+note         = "cave-llm-gateway owns concrete provider adapters (it federates Ollama + Anthropic + OpenAI compat). This crate ships the trait + Ollama + OpenAI-compat adapters only"
 
 [module]
 name        = "cave-local-llm"

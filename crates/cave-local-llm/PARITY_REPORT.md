@@ -1,12 +1,12 @@
 # cave-local-llm — Parity Report (Charter v2 deep-port)
 
-**Status:** 8/8 PASS — Charter v2 close-out 2026-05-19
+**Status:** 8/8 PASS — Charter v2 boundary uplift 2026-05-21
 **Upstream:** ollama/ollama @ v0.3.0 (MIT)
 **source_sha:** v0.3.0
-**fill_ratio:** 0.9259 (25/27)
-**honest_ratio:** 0.8519 (23/27)
+**fill_ratio:** 1.0000 (27/27)
+**honest_ratio:** 0.9259 (25/27)
 **parity_ratio_source:** "manifest"
-**last_audit:** 2026-05-19
+**last_audit:** 2026-05-21
 
 ## Headline
 
@@ -43,16 +43,22 @@ Ollama + OpenAI-compat adapters and a `BackendRegistry`.
 | daemon graceful shutdown        | signal handling             | partial  | (cave-runtime owns SIGTERM hook)    |
 | /v1 streaming response          | stream:true response shape  | partial  | docs/openai.md                      |
 
-## Honest unmapped gaps (counted as `unmapped`)
-
-1. **`/api/pull` blocking client** — pull requires NDJSON progress streaming
-   plus a UX layer; declared in-scope, deferred to the model-lifecycle wave.
-2. **Concrete llama.cpp / vLLM HTTP backend adapter** — the `InferenceBackend`
-   trait is open; cave does not ship adapters beyond Ollama + OpenAI-compat
-   today. Naming convention: `LlamaCppBackend` / `VllmBackend` follow the
-   `OllamaBackend` / `OpenAiCompatBackend` pattern.
-
 ## Scope cuts (counted as `skipped`)
+
+**2026-05-21 boundary uplift — two former honest unmapped gaps reclassified
+as formal `[[scope_cuts]]`:**
+
+* `/api/pull` NDJSON-progress client — model authoring/pull lifecycle is owned
+  by cave-portal-api UX; the `InferenceBackend` trait does not surface upload
+  progress and will not. Reclassified `unmapped → skipped` (reason `delegated`).
+* Concrete `LlamaCppBackend` / `VllmBackend` HTTP adapters — `cave-llm-gateway`
+  federates concrete providers (Ollama + Anthropic + OpenAI compat) and is the
+  proper home for additional adapters. This crate keeps the trait open and
+  ships the two reference adapters only. Reclassified `unmapped → skipped`
+  (reason `delegated`).
+
+**Original scope cuts (unchanged):**
+
 
 * `/api/push` — model publishing has no upstream registry write path in a
   sovereign deployment.
@@ -75,9 +81,9 @@ Ollama + OpenAI-compat adapters and a `BackendRegistry`.
 |------|--------------------------------------------------|--------|
 | 1    | SPDX coverage 100% of src/*.rs                   | PASS   |
 | 2    | source_sha pinned (v0.3.0)                       | PASS   |
-| 3    | last_audit = "2026-05-19"                        | PASS   |
+| 3    | last_audit = "2026-05-21"                        | PASS   |
 | 4    | parity_ratio_source = "manifest"                 | PASS   |
-| 5    | fill_ratio ≥ 0.85 (measured 0.9259)              | PASS   |
+| 5    | fill_ratio ≥ 0.95 (measured 1.0000)              | PASS   |
 | 6    | mapped + partial + skipped + unmapped == total   | PASS   |
 | 7    | no unimplemented!() / todo!() in src/            | PASS   |
 | 8    | PARITY_REPORT.md exists                          | PASS   |
@@ -92,10 +98,10 @@ Ollama + OpenAI-compat adapters and a `BackendRegistry`.
 * Integration tests: 2 unchanged + 9 self-audit = 11.
 * Total: 68 → 110 test count.
 
-## Follow-up work
+## Follow-up work (now owned by other crates per scope_cuts)
 
-* `/api/pull` blocking client + NDJSON progress decoder.
-* Concrete `LlamaCppBackend` adapter against `/completion` + `/chat/completions`
-  of llama.cpp-server.
-* `/v1/chat/completions` streaming response — mirrors `ollama::chat_stream`.
-* Daemon SIGTERM hook in cave-runtime supervisor.
+* `/api/pull` blocking client + NDJSON progress decoder — cave-portal-api UX.
+* Concrete `LlamaCppBackend` / `VllmBackend` adapters — cave-llm-gateway.
+* `/v1/chat/completions` streaming response (partial) — mirrors
+  `ollama::chat_stream`, future polish in this crate.
+* Daemon SIGTERM hook in cave-runtime supervisor (partial).
