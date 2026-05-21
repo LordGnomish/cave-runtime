@@ -29,10 +29,12 @@ pub mod routes;
 pub mod store;
 pub mod webhook;
 pub mod workflow;
+pub mod file_storage;
 
 pub use store::{ConvertedLead, CrmStore};
 pub use webhook::{WebhookBus, WebhookDelivery, WebhookOperation, WebhookSubscription};
 pub use workflow::{Workflow, WorkflowRun, WorkflowRunStatus, WorkflowStep, WorkflowStepType, WorkflowStore};
+pub use file_storage::{is_safe_relative_path, assert_resource_path_is_safe, assert_storage_path_is_within_workspace, build_on_storage_path};
 
 pub type State = CrmStore;
 
