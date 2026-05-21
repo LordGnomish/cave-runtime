@@ -6,9 +6,9 @@
 // Gates:
 //   1. SPDX coverage 100% of src/*.rs
 //   2. source_sha pinned (kubernetes v1.36.0 release tag)
-//   3. last_audit = 2026-05-19
+//   3. last_audit = 2026-05-21
 //   4. parity_ratio_source = "manifest"
-//   5. fill_ratio >= 0.85
+//   5. fill_ratio >= 0.95
 //   6. mapped + partial + skipped + unmapped == total
 //   7. no unimplemented!() / todo!() in src/
 //   8. PARITY_REPORT.md exists
@@ -61,11 +61,11 @@ fn gate_2_source_sha_pinned() {
 }
 
 #[test]
-fn gate_3_last_audit_2026_05_19() {
+fn gate_3_last_audit_2026_05_21() {
     let m = read_manifest();
     assert!(
-        has_kv(&m, "last_audit", "\"2026-05-19\""),
-        "last_audit must be 2026-05-19 in [parity] block"
+        has_kv(&m, "last_audit", "\"2026-05-21\""),
+        "last_audit must be 2026-05-21 in [parity] block"
     );
 }
 
@@ -84,8 +84,8 @@ fn gate_5_fill_ratio_floor() {
     let ratio =
         extract_float(&m, "fill_ratio").expect("manifest must declare fill_ratio = <0.0..1.0>");
     assert!(
-        ratio >= 0.85,
-        "fill_ratio = {} (need >= 0.85 — kube-proxy in-scope coverage)",
+        ratio >= 0.95,
+        "fill_ratio = {} (need >= 0.95 — kube-proxy in-scope coverage)",
         ratio
     );
 }
@@ -152,7 +152,7 @@ fn gate_9_charter_v2_summary() {
     let total = extract_int(&m, "total").unwrap_or(0);
     let mapped = extract_int(&m, "mapped_count").unwrap_or(0);
     assert!(
-        ratio >= 0.85 && total > 0 && mapped > 0 && m.contains("source_sha"),
+        ratio >= 0.95 && total > 0 && mapped > 0 && m.contains("source_sha"),
         "Charter v2 composite invariants not satisfied"
     );
 }

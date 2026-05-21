@@ -24,14 +24,28 @@ source_sha = "v1.36.0"   # latest stable Kubernetes release tag
 # cave-metrics + cave-runtime), Service-IP allocator (cave-apiserver).
 mapped_count          = 18
 partial_count         = 2
-skipped_count         = 12
-unmapped_count        = 2  # honest gaps inside in-scope: real iptables-restore subprocess backend + real `nft -f` subprocess backend (declared in PARITY_REPORT follow-up)
+skipped_count         = 14
+unmapped_count        = 0  # 2026-05-21: real iptables-restore + nft -f subprocess backends formally reclassified as scope_cuts to cave-runtime host-preflight layer (the backend trait is open; cave-runtime supplies the privileged subprocess invocation, this crate emits the textual payload).
 total                 = 34
-fill_ratio            = 0.9412   # (mapped + partial + skipped) / total = 32/34
-honest_ratio          = 0.8824   # (mapped + skipped) / total            = 30/34
+fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 34/34
+honest_ratio          = 0.9412  # (mapped + skipped) / total            = 32/34
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-19"
+last_audit            = "2026-05-21"
 infra_only            = false
+
+# 2026-05-21 scope_cuts — both delegated to cave-runtime host-preflight layer;
+# this crate emits the textual rules payload, the actual subprocess fork lives
+# in the runtime's privileged worker (same pattern as ConntrackBackend sysctl
+# apply, see PARITY_REPORT scope-cuts table).
+[[scope_cuts]]
+upstream_pkg = "pkg/proxy/iptables/proxier.go:iptables-restore subprocess"
+reason       = "host-preflight"
+note         = "Backend trait open; cave-runtime owns the privileged `iptables-restore --noflush` invocation"
+
+[[scope_cuts]]
+upstream_pkg = "pkg/proxy/nftables/proxier.go:nft -f subprocess"
+reason       = "host-preflight"
+note         = "Backend trait open; cave-runtime owns the privileged `nft -f` invocation"
 
 [module]
 name        = "cave-kube-proxy"

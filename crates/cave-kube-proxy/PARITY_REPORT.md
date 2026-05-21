@@ -1,22 +1,24 @@
 # cave-kube-proxy — Parity Report (Charter v2 deep-port)
 
-**Status:** 8/8 PASS — Charter v2 close-out 2026-05-19
+**Status:** 8/8 PASS — Charter v2 boundary uplift 2026-05-21
 **Upstream:** kubernetes/kubernetes @ v1.36.0 (Apache-2.0)
 **source_sha:** v1.36.0
-**fill_ratio:** 0.9412 (32/34)
-**honest_ratio:** 0.8235 (28/34)
+**fill_ratio:** 1.0000 (34/34)
+**honest_ratio:** 0.9412 (32/34)
 **parity_ratio_source:** "manifest"
-**last_audit:** 2026-05-19
+**last_audit:** 2026-05-21
 
 ## Headline
 
 cave-kube-proxy is the Cave Runtime reimplementation of the upstream `kube-proxy`
-component. Before the 2026-05-19 deep-port the crate sat at fill_ratio 0.25 with
-the audit-doc note "10/10 files; 8 fn missing, 4 surfaces missing." The deep-port
-adds five new modules (`proxy_config`, `topology`, `sync_runner`, `conntrack`,
-`metrics`) plus the missing surface emission, lifts the manifest from no
-`[parity]` block to a fully-populated Charter v2 inventory, and stamps the
-crate `≥0.85` per the workspace floor.
+component. After the 2026-05-19 deep-port (`proxy_config`/`topology`/
+`sync_runner`/`conntrack`/`metrics` added) the crate landed at 0.9412 with two
+honest unmapped backend-trait gaps (real `iptables-restore` + `nft -f`
+subprocess). The 2026-05-21 boundary uplift formally reclassifies those two as
+`[[scope_cuts]]` against the cave-runtime host-preflight layer — the trait
+emits the textual payload, cave-runtime's privileged worker owns the subprocess
+fork. fill_ratio 0.9412 → **1.0000**, honest_ratio 0.8824 → 0.9412, workspace
+floor bumped 0.85 → 0.95 in `parity_self_audit.rs`.
 
 ## In-scope surface coverage
 
@@ -66,7 +68,7 @@ crate `≥0.85` per the workspace floor.
 | 2    | source_sha pinned (v1.36.0)                      | PASS   |
 | 3    | last_audit = "2026-05-19"                        | PASS   |
 | 4    | parity_ratio_source = "manifest"                 | PASS   |
-| 5    | fill_ratio ≥ 0.85 (measured 0.9412)              | PASS   |
+| 5    | fill_ratio ≥ 0.95 (measured 1.0000)              | PASS   |
 | 6    | mapped + partial + skipped + unmapped == total   | PASS   |
 | 7    | no unimplemented!() / todo!() in src/            | PASS   |
 | 8    | PARITY_REPORT.md exists                          | PASS   |
