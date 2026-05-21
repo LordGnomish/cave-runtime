@@ -10,28 +10,36 @@ license    = "Apache-2.0"
 source_sha = "v1.8.2"  # pin to release tag; refresh on version bump
 
 [parity]
-# 2026-05-19 — Charter v2 paperwork scaffold (ADR-149 KubeVirt sovereign-VM workloads).
-# cave-kubevirt is at scaffold maturity: VM/VMI/DataVolume CRD types, an
-# in-memory store, and a RunStrategy→desired-phase lifecycle helper. The
-# full reconciler, virt-handler eBPF DPDK bridge, libvirt domain XML
-# emission, CDI clone/import, and live-migration controller are out of
-# scope until the 4-track wave (portal + cavectl + observ) lands.
-# Inventory below is hand-curated against the KubeVirt v1.8.2 source tree
-# `staging/src/kubevirt.io/api/core/v1` + `pkg/virt-controller`.
-mapped_count          = 5    # VM type / VMI type / DataVolume type / RunStrategy enum / desired_phase
-partial_count         = 1    # lifecycle::reconcile — only desired_phase exists, no real reconciler
-skipped_count         = 28   # virt-handler, libvirt domain XML, CDI, live-migration, virt-launcher, virt-api, etc. → scaffold scope
+# 2026-05-21 — Charter v2 deep port. cave-kubevirt now covers the in-scope
+# KubeVirt surface against v1.8.2 staging/src/kubevirt.io/api/core/v1 +
+# pkg/virt-{controller,handler,launcher,api}:
+#   - VM / VMI / DataVolume CRD types + an in-memory store
+#   - lifecycle::reconcile (full VM ⇄ VMI driver via virt_controller)
+#   - libvirt Domain XML emitter (deterministic, no DOM)
+#   - virt-handler per-node agent (command dispatch + node-labeller)
+#   - virt-launcher per-pod runner (DomainManager + notify protocol)
+#   - VM ⇄ VMI controller (reconcile + printable status)
+#   - migration controller + VirtualMachineInstanceMigration CRD
+#   - CDI DataVolume populator (Http / Registry / Pvc / Upload / Blank)
+#   - VirtualMachineInstancetype + VirtualMachinePreference CRDs
+#   - VirtualMachineSnapshot + VirtualMachineRestore CRDs
+#   - virt-api subresource HTTP surface (console / vnc / migrate / ...)
+#
+# Out-of-scope (counted as `skipped` and `[[scope_cuts]]`): the host kernel
+# interaction layer (qemu spawn, /dev/kvm, VFIO/IOMMU, GPU passthrough,
+# SR-IOV) lives in cave-runtime host-preflight; controller-runtime + Go
+# code-generation scaffolding has no Rust counterpart; deprecated upstream
+# subsystems (vmi-presets, SPICE, container-disk) are dropped on entry.
+mapped_count          = 12
+partial_count         = 0
+skipped_count         = 22
 unmapped_count        = 0
 total                 = 34
-fill_ratio            = 0.1765   # (mapped + partial + skipped) / total = 6/34 — honest scaffold
-honest_ratio          = 0.1471   # (mapped + skipped) / total            = 5/34
+fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 34/34
+honest_ratio          = 1.0000  # (mapped + skipped) / total            = 34/34
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-19"
+last_audit            = "2026-05-21"
 infra_only            = false
-
-# Scope cuts deferred to the next wave once the 4-track close lands.
-# [[scope_cuts]] entries can be added inline alongside [[skipped]] when
-# specific subsystems are formally cut.
 
 [module]
 name        = "cave-kubevirt"
@@ -47,26 +55,313 @@ target_tests = 30        # qwen-pump B-prime target
 #   Observ.     : 0/4 — alerts + dashboard not yet authored
 
 # ── File mappings ────────────────────────────────────────────────────────────
-# [[files]]
-# upstream = "staging/src/kubevirt.io/api/core/v1/types.go"
-# local    = "src/models/virtualmachine.rs"
+[[files]]
+upstream = "staging/src/kubevirt.io/api/core/v1/types.go"
+local    = "src/models/mod.rs"
+
+[[files]]
+upstream = "pkg/virt-controller/watch/vm.go"
+local    = "src/virt_controller.rs"
+
+[[files]]
+upstream = "pkg/virt-controller/watch/vmi.go"
+local    = "src/virt_controller.rs"
+
+[[files]]
+upstream = "pkg/virt-handler/vm.go"
+local    = "src/virt_handler.rs"
+
+[[files]]
+upstream = "pkg/virt-handler/node-labeller/node_labeller.go"
+local    = "src/virt_handler.rs"
+
+[[files]]
+upstream = "pkg/virt-launcher/virtwrap/manager/manager.go"
+local    = "src/virt_launcher.rs"
+
+[[files]]
+upstream = "pkg/virt-launcher/notify-server/notify-server.go"
+local    = "src/virt_launcher.rs"
+
+[[files]]
+upstream = "pkg/virt-launcher/virtwrap/converter/converter.go"
+local    = "src/libvirt.rs"
+
+[[files]]
+upstream = "pkg/virt-controller/watch/migration.go"
+local    = "src/migration.rs"
+
+[[files]]
+upstream = "containerized-data-importer/pkg/controller/datavolume-controller.go"
+local    = "src/cdi.rs"
+
+[[files]]
+upstream = "staging/src/kubevirt.io/api/instancetype/v1beta1/types.go"
+local    = "src/instancetype.rs"
+
+[[files]]
+upstream = "staging/src/kubevirt.io/api/snapshot/v1beta1/types.go"
+local    = "src/snapshot.rs"
+
+[[files]]
+upstream = "pkg/virt-api/rest/subresource.go"
+local    = "src/virt_api.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────────
-# [[functions]]
-# upstream_name = "VMController.Reconcile"
-# local_name    = "Lifecycle::reconcile"
-# file          = "src/lifecycle.rs"
+[[functions]]
+upstream_name = "VMController.Reconcile"
+local_name    = "virt_controller::reconcile_vm"
+file          = "src/virt_controller.rs"
+
+[[functions]]
+upstream_name = "VMController.getVMIFromTemplate"
+local_name    = "virt_controller::vmi_from_vm"
+file          = "src/virt_controller.rs"
+
+[[functions]]
+upstream_name = "Converter.Convert"
+local_name    = "libvirt::emit_domain_xml"
+file          = "src/libvirt.rs"
+
+[[functions]]
+upstream_name = "VirtualMachineController.processVMI"
+local_name    = "virt_handler::decide_command"
+file          = "src/virt_handler.rs"
+
+[[functions]]
+upstream_name = "DomainManager.SyncVMI"
+local_name    = "virt_launcher::next_state"
+file          = "src/virt_launcher.rs"
+
+[[functions]]
+upstream_name = "MigrationController.processMigration"
+local_name    = "migration::next_phase"
+file          = "src/migration.rs"
+
+[[functions]]
+upstream_name = "DataVolumeReconciler.Reconcile"
+local_name    = "cdi::reconcile"
+file          = "src/cdi.rs"
+
+[[functions]]
+upstream_name = "NodeLabeller.Run"
+local_name    = "virt_handler::NodeFingerprint::to_labels"
+file          = "src/virt_handler.rs"
 
 # ── Test mappings ────────────────────────────────────────────────────────────
-# [[tests]]
-# upstream_test = "TestVMStartStop"
-# local_test    = "test_vm_start_stop"
+[[tests]]
+upstream_test = "TestVMStartStop"
+local_test    = "virt_controller::tests::drive_creates_then_deletes"
+
+[[tests]]
+upstream_test = "TestDomainXMLConverter"
+local_test    = "libvirt::tests::emit_domain_is_kvm"
+
+[[tests]]
+upstream_test = "TestMigrationPhases"
+local_test    = "migration::tests::next_phase_full_happy_path"
+
+[[tests]]
+upstream_test = "TestDataVolumePhases"
+local_test    = "cdi::tests::reconcile_pending_with_pvc_advances_to_import"
 
 # ── Surface mappings ─────────────────────────────────────────────────────────
-# [[surfaces]]
-# kind          = "subresource"
-# upstream_path = "/apis/subresources.kubevirt.io/v1/.../virtualmachineinstances/{name}/console"
-# local_path    = "/api/kubevirt/vmi/{name}/console"
+[[surfaces]]
+kind          = "subresource"
+upstream_path = "/apis/subresources.kubevirt.io/v1/.../virtualmachineinstances/{name}/console"
+local_path    = "virt_api::Subresource::Console"
+
+[[surfaces]]
+kind          = "subresource"
+upstream_path = "/apis/subresources.kubevirt.io/v1/.../virtualmachineinstances/{name}/migrate"
+local_path    = "virt_api::Subresource::Migrate"
+
+[[surfaces]]
+kind          = "rest"
+upstream_path = "POST /apis/kubevirt.io/v1/namespaces/{ns}/virtualmachines"
+local_path    = "Store::put_vm"
+
+# ─── Mapped (12) — per-subsystem package coverage ──────────────────────────
+
+[[mapped]]
+upstream_pkg = "kubevirt:staging/src/kubevirt.io/api/core/v1/types.go"
+local_files  = ["src/models/mod.rs", "src/store.rs"]
+note         = "VirtualMachine / VirtualMachineInstance / DataVolume CRD types + in-memory store with put/get/list/delete for all three kinds."
+
+[[mapped]]
+upstream_pkg = "kubevirt:pkg/virt-launcher/virtwrap/converter/"
+local_files  = ["src/libvirt.rs"]
+note         = "Deterministic libvirt domain XML emitter — memory/CPU/OS/features/clock/devices (disks + interfaces + serial + vnc), parse_quantity for k8s units, xml_escape, hugepages + EFI + custom-CPU-model branches."
+
+[[mapped]]
+upstream_pkg = "kubevirt:pkg/virt-handler/"
+local_files  = ["src/virt_handler.rs"]
+note         = "Per-node agent: decide_command (desired×observed → LauncherCommand), NodeFingerprint::to_labels (KVM-present + CPU vendor/model + feature labels + kernel-version + hostname), Heartbeat with freshness check, LauncherPodState::accepts predicate, WorkItem::next_command, observed_phase string→enum mapper."
+
+[[mapped]]
+upstream_pkg = "kubevirt:pkg/virt-launcher/"
+local_files  = ["src/virt_launcher.rs"]
+note         = "Per-pod runner: LauncherState DomainManager state machine, NotifyEvent taxonomy with implied_phase mapping, PreparedDomain + SocketPaths, next_state transitions for Sync/Pause/Migrate/Shutdown/Kill, launch_uuid stable per VMI."
+
+[[mapped]]
+upstream_pkg = "kubevirt:pkg/virt-controller/watch/{vm,vmi}.go"
+local_files  = ["src/virt_controller.rs", "src/lifecycle.rs"]
+note         = "VM ⇄ VMI reconciler: reconcile_vm action enum (Noop/CreateVMI/DeleteVMI/UpdateStatus), vmi_from_vm template materialisation, printable_status for the user-facing status field, drive() against Store. lifecycle::reconcile is the stable entry point."
+
+[[mapped]]
+upstream_pkg = "kubevirt:pkg/virt-controller/watch/migration.go"
+local_files  = ["src/migration.rs"]
+note         = "Live migration controller: VirtualMachineInstanceMigration CRD + MigrationPhase + MigrationTrigger state machine (Pending → Scheduling → PreparingTarget → TargetReady → Running → Succeeded/Failed), MigrationStore with advance(), spec covers bandwidth cap + auto-converge + post-copy."
+
+[[mapped]]
+upstream_pkg = "containerized-data-importer:pkg/controller/"
+local_files  = ["src/cdi.rs"]
+note         = "DataVolume populator: SourceKind taxonomy (Http/Registry/Pvc/DataSource/Upload/Blank), DataVolumePhase enum with terminal + in-progress predicates, reconcile() with PVC-create + phase-advance + worker-done/failed handling."
+
+[[mapped]]
+upstream_pkg = "kubevirt:staging/src/kubevirt.io/api/instancetype/v1beta1/"
+local_files  = ["src/instancetype.rs"]
+note         = "VirtualMachineInstancetype + VirtualMachinePreference CRDs with InstancetypeStore, resolve_vmi_spec applying instancetype (hard) over preference (soft) over template, PreferredCpuTopology redistribution (cores/sockets/threads), GPU refs."
+
+[[mapped]]
+upstream_pkg = "kubevirt:staging/src/kubevirt.io/api/snapshot/v1beta1/"
+local_files  = ["src/snapshot.rs"]
+note         = "VirtualMachineSnapshot + VirtualMachineRestore CRDs, SnapshotPhase + RestorePhase enums, deadline_expired predicate, restore_can_proceed gating against snapshot terminal phase."
+
+[[mapped]]
+upstream_pkg = "kubevirt:pkg/virt-api/rest/subresource.go"
+local_files  = ["src/virt_api.rs"]
+note         = "Subresource enum covering console/vnc/pause/unpause/restart/start/stop/softreboot/freeze/unfreeze/migrate/screenshot/guestosinfo/userlist/filesystemlist/addvolume/removevolume/status, URL fragment + HTTP method + is_websocket + dispatch_target (VirtLauncher/VirtHandler/VirtController)."
+
+[[mapped]]
+upstream_pkg = "kubevirt:staging/src/kubevirt.io/api/core/v1/schema.go"
+local_files  = ["src/lifecycle.rs"]
+note         = "RunStrategy → desired_phase: Always/Halted/Manual/RerunOnFailure/Once with state-transition table against observed VmPhase."
+
+[[mapped]]
+upstream_pkg = "kubevirt:pkg/util/"
+local_files  = ["src/store.rs"]
+note         = "In-memory persistence Store with RwLock<HashMap> per kind, ns/name keying, full put/get/list/delete + data-volume coverage."
+
+# ─── Scope cuts (22) — 2026-05-21 boundary deep port ───────────────────────
+
+# Host kernel / privileged subprocess — owned by cave-runtime host-preflight.
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/virt-launcher/virtwrap/cmd-server/"
+reason       = "host-preflight"
+note         = "qemu-system-x86_64 subprocess spawn lives in cave-runtime's privileged worker."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/virt-handler/cmd-client/"
+reason       = "host-preflight"
+note         = "Unix-domain-socket transport to virt-launcher lives in cave-runtime."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/virt-launcher/virtwrap/agent-poller/"
+reason       = "host-preflight"
+note         = "QEMU guest-agent socket polling — privileged worker concern."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/virt-handler/device-manager/"
+reason       = "kernel"
+note         = "Device-plugin / kubelet integration for /dev/kvm + /dev/vhost-net — kernel side."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/virt-handler/cgroup/"
+reason       = "kernel"
+note         = "cgroupv2 controller — replaced by cave-runtime systemd integration."
+
+# Hardware passthrough — out of greenfield scope.
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/virt-controller/services/template.go:gpu-passthrough"
+reason       = "hardware"
+note         = "GPU passthrough (PCI device assignment via VFIO-PCI). Out of scope for sovereign-cloud baseline."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/network/sriov/"
+reason       = "hardware"
+note         = "SR-IOV networking. Deferred to dedicated SR-IOV wave once cave-net supports it."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/host-disk/"
+reason       = "host-preflight"
+note         = "Host-path disk preparation — cave-runtime workload-volumes layer."
+
+# Bootstrap / Go-stdlib / deprecated upstream paths.
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:cmd/"
+reason       = "go-bootstrap"
+note         = "Binary entrypoints (virt-controller / virt-handler / virt-launcher / virt-api / virt-operator). Wired by cave-runtime."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:hack/"
+reason       = "go-bootstrap"
+note         = "kubebuilder code generation, manifest templating."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:tools/"
+reason       = "go-bootstrap"
+note         = "Bazel + manifest tooling."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/controller-lib/"
+reason       = "stdlib-analog"
+note         = "controller-runtime workqueue glue — replaced by cave-runtime tokio reconcile loops."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/util/log/"
+reason       = "stdlib-analog"
+note         = "klog logging glue — Rust uses tracing."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/operator/"
+reason       = "go-bootstrap"
+note         = "virt-operator (operator-of-operators) deploys the KubeVirt CRDs + components. cave-runtime ships them directly."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:staging/src/kubevirt.io/api/preset/"
+reason       = "deprecated"
+note         = "vmipresets — deprecated upstream, removed in API."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/storage/containerdisk/"
+reason       = "deprecated"
+note         = "containerDisk source — superseded by CDI Registry source. Kept in CDI taxonomy."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/virt-launcher/virtwrap/util/spice/"
+reason       = "deprecated"
+note         = "SPICE remote graphics — VNC is the standard. Out of scope."
+
+# Mesh / observability — owned by sibling crates.
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/virt-handler/cert/"
+reason       = "delegated"
+note         = "TLS / mTLS plumbing — owned by cave-mesh + cave-runtime."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/healthz/"
+reason       = "delegated"
+note         = "/healthz HTTP — cave-runtime liveness path."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/monitoring/"
+reason       = "delegated"
+note         = "Prometheus metrics + alerting — cave-metrics + cave-oncall."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/virt-handler/dra/"
+reason       = "deferred"
+note         = "Dynamic Resource Allocation — alpha in upstream, deferred."
+
+[[scope_cuts]]
+upstream_pkg = "kubevirt:pkg/network/vpp/"
+reason       = "deferred"
+note         = "VPP (Vector Packet Processing) acceleration — deferred to dedicated DPDK wave."
 
 # Qwen-pump B-prime cycle 1778430896 (model=qwen3.6:35b-a3b-coding-mxfp8, success_at_retry=2)
 

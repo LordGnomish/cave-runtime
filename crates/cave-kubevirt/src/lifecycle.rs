@@ -9,6 +9,9 @@
 //! only; production logic (defragmentation, live-migration, hotplug) is pending.
 
 use crate::models::{RunStrategy, VirtualMachine, VmPhase};
+use crate::store::Store;
+use crate::virt_controller::{drive, ReconcileAction};
+use std::sync::Arc;
 
 /// Compute the desired VM phase given the VM spec and the *current* observed phase.
 /// Mirrors the upstream `desiredState` switch but covers only the basic
@@ -36,4 +39,12 @@ pub fn desired_phase(vm: &VirtualMachine, observed: VmPhase) -> VmPhase {
             other => other,
         },
     }
+}
+
+/// Full VM reconcile against an in-memory store. Returns the action that
+/// was applied. Delegates to `virt_controller::drive` — kept here as a
+/// stable entry-point for downstream callers (`cave-runtime` clusters
+/// the per-VM workqueue around this name).
+pub fn reconcile(store: &Arc<Store>, vm: &VirtualMachine) -> ReconcileAction {
+    drive(store, vm)
 }
