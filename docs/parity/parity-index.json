@@ -873,7 +873,7 @@
     },
     "cave-kube-proxy": {
       "cave_src_loc": null,
-      "honest_ratio": 0.8235,
+      "honest_ratio": 0.8824,
       "last_audit_disk": "2026-05-19",
       "manifest_filled": true,
       "mapped_count": 18,
@@ -881,11 +881,11 @@
       "parity_ratio": 0.9412,
       "parity_ratio_source": "manifest",
       "partial_count": 2,
-      "skipped_count": 14,
+      "skipped_count": 12,
       "stubs": null,
       "tier": "B",
       "total_count": 34,
-      "unmapped_count": 0,
+      "unmapped_count": 2,
       "upstream": "kubernetes/kubernetes",
       "upstream_version": "v1.28.0"
     },
@@ -993,12 +993,19 @@
     },
     "cave-local-llm": {
       "cave_src_loc": null,
+      "honest_ratio": 0.8519,
+      "last_audit_disk": "2026-05-19",
       "manifest_filled": true,
+      "mapped_count": 13,
       "note": "5/5 fn, 3/3 surf \u2014 **3 stubs** in src; needs file + test mappings",
-      "parity_ratio": 0.5,
-      "parity_ratio_source": "audit",
+      "parity_ratio": 0.9259,
+      "parity_ratio_source": "manifest",
+      "partial_count": 2,
+      "skipped_count": 10,
       "stubs": null,
       "tier": "B",
+      "total_count": 27,
+      "unmapped_count": 2,
       "upstream": "huggingface/transformers",
       "upstream_version": "v4.36"
     },
@@ -1726,7 +1733,7 @@
     "injected": 9,
     "new_filled": 94,
     "phantoms": 0,
-    "ratio_overrides": 53
+    "ratio_overrides": 54
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"

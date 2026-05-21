@@ -140,6 +140,20 @@ pub struct VersionInfo {
 }
 
 impl OllamaClient {
+    /// Returns the configured base URL (no trailing slash).
+    /// Used by lifecycle/extras helpers that need to assemble auxiliary
+    /// endpoints without re-wiring a second client.
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
+    /// Borrow the reqwest client so siblings can share its pool +
+    /// timeouts. Avoids constructing duplicate clients with mismatched
+    /// per-request defaults.
+    pub fn http_client(&self) -> &Client {
+        &self.client
+    }
+
     pub fn new(base_url: impl Into<String>) -> Self {
         // Short per-request timeout so a hung Ollama doesn't stall a daemon tick
         // for minutes. health_check() is the dedicated liveness probe; real

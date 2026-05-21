@@ -24,11 +24,11 @@ source_sha = "v1.36.0"   # latest stable Kubernetes release tag
 # cave-metrics + cave-runtime), Service-IP allocator (cave-apiserver).
 mapped_count          = 18
 partial_count         = 2
-skipped_count         = 14
-unmapped_count        = 0
+skipped_count         = 12
+unmapped_count        = 2  # honest gaps inside in-scope: real iptables-restore subprocess backend + real `nft -f` subprocess backend (declared in PARITY_REPORT follow-up)
 total                 = 34
-fill_ratio            = 0.9412
-honest_ratio          = 0.8235
+fill_ratio            = 0.9412   # (mapped + partial + skipped) / total = 32/34
+honest_ratio          = 0.8824   # (mapped + skipped) / total            = 30/34
 parity_ratio_source   = "manifest"
 last_audit            = "2026-05-19"
 infra_only            = false
