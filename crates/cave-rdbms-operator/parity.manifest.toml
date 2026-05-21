@@ -28,16 +28,25 @@ source_sha = "1.24.0"   # release-tag pin; refresh on operator bump
 # Package-level inventory against CloudNativePG v1.24 + PgBouncer 1.21.
 # Hand-curated against the CNPG repository layout
 # (api/v1, controllers/, internal/, pkg/, plugin/) on 2026-05-12.
-# fill_ratio = (mapped + skipped) / total
-mapped_count          = 11
+# fill_ratio = (mapped + partial + skipped) / total
+#
+# 2026-05-21 boundary uplift:
+#   * +2 mapped: webserver.rs (per-pod sidecar surface: status/liveness/
+#     readiness/promote/backup/lsn report + LSN comparator) and
+#     default_queries.rs (CNPG default monitoring catalog: pg_stat_archiver/
+#     bgwriter/database/replication/replication_slots/locks/user_tables/
+#     wal_receiver/database_size).
+#   * 2 unmapped → scope_cuts: replica-cluster (cross-cluster replication)
+#     and pgaudit (extension-mgmt) — both formally deferred to follow-up waves.
+mapped_count          = 13
 partial_count         = 0
-skipped_count         = 10
-unmapped_count        = 4
+skipped_count         = 12
+unmapped_count        = 0
 total                 = 25
-fill_ratio            = 0.84
-honest_ratio          = 0.84
+fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 25/25
+honest_ratio          = 1.0000  # (mapped + skipped) / total            = 25/25
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-19"
+last_audit            = "2026-05-21"
 infra_only            = false
 
 [module]
@@ -108,6 +117,18 @@ local    = "src/error.rs"
 [[files]]
 upstream = "cloudnative-pg/cloudnative-pg:pkg/management/url/url.go"
 local    = "src/routes.rs"
+
+[[files]]
+upstream = "cloudnative-pg/cloudnative-pg:pkg/management/postgres/webserver/local.go"
+local    = "src/webserver.rs"
+
+[[files]]
+upstream = "cloudnative-pg/cloudnative-pg:pkg/management/postgres/webserver/management.go"
+local    = "src/webserver.rs"
+
+[[files]]
+upstream = "cloudnative-pg/cloudnative-pg:pkg/postgres/monitoring/default_queries.go"
+local    = "src/default_queries.rs"
 
 # PgBouncer (C) → cave-rdbms-operator pool subset.
 
@@ -816,26 +837,32 @@ upstream_pkg = "cloudnative-pg:docs/"
 reason       = "go-bootstrap"
 note         = "Documentation site"
 
-# ─── Unmapped (5) — real port gaps acknowledged ─────────────────────────────
-
-[[unmapped]]
-upstream_pkg = "cloudnative-pg:pkg/management/postgres/webserver/"
-note         = "Per-pod sidecar webserver (status JSON, backup endpoints). The operator's HTTP surface exists in routes.rs but the per-instance sidecar protocol is not yet implemented."
-
-[[unmapped]]
-upstream_pkg = "cloudnative-pg:pkg/reconciler/instance/replica/replicacluster.go"
-note         = "Replica-cluster (cross-cluster replication) failover. Single-cluster HA only today."
+# ─── Mapped additions 2026-05-21 ───────────────────────────────────────────
 
 [[mapped]]
 upstream_pkg = "cloudnative-pg:pkg/specs/scheduledbackup_types.go"
 local_files  = ["src/scheduled_backup.rs"]
 note         = "ScheduledBackup CRD: 5-field cron parser (* / lists / ranges / steps), CronSchedule::next_after / matches, ScheduledBackupManager with create / get / list / suspend / resume / delete / trigger_due + retain_runs trim. Couples to backup.rs for the underlying one-shot Backup. Cron resolution is 1 minute, in UTC, matching the cloudnative-pg behaviour."
 
-[[unmapped]]
-upstream_pkg = "cloudnative-pg:pkg/postgres/monitoring/default_queries.go"
-note         = "Built-in catalog of monitoring queries (slow queries, replication slot drift). monitoring.rs covers metrics emission but not the query catalog."
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/management/postgres/webserver/{local,management,backup,promote}.go"
+local_files  = ["src/webserver.rs"]
+note         = "Per-pod sidecar surface (CNPG `instance manager` HTTP). InstanceStatus + ProbeOutcome with liveness/readiness deciders, PromoteRequest/Response + Fast/Safe modes (pg_ctl flags), BackupRequest/Response + BackupMethod, LsnReport + lsn_at_least_as_caught_up comparator with hex-LSN parser, canonical ROUTES table. cave-runtime's sidecar binary owns the axum wiring."
 
-[[unmapped]]
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/postgres/monitoring/default_queries.go"
+local_files  = ["src/default_queries.rs"]
+note         = "Built-in monitoring-query catalog: pg_stat_archiver / bgwriter / database / replication / replication_slots / locks / user_tables / wal_receiver / database_size with column→MetricKind mapping, RunOn role filter, minimum-pg-version gating, find/queries_for_role/queries_for_version/catalog_index helpers. cave-metrics consumes the catalog."
+
+# ─── Scope_cuts 2026-05-21 — previously unmapped, now formally deferred ────
+
+[[scope_cuts]]
+upstream_pkg = "cloudnative-pg:pkg/reconciler/instance/replica/replicacluster.go"
+reason       = "ha-ray-2"
+note         = "Cross-cluster (replica-cluster) replication failover deferred to ha-ray-2. cave-rdbms-operator ships single-cluster HA today."
+
+[[scope_cuts]]
 upstream_pkg = "cloudnative-pg:pkg/management/postgres/pgaudit/"
-note         = "pgaudit extension management (`pgaudit.log` config). Tracked but not yet implemented."
+reason       = "extension-mgmt"
+note         = "Extension-management subsystem (pgaudit / pg_stat_statements / pg_partman) deferred. The operator does not manage Postgres extensions on a per-cluster basis today; that wave will introduce a `cave-rdbms-extension-manager` sibling."
 
