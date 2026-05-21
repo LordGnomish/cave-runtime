@@ -20,6 +20,18 @@ pub mod metrics;
 /// Re-exports the Ollama client module for communicating with the local LLM server.
 pub mod ollama;
 
+/// Lifecycle/extras client (show / pull / copy / delete / embed / ps).
+pub mod ollama_extras;
+
+/// OpenAI-compatible client (chat / completions / embeddings / models).
+pub mod openai_compat;
+
+/// Prompt template engine — substitution + if + range subset of Go-template.
+pub mod prompt_template;
+
+/// Async inference backend trait + Ollama + OpenAI-compat adapters + registry.
+pub mod backend;
+
 /// Re-exports the queue module for managing priority-based task scheduling.
 pub mod queue;
 

@@ -1,0 +1,52 @@
+# parity.manifest.toml — cave-upstream-watchd
+#
+# 2026-05-19 Charter v2 paperwork — first-party crate, infra_only.
+#
+# cave-upstream-watchd is a sovereign release-watch daemon. It polls
+# tracked upstreams (Atom feed primary per ADR-026, GitHub App enrichment
+# Phase 2, legacy PAT JSON as fallback) and emits GAP_OPENED events when
+# any upstream lands a release past the local `parity.manifest.toml::
+# [upstream] version` pin. The crate is the foundation of the
+# self-healing / self-improving Charter loop — see ADR-026 and the
+# upstream-tracker memory files.
+#
+# Since this is first-party CAVE infrastructure (no external upstream is
+# being mirrored), the manifest carries `infra_only = true` and the
+# parity-index tooling routes it through the `parity_ratio_source =
+# "infra_only"` path (same pattern as cave-cli, cave-upstream,
+# cave-runbook, cave-docs-site, cave-core).
+#
+# The atom/json hybrid design is documented in:
+#   * docs/adr/ADR-026 (or ADR-RUNTIME-UPSTREAM-WATCH-001 — see internal ADR set)
+#   * docs/runbooks/github-app-setup.md
+#   * Memory: project_upstream_tracker_atom.md, upstream-tracker-finish-2026-05-19.md
+
+[upstream]
+org        = "cave-runtime"
+repo       = "cave-runtime"
+version    = "v0.1.0"
+source_sha = "v0.1.0"   # first-party self-pin against the workspace version
+
+[parity]
+infra_only           = true
+ratio                = 0.0        # first-party — no external upstream surface to measure
+parity_ratio_source  = "infra_only"
+last_audit           = "2026-05-19"
+
+[module]
+name        = "cave-upstream-watchd"
+description = "Upstream release watch daemon — Atom + GitHub App hybrid poller + GAP_OPENED dispatcher"
+source_root = "src"
+first_party = true
+
+[[surfaces]]
+kind          = "cli"
+upstream_path = "(internal)"
+local_path    = "cave-upstream-watchd"
+notes         = "Daemon binary — launchd-supervised, polls every 3600s."
+
+[[surfaces]]
+kind          = "cli"
+upstream_path = "(internal)"
+local_path    = "cave-tdd-check"
+notes         = "TDD gate runner — companion binary."

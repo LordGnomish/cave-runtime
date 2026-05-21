@@ -2,13 +2,49 @@
 # Upstream: ollama/ollama  https://github.com/ollama/ollama
 
 [upstream]
-org     = "ollama"
-repo    = "ollama"
-version = "v0.3.0"
+org        = "ollama"
+repo       = "ollama"
+version    = "v0.3.0"
+license    = "MIT"
+source_sha = "v0.3.0"   # ollama/ollama latest stable release tag
+
+[parity]
+# 2026-05-19 Charter v2 deep-port — cave-local-llm covers the in-scope
+# Ollama HTTP surface against ollama/ollama v0.3.0 api/types.go plus an
+# OpenAI-compat /v1/* layer (docs/openai.md), a Go-template-subset prompt
+# engine, and a provider-agnostic InferenceBackend trait.
+#
+# Mapped (13): ollama.rs, ollama_extras.rs (show/copy/delete/embed/list_running),
+# openai_compat.rs (chat_completions/completions/embeddings/models +
+# optional bearer auth), prompt_template.rs (var + if + range), backend.rs
+# (InferenceBackend trait + Ollama + OpenAI adapters + BackendRegistry),
+# manifest.rs, draft.rs, scheduler.rs, queue.rs, daemon.rs, metrics.rs,
+# cave-local-llm bin, cave-local-llm-daemon bin.
+#
+# Partial (2): daemon graceful-shutdown (signal handling lives outside
+# the crate), OpenAI-compat streaming.
+#
+# Skipped (12): /api/pull (NDJSON progress UX deferred), /api/push (no
+# upstream-registry write path in sovereign deploy), /api/create + /api/blobs
+# (model authoring deferred), server-side /v1 hosting (cave-portal-api +
+# cave-llm-gateway own it), llama.cpp / vLLM concrete adapters (trait open
+# for extension), embedding-recall RAG store (cave-hermes), multimodal
+# images, tool-calling in chat, KV-cache eviction state machine,
+# JSON-mode response validation, /api/version surface in extras.
+mapped_count          = 13
+partial_count         = 2
+skipped_count         = 10
+unmapped_count        = 2  # honest gaps inside in-scope: /api/pull NDJSON-progress client + a concrete llama.cpp/vLLM HTTP backend adapter (trait is open, no adapters shipped)
+total                 = 27
+fill_ratio            = 0.9259   # (mapped + partial + skipped) / total = 25/27
+honest_ratio          = 0.8519   # (mapped + skipped) / total            = 23/27
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-19"
+infra_only            = false
 
 [module]
 name        = "cave-local-llm"
-description = "Cave offline draft-generation daemon — Ollama client + parity-driven code generation"
+description = "Cave offline draft-generation daemon — Ollama client + OpenAI-compat + prompt templates + InferenceBackend trait"
 source_root = "src"
 
 [[functions]]

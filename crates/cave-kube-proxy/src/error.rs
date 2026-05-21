@@ -28,4 +28,15 @@ pub enum KubeProxyError {
         "cross-tenant access denied: store tenant '{store}' does not match request tenant '{req}'"
     )]
     CrossTenantDenied { store: String, req: String },
+
+    /// Mirrors `cmd/kube-proxy/app/server.go:412` (validateProxyMode) —
+    /// the runtime rejects malformed `KubeProxyConfiguration` at startup.
+    #[error("invalid kube-proxy config: {0}")]
+    InvalidConfig(String),
+
+    /// Mirrors `pkg/proxy/conntrack/conntrack.go:48` (Exec.Run failure) —
+    /// the conntrack helper could not reach `/proc/sys/net/netfilter/`
+    /// to apply the requested setting.
+    #[error("conntrack setting '{key}' could not be applied: {reason}")]
+    ConntrackApply { key: String, reason: String },
 }
