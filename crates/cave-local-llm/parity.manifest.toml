@@ -2,14 +2,27 @@
 # Upstream: ollama/ollama  https://github.com/ollama/ollama
 
 [upstream]
-org     = "ollama"
-repo    = "ollama"
-version = "v0.3.0"
+org       = "ollama"
+repo      = "ollama"
+version = "v0.30.0-rc21"
+
+[parity]
+mapped_count      = 13
+partial_count     = 2
+skipped_count     = 7
+unmapped_count    = 0
+total             = 22
+fill_ratio        = 0.5909
+honest_ratio      = 0.5909
+last_audit        = "2026-05-21"
+parity_ratio_source = "manifest"
 
 [module]
-name        = "cave-local-llm"
+name          = "cave-local-llm"
 description = "Cave offline draft-generation daemon — Ollama client + parity-driven code generation"
 source_root = "src"
+
+# ── Function mappings ──────────────────────────────────────────────────────────
 
 [[functions]]
 upstream_name = "Tags"
@@ -36,26 +49,219 @@ upstream_name = "ChatStream"
 local_name    = "chat_stream"
 file          = "src/ollama.rs"
 
+[[functions]]
+upstream_name = "Show"
+local_name    = "show"
+file          = "src/ollama_extras.rs"
+
+[[functions]]
+upstream_name = "Copy"
+local_name    = "copy"
+file          = "src/ollama_extras.rs"
+
+[[functions]]
+upstream_name = "Delete"
+local_name    = "delete"
+file          = "src/ollama_extras.rs"
+
+[[functions]]
+upstream_name = "Embed"
+local_name    = "embed"
+file          = "src/ollama_extras.rs"
+
+[[functions]]
+upstream_name = "Ps"
+local_name    = "list_running"
+file          = "src/ollama_extras.rs"
+
+[[functions]]
+upstream_name = "Version"
+local_name    = "health_check"
+file          = "src/ollama.rs"
+
+[[functions]]
+upstream_name = "Create"
+local_name    = ""
+file          = "(pending)"
+
+[[functions]]
+upstream_name = "Pull"
+local_name    = ""
+file          = "(pending)"
+
+[[functions]]
+upstream_name = "Push"
+local_name    = ""
+file          = "(pending)"
+
+# ── Surface mappings ───────────────────────────────────────────────────────────
+
 [[surfaces]]
-kind          = "http"
+kind            = "http"
 upstream_path = "GET /api/tags"
-local_path    = "GET /api/tags"
+local_path      = "GET /api/tags"
 
 [[surfaces]]
-kind          = "http"
+kind            = "http"
 upstream_path = "POST /api/generate"
-local_path    = "POST /api/generate"
+local_path      = "POST /api/generate"
 
 [[surfaces]]
-kind          = "http"
+kind            = "http"
 upstream_path = "POST /api/chat"
-local_path    = "POST /api/chat"
+local_path      = "POST /api/chat"
+
+[[surfaces]]
+kind            = "http"
+upstream_path = "GET /api/version"
+local_path      = "GET /api/version"
+
+[[surfaces]]
+kind            = "http"
+upstream_path = "POST /api/show"
+local_path      = "POST /api/show"
+
+[[surfaces]]
+kind            = "http"
+upstream_path = "POST /api/copy"
+local_path      = "POST /api/copy"
+
+[[surfaces]]
+kind            = "http"
+upstream_path = "POST /api/delete"
+local_path      = "POST /api/delete"
+
+[[surfaces]]
+kind            = "http"
+upstream_path = "POST /api/embed"
+local_path      = "POST /api/embed"
+
+[[surfaces]]
+kind            = "http"
+upstream_path = "GET /api/ps"
+local_path      = "GET /api/ps"
+
+[[surfaces]]
+kind            = "http"
+upstream_path = "POST /api/create"
+local_path      = ""
+reason          = "delegated"
+note            = "Model file authoring owned by cave-portal-api UX"
+
+[[surfaces]]
+kind            = "http"
+upstream_path = "POST /api/pull"
+local_path      = ""
+reason          = "delegated"
+note            = "Model pull lifecycle owned by cave-portal-api UX"
+
+[[surfaces]]
+kind            = "http"
+upstream_path = "POST /api/push"
+local_path      = ""
+reason          = "delegated"
+note            = "Model publish has no upstream registry write path in sovereign deployments"
+
+[[surfaces]]
+kind            = "http"
+upstream_path = "POST /api/blobs"
+local_path      = ""
+reason          = "delegated"
+note            = "Chunked blob upload underlying push/create — deferred"
+
+# ── Mapped modules ────────────────────────────────────────────────────────────
+
+[[mapped]]
+upstream_pkg = "api/types.go"
+local_files   = ["src/ollama.rs", "src/ollama_extras.rs"]
+note          = "Ollama HTTP client — tags, generate, chat + extras (show, copy, delete, embed, ps)"
+
+[[mapped]]
+upstream_pkg = "cmd/ollama/"
+local_files   = ["src/bin/cave-local-llm.rs", "src/bin/cave-local-llm-daemon.rs"]
+note          = "CLI binaries mirroring ollama CLI (one-shot + daemon)"
+
+[[mapped]]
+upstream_pkg = "app/llm/"
+local_files   = ["src/draft.rs", "src/daemon.rs", "src/scheduler.rs", "src/queue.rs", "src/metrics.rs", "src/manifest.rs", "src/probe.rs"]
+note          = "Draft generation daemon: draft model, Ollama prompt builder, scheduler guardrails, priority queue, daemon loop, metrics, manifest reader, compile probe"
+
+# ── Skipped items ─────────────────────────────────────────────────────────────
+
+[[skipped]]
+upstream_pkg = "Prompt templates"
+reason        = "parallel-track"
+note          = "Go-template subset mapped in upstream docs but cave-runtime implements its own template engine"
+
+[[skipped]]
+upstream_pkg = "OpenAI-compatible /v1"
+reason        = "delegated"
+note          = "OpenAI compat server owned by cave-llm-gateway"
+
+[[skipped]]
+upstream_pkg = "Multimodal image inputs"
+reason        = "deferred"
+note          = "images[] field on Generate/Chat — multimodal parsing deferred"
+
+[[skipped]]
+upstream_pkg = "Tool calling"
+reason        = "deferred"
+note          = "tool_calls + tool role in chat messages — deferred"
+
+[[skipped]]
+upstream_pkg = "KV cache eviction"
+reason        = "deferred"
+note          = "Daemon-side ergonomic, not in API surface"
+
+[[skipped]]
+upstream_pkg = "JSON mode validation"
+reason        = "deferred"
+note          = "options.format='json' honoured by Ollama; cave does not add cave-side validation"
+
+[[skipped]]
+upstream_pkg = "Embedding recall RAG"
+reason        = "delegated"
+note          = "Owned by cave-hermes"
+
+# ── Partially mapped ──────────────────────────────────────────────────────────
+
+[[partial]]
+upstream_pkg = "Daemon lifecycle"
+local_files   = ["src/daemon.rs", "src/ollama.rs"]
+note          = "Ollama lifecycle subset (show/copy/delete/embed/ps) mapped via OllamaExtrasClient; daemon loop with signal handling partially complete"
+
+[[partial]]
+upstream_pkg = "Prompt templates"
+local_files   = ["src/draft.rs"]
+note          = "Go-template subset ({{ var }}, {{ if }}, {{ range }}) mapped; full Go template engine deferred"
+
+# ── File-to-module mappings ────────────────────────────────────────────────────
+
+[[files]]
+upstream = "api/types.go"
+local    = "src/ollama.rs"
+
+[[files]]
+upstream = "api/types_extra.go"
+local    = "src/ollama_extras.rs"
+
+[[files]]
+upstream = "app/llm/message.go"
+local    = "src/draft.rs"
+
+[[files]]
+upstream = "app/llm/llm.go"
+local    = "src/daemon.rs"
+
+[[files]]
+upstream = "app/llm/probe.go"
+local    = "src/probe.rs"
 
 [portal_ui]
-upstream_ui  = "(CLI-only)"
-upstream_url = "https://ollama.com/"
-status       = "scaffold"
-loc          = 75
-priority     = "P2"
-notes        = "Ollama is CLI"
-last_audit   = "2026-05-11"
+upstream_ui   = "(CLI-only)"
+upstream_url  = "https://ollama.com/"
+status        = "scaffold"
+loc           = 75
+priority      = "P2"
+notes         = "Ollama is CLI"
+last_audit    = "2026-05-21"
