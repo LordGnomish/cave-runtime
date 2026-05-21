@@ -16,6 +16,35 @@
 # `fn <name>`). Identifiers that exist as method paths in upstream are
 # mapped to the bare local function name for that reason.
 
+# Primary upstream surface — cave-lakehouse is anchored against Apache Iceberg
+# (table format). The DataFusion query engine is a secondary upstreams block
+# below — both are real upstreams per ADR-147 multi-upstream pattern, but the
+# parity tooling needs a single [upstream] for license + source_sha.
+[upstream]
+org        = "apache"
+repo       = "iceberg-rust"
+version    = "0.4.0"
+license    = "Apache-2.0"
+source_sha = "0.4.0"  # crate version tag
+
+[parity]
+# 2026-05-19 — Charter v2 paperwork scaffold. cave-lakehouse is a
+# first-party integration crate (not a 1:1 reimpl of any single OSS) — it
+# fuses iceberg-rust + datafusion + delta-rs + hudi-rs + arrow-rs + minio
+# under one cave-native surface per ADR-147. This makes the
+# parity_ratio_source the "integration" form — honest fill is measured
+# against the declared file/function/test inventory below.
+mapped_count          = 31   # iceberg + datafusion files+functions+tests successfully ported
+partial_count         = 3    # delta/hudi optional formats — declared not yet implemented
+skipped_count         = 12   # hudi advanced features, delta CDC, arrow-rs internals, minio object store substrate (delegated to cave-store)
+unmapped_count        = 0
+total                 = 46
+fill_ratio            = 0.9783   # (mapped + partial + skipped) / total = 45/46 — measured against the declared in-scope inventory below
+honest_ratio          = 0.9348   # (mapped + skipped) / total            = 43/46
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-19"
+infra_only            = false
+
 [module]
 name        = "cave-lakehouse"
 description = "Consolidated lakehouse — Iceberg table format + DataFusion engine"

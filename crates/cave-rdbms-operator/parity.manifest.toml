@@ -13,20 +13,32 @@
 # `routes.rs` exposes a unified HTTP admin API that maps both upstreams onto
 # REST endpoints under `/api/pg/*`.
 
+# Primary upstream surface — CloudNativePG. PgBouncer is declared as the
+# secondary upstreams block below per ADR-147 multi-upstream pattern;
+# both are real upstreams, but parity tooling reads license + source_sha
+# from this single [upstream] block.
+[upstream]
+org        = "cloudnative-pg"
+repo       = "cloudnative-pg"
+version    = "1.24.0"
+license    = "Apache-2.0"
+source_sha = "1.24.0"   # release-tag pin; refresh on operator bump
+
 [parity]
 # Package-level inventory against CloudNativePG v1.24 + PgBouncer 1.21.
 # Hand-curated against the CNPG repository layout
 # (api/v1, controllers/, internal/, pkg/, plugin/) on 2026-05-12.
 # fill_ratio = (mapped + skipped) / total
-mapped_count   = 11
-partial_count  = 0
-skipped_count  = 10
-unmapped_count = 4
-total          = 25
-fill_ratio     = 0.84
-honest_ratio   = 0.84
-last_audit     = "2026-05-13"
-infra_only     = false
+mapped_count          = 11
+partial_count         = 0
+skipped_count         = 10
+unmapped_count        = 4
+total                 = 25
+fill_ratio            = 0.84
+honest_ratio          = 0.84
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-19"
+infra_only            = false
 
 [module]
 name        = "cave-rdbms-operator"

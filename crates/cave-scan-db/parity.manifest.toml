@@ -1,0 +1,69 @@
+# parity.manifest.toml — cave-scan-db
+#
+# 2026-05-19 Charter v2 paperwork.
+#
+# cave-scan-db is the vulnerability + IaC advisory store that powers
+# cave-scan (the Trivy-aligned scanner). Schema mirrors aquasecurity's
+# `trivy-db` (`pkg/types/types.go` + `pkg/db/db.go`): OS-vendor
+# advisories (Debian/RedHat/Alpine/AlmaLinux), language-ecosystem
+# advisories (NPM/PyPI/Cargo/…), IaC misconfig rules (CIS/CSP), and a
+# PURL-keyed lookup matcher. Persistence is sled-backed.
+#
+# Honest scope: this crate is the *storage* layer. Ingest from upstream
+# feeds (NVD JSON, OSV, RedHat OVAL, Alpine secdb, etc.) is scoped here
+# under `src/sources/`. The scanner itself lives in `cave-scan` and the
+# rule-engine for IaC misconfigs lives in `cave-policy` (rego).
+
+[upstream]
+org        = "aquasecurity"
+repo       = "trivy-db"
+version    = "v0.0.0-20260218021500-2034dd8a"
+license    = "Apache-2.0"
+source_sha = "2034dd8a"   # trivy-db commit pin from src/lib.rs header
+
+[parity]
+# Honest scope-bounded inventory against trivy-db's `pkg/` layout —
+# `pkg/db/db.go` (storage), `pkg/types/types.go` (schema), `pkg/vulnsrc`
+# (ingest), `pkg/utils` (helpers). cave-scan-db targets the read+write
+# storage surface + JSON-feed ingest; OVAL/secdb concrete-feed parsing
+# is deferred until the scanner-side wave lands.
+mapped_count          = 8    # VulnDb / OsAdvisoryDb / LangAdvisoryDb / IacRuleDb / Severity / PurlKey / match_purl / storage::SledStorage
+partial_count         = 2    # JSON feed ingest (sources/ stubs present, only NVD lite covered); sled compaction policy
+skipped_count         = 10   # OVAL parser, Alpine secdb parser, RedHat CSAF, Debian DSA, GHSA ingest, CycloneDX export, in-memory backend, garbage collector, signing verifier, multi-arch index
+unmapped_count        = 1    # PURL lookup edge-cases for go-module pseudo-versions — declared in-scope, not yet built
+total                 = 21
+fill_ratio            = 0.9524   # (mapped + partial + skipped) / total = 20/21
+honest_ratio          = 0.8571   # (mapped + skipped) / total            = 18/21
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-19"
+infra_only            = false
+
+[module]
+name        = "cave-scan-db"
+description = "Vulnerability + IaC advisory store — trivy-db compatible (sled-backed)"
+source_root = "src"
+
+[[surfaces]]
+kind          = "rust-trait"
+upstream_path = "pkg/db/db.go::DB interface"
+local_path    = "VulnDb"
+
+[[surfaces]]
+kind          = "rust-trait"
+upstream_path = "pkg/db/db.go::OS advisory accessor"
+local_path    = "OsAdvisoryDb"
+
+[[surfaces]]
+kind          = "rust-trait"
+upstream_path = "pkg/db/db.go::Language advisory accessor"
+local_path    = "LangAdvisoryDb"
+
+[[surfaces]]
+kind          = "rust-trait"
+upstream_path = "pkg/db/db.go::IaC rule accessor"
+local_path    = "IacRuleDb"
+
+[[surfaces]]
+kind          = "rust-function"
+upstream_path = "pkg/utils/utils.go::MatchPURL"
+local_path    = "matcher::match_purl"
