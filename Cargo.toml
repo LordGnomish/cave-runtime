@@ -144,6 +144,8 @@ members = [
     "crates/cave-kubevirt",
     # === Hermes Agent Orchestrator ===
     "crates/cave-hermes",
+    # === LLM Tracker (daily always-latest, Phase 0 report-only) ===
+    "crates/cave-llm-tracker",
 ]
 
 [workspace.package]
