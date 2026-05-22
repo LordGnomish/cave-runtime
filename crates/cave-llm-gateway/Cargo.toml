@@ -30,6 +30,8 @@ async-trait = { workspace = true }
 futures = { workspace = true }
 reqwest = { workspace = true }
 bytes = { workspace = true }
+parking_lot = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
+

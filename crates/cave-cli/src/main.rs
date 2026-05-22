@@ -612,6 +612,18 @@ enum LlmGwCmd {
     Routes,
     Usage,
     Limits,
+    /// List registered providers and their declared models
+    Providers,
+    /// Aggregate health probe across every registered provider
+    Health,
+    /// Capability-router ranking against the seed catalogue
+    Capabilities,
+    /// Cost ledger snapshot (per consumer)
+    Cost,
+    /// Response cache stats
+    Cache,
+    /// Trigger a cave-llm-tracker bench run via the gateway
+    Bench,
 }
 
 #[derive(Subcommand)]
@@ -4597,6 +4609,12 @@ source_root = "src"
             LlmGwCmd::Routes => c.get("/api/llm-gateway/routes").await,
             LlmGwCmd::Usage => c.get("/api/llm-gateway/usage").await,
             LlmGwCmd::Limits => c.get("/api/llm-gateway/limits").await,
+            LlmGwCmd::Providers => c.get("/api/llm-gateway/providers").await,
+            LlmGwCmd::Health => c.get("/api/llm-gateway/health").await,
+            LlmGwCmd::Capabilities => c.get("/api/llm-gateway/capabilities").await,
+            LlmGwCmd::Cost => c.get("/api/llm-gateway/cost").await,
+            LlmGwCmd::Cache => c.get("/api/llm-gateway/cache/stats").await,
+            LlmGwCmd::Bench => c.post("/api/llm-gateway/bench", json!({})).await,
         },
         Commands::Logs { cmd } => match cmd {
             LogsCmd::Streams => c.get("/api/logs/streams").await,

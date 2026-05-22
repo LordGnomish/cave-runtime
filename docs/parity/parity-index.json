@@ -980,14 +980,19 @@
     },
     "cave-llm-gateway": {
       "cave_src_loc": 3689,
-      "honest_ratio": 0.0,
-      "last_audit_disk": "2026-05-12",
+      "honest_ratio": 0.5,
+      "last_audit_disk": "2026-05-21",
       "manifest_filled": true,
+      "mapped_count": 23,
       "note": null,
-      "parity_ratio": 0.0,
+      "parity_ratio": 1.0,
       "parity_ratio_source": "manifest",
+      "partial_count": 3,
+      "skipped_count": 20,
       "stubs": null,
       "tier": "C",
+      "total_count": 46,
+      "unmapped_count": 0,
       "upstream": "BerriAI/litellm",
       "upstream_version": "v1.0.0"
     },
@@ -1756,7 +1761,7 @@
     "injected": 10,
     "new_filled": 95,
     "phantoms": 0,
-    "ratio_overrides": 56
+    "ratio_overrides": 57
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"

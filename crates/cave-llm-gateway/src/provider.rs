@@ -38,6 +38,15 @@ pub struct ProviderConfig {
 pub enum ProviderType {
     OpenAi,
     Anthropic,
+    /// Ollama native `/api/chat` protocol.
+    Ollama,
+    /// llama.cpp `llama-server` (OpenAI-compatible).
+    LlamaCpp,
+    /// MLX-LM HTTP server (OpenAI-compatible).
+    Mlx,
+    /// Mistral La Plateforme SaaS (OpenAI-compatible).
+    Mistral,
+    /// Generic OpenAI-compatible local endpoint (Ollama OpenAI shim, vLLM, LM Studio).
     Local,
     Mock,
 }
@@ -410,6 +419,14 @@ impl ProviderRegistry {
             let provider: Arc<dyn LlmProvider> = match cfg.provider_type {
                 ProviderType::OpenAi => Arc::new(OpenAiProvider::new(cfg)),
                 ProviderType::Anthropic => Arc::new(AnthropicProvider::new(cfg)),
+                ProviderType::Ollama => Arc::new(crate::providers::ollama::OllamaProvider::new(cfg)),
+                ProviderType::LlamaCpp => {
+                    Arc::new(crate::providers::llama_cpp::LlamaCppProvider::new(cfg))
+                }
+                ProviderType::Mlx => Arc::new(crate::providers::mlx::MlxProvider::new(cfg)),
+                ProviderType::Mistral => {
+                    Arc::new(crate::providers::mistral::MistralProvider::new(cfg))
+                }
                 ProviderType::Local => Arc::new(LocalProvider::new(cfg)),
                 ProviderType::Mock => Arc::new(MockProvider::new(cfg.name)),
             };

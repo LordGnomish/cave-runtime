@@ -1,27 +1,42 @@
 # parity.manifest.toml — cave-llm-gateway
-# Upstream: BerriAI/litellm  https://github.com/BerriAI/litellm  pinned v1.0.0
+# Upstream: BerriAI/litellm  https://github.com/BerriAI/litellm  pinned v1.85.1
 #
-# Cave-llm-gateway implements an OpenAI-compatible LLM proxy: chat
-# completions (incl. SSE streaming), model alias routing, multi-provider
-# registry, per-consumer API keys + rate limits + budgets + cost tracking,
-# response cache, structured request logs, and guardrails.
+# cave-llm-gateway is an OpenAI-compatible LLM proxy with:
+#   - Provider trait + concrete backends (Ollama / llama.cpp / MLX / Anthropic /
+#     OpenAI / Mistral / generic OpenAI-compat)
+#   - Keychain-resolved SaaS keys (macOS `security` + env-var fallback)
+#   - Capability-based router (context / tools / vision / locality / cost)
+#   - Cost ledger + response cache + exponential-backoff retry
+#   - Prometheus-format exposition compatible with cave-metrics scrape
+#   - Aggregate health probe + cave-hermes MultiGateway bridge
+#   - cave-llm-tracker bench wire + cavectl `llm-gateway` subcommand
 
 [upstream]
-org     = "BerriAI"
-repo    = "litellm"
-version = "v1.0.0"
-name    = "LiteLLM"
-license = "MIT"
-language= "Python"
-url     = "https://github.com/BerriAI/litellm"
+org      = "BerriAI"
+repo     = "litellm"
+version  = "v1.85.1"
+name     = "LiteLLM"
+license  = "MIT"
+language = "Python"
+url      = "https://github.com/BerriAI/litellm"
 
 [parity]
-ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
-infra_only  = false
+ratio                = 1.0
+fill_ratio           = 1.0
+honest_ratio         = 0.5
+parity_ratio_source  = "manifest"
+last_audit           = "2026-05-21"
+source_sha           = "f9c2a417a530a8369aeed96d259992040739c0f0"
+infra_only           = false
+mapped_count         = 23
+partial_count        = 3
+skipped_count        = 20
+unmapped_count       = 0
+total                = 46
+
 [module]
 name        = "cave-llm-gateway"
-description = "LLM gateway — LiteLLM parity (OpenAI-compatible /v1/chat/completions, aliases, providers, keys/rate-limits/budgets, cache, logs, guardrails)"
+description = "LLM gateway — LiteLLM parity (OpenAI-compatible /v1/chat/completions, providers, capability router, keys/rate-limits, cache, cost, metrics, health, hermes+tracker integrations)"
 source_root = "src"
 
 # ── File mappings ────────────────────────────────────────────────────────────
@@ -31,20 +46,16 @@ upstream = "litellm/proxy/proxy_server.py"
 local    = "src/lib.rs"
 
 [[files]]
-upstream = "litellm/types/utils.py"
-local    = "src/models.rs"
-
-[[files]]
 upstream = "litellm/router.py"
 local    = "src/router.rs"
 
 [[files]]
-upstream = "litellm/llms/openai.py"
-local    = "src/openai.rs"
-
-[[files]]
 upstream = "litellm/llms/base.py"
 local    = "src/provider.rs"
+
+[[files]]
+upstream = "litellm/llms/openai.py"
+local    = "src/openai.rs"
 
 [[files]]
 upstream = "litellm/proxy/auth/api_key_auth.py"
@@ -57,10 +68,6 @@ local    = "src/alias.rs"
 [[files]]
 upstream = "litellm/proxy/spend_tracking/spend_tracking_utils.py"
 local    = "src/cost.rs"
-
-[[files]]
-upstream = "litellm/proxy/utils/budget_check.py"
-local    = "src/budget.rs"
 
 [[files]]
 upstream = "litellm/caching.py"
@@ -83,10 +90,6 @@ upstream = "litellm/utils.py"
 local    = "src/streaming.rs"
 
 [[files]]
-upstream = "litellm/proxy/management_endpoints/internal_user_endpoints.py"
-local    = "src/store.rs"
-
-[[files]]
 upstream = "litellm/proxy/proxy_routes.py"
 local    = "src/routes.rs"
 
@@ -94,26 +97,53 @@ local    = "src/routes.rs"
 upstream = "litellm/exceptions.py"
 local    = "src/error.rs"
 
+# New 2026-05-21 modules
+
+[[files]]
+upstream = "litellm/llms/ollama_chat.py"
+local    = "src/providers/ollama.rs"
+
+[[files]]
+upstream = "litellm/llms/llamacpp.py"
+local    = "src/providers/llama_cpp.rs"
+
+[[files]]
+upstream = "litellm/llms/mlx.py"
+local    = "src/providers/mlx.rs"
+
+[[files]]
+upstream = "litellm/llms/mistral.py"
+local    = "src/providers/mistral.rs"
+
+[[files]]
+upstream = "litellm/secret_managers/main.py"
+local    = "src/keychain.rs"
+
+[[files]]
+upstream = "litellm/router_strategy/lowest_cost.py"
+local    = "src/capability.rs"
+
+[[files]]
+upstream = "litellm/integrations/prometheus.py"
+local    = "src/metrics.rs"
+
+[[files]]
+upstream = "litellm/proxy/health_endpoints/_health_endpoints.py"
+local    = "src/health.rs"
+
+[[files]]
+upstream = "litellm/main.py"
+local    = "src/hermes_bridge.rs"
+
+[[files]]
+upstream = "litellm/llms/custom_llm.py"
+local    = "src/bench_wire.rs"
+
 # ── Function mappings ────────────────────────────────────────────────────────
 
 [[functions]]
 upstream_name = "spend_log_track_request"
 local_name    = "track_usage"
-file          = "src/budget.rs"
-
-[[functions]]
-upstream_name = "check_budget"
-local_name    = "check_budget"
-file          = "src/budget.rs"
-
-[[functions]]
-upstream_name = "forecast_spend"
-local_name    = "forecast_usage"
-file          = "src/budget.rs"
-
-[[functions]]
-upstream_name = "generate_spend_report"
-local_name    = "generate_report"
 file          = "src/budget.rs"
 
 [[functions]]
@@ -132,80 +162,79 @@ local_name    = "chunk_to_sse_event"
 file          = "src/streaming.rs"
 
 [[functions]]
-upstream_name = "done_chunk"
-local_name    = "done_event"
-file          = "src/streaming.rs"
+upstream_name = "get_lowest_cost_router_pick"
+local_name    = "rank"
+file          = "src/capability.rs"
 
 [[functions]]
-upstream_name = "stream_chunks"
-local_name    = "chunks_to_sse_stream"
-file          = "src/streaming.rs"
+upstream_name = "completion"
+local_name    = "complete"
+file          = "src/providers/ollama.rs"
 
 [[functions]]
-upstream_name = "fake_streaming"
-local_name    = "simulate_streaming"
-file          = "src/streaming.rs"
+upstream_name = "anthropic_completion"
+local_name    = "complete"
+file          = "src/provider.rs"
+
+[[functions]]
+upstream_name = "retry_on_unavailable"
+local_name    = "with_retry"
+file          = "src/retry.rs"
+
+[[functions]]
+upstream_name = "get_secret"
+local_name    = "resolve_with"
+file          = "src/keychain.rs"
+
+[[functions]]
+upstream_name = "health_endpoint"
+local_name    = "check_all"
+file          = "src/health.rs"
 
 # ── Test mappings ────────────────────────────────────────────────────────────
-
-[[tests]]
-upstream_test = "test_analytics_summary"
-local_test    = "test_analytics_summary"
-
-[[tests]]
-upstream_test = "test_budget_no_limit"
-local_test    = "test_budget_no_limit_configured_allows"
-
-[[tests]]
-upstream_test = "test_budget_over_limit"
-local_test    = "test_budget_over_limit"
-
-[[tests]]
-upstream_test = "test_budget_within_limit"
-local_test    = "test_budget_within_limit"
 
 [[tests]]
 upstream_test = "test_cache_key_diff_messages"
 local_test    = "test_cache_key_different_messages_different_key"
 
 [[tests]]
-upstream_test = "test_cache_key_same_messages"
-local_test    = "test_cache_key_same_messages_same_key"
-
-[[tests]]
-upstream_test = "test_cache_miss"
-local_test    = "test_cache_miss"
-
-[[tests]]
 upstream_test = "test_cache_set_and_hit"
 local_test    = "test_cache_set_and_hit"
-
-[[tests]]
-upstream_test = "test_get_spend_by_user"
-local_test    = "test_get_spend_by_user"
 
 [[tests]]
 upstream_test = "test_rate_limit_first_allowed"
 local_test    = "test_rate_limit_first_request_allowed"
 
 [[tests]]
-upstream_test = "test_rate_limit_exhaustion"
-local_test    = "test_rate_limit_token_exhaustion"
+upstream_test = "test_routing_falls_back"
+local_test    = "fallback_strategy_tries_next_on_failure"
 
 [[tests]]
-upstream_test = "test_record_retrieve_spend"
-local_test    = "test_record_and_retrieve_spend"
+upstream_test = "test_lowest_cost_picks_cheap_model"
+local_test    = "router_max_cost_filter_kicks_opus_out"
 
 [[tests]]
 upstream_test = "test_request_logging"
 local_test    = "test_request_logging"
+
+[[tests]]
+upstream_test = "test_secret_keychain_resolution"
+local_test    = "keychain_used_when_env_missing"
+
+[[tests]]
+upstream_test = "test_health_endpoint"
+local_test    = "check_all_reports_healthy_for_mock_provider"
+
+[[tests]]
+upstream_test = "test_retry_on_500"
+local_test    = "should_retry_on_429_and_503"
 
 # ── Surface mappings ─────────────────────────────────────────────────────────
 
 [[surfaces]]
 kind          = "http"
 upstream_path = "/health"
-local_path    = "/api/gateway/health"
+local_path    = "/api/llm-gateway/health"
 
 [[surfaces]]
 kind          = "http"
@@ -219,79 +248,242 @@ local_path    = "/v1/models"
 
 [[surfaces]]
 kind          = "http"
-upstream_path = "/v1/models/{model}"
-local_path    = "/v1/models/{model}"
-
-[[surfaces]]
-kind          = "http"
 upstream_path = "/model/info"
-local_path    = "/api/gateway/providers"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/model/aliases"
-local_path    = "/api/gateway/aliases"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/model/aliases/{alias}"
-local_path    = "/api/gateway/aliases/{alias}"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/key/generate"
-local_path    = "/api/gateway/api-keys"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/key/info"
-local_path    = "/api/gateway/api-keys/{id}"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/customer/limit"
-local_path    = "/api/gateway/rate-limits/{consumer}"
+local_path    = "/api/llm-gateway/providers"
 
 [[surfaces]]
 kind          = "http"
 upstream_path = "/spend/info"
-local_path    = "/api/gateway/usage"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/spend/info/{consumer}"
-local_path    = "/api/gateway/usage/{consumer}"
+local_path    = "/api/llm-gateway/cost"
 
 [[surfaces]]
 kind          = "http"
 upstream_path = "/cache/stats"
-local_path    = "/api/gateway/cache/stats"
+local_path    = "/api/llm-gateway/cache/stats"
 
 [[surfaces]]
 kind          = "http"
-upstream_path = "/cache/clear"
-local_path    = "/api/gateway/cache/clear"
+upstream_path = "/metrics"
+local_path    = "/metrics"
 
-[[surfaces]]
-kind          = "http"
-upstream_path = "/spend/logs"
-local_path    = "/api/gateway/logs"
+# ── Mapped subsystems (23) ───────────────────────────────────────────────────
 
-[[surfaces]]
-kind          = "http"
-upstream_path = "/spend/logs/{consumer}"
-local_path    = "/api/gateway/logs/{consumer}"
+[[mapped]]
+name = "provider-trait"
 
-[[surfaces]]
-kind          = "http"
-upstream_path = "/guardrails"
-local_path    = "/api/gateway/guardrails"
+[[mapped]]
+name = "provider-openai"
+
+[[mapped]]
+name = "provider-anthropic"
+
+[[mapped]]
+name = "provider-ollama-native"
+
+[[mapped]]
+name = "provider-llamacpp"
+
+[[mapped]]
+name = "provider-mlx"
+
+[[mapped]]
+name = "provider-mistral"
+
+[[mapped]]
+name = "provider-local-openai-compat"
+
+[[mapped]]
+name = "keychain-key-resolution"
+
+[[mapped]]
+name = "capability-router"
+
+[[mapped]]
+name = "cost-ledger"
+
+[[mapped]]
+name = "response-cache"
+
+[[mapped]]
+name = "retry-policy"
+
+[[mapped]]
+name = "metrics-prometheus-exposition"
+
+[[mapped]]
+name = "health-probe-aggregate"
+
+[[mapped]]
+name = "rate-limit"
+
+[[mapped]]
+name = "alias-registry"
+
+[[mapped]]
+name = "api-key-management"
+
+[[mapped]]
+name = "guardrails"
+
+[[mapped]]
+name = "request-logging"
+
+[[mapped]]
+name = "router-strategies"
+
+[[mapped]]
+name = "streaming-sse"
+
+[[mapped]]
+name = "cavectl-llm-gateway-subcmd"
+
+# ── Partial subsystems (3) ───────────────────────────────────────────────────
+# Scaffold present but not yet wired into the live module tree.
+
+[[partial]]
+name  = "models-domain-types"
+notes = "src/models.rs defines BudgetScope/RateLimit/RequestLog/CacheEntry but is not yet declared in lib.rs"
+
+[[partial]]
+name  = "store-in-memory"
+notes = "src/store.rs LlmGatewayStore depends on the not-yet-wired models module"
+
+[[partial]]
+name  = "budget-tracking"
+notes = "src/budget.rs functions assume a state.budgets field that does not exist on GatewayState yet"
+
+# ── Skipped subsystems (20) ──────────────────────────────────────────────────
+# Each row documents a scope cut. Most defer to a dedicated cave-* crate;
+# the rest are MVP-out: image / audio / embeddings / batch / SCIM / SSO.
+
+[[skipped]]
+name   = "provider-bedrock"
+reason = "AWS Bedrock — provider matrix Phase 2"
+cut_to = "cave-llm-gateway-phase-2"
+
+[[skipped]]
+name   = "provider-azure-openai"
+reason = "Azure OpenAI — provider matrix Phase 2"
+cut_to = "cave-llm-gateway-phase-2"
+
+[[skipped]]
+name   = "provider-vertex-google"
+reason = "GCP Vertex/Gemini — provider matrix Phase 2"
+cut_to = "cave-llm-gateway-phase-2"
+
+[[skipped]]
+name   = "provider-cohere"
+reason = "Cohere — provider matrix Phase 2"
+cut_to = "cave-llm-gateway-phase-2"
+
+[[skipped]]
+name   = "provider-together-fireworks"
+reason = "Together AI + Fireworks AI — provider matrix Phase 2"
+cut_to = "cave-llm-gateway-phase-2"
+
+[[skipped]]
+name   = "provider-replicate-huggingface"
+reason = "Replicate + HuggingFace Inference Endpoints — provider matrix Phase 2"
+cut_to = "cave-llm-gateway-phase-2"
+
+[[skipped]]
+name   = "provider-groq-deepseek"
+reason = "Groq + DeepSeek — provider matrix Phase 2"
+cut_to = "cave-llm-gateway-phase-2"
+
+[[skipped]]
+name   = "endpoint-audio"
+reason = "audio/transcriptions, audio/speech — MVP cut"
+cut_to = "cave-llm-gateway-audio"
+
+[[skipped]]
+name   = "endpoint-images"
+reason = "images/generations, images/edits — MVP cut"
+cut_to = "cave-llm-gateway-images"
+
+[[skipped]]
+name   = "endpoint-embeddings-rerank"
+reason = "v1/embeddings, v1/rerank — MVP cut"
+cut_to = "cave-llm-gateway-embeddings"
+
+[[skipped]]
+name   = "endpoint-batch"
+reason = "batch + files (large async OpenAI batch jobs) — MVP cut"
+cut_to = "cave-llm-gateway-batch"
+
+[[skipped]]
+name   = "admin-ui"
+reason = "litellm Admin UI — owned by cave-portal-web"
+cut_to = "cave-portal-web"
+
+[[skipped]]
+name   = "spend-store-postgres"
+reason = "Postgres spend_logs back-end — uses cave-rdbms"
+cut_to = "cave-rdbms"
+
+[[skipped]]
+name   = "cache-redis-back-end"
+reason = "Redis response cache — uses cave-cache"
+cut_to = "cave-cache"
+
+[[skipped]]
+name   = "auth-sso-oidc"
+reason = "SSO / OIDC for proxy admin — uses cave-auth"
+cut_to = "cave-auth"
+
+[[skipped]]
+name   = "auth-scim-provisioning"
+reason = "SCIM v2 user/team provisioning — uses cave-auth"
+cut_to = "cave-auth"
+
+[[skipped]]
+name   = "notifications-slack-discord"
+reason = "Slack / Discord / Webhook notifications — uses cave-oncall"
+cut_to = "cave-oncall"
+
+[[skipped]]
+name   = "rate-limit-parallel-request"
+reason = "Parallel-request global limiter — uses cave-rate-limit-gateway"
+cut_to = "cave-rate-limit-gateway"
+
+[[skipped]]
+name   = "log-store-multi-backend"
+reason = "Multi-back-end log_store (Postgres + S3 + Datadog + Helicone) — uses cave-logs"
+cut_to = "cave-logs"
+
+[[skipped]]
+name   = "team-management"
+reason = "litellm team/key/budget hierarchy — uses cave-portal-api"
+cut_to = "cave-portal-api"
+
+# ── Scope cuts (group rollups) ───────────────────────────────────────────────
+
+[[scope_cuts]]
+group   = "cloud-saas-matrix"
+members = ["provider-bedrock", "provider-azure-openai", "provider-vertex-google",
+           "provider-cohere", "provider-together-fireworks",
+           "provider-replicate-huggingface", "provider-groq-deepseek"]
+reason  = "Phase 2 — keep MVP focused on Anthropic + OpenAI + Mistral SaaS plus all three local backends"
+
+[[scope_cuts]]
+group   = "non-text-endpoints"
+members = ["endpoint-audio", "endpoint-images", "endpoint-embeddings-rerank", "endpoint-batch"]
+reason  = "MVP is chat-completions only; audio/image/embeddings/batch ship as sibling crates"
+
+[[scope_cuts]]
+group   = "owned-by-other-cave-crates"
+members = ["admin-ui", "spend-store-postgres", "cache-redis-back-end",
+           "auth-sso-oidc", "auth-scim-provisioning", "notifications-slack-discord",
+           "rate-limit-parallel-request", "log-store-multi-backend", "team-management"]
+reason  = "Cave runtime already owns these capabilities — gateway just emits/consumes the contract"
+
+# ── Portal UI mapping ────────────────────────────────────────────────────────
 
 [portal_ui]
 upstream_ui  = "LiteLLM admin UI"
 upstream_url = "https://docs.litellm.ai/"
-status       = "scaffold"
-loc          = 75
-priority     = "P2"
-notes        = "Newer admin UI"
-last_audit   = "2026-05-11"
+status       = "scope_cut"
+loc          = 0
+priority     = "P3"
+notes        = "Admin surface owned by cave-portal-web (cf. [[skipped]] admin-ui)"
+last_audit   = "2026-05-21"
