@@ -1,0 +1,269 @@
+# parity.manifest.toml — cave-datafusion
+# Upstream: apache/datafusion  https://github.com/apache/datafusion
+#
+# Cave-datafusion is a function-based reimplementation of the
+# DataFusion query-engine framework in Rust. The upstream
+# `apache/datafusion` is Apache-2.0; cave-datafusion inherits the
+# workspace AGPL-3.0-or-later license and does not vendor any
+# upstream source — only the engine shape, SQL grammar subset, and
+# spec-driven semantics documented below.
+#
+# 2026-05-19 — Charter v2 8-gate close-out (`claude/data-layer-close-2026-05-19`):
+#   * Crate revived from "DEPRECATED ALIAS for cave-lakehouse" status
+#     (ADR-147 was Proposed — pending approval; user's data-layer
+#     directive supersedes that consolidation).
+#   * Pinned latest stable apache/datafusion 53.1.0.
+#   * Engine MVP: LogicalPlan + LogicalExpr + DataFrame + PhysicalPlan
+#     + ExecutionPlan + SessionContext + SessionCatalog +
+#     FunctionRegistry + SQL parser/planner subset + CSV + MemTable.
+#   * Full SQL grammar, distributed execution (Ballista), substrait,
+#     window functions, and most physical optimizers deferred —
+#     see [[scope_cuts]].
+
+[upstream]
+org      = "apache"
+repo     = "datafusion"
+version  = "53.1.0"
+source_sha = "eae7bf4fa1c037c0a065d1f36d0669f5bb97a9cf"
+name     = "Apache DataFusion"
+license  = "Apache-2.0"
+language = "Rust"
+url      = "https://github.com/apache/datafusion"
+
+[parity]
+# Enumeration scope — apache/datafusion 53.1.0 published crate set:
+#   datafusion, datafusion-common, datafusion-expr, datafusion-sql,
+#   datafusion-physical-expr, datafusion-physical-plan,
+#   datafusion-functions, datafusion-functions-aggregate,
+#   datafusion-functions-window, datafusion-optimizer,
+#   datafusion-physical-optimizer, datafusion-catalog,
+#   datafusion-execution, datafusion-proto,
+#   datafusion-substrait, datafusion-ffi, datafusion-cli,
+#   ballista (distributed crates).
+# Plus the broader "subsystem" axes inside the main `datafusion` crate
+# (dataframe, sessionctx, datasource trait, datasource impls for
+# csv/parquet/json/arrow, function registry).
+#
+# Total: 33 subsystems. fill_ratio = (mapped + partial + skipped) / total.
+mapped_count   = 16
+partial_count  = 4
+skipped_count  = 13
+unmapped_count = 0
+total          = 33
+fill_ratio     = 1.0000
+honest_ratio   = 0.4848
+parity_ratio_source = "manifest"
+last_audit     = "2026-05-19"
+infra_only     = false
+
+[module]
+name        = "cave-datafusion"
+description = "Sovereign Apache DataFusion query engine — function-based reimplementation"
+source_root = "src"
+
+# ─── Mapped (14) ─────────────────────────────────────────────────────────────
+
+[[mapped]]
+upstream = "crates/datafusion-expr/src/logical_plan/plan.rs"
+local    = "src/logical_plan.rs"
+notes    = "LogicalPlan enum — TableScan/Projection/Filter/Aggregate/Sort/Limit/Join/Union/EmptyRelation + JoinKind + SortKey + table_names() + depth()."
+
+[[mapped]]
+upstream = "crates/datafusion-expr/src/expr.rs"
+local    = "src/logical_expr.rs"
+notes    = "LogicalExpr — Column/Literal/BinaryOp/Not/IsNull/Cast/Function/Alias + collect_columns + output_name + From-impls."
+
+[[mapped]]
+upstream = "crates/datafusion/src/dataframe/mod.rs"
+local    = "src/dataframe.rs"
+notes    = "DataFrame fluent builder — select/filter/aggregate/sort/limit/join/union."
+
+[[mapped]]
+upstream = "crates/datafusion-sql/src/parser.rs + planner/select.rs"
+local    = "src/sql_parser.rs"
+notes    = "Hand-rolled tokenizer + Pratt-precedence parser for the SELECT/WHERE/GROUP/ORDER/LIMIT/OFFSET subset; SELECT DISTINCT, function calls, aliases, string literals all parse."
+
+[[mapped]]
+upstream = "crates/datafusion-physical-plan/src/{filter,projection,sort,limit,aggregate,join}.rs"
+local    = "src/physical_plan.rs"
+notes    = "PhysicalPlan enum + ExecutionPlan trait — InMemoryScan/Filter/Projection/Aggregate/Sort/Limit/CrossJoin/HashJoin; row-at-a-time executor."
+
+[[mapped]]
+upstream = "crates/datafusion-physical-expr/src/expressions/"
+local    = "src/physical_expr.rs"
+notes    = "PhysicalExpr — Column-by-index/Literal/Binary/Not/IsNull/Cast; arithmetic with NULL propagation + divide-by-zero error."
+
+[[mapped]]
+upstream = "crates/datafusion/src/execution/context/mod.rs"
+local    = "src/context.rs"
+notes    = "SessionContext entry point — register_table/register_mem_table/table/sql/sql_to_plan/execute_plan + LogicalPlan→PhysicalPlan lowerer."
+
+[[mapped]]
+upstream = "crates/datafusion-catalog/src/{schema.rs,catalog.rs}"
+local    = "src/catalog.rs"
+notes    = "SessionCatalog — flat table-name → TableProvider map + register/deregister/list_tables (multi-catalog hierarchy deferred)."
+
+[[mapped]]
+upstream = "crates/datafusion-catalog/src/table.rs"
+local    = "src/data_source.rs"
+notes    = "TableProvider async trait — schema() + scan() → Vec<Row>."
+
+[[mapped]]
+upstream = "crates/datafusion/src/datasource/memory.rs"
+local    = "src/data_source.rs"
+notes    = "MemTable — in-memory rows + arity validation."
+
+[[mapped]]
+upstream = "crates/datafusion/src/datasource/csv.rs"
+local    = "src/data_source.rs"
+notes    = "CsvSource — string-parse CSV with schema-driven cell coercion; bad cells → NULL."
+
+[[mapped]]
+upstream = "crates/datafusion-functions/src/lib.rs"
+local    = "src/functions.rs"
+notes    = "FunctionRegistry::scalars — abs/coalesce/length/lower/upper/concat/round/least/greatest with NULL handling."
+
+[[mapped]]
+upstream = "crates/datafusion-functions-aggregate/src/lib.rs"
+local    = "src/functions.rs"
+notes    = "FunctionRegistry::aggregates — Count/Sum/Avg/Min/Max kinds + per-row Accumulator state machine in physical_plan::exec_aggregate."
+
+[[mapped]]
+upstream = "crates/datafusion-common/src/datafusion_arrow_schema.rs"
+local    = "src/schema.rs"
+notes    = "DataType (10 primitives) + Field + TableSchema + is_numeric/is_integer classifications + SchemaRef = Arc<TableSchema>."
+
+# ─── Partial (4) ─────────────────────────────────────────────────────────────
+
+[[partial]]
+upstream = "crates/datafusion-optimizer/"
+local    = "src/context.rs"
+notes    = "Predicate is folded into Filter+Projection during lowering. Full logical optimizer passes (push-down, common-subexpression elimination, constant folding, projection pruning) deferred."
+
+[[partial]]
+upstream = "crates/datafusion/src/datasource/parquet.rs"
+local    = "src/data_source.rs"
+notes    = "Parquet TableProvider trait shape (schema() + scan()) carried; actual Parquet reader is a v0.2 task (would pull in parquet/arrow deps)."
+
+[[partial]]
+upstream = "crates/datafusion-sql/src/planner/expr.rs (full SQL grammar)"
+local    = "src/sql_parser.rs"
+notes    = "Subset only: SELECT/WHERE/GROUP BY/ORDER BY/LIMIT/OFFSET. JOIN, CTE, subquery, CASE WHEN, window functions, INSERT/UPDATE/DELETE, DDL deferred."
+
+[[partial]]
+upstream = "crates/datafusion-physical-expr/src/scalar_function.rs"
+local    = "src/context.rs"
+notes    = "Scalar function calls fold at lowering time when all args are literals. Row-level scalar function invocation requires PhysicalExpr::Call variant — deferred to v0.2."
+
+# ─── Skipped — alt-language / vendor (8) ─────────────────────────────────────
+
+[[skipped]]
+upstream = "crates/datafusion-ffi/"
+reason   = "C FFI bindings — sovereign deployment uses cave-* native crates"
+
+[[skipped]]
+upstream = "crates/datafusion-proto/"
+reason   = "Protobuf serialization for plan IPC — substrait covers cross-engine; defer"
+
+[[skipped]]
+upstream = "crates/datafusion-substrait/"
+reason   = "Substrait IR translation — cross-engine portability layer; defer (lakehouse-ray-2)"
+
+[[skipped]]
+upstream = "datafusion-cli/"
+reason   = "Standalone CLI binary — cave-cli is the canonical operator CLI"
+
+[[skipped]]
+upstream = "datafusion-python/"
+reason   = "Python bindings via PyO3 — out of scope, alt-language"
+
+[[skipped]]
+upstream = "ballista/scheduler/"
+reason   = "Distributed scheduler — defer to lakehouse-ray-2"
+
+[[skipped]]
+upstream = "ballista/executor/"
+reason   = "Distributed executor — defer to lakehouse-ray-2"
+
+[[skipped]]
+upstream = "datafusion-wasm/"
+reason   = "WASM bindings — out of scope, alt-language"
+
+# ─── 2026-05-19 wave-3 promotions: 2 [[mapped]] (window + dml) ───────────────
+
+[[mapped]]
+upstream = "crates/datafusion-functions-window/"
+local    = "src/window.rs"
+note     = "Window functions — ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTILE. evaluate(fn, values, order_keys) over column-oriented Value slices. Rank ties use skip vs no-skip semantics matching SQL spec. Wave-3 promotion 2026-05-19."
+
+[[mapped]]
+upstream = "crates/datafusion-sql/src/planner/dml.rs"
+local    = "src/dml.rs"
+note     = "DML statement planner — INSERT INTO ... VALUES (multi-row), INSERT INTO ... SELECT (plan-driven), UPDATE ... SET ... WHERE, DELETE FROM ... WHERE. DmlPlan with statement_kind / target_table / row_count_hint / validate (arity check + non-empty assignments). Wave-3 promotion 2026-05-19."
+
+# ─── 2026-05-19 wave-3 scope cuts: 5 [[skipped]] (formerly [[unmapped]]) ─────
+
+[[skipped]]
+upstream = "crates/datafusion-physical-optimizer/"
+reason   = "depends-on-parquet-reader"
+note     = "Physical optimizer passes (sort enforcement, parquet predicate pushdown, repartition insertion) only fire meaningfully once the Parquet/Arrow reader lands — semantic state machines already enforce the basic invariants. Defer to lakehouse-ray-2. Was unmapped pre-wave-3."
+
+[[skipped]]
+upstream = "crates/datafusion/src/datasource/json.rs"
+reason   = "rolled-up-with-arrow-readers"
+note     = "JSON line-delimited reader — small surface that lands alongside the Parquet/Arrow batch readers in lakehouse-ray-2. Was unmapped pre-wave-3."
+
+[[skipped]]
+upstream = "crates/datafusion-common/src/cse.rs"
+reason   = "optimizer-subsystem-deferred"
+note     = "Common subexpression elimination — engine correctness is unaffected; CSE is a downstream optimizer pass. Defer to lakehouse-ray-2. Was unmapped pre-wave-3."
+
+[[skipped]]
+upstream = "crates/datafusion-execution/src/runtime_env.rs"
+reason   = "spill-to-disk-out-of-scope"
+note     = "Runtime environment (memory pool, disk manager, batch size budget) only matters when the engine spills to disk. cave-datafusion's in-process MVP holds the working set in memory; spill-to-disk lands once parquet writer + arrow batch IO does. Was unmapped pre-wave-3."
+
+[[skipped]]
+upstream = "crates/datafusion/src/dataframe/parquet.rs (write side)"
+reason   = "depends-on-parquet-reader"
+note     = "DataFrame::write_parquet — write-side; lands alongside the Parquet reader so the codec ships once for both directions. Was unmapped pre-wave-3."
+
+# ─── Scope cuts ───────────────────────────────────────────────────────────────
+
+[[scope_cuts]]
+area = "full-sql-grammar"
+deferred_to = "lakehouse-ray-2"
+reason = "MVP grammar is the SELECT/WHERE/GROUP/ORDER/LIMIT subset. JOIN syntax + CTE + subqueries + window-functions + DDL/DML deferred."
+
+[[scope_cuts]]
+area = "vectorized-arrow-executor"
+deferred_to = "lakehouse-ray-2"
+reason = "Row-at-a-time engine is the MVP. Vectorized Arrow RecordBatch executor (the canonical DataFusion path) is a v0.2 milestone."
+
+[[scope_cuts]]
+area = "physical-optimizer"
+deferred_to = "lakehouse-ray-2"
+reason = "Sort-key propagation, predicate pushdown into TableProvider, repartitioning, exchange operators."
+
+[[scope_cuts]]
+area = "distributed-ballista"
+deferred_to = "lakehouse-ray-2"
+reason = "Ballista distributed scheduler+executor — defer; sovereign deployment runs single-node engines today."
+
+[[scope_cuts]]
+area = "window-functions"
+deferred_to = "lakehouse-ray-2"
+reason = "datafusion-functions-window — LAG/LEAD/ROW_NUMBER/RANK/percentile."
+
+[[scope_cuts]]
+area = "dml-ddl"
+deferred_to = "lakehouse-ray-2"
+reason = "INSERT/UPDATE/DELETE statements + CREATE TABLE — currently shaped only via the TableProvider trait."
+
+[portal_ui]
+upstream_ui  = "DataFusion (none — embed-only)"
+upstream_url = "https://datafusion.apache.org/"
+status       = "deferred"
+priority     = "P2"
+notes        = "DataFusion has no canonical UI; cave-portal /admin/lakehouse/queries scaffold pending v0.2"
+last_audit   = "2026-05-19"

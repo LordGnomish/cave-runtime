@@ -1,0 +1,729 @@
+# parity.manifest.toml — cave-vault
+# Upstream: openbao/openbao  https://github.com/openbao/openbao
+# Pinned to the latest v2.x stable release at 2026-04-26.
+
+[upstream]
+org        = "openbao"
+repo       = "openbao"
+version    = "v2.5.3"
+source_sha = "v2.5.3"
+name       = "OpenBao"
+license    = "MPL-2.0"
+language   = "Go"
+url        = "https://github.com/openbao/openbao"
+[parity]
+# Package-level inventory against openbao/openbao v2.5.3 — every
+# top-level package the secret store needs (engines, auth, core,
+# audit, sys-API). Inventory hand-curated 2026-05-12 against the
+# OpenBao tree (`builtin/credential`, `builtin/logical`, `vault/`,
+# `audit/`, `physical/`, `sdk/`, `command/`).
+#
+# 2026-05-19 parity uplift wave 3:
+#   * +2 mapped: jwt-bearer auth (src/auth/jwt.rs), namespaces+quotas
+#     (src/lib.rs::NamespaceStore + src/core/quota.rs).
+#   * +6 skipped (formerly unmapped): cloud storage backends, DR
+#     replication, cloud credential methods, cloud secret engines,
+#     vault agent, activity tracking — see scope-cut rationale in the
+#     [[skipped]] blocks below.
+#   * fill_ratio bumped 0.7895 → 1.0000 (mapped+partial+skipped/total).
+#   * honest_ratio bumped 0.7895 → 0.5526 (mapped/total — drops since
+#     6 surfaces moved to scoped-out rather than implemented).
+mapped_count   = 21
+partial_count  = 0
+skipped_count  = 17
+unmapped_count = 0
+total          = 38
+fill_ratio     = 1.0000
+honest_ratio   = 0.5526
+last_audit     = "2026-05-19"
+parity_ratio_source = "manifest"
+infra_only     = false
+
+[module]
+name          = "cave-vault"
+description   = "Secrets management — OpenBao (HashiCorp Vault fork) parity"
+source_root   = "src"
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
+pump_priority = "HIGH"  # charter-critical 7 — secrets management surface
+
+# ── File mappings ────────────────────────────────────────────────────────────
+[[files]]
+upstream = "builtin/logical/kv/path_data.go"
+local    = "src/engines/kv2.rs"
+
+[[files]]
+upstream = "builtin/logical/kv/path_metadata.go"
+local    = "src/engines/kv2.rs"
+
+[[files]]
+upstream = "builtin/logical/kv/path_delete.go"
+local    = "src/engines/kv2.rs"
+
+[[files]]
+upstream = "builtin/logical/kv/path_destroy.go"
+local    = "src/engines/kv2.rs"
+
+[[files]]
+upstream = "builtin/credential/userpass/path_login.go"
+local    = "src/auth/userpass.rs"
+
+[[files]]
+upstream = "builtin/credential/userpass/path_users.go"
+local    = "src/auth/userpass.rs"
+
+[[files]]
+upstream = "builtin/credential/approle/path_role.go"
+local    = "src/auth/approle.rs"
+
+[[files]]
+upstream = "builtin/credential/approle/path_login.go"
+local    = "src/auth/approle.rs"
+
+[[files]]
+upstream = "vault/policy.go"
+local    = "src/core/policy.rs"
+
+[[files]]
+upstream = "vault/policy_store.go"
+local    = "src/core/policy.rs"
+
+[[files]]
+upstream = "vault/mount.go"
+local    = "src/lib.rs"
+
+[[files]]
+upstream = "vault/token_store.go"
+local    = "src/token.rs"
+
+[[files]]
+upstream = "vault/seal.go"
+local    = "src/core/seal.rs"
+
+[[files]]
+upstream = "sdk/helper/shamir/shamir.go"
+local    = "src/core/seal.rs"
+
+[[files]]
+upstream = "audit/format.go"
+local    = "src/core/audit.rs"
+
+[[files]]
+upstream = "audit/format_json.go"
+local    = "src/core/audit.rs"
+
+[[files]]
+upstream = "helper/namespace/namespace.go"
+local    = "src/lib.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+[[functions]]
+upstream_name = "pathDataRead"
+local_name    = "read_secret_version"
+file          = "src/engines/kv2.rs"
+
+[[functions]]
+upstream_name = "pathDataWrite"
+local_name    = "write_secret"
+file          = "src/engines/kv2.rs"
+
+[[functions]]
+upstream_name = "pathDataDelete"
+local_name    = "delete_secret"
+file          = "src/engines/kv2.rs"
+
+[[functions]]
+upstream_name = "pathUndeleteWrite"
+local_name    = "undelete_versions"
+file          = "src/engines/kv2.rs"
+
+[[functions]]
+upstream_name = "pathDestroyWrite"
+local_name    = "destroy_versions"
+file          = "src/engines/kv2.rs"
+
+[[functions]]
+upstream_name = "pathMetadataRead"
+local_name    = "read_metadata"
+file          = "src/engines/kv2.rs"
+
+[[functions]]
+upstream_name = "pathMetadataWrite"
+local_name    = "write_metadata"
+file          = "src/engines/kv2.rs"
+
+[[functions]]
+upstream_name = "ParseACLPolicy"
+local_name    = "Policy::parse"
+file          = "src/core/policy.rs"
+
+[[functions]]
+upstream_name = "Split"
+local_name    = "split_secret"
+file          = "src/core/seal.rs"
+
+[[functions]]
+upstream_name = "Combine"
+local_name    = "combine_shares"
+file          = "src/core/seal.rs"
+
+# Transit engine — encryption + signing
+[[functions]]
+upstream_name = "pathEncryptWrite"
+local_name    = "encrypt"
+file          = "src/engines/transit.rs"
+
+[[functions]]
+upstream_name = "pathDecryptWrite"
+local_name    = "decrypt"
+file          = "src/engines/transit.rs"
+
+[[functions]]
+upstream_name = "pathSignWrite"
+local_name    = "sign"
+file          = "src/engines/transit.rs"
+
+[[functions]]
+upstream_name = "pathRotate"
+local_name    = "rotate_key"
+file          = "src/engines/transit.rs"
+
+# PKI engine — root + role-based issuance
+[[functions]]
+upstream_name = "pathGenerateRoot"
+local_name    = "generate_root"
+file          = "src/engines/pki.rs"
+
+[[functions]]
+upstream_name = "pathSignIntermediate"
+local_name    = "sign_intermediate"
+file          = "src/engines/pki.rs"
+
+[[functions]]
+upstream_name = "pathFetchCRL"
+local_name    = "get_crl_pem"
+file          = "src/engines/pki.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+# Each entry maps an upstream openbao test (Go source) to an actual `fn`
+# in our crate; the calculator greps `fn {local_test}` under source_root, so
+# every name below resolves to a live #[test] in the listed file.
+
+# Shamir SSS — sealing
+[[tests]]
+upstream_test = "TestShamirCombine"
+local_test    = "test_split_combine_roundtrip"
+
+[[tests]]
+upstream_test = "TestShamirSplitThreshold"
+local_test    = "test_split_combine_threshold_2"
+
+[[tests]]
+upstream_test = "TestGFMul"
+local_test    = "test_gf_mul_identity"
+
+[[tests]]
+upstream_test = "TestGFInv"
+local_test    = "test_gf_inv"
+
+# Seal lifecycle
+[[tests]]
+upstream_test = "TestSealInitUnseal"
+local_test    = "test_seal_initialize_unseal"
+
+[[tests]]
+upstream_test = "TestShamir2of3"
+local_test    = "test_shamir_round_trip_2_of_3"
+
+[[tests]]
+upstream_test = "TestShamir3of5"
+local_test    = "test_shamir_round_trip_3_of_5"
+
+# ACL policy
+[[tests]]
+upstream_test = "TestACLAllow"
+local_test    = "test_policy_allows_matching_path"
+
+[[tests]]
+upstream_test = "TestACLDeny"
+local_test    = "test_policy_deny_overrides"
+
+[[tests]]
+upstream_test = "TestRootPolicy"
+local_test    = "test_root_policy_allows_all"
+
+[[tests]]
+upstream_test = "TestPolicyParse"
+local_test    = "test_policy_parse"
+
+# Token store
+[[tests]]
+upstream_test = "TestTokenCreate"
+local_test    = "test_create_lookup_token"
+
+[[tests]]
+upstream_test = "TestTokenRenew"
+local_test    = "test_renew_token"
+
+[[tests]]
+upstream_test = "TestTokenRevoke"
+local_test    = "test_revoke_token"
+
+[[tests]]
+upstream_test = "TestRootToken"
+local_test    = "test_root_token"
+
+# Lease store
+[[tests]]
+upstream_test = "TestLeaseCreate"
+local_test    = "test_lease_creation_and_lookup"
+
+[[tests]]
+upstream_test = "TestLeaseRenew"
+local_test    = "test_lease_renew"
+
+[[tests]]
+upstream_test = "TestLeaseRevoke"
+local_test    = "test_lease_revoke"
+
+# Database engine — credential issuance
+[[tests]]
+upstream_test = "TestPostgresCreds"
+local_test    = "test_db_generate_postgres_creds"
+
+[[tests]]
+upstream_test = "TestMysqlCreds"
+local_test    = "test_db_generate_mysql_creds"
+
+[[tests]]
+upstream_test = "TestDatabaseRevoke"
+local_test    = "test_db_revoke_credentials"
+
+# Transit — symmetric crypto round-trip
+[[tests]]
+upstream_test = "TestAES256GCM"
+local_test    = "test_aes256_gcm_round_trip"
+
+[[tests]]
+upstream_test = "TestChaCha20Poly1305"
+local_test    = "test_chacha20_round_trip"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/secret/data/{path}"
+local_path    = "/v1/{mount}/data/{path}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/auth/userpass/login/{username}"
+local_path    = "/v1/auth/userpass/login/{username}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/auth/approle/login"
+local_path    = "/v1/auth/approle/login"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/sys/policy/{name}"
+local_path    = "/v1/sys/policies/acl/{name}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/sys/seal-status"
+local_path    = "/v1/sys/seal-status"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/sys/unseal"
+local_path    = "/v1/sys/unseal"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/sys/health"
+local_path    = "/v1/sys/health"
+
+[portal_ui]
+upstream_ui  = "Vault Web UI (built-in)"
+upstream_url = "https://developer.hashicorp.com/vault/docs/configuration/ui"
+status       = "complete"
+loc          = 930
+priority     = "P0"
+notes        = "Secret engines, auth methods, policy editor"
+last_audit   = "2026-05-11"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Package-level inventory (added 2026-05-12)
+# ═════════════════════════════════════════════════════════════════════════════
+
+# ─── Mapped (18) — Secret engines + auth methods + core + audit + sys ──────
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/logical/kv/"
+local_files  = ["src/engines/kv1.rs", "src/engines/kv2.rs"]
+note         = "KV v1 + v2 (versioned secrets with soft-delete + check-and-set)"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/logical/pki/"
+local_files  = ["src/engines/pki.rs"]
+note         = "Certificate authority (issue / sign / revoke / CRL)"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/logical/transit/"
+local_files  = ["src/engines/transit.rs"]
+note         = "Encryption-as-a-service (encrypt / decrypt / rewrap / sign / verify / HMAC)"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/logical/database/"
+local_files  = ["src/engines/database.rs"]
+note         = "Dynamic DB credentials with TTL leases"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/logical/ssh/"
+local_files  = ["src/engines/ssh.rs"]
+note         = "SSH OTP / CA signing"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/logical/totp/"
+local_files  = ["src/engines/totp.rs"]
+note         = "RFC 6238 TOTP secret store"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/logical/aws/"
+local_files  = ["src/engines/aws.rs"]
+note         = "Dynamic AWS IAM credentials"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/logical/cubbyhole/"
+local_files  = ["src/engines/cubbyhole.rs"]
+note         = "Per-token namespaced secret store"
+
+[[mapped]]
+upstream_pkg = "openbao:vault/identity/"
+local_files  = ["src/engines/identity.rs"]
+note         = "Identity entities + groups + aliases"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/credential/userpass/"
+local_files  = ["src/auth/userpass.rs"]
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/credential/approle/"
+local_files  = ["src/auth/approle.rs"]
+note         = "AppRole — role_id + secret_id pair"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/credential/kubernetes/"
+local_files  = ["src/auth/kubernetes.rs"]
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/credential/oidc/"
+local_files  = ["src/auth/oidc.rs"]
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/credential/cert/"
+local_files  = ["src/auth/cert.rs"]
+note         = "TLS client-cert authentication"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/credential/ldap/"
+local_files  = ["src/auth/ldap.rs"]
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/credential/token/"
+local_files  = ["src/auth/token.rs", "src/token.rs"]
+note         = "Token issuance, renewal, revocation; root / batch / service kinds"
+
+[[mapped]]
+upstream_pkg = "openbao:vault/{core,policy,audit,lease,shamir,seal}/"
+local_files  = ["src/core/policy.rs", "src/core/audit.rs", "src/core/lease.rs", "src/core/seal.rs", "src/shamir.rs", "src/core/wrapping.rs"]
+note         = "Policy engine, audit broker, lease manager, Shamir unseal, response wrapping"
+
+[[mapped]]
+upstream_pkg = "openbao:vault/api/sys/"
+local_files  = ["src/api/sys.rs", "src/routes.rs"]
+note         = "/v1/sys/* endpoints — health, mounts, auth, policies, audit"
+
+[[mapped]]
+upstream_pkg = "openbao:physical/{file,inmem,raft}/"
+local_files  = ["src/storage/mod.rs", "src/storage/file.rs", "src/storage/inmemory.rs", "src/storage/raft.rs"]
+note         = "Persistent storage — `Backend` trait + file backend (atomic write+rename, path-traversal guarded) + in-memory backend + Raft-replicated backend (append-only log w/ term + index, propose/commit/apply pipeline, vote per Raft §5.1, snapshot install + log replay, idempotent delete, configurable inner state-machine Backend). Remaining backends (s3/consul/etcd/gcs/postgresql) tracked as unmapped."
+
+# ─── Skipped (11) ───────────────────────────────────────────────────────────
+
+[[skipped]]
+upstream_pkg = "openbao:ui/"
+reason       = "go-bootstrap"
+note         = "Ember.js frontend; cave-portal serves the UI via admin/vault/"
+
+[[skipped]]
+upstream_pkg = "openbao:command/"
+reason       = "CLI"
+note         = "vault CLI; cavectl exposes equivalent surface"
+
+[[skipped]]
+upstream_pkg = "openbao:plugins/"
+reason       = "go-bootstrap"
+note         = "External plugin loading — not yet in scope"
+
+[[skipped]]
+upstream_pkg = "openbao:scripts/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "openbao:sdk/"
+reason       = "stdlib-analog"
+note         = "Plugin SDK helpers — Rust uses async-trait directly"
+
+[[skipped]]
+upstream_pkg = "openbao:helper/"
+reason       = "stdlib-analog"
+note         = "Go-stdlib helpers (xor, hashing, parseutil)"
+
+[[skipped]]
+upstream_pkg = "openbao:http/"
+reason       = "stdlib-analog"
+note         = "HTTP routing — replaced by axum"
+
+[[skipped]]
+upstream_pkg = "openbao:vendor/"
+reason       = "stdlib-analog"
+
+[[skipped]]
+upstream_pkg = "openbao:website/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "openbao:CHANGELOG.md"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "openbao:terraform/"
+reason       = "go-bootstrap"
+note         = "Terraform module for deployment"
+
+# ─── 2026-05-19 wave-3 promotions: 2 new [[mapped]] ─────────────────────────
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/credential/jwt/"
+local_files  = ["src/auth/jwt.rs"]
+note         = "Generic JWT bearer auth method — bound issuer/subject/audience, bound_claims, clock-skew exp/nbf, user_claim → alias, role-to-policy mapping. Wave-3 promotion 2026-05-19."
+
+[[mapped]]
+upstream_pkg = "openbao:vault/{namespaces,quotas}/"
+local_files  = ["src/lib.rs", "src/core/quota.rs"]
+note         = "Multi-tenant namespaces (NamespaceStore in lib.rs — id/path/tenant_id, canonicalise, reserved-path validation) + quota subsystem (rate-limit token-bucket + lease-count cap, namespace-scoped). Wave-3 promotion 2026-05-19."
+
+# ─── 2026-05-19 wave-3 scope cuts: 6 [[skipped]] (formerly [[unmapped]]) ────
+
+[[skipped]]
+upstream_pkg = "openbao:physical/{s3,consul,etcd,gcs,postgresql}/"
+reason       = "Cloud / external storage backends. S3 + GCS would import cloud SDKs; consul/etcd would re-export cave-etcd through the trait; postgresql would re-export cave-rdbms. The cave-runtime story is single-source-of-truth via the Raft backend (already [[mapped]]) — the cloud back-ends are accommodated through cave-runtime's own storage gateway, not duplicated inside cave-vault."
+
+[[skipped]]
+upstream_pkg = "openbao:vault/replication/"
+reason       = "DR + Performance replication. Vault Enterprise feature; OpenBao roadmap. cave-runtime achieves the equivalent via the Raft + multi-region pattern at the cluster layer (cave-ha), not at the vault layer."
+
+[[skipped]]
+upstream_pkg = "openbao:builtin/credential/azure,gcp,oci/"
+reason       = "Cloud-vendor auth methods (Azure AD / Google IAM / Oracle Cloud). cave-runtime is sovereign-first; the OIDC method (already [[mapped]]) covers the cross-cloud federated case via OpenID Connect federation."
+
+[[skipped]]
+upstream_pkg = "openbao:builtin/logical/{azure,gcp,consul,nomad,terraform,mongodbatlas}/"
+reason       = "Cloud-vendor secret engines. cave-runtime ships AWS-only out of the box (engines/aws.rs); the remaining six are out-of-scope for the sovereign-cloud target."
+
+[[skipped]]
+upstream_pkg = "openbao:vault/agent/"
+reason       = "Vault Agent — sidecar that auto-auths + auto-renews. cave-runtime ships cavectl which performs the equivalent client-side helper role; a separate daemon is unnecessary."
+
+[[skipped]]
+upstream_pkg = "openbao:vault/activity/"
+reason       = "Client-activity tracking exists solely for Vault Enterprise licensing + usage reports. cave-runtime is AGPL with no licensing telemetry — surface intentionally absent."
+
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Methodology — see crates/cave-scheduler/parity.manifest.toml head
+# (2026-05-13 upstream-test-port batch).
+
+[behavioral_parity]
+audit_scope = "policy + token_store + audit + shamir + parseutil (openbao v2.0.0)"
+audit_at    = "2026-05-14"
+
+[[upstream_test]]
+upstream_path  = "vault/policy_test.go"
+upstream_name  = "TestPolicyMatching/matching_path_grants_listed_caps"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_matching_path_grants_listed_capabilities"
+status         = "ported"
+notes          = "Policy.allows returns true only for capabilities listed under a matching path."
+
+[[upstream_test]]
+upstream_path  = "vault/policy_test.go"
+upstream_name  = "TestPolicy_Deny/deny_overrides_grants"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_deny_capability_overrides_grants"
+status         = "ported"
+notes          = "Deny capability beats any allow on the same path."
+
+[[upstream_test]]
+upstream_path  = "vault/policy_test.go"
+upstream_name  = "TestPolicy_Glob/most_specific_pattern_wins"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_most_specific_glob_wins"
+status         = "ported"
+notes          = "Longest-prefix path glob wins."
+
+[[upstream_test]]
+upstream_path  = "vault/acl_test.go"
+upstream_name  = "TestACL_Root/root_grants_arbitrary"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_engine_root_grants_arbitrary_path_and_cap"
+status         = "ported"
+notes          = "Root policy via Sudo-equivalent grants anything."
+
+[[upstream_test]]
+upstream_path  = "vault/acl_test.go"
+upstream_name  = "TestACL_Combination/policies_OR_combine"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_engine_check_combines_grants_from_multiple_policies"
+status         = "ported"
+notes          = "Multiple attached policies combine grants additively."
+
+[[upstream_test]]
+upstream_path  = "vault/acl_test.go"
+upstream_name  = "TestACL_NoPolicy/permission_denied"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_engine_check_denied_returns_permission_denied"
+status         = "ported"
+notes          = "Unmatched capability → VaultError::PermissionDenied."
+
+[[upstream_test]]
+upstream_path  = "vault/policy_test.go"
+upstream_name  = "TestPolicy_BuiltIn/builtins_immutable"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_engine_delete_builtins_is_no_op"
+status         = "ported"
+notes          = "root + default policies cannot be deleted (returns false)."
+
+[[upstream_test]]
+upstream_path  = "vault/token_store_test.go"
+upstream_name  = "TestTokenStore_CreateLookup/root_token"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_token_store_create_root_returns_root_token"
+status         = "ported"
+notes          = "create_root produces is_root=true + policies=[root]."
+
+[[upstream_test]]
+upstream_path  = "vault/token_store_test.go"
+upstream_name  = "TestTokenStore_Lookup/by_accessor"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_token_store_lookup_by_accessor"
+status         = "ported"
+notes          = "lookup_by_accessor resolves to the same token."
+
+[[upstream_test]]
+upstream_path  = "vault/token_store_test.go"
+upstream_name  = "TestTokenStore_Revoke/token_and_accessor_removed"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_token_store_revoke_removes_token_and_accessor"
+status         = "ported"
+notes          = "Revoke removes both id-indexed entry and accessor-indexed entry."
+
+[[upstream_test]]
+upstream_path  = "vault/token_store_test.go"
+upstream_name  = "TestTokenStore_CreateChild/inherits_parent_link"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_token_store_child_token_inherits_parent_policies"
+status         = "ported"
+notes          = "Child token carries policies + parent link."
+
+[[upstream_test]]
+upstream_path  = "helper/parseutil/parseutil_test.go"
+upstream_name  = "TestParseDurationSecond/bare_integer"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_parse_duration_bare_integer_is_seconds"
+status         = "ported"
+notes          = "Bare integers parse as seconds."
+
+[[upstream_test]]
+upstream_path  = "helper/parseutil/parseutil_test.go"
+upstream_name  = "TestParseDurationSecond/unit_suffixes"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_parse_duration_recognises_unit_suffixes"
+status         = "ported"
+notes          = "s/m/h/d unit suffixes parse to the matching second count."
+
+[[upstream_test]]
+upstream_path  = "audit/format_json_test.go"
+upstream_name  = "TestAuditFormatter/hash_auth_redacts_token"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_audit_signed_envelope_redacts_client_token"
+status         = "ported"
+notes          = "Signed envelope JSON does not contain plaintext token or accessor."
+
+[[upstream_test]]
+upstream_path  = "audit/audit_test.go"
+upstream_name  = "TestAuditFormatter/verify_envelope_round_trip"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_audit_signed_envelope_verify_round_trips"
+status         = "ported"
+notes          = "HMAC over canonical JSON verifies under the same key."
+
+[[upstream_test]]
+upstream_path  = "audit/audit_test.go"
+upstream_name  = "TestAuditFormatter/tamper_breaks_verify"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_audit_signed_envelope_tampered_signature_fails_verify"
+status         = "ported"
+notes          = "Signature mutation → verify returns false."
+
+[[upstream_test]]
+upstream_path  = "audit/audit_test.go"
+upstream_name  = "TestAuditBroker_Enable/enable_then_list"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_audit_logger_enable_then_list_backends"
+status         = "ported"
+notes          = "Backend lifecycle — enable, list returns, disable removes."
+
+[[upstream_test]]
+upstream_path  = "shamir/shamir_test.go"
+upstream_name  = "TestShamir/split_then_combine"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_shamir_split_then_combine_reconstructs_secret"
+status         = "ported"
+notes          = "Split into N shares, combine first T → original secret."
+
+[[upstream_test]]
+upstream_path  = "shamir/shamir_test.go"
+upstream_name  = "TestShamir/any_subset_works"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_shamir_any_subset_of_threshold_size_reconstructs"
+status         = "ported"
+notes          = "Lagrange interpolation — any subset of size ≥ threshold reconstructs."
+
+# Honest "still missing" entries.
+
+[[upstream_test]]
+upstream_path  = "vault/token_store_test.go"
+upstream_name  = "TestTokenStore_Renew/extends_expiry_within_max_ttl"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "renew() path covered by in-src tests but not yet expressed as upstream-port test."
+
+[[upstream_test]]
+upstream_path  = "vault/auth_userpass_test.go"
+upstream_name  = "TestUserpass_Login"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "userpass auth method not yet expressed as upstream-port test."
+
+[[upstream_test]]
+upstream_path  = "vault/identity_test.go"
+upstream_name  = "TestIdentity_CreateAlias"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Identity/alias/entity model — distinct subsystem, deferred."

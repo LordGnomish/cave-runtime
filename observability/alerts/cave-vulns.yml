@@ -1,0 +1,158 @@
+# Vulnerability tracking
+groups:
+  - name: cave-vulns-slo
+    interval: 30s
+    rules:
+      - alert: VulnsSloBurnRateFast
+        expr: |
+          (
+            sum(rate(vulns_total{job="cave-vulns",code=~"5.."}[1h]))
+            /
+            sum(rate(vulns_total{job="cave-vulns"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-vulns fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-vulns/slo-burn-fast.md"
+      - alert: VulnsSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(vulns_total{job="cave-vulns",code=~"5.."}[6h]))
+            /
+            sum(rate(vulns_total{job="cave-vulns"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-vulns slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-vulns/slo-burn-slow.md"
+      - alert: VulnsErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(vulns_total{job="cave-vulns",code=~"5.."}[7d]))
+              / sum(rate(vulns_total{job="cave-vulns"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-vulns 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-vulns/error-budget.md"
+      - alert: VulnsLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(vulns_duration_seconds_bucket{job="cave-vulns"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-vulns p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-vulns/latency.md"
+      - alert: VulnsSaturationHigh
+        expr: 'sum(vulns_inflight_requests{job="cave-vulns"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-vulns inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-vulns/saturation.md"
+      - alert: VulnsMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-vulns"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-vulns RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-vulns/memory.md"
+      - alert: VulnsCardinalityExplosion
+        expr: 'count(count by (tenant_id) (vulns_total{job="cave-vulns"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-vulns tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-vulns/cardinality.md"
+      - alert: VulnsHealthProbeFailing
+        expr: 'min(up{job="cave-vulns"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-vulns health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-vulns/health.md"
+
+  - name: cave-vulns-domain
+    interval: 60s
+    rules:
+      # Domain alert 1: critical finding introduced anywhere in the workspace.
+      # Triggers within 5m of a brand-new Critical row landing in vulns_findings_total.
+      - alert: VulnsCriticalFindingIntroduced
+        expr: |
+          increase(vulns_findings_total{severity="Critical"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "New Critical finding in cave-vulns"
+          description: "{{ $value }} new Critical finding(s) in the last 5m. Investigate immediately — Charter SLA window is 7 days."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-vulns/critical-finding.md"
+
+      # Domain alert 2: SLA breach imminent — any active finding with
+      # vulns_sla_days_until_breach <= 3 days.
+      - alert: VulnsSlaBreachImminent
+        expr: |
+          min(vulns_sla_days_until_breach{state="active"}) by (severity, tenant_id) <= 3
+        for: 10m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "SLA breach imminent (≤3 days) — {{ $labels.severity }} severity, tenant {{ $labels.tenant_id }}"
+          description: "Minimum days_until_breach = {{ $value }}. Schedule remediation or risk-acceptance."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-vulns/sla-imminent.md"
+
+      # Domain alert 3: scan-import failure rate — >=20% of scan attempts
+      # over 15m fail at the parser layer (invalid JSON, unsupported scan_type).
+      - alert: VulnsScanImportFailureRateHigh
+        expr: |
+          (
+            sum(rate(vulns_scan_imports_total{outcome="error"}[15m]))
+            /
+            clamp_min(sum(rate(vulns_scan_imports_total[15m])), 1)
+          ) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-vulns scan-import failure rate > 20%"
+          description: "Failed import fraction = {{ $value | humanizePercentage }} over 15m."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-vulns/scan-import-failures.md"
+
+      # Bonus: risk-acceptance expiry surge — many RAs expired in a 1h window
+      # cause a synchronous reactivation storm.
+      - alert: VulnsRiskAcceptanceExpirySurge
+        expr: |
+          increase(vulns_risk_acceptance_expired_total[1h]) > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Risk-acceptance expiry surge: {{ $value }} expirations in 1h"
+          description: "Reactivation storm — check downstream SLA breach dashboard."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-vulns/ra-expiry-surge.md"

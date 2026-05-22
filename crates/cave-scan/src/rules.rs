@@ -1,0 +1,902 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
+//! Built-in rule catalogue with 50+ SAST rules across 6 languages.
+//!
+//! Rules are organized by language and categorized as Security (SEC),
+//! Bug (BUG), Code Smell (SMELL), or Duplication (DUP).
+//!
+//! Note: this module defines its own `ScanRule`/`IssueType`/`IssueSeverity`
+//! types (the SonarQube-style catalog shape) which are deliberately distinct
+//! from the keyword-engine `models::ScanRule` shape used by `engine.rs`.
+//! Bridging the two is a downstream concern; this file keeps the rich
+//! SAST taxonomy intact.
+
+use serde::{Deserialize, Serialize};
+
+/// Kind of issue raised by a rule, SonarQube-style.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IssueType {
+    Vulnerability,
+    Bug,
+    CodeSmell,
+    SecurityHotspot,
+    Duplication,
+}
+
+/// Severity of an issue raised by a rule, SonarQube-style.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IssueSeverity {
+    Blocker,
+    Critical,
+    Major,
+    Minor,
+    Info,
+}
+
+/// A SAST rule in the rich catalog shape (separate from `models::ScanRule`,
+/// which is the simpler keyword-engine shape used at scan time).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScanRule {
+    pub id: String,
+    pub name: String,
+    pub issue_type: IssueType,
+    pub severity: IssueSeverity,
+    /// Languages the rule applies to (empty = applies to all).
+    pub languages: Vec<String>,
+    /// Optional regex pattern. `None` means the rule is evaluated by a
+    /// dedicated analyzer (e.g. complexity, nesting depth) rather than regex.
+    pub pattern: Option<String>,
+    pub message_template: String,
+    pub effort_mins: u32,
+    pub tags: Vec<String>,
+    /// Common Weakness Enumeration ID, when applicable.
+    pub cwe: Option<u32>,
+}
+
+/// Construct the extended set of analysis rules (50+ rules).
+pub fn extended_scan_rules() -> Vec<ScanRule> {
+    vec![
+        // =========================================================================
+        // PYTHON (10+ rules)
+        // =========================================================================
+        // SEC rules
+        ScanRule {
+            id: "PY001".to_string(),
+            name: "eval() usage".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Critical,
+            languages: vec!["Python".to_string()],
+            pattern: Some(r"\beval\s*\(".to_string()),
+            message_template: "eval() executes arbitrary code -- severe security risk: {match}"
+                .to_string(),
+            effort_mins: 30,
+            tags: vec![
+                "python".to_string(),
+                "security".to_string(),
+                "injection".to_string(),
+            ],
+            cwe: Some(95),
+        },
+        ScanRule {
+            id: "PY002".to_string(),
+            name: "exec() usage".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Critical,
+            languages: vec!["Python".to_string()],
+            pattern: Some(r"\bexec\s*\(".to_string()),
+            message_template:
+                "exec() executes arbitrary code -- avoid with untrusted input: {match}".to_string(),
+            effort_mins: 30,
+            tags: vec![
+                "python".to_string(),
+                "security".to_string(),
+                "injection".to_string(),
+            ],
+            cwe: Some(95),
+        },
+        ScanRule {
+            id: "PY003".to_string(),
+            name: "os.system() shell injection".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Critical,
+            languages: vec!["Python".to_string()],
+            pattern: Some(r"os\.system\(".to_string()),
+            message_template: "os.system() with untrusted input is shell-injection risk: {match}"
+                .to_string(),
+            effort_mins: 40,
+            tags: vec![
+                "python".to_string(),
+                "security".to_string(),
+                "shell-injection".to_string(),
+            ],
+            cwe: Some(78),
+        },
+        ScanRule {
+            id: "PY004".to_string(),
+            name: "subprocess.call(shell=True)".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Critical,
+            languages: vec!["Python".to_string()],
+            pattern: Some(r"subprocess\.call\(.*shell\s*=\s*True".to_string()),
+            message_template: "subprocess with shell=True enables shell injection: {match}"
+                .to_string(),
+            effort_mins: 30,
+            tags: vec![
+                "python".to_string(),
+                "security".to_string(),
+                "shell-injection".to_string(),
+            ],
+            cwe: Some(78),
+        },
+        ScanRule {
+            id: "PY005".to_string(),
+            name: "pickle.loads() deserialization".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Critical,
+            languages: vec!["Python".to_string()],
+            pattern: Some(r"pickle\.loads\(".to_string()),
+            message_template: "pickle.loads() with untrusted input allows code execution: {match}"
+                .to_string(),
+            effort_mins: 45,
+            tags: vec![
+                "python".to_string(),
+                "security".to_string(),
+                "deserialization".to_string(),
+            ],
+            cwe: Some(502),
+        },
+        // BUG rules
+        ScanRule {
+            id: "PY006".to_string(),
+            name: "assert in production code".to_string(),
+            issue_type: IssueType::Bug,
+            severity: IssueSeverity::Major,
+            languages: vec!["Python".to_string()],
+            pattern: Some(r"^\s*assert\b".to_string()),
+            message_template: "assert statements are stripped in optimized builds: {match}"
+                .to_string(),
+            effort_mins: 15,
+            tags: vec![
+                "python".to_string(),
+                "bug".to_string(),
+                "testing".to_string(),
+            ],
+            cwe: None,
+        },
+        ScanRule {
+            id: "PY007".to_string(),
+            name: "bare except clause".to_string(),
+            issue_type: IssueType::CodeSmell,
+            severity: IssueSeverity::Major,
+            languages: vec!["Python".to_string()],
+            pattern: Some(r"except\s*:".to_string()),
+            message_template:
+                "bare except: catches all exceptions including KeyboardInterrupt: {match}"
+                    .to_string(),
+            effort_mins: 10,
+            tags: vec![
+                "python".to_string(),
+                "smell".to_string(),
+                "error-handling".to_string(),
+            ],
+            cwe: Some(396),
+        },
+        ScanRule {
+            id: "PY008".to_string(),
+            name: "mutable default argument".to_string(),
+            issue_type: IssueType::Bug,
+            severity: IssueSeverity::Major,
+            languages: vec!["Python".to_string()],
+            pattern: Some(r"def\s+\w+\([^)]*=[^)]*\[\]".to_string()),
+            message_template: "mutable default arguments are shared across calls: {match}"
+                .to_string(),
+            effort_mins: 20,
+            tags: vec![
+                "python".to_string(),
+                "bug".to_string(),
+                "function-def".to_string(),
+            ],
+            cwe: None,
+        },
+        // SMELL rules
+        ScanRule {
+            id: "PY009".to_string(),
+            name: "print() left in code".to_string(),
+            issue_type: IssueType::CodeSmell,
+            severity: IssueSeverity::Minor,
+            languages: vec!["Python".to_string()],
+            pattern: Some(r"^\s*print\s*\(".to_string()),
+            message_template: "Debug print statement -- use logging instead: {match}".to_string(),
+            effort_mins: 5,
+            tags: vec![
+                "python".to_string(),
+                "smell".to_string(),
+                "debug".to_string(),
+            ],
+            cwe: None,
+        },
+        ScanRule {
+            id: "PY010".to_string(),
+            name: "f-string SQL injection pattern".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Critical,
+            languages: vec!["Python".to_string()],
+            pattern: Some(r#"f["'].*SELECT.*\{.*\}.*["']"#.to_string()),
+            message_template: "f-string SQL injection -- use parameterized queries: {match}"
+                .to_string(),
+            effort_mins: 30,
+            tags: vec![
+                "python".to_string(),
+                "security".to_string(),
+                "sql-injection".to_string(),
+            ],
+            cwe: Some(89),
+        },
+        // =========================================================================
+        // JAVASCRIPT / TYPESCRIPT (10+ rules)
+        // =========================================================================
+        // SEC rules
+        ScanRule {
+            id: "JS001".to_string(),
+            name: "eval() usage".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Critical,
+            languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
+            pattern: Some(r"\beval\s*\(".to_string()),
+            message_template: "eval() is a severe XSS/injection vector: {match}".to_string(),
+            effort_mins: 30,
+            tags: vec![
+                "javascript".to_string(),
+                "security".to_string(),
+                "xss".to_string(),
+            ],
+            cwe: Some(95),
+        },
+        ScanRule {
+            id: "JS002".to_string(),
+            name: "innerHTML assignment (XSS)".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Major,
+            languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
+            pattern: Some(r"\.innerHTML\s*=".to_string()),
+            message_template:
+                "innerHTML assignment is XSS risk -- use textContent or sanitize: {match}"
+                    .to_string(),
+            effort_mins: 20,
+            tags: vec![
+                "javascript".to_string(),
+                "security".to_string(),
+                "xss".to_string(),
+            ],
+            cwe: Some(79),
+        },
+        ScanRule {
+            id: "JS003".to_string(),
+            name: "document.write() (XSS/deprecated)".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Major,
+            languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
+            pattern: Some(r"document\.write\(".to_string()),
+            message_template: "document.write() is deprecated and XSS risk: {match}".to_string(),
+            effort_mins: 15,
+            tags: vec![
+                "javascript".to_string(),
+                "xss".to_string(),
+                "deprecated".to_string(),
+            ],
+            cwe: Some(79),
+        },
+        ScanRule {
+            id: "JS004".to_string(),
+            name: "setTimeout with string".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Major,
+            languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
+            pattern: Some(r#"setTimeout\s*\(\s*['"]"#.to_string()),
+            message_template: "setTimeout with string evaluates code -- use function: {match}"
+                .to_string(),
+            effort_mins: 10,
+            tags: vec![
+                "javascript".to_string(),
+                "security".to_string(),
+                "code-execution".to_string(),
+            ],
+            cwe: Some(95),
+        },
+        ScanRule {
+            id: "JS005".to_string(),
+            name: "new Function() constructor".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Major,
+            languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
+            pattern: Some(r"new\s+Function\s*\(".to_string()),
+            message_template: "new Function() with dynamic strings is code injection: {match}"
+                .to_string(),
+            effort_mins: 25,
+            tags: vec![
+                "javascript".to_string(),
+                "security".to_string(),
+                "code-execution".to_string(),
+            ],
+            cwe: Some(95),
+        },
+        // SMELL/BUG rules
+        ScanRule {
+            id: "JS006".to_string(),
+            name: "console.log left in code".to_string(),
+            issue_type: IssueType::CodeSmell,
+            severity: IssueSeverity::Minor,
+            languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
+            pattern: Some(r"console\.log\s*\(".to_string()),
+            message_template: "Debug console.log() left in code: {match}".to_string(),
+            effort_mins: 5,
+            tags: vec![
+                "javascript".to_string(),
+                "smell".to_string(),
+                "debug".to_string(),
+            ],
+            cwe: None,
+        },
+        ScanRule {
+            id: "JS007".to_string(),
+            name: "var instead of let/const".to_string(),
+            issue_type: IssueType::CodeSmell,
+            severity: IssueSeverity::Minor,
+            languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
+            pattern: Some(r"^\s*var\s+\w+".to_string()),
+            message_template: "var has function scope -- use let or const: {match}".to_string(),
+            effort_mins: 10,
+            tags: vec![
+                "javascript".to_string(),
+                "smell".to_string(),
+                "modernization".to_string(),
+            ],
+            cwe: None,
+        },
+        ScanRule {
+            id: "JS008".to_string(),
+            name: "== instead of ===".to_string(),
+            issue_type: IssueType::Bug,
+            severity: IssueSeverity::Major,
+            languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
+            pattern: Some(r"[^=!]==[^=]".to_string()),
+            message_template: "== allows type coercion -- use === for strict equality: {match}"
+                .to_string(),
+            effort_mins: 10,
+            tags: vec![
+                "javascript".to_string(),
+                "bug".to_string(),
+                "comparison".to_string(),
+            ],
+            cwe: Some(1025),
+        },
+        ScanRule {
+            id: "JS009".to_string(),
+            name: "missing await on async call".to_string(),
+            issue_type: IssueType::Bug,
+            severity: IssueSeverity::Major,
+            languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
+            pattern: Some(r"const\s+\w+\s*=\s*\w+\([^)]*\);".to_string()),
+            message_template: "Async function called without await -- may return Promise: {match}"
+                .to_string(),
+            effort_mins: 15,
+            tags: vec![
+                "javascript".to_string(),
+                "bug".to_string(),
+                "async".to_string(),
+            ],
+            cwe: None,
+        },
+        ScanRule {
+            id: "JS010".to_string(),
+            name: "hardcoded JWT secret".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Critical,
+            languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
+            pattern: Some(r#"(?i)jwt.*secret\s*[:=]\s*['"][^'"]{8,}['"]"#.to_string()),
+            message_template: "Hardcoded JWT secret -- use environment variables: {match}"
+                .to_string(),
+            effort_mins: 20,
+            tags: vec![
+                "javascript".to_string(),
+                "security".to_string(),
+                "secrets".to_string(),
+            ],
+            cwe: Some(798),
+        },
+        // =========================================================================
+        // RUST (8+ rules)
+        // =========================================================================
+        ScanRule {
+            id: "RUST001".to_string(),
+            name: "unwrap() in library code".to_string(),
+            issue_type: IssueType::CodeSmell,
+            severity: IssueSeverity::Minor,
+            languages: vec!["Rust".to_string()],
+            pattern: Some(r"\.unwrap\(\)".to_string()),
+            message_template:
+                "unwrap() panics on failure -- use ? or expect() with message: {match}".to_string(),
+            effort_mins: 10,
+            tags: vec!["rust".to_string(), "error-handling".to_string()],
+            cwe: None,
+        },
+        ScanRule {
+            id: "RUST002".to_string(),
+            name: "panic!() in library code".to_string(),
+            issue_type: IssueType::Bug,
+            severity: IssueSeverity::Major,
+            languages: vec!["Rust".to_string()],
+            pattern: Some(r"panic!\s*\(".to_string()),
+            message_template: "panic!() terminates thread -- prefer returning Result: {match}"
+                .to_string(),
+            effort_mins: 20,
+            tags: vec!["rust".to_string(), "error-handling".to_string()],
+            cwe: None,
+        },
+        ScanRule {
+            id: "RUST003".to_string(),
+            name: "unsafe block (requires review)".to_string(),
+            issue_type: IssueType::SecurityHotspot,
+            severity: IssueSeverity::Major,
+            languages: vec!["Rust".to_string()],
+            pattern: Some(r"\bunsafe\s*\{".to_string()),
+            message_template: "unsafe code -- requires manual memory-safety review: {match}"
+                .to_string(),
+            effort_mins: 60,
+            tags: vec![
+                "rust".to_string(),
+                "security".to_string(),
+                "memory-safety".to_string(),
+            ],
+            cwe: Some(119),
+        },
+        ScanRule {
+            id: "RUST004".to_string(),
+            name: "todo!() in code".to_string(),
+            issue_type: IssueType::Bug,
+            severity: IssueSeverity::Major,
+            languages: vec!["Rust".to_string()],
+            pattern: Some(r"todo!\s*\(".to_string()),
+            message_template: "todo!() macro not implemented -- remove before release: {match}"
+                .to_string(),
+            effort_mins: 30,
+            tags: vec!["rust".to_string(), "incomplete".to_string()],
+            cwe: None,
+        },
+        ScanRule {
+            id: "RUST005".to_string(),
+            name: "clone() in hot path".to_string(),
+            issue_type: IssueType::CodeSmell,
+            severity: IssueSeverity::Minor,
+            languages: vec!["Rust".to_string()],
+            pattern: Some(r"\.clone\(\)".to_string()),
+            message_template:
+                "clone() may cause performance issues -- consider references: {match}".to_string(),
+            effort_mins: 15,
+            tags: vec!["rust".to_string(), "performance".to_string()],
+            cwe: None,
+        },
+        ScanRule {
+            id: "RUST006".to_string(),
+            name: "std::process::Command without sanitization".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Critical,
+            languages: vec!["Rust".to_string()],
+            pattern: Some(r"Command::new".to_string()),
+            message_template: "Command::new() -- ensure input is properly sanitized: {match}"
+                .to_string(),
+            effort_mins: 30,
+            tags: vec![
+                "rust".to_string(),
+                "security".to_string(),
+                "command-injection".to_string(),
+            ],
+            cwe: Some(78),
+        },
+        ScanRule {
+            id: "RUST007".to_string(),
+            name: "hardcoded secrets".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Major,
+            languages: vec!["Rust".to_string()],
+            pattern: Some(r#"(?i)(password|secret|api_key)\s*=\s*["\']"#.to_string()),
+            message_template: "Hardcoded secret detected -- use environment variables: {match}"
+                .to_string(),
+            effort_mins: 20,
+            tags: vec![
+                "rust".to_string(),
+                "security".to_string(),
+                "secrets".to_string(),
+            ],
+            cwe: Some(798),
+        },
+        ScanRule {
+            id: "RUST008".to_string(),
+            name: "#[allow(unused)] blanket suppression".to_string(),
+            issue_type: IssueType::CodeSmell,
+            severity: IssueSeverity::Minor,
+            languages: vec!["Rust".to_string()],
+            pattern: Some(r"#\[allow\(unused\)".to_string()),
+            message_template:
+                "Blanket allow(unused) suppresses all warnings -- be specific: {match}".to_string(),
+            effort_mins: 5,
+            tags: vec![
+                "rust".to_string(),
+                "smell".to_string(),
+                "linting".to_string(),
+            ],
+            cwe: None,
+        },
+        // =========================================================================
+        // GO (8+ rules)
+        // =========================================================================
+        ScanRule {
+            id: "GO001".to_string(),
+            name: "fmt.Println in production".to_string(),
+            issue_type: IssueType::CodeSmell,
+            severity: IssueSeverity::Minor,
+            languages: vec!["Go".to_string()],
+            pattern: Some(r"fmt\.Println".to_string()),
+            message_template: "Debug fmt.Println() -- use structured logging: {match}".to_string(),
+            effort_mins: 5,
+            tags: vec!["go".to_string(), "smell".to_string(), "logging".to_string()],
+            cwe: None,
+        },
+        ScanRule {
+            id: "GO002".to_string(),
+            name: "unchecked error (err != nil)".to_string(),
+            issue_type: IssueType::Bug,
+            severity: IssueSeverity::Major,
+            languages: vec!["Go".to_string()],
+            pattern: Some(r"_\s*:=\s*\w+\([^)]*\)".to_string()),
+            message_template: "Error ignored with _ -- check and handle errors: {match}"
+                .to_string(),
+            effort_mins: 15,
+            tags: vec![
+                "go".to_string(),
+                "bug".to_string(),
+                "error-handling".to_string(),
+            ],
+            cwe: None,
+        },
+        ScanRule {
+            id: "GO003".to_string(),
+            name: "SQL injection (string concatenation)".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Critical,
+            languages: vec!["Go".to_string()],
+            pattern: Some(r#"(?i)query\s*\(\s*.*\+.*\)"#.to_string()),
+            message_template: "SQL string concatenation -- use parameterized queries: {match}"
+                .to_string(),
+            effort_mins: 30,
+            tags: vec![
+                "go".to_string(),
+                "security".to_string(),
+                "sql-injection".to_string(),
+            ],
+            cwe: Some(89),
+        },
+        ScanRule {
+            id: "GO004".to_string(),
+            name: "HTTP without TLS".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Critical,
+            languages: vec!["Go".to_string()],
+            pattern: Some(r"http\.ListenAndServe".to_string()),
+            message_template: "Plain HTTP -- use https and ListenAndServeTLS: {match}".to_string(),
+            effort_mins: 20,
+            tags: vec!["go".to_string(), "security".to_string(), "tls".to_string()],
+            cwe: Some(295),
+        },
+        ScanRule {
+            id: "GO005".to_string(),
+            name: "weak crypto (MD5/SHA1)".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Major,
+            languages: vec!["Go".to_string()],
+            pattern: Some(r"crypto/(md5|sha1)".to_string()),
+            message_template: "MD5/SHA1 is cryptographically weak -- use SHA-256+: {match}"
+                .to_string(),
+            effort_mins: 20,
+            tags: vec![
+                "go".to_string(),
+                "security".to_string(),
+                "cryptography".to_string(),
+            ],
+            cwe: Some(327),
+        },
+        ScanRule {
+            id: "GO006".to_string(),
+            name: "defer in loop".to_string(),
+            issue_type: IssueType::Bug,
+            severity: IssueSeverity::Major,
+            languages: vec!["Go".to_string()],
+            pattern: Some(r"(?s)(for|while).*\{.*defer.*\}".to_string()),
+            message_template:
+                "defer in loop -- deferred functions won't run until function exit: {match}"
+                    .to_string(),
+            effort_mins: 25,
+            tags: vec![
+                "go".to_string(),
+                "bug".to_string(),
+                "resource-leak".to_string(),
+            ],
+            cwe: Some(772),
+        },
+        ScanRule {
+            id: "GO007".to_string(),
+            name: "unhandled goroutine panic".to_string(),
+            issue_type: IssueType::Bug,
+            severity: IssueSeverity::Major,
+            languages: vec!["Go".to_string()],
+            pattern: Some(r"go\s+\w+\(".to_string()),
+            message_template: "Goroutine launched -- ensure panic recovery with recover(): {match}"
+                .to_string(),
+            effort_mins: 30,
+            tags: vec![
+                "go".to_string(),
+                "bug".to_string(),
+                "concurrency".to_string(),
+            ],
+            cwe: None,
+        },
+        ScanRule {
+            id: "GO008".to_string(),
+            name: "hardcoded credentials".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Major,
+            languages: vec!["Go".to_string()],
+            pattern: Some(r#"(?i)(password|api_key|secret)\s*:=\s*["\']"#.to_string()),
+            message_template: "Hardcoded secret -- use environment variables or vaults: {match}"
+                .to_string(),
+            effort_mins: 20,
+            tags: vec![
+                "go".to_string(),
+                "security".to_string(),
+                "secrets".to_string(),
+            ],
+            cwe: Some(798),
+        },
+        // =========================================================================
+        // JAVA (6+ rules)
+        // =========================================================================
+        ScanRule {
+            id: "JAVA001".to_string(),
+            name: "System.out.println in production".to_string(),
+            issue_type: IssueType::CodeSmell,
+            severity: IssueSeverity::Minor,
+            languages: vec!["Java".to_string()],
+            pattern: Some(r"System\.out\.println".to_string()),
+            message_template: "Debug System.out.println() -- use logger: {match}".to_string(),
+            effort_mins: 5,
+            tags: vec![
+                "java".to_string(),
+                "smell".to_string(),
+                "logging".to_string(),
+            ],
+            cwe: None,
+        },
+        ScanRule {
+            id: "JAVA002".to_string(),
+            name: "SQL injection (string concat)".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Critical,
+            languages: vec!["Java".to_string()],
+            pattern: Some(r"(?i)query.*\+.*select".to_string()),
+            message_template: "SQL string concatenation -- use PreparedStatement: {match}"
+                .to_string(),
+            effort_mins: 30,
+            tags: vec![
+                "java".to_string(),
+                "security".to_string(),
+                "sql-injection".to_string(),
+            ],
+            cwe: Some(89),
+        },
+        ScanRule {
+            id: "JAVA003".to_string(),
+            name: "new Random() for security".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Major,
+            languages: vec!["Java".to_string()],
+            pattern: Some(r"new\s+Random\s*\(".to_string()),
+            message_template:
+                "java.util.Random is not cryptographically secure -- use SecureRandom: {match}"
+                    .to_string(),
+            effort_mins: 15,
+            tags: vec![
+                "java".to_string(),
+                "security".to_string(),
+                "cryptography".to_string(),
+            ],
+            cwe: Some(338),
+        },
+        ScanRule {
+            id: "JAVA004".to_string(),
+            name: "empty catch block".to_string(),
+            issue_type: IssueType::Bug,
+            severity: IssueSeverity::Major,
+            languages: vec!["Java".to_string()],
+            pattern: Some(r"catch\s*\([^)]+\)\s*\{\s*\}".to_string()),
+            message_template: "Empty catch block -- at least log the exception: {match}"
+                .to_string(),
+            effort_mins: 15,
+            tags: vec![
+                "java".to_string(),
+                "bug".to_string(),
+                "error-handling".to_string(),
+            ],
+            cwe: Some(390),
+        },
+        ScanRule {
+            id: "JAVA005".to_string(),
+            name: "== for string comparison".to_string(),
+            issue_type: IssueType::Bug,
+            severity: IssueSeverity::Major,
+            languages: vec!["Java".to_string()],
+            pattern: Some(r"String.*==".to_string()),
+            message_template: "Use .equals() for string comparison, not ==: {match}".to_string(),
+            effort_mins: 10,
+            tags: vec![
+                "java".to_string(),
+                "bug".to_string(),
+                "comparison".to_string(),
+            ],
+            cwe: Some(1025),
+        },
+        ScanRule {
+            id: "JAVA006".to_string(),
+            name: "hardcoded password".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Major,
+            languages: vec!["Java".to_string()],
+            pattern: Some(r#"(?i)password\s*=\s*["\'][^"\']{3,}"#.to_string()),
+            message_template: "Hardcoded password -- use configuration management: {match}"
+                .to_string(),
+            effort_mins: 20,
+            tags: vec![
+                "java".to_string(),
+                "security".to_string(),
+                "secrets".to_string(),
+            ],
+            cwe: Some(798),
+        },
+        // =========================================================================
+        // GENERAL / MULTI-LANGUAGE (8+ rules)
+        // =========================================================================
+        ScanRule {
+            id: "GEN001".to_string(),
+            name: "TODO/FIXME comment".to_string(),
+            issue_type: IssueType::CodeSmell,
+            severity: IssueSeverity::Minor,
+            languages: vec![],
+            pattern: Some(r"(?i)(TODO|FIXME)".to_string()),
+            message_template: "Unresolved TODO/FIXME -- schedule a fix: {match}".to_string(),
+            effort_mins: 5,
+            tags: vec![
+                "general".to_string(),
+                "smell".to_string(),
+                "maintenance".to_string(),
+            ],
+            cwe: None,
+        },
+        ScanRule {
+            id: "GEN002".to_string(),
+            name: "hardcoded IP address".to_string(),
+            issue_type: IssueType::CodeSmell,
+            severity: IssueSeverity::Minor,
+            languages: vec![],
+            pattern: Some(r"\b(?:\d{1,3}\.){3}\d{1,3}\b".to_string()),
+            message_template: "Hardcoded IP address -- use configuration: {match}".to_string(),
+            effort_mins: 10,
+            tags: vec![
+                "general".to_string(),
+                "smell".to_string(),
+                "configuration".to_string(),
+            ],
+            cwe: None,
+        },
+        ScanRule {
+            id: "GEN003".to_string(),
+            name: "hardcoded API key/token".to_string(),
+            issue_type: IssueType::Vulnerability,
+            severity: IssueSeverity::Critical,
+            languages: vec![],
+            pattern: Some(
+                r#"(?i)(api[_-]?key|token|bearer)\s*[:=]\s*['\"][^'\"]{16,}"#.to_string(),
+            ),
+            message_template: "Hardcoded API key/token -- rotate immediately: {match}".to_string(),
+            effort_mins: 30,
+            tags: vec![
+                "general".to_string(),
+                "security".to_string(),
+                "secrets".to_string(),
+            ],
+            cwe: Some(798),
+        },
+        ScanRule {
+            id: "GEN004".to_string(),
+            name: "large function (>200 lines)".to_string(),
+            issue_type: IssueType::CodeSmell,
+            severity: IssueSeverity::Minor,
+            languages: vec![],
+            pattern: None, // Handled by complexity analysis
+            message_template:
+                "Function exceeds 200 lines -- consider breaking into smaller functions".to_string(),
+            effort_mins: 90,
+            tags: vec![
+                "general".to_string(),
+                "smell".to_string(),
+                "maintainability".to_string(),
+            ],
+            cwe: None,
+        },
+        ScanRule {
+            id: "GEN005".to_string(),
+            name: "deeply nested code (>4 levels)".to_string(),
+            issue_type: IssueType::CodeSmell,
+            severity: IssueSeverity::Minor,
+            languages: vec![],
+            pattern: None, // Handled by complexity analysis
+            message_template: "Code nesting exceeds 4 levels -- simplify control flow".to_string(),
+            effort_mins: 30,
+            tags: vec![
+                "general".to_string(),
+                "smell".to_string(),
+                "complexity".to_string(),
+            ],
+            cwe: None,
+        },
+        ScanRule {
+            id: "GEN006".to_string(),
+            name: "commented-out code block".to_string(),
+            issue_type: IssueType::CodeSmell,
+            severity: IssueSeverity::Minor,
+            languages: vec![],
+            pattern: Some(r"^[\s]*//.*\w+.*[\s]*//.*\w+".to_string()),
+            message_template: "Commented-out code -- delete or restore: {match}".to_string(),
+            effort_mins: 5,
+            tags: vec![
+                "general".to_string(),
+                "smell".to_string(),
+                "maintenance".to_string(),
+            ],
+            cwe: None,
+        },
+        ScanRule {
+            id: "GEN007".to_string(),
+            name: "magic number".to_string(),
+            issue_type: IssueType::CodeSmell,
+            severity: IssueSeverity::Minor,
+            languages: vec![],
+            pattern: Some(r"=\s*[0-9]{2,}(?![0-9])".to_string()),
+            message_template: "Magic number -- extract as named constant: {match}".to_string(),
+            effort_mins: 10,
+            tags: vec![
+                "general".to_string(),
+                "smell".to_string(),
+                "readability".to_string(),
+            ],
+            cwe: None,
+        },
+        ScanRule {
+            id: "GEN008".to_string(),
+            name: "long parameter list (>5 params)".to_string(),
+            issue_type: IssueType::CodeSmell,
+            severity: IssueSeverity::Minor,
+            languages: vec![],
+            pattern: Some(r"(?:def|function|fn)\s+\w+\s*\(\s*\w+.*,.*,.*,.*,.*,".to_string()),
+            message_template: "Function has >5 parameters -- consider object parameter: {match}"
+                .to_string(),
+            effort_mins: 20,
+            tags: vec![
+                "general".to_string(),
+                "smell".to_string(),
+                "api-design".to_string(),
+            ],
+            cwe: None,
+        },
+    ]
+}

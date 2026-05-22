@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  com.cave.runtime.plist.template — launchctl agent definition for the
+  local cave-runtime daemon on macOS.
+
+  Install:
+    1. cp scripts/com.cave.runtime.plist.template ~/Library/LaunchAgents/com.cave.runtime.plist
+    2. Edit the placeholders below — at minimum:
+       - $DATA_DIR    → your data dir (e.g. /Users/you/.cave)
+       - $PORT        → portal port (e.g. 8080)
+       - $JWT_SECRET  → any string for dev (used by the auth middleware)
+    3. mkdir -p ~/Library/Logs
+    4. launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.cave.runtime.plist
+
+  After installation, restart the daemon any time with:
+    ./scripts/cave-runtime-rebuild-restart.sh
+
+  Verify:
+    launchctl print gui/$(id -u)/com.cave.runtime
+    tail -F ~/Library/Logs/cave-runtime.log
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.cave.runtime</string>
+
+    <key>Program</key>
+    <string>/usr/local/bin/cave-runtime</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/cave-runtime</string>
+        <string>serve</string>
+        <string>--data-dir</string>
+        <string>$DATA_DIR</string>
+        <string>--port</string>
+        <string>$PORT</string>
+    </array>
+
+    <!-- Environment: JWT secret for the dev portal auth middleware. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CAVE_JWT_SECRET</key>
+        <string>$JWT_SECRET</string>
+        <key>CAVE_DEV_MODE</key>
+        <string>true</string>
+    </dict>
+
+    <!-- Start at login, restart on crash. -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Logs at ~/Library/Logs/cave-runtime.log. -->
+    <key>StandardOutPath</key>
+    <string>$HOME/Library/Logs/cave-runtime.log</string>
+    <key>StandardErrorPath</key>
+    <string>$HOME/Library/Logs/cave-runtime.log</string>
+
+    <!-- Throttle: never restart faster than every 10s after a crash. -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <!-- Keep file descriptor limits generous for the apiserver/etcd listeners. -->
+    <key>SoftResourceLimits</key>
+    <dict>
+        <key>NumberOfFiles</key>
+        <integer>4096</integer>
+    </dict>
+</dict>
+</plist>

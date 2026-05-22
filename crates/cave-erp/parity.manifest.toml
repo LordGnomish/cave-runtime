@@ -1,0 +1,55 @@
+# parity.manifest.toml — cave-erp
+# Upstream: frappe/erpnext v16.16.0  https://github.com/frappe/erpnext
+#
+# Re-targeted 2026-05-02 from `erpnext/erpnext` (wrong org). Canonical
+# org is Frappe Technologies; the org alias `erpnext/erpnext` was never
+# the source repository.
+
+[upstream]
+org     = "frappe"
+repo    = "erpnext"
+version = "v16.16.0"
+name    = "ERPNext"
+license = "GPL-3.0"
+language= "Python"
+url     = "https://github.com/frappe/erpnext"
+
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
+[module]
+name        = "cave-erp"
+description = "Enterprise resource planning — ERPNext replacement"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+# [[files]]
+# upstream = "path/in/upstream/repo.go"
+# local    = "src/local.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+# [[functions]]
+# upstream_name = "UpstreamFunc"
+# local_name    = "local_fn"
+# file          = "src/routes.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+# [[tests]]
+# upstream_test = "TestUpstreamFunc"
+# local_test    = "test_local_fn"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+# [[surfaces]]
+# kind          = "http"
+# upstream_path = "/api/upstream"
+# local_path    = "/api/erp/endpoint"
+
+[portal_ui]
+upstream_ui  = "ERPNext"
+upstream_url = "https://erpnext.com/"
+status       = "partial"
+loc          = 153
+priority     = "P1"
+notes        = "Full ERP UI"
+last_audit   = "2026-05-11"

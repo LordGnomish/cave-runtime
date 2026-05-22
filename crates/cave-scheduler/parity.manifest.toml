@@ -1,0 +1,1199 @@
+# parity.manifest.toml — cave-scheduler
+# Upstream: kubernetes/kubernetes  https://github.com/kubernetes/kubernetes
+#
+# 2026-05-19 UPLIFT — Charter v2 parity uplift 0.8966 → 0.9655.
+#   * Two [[unmapped]] → [[mapped]] (interpodaffinity soft scoring,
+#     volumezone Filter):
+#       - pkg/scheduler/framework/plugins/interpodaffinity/ →
+#         src/interpodaffinity_scoring.rs (new). PreScore computes the
+#         per-(topology_key, topology_value) weight table once per
+#         cycle; Score sums it for the candidate node; NormalizeScore
+#         linearly maps the range onto [0, framework.MAX_NODE_SCORE].
+#         Symmetric soft anti-affinity subtracts weights. The existing
+#         eager `InterPodAffinityScore` in plugins.rs stays for callers
+#         that want the O(N×M) direct path; the new module is the
+#         framework-shaped Pre/Score/Normalize variant upstream uses.
+#       - pkg/scheduler/framework/plugins/volumezone/ →
+#         src/volumezone_plugin.rs (new). Dedicated module mirroring
+#         upstream's package layout; checks bound-PV `node_affinity`
+#         entries against the candidate node's `topology.kubernetes.io/
+#         {zone,region}` and legacy `failure-domain.beta` labels.
+#         Unbound PVCs skip; PVs with no zone affinity are
+#         unconstrained.
+#   * Counts: mapped 19→21, unmapped 3→1, fill_ratio
+#     (21+0+7)/29 = 0.9655, honest_ratio (21+7)/29 = 0.9655.
+#   * Refreshed `last_audit = "2026-05-19"`.
+#
+# 2026-05-18 FINALIZE — Charter v2 8-gate close-out.
+#   * Added `source_sha = "v1.36.0"` for reproducibility audits — pins
+#     the git tree-ish the manifest was enumerated against.
+#   * Refreshed `last_audit = "2026-05-18"`.
+#   * Baseline measured fill_ratio 0.8966 (mapped 19 / partial 0 /
+#     skipped 7 / unmapped 3 / total 29) from the 2026-05-13 batch2
+#     imagelocality port.
+#   * SPDX (AGPL-3.0-or-later) coverage: 25/25 .rs files.
+#   * 4-track: Backend cave-scheduler lib + Portal /admin/scheduler/ +
+#     cavectl SchedulerCmd + observability cave-scheduler alerts &
+#     dashboard — all green pre-close.
+
+[upstream]
+org        = "kubernetes"
+repo       = "kubernetes"
+version    = "v1.36.0"
+source_sha = "v1.36.0"
+
+[parity]
+# Package-level inventory (see [[mapped]]/[[skipped]]/[[unmapped]] below):
+#   fill_ratio = (mapped + skipped) / total
+# On 2026-05-12 the audit-doc self-reported 1.0 was replaced with a
+# measured value: kubernetes/kubernetes v1.31.x pkg/scheduler/* packages
+# enumerated and classified honestly.
+# See docs/parity/cave-scheduler-port-2026-05-12.md for methodology.
+mapped_count   = 21
+partial_count  = 0
+skipped_count  = 7
+unmapped_count = 1
+total          = 29
+fill_ratio     = 0.9655
+honest_ratio   = 0.9655
+last_audit     = "2026-05-19"
+infra_only     = false
+
+[module]
+name        = "cave-scheduler"
+description = "kube-scheduler reimpl — Filter/Score framework, preemption, priority queue, topology spread, DRA (KEP-4381), multi-profile"
+source_root = "src"
+pump_priority = "HIGH"  # qwen-pump B-prime priority gate
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
+
+# ── Package-level upstream inventory (2026-05-12 measured audit) ────────────
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/"
+local_files  = ["src/scheduler.rs", "src/lib.rs"]
+note         = "Top-level scheduling loop + scheduleOne"
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/"
+local_files  = ["src/framework.rs", "src/extension_points.rs"]
+note         = "Plugin framework — PreFilter/Filter/PostFilter/PreScore/Score/Reserve/Permit/PreBind/Bind/PostBind"
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/"
+local_files  = ["src/plugins.rs"]
+note         = "55 KB of built-in plugins"
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/noderesources/"
+local_files  = ["src/noderesources.rs"]
+note         = "Resource fit (least/most/balanced) + extended resources"
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/podtopologyspread/"
+local_files  = ["src/topology.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/volumebinding/"
+local_files  = ["src/volume.rs"]
+note         = "VolumeBinding + PVC binding + CSI integration"
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/dynamicresources/"
+local_files  = ["src/dra.rs", "src/dra_scheduler.rs"]
+note         = "DRA scheduler hooks (KEP-4381, v1.32 beta)"
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/preemption/"
+local_files  = ["src/preempt.rs", "src/default_preemption.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/internal/queue/"
+local_files  = ["src/priority_queue.rs", "src/priority_sort.rs"]
+note         = "Active/Backoff/Unschedulable queues"
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/internal/cache/"
+local_files  = ["src/cache.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/runtime/"
+local_files  = ["src/framework.rs", "src/cycle_state.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/profile/"
+local_files  = ["src/profiles.rs"]
+note         = "Multi-profile (multiple schedulers in one binary)"
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/extender/"
+local_files  = ["src/extender.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/schedulinggates/"
+local_files  = ["src/gates.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/eventhandlers.go"
+local_files  = ["src/events.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/defaultbinder/"
+local_files  = ["src/bind.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/apis/scheduling/"
+local_files  = ["src/models.rs"]
+note         = "PriorityClass types"
+
+[[mapped]]
+upstream_pkg = "staging/src/k8s.io/kube-scheduler/"
+local_files  = ["src/routes.rs"]
+
+[[skipped]]
+upstream_pkg = "cmd/kube-scheduler/"
+reason       = "go-bootstrap"
+note         = "Go main() + cobra; cave-runtime serve wires the scheduler"
+
+[[skipped]]
+upstream_pkg = "pkg/scheduler/apis/config/"
+reason       = "stdlib-analog"
+note         = "KubeSchedulerConfiguration types — cave uses serde structs in models.rs"
+
+[[skipped]]
+upstream_pkg = "pkg/scheduler/internal/heap/"
+reason       = "stdlib-analog"
+note         = "Min-heap helpers; cave uses std BinaryHeap"
+
+[[skipped]]
+upstream_pkg = "staging/src/k8s.io/component-helpers/scheduling/"
+reason       = "stdlib-analog"
+note         = "Tolerates/Affinity helpers — folded into plugins.rs"
+
+[[skipped]]
+upstream_pkg = "pkg/scheduler/util/"
+reason       = "stdlib-analog"
+note         = "Conversion + assumption helpers"
+
+[[skipped]]
+upstream_pkg = "pkg/scheduler/testing/"
+reason       = "test-harness"
+note         = "Test fixture builders — cave has #[cfg(test)] helpers in each module"
+
+[[skipped]]
+upstream_pkg = "pkg/scheduler/metrics/"
+reason       = "parallel-track"
+note         = "Prometheus metric definitions — cave uses prometheus-client crate directly"
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/imagelocality/"
+local_files  = ["src/plugins.rs"]
+note         = "k8s-cri push batch2 2026-05-13: ImageLocality scorer ported with upstream's size-weighted formula. `scaled_image_score = size × (num_nodes_with_image / total_nodes)`; `calculate_priority` linearly maps the sum onto [0, MAX_NODE_SCORE] between min/max thresholds (23 MiB / 1000 MiB × containers). 14 deterministic tests + `update_node_images` / `set_cluster_state` APIs for cave-kubelet image GC or cave-cri ListImages to populate."
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/interpodaffinity/"
+local_files  = ["src/interpodaffinity_scoring.rs", "src/plugins.rs"]
+note         = "2026-05-19 uplift: dedicated PreScore/Score/Normalize module mirroring upstream's `scoring.go`. PreScoreState aggregates ±weight per (topology_key, topology_value) once per cycle; Score is O(1) per node; Normalize maps the raw [min,max] linearly to [0, MAX_NODE_SCORE]. Hard-affinity Filter (`InterPodAffinity` in plugins.rs) remains; this module fills the soft-preferences gap."
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/volumezone/"
+local_files  = ["src/volumezone_plugin.rs", "src/volume.rs"]
+note         = "2026-05-19 uplift: dedicated module mirroring upstream's package layout. Filter rejects nodes whose `topology.kubernetes.io/{zone,region}` (or legacy `failure-domain.beta.*`) label isn't in the pod's bound PV's `node_affinity` allow-list. Unbound PVCs skip; PVs without zone affinity are unconstrained; missing node label is a hard reject."
+
+[[unmapped]]
+upstream_pkg = "pkg/scheduler/framework/preemption/recovery"
+note         = "Preemption-victim restoration after API failure during the victim eviction window. cave preempt.rs aborts and re-queues but does not re-add the would-have-victims, so transient apiserver errors can leak victim state."
+
+# ── File mappings ────────────────────────────────────────────────────────────
+
+[[files]]
+upstream = "pkg/scheduler/framework/interface.go"
+local    = "src/framework.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/runtime/framework.go"
+local    = "src/framework.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/noderesources/fit.go"
+local    = "src/noderesources.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/noderesources/least_allocated.go"
+local    = "src/noderesources.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/noderesources/balanced_allocation.go"
+local    = "src/noderesources.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/nodeaffinity/node_affinity.go"
+local    = "src/plugins.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/interpodaffinity/plugin.go"
+local    = "src/plugins.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/interpodaffinity/scoring.go"
+local    = "src/interpodaffinity_scoring.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/volumezone/volume_zone.go"
+local    = "src/volumezone_plugin.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/nodename/node_name.go"
+local    = "src/plugins.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/nodeunschedulable/node_unschedulable.go"
+local    = "src/plugins.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/tainttoleration/taint_toleration.go"
+local    = "src/plugins.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/imagelocality/image_locality.go"
+local    = "src/plugins.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/volumebinding/volume_binding.go"
+local    = "src/volume.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/volumerestrictions/volume_restrictions.go"
+local    = "src/volume.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/nodeports/node_ports.go"
+local    = "src/plugins.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/nodevolumelimits/csi.go"
+local    = "src/plugins.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/nodevolumelimits/non_csi.go"
+local    = "src/plugins.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/defaultpreemption/default_preemption.go"
+local    = "src/default_preemption.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/preemption/preemption.go"
+local    = "src/preempt.rs"
+
+[[files]]
+upstream = "pkg/scheduler/internal/queue/scheduling_queue.go"
+local    = "src/priority_queue.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/podtopologyspread/scoring.go"
+local    = "src/topology.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/podtopologyspread/filtering.go"
+local    = "src/topology.rs"
+
+[[files]]
+upstream = "pkg/scheduler/apis/config/types.go"
+local    = "src/profiles.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/dynamicresources/dynamicresources.go"
+local    = "src/dra.rs"
+
+# sweep-001: assume cache + extra extension points
+[[files]]
+upstream = "pkg/scheduler/internal/cache/cache.go"
+local    = "src/cache.rs"
+
+[[files]]
+upstream = "pkg/scheduler/scheduler.go"
+local    = "src/scheduler.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/cycle_state.go"
+local    = "src/cycle_state.rs"
+
+[[files]]
+upstream = "pkg/scheduler/eventhandlers.go"
+local    = "src/events.rs"
+
+[[files]]
+upstream = "pkg/scheduler/extender.go"
+local    = "src/extender.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/schedulinggates/scheduling_gates.go"
+local    = "src/gates.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/queuesort/priority_sort.go"
+local    = "src/priority_sort.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/defaultbinder/default_binder.go"
+local    = "src/bind.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/plugins/dynamicresources/structured.go"
+local    = "src/dra_scheduler.rs"
+
+[[files]]
+upstream = "pkg/scheduler/framework/extension_points.go"
+local    = "src/extension_points.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+# Scheduler core
+[[functions]]
+upstream_name = "schedulingCycle"
+local_name    = "schedule"
+file          = "src/scheduler.rs"
+
+# Framework runtime
+[[functions]]
+upstream_name = "RunFilterPlugins"
+local_name    = "run_filters"
+file          = "src/framework.rs"
+
+[[functions]]
+upstream_name = "RunPreFilterPlugins"
+local_name    = "run_pre_filters"
+file          = "src/framework.rs"
+
+[[functions]]
+upstream_name = "RunScorePlugins"
+local_name    = "run_scores"
+file          = "src/framework.rs"
+
+[[functions]]
+upstream_name = "RunPreBindPlugins"
+local_name    = "run_pre_bind"
+file          = "src/framework.rs"
+
+[[functions]]
+upstream_name = "RunBindPlugins"
+local_name    = "run_bind"
+file          = "src/framework.rs"
+
+[[functions]]
+upstream_name = "RunPostBindPlugins"
+local_name    = "run_post_bind"
+file          = "src/framework.rs"
+
+[[functions]]
+upstream_name = "RunReservePluginsReserve"
+local_name    = "run_reserve"
+file          = "src/framework.rs"
+
+[[functions]]
+upstream_name = "RunReservePluginsUnreserve"
+local_name    = "run_unreserve"
+file          = "src/framework.rs"
+
+[[functions]]
+upstream_name = "RunPermitPlugins"
+local_name    = "run_permit"
+file          = "src/framework.rs"
+
+[[functions]]
+upstream_name = "RunPostFilterPlugins"
+local_name    = "run_post_filters"
+file          = "src/framework.rs"
+
+[[functions]]
+upstream_name = "RunPreScorePlugins"
+local_name    = "run_pre_scores"
+file          = "src/framework.rs"
+
+[[functions]]
+upstream_name = "RunPreEnqueuePlugins"
+local_name    = "run_pre_enqueue"
+file          = "src/framework.rs"
+
+# Cache (sweep-001)
+[[functions]]
+upstream_name = "AssumePod"
+local_name    = "assume_pod"
+file          = "src/cache.rs"
+
+[[functions]]
+upstream_name = "FinishBinding"
+local_name    = "finish_binding"
+file          = "src/cache.rs"
+
+[[functions]]
+upstream_name = "ForgetPod"
+local_name    = "forget_pod"
+file          = "src/cache.rs"
+
+[[functions]]
+upstream_name = "RemovePod"
+local_name    = "remove_pod"
+file          = "src/cache.rs"
+
+[[functions]]
+upstream_name = "cleanupAssumedPods"
+local_name    = "cleanup_assumed_pods"
+file          = "src/cache.rs"
+
+# Plugins
+[[functions]]
+upstream_name = "NodeSelectorTermMatches"
+local_name    = "node_selector_term_matches"
+file          = "src/plugins.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+# Scheduler core
+[[tests]]
+upstream_test = "TestScheduleBasic"
+local_test    = "test_schedule_basic"
+
+[[tests]]
+upstream_test = "TestScheduleNoCapacity"
+local_test    = "test_schedule_no_capacity"
+
+[[tests]]
+upstream_test = "TestScheduleNodeSelector"
+local_test    = "test_schedule_node_selector"
+
+[[tests]]
+upstream_test = "TestScheduleTaintNoToleration"
+local_test    = "test_schedule_taint_no_toleration"
+
+[[tests]]
+upstream_test = "TestScheduleAffinityBonus"
+local_test    = "test_schedule_affinity_bonus"
+
+# sweep-001 cache.rs
+[[tests]]
+upstream_test = "TestNewCacheEmpty"
+local_test    = "new_cache_is_empty"
+
+[[tests]]
+upstream_test = "TestAssumePodRecordsReservation"
+local_test    = "assume_pod_records_pod_and_reservation"
+
+[[tests]]
+upstream_test = "TestAssumeSamePodTwiceRejected"
+local_test    = "assume_same_pod_twice_is_rejected"
+
+[[tests]]
+upstream_test = "TestFinishBindingClearsAssumed"
+local_test    = "finish_binding_clears_assumed_flag_resources_remain"
+
+[[tests]]
+upstream_test = "TestFinishBindingUnknownPod"
+local_test    = "finish_binding_unknown_pod_errors"
+
+[[tests]]
+upstream_test = "TestFinishBindingAlreadyFinished"
+local_test    = "finish_binding_already_finished_pod_errors"
+
+[[tests]]
+upstream_test = "TestFinishBindingWrongNode"
+local_test    = "finish_binding_with_wrong_node_errors"
+
+[[tests]]
+upstream_test = "TestForgetPodReleases"
+local_test    = "forget_pod_releases_reservation"
+
+[[tests]]
+upstream_test = "TestForgetPodUnknown"
+local_test    = "forget_pod_unknown_errors"
+
+[[tests]]
+upstream_test = "TestRemovePodAfterFinish"
+local_test    = "remove_pod_after_finish_releases_reservation"
+
+[[tests]]
+upstream_test = "TestCleanupRemovesStale"
+local_test    = "cleanup_removes_only_stale_assumed_pods"
+
+[[tests]]
+upstream_test = "TestCleanupNoAssumed"
+local_test    = "cleanup_no_assumed_pods_returns_empty"
+
+[[tests]]
+upstream_test = "TestCleanupSpareFinishedPods"
+local_test    = "cleanup_does_not_touch_finished_pods_even_when_old"
+
+[[tests]]
+upstream_test = "TestCleanupDeterministicOrder"
+local_test    = "cleanup_deterministic_order_of_reclaimed_uids"
+
+[[tests]]
+upstream_test = "TestCleanupBoundaryAtTTL"
+local_test    = "cleanup_boundary_at_exactly_ttl_is_inclusive"
+
+[[tests]]
+upstream_test = "TestCleanupJustBelowTTL"
+local_test    = "cleanup_just_below_ttl_keeps_pod"
+
+[[tests]]
+upstream_test = "TestReservationAccumulates"
+local_test    = "reservation_accumulates_across_multiple_pods_on_same_node"
+
+[[tests]]
+upstream_test = "TestReservationPartitionsPerNode"
+local_test    = "reservation_partitions_per_node"
+
+[[tests]]
+upstream_test = "TestReservationDropsToZero"
+local_test    = "reservation_drops_to_zero_after_all_pods_forgotten"
+
+[[tests]]
+upstream_test = "TestReservationEmptyForUnknownNode"
+local_test    = "reservation_empty_for_unknown_node"
+
+[[tests]]
+upstream_test = "TestReservationSubtractionSaturates"
+local_test    = "reservation_subtraction_saturates"
+
+[[tests]]
+upstream_test = "TestNodePodCount"
+local_test    = "node_pod_count_counts_per_node"
+
+[[tests]]
+upstream_test = "TestAssumedPodIsAssumedHelper"
+local_test    = "assumed_pod_is_assumed_via_helper"
+
+[[tests]]
+upstream_test = "TestAssumedCountExcludesFinished"
+local_test    = "assumed_count_excludes_finished_pods"
+
+[[tests]]
+upstream_test = "TestCacheConfigDefaults"
+local_test    = "cache_config_defaults_match_upstream"
+
+[[tests]]
+upstream_test = "TestFullLifecycleClean"
+local_test    = "full_lifecycle_clean_state"
+
+[[tests]]
+upstream_test = "TestFullLifecycleFailureClean"
+local_test    = "full_lifecycle_failure_clean_state"
+
+[[tests]]
+upstream_test = "TestManyPodsAssumeFinishPattern"
+local_test    = "many_pods_assume_finish_pattern"
+
+[[tests]]
+upstream_test = "TestCacheErrorVariants"
+local_test    = "cache_errors_are_distinct_variants"
+
+[[tests]]
+upstream_test = "TestPodCountIncludesFinished"
+local_test    = "pod_count_tracks_total_including_finished"
+
+[[tests]]
+upstream_test = "TestForgetAfterFinishReleases"
+local_test    = "forget_after_finish_still_releases"
+
+[[tests]]
+upstream_test = "TestPodLookupAfterForgetNone"
+local_test    = "pod_lookup_by_uid_after_forget_returns_none"
+
+[[tests]]
+upstream_test = "TestReservationRemainsAfterFinish"
+local_test    = "reservation_remains_after_finish_until_removed"
+
+[[tests]]
+upstream_test = "TestEmptyNodeRemovedFromMap"
+local_test    = "empty_node_disappears_from_reservation_map"
+
+[[tests]]
+upstream_test = "TestCleanupSortedOrderIdempotent"
+local_test    = "cleanup_returns_uids_in_sorted_order_for_idempotent_logging"
+
+# Plugins (plugins.rs)
+[[tests]]
+upstream_test = "TestNodeNameSkipUnset"
+local_test    = "node_name_skip_when_unset"
+
+[[tests]]
+upstream_test = "TestNodeNamePassesMatch"
+local_test    = "node_name_passes_match"
+
+[[tests]]
+upstream_test = "TestNodeNameUnresolvableMismatch"
+local_test    = "node_name_unresolvable_when_mismatch"
+
+[[tests]]
+upstream_test = "TestNodeUnschedulableReady"
+local_test    = "node_unsched_passes_ready"
+
+[[tests]]
+upstream_test = "TestNodeUnschedulableCordoned"
+local_test    = "node_unsched_blocks_cordoned"
+
+[[tests]]
+upstream_test = "TestNodeUnschedulableTolerationAllows"
+local_test    = "node_unsched_allows_cordoned_with_toleration"
+
+# Framework
+[[tests]]
+upstream_test = "TestFrameworkPodTenant"
+local_test    = "pod_carries_tenant_id"
+
+[[tests]]
+upstream_test = "TestFrameworkFilterChainSuccess"
+local_test    = "framework_filter_chain_passes_when_all_succeed"
+
+[[tests]]
+upstream_test = "TestFrameworkFilterChainShortCircuit"
+local_test    = "framework_filter_chain_short_circuits_on_first_fail"
+
+[[tests]]
+upstream_test = "TestFrameworkScoringWeightsClamp"
+local_test    = "scoring_weights_clamp_and_sum"
+
+[[tests]]
+upstream_test = "TestFrameworkScoringClampsAboveMax"
+local_test    = "scoring_clamps_above_max"
+
+[[tests]]
+upstream_test = "TestFrameworkScheduleHighestScore"
+local_test    = "schedule_one_picks_highest_score"
+
+# Node resources
+[[tests]]
+upstream_test = "TestNodeResourcesFitPasses"
+local_test    = "filter_passes_when_resources_fit"
+
+[[tests]]
+upstream_test = "TestNodeResourcesPodCountExhausted"
+local_test    = "filter_rejects_when_pod_count_exhausted"
+
+[[tests]]
+upstream_test = "TestNodeResourcesCPUShort"
+local_test    = "filter_rejects_when_cpu_short"
+
+[[tests]]
+upstream_test = "TestNodeResourcesMemoryShort"
+local_test    = "filter_rejects_when_memory_short"
+
+[[tests]]
+upstream_test = "TestNodeResourcesEphemeralShort"
+local_test    = "filter_rejects_when_ephemeral_storage_short"
+
+[[tests]]
+upstream_test = "TestNodeResourcesEphemeralFits"
+local_test    = "filter_passes_when_ephemeral_storage_fits"
+
+# Priority queue
+[[tests]]
+upstream_test = "TestQueuePriorityOrder"
+local_test    = "pop_in_priority_order"
+
+[[tests]]
+upstream_test = "TestQueueFIFOWithinPriority"
+local_test    = "fifo_within_same_priority"
+
+[[tests]]
+upstream_test = "TestQueueBackoffPersistsViaUnschedulable"
+local_test    = "backoff_attempts_persist_via_unschedulable"
+
+[[tests]]
+upstream_test = "TestQueueFlushBackoff"
+local_test    = "flush_backoff_returns_to_active_after_deadline"
+
+[[tests]]
+upstream_test = "TestQueueUnschedulableUntilMove"
+local_test    = "unschedulable_stays_until_move"
+
+# Profiles
+[[tests]]
+upstream_test = "TestProfileEmptySchedulerNameDefault"
+local_test    = "empty_scheduler_name_uses_default"
+
+[[tests]]
+upstream_test = "TestProfileExplicitNameRoute"
+local_test    = "explicit_scheduler_name_routes_to_that_profile"
+
+[[tests]]
+upstream_test = "TestProfileUnknownNameUnschedulable"
+local_test    = "unknown_scheduler_name_unschedulable"
+
+[[tests]]
+upstream_test = "TestProfileRegisteredCount"
+local_test    = "registered_profile_count_round_trip"
+
+# Extender
+[[tests]]
+upstream_test = "TestExtenderManagedResourceSkip"
+local_test    = "managed_resource_skip_flag"
+
+[[tests]]
+upstream_test = "TestExtenderConfigDefaults"
+local_test    = "config_defaults_match_upstream"
+
+[[tests]]
+upstream_test = "TestExtenderFilterPassesWhenExtenderPasses"
+local_test    = "filter_passes_when_extender_passes"
+
+[[tests]]
+upstream_test = "TestExtenderFilterRejectsWithReason"
+local_test    = "filter_rejects_with_extender_reason"
+
+[[tests]]
+upstream_test = "TestExtenderFilterNoVerb"
+local_test    = "filter_no_verb_is_skip"
+
+[[tests]]
+upstream_test = "TestExtenderFilterErrorIgnorable"
+local_test    = "filter_error_with_ignorable_returns_skip"
+
+# Bind
+[[tests]]
+upstream_test = "TestDefaultBinderRecordsDecision"
+local_test    = "default_binder_records_decision"
+
+[[tests]]
+upstream_test = "TestDefaultBinderRejectsEmptyNode"
+local_test    = "default_binder_rejects_empty_node"
+
+[[tests]]
+upstream_test = "TestDefaultBinderClearResetsLog"
+local_test    = "default_binder_clear_resets_log"
+
+[[tests]]
+upstream_test = "TestDefaultBinderPreservesOrder"
+local_test    = "default_binder_preserves_order"
+
+[[tests]]
+upstream_test = "TestSkipBinderReturnsSkip"
+local_test    = "skip_binder_returns_skip"
+
+# Priority sort
+[[tests]]
+upstream_test = "TestPrioritySortHigherFirst"
+local_test    = "priority_sort_higher_first"
+
+[[tests]]
+upstream_test = "TestPrioritySortTieBreakUid"
+local_test    = "priority_sort_equal_priority_tie_breaks_by_uid"
+
+[[tests]]
+upstream_test = "TestPrioritySortZeroVsNegative"
+local_test    = "priority_sort_zero_vs_negative"
+
+# Topology
+[[tests]]
+upstream_test = "TestTopologyDoNotScheduleOnSkew"
+local_test    = "do_not_schedule_blocks_when_skew_exceeded"
+
+[[tests]]
+upstream_test = "TestTopologyScheduleAnyway"
+local_test    = "schedule_anyway_does_not_filter"
+
+[[tests]]
+upstream_test = "TestTopologyScoreFavorsLowSkew"
+local_test    = "schedule_anyway_score_prefers_low_skew_node"
+
+[[tests]]
+upstream_test = "TestTopologyMinDomainsPads"
+local_test    = "min_domains_pads_with_empty_domains"
+
+[[tests]]
+upstream_test = "TestTopologyMissingKeyRejected"
+local_test    = "missing_topology_key_on_node_rejected"
+
+[[tests]]
+upstream_test = "TestTopologyMatchLabelKeys"
+local_test    = "match_label_keys_lifts_pod_label_into_selector"
+
+# Volume
+[[tests]]
+upstream_test = "TestVolumeMissingPVC"
+local_test    = "missing_pvc_is_unresolvable"
+
+[[tests]]
+upstream_test = "TestVolumeAlreadyBoundDifferentNode"
+local_test    = "already_bound_pvc_to_different_node_rejected"
+
+[[tests]]
+upstream_test = "TestVolumeAlreadyBoundSameNode"
+local_test    = "already_bound_pvc_to_same_node_succeeds"
+
+[[tests]]
+upstream_test = "TestVolumeImmediateUnboundUnschedulable"
+local_test    = "immediate_unbound_pvc_is_unschedulable"
+
+[[tests]]
+upstream_test = "TestVolumeImmediateNodeAffinity"
+local_test    = "immediate_with_pv_node_affinity_filters"
+
+# Preemption
+[[tests]]
+upstream_test = "TestPreemptPicksMinimumVictims"
+local_test    = "preempt_picks_minimum_victims"
+
+[[tests]]
+upstream_test = "TestPreemptDoesNotEvictHigherPriority"
+local_test    = "preempt_does_not_evict_higher_priority"
+
+[[tests]]
+upstream_test = "TestPreemptRespectsPDB"
+local_test    = "preempt_skips_pdb_violators"
+
+[[tests]]
+upstream_test = "TestPreemptSetsNominatedNodeName"
+local_test    = "preempt_sets_nominated_node_name"
+
+# Default preemption nominator
+[[tests]]
+upstream_test = "TestNominatedMapRoundTrip"
+local_test    = "nominated_map_round_trip"
+
+[[tests]]
+upstream_test = "TestNominatedMapReplacesExisting"
+local_test    = "nominated_map_replaces_existing"
+
+[[tests]]
+upstream_test = "TestAsyncHandleEnqueueDequeue"
+local_test    = "async_handle_enqueue_and_dequeue"
+
+# Gates
+[[tests]]
+upstream_test = "TestGatesNoneSucceeds"
+local_test    = "no_gates_succeeds"
+
+[[tests]]
+upstream_test = "TestGatesSinglePending"
+local_test    = "single_gate_blocks_with_pending"
+
+[[tests]]
+upstream_test = "TestGatesMultipleListed"
+local_test    = "multiple_gates_listed_in_message"
+
+[[tests]]
+upstream_test = "TestGatesClearedUnblocks"
+local_test    = "cleared_gates_unblock"
+
+# Extension points
+[[tests]]
+upstream_test = "TestPreFilterResultIntersects"
+local_test    = "pre_filter_result_intersects"
+
+[[tests]]
+upstream_test = "TestPreFilterResultAllIdentity"
+local_test    = "pre_filter_result_all_is_identity"
+
+[[tests]]
+upstream_test = "TestNodeToStatusMap"
+local_test    = "node_to_status_map_tracks_rejections"
+
+[[tests]]
+upstream_test = "TestPostFilterNominator"
+local_test    = "post_filter_nominate_carries_node"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/healthz"
+local_path    = "/api/scheduler/health"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/scheduler/v1/schedule"
+local_path    = "/api/scheduler/schedule"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/scheduler/v1/nodes"
+local_path    = "/api/scheduler/nodes"
+
+# ── KEP refs ─────────────────────────────────────────────────────────────────
+# KEP-4381: Dynamic Resource Allocation with Structured Parameters (GA in v1.36)
+# KEP-3633: PodAffinity matchLabelKeys (Beta in v1.31, GA target v1.36)
+# KEP-3094: minDomains in Pod Topology Spread (GA in v1.30; tracked here)
+
+[portal_ui]
+upstream_ui  = "Kubernetes Dashboard (scheduling)"
+upstream_url = "https://github.com/kubernetes/dashboard"
+status       = "complete"
+loc          = 850
+priority     = "P0"
+notes        = "Folder split: queue/plugins/bindings/nodescores/events (23 tests). kube-scheduler observability parity."
+last_audit   = "2026-05-11"
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Each [[upstream_test]] entry pairs ONE upstream test (Go t.Run subtest =
+# one entry) with the cave port. `status`:
+#   ported  — line-by-line behavioral port, asserts the same input→output
+#             equivalence class as the upstream case;
+#   partial — covers part of the upstream case (e.g. only the happy path);
+#   missing — declared in the audited scope but not yet ported.
+#
+# behavioral_parity_ratio (rendered on /admin/compliance) =
+#   ported_count / total entries here.
+# Scope-bounded: the denominator is the audited subset, not the entire
+# upstream test corpus. Honest Charter framing — expand the scope by
+# adding more `missing` entries.
+
+[behavioral_parity]
+audit_scope = "imagelocality + tainttoleration + nodeaffinity + nodename + nodeunschedulable + noderesources/least_allocated (v1.36.0)"
+audit_at    = "2026-05-13"
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/imagelocality/image_locality_test.go"
+upstream_name  = "TestImageLocalityPriority/40MB_image_one_of_ten_nodes"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_image_locality_40mb_one_of_ten_below_threshold"
+status         = "ported"
+notes          = "Scaled 40MB × (1/10) = 4MB; below 23MB min → score 0."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/imagelocality/image_locality_test.go"
+upstream_name  = "TestImageLocalityPriority/250MB_single_node_linear"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_image_locality_250mb_single_node_linear"
+status         = "ported"
+notes          = "Linear region: (250 − 23) / (1000 − 23) × 100 ≈ 23."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/imagelocality/image_locality_test.go"
+upstream_name  = "TestImageLocalityPriority/2000MB_saturates_max"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_image_locality_2000mb_single_node_saturates"
+status         = "ported"
+notes          = "Image >> 1000MB max → MAX_NODE_SCORE."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/imagelocality/image_locality_test.go"
+upstream_name  = "TestImageLocalityPriority/no_images_in_pod"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_image_locality_no_images_in_pod"
+status         = "ported"
+notes          = "Empty container_images → score 0 short-circuit."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/imagelocality/image_locality_test.go"
+upstream_name  = "TestImageLocalityPriority/multi_container_monotonic"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_image_locality_multi_container_monotonic_sum"
+status         = "ported"
+notes          = "Adding a cached image must not decrease the score (monotonic)."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/imagelocality/image_locality_test.go"
+upstream_name  = "TestImageLocalityPriority/scaled_score_formula"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_image_locality_scaled_score_formula_holds"
+status         = "ported"
+notes          = "Driver-level formula: size × num_nodes / total_nodes."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/imagelocality/image_locality_test.go"
+upstream_name  = "image_locality.go::constants"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_image_locality_constants_match"
+status         = "ported"
+notes          = "Threshold constants 23<<20 and 1000<<20 match upstream verbatim."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/tainttoleration/taint_toleration_test.go"
+upstream_name  = "TestTaintTolerationFilter/no_schedule_blocks_when_not_tolerated"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_taint_toleration_no_schedule_blocks_when_not_tolerated"
+status         = "ported"
+notes          = "NoSchedule taint, no toleration → Unschedulable."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/tainttoleration/taint_toleration_test.go"
+upstream_name  = "TestTaintTolerationFilter/Exists_operator_tolerates_any_value"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_taint_toleration_exists_operator_tolerates_any_value"
+status         = "ported"
+notes          = "Exists toleration matches taint regardless of value."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/nodeaffinity/node_affinity_test.go"
+upstream_name  = "TestNodeAffinity/required_NotIn_excludes_match"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_node_affinity_required_notin_excludes_match"
+status         = "ported"
+notes          = "Required NotIn operator: matching value → Unschedulable."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/nodename/node_name_test.go"
+upstream_name  = "TestNodeName/skip_when_unspecified"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_node_name_skip_when_unspecified"
+status         = "ported"
+notes          = "Pod.spec.nodeName absent → plugin returns Skip code."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/nodeunschedulable/node_unschedulable_test.go"
+upstream_name  = "TestNodeUnschedulable/cordoned_with_toleration_passes"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_node_unschedulable_cordoned_with_toleration_passes"
+status         = "ported"
+notes          = "Toleration on node.kubernetes.io/unschedulable lets pod schedule."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/noderesources/least_allocated_test.go"
+upstream_name  = "TestLeastAllocated/more_free_resources_score_higher"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_least_allocated_more_free_scores_higher"
+status         = "ported"
+notes          = "Cold node (allocated=0) outscores hot node (allocated≈full)."
+
+# Honest "still missing" entries — these are declared in the audit
+# scope but not yet ported. They count toward the denominator and
+# pull the behavioral_parity_ratio down so the dashboard stays honest.
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/imagelocality/image_locality_test.go"
+upstream_name  = "TestNormalizeScore/cap_below_max"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Score-aggregation normalisation not yet wired through Framework.run_score."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/tainttoleration/taint_toleration_test.go"
+upstream_name  = "TestTaintTolerationScore/preferred_count_minus_intolerable"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "PreferNoSchedule scoring path not yet ported (filter-only TaintToleration today)."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/podtopologyspread/scoring_test.go"
+upstream_name  = "TestPodTopologySpreadScore/skew_zero_full_score"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Topology spread Score not yet exposed via plugins.rs."
+
+# ── Batch 3 upstream tests (2026-05-14) ──────────────────────────────────────
+# Appended to the existing [behavioral_parity] audit; build-parity-index.py
+# picks up every [[upstream_test]] entry across the whole manifest file.
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/nodeaffinity/node_affinity_test.go"
+upstream_name  = "TestNodeAffinity/Gt_operator_passes_when_greater"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_node_affinity_gt_operator_passes_when_node_value_greater"
+status         = "ported"
+notes          = "Numeric Gt comparison: cores=16 > 8 → success."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/nodeaffinity/node_affinity_test.go"
+upstream_name  = "TestNodeAffinity/Lt_operator_blocks_when_not_less"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_node_affinity_lt_operator_blocks_when_node_value_not_less"
+status         = "ported"
+notes          = "Numeric Lt comparison: cores=16 not < 8 → Unschedulable."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/nodeaffinity/node_affinity_test.go"
+upstream_name  = "TestNodeAffinity/Exists_matches_any_value"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_node_affinity_exists_operator_matches_any_value"
+status         = "ported"
+notes          = "Exists ignores values list; missing key → Unschedulable."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/interpodaffinity/filter_test.go"
+upstream_name  = "TestInterPodAffinity/requires_peer_in_topology_domain"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_interpod_affinity_requires_peer_in_same_topology_domain"
+status         = "ported"
+notes          = "PodAffinity needs ≥1 matching peer on same topology-key value."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/interpodaffinity/filter_test.go"
+upstream_name  = "TestInterPodAntiAffinity/blocks_when_peer_already_in_domain"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_interpod_anti_affinity_blocks_when_peer_already_in_domain"
+status         = "ported"
+notes          = "Anti-affinity: a single matching peer on the same topology value → Unschedulable."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/tainttoleration/taint_toleration_test.go"
+upstream_name  = "TestTaintTolerationFilter/NoExecute_blocks_when_not_tolerated"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_taint_toleration_no_execute_blocks_filter_when_not_tolerated"
+status         = "ported"
+notes          = "NoExecute is filter-blocking, not only runtime-evicting."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/tainttoleration/taint_toleration_test.go"
+upstream_name  = "TestTaintTolerationFilter/PreferNoSchedule_advisory_only"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_taint_toleration_prefer_no_schedule_does_not_block_filter"
+status         = "ported"
+notes          = "PreferNoSchedule MUST NOT cause Unschedulable at the filter stage."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/tainttoleration/taint_toleration_test.go"
+upstream_name  = "TestTaintTolerationFilter/Equal_value_mismatch"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_taint_toleration_equal_value_mismatch_does_not_tolerate"
+status         = "ported"
+notes          = "Equal operator requires both key AND value to match the taint."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/podtopologyspread/filtering_test.go"
+upstream_name  = "TestPodTopologySpread/DoNotSchedule_blocks_skew_exceeded"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_topology_spread_do_not_schedule_blocks_when_skew_exceeded"
+status         = "ported"
+notes          = "Placing on overcrowded zone violates maxSkew → Unschedulable."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/podtopologyspread/filtering_test.go"
+upstream_name  = "TestPodTopologySpread/ScheduleAnyway_passes_filter"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_topology_spread_schedule_anyway_filter_always_passes"
+status         = "ported"
+notes          = "ScheduleAnyway is a soft constraint — Filter always returns Success."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/noderesources/most_allocated_test.go"
+upstream_name  = "TestMostAllocated/picks_higher_utilisation"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_node_resources_most_allocated_prefers_higher_utilisation"
+status         = "ported"
+notes          = "MostAllocated bin-packs — picks node with more used resources."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/noderesources/fit_test.go"
+upstream_name  = "TestNodeResourcesFit_ExtendedResource/insufficient_blocks"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_node_resources_fit_blocks_when_extended_resource_insufficient"
+status         = "ported"
+notes          = "Extended resource (nvidia.com/gpu) insufficiency → Unschedulable."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/noderesources/fit_test.go"
+upstream_name  = "TestNodeResourcesFit/pod_capacity_exhausted_blocks"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_node_resources_fit_blocks_when_pod_count_capacity_exhausted"
+status         = "ported"
+notes          = "Pod-count cap exhaustion → distinct Unschedulable reason."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/noderesources/fit_test.go"
+upstream_name  = "TestNodeResourcesFit/ignored_resource_skipped"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_node_resources_fit_ignored_resource_skips_filter"
+status         = "ported"
+notes          = "ignored_resources makes a resource invisible to the filter."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/noderesources/least_allocated_test.go"
+upstream_name  = "TestLeastAllocated/cold_outscores_hot"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_node_resources_fit_least_allocated_prefers_cold_node"
+status         = "ported"
+notes          = "Default scoring strategy = LeastAllocated; cold node wins."

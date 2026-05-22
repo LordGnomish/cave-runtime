@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  cave-hermes-orchestrator launchd plist (macOS).
+
+  STATUS: DISABLED on disk. Drops a no-op stub on the host until Burak
+  explicitly enables it. Designed so it can sit next to the existing
+  cave-upstream-watchd / qwen-pump / local-llm-daemon units without
+  collision and only activates when manually loaded.
+
+  Created:    2026-05-19 (A+C path — Hermes Agent adoption)
+  Owner:      Burak (btartan@gmail.com)
+  ADR:        docs/adr/ADR-026_Hermes_Agent_Adoption.md
+  Bridge:     ~/Code/cave-runtime/scripts/hermes-pump-bridge.sh
+              (chmod 644 — not executable until Burak chmod +x)
+
+  Install / enable workflow (DO NOT run automatically — Burak does this
+  manually after he has verified the bridge script + put his
+  ANTHROPIC_API_KEY in keychain or ~/.hermes/.env):
+
+    1. chmod +x ~/Code/cave-runtime/scripts/hermes-pump-bridge.sh
+    2. Remove the <key>Disabled</key><true/> pair below, OR run:
+         /bin/launchctl bootout gui/$UID/com.cave.hermes-orchestrator 2>/dev/null
+         /bin/launchctl enable  gui/$UID/com.cave.hermes-orchestrator
+    3. /bin/launchctl bootstrap gui/$UID \
+         ~/Library/LaunchAgents/com.cave.hermes-orchestrator.plist
+
+  Uninstall:
+    /bin/launchctl bootout gui/$UID/com.cave.hermes-orchestrator
+    rm ~/Library/LaunchAgents/com.cave.hermes-orchestrator.plist
+
+  Logs:
+    ~/Library/Application Support/cave-runtime/hermes-orchestrator/orch.log
+    ~/Library/Application Support/cave-runtime/hermes-orchestrator/orch.err
+
+  Coexistence:
+    Lives alongside, does NOT replace:
+      - com.btartan.cave-upstream-watchd
+      - com.cave.upstream-watchd-poller
+      - com.caveruntime.local-llm-daemon
+      - com.caveruntime.qwen-pump
+      - com.caveruntime.qwen-pump-refiller
+      - com.cave.ollama-safe-upgrade
+      - homebrew.mxcl.ollama
+    Bridge script reads pump dispatch state, never writes to pump queues.
+
+  Tier routing (set by ~/.hermes/config.yaml):
+    Tier-1 (active):  ollama-local / qwen3.6:35b-a3b-coding-mxfp8
+    Tier-2 (pre-wire, disabled): anthropic / claude-sonnet-4.6 + claude-opus-4.7
+                                 — flips on the moment ANTHROPIC_API_KEY is
+                                 present in ~/.hermes/.env or keychain.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.cave.hermes-orchestrator</string>
+
+  <!-- ⚠ DISABLED — do not auto-load until Burak flips this. -->
+  <key>Disabled</key>
+  <true/>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>KeepAlive</key>
+  <false/>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/gnomish/Code/cave-runtime/scripts/hermes-pump-bridge.sh</string>
+    <string>orchestrate</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/gnomish/Code/cave-runtime</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- Tier-1: Ollama daemon (already running via homebrew.mxcl.ollama). -->
+    <key>OLLAMA_HOST</key>
+    <string>http://localhost:11434</string>
+
+    <!-- Hermes home / config — explicit so cron / non-login launchd env
+         doesn't fall back to root or empty. -->
+    <key>HERMES_HOME</key>
+    <string>/Users/gnomish/.hermes</string>
+
+    <!-- PATH must include ~/.local/bin so `hermes` resolves, plus Homebrew
+         arm64 (/opt/homebrew/bin) for ripgrep/ffmpeg shipped via brew. -->
+    <key>PATH</key>
+    <string>/Users/gnomish/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+
+    <!-- Tier-2 placeholder: Burak fills this in ~/.hermes/.env (or via
+         macOS keychain + Hermes auth). Hermes reads .env automatically.
+         NOT included here on disk — keeps secrets out of plist files. -->
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/Users/gnomish/Library/Application Support/cave-runtime/hermes-orchestrator/orch.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/gnomish/Library/Application Support/cave-runtime/hermes-orchestrator/orch.err</string>
+
+  <!-- Lower priority — orchestrator should yield to the active pump and
+       to the LLM daemon serving foreground work. -->
+  <key>LowPriorityIO</key>
+  <true/>
+  <key>Nice</key>
+  <integer>10</integer>
+
+  <!-- Throttle restart attempts in case the bridge script panics so we
+       don't spin against a busted config. -->
+  <key>ThrottleInterval</key>
+  <integer>60</integer>
+</dict>
+</plist>

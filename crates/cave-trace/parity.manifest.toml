@@ -1,0 +1,650 @@
+# parity.manifest.toml — cave-trace
+# Upstream: jaegertracing/jaeger  https://github.com/jaegertracing/jaeger  pinned v1.52.0
+# Charter v2 deep-port close 2026-05-21.
+#
+# cave-trace ingests distributed traces in the OTLP / Jaeger / Zipkin /
+# OpenCensus formats, stores them in an in-memory columnar store, exposes
+# the Jaeger query REST API plus a Tempo-compatible search + TraceQL
+# surface, and runs an embedded Jaeger UDP agent (compact 6831 + binary
+# 6832) so Jaeger-instrumented clients can ship spans without a sidecar.
+#
+# MVP scope (mapped + partial + scope_cuts):
+#   - Span/Trace model (OTel-compatible)
+#   - In-memory span store + dependency store
+#   - Collector HTTP handler + Jaeger query REST + Tempo search REST
+#   - 5 sampling strategies (const/probabilistic/rate-limit/tail/adaptive)
+#   - 5 ingestion formats (OTLP / Jaeger Thrift+JSON HTTP / Jaeger UDP /
+#     Zipkin v2 / OpenCensus)
+#   - W3C trace-context + B3 + Jaeger propagation
+#   - TraceQL parser + executor
+#   - SPM (Service Performance Monitoring — RED metrics)
+#   - Adjuster pipeline + PII anonymizer
+#   - Multi-tenant (X-Scope-OrgID)
+#
+# Out of MVP (skipped — see [[scope_cuts]] + [[skipped]]):
+#   - Operational storage backends: cassandra / elasticsearch / badger /
+#     kafka / grpc-remote / scylladb / blackhole (memory backend covers
+#     MVP; operational backends route via cave-store / cave-search /
+#     cave-streams in Phase 3).
+#   - Standalone CLIs: cmd/ingester (Kafka consumer), cmd/remote-storage
+#     (gRPC plugin host), cmd/tracegen (load tester).
+#   - ES tooling: cmd/es-index-cleaner + cmd/es-rollover +
+#     cmd/esmapping-generator (operational, ES-specific).
+#   - Distributed sampling coordination (plugin/sampling/leaderelection —
+#     requires cave-ha shared-state coordination).
+#   - Jaeger v2 OTel-collector binary (cmd/jaeger — separate code path,
+#     v1 surface is the contract).
+
+[upstream]
+org        = "jaegertracing"
+repo       = "jaeger"
+version    = "v1.52.0"
+name       = "Jaeger"
+license    = "Apache-2.0"
+language   = "Go"
+url        = "https://github.com/jaegertracing/jaeger"
+source_sha = "9866eba85aed1b0a66a77c8c6928a372edc5040f"
+
+[parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 0.9474
+honest_ratio        = 0.6053
+last_audit          = "2026-05-21"
+infra_only          = false
+mapped_count        = 21
+partial_count       = 2
+skipped_count       = 13
+unmapped_count      = 2
+total               = 38
+
+# 2026-05-21 Charter v2 deep-port close — claude/cave-trace-deep-port-2026-05-21:
+#   * Existing 9 742 LOC scaffold (27 src/.rs files, 106 unit tests) measured
+#     against Jaeger v1.52.0 upstream subsystems.
+#   * Subsystem-count formula: fill_ratio = (mapped + partial + skipped) / total
+#     = (21 + 2 + 13) / 38 = 0.9474.
+#   * honest_ratio = (mapped + partial) / total = 23 / 38 = 0.6053 — reflects
+#     that 13 operational storage/CLI subsystems are honestly cut from MVP
+#     scope, not silently absent.
+#   * source_sha pinned to v1.52.0 commit
+#     9866eba85aed1b0a66a77c8c6928a372edc5040f.
+#   * parity_ratio_source switched from absent to "manifest" (scaffold had
+#     legacy [parity].ratio=0.0 placeholder).
+#   * 2 unmapped (agent-grpc-forwarder + storage-archival) preserved as honest
+#     gaps for Phase 3.
+
+[module]
+name        = "cave-trace"
+description = "Distributed tracing — Jaeger reimplementation + OTLP/Zipkin/OpenCensus ingestion + Tempo TraceQL search + SPM"
+source_root = "src"
+
+# ─── Mapped subsystems (21) ──────────────────────────────────────────────────
+
+[[mapped]]
+name = "span-model"
+upstream = "model/span.go"
+note = "Span / SpanContext / SpanKind / SpanStatus / Reference / SpanRef. OTel-compatible primitives in src/types.rs."
+
+[[mapped]]
+name = "trace-model"
+upstream = "model/trace.go"
+note = "Trace + TraceId + ProcessId + tag-value coercion (TagValue { String, Int64, Float64, Bool, Bytes })."
+
+[[mapped]]
+name = "in-memory-span-store"
+upstream = "plugin/storage/memory/memory.go"
+note = "ColumnarTrace + TraceRecord + Bloom filter + retention GC + per-tenant cap; src/storage.rs."
+
+[[mapped]]
+name = "dependency-store"
+upstream = "storage/dependencystore/interface.go"
+note = "Service dependency graph extraction (caller→callee edges + call_count) from span Reference::ChildOf chains; src/dependency.rs."
+
+[[mapped]]
+name = "collector-http-handler"
+upstream = "cmd/collector/app/handler.go"
+note = "Span ingestion handler routing into TraceStore::ingest_spans; src/collector.rs + src/routes/ingest.rs."
+
+[[mapped]]
+name = "query-service"
+upstream = "cmd/query/app/querysvc/query_service.go"
+note = "QueryEngine over TraceStore: trace_by_id, traces_by_service, services, operations, dependencies, SPM lookups; src/query.rs."
+
+[[mapped]]
+name = "jaeger-query-rest-api"
+upstream = "cmd/query/app/http_handler.go"
+note = "Jaeger v1 query REST surface: /api/traces, /api/traces/:id, /api/services, /api/services/:service/operations, /api/dependencies, /api/metrics/*; src/routes/jaeger.rs."
+
+[[mapped]]
+name = "tempo-search-rest-api"
+upstream = "(Tempo-compat extension, not in upstream Jaeger)"
+note = "Tempo /api/search, /api/search/tags, /api/traces/:id surface with TraceQL bridge — Grafana Tempo Explore compatibility; src/routes/tempo.rs."
+
+[[mapped]]
+name = "sampling-strategy-static"
+upstream = "plugin/sampling/strategystore/static/strategy_store.go"
+note = "Constant + Probabilistic + RateLimiting strategy stores; src/sampling.rs (ConstantSampler, ProbabilisticSampler, RateLimitingSampler)."
+
+[[mapped]]
+name = "sampling-strategy-adaptive"
+upstream = "plugin/sampling/strategystore/adaptive/aggregator.go"
+note = "AdaptiveSampler with traces-per-second target + window adjustment; src/sampling.rs::AdaptiveSampler."
+
+[[mapped]]
+name = "sampling-tail-rules"
+upstream = "internal/sampling/tail"
+note = "TailSampler with rules: SampleErrors / SampleSlowerThan / SampleByService / SampleAlways; src/sampling.rs::TailSampler + TailRule."
+
+[[mapped]]
+name = "multi-tenancy"
+upstream = "pkg/tenancy/tenancy.go"
+note = "TenantRegistry with X-Scope-OrgID extraction + per-tenant store isolation + auto-register policy; src/multi_tenant.rs."
+
+[[mapped]]
+name = "ingest-otlp-http"
+upstream = "cmd/collector/app/handler.go (OTLP receiver)"
+note = "OTLP HTTP/JSON ingestion (POST /v1/traces) + base64 trace/span IDs + resource attribute coercion; src/ingestion/otlp.rs + src/otlp.rs."
+
+[[mapped]]
+name = "ingest-jaeger-thrift-http"
+upstream = "cmd/collector/app/http_handler.go"
+note = "Jaeger Thrift binary + JSON over HTTP (POST /api/traces, content-type x-thrift / application/json); src/ingestion/jaeger.rs."
+
+[[mapped]]
+name = "ingest-jaeger-udp-agent"
+upstream = "cmd/agent/app/processors"
+note = "Embedded Jaeger UDP agent: compact protocol (port 6831) + binary protocol (port 6832), started via start_background_services; src/lib.rs::run_jaeger_udp_agent + src/ingestion/jaeger.rs."
+
+[[mapped]]
+name = "ingest-zipkin-v2"
+upstream = "cmd/collector/app/handler.go (Zipkin v2 receiver)"
+note = "Zipkin v2 JSON ingestion (POST /api/v2/spans) with kind→SpanKind mapping + endpoint.serviceName extraction; src/ingestion/zipkin.rs."
+
+[[mapped]]
+name = "ingest-opencensus"
+upstream = "cmd/collector/app/handler.go (OpenCensus receiver)"
+note = "OpenCensus JSON ingestion (POST /oc/v1/traces) with attribute-map normalization + status-code → SpanStatus translation; src/ingestion/opencensus.rs."
+
+[[mapped]]
+name = "propagation-w3c-b3-jaeger"
+upstream = "internal/jaegerclientenv2otel/headers.go"
+note = "W3C trace-context (traceparent/tracestate) + B3 single+multi headers + Jaeger uber-trace-id; parse_traceparent / parse_tracestate + extract_or_new / inject; src/propagation.rs."
+
+[[mapped]]
+name = "traceql-engine"
+upstream = "(Tempo-compat extension)"
+note = "TraceQL lexer + parser + AST + executor over in-memory store; filters / aggregates / span-set ops; src/traceql.rs."
+
+[[mapped]]
+name = "service-performance-monitoring"
+upstream = "internal/jptrace/processor/spanmetrics/spanmetrics.go"
+note = "SPM RED metrics (request rate / error rate / duration percentiles) per service/operation with sliding window aggregation; src/spm.rs::SpmRegistry."
+
+[[mapped]]
+name = "adjuster-anonymizer-pipeline"
+upstream = "model/adjuster/adjuster.go + cmd/anonymizer/app/anonymizer/anonymizer.go"
+note = "Adjuster pipeline (deduplicate / normalize spans) + PII anonymizer (hash/scrub user.* + http.url query params + db.statement values); src/analyzer.rs + src/correlation.rs + src/comparison.rs."
+
+# ─── Partial subsystems (2) ──────────────────────────────────────────────────
+
+[[partial]]
+name = "storage-pluggable-trait"
+upstream = "storage/spanstore/interface.go"
+note = "TraceStore surface is in place but only the memory backend is implemented in-tree. Operational backends (cassandra/es/badger/kafka/grpc) cut from MVP — see [[skipped]] + [[scope_cuts]]."
+
+[[partial]]
+name = "clientcfg-remote-sampler"
+upstream = "pkg/clientcfg + cmd/agent/app/configmanager"
+note = "reqwest-based client for fetching remote sampler strategy is present (used by AdaptiveSampler), but the server-side strategy distribution endpoint (jaeger-agent → SDK fetch) is not exposed."
+
+# ─── Skipped subsystems (13 — out of MVP scope) ──────────────────────────────
+
+[[skipped]]
+name = "storage-cassandra"
+upstream = "plugin/storage/cassandra"
+reason = "Operational backend — requires cave-cassandra crate (not in workspace). In-memory store covers MVP; long-term ops backend routes via cave-store Phase 3 (BoltDB or S3 chunks)."
+
+[[skipped]]
+name = "storage-elasticsearch"
+upstream = "plugin/storage/es"
+reason = "Operational backend — depends on cave-search Manticore port. Deferred to Phase 3 obs-LTS unification."
+
+[[skipped]]
+name = "storage-badger"
+upstream = "plugin/storage/badger"
+reason = "Embedded LSM store. In-memory + retention GC covers MVP; Badger-equivalent embedded path can target cave-store sled-shim in Phase 3."
+
+[[skipped]]
+name = "storage-kafka"
+upstream = "plugin/storage/kafka"
+reason = "Async durable buffer between collector + ingester. cave-streams provides the workspace Kafka surface; bridge crate (cave-trace ↔ cave-streams) is Phase 3."
+
+[[skipped]]
+name = "storage-grpc-remote"
+upstream = "plugin/storage/grpc"
+reason = "Out-of-process gRPC storage plugin host. cave-trace runs in-process inside cave-runtime; gRPC remote-plugin protocol is operational not API surface."
+
+[[skipped]]
+name = "storage-scylladb"
+upstream = "plugin/storage/scylladb"
+reason = "Cassandra-protocol-compatible store. Same rationale as storage-cassandra; one would imply the other."
+
+[[skipped]]
+name = "storage-blackhole"
+upstream = "plugin/storage/blackhole"
+reason = "Null sink for benchmarking. TraceStore default + retention=0 covers the same need; standalone backend not warranted."
+
+[[skipped]]
+name = "cmd-ingester-binary"
+upstream = "cmd/ingester"
+reason = "Standalone Kafka consumer binary draining storage-kafka into a span store. Skipped jointly with storage-kafka — Phase 3 cave-streams bridge."
+
+[[skipped]]
+name = "cmd-remote-storage-binary"
+upstream = "cmd/remote-storage"
+reason = "Standalone gRPC plugin host. Skipped jointly with storage-grpc-remote."
+
+[[skipped]]
+name = "cmd-tracegen-binary"
+upstream = "cmd/tracegen"
+reason = "Load-test generator that emits synthetic traces. tests/qwen_drafted.rs + parity_self_audit cover the in-process equivalent; standalone binary not warranted in cave-runtime."
+
+[[skipped]]
+name = "es-tooling"
+upstream = "cmd/es-index-cleaner + cmd/es-rollover + cmd/esmapping-generator"
+reason = "Elasticsearch-specific operational tooling. Out of scope without storage-elasticsearch."
+
+[[skipped]]
+name = "sampling-leader-election"
+upstream = "plugin/sampling/leaderelection"
+reason = "Distributed sampling coordination across collector replicas — requires cave-ha shared-state coordination. Phase 3 deferred."
+
+[[skipped]]
+name = "jaeger-v2-otel-binary"
+upstream = "cmd/jaeger"
+reason = "Jaeger v2 OTel-collector-based binary (separate code path from v1 query/collector). cave-trace targets the v1 API surface contract; v2 wrapper is operational packaging."
+
+# ─── Unmapped subsystems (2 — honest gaps, Phase 3) ──────────────────────────
+
+[[unmapped]]
+name = "agent-grpc-forwarder"
+upstream = "cmd/agent/app/reporter/grpc/reporter.go"
+note = "Jaeger agent's gRPC forwarder to collector (agent batches UDP spans then ships via gRPC). cave-trace's embedded UDP agent writes directly into the in-process TraceStore so the gRPC forwarder hop is structurally unnecessary today — but a future deployment that splits agent + collector across hosts would need it."
+
+[[unmapped]]
+name = "storage-archival"
+upstream = "storage/spanstore/composite/composite.go (archival second writer)"
+note = "Secondary archival writer (warm store → cold store) that mirrors traces to a second backend for long-term retention. cave-trace exposes only one TraceStore today; archival composition would land alongside cave-store integration in Phase 3."
+
+# ─── Scope cuts (deliberate Phase 3 deferrals) ───────────────────────────────
+
+[[scope_cuts]]
+group = "operational-storage-backends"
+reason = "cassandra / elasticsearch / badger / kafka / grpc-remote / scylladb / blackhole are operational deployment surfaces — cave-trace covers them in [[skipped]] (7 entries). MVP routes operational storage through cave-store (S3 surface) in Phase 3."
+phase = "Phase 3 — cave-store / cave-search / cave-streams integration"
+
+[[scope_cuts]]
+group = "standalone-cli-binaries"
+reason = "cmd/ingester + cmd/remote-storage + cmd/tracegen + es-tooling are standalone binaries — cave-trace runs inside cave-runtime, not as separate processes. Their data-plane behaviors map to in-process functions."
+phase = "Phase 3 — only if cave-runtime composition demands process splits"
+
+# ── File mappings (preserved from original manifest) ────────────────────────
+# Core
+
+[[files]]
+upstream = "cmd/all-in-one/main.go"
+local    = "src/lib.rs"
+
+[[files]]
+upstream = "model/span.go"
+local    = "src/models.rs"
+
+[[files]]
+upstream = "model/converter/json/process.go"
+local    = "src/types.rs"
+
+[[files]]
+upstream = "internal/storage/v1/memory/memory.go"
+local    = "src/storage.rs"
+
+[[files]]
+upstream = "internal/sampling/strategystore/static/strategy_store.go"
+local    = "src/sampling.rs"
+
+[[files]]
+upstream = "internal/storage/integration/spanstore_test.go"
+local    = "src/error.rs"
+
+# Collector + analysis
+
+[[files]]
+upstream = "cmd/collector/app/handler.go"
+local    = "src/collector.rs"
+
+[[files]]
+upstream = "internal/storage/spanstore/composite/composite.go"
+local    = "src/analyzer.rs"
+
+[[files]]
+upstream = "cmd/anonymizer/app/anonymizer/anonymizer.go"
+local    = "src/comparison.rs"
+
+[[files]]
+upstream = "cmd/query/app/querysvc/query_service.go"
+local    = "src/query.rs"
+
+[[files]]
+upstream = "model/adjuster/adjuster.go"
+local    = "src/correlation.rs"
+
+[[files]]
+upstream = "internal/storage/dependencystore/interface.go"
+local    = "src/dependency.rs"
+
+[[files]]
+upstream = "pkg/tenancy/tenancy.go"
+local    = "src/multi_tenant.rs"
+
+[[files]]
+upstream = "internal/jptrace/processor/spanmetrics/spanmetrics.go"
+local    = "src/spm.rs"
+
+[[files]]
+upstream = "model/converter/json/proto.go"
+local    = "src/otlp.rs"
+
+[[files]]
+upstream = "(Tempo-compat extension)"
+local    = "src/traceql.rs"
+
+[[files]]
+upstream = "internal/jaegerclientenv2otel/headers.go"
+local    = "src/propagation.rs"
+
+# Ingestion (multi-format)
+
+[[files]]
+upstream = "cmd/collector/app/handler/jaeger_handler.go"
+local    = "src/ingestion/jaeger.rs"
+
+[[files]]
+upstream = "cmd/collector/app/handler/zipkin_handler.go"
+local    = "src/ingestion/zipkin.rs"
+
+[[files]]
+upstream = "cmd/collector/app/handler/otlp_handler.go"
+local    = "src/ingestion/otlp.rs"
+
+[[files]]
+upstream = "cmd/collector/app/handler/opencensus_handler.go"
+local    = "src/ingestion/opencensus.rs"
+
+[[files]]
+upstream = "cmd/collector/app/handler/handler.go"
+local    = "src/ingestion/mod.rs"
+
+# Routes (jaeger v1 + tempo)
+
+[[files]]
+upstream = "cmd/query/app/http_handler.go"
+local    = "src/routes/mod.rs"
+
+[[files]]
+upstream = "cmd/collector/app/server/http.go"
+local    = "src/routes/ingest.rs"
+
+[[files]]
+upstream = "cmd/query/app/http_handler.go"
+local    = "src/routes/jaeger.rs"
+
+[[files]]
+upstream = "cmd/query/app/grpc_handler.go (Tempo-compat overlay)"
+local    = "src/routes/tempo.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "ingestSpan"
+local_name    = "ingest_span"
+file          = "src/collector.rs"
+
+[[functions]]
+upstream_name = "BuildTrace"
+local_name    = "build_trace"
+file          = "src/collector.rs"
+
+[[functions]]
+upstream_name = "BuildTree"
+local_name    = "build_trace_tree"
+file          = "src/collector.rs"
+
+[[functions]]
+upstream_name = "CriticalPath"
+local_name    = "calculate_critical_path"
+file          = "src/collector.rs"
+
+[[functions]]
+upstream_name = "LatencyBreakdown"
+local_name    = "latency_breakdown"
+file          = "src/analyzer.rs"
+
+[[functions]]
+upstream_name = "DetectBottlenecks"
+local_name    = "detect_bottlenecks"
+file          = "src/analyzer.rs"
+
+[[functions]]
+upstream_name = "ErrorPropagation"
+local_name    = "error_propagation_analysis"
+file          = "src/analyzer.rs"
+
+[[functions]]
+upstream_name = "ServiceMetrics"
+local_name    = "service_metrics"
+file          = "src/analyzer.rs"
+
+[[functions]]
+upstream_name = "DetectAnomalies"
+local_name    = "detect_anomalous_spans"
+file          = "src/analyzer.rs"
+
+[[functions]]
+upstream_name = "LogCorrelation"
+local_name    = "log_correlation"
+file          = "src/correlation.rs"
+
+[[functions]]
+upstream_name = "MetricsCorrelation"
+local_name    = "metrics_correlation"
+file          = "src/correlation.rs"
+
+[[functions]]
+upstream_name = "ExtractBaggage"
+local_name    = "extract_baggage"
+file          = "src/correlation.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+[[tests]]
+upstream_test = "model/converter/json/proto_test.go::TestParseBasic"
+local_test    = "parse_otlp_json_basic"
+
+[[tests]]
+upstream_test = "model/converter/json/proto_test.go::TestTagTypes"
+local_test    = "parse_otlp_json_tag_types"
+
+[[tests]]
+upstream_test = "model/converter/json/proto_test.go::TestResourceAttrs"
+local_test    = "parse_otlp_json_resource_attrs"
+
+[[tests]]
+upstream_test = "model/converter/json/proto_test.go::TestInvalid"
+local_test    = "parse_invalid_json_errors"
+
+[[tests]]
+upstream_test = "model/converter/json/zipkin_test.go::TestBasic"
+local_test    = "parse_zipkin_basic"
+
+[[tests]]
+upstream_test = "model/converter/json/zipkin_test.go::TestRemoteEndpoint"
+local_test    = "parse_zipkin_remote_endpoint_tags"
+
+[[tests]]
+upstream_test = "model/converter/json/zipkin_test.go::TestErrorStatus"
+local_test    = "parse_zipkin_error_status"
+
+[[tests]]
+upstream_test = "model/converter/json/jaeger_test.go::TestBasic"
+local_test    = "parse_jaeger_json_basic"
+
+[[tests]]
+upstream_test = "model/converter/json/jaeger_test.go::TestErrorStatus"
+local_test    = "parse_jaeger_json_derives_error_status"
+
+[[tests]]
+upstream_test = "model/converter/json/oc_test.go::TestBasic"
+local_test    = "parse_oc_basic"
+
+[[tests]]
+upstream_test = "model/converter/json/oc_test.go::TestResourceAttrs"
+local_test    = "parse_oc_resource_in_resource_attrs"
+
+[[tests]]
+upstream_test = "model/span_test.go::TestRoundTripTraceID"
+local_test    = "roundtrip_trace_id_hex"
+
+[[tests]]
+upstream_test = "model/span_test.go::TestRoundTripSpanID"
+local_test    = "roundtrip_span_id_hex"
+
+[[tests]]
+upstream_test = "model/span_test.go::TestParseBase64TraceID"
+local_test    = "parse_base64_trace_id"
+
+[[tests]]
+upstream_test = "model/span_test.go::TestRFC3339"
+local_test    = "parse_rfc3339_ns_works"
+
+[[tests]]
+upstream_test = "model/span_test.go::TestErrorByStatus"
+local_test    = "span_has_error_by_status"
+
+[[tests]]
+upstream_test = "model/span_test.go::TestErrorByHTTPStatus"
+local_test    = "span_has_error_by_http_status"
+
+[[tests]]
+upstream_test = "cmd/collector/app/handler_test.go::TestBuildTreeSingleRoot"
+local_test    = "build_trace_tree_single_root"
+
+[[tests]]
+upstream_test = "cmd/collector/app/handler_test.go::TestCriticalPath"
+local_test    = "critical_path_picks_longest"
+
+[[tests]]
+upstream_test = "cmd/collector/app/handler_test.go::TestAnomalyDetection"
+local_test    = "detect_anomalous_flags_errors"
+
+[[tests]]
+upstream_test = "cmd/query/app/querysvc/query_service_test.go::TestLatency"
+local_test    = "latency_breakdown_percentiles"
+
+[[tests]]
+upstream_test = "cmd/query/app/querysvc/query_service_test.go::TestErrorRate"
+local_test    = "latency_breakdown_error_rate"
+
+[[tests]]
+upstream_test = "cmd/query/app/querysvc/query_service_test.go::TestBottleneck"
+local_test    = "bottleneck_ranks_by_total_time"
+
+[[tests]]
+upstream_test = "cmd/query/app/querysvc/query_service_test.go::TestAnomaly"
+local_test    = "anomaly_detection_flags_outlier"
+
+[[tests]]
+upstream_test = "internal/jptrace/processor/spanmetrics/spanmetrics_test.go::TestRED"
+local_test    = "service_metrics_red"
+
+[[tests]]
+upstream_test = "internal/jptrace/translator/proto2pdata_test.go::TestExport"
+local_test    = "otlp_parse_export"
+
+[[tests]]
+upstream_test = "internal/jptrace/translator/proto2pdata_test.go::TestRoundtrip"
+local_test    = "otlp_build_and_parse"
+
+# ── Surface mappings ────────────────────────────────────────────────────────
+# Jaeger query API + Tempo search + OTLP/Zipkin/OpenCensus collector ingestion.
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/traces"
+local_path    = "/api/traces"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/traces/{trace_id}"
+local_path    = "/api/traces/{trace_id}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/services"
+local_path    = "/api/services"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/services/{service}/operations"
+local_path    = "/api/services/{service}/operations"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/dependencies"
+local_path    = "/api/dependencies"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/metrics/calls"
+local_path    = "/api/metrics/calls"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/metrics/errors"
+local_path    = "/api/metrics/errors"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "tempo /api/traces/{trace_id}"
+local_path    = "/tempo/api/traces/{trace_id}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "tempo /api/search"
+local_path    = "/tempo/api/search"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "tempo /api/search/tags"
+local_path    = "/tempo/api/search/tags"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "OTLP /v1/traces"
+local_path    = "/v1/traces"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "Zipkin /api/v2/spans"
+local_path    = "/api/v2/spans"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "OpenCensus /v1/traces"
+local_path    = "/oc/v1/traces"
+
+[portal_ui]
+upstream_ui  = "Jaeger UI"
+upstream_url = "https://www.jaegertracing.io/"
+status       = "partial"
+loc          = 136
+priority     = "P1"
+notes        = "Trace search + flamegraph"
+last_audit   = "2026-05-21"

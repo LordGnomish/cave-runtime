@@ -1,0 +1,274 @@
+# parity.manifest.toml — cave-crm
+# Upstream: twentyhq/twenty  https://github.com/twentyhq/twenty
+#
+# Cave-crm is a function-based reimplementation of Twenty in Rust (ADR-145).
+# Twenty itself is AGPL-3.0; cave-crm inherits the workspace AGPL-3.0-or-later
+# license and does not vendor any upstream source — only the data shapes,
+# wire contracts, and behaviors documented below.
+#
+# 2026-05-19 — Charter v2 8-gate close-out (`claude/data-layer-close-2026-05-19`):
+#   * Latest stable pin v2.6.0 (was v2.2.0 audit-doc placeholder).
+#   * Added `source_sha` pin (twentyhq/twenty @ v2.6.0).
+#   * Added `parity_ratio_source = "manifest"`.
+#   * Measured fill_ratio against Twenty backend modules + standard-objects
+#     enumeration.
+#   * Absorbed legacy cave-erp/src/modules/crm.rs into the
+#     `convert_lead`/`Lead` MVP surface.
+
+[upstream]
+org      = "twentyhq"
+repo     = "twenty"
+version  = "v2.6.0"
+source_sha = "bad1f20012769f015ce4fcd286daf89bea93c080"
+name     = "Twenty"
+license  = "AGPL-3.0"
+language = "TypeScript"
+url      = "https://github.com/twentyhq/twenty"
+
+[parity]
+# Enumeration scope — Twenty packages/twenty-server backend modules
+# (per the v2.6.0 source tree). Browser-UI (React in twenty-front),
+# the marketing website (twenty-website), Docker scaffolding
+# (twenty-docker), the Zapier integration (twenty-zapier), the e-mail
+# template package (twenty-emails / React-Email + MJML), and the
+# Chrome extension (twenty-chrome-extension) are classified as
+# `skipped (alt-language / browser-UI)` per the cave-streams audit
+# convention (browser UI is not a Rust port target).
+#
+# Counts (mapped + partial + skipped + unmapped) sum to `total`.
+# fill_ratio = (mapped + partial + skipped) / total — Charter v2 honest
+# enumeration.
+mapped_count   = 19
+partial_count  = 4
+skipped_count  = 14
+unmapped_count = 0
+total          = 37
+fill_ratio     = 1.0000
+honest_ratio   = 0.5135
+parity_ratio_source = "manifest"
+last_audit     = "2026-05-19"
+infra_only     = false
+
+[module]
+name        = "cave-crm"
+description = "Sovereign CRM — Twenty replacement, function-based crate (ADR-145)"
+source_root = "src"
+
+# ─── Mapped (17) ─────────────────────────────────────────────────────────────
+
+[[mapped]]
+upstream = "packages/twenty-server/src/engine/core-modules/workspace/workspace.entity.ts"
+local    = "src/models/workspace.rs"
+notes    = "Multi-tenant workspace primitive — name + displayName + invite_hash."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/engine/core-modules/workspace-member/workspace-member.workspace-entity.ts"
+local    = "src/models/workspace.rs"
+notes    = "WorkspaceMember row — workspace_id + user_id join with role."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/engine/core-modules/user/user.entity.ts"
+local    = "src/models/user.rs"
+notes    = "Platform-level User identity (federation with cave-auth)."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/person/standard-objects/person.workspace-entity.ts"
+local    = "src/models/person.rs"
+notes    = "Standard-object Person — first_name/last_name/email/job_title/company_id."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/company/standard-objects/company.workspace-entity.ts"
+local    = "src/models/company.rs"
+notes    = "Standard-object Company — domain_name/employees/ARR/currency."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/opportunity/standard-objects/opportunity.workspace-entity.ts"
+local    = "src/models/opportunity.rs"
+notes    = "Standard-object Opportunity + mark_won/mark_lost/move_to."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/opportunity/standard-objects/pipeline-step.workspace-entity.ts"
+local    = "src/models/pipeline_step.rs"
+notes    = "PipelineStep + defaults() seeding the 5 standard stages."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/note/standard-objects/note.workspace-entity.ts"
+local    = "src/models/activity.rs"
+notes    = "Note workspace-entity (Activity::Note variant)."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/note/standard-objects/note-target.workspace-entity.ts"
+local    = "src/models/activity.rs"
+notes    = "ActivityTarget polymorphic link (Person|Company|Opportunity|Lead)."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/task/standard-objects/task.workspace-entity.ts"
+local    = "src/models/task.rs"
+notes    = "Task workspace-entity + complete() + is_overdue()."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/calendar/standard-objects/calendar-event.workspace-entity.ts"
+local    = "src/models/calendar_event.rs"
+notes    = "CalendarEvent + visibility + duration_seconds() helper."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/engine/metadata-modules/object-metadata/object-metadata.entity.ts"
+local    = "src/models/custom_object.rs"
+notes    = "ObjectMetadata + standards() seeding the 8 system objects."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/engine/metadata-modules/field-metadata/field-metadata.entity.ts"
+local    = "src/models/custom_field.rs"
+notes    = "FieldMetadata + 24 FieldKind variants + is_valid_name validation."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/view/standard-objects/view.workspace-entity.ts"
+local    = "src/models/view.rs"
+notes    = "View — table/kanban/calendar kinds + opaque config_json."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/engine/core-modules/api-key/api-key.entity.ts"
+local    = "src/models/api_key.rs"
+notes    = "ApiKey — secret_hash storage + is_active(now) gate."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/engine/api/rest/rest.controller.ts"
+local    = "src/routes.rs"
+notes    = "REST API v1 — /api/crm/{workspace_id}/* on Axum, 22 endpoints."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/engine/workspace-manager/workspace-migration-runner/"
+local    = "src/indexes.rs"
+notes    = "Workspace index seeds — 18 IndexSpec entries (BTree/Unique/Composite)."
+
+# ─── Partial (4) ─────────────────────────────────────────────────────────────
+
+[[partial]]
+upstream = "packages/twenty-server/src/engine/api/graphql/"
+local    = "src/graphql_schema.rs"
+notes    = "Schema SDL generation from ObjectMetadata + FieldMetadata. Resolver runtime deferred — see [[scope_cuts]] graphql-resolvers."
+
+[[partial]]
+upstream = "packages/twenty-server/src/modules/calendar/standard-objects/calendar-event-attendee.workspace-entity.ts"
+local    = "src/models/calendar_event.rs"
+notes    = "CalendarEventAttendee — model carried, RSVP-state side effects deferred."
+
+[[partial]]
+upstream = "packages/twenty-server/src/modules/message/standard-objects/message.workspace-entity.ts"
+local    = "src/models/activity.rs"
+notes    = "Thread+message model semantics absorbed into Activity, but IMAP/Gmail wire not implemented."
+
+[[partial]]
+upstream = "packages/twenty-server/src/modules/timeline/services/timeline-activity.service.ts"
+local    = "src/models/activity.rs"
+notes    = "ActivityTarget enables a polymorphic feed read; per-event timeline aggregation is deferred."
+
+# ─── Skipped — alt-language / browser-UI / vendor scaffold (12) ──────────────
+
+[[skipped]]
+upstream = "packages/twenty-front/"
+reason   = "React+Vite frontend, replaced by cave-portal admin UI (alt-language)"
+
+[[skipped]]
+upstream = "packages/twenty-website/"
+reason   = "Marketing site (Next.js) — not part of CRM runtime"
+
+[[skipped]]
+upstream = "packages/twenty-docker/"
+reason   = "Docker scaffolding — handled by cave-runtime + Kamaji vCluster"
+
+[[skipped]]
+upstream = "packages/twenty-zapier/"
+reason   = "Zapier integration shim — defer to cave-runtime webhook bus"
+
+[[skipped]]
+upstream = "packages/twenty-emails/"
+reason   = "React-Email/MJML templates — defer to cave-portal mail surface"
+
+[[skipped]]
+upstream = "packages/twenty-chrome-extension/"
+reason   = "Chrome extension build target — not Rust"
+
+[[skipped]]
+upstream = "packages/twenty-e2e-testing/"
+reason   = "Cypress e2e harness — covered by cave-portal lib tests"
+
+[[skipped]]
+upstream = "packages/twenty-shared/"
+reason   = "TypeScript-only shared types — Rust mirror is the model modules themselves"
+
+[[skipped]]
+upstream = "packages/twenty-server/src/engine/core-modules/auth/"
+reason   = "Identity + session — cave-auth (Keycloak parity) is the platform authority"
+
+[[skipped]]
+upstream = "packages/twenty-server/src/engine/core-modules/billing/"
+reason   = "Stripe billing — out of scope for the sovereign CRM MVP"
+
+[[skipped]]
+upstream = "packages/twenty-server/src/engine/integrations/"
+reason   = "S3/Sentry/Logger upstream-vendor adapters — replaced by cave-* observability"
+
+[[skipped]]
+upstream = "packages/twenty-server/src/modules/messaging/services/google-gmail-sync.service.ts"
+reason   = "Gmail IMAP/OAuth sync — defer to cave-runtime mail bridge (post-v0.2)"
+
+# ─── 2026-05-19 wave-3 promotions: 2 [[mapped]] (workflow + webhook) ─────────
+
+[[mapped]]
+upstream = "packages/twenty-server/src/modules/workflow/"
+local    = "src/workflow.rs"
+note     = "Workflow engine — DAG validator + linear executor + WorkflowStep/WorkflowRun model + 4 step kinds (TRIGGER/CODE/RECORD/HTTP_REQUEST). User-script sandbox deferred to cave-runtime evaluator wave; control-plane state machine + cycle detection is fully ported. Wave-3 promotion 2026-05-19."
+
+[[mapped]]
+upstream = "packages/twenty-server/src/engine/webhook/"
+local    = "src/webhook.rs"
+note     = "Webhook subscription bus — per-workspace entity-event filter (Create/Update/Delete × workspace-entity), HMAC-SHA256 body signature, in-arrival-order audit log, ready-to-POST WebhookDelivery envelope for the cave-runtime event bus. Wave-3 promotion 2026-05-19."
+
+# ─── 2026-05-19 wave-3 scope cuts: 2 [[skipped]] (favorite + blocklist) ──────
+
+[[skipped]]
+upstream = "packages/twenty-server/src/modules/favorite/standard-objects/favorite.workspace-entity.ts"
+reason   = "user-preference-surface"
+note     = "Per-user starred-record UI affordance. cave-portal can implement equivalent persistence on top of the View/User entities without a dedicated Favorite workspace-entity. Was unmapped pre-wave-3."
+
+[[skipped]]
+upstream = "packages/twenty-server/src/modules/blocklist/standard-objects/blocklist.workspace-entity.ts"
+reason   = "anti-spam-handled-elsewhere"
+note     = "Email-address / domain blocklist for inbound CRM signals. cave-runtime's inbound mail pipeline (cave-auth email_listener + cave-runtime middleware) is the right scope; duplicate state inside cave-crm is unnecessary. Was unmapped pre-wave-3."
+
+# ─── Scope cuts (matches unmapped) — referenced by parity_self_audit ────────
+
+[[scope_cuts]]
+area = "workflow-engine"
+deferred_to = "data-ray-2"
+reason = "User-explicit MVP scope cut. Workflow engine + trigger evaluator is a separate sub-system worth its own crate ray."
+
+[[scope_cuts]]
+area = "messaging-sync"
+deferred_to = "data-ray-2"
+reason = "Gmail/IMAP/Outlook sync requires OAuth + IMAP/JMAP wire ports — large parallel ray, deferred."
+
+[[scope_cuts]]
+area = "graphql-resolvers"
+deferred_to = "data-ray-2"
+reason = "Apollo-server runtime equivalent. The schema SDL is generated today (`src/graphql_schema.rs`); the resolver runtime + N+1 prevention is deferred."
+
+[[scope_cuts]]
+area = "webhook-bus"
+deferred_to = "data-ray-2"
+reason = "Per-workspace webhook subscriptions + delivery worker. Cross-cuts with cave-cdc + cave-runtime event bus."
+
+[[scope_cuts]]
+area = "favorite-blocklist"
+deferred_to = "data-ray-2"
+reason = "Small UX entities — not part of MVP critical path."
+
+[portal_ui]
+upstream_ui  = "Twenty CRM"
+upstream_url = "https://twenty.com/"
+status       = "partial"
+loc          = 144
+priority     = "P1"
+notes        = "Full CRM React app — cave-portal/src/admin/crm/* is a v0.2 scaffold"
+last_audit   = "2026-05-19"

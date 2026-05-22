@@ -1,0 +1,97 @@
+# Runbook executor
+groups:
+  - name: cave-runbook-slo
+    interval: 30s
+    rules:
+      - alert: RunbookSloBurnRateFast
+        expr: |
+          (
+            sum(rate(runbook_total{job="cave-runbook",code=~"5.."}[1h]))
+            /
+            sum(rate(runbook_total{job="cave-runbook"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-runbook fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-runbook/slo-burn-fast.md"
+      - alert: RunbookSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(runbook_total{job="cave-runbook",code=~"5.."}[6h]))
+            /
+            sum(rate(runbook_total{job="cave-runbook"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-runbook slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-runbook/slo-burn-slow.md"
+      - alert: RunbookErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(runbook_total{job="cave-runbook",code=~"5.."}[7d]))
+              / sum(rate(runbook_total{job="cave-runbook"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-runbook 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-runbook/error-budget.md"
+      - alert: RunbookLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(runbook_duration_seconds_bucket{job="cave-runbook"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-runbook p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-runbook/latency.md"
+      - alert: RunbookSaturationHigh
+        expr: 'sum(runbook_inflight_requests{job="cave-runbook"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-runbook inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-runbook/saturation.md"
+      - alert: RunbookMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-runbook"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-runbook RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-runbook/memory.md"
+      - alert: RunbookCardinalityExplosion
+        expr: 'count(count by (tenant_id) (runbook_total{job="cave-runbook"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-runbook tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-runbook/cardinality.md"
+      - alert: RunbookHealthProbeFailing
+        expr: 'min(up{job="cave-runbook"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-runbook health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-runbook/health.md"

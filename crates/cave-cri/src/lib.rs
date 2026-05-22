@@ -1,0 +1,146 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
+//! cave-cri — Container Runtime Interface.
+//!
+//! Reimplements containerd/crun functionality in Rust:
+//! - Linux namespace isolation (pid, net, mnt, uts, ipc)
+//! - cgroup v2 resource limits (cpu, memory, pids)
+//! - OCI image pull from registries (Docker Hub, Harbor)
+//! - Root filesystem assembly via overlayfs
+//! - Full container lifecycle (create, start, stop, kill, delete)
+//!
+//! ## API — 42 endpoints (100% containerd CRI parity)
+//!
+//! ```text
+//! GET    /api/cri/health
+//! GET    /api/cri/version
+//! GET    /api/cri/status
+//! GET    /api/cri/stats
+//! GET    /api/cri/events
+//! GET    /api/cri/metrics
+//!
+//! POST   /api/cri/containers
+//! GET    /api/cri/containers
+//! GET    /api/cri/containers/{id}
+//! PUT    /api/cri/containers/{id}
+//! DELETE /api/cri/containers/{id}
+//! POST   /api/cri/containers/{id}/start
+//! POST   /api/cri/containers/{id}/stop
+//! POST   /api/cri/containers/{id}/kill
+//! POST   /api/cri/containers/{id}/pause
+//! POST   /api/cri/containers/{id}/unpause
+//! POST   /api/cri/containers/{id}/exec
+//! POST   /api/cri/containers/{id}/attach
+//! POST   /api/cri/containers/{id}/checkpoint
+//! POST   /api/cri/containers/{id}/restore
+//! GET    /api/cri/containers/{id}/logs
+//! GET    /api/cri/containers/{id}/stats
+//! GET    /api/cri/containers/{id}/processes
+//!
+//! POST   /api/cri/images/pull
+//! GET    /api/cri/images
+//! GET    /api/cri/images/{reference}
+//! DELETE /api/cri/images/{reference}
+//! POST   /api/cri/images/{reference}/tag
+//! GET    /api/cri/images/{reference}/history
+//!
+//! POST   /api/cri/sandboxes
+//! GET    /api/cri/sandboxes
+//! GET    /api/cri/sandboxes/{id}
+//! DELETE /api/cri/sandboxes/{id}
+//! GET    /api/cri/sandboxes/{id}/stats
+//!
+//! POST   /api/cri/snapshots
+//! GET    /api/cri/snapshots
+//! DELETE /api/cri/snapshots/{id}
+//! GET    /api/cri/snapshots/{id}/mounts
+//! GET    /api/cri/snapshots/{id}/usage
+//!
+//! POST   /api/cri/network/attach
+//! POST   /api/cri/network/detach
+//! GET    /api/cri/network/status
+//! ```
+
+pub mod auth;
+pub mod cgroup;
+pub mod cgroup_v2;
+pub mod content;
+pub mod criu;
+pub mod diff;
+pub mod error;
+pub mod health;
+pub mod introspection;
+pub mod leases;
+pub mod log_v2;
+pub mod logs;
+pub mod manifest_list;
+pub mod models;
+pub mod namespace;
+pub mod oci_spec;
+pub mod oom_watcher;
+pub mod paths;
+pub mod pull_progress;
+pub mod registry;
+pub mod rootfs;
+pub mod routes;
+pub mod runtime;
+pub mod runtime_handler;
+pub mod sandbox;
+/// k8s-cri push batch2 2026-05-13: Windows + FreeBSD sandbox
+/// runners. Mirrors `pkg/cri/server/podsandbox/sandbox_run_other.go`.
+/// State machine + path layout + spec validation are platform-
+/// independent (tests run on every host); the real syscall layer
+/// (`jail_create` / `CreateJobObjectW` / HCS) belongs to the
+/// runtime backend.
+pub mod sandbox_other;
+pub mod state_machine;
+pub mod stats;
+pub mod store;
+pub mod streaming;
+pub mod transport;
+pub mod userns;
+
+#[cfg(test)]
+mod upstream_tests;
+
+#[cfg(test)]
+mod parity_tests;
+
+use dashmap::DashMap;
+use registry::RegistryClient;
+use routes::CriState;
+use std::sync::Arc;
+use store::{ContainerStore, ImageStore, SandboxStore, SnapshotStore};
+use tokio::sync::Mutex;
+
+/// Initialize cave-cri state.
+pub fn new_state() -> Arc<CriState> {
+    let cache_dir = paths::image_cache_dir();
+    Arc::new(CriState {
+        containers: ContainerStore::new(),
+        images: ImageStore::new(),
+        registry: RegistryClient::new(cache_dir),
+        sandboxes: SandboxStore::new(),
+        snapshots: SnapshotStore::new(),
+        events: Mutex::new(Vec::new()),
+        network: DashMap::new(),
+        runtime_handlers: runtime_handler::RuntimeHandlerRegistry::with_defaults(),
+        credentials: auth::CredentialStore::new(),
+        pull_progress: pull_progress::PullProgressTracker::new(),
+        userns_allocator: userns::UserNsAllocator::defaults(),
+    })
+}
+
+/// Create the axum router for cave-cri.
+pub fn router(state: Arc<CriState>) -> axum::Router {
+    routes::create_router(state)
+}
+
+/// Calculate parity against the local source tree at compile-time crate root.
+pub fn calculate_parity() -> Result<cave_kernel::parity::ParityReport, String> {
+    cave_kernel::parity::calculate_from_str(
+        include_str!("../parity.manifest.toml"),
+        env!("CARGO_MANIFEST_DIR"),
+    )
+    .map_err(|e| e.to_string())
+}

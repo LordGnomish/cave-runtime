@@ -1,0 +1,38 @@
+[package]
+name = "cave-scan"
+description = "Code quality & SAST — compatible with SonarQube"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-scan"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["sast", "code-quality", "sonarqube", "security", "static-analysis"]
+categories = ["development-tools", "command-line-utilities"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+cave-auth = { path = "../cave-auth" }
+cave-db = { path = "../cave-db" }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tree-sitter = { workspace = true }
+regex = { workspace = true }
+# === S3 db+iac+secrets+license ===
+cave-scan-db = { path = "../cave-scan-db" }
+serde_yaml = { workspace = true }
+hcl-rs = { workspace = true }
+aho-corasick = { workspace = true }
+# === S3 end ===
+# === S2 trivy scan engine ===
+toml = { workspace = true }
+# === S2 end ===

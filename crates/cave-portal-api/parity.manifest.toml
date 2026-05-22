@@ -1,0 +1,24 @@
+# parity.manifest.toml — cave-portal-api
+# Upstream tracked via parent crate cave-portal (backstage/backstage).
+# This sub-crate tracks the *backend API* surface only.
+#
+# Stubbed 2026-05-02. Bump dispatch happens against cave-portal; this
+# manifest exists to make the crate visible to the audit, not to dispatch
+# its own bump task.
+
+[upstream]
+org     = "backstage"
+repo    = "backstage"
+version = "v1.50.4"
+
+[module]
+name        = "cave-portal-api"
+description = "Backstage backend API surface — sub-crate of cave-portal"
+source_root = "src"
+parent_module = "cave-portal"
+
+[parity]
+infra_only = true
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+

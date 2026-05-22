@@ -1,0 +1,24 @@
+# Test fixture for cave-local-llm manifest_integration tests.
+# upstream project chosen for familiarity — do not derive operational meaning from this fixture.
+
+[upstream]
+org     = "trufflesecurity"
+repo    = "trufflehog"
+version = "v3.63.0"
+
+[module]
+name        = "cave-local-llm-test"
+description = "Manifest reader integration test fixture"
+source_root = "src"
+
+# existing_fn is present in fixtures/sample_source.rs
+[[functions]]
+upstream_name = "ExistingFunction"
+local_name    = "existing_fn"
+file          = "fixtures/sample_source.rs"
+
+# missing_fn is NOT present in fixtures/sample_source.rs — should be detected as missing
+[[functions]]
+upstream_name = "MissingFunction"
+local_name    = "missing_fn"
+file          = "fixtures/sample_source.rs"

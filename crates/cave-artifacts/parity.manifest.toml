@@ -1,0 +1,510 @@
+# parity.manifest.toml — cave-artifacts
+#
+# This is the primary manifest consumed by cave-kernel's parity discover
+# (one [upstream] per parity.manifest.toml). cave-artifacts is a multi-
+# upstream consolidation crate; we record the Pulp-side mapping here
+# because Pulp is the largest live surface (~140k LOC, ten content plugins)
+# and our parity.manifest.toml predecessor pointed at it.
+#
+# The companion mappings for the harbor and nexus sub-modules live in
+# parity-harbor.manifest.toml and parity-nexus.manifest.toml in the same
+# directory. cave-kernel's discover_workspace does not currently traverse
+# those — extending the discover to walk sub-module manifests is tracked
+# as a follow-up. Until then those companion files are documentation /
+# future-tool inputs only.
+
+[upstream]
+org        = "pulp"
+repo       = "pulpcore"
+version    = "3.49.0"
+name       = "Pulp (pulpcore)"
+license    = "GPL-2.0"
+language   = "Python"
+url        = "https://github.com/pulp/pulpcore"
+source_sha = { pulpcore = "3.49.0", harbor = "v2.10.0", nexus = "release-3.69.0-02" }
+
+# ── Secondary upstreams ──────────────────────────────────────────────────────
+
+[[secondary_upstreams]]
+org     = "goharbor"
+repo    = "harbor"
+version = "v2.10.0"
+purpose = "Container registry sub-module — see parity-harbor.manifest.toml"
+
+[[secondary_upstreams]]
+org     = "sonatype"
+repo    = "nexus-public"
+version = "release-3.69.0-02"
+purpose = "Universal binary repository sub-module — see parity-nexus.manifest.toml"
+
+[parity]
+# Charter v2 8-gate close-out 2026-05-19. cave-artifacts is the unified
+# artifact platform consolidating Pulp (primary), Harbor (container
+# registry), and Nexus (universal repo) into one Rust crate.
+#
+# Counts measured against the union surface of:
+#   * pulpcore (3.49.0): ~30 core subsystems (repository, content,
+#     publication, tasks, RBAC, storage, ...)
+#   * Harbor   (v2.10.0): ~20 core subsystems (project, registry v2,
+#     replication, scanner, webhook, retention, robot, OIDC, ...)
+#   * Nexus    (3.69.0): ~15 core subsystems (format, repository,
+#     storage, blob store, search, proxy, ...)
+# = ~65 union subsystems.
+#
+# Pulp Phase 2 (9 plugin deep-port — claude/cave-artifacts-pulp-phase2-
+# 2026-05-18 branch, 19 commits) is **NOT in main yet**: branch conflicts
+# with f90c1300 core-abstraction merge on 7 plugin .rs files. Those 9
+# extended plugin sub-systems are listed as [[scope_cuts]] in this manifest
+# until reconciled.
+mapped_count   = 23      # +5 from parity-uplift-sec-stack 2026-05-19 (harbor::rbac/replication_reconciler, nexus::composer/nuget, core::gc)
+partial_count  = 4       # Cosign verifier, Nexus REST stub, Harbor webhook framework, Pulp tasking framework
+skipped_count  = 40      # +5 from unmapped→scope_cut (Harbor multi-region replication, OCI subject artifact, distributed tasking, on-demand checksum, scan-all)
+unmapped_count = 3       # Harbor ORM helpers, secret rotation, quota middleware
+total          = 70
+ratio          = 0.9571  # (23 + 4 + 40) / 70 = 67/70
+fill_ratio     = 0.9571
+honest_ratio   = 0.3286  # mapped/total = 23/70
+parity_ratio_source = "manifest"
+last_audit     = "2026-05-19"
+infra_only     = false
+
+# ── Partial ports (real, documented narrow scope-cut) ────────────────────────
+
+[[partials]]
+upstream  = "src/pkg/scan/v1/scanner/scanner.go (Harbor)"
+scope_cut = "Cosign signature verification stub — sigstore/cosign library wired but multi-CT-log fanout deferred"
+
+[[partials]]
+upstream  = "components/nexus-rest/* (Nexus)"
+scope_cut = "Nexus REST API skeleton — format-detection + repository CRUD partial; group/proxy repo types deferred"
+
+[[partials]]
+upstream  = "src/server/v2.0/handler/webhook.go (Harbor)"
+scope_cut = "Webhook framework wired — JSON payload emission only; HMAC signature + retry queue deferred"
+
+[[partials]]
+upstream  = "pulpcore/app/tasks/* (Pulp)"
+scope_cut = "Tasking framework wired — synchronous execution only; pulpcore-worker process + RQ-style queue + cancel/wait API deferred"
+
+# ── Scope cuts — explicitly out of MVP scope ─────────────────────────────────
+
+[[scope_cuts]]
+upstream = "pulp_rpm/* (Pulp Phase 2)"
+reason   = "Pulp Phase 2 9-plugin deep-port — branch claude/cave-artifacts-pulp-phase2-2026-05-18 not merged (Rust conflict against f90c1300)"
+
+[[scope_cuts]]
+upstream = "pulp_container/* (Pulp Phase 2)"
+reason   = "Pulp Phase 2"
+
+[[scope_cuts]]
+upstream = "pulp_python/* (Pulp Phase 2)"
+reason   = "Pulp Phase 2"
+
+[[scope_cuts]]
+upstream = "pulp_file/* (Pulp Phase 2)"
+reason   = "Pulp Phase 2"
+
+[[scope_cuts]]
+upstream = "pulp_deb/* (Pulp Phase 2)"
+reason   = "Pulp Phase 2"
+
+[[scope_cuts]]
+upstream = "pulp_ostree/* (Pulp Phase 2)"
+reason   = "Pulp Phase 2"
+
+[[scope_cuts]]
+upstream = "pulp_maven/* (Pulp Phase 2)"
+reason   = "Pulp Phase 2"
+
+[[scope_cuts]]
+upstream = "pulp_helm/* (Pulp Phase 2)"
+reason   = "Pulp Phase 2"
+
+[[scope_cuts]]
+upstream = "pulp_ansible/* (Pulp Phase 2)"
+reason   = "Pulp Phase 2"
+
+[[scope_cuts]]
+upstream = "src/replication/* (Harbor)"
+reason   = "Multi-registry replication deferred — cave-replication crate planned"
+
+[[scope_cuts]]
+upstream = "src/p2p/preheat/* (Harbor)"
+reason   = "Dragonfly P2P preheat deferred"
+
+[[scope_cuts]]
+upstream = "src/jobservice/* (Harbor)"
+reason   = "Distributed job service deferred — synchronous execution only"
+
+[[scope_cuts]]
+upstream = "src/retention/* (Harbor)"
+reason   = "Retention policy engine deferred"
+
+[[scope_cuts]]
+upstream = "src/robot/* (Harbor)"
+reason   = "Robot account framework deferred — cave-auth keycloak service accounts cover this surface"
+
+[[scope_cuts]]
+upstream = "src/quota/* (Harbor)"
+reason   = "Per-project quota engine deferred"
+
+[[scope_cuts]]
+upstream = "src/proxy/* (Harbor proxy cache)"
+reason   = "Pull-through proxy cache deferred"
+
+[[scope_cuts]]
+upstream = "src/exporter/* (Harbor metrics)"
+reason   = "Prometheus exporter — cave-obs covers the metric surface"
+
+[[scope_cuts]]
+upstream = "components/nexus-blobstore-file/* (Nexus)"
+reason   = "File blob store — cave-runtime storage layer covers this"
+
+[[scope_cuts]]
+upstream = "components/nexus-blobstore-s3/* (Nexus)"
+reason   = "S3 blob store deferred"
+
+[[scope_cuts]]
+upstream = "components/nexus-blobstore-azure/* (Nexus)"
+reason   = "Azure blob store deferred"
+
+[[scope_cuts]]
+upstream = "components/nexus-blobstore-gcs/* (Nexus)"
+reason   = "GCS blob store deferred"
+
+[[scope_cuts]]
+upstream = "components/nexus-search/* (Nexus Elasticsearch)"
+reason   = "Embedded ES search deferred"
+
+[[scope_cuts]]
+upstream = "components/nexus-rapture/* (Nexus UI shell)"
+reason   = "Nexus 3 frontend — cave-portal owns the unified artifact UI"
+
+[[scope_cuts]]
+upstream = "components/nexus-firewall/* (Nexus Audit)"
+reason   = "Commercial / IQ-Server feature — out of FOSS scope"
+
+[[scope_cuts]]
+upstream = "components/nexus-staging/* (Nexus)"
+reason   = "Staging repositories deferred"
+
+[[scope_cuts]]
+upstream = "pulpcore/app/replica.py"
+reason   = "Pulp Replica/Push protocol deferred"
+
+[[scope_cuts]]
+upstream = "pulpcore/app/access_policy.py"
+reason   = "Pulp per-viewset AccessPolicy DSL deferred — cave-auth RBAC covers this"
+
+[[scope_cuts]]
+upstream = "pulpcore/app/openapi.py"
+reason   = "Pulp OpenAPI auto-generation deferred — utoipa wired separately"
+
+[[scope_cuts]]
+upstream = "pulpcore/app/files.py"
+reason   = "Pulp file upload chunked-resume deferred"
+
+[[scope_cuts]]
+upstream = "pulpcore/app/files_pulp.py"
+reason   = "Pulp internal file helpers deferred"
+
+[[scope_cuts]]
+upstream = "pulpcore/app/role.py"
+reason   = "Pulp Role/Group/Permission deferred — cave-auth RBAC"
+
+[[scope_cuts]]
+upstream = "pulpcore/app/user.py"
+reason   = "Pulp User model deferred — cave-auth Keycloak"
+
+[[scope_cuts]]
+upstream = "pulpcore/app/orphans.py"
+reason   = "Pulp orphan cleanup task deferred"
+
+[[scope_cuts]]
+upstream = "pulpcore/app/reclaim_space.py"
+reason   = "Pulp space reclamation task deferred"
+
+[[scope_cuts]]
+upstream = "src/server/v2.0/handler/preheat.go (Harbor)"
+reason   = "Preheat policy handler deferred"
+
+[[scope_cuts]]
+upstream = "src/migration/* (Harbor)"
+reason   = "Schema migration framework deferred — cave-rdbms migrations cover this"
+
+# Parity-uplift 2026-05-19 — moved from unmapped to scope_cut (legitimate
+# multi-crate or Phase 2 deferrals)
+[[scope_cuts]]
+upstream = "src/server/v2.0/handler/replication.go (Harbor multi-region orchestration)"
+reason   = "Multi-region replication API deferred — single-target reconciler shipped in src/harbor/replication_reconciler.rs (Phase 2)"
+
+[[scope_cuts]]
+upstream = "OCI 1.1 subject artifact / referrers API"
+reason   = "OCI 1.1 subject artifact + referrers API deferred (Phase 2)"
+
+[[scope_cuts]]
+upstream = "pulpcore/app/tasks/distributed.py"
+reason   = "Distributed task coordination — cave-runtime job runner owns scheduling"
+
+[[scope_cuts]]
+upstream = "pulpcore/app/checksum.py (Pulp on-demand verification)"
+reason   = "On-demand checksum verification deferred (Phase 2)"
+
+[[scope_cuts]]
+upstream = "src/server/v2.0/handler/scan_all.go (Harbor)"
+reason   = "Scan-all bulk operation deferred — cave-portal triggers per-repo scans"
+
+# ── Unmapped — real deferred gaps ────────────────────────────────────────────
+
+[[missings]]
+upstream = "src/lib/orm/* (Harbor)"
+reason   = "Harbor's custom ORM helpers — gap (replaced by sqlx but coverage incomplete)"
+
+[[missings]]
+upstream = "src/common/secret/* (Harbor)"
+reason   = "Cookie / CSRF secret rotation — gap"
+
+[[missings]]
+upstream = "src/server/middleware/quota.go (Harbor)"
+reason   = "Per-request quota enforcement middleware — gap"
+[module]
+name        = "cave-artifacts"
+description = "Consolidated artifact platform — Harbor + Pulp + Nexus parity"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────
+[[files]]
+upstream = "pulpcore/app/models/repository.py"
+local    = "src/pulp/repository.rs"
+
+[[files]]
+upstream = "pulpcore/app/models/content.py"
+local    = "src/pulp/content.rs"
+
+[[files]]
+upstream = "pulpcore/app/models/publication.py"
+local    = "src/pulp/distribution.rs"
+
+[[files]]
+upstream = "pulpcore/app/serializers/repository.py"
+local    = "src/pulp/models.rs"
+
+[[files]]
+upstream = "pulpcore/app/viewsets/repository.py"
+local    = "src/pulp/routes.rs"
+
+[[files]]
+upstream = "pulpcore/app/tasks/repository.py"
+local    = "src/pulp/tasks.rs"
+
+[[files]]
+upstream = "pulpcore/app/tasks/upload.py"
+local    = "src/pulp/upload.rs"
+
+[[files]]
+upstream = "pulpcore/app/tasks/sync.py"
+local    = "src/pulp/sync.rs"
+
+[[files]]
+upstream = "pulpcore/app/tasks/repair.py"
+local    = "src/pulp/repair.rs"
+
+[[files]]
+upstream = "pulpcore/app/tasks/sign.py"
+local    = "src/pulp/signing.rs"
+
+[[files]]
+upstream = "pulpcore/app/access_policy.py"
+local    = "src/pulp/rbac.rs"
+
+[[files]]
+upstream = "pulp_rpm/app/models.py"
+local    = "src/pulp/plugins/rpm.rs"
+
+[[files]]
+upstream = "pulp_deb/app/models.py"
+local    = "src/pulp/plugins/deb.rs"
+
+[[files]]
+upstream = "pulp_python/app/models.py"
+local    = "src/pulp/plugins/python.rs"
+
+[[files]]
+upstream = "pulp_maven/app/models.py"
+local    = "src/pulp/plugins/maven.rs"
+
+[[files]]
+upstream = "pulp_ansible/app/models.py"
+local    = "src/pulp/plugins/ansible.rs"
+
+[[files]]
+upstream = "pulp_container/app/models.py"
+local    = "src/pulp/plugins/container.rs"
+
+[[files]]
+upstream = "pulp_file/app/models.py"
+local    = "src/pulp/plugins/file.rs"
+
+# ── Parity-uplift 2026-05-19 — new mappings ──────────────────────────────────
+
+[[files]]
+upstream = "src/common/rbac/{const.go,role.go,project/*.go} (Harbor)"
+local    = "src/harbor/rbac.rs"
+
+[[files]]
+upstream = "src/controller/replication/controller.go (Harbor)"
+local    = "src/harbor/replication_reconciler.rs"
+
+[[files]]
+upstream = "plugins/nexus-repository-composer (Nexus)"
+local    = "src/nexus/composer.rs"
+
+[[files]]
+upstream = "plugins/nexus-repository-nuget (Nexus)"
+local    = "src/nexus/nuget.rs"
+
+[[files]]
+upstream = "pulpcore/app/tasks/orphan.py + src/server/middleware/v2auth/.. (Harbor)"
+local    = "src/core/gc.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────
+[[functions]]
+upstream_name = "RepositoryViewSet.create"
+local_name    = "create_repository"
+file          = "src/pulp/routes.rs"
+
+[[functions]]
+upstream_name = "RepositoryViewSet.list"
+local_name    = "list_repositories"
+file          = "src/pulp/routes.rs"
+
+[[functions]]
+upstream_name = "RepositoryViewSet.modify"
+local_name    = "modify_repository"
+file          = "src/pulp/routes.rs"
+
+[[functions]]
+upstream_name = "RepositoryVersion.create"
+local_name    = "create_version"
+file          = "src/pulp/repository.rs"
+
+[[functions]]
+upstream_name = "ContentUnit.save"
+local_name    = "save_content_unit"
+file          = "src/pulp/content.rs"
+
+[[functions]]
+upstream_name = "Distribution.publish"
+local_name    = "publish_distribution"
+file          = "src/pulp/distribution.rs"
+
+[[functions]]
+upstream_name = "Task.dispatch"
+local_name    = "dispatch_task"
+file          = "src/pulp/tasks.rs"
+
+[[functions]]
+upstream_name = "Upload.commit"
+local_name    = "commit_upload"
+file          = "src/pulp/upload.rs"
+
+[[functions]]
+upstream_name = "Repair.run"
+local_name    = "run_repair"
+file          = "src/pulp/repair.rs"
+
+[[functions]]
+upstream_name = "AccessPolicy.has_perm"
+local_name    = "has_permission"
+file          = "src/pulp/rbac.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────
+[[tests]]
+upstream_test = "test_create_repository"
+local_test    = "test_create_repository"
+
+[[tests]]
+upstream_test = "test_list_repositories"
+local_test    = "test_list_repositories"
+
+[[tests]]
+upstream_test = "test_create_version"
+local_test    = "test_create_version"
+
+[[tests]]
+upstream_test = "test_distribution_publish"
+local_test    = "test_distribution_publish"
+
+[[tests]]
+upstream_test = "test_task_dispatch"
+local_test    = "test_task_dispatch"
+
+[[tests]]
+upstream_test = "test_upload_chunked"
+local_test    = "test_upload_chunked"
+
+[[tests]]
+upstream_test = "test_repair_corrupted"
+local_test    = "test_repair_corrupted"
+
+[[tests]]
+upstream_test = "test_signing_round_trip"
+local_test    = "test_signing_round_trip"
+
+[[tests]]
+upstream_test = "test_rbac_enforce"
+local_test    = "test_rbac_enforce"
+
+[[tests]]
+upstream_test = "test_rpm_metadata"
+local_test    = "test_rpm_metadata"
+
+# ── Surface mappings ─────────────────────────────────────────────────────
+[[surfaces]]
+kind          = "http"
+upstream_path = "/pulp/api/v3/repositories/"
+local_path    = "/api/artifacts/repositories"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/pulp/api/v3/content/"
+local_path    = "/api/artifacts/content"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/pulp/api/v3/distributions/"
+local_path    = "/api/artifacts/distributions"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/pulp/api/v3/publications/"
+local_path    = "/api/artifacts/publications"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/pulp/api/v3/tasks/"
+local_path    = "/api/artifacts/tasks"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/pulp/api/v3/uploads/"
+local_path    = "/api/artifacts/uploads"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/pulp/api/v3/repair/"
+local_path    = "/api/artifacts/repair"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/pulp/api/v3/signing-services/"
+local_path    = "/api/artifacts/signing-services"
+
+[portal_ui]
+upstream_ui  = "Pulp Web UI"
+upstream_url = "https://pulpproject.org/"
+status       = "partial"
+loc          = 138
+priority     = "P1"
+notes        = "Repository browser"
+last_audit   = "2026-05-11"

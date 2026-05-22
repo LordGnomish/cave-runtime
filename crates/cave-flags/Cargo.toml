@@ -1,0 +1,27 @@
+[package]
+name = "cave-flags"
+description = "Feature flag service — compatible with Unleash. Evaluation engine, REST API, SSE streaming."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-db = { path = "../cave-db" }
+# Web framework
+axum = { workspace = true }
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+# Async runtime
+tokio = { workspace = true }
+# Observability
+tracing = { workspace = true }
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+# Database (self-contained pool; does not depend on cave-db to avoid cave-core breakage)
+deadpool-postgres = { workspace = true }
+tokio-postgres = { workspace = true }
+# Crypto
+sha2 = { workspace = true }

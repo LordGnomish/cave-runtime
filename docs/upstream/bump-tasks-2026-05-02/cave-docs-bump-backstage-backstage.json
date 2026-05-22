@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "cave_module": "cave-docs",
+  "upstream_repo": "backstage/backstage",
+  "old_tag": "v1.20.0",
+  "new_tag": "v1.50.4",
+  "release_url": "https://github.com/backstage/backstage/releases/tag/v1.50.4",
+  "release_name": null,
+  "release_body": null,
+  "published_at": null,
+  "surfaces_added": [],
+  "surfaces_removed": [],
+  "surfaces_changed": [],
+  "priority": "high",
+  "created_at": "2026-05-02T17:03:51Z",
+  "origin": {
+    "daemon": "version-audit-2026-05-02",
+    "run_id": "manual-burak-bump-plan"
+  },
+  "audit_status": "STALE",
+  "audit_note": "0.+30",
+  "audit_action_recommendation": "Bump manifest [upstream].version to latest, regenerate parity port, open draft PR. Block on human review (no auto-merge)."
+}

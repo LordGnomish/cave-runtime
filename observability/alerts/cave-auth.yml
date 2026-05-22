@@ -1,0 +1,324 @@
+# cave-auth — Prometheus alert rules
+#
+# Drop into deploy/prometheus/rules/cave-auth.yml (or whatever the operator
+# rule path is in your kube/Helm install). Validate before deploy:
+#
+#     promtool check rules cave-auth-alerts.yml
+#
+# Runbook URLs assume the standard portal layout
+# (docs/runbooks/auth/<slug>.md). Adjust the runbook_url annotation prefix if
+# your portal lives elsewhere.
+#
+# Metric name source-of-truth: cave-auth crate (keycloak module from
+# feat/cave-auth-keycloak-mvp). Every metric below is intended to be
+# instrumented in cave-auth/src/keycloak/{provider,admin,pqc}.rs and exposed
+# via cave-runtime's /metrics endpoint.
+
+groups:
+  - name: cave-auth.security
+    interval: 30s
+    rules:
+      - alert: AuthHighFailureRate
+        expr: |
+          (
+            sum by (realm) (rate(cave_auth_login_total{outcome="failure"}[5m]))
+            /
+            clamp_min(sum by (realm) (rate(cave_auth_login_total[5m])), 1e-9)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+          tier: "1"
+        annotations:
+          summary: "Login failure rate >5% in realm {{ $labels.realm }}"
+          description: |
+            cave-auth has seen >5% failed logins for realm {{ $labels.realm }}
+            over the last 5 minutes (current ratio: {{ $value | humanizePercentage }}).
+            Possible causes: credential-stuffing, broken IdP federation, or a
+            recent password-policy change locking real users out.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/high-failure-rate"
+
+      - alert: AuthLockoutSpike
+        expr: |
+          sum by (realm) (
+            increase(cave_auth_login_total{outcome="failure", reason="locked"}[5m])
+          ) > 20
+        for: 2m
+        labels:
+          severity: critical
+          team: security
+          tier: "1"
+        annotations:
+          summary: "Account-lockout spike in realm {{ $labels.realm }} (>20 / 5m)"
+          description: |
+            More than 20 accounts hit the lockout threshold in realm
+            {{ $labels.realm }} within the last 5 minutes (count: {{ $value }}).
+            Almost always indicative of an active credential-stuffing attack —
+            triage immediately and consider rotating breached-password lists.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/lockout-spike"
+
+      - alert: UnauthorizedAttemptsBurst
+        expr: |
+          sum by (realm) (
+            rate(cave_auth_http_requests_total{status=~"401|403"}[1m])
+          ) > 10
+        for: 1m
+        labels:
+          severity: critical
+          team: security
+          tier: "1"
+        annotations:
+          summary: "401/403 burst on cave-auth in realm {{ $labels.realm }}"
+          description: |
+            cave-auth saw more than 10 unauthorized requests per second in
+            realm {{ $labels.realm }} for over a minute (current rate:
+            {{ $value | humanize }}/s). Check the source IPs in the audit log
+            and rate-limit at the gateway if the burst is from a single peer.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/unauthorized-burst"
+
+      - alert: TokenIssuanceAnomaly
+        expr: |
+          (
+            sum by (realm) (rate(cave_auth_token_issued_total[5m]))
+            >
+            2 * (
+              sum by (realm) (rate(cave_auth_token_issued_total[1h] offset 1h))
+            )
+          )
+          and on(realm) (
+            sum by (realm) (rate(cave_auth_token_issued_total[5m])) > 1
+          )
+        for: 10m
+        labels:
+          severity: warning
+          team: security
+          tier: "1"
+        annotations:
+          summary: "Token issuance 2× baseline in realm {{ $labels.realm }}"
+          description: |
+            cave-auth is issuing tokens at over 2× the rolling 1-hour
+            baseline in realm {{ $labels.realm }}. Could be a runaway
+            client retry-loop, leaked refresh-token, or legitimate launch
+            traffic — confirm against deploy events before paging on-call.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/token-issuance-anomaly"
+
+  - name: cave-auth.availability
+    interval: 30s
+    rules:
+      - alert: KeycloakRealmDown
+        expr: |
+          min by (realm) (cave_auth_realm_up) == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+          tier: "1"
+          page: "true"
+        annotations:
+          summary: "Keycloak realm {{ $labels.realm }} unreachable"
+          description: |
+            The cave-auth admin probe hitting /admin/realms/{{ $labels.realm }}
+            has returned non-2xx for over 2 minutes. All authentication
+            traffic for this tenant is currently failing.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/realm-down"
+
+      - alert: OIDCRoundtripSlow
+        expr: |
+          histogram_quantile(0.99,
+            sum by (le, endpoint, realm) (
+              rate(cave_auth_oidc_request_duration_seconds_bucket[5m])
+            )
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+          tier: "1"
+        annotations:
+          summary: "OIDC {{ $labels.endpoint }} p99 >2s in realm {{ $labels.realm }}"
+          description: |
+            p99 latency for {{ $labels.endpoint }} on realm {{ $labels.realm }}
+            is {{ $value | humanizeDuration }} — well over the 2s SLO.
+            User-facing login pages will feel sluggish; check the realm's
+            backing store + JWKS hot-path.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/oidc-slow"
+
+      - alert: MTLSHandshakeFailures
+        expr: |
+          (
+            sum(rate(cave_auth_mtls_handshake_total{outcome="failure"}[5m]))
+            /
+            clamp_min(sum(rate(cave_auth_mtls_handshake_total[5m])), 1e-9)
+          ) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+          tier: "1"
+        annotations:
+          summary: "mTLS handshake failure rate >1% on cave-auth"
+          description: |
+            More than 1% of mTLS handshakes on the cave-auth admin/OIDC
+            listeners have failed over the last 5 minutes (current:
+            {{ $value | humanizePercentage }}). Often a cert-rotation race
+            or a misconfigured client trust-bundle.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/mtls-failures"
+
+  - name: cave-auth.product
+    interval: 60s
+    rules:
+      - alert: PasskeyEnrollmentDrop
+        expr: |
+          (
+            sum(rate(cave_auth_passkey_enrolled_total[1h]))
+            <
+            0.5 * sum(rate(cave_auth_passkey_enrolled_total[1d] offset 1d))
+          )
+          and on() (
+            sum(rate(cave_auth_passkey_enrolled_total[1d] offset 1d)) > 0.001
+          )
+        for: 30m
+        labels:
+          severity: info
+          team: product
+          tier: "1"
+        annotations:
+          summary: "Passkey enrolment dropped >50% week-over-week"
+          description: |
+            cave-auth passkey enrolment in the last hour is less than
+            half of the same hour last week. Could be an upstream UX
+            change, broken enrolment endpoint, or a holiday — check the
+            Portal Auth widget conversion funnel before raising further.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/passkey-drop"
+
+      - alert: AuthAuditEventsStalled
+        expr: |
+          sum(rate(cave_auth_audit_events_total[5m])) == 0
+          and on() (
+            sum(rate(cave_auth_login_total[5m])) > 0
+          )
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+          tier: "1"
+        annotations:
+          summary: "cave-auth produced 0 audit events while logins are live"
+          description: |
+            Login activity is non-zero but the cave-auth audit pipeline
+            has emitted no events for 5 minutes. Most likely the audit
+            sink (Loki / S3) is down or AuditLogger is silently failing.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/audit-stalled"
+
+      - alert: WebAuthnRegistrationFailureRate
+        expr: |
+          (
+            sum(rate(cave_auth_webauthn_registration_total{outcome="failure"}[5m]))
+            /
+            clamp_min(sum(rate(cave_auth_webauthn_registration_total[5m])), 1e-9)
+          ) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+          team: security
+          tier: "1"
+        annotations:
+          summary: ">10% of WebAuthn registration ceremonies are failing"
+          description: |
+            cave-auth/webauthn/registration.rs is rejecting more than 10% of
+            attestation responses. Common causes: wrong RP origin in the
+            cave-portal `/admin/auth/webauthn` page config, a mismatched
+            challenge cache TTL, or an unsupported attestation fmt the RP
+            policy is rejecting.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/webauthn-registration-failure"
+
+      - alert: WebAuthnAssertionSignatureVerifyFailureRate
+        expr: |
+          (
+            sum(rate(cave_auth_webauthn_assertion_signature_verify_failure_total[5m]))
+            /
+            clamp_min(sum(rate(cave_auth_webauthn_assertion_total[5m])), 1e-9)
+          ) > 0.02
+        for: 5m
+        labels:
+          severity: critical
+          team: security
+          tier: "1"
+        annotations:
+          summary: ">2% of WebAuthn assertions fail signature verification"
+          description: |
+            cave-auth/webauthn/authentication.rs is rejecting assertion
+            signatures above the 2% noise floor. Either an authenticator
+            is roaming with a stale public-key cache, a man-in-the-middle
+            is replaying authenticatorData, or the RP origin / rpId is
+            misconfigured. Investigate immediately — passkey login is
+            user-visible and high-trust.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/webauthn-signature-fail"
+
+      - alert: PqcSignBackendMissing
+        expr: |
+          (
+            sum(rate(cave_auth_pqc_sign_errors_total{reason="backend_missing"}[5m])) > 0
+          )
+        for: 10m
+        labels:
+          severity: info
+          team: platform
+          tier: "1"
+        annotations:
+          summary: "ML-DSA-65 backend not wired on this cave-auth instance"
+          description: |
+            The pluggable FIPS-204 backend in cave-auth/keycloak/pqc.rs is
+            still NullMlDsa65Backend on this node. Tokens are being signed
+            with Ed25519-only — acceptable for MVP but ADR-GOLDEN-003 wants
+            the hybrid path live before the OSS launch (target 21 May).
+          runbook_url: "https://portal.cave.dev/runbooks/auth/wire-mldsa-backend"
+
+# ── A1: SAML 2.0 broker (Keycloak v22.0.0 port) ─────────────────────────────
+# Appended-only; the rules above are untouched.
+  - name: cave-auth.saml
+    interval: 30s
+    rules:
+      - alert: SamlAuthnFailuresRate
+        expr: |
+          (
+            sum(rate(cave_auth_saml_authn_failures_total[5m])) > 0.1
+          )
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+          tier: "1"
+        annotations:
+          summary: "SAML 2.0 AuthnRequest failures over threshold"
+          description: |
+            cave-auth's SAML 2.0 broker is rejecting >0.1 AuthnRequest/s for
+            10m. Common causes: SP metadata drift (signing cert rotated
+            without push), clock skew on the IdP host, mis-bound
+            destination URL. Check the audit log
+            (`/admin/auth/audit?protocol=saml`) for the rejection reason
+            label and runbook for fixup steps.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/saml-authn-failures"
+
+      - alert: SamlAssertionSignatureVerifyFailures
+        expr: |
+          (
+            sum(rate(cave_auth_saml_assertion_signature_verify_failures_total[5m])) > 0
+          )
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+          tier: "1"
+        annotations:
+          summary: "SAML 2.0 Assertion signature verification failing"
+          description: |
+            cave-auth is rejecting >0 SAML 2.0 Assertion signatures over
+            the last 5m. A non-zero rate here is always notable — either
+            the IdP rotated keys without publishing new metadata, an
+            attacker is replaying or forging an assertion, or our
+            canonicalisation path has drifted from the IdP's. Open the
+            audit log filtered to `event=saml.signature.verify.fail` and
+            inspect the issuer / cert thumbprint.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/saml-signature-verify-failures"

@@ -1,0 +1,55 @@
+# cave-permission alerts — auto-generated tier1 obs scaffold
+groups:
+  - name: cave-permission-slo
+    interval: 30s
+    rules:
+      - alert: PermissionSloBurnRateFast
+        expr: |
+          (
+            sum(rate(cave_permission_total{job="cave-permission",code=~"5.."}[1h]))
+            /
+            sum(rate(cave_permission_total{job="cave-permission"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-permission fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-permission/slo-burn-fast.md"
+      - alert: PermissionLatencyP99High
+        expr: |
+          histogram_quantile(0.99, sum(rate(cave_permission_request_duration_seconds_bucket{job="cave-permission"}[5m])) by (le)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-permission p99 latency > 500ms"
+          description: "p99 latency = {{ $value }}s over 5m."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-permission/latency.md"
+      - alert: PermissionSaturationHigh
+        expr: 'sum(rate(cave_permission_inflight_requests{job="cave-permission"}[5m])) > 100'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-permission inflight requests > 100"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-permission/saturation.md"
+      - alert: PermissionMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-permission"} > (4 * 1024 * 1024 * 1024)'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-permission RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-permission/memory.md"
+      - alert: PermissionHealthProbeFailing
+        expr: 'min(up{job="cave-permission"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-permission health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-permission/health.md"

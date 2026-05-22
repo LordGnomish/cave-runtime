@@ -1,0 +1,160 @@
+# DragonflyDB-parity cache
+groups:
+  - name: cave-cache-slo
+    interval: 30s
+    rules:
+      - alert: CacheSloBurnRateFast
+        expr: |
+          (
+            sum(rate(cache_total{job="cave-cache",code=~"5.."}[1h]))
+            /
+            sum(rate(cache_total{job="cave-cache"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-cache fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/slo-burn-fast.md"
+      - alert: CacheSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(cache_total{job="cave-cache",code=~"5.."}[6h]))
+            /
+            sum(rate(cache_total{job="cave-cache"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-cache slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/slo-burn-slow.md"
+      - alert: CacheErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(cache_total{job="cave-cache",code=~"5.."}[7d]))
+              / sum(rate(cache_total{job="cave-cache"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-cache 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/error-budget.md"
+      - alert: CacheLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(cache_duration_seconds_bucket{job="cave-cache"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-cache p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/latency.md"
+      - alert: CacheSaturationHigh
+        expr: 'sum(cache_inflight_requests{job="cave-cache"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-cache inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/saturation.md"
+      - alert: CacheMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-cache"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-cache RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/memory.md"
+      - alert: CacheCardinalityExplosion
+        expr: 'count(count by (tenant_id) (cache_total{job="cave-cache"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-cache tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/cardinality.md"
+      - alert: CacheHealthProbeFailing
+        expr: 'min(up{job="cave-cache"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-cache health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/health.md"
+
+  - name: cave-cache-deep
+    interval: 30s
+    rules:
+      - alert: CacheLowHitRate
+        expr: |
+          (sum(rate(cache_hits_total{job="cave-cache"}[10m]))
+            /
+           clamp_min(sum(rate(cache_lookups_total{job="cave-cache"}[10m])), 1))
+          < 0.5
+        for: 30m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "Cache hit rate < 50% over 30m"
+          description: "Working-set spilled out of memory or TTLs misconfigured."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/low-hit-rate.md"
+      - alert: CacheHighEvictionRate
+        expr: 'sum(rate(cache_evictions_total{job="cave-cache"}[5m])) > 1000'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Eviction rate > 1k/s"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/high-eviction-rate.md"
+      - alert: CacheMemoryFragmentation
+        expr: |
+          max(cache_memory_used_rss_bytes{job="cave-cache"}
+            /
+          clamp_min(cache_memory_used_bytes{job="cave-cache"}, 1)) > 1.5
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "RSS / used > 1.5 (fragmentation)"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/memory-fragmentation.md"
+      - alert: CacheClusterRebalanceStorm
+        expr: 'increase(cache_cluster_slot_rebalance_total{job="cave-cache"}[10m]) > 50'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "> 50 slot rebalance events in 10m"
+          description: "Cluster topology is churning — pause autoscale and inspect."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/cluster-rebalance-storm.md"
+      - alert: CacheSlowLogSurge
+        expr: 'increase(cache_slowlog_entries_total{job="cave-cache"}[5m]) > 100'
+        for: 5m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "> 100 slow-log entries in 5m"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/slowlog-surge.md"
+      - alert: CachePubsubBacklog
+        expr: 'sum(cache_pubsub_pending_messages{job="cave-cache"}) > 100000'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pub/sub backlog > 100k messages"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/pubsub-backlog.md"

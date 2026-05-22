@@ -1,0 +1,27 @@
+[package]
+name = "cave-ai-obs"
+description = "LLM observability — compatible with Langfuse"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-ai-obs"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["llm", "observability", "langfuse", "ai", "tracing"]
+categories = ["api-bindings", "asynchronous", "development-tools"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+cave-auth = { path = "../cave-auth" }
+cave-db = { path = "../cave-db" }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }

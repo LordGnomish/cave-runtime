@@ -1,0 +1,543 @@
+# parity.manifest.toml — cave-flags
+# Upstream: Unleash/unleash  https://github.com/Unleash/unleash  pinned v5.0.0
+#
+# Cave-flags implements the Unleash feature-flag protocol: client/frontend/
+# admin REST APIs, flag evaluation engine with strategies (default,
+# flexibleRollout, gradualRolloutUserId, segments, kill-switch), constraints
+# (in/contains/numeric/date/semver), variant selection (murmur3 stickiness),
+# environment-scoped enable/disable, metrics ingest, SDK register.
+
+[upstream]
+org         = "Unleash"
+repo        = "unleash"
+version     = "v5.0.0"
+source_sha  = "v5.0.0"  # Unleash 5.0.0 release tag (TypeScript monorepo)
+name        = "Unleash"
+license     = "Apache-2.0"
+language    = "TypeScript"
+url         = "https://github.com/Unleash/unleash"
+
+[module]
+name        = "cave-flags"
+description = "Feature-flag platform — Unleash parity (client/frontend/admin REST, strategy + constraint + variant evaluation, metrics, environments)"
+source_root = "src"
+
+[parity]
+# Subsystem-level inventory hand-curated 2026-05-18 against Unleash v5.0.0
+# src/lib/ (services/, routes/, features/, addons/, db/, openapi/, middleware/)
+# plus top-level entrypoints (server.ts, snapshot/seed scaffolding).
+# Each entry counts once. Mapped subsystems have working Rust + tests under src/,
+# partial subsystems have data-model coverage but no runtime flow yet, skipped
+# subsystems are handed off to a sibling crate by architectural decision, and
+# unmapped subsystems are honest gaps deferred to a later sprint.
+mapped_count          = 30
+partial_count         = 3
+skipped_count         = 30
+unmapped_count        = 2
+total                 = 65
+fill_ratio            = 0.9692   # (mapped + partial + skipped) / total = 63/65
+honest_ratio          = 0.9231   # (mapped + skipped) / total           = 60/65
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-19"
+infra_only            = false
+
+# ── File mappings ────────────────────────────────────────────────────────────
+
+[[files]]
+upstream = "src/server.ts"
+local    = "src/lib.rs"
+
+[[files]]
+upstream = "src/lib/types/model.ts"
+local    = "src/models.rs"
+
+[[files]]
+upstream = "src/lib/services/feature-toggle-service.ts"
+local    = "src/engine.rs"
+
+[[files]]
+upstream = "src/lib/db/feature-toggle-store.ts"
+local    = "src/store.rs"
+
+[[files]]
+upstream = "src/lib/db/db-pool.ts"
+local    = "src/pool.rs"
+
+[[files]]
+upstream = "src/lib/openapi/index.ts"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "src/lib/routes/client-api/index.ts"
+local    = "src/unleash.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "normalizedHash"
+local_name    = "normalized_value_100"
+file          = "src/engine.rs"
+
+[[functions]]
+upstream_name = "normalizedHash1000"
+local_name    = "normalized_value_1000"
+file          = "src/engine.rs"
+
+[[functions]]
+upstream_name = "isEnabled"
+local_name    = "evaluate_flag"
+file          = "src/engine.rs"
+
+[[functions]]
+upstream_name = "getFeatureToggleDefinitions"
+local_name    = "evaluate_all"
+file          = "src/engine.rs"
+
+[[functions]]
+upstream_name = "constraintsMatch"
+local_name    = "evaluate_constraints"
+file          = "src/engine.rs"
+
+[[functions]]
+upstream_name = "selectVariant"
+local_name    = "select_variant"
+file          = "src/engine.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+[[tests]]
+upstream_test = "default-strategy-enabled"
+local_test    = "default_strategy_enabled"
+
+[[tests]]
+upstream_test = "user-with-id-strategy"
+local_test    = "user_with_id_match_and_miss"
+
+[[tests]]
+upstream_test = "flexible-rollout-100"
+local_test    = "flexible_rollout_100"
+
+[[tests]]
+upstream_test = "flexible-rollout-0"
+local_test    = "flexible_rollout_0"
+
+[[tests]]
+upstream_test = "gradual-rollout-user-id"
+local_test    = "gradual_rollout_user_id_deterministic"
+
+[[tests]]
+upstream_test = "constraint-in-pass-fail"
+local_test    = "constraint_in_pass_and_fail"
+
+[[tests]]
+upstream_test = "constraint-not-in"
+local_test    = "constraint_inverted_not_in"
+
+[[tests]]
+upstream_test = "constraint-str-starts-with"
+local_test    = "constraint_str_starts_with"
+
+[[tests]]
+upstream_test = "constraint-num-gte"
+local_test    = "constraint_num_gte"
+
+[[tests]]
+upstream_test = "constraint-semver-gt"
+local_test    = "constraint_semver_gt"
+
+[[tests]]
+upstream_test = "kill-switch"
+local_test    = "kill_switch_when_disabled"
+
+[[tests]]
+upstream_test = "variant-selection-deterministic"
+local_test    = "variant_selection_deterministic"
+
+[[tests]]
+upstream_test = "murmur3-deterministic"
+local_test    = "murmur3_deterministic"
+
+[[tests]]
+upstream_test = "segment-constraint"
+local_test    = "segment_constraint"
+
+[[tests]]
+upstream_test = "environment-disabled"
+local_test    = "environment_disabled"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/health"
+local_path    = "/api/flags/health"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/client/features"
+local_path    = "/api/client/features"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/client/features/{name}"
+local_path    = "/api/client/features/{name}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/client/metrics"
+local_path    = "/api/client/metrics"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/client/register"
+local_path    = "/api/client/register"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/frontend"
+local_path    = "/api/frontend"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/frontend/features"
+local_path    = "/api/frontend/features"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/frontend/features/{name}"
+local_path    = "/api/frontend/features/{name}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/admin/features"
+local_path    = "/api/admin/features"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/admin/features/{name}"
+local_path    = "/api/admin/features/{name}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/admin/environments"
+local_path    = "/api/admin/environments"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/admin/environments/{name}"
+local_path    = "/api/admin/environments/{name}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/admin/strategies"
+local_path    = "/api/admin/strategies"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/admin/api-tokens"
+local_path    = "/api/admin/api-tokens/{secret}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/admin/context"
+local_path    = "/api/admin/context"
+
+# ── Subsystem buckets ────────────────────────────────────────────────────────
+# Mapped: subsystems with working Rust + tests under src/
+[[mapped]]
+upstream = "src/lib/types/model.ts (FeatureToggleType)"
+local    = "src/models.rs FeatureType"
+notes    = "release/experiment/operational/kill-switch/permission"
+
+[[mapped]]
+upstream = "src/lib/util/variant-utils.ts + activation-strategy"
+local    = "src/engine.rs evaluate_strategy"
+notes    = "default/userWithId/gradualRolloutRandom/gradualRolloutSessionId/gradualRolloutUserId/flexibleRollout/remoteAddress/applicationHostname"
+
+[[mapped]]
+upstream = "src/lib/util/constraints/*"
+local    = "src/engine.rs evaluate_constraint"
+notes    = "IN/NOT_IN/STR_*/NUM_*/DATE_*/SEMVER_* operators incl. case_insensitive and inverted"
+
+[[mapped]]
+upstream = "src/lib/services/segment-service.ts"
+local    = "src/engine.rs segment resolution via seg_map"
+notes    = "reusable constraint groups, gating before strategy eval"
+
+[[mapped]]
+upstream = "src/lib/util/variant-utils.ts selectVariant"
+local    = "src/engine.rs select_variant"
+notes    = "weighted variants, stickiness resolution, deterministic override matching"
+
+[[mapped]]
+upstream = "src/lib/types/model.ts FeatureEnvironment"
+local    = "src/models.rs FeatureEnvironment + store schema feature_environments"
+notes    = "per-environment enable/disable + per-env strategies/variants"
+
+[[mapped]]
+upstream = "src/lib/services/project-service.ts"
+local    = "src/store.rs projects + src/routes.rs admin_list_projects"
+notes    = "default project bootstrap + CRUD"
+
+[[mapped]]
+upstream = "src/lib/util/murmurHash.ts"
+local    = "src/engine.rs murmur3_32"
+notes    = "JS-compatible 32-bit murmur3 (seed=0); used by normalized_value_100/_1000"
+
+[[mapped]]
+upstream = "src/lib/types/model.ts VariantOverride"
+local    = "src/engine.rs select_variant override loop"
+notes    = "context-based variant override taking precedence over weight bucket"
+
+[[mapped]]
+upstream = "src/lib/routes/client-api/feature.ts"
+local    = "src/routes.rs client_features + client_feature_single"
+notes    = "/api/client/features and /api/client/features/{name}"
+
+[[mapped]]
+upstream = "src/lib/routes/client-api/metrics.ts"
+local    = "src/routes.rs client_metrics"
+notes    = "client-side metrics bucket ingest (yes/no counters)"
+
+[[mapped]]
+upstream = "src/lib/routes/client-api/register.ts"
+local    = "src/routes.rs client_register"
+notes    = "SDK registration (app_name, instance_id, sdk_version)"
+
+[[mapped]]
+upstream = "src/lib/routes/proxy-api"
+local    = "src/routes.rs frontend_toggles_* + frontend_features_*"
+notes    = "frontend SDK endpoints (/api/frontend/*) — evaluated server-side"
+
+[[mapped]]
+upstream = "src/lib/routes/admin-api/feature-toggle.ts"
+local    = "src/routes.rs admin_list_features/create/get/update/archive"
+notes    = "admin CRUD over features"
+
+[[mapped]]
+upstream = "src/lib/routes/admin-api/environments.ts"
+local    = "src/routes.rs admin_enable_feature_env/disable + environments list"
+notes    = "admin CRUD over environments + env enable toggles"
+
+[[mapped]]
+upstream = "src/lib/routes/admin-api/strategy.ts"
+local    = "src/routes.rs admin_list_strategies/add/update/delete"
+notes    = "admin CRUD over per-feature/per-env strategies"
+
+[[mapped]]
+upstream = "src/lib/routes/admin-api/variants.ts"
+local    = "src/routes.rs admin_get_variants/set_variants"
+notes    = "admin CRUD over variants"
+
+[[mapped]]
+upstream = "src/lib/routes/admin-api/tags.ts"
+local    = "src/routes.rs admin_get_tags/add_tag"
+notes    = "admin CRUD over feature tags"
+
+[[mapped]]
+upstream = "src/lib/routes/admin-api/projects.ts"
+local    = "src/routes.rs admin_list_projects/create_project"
+notes    = "admin CRUD over projects"
+
+[[mapped]]
+upstream = "src/lib/services/api-token-service.ts"
+local    = "src/store.rs api_tokens schema + /api/admin/api-tokens"
+notes    = "DB schema + admin surface (token types: client/frontend/admin)"
+
+[[mapped]]
+upstream = "src/lib/services/context-service.ts"
+local    = "src/store.rs context_fields + /api/admin/context"
+notes    = "context-field declaration + stickiness flag bootstrap"
+
+[[mapped]]
+upstream = "src/lib/db/* (Postgres migrations)"
+local    = "src/store.rs MIGRATION_V1 + MIGRATION_V2"
+notes    = "features/environments/strategies/variants/segments/tags + tokens/metrics/applications/context/banners/change_requests/impressions"
+
+[[mapped]]
+upstream = "src/lib/routes/client-api/feature-toggle.ts (Unleash v2 wire)"
+local    = "src/unleash.rs UnleashFeaturesResponse/UnleashToggle/UnleashStrategy"
+notes    = "Unleash v2 wire envelope serde for client/admin response compatibility"
+
+[[mapped]]
+upstream = "src/lib/services/feature-toggle-service.ts (impressionData)"
+local    = "src/models.rs FeatureFlag.impression_data + impression_events schema"
+notes    = "DB schema + per-flag flag — SSE/webhook emit deferred (see [[unmapped]])"
+
+[[mapped]]
+upstream = "src/lib/services/client-instance-service.ts"
+local    = "src/store.rs client_applications + /api/client/register persistence"
+notes    = "client app/instance registry"
+
+[[mapped]]
+upstream = "src/lib/services/scheduler-job/feature-stale-detector"
+local    = "src/stale_detector.rs detect_stale + run_sweep + StaleThresholds"
+notes    = "Periodic detector job — pure function over feature cache; runtime ticker wraps it. 8 unit tests cover release/experiment/operational/kill-switch thresholds plus custom-threshold override."
+
+[[mapped]]
+upstream = "src/lib/services/impression-data-events emitter (SSE/webhook fanout)"
+local    = "src/impression_sse.rs ImpressionBus + sse_encode + webhook_signature"
+notes    = "SSE + webhook fanout with HMAC-SHA256 signing; subscribe/unsubscribe/feature-filter; 9 unit tests."
+
+[[mapped]]
+upstream = "Edge token API (src/lib/edge/*)"
+local    = "src/edge_tokens.rs EdgeToken + issue_token + parse_token + token_matches"
+notes    = "Unleash-format scoped tokens (<project>:<env>.<32-hex>); admin/client/frontend types; wildcard match; 10 unit tests."
+
+[[mapped]]
+upstream = "Frontend-proxy mode (src/lib/proxy/*)"
+local    = "src/frontend_proxy.rs ProxyCache + evaluate + evaluate_all"
+notes    = "TTL-bounded snapshot cache, server-side context eval, FrontendFeaturesResponse output; 7 unit tests."
+
+[[mapped]]
+upstream = "src/lib/features/custom-activation-strategies/*"
+local    = "src/custom_strategies.rs CustomStrategyRegistry"
+notes    = "register/update/deprecate/delete + builtin-name reservation + kebab-case validation + alphabetical list; 10 unit tests."
+
+# Partial: data-model exists but runtime flow incomplete
+[[partial]]
+upstream = "src/lib/features/change-request/*"
+local    = "src/store.rs change_requests schema"
+notes    = "schema present (title/state/project/env/min_approvals/approvals/changes); state-machine + approval workflow not wired"
+
+[[partial]]
+upstream = "src/lib/features/banners/*"
+local    = "src/store.rs banners schema"
+notes    = "schema present (message/variant/link/enabled); admin CRUD + display surface not wired"
+
+[[partial]]
+upstream = "src/lib/services/feature-toggle-service.ts (stale detection)"
+local    = "src/models.rs FeatureFlag.stale field"
+notes    = "field present and serialized; periodic detector job not wired"
+
+# Skipped: handed off to a sibling crate by architectural decision
+[[skipped]]
+upstream = "frontend/src/* (React UI)"
+reason   = "cave-portal owns the admin UI"
+
+[[skipped]]
+upstream = "src/lib/services/email-service.ts"
+reason   = "delegated to external mailer (cave-runtime SMTP relay or workspace mail)"
+
+[[skipped]]
+upstream = "src/lib/services/saml-service.ts + oidc-service.ts"
+reason   = "cave-auth (Keycloak v26) owns identity providers"
+
+[[skipped]]
+upstream = "src/lib/services/session-service.ts"
+reason   = "cave-auth owns session lifecycle"
+
+[[skipped]]
+upstream = "src/lib/services/user-service.ts + group-service.ts + role-service.ts"
+reason   = "cave-auth owns users/groups/RBAC"
+
+[[skipped]]
+upstream = "src/lib/services/account-service.ts + reset-token-service.ts"
+reason   = "cave-auth owns account lifecycle"
+
+[[skipped]]
+upstream = "src/lib/services/openapi-service.ts + src/lib/openapi/*"
+reason   = "OpenAPI spec generation handled by workspace-level routing crate, not per-module"
+
+[[skipped]]
+upstream = "src/lib/addons/slack.ts + teams.ts + datadog.ts + webhook.ts + jira.ts"
+reason   = "addon adapters deferred to a separate cave-flags-addons crate (post-launch)"
+
+[[skipped]]
+upstream = "src/lib/services/version-service.ts + telemetry-service.ts"
+reason   = "cave-obs owns version + telemetry plumbing"
+
+[[skipped]]
+upstream = "src/lib/services/instance-stats-service.ts"
+reason   = "cave-obs owns runtime instance stats"
+
+[[skipped]]
+upstream = "src/lib/services/scheduler-service.ts"
+reason   = "cave-runtime owns periodic-job scheduling (see [[unmapped]] for stale-detection job)"
+
+[[skipped]]
+upstream = "src/lib/middleware/* (auth, rate-limit, oas, cors)"
+reason   = "cave-runtime middleware stack handles these uniformly"
+
+[[skipped]]
+upstream = "src/lib/services/event-service.ts"
+reason   = "cave-runtime event bus handles cross-module events"
+
+[[skipped]]
+upstream = "src/lib/services/event-store.ts"
+reason   = "cave-runtime event store"
+
+[[skipped]]
+upstream = "src/lib/services/settings-service.ts"
+reason   = "cave-runtime settings"
+
+[[skipped]]
+upstream = "src/lib/util/db-locks.ts + advisory-lock.ts"
+reason   = "cave-db advisory-lock layer"
+
+[[skipped]]
+upstream = "src/lib/services/maintenance-service.ts"
+reason   = "cave-runtime ops surface"
+
+[[skipped]]
+upstream = "src/lib/util/loadProjectFiles.ts"
+reason   = "Node-specific bootstrap (no equivalent in Rust binary)"
+
+[[skipped]]
+upstream = "src/lib/util/get-prom-client.ts"
+reason   = "cave-obs Prometheus client"
+
+[[skipped]]
+upstream = "src/lib/services/health-service.ts"
+reason   = "cave-runtime health probe (cave-flags surfaces /api/flags/health only)"
+
+[[skipped]]
+upstream = "src/lib/migration-runner.ts + db-migrator.ts"
+reason   = "cave-db migration framework (store.rs migrations live in cave-flags but runner is cave-db's)"
+
+[[skipped]]
+upstream = "src/test/* + test-helpers"
+reason   = "test infra; tests live alongside Rust modules"
+
+[[skipped]]
+upstream = "scripts/* + dev-server/* + build-tooling"
+reason   = "TypeScript dev/build infra"
+
+[[skipped]]
+upstream = "src/lib/db/event-store.ts"
+reason   = "cave-runtime event bus"
+
+[[skipped]]
+upstream = "src/lib/services/version-check-service.ts"
+reason   = "cave-upstream-watchd owns upstream version tracking"
+
+[[skipped]]
+upstream = "src/lib/services/openapi-service-generated-types.ts"
+reason   = "generated TS types; Rust uses serde directly"
+
+[[skipped]]
+upstream = "enterprise/* (closed-source plugins)"
+reason   = "AGPL workspace does not bundle commercial plugins"
+
+[[skipped]]
+upstream = "src/lib/util/redis-pubsub.ts"
+reason   = "cave-cache pubsub (no proxy-only deployments yet)"
+
+[[skipped]]
+upstream = "src/lib/services/proxy-repository.ts"
+reason   = "Unleash Edge / Unleash Proxy are separate runtime targets — see [[unmapped]] for the edge-proxy mode"
+
+[[skipped]]
+upstream = "src/lib/services/public-signup-service.ts"
+reason   = "cave-auth handles public signup tokens"
+
+# Unmapped: honest gaps deferred to a later sprint
+[[unmapped]]
+upstream = "src/lib/services/scheduler-job/metric-bucket-compactor"
+priority = "P2"
+notes    = "Hourly compaction of metrics table to keep yes/no counters bounded. Schema present, runner not wired."
+
+[[unmapped]]
+upstream = "src/lib/services/public-signup-token-service.ts (token surface only)"
+priority = "P3"
+notes    = "Public invite/signup token API surface. Token persistence delegated to cave-auth; cave-flags surface for project-invite tokens deferred."

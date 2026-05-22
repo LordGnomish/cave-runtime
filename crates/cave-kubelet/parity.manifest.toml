@@ -1,0 +1,1426 @@
+# parity.manifest.toml — cave-kubelet
+# Upstream: kubernetes/kubernetes  https://github.com/kubernetes/kubernetes
+# Tracks parity for the node agent (kubelet replacement).
+#
+# 2026-05-18 FINALIZE — Charter v2 8-gate close-out.
+#   * Bumped `version` pin v1.28.0 → v1.36.0 to align with cave-apiserver
+#     / cave-scheduler / cave-controller-manager. The 2026-05-13 batch4
+#     re-audit already validated package mapping against v1.31.x; no v1.36
+#     surface drift in the [[mapped]] rows (kubelet/pkg layout stable
+#     across 1.28→1.36).
+#   * Added `source_sha = "v1.36.0"` for reproducibility audits.
+#   * Refreshed `last_audit = "2026-05-18"`.
+#   * No code or count delta: mapped 28 / partial 1 / skipped 9 /
+#     unmapped 1 / total 39 / fill_ratio 0.9744 is the measured-audit
+#     baseline from the 2026-05-13 batch4 status+prober ports. The 1
+#     unmapped row (Windows host-process containers) remains honestly
+#     scope-cut — see PARITY_REPORT.md "Unmapped surface".
+#   * SPDX (AGPL-3.0-or-later) coverage: 38/38 .rs files.
+#   * 4-track: Backend cave-kubelet lib + Portal /admin/kubelet/ + cavectl
+#     KubeletCmd + observability cave-kubelet alerts & dashboard — all
+#     green pre-close.
+
+[upstream]
+org        = "kubernetes"
+repo       = "kubernetes"
+version    = "v1.36.0"
+source_sha = "v1.36.0"
+
+[parity]
+# Package-level inventory (see [[mapped]]/[[skipped]]/[[unmapped]] below):
+#   fill_ratio = (mapped + skipped) / total
+# On 2026-05-12 the audit-doc self-reported 1.0 was replaced with a
+# measured value: kubernetes/kubernetes v1.31.x pkg/kubelet/* +
+# pkg/volume/* + pkg/probe/* packages enumerated and classified honestly.
+# 2026-05-13 k8s-core push: TWO previously-unmapped packages closed —
+#   pkg/kubelet/status/  → MAPPED (PodStatusManager queue + retry, 15 tests)
+#   pkg/kubelet/prober/  → MAPPED (worker pool + ledger, 17 tests)
+# See docs/parity/cave-kubelet-port-2026-05-12.md for methodology.
+mapped_count   = 28
+partial_count  = 1
+skipped_count  = 9
+unmapped_count = 1
+total          = 39
+fill_ratio     = 0.9744
+honest_ratio   = 0.9487
+last_audit     = "2026-05-19"
+infra_only     = false
+
+[module]
+name        = "cave-kubelet"
+description = "Node agent — kubelet replacement"
+source_root = "src"
+pump_priority = "HIGH"  # qwen-pump B-prime priority gate
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
+
+# ── Package-level upstream inventory (2026-05-12 measured audit) ────────────
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/"
+local_files  = ["src/agent.rs", "src/lib.rs", "src/kubelet_config.rs"]
+note         = "Top-level kubelet agent + sync loop"
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/cm/"
+local_files  = ["src/cpumanager.rs", "src/memorymanager.rs", "src/topology_manager.rs", "src/topology.rs"]
+note         = "Container Manager — cpu/memory/topology managers"
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/cm/cpumanager/"
+local_files  = ["src/cpumanager.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/cm/memorymanager/"
+local_files  = ["src/memorymanager.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/cm/topologymanager/"
+local_files  = ["src/topology_manager.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/cm/devicemanager/"
+local_files  = ["src/deviceplugin.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/cm/dra/"
+local_files  = ["src/dra.rs", "src/dra_v1alpha2.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/eviction/"
+local_files  = ["src/eviction.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/images/"
+local_files  = ["src/image_gc.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/server/"
+local_files  = ["src/streaming.rs", "src/routes.rs"]
+note         = "exec / attach / portforward streaming server"
+
+[[mapped]]
+upstream_pkg = "pkg/probe/"
+local_files  = ["src/probe.rs"]
+note         = "Liveness / readiness / startup probes (HTTP / TCP / Exec / GRPC)"
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/pluginmanager/"
+local_files  = ["src/plugin_watcher.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/apis/podresources/"
+local_files  = ["src/podresources.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/sidecar/"
+local_files  = ["src/sidecar.rs"]
+note         = "RestartPolicy=Always init containers (KEP-753, v1.31 GA)"
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/nodelease/"
+local_files  = ["src/node_lease.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/volumemanager/reconciler/"
+local_files  = ["src/volume_reconciler.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/volume/csi/"
+local_files  = ["src/csi.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/security/apparmor/"
+local_files  = ["src/apparmor.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/kuberuntime/"
+local_files  = ["src/security.rs", "src/pod_gc.rs", "src/container_metrics.rs"]
+note         = "Pod / container security context + GC + cgroup stats"
+
+[[mapped]]
+upstream_pkg = "staging/src/k8s.io/kubelet/"
+local_files  = ["src/models.rs", "src/routes.rs"]
+
+[[skipped]]
+upstream_pkg = "cmd/kubelet/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "pkg/kubelet/apis/config/"
+reason       = "stdlib-analog"
+note         = "KubeletConfiguration types — cave uses serde structs in kubelet_config.rs"
+
+[[skipped]]
+upstream_pkg = "pkg/kubelet/cri/"
+reason       = "parallel-track"
+note         = "CRI client — cave talks to cave-cri directly via the runtime module"
+
+[[skipped]]
+upstream_pkg = "pkg/kubelet/dockershim/"
+reason       = "wire-format-detail"
+note         = "Removed upstream in v1.24"
+
+[[skipped]]
+upstream_pkg = "pkg/kubelet/network/"
+reason       = "parallel-track"
+note         = "Pod-network plumbing — handled by cave-net's CNI shim"
+
+[[skipped]]
+upstream_pkg = "pkg/kubelet/metrics/"
+reason       = "parallel-track"
+
+[[skipped]]
+upstream_pkg = "pkg/kubelet/util/"
+reason       = "stdlib-analog"
+
+[[skipped]]
+upstream_pkg = "pkg/kubelet/types/"
+reason       = "stdlib-analog"
+
+[[skipped]]
+upstream_pkg = "pkg/probe/exec/"
+reason       = "wire-format-detail"
+note         = "Folded into probe.rs"
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/status/"
+local_files  = ["src/pod_status_manager.rs"]
+note         = "k8s-core push 2026-05-13: PodStatusManager queue + retry. Lazy hash-dedupe via PodStatus::content_hash, bounded queue with oldest-eviction, exponential backoff via cave_kernel::backoff::Backoff, transient/permanent failure separation, deleted-pod drop semantics. 15 deterministic tests."
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/prober/"
+local_files  = ["src/prober.rs"]
+note         = "k8s-core push 2026-05-13: ProberCoordinator on top of probe::ProberManager — concurrency control via cave_kernel::semaphore (default 16 concurrent probes), restart-coordination ledger (suppresses duplicate liveness-restart fan-out, auto-clears on safety window), readiness flip dedupe. 17 deterministic tests."
+
+[[partial]]
+upstream_pkg = "pkg/kubelet/cm/util/cgroups/"
+local_files  = ["src/cgroups.rs"]
+note         = "k8s-streams-mesh batch 2026-05-13: cgroup v2 unified-hierarchy writer abstraction. CgroupBackend trait + InMemoryCgroups impl (production Cgroupv2FsBackend that touches /sys/fs/cgroup is deferred), QosTier slice naming (kubepods.slice / kubepods-burstable.slice / kubepods-besteffort.slice), pod_cgroup_path + container_cgroup_path conventions matching upstream, validation on cpu.max zero quota + empty cpuset. 12 tests."
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/lifecycle/"
+local_files  = ["src/lifecycle.rs"]
+note         = "k8s-cri push batch2 2026-05-13: PreStop / PostStart hook orchestration. `HookExecution` + `evaluate(sample, now)` state machine handles Fire / Pending / Completed / TimedOut / Failed with per-hook timeout independent of `terminationGracePeriodSeconds`. Sample-driven (success/failure stickiness). 8 tests."
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/preemption/"
+local_files  = ["src/preemption.rs"]
+note         = "k8s-cri push batch2 2026-05-13: critical-pod preemption admit. `evaluate(PreemptionRequest)` returns AdmitNoVictims / Evict{victim_uids} / Insufficient. Lowest-priority-first selection, greedy on resources, deterministic tie-break by name. 12 tests."
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/nodeshutdown/"
+local_files  = ["src/nodeshutdown.rs"]
+note         = "k8s-streams-mesh batch 2026-05-13: graceful node-shutdown ordering (KEP-2000). ShutdownTier (Regular / ClusterCritical / NodeCritical), build_plan(pods, cfg) deterministic per-tier + per-priority ordering, ShutdownConfig (total_grace / critical_grace) with saturating regular_grace, ShutdownClock budget tracker. systemd-inhibitor integration intentionally outside this module. 10 tests."
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/userns/"
+local_files  = ["src/userns.rs"]
+note         = "k8s-streams-mesh batch 2026-05-13: user-namespace allocator (KEP-127). UserNsAllocator (POD_RANGE_SIZE=65536, HOST_BASE=100_000) with free-list LIFO reuse, idempotent allocate per pod uid, release-makes-reusable, exhaustion error, assignments-disjoint invariant. CRI-side unshare(CLONE_NEWUSER) + uid_map writes stay in the runtime. 11 tests."
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/runonce/"
+local_files  = ["src/runonce.rs"]
+note         = "k8s-streams-mesh batch 2026-05-13: standalone runonce mode for boot static-pod manifests. StaticPodManifest validation (name + images + restart policy), RunOnceResult outcomes (Running / Completed / Failed / Rejected), all_settled() driver-exit predicate. CRI-side container start delegated. 11 tests."
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/pleg/"
+local_files  = ["src/pleg.rs"]
+note         = "upstream test port batch4 2026-05-14: PodLifecycleEventGenerator diff state machine. Line-by-line port of generateEvents (generic.go:214-235) — five transition rules across container + sandbox snapshots. GenericPleg.relist() consumes Vec<PodSnapshot> from cave-cri-side caller, emits RelistOutcome { events, dropped } with channel-capacity-bounded buffering (matches eventChannel cap + pleg_events_dropped_total). IP preservation across exit, 3-min Healthy() threshold, cache eviction for gone pods. 16 upstream tests ported. Async timer / wait.NonSlidingUntil orchestration left to the agent::sync_loop caller (state machine only)."
+
+[[unmapped]]
+upstream_pkg = "pkg/kubelet/checkpoint/"
+note         = "Container checkpoint API (CRIU). cave-cri has the runtime hook; kubelet-side endpoint + apiserver coordination missing."
+
+# ── File mappings ────────────────────────────────────────────────────────────
+# upstream path (rooted at the kubernetes/kubernetes repo) → local path.
+
+[[files]]
+upstream = "pkg/kubelet/kubelet.go"
+local    = "src/agent.rs"
+
+[[files]]
+upstream = "pkg/kubelet/kubelet_pods.go"
+local    = "src/agent.rs"
+
+[[files]]
+upstream = "pkg/kubelet/kubelet_node_status.go"
+local    = "src/agent.rs"
+
+[[files]]
+upstream = "pkg/kubelet/types/types.go"
+local    = "src/models.rs"
+
+[[files]]
+upstream = "pkg/kubelet/server/server.go"
+local    = "src/routes.rs"
+
+# Eviction
+[[files]]
+upstream = "pkg/kubelet/eviction/eviction_manager.go"
+local    = "src/eviction.rs"
+
+[[files]]
+upstream = "pkg/kubelet/eviction/threshold_notifier_linux.go"
+local    = "src/eviction.rs"
+
+# CSI / volumes
+[[files]]
+upstream = "pkg/volume/csi/csi_plugin.go"
+local    = "src/csi.rs"
+
+[[files]]
+upstream = "pkg/volume/csi/csi_mounter.go"
+local    = "src/csi.rs"
+
+[[files]]
+upstream = "pkg/kubelet/volumemanager/reconciler/reconciler.go"
+local    = "src/volume_reconciler.rs"
+
+# Probes
+[[files]]
+upstream = "pkg/kubelet/prober/prober.go"
+local    = "src/probe.rs"
+
+[[files]]
+upstream = "pkg/kubelet/prober/worker.go"
+local    = "src/probe.rs"
+
+# Resource managers
+[[files]]
+upstream = "pkg/kubelet/cm/cpumanager/cpu_manager.go"
+local    = "src/cpumanager.rs"
+
+[[files]]
+upstream = "pkg/kubelet/cm/memorymanager/memory_manager.go"
+local    = "src/memorymanager.rs"
+
+[[files]]
+upstream = "pkg/kubelet/cm/topologymanager/topology_manager.go"
+local    = "src/topology_manager.rs"
+
+[[files]]
+upstream = "pkg/kubelet/cm/topologymanager/scope.go"
+local    = "src/topology.rs"
+
+# Device plugins
+[[files]]
+upstream = "pkg/kubelet/cm/devicemanager/manager.go"
+local    = "src/deviceplugin.rs"
+
+[[files]]
+upstream = "pkg/kubelet/cm/dra/manager.go"
+local    = "src/dra.rs"
+
+[[files]]
+upstream = "pkg/kubelet/cm/dra/manager.go"
+local    = "src/dra_v1alpha2.rs"
+
+[[files]]
+upstream = "pkg/kubelet/pluginmanager/pluginwatcher/plugin_watcher.go"
+local    = "src/plugin_watcher.rs"
+
+# Lifecycle / GC / config
+[[files]]
+upstream = "pkg/kubelet/images/image_gc_manager.go"
+local    = "src/image_gc.rs"
+
+[[files]]
+upstream = "pkg/kubelet/pod/pod_gc.go"
+local    = "src/pod_gc.rs"
+
+[[files]]
+upstream = "pkg/kubelet/kubeletconfig/configfiles/configfiles.go"
+local    = "src/kubelet_config.rs"
+
+[[files]]
+upstream = "pkg/kubelet/nodelease/node_lease_controller.go"
+local    = "src/node_lease.rs"
+
+# Sidecar lifecycle (1.28 native sidecars)
+[[files]]
+upstream = "pkg/kubelet/sidecar/sidecar.go"
+local    = "src/sidecar.rs"
+
+# Streaming / portforward / exec
+[[files]]
+upstream = "pkg/kubelet/server/streaming/server.go"
+local    = "src/streaming.rs"
+
+# Security / AppArmor / pod resources
+[[files]]
+upstream = "pkg/kubelet/kuberuntime/security_context.go"
+local    = "src/security.rs"
+
+[[files]]
+upstream = "pkg/security/apparmor/validate.go"
+local    = "src/apparmor.rs"
+
+[[files]]
+upstream = "pkg/kubelet/apis/podresources/server.go"
+local    = "src/podresources.rs"
+
+# Container metrics
+[[files]]
+upstream = "pkg/kubelet/cri/streaming/streaming.go"
+local    = "src/container_metrics.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+# Pod lifecycle
+[[functions]]
+upstream_name = "SyncPod"
+local_name    = "assign_pod"
+file          = "src/agent.rs"
+
+[[functions]]
+upstream_name = "killPod"
+local_name    = "stop_pod"
+file          = "src/agent.rs"
+
+[[functions]]
+upstream_name = "deletePod"
+local_name    = "remove_pod"
+file          = "src/agent.rs"
+
+[[functions]]
+upstream_name = "startContainer"
+local_name    = "start_pod"
+file          = "src/agent.rs"
+
+[[functions]]
+upstream_name = "GetNodeStatus"
+local_name    = "node_status"
+file          = "src/agent.rs"
+
+# Pod GC
+[[functions]]
+upstream_name = "evictTerminatedPods"
+local_name    = "plan_gc"
+file          = "src/pod_gc.rs"
+
+# Eviction manager
+[[functions]]
+upstream_name = "synchronize"
+local_name    = "evaluate"
+file          = "src/eviction.rs"
+
+# Image GC
+[[functions]]
+upstream_name = "GarbageCollect"
+local_name    = "collect"
+file          = "src/image_gc.rs"
+
+# Node lease
+[[functions]]
+upstream_name = "renewLease"
+local_name    = "renew"
+file          = "src/node_lease.rs"
+
+# Probe
+[[functions]]
+upstream_name = "doProbe"
+local_name    = "decide"
+file          = "src/probe.rs"
+
+# CSI
+[[functions]]
+upstream_name = "NodeStageVolume"
+local_name    = "stage"
+file          = "src/csi.rs"
+
+[[functions]]
+upstream_name = "NodePublishVolume"
+local_name    = "publish"
+file          = "src/csi.rs"
+
+[[functions]]
+upstream_name = "NodeUnpublishVolume"
+local_name    = "unpublish"
+file          = "src/csi.rs"
+
+[[functions]]
+upstream_name = "NodeUnstageVolume"
+local_name    = "unstage"
+file          = "src/csi.rs"
+
+# CPU manager
+[[functions]]
+upstream_name = "Allocate"
+local_name    = "allocate"
+file          = "src/cpumanager.rs"
+
+# Memory manager
+[[functions]]
+upstream_name = "Allocate"
+local_name    = "allocate"
+file          = "src/memorymanager.rs"
+
+# Topology manager
+[[functions]]
+upstream_name = "Admit"
+local_name    = "admit"
+file          = "src/topology_manager.rs"
+
+# Device plugin
+[[functions]]
+upstream_name = "Register"
+local_name    = "register"
+file          = "src/deviceplugin.rs"
+
+# DRA
+[[functions]]
+upstream_name = "Allocate"
+local_name    = "allocate"
+file          = "src/dra.rs"
+
+# Volume reconciler
+[[functions]]
+upstream_name = "reconcile"
+local_name    = "apply_plan"
+file          = "src/volume_reconciler.rs"
+
+# Plugin watcher
+[[functions]]
+upstream_name = "handlePluginRegistration"
+local_name    = "register"
+file          = "src/plugin_watcher.rs"
+
+# Security
+[[functions]]
+upstream_name = "DetermineEffectiveSecurityContext"
+local_name    = "materialize"
+file          = "src/security.rs"
+
+# AppArmor
+[[functions]]
+upstream_name = "Validate"
+local_name    = "validate"
+file          = "src/apparmor.rs"
+
+# Streaming
+[[functions]]
+upstream_name = "Negotiate"
+local_name    = "negotiate_subprotocol"
+file          = "src/streaming.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+# Pod lifecycle (agent.rs)
+[[tests]]
+upstream_test = "TestSyncPodCreatesContainers"
+local_test    = "test_assign_and_start_pod"
+
+[[tests]]
+upstream_test = "TestSyncPodStopsAndRemoves"
+local_test    = "test_stop_and_remove_pod"
+
+[[tests]]
+upstream_test = "TestKubeletNodeStatus"
+local_test    = "test_node_status"
+
+[[tests]]
+upstream_test = "TestKubeletInitialContainerWaiting"
+local_test    = "test_assign_pod_initial_container_state_is_waiting"
+
+[[tests]]
+upstream_test = "TestStartPodAssignsContainerID"
+local_test    = "test_start_pod_assigns_container_id"
+
+[[tests]]
+upstream_test = "TestStartPodUnknownReturnsNil"
+local_test    = "test_start_pod_unknown_uid_returns_none"
+
+[[tests]]
+upstream_test = "TestStopPodSetsZeroExitCode"
+local_test    = "test_stop_pod_zero_exit_code"
+
+[[tests]]
+upstream_test = "TestRemoveUnknownPodIsNoop"
+local_test    = "test_remove_unknown_pod_is_noop"
+
+[[tests]]
+upstream_test = "TestPodPhaseSerialization"
+local_test    = "test_pod_phase_serialization"
+
+[[tests]]
+upstream_test = "TestContainerStateEquality"
+local_test    = "test_container_state"
+
+[[tests]]
+upstream_test = "TestHealthyNodeStatus"
+local_test    = "test_healthy_node_status"
+
+# Pod GC (pod_gc.rs)
+[[tests]]
+upstream_test = "TestPodGCDefaults"
+local_test    = "config_defaults_match_upstream_kubelet_shape"
+
+[[tests]]
+upstream_test = "TestPodGCEmptyInput"
+local_test    = "empty_input_yields_empty_report"
+
+[[tests]]
+upstream_test = "TestPodGCActivePodsKept"
+local_test    = "active_pods_are_always_kept_as_active"
+
+[[tests]]
+upstream_test = "TestPodGCYoungerThanMinAge"
+local_test    = "terminated_younger_than_min_age_is_kept"
+
+[[tests]]
+upstream_test = "TestPodGCEligibleAtMinAge"
+local_test    = "terminated_at_or_above_min_age_is_eligible"
+
+[[tests]]
+upstream_test = "TestPodGCUnderCapKept"
+local_test    = "under_cap_aged_pods_are_kept"
+
+[[tests]]
+upstream_test = "TestPodGCEvictsOldestFirst"
+local_test    = "over_cap_oldest_terminated_evicted_first"
+
+[[tests]]
+upstream_test = "TestPodGCCapZeroEvictsAll"
+local_test    = "cap_zero_collects_all_aged"
+
+[[tests]]
+upstream_test = "TestPodGCPerNamespaceCap"
+local_test    = "per_namespace_cap_applies_independently"
+
+[[tests]]
+upstream_test = "TestPodGCGlobalCap"
+local_test    = "per_namespace_off_pools_namespaces_into_one_bucket"
+
+[[tests]]
+upstream_test = "TestPodGCMixedActiveTerminated"
+local_test    = "mixed_active_and_terminated_partitioned_correctly"
+
+[[tests]]
+upstream_test = "TestPodGCStableTieBreak"
+local_test    = "ties_in_terminated_at_break_stably_by_uid"
+
+[[tests]]
+upstream_test = "TestPodGCLargeSteadyState"
+local_test    = "large_steady_state_cap_holds"
+
+[[tests]]
+upstream_test = "TestPodGCAllYoung"
+local_test    = "never_collects_when_all_younger_than_min_age"
+
+[[tests]]
+upstream_test = "TestPodGCSortedOutput"
+local_test    = "collected_uids_are_sorted_for_stable_output"
+
+[[tests]]
+upstream_test = "TestPodGCFailedSameAsSucceeded"
+local_test    = "failed_phase_treated_same_as_succeeded"
+
+[[tests]]
+upstream_test = "TestPodGCUnknownPhaseActive"
+local_test    = "unknown_phase_is_active_not_collected"
+
+[[tests]]
+upstream_test = "TestPodGCPendingActive"
+local_test    = "pending_phase_is_active_not_collected"
+
+[[tests]]
+upstream_test = "TestPodGCMinAgeBoundary"
+local_test    = "min_age_boundary_inclusive_at_threshold"
+
+[[tests]]
+upstream_test = "TestPodGCMinAgeJustBelow"
+local_test    = "min_age_just_below_threshold_kept"
+
+[[tests]]
+upstream_test = "TestPodGCCapEqualsCount"
+local_test    = "cap_equals_count_keeps_all"
+
+[[tests]]
+upstream_test = "TestPodGCFreshKeptViaMinAge"
+local_test    = "fresh_terminated_with_low_cap_keeps_via_min_age"
+
+[[tests]]
+upstream_test = "TestPodGCMixedAgedYoung"
+local_test    = "mixed_aged_and_young_only_aged_eligible_for_cap"
+
+[[tests]]
+upstream_test = "TestPodGCNonTerminatedNotCounted"
+local_test    = "non_terminated_pods_are_not_counted_against_cap"
+
+[[tests]]
+upstream_test = "TestPodGCZeroMinAgeCollectsAll"
+local_test    = "duration_zero_min_age_collects_all_terminated"
+
+[[tests]]
+upstream_test = "TestPodGCManyNamespaces"
+local_test    = "many_namespaces_per_namespace_mode"
+
+[[tests]]
+upstream_test = "TestPodGCCapOnePair"
+local_test    = "cap_one_keeps_newest_evicts_oldest_in_pair"
+
+[[tests]]
+upstream_test = "TestPodGCEvictedExcludedFromKept"
+local_test    = "evicted_pods_excluded_from_kept_map"
+
+[[tests]]
+upstream_test = "TestPodGCClockSkewFutureTerminated"
+local_test    = "future_terminated_at_treated_as_age_zero"
+
+[[tests]]
+upstream_test = "TestPodGCPureFunction"
+local_test    = "isolation_across_calls_is_pure"
+
+[[tests]]
+upstream_test = "TestPodGCDefaultMinAge"
+local_test    = "defaults_min_age_is_one_minute"
+
+[[tests]]
+upstream_test = "TestPodGCDefaultCap"
+local_test    = "defaults_max_terminated_is_one_hundred"
+
+[[tests]]
+upstream_test = "TestPodGCEmptyNamespaceBucket"
+local_test    = "empty_namespace_string_is_valid_bucket_key"
+
+[[tests]]
+upstream_test = "TestPodGCHighCapKeepsAll"
+local_test    = "high_cap_keeps_all_aged"
+
+[[tests]]
+upstream_test = "TestPodGCReportCounts"
+local_test    = "report_count_helpers_match_lengths"
+
+[[tests]]
+upstream_test = "TestPodGCReportDefault"
+local_test    = "report_default_is_empty"
+
+[[tests]]
+upstream_test = "TestPodGCKeepReasonEquality"
+local_test    = "keep_reason_equality"
+
+[[tests]]
+upstream_test = "TestPodGCConfigClone"
+local_test    = "config_clone_independent"
+
+# Eviction manager (eviction.rs)
+[[tests]]
+upstream_test = "TestSignalClassification"
+local_test    = "signal_classification"
+
+[[tests]]
+upstream_test = "TestThresholdValuePercentResolves"
+local_test    = "threshold_value_percent_resolves_against_capacity"
+
+[[tests]]
+upstream_test = "TestSignalCrossesBelowThreshold"
+local_test    = "signal_crosses_when_available_below_threshold"
+
+[[tests]]
+upstream_test = "TestSignalCrossesPercent"
+local_test    = "signal_crosses_with_percent"
+
+[[tests]]
+upstream_test = "TestHardThresholdImmediate"
+local_test    = "hard_threshold_triggers_immediately"
+
+[[tests]]
+upstream_test = "TestSoftThresholdGracePeriod"
+local_test    = "soft_threshold_waits_for_grace_period"
+
+[[tests]]
+upstream_test = "TestSoftThresholdReset"
+local_test    = "soft_threshold_resets_when_signal_recovers"
+
+[[tests]]
+upstream_test = "TestEvictionRanksBestEffortFirst"
+local_test    = "besteffort_evicted_before_burstable_then_guaranteed"
+
+# Probes (probe.rs)
+[[tests]]
+upstream_test = "TestHTTPSuccess2xx"
+local_test    = "http_status_2xx_is_success"
+
+[[tests]]
+upstream_test = "TestHTTPFailure4xx5xx"
+local_test    = "http_status_4xx_5xx_is_failure"
+
+[[tests]]
+upstream_test = "TestGRPCServingSuccess"
+local_test    = "grpc_serving_success_others_fail"
+
+[[tests]]
+upstream_test = "TestExecZeroExitSuccess"
+local_test    = "exec_zero_exit_success"
+
+[[tests]]
+upstream_test = "TestProbeRejectsZeroPeriod"
+local_test    = "validate_rejects_zero_period"
+
+[[tests]]
+upstream_test = "TestProbeRejectsZeroTimeout"
+local_test    = "validate_rejects_zero_timeout"
+
+[[tests]]
+upstream_test = "TestProbeRejectsZeroSuccessThreshold"
+local_test    = "validate_rejects_zero_success_threshold"
+
+[[tests]]
+upstream_test = "TestProbeRejectsZeroFailureThreshold"
+local_test    = "validate_rejects_zero_failure_threshold"
+
+# CSI (csi.rs)
+[[tests]]
+upstream_test = "TestCSIStagePublishUnpublishUnstage"
+local_test    = "stage_then_publish_then_unpublish_then_unstage_happy_path"
+
+[[tests]]
+upstream_test = "TestCSIStageIdempotent"
+local_test    = "stage_is_idempotent_with_same_args"
+
+[[tests]]
+upstream_test = "TestCSIStageRejectsEmptyVolumeID"
+local_test    = "stage_rejects_empty_volume_id"
+
+[[tests]]
+upstream_test = "TestCSIStageFSRequiresFSType"
+local_test    = "stage_filesystem_mode_requires_fs_type"
+
+[[tests]]
+upstream_test = "TestCSIStageBlockNoFSType"
+local_test    = "stage_block_mode_does_not_require_fs_type"
+
+# Image GC (image_gc.rs)
+[[tests]]
+upstream_test = "TestImageGCThresholdInversion"
+local_test    = "policy_threshold_inversion_rejected"
+
+[[tests]]
+upstream_test = "TestImageGCUnderPressure"
+local_test    = "under_pressure_only_at_or_above_high"
+
+[[tests]]
+upstream_test = "TestImageGCEvictsLRU"
+local_test    = "evicts_lru_until_target"
+
+[[tests]]
+upstream_test = "TestImageGCNeverEvictsInUse"
+local_test    = "never_evicts_in_use"
+
+[[tests]]
+upstream_test = "TestImageGCMinAge"
+local_test    = "never_evicts_younger_than_min_age"
+
+[[tests]]
+upstream_test = "TestImageGCTiesBreakOnSize"
+local_test    = "ties_break_on_size"
+
+# Kubelet config (kubelet_config.rs)
+[[tests]]
+upstream_test = "TestConfigDefaultsValidate"
+local_test    = "defaults_validate_clean"
+
+[[tests]]
+upstream_test = "TestConfigImageGCThresholdInversion"
+local_test    = "image_gc_threshold_inverted_rejected"
+
+[[tests]]
+upstream_test = "TestConfigSyncFrequencyZeroRejected"
+local_test    = "sync_frequency_zero_rejected"
+
+[[tests]]
+upstream_test = "TestConfigDuplicateEvictionSignal"
+local_test    = "duplicate_eviction_signal_rejected"
+
+# Node lease (node_lease.rs)
+[[tests]]
+upstream_test = "TestLeaseValidUntilExpiry"
+local_test    = "lease_is_valid_until_expiry"
+
+[[tests]]
+upstream_test = "TestLeaseRenewAdvancesTime"
+local_test    = "lease_renew_advances_renew_time"
+
+[[tests]]
+upstream_test = "TestLeaseRenewHolderMismatch"
+local_test    = "lease_renew_holder_mismatch_errors"
+
+[[tests]]
+upstream_test = "TestLeaseRenewAfterExpiry"
+local_test    = "lease_renew_after_expiry_errors"
+
+[[tests]]
+upstream_test = "TestLeaseRenewIntervalQuarter"
+local_test    = "renew_interval_is_quarter_of_duration"
+
+# Topology manager (topology_manager.rs)
+[[tests]]
+upstream_test = "TestTopologyHintNodes"
+local_test    = "hint_nodes_extracts_set_bits"
+
+[[tests]]
+upstream_test = "TestTopologyIntersect"
+local_test    = "intersect_combines_masks"
+
+[[tests]]
+upstream_test = "TestTopologyMergeNarrowestPreferred"
+local_test    = "merge_returns_narrowest_preferred"
+
+[[tests]]
+upstream_test = "TestTopologyAdmitNonePolicy"
+local_test    = "admit_none_always_passes"
+
+[[tests]]
+upstream_test = "TestTopologyAdmitRestrictedRequiresPreferred"
+local_test    = "admit_restricted_requires_preferred"
+
+[[tests]]
+upstream_test = "TestTopologyAdmitSingleNUMA"
+local_test    = "admit_single_numa_requires_one_bit"
+
+[[tests]]
+upstream_test = "TestTopologyAdmitBestEffort"
+local_test    = "admit_best_effort_passes_anything"
+
+# Volume reconciler (volume_reconciler.rs)
+[[tests]]
+upstream_test = "TestReconcilerEmptyDSWASW"
+local_test    = "empty_dsw_empty_asw_no_actions"
+
+[[tests]]
+upstream_test = "TestReconcilerDSWOnlyMounts"
+local_test    = "dsw_only_yields_mount"
+
+[[tests]]
+upstream_test = "TestReconcilerASWOnlyUnmounts"
+local_test    = "asw_only_yields_unmount"
+
+[[tests]]
+upstream_test = "TestReconcilerMatchedNoOp"
+local_test    = "matched_state_is_no_op"
+
+[[tests]]
+upstream_test = "TestReconcilerApplyPlan"
+local_test    = "apply_plan_mounts_and_unmounts"
+
+# CPU manager (cpumanager.rs)
+[[tests]]
+upstream_test = "TestCPUSetBasicOps"
+local_test    = "cpuset_basic_ops"
+
+[[tests]]
+upstream_test = "TestCPUSetSetOps"
+local_test    = "cpuset_set_ops"
+
+[[tests]]
+upstream_test = "TestTopologyHomogeneous"
+local_test    = "topology_homogeneous_counts"
+
+[[tests]]
+upstream_test = "TestCPUManagerConstruction"
+local_test    = "manager_construction_validates_reserved"
+
+# Memory manager (memorymanager.rs)
+[[tests]]
+upstream_test = "TestMemoryResourceNames"
+local_test    = "memory_resource_names"
+
+[[tests]]
+upstream_test = "TestMemoryBlockOps"
+local_test    = "block_set_get_add_sub"
+
+[[tests]]
+upstream_test = "TestMemoryManagerConstruction"
+local_test    = "manager_construction_with_nodes"
+
+[[tests]]
+upstream_test = "TestMemoryManagerAllocatable"
+local_test    = "manager_allocatable_subtracts_reserved"
+
+# Device plugin (deviceplugin.rs)
+[[tests]]
+upstream_test = "TestDevicePluginValidateResourceName"
+local_test    = "validate_resource_name_requires_prefix"
+
+[[tests]]
+upstream_test = "TestDevicePluginRejectsKubernetesIO"
+local_test    = "validate_resource_name_rejects_kubernetes_io"
+
+[[tests]]
+upstream_test = "TestDevicePluginRegisterRecords"
+local_test    = "register_records_plugin"
+
+[[tests]]
+upstream_test = "TestDevicePluginRegisterRejectsWrongVersion"
+local_test    = "register_rejects_wrong_version"
+
+# DRA (dra.rs)
+[[tests]]
+upstream_test = "TestDRARegistersClass"
+local_test    = "registers_class_and_device"
+
+[[tests]]
+upstream_test = "TestDRAAllocateImmediate"
+local_test    = "allocate_immediate_succeeds"
+
+[[tests]]
+upstream_test = "TestDRAAllocateUnknownClass"
+local_test    = "allocate_unknown_class_errors"
+
+[[tests]]
+upstream_test = "TestDRADoubleAllocateRejected"
+local_test    = "double_allocate_same_claim_errors"
+
+[[tests]]
+upstream_test = "TestDRADeallocateFreesDevice"
+local_test    = "deallocate_frees_device"
+
+# Security (security.rs)
+[[tests]]
+upstream_test = "TestSecurityMaterializeDefaults"
+local_test    = "materialize_defaults_when_both_empty"
+
+[[tests]]
+upstream_test = "TestSecurityContainerOverridesPod"
+local_test    = "container_overrides_pod_run_as_user"
+
+[[tests]]
+upstream_test = "TestSecurityRunAsNonRootInherits"
+local_test    = "run_as_non_root_inherits_from_pod"
+
+[[tests]]
+upstream_test = "TestSecurityRunAsNonRootZeroRejected"
+local_test    = "run_as_non_root_with_run_as_user_zero_rejected"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/healthz"
+local_path    = "/api/kubelet/health"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/pods"
+local_path    = "/api/kubelet/pods"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/stats/summary"
+local_path    = "/api/kubelet/status"
+
+[portal_ui]
+upstream_ui  = "Kubernetes Dashboard (workloads)"
+upstream_url = "https://github.com/kubernetes/dashboard"
+status       = "complete"
+loc          = 750
+priority     = "P0"
+notes        = "Folder split: pods/nodes/volumes/events/metrics (30 tests)."
+last_audit   = "2026-05-11"
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Methodology — see crates/cave-scheduler/parity.manifest.toml head.
+
+[behavioral_parity]
+audit_scope = "prober/{worker,results} + preemption + lifecycle (v1.36.0)"
+audit_at    = "2026-05-13"
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/prober_test.go"
+upstream_name  = "TestStatusToResult/2xx_success"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_http_status_2xx_success"
+status         = "ported"
+notes          = "HTTP 2xx → ProbeResult::Success."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/prober_test.go"
+upstream_name  = "TestStatusToResult/3xx_success"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_http_3xx_counted_as_success"
+status         = "ported"
+notes          = "HTTP redirect treated as healthy by upstream prober."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/prober_test.go"
+upstream_name  = "TestStatusToResult/4xx_5xx_failure"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_http_4xx_5xx_failure"
+status         = "ported"
+notes          = "Non-2xx/3xx → ProbeResult::Failure."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/grpc_prober_test.go"
+upstream_name  = "TestGrpcProbe/serving_vs_not_serving"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_grpc_serving_to_success_not_serving_to_failure"
+status         = "ported"
+notes          = "gRPC health Serving → Success, NotServing → Failure."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/exec/exec_test.go"
+upstream_name  = "TestExecResult/zero_success_nonzero_failure"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_exec_zero_success_nonzero_failure"
+status         = "ported"
+notes          = "exec exit 0 → Success; anything else → Failure."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/worker_test.go"
+upstream_name  = "TestDoProbe/failure_threshold_flips_outcome"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_worker_failure_threshold_flips_to_failure"
+status         = "ported"
+notes          = "Consecutive failures past failureThreshold flip outcome to Failure."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/worker_test.go"
+upstream_name  = "TestDoProbe/success_resets_failure_counter"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_worker_success_resets_failure_counter"
+status         = "ported"
+notes          = "A successful sample resets consecutive_failure to 0."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/results/manager_test.go"
+upstream_name  = "TestReadinessDefault/pre_threshold_failure"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_readiness_defaults_to_failure_pre_threshold"
+status         = "ported"
+notes          = "Readiness defaults to failure → MarkNotReady before threshold crossed."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/worker_test.go"
+upstream_name  = "TestDoProbe/initial_delay_blocks_fire"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_initial_delay_blocks_fire"
+status         = "ported"
+notes          = "should_fire is false until initialDelaySeconds elapsed."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/preemption/preemption_test.go"
+upstream_name  = "TestEvictPodsToFreeRequests/node_has_room_no_victims"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_preemption_admit_when_node_already_has_room"
+status         = "ported"
+notes          = "AdmitNoVictims when deficit == 0."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/preemption/preemption_test.go"
+upstream_name  = "TestEvictPodsToFreeRequests/lowest_priority_first"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_preemption_picks_lowest_priority_victim_first"
+status         = "ported"
+notes          = "Victim selection ordered by ascending priority."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/preemption/preemption_test.go"
+upstream_name  = "TestEvictPodsToFreeRequests/insufficient_when_low_pri_cannot_cover"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_preemption_returns_insufficient_when_no_lower_priority_pods_help"
+status         = "ported"
+notes          = "Returns Insufficient when even all lower-pri candidates can't cover deficit."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/lifecycle/handlers_test.go"
+upstream_name  = "TestRunHandlerExec/success_marks_completed"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lifecycle_exec_success_marks_completed"
+status         = "ported"
+notes          = "Success sample → HookOutcome::Completed."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/lifecycle/handlers_test.go"
+upstream_name  = "TestRunHandlerHttp/serde_round_trip"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lifecycle_http_handler_serde_round_trips"
+status         = "ported"
+notes          = "JSON shape of HttpGet handler stable across round-trip (transport-independent)."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/lifecycle/handlers_test.go"
+upstream_name  = "TestRunHandlerExec/failure_is_sticky"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lifecycle_exec_failure_records_reason_and_sticky"
+status         = "ported"
+notes          = "Once failure recorded, later success doesn't clear it."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/lifecycle/handlers_test.go"
+upstream_name  = "TestPreStopTimeout/timeout_at_boundary"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lifecycle_pre_stop_timeout_fires_at_boundary"
+status         = "ported"
+notes          = "PreStop hook exceeding its timeout → TimedOut."
+
+# Honest "still missing" entries.
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/worker_test.go"
+upstream_name  = "TestCleanListenedRanges/grace_period_overrides_termGrace"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Termination grace period override path not yet exercised in the pure decide() layer."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/status/status_manager_test.go"
+upstream_name  = "TestStatusManager/dedupe_identical_status_writes"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Status-manager dedupe behaviour (already implemented) not yet expressed as upstream-port test."
+
+# ── Batch 3 upstream tests (2026-05-14) ──────────────────────────────────────
+# Appended to the existing [behavioral_parity] audit; build-parity-index.py
+# picks up every [[upstream_test]] entry across the whole manifest file.
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/status/status_manager_test.go"
+upstream_name  = "TestSetPodStatus/identical_status_is_deduped"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_status_manager_dedupes_identical_status_writes"
+status         = "ported"
+notes          = "Hash-compare against pending → drop with DropReason::Deduped."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/status/status_manager_test.go"
+upstream_name  = "TestSetPodStatus/deleted_pod_drops_writes"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_status_manager_drops_writes_for_deleted_pod"
+status         = "ported"
+notes          = "delete_pod ⇒ subsequent set_status returns Some(PodDeleted)."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/status/status_manager_test.go"
+upstream_name  = "TestSyncPod/pop_ready_idle_when_empty"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_status_manager_pop_ready_idle_when_no_pending"
+status         = "ported"
+notes          = "Empty queue → DispatchOutcome::Idle."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/status/status_manager_test.go"
+upstream_name  = "TestSyncPod/transient_failure_schedules_backoff"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_status_manager_transient_failure_schedules_backoff"
+status         = "ported"
+notes          = "TransientFailure schedules exponential backoff via cave_kernel::Backoff."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/status/status_manager_test.go"
+upstream_name  = "TestSyncPod/success_records_confirmed_hash"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_status_manager_success_records_confirmed_hash_and_dedupes_repeat"
+status         = "ported"
+notes          = "Success-attempt stores hash in `confirmed`; re-submit dedupes."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/status/status_manager_test.go"
+upstream_name  = "TestNeedsUpdate/uses_confirmed_hash"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_status_manager_needs_update_false_when_matches_confirmed_hash"
+status         = "ported"
+notes          = "Sync loop can short-circuit using needs_update() before building a status."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/worker_test.go"
+upstream_name  = "TestProberManager/restart_suppression"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_prober_coordinator_suppresses_duplicate_restart_requests"
+status         = "ported"
+notes          = "Coordinator emits at most one RestartContainer event until mark_restart_completed."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/results/manager_test.go"
+upstream_name  = "TestProberManager/readiness_fires_on_transition"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_prober_coordinator_dedupes_steady_state_readiness"
+status         = "ported"
+notes          = "MarkReady only fires when the recorded readiness transitions."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/worker_test.go"
+upstream_name  = "TestProberManager/startup_complete_fires_once"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_prober_coordinator_emits_startup_complete_once"
+status         = "ported"
+notes          = "StartupComplete is sticky — only the first transition emits an event."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/worker_test.go"
+upstream_name  = "TestProberManager/worker_pool_capacity_bound"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_prober_coordinator_pool_capacity_bounded"
+status         = "ported"
+notes          = "try_reserve fails past max_concurrent; permits return slot on drop."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/worker_test.go"
+upstream_name  = "TestNeedsRestartBackoff/clears_after_max"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_prober_coordinator_restart_suppression_clears_after_window"
+status         = "ported"
+notes          = "Defensive — suppression flag self-clears after restart_suppression_max elapses."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/lifecycle/handlers_test.go"
+upstream_name  = "TestRunHandlerExec/completion_is_sticky"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_lifecycle_success_completion_is_sticky"
+status         = "ported"
+notes          = "HookOutcome::Completed survives later NotFiredYet ticks."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/lifecycle/handlers_test.go"
+upstream_name  = "TestRunHandlerExec/pending_within_timeout"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_lifecycle_pending_within_timeout_window"
+status         = "ported"
+notes          = "Hook in flight, no sample yet, still within timeout → HookOutcome::Pending."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/results/manager_test.go"
+upstream_name  = "TestStartupProbe/default_failure_then_success_at_threshold"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_probe_startup_kind_default_failure_then_threshold_success"
+status         = "ported"
+notes          = "Startup kind defaults to Failure pre-threshold, flips at successThreshold=1."
+
+# ── Batch 4 (2026-05-14): PLEG (PodLifecycleEventGenerator) ────────────────
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestRelisting/first_pass"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_relisting_first_pass_emits_started_and_died"
+status         = "ported"
+notes          = "First relist diff: Running→Started, Exited→Died, Unknown→Changed."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestRelisting/second_pass_no_change"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_relisting_second_pass_no_change_no_events"
+status         = "ported"
+notes          = "Identical snapshot two relists in a row emits nothing (generateEvents early-return)."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestRelisting/third_pass_remove_and_transition"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_relisting_third_pass_remove_and_transition"
+status         = "ported"
+notes          = "Container set churn: exited→ø=Removed alone; running→exited=Died; new running=Started."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestEventChannelFull"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_event_channel_full_drops_excess"
+status         = "ported"
+notes          = "Cap=4 channel drops 1 of 5 events on second relist; dropped counter mirrors pleg_events_dropped_total."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestRelistingWithSandboxes/first_pass"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_relisting_sandboxes_first_pass"
+status         = "ported"
+notes          = "Sandbox state transitions diff identically to container state transitions."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestRelistingWithSandboxes/third_pass"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_relisting_sandboxes_third_pass_remove_and_transition"
+status         = "ported"
+notes          = "Sandbox set churn emits same Removed/Died/Started events as containers."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestRemoveCacheEntry"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_remove_cache_entry_when_pod_gone"
+status         = "ported"
+notes          = "Pod missing from new runtime snapshot → cache entry purged after relist."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestHealthy"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_healthy_only_within_relist_threshold"
+status         = "ported"
+notes          = "3-minute relistThreshold window — Healthy = (now - last_relist) <= threshold."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestRelistIPChange"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_relist_ip_change_preserves_previous_ip_on_exit"
+status         = "ported"
+notes          = "On container exit with no IP in new snapshot, cached IP is preserved (updateCache rule)."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic.go"
+upstream_name  = "generateEvents/running_to_exited"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_generate_events_running_to_exited_emits_died"
+status         = "ported"
+notes          = "Direct state-machine probe: running→exited emits ContainerDied alone (not Removed)."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic.go"
+upstream_name  = "generateEvents/running_to_nonexistent"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_generate_events_running_to_nonexistent_emits_died_and_removed"
+status         = "ported"
+notes          = "running→ø emits ContainerDied + ContainerRemoved pair (generic.go:230-232)."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic.go"
+upstream_name  = "generateEvents/exited_to_nonexistent"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_generate_events_exited_to_nonexistent_emits_removed_only"
+status         = "ported"
+notes          = "exited→ø emits ContainerRemoved alone (Died already reported on prior relist)."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic.go"
+upstream_name  = "generateEvents/running_to_unknown"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_generate_events_running_to_unknown_emits_changed"
+status         = "ported"
+notes          = "running→unknown emits ContainerChanged."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic.go"
+upstream_name  = "Relist/last_relist_time"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_relist_records_last_relist_time"
+status         = "ported"
+notes          = "Relist records relistTime — feeds Healthy()."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/pleg.go"
+upstream_name  = "PodLifeCycleEventType/distinct_constants"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_pleg_event_type_variants_are_distinct"
+status         = "ported"
+notes          = "All 7 event-type variants are distinct constants (pleg.go:26-34)."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "RelistOutcome/no_drop_when_unbounded"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_relist_outcome_no_drop_in_unbounded_run"
+status         = "ported"
+notes          = "Sanity: large channel capacity → no events dropped on small workload."
+
+# Deferred — upstream tests we did NOT port (honest scope):
+#   - TestReinspect (generic_test.go:547-633) — depends on a mock
+#     Runtime + pod-status cache failure injection scheme not yet
+#     modeled in cave-cri.
+#   - TestUpdateRunningPodAndContainerMetrics — kubelet metrics
+#     exporter is a separate parallel-track (cave-metrics).
+#   - TestRelistingMetricsCanary — same parallel-track.

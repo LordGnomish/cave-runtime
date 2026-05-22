@@ -1,0 +1,97 @@
+# Deployer
+groups:
+  - name: cave-deploy-slo
+    interval: 30s
+    rules:
+      - alert: DeploySloBurnRateFast
+        expr: |
+          (
+            sum(rate(deploy_total{job="cave-deploy",code=~"5.."}[1h]))
+            /
+            sum(rate(deploy_total{job="cave-deploy"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-deploy fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-deploy/slo-burn-fast.md"
+      - alert: DeploySloBurnRateSlow
+        expr: |
+          (
+            sum(rate(deploy_total{job="cave-deploy",code=~"5.."}[6h]))
+            /
+            sum(rate(deploy_total{job="cave-deploy"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-deploy slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-deploy/slo-burn-slow.md"
+      - alert: DeployErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(deploy_total{job="cave-deploy",code=~"5.."}[7d]))
+              / sum(rate(deploy_total{job="cave-deploy"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-deploy 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-deploy/error-budget.md"
+      - alert: DeployLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(deploy_duration_seconds_bucket{job="cave-deploy"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-deploy p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-deploy/latency.md"
+      - alert: DeploySaturationHigh
+        expr: 'sum(deploy_inflight_requests{job="cave-deploy"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-deploy inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-deploy/saturation.md"
+      - alert: DeployMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-deploy"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-deploy RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-deploy/memory.md"
+      - alert: DeployCardinalityExplosion
+        expr: 'count(count by (tenant_id) (deploy_total{job="cave-deploy"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-deploy tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-deploy/cardinality.md"
+      - alert: DeployHealthProbeFailing
+        expr: 'min(up{job="cave-deploy"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-deploy health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-deploy/health.md"

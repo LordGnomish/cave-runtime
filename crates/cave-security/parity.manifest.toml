@@ -1,0 +1,331 @@
+# parity.manifest.toml — cave-security
+# Upstream: falcosecurity/falco  https://github.com/falcosecurity/falco  pinned v0.36.0
+#
+# cave-security has two upstream targets bundled together:
+#   - Falco runtime detection (rules engine + condition lang + alert output) — primary
+#   - Trivy-style scanning (image/fs/config + vuln DB + SBOM + secret scan + license + ignore)
+# Mappings below use Falco as the primary upstream; the trivy/* slice is
+# tracked here too so the calculator-format scoring covers both.
+
+[upstream]
+org     = "falcosecurity"
+repo    = "falco"
+version = "v0.36.0"
+name    = "Falco"
+license = "Apache-2.0"
+language= "C++"
+url     = "https://github.com/falcosecurity/falco"
+
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
+[module]
+name        = "cave-security"
+description = "Falco-equivalent runtime detection (rules engine + condition lang + alerts) + Trivy-style image/fs/config scanning + SBOM"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+# Falco core
+
+[[files]]
+upstream = "userspace/falco/app/app.cpp"
+local    = "src/lib.rs"
+
+[[files]]
+upstream = "userspace/engine/rules.cpp"
+local    = "src/rules.rs"
+
+[[files]]
+upstream = "userspace/engine/falco_engine.cpp"
+local    = "src/falco/engine.rs"
+
+[[files]]
+upstream = "userspace/engine/rule.cpp"
+local    = "src/falco/rule.rs"
+
+[[files]]
+upstream = "userspace/engine/conditions.cpp"
+local    = "src/falco/condition.rs"
+
+[[files]]
+upstream = "userspace/engine/falco_engine.h"
+local    = "src/falco/mod.rs"
+
+[[files]]
+upstream = "userspace/engine/output.cpp"
+local    = "src/falco/output.rs"
+
+[[files]]
+upstream = "userspace/engine/falco_common.cpp"
+local    = "src/falco/fields.rs"
+
+[[files]]
+upstream = "userspace/falco/app/actions/load_rules_files.cpp"
+local    = "src/models.rs"
+
+[[files]]
+upstream = "userspace/falco/app/actions/init_falco_engine.cpp"
+local    = "src/scanner.rs"
+
+[[files]]
+upstream = "userspace/falco/falco_outputs.cpp"
+local    = "src/routes.rs"
+
+# Trivy core (aquasecurity/trivy v0.48.0)
+
+[[files]]
+upstream = "pkg/scanner/scanner.go"
+local    = "src/trivy/scanner.rs"
+
+[[files]]
+upstream = "pkg/fanal/fanal.go"
+local    = "src/trivy/mod.rs"
+
+[[files]]
+upstream = "pkg/scanner/utils/utils.go"
+local    = "src/trivy/output.rs"
+
+[[files]]
+upstream = "pkg/types/vulnerability.go"
+local    = "src/trivy/vuln_db.rs"
+
+[[files]]
+upstream = "pkg/sbom/sbom.go"
+local    = "src/trivy/sbom.rs"
+
+[[files]]
+upstream = "pkg/fanal/secret/scanner.go"
+local    = "src/trivy/secret.rs"
+
+[[files]]
+upstream = "pkg/fanal/license/license.go"
+local    = "src/trivy/license.rs"
+
+[[files]]
+upstream = "pkg/scanner/misconfig/misconfig.go"
+local    = "src/trivy/misconfig.rs"
+
+[[files]]
+upstream = "pkg/fanal/analyzer/os/os.go"
+local    = "src/trivy/os_pkg.rs"
+
+[[files]]
+upstream = "pkg/fanal/analyzer/language/language.go"
+local    = "src/trivy/lang_pkg.rs"
+
+[[files]]
+upstream = "pkg/result/ignore.go"
+local    = "src/trivy/ignore.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "EvalCondition"
+local_name    = "evaluate_condition"
+file          = "src/rules.rs"
+
+[[functions]]
+upstream_name = "EvalRules"
+local_name    = "evaluate_rules"
+file          = "src/rules.rs"
+
+[[functions]]
+upstream_name = "BuiltinRules"
+local_name    = "builtin_rules"
+file          = "src/rules.rs"
+
+[[functions]]
+upstream_name = "ScanImage"
+local_name    = "scan_image"
+file          = "src/scanner.rs"
+
+[[functions]]
+upstream_name = "FindVulns"
+local_name    = "find_vulnerabilities"
+file          = "src/scanner.rs"
+
+[[functions]]
+upstream_name = "EvaluatePolicy"
+local_name    = "evaluate_policy"
+file          = "src/scanner.rs"
+
+[[functions]]
+upstream_name = "GenerateSBOM"
+local_name    = "generate_sbom"
+file          = "src/scanner.rs"
+
+[[functions]]
+upstream_name = "SampleDB"
+local_name    = "sample_cve_db"
+file          = "src/scanner.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+[[tests]]
+upstream_test = "userspace/engine/eval_test.cpp::TestSimpleEq"
+local_test    = "simple_eq"
+
+[[tests]]
+upstream_test = "userspace/engine/eval_test.cpp::TestBooleanAnd"
+local_test    = "boolean_and"
+
+[[tests]]
+upstream_test = "userspace/engine/eval_test.cpp::TestBooleanNot"
+local_test    = "boolean_not"
+
+[[tests]]
+upstream_test = "userspace/engine/eval_test.cpp::TestInList"
+local_test    = "in_list"
+
+[[tests]]
+upstream_test = "userspace/engine/eval_test.cpp::TestNamedList"
+local_test    = "named_list"
+
+[[tests]]
+upstream_test = "userspace/engine/eval_test.cpp::TestStartswith"
+local_test    = "startswith_op"
+
+[[tests]]
+upstream_test = "userspace/engine/eval_test.cpp::TestIcontains"
+local_test    = "icontains_op"
+
+[[tests]]
+upstream_test = "userspace/engine/eval_test.cpp::TestGlob"
+local_test    = "glob_match_test"
+
+[[tests]]
+upstream_test = "userspace/engine/eval_test.cpp::TestNumeric"
+local_test    = "numeric_compare"
+
+[[tests]]
+upstream_test = "userspace/engine/eval_test.cpp::TestMacroRef"
+local_test    = "macro_ref"
+
+[[tests]]
+upstream_test = "userspace/engine/falco_engine_test.cpp::TestBuiltinRules"
+local_test    = "default_store_has_builtin_rules"
+
+[[tests]]
+upstream_test = "userspace/engine/falco_engine_test.cpp::TestTerminalShell"
+local_test    = "evaluate_terminal_shell_in_container"
+
+[[tests]]
+upstream_test = "userspace/engine/falco_engine_test.cpp::TestBenign"
+local_test    = "no_alert_for_benign_event"
+
+[[tests]]
+upstream_test = "userspace/engine/falco_engine_test.cpp::TestLoadYaml"
+local_test    = "load_custom_yaml_rules"
+
+[[tests]]
+upstream_test = "userspace/engine/output_test.cpp::TestFormatJson"
+local_test    = "format_json"
+
+[[tests]]
+upstream_test = "userspace/engine/output_test.cpp::TestFormatText"
+local_test    = "format_text"
+
+[[tests]]
+upstream_test = "userspace/engine/output_test.cpp::TestSubstitution"
+local_test    = "format_output_substitution"
+
+[[tests]]
+upstream_test = "userspace/engine/rule_test.cpp::TestParseBuiltins"
+local_test    = "parse_builtin_rules"
+
+[[tests]]
+upstream_test = "userspace/engine/rule_test.cpp::TestPriorities"
+local_test    = "rule_priorities_ordered"
+
+[[tests]]
+upstream_test = "userspace/engine/rule_test.cpp::TestMerge"
+local_test    = "ruleset_merge"
+
+[[tests]]
+upstream_test = "userspace/engine/event_test.cpp::TestContext"
+local_test    = "event_context_get_set"
+
+[[tests]]
+upstream_test = "userspace/engine/event_test.cpp::TestExecveSyscall"
+local_test    = "syscall_execve_context"
+
+[[tests]]
+upstream_test = "userspace/engine/grpc_test.cpp::TestAlertConv"
+local_test    = "grpc_alert_from_alert"
+
+# Trivy misconfig tests
+
+[[tests]]
+upstream_test = "pkg/scanner/misconfig/dockerfile_test.go::TestRootUser"
+local_test    = "dockerfile_root_user"
+
+[[tests]]
+upstream_test = "pkg/scanner/misconfig/dockerfile_test.go::TestAddInstruction"
+local_test    = "dockerfile_add_instruction"
+
+[[tests]]
+upstream_test = "pkg/scanner/misconfig/dockerfile_test.go::TestLatestTag"
+local_test    = "dockerfile_latest_tag"
+
+[[tests]]
+upstream_test = "pkg/scanner/misconfig/k8s_test.go::TestPrivileged"
+local_test    = "k8s_privileged_container"
+
+[[tests]]
+upstream_test = "pkg/scanner/misconfig/terraform_test.go::TestPublicS3"
+local_test    = "terraform_public_s3"
+
+[[tests]]
+upstream_test = "pkg/scanner/misconfig/terraform_test.go::TestOpenSG"
+local_test    = "terraform_open_sg"
+
+[[tests]]
+upstream_test = "pkg/scanner/misconfig/cli_test.go::TestScanDockerfile"
+local_test    = "scan_config_dockerfile"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/scan/config"
+local_path    = "/api/scan/config"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/vulnerabilities/{id}"
+local_path    = "/api/vulnerabilities/{id}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/rules"
+local_path    = "/api/rules"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/security/alerts"
+local_path    = "/api/security/alerts"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/security/alerts/stream"
+local_path    = "/api/security/alerts/stream"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/sbom/{image}"
+local_path    = "/api/sbom/{image}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/security/health"
+local_path    = "/api/security/health"
+
+[portal_ui]
+upstream_ui  = "Falco (limited)"
+upstream_url = "https://falco.org/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Falcosidekick UI is partial"
+last_audit   = "2026-05-11"

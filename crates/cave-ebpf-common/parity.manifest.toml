@@ -1,0 +1,115 @@
+# parity.manifest.toml — cave-ebpf-common
+#
+# This crate is a shared types crate (BPF map definitions, syscall
+# event structs) used by both kernel-space eBPF programs and user-
+# space consumers. It is NOT a Cilium port — the actual Cilium
+# port lives in cave-net (see crates/cave-net/parity.manifest.toml,
+# upstream = cilium/cilium, fill_ratio = 0.9179 as of 2026-05-13).
+#
+# Previously this manifest mis-declared upstream = cilium/cilium,
+# which caused the /upstream tracker to display "Cilium 0%" (the
+# tracker mapped Cilium → cave-ebpf-common, whose skeleton manifest
+# computed overall=0.0). Marking infra_only = true so the dashboard
+# treats this as a Cave-internal crate and stops reporting a parity
+# axis that doesn't apply. The tracker now maps Cilium → cave-net
+# (see crates/cave-upstream/src/projects.rs).
+
+[module]
+name        = "cave-ebpf-common"
+description = "Shared eBPF types — BPF map definitions, syscall event structs. Cave-internal types crate; the Cilium parity port lives in cave-net."
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+# [[files]]
+# upstream = "path/in/upstream/repo.go"
+# local    = "src/local.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+# [[functions]]
+# upstream_name = "UpstreamFunc"
+# local_name    = "local_fn"
+# file          = "src/routes.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+# [[tests]]
+# upstream_test = "TestUpstreamFunc"
+# local_test    = "test_local_fn"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+# [[surfaces]]
+# kind          = "http"
+# upstream_path = "/api/upstream"
+# local_path    = "/api/ebpf-common/endpoint"
+
+[parity]
+infra_only = true
+# Cave-internal types crate — no upstream parity axis applies.
+# Previously declared upstream=cilium/cilium, which the /upstream
+# tracker page treated as a real Cilium port and reported "0%".
+# Marking infra_only=true keeps this crate out of the upstream
+# parity averages on the compliance dashboard.
+fill_ratio  = 0.0
+last_audit  = "2026-05-13"
+
+
+# Qwen-pump B-prime cycle 1778774770 (model=qwen3.6:35b-a3b-coding-mxfp8, success_at_retry=1)
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_net_event_struct_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_net_event_default_invariant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_resource_event_struct_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_resource_event_type_safety"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_syscall_event_struct_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_syscall_event_invariant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_net_event_empty_tenant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_resource_event_long_tenant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_syscall_event_special_chars_tenant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_net_event_unicode_tenant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_resource_event_numeric_tenant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_syscall_event_whitespace_tenant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_net_event_mixed_case_tenant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_resource_event_hyphen_tenant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_syscall_event_underscore_tenant"

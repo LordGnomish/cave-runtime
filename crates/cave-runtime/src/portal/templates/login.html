@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign in — CAVE Runtime</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg-0:#040713;
+  --bg-1:#070d1f;
+  --text:#eef3fb;
+  --text-muted:#9aa6c0;
+  --text-faint:#5f6c8a;
+  --accent:#5ec4ff;
+  --accent-strong:#3b8fd8;
+  --teal:#3ddbc4;
+  --teal-strong:#19b6a0;
+  --purple:#b08cff;
+  --purple-strong:#8a5fff;
+  --pink:#ff7ac6;
+  --red:#ff7a7a;
+  --green:#5dd39e;
+  --glass:rgba(255,255,255,0.045);
+  --glass-strong:rgba(255,255,255,0.07);
+  --glass-border:rgba(255,255,255,0.10);
+  --glass-border-hover:rgba(255,255,255,0.18);
+  --shadow-card:0 30px 80px -24px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.04) inset;
+  --transition:0.25s cubic-bezier(0.4,0,0.2,1);
+  --font:'Inter','SF Pro Text',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  --font-mono:ui-monospace,'SF Mono','JetBrains Mono','Fira Code',Menlo,Consolas,monospace;
+}
+html,body{height:100%;background:var(--bg-0);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-0.005em}
+body{
+  position:relative;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;padding:24px;
+  background:var(--bg-0);
+}
+
+/* ─── Animated mesh gradient background ───────────────────────────────── */
+.mesh{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.mesh::before,.mesh::after,.mesh-blob{
+  content:"";position:absolute;border-radius:50%;
+  filter:blur(90px);opacity:0.65;mix-blend-mode:screen;
+}
+.mesh::before{
+  width:60vw;height:60vw;left:-10vw;top:-15vh;
+  background:radial-gradient(circle, rgba(59,143,216,0.55), transparent 60%);
+  animation:meshShiftA 22s ease-in-out infinite;
+}
+.mesh::after{
+  width:55vw;height:55vw;right:-12vw;bottom:-15vh;
+  background:radial-gradient(circle, rgba(176,140,255,0.50), transparent 60%);
+  animation:meshShiftB 28s ease-in-out infinite;
+}
+.mesh-blob{
+  width:48vw;height:48vw;left:30vw;bottom:-10vh;
+  background:radial-gradient(circle, rgba(61,219,196,0.42), transparent 60%);
+  animation:meshShiftC 25s ease-in-out infinite;
+}
+.mesh-blob.mesh-blob-2{
+  width:36vw;height:36vw;left:48vw;top:-8vh;
+  background:radial-gradient(circle, rgba(255,122,198,0.32), transparent 60%);
+  animation:meshShiftD 32s ease-in-out infinite;
+  opacity:0.45;
+}
+@keyframes meshShiftA{
+  0%,100%{transform:translate(0,0) scale(1)}
+  33%{transform:translate(8vw,5vh) scale(1.1)}
+  66%{transform:translate(-4vw,10vh) scale(0.95)}
+}
+@keyframes meshShiftB{
+  0%,100%{transform:translate(0,0) scale(1)}
+  50%{transform:translate(-10vw,-8vh) scale(1.15)}
+}
+@keyframes meshShiftC{
+  0%,100%{transform:translate(0,0) scale(1)}
+  40%{transform:translate(-12vw,-10vh) scale(1.05)}
+  80%{transform:translate(6vw,4vh) scale(0.9)}
+}
+@keyframes meshShiftD{
+  0%,100%{transform:translate(0,0) scale(1)}
+  50%{transform:translate(8vw,12vh) scale(1.2)}
+}
+
+/* dot grid overlay — adds tech texture without overwhelming */
+.grid-overlay{
+  position:fixed;inset:0;z-index:1;pointer-events:none;
+  background-image:radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0);
+  background-size:26px 26px;
+  mask-image:radial-gradient(ellipse 90% 80% at 50% 50%, black 25%, transparent 75%);
+  -webkit-mask-image:radial-gradient(ellipse 90% 80% at 50% 50%, black 25%, transparent 75%);
+}
+/* faint scanline at top, like a control surface */
+.scanline{
+  position:fixed;top:0;left:0;right:0;height:1px;z-index:2;
+  background:linear-gradient(90deg, transparent, rgba(94,196,255,0.5), rgba(176,140,255,0.5), rgba(61,219,196,0.5), transparent);
+  opacity:0.55;
+}
+
+/* ─── Card shell ─────────────────────────────────────────────────────── */
+.shell{
+  position:relative;z-index:10;
+  width:100%;max-width:460px;
+  background:var(--glass);
+  backdrop-filter:blur(24px) saturate(180%);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);
+  border:1px solid var(--glass-border);
+  border-radius:20px;
+  padding:38px 36px 28px;
+  box-shadow:var(--shadow-card);
+  animation:cardIn 600ms cubic-bezier(0.16,1,0.3,1) both;
+}
+@keyframes cardIn{
+  from{opacity:0;transform:translateY(12px) scale(0.985)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+/* ─── Brand wordmark ─────────────────────────────────────────────────── */
+.brand{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:24px}
+.wordmark{display:flex;align-items:baseline;gap:10px;line-height:1}
+.wordmark-mark{
+  width:36px;height:36px;border-radius:9px;
+  background:linear-gradient(135deg, var(--accent-strong) 0%, var(--accent) 40%, var(--teal) 100%);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-mono);font-weight:700;font-size:13px;color:#fff;
+  box-shadow:0 6px 18px -6px rgba(94,196,255,0.55), 0 0 0 1px rgba(255,255,255,0.10) inset;
+  position:relative;
+}
+.wordmark-mark::after{
+  content:"";position:absolute;inset:-3px;border-radius:11px;
+  background:linear-gradient(135deg, var(--accent), var(--teal));
+  filter:blur(12px);opacity:0.4;z-index:-1;
+}
+.wordmark-text{
+  font-family:var(--font-mono);font-weight:800;font-size:30px;letter-spacing:0.08em;
+  background:linear-gradient(180deg, #ffffff 0%, #c8d4ec 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.wordmark-sub{
+  font-family:var(--font-mono);font-weight:600;font-size:11px;letter-spacing:0.32em;
+  color:var(--text-muted);margin-top:1px;text-transform:uppercase;
+}
+.tagline{
+  font-size:11.5px;color:var(--text-faint);letter-spacing:0.04em;margin-top:6px;
+  display:flex;gap:8px;align-items:center;
+}
+.tagline .pulse{
+  width:6px;height:6px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 0 0 rgba(93,211,158,0.6);
+  animation:pulse 2.4s ease-out infinite;
+}
+@keyframes pulse{
+  0%{box-shadow:0 0 0 0 rgba(93,211,158,0.55)}
+  70%{box-shadow:0 0 0 8px rgba(93,211,158,0)}
+  100%{box-shadow:0 0 0 0 rgba(93,211,158,0)}
+}
+
+/* ─── Section labels ─────────────────────────────────────────────────── */
+.section-label{
+  display:flex;align-items:center;gap:10px;
+  font-family:var(--font-mono);font-size:10px;font-weight:600;
+  text-transform:uppercase;letter-spacing:0.18em;
+  color:var(--text-faint);
+  margin:0 0 12px 2px;
+}
+.section-label::after{
+  content:"";flex:1;height:1px;
+  background:linear-gradient(90deg, var(--glass-border), transparent);
+}
+
+/* ─── Personas ───────────────────────────────────────────────────────── */
+.personas{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px;
+}
+.persona{
+  --p-color:var(--accent);
+  --p-glow:rgba(94,196,255,0.30);
+  position:relative;
+  background:var(--glass);
+  border:1px solid var(--glass-border);
+  border-radius:14px;
+  padding:18px 14px 16px;
+  cursor:pointer;
+  text-align:left;
+  font-family:inherit;color:var(--text);
+  transition:transform var(--transition),border-color var(--transition),background var(--transition),box-shadow var(--transition);
+  display:flex;flex-direction:column;gap:10px;
+  overflow:hidden;
+  opacity:0;animation:personaIn 500ms cubic-bezier(0.16,1,0.3,1) forwards;
+}
+.persona.platform{--p-color:var(--teal);--p-glow:rgba(61,219,196,0.32);animation-delay:60ms}
+.persona.tenant{--p-color:var(--purple);--p-glow:rgba(176,140,255,0.32);animation-delay:120ms}
+@keyframes personaIn{
+  from{opacity:0;transform:translateY(8px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.persona::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--p-color);
+  opacity:0;transition:opacity var(--transition);
+}
+.persona::after{
+  content:"";position:absolute;inset:-1px;border-radius:14px;
+  background:radial-gradient(circle at 50% 0%, var(--p-glow), transparent 60%);
+  opacity:0;transition:opacity var(--transition);pointer-events:none;
+}
+.persona:hover{
+  transform:translateY(-3px);
+  border-color:var(--glass-border-hover);
+  background:var(--glass-strong);
+  box-shadow:0 16px 32px -12px var(--p-glow);
+}
+.persona:hover::before,.persona:hover::after{opacity:1}
+.persona:active{transform:translateY(-1px)}
+.persona:focus-visible{outline:2px solid var(--p-color);outline-offset:2px}
+.persona-icon{
+  width:36px;height:36px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,0.04);
+  border:1px solid var(--glass-border);
+  color:var(--p-color);
+  transition:background var(--transition),border-color var(--transition);
+}
+.persona:hover .persona-icon{background:var(--p-glow);border-color:var(--p-color)}
+.persona-icon svg{width:18px;height:18px}
+.persona-name{font-size:14.5px;font-weight:600;letter-spacing:-0.01em}
+.persona-role{font-size:11.5px;color:var(--text-muted);line-height:1.45}
+.persona-email{
+  font-size:11px;color:var(--text-faint);font-family:var(--font-mono);
+  margin-top:3px;display:inline-flex;align-items:center;gap:4px;
+}
+.persona-arrow{
+  position:absolute;right:14px;top:18px;
+  color:var(--text-faint);transition:color var(--transition),transform var(--transition);
+}
+.persona:hover .persona-arrow{color:var(--p-color);transform:translateX(2px)}
+
+/* ─── Collapsible manual sign-in ─────────────────────────────────────── */
+details{margin-bottom:14px}
+summary{
+  list-style:none;cursor:pointer;
+  padding:11px 14px;
+  background:var(--glass);
+  border:1px solid var(--glass-border);
+  border-radius:10px;
+  font-size:12.5px;font-weight:500;color:var(--text-muted);
+  display:flex;align-items:center;gap:10px;
+  transition:background var(--transition),border-color var(--transition),color var(--transition);
+}
+summary::-webkit-details-marker{display:none}
+summary:hover{background:var(--glass-strong);border-color:var(--glass-border-hover);color:var(--text)}
+.sum-chev{
+  margin-left:auto;color:var(--text-faint);
+  transition:transform var(--transition),color var(--transition);
+}
+details[open] summary .sum-chev{transform:rotate(180deg);color:var(--accent)}
+details[open] summary{border-color:var(--glass-border-hover);background:var(--glass-strong);color:var(--text)}
+.sum-icon{color:var(--text-faint)}
+details[open] .sum-icon{color:var(--accent)}
+.manual-body{
+  padding:16px 4px 4px;
+  animation:manualIn 250ms ease-out;
+}
+@keyframes manualIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+label{
+  font-family:var(--font-mono);
+  font-size:10px;text-transform:uppercase;letter-spacing:0.16em;
+  color:var(--text-faint);font-weight:600;padding-left:2px;
+}
+input{
+  width:100%;padding:11px 14px;
+  background:rgba(0,0,0,0.28);
+  color:var(--text);
+  border:1px solid var(--glass-border);
+  border-radius:9px;
+  font-family:inherit;font-size:14px;
+  outline:none;
+  transition:border-color var(--transition),box-shadow var(--transition),background var(--transition);
+}
+input::placeholder{color:var(--text-faint)}
+input:hover{border-color:var(--glass-border-hover)}
+input:focus{
+  border-color:var(--accent);
+  background:rgba(0,0,0,0.42);
+  box-shadow:0 0 0 4px rgba(94,196,255,0.18);
+}
+.btn-primary{
+  width:100%;margin-top:6px;padding:12px 18px;
+  background:linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 50%, var(--purple-strong) 100%);
+  background-size:180% 180%;background-position:0% 50%;
+  color:#fff;border:none;border-radius:10px;
+  font-family:inherit;font-size:14px;font-weight:600;letter-spacing:-0.005em;
+  cursor:pointer;
+  box-shadow:0 8px 22px -8px rgba(94,196,255,0.55), 0 1px 0 rgba(255,255,255,0.18) inset;
+  transition:transform var(--transition),box-shadow var(--transition),background-position var(--transition),filter var(--transition);
+}
+.btn-primary:hover{filter:brightness(1.08);transform:translateY(-1px);background-position:100% 50%;box-shadow:0 14px 30px -8px rgba(94,196,255,0.65), 0 1px 0 rgba(255,255,255,0.22) inset}
+.btn-primary:active{transform:translateY(0);filter:brightness(0.96)}
+
+/* ─── Errors ─────────────────────────────────────────────────────────── */
+.error{
+  margin-bottom:12px;padding:10px 12px;
+  background:rgba(255,122,122,0.08);
+  border:1px solid rgba(255,122,122,0.30);
+  color:var(--red);border-radius:8px;font-size:12.5px;
+  display:none;align-items:center;gap:8px;
+}
+.error.show{display:flex}
+
+/* ─── Keycloak tertiary ──────────────────────────────────────────────── */
+.tertiary-row{
+  display:flex;align-items:center;justify-content:center;
+  margin-top:6px;padding-top:14px;
+  border-top:1px solid var(--glass-border);
+  font-size:12px;
+}
+.tertiary-row a{
+  color:var(--text-muted);text-decoration:none;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 10px;border-radius:6px;
+  transition:color var(--transition),background var(--transition);
+}
+.tertiary-row a:hover{color:var(--accent);background:rgba(94,196,255,0.05)}
+.tertiary-row a:hover .arr{transform:translateX(2px)}
+.tertiary-row .arr{transition:transform var(--transition);display:inline-block}
+
+/* ─── Footer ─────────────────────────────────────────────────────────── */
+.footer{
+  margin-top:18px;padding-top:14px;
+  border-top:1px solid var(--glass-border);
+  font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;
+}
+.footer a{color:var(--text-muted);text-decoration:none}
+.footer a:hover{color:var(--accent)}
+.countdown{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:2px 8px;border-radius:10px;
+  background:linear-gradient(135deg, rgba(176,140,255,0.18), rgba(94,196,255,0.18));
+  border:1px solid rgba(176,140,255,0.30);
+  color:var(--purple);
+}
+.countdown strong{color:#fff;font-weight:700}
+
+/* ─── Responsive ─────────────────────────────────────────────────────── */
+@media (max-width:520px){
+  .shell{padding:28px 22px 22px;border-radius:16px}
+  .personas{grid-template-columns:1fr}
+  .wordmark-text{font-size:26px}
+}
+
+/* ─── Reduced motion ─────────────────────────────────────────────────── */
+@media (prefers-reduced-motion:reduce){
+  .mesh::before,.mesh::after,.mesh-blob,
+  .shell,.persona,.tagline .pulse{animation:none !important}
+  .shell{transform:none !important;opacity:1 !important}
+  .persona{opacity:1 !important;transform:none !important}
+  *{transition-duration:0.01ms !important}
+}
+</style>
+</head>
+<body>
+
+<div class="mesh">
+  <div class="mesh-blob"></div>
+  <div class="mesh-blob mesh-blob-2"></div>
+</div>
+<div class="grid-overlay"></div>
+<div class="scanline"></div>
+
+<div class="shell">
+  <div class="brand">
+    <div class="wordmark">
+      <div class="wordmark-mark">CV</div>
+      <div>
+        <div class="wordmark-text">CAVE</div>
+        <div class="wordmark-sub">RUNTIME</div>
+      </div>
+    </div>
+    <div class="tagline">
+      <span class="pulse"></span>
+      Sovereign Cloud OS · Multi-Region HA + DR
+    </div>
+  </div>
+
+  <div class="error" id="err">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span id="err-msg">…</span>
+  </div>
+
+  <div class="section-label">Choose persona</div>
+  <div class="personas">
+    <button type="button" class="persona platform" data-user="admin@platform" data-pw="admin">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between">
+        <div class="persona-icon">
+          <!-- Shield -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2 L4 5 V11 C4 16 7.5 20.2 12 22 C16.5 20.2 20 16 20 11 V5 Z"/>
+            <path d="M9 12 L11 14 L15 10" />
+          </svg>
+        </div>
+        <span class="persona-arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </span>
+      </div>
+      <div>
+        <div class="persona-name">Platform Admin</div>
+        <div class="persona-role">All tenants · all ADRs · upstream tracker · attribution</div>
+        <div class="persona-email">admin@platform</div>
+      </div>
+    </button>
+    <button type="button" class="persona tenant" data-user="admin@tenant1" data-pw="admin">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between">
+        <div class="persona-icon">
+          <!-- Building -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="3" width="16" height="18" rx="1.5"/>
+            <line x1="9" y1="8" x2="11" y2="8"/><line x1="13" y1="8" x2="15" y2="8"/>
+            <line x1="9" y1="12" x2="11" y2="12"/><line x1="13" y1="12" x2="15" y2="12"/>
+            <line x1="9" y1="16" x2="11" y2="16"/><line x1="13" y1="16" x2="15" y2="16"/>
+            <line x1="2" y1="21" x2="22" y2="21"/>
+          </svg>
+        </div>
+        <span class="persona-arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </span>
+      </div>
+      <div>
+        <div class="persona-name">Tenant Admin</div>
+        <div class="persona-role">Scoped to one tenant · isolation enforced</div>
+        <div class="persona-email">admin@tenant1</div>
+      </div>
+    </button>
+  </div>
+
+  <details>
+    <summary>
+      <span class="sum-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 11V7a4 4 0 1 1 8 0v4"/><rect x="3" y="11" width="18" height="11" rx="2"/></svg>
+      </span>
+      Sign in manually with credentials
+      <span class="sum-chev">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </span>
+    </summary>
+    <div class="manual-body">
+      <form id="lf" action="/api/auth/login" method="POST" autocomplete="on">
+        <div class="field">
+          <label for="username">Username</label>
+          <input id="username" name="username" required autocomplete="username" placeholder="you@cave">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" required autocomplete="current-password" placeholder="••••••••">
+        </div>
+        <button type="submit" class="btn-primary">Sign in →</button>
+      </form>
+    </div>
+  </details>
+
+  <div class="tertiary-row">
+    <a href="/api/auth/oidc/start">Or sign in with Keycloak <span class="arr">→</span></a>
+  </div>
+
+  <div class="footer">
+    <span>cave-runtime · v0.1.0-pre</span>
+    <span class="countdown" id="countdown">OSS launch · <strong>—</strong></span>
+    <a href="https://github.com/cave-runtime/cave-runtime" target="_blank" rel="noopener">github →</a>
+  </div>
+</div>
+
+<script>
+const errEl = document.getElementById('err');
+const errMsg = document.getElementById('err-msg');
+function showErr(m){errMsg.textContent=m;errEl.classList.add('show')}
+function clearErr(){errEl.classList.remove('show')}
+
+async function postLogin(username, password){
+  clearErr();
+  const params = new URLSearchParams();
+  params.append('username', username);
+  params.append('password', password);
+  let resp;
+  try{
+    resp = await fetch('/api/auth/login', {
+      method:'POST',
+      headers:{'content-type':'application/x-www-form-urlencoded'},
+      body:params.toString(),
+      redirect:'manual',
+      credentials:'include',
+    });
+  }catch(e){showErr('Network error: '+e.message);return}
+  if(resp.type==='opaqueredirect' || (resp.status>=300 && resp.status<400) || resp.status===200){
+    location.href = '/';return;
+  }
+  let m = `Login failed (${resp.status})`;
+  try{const j=await resp.json();if(j.error)m=j.error}catch(_){}
+  showErr(m);
+}
+
+document.querySelectorAll('.persona').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.style.opacity = '0.7';
+    postLogin(btn.dataset.user, btn.dataset.pw);
+  });
+});
+
+document.getElementById('lf').addEventListener('submit', ev => {
+  ev.preventDefault();
+  const fd = new FormData(ev.target);
+  postLogin(fd.get('username'), fd.get('password'));
+});
+
+// OSS launch countdown — Burak's stated 20-day window from 2026-05-02.
+(function(){
+  const target = new Date('2026-05-22T00:00:00Z');
+  const el = document.getElementById('countdown').querySelector('strong');
+  function tick(){
+    const ms = target.getTime() - Date.now();
+    if(ms <= 0){el.textContent='shipped'; return}
+    const days = Math.ceil(ms / 86400000);
+    el.textContent = days + (days===1 ? ' day' : ' days');
+  }
+  tick();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,868 @@
+# parity.manifest.toml — cave-rdbms-operator
+# Renamed from cave-pg per ADR-147 §3.1. Multi-upstream form per ADR-RUNTIME-UPSTREAM-MIRROR-001.
+#
+# Cave-rdbms-operator is the *control-plane* for Postgres-style RDBMS
+# instances:
+#
+#   * **CloudNativePG (CNPG)** — primary upstream. The operator's domain logic
+#     (Cluster CRD reconciliation, primary election, Barman backup, failover)
+#     lives in `lifecycle.rs`, `backup.rs`, `ha.rs`, `monitoring.rs`.
+#   * **PgBouncer** — secondary upstream. The connection-pooler subset
+#     (transaction/session/statement modes, pool stats) lives in `pool.rs`.
+#
+# `routes.rs` exposes a unified HTTP admin API that maps both upstreams onto
+# REST endpoints under `/api/pg/*`.
+
+# Primary upstream surface — CloudNativePG. PgBouncer is declared as the
+# secondary upstreams block below per ADR-147 multi-upstream pattern;
+# both are real upstreams, but parity tooling reads license + source_sha
+# from this single [upstream] block.
+[upstream]
+org        = "cloudnative-pg"
+repo       = "cloudnative-pg"
+version    = "1.24.0"
+license    = "Apache-2.0"
+source_sha = "1.24.0"   # release-tag pin; refresh on operator bump
+
+[parity]
+# Package-level inventory against CloudNativePG v1.24 + PgBouncer 1.21.
+# Hand-curated against the CNPG repository layout
+# (api/v1, controllers/, internal/, pkg/, plugin/) on 2026-05-12.
+# fill_ratio = (mapped + partial + skipped) / total
+#
+# 2026-05-21 boundary uplift:
+#   * +2 mapped: webserver.rs (per-pod sidecar surface: status/liveness/
+#     readiness/promote/backup/lsn report + LSN comparator) and
+#     default_queries.rs (CNPG default monitoring catalog: pg_stat_archiver/
+#     bgwriter/database/replication/replication_slots/locks/user_tables/
+#     wal_receiver/database_size).
+#   * 2 unmapped → scope_cuts: replica-cluster (cross-cluster replication)
+#     and pgaudit (extension-mgmt) — both formally deferred to follow-up waves.
+mapped_count          = 13
+partial_count         = 0
+skipped_count         = 12
+unmapped_count        = 0
+total                 = 25
+fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 25/25
+honest_ratio          = 1.0000  # (mapped + skipped) / total            = 25/25
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-21"
+infra_only            = false
+
+[module]
+name        = "cave-rdbms-operator"
+description = "RDBMS operator (CloudNativePG-style) — sibling to cave-rdbms (engine)"
+source_root = "src"
+pump_priority = "HIGH"  # qwen-pump B-prime priority gate
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
+
+[[upstreams]]
+org     = "cloudnative-pg"
+repo    = "cloudnative-pg"
+version = "1.24.0"
+role    = "primary-operator"
+notes   = "Cluster CRD spec, Barman backup integration, connection pooling, PVCResize, tablespace mgmt."
+
+[[upstreams]]
+org     = "pgbouncer"
+repo    = "pgbouncer"
+version = "1.21.0"
+role    = "secondary-pooler"
+notes   = "Connection-pooler subset of the operator surface — pool stats, pool sizing, pool routing."
+
+# ── File mappings ────────────────────────────────────────────────────────────
+
+# CloudNativePG (Go) → cave-rdbms-operator (Rust). The operator surface.
+
+[[files]]
+upstream = "cloudnative-pg/cloudnative-pg:pkg/specs/pgbouncer.go"
+local    = "src/pool.rs"
+
+[[files]]
+upstream = "cloudnative-pg/cloudnative-pg:pkg/management/postgres/lifecycle.go"
+local    = "src/lifecycle.rs"
+
+[[files]]
+upstream = "cloudnative-pg/cloudnative-pg:pkg/management/postgres/webserver/management.go"
+local    = "src/manager.rs"
+
+[[files]]
+upstream = "cloudnative-pg/cloudnative-pg:pkg/management/barman/barman.go"
+local    = "src/backup.rs"
+
+[[files]]
+upstream = "cloudnative-pg/cloudnative-pg:pkg/reconciler/instance/replica/replica.go"
+local    = "src/ha.rs"
+
+[[files]]
+upstream = "cloudnative-pg/cloudnative-pg:pkg/postgres/metrics/metrics.go"
+local    = "src/monitoring.rs"
+
+[[files]]
+upstream = "cloudnative-pg/cloudnative-pg:pkg/management/postgres/user.go"
+local    = "src/user.rs"
+
+[[files]]
+upstream = "cloudnative-pg/cloudnative-pg:api/v1/cluster_types.go"
+local    = "src/types.rs"
+
+[[files]]
+upstream = "cloudnative-pg/cloudnative-pg:api/v1/cluster_types.go"
+local    = "src/models.rs"
+
+[[files]]
+upstream = "cloudnative-pg/cloudnative-pg:internal/cnpi/plugin/operatorclient/operatorclient.go"
+local    = "src/error.rs"
+
+[[files]]
+upstream = "cloudnative-pg/cloudnative-pg:pkg/management/url/url.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "cloudnative-pg/cloudnative-pg:pkg/management/postgres/webserver/local.go"
+local    = "src/webserver.rs"
+
+[[files]]
+upstream = "cloudnative-pg/cloudnative-pg:pkg/management/postgres/webserver/management.go"
+local    = "src/webserver.rs"
+
+[[files]]
+upstream = "cloudnative-pg/cloudnative-pg:pkg/postgres/monitoring/default_queries.go"
+local    = "src/default_queries.rs"
+
+# PgBouncer (C) → cave-rdbms-operator pool subset.
+
+[[files]]
+upstream = "pgbouncer/pgbouncer:src/pooler.c"
+local    = "src/pool.rs"
+
+[[files]]
+upstream = "pgbouncer/pgbouncer:src/objects.c"
+local    = "src/pool.rs"
+
+[[files]]
+upstream = "pgbouncer/pgbouncer:src/main.c"
+local    = "src/manager.rs"
+
+[[files]]
+upstream = "pgbouncer/pgbouncer:src/admin.c"
+local    = "src/routes.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+# Lifecycle (CNPG cluster reconciler ⇄ in-memory InstanceManager).
+
+[[functions]]
+upstream_name = "(*ClusterReconciler).Create"
+local_name    = "create_instance"
+file          = "src/lifecycle.rs"
+
+[[functions]]
+upstream_name = "(*ClusterReconciler).Get"
+local_name    = "get_instance"
+file          = "src/lifecycle.rs"
+
+[[functions]]
+upstream_name = "(*ClusterReconciler).List"
+local_name    = "list_instances"
+file          = "src/lifecycle.rs"
+
+[[functions]]
+upstream_name = "(*ClusterReconciler).Start"
+local_name    = "start_instance"
+file          = "src/lifecycle.rs"
+
+[[functions]]
+upstream_name = "(*ClusterReconciler).Stop"
+local_name    = "stop_instance"
+file          = "src/lifecycle.rs"
+
+[[functions]]
+upstream_name = "(*ClusterReconciler).Restart"
+local_name    = "restart_instance"
+file          = "src/lifecycle.rs"
+
+[[functions]]
+upstream_name = "(*ClusterReconciler).Delete"
+local_name    = "delete_instance"
+file          = "src/lifecycle.rs"
+
+[[functions]]
+upstream_name = "(*ClusterReconciler).MarkFailed"
+local_name    = "mark_failed"
+file          = "src/lifecycle.rs"
+
+[[functions]]
+upstream_name = "(*ClusterReconciler).Promote"
+local_name    = "promote"
+file          = "src/lifecycle.rs"
+
+[[functions]]
+upstream_name = "(*Cluster).GetConnectionString"
+local_name    = "connection_string"
+file          = "src/lifecycle.rs"
+
+# Backup (Barman + CNPG backup loop).
+
+[[functions]]
+upstream_name = "(*BarmanBackup).Start"
+local_name    = "start_backup"
+file          = "src/backup.rs"
+
+[[functions]]
+upstream_name = "(*BarmanBackup).Complete"
+local_name    = "complete_backup"
+file          = "src/backup.rs"
+
+[[functions]]
+upstream_name = "(*BarmanBackup).Fail"
+local_name    = "fail_backup"
+file          = "src/backup.rs"
+
+[[functions]]
+upstream_name = "(*BarmanBackup).List"
+local_name    = "list_backups"
+file          = "src/backup.rs"
+
+[[functions]]
+upstream_name = "(*BarmanBackup).FindPITRBase"
+local_name    = "find_pitr_base"
+file          = "src/backup.rs"
+
+[[functions]]
+upstream_name = "(*BarmanBackup).ApplyRetention"
+local_name    = "apply_retention"
+file          = "src/backup.rs"
+
+[[functions]]
+upstream_name = "(*BarmanBackup).WALSegmentPath"
+local_name    = "wal_segment_path"
+file          = "src/backup.rs"
+
+# HA (CNPG replication + failover + pg_rewind).
+
+[[functions]]
+upstream_name = "(*ReplicaReconciler).Register"
+local_name    = "register_replica"
+file          = "src/ha.rs"
+
+[[functions]]
+upstream_name = "(*ReplicaReconciler).UpdateLag"
+local_name    = "update_replica_lag"
+file          = "src/ha.rs"
+
+[[functions]]
+upstream_name = "(*ReplicaReconciler).TriggerFailover"
+local_name    = "trigger_failover"
+file          = "src/ha.rs"
+
+[[functions]]
+upstream_name = "(*ReplicaReconciler).PgRewindNeeded"
+local_name    = "pg_rewind_needed"
+file          = "src/ha.rs"
+
+[[functions]]
+upstream_name = "(*ReplicaReconciler).CheckHealth"
+local_name    = "check_replication_health"
+file          = "src/ha.rs"
+
+# PgBouncer pooling (C struct API ⇄ Rust ConnectionPool).
+
+[[functions]]
+upstream_name = "create_pool"
+local_name    = "create_pool"
+file          = "src/pool.rs"
+
+[[functions]]
+upstream_name = "release_pool"
+local_name    = "remove_pool"
+file          = "src/pool.rs"
+
+[[functions]]
+upstream_name = "get_server"
+local_name    = "acquire"
+file          = "src/pool.rs"
+
+[[functions]]
+upstream_name = "release_server"
+local_name    = "release"
+file          = "src/pool.rs"
+
+[[functions]]
+upstream_name = "stats_get"
+local_name    = "get_stats"
+file          = "src/pool.rs"
+
+[[functions]]
+upstream_name = "list_pools"
+local_name    = "list_pools"
+file          = "src/pool.rs"
+
+# User / role management (CNPG user reconciler + Postgres GRANT/REVOKE SQL).
+
+[[functions]]
+upstream_name = "createRole"
+local_name    = "create_role"
+file          = "src/user.rs"
+
+[[functions]]
+upstream_name = "dropRole"
+local_name    = "drop_role"
+file          = "src/user.rs"
+
+[[functions]]
+upstream_name = "alterRole"
+local_name    = "alter_role"
+file          = "src/user.rs"
+
+[[functions]]
+upstream_name = "grantRole"
+local_name    = "grant_role"
+file          = "src/user.rs"
+
+[[functions]]
+upstream_name = "revokeRole"
+local_name    = "revoke_role"
+file          = "src/user.rs"
+
+# Monitoring (pg_stat_activity + pg_stat_user_tables parsers).
+
+[[functions]]
+upstream_name = "ParsePgStatActivity"
+local_name    = "parse_stat_activity"
+file          = "src/monitoring.rs"
+
+[[functions]]
+upstream_name = "ParsePgStatUserTables"
+local_name    = "parse_stat_tables"
+file          = "src/monitoring.rs"
+
+[[functions]]
+upstream_name = "ComputeReplicationLagSummary"
+local_name    = "compute_lag_summary"
+file          = "src/monitoring.rs"
+
+[[functions]]
+upstream_name = "FindSlowQueries"
+local_name    = "find_slow_queries"
+file          = "src/monitoring.rs"
+
+[[functions]]
+upstream_name = "ConnectionCount"
+local_name    = "count_connections"
+file          = "src/monitoring.rs"
+
+[[functions]]
+upstream_name = "ExportPrometheusMetrics"
+local_name    = "metrics_text"
+file          = "src/monitoring.rs"
+
+# Pure manager predicates (cave-pg-only — no upstream counterpart, mapped to
+# CNPG status structs via behaviour).
+
+[[functions]]
+upstream_name = "isReplicaHealthy"
+local_name    = "replication_healthy"
+file          = "src/manager.rs"
+
+[[functions]]
+upstream_name = "needsVacuum"
+local_name    = "needs_vacuum"
+file          = "src/manager.rs"
+
+[[functions]]
+upstream_name = "computePoolUtilization"
+local_name    = "pool_utilisation_pct"
+file          = "src/manager.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+[[tests]]
+upstream_test = "TestClusterCreate"
+local_test    = "instance_manager_creates_unique_instance"
+
+[[tests]]
+upstream_test = "TestClusterCreateDuplicate"
+local_test    = "instance_manager_rejects_duplicate_name"
+
+[[tests]]
+upstream_test = "TestClusterGetByID"
+local_test    = "instance_manager_get_by_id_and_name"
+
+[[tests]]
+upstream_test = "TestClusterList"
+local_test    = "instance_manager_lists_all"
+
+[[tests]]
+upstream_test = "TestClusterLifecycle"
+local_test    = "instance_manager_lifecycle_transitions"
+
+[[tests]]
+upstream_test = "TestPromoteClearsLag"
+local_test    = "instance_manager_promote_clears_lag"
+
+[[tests]]
+upstream_test = "TestUpdateLabels"
+local_test    = "instance_manager_labels_replace"
+
+[[tests]]
+upstream_test = "TestDeleteInstance"
+local_test    = "instance_manager_delete_removes"
+
+[[tests]]
+upstream_test = "TestConnectionString"
+local_test    = "instance_manager_connection_string_format"
+
+[[tests]]
+upstream_test = "TestBackupStart"
+local_test    = "backup_manager_starts_and_completes"
+
+[[tests]]
+upstream_test = "TestBackupFail"
+local_test    = "backup_manager_fails_a_backup"
+
+[[tests]]
+upstream_test = "TestBackupList"
+local_test    = "backup_manager_lists_per_instance"
+
+[[tests]]
+upstream_test = "TestBackupDelete"
+local_test    = "backup_manager_delete"
+
+[[tests]]
+upstream_test = "TestPITRBase"
+local_test    = "backup_manager_finds_pitr_base"
+
+[[tests]]
+upstream_test = "TestPITRNoBaseError"
+local_test    = "backup_manager_pitr_no_base_errors"
+
+[[tests]]
+upstream_test = "TestRetentionDropsOld"
+local_test    = "backup_manager_retention_drops_old"
+
+[[tests]]
+upstream_test = "TestWALSegmentPath"
+local_test    = "backup_manager_wal_segment_path_escapes_slash"
+
+[[tests]]
+upstream_test = "TestListWALSegments"
+local_test    = "backup_manager_lists_wal_segments"
+
+[[tests]]
+upstream_test = "TestReplicaRegister"
+local_test    = "ha_controller_registers_and_lists_replicas"
+
+[[tests]]
+upstream_test = "TestReplicaUpdateLag"
+local_test    = "ha_controller_updates_lag"
+
+[[tests]]
+upstream_test = "TestFailoverPicksLowestLag"
+local_test    = "ha_controller_failover_picks_lowest_lag"
+
+[[tests]]
+upstream_test = "TestFailoverHistory"
+local_test    = "ha_controller_failover_records_history"
+
+[[tests]]
+upstream_test = "TestFailoverNoReplicas"
+local_test    = "ha_controller_failover_without_replicas_errors"
+
+[[tests]]
+upstream_test = "TestReplicationHealthSummary"
+local_test    = "ha_controller_health_summary"
+
+[[tests]]
+upstream_test = "TestReplicationHealthLagThreshold"
+local_test    = "ha_controller_health_unhealthy_when_lag_huge"
+
+[[tests]]
+upstream_test = "TestPgRewindConservative"
+local_test    = "ha_controller_pg_rewind_conservative"
+
+[[tests]]
+upstream_test = "TestPoolCreate"
+local_test    = "pool_creates_and_lists"
+
+[[tests]]
+upstream_test = "TestPoolDuplicateName"
+local_test    = "pool_rejects_duplicate_name"
+
+[[tests]]
+upstream_test = "TestPoolRemoveUnknown"
+local_test    = "pool_remove_unknown_errors"
+
+[[tests]]
+upstream_test = "TestPoolAcquireRelease"
+local_test    = "pool_acquire_increments_stats_release_decrements"
+
+[[tests]]
+upstream_test = "TestPoolAcquireUnknown"
+local_test    = "pool_acquire_unknown_pool_errors"
+
+[[tests]]
+upstream_test = "TestPoolAllStats"
+local_test    = "pool_get_all_stats_returns_all"
+
+[[tests]]
+upstream_test = "TestPoolModeDescriptions"
+local_test    = "pool_mode_descriptions"
+
+[[tests]]
+upstream_test = "TestPoolRemoveDropsStats"
+local_test    = "pool_remove_drops_stats"
+
+[[tests]]
+upstream_test = "TestUserCreateEmitsSQL"
+local_test    = "user_manager_create_role_emits_sql"
+
+[[tests]]
+upstream_test = "TestUserCreateRejectsDuplicate"
+local_test    = "user_manager_create_role_rejects_duplicate"
+
+[[tests]]
+upstream_test = "TestUserDropRole"
+local_test    = "user_manager_drop_role"
+
+[[tests]]
+upstream_test = "TestUserAlterRoleCombines"
+local_test    = "user_manager_alter_role_combines_options"
+
+[[tests]]
+upstream_test = "TestUserGrantRevoke"
+local_test    = "user_manager_grant_revoke"
+
+[[tests]]
+upstream_test = "TestUserCreateUserSQL"
+local_test    = "user_manager_create_user_sql_full_options"
+
+[[tests]]
+upstream_test = "TestUserRegisterAndList"
+local_test    = "user_manager_register_and_list"
+
+[[tests]]
+upstream_test = "TestParsePgStatActivity"
+local_test    = "monitor_parses_stat_activity"
+
+[[tests]]
+upstream_test = "TestParsePgStatTables"
+local_test    = "monitor_parses_stat_tables"
+
+[[tests]]
+upstream_test = "TestComputeLagSummary"
+local_test    = "monitor_lag_summary_aggregates"
+
+[[tests]]
+upstream_test = "TestComputeLagSummaryEmpty"
+local_test    = "monitor_lag_summary_empty"
+
+[[tests]]
+upstream_test = "TestCountConnections"
+local_test    = "monitor_count_connections_buckets"
+
+[[tests]]
+upstream_test = "TestFindSlowQueries"
+local_test    = "monitor_finds_slow_queries"
+
+[[tests]]
+upstream_test = "TestExportPrometheusMetrics"
+local_test    = "monitor_metrics_text_emits_prometheus_format"
+
+[[tests]]
+upstream_test = "TestSlowQueriesByThreshold"
+local_test    = "manager_slow_queries_filters_by_threshold"
+
+[[tests]]
+upstream_test = "TestBloatedTablesByRatio"
+local_test    = "manager_bloated_tables_filters"
+
+[[tests]]
+upstream_test = "TestSizeAlertByThreshold"
+local_test    = "manager_size_alert_records_filter_by_threshold"
+
+[[tests]]
+upstream_test = "TestReplicationHealthyThresholds"
+local_test    = "manager_replication_healthy_thresholds"
+
+[[tests]]
+upstream_test = "TestPoolUtilisation"
+local_test    = "manager_pool_utilisation"
+
+[[tests]]
+upstream_test = "TestNeedsVacuum"
+local_test    = "manager_needs_vacuum_logic"
+
+[[tests]]
+upstream_test = "TestReplicationSlotSerde"
+local_test    = "replication_slot_round_trips_via_serde"
+
+# ── Surface mappings (HTTP admin API) ────────────────────────────────────────
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/clusters"
+local_path    = "/api/pg/databases"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/clusters/{id}"
+local_path    = "/api/pg/databases/{id}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/clusters/{id}/healthcheck"
+local_path    = "/api/pg/databases/{id}/healthcheck"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/clusters/{id}/migrations"
+local_path    = "/api/pg/migrations"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/clusters/{id}/pools"
+local_path    = "/api/pg/pools"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/clusters/{id}/pools/{pid}"
+local_path    = "/api/pg/pools/{id}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/clusters/{id}/queries/slow"
+local_path    = "/api/pg/queries/slow"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/clusters/{id}/queries"
+local_path    = "/api/pg/queries"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/clusters/{id}/backups"
+local_path    = "/api/pg/backups"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/clusters/{id}/backups/{bid}"
+local_path    = "/api/pg/backups/{id}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/health"
+local_path    = "/api/pg/health"
+
+# Qwen-pump B-prime cycle 1778427170 (model=qwen3.6:35b-a3b-coding-mxfp8, success_at_retry=2)
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_pool_utilisation_pct_basic"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_pool_utilisation_pct_zero_current"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_pool_utilisation_pct_full_capacity"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_bloated_tables_empty_list"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_bloated_tables_filter_by_ratio"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_needs_vacuum_basic"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_replication_healthy_healthy_status"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_size_alert_records_empty_list"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_size_alert_records_filter_by_threshold"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_slow_queries_empty_list"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_slow_queries_filter_by_threshold"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_module_name_constant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_pg_result_type_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_pg_error_enum_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_backup_status_enum_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_pool_mode_enum_exists"
+
+[portal_ui]
+upstream_ui  = "CloudNativePG (CRD)"
+upstream_url = "https://cloudnative-pg.io/"
+status       = "partial"
+loc          = 300
+priority     = "P1"
+notes        = "Cluster lifecycle UI"
+last_audit   = "2026-05-11"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Package-level inventory (added 2026-05-12 — measured, not self-reported)
+# See cave-etcd-port-2026-05-12.md for schema; same shape applies here.
+# ═════════════════════════════════════════════════════════════════════════════
+
+# ─── Mapped (9) — CloudNativePG packages with real cave-rdbms-operator coverage
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:api/v1/cluster_types.go"
+local_files  = ["src/types.rs", "src/models.rs"]
+note         = "Cluster CRD spec + status fields"
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/management/postgres/lifecycle.go"
+local_files  = ["src/lifecycle.rs"]
+note         = "Instance lifecycle (create / start / stop / promote / delete)"
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/reconciler/instance/replica/replica.go"
+local_files  = ["src/ha.rs"]
+note         = "Replica registration, lag tracking, failover trigger, pg_rewind"
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/management/barman/barman.go"
+local_files  = ["src/backup.rs"]
+note         = "Barman backup loop (start/complete/fail, retention, PITR base)"
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/postgres/metrics/metrics.go"
+local_files  = ["src/monitoring.rs"]
+note         = "PostgreSQL exporter metrics + status struct"
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/management/postgres/user.go"
+local_files  = ["src/user.rs"]
+note         = "User / role create / drop / grant / revoke / password"
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/specs/pgbouncer.go"
+local_files  = ["src/pool.rs"]
+note         = "PgBouncer pool spec + lifecycle (acts as the bridge upstream)"
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/reconciler/instance/pgbouncer/"
+local_files  = ["src/pooler.rs"]
+note         = "Pooler CRD reconciler: PoolerSpec/Status with phase + conditions (Available/Progressing/Failed), spec validation, generation/observed_generation tracking, render_pgbouncer_ini for the per-pod pgbouncer.ini projection, reconcile(observed_ready) phase advancement (Pending → Configuring → Degraded → Ready). Upstream's k8s pod-spec emission lives in cave-runtime cluster glue; this module owns the CRD object + reconcile loop."
+
+[[mapped]]
+upstream_pkg = "pgbouncer:src/{pooler.c,objects.c,admin.c}"
+local_files  = ["src/pool.rs"]
+note         = "Connection pool primitives — acquire / release / stats / list"
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/management/url/url.go"
+local_files  = ["src/routes.rs"]
+note         = "Unified HTTP admin API; mirrors the CNPG webserver routes"
+
+# ─── Skipped (10) — out of scope per Charter ───────────────────────────────
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:e2e/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:hack/"
+reason       = "go-bootstrap"
+note         = "kubebuilder boilerplate, manifest generators"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:config/"
+reason       = "go-bootstrap"
+note         = "kubectl/operator install manifests + Helm chart"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:cmd/manager/"
+reason       = "go-bootstrap"
+note         = "Operator binary main; replaced by cave-runtime serve"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:pkg/utils/"
+reason       = "stdlib-analog"
+note         = "Go-stdlib helpers; Rust uses tokio + std directly"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:pkg/postgres/version/"
+reason       = "stdlib-analog"
+note         = "Version-string parsing; Rust uses semver crate"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:internal/cmd/plugin/"
+reason       = "CLI"
+note         = "kubectl-cnpg plugin; replaced by cavectl rdbms subcommand"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:pkg/management/log/"
+reason       = "stdlib-analog"
+note         = "Logging glue; Rust uses tracing"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:contrib/"
+reason       = "CLI"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:docs/"
+reason       = "go-bootstrap"
+note         = "Documentation site"
+
+# ─── Mapped additions 2026-05-21 ───────────────────────────────────────────
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/specs/scheduledbackup_types.go"
+local_files  = ["src/scheduled_backup.rs"]
+note         = "ScheduledBackup CRD: 5-field cron parser (* / lists / ranges / steps), CronSchedule::next_after / matches, ScheduledBackupManager with create / get / list / suspend / resume / delete / trigger_due + retain_runs trim. Couples to backup.rs for the underlying one-shot Backup. Cron resolution is 1 minute, in UTC, matching the cloudnative-pg behaviour."
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/management/postgres/webserver/{local,management,backup,promote}.go"
+local_files  = ["src/webserver.rs"]
+note         = "Per-pod sidecar surface (CNPG `instance manager` HTTP). InstanceStatus + ProbeOutcome with liveness/readiness deciders, PromoteRequest/Response + Fast/Safe modes (pg_ctl flags), BackupRequest/Response + BackupMethod, LsnReport + lsn_at_least_as_caught_up comparator with hex-LSN parser, canonical ROUTES table. cave-runtime's sidecar binary owns the axum wiring."
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/postgres/monitoring/default_queries.go"
+local_files  = ["src/default_queries.rs"]
+note         = "Built-in monitoring-query catalog: pg_stat_archiver / bgwriter / database / replication / replication_slots / locks / user_tables / wal_receiver / database_size with column→MetricKind mapping, RunOn role filter, minimum-pg-version gating, find/queries_for_role/queries_for_version/catalog_index helpers. cave-metrics consumes the catalog."
+
+# ─── Scope_cuts 2026-05-21 — previously unmapped, now formally deferred ────
+
+[[scope_cuts]]
+upstream_pkg = "cloudnative-pg:pkg/reconciler/instance/replica/replicacluster.go"
+reason       = "ha-ray-2"
+note         = "Cross-cluster (replica-cluster) replication failover deferred to ha-ray-2. cave-rdbms-operator ships single-cluster HA today."
+
+[[scope_cuts]]
+upstream_pkg = "cloudnative-pg:pkg/management/postgres/pgaudit/"
+reason       = "extension-mgmt"
+note         = "Extension-management subsystem (pgaudit / pg_stat_statements / pg_partman) deferred. The operator does not manage Postgres extensions on a per-cluster basis today; that wave will introduce a `cave-rdbms-extension-manager` sibling."
+

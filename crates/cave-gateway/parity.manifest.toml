@@ -1,0 +1,341 @@
+# parity.manifest.toml — cave-gateway
+# Upstream: Kong/kong  https://github.com/Kong/kong  pinned v3.5.0
+#
+# cave-gateway is a Kong + Gravitee multi-upstream consolidation crate per
+# ADR-RUNTIME-API-GATEWAY-CONSOLIDATION-001. Kong covers the proxy data path
+# (admin API, runloop proxy, balancer, healthchecks, plugin chain) and is
+# recorded here as the primary upstream — cave-kernel's discover_workspace
+# reads one [upstream] per parity.manifest.toml. The Gravitee half (API /
+# Plan / Application / Subscription management surface, developer portal,
+# governance, federation) lives under src/gravitee/* and is documented in
+# the companion parity-gravitee.manifest.toml in this directory; same
+# multi-upstream + companion-manifest pattern as cave-artifacts (Pulp +
+# Harbor + Nexus).
+#
+# 2026-05-02 — Envoy xDS surface removed. Envoy was a "rejected alternative"
+# in seven ADRs and the previous src/xds.rs file along with its mappings
+# (LDS/RDS/CDS/EDS) is gone. The crate is now Kong + Gravitee canonical.
+
+[upstream]
+org     = "Kong"
+repo    = "kong"
+version = "v3.5.0"
+name    = "Kong"
+license = "Apache-2.0"
+language= "Lua"
+url     = "https://github.com/Kong/kong"
+
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
+[module]
+name        = "cave-gateway"
+description = "API gateway — Kong reimplementation + Gravitee API/plan/application/subscription surface + portal/catalog/governance"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+
+[[files]]
+upstream = "kong/init.lua"
+local    = "src/lib.rs"
+
+[[files]]
+upstream = "kong/api/init.lua"
+local    = "src/admin.rs"
+
+[[files]]
+upstream = "kong/runloop/handler.lua"
+local    = "src/proxy.rs"
+
+[[files]]
+upstream = "kong/runloop/balancer/init.lua"
+local    = "src/lb.rs"
+
+[[files]]
+upstream = "kong/runloop/healthcheck.lua"
+local    = "src/health.rs"
+
+[[files]]
+upstream = "kong/db/init.lua"
+local    = "src/store.rs"
+
+[[files]]
+upstream = "kong/router/atc.lua"
+local    = "src/matcher.rs"
+
+[[files]]
+upstream = "kong/conf_loader/init.lua"
+local    = "src/models.rs"
+
+[[files]]
+upstream = "kong/runloop/plugin_servers.lua"
+local    = "src/plugins/mod.rs"
+
+[[files]]
+upstream = "kong/plugins/jwt/handler.lua"
+local    = "src/plugins/jwt.rs"
+
+[[files]]
+upstream = "kong/plugins/oauth2/access.lua"
+local    = "src/plugins/oauth2.rs"
+
+[[files]]
+upstream = "kong/plugins/cors/handler.lua"
+local    = "src/plugins/cors.rs"
+
+[[files]]
+upstream = "kong/plugins/rate-limiting/handler.lua"
+local    = "src/plugins/rate_limiting.rs"
+
+[[files]]
+upstream = "kong/plugins/key-auth/handler.lua"
+local    = "src/plugins/key_auth.rs"
+
+[[files]]
+upstream = "kong/plugins/basic-auth/access.lua"
+local    = "src/plugins/basic_auth.rs"
+
+[[files]]
+upstream = "kong/plugins/hmac-auth/access.lua"
+local    = "src/plugins/hmac_auth.rs"
+
+[[files]]
+upstream = "kong/plugins/acl/handler.lua"
+local    = "src/plugins/acl.rs"
+
+[[files]]
+upstream = "kong/plugins/ip-restriction/handler.lua"
+local    = "src/plugins/ip_restriction.rs"
+
+[[files]]
+upstream = "kong/plugins/bot-detection/handler.lua"
+local    = "src/plugins/bot_detection.rs"
+
+[[files]]
+upstream = "kong/plugins/proxy-cache/handler.lua"
+local    = "src/plugins/proxy_cache.rs"
+
+[[files]]
+upstream = "kong/plugins/request-size-limiting/handler.lua"
+local    = "src/plugins/request_size_limiting.rs"
+
+[[files]]
+upstream = "kong/plugins/request-termination/handler.lua"
+local    = "src/plugins/request_termination.rs"
+
+[[files]]
+upstream = "kong/plugins/request-transformer/handler.lua"
+local    = "src/plugins/request_transformer.rs"
+
+[[files]]
+upstream = "kong/plugins/response-transformer/handler.lua"
+local    = "src/plugins/response_transformer.rs"
+
+[[files]]
+upstream = "kong/plugins/zipkin/handler.lua"
+local    = "src/plugins/zipkin.rs"
+
+[[files]]
+upstream = "kong/plugins/prometheus/handler.lua"
+local    = "src/plugins/prometheus.rs"
+
+[[files]]
+upstream = "kong/plugins/grpc-gateway/deco.lua"
+local    = "src/plugins/grpc_gateway.rs"
+
+[[files]]
+upstream = "kong/plugins/file-log/handler.lua"
+local    = "src/plugins/logging.rs"
+
+[[files]]
+upstream = "kong/runloop/certificate.lua"
+local    = "src/tls.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "kong.api.api_helpers.attach_routes"
+local_name    = "admin_router"
+file          = "src/admin.rs"
+
+[[functions]]
+upstream_name = "kong.runloop.balancer.execute"
+local_name    = "select_target"
+file          = "src/lb.rs"
+
+[[functions]]
+upstream_name = "kong.plugins.jwt.access.verify_signature_hs256"
+local_name    = "verify_jwt_hs256"
+file          = "src/plugins/jwt.rs"
+
+[[functions]]
+upstream_name = "kong.plugins.jwt.access.verify_signature_rs256"
+local_name    = "verify_jwt_rs256"
+file          = "src/plugins/jwt.rs"
+
+[[functions]]
+upstream_name = "kong.plugins.jwt.access.verify_signature_es256"
+local_name    = "verify_jwt_es256"
+file          = "src/plugins/jwt.rs"
+
+[[functions]]
+upstream_name = "kong.runloop.balancer.consistent_hash"
+local_name    = "hash_str"
+file          = "src/lb.rs"
+
+[[functions]]
+upstream_name = "kong.runloop.healthcheck.is_healthy"
+local_name    = "is_healthy"
+file          = "src/health.rs"
+
+[[functions]]
+upstream_name = "kong.runloop.healthcheck.report_status"
+local_name    = "observe"
+file          = "src/health.rs"
+
+[[functions]]
+upstream_name = "kong.runloop.certificate.parse_pem"
+local_name    = "parse_certified_key"
+file          = "src/tls.rs"
+
+[[functions]]
+upstream_name = "kong.runloop.certificate.serve_acme"
+local_name    = "acme_challenge_handler"
+file          = "src/tls.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+[[tests]]
+upstream_test = "spec.01-unit.05-utils.hop_by_hop_headers"
+local_test    = "hop_by_hop_headers"
+
+[[tests]]
+upstream_test = "spec.01-unit.balancer.round_robin"
+local_test    = "round_robin_distributes"
+
+[[tests]]
+upstream_test = "spec.01-unit.balancer.consistent_hash_same_key"
+local_test    = "consistent_hash_same_key"
+
+[[tests]]
+upstream_test = "spec.01-unit.balancer.consistent_hash_stability"
+local_test    = "test_consistent_hash_stability"
+
+[[tests]]
+upstream_test = "spec.01-unit.balancer.consistent_hash_different_keys"
+local_test    = "test_consistent_hash_different_keys"
+
+[[tests]]
+upstream_test = "spec.01-unit.balancer.least_connections"
+local_test    = "least_connections_picks_lowest"
+
+[[tests]]
+upstream_test = "spec.01-unit.healthcheck.marks_unhealthy_after_threshold"
+local_test    = "marks_unhealthy_after_threshold"
+
+[[tests]]
+upstream_test = "spec.01-unit.healthcheck.recovers_after_successes"
+local_test    = "recovers_after_successes"
+
+[[tests]]
+upstream_test = "spec.01-unit.healthcheck.force_set_status"
+local_test    = "force_set_status"
+
+[[tests]]
+upstream_test = "spec.01-unit.circuit_breaker.opens_after_threshold"
+local_test    = "opens_after_threshold"
+
+[[tests]]
+upstream_test = "spec.01-unit.circuit_breaker.closes_after_success"
+local_test    = "closes_after_success"
+
+[[tests]]
+upstream_test = "spec.01-unit.circuit_breaker.opens_on_failures"
+local_test    = "test_circuit_opens_on_failures"
+
+[[tests]]
+upstream_test = "spec.01-unit.circuit_breaker.rejects_in_open_state"
+local_test    = "test_circuit_rejects_in_open_state"
+
+[[tests]]
+upstream_test = "spec.01-unit.circuit_breaker.half_open_after_timeout"
+local_test    = "test_circuit_half_open_after_timeout"
+
+[[tests]]
+upstream_test = "spec.01-unit.circuit_breaker.closes_after_successes_in_half_open"
+local_test    = "test_circuit_closes_after_successes_in_half_open"
+
+[[tests]]
+upstream_test = "spec.01-unit.circuit_breaker.reopens_on_failure_in_half_open"
+local_test    = "test_circuit_reopens_on_failure_in_half_open"
+
+[[tests]]
+upstream_test = "spec.03-plugins.16-jwt.parses_authorization_header"
+local_test    = "parses_authorization_header"
+
+[[tests]]
+upstream_test = "spec.03-plugins.16-jwt.verify_hs256"
+local_test    = "verify_hs256"
+
+[[tests]]
+upstream_test = "spec.01-unit.tls.sni_resolver_exact_match"
+local_test    = "sni_resolver_exact_match"
+
+[[tests]]
+upstream_test = "spec.01-unit.tls.acme_challenge_store"
+local_test    = "acme_challenge_store"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+# Kong admin API surfaces map to /admin/v1/* (Kong-compatible) under
+# cave-gateway. Gravitee management surfaces map to /api/gateway/gravitee/*
+# (see parity-gravitee.manifest.toml for those entries).
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/services"
+local_path    = "/admin/v1/services"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/services/{id}"
+local_path    = "/admin/v1/services/{id_or_name}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/upstreams"
+local_path    = "/admin/v1/upstreams"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/consumers"
+local_path    = "/admin/v1/consumers"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/upstreams/{id}/targets"
+local_path    = "/admin/v1/upstreams/{id_or_name}/targets"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/upstreams/{id}/health"
+local_path    = "/admin/v1/upstreams/{id_or_name}/health"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/routes"
+local_path    = "/admin/v1/routes"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/plugins"
+local_path    = "/admin/v1/plugins"
+
+[portal_ui]
+upstream_ui  = "Kong Manager"
+upstream_url = "https://docs.konghq.com/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Plugin / route browser"
+last_audit   = "2026-05-11"

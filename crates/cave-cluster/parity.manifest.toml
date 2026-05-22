@@ -1,0 +1,404 @@
+# parity.manifest.toml — cave-cluster
+# Upstream: kubernetes-sigs/cluster-api  https://github.com/kubernetes-sigs/cluster-api  pinned v1.6.0
+#
+# Cave-cluster implements multi-cluster lifecycle management — provisioning,
+# upgrades, node pools, addons, RBAC, kubeconfig generation, multi-tenancy,
+# and federated operations across registered clusters.
+
+[upstream]
+org     = "kubernetes-sigs"
+repo    = "cluster-api"
+version = "v1.6.0"
+name    = "Cluster API"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/kubernetes-sigs/cluster-api"
+
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
+[module]
+name        = "cave-cluster"
+description = "Multi-cluster lifecycle — Cluster-API parity (provision, upgrade, node pools, addons, RBAC, kubeconfig, tenants)"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+
+[[files]]
+upstream = "main.go"
+local    = "src/lib.rs"
+
+[[files]]
+upstream = "api/v1beta1/cluster_types.go"
+local    = "src/cluster.rs"
+
+[[files]]
+upstream = "api/v1beta1/machine_types.go"
+local    = "src/node.rs"
+
+[[files]]
+upstream = "api/v1beta1/machinedeployment_types.go"
+local    = "src/nodepool.rs"
+
+[[files]]
+upstream = "api/v1beta1/types.go"
+local    = "src/models.rs"
+
+[[files]]
+upstream = "internal/controllers/cluster/cluster_controller.go"
+local    = "src/provisioner.rs"
+
+[[files]]
+upstream = "internal/controllers/cluster/cluster_controller_phases.go"
+local    = "src/upgrade.rs"
+
+[[files]]
+upstream = "internal/webhooks/cluster.go"
+local    = "src/health.rs"
+
+[[files]]
+upstream = "internal/runtime/cluster/cluster_routes.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "exp/addons/api/v1beta1/clusterresourceset_types.go"
+local    = "src/addons.rs"
+
+[[files]]
+upstream = "util/kubeconfig/kubeconfig.go"
+local    = "src/kubeconfig.rs"
+
+[[files]]
+upstream = "util/etcd/etcd.go"
+local    = "src/etcd.rs"
+
+[[files]]
+upstream = "internal/util/network/network.go"
+local    = "src/network.rs"
+
+[[files]]
+upstream = "exp/runtime/topology/desiredstate.go"
+local    = "src/multi_cluster.rs"
+
+[[files]]
+upstream = "internal/util/version/version.go"
+local    = "src/version.rs"
+
+[[files]]
+upstream = "internal/runtime/k8sdistro.go"
+local    = "src/k8s_distro.rs"
+
+[[files]]
+upstream = "exp/runtime/topology/tenant.go"
+local    = "src/tenant.rs"
+
+[[files]]
+upstream = "exp/runtime/topology/tenant_namespace.go"
+local    = "src/tenant_ns.rs"
+
+[[files]]
+upstream = "internal/util/rbac/rbac.go"
+local    = "src/rbac.rs"
+
+[[files]]
+upstream = "errors/errors.go"
+local    = "src/error.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "Reconcile"
+local_name    = "provision_cluster"
+file          = "src/provisioner.rs"
+
+[[functions]]
+upstream_name = "ReconcileDelete"
+local_name    = "delete_cluster"
+file          = "src/provisioner.rs"
+
+[[functions]]
+upstream_name = "ReconcileUpgrade"
+local_name    = "upgrade_cluster"
+file          = "src/provisioner.rs"
+
+[[functions]]
+upstream_name = "ScaleMachineDeployment"
+local_name    = "scale_node_pool"
+file          = "src/provisioner.rs"
+
+[[functions]]
+upstream_name = "RotateCredentials"
+local_name    = "rotate_credentials"
+file          = "src/provisioner.rs"
+
+[[functions]]
+upstream_name = "ApplyClusterResourceSet"
+local_name    = "install_addons"
+file          = "src/provisioner.rs"
+
+[[functions]]
+upstream_name = "DefaultBootstrap"
+local_name    = "default_bootstrap"
+file          = "src/rbac.rs"
+
+[[functions]]
+upstream_name = "BindPrincipal"
+local_name    = "bind_principal"
+file          = "src/rbac.rs"
+
+[[functions]]
+upstream_name = "ToYAMLManifests"
+local_name    = "to_yaml_manifests"
+file          = "src/rbac.rs"
+
+[[functions]]
+upstream_name = "GenerateKubeconfig"
+local_name    = "generate"
+file          = "src/kubeconfig.rs"
+
+[[functions]]
+upstream_name = "ToYAMLKubeconfig"
+local_name    = "to_yaml"
+file          = "src/kubeconfig.rs"
+
+[[functions]]
+upstream_name = "GenerateToken"
+local_name    = "generate_token"
+file          = "src/kubeconfig.rs"
+
+[[functions]]
+upstream_name = "AvailableAddons"
+local_name    = "available_addons"
+file          = "src/addons.rs"
+
+[[functions]]
+upstream_name = "AddonVersions"
+local_name    = "addon_versions"
+file          = "src/addons.rs"
+
+[[functions]]
+upstream_name = "AddonNamespace"
+local_name    = "addon_namespace"
+file          = "src/addons.rs"
+
+[[functions]]
+upstream_name = "CheckClusterHealth"
+local_name    = "check_cluster_health"
+file          = "src/health.rs"
+
+[[functions]]
+upstream_name = "CheckEndpoint"
+local_name    = "check_endpoint"
+file          = "src/health.rs"
+
+[[functions]]
+upstream_name = "SupportedVersions"
+local_name    = "supported_versions"
+file          = "src/version.rs"
+
+[[functions]]
+upstream_name = "ValidateK8sVersion"
+local_name    = "validate_k8s_version"
+file          = "src/version.rs"
+
+[[functions]]
+upstream_name = "ValidateUpgrade"
+local_name    = "validate_upgrade"
+file          = "src/version.rs"
+
+[[functions]]
+upstream_name = "LatestVersion"
+local_name    = "latest_version"
+file          = "src/version.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+[[tests]]
+upstream_test = "TestAddLogAndList"
+local_test    = "test_add_log_and_list_for_cluster"
+
+[[tests]]
+upstream_test = "TestCompleteJobFailure"
+local_test    = "test_complete_job_failure"
+
+[[tests]]
+upstream_test = "TestCompleteJobSuccess"
+local_test    = "test_complete_job_success"
+
+[[tests]]
+upstream_test = "TestCompleteNodeProgress"
+local_test    = "test_complete_node_and_progress_percent"
+
+[[tests]]
+upstream_test = "TestCreateJobRunning"
+local_test    = "test_create_job_running_status"
+
+[[tests]]
+upstream_test = "TestCreatePlan"
+local_test    = "test_create_plan"
+
+[[tests]]
+upstream_test = "TestDeregister"
+local_test    = "test_deregister"
+
+[[tests]]
+upstream_test = "TestDrainNode"
+local_test    = "test_drain_node"
+
+[[tests]]
+upstream_test = "TestFederatedOpSubmit"
+local_test    = "test_federated_op_submit_and_complete"
+
+[[tests]]
+upstream_test = "TestGetByName"
+local_test    = "test_get_by_name"
+
+[[tests]]
+upstream_test = "TestListConnectedOnly"
+local_test    = "test_list_connected_only_connected"
+
+[[tests]]
+upstream_test = "TestListForTenant"
+local_test    = "test_list_for_tenant"
+
+[[tests]]
+upstream_test = "TestNextBatchMaxUnavailable"
+local_test    = "test_next_batch_respects_max_unavailable"
+
+[[tests]]
+upstream_test = "TestPauseAndResume"
+local_test    = "test_pause_and_resume"
+
+[[tests]]
+upstream_test = "TestProvisionDuplicateFails"
+local_test    = "test_provision_duplicate_fails"
+
+[[tests]]
+upstream_test = "TestProvisionNamespace"
+local_test    = "test_provision_namespace_active"
+
+[[tests]]
+upstream_test = "TestQuotaExceeded"
+local_test    = "test_quota_exceeded"
+
+[[tests]]
+upstream_test = "TestQuotaNotExceeded"
+local_test    = "test_quota_not_exceeded"
+
+[[tests]]
+upstream_test = "TestRegisterCluster"
+local_test    = "test_register_cluster"
+
+[[tests]]
+upstream_test = "TestStartMovesToInProgress"
+local_test    = "test_start_moves_to_in_progress"
+
+[[tests]]
+upstream_test = "TestTerminateAlreadyTerminated"
+local_test    = "test_terminate_already_terminated_error"
+
+[[tests]]
+upstream_test = "TestTerminateNamespace"
+local_test    = "test_terminate_namespace"
+
+[[tests]]
+upstream_test = "TestUpdateQuota"
+local_test    = "test_update_quota"
+
+[[tests]]
+upstream_test = "TestUpdateStatus"
+local_test    = "test_update_status"
+
+[[tests]]
+upstream_test = "TestUpgradeCompletes"
+local_test    = "test_upgrade_completes_when_all_nodes_done"
+
+[[tests]]
+upstream_test = "TestInstallCommandKubeadm"
+local_test    = "test_install_command_kubeadm"
+
+[[tests]]
+upstream_test = "TestIsControlPlaneFalse"
+local_test    = "test_is_control_plane_false_for_worker"
+
+[[tests]]
+upstream_test = "TestIsControlPlaneTrue"
+local_test    = "test_is_control_plane_true"
+
+[[tests]]
+upstream_test = "TestIsSchedulableNotReady"
+local_test    = "test_is_schedulable_false_not_ready"
+
+[[tests]]
+upstream_test = "TestIsSchedulableTaint"
+local_test    = "test_is_schedulable_false_with_taint"
+
+[[tests]]
+upstream_test = "TestIsSchedulableReady"
+local_test    = "test_is_schedulable_ready_no_taints"
+
+[[tests]]
+upstream_test = "TestNodeCreationDefaults"
+local_test    = "test_node_creation_defaults"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/healthz"
+local_path    = "/api/cluster/health"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/apis/cluster.x-k8s.io/v1beta1/clusters"
+local_path    = "/api/cluster/clusters"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/apis/cluster.x-k8s.io/v1beta1/clusters/{name}"
+local_path    = "/api/cluster/clusters/{name}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/apis/cluster.x-k8s.io/v1beta1/clusters/{name}/health"
+local_path    = "/api/cluster/clusters/{name}/health"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/apis/cluster.x-k8s.io/v1beta1/clusters/{name}/kubeconfig"
+local_path    = "/api/cluster/clusters/{name}/kubeconfig"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/apis/cluster.x-k8s.io/v1beta1/clusters/{name}/upgrade"
+local_path    = "/api/cluster/clusters/{name}/upgrade"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/apis/addons.cluster.x-k8s.io/v1beta1/available"
+local_path    = "/api/cluster/addons/available"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/apis/multitenancy.cluster.x-k8s.io/v1/tenants"
+local_path    = "/api/cluster/tenants"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/apis/multitenancy.cluster.x-k8s.io/v1/tenants/{id}"
+local_path    = "/api/cluster/tenants/{id}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/version/supported"
+local_path    = "/api/cluster/versions"
+
+[portal_ui]
+upstream_ui  = "(CRD-only)"
+upstream_url = "https://cluster-api.sigs.k8s.io/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Cluster-API CLI/CRD"
+last_audit   = "2026-05-11"

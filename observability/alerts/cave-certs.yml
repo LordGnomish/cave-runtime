@@ -1,0 +1,97 @@
+# Cert lifecycle
+groups:
+  - name: cave-certs-slo
+    interval: 30s
+    rules:
+      - alert: CertsSloBurnRateFast
+        expr: |
+          (
+            sum(rate(certs_total{job="cave-certs",code=~"5.."}[1h]))
+            /
+            sum(rate(certs_total{job="cave-certs"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-certs fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-certs/slo-burn-fast.md"
+      - alert: CertsSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(certs_total{job="cave-certs",code=~"5.."}[6h]))
+            /
+            sum(rate(certs_total{job="cave-certs"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-certs slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-certs/slo-burn-slow.md"
+      - alert: CertsErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(certs_total{job="cave-certs",code=~"5.."}[7d]))
+              / sum(rate(certs_total{job="cave-certs"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-certs 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-certs/error-budget.md"
+      - alert: CertsLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(certs_duration_seconds_bucket{job="cave-certs"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-certs p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-certs/latency.md"
+      - alert: CertsSaturationHigh
+        expr: 'sum(certs_inflight_requests{job="cave-certs"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-certs inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-certs/saturation.md"
+      - alert: CertsMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-certs"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-certs RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-certs/memory.md"
+      - alert: CertsCardinalityExplosion
+        expr: 'count(count by (tenant_id) (certs_total{job="cave-certs"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-certs tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-certs/cardinality.md"
+      - alert: CertsHealthProbeFailing
+        expr: 'min(up{job="cave-certs"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-certs health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-certs/health.md"

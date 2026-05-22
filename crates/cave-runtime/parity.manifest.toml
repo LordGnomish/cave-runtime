@@ -1,0 +1,25 @@
+# parity.manifest.toml — cave-runtime
+# First-party meta-crate. No external upstream — this is the umbrella
+# composition layer that wires every cave-* module into a runnable
+# service graph.
+#
+# Stubbed 2026-05-02 with the cave-runtime self-reference convention used
+# by the other first-party meta-crates (cave-core, cave-db, cave-ledger,
+# cave-runbook, cave-docs-site, cave-upstream).
+
+[upstream]
+org     = "cave-runtime"
+repo    = "cave-runtime"
+version = "v0.1.0"
+
+[module]
+name        = "cave-runtime"
+description = "Top-level service composition / runtime entrypoint (first-party)"
+source_root = "src"
+first_party = true
+
+[parity]
+infra_only = true
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+

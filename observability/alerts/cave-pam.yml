@@ -1,0 +1,97 @@
+# Privileged access mgmt
+groups:
+  - name: cave-pam-slo
+    interval: 30s
+    rules:
+      - alert: PamSloBurnRateFast
+        expr: |
+          (
+            sum(rate(pam_total{job="cave-pam",code=~"5.."}[1h]))
+            /
+            sum(rate(pam_total{job="cave-pam"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-pam fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-pam/slo-burn-fast.md"
+      - alert: PamSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(pam_total{job="cave-pam",code=~"5.."}[6h]))
+            /
+            sum(rate(pam_total{job="cave-pam"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-pam slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-pam/slo-burn-slow.md"
+      - alert: PamErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(pam_total{job="cave-pam",code=~"5.."}[7d]))
+              / sum(rate(pam_total{job="cave-pam"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-pam 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-pam/error-budget.md"
+      - alert: PamLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(pam_duration_seconds_bucket{job="cave-pam"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-pam p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-pam/latency.md"
+      - alert: PamSaturationHigh
+        expr: 'sum(pam_inflight_requests{job="cave-pam"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-pam inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-pam/saturation.md"
+      - alert: PamMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-pam"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-pam RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-pam/memory.md"
+      - alert: PamCardinalityExplosion
+        expr: 'count(count by (tenant_id) (pam_total{job="cave-pam"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-pam tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-pam/cardinality.md"
+      - alert: PamHealthProbeFailing
+        expr: 'min(up{job="cave-pam"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-pam health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-pam/health.md"

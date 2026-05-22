@@ -1,0 +1,59 @@
+name: parity-index-sync
+
+# Verify that docs/parity/parity-index.json is in sync with the on-disk
+# parity manifests. If a PR edits a manifest but doesn't regenerate the
+# index, this job fails — the compliance dashboard would otherwise render
+# stale data until someone notices manually.
+#
+# Local complement: scripts/git-hooks/post-commit auto-regenerates +
+# amends the index on commit. This CI job catches contributors who
+# haven't installed the hook.
+
+on:
+  pull_request:
+    paths:
+      - "crates/**/parity.manifest.toml"
+      - "docs/parity/parity-index.json"
+      - "scripts/build-parity-index.py"
+      - ".github/workflows/parity-index-sync.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/**/parity.manifest.toml"
+      - "docs/parity/parity-index.json"
+      - "scripts/build-parity-index.py"
+
+jobs:
+  verify-in-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Regenerate parity-index.json
+        run: python3 scripts/build-parity-index.py
+
+      - name: Verify no drift
+        id: drift
+        run: |
+          if git diff --quiet -- docs/parity/parity-index.json; then
+            echo "in-sync" >&2
+            exit 0
+          fi
+          echo "❌ docs/parity/parity-index.json is out of sync with the on-disk parity manifests." >&2
+          echo "" >&2
+          echo "Run locally to fix:" >&2
+          echo "  python3 scripts/build-parity-index.py" >&2
+          echo "  git add docs/parity/parity-index.json" >&2
+          echo "  git commit --amend --no-edit" >&2
+          echo "" >&2
+          echo "Or install the post-commit hook once so this auto-resolves:" >&2
+          echo "  ./scripts/install-git-hooks.sh" >&2
+          echo "" >&2
+          echo "Pending diff:" >&2
+          git --no-pager diff -- docs/parity/parity-index.json >&2
+          exit 1

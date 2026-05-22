@@ -1,0 +1,28 @@
+# parity.manifest.toml — cave-tracing
+# Upstream: jaegertracing/jaeger v2.17.0
+#   https://github.com/jaegertracing/jaeger
+#
+# Jaeger v2 is a CNCF graduated distributed-tracing collector. cave-tracing
+# tracks its OTLP-receiver and storage surface. cave-trace (already in
+# the registry) covers the same upstream — these may merge before launch.
+#
+# Stubbed 2026-05-02.
+
+[upstream]
+org     = "jaegertracing"
+repo    = "jaeger"
+version = "v2.17.0"
+name    = "Jaeger"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/jaegertracing/jaeger"
+[module]
+name        = "cave-tracing"
+description = "Distributed tracing collector — Jaeger v2 reimplementation"
+source_root = "src"
+
+[parity]
+infra_only = true
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+

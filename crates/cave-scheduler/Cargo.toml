@@ -1,0 +1,25 @@
+[package]
+name = "cave-scheduler"
+version = "0.1.0"
+edition = "2021"
+description = "Pod scheduler — assigns pods to nodes based on resources, affinity, and constraints"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-scheduler"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["scheduler", "kubernetes", "pods", "nodes", "resources"]
+categories = ["api-bindings", "command-line-utilities"]
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+axum = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+thiserror = "1"
+dashmap = "6"

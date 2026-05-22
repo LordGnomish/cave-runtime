@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright 2026 Cave Runtime contributors
+#
+# cave-hermes — Hermes Agent-parity orchestration runtime (MVP).
+# Upstream: NousResearch/hermes-agent v2026.5.16 (commit 8487dfb57d2f2f7b310a2b3eb692b32674af22cd)
+# Upstream license: MIT (Copyright 2025 Nous Research); cave-hermes is AGPL-3.0-or-later.
+
+[package]
+name = "cave-hermes"
+description = "Hermes-parity agent orchestration — persistent memory, tool registry, workflow recovery, planner, model router, recall, session log"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+parking_lot = { workspace = true }
+uuid = { workspace = true }
+regex = { workspace = true }
+rusqlite = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

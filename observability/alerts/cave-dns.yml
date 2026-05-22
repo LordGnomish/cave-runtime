@@ -1,0 +1,97 @@
+# DNS service
+groups:
+  - name: cave-dns-slo
+    interval: 30s
+    rules:
+      - alert: DnsSloBurnRateFast
+        expr: |
+          (
+            sum(rate(dns_total{job="cave-dns",code=~"5.."}[1h]))
+            /
+            sum(rate(dns_total{job="cave-dns"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-dns fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-dns/slo-burn-fast.md"
+      - alert: DnsSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(dns_total{job="cave-dns",code=~"5.."}[6h]))
+            /
+            sum(rate(dns_total{job="cave-dns"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-dns slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-dns/slo-burn-slow.md"
+      - alert: DnsErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(dns_total{job="cave-dns",code=~"5.."}[7d]))
+              / sum(rate(dns_total{job="cave-dns"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-dns 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-dns/error-budget.md"
+      - alert: DnsLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(dns_duration_seconds_bucket{job="cave-dns"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-dns p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-dns/latency.md"
+      - alert: DnsSaturationHigh
+        expr: 'sum(dns_inflight_requests{job="cave-dns"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-dns inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-dns/saturation.md"
+      - alert: DnsMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-dns"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-dns RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-dns/memory.md"
+      - alert: DnsCardinalityExplosion
+        expr: 'count(count by (tenant_id) (dns_total{job="cave-dns"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-dns tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-dns/cardinality.md"
+      - alert: DnsHealthProbeFailing
+        expr: 'min(up{job="cave-dns"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-dns health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-dns/health.md"

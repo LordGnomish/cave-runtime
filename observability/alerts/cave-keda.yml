@@ -1,0 +1,140 @@
+# KEDA-parity event scaler
+groups:
+  - name: cave-keda-slo
+    interval: 30s
+    rules:
+      - alert: KedaSloBurnRateFast
+        expr: |
+          (
+            sum(rate(keda_total{job="cave-keda",code=~"5.."}[1h]))
+            /
+            sum(rate(keda_total{job="cave-keda"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-keda fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-keda/slo-burn-fast.md"
+      - alert: KedaSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(keda_total{job="cave-keda",code=~"5.."}[6h]))
+            /
+            sum(rate(keda_total{job="cave-keda"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-keda slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-keda/slo-burn-slow.md"
+      - alert: KedaErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(keda_total{job="cave-keda",code=~"5.."}[7d]))
+              / sum(rate(keda_total{job="cave-keda"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-keda 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-keda/error-budget.md"
+      - alert: KedaLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(keda_duration_seconds_bucket{job="cave-keda"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-keda p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-keda/latency.md"
+      - alert: KedaSaturationHigh
+        expr: 'sum(keda_inflight_requests{job="cave-keda"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-keda inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-keda/saturation.md"
+      - alert: KedaMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-keda"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-keda RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-keda/memory.md"
+      - alert: KedaCardinalityExplosion
+        expr: 'count(count by (tenant_id) (keda_total{job="cave-keda"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-keda tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-keda/cardinality.md"
+      - alert: KedaHealthProbeFailing
+        expr: 'min(up{job="cave-keda"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-keda health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-keda/health.md"
+  # KEDA workload-specific (2026-05-10 batch).
+  - name: cave-keda-workload
+    interval: 30s
+    rules:
+      - alert: KedaScaledObjectSyncErrorRateHigh
+        expr: |
+          (
+            sum(rate(keda_scaledobject_sync_errors_total{job="cave-keda"}[5m]))
+            /
+            sum(rate(keda_scaledobject_sync_attempts_total{job="cave-keda"}[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-keda ScaledObject sync error rate > 5%"
+          description: "{{ $value | humanizePercentage }} of ScaledObject reconciliations failing in last 5m."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-keda/scaledobject-sync-errors.md"
+      - alert: KedaControllerDown
+        expr: 'min(up{job="cave-keda",component="controller"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-keda controller is down"
+          description: "Controller pod missing for ≥1m — ScaledObjects will not reconcile."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-keda/controller-down.md"
+      - alert: KedaScalingEventRateSpike
+        expr: |
+          (
+            sum(rate(keda_scaler_events_total{job="cave-keda"}[5m]))
+            /
+            (sum(rate(keda_scaler_events_total{job="cave-keda"}[1h])) + 0.001)
+          ) > 3
+        for: 5m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-keda scaling-event rate 3× hourly baseline"
+          description: "Last 5-minute scaling-event rate = {{ $value }}× the trailing-1h rate. Possible thrashing or trigger misconfig."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-keda/scaling-event-spike.md"

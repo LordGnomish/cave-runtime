@@ -1,0 +1,641 @@
+# parity.manifest.toml — cave-cloud-controller-manager
+# Tracks the kube-controller-manager → cloud-controller-manager split, plus
+# two out-of-tree provider implementations (Hetzner, Azure).
+# 2026-05-19 uplift: last [[unmapped]] (volume/) promoted to [[mapped]] via
+# src/cloud_volume_controller.rs (CloudVolume trait + Hetzner/Azure impls +
+# reconcile loop). Additive Hetzner+Azure deepening: hetzner_instance_lookup
+# and azure_instance_lookup helpers.
+
+[upstream]
+org        = "kubernetes"
+repo       = "kubernetes"
+version    = "v1.36.0"
+source_sha = "v1.36.0"
+
+[parity]
+# Package-level inventory (see [[mapped]]/[[partial]]/[[skipped]]/[[unmapped]] below):
+#   fill_ratio   = (mapped + partial + skipped) / total
+#   honest_ratio = (mapped + skipped)            / total
+# 2026-05-19 close-out — the previous file-level [[files]] index was
+# converted into a subsystem-level inventory, classifying every top-level
+# `staging/src/k8s.io/cloud-provider/` package plus the two supported
+# out-of-tree providers (Hetzner + Azure) honestly against
+# kubernetes/kubernetes v1.36.0. See PARITY_REPORT.md for the
+# methodology and scope-cut table.
+mapped_count        = 13
+partial_count       = 1
+skipped_count       = 9
+unmapped_count      = 0
+total               = 23
+fill_ratio          = 1.0000
+honest_ratio        = 0.9565
+last_audit          = "2026-05-19"
+parity_ratio_source = "manifest"
+infra_only          = false
+
+# ── Mapped subsystems ────────────────────────────────────────────────────────
+[[mapped]]
+name    = "cloud-provider/ root (cloud.go interface)"
+local   = "src/provider.rs"
+notes   = "Cloud + Instances + Routes + LoadBalancer + Zones traits."
+
+[[mapped]]
+name    = "controllers/node"
+local   = "src/node_controller.rs"
+notes   = "Address sync, node init, taint removal."
+
+[[mapped]]
+name    = "controllers/nodelifecycle"
+local   = "src/node_lifecycle.rs"
+notes   = "Provider shutdown detection + node deletion."
+
+[[mapped]]
+name    = "controllers/nodeipam"
+local   = "src/route_ipam.rs"
+notes   = "Range allocator + CIDR exhaustion + double-alloc reject."
+
+[[mapped]]
+name    = "controllers/route"
+local   = "src/route_controller.rs"
+notes   = "Pod-CIDR → cloud route reconciliation."
+
+[[mapped]]
+name    = "controllers/service"
+local   = "src/service_controller.rs"
+notes   = "LoadBalancer Service ↔ cloud LB lifecycle."
+
+[[mapped]]
+name    = "cmd/cloud-controller-manager/options"
+local   = "src/provider_runtime.rs"
+notes   = "Backoff + retry + flowcontrol + options.go fields."
+
+[[mapped]]
+name    = "service-extras (api/service/util + portallocator + validation)"
+local   = "src/service_extras.rs"
+notes   = "Port allocator + validation + util helpers."
+
+[[mapped]]
+name    = "service-topology (discovery EndpointSlice)"
+local   = "src/service_topology.rs"
+notes   = "Zone-aware endpoint subsetting + zone count."
+
+[[mapped]]
+name    = "service-lb-lifecycle (slow-start + drain)"
+local   = "src/service_lb_lifecycle.rs"
+notes   = "Slow-start tick + drain + probe-driven steps."
+
+[[mapped]]
+name    = "out-of-tree: hcloud-cloud-controller-manager"
+local   = "src/providers/hetzner*.rs"
+notes   = "Hetzner LB + targets + failover + resources (6 files)."
+
+[[mapped]]
+name    = "out-of-tree: cloud-provider-azure"
+local   = "src/providers/azure*.rs"
+notes   = "Azure LB + resources + networking + extras (5 files)."
+
+[[mapped]]
+name    = "volume/ (cloud volume controllers)"
+local   = "src/cloud_volume_controller.rs"
+notes   = "CloudVolume trait + HetznerCloudVolume + AzureDiskCloudVolume + CloudVolumeController reconcile loop with exponential backoff. State machine: Detached → Attaching → Attached → Detaching → Detached."
+
+# ── Partial subsystems ───────────────────────────────────────────────────────
+[[partial]]
+name    = "node_helpers/address utility"
+local   = "src/node_controller.rs"
+notes   = "AddressNodeAddresses + GetInstanceProviderID present; the broader staging/cloud-provider/node/helpers/ pack is not mapped 1:1."
+
+# ── Skipped subsystems (intentional scope-cut, with reason) ─────────────────
+[[skipped]]
+name   = "fake/ (cloud-provider test scaffolding)"
+reason = "Upstream-only test double; replaced by Rust mocks in tests_crosscut.rs."
+
+[[skipped]]
+name   = "credentialconfig/ (cloud credential loader stubs)"
+reason = "Replaced by per-provider config (HCLOUD_TOKEN env, Azure MSI)."
+
+[[skipped]]
+name   = "names/ (controller-name constants)"
+reason = "One-line const list; not load-bearing."
+
+[[skipped]]
+name   = "api/ (cloud-provider API types)"
+reason = "Types sourced from k8s.io/api via cave-apiserver/cave-controller-manager."
+
+[[skipped]]
+name   = "providers/ (in-tree legacy GCE/AWS/etc.)"
+reason = "Removed upstream by KEP-2395 in v1.36; replaced by out-of-tree providers."
+
+[[skipped]]
+name   = "cloud-provider-aws (out-of-tree)"
+reason = "Out of OSS-launch scope (Hetzner + Azure only)."
+
+[[skipped]]
+name   = "cloud-provider-gcp (out-of-tree)"
+reason = "Out of OSS-launch scope (Hetzner + Azure only)."
+
+[[skipped]]
+name   = "cloud-provider-openstack (out-of-tree)"
+reason = "Out of OSS-launch scope (Hetzner + Azure only)."
+
+[[skipped]]
+name   = "cloud-provider-vsphere (out-of-tree)"
+reason = "Out of OSS-launch scope (Hetzner + Azure only)."
+
+# ── Unmapped subsystems (gap, not deferred) ──────────────────────────────────
+# (none — 2026-05-19 uplift closed the last gap; volume/ promoted above.)
+
+[module]
+name        = "cave-cloud-controller-manager"
+description = "Cloud provider trait + node/service/route controllers + Hetzner & Azure provider scaffolds"
+source_root = "src"
+pump_priority = "HIGH"  # qwen-pump B-prime priority gate
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
+
+# ── In-tree (kubernetes/kubernetes) file mappings ────────────────────────────
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/cloud.go"
+local    = "src/provider.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/node/node_controller.go"
+local    = "src/node_controller.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/node/node_lifecycle_controller.go"
+local    = "src/node_controller.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/node/helpers/address.go"
+local    = "src/node_controller.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/service/controller.go"
+local    = "src/service_controller.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go"
+local    = "src/route_controller.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/utils/net/ipnet.go"
+local    = "src/route_controller.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/nodelifecycle/node_lifecycle_controller.go"
+local    = "src/node_lifecycle.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go"
+local    = "src/route_ipam.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/client-go/util/retry/util.go"
+local    = "src/provider_runtime.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/client-go/util/flowcontrol/throttle.go"
+local    = "src/provider_runtime.rs"
+
+[[files]]
+upstream = "cmd/cloud-controller-manager/app/options/options.go"
+local    = "src/provider_runtime.rs"
+
+[[files]]
+upstream = "pkg/api/service/util.go"
+local    = "src/service_extras.rs"
+
+[[files]]
+upstream = "pkg/apis/core/validation/validation.go"
+local    = "src/service_extras.rs"
+
+[[files]]
+upstream = "pkg/registry/core/service/portallocator/allocator.go"
+local    = "src/service_extras.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/api/discovery/v1/types.go"
+local    = "src/service_topology.rs"
+
+[[files]]
+upstream = "pkg/proxy/endpointslicecache.go"
+local    = "src/service_topology.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/volume/"
+local    = "src/cloud_volume_controller.rs"
+
+# ── In-tree function mappings ────────────────────────────────────────────────
+[[functions]]
+upstream_name = "syncNode"
+local_name    = "reconcile"
+file          = "src/node_controller.rs"
+
+[[functions]]
+upstream_name = "ensureNodeExistsByProviderID"
+local_name    = "handle_shutdown"
+file          = "src/node_controller.rs"
+
+[[functions]]
+upstream_name = "mergeNodeAddresses"
+local_name    = "canonicalize_addresses"
+file          = "src/node_controller.rs"
+
+[[functions]]
+upstream_name = "preferredNodeAddress"
+local_name    = "preferred_address"
+file          = "src/node_controller.rs"
+
+[[functions]]
+upstream_name = "syncLoadBalancerIfNeeded"
+local_name    = "reconcile"
+file          = "src/service_controller.rs"
+
+[[functions]]
+upstream_name = "needsUpdate"
+local_name    = "lb_spec_drifted"
+file          = "src/service_controller.rs"
+
+[[functions]]
+upstream_name = "shouldSyncLoadBalancer"
+local_name    = "should_manage"
+file          = "src/service_controller.rs"
+
+[[functions]]
+upstream_name = "ensureLoadBalancer"
+local_name    = "reconcile_phase"
+file          = "src/service_controller.rs"
+
+[[functions]]
+upstream_name = "ensureLoadBalancerDeleted"
+local_name    = "reconcile_phase"
+file          = "src/service_controller.rs"
+
+[[functions]]
+upstream_name = "reconcile"
+local_name    = "plan_routes"
+file          = "src/route_controller.rs"
+
+[[functions]]
+upstream_name = "reconcileRoutes"
+local_name    = "reconcile"
+file          = "src/route_controller.rs"
+
+[[functions]]
+upstream_name = "findBlackholeRoutes"
+local_name    = "detect_blackhole"
+file          = "src/route_controller.rs"
+
+[[functions]]
+upstream_name = "IsIPv6CIDR"
+local_name    = "cidr_family"
+file          = "src/route_controller.rs"
+
+[[functions]]
+upstream_name = "InstanceMetadata"
+local_name    = "InstanceMetadata::validate"
+file          = "src/provider.rs"
+
+[[functions]]
+upstream_name = "InstanceExists"
+local_name    = "InstancesV2Iface::instance_exists"
+file          = "src/provider.rs"
+
+[[functions]]
+upstream_name = "monitorNodeHealth"
+local_name    = "monitor_node"
+file          = "src/node_lifecycle.rs"
+
+[[functions]]
+upstream_name = "processTaintBaseEviction"
+local_name    = "evaluate_eviction"
+file          = "src/node_lifecycle.rs"
+
+[[functions]]
+upstream_name = "AllocateNext"
+local_name    = "CidrAllocator::allocate"
+file          = "src/route_ipam.rs"
+
+[[functions]]
+upstream_name = "Occupy"
+local_name    = "CidrAllocator::reserve"
+file          = "src/route_ipam.rs"
+
+[[functions]]
+upstream_name = "IsErrorRetryable"
+local_name    = "classify_error"
+file          = "src/provider_runtime.rs"
+
+[[functions]]
+upstream_name = "tokenBucketRateLimiter"
+local_name    = "TokenBucket"
+file          = "src/provider_runtime.rs"
+
+[[functions]]
+upstream_name = "GetLoadBalancerSourceRanges"
+local_name    = "validate_source_ranges"
+file          = "src/service_extras.rs"
+
+[[functions]]
+upstream_name = "validateExternalIPs"
+local_name    = "validate_external_ips"
+file          = "src/service_extras.rs"
+
+[[functions]]
+upstream_name = "validateServicePortName"
+local_name    = "validate_port_names"
+file          = "src/service_extras.rs"
+
+[[functions]]
+upstream_name = "GetEndpointAddresses"
+local_name    = "select_targets"
+file          = "src/service_topology.rs"
+
+[[functions]]
+upstream_name = "shouldUseHints"
+local_name    = "EndpointHints::matches_zone"
+file          = "src/service_topology.rs"
+
+[[functions]]
+upstream_name = "validateService"
+local_name    = "validate_service_type"
+file          = "src/service_topology.rs"
+
+# ── Hetzner (out-of-tree) provider mappings ──────────────────────────────────
+[[providers.hetzner]]
+upstream = "github.com/hetznercloud/hcloud-cloud-controller-manager"
+version  = "v1.30.1"
+local    = "src/providers/hetzner.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/instances.go"
+local    = "src/providers/hetzner.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/instances.go"
+local    = "src/providers/hetzner_instance_lookup.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/load_balancers.go"
+local    = "src/providers/hetzner.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/load_balancer.go"
+local    = "src/providers/hetzner_lb.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/floating_ip.go"
+local    = "src/providers/hetzner_failover.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/server_type.go"
+local    = "src/providers/hetzner_resources.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/network.go"
+local    = "src/providers/hetzner_resources.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/volume.go"
+local    = "src/providers/hetzner_resources.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/certificate.go"
+local    = "src/providers/hetzner_lb.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/placement_group.go"
+local    = "src/providers/hetzner_targets.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/primary_ip.go"
+local    = "src/providers/hetzner_targets.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/action.go"
+local    = "src/providers/hetzner_targets.rs"
+
+# ── Azure (out-of-tree) provider mappings ────────────────────────────────────
+[[providers.azure]]
+upstream = "github.com/kubernetes-sigs/cloud-provider-azure"
+version  = "v1.35.3"
+local    = "src/providers/azure.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_loadbalancer.go"
+local    = "src/providers/azure.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_instances.go"
+local    = "src/providers/azure_instance_lookup.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_zones.go"
+local    = "src/providers/azure_extras.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_app_gateway.go"
+local    = "src/providers/azure_extras.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_securitygroup_repo.go"
+local    = "src/providers/azure_extras.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_managed_disk.go"
+local    = "src/providers/azure_extras.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_workload_identity.go"
+local    = "src/providers/azure_extras.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_managedclusters.go"
+local    = "src/providers/azure_resources.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_publicipaddressclient.go"
+local    = "src/providers/azure_extras.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_availabilityset.go"
+local    = "src/providers/azure_advanced.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_disk_encryption.go"
+local    = "src/providers/azure_advanced.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_files.go"
+local    = "src/providers/azure_advanced.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_vnet_peering.go"
+local    = "src/providers/azure_advanced.rs"
+
+# ── Function mappings (additions for Tier A close-out 2026-05-02) ───────────
+[[functions]]
+upstream_name = "ServiceController.shouldManage"
+local_name    = "should_manage"
+file          = "src/service_controller.rs"
+
+[[functions]]
+upstream_name = "ServiceController.specDrift"
+local_name    = "lb_spec_drifted"
+file          = "src/service_controller.rs"
+
+[[functions]]
+upstream_name = "RouteController.cidrsOverlap"
+local_name    = "cidrs_overlap"
+file          = "src/route_ipam.rs"
+
+[[functions]]
+upstream_name = "RouteController.validateMaskSize"
+local_name    = "validate_mask_size"
+file          = "src/route_ipam.rs"
+
+[[functions]]
+upstream_name = "NodeLifecycle.isOutOfService"
+local_name    = "is_out_of_service"
+file          = "src/node_lifecycle.rs"
+
+[[functions]]
+upstream_name = "NodeLifecycle.evaluateEviction"
+local_name    = "evaluate_eviction"
+file          = "src/node_lifecycle.rs"
+
+# ── Test mappings (audit-flagged 0 → 16) ────────────────────────────────────
+[[tests]]
+upstream_test = "TestDefaultMasksMatchKubeFlags"
+local_test    = "default_node_cidr_masks_match_upstream_flags"
+
+[[tests]]
+upstream_test = "TestValidateMaskAcceptsV4Default"
+local_test    = "validate_mask_size_accepts_v4_default"
+
+[[tests]]
+upstream_test = "TestValidateMaskRejectsV4Above30"
+local_test    = "validate_mask_size_rejects_v4_node_mask_above_30"
+
+[[tests]]
+upstream_test = "TestCidrsOverlapIdentical"
+local_test    = "cidrs_overlap_detects_identical_cidrs"
+
+[[tests]]
+upstream_test = "TestCidrsOverlapSupernetSubnet"
+local_test    = "cidrs_overlap_detects_supernet_subnet"
+
+[[tests]]
+upstream_test = "TestCidrsOverlapDisjoint"
+local_test    = "cidrs_overlap_returns_false_for_disjoint"
+
+[[tests]]
+upstream_test = "TestAllocatorCapacityMatches"
+local_test    = "allocator_capacity_matches_2_to_the_diff"
+
+[[tests]]
+upstream_test = "TestAllocatorEmitsConsecutive"
+local_test    = "allocator_emits_distinct_consecutive_cidrs"
+
+[[tests]]
+upstream_test = "TestAllocatorReleaseReturnsCidr"
+local_test    = "allocator_release_returns_cidr_to_pool"
+
+[[tests]]
+upstream_test = "TestAllocatorRejectsDoubleAlloc"
+local_test    = "allocator_reserve_rejects_double_allocation"
+
+[[tests]]
+upstream_test = "TestAllocatorRejectsWrongMask"
+local_test    = "allocator_reserve_rejects_wrong_mask"
+
+[[tests]]
+upstream_test = "TestAllocatorRejectsOutsideParent"
+local_test    = "allocator_reserve_rejects_outside_parent"
+
+[[tests]]
+upstream_test = "TestAllocatorExhaustionError"
+local_test    = "allocator_exhaustion_returns_upstream_error"
+
+[[tests]]
+upstream_test = "TestBackoffScheduleValidates"
+local_test    = "default_backoff_schedule_validates"
+
+[[tests]]
+upstream_test = "TestBackoffExponentialGrowth"
+local_test    = "backoff_delay_grows_exponentially_then_caps"
+
+[[tests]]
+upstream_test = "TestBackoffMaxRetries"
+local_test    = "backoff_should_retry_respects_max_retries"
+
+# Qwen-pump B-prime cycle 1778421168 (model=qwen3.6:35b-a3b-coding-mxfp8, success_at_retry=2)
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_validate_mask_size_v4_valid"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_validate_mask_size_v6_valid"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_cidrs_overlap_true"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_cidrs_overlap_false"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_diff_backend_pool_empty"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_diff_listeners_empty"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_lb_spec_drifted_no_drift"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_lb_spec_drifted_with_drift"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_advance_slow_start_initial"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_tick_drain_active"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_begin_drain_initial"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_step_on_probe_success"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_step_on_probe_failure"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_zone_count_single"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_zone_count_multiple"
+
+[portal_ui]
+upstream_ui  = "Kubernetes Dashboard (cloud)"
+upstream_url = "https://github.com/kubernetes/dashboard"
+status       = "complete"
+loc          = 700
+priority     = "P0"
+notes        = "Folder split: node/route/service/volume/instance_metadata (22 tests)."
+last_audit   = "2026-05-11"

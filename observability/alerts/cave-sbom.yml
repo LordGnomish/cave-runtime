@@ -1,0 +1,144 @@
+# SBOM generation
+groups:
+  - name: cave-sbom-slo
+    interval: 30s
+    rules:
+      - alert: SbomSloBurnRateFast
+        expr: |
+          (
+            sum(rate(sbom_total{job="cave-sbom",code=~"5.."}[1h]))
+            /
+            sum(rate(sbom_total{job="cave-sbom"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-sbom fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-sbom/slo-burn-fast.md"
+      - alert: SbomSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(sbom_total{job="cave-sbom",code=~"5.."}[6h]))
+            /
+            sum(rate(sbom_total{job="cave-sbom"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-sbom slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-sbom/slo-burn-slow.md"
+      - alert: SbomErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(sbom_total{job="cave-sbom",code=~"5.."}[7d]))
+              / sum(rate(sbom_total{job="cave-sbom"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-sbom 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-sbom/error-budget.md"
+      - alert: SbomLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(sbom_duration_seconds_bucket{job="cave-sbom"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-sbom p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-sbom/latency.md"
+      - alert: SbomSaturationHigh
+        expr: 'sum(sbom_inflight_requests{job="cave-sbom"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-sbom inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-sbom/saturation.md"
+      - alert: SbomMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-sbom"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-sbom RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-sbom/memory.md"
+      - alert: SbomCardinalityExplosion
+        expr: 'count(count by (tenant_id) (sbom_total{job="cave-sbom"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-sbom tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-sbom/cardinality.md"
+      - alert: SbomHealthProbeFailing
+        expr: 'min(up{job="cave-sbom"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-sbom health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-sbom/health.md"
+
+  # ── Dependency-Track parity: SBOM-domain alerts ───────────────────────────
+  - name: cave-sbom-domain
+    interval: 1m
+    rules:
+      - alert: SbomCriticalVulnerableComponent
+        # A single critical-severity advisory matched a tracked component.
+        # Mirrors DependencyTrack `NEW_VULNERABILITY` + severity=CRITICAL.
+        expr: |
+          sum(sbom_components_vulnerable{job="cave-sbom",severity="CRITICAL"}) > 0
+        for: 5m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-sbom: critical CVE matched a component"
+          description: "{{ $value }} component(s) carry a CVSS≥9.0 advisory. Triage required."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-sbom/critical-vuln-component.md"
+      - alert: SbomPolicyViolationSpike
+        # FAIL-state policy violations spiking week-over-week.
+        # Mirrors DependencyTrack `POLICY_VIOLATION`.
+        expr: |
+          sum(increase(sbom_policy_violations_total{job="cave-sbom",state="FAIL"}[1h]))
+            > 10
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-sbom: >10 FAIL-state policy violations in last hour"
+          description: "Hourly rate = {{ $value }}. Check policy noise vs new BOMs landing."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-sbom/policy-spike.md"
+      - alert: SbomBomIngestFailureRate
+        # BOM upload-failure rate exceeds 10% over 15m window.
+        expr: |
+          (sum(rate(sbom_bom_ingest_total{job="cave-sbom",outcome="failure"}[15m]))
+           /
+           sum(rate(sbom_bom_ingest_total{job="cave-sbom"}[15m])))
+            > 0.1
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-sbom: >10% BOM ingest failures"
+          description: "BOM ingest failure ratio = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-sbom/ingest-failure.md"

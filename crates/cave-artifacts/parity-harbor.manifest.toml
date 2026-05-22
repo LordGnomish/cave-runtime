@@ -1,0 +1,183 @@
+# parity-harbor.manifest.toml — cave-artifacts/harbor sub-module
+#
+# Companion manifest for the harbor sub-module of cave-artifacts. cave-
+# kernel's discover_workspace currently only reads parity.manifest.toml
+# (one upstream per crate). This file therefore is read documentation /
+# future-tool input today — extending discovery to walk per-sub-module
+# manifests is a tracked follow-up.
+
+[upstream]
+org     = "goharbor"
+repo    = "harbor"
+version = "v2.10.0"
+
+[module]
+name        = "cave-artifacts-harbor"
+description = "Container registry sub-module — Harbor + Docker V2 + OCI"
+source_root = "src/harbor"
+
+# ── File mappings ────────────────────────────────────────────────────────
+[[files]]
+upstream = "src/server/v2.0/handler/project.go"
+local    = "src/harbor/routes/harbor.rs"
+
+[[files]]
+upstream = "src/server/registry/handler.go"
+local    = "src/harbor/routes/v2.rs"
+
+[[files]]
+upstream = "src/server/registry/proxy.go"
+local    = "src/harbor/routes/proxy.rs"
+
+[[files]]
+upstream = "src/pkg/blob/manager.go"
+local    = "src/harbor/storage.rs"
+
+[[files]]
+upstream = "src/pkg/scan/job.go"
+local    = "src/harbor/pipeline.rs"
+
+[[files]]
+upstream = "src/pkg/repository/model.go"
+local    = "src/harbor/models.rs"
+
+[[files]]
+upstream = "src/pkg/scan/dao/manager.go"
+local    = "src/harbor/store.rs"
+
+[[files]]
+upstream = "src/pkg/proxy/proxy.go"
+local    = "src/harbor/proxy.rs"
+
+[[files]]
+upstream = "src/jobservice/job/impl/gc/garbage_collection.go"
+local    = "src/harbor/gc.rs"
+
+[[files]]
+upstream = "src/server/middleware/repoproxy/proxy.go"
+local    = "src/harbor/harbor.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────
+[[functions]]
+upstream_name = "GetManifest"
+local_name    = "get_manifest"
+file          = "src/harbor/routes/v2.rs"
+
+[[functions]]
+upstream_name = "PutManifest"
+local_name    = "put_manifest"
+file          = "src/harbor/routes/v2.rs"
+
+[[functions]]
+upstream_name = "DeleteManifest"
+local_name    = "delete_manifest"
+file          = "src/harbor/routes/v2.rs"
+
+[[functions]]
+upstream_name = "GetBlob"
+local_name    = "get_blob"
+file          = "src/harbor/routes/v2.rs"
+
+[[functions]]
+upstream_name = "InitiateBlobUpload"
+local_name    = "initiate_blob_upload"
+file          = "src/harbor/routes/v2.rs"
+
+[[functions]]
+upstream_name = "CompleteBlobUpload"
+local_name    = "complete_blob_upload"
+file          = "src/harbor/routes/v2.rs"
+
+[[functions]]
+upstream_name = "ProjectHandler.Create"
+local_name    = "create_project"
+file          = "src/harbor/routes/harbor.rs"
+
+[[functions]]
+upstream_name = "ProjectHandler.Get"
+local_name    = "get_project"
+file          = "src/harbor/routes/harbor.rs"
+
+[[functions]]
+upstream_name = "Proxy.ServeHTTP"
+local_name    = "serve_proxy"
+file          = "src/harbor/routes/proxy.rs"
+
+[[functions]]
+upstream_name = "GarbageCollection.Run"
+local_name    = "run_gc"
+file          = "src/harbor/gc.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────
+[[tests]]
+upstream_test = "TestProjectCreate"
+local_test    = "test_project_create"
+
+[[tests]]
+upstream_test = "TestManifestRoundTrip"
+local_test    = "test_manifest_round_trip"
+
+[[tests]]
+upstream_test = "TestBlobUploadResume"
+local_test    = "test_blob_upload_resume"
+
+[[tests]]
+upstream_test = "TestProxyCacheHit"
+local_test    = "test_proxy_cache_hit"
+
+[[tests]]
+upstream_test = "TestGCDanglingBlobs"
+local_test    = "test_gc_dangling_blobs"
+
+[[tests]]
+upstream_test = "TestPipelineScanQueue"
+local_test    = "test_pipeline_scan_queue"
+
+[[tests]]
+upstream_test = "TestStorageDigestCompute"
+local_test    = "test_storage_digest_compute"
+
+[[tests]]
+upstream_test = "TestModelsManifestParse"
+local_test    = "test_models_manifest_parse"
+
+# ── Surface mappings ─────────────────────────────────────────────────────
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v2/{name}/manifests/{reference}"
+local_path    = "/v2/{name}/manifests/{reference}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v2/{name}/blobs/{digest}"
+local_path    = "/v2/{name}/blobs/{digest}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v2/{name}/blobs/uploads/"
+local_path    = "/v2/{name}/blobs/uploads/"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v2.0/projects"
+local_path    = "/api/v2.0/projects"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v2.0/registries"
+local_path    = "/api/v2.0/registries"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v2.0/replication/policies"
+local_path    = "/api/v2.0/replication/policies"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v2.0/scanners"
+local_path    = "/api/v2.0/scanners"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v2.0/webhook/policies"
+local_path    = "/api/v2.0/webhook/policies"

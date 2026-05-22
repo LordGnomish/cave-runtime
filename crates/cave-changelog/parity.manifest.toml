@@ -1,0 +1,43 @@
+# parity.manifest.toml — cave-changelog
+# Upstream: twisted/towncrier 25.8.0  https://github.com/twisted/towncrier
+#
+# Re-targeted 2026-05-02 from `towncrier/towncrier` (DEAD: solo
+# repository was retired; project transferred to the Twisted org).
+
+[upstream]
+org     = "twisted"
+repo    = "towncrier"
+version = "25.8.0"
+
+[module]
+name        = "cave-changelog"
+description = "Changelog generation — towncrier replacement"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+# [[files]]
+# upstream = "path/in/upstream/repo.go"
+# local    = "src/local.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+# [[functions]]
+# upstream_name = "UpstreamFunc"
+# local_name    = "local_fn"
+# file          = "src/routes.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+# [[tests]]
+# upstream_test = "TestUpstreamFunc"
+# local_test    = "test_local_fn"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+# [[surfaces]]
+# kind          = "http"
+# upstream_path = "/api/upstream"
+# local_path    = "/api/changelog/endpoint"
+
+[parity]
+infra_only = true
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+

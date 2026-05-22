@@ -1,0 +1,38 @@
+[package]
+name = "cave-streams"
+description = "Kafka-compatible streaming — full wire protocol, Schema Registry, Kafka Connect"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-streams"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["kafka", "pulsar", "streaming", "messaging", "broker"]
+categories = ["network-programming", "asynchronous", "database-implementations"]
+version.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+axum = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+bytes = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+dashmap = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+flate2 = { workspace = true }
+snap = { workspace = true }
+lz4_flex = { workspace = true }
+zstd = { workspace = true }
+regex = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

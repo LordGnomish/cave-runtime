@@ -1,0 +1,338 @@
+# parity-gravitee.manifest.toml — cave-gateway/gravitee sub-module
+#
+# Companion manifest for the Gravitee half of cave-gateway. cave-kernel's
+# discover_workspace currently only reads parity.manifest.toml (one
+# upstream per crate) — this file therefore is read documentation /
+# future-tool input today, same pattern as cave-artifacts'
+# parity-harbor.manifest.toml + parity-nexus.manifest.toml.
+#
+# cave-gateway is a Kong + Gravitee multi-upstream consolidation per
+# ADR-RUNTIME-API-GATEWAY-CONSOLIDATION-001. Kong covers the proxy data
+# path (mapped in parity.manifest.toml as the primary [upstream]); this
+# file maps the Gravitee management + portal + governance surface.
+
+[upstream]
+org     = "gravitee-io"
+repo    = "gravitee-api-management"
+version = "v4.4.0"
+
+[module]
+name        = "cave-gateway-gravitee"
+description = "Gravitee API/plan/application/subscription management surface, developer portal, governance, federation"
+source_root = "src/gravitee"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+
+[[files]]
+upstream = "gravitee-apim-rest-api/gravitee-apim-rest-api-management/src/main/java/io/gravitee/rest/api/management/rest/resource/ApiResource.java"
+local    = "src/gravitee/apis.rs"
+
+[[files]]
+upstream = "gravitee-apim-rest-api/gravitee-apim-rest-api-management/src/main/java/io/gravitee/rest/api/management/rest/resource/PlanResource.java"
+local    = "src/gravitee/apis.rs"
+
+[[files]]
+upstream = "gravitee-apim-rest-api/gravitee-apim-rest-api-portal/src/main/java/io/gravitee/rest/api/portal/rest/resource/ApplicationResource.java"
+local    = "src/gravitee/apis.rs"
+
+[[files]]
+upstream = "gravitee-apim-rest-api/gravitee-apim-rest-api-portal/src/main/java/io/gravitee/rest/api/portal/rest/resource/SubscriptionResource.java"
+local    = "src/gravitee/apis.rs"
+
+[[files]]
+upstream = "gravitee-apim-rest-api/gravitee-apim-rest-api-management/src/main/java/io/gravitee/rest/api/management/rest/resource/PortalResource.java"
+local    = "src/gravitee/devportal.rs"
+
+[[files]]
+upstream = "gravitee-apim-rest-api/gravitee-apim-rest-api-management/src/main/java/io/gravitee/rest/api/management/rest/resource/CategoryResource.java"
+local    = "src/gravitee/catalog.rs"
+
+[[files]]
+upstream = "gravitee-apim-rest-api/gravitee-apim-rest-api-management/src/main/java/io/gravitee/rest/api/management/rest/resource/AnalyticsResource.java"
+local    = "src/gravitee/analytics.rs"
+
+[[files]]
+upstream = "gravitee-apim-rest-api/gravitee-apim-rest-api-management/src/main/java/io/gravitee/rest/api/management/rest/resource/DebugApiResource.java"
+local    = "src/gravitee/debug.rs"
+
+[[files]]
+upstream = "gravitee-apim-definition/gravitee-apim-definition-jackson/src/main/java/io/gravitee/definition/jackson/datatype/api/deser/ApiDeserializer.java"
+local    = "src/gravitee/governance.rs"
+
+[[files]]
+upstream = "gravitee-apim-rest-api/gravitee-apim-rest-api-management/src/main/java/io/gravitee/rest/api/management/v2/rest/resource/api/federation/FederationResource.java"
+local    = "src/gravitee/federation.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "io.gravitee.rest.api.service.ApiService.start"
+local_name    = "publish_api"
+file          = "src/gravitee/apis.rs"
+
+[[functions]]
+upstream_name = "io.gravitee.rest.api.service.ApiService.stop"
+local_name    = "unpublish_api"
+file          = "src/gravitee/apis.rs"
+
+[[functions]]
+upstream_name = "io.gravitee.rest.api.service.ApiService.deprecate"
+local_name    = "deprecate_api"
+file          = "src/gravitee/apis.rs"
+
+[[functions]]
+upstream_name = "io.gravitee.rest.api.service.PlanService.publish"
+local_name    = "publish_plan"
+file          = "src/gravitee/apis.rs"
+
+[[functions]]
+upstream_name = "io.gravitee.rest.api.service.PlanService.close"
+local_name    = "close_plan"
+file          = "src/gravitee/apis.rs"
+
+[[functions]]
+upstream_name = "io.gravitee.rest.api.service.SubscriptionService.create"
+local_name    = "subscribe"
+file          = "src/gravitee/apis.rs"
+
+[[functions]]
+upstream_name = "io.gravitee.rest.api.service.SubscriptionService.process"
+local_name    = "accept_subscription"
+file          = "src/gravitee/apis.rs"
+
+[[functions]]
+upstream_name = "io.gravitee.rest.api.service.SubscriptionService.close"
+local_name    = "close_subscription"
+file          = "src/gravitee/apis.rs"
+
+[[functions]]
+upstream_name = "io.gravitee.rest.api.service.SubscriptionService.pause"
+local_name    = "pause_subscription"
+file          = "src/gravitee/apis.rs"
+
+[[functions]]
+upstream_name = "io.gravitee.rest.api.service.SubscriptionService.resume"
+local_name    = "resume_subscription"
+file          = "src/gravitee/apis.rs"
+
+[[functions]]
+upstream_name = "io.gravitee.rest.api.service.ApiKeyService.findByKey"
+local_name    = "lookup_by_api_key"
+file          = "src/gravitee/apis.rs"
+
+[[functions]]
+upstream_name = "io.gravitee.gateway.policy.impl.PolicyChain.doNext"
+local_name    = "effective_policy_chain"
+file          = "src/gravitee/apis.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.ApiServiceTest.shouldCreateApi"
+local_test    = "create_and_fetch_api"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.ApiServiceTest.shouldStartApi"
+local_test    = "publish_api_sets_lifecycle_and_timestamp"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.ApiServiceTest.shouldStopApi"
+local_test    = "unpublish_after_publish_keeps_definition"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.ApiServiceTest.shouldDeprecateApi"
+local_test    = "deprecate_api_marks_state"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.ApiServiceTest.shouldDeleteApiCascade"
+local_test    = "delete_api_cascades_plans_and_subscriptions"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.PlanServiceTest.shouldNotCreateForUnknownApi"
+local_test    = "create_plan_for_unknown_api_rejected"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.PlanServiceTest.shouldListPlansForApi"
+local_test    = "list_plans_for_api_filters_correctly"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.PlanServiceTest.shouldPublishPlan"
+local_test    = "publish_plan_updates_status"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.PlanServiceTest.shouldClosePlan"
+local_test    = "close_plan_updates_status"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.PlanServiceTest.shouldNotDeletePlanWithSubscriptions"
+local_test    = "delete_plan_with_active_subscription_rejected"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.PlanServiceTest.shouldDeletePlanWithoutSubscriptions"
+local_test    = "delete_plan_without_subs_succeeds"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.ApplicationServiceTest.shouldCreateSimpleApplication"
+local_test    = "create_application_simple_no_oauth_creds"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.ApplicationServiceTest.shouldCreateOAuthApplication"
+local_test    = "create_application_oauth_kind_mints_client_credentials"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.ApplicationServiceTest.shouldDeleteAppCloseSubs"
+local_test    = "delete_application_closes_open_subscriptions"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.SubscriptionServiceTest.shouldNotSubscribeUnpublishedPlan"
+local_test    = "subscribe_to_unpublished_plan_rejected"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.SubscriptionServiceTest.shouldAutoAcceptKeyless"
+local_test    = "subscribe_keyless_plan_auto_accepts"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.SubscriptionServiceTest.shouldMintApiKeyOnAutoValidation"
+local_test    = "subscribe_apikey_plan_auto_validation_mints_key"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.SubscriptionServiceTest.shouldRequireManualValidation"
+local_test    = "subscribe_manual_validation_pending"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.SubscriptionServiceTest.shouldAcceptPending"
+local_test    = "accept_pending_subscription_transitions_to_accepted"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.SubscriptionServiceTest.shouldNotReAcceptAccepted"
+local_test    = "accept_already_accepted_subscription_rejected"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.SubscriptionServiceTest.shouldRejectPending"
+local_test    = "reject_pending_subscription"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.SubscriptionServiceTest.shouldDropApiKeyOnClose"
+local_test    = "close_subscription_drops_api_key_index"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.SubscriptionServiceTest.shouldPauseAndResume"
+local_test    = "pause_then_resume_subscription_round_trip"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.SubscriptionServiceTest.shouldNotPausePending"
+local_test    = "cannot_pause_pending_subscription"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.SubscriptionServiceTest.shouldFilterByApplication"
+local_test    = "list_subscriptions_for_application_filters"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.SubscriptionServiceTest.shouldFilterByApi"
+local_test    = "list_subscriptions_for_api_filters"
+
+[[tests]]
+upstream_test = "io.gravitee.gateway.policy.impl.PolicyChainTest.shouldExecuteOnlyForActiveSubscription"
+local_test    = "effective_policy_chain_only_when_active"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.PortalServiceTest.shouldHidePrivateAndUnpublished"
+local_test    = "portal_visibility_excludes_private_and_unpublished"
+
+[[tests]]
+upstream_test = "io.gravitee.rest.api.service.impl.ApiKeyServiceTest.shouldLookupAfterAccept"
+local_test    = "api_key_lookup_after_accept_succeeds"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+# Gravitee Management API + Portal API surfaces consolidate under
+# /api/gateway/gravitee/* in cave-gateway.
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/management/organizations/{org}/environments/{env}/apis"
+local_path    = "/api/gateway/gravitee/apis"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/management/organizations/{org}/environments/{env}/apis/{id}"
+local_path    = "/api/gateway/gravitee/apis/{id}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/management/organizations/{org}/environments/{env}/apis/{id}/_start"
+local_path    = "/api/gateway/gravitee/apis/{id}/_publish"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/management/organizations/{org}/environments/{env}/apis/{id}/_stop"
+local_path    = "/api/gateway/gravitee/apis/{id}/_unpublish"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/management/organizations/{org}/environments/{env}/apis/{id}/_deprecate"
+local_path    = "/api/gateway/gravitee/apis/{id}/_deprecate"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/management/organizations/{org}/environments/{env}/apis/{api}/plans"
+local_path    = "/api/gateway/gravitee/apis/{id}/plans"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/management/organizations/{org}/environments/{env}/plans"
+local_path    = "/api/gateway/gravitee/plans"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/management/organizations/{org}/environments/{env}/plans/{id}/_publish"
+local_path    = "/api/gateway/gravitee/plans/{id}/_publish"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/management/organizations/{org}/environments/{env}/plans/{id}/_close"
+local_path    = "/api/gateway/gravitee/plans/{id}/_close"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/portal/applications"
+local_path    = "/api/gateway/gravitee/applications"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/portal/applications/{id}"
+local_path    = "/api/gateway/gravitee/applications/{id}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/portal/applications/{app}/subscriptions"
+local_path    = "/api/gateway/gravitee/applications/{id}/subscriptions"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/portal/subscriptions"
+local_path    = "/api/gateway/gravitee/subscriptions"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/portal/subscriptions/{id}/_close"
+local_path    = "/api/gateway/gravitee/subscriptions/{id}/_close"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/portal/subscriptions/{id}/_pause"
+local_path    = "/api/gateway/gravitee/subscriptions/{id}/_pause"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/portal/subscriptions/{id}/_resume"
+local_path    = "/api/gateway/gravitee/subscriptions/{id}/_resume"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/portal/apis"
+local_path    = "/api/gateway/gravitee/portal/apis"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/portal/apis/{id}"
+local_path    = "/api/gateway/gravitee/portal/apis/{id}"

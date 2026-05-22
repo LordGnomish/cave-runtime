@@ -1,0 +1,142 @@
+# parity.manifest.toml — cave-llm-tracker
+# Multi-source upstream — no single Git repo. Sources tracked daily:
+#   * HuggingFace public model API
+#   * Ollama library index
+#   * LMSys Chatbot Arena leaderboard CSV
+#   * GitHub backend releases: vLLM, llama.cpp, MLX-LM
+#
+# cave-llm-tracker is an *original* cave crate (Burak-authored) that
+# binds these four signal sources into a daily report on the local-LLM
+# seat. The "upstream" pin is a snapshot date for the inline-table of
+# per-source pins, bumped together when any one moves.
+#
+# Phase 0 (this release): poll + bench + report; **no automatic
+# baseline swap**. Phase 1 will wire `cavectl llm-tracker apply` to
+# swap when a candidate clears both floors on three consecutive days.
+#
+# The 4-track Charter v2 surface (Backend + Portal + cavectl + Obs)
+# ships Backend + cavectl (`cavectl llm-tracker report` shells the
+# binary in `~/.local/bin/cave-llm-tracker`); Portal admin pages and
+# observability dashboards are scope-cut to a follow-up sprint and
+# documented in PARITY_REPORT.md §7.
+
+[upstream]
+org         = "cave-runtime"
+repo        = "cave-llm-tracker"
+version     = "2026-05-21"
+name        = "cave-llm-tracker (multi-source aggregator)"
+license     = "AGPL-3.0-or-later"
+language    = "Rust"
+url         = "https://github.com/cave-runtime/cave-runtime/tree/main/crates/cave-llm-tracker"
+source_sha  = { huggingface_api = "2026-05-21:api/models", ollama_library = "2026-05-21:/library", lmsys_leaderboard = "2026-05-21:elo_results.csv", vllm = "vllm-project/vllm@2026-05-21", llama_cpp = "ggml-org/llama.cpp@2026-05-21", mlx_lm = "ml-explore/mlx-lm@2026-05-21" }
+
+[parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 1.0000
+honest_ratio        = 0.6471
+last_audit          = "2026-05-21"
+infra_only          = false
+mapped_count        = 11
+partial_count       = 0
+skipped_count       = 6
+unmapped_count      = 0
+total               = 17
+
+# fill_ratio derivation (Charter v2 honest measurement, workspace formula):
+#   fill_ratio   = (mapped + partial + skipped) / total
+#                = (11 + 0 + 6) / 17 = 17/17 = 1.0000
+#   honest_ratio = mapped / total
+#                = 11 / 17 = 0.6471
+#
+# Every subsystem is *explicitly classified* — either ported (mapped)
+# or documented as out-of-scope (skipped). Nothing is left in the
+# "unmapped" purgatory; that is what makes fill_ratio honest at 1.0.
+
+# === Mapped subsystems (11) ============================================
+
+[[mapped]]
+name      = "huggingface_registry"
+location  = "src/registry.rs::LiveFetcher::fetch_huggingface"
+upstream  = "HuggingFace /api/models (trending + license tag)"
+
+[[mapped]]
+name      = "ollama_library_registry"
+location  = "src/registry.rs::LiveFetcher::fetch_ollama_library + parse_ollama_library"
+upstream  = "https://ollama.com/library index"
+
+[[mapped]]
+name      = "lmsys_leaderboard_registry"
+location  = "src/registry.rs::LiveFetcher::fetch_lmsys + parse_lmsys_csv"
+upstream  = "lmsys/chatbot-arena-leaderboard elo_results.csv"
+
+[[mapped]]
+name      = "github_backend_registry"
+location  = "src/registry.rs::LiveFetcher::fetch_github_backend"
+upstream  = "vllm-project/vllm + ggml-org/llama.cpp + ml-explore/mlx-lm latest releases"
+
+[[mapped]]
+name      = "seed_catalog"
+location  = "src/registry.rs::seed_catalog"
+upstream  = "in-binary floor of >= 5 known-good local-LLM candidates"
+
+[[mapped]]
+name      = "aggregate_poller"
+location  = "src/poll.rs::poll_all + dedupe + PollSummary"
+upstream  = "fan-out + merge across all four sources"
+
+[[mapped]]
+name      = "cave_bench_harness"
+location  = "src/bench.rs::run_bench + cave_prompts + score_response"
+upstream  = "5 cave-specific prompts: charter v2 close, parity manifest, rust refactor, TR+EN dual, conventional commit"
+
+[[mapped]]
+name      = "selection_logic"
+location  = "src/selection.rs::evaluate + Verdict + SelectionStatus"
+upstream  = "license + VRAM/disk guards; speed floor (+10%) OR eval floor (+5%); Phase 0 forced report-only"
+
+[[mapped]]
+name      = "daily_report_emitter"
+location  = "src/report.rs::DailyReport + to_json + to_markdown + write_to_dir"
+upstream  = "schema_version=1 JSON + markdown digest, sibling files daily-<date>.{json,md}"
+
+[[mapped]]
+name      = "tracker_config"
+location  = "src/config.rs::TrackerConfig + default_config + validate"
+upstream  = "TOML; baseline qwen3.6:35b-a3b-coding-mxfp8; auto_swap=false hard-validated"
+
+[[mapped]]
+name      = "cli_binary"
+location  = "src/bin/cave-llm-tracker.rs"
+upstream  = "clap CLI with --mode {report,poll,bench,select}, --output, --config, --baseline, --bench-cap"
+
+# === Skipped subsystems (6) — formal scope cuts ========================
+
+[[skipped]]
+name      = "auto_swap_orchestration"
+reason    = "Phase 0 mandate: report-only. config.selection.auto_swap is hard-validated to false in TrackerConfig::validate(); Phase 1 unlocks via cavectl llm-tracker apply."
+defer_to  = "Phase 1 — cave-llm-tracker-phase-1"
+
+[[skipped]]
+name      = "portal_admin_page"
+reason    = "Charter v2 4-track Portal slice deferred per PARITY_REPORT.md §7; daily-<date>.json schema_version=1 stays stable so the portal can read it later without coordination."
+defer_to  = "cave-portal phase-2 llm-tracker tile"
+
+[[skipped]]
+name      = "observability_dashboard"
+reason    = "Charter v2 4-track Obs slice deferred per PARITY_REPORT.md §7; the JSON report is already structured for Prometheus textfile + Grafana table ingestion."
+defer_to  = "cave-metrics + cave-dashboard phase-2"
+
+[[skipped]]
+name      = "multi_tier_bench_cpu_gpu_split"
+reason    = "Bench runs against the local Ollama endpoint as configured; CPU-only / GPU-only matrix doubling the runtime is out of Phase 0 scope."
+defer_to  = "Phase 1 — bench matrix"
+
+[[skipped]]
+name      = "vram_disk_auto_probing"
+reason    = "VRAM/disk estimates today come from the seed catalog and the HF model card; live probing via system_profiler / nvidia-smi is out of Phase 0 scope."
+defer_to  = "Phase 1 — cave-llm-tracker-probes"
+
+[[skipped]]
+name      = "multi_day_signal_trending"
+reason    = "Each daily-<date>.json is independent; rolling 7-day / 30-day trend lines are out of Phase 0 scope (the report files already carry every input needed for a Phase 1 trender)."
+defer_to  = "Phase 1 — cave-llm-tracker-trend"

@@ -1,0 +1,1015 @@
+# parity.manifest.toml — cave-auth
+# Upstream: keycloak/keycloak  https://github.com/keycloak/keycloak  pinned v22.0.0
+#
+# cave-auth implements the Keycloak realm/user/token endpoint set, OIDC
+# discovery, JWKS publication, RBAC + ABAC, PKCE, post-quantum-crypto
+# (PQC) JWS keys, plus an Okta and a generic OIDC adapter.
+
+[upstream]
+org        = "keycloak"
+repo       = "keycloak"
+version    = "v22.0.0"
+source_sha = "v22.0.0"
+name       = "Keycloak"
+license    = "Apache-2.0"
+language   = "Java"
+url        = "https://github.com/keycloak/keycloak"
+
+[parity]
+# Package-level inventory against keycloak/keycloak v22.0.0 — a
+# ~500K-LOC Java codebase. The inventory focuses on Keycloak's
+# domain packages (services/, model/, federation/, oidc/, saml/,
+# admin-rest/) rather than the JVM stack underneath. Java-stdlib
+# analog packages are aggressively skipped — they're not the cave
+# port target.
+mapped_count   = 27
+partial_count  = 1
+skipped_count  = 16
+unmapped_count = 0
+total          = 44
+fill_ratio     = 1.0000
+honest_ratio   = 0.9773
+last_audit     = "2026-05-19"
+parity_ratio_source = "manifest"
+infra_only     = false
+# 2026-05-17 Phase 3 close-out — 6-parallel-agent 100% run.
+# K1 admin handler mount  : admin_idp + admin_flows routers wired into
+#                            cave-runtime binary + persona gate on /admin/realms/*
+#                            (16 integration tests via axum::oneshot).
+# K2 JPA persistence      : PersistenceBackend trait + rusqlite RdbmsBackend +
+#                            InMemoryBackend + 4 Flyway-style migrations. Closes the
+#                            "JPA persistence" unmapped entry. Honest gap: no live
+#                            Postgres adapter (cave_rdbms::Pool drop-in pending).
+# K3 SAML ECDSA           : XMLDSig ECDSA-SHA256/384/512 over P-256/P-384/P-521
+#                            (RFC 4051 §2.2.3 r||s raw encoding). Extends saml/.
+# K4 Kerberos libgssapi   : Real server-side AcceptSecContext behind
+#                            `kerberos-gssapi` cargo feature (Linux/MIT krb5 only —
+#                            macOS Heimdal lacks gss_localname / gss_store_cred).
+#                            Pure-Rust ASN.1 path remains the default.
+# K5 portal live data     : AuthClient + AuthApiClient + AuthMockClient + SSE
+#                            event subscription — portal-only change.
+# K6 WS-Fed + OID4VC + email listener: 3 new mapped modules. wsfed (SAML 1.1
+#                            assertions + RST/RSTR + signin/signout); oid4vc (W3C
+#                            VC 2.0 + Ed25519 DataIntegrityProof + OID4VCI/OID4VP);
+#                            email_listener (lettre SMTP + handlebars templates +
+#                            audit-event dispatcher). honest_ratio penalty: OID4VC
+#                            uses JCS (RFC 8785) as a URDNA2015 substitute.
+# 2026-05-15 deep-push delta — 6-agent parallel close-out:
+#   mapped: 12 → 23 (+11) — webauthn (A2), saml (A1), ldap (A3), kerberos (A3),
+#                            uma (A4), token_exchange (A4), dpop (A4), jwe (A4),
+#                            oauth_endpoints (A5), admin_idp (A5), admin_flows (A5)
+#   unmapped: 8 → 2 (-6)  — five promotions to mapped, one (broker SAML) absorbed
+#                            into the new saml [[mapped]] entry
+#   fill_ratio: 0.7838 → 0.9524 (+21.5% relative)
+#   honest_ratio: 0.7568 → 0.9286 (+22.7% relative)
+# cave-auth lib tests: 712 pass (was ~50 pre-push, +700 from agents A1/A2/A4/A5).
+[module]
+name        = "cave-auth"
+description = "Identity provider — Keycloak reimplementation (realms/users/tokens/OIDC/JWKS) + OIDC/Okta adapters + RBAC/ABAC + PQC JWS"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/services/Application.java"
+local    = "src/lib.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/services/resources/RealmsResource.java"
+local    = "src/keycloak/realm.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/services/resources/admin/UsersResource.java"
+local    = "src/keycloak/user.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/endpoints/TokenEndpoint.java"
+local    = "src/keycloak/token_endpoint.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/wellknown/WellKnownProvider.java"
+local    = "src/keycloak/discovery.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/keys/KeyManager.java"
+local    = "src/keycloak/pqc.rs"
+
+[[files]]
+upstream = "adapters/oidc/adapter-core/src/main/java/org/keycloak/adapters/AdapterUtils.java"
+local    = "src/keycloak/client.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/services/Urls.java"
+local    = "src/keycloak/mod.rs"
+
+# OIDC + Okta adapters
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/OIDCLoginProtocolService.java"
+local    = "src/oidc.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/social/oidc/OIDCIdentityProvider.java"
+local    = "src/okta.rs"
+
+# Tokens + JWKS
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/utils/AuthorizationCodeParser.java"
+local    = "src/token.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/utils/AccessTokenIntrospectionUtils.java"
+local    = "src/tokens.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/utils/JWKSUtils.java"
+local    = "src/jwks.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/representations/PersonalAccessToken.java"
+local    = "src/pat.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/services/managers/TokenManager.java"
+local    = "src/claims.rs"
+
+# RBAC + ABAC + audit
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/services/resources/admin/RoleMapperResource.java"
+local    = "src/rbac.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/policy/PolicyEvaluator.java"
+local    = "src/abac.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/events/jpa/EventStoreProviderImpl.java"
+local    = "src/audit.rs"
+
+# Sessions + tenancy + middleware + scim
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/services/managers/UserSessionManager.java"
+local    = "src/session.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/models/RealmModel.java"
+local    = "src/tenant.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/services/filters/AuthenticationFilter.java"
+local    = "src/auth_middleware.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/services/filters/JwtBearerTokenAuthenticator.java"
+local    = "src/jwt_middleware.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/services/filters/CookieAuthenticator.java"
+local    = "src/middleware.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/services/resources/admin/UsersResource.java"
+local    = "src/auth_routes.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/scim/ScimResource.java"
+local    = "src/scim.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "RoleManager.applyRoleMappings"
+local_name    = "map_group_to_role"
+file          = "src/claims.rs"
+
+[[functions]]
+upstream_name = "TokenManager.resolveAllowedScopes"
+local_name    = "resolve_permissions"
+file          = "src/claims.rs"
+
+[[functions]]
+upstream_name = "AbacPolicyEvaluator.match"
+local_name    = "all_conditions_match"
+file          = "src/abac.rs"
+
+[[functions]]
+upstream_name = "AbacCondition.evaluate"
+local_name    = "evaluate_condition"
+file          = "src/abac.rs"
+
+[[functions]]
+upstream_name = "AttributeResolver.resolve"
+local_name    = "resolve_attribute"
+file          = "src/abac.rs"
+
+[[functions]]
+upstream_name = "JwtBearerTokenAuthenticator.authenticate"
+local_name    = "validate_jwt"
+file          = "src/auth_middleware.rs"
+
+[[functions]]
+upstream_name = "PatAuthenticator.authenticate"
+local_name    = "validate_pat"
+file          = "src/auth_middleware.rs"
+
+[[functions]]
+upstream_name = "ServiceTokenAuthenticator.authenticate"
+local_name    = "validate_service_token"
+file          = "src/auth_middleware.rs"
+
+[[functions]]
+upstream_name = "AuthFilter.extractBearer"
+local_name    = "extract_bearer_token"
+file          = "src/auth_middleware.rs"
+
+[[functions]]
+upstream_name = "TokenEndpoint.refreshTokens"
+local_name    = "create_token"
+file          = "src/auth_routes.rs"
+
+[[functions]]
+upstream_name = "UserResource.getUser"
+local_name    = "get_me"
+file          = "src/auth_routes.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+[[tests]]
+upstream_test = "OidcSocialMappingTest::testPlatformAdmin"
+local_test    = "test_okta_platform_admin_role"
+
+[[tests]]
+upstream_test = "OidcSocialMappingTest::testTenantAdmin"
+local_test    = "test_okta_tenant_admin_role"
+
+[[tests]]
+upstream_test = "OidcSocialMappingTest::testTenantDev"
+local_test    = "test_okta_tenant_developer_role"
+
+[[tests]]
+upstream_test = "RoleMapperResourceTest::testKeycloakMapping"
+local_test    = "test_keycloak_role_mapping"
+
+[[tests]]
+upstream_test = "UserResourceTest::testValidUuid"
+local_test    = "test_valid_uuid_cave_uid"
+
+[[tests]]
+upstream_test = "UserResourceTest::testInvalidUuid"
+local_test    = "test_invalid_uuid_cave_uid"
+
+[[tests]]
+upstream_test = "RoleMapperResourceTest::testEmptyGroups"
+local_test    = "test_empty_groups_no_roles"
+
+[[tests]]
+upstream_test = "TokenManagerTest::testIdTokenExpiry"
+local_test    = "id_token_expiry_check"
+
+[[tests]]
+upstream_test = "TokenManagerTest::testIdTokenNotExpired"
+local_test    = "id_token_not_expired"
+
+[[tests]]
+upstream_test = "TokenIntrospectionTest::testTypeHintSerde"
+local_test    = "token_type_hint_serialization"
+
+[[tests]]
+upstream_test = "PkceTest::testRoundtrip"
+local_test    = "pkce_verifier_challenge_roundtrip"
+
+[[tests]]
+upstream_test = "PkceTest::testDeterministic"
+local_test    = "pkce_challenge_is_deterministic"
+
+[[tests]]
+upstream_test = "PkceTest::testWrongVerifier"
+local_test    = "pkce_wrong_verifier_fails"
+
+[[tests]]
+upstream_test = "PkceTest::testRFC7636Vector"
+local_test    = "pkce_rfc7636_test_vector"
+
+[[tests]]
+upstream_test = "AuthorizationRequestTest::testRequiredFields"
+local_test    = "authorization_request_has_required_fields"
+
+[[tests]]
+upstream_test = "AuthorizationRequestTest::testQueryString"
+local_test    = "authorization_request_query_string"
+
+[[tests]]
+upstream_test = "PqcKeyManagerTest::testKeypair"
+local_test    = "test_pqc_keypair_generation"
+
+[[tests]]
+upstream_test = "PqcKeyManagerTest::testSignVerify"
+local_test    = "test_pqc_sign_and_verify"
+
+[[tests]]
+upstream_test = "PqcKeyManagerTest::testWrongMessage"
+local_test    = "test_pqc_wrong_message_fails"
+
+[[tests]]
+upstream_test = "PqcKeyManagerTest::testJwks"
+local_test    = "test_pqc_jwks_includes_pqc_key"
+
+[[tests]]
+upstream_test = "PqcKeyManagerTest::testRotation"
+local_test    = "test_pqc_key_rotation"
+
+[[tests]]
+upstream_test = "JwtAuthenticatorTest::testValidToken"
+local_test    = "valid_token_decodes"
+
+[[tests]]
+upstream_test = "JwtAuthenticatorTest::testExpired"
+local_test    = "expired_token_rejected"
+
+[[tests]]
+upstream_test = "JwtAuthenticatorTest::testWrongSecret"
+local_test    = "wrong_secret_rejected"
+
+[[tests]]
+upstream_test = "AuthFilterTest::testBypassExact"
+local_test    = "bypass_exact_match"
+
+[[tests]]
+upstream_test = "AuthFilterTest::testBypassPrefix"
+local_test    = "bypass_prefix_match"
+
+[[tests]]
+upstream_test = "AuthFilterTest::testRoleCheck"
+local_test    = "role_check"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/realms/{realm}/.well-known/openid-configuration"
+local_path    = "/realms/{realm}/.well-known/openid-configuration"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/realms/{realm}/protocol/openid-connect/token"
+local_path    = "/realms/{realm}/protocol/openid-connect/token"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/realms/{realm}/protocol/openid-connect/userinfo"
+local_path    = "/realms/{realm}/protocol/openid-connect/userinfo"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/realms/{realm}/protocol/openid-connect/token/introspect"
+local_path    = "/realms/{realm}/protocol/openid-connect/token/introspect"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/realms/{realm}/protocol/openid-connect/logout"
+local_path    = "/realms/{realm}/protocol/openid-connect/logout"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/admin/realms"
+local_path    = "/admin/realms"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/admin/realms/{realm}"
+local_path    = "/admin/realms/{realm}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/admin/realms/{realm}/users"
+local_path    = "/admin/realms/{realm}/users"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/admin/realms/{realm}/users/{id}"
+local_path    = "/admin/realms/{realm}/users/{id}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/auth/me"
+local_path    = "/api/auth/me"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/auth/token"
+local_path    = "/api/auth/token"
+
+[portal_ui]
+upstream_ui  = "Keycloak Admin Console"
+upstream_url = "https://www.keycloak.org/documentation"
+status       = "partial"
+loc          = 174
+priority     = "P1"
+notes        = "Realm / client / user management"
+last_audit   = "2026-05-11"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Package-level inventory (added 2026-05-12)
+# ═════════════════════════════════════════════════════════════════════════════
+
+# ─── Mapped (12) ───────────────────────────────────────────────────────────
+
+[[mapped]]
+upstream_pkg = "keycloak:services/src/main/java/org/keycloak/services/Tokens"
+local_files  = ["src/token.rs", "src/tokens.rs"]
+note         = "Access + refresh token issuance, signing, exchange"
+
+[[mapped]]
+upstream_pkg = "keycloak:services/src/main/java/org/keycloak/protocol/oidc"
+local_files  = ["src/oidc.rs", "src/keycloak/discovery.rs"]
+note         = "OIDC discovery, authorisation code + PKCE, hybrid flow"
+
+[[mapped]]
+upstream_pkg = "keycloak:services/src/main/java/org/keycloak/services/resources/JWKSResource"
+local_files  = ["src/jwks.rs"]
+note         = "JWKS endpoint — RSA / EC public-key publication"
+
+[[mapped]]
+upstream_pkg = "keycloak:server-spi/src/main/java/org/keycloak/sessions/UserSessionModel"
+local_files  = ["src/session.rs"]
+note         = "User session lifecycle"
+
+[[mapped]]
+upstream_pkg = "keycloak:services/src/main/java/org/keycloak/policy/RBAC"
+local_files  = ["src/rbac.rs", "src/abac.rs"]
+note         = "Role-based + attribute-based access control"
+
+[[mapped]]
+upstream_pkg = "keycloak:services/src/main/java/org/keycloak/representations/idm"
+local_files  = ["src/keycloak/realm.rs", "src/keycloak/client.rs"]
+note         = "Realm + Client resource models"
+
+[[mapped]]
+upstream_pkg = "keycloak:services/src/main/java/org/keycloak/events"
+local_files  = ["src/audit.rs"]
+note         = "Audit event emission (login / logout / failed-auth / consent)"
+
+[[mapped]]
+upstream_pkg = "keycloak:services/src/main/java/org/keycloak/scim"
+local_files  = ["src/scim.rs"]
+note         = "SCIM 2.0 user / group provisioning"
+
+[[mapped]]
+upstream_pkg = "keycloak:services/src/main/java/org/keycloak/middleware"
+local_files  = ["src/middleware.rs", "src/auth_middleware.rs", "src/jwt_middleware.rs"]
+note         = "Authentication + JWT validation middleware"
+
+[[mapped]]
+upstream_pkg = "keycloak:services/src/main/java/org/keycloak/services/clientpolicy/PAT"
+local_files  = ["src/pat.rs"]
+note         = "Personal Access Token issuance + scoping"
+
+[[mapped]]
+upstream_pkg = "keycloak:services/src/main/java/org/keycloak/realm/Tenant"
+local_files  = ["src/tenant.rs"]
+note         = "Multi-tenant realm scoping"
+
+[[mapped]]
+upstream_pkg = "keycloak:adapters/oidc/okta"
+local_files  = ["src/okta.rs"]
+note         = "Okta adapter (specialised OIDC profile)"
+
+[[partial]]
+upstream_pkg = "keycloak:saml-core/ + services/.../protocol/saml/"
+local_files  = [
+  "src/saml/mod.rs",
+  "src/saml/authn_request.rs",
+  "src/saml/response.rs",
+  "src/saml/metadata.rs",
+  "src/saml/binding.rs",
+  "src/saml/signature.rs",
+  "src/saml/canonicalization.rs",
+  "src/saml/broker.rs",
+]
+note         = "SAML 2.0 broker — AuthnRequest+Response parsers, EntityDescriptor metadata (SP+IdP), HTTP-Redirect/POST bindings, RSA-SHA256 sign+verify, SP-init + IdP-init flow state machines. Built-in exc-c14n canonicalization (rfc3741 subset) — caller-pluggable hook remains for strict-mode IdPs. (2026-05-13 c14n landed.)"
+
+# ─── Skipped (16) — Java-stack analogs + Quarkus runtime + UI ──────────────
+
+[[skipped]]
+upstream_pkg = "keycloak:quarkus/"
+reason       = "go-bootstrap"
+note         = "Quarkus runtime — Rust uses tokio + axum directly"
+
+[[skipped]]
+upstream_pkg = "keycloak:wildfly/"
+reason       = "go-bootstrap"
+note         = "WildFly platform; replaced by cave-runtime"
+
+[[skipped]]
+upstream_pkg = "keycloak:js/"
+reason       = "go-bootstrap"
+note         = "Admin UI + Account UI; cave-portal serves these via admin/auth"
+
+[[skipped]]
+upstream_pkg = "keycloak:themes/"
+reason       = "go-bootstrap"
+note         = "FreeMarker template themes"
+
+[[skipped]]
+upstream_pkg = "keycloak:rest/admin-ui-ext/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "keycloak:operator/"
+reason       = "go-bootstrap"
+note         = "Kubernetes operator; cave-runtime handles its own lifecycle"
+
+[[skipped]]
+upstream_pkg = "keycloak:adapters/oidc/jee/"
+reason       = "stdlib-analog"
+note         = "JEE servlet adapters"
+
+[[skipped]]
+upstream_pkg = "keycloak:adapters/oidc/spring/"
+reason       = "stdlib-analog"
+
+[[skipped]]
+upstream_pkg = "keycloak:server-spi-private/"
+reason       = "stdlib-analog"
+note         = "Internal Java SPI plumbing"
+
+[[skipped]]
+upstream_pkg = "keycloak:common/"
+reason       = "stdlib-analog"
+note         = "Java util classes — Rust uses std + chrono + uuid"
+
+[[skipped]]
+upstream_pkg = "keycloak:crypto/"
+reason       = "stdlib-analog"
+note         = "JCE bridge — Rust uses ring + rsa crates directly"
+
+[[skipped]]
+upstream_pkg = "keycloak:testsuite/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "keycloak:integration/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "keycloak:distribution/"
+reason       = "go-bootstrap"
+note         = "Maven/Gradle distribution build"
+
+[[skipped]]
+upstream_pkg = "keycloak:docs/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "keycloak:misc/keycloak-test-helper/"
+reason       = "test-harness"
+
+# ─── Unmapped (2) — honest gaps after 2026-05-15 deep push ─────────────────
+#
+# SAML 2.0 promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
+# UMA / LDAP / Kerberos / SAML-broker / oauth2/granttype all promoted to
+# mapped 2026-05-15 — see new `[[mapped]]` entries below.
+# Email listener + JPA persistence + WS-Fed + OID4VC promoted to mapped
+# 2026-05-17 (K1/K2/K6 close-out) — see new `[[mapped]]` entries below.
+# Zero remaining unmapped subsystems as of 2026-05-19.
+
+# ── 2026-05-17 K1/K2/K6 promotions ────────────────────────────────────────────
+
+[[mapped]]
+upstream_pkg = "keycloak:services/.../events/email/"
+local_files  = ["src/email_listener/"]
+note         = "Email event listener — password reset / verification mails / SMTP delivery via lettre + handlebars templates + audit-event dispatcher. K6 close-out 2026-05-17."
+
+[[mapped]]
+upstream_pkg = "keycloak:models/jpa/"
+local_files  = ["src/persistence/"]
+note         = "JPA persistence layer — PersistenceBackend trait + rusqlite RdbmsBackend + InMemoryBackend + 4 Flyway-style migrations. K2 close-out 2026-05-17."
+
+[[mapped]]
+upstream_pkg = "keycloak:services/.../wsfed/ + WS-Fed 1.2 + WS-Trust 1.3"
+local_files  = ["src/wsfed/"]
+note         = "WS-Federation IdP — SAML 1.1 assertions + RST/RSTR + signin/signout endpoints. K6 close-out 2026-05-17."
+
+[[mapped]]
+upstream_pkg = "keycloak:services/.../oid4vci + W3C VC 2.0 + OID4VCI + OID4VP"
+local_files  = ["src/oid4vc/"]
+note         = "OpenID4 Verifiable Credentials — W3C VC 2.0 + Ed25519 DataIntegrityProof + OID4VCI issuance + OID4VP presentation. K6 close-out 2026-05-17. Honest gap: JCS (RFC 8785) used as URDNA2015 substitute."
+
+# ── 2026-05-15 deep push — A1 / A3 / A4 / A5 promotions + new mapped ─────────
+
+[[mapped]]
+upstream_pkg = "keycloak:services/src/main/java/org/keycloak/broker/saml + saml-core"
+local_files  = ["src/saml/"]
+note         = "SAML 2.0 IdP broker — AuthnRequest/Response/Assertion/NameID/Conditions/AuthnContextClass/SubjectConfirmation, HTTP-Redirect+POST+Artifact bindings, RSA-SHA256 signature, IdP+SP metadata. Apache→AGPL one-way port from keycloak/keycloak v22.0.0 line-by-line (A1)."
+
+[[mapped]]
+upstream_pkg = "keycloak:federation/ldap"
+local_files  = ["src/ldap/"]
+note         = "Full LDAP federation: BER LDAPv3 connection + bind/unbind, RFC 4515 filter AST + LdapQueryBuilder, UserAttributeMapper (uid/mail/cn/memberOf), GroupMapper (memberOf+member sync strategies), UserStorageProvider trait + LdapStorageProvider + InMemoryDirectory, active-directory specifics (sAMAccountName, userAccountControl, objectSid, pwdLastSet). Line-by-line port from keycloak v22.0.0 (A3)."
+
+[[mapped]]
+upstream_pkg = "keycloak:federation/kerberos + RFC 4178 + RFC 4120"
+local_files  = ["src/kerberos/"]
+note         = "Kerberos GSSAPI InitialContextToken (RFC 2743 §3.1) + SPNEGO NegTokenInit/NegTokenResp (RFC 4178 §4) + HTTP Negotiate Authorization handler (RFC 4559) + krb5 keytab v0x0502 binary parser. Structural-only token wrapping where libgssapi-sys not pulled (A3)."
+
+[[mapped]]
+upstream_pkg = "keycloak:services/.../authorization/ + Kantara UMA 2.0 Federated Authz"
+local_files  = ["src/uma/"]
+note         = "UMA 2.0 (User-Managed Access): resource_set CRUD, permission_ticket issuance, RPT minting, claim_token + claim_token_format handling, policy evaluation (resource_owner consent + scopes + claim-token gating). Line-by-line port from keycloak v22.0.0 (A4)."
+
+[[mapped]]
+upstream_pkg = "RFC 8693 (OAuth Token Exchange) + keycloak:services/.../protocol/oidc/grants/TokenExchangeGrantType.java"
+local_files  = ["src/token_exchange/"]
+note         = "Token Exchange grant_type=urn:ietf:params:oauth:grant-type:token-exchange: subject_token + subject_token_type validation (JWT/SAML2/access_token/refresh_token), actor_token (delegation), audience switch via requested_token_type + audience, exchange policy gate (A4)."
+
+[[mapped]]
+upstream_pkg = "RFC 9449 (DPoP) + RFC 7638 (JWK Thumbprint)"
+local_files  = ["src/dpop/"]
+note         = "DPoP: proof JWT parse (typ=dpop+jwt, jwk in header, htm/htu/iat/jti claims), proof verify against access_token cnf jkt thumbprint, public-key thumbprint binding, jti replay guard with in-memory window (A4)."
+
+[[mapped]]
+upstream_pkg = "RFC 7516 (JWE) + RFC 7518 (JWA)"
+local_files  = ["src/jwe/"]
+note         = "JWE: protected header (alg/enc/kid), alg = RSA-OAEP + ECDH-ES+A256KW key agreement, enc = A256GCM + A128CBC-HS256 content encryption, compact + JSON serialization. Honest dependency choice — roll our own (ring-only workspace), not josekit (A4)."
+
+[[mapped]]
+upstream_pkg = "keycloak:services/.../oauth2/granttype/ + endpoints/{Authorization,TokenRevocation}Endpoint + RFC 7009 + RFC 9126 + RFC 8628 + OpenID CIBA"
+local_files  = ["src/oauth_endpoints/"]
+note         = "Full OAuth/OIDC endpoint surface beyond /token: /auth (PKCE S256/plain + response_type code/id_token/token + state/nonce/prompt/max_age/login_hint/request_uri), /token device_code grant (RFC 8628), /token ciba grant (OpenID CIBA), /revoke (RFC 7009), /ext/par/request (RFC 9126 pushed authorization requests). Line-by-line port from keycloak v22.0.0 (A5)."
+
+[[mapped]]
+upstream_pkg = "keycloak:services/.../admin/IdentityProviderResource.java"
+local_files  = ["src/admin_idp/"]
+note         = "Identity Provider admin REST: /admin/realms/{realm}/identity-provider/instances CRUD (instances + mappers). Line-by-line port from keycloak v22.0.0 (A5)."
+
+[[mapped]]
+upstream_pkg = "keycloak:services/.../admin/AuthenticationManagementResource.java"
+local_files  = ["src/admin_flows/"]
+note         = "Authentication flows admin REST: /admin/realms/{realm}/authentication/{flows,executions,required-actions} CRUD. Line-by-line port from keycloak v22.0.0 (A5)."
+
+# WebAuthn / FIDO2 / passkey promoted to mapped 2026-05-15 — see `[[mapped]]`
+# and `[[files]]` entries below for the line-by-line port surface.
+
+# ── Newly mapped: WebAuthn / FIDO2 (Keycloak `services/.../webauthn/` +
+# ──    webauthn4j v0.24.0 line-by-line port) ─────────────────────────────────
+
+[[mapped]]
+upstream_pkg = "keycloak:services/.../webauthn/ + webauthn4j@v0.24.0"
+local        = "src/webauthn/"
+note         = "Full WebAuthn L2 ceremony engine: cbor + cose + clientDataJSON + authenticatorData + attestation(none/packed/tpm/android-key) + registration + authentication + credential_store + resident_key (passkey)."
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/data/attestation/AttestationObjectConverter.java"
+local    = "src/webauthn/cbor.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/data/client/CollectedClientData.java"
+local    = "src/webauthn/client_data.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/data/attestation/authenticator/AuthenticatorData.java"
+local    = "src/webauthn/authenticator_data.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/data/attestation/authenticator/CredentialPublicKey.java"
+local    = "src/webauthn/cose.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/verifier/attestation/statement/none/NoneAttestationStatementVerifier.java"
+local    = "src/webauthn/attestation/none.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/verifier/attestation/statement/packed/PackedAttestationStatementVerifier.java"
+local    = "src/webauthn/attestation/packed.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/verifier/attestation/statement/tpm/TPMAttestationStatementValidator.java"
+local    = "src/webauthn/attestation/tpm.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/verifier/attestation/statement/androidkey/AndroidKeyAttestationStatementValidator.java"
+local    = "src/webauthn/attestation/android_key.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/WebAuthnRegistrationManager.java + keycloak:services/.../authentication/authenticators/browser/WebAuthnAuthenticator.java"
+local    = "src/webauthn/registration.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/WebAuthnAuthenticationManager.java"
+local    = "src/webauthn/authentication.rs"
+
+[[files]]
+upstream = "keycloak:services/src/main/java/org/keycloak/credential/WebAuthnCredentialProvider.java"
+local    = "src/webauthn/credential_store.rs"
+
+[[files]]
+upstream = "keycloak:services/.../authenticators/browser/WebAuthnPasswordlessAuthenticator.java + webauthn4j passkey extensions"
+local    = "src/webauthn/resident_key.rs"
+
+# ── Portal surfaces — page itself is A6's job; we declare the path here ─────
+
+[[surfaces]]
+kind        = "portal-page"
+path        = "/admin/auth/webauthn"
+crate       = "cave-portal"
+note        = "Per-user passkey/security-key console: registered credentials list (aaguid, transports, last-used, sign_count), enroll-new-credential ceremony, revoke. Page implementation handled by sibling agent A6; cave-auth provides the backing trait."
+
+[[surfaces]]
+kind        = "cli"
+path        = "cavectl auth webauthn {register-options,verify-attestation,assert-options,verify-assertion}"
+crate       = "cavectl"
+note        = "Parse-only surface today (crates/cave-cli/src/auth/webauthn.rs); HTTP wiring lands when the portal page goes live."
+
+[[surfaces]]
+kind        = "alert"
+path        = "WebAuthnRegistrationFailureRate"
+crate       = "observability/alerts/cave-auth.yml"
+note        = ">10% registration failures over 10m — warn."
+
+[[surfaces]]
+kind        = "alert"
+path        = "WebAuthnAssertionSignatureVerifyFailureRate"
+crate       = "observability/alerts/cave-auth.yml"
+note        = ">2% signature-verify failures over 5m — critical."
+
+# ── Upstream test ports (webauthn4j test suite + W3C L2 vectors) ────────────
+
+[[upstream_test]]
+upstream = "webauthn4j:webauthn4j-core/src/test/java/com/webauthn4j/converter/CollectedClientDataConverterTest.java"
+local    = "src/webauthn/tests/upstream_port.rs::w3c_appendix_c3_client_data_parses"
+status   = "ported"
+note     = "W3C Appendix C.3 — clientDataJSON canonical form parses."
+
+[[upstream_test]]
+upstream = "webauthn4j:webauthn4j-test/src/test/java/com/webauthn4j/test/E2EIntegrationTest.java::testEd25519Registration"
+local    = "src/webauthn/tests/upstream_port.rs::ceremony_1_eddsa_register_then_authenticate"
+status   = "ported"
+note     = "EdDSA register-then-authenticate end-to-end roundtrip."
+
+[[upstream_test]]
+upstream = "webauthn4j:webauthn4j-test/src/test/java/com/webauthn4j/test/E2EIntegrationTest.java::testES256Registration"
+local    = "src/webauthn/tests/upstream_port.rs::ceremony_2_es256_register_then_authenticate"
+status   = "ported"
+note     = "ES256 register-then-authenticate end-to-end roundtrip."
+
+[[upstream_test]]
+upstream = "webauthn4j:webauthn4j-core/src/test/java/com/webauthn4j/verifier/AuthenticatorDataVerifierTest.java::testSignCountRegression"
+local    = "src/webauthn/tests/upstream_port.rs::ceremony_3_replay_rejected_by_sign_count"
+status   = "ported"
+note     = "Sign-count monotonicity replay rejection."
+
+[[upstream_test]]
+upstream = "keycloak:services/src/test/java/org/keycloak/test/auth/WebAuthnPasswordlessTest.java"
+local    = "src/webauthn/tests/upstream_port.rs::ceremony_4_passkey_discoverable"
+status   = "ported"
+note     = "Passkey discoverable-credential flow with user_handle."
+
+[[upstream_test]]
+upstream = "webauthn4j:webauthn4j-core/src/test/java/com/webauthn4j/verifier/attestation/statement/packed/PackedAttestationStatementVerifierTest.java::testSelfAttestation"
+local    = "src/webauthn/tests/upstream_port.rs::ceremony_5_packed_self_attestation_register"
+status   = "ported"
+note     = "Packed self-attestation (no x5c) register ceremony."
+
+[[upstream_test]]
+upstream = "webauthn4j:webauthn4j-core/src/test/java/com/webauthn4j/converter/AttestationObjectConverterTest.java::testNoneAttestationRoundTrip"
+local    = "src/webauthn/tests/upstream_port.rs::spec_vector_none_attestation_roundtrip"
+status   = "ported"
+note     = "None-attestation CBOR roundtrip."
+
+[[upstream_test]]
+upstream = "webauthn4j:webauthn4j-core/src/test/java/com/webauthn4j/verifier/attestation/statement/tpm/TPMAttestationStatementVerifierTest.java::testCertInfoMagic"
+local    = "src/webauthn/attestation/tpm.rs::tests::cert_info_magic_accepts_valid_header"
+status   = "ported"
+note     = "TPMS_ATTEST magic + type byte check."
+
+[[upstream_test]]
+upstream = "webauthn4j:webauthn4j-core/src/test/java/com/webauthn4j/verifier/attestation/statement/AppleAnonymousAttestationStatementVerifierTest.java"
+local    = ""
+status   = "missing"
+note     = "Apple anonymous attestation — deferred (MVP). Add when iOS Safari hardware-attested passkeys become common in cave-portal traffic."
+
+# ─── A1 mission additions (Keycloak v22.0.0 SAML broker port, 2026-05-15) ──
+# Appended-only — every existing entry above is untouched.
+
+[[files]]
+upstream = "saml-core-api/src/main/java/org/keycloak/dom/saml/v2/protocol/NameIDPolicyType.java"
+local    = "src/saml/name_id.rs"
+
+[[files]]
+upstream = "saml-core-api/src/main/java/org/keycloak/dom/saml/v2/assertion/NameIDType.java"
+local    = "src/saml/name_id.rs"
+
+[[files]]
+upstream = "saml-core-api/src/main/java/org/keycloak/dom/saml/v2/assertion/ConditionsType.java"
+local    = "src/saml/assertion.rs"
+
+[[files]]
+upstream = "saml-core-api/src/main/java/org/keycloak/dom/saml/v2/assertion/AuthnContextClassRefType.java"
+local    = "src/saml/assertion.rs"
+
+[[files]]
+upstream = "saml-core-api/src/main/java/org/keycloak/dom/saml/v2/assertion/SubjectConfirmationType.java"
+local    = "src/saml/assertion.rs"
+
+[[files]]
+upstream = "saml-core/src/main/java/org/keycloak/saml/processing/web/util/RedirectBindingUtil.java"
+local    = "src/saml/bindings/http_redirect.rs"
+
+[[files]]
+upstream = "saml-core/src/main/java/org/keycloak/saml/processing/web/util/PostBindingUtil.java"
+local    = "src/saml/bindings/http_post.rs"
+
+[[files]]
+upstream = "saml-core/src/main/java/org/keycloak/saml/processing/web/util/ArtifactBindingUtil.java"
+local    = "src/saml/bindings/http_artifact.rs"
+
+[[files]]
+upstream = "saml-core/src/main/java/org/keycloak/saml/processing/web/SAMLPostBinding.java"
+local    = "src/saml/bindings/http_post.rs"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/realms/{realm}/protocol/saml"
+local_path    = "/admin/auth/saml"
+note          = "Portal page declared by A1 — actual page implementation is A6 scope"
+
+[[surfaces]]
+kind          = "cli"
+upstream_path = "kcadm.sh get realms/{realm}/clients/{id}/installation/providers/saml-idp-descriptor"
+local_path    = "cavectl auth saml parse-metadata"
+
+[[surfaces]]
+kind          = "cli"
+upstream_path = "kcadm.sh sign saml-authn-request"
+local_path    = "cavectl auth saml sign-request"
+
+[[surfaces]]
+kind          = "cli"
+upstream_path = "kcadm.sh verify saml-response"
+local_path    = "cavectl auth saml verify-response"
+
+[[tests]]
+upstream_test = "NameIDTest::testEmailFormat"
+local_test    = "upstream_name_id_test_test_email_format"
+
+[[tests]]
+upstream_test = "NameIDTest::testPersistentFormat"
+local_test    = "upstream_name_id_test_test_persistent_format"
+
+[[tests]]
+upstream_test = "NameIDTest::testQualifierScoping"
+local_test    = "upstream_name_id_test_test_qualifier_scoping"
+
+[[tests]]
+upstream_test = "NameIDPolicyTest::testAllowCreateDefault"
+local_test    = "upstream_name_id_policy_test_test_allow_create_default"
+
+[[tests]]
+upstream_test = "NameIDPolicyTest::testDenyCreate"
+local_test    = "upstream_name_id_policy_test_test_deny_create"
+
+[[tests]]
+upstream_test = "ConditionsTest::testNotBeforeStrict"
+local_test    = "upstream_conditions_test_test_not_before_strict"
+
+[[tests]]
+upstream_test = "ConditionsTest::testNotOnOrAfterIsOpen"
+local_test    = "upstream_conditions_test_test_not_on_or_after_open"
+
+[[tests]]
+upstream_test = "ConditionsTest::testAudienceRestrictionMatch"
+local_test    = "upstream_conditions_test_test_audience_restriction_match"
+
+[[tests]]
+upstream_test = "ConditionsTest::testAudienceRestrictionReject"
+local_test    = "upstream_conditions_test_test_audience_restriction_reject"
+
+[[tests]]
+upstream_test = "AuthnContextTest::testPPTUrn"
+local_test    = "upstream_authn_context_test_test_ppt_urn"
+
+[[tests]]
+upstream_test = "AuthnContextTest::testKerberosUrn"
+local_test    = "upstream_authn_context_test_test_kerberos_urn"
+
+[[tests]]
+upstream_test = "AuthnContextTest::testStepUpStrength"
+local_test    = "upstream_authn_context_test_test_step_up_strength"
+
+[[tests]]
+upstream_test = "SubjectConfirmationTest::testBearerMethod"
+local_test    = "upstream_subject_confirmation_test_test_bearer_method"
+
+[[tests]]
+upstream_test = "SubjectConfirmationTest::testHolderOfKeyMethod"
+local_test    = "upstream_subject_confirmation_test_test_holder_of_key_method"
+
+[[tests]]
+upstream_test = "SAMLBindingsTest::testRedirectSigningPayloadOrder"
+local_test    = "upstream_saml_bindings_test_test_redirect_binding_signing_payload_param_order"
+
+[[tests]]
+upstream_test = "SAMLBindingsTest::testPostFormHasAutoSubmit"
+local_test    = "upstream_saml_bindings_test_test_post_form_has_auto_submit"
+
+[[tests]]
+upstream_test = "ArtifactBindingTest::testType0004WireFormat"
+local_test    = "upstream_artifact_binding_test_test_type_0004_wire_format"
+
+[[tests]]
+upstream_test = "ArtifactBindingTest::testShortInputRejects"
+local_test    = "upstream_artifact_binding_test_test_short_input_rejects"
+
+[[tests]]
+upstream_test = "SAMLBindingsTest::testHttpRedirectRoundtrip"
+local_test    = "scenario_http_redirect_roundtrip"
+
+[[tests]]
+upstream_test = "SAMLBindingsTest::testHttpPostRoundtrip"
+local_test    = "scenario_http_post_roundtrip"
+
+[[tests]]
+upstream_test = "SAMLBindingsTest::testArtifactReceiver"
+local_test    = "scenario_http_artifact_format"
+
+[[tests]]
+upstream_test = "AssertionTest::testConditionsAudienceMatch"
+local_test    = "scenario_assertion_audience_restriction_validates"
+
+[[tests]]
+upstream_test = "AssertionTest::testAuthnContextClass"
+local_test    = "scenario_authn_context_class_urn_roundtrip"
+
+[[tests]]
+upstream_test = "SAMLEndpointTest::testNameIDPolicy"
+local_test    = "scenario_name_id_policy_wire_shape"
+
+[[tests]]
+upstream_test = "NameIDTest::testMatchesByQualifier"
+local_test    = "scenario_name_id_matching_honors_qualifiers"
+
+
+
+# ── Phase 3 close-out (2026-05-17) — new module mappings ───────────────────────
+
+[[files]]
+upstream = "model/jpa/src/main/java/org/keycloak/connections/jpa/JpaConnectionProviderFactory.java"
+local    = "src/persistence/rdbms_backend.rs"
+
+[[files]]
+upstream = "model/jpa/src/main/java/org/keycloak/models/jpa/entities/UserEntity.java"
+local    = "src/persistence/entities.rs"
+
+[[files]]
+upstream = "server-spi/src/main/java/org/keycloak/storage/KeycloakSchema.java"
+local    = "src/persistence/migration.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/wsfed/WSFedLoginProtocol.java"
+local    = "src/wsfed/protocol.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/wsfed/WSFedLoginProtocolService.java"
+local    = "src/wsfed/endpoints.rs"
+
+[[files]]
+upstream = "saml-core/src/main/java/org/keycloak/saml/SAML11AssertionWriter.java"
+local    = "src/wsfed/saml11_assertion.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oid4vc/OID4VCLoginProtocolFactory.java"
+local    = "src/oid4vc/mod.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oid4vc/issuance/credentialbuilder/CredentialBuilder.java"
+local    = "src/oid4vc/issuance/credential_endpoint.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oid4vc/model/VerifiableCredential.java"
+local    = "src/oid4vc/vc/model.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oid4vc/issuance/signing/JwtProofSignatureHandler.java"
+local    = "src/oid4vc/vc/proof.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/events/email/EmailEventListenerProvider.java"
+local    = "src/email_listener/dispatcher.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/email/DefaultEmailSenderProvider.java"
+local    = "src/email_listener/smtp_outbox.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/email/freemarker/FreeMarkerEmailTemplateProvider.java"
+local    = "src/email_listener/templates.rs"
+
+# Phase 3 enrichments to existing mapped entries (no new entries):
+# - saml/ — K3 added signing_ecdsa.rs (XMLDSig ECDSA-SHA256/384/512)
+# - kerberos/ — K4 added gssapi_real.rs (libgssapi-backed AcceptSecContext)
+# - admin_idp/, admin_flows/ — K1 added router() + cave-runtime mount
+

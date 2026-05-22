@@ -1,0 +1,37 @@
+[package]
+name = "cave-desktop"
+description = "CAVE native admin shell — GPUI-based desktop companion to the web portal (ADR-PORTAL-DESKTOP-001)"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-desktop"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["cli", "admin", "desktop", "gpui", "native"]
+categories = ["command-line-utilities", "development-tools"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# TODO(adr-portal-desktop-001): GPUI dependency parked.
+# The intended dep is:
+#     gpui = { git = "https://github.com/zed-industries/zed", branch = "main", optional = true }
+# but gpui v0.2.2 from Zed's main pins `core-foundation = "=0.10.0"`, which
+# conflicts with our workspace's transitive resolution to core-foundation
+# 0.10.1 (post a recent qwen-pump merge that pulled the newer version). Even
+# with `optional = true`, cargo resolves the lockfile workspace-wide and fails.
+# Reintroduce once we either:
+#    (a) pin Zed to a rev that uses core-foundation 0.10.1, or
+#    (b) move cave-desktop out of the workspace into its own Cargo.toml.
+# See ADR-PORTAL-DESKTOP-001 Implementation status section.
+
+[features]
+default = []
+# Placeholder feature kept for src/main.rs cfg-gating. No-op while the gpui
+# dep is parked — flipping it on only changes the stderr message in main.rs.
+gpui-runtime = []

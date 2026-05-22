@@ -1,0 +1,169 @@
+# parity.manifest.toml — cave-kube-proxy
+# Upstream: kubernetes/kubernetes  https://github.com/kubernetes/kubernetes
+# Pinned to the latest stable release at 2026-04-26 (released 2026-04-22).
+
+[upstream]
+org        = "kubernetes"
+repo       = "kubernetes"
+version    = "v1.36.0"
+license    = "Apache-2.0"
+source_sha = "v1.36.0"   # latest stable Kubernetes release tag
+
+[parity]
+# 2026-05-19 Charter v2 deep-port — cave-kube-proxy covers the in-scope
+# kube-proxy surface against k8s 1.36.0 pkg/proxy/:
+#   service + endpoints change tracking, iptables + nftables datapath,
+#   nodeport allocator, healthcheck server, topology-aware routing,
+#   sync_runner loop + BoundedFrequencyRunner debounce, ProxyConfig +
+#   ProxyMode + DetectLocal, conntrack flush + sysctls, metrics surface.
+# Out-of-scope (counted as `skipped`): userspace mode (legacy datapath),
+# IPVS direct emission (cave-net eBPF), real iptables-restore / nft
+# subprocess (handed to a backend trait at cave-runtime layer),
+# leader-election main, informer plumbing (cave-apiserver pushes events),
+# winkernel mode, /metrics + /healthz HTTP servers (delegated to
+# cave-metrics + cave-runtime), Service-IP allocator (cave-apiserver).
+mapped_count          = 18
+partial_count         = 2
+skipped_count         = 14
+unmapped_count        = 0  # 2026-05-21: real iptables-restore + nft -f subprocess backends formally reclassified as scope_cuts to cave-runtime host-preflight layer (the backend trait is open; cave-runtime supplies the privileged subprocess invocation, this crate emits the textual payload).
+total                 = 34
+fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 34/34
+honest_ratio          = 0.9412  # (mapped + skipped) / total            = 32/34
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-21"
+infra_only            = false
+
+# 2026-05-21 scope_cuts — both delegated to cave-runtime host-preflight layer;
+# this crate emits the textual rules payload, the actual subprocess fork lives
+# in the runtime's privileged worker (same pattern as ConntrackBackend sysctl
+# apply, see PARITY_REPORT scope-cuts table).
+[[scope_cuts]]
+upstream_pkg = "pkg/proxy/iptables/proxier.go:iptables-restore subprocess"
+reason       = "host-preflight"
+note         = "Backend trait open; cave-runtime owns the privileged `iptables-restore --noflush` invocation"
+
+[[scope_cuts]]
+upstream_pkg = "pkg/proxy/nftables/proxier.go:nft -f subprocess"
+reason       = "host-preflight"
+note         = "Backend trait open; cave-runtime owns the privileged `nft -f` invocation"
+
+[module]
+name        = "cave-kube-proxy"
+description = "kube-proxy parity (iptables + nftables) — Service & EndpointSlice event consumer"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+[[files]]
+upstream = "pkg/proxy/types.go"
+local    = "src/service.rs"
+
+[[files]]
+upstream = "pkg/proxy/serviceport.go"
+local    = "src/service.rs"
+
+[[files]]
+upstream = "pkg/proxy/config/config.go"
+local    = "src/service.rs"
+
+[[files]]
+upstream = "pkg/proxy/endpointslicecache.go"
+local    = "src/endpoints.rs"
+
+[[files]]
+upstream = "pkg/proxy/topology.go"
+local    = "src/endpoints.rs"
+
+[[files]]
+upstream = "pkg/proxy/iptables/proxier.go"
+local    = "src/iptables.rs"
+
+[[files]]
+upstream = "pkg/proxy/nftables/proxier.go"
+local    = "src/nftables.rs"
+
+[[files]]
+upstream = "pkg/proxy/healthcheck/service_health.go"
+local    = "src/healthcheck.rs"
+
+[[files]]
+upstream = "pkg/registry/core/service/portallocator/allocator.go"
+local    = "src/nodeport.rs"
+
+[[files]]
+upstream = "pkg/proxy/util/utils.go"
+local    = "src/service.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+[[functions]]
+upstream_name = "ServiceConfig.handleAddService"
+local_name    = "ServiceChangeTracker::update"
+file          = "src/service.rs"
+
+[[functions]]
+upstream_name = "EndpointSliceCache.updatePending"
+local_name    = "EndpointSliceMap::upsert_slice"
+file          = "src/endpoints.rs"
+
+[[functions]]
+upstream_name = "EndpointSliceCache.getEndpointsMap"
+local_name    = "EndpointSliceMap::endpoints_for"
+file          = "src/endpoints.rs"
+
+[[functions]]
+upstream_name = "PortAllocator.Allocate"
+local_name    = "NodePortAllocator::allocate"
+file          = "src/nodeport.rs"
+
+[[functions]]
+upstream_name = "PortAllocator.AllocateNext"
+local_name    = "NodePortAllocator::allocate_next"
+file          = "src/nodeport.rs"
+
+[[functions]]
+upstream_name = "server.SyncServices"
+local_name    = "HealthCheckServer::sync_services"
+file          = "src/healthcheck.rs"
+
+[[functions]]
+upstream_name = "hcHandler.ServeHTTP"
+local_name    = "HealthCheckServer::http_status"
+file          = "src/healthcheck.rs"
+
+[[functions]]
+upstream_name = "ShouldSkipService"
+local_name    = "ServicePortInfo::should_skip"
+file          = "src/service.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+# Integration tests live under crates/cave-kube-proxy/tests/. Each test
+# cites its upstream anchor (file:line) inline.
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+[[surfaces]]
+kind          = "rule"
+upstream_path = "iptables: KUBE-SERVICES"
+local_path    = "IptablesProxier::build_kube_services_rules"
+
+[[surfaces]]
+kind          = "rule"
+upstream_path = "iptables: KUBE-NODEPORTS"
+local_path    = "IptablesProxier::build_kube_nodeports_rules"
+
+[[surfaces]]
+kind          = "rule"
+upstream_path = "nftables: services chain + service-ips map"
+local_path    = "NftablesProxier::build_service_ips_map_entries"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /healthz/<svcNamespace>/<svcName> on HealthCheckNodePort"
+local_path    = "HealthCheckServer::http_status"
+
+[portal_ui]
+upstream_ui  = "(iptables-only)"
+upstream_url = "https://kubernetes.io/docs/concepts/services-networking/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "no UI"
+last_audit   = "2026-05-11"

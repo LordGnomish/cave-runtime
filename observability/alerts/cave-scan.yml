@@ -1,0 +1,164 @@
+# Security scan
+groups:
+  - name: cave-scan-slo
+    interval: 30s
+    rules:
+      - alert: ScanSloBurnRateFast
+        expr: |
+          (
+            sum(rate(scan_total{job="cave-scan",code=~"5.."}[1h]))
+            /
+            sum(rate(scan_total{job="cave-scan"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-scan fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-scan/slo-burn-fast.md"
+      - alert: ScanSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(scan_total{job="cave-scan",code=~"5.."}[6h]))
+            /
+            sum(rate(scan_total{job="cave-scan"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-scan slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-scan/slo-burn-slow.md"
+      - alert: ScanErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(scan_total{job="cave-scan",code=~"5.."}[7d]))
+              / sum(rate(scan_total{job="cave-scan"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-scan 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-scan/error-budget.md"
+      - alert: ScanLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(scan_duration_seconds_bucket{job="cave-scan"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-scan p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-scan/latency.md"
+      - alert: ScanSaturationHigh
+        expr: 'sum(scan_inflight_requests{job="cave-scan"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-scan inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-scan/saturation.md"
+      - alert: ScanMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-scan"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-scan RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-scan/memory.md"
+      - alert: ScanCardinalityExplosion
+        expr: 'count(count by (tenant_id) (scan_total{job="cave-scan"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-scan tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-scan/cardinality.md"
+      - alert: ScanHealthProbeFailing
+        expr: 'min(up{job="cave-scan"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-scan health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-scan/health.md"
+
+  # Trivy-style scanning alerts (image / fs / iac / secrets)
+  - name: cave-scan-trivy
+    interval: 30s
+    rules:
+      - alert: ScanCriticalVulnFound
+        expr: 'increase(scan_findings_total{job="cave-scan",severity="CRITICAL"}[5m]) > 0'
+        for: 0m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-scan reported a CRITICAL vulnerability"
+          description: "{{ $value }} new CRITICAL findings in the last 5 minutes."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-scan/critical-vuln.md"
+      - alert: ScanHighVulnFound
+        expr: 'increase(scan_findings_total{job="cave-scan",severity="HIGH"}[15m]) > 5'
+        for: 5m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-scan reported >5 HIGH vulnerabilities in 15m"
+          description: "Tenant {{ $labels.tenant_id }} accumulated {{ $value }} HIGH findings."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-scan/high-vuln.md"
+      - alert: ScanFailed
+        expr: 'increase(scan_failed_total{job="cave-scan"}[10m]) > 3'
+        for: 5m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-scan jobs failing"
+          description: "{{ $value }} scan jobs failed in the last 10 minutes."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-scan/scan-failed.md"
+      - alert: ScanVulnDbStale
+        expr: 'time() - scan_vulndb_last_update_timestamp_seconds{job="cave-scan"} > 86400'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-scan vulnerability DB stale (>24h)"
+          description: "Last update {{ $value }}s ago — feeds may be down."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-scan/vulndb-stale.md"
+      - alert: ScanDurationHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(scan_image_duration_seconds_bucket{job="cave-scan"}[10m])) by (le)
+          ) > 60
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-scan image scans p95 > 60s"
+          description: "p95 = {{ $value }}s — vulnerability DB or registry-pull may be slow."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-scan/duration-high.md"
+      - alert: ScanSecretLeakDetected
+        expr: 'increase(scan_findings_total{job="cave-scan",scanner="secret",severity=~"CRITICAL|HIGH"}[1m]) > 0'
+        for: 0m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-scan detected a leaked secret"
+          description: "Scanner=secret produced {{ $value }} CRITICAL/HIGH finding(s). Rotate immediately."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-scan/secret-leak.md"

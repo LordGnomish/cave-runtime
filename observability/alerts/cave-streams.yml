@@ -1,0 +1,183 @@
+# Kafka-parity streams
+groups:
+  - name: cave-streams-slo
+    interval: 30s
+    rules:
+      - alert: StreamsSloBurnRateFast
+        expr: |
+          (
+            sum(rate(kafka_total{job="cave-streams",code=~"5.."}[1h]))
+            /
+            sum(rate(kafka_total{job="cave-streams"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-streams fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-streams/slo-burn-fast.md"
+      - alert: StreamsSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(kafka_total{job="cave-streams",code=~"5.."}[6h]))
+            /
+            sum(rate(kafka_total{job="cave-streams"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-streams slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-streams/slo-burn-slow.md"
+      - alert: StreamsErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(kafka_total{job="cave-streams",code=~"5.."}[7d]))
+              / sum(rate(kafka_total{job="cave-streams"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-streams 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-streams/error-budget.md"
+      - alert: StreamsLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(kafka_duration_seconds_bucket{job="cave-streams"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-streams p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-streams/latency.md"
+      - alert: StreamsSaturationHigh
+        expr: 'sum(kafka_inflight_requests{job="cave-streams"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-streams inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-streams/saturation.md"
+      - alert: StreamsMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-streams"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-streams RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-streams/memory.md"
+      - alert: StreamsCardinalityExplosion
+        expr: 'count(count by (tenant_id) (kafka_total{job="cave-streams"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-streams tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-streams/cardinality.md"
+      - alert: StreamsHealthProbeFailing
+        expr: 'min(up{job="cave-streams"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-streams health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-streams/health.md"
+
+  - name: cave-streams-connect
+    interval: 30s
+    rules:
+      - alert: CaveStreamsConnectWorkerDown
+        expr: 'min by (worker_id) (cave_streams_connect_worker_up{job="cave-streams"}) < 1'
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Connect worker {{ $labels.worker_id }} reports up=0"
+          description: "A Connect worker has been unreachable for >2m. Tasks owned by this worker will fail their next tick and rebalance to peers."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-streams/connect-worker-down.md"
+      - alert: CaveStreamsConnectTaskFailureRate
+        expr: |
+          (
+            sum by (connector) (rate(cave_streams_connect_task_failures_total{job="cave-streams"}[5m]))
+            /
+            sum by (connector) (rate(cave_streams_connect_task_ticks_total{job="cave-streams"}[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Connect connector {{ $labels.connector }} failing > 5% of ticks"
+          description: "Task failure rate over the past 5m exceeds 5%. Inspect /connectors/{{ $labels.connector }}/status for the trace."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-streams/connect-task-failure.md"
+      - alert: CaveStreamsConnectRebalancing
+        expr: 'max by (group_id) (cave_streams_connect_herder_state{state="Rebalancing"}) > 0'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Connect group {{ $labels.group_id }} stuck rebalancing > 10m"
+          description: "A 10m-long rebalance suggests assignment-poll churn (network instability, partial member outages, or a misbehaving plugin)."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-streams/connect-rebalance-storm.md"
+      - alert: CaveStreamsConnectOffsetCommitLag
+        expr: 'max by (connector) (cave_streams_connect_offset_commit_lag_seconds{job="cave-streams"}) > 60'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Connector {{ $labels.connector }} offset-commit lag > 60s"
+          description: "Source connector hasn't committed offsets to the in-memory store in over a minute. On restart, the connector will re-emit records past this gap."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-streams/connect-offset-lag.md"
+      - alert: CaveStreamsConnectConnectorPaused
+        expr: 'max by (connector) (cave_streams_connect_connector_state{state="Paused"}) > 0'
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "Connector {{ $labels.connector }} has been paused for > 1h"
+          description: "Long-running pause is unusual outside maintenance windows — confirm intent."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-streams/connect-paused.md"
+      - alert: CaveStreamsConnectDeadLetterRate
+        expr: 'sum by (connector) (rate(cave_streams_connect_dlq_records_total{job="cave-streams"}[5m])) > 1'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Connector {{ $labels.connector }} producing > 1 DLQ record/s"
+          description: "Records are being routed to the dead-letter queue. Check the transform chain + sink connector schema compatibility."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-streams/connect-dlq-rate.md"
+      - alert: CaveStreamsTieredStorageRemoteCopyLag
+        expr: 'max by (topic, partition) (cave_streams_tiered_remote_copy_lag_seconds{job="cave-streams"}) > 600'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tiered-storage remote copy lag > 10m on {{ $labels.topic }}-{{ $labels.partition }}"
+          description: "Local segment retention will trip before the copy finishes — risk of irrecoverable data loss past the local retention window."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-streams/tiered-copy-lag.md"
+      - alert: CaveStreamsTieredStorageFetchFailureRate
+        expr: |
+          (
+            sum(rate(cave_streams_tiered_fetch_failures_total{job="cave-streams"}[5m]))
+            /
+            sum(rate(cave_streams_tiered_fetch_requests_total{job="cave-streams"}[5m]))
+          ) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tiered-storage fetch failure rate > 1%"
+          description: "Consumers reading historical offsets are missing data — verify remote storage backend (S3 / HDFS) availability and credentials."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-streams/tiered-fetch-failures.md"

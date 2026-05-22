@@ -1,0 +1,55 @@
+# cave-gitops-config alerts — auto-generated tier1 obs scaffold
+groups:
+  - name: cave-gitops-config-slo
+    interval: 30s
+    rules:
+      - alert: GitopsconfigSloBurnRateFast
+        expr: |
+          (
+            sum(rate(cave_gitops_config_total{job="cave-gitops-config",code=~"5.."}[1h]))
+            /
+            sum(rate(cave_gitops_config_total{job="cave-gitops-config"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-gitops-config fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-gitops-config/slo-burn-fast.md"
+      - alert: GitopsconfigLatencyP99High
+        expr: |
+          histogram_quantile(0.99, sum(rate(cave_gitops_config_request_duration_seconds_bucket{job="cave-gitops-config"}[5m])) by (le)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-gitops-config p99 latency > 500ms"
+          description: "p99 latency = {{ $value }}s over 5m."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-gitops-config/latency.md"
+      - alert: GitopsconfigSaturationHigh
+        expr: 'sum(rate(cave_gitops_config_inflight_requests{job="cave-gitops-config"}[5m])) > 100'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-gitops-config inflight requests > 100"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-gitops-config/saturation.md"
+      - alert: GitopsconfigMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-gitops-config"} > (4 * 1024 * 1024 * 1024)'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-gitops-config RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-gitops-config/memory.md"
+      - alert: GitopsconfigHealthProbeFailing
+        expr: 'min(up{job="cave-gitops-config"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-gitops-config health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-gitops-config/health.md"

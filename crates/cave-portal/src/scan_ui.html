@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CAVE — Code Scan (SonarQube replacement)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--bg:#0b0f17;--panel:#141a24;--border:#1f2937;--muted:#6b7280;--text:#e5e7eb;--accent:#6366f1;--ok:#10b981;--warn:#f59e0b;--err:#ef4444;--rA:#10b981;--rB:#22c55e;--rC:#eab308;--rD:#f97316;--rE:#ef4444}
+*{box-sizing:border-box}html,body{margin:0;padding:0;min-height:100%;background:var(--bg);color:var(--text);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif}
+.shell{display:grid;grid-template-rows:48px 1fr;min-height:100vh}
+header{display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid var(--border);background:var(--panel)}
+header h1{font-size:14px;margin:0;font-weight:600}
+header .crumb{color:var(--muted);font-size:12px}
+.right{margin-left:auto;display:flex;gap:8px;align-items:center}
+button,select,input{background:#0f1622;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+main{padding:14px;display:grid;grid-template-columns:minmax(300px,360px) 1fr;gap:14px;align-items:start}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px}
+.card h2{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.rating{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;font-weight:700;color:#0b0f17}
+.rating.a{background:var(--rA)} .rating.b{background:var(--rB)} .rating.c{background:var(--rC)} .rating.d{background:var(--rD)} .rating.e{background:var(--rE)}
+.metric{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)}
+.metric:last-child{border-bottom:none}
+.metric .l{color:var(--muted);font-size:12.5px}
+.metric .v{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);font-size:13px}
+.list{max-height:380px;overflow:auto}
+.list-item{padding:8px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer;background:#0f1622}
+.list-item:hover{border-color:#374151}
+.list-item .title{font-size:13px;color:var(--text)}
+.list-item .meta{font-size:11px;color:var(--muted);margin-top:3px;display:flex;gap:6px}
+.pill{padding:1px 8px;border-radius:999px;border:1px solid var(--border);font-size:11px}
+.pill.b{border-color:#7f1d1d;color:#fecaca;background:#1f0808}
+.pill.v{border-color:#854d0e;color:#fde68a}
+.pill.s{border-color:#1e40af;color:#bfdbfe}
+.pill.h{border-color:#6d28d9;color:#ddd6fe}
+.pill.d{border-color:#065f46;color:#a7f3d0}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:6px 10px;font-size:13px}
+.kv .k{color:var(--muted)}
+.kv .v{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);word-break:break-all}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:10px}
+.tab{padding:6px 12px;border:1px solid var(--border);border-bottom:none;border-radius:6px 6px 0 0;background:#0f1622;color:var(--muted);cursor:pointer;font-size:12px}
+.tab.active{color:var(--text);border-color:var(--accent);background:var(--panel)}
+.tab-content{display:none} .tab-content.active{display:block}
+.row{display:flex;gap:8px;align-items:center;margin:6px 0}
+.notice{padding:10px;background:#1a2028;border:1px solid var(--border);border-radius:8px;color:var(--muted);margin-bottom:12px;grid-column:1 / -1}
+.notice b{color:var(--text)}
+a{color:#93c5fd;text-decoration:none}a:hover{text-decoration:underline}
+.empty{color:var(--muted);font-size:12px;padding:18px;text-align:center}
+</style>
+</head>
+<body>
+<div class="shell">
+<header>
+  <h1>🔬 CAVE Code Scan</h1>
+  <span class="crumb">/ portal / scan (SonarQube replacement)</span>
+  <div class="right">
+    <button id="refresh">↻ Refresh</button>
+    <a href="/" style="color:var(--muted);font-size:12px">← Portal overview</a>
+  </div>
+</header>
+<main>
+  <div class="notice">
+    <b>cave-scan</b> — SAST + code quality. Projects hold metrics; scans produce issues (Bugs, Vulnerabilities, Code Smells, Security Hotspots, Duplications); quality gates evaluate pass/warn/fail against thresholds. Source-code analysis only — container/IaC scanning lives in <code>cave-container-scan</code>.
+  </div>
+
+  <section class="card">
+    <h2>Projects</h2>
+    <div id="projectList" class="list"><div class="empty">loading…</div></div>
+    <div class="row" style="margin-top:10px">
+      <button class="primary" id="newProject">+ New project</button>
+      <button id="showRules">Rules</button>
+      <button id="showGates">Gates</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="tabs">
+      <div class="tab active" data-tab="overview">Overview</div>
+      <div class="tab" data-tab="issues">Issues</div>
+      <div class="tab" data-tab="history">History</div>
+      <div class="tab" data-tab="gate">Quality gate</div>
+    </div>
+    <div id="tab-overview" class="tab-content active">
+      <h2 id="projName">Select a project</h2>
+      <div id="overview"><div class="empty">— no project selected —</div></div>
+    </div>
+    <div id="tab-issues" class="tab-content">
+      <div class="row">
+        <select id="issueFilter">
+          <option value="all">All issues</option>
+          <option value="Bug">Bugs</option>
+          <option value="Vulnerability">Vulnerabilities</option>
+          <option value="CodeSmell">Code Smells</option>
+          <option value="SecurityHotspot">Security Hotspots</option>
+          <option value="Duplication">Duplications</option>
+        </select>
+      </div>
+      <div id="issueList" class="list"><div class="empty">— run a scan first —</div></div>
+    </div>
+    <div id="tab-history" class="tab-content">
+      <div id="historyList" class="list"><div class="empty">— no history —</div></div>
+    </div>
+    <div id="tab-gate" class="tab-content">
+      <div id="gateView"><div class="empty">— no quality gate bound —</div></div>
+    </div>
+  </section>
+</main>
+</div>
+
+<script>
+const el=id=>document.getElementById(id);
+const esc=s=>(s??'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const api=(p,o={})=>fetch(p,{headers:{'content-type':'application/json'},...o}).then(r=>r.ok?r.json():Promise.reject(r.status));
+
+let current={projects:[],activeProjectId:null,lastResultId:null};
+
+function ratingClass(r){return ('rating '+(r||'A').toLowerCase());}
+
+document.querySelectorAll('.tab').forEach(t=>{
+  t.onclick=()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+    el('tab-'+t.dataset.tab).classList.add('active');
+    if(t.dataset.tab==='history' && current.activeProjectId) loadHistory(current.activeProjectId);
+    if(t.dataset.tab==='gate') loadGate();
+    if(t.dataset.tab==='issues' && current.lastResultId) loadIssues(current.lastResultId);
+  };
+});
+
+async function loadProjects(){
+  try{
+    const ps=await api('/api/scan/projects');
+    current.projects=Array.isArray(ps)?ps:(ps.items||[]);
+    const list=el('projectList'); list.innerHTML='';
+    if(!current.projects.length){list.innerHTML='<div class="empty">No projects — click "+ New project"</div>';return;}
+    current.projects.forEach(p=>{
+      const item=document.createElement('div');item.className='list-item';
+      item.innerHTML=`<div class="title">${esc(p.name||p.key||'(unnamed)')}</div>
+        <div class="meta"><span>${esc(p.key||p.id.slice(0,8))}</span><span>${esc(p.language||p.main_branch||'—')}</span></div>`;
+      item.onclick=()=>selectProject(p);
+      list.appendChild(item);
+    });
+  }catch(e){el('projectList').innerHTML='<div class="empty">API error: '+e+' — is runtime up?</div>';}
+}
+
+async function selectProject(p){
+  current.activeProjectId=p.id;
+  el('projName').textContent=(p.name||p.key)+' — '+(p.key||'');
+  try{
+    const m=await api(`/api/scan/projects/${encodeURIComponent(p.id)}/metrics`);
+    el('overview').innerHTML=`
+      <div style="display:flex;gap:14px;margin-bottom:12px">
+        <div class="${ratingClass(m.reliability_rating)}" title="Reliability">${esc(m.reliability_rating||'?')}</div>
+        <div class="${ratingClass(m.security_rating)}" title="Security">${esc(m.security_rating||'?')}</div>
+        <div class="${ratingClass(m.maintainability_rating)}" title="Maintainability">${esc(m.maintainability_rating||'?')}</div>
+      </div>
+      <div class="metric"><span class="l">Lines of code</span><span class="v">${esc(m.lines_of_code??'—')}</span></div>
+      <div class="metric"><span class="l">Coverage</span><span class="v">${m.coverage_percent!=null?m.coverage_percent.toFixed(1)+'%':'—'}</span></div>
+      <div class="metric"><span class="l">Duplication</span><span class="v">${m.duplication_percent!=null?m.duplication_percent.toFixed(1)+'%':'—'}</span></div>
+      <div class="metric"><span class="l">Complexity</span><span class="v">${esc(m.complexity??'—')}</span></div>
+      <div class="metric"><span class="l">Cognitive complexity</span><span class="v">${esc(m.cognitive_complexity??'—')}</span></div>
+      <div class="metric"><span class="l">Bugs</span><span class="v">${esc(m.bugs??0)}</span></div>
+      <div class="metric"><span class="l">Vulnerabilities</span><span class="v">${esc(m.vulnerabilities??0)}</span></div>
+      <div class="metric"><span class="l">Code smells</span><span class="v">${esc(m.code_smells??0)}</span></div>
+      <div class="metric"><span class="l">Security hotspots</span><span class="v">${esc(m.security_hotspots??0)}</span></div>
+      <div class="metric"><span class="l">Technical debt (min)</span><span class="v">${esc(m.technical_debt_mins??0)}</span></div>
+      <div style="margin-top:12px">
+        <button class="primary" id="triggerScan">▶ Trigger scan</button>
+      </div>`;
+    el('triggerScan').onclick=async()=>{
+      try{
+        const r=await api(`/api/scan/projects/${encodeURIComponent(p.id)}/scan`,{method:'POST'});
+        current.lastResultId=r.id||r.result_id||null;
+        alert('Scan triggered: '+(current.lastResultId||'ok'));
+        loadHistory(p.id);
+      }catch(e){alert('Scan failed: '+e);}
+    };
+  }catch(e){
+    el('overview').innerHTML='<div class="empty">metrics load failed: '+e+'</div>';
+  }
+}
+
+async function loadHistory(pid){
+  try{
+    const h=await api(`/api/scan/projects/${encodeURIComponent(pid)}/history`);
+    const list=el('historyList'); list.innerHTML='';
+    const arr=Array.isArray(h)?h:(h.items||[]);
+    if(!arr.length){list.innerHTML='<div class="empty">no scans yet</div>';return;}
+    arr.forEach(r=>{
+      const item=document.createElement('div'); item.className='list-item';
+      item.innerHTML=`<div class="title">Scan ${esc(r.id.slice(0,8))}</div>
+        <div class="meta"><span>${esc(r.started_at||r.completed_at||'—')}</span><span>${esc(r.status||'—')}</span></div>`;
+      item.onclick=()=>{ current.lastResultId=r.id; loadIssues(r.id); document.querySelector('.tab[data-tab="issues"]').click(); };
+      list.appendChild(item);
+    });
+  }catch(e){el('historyList').innerHTML='<div class="empty">history error: '+e+'</div>';}
+}
+
+async function loadIssues(resultId){
+  try{
+    const issues=await api(`/api/scan/results/${encodeURIComponent(resultId)}/issues`);
+    const filter=el('issueFilter').value;
+    const arr=Array.isArray(issues)?issues:(issues.items||[]);
+    const filtered=filter==='all'?arr:arr.filter(i=>i.issue_type===filter);
+    const list=el('issueList'); list.innerHTML='';
+    if(!filtered.length){list.innerHTML='<div class="empty">no issues in this filter</div>';return;}
+    filtered.forEach(i=>{
+      const item=document.createElement('div'); item.className='list-item';
+      const typeClass={Bug:'b',Vulnerability:'v',CodeSmell:'s',SecurityHotspot:'h',Duplication:'d'}[i.issue_type]||'s';
+      item.innerHTML=`<div class="title">${esc(i.message||i.rule_name||'(no message)')}</div>
+        <div class="meta">
+          <span class="pill ${typeClass}">${esc(i.issue_type||'—')}</span>
+          <span class="pill">${esc(i.severity||'—')}</span>
+          ${i.file?`<span>${esc(i.file)}${i.line?':'+i.line:''}</span>`:''}
+        </div>`;
+      list.appendChild(item);
+    });
+  }catch(e){el('issueList').innerHTML='<div class="empty">issues error: '+e+'</div>';}
+}
+
+async function loadGate(){
+  try{
+    const gates=await api('/api/scan/quality-gates');
+    const arr=Array.isArray(gates)?gates:(gates.items||[]);
+    if(!arr.length){el('gateView').innerHTML='<div class="empty">no quality gates defined</div>';return;}
+    const g=arr[0];
+    el('gateView').innerHTML=`
+      <div class="kv">
+        <span class="k">Name</span><span class="v">${esc(g.name||'—')}</span>
+        <span class="k">ID</span><span class="v">${esc(g.id||'—')}</span>
+        <span class="k">Is default</span><span class="v">${g.is_default?'yes':'no'}</span>
+      </div>
+      <h2 style="margin-top:14px">Conditions</h2>
+      ${(g.conditions||[]).map(c=>`<div class="metric"><span class="l">${esc(c.metric)}</span><span class="v">${esc(c.operator)} ${esc(c.threshold)}</span></div>`).join('')||'<div class="empty">— no conditions —</div>'}`;
+  }catch(e){el('gateView').innerHTML='<div class="empty">gate load error: '+e+'</div>';}
+}
+
+el('refresh').onclick=loadProjects;
+el('issueFilter').onchange=()=>{ if(current.lastResultId) loadIssues(current.lastResultId); };
+el('newProject').onclick=async()=>{
+  const key=prompt('Project key (slug):');if(!key)return;
+  const name=prompt('Display name:',key);if(!name)return;
+  const repo=prompt('Repository URL:','');
+  try{
+    await api('/api/scan/projects',{method:'POST',body:JSON.stringify({key,name,repo,branch:'main'})});
+    loadProjects();
+  }catch(e){alert('Create failed: '+e);}
+};
+el('showRules').onclick=async()=>{
+  try{
+    const r=await api('/api/scan/rules');
+    const arr=Array.isArray(r)?r:(r.items||[]);
+    el('projName').textContent=`Rules (${arr.length})`;
+    el('overview').innerHTML='<div class="list">'+arr.map(x=>`<div class="list-item"><div class="title">${esc(x.name||x.id)}</div><div class="meta"><span>${esc((x.languages||[]).join(', '))||'—'}</span><span>${esc(x.severity||'—')}</span></div></div>`).join('')+'</div>';
+  }catch(e){alert('Rules error: '+e);}
+};
+el('showGates').onclick=()=>{ document.querySelector('.tab[data-tab="gate"]').click(); };
+
+loadProjects();
+</script>
+</body></html>

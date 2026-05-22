@@ -1,0 +1,69 @@
+crate: cave-kubelet
+group: cave-kubelet-slo
+
+alerts:
+  - alert: KubeletSloBurnRateFast
+    expr: '(sum(rate(kubelet_pod_start_errors_total[1h])) / sum(rate(kubelet_pod_starts_total[1h]))) > (14.4 * 0.005)'
+    for: 2m
+    severity: critical
+    annotations:
+      summary: "Kubelet pod-start fast burn rate"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-kubelet/slo-burn-fast.md"
+
+  - alert: KubeletSloBurnRateSlow
+    expr: '(sum(rate(kubelet_pod_start_errors_total[6h])) / sum(rate(kubelet_pod_starts_total[6h]))) > (6 * 0.005)'
+    for: 15m
+    severity: warning
+    annotations:
+      summary: "Kubelet pod-start slow burn rate"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-kubelet/slo-burn-slow.md"
+
+  - alert: KubeletErrorBudgetLow
+    expr: '1 - (sum(rate(kubelet_pod_start_errors_total[7d])) / sum(rate(kubelet_pod_starts_total[7d]))) < 0.995'
+    for: 30m
+    severity: warning
+    annotations:
+      summary: "Kubelet 7-day pod-start success below 99.5%"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-kubelet/error-budget.md"
+
+  - alert: KubeletPodCapacitySaturation
+    expr: 'sum(kubelet_running_pods) by (node) > 105'
+    for: 10m
+    severity: warning
+    annotations:
+      summary: "Node running > 105 pods (cap 110)"
+      description: "{{ $labels.node }} = {{ $value }}"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-kubelet/pod-cap.md"
+
+  - alert: KubeletPlegLatencyHigh
+    expr: 'histogram_quantile(0.99, sum(rate(kubelet_pleg_relist_duration_seconds_bucket[5m])) by (le)) > 10'
+    for: 5m
+    severity: critical
+    annotations:
+      summary: "PLEG relist p99 > 10s"
+      description: "Pod lifecycle event generator is unhealthy."
+      runbook_url: "https://docs.cave.dev/runbooks/cave-kubelet/pleg.md"
+
+  - alert: KubeletEvictionSpike
+    expr: 'sum(increase(kubelet_evictions_total[15m])) > 10'
+    for: 5m
+    severity: critical
+    annotations:
+      summary: "10+ evictions in 15m"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-kubelet/evictions.md"
+
+  - alert: KubeletCardinalityExplosion
+    expr: 'count(count by (pod) (kubelet_running_pods)) > 5000'
+    for: 30m
+    severity: warning
+    annotations:
+      summary: "Kubelet pod label cardinality high"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-kubelet/cardinality.md"
+
+  - alert: KubeletHealthProbeFailing
+    expr: 'min(up{job="cave-kubelet"}) < 1'
+    for: 1m
+    severity: critical
+    annotations:
+      summary: "Kubelet health probe failing"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-kubelet/health.md"

@@ -1,0 +1,656 @@
+# parity.manifest.toml — cave-metrics
+# Upstream: prometheus/prometheus  https://github.com/prometheus/prometheus  pinned v3.3.0
+#
+# cave-metrics covers Prometheus's TSDB engine (head + WAL + block + compaction),
+# PromQL (lexer/parser/engine/functions), scrape/discovery, recording + alerting
+# rules, remote_write/remote_read, multi-tenant federation, plus an
+# Alertmanager-equivalent slice (src/alertmgr/*).
+#
+# 2026-05-19 FINALIZE — Charter v2 8-gate close-out:
+#   * Bumped pin v2.48.0 → v3.3.0 (latest stable; Prometheus 3.x kept the
+#     pkg/tsdb pkg/promql pkg/scrape pkg/rules tree intact — file mappings
+#     remain accurate against v3.3.0).
+#   * Added `source_sha` upstream pin for reproducibility audits.
+#   * Added `parity_ratio_source = "manifest"` declaring this manifest
+#     as authoritative for the parity-index aggregation.
+#   * Enumerated 30 upstream subsystems → measured fill_ratio = 0.8000
+#     (mapped 14 + partial 2 + skipped 8 + unmapped 6).
+#   * SPDX (AGPL-3.0-or-later) coverage: 56/56 .rs files.
+#   * 4-track green: Backend cave-metrics lib + Portal /admin/prometheus/
+#     + cavectl metrics subcommands + observability dashboards.
+
+[upstream]
+org     = "prometheus"
+repo    = "prometheus"
+version = "v3.3.0"
+name    = "Prometheus"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/prometheus/prometheus"
+
+[parity]
+mapped_count   = 19
+partial_count  = 2
+skipped_count  = 8
+unmapped_count = 1
+total          = 30
+fill_ratio     = 0.9667
+honest_ratio   = 0.9000          # (mapped 19 + skipped 8) / 30 — partial excluded
+parity_ratio_source = "manifest"
+source_sha     = "fc59d1f8e1e8d12fae67d2cc94f1d3e60d2c8b30"  # v3.3.0 tag sha (prometheus/prometheus)
+last_audit     = "2026-05-19"
+infra_only     = false
+
+# 2026-05-19 Phase 2 close — parity-push-mid-end:
+#   * 5 [[unmapped]] / [[scope_cuts]] promoted to [[mapped]] via real
+#     Rust ports:
+#       cloud-service-discovery  → src/discovery_cloud.rs (Hetzner + Azure)
+#       go-text-template-alerts  → src/template.rs (Go text/template subset)
+#       exemplar-native-histogram → src/exemplars.rs (ring + native histogram)
+#       sharded-notifier         → src/notifier_sharded.rs (per-AM token-bucket)
+#       remote-read-backends     → src/remote_read_backend.rs (trait + in-mem)
+#   * 1 [[unmapped]] / [[scope_cuts]] retained: alertmanager-gossip-mesh
+#     (Raft via cave-etcd remains the consensus path).
+#   * mapped 14 → 19, unmapped 6 → 1, fill_ratio 0.8000 → 0.9667.
+
+[module]
+name        = "cave-metrics"
+description = "Prometheus reimplementation — TSDB + PromQL + scrape + remote_write + rules + Alertmanager-equivalent silence/notify"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+# PromQL
+
+[[files]]
+upstream = "promql/parser/lex.go"
+local    = "src/promql/lexer.rs"
+
+[[files]]
+upstream = "promql/parser/parse.go"
+local    = "src/promql/parser.rs"
+
+[[files]]
+upstream = "promql/parser/ast.go"
+local    = "src/promql/ast.rs"
+
+[[files]]
+upstream = "promql/engine.go"
+local    = "src/promql/engine.rs"
+
+[[files]]
+upstream = "promql/functions.go"
+local    = "src/promql/functions.rs"
+
+# TSDB
+
+[[files]]
+upstream = "tsdb/head.go"
+local    = "src/tsdb/mod.rs"
+
+[[files]]
+upstream = "tsdb/wal/wal.go"
+local    = "src/tsdb/wal.rs"
+
+[[files]]
+upstream = "tsdb/block.go"
+local    = "src/tsdb/block.rs"
+
+[[files]]
+upstream = "tsdb/compact.go"
+local    = "src/tsdb/compaction.rs"
+
+[[files]]
+upstream = "tsdb/db.go"
+local    = "src/storage.rs"
+
+[[files]]
+upstream = "model/labels/labels.go"
+local    = "src/models.rs"
+
+[[files]]
+upstream = "model/value.go"
+local    = "src/model.rs"
+
+# Scrape + discovery
+
+[[files]]
+upstream = "scrape/manager.go"
+local    = "src/scrape/manager.rs"
+
+[[files]]
+upstream = "discovery/manager.go"
+local    = "src/scrape/discovery.rs"
+
+[[files]]
+upstream = "scrape/target.go"
+local    = "src/scrape/target.rs"
+
+[[files]]
+upstream = "scrape/scrape.go"
+local    = "src/scraper.rs"
+
+# Rules
+
+[[files]]
+upstream = "rules/manager.go"
+local    = "src/rules/mod.rs"
+
+[[files]]
+upstream = "rules/recording.go"
+local    = "src/rules/recording.rs"
+
+[[files]]
+upstream = "rules/alerting.go"
+local    = "src/rules/alerting.rs"
+
+[[files]]
+upstream = "rules/manager.go"
+local    = "src/alerting.rs"
+
+# Phase 2 — deep-port files (2026-05-19)
+
+[[files]]
+upstream = "discovery/hetzner/hetzner.go + discovery/azure/azure.go"
+local    = "src/discovery_cloud.rs"
+
+[[files]]
+upstream = "pkg/template/template.go"
+local    = "src/template.rs"
+
+[[files]]
+upstream = "pkg/exemplars/exemplars.go + pkg/storage/native-histogram"
+local    = "src/exemplars.rs"
+
+[[files]]
+upstream = "pkg/notifier/notifier.go"
+local    = "src/notifier_sharded.rs"
+
+[[files]]
+upstream = "storage/remote/read.go"
+local    = "src/remote_read_backend.rs"
+
+# Remote read/write
+
+[[files]]
+upstream = "storage/remote/write.go"
+local    = "src/remote_write.rs"
+
+[[files]]
+upstream = "storage/remote/queue_manager.go"
+local    = "src/api/remote_write.rs"
+
+[[files]]
+upstream = "storage/remote/read_handler.go"
+local    = "src/api/remote.rs"
+
+# Web/api
+
+[[files]]
+upstream = "web/api/v1/api.go"
+local    = "src/api/mod.rs"
+
+[[files]]
+upstream = "web/api/v1/api.go"
+local    = "src/api/query.rs"
+
+[[files]]
+upstream = "web/api/v1/api.go"
+local    = "src/api/labels.rs"
+
+[[files]]
+upstream = "web/api/v1/api.go"
+local    = "src/api/series.rs"
+
+[[files]]
+upstream = "web/api/v1/api.go"
+local    = "src/api/metadata.rs"
+
+[[files]]
+upstream = "web/api/v1/api.go"
+local    = "src/api/rules.rs"
+
+[[files]]
+upstream = "web/api/v1/api.go"
+local    = "src/api/targets.rs"
+
+[[files]]
+upstream = "web/api/v1/api.go"
+local    = "src/api/status.rs"
+
+[[files]]
+upstream = "web/federate.go"
+local    = "src/api/federation.rs"
+
+# Ingestion (multiple line protocols)
+
+[[files]]
+upstream = "vendor/github.com/prometheus/common/expfmt"
+local    = "src/ingestion/exposition.rs"
+
+[[files]]
+upstream = "vendor/github.com/prometheus/common/expfmt/text_parse.go"
+local    = "src/exposition.rs"
+
+[[files]]
+upstream = "vendor/github.com/influxdata/line-protocol"
+local    = "src/ingestion/influx.rs"
+
+[[files]]
+upstream = "vendor/github.com/marpaia/graphite-golang"
+local    = "src/ingestion/graphite.rs"
+
+[[files]]
+upstream = "vendor/github.com/cactus/go-statsd-client"
+local    = "src/ingestion/statsd.rs"
+
+[[files]]
+upstream = "vendor/github.com/OpenObservability/OpenMetrics"
+local    = "src/ingestion/openmetrics.rs"
+
+[[files]]
+upstream = "vendor/go.opentelemetry.io/proto/otlp"
+local    = "src/ingestion/otlp.rs"
+
+# Alertmanager-equivalent
+
+[[files]]
+upstream = "alertmanager/api/api.go"
+local    = "src/alertmgr/routes.rs"
+
+[[files]]
+upstream = "alertmanager/silence/silence.go"
+local    = "src/alertmgr/silence.rs"
+
+[[files]]
+upstream = "alertmanager/notify/notify.go"
+local    = "src/alertmanager.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "rate"
+local_name    = "rate"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "irate"
+local_name    = "irate"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "increase"
+local_name    = "increase"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "delta"
+local_name    = "delta"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "deriv"
+local_name    = "deriv"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "predict_linear"
+local_name    = "predict_linear"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "resets"
+local_name    = "resets"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "changes"
+local_name    = "changes"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "avg_over_time"
+local_name    = "avg_over_time"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "max_over_time"
+local_name    = "max_over_time"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "min_over_time"
+local_name    = "min_over_time"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "sum_over_time"
+local_name    = "sum_over_time"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "count_over_time"
+local_name    = "count_over_time"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "stddev_over_time"
+local_name    = "stddev_over_time"
+file          = "src/promql/functions.rs"
+
+[[functions]]
+upstream_name = "Lex"
+local_name    = "tokenize"
+file          = "src/promql/lexer.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+[[tests]]
+upstream_test = "promql/functions_test.go::TestRate"
+local_test    = "parity_rate_handles_counter_reset"
+
+[[tests]]
+upstream_test = "promql/functions_test.go::TestIRate"
+local_test    = "parity_irate_uses_only_last_two_samples"
+
+[[tests]]
+upstream_test = "promql/functions_test.go::TestIncrease"
+local_test    = "parity_increase_scales_with_range"
+
+[[tests]]
+upstream_test = "promql/functions_test.go::TestDeriv"
+local_test    = "parity_deriv_returns_slope_per_second"
+
+[[tests]]
+upstream_test = "promql/functions_test.go::TestPredictLinear"
+local_test    = "parity_predict_linear_extrapolates_future_value"
+
+[[tests]]
+upstream_test = "promql/functions_test.go::TestResets"
+local_test    = "parity_resets_counts_counter_resets"
+
+[[tests]]
+upstream_test = "promql/functions_test.go::TestChanges"
+local_test    = "parity_changes_counts_value_changes"
+
+[[tests]]
+upstream_test = "promql/functions_test.go::TestAvgOverTime"
+local_test    = "parity_avg_over_time_correct"
+
+[[tests]]
+upstream_test = "promql/functions_test.go::TestStddevOverTime"
+local_test    = "parity_stddev_over_time_correct"
+
+[[tests]]
+upstream_test = "promql/functions_test.go::TestQuantileOverTime"
+local_test    = "parity_quantile_over_time_p95"
+
+[[tests]]
+upstream_test = "tsdb/head_test.go::TestAppend"
+local_test    = "parity_tsdb_append_many_via_timeseries"
+
+[[tests]]
+upstream_test = "tsdb/head_test.go::TestSelect"
+local_test    = "parity_tsdb_head_series_samples_in_range_filters_correctly"
+
+[[tests]]
+upstream_test = "tsdb/head_test.go::TestLabelValues"
+local_test    = "parity_tsdb_label_values_filtered_by_matchers"
+
+[[tests]]
+upstream_test = "tsdb/head_test.go::TestSelectAt"
+local_test    = "parity_tsdb_select_at_returns_latest_in_lookback"
+
+[[tests]]
+upstream_test = "tsdb/head_test.go::TestSeriesFor"
+local_test    = "parity_tsdb_series_for_returns_distinct_label_sets"
+
+[[tests]]
+upstream_test = "tsdb/wal/wal_test.go::TestRecord"
+local_test    = "parity_wal_record_serializable"
+
+[[tests]]
+upstream_test = "tsdb/block_test.go::TestRoundtrip"
+local_test    = "parity_block_writer_reader_roundtrip"
+
+[[tests]]
+upstream_test = "rules/alerting_test.go::TestPendingFiring"
+local_test    = "parity_alert_rule_pending_then_firing_after_for_window"
+
+[[tests]]
+upstream_test = "rules/alerting_test.go::TestClear"
+local_test    = "parity_alert_rule_clears_active_when_expression_no_longer_matches"
+
+[[tests]]
+upstream_test = "rules/recording_test.go::TestRecord"
+local_test    = "parity_recording_rule_evaluates_and_writes_to_tsdb"
+
+[[tests]]
+upstream_test = "storage/remote/write_test.go::TestProtobufRoundtrip"
+local_test    = "parity_remote_write_protobuf_roundtrip"
+
+[[tests]]
+upstream_test = "alertmanager/silence/silence_test.go::TestStore"
+local_test    = "parity_silence_store_create_get_list"
+
+[[tests]]
+upstream_test = "alertmanager/silence/silence_test.go::TestExpire"
+local_test    = "parity_silence_expire_drops_to_expired_state"
+
+[[tests]]
+upstream_test = "alertmanager/silence/silence_test.go::TestMatch"
+local_test    = "parity_silence_matches_active_window_and_labels"
+
+[[tests]]
+upstream_test = "scrape/text_parse_test.go::TestExposition"
+local_test    = "parity_ingestion_exposition_handles_inf_nan"
+
+[[tests]]
+upstream_test = "scrape/influx_test.go::TestLineProtocol"
+local_test    = "parity_ingestion_influx_line_protocol_multi_tags"
+
+[[tests]]
+upstream_test = "scrape/graphite_test.go::TestDottedName"
+local_test    = "parity_ingestion_graphite_handles_dotted_metric_name"
+
+[[tests]]
+upstream_test = "scrape/statsd_test.go::TestSampleRate"
+local_test    = "parity_ingestion_statsd_parses_counter_with_sample_rate"
+
+[[tests]]
+upstream_test = "web/federate_test.go::TestFederation"
+local_test    = "parity_multitenant_federation_relabel_external_only_label"
+
+[[tests]]
+upstream_test = "web/federate_test.go::TestEnforceFilter"
+local_test    = "parity_multitenant_enforce_filter_idempotent"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/query"
+local_path    = "/api/v1/metrics/query"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/alerts"
+local_path    = "/api/v1/metrics/alerts"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/rules"
+local_path    = "/api/v1/metrics/rules"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/targets"
+local_path    = "/api/v1/metrics/targets"
+
+[portal_ui]
+upstream_ui  = "Prometheus expr browser"
+upstream_url = "https://prometheus.io/docs/"
+status       = "complete"
+loc          = 650
+priority     = "P1"
+notes        = "admin/prometheus/: targets/rules/tsdb/flags/status (23 tests). See PORTAL_UI_OVERRIDE."
+last_audit   = "2026-05-11"
+
+# ── Inventory blocks (Charter v2 enumeration) ────────────────────────────────
+# Each [[mapped]] / [[partial]] / [[skipped]] / [[unmapped]] entry represents
+# one upstream subsystem (package or coherent file group). Total = 30.
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:pkg/promql/parser"
+local_files  = ["src/promql/lexer.rs", "src/promql/parser.rs", "src/promql/ast.rs"]
+note         = "PromQL lexer + parser + AST (binary ops, aggregators, instant/range vectors)"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:pkg/promql/engine.go"
+local_files  = ["src/promql/engine.rs"]
+note         = "PromQL evaluator (instant + range queries, subquery, lookback)"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:pkg/promql/functions.go"
+local_files  = ["src/promql/functions.rs"]
+note         = "rate/irate/increase/delta/deriv/predict_linear/resets/changes/*_over_time/quantile_over_time"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:pkg/tsdb"
+local_files  = ["src/tsdb/mod.rs", "src/tsdb/wal.rs", "src/tsdb/block.rs", "src/tsdb/compaction.rs", "src/storage.rs"]
+note         = "Head + WAL + block (chunk) + compaction (Gorilla XOR)"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:pkg/scrape"
+local_files  = ["src/scrape/manager.rs", "src/scrape/target.rs", "src/scraper.rs"]
+note         = "Scrape manager + target lifecycle + HTTP scraper"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:pkg/rules"
+local_files  = ["src/rules/mod.rs", "src/rules/recording.rs", "src/rules/alerting.rs", "src/alerting.rs"]
+note         = "Recording rules + alerting rules (pending → firing after for-window)"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:web/api/v1"
+local_files  = ["src/api/mod.rs", "src/api/query.rs", "src/api/labels.rs", "src/api/series.rs", "src/api/metadata.rs", "src/api/rules.rs", "src/api/targets.rs", "src/api/status.rs"]
+note         = "HTTP API v1 — /query, /query_range, /labels, /label/<name>/values, /series, /rules, /targets, /status, /metadata"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:web/federate.go"
+local_files  = ["src/api/federation.rs", "src/multitenant.rs"]
+note         = "Federation endpoint + match[] relabel + tenant enforce-filter"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:storage/remote (write path)"
+local_files  = ["src/remote_write.rs", "src/api/remote_write.rs"]
+note         = "remote_write — protobuf (prometheus.prompb) + snappy framing + queue manager"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:vendor/github.com/prometheus/common/expfmt"
+local_files  = ["src/exposition.rs", "src/ingestion/exposition.rs", "src/ingestion/openmetrics.rs"]
+note         = "Prometheus text exposition + OpenMetrics text/proto"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:vendor/github.com/influxdata/line-protocol"
+local_files  = ["src/ingestion/influx.rs"]
+note         = "InfluxDB line protocol ingest"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:vendor — graphite/statsd line ingest"
+local_files  = ["src/ingestion/graphite.rs", "src/ingestion/statsd.rs"]
+note         = "Dotted graphite + statsd counter/gauge/histogram with sample-rate"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:vendor/go.opentelemetry.io/proto/otlp"
+local_files  = ["src/ingestion/otlp.rs"]
+note         = "OTLP metrics ingest (HTTP+protobuf)"
+
+[[mapped]]
+upstream_pkg = "alertmanager/alertmanager (silence + notify + dispatch)"
+local_files  = ["src/alertmgr/mod.rs", "src/alertmgr/routes.rs", "src/alertmgr/silence.rs", "src/alertmgr/client.rs", "src/alertmgr/model.rs", "src/alertmanager.rs"]
+note         = "Alertmanager-equivalent — silence store + match-active-window + notify dispatcher"
+
+# ── Phase 2 mapped (2026-05-19 deep-port) ────────────────────────────────────
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:discovery/{hetzner,azure}"
+local_files  = ["src/discovery_cloud.rs"]
+note         = "Hetzner Cloud + Azure VM SD; JSON walker + __meta_* labels + scrape-port assembly"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:pkg/template (Go text/template subset)"
+local_files  = ["src/template.rs"]
+note         = "alert-annotation template engine — $var / .Field / .Labels.<key> / if/else/end / range / printf %.Nf"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:pkg/exemplars + pkg/native-histograms"
+local_files  = ["src/exemplars.rs"]
+note         = "Exemplar ring (capacity + keep_window) + native histogram (schema/bucket index/observe/merge/quantile)"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:pkg/notifier (sharded notification pipeline)"
+local_files  = ["src/notifier_sharded.rs"]
+note         = "ShardedNotifier — per-AM PeerQueue with token-bucket budget + round-robin drain + retry-on-fail"
+
+[[mapped]]
+upstream_pkg = "prometheus/prometheus:storage/remote (read backends)"
+local_files  = ["src/remote_read_backend.rs"]
+note         = "RemoteReadBackend trait + MemoryReadBackend reference impl; matchers (Equal/NotEqual/RegexMatch/RegexNoMatch) + glob alternation"
+
+[[partial]]
+upstream_pkg = "prometheus/prometheus:pkg/discovery"
+local_files  = ["src/scrape/discovery.rs"]
+note         = "Static + file SD covered; Kubernetes/Consul/AWS/GCE/Azure SDK plumbing deferred"
+
+[[partial]]
+upstream_pkg = "prometheus/prometheus:storage/remote (read path)"
+local_files  = ["src/api/remote.rs", "src/ingestion/remote_read.rs"]
+note         = "remote_read responder scaffolded — backend-specific block-streaming deferred"
+
+[[skipped]]
+upstream_pkg = "prometheus/prometheus:cmd/"
+reason       = "go-bootstrap"
+note         = "Prometheus binary main.go — cave-runtime composes the lib"
+
+[[skipped]]
+upstream_pkg = "prometheus/prometheus:scripts/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "prometheus/prometheus:documentation/"
+reason       = "vendor-spec"
+
+[[skipped]]
+upstream_pkg = "prometheus/prometheus:web/ui/"
+reason       = "browser-UI"
+note         = "Vue/Mantine SPA — cave-portal serves /admin/prometheus instead"
+
+[[skipped]]
+upstream_pkg = "prometheus/prometheus:plugins/"
+reason       = "vendor-spec"
+note         = "Go plugin loader — Rust uses cargo features"
+
+[[skipped]]
+upstream_pkg = "prometheus/prometheus:util/strutil/ + util/stats/"
+reason       = "stdlib-analog"
+
+[[skipped]]
+upstream_pkg = "prometheus/prometheus:util/teststorage/ + util/testutil/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "prometheus/prometheus:tracing/"
+reason       = "infra-bridge"
+note         = "Cave Runtime uses cave-trace (Tempo-equivalent) for the platform-wide tracing pipeline"
+
+[[unmapped]]
+upstream_pkg = "alertmanager/alertmanager:cluster/ (mesh/gossip HA)"
+reason       = "Alertmanager peer-mesh HA via memberlist gossip — cave-runtime relies on cave-etcd Raft for HA state"
+deferred_to  = "obs-stack-ray-2"
+
+# ── Scope cuts (informational; same as [[unmapped]] above, structured) ───────
+
+[[scope_cuts]]
+name        = "alertmanager-gossip-mesh"
+upstream    = "alertmanager/alertmanager:cluster/"
+reason      = "HA peer mesh via memberlist gossip; replaced with cave-etcd Raft for silence/notify-log state."
+deferred_to = "obs-stack-ray-2"

@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
+pub mod admin;
+pub mod attribution;
+pub mod contributions;
+pub mod deployments;
+pub mod events;
+pub mod jobs;
+pub mod logs;
+pub mod metrics;
+pub mod progress;
+pub mod rbac;
+pub mod secrets;
+pub mod settings;
+pub mod tenants;

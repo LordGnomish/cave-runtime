@@ -1,0 +1,51 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
+//! Portal plugins — per-domain views rendered natively.
+//!
+//! Each plugin owns a set of panels, list pages, and detail views for one
+//! capability area. The portal *never* embeds an upstream UI; if the
+//! capability is provided by an external tool (Argo CD, Grafana, Vault, etc.)
+//! the plugin re-implements the relevant view shape and uses cave-portal-api
+//! as the single data plane.
+
+pub mod argocd;
+pub mod argocd_advanced;
+pub mod badges;
+pub mod cache;
+pub mod cost_insight;
+pub mod defectdojo;
+pub mod docdb;
+pub mod grafana;
+pub mod grafana_renderer;
+pub mod hubble;
+pub mod kubernetes;
+pub mod lakehouse;
+pub mod rdbms_operator;
+pub mod reflex;
+pub mod reflex_advanced;
+pub mod scaffolder;
+pub mod search;
+pub mod techdocs;
+pub mod vault;
+pub mod vault_advanced;
+
+/// Persona for whom a plugin view is intended.
+///
+/// Mirrors the persona model in `cave-portal-api`: tenants are app owners,
+/// operators are cluster admins, admins are platform staff.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ViewPersona {
+    Tenant,
+    Operator,
+    Admin,
+}
+
+impl ViewPersona {
+    pub fn label(&self) -> &'static str {
+        match self {
+            ViewPersona::Tenant => "tenant",
+            ViewPersona::Operator => "operator",
+            ViewPersona::Admin => "admin",
+        }
+    }
+}

@@ -1,0 +1,26 @@
+[package]
+name = "cave-kubelet"
+version = "0.1.0"
+edition = "2021"
+description = "Node agent — watches API server for pod assignments, manages container lifecycle via cave-cri"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-kubelet"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["kubernetes", "kubelet", "container", "orchestration", "node-agent"]
+categories = ["api-bindings", "command-line-utilities", "network-programming"]
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+axum = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+thiserror = "1"
+dashmap = "6"
+cave-kernel = { path = "../cave-kernel" }

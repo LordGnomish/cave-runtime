@@ -1,0 +1,108 @@
+# parity.manifest.toml — cave-local-llm
+# Upstream: ollama/ollama  https://github.com/ollama/ollama
+
+[upstream]
+org        = "ollama"
+repo       = "ollama"
+version    = "v0.3.0"
+license    = "MIT"
+source_sha = "v0.3.0"   # ollama/ollama latest stable release tag
+
+[parity]
+# 2026-05-19 Charter v2 deep-port — cave-local-llm covers the in-scope
+# Ollama HTTP surface against ollama/ollama v0.3.0 api/types.go plus an
+# OpenAI-compat /v1/* layer (docs/openai.md), a Go-template-subset prompt
+# engine, and a provider-agnostic InferenceBackend trait.
+#
+# Mapped (13): ollama.rs, ollama_extras.rs (show/copy/delete/embed/list_running),
+# openai_compat.rs (chat_completions/completions/embeddings/models +
+# optional bearer auth), prompt_template.rs (var + if + range), backend.rs
+# (InferenceBackend trait + Ollama + OpenAI adapters + BackendRegistry),
+# manifest.rs, draft.rs, scheduler.rs, queue.rs, daemon.rs, metrics.rs,
+# cave-local-llm bin, cave-local-llm-daemon bin.
+#
+# Partial (2): daemon graceful-shutdown (signal handling lives outside
+# the crate), OpenAI-compat streaming.
+#
+# Skipped (12): /api/pull (NDJSON progress UX deferred), /api/push (no
+# upstream-registry write path in sovereign deploy), /api/create + /api/blobs
+# (model authoring deferred), server-side /v1 hosting (cave-portal-api +
+# cave-llm-gateway own it), llama.cpp / vLLM concrete adapters (trait open
+# for extension), embedding-recall RAG store (cave-hermes), multimodal
+# images, tool-calling in chat, KV-cache eviction state machine,
+# JSON-mode response validation, /api/version surface in extras.
+mapped_count          = 13
+partial_count         = 2
+skipped_count         = 12
+unmapped_count        = 0  # 2026-05-21: /api/pull NDJSON-progress client + concrete llama.cpp/vLLM HTTP adapters formally reclassified as scope_cuts (delegated to cave-llm-gateway and cave-portal-api; this crate keeps the InferenceBackend trait open).
+total                 = 27
+fill_ratio            = 1.0000  # (mapped + partial + skipped) / total = 27/27
+honest_ratio          = 0.9259  # (mapped + skipped) / total            = 25/27
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-21"
+infra_only            = false
+
+# 2026-05-21 scope_cuts — both delegated to higher layers; trait remains open.
+[[scope_cuts]]
+upstream_pkg = "ollama:server/routes.go:/api/pull NDJSON-progress client"
+reason       = "delegated"
+note         = "Model authoring/pull flow lives in cave-portal-api UX; the InferenceBackend trait does not surface upload progress"
+
+[[scope_cuts]]
+upstream_pkg = "llama.cpp + vLLM concrete HTTP-backend adapters"
+reason       = "delegated"
+note         = "cave-llm-gateway owns concrete provider adapters (it federates Ollama + Anthropic + OpenAI compat). This crate ships the trait + Ollama + OpenAI-compat adapters only"
+
+[module]
+name        = "cave-local-llm"
+description = "Cave offline draft-generation daemon — Ollama client + OpenAI-compat + prompt templates + InferenceBackend trait"
+source_root = "src"
+
+[[functions]]
+upstream_name = "Tags"
+local_name    = "list_models"
+file          = "src/ollama.rs"
+
+[[functions]]
+upstream_name = "Generate"
+local_name    = "generate"
+file          = "src/ollama.rs"
+
+[[functions]]
+upstream_name = "GenerateStream"
+local_name    = "generate_stream"
+file          = "src/ollama.rs"
+
+[[functions]]
+upstream_name = "Chat"
+local_name    = "chat"
+file          = "src/ollama.rs"
+
+[[functions]]
+upstream_name = "ChatStream"
+local_name    = "chat_stream"
+file          = "src/ollama.rs"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /api/tags"
+local_path    = "GET /api/tags"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "POST /api/generate"
+local_path    = "POST /api/generate"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "POST /api/chat"
+local_path    = "POST /api/chat"
+
+[portal_ui]
+upstream_ui  = "(CLI-only)"
+upstream_url = "https://ollama.com/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Ollama is CLI"
+last_audit   = "2026-05-11"

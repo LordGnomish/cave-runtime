@@ -1,0 +1,57 @@
+# parity.manifest.toml — cave-slo
+# Upstream: nobl9/nobl9-go v0.126.1  https://github.com/nobl9/nobl9-go
+#
+# Re-targeted 2026-05-02 from `OpenSLO/OpenSLO` (DEAD: spec repo had 0
+# tags via ls-remote — project moved/forked, no concrete impl there to
+# port against). Pivoted to nobl9/nobl9-go, the most active OSS Go
+# reference implementation of OpenSLO/SLO-as-code (Apache-2.0). The
+# `nobl9/sloctl` CLI (v0.22.0) is a secondary surface to track.
+
+[upstream]
+org     = "nobl9"
+repo    = "nobl9-go"
+version = "v0.126.1"
+name    = "Nobl9 SLO SDK (Go)"
+license = "MIT"
+language= "Go"
+url     = "https://github.com/nobl9/nobl9-go"
+
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
+[module]
+name        = "cave-slo"
+description = "SLO tracking — OpenSLO replacement"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+# [[files]]
+# upstream = "path/in/upstream/repo.go"
+# local    = "src/local.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+# [[functions]]
+# upstream_name = "UpstreamFunc"
+# local_name    = "local_fn"
+# file          = "src/routes.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+# [[tests]]
+# upstream_test = "TestUpstreamFunc"
+# local_test    = "test_local_fn"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+# [[surfaces]]
+# kind          = "http"
+# upstream_path = "/api/upstream"
+# local_path    = "/api/slo/endpoint"
+
+[portal_ui]
+upstream_ui  = "OpenSLO (spec)"
+upstream_url = "https://openslo.com/"
+status       = "partial"
+loc          = 89
+priority     = "P2"
+notes        = "Spec-first, no canonical UI"
+last_audit   = "2026-05-11"

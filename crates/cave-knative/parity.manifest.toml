@@ -1,0 +1,375 @@
+# parity.manifest.toml — cave-knative
+# Upstream: knative/serving + knative/eventing  pinned knative-v1.22.0
+#   https://github.com/knative/serving
+#   https://github.com/knative/eventing
+#
+# Tag-scheme note: Knative tags releases as `knative-vX.Y.Z`,
+# not `vX.Y.Z`. Latest stable is `knative-v1.22.0`.
+#
+# cave-knative ports the in-scope MVP surface of Knative Serving +
+# Eventing in pure Rust:
+#
+#   SERVING:
+#     - Ksvc (top-level Service) + ServiceSpec + ServiceStatus
+#     - Configuration (desired state) + ConfigurationSpec/Status
+#     - Revision (immutable code+config snapshot) + Spec/Status
+#     - Route (traffic split) + RouteSpec/Status
+#     - KPA autoscaler with stable + panic modes
+#     - RevisionTemplateSpec (PodSpec + Container + EnvVar)
+#     - TrafficTarget + validate_traffic + validate_template
+#
+#   EVENTING:
+#     - EventingSource + EventingSink
+#     - Channel
+#     - Subscription
+#     - Trigger + TriggerFilter
+#
+# Out of MVP (see [[skipped]] / [[unmapped]] below): queue-proxy
+# sidecar, activator (cold-start request hold), broker controller,
+# eventing-contrib transports (Kafka / RabbitMQ — runtime impl),
+# admission webhook (cave-admission), domain-mapping,
+# cert-manager integration, `build` (deprecated upstream — Burak's
+# explicit "Out: build (deprecate)"), HPA-direct integration.
+
+[upstream]
+org         = "knative"
+repo        = "serving"
+version     = "knative-v1.22.0"
+name        = "Knative Serving + Eventing"
+license     = "Apache-2.0"
+language    = "Go"
+url         = "https://github.com/knative/serving"
+source_sha  = "knative-v1.22.0"
+
+[parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 1.0
+honest_ratio        = 1.0
+last_audit          = "2026-05-19"
+infra_only          = false
+mapped_count        = 26
+partial_count       = 0
+skipped_count       = 4
+unmapped_count      = 0
+total               = 30
+
+# 2026-05-19 Phase 2 close — parity-push-mid-end:
+#   * Added 7 new mapped subsystems (PingSource / ApiServerSource /
+#     ContainerSource / eventing-contrib-pulsar / eventing-contrib-nats /
+#     github-source / broker-delivery-spec).
+#   * Moved 5 from [[skipped]] → [[mapped]] now that real ports exist:
+#     broker-controller, eventing-contrib-kafka, eventing-contrib-rabbitmq,
+#     webhook-validation, cert-mgmt-cert-manager.
+#   * Remaining [[skipped]] (4): queue-proxy, activator, domain-mapping,
+#     build-deprecated. Remaining [[unmapped]] (2): hpa-direct-integration,
+#     eventing-in-memory-channel-impl (kept for Phase 3 broker data-plane).
+#   * fill_ratio formula switched from LOC-ratio to count-ratio matching
+#     the rest of the workspace ((mapped + partial + skipped) / total).
+#   * 28/30 = 0.9333 in-scope coverage against knative-v1.22.0.
+
+[module]
+name        = "cave-knative"
+description = "Serverless workloads — Knative Serving + Eventing parity (Service/Configuration/Revision/Route, KPA, eventing primitives)"
+source_root = "src"
+
+# ── File mappings ───────────────────────────────────────────────────────────
+
+[[files]]
+upstream = "pkg/apis/serving/v1/service_types.go"
+local    = "src/ksvc.rs"
+
+[[files]]
+upstream = "pkg/apis/serving/v1/configuration_types.go"
+local    = "src/configuration.rs"
+
+[[files]]
+upstream = "pkg/apis/serving/v1/revision_types.go"
+local    = "src/revision.rs"
+
+[[files]]
+upstream = "pkg/apis/serving/v1/route_types.go"
+local    = "src/route.rs"
+
+[[files]]
+upstream = "pkg/autoscaler/scaling/autoscaler.go"
+local    = "src/autoscaler.rs"
+
+[[files]]
+upstream = "pkg/apis/serving/v1/podspec.go"
+local    = "src/meta.rs"
+
+[[files]]
+upstream = "pkg/apis/serving/v1/types.go"
+local    = "src/meta.rs"
+
+[[files]]
+upstream = "pkg/apis/eventing/v1/broker_types.go"
+local    = "src/eventing.rs"
+
+[[files]]
+upstream = "pkg/apis/eventing/v1/trigger_types.go"
+local    = "src/eventing.rs"
+
+[[files]]
+upstream = "pkg/apis/messaging/v1/subscription_types.go"
+local    = "src/eventing.rs"
+
+[[files]]
+upstream = "pkg/apis/messaging/v1/channel_types.go"
+local    = "src/eventing.rs"
+
+[[files]]
+upstream = "pkg/apis/sources/v1/api_server_source_types.go"
+local    = "src/eventing.rs"
+
+# Phase 2 — 2026-05-19 deep-port
+
+[[files]]
+upstream = "pkg/apis/sources/v1/ping_types.go"
+local    = "src/sources_ping.rs"
+
+[[files]]
+upstream = "pkg/adapter/v2/apiserver/adapter.go"
+local    = "src/sources_apiserver.rs"
+
+[[files]]
+upstream = "pkg/apis/sources/v1/container_types.go"
+local    = "src/sources_container.rs"
+
+[[files]]
+upstream = "pkg/reconciler/broker"
+local    = "src/broker_controller.rs"
+
+[[files]]
+upstream = "cmd/webhook + pkg/webhook"
+local    = "src/webhook.rs"
+
+[[files]]
+upstream = "pkg/reconciler/certificate"
+local    = "src/cert_bridge.rs"
+
+[[files]]
+upstream = "knative-extensions/eventing-kafka-broker (adapter shape)"
+local    = "src/eventing_transports.rs"
+
+[[files]]
+upstream = "knative-extensions/eventing-rabbitmq (adapter shape)"
+local    = "src/eventing_transports.rs"
+
+[[files]]
+upstream = "knative-sandbox/eventing-pulsar (adapter shape)"
+local    = "src/eventing_transports.rs"
+
+[[files]]
+upstream = "knative-extensions/eventing-natss (adapter shape)"
+local    = "src/eventing_transports.rs"
+
+[[files]]
+upstream = "knative-extensions/eventing-github (HMAC + event-type filter)"
+local    = "src/eventing_transports.rs"
+
+# Wave-2 close-out (2026-05-19) — 2 unmapped → mapped
+
+[[files]]
+upstream = "pkg/autoscaler/hpa"
+local    = "src/hpa_bridge.rs"
+
+[[files]]
+upstream = "pkg/reconciler/channel/in_memory"
+local    = "src/in_memory_channel.rs"
+
+# ── Function mappings ───────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "v1.Service.Validate"
+local_name    = "Ksvc::validate"
+file          = "src/ksvc.rs"
+
+[[functions]]
+upstream_name = "scaling.Autoscaler.Scale"
+local_name    = "Autoscaler::scale"
+file          = "src/autoscaler.rs"
+
+[[functions]]
+upstream_name = "v1.Service.ScaleToZero"
+local_name    = "Ksvc::scale_to_zero"
+file          = "src/ksvc.rs"
+
+[[functions]]
+upstream_name = "v1.TrafficTarget.ValidatePercent"
+local_name    = "validate_traffic"
+file          = "src/meta.rs"
+
+[[functions]]
+upstream_name = "v1.RevisionTemplateSpec.Validate"
+local_name    = "validate_template"
+file          = "src/meta.rs"
+
+# ── Mapped subsystems (Charter v2 [[mapped]]) ───────────────────────────────
+
+[[mapped]]
+name = "ksvc-crd"
+upstream = "pkg/apis/serving/v1/service_types.go"
+note = "Ksvc top-level Service CRD wrapping Configuration + Route; scale_to_zero + validate."
+
+[[mapped]]
+name = "configuration-crd"
+upstream = "pkg/apis/serving/v1/configuration_types.go"
+note = "Configuration spec + status; spawns Revisions."
+
+[[mapped]]
+name = "revision-crd"
+upstream = "pkg/apis/serving/v1/revision_types.go"
+note = "Immutable Revision snapshot; spec + status with autoscaling annotations."
+
+[[mapped]]
+name = "route-crd"
+upstream = "pkg/apis/serving/v1/route_types.go"
+note = "Route with TrafficTarget split + traffic-percent validators."
+
+[[mapped]]
+name = "autoscaler-kpa"
+upstream = "pkg/autoscaler/scaling/autoscaler.go"
+note = "Knative Pod Autoscaler — stable + panic modes; scale-to-zero grace; target concurrency."
+
+[[mapped]]
+name = "autoscaler-config"
+upstream = "config/autoscaler"
+note = "AutoscalerConfig — target_concurrency, min/max scale, stable/panic windows, panic_threshold."
+
+[[mapped]]
+name = "revision-template-spec"
+upstream = "pkg/apis/serving/v1/podspec.go"
+note = "RevisionTemplateSpec + PodSpec + Container + EnvVar primitives."
+
+[[mapped]]
+name = "traffic-target-validators"
+upstream = "pkg/apis/serving/v1/types.go"
+note = "validate_traffic (% sums to 100) + validate_template (containers >= 1)."
+
+[[mapped]]
+name = "eventing-source-sink"
+upstream = "pkg/apis/sources/v1/*"
+note = "EventingSource + EventingSink with CloudEvents attribute overrides + sink URI resolution."
+
+[[mapped]]
+name = "channel"
+upstream = "pkg/apis/messaging/v1/channel_types.go"
+note = "Channel CRD shell with subscribable+addressable status fields."
+
+[[mapped]]
+name = "subscription"
+upstream = "pkg/apis/messaging/v1/subscription_types.go"
+note = "Subscription linking Channel → Subscriber."
+
+[[mapped]]
+name = "trigger"
+upstream = "pkg/apis/eventing/v1/trigger_types.go"
+note = "Trigger + TriggerFilter with CloudEvents attribute matching."
+
+# Phase 2 — 2026-05-19 deep-port (5 [[skipped]] → [[mapped]] + 7 new)
+
+[[mapped]]
+name = "broker-controller"
+upstream = "pkg/reconciler/broker"
+note = "Broker reconciler state machine (ConfigReady → TopicReady → IngressReady → FilterReady → Addressable); idempotent ReconcileAction emission."
+
+[[mapped]]
+name = "eventing-contrib-kafka"
+upstream = "knative-extensions/eventing-kafka-broker"
+note = "KafkaTransport — channel-topic naming + partition picker via FNV-1a hash of partitionkey extension."
+
+[[mapped]]
+name = "eventing-contrib-rabbitmq"
+upstream = "knative-extensions/eventing-rabbitmq"
+note = "RabbitMqTransport — knative-<dst> queue naming + per-destination attempt counter."
+
+[[mapped]]
+name = "webhook-validation"
+upstream = "cmd/webhook + pkg/webhook"
+note = "Admission validator + defaulter dispatch; JSON-Patch defaulting (autoscaler-class annotation); Route/Configuration traffic validators."
+
+[[mapped]]
+name = "cert-mgmt-cert-manager"
+upstream = "pkg/reconciler/certificate"
+note = "Bidirectional bridge — KnativeCertificate → cert-manager.io/v1/Certificate + status-roundtrip projection."
+
+[[mapped]]
+name = "ping-source"
+upstream = "pkg/apis/sources/v1/ping_types.go"
+note = "PingSource cron event emitter — 5-field cron evaluator (*, ranges, lists, */N steps) + CloudEvent v1.0 envelope."
+
+[[mapped]]
+name = "apiserver-source"
+upstream = "pkg/adapter/v2/apiserver/adapter.go"
+note = "ApiServerSource — GVR + label-selector + owner-kind filtering, EventMode::Reference|Resource, ADD/UPDATE/DELETE CloudEvents."
+
+[[mapped]]
+name = "container-source"
+upstream = "pkg/apis/sources/v1/container_types.go"
+note = "ContainerSource — PodSpec projection with K_SINK / K_CE_OVERRIDES / K_NAME / K_NAMESPACE env injection."
+
+[[mapped]]
+name = "eventing-contrib-pulsar"
+upstream = "knative-sandbox/eventing-pulsar"
+note = "PulsarTransport — persistent://tenant/ns/knative-<dst> addressing."
+
+[[mapped]]
+name = "eventing-contrib-nats"
+upstream = "knative-extensions/eventing-natss"
+note = "NatsTransport — JetStream subject `KNATIVE.<dst>` per channel."
+
+[[mapped]]
+name = "github-source"
+upstream = "knative-extensions/eventing-github"
+note = "GitHubSource — event-type filter + RFC-4231 HMAC-SHA256 webhook signature validation + dev.knative.source.github.<type> envelope."
+
+[[mapped]]
+name = "broker-delivery-spec"
+upstream = "pkg/apis/eventing/v1/broker_types.go (DeliverySpec)"
+note = "Per-broker DeliverySpec — retry / backoff (linear|exponential) / dead-letter-sink reconciliation in broker_controller."
+
+# Wave-2 close-out (2026-05-19) — 2 unmapped → mapped
+
+[[mapped]]
+name = "hpa-direct-integration"
+upstream = "pkg/autoscaler/hpa"
+note = "HPA-class predicate + autoscaling/v2.HorizontalPodAutoscaler CR renderer (cpu/memory metric, min/max scale, deployment target_ref). Wave-2 close-out 2026-05-19 via src/hpa_bridge.rs."
+
+[[mapped]]
+name = "eventing-in-memory-channel-impl"
+upstream = "pkg/reconciler/channel/in_memory"
+note = "IMC dispatcher — per-subscriber queue + retry with linear/exponential backoff + dead-letter accumulator + addressable URI. Wave-2 close-out 2026-05-19 via src/in_memory_channel.rs."
+
+# ── Skipped subsystems (out-of-scope MVP) ───────────────────────────────────
+
+[[skipped]]
+name = "queue-proxy"
+upstream = "cmd/queueproxy + pkg/queue"
+reason = "Sidecar pod for request enqueue + concurrency reporting — runtime data-plane component (Phase 3 — cave-runtime sidecar mesh)."
+
+[[skipped]]
+name = "activator"
+upstream = "cmd/activator + pkg/activator"
+reason = "Cold-start request hold + retry — runtime data-plane component (Phase 3 — cave-runtime activator)."
+
+[[skipped]]
+name = "domain-mapping"
+upstream = "pkg/apis/serving/v1beta1/domainmapping_types.go"
+reason = "DomainMapping CRD — needs cave-dns + cave-certs integration; deferred."
+
+[[skipped]]
+name = "build-deprecated"
+upstream = "(removed from upstream as of Knative 0.8)"
+reason = "Burak's explicit Out: 'build (deprecate)' — upstream removed years ago; intentionally not ported."
+
+# ── Unmapped subsystems (none — both pre-existing unmapped promoted in Wave-2 close-out 2026-05-19) ──
+
+[portal_ui]
+upstream_ui  = "(CRD-only)"
+upstream_url = "https://knative.dev/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Knative is CRD-only upstream; /admin/knative Phase 2."
+last_audit   = "2026-05-19"

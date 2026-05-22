@@ -1,0 +1,433 @@
+# parity.manifest.toml — cave-dns
+# Upstream: coredns/coredns  https://github.com/coredns/coredns  pinned v1.11.0
+#
+# cave-dns covers CoreDNS's plugin chain (cache/forward/file/etcd/kubernetes/
+# acl/rewrite/log/health/metrics/etc.), DNSSEC + EDNS protocol parsing, and
+# UDP/TCP/DoH/DoT servers + a REST zone management API.
+
+[upstream]
+org     = "coredns"
+repo    = "coredns"
+version = "v1.11.0"
+name    = "CoreDNS"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/coredns/coredns"
+
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
+[module]
+name        = "cave-dns"
+description = "CoreDNS reimplementation — plugin chain + DNSSEC + UDP/TCP/DoH/DoT servers + REST zone management"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+# Core
+
+[[files]]
+upstream = "coremain/run.go"
+local    = "src/lib.rs"
+
+[[files]]
+upstream = "core/dnsserver/server.go"
+local    = "src/server/mod.rs"
+
+[[files]]
+upstream = "core/dnsserver/server_udp.go"
+local    = "src/server/udp.rs"
+
+[[files]]
+upstream = "core/dnsserver/server_tcp.go"
+local    = "src/server/tcp.rs"
+
+[[files]]
+upstream = "core/dnsserver/server_https.go"
+local    = "src/server/doh.rs"
+
+[[files]]
+upstream = "core/dnsserver/server_tls.go"
+local    = "src/server/dot.rs"
+
+[[files]]
+upstream = "request/request.go"
+local    = "src/message.rs"
+
+[[files]]
+upstream = "plugin/plugin.go"
+local    = "src/plugin.rs"
+
+[[files]]
+upstream = "core/dnsserver/config.go"
+local    = "src/config.rs"
+
+[[files]]
+upstream = "request/request.go"
+local    = "src/models.rs"
+
+[[files]]
+upstream = "request/request.go"
+local    = "src/types.rs"
+
+[[files]]
+upstream = "core/dnsserver/registers.go"
+local    = "src/error.rs"
+
+[[files]]
+upstream = "core/dnsserver/registers.go"
+local    = "src/forward.rs"
+
+[[files]]
+upstream = "plugin/cache/cache.go"
+local    = "src/cache.rs"
+
+[[files]]
+upstream = "plugin/kubernetes/kubernetes.go"
+local    = "src/discovery.rs"
+
+[[files]]
+upstream = "plugin/kubernetes/parse.go"
+local    = "src/manager.rs"
+
+[[files]]
+upstream = "plugin/dnssec/dnssec.go"
+local    = "src/resolver.rs"
+
+# Plugins (plugin/<name>/handler.go)
+
+[[files]]
+upstream = "plugin/cache/cache.go"
+local    = "src/plugins/cache.rs"
+
+[[files]]
+upstream = "plugin/forward/forward.go"
+local    = "src/plugins/forward.rs"
+
+[[files]]
+upstream = "plugin/file/file.go"
+local    = "src/plugins/file.rs"
+
+[[files]]
+upstream = "plugin/etcd/etcd.go"
+local    = "src/plugins/etcd.rs"
+
+[[files]]
+upstream = "plugin/kubernetes/kubernetes.go"
+local    = "src/plugins/kubernetes.rs"
+
+[[files]]
+upstream = "plugin/acl/acl.go"
+local    = "src/plugins/acl.rs"
+
+[[files]]
+upstream = "plugin/rewrite/rewrite.go"
+local    = "src/plugins/rewrite.rs"
+
+[[files]]
+upstream = "plugin/log/log.go"
+local    = "src/plugins/log.rs"
+
+[[files]]
+upstream = "plugin/metrics/metrics.go"
+local    = "src/plugins/metrics.rs"
+
+[[files]]
+upstream = "plugin/health/health.go"
+local    = "src/plugins/health.rs"
+
+[[files]]
+upstream = "plugin/ready/ready.go"
+local    = "src/plugins/ready.rs"
+
+[[files]]
+upstream = "plugin/loop/loop.go"
+local    = "src/plugins/loop_detect.rs"
+
+[[files]]
+upstream = "plugin/reload/reload.go"
+local    = "src/plugins/reload.rs"
+
+[[files]]
+upstream = "plugin/loadbalance/loadbalance.go"
+local    = "src/plugins/loadbalance.rs"
+
+[[files]]
+upstream = "plugin/secondary/secondary.go"
+local    = "src/plugins/secondary.rs"
+
+[[files]]
+upstream = "plugin/template/template.go"
+local    = "src/plugins/template.rs"
+
+[[files]]
+upstream = "plugin/auto/auto.go"
+local    = "src/plugins/auto.rs"
+
+[[files]]
+upstream = "plugin/whoami/whoami.go"
+local    = "src/plugins/whoami.rs"
+
+[[files]]
+upstream = "plugin/chaos/chaos.go"
+local    = "src/plugins/chaos.rs"
+
+[[files]]
+upstream = "plugin/route53/route53.go"
+local    = "src/plugins/route53.rs"
+
+[[files]]
+upstream = "plugin/hosts/hosts.go"
+local    = "src/plugins/hosts.rs"
+
+[[files]]
+upstream = "plugin/any/any.go"
+local    = "src/plugins/any.rs"
+
+[[files]]
+upstream = "plugin/errors/errors.go"
+local    = "src/plugins/errors.rs"
+
+[[files]]
+upstream = "plugin/plugin.go"
+local    = "src/plugins/mod.rs"
+
+# Protocol (DNSSEC + EDNS + msg)
+
+[[files]]
+upstream = "vendor/github.com/miekg/dns/dnssec.go"
+local    = "src/protocol/dnssec.rs"
+
+[[files]]
+upstream = "vendor/github.com/miekg/dns/edns.go"
+local    = "src/protocol/edns.rs"
+
+[[files]]
+upstream = "vendor/github.com/miekg/dns/msg.go"
+local    = "src/protocol/message.rs"
+
+[[files]]
+upstream = "vendor/github.com/miekg/dns/types.go"
+local    = "src/protocol/records.rs"
+
+[[files]]
+upstream = "vendor/github.com/miekg/dns/dns.go"
+local    = "src/protocol/mod.rs"
+
+# Zone
+
+[[files]]
+upstream = "plugin/file/zone.go"
+local    = "src/zone/zone.rs"
+
+[[files]]
+upstream = "plugin/file/file.go"
+local    = "src/zone/file.rs"
+
+[[files]]
+upstream = "plugin/transfer/transfer.go"
+local    = "src/zone/transfer.rs"
+
+[[files]]
+upstream = "plugin/dynamicupdate/update.go"
+local    = "src/zone/update.rs"
+
+[[files]]
+upstream = "plugin/file/zone.go"
+local    = "src/zone/manager.rs"
+
+[[files]]
+upstream = "plugin/file/file.go"
+local    = "src/zone/mod.rs"
+
+# REST API + routes
+
+[[files]]
+upstream = "plugin/api/api.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "plugin/api/api.go"
+local    = "src/api/mod.rs"
+
+[[files]]
+upstream = "plugin/api/zones.go"
+local    = "src/api/zones.rs"
+
+[[files]]
+upstream = "plugin/api/records.go"
+local    = "src/api/records.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "Encode"
+local_name    = "encode"
+file          = "src/message.rs"
+
+[[functions]]
+upstream_name = "Decode"
+local_name    = "decode"
+file          = "src/message.rs"
+
+[[functions]]
+upstream_name = "Sync"
+local_name    = "sync_records"
+file          = "src/manager.rs"
+
+[[functions]]
+upstream_name = "Diff"
+local_name    = "detect_drift"
+file          = "src/manager.rs"
+
+[[functions]]
+upstream_name = "Validate"
+local_name    = "validate_records"
+file          = "src/manager.rs"
+
+[[functions]]
+upstream_name = "ApplyChanges"
+local_name    = "apply_changes"
+file          = "src/manager.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+[[tests]]
+upstream_test = "plugin/cache/cache_test.go::TestPutGet"
+local_test    = "put_and_get_entry"
+
+[[tests]]
+upstream_test = "plugin/cache/cache_test.go::TestExpired"
+local_test    = "expired_entry_is_removed"
+
+[[tests]]
+upstream_test = "plugin/rewrite/rewrite_test.go::TestExactName"
+local_test    = "exact_name_rewrite"
+
+[[tests]]
+upstream_test = "plugin/rewrite/rewrite_test.go::TestRegex"
+local_test    = "regex_rewrite"
+
+[[tests]]
+upstream_test = "plugin/file/zone_test.go::TestAddLookup"
+local_test    = "add_and_lookup_record"
+
+[[tests]]
+upstream_test = "plugin/file/zone_test.go::TestRemove"
+local_test    = "remove_record_by_name_and_type"
+
+[[tests]]
+upstream_test = "plugin/transfer/transfer_test.go::TestAXFR"
+local_test    = "axfr_records_starts_and_ends_with_soa"
+
+[[tests]]
+upstream_test = "plugin/file/zone_test.go::TestWildcard"
+local_test    = "lookup_with_wildcard_synthesises"
+
+[[tests]]
+upstream_test = "plugin/file/zone_test.go::TestSOA"
+local_test    = "make_default_soa_has_correct_type"
+
+[[tests]]
+upstream_test = "plugin/file/zone_test.go::TestParseSimple"
+local_test    = "parse_simple_zone_content"
+
+[[tests]]
+upstream_test = "vendor/miekg/dns/msg_test.go::TestRoundtrip"
+local_test    = "round_trip_empty_message"
+
+[[tests]]
+upstream_test = "request/request_test.go::TestMakeResponse"
+local_test    = "make_response_copies_id_and_queries"
+
+[[tests]]
+upstream_test = "vendor/miekg/dns/types_test.go::TestARecord"
+local_test    = "a_record_encodes"
+
+[[tests]]
+upstream_test = "vendor/miekg/dns/types_test.go::TestTtlClamp"
+local_test    = "decrement_ttl_clamps"
+
+[[tests]]
+upstream_test = "vendor/miekg/dns/types_test.go::TestParseType"
+local_test    = "parse_record_type_works"
+
+[[tests]]
+upstream_test = "plugin/dnssec/dnssec_test.go::TestRRSIGType"
+local_test    = "validate_rrsig_wrong_type_fails"
+
+[[tests]]
+upstream_test = "plugin/dnssec/dnssec_test.go::TestUnsignedDefault"
+local_test    = "signing_mode_default_is_unsigned"
+
+[[tests]]
+upstream_test = "plugin/sync/sync_test.go::TestDetectMissing"
+local_test    = "test_detect_drift_missing"
+
+[[tests]]
+upstream_test = "plugin/sync/sync_test.go::TestDetectModified"
+local_test    = "test_detect_drift_modified"
+
+[[tests]]
+upstream_test = "plugin/sync/sync_test.go::TestDetectClean"
+local_test    = "test_detect_drift_clean"
+
+[[tests]]
+upstream_test = "plugin/sync/sync_test.go::TestDetectExtra"
+local_test    = "test_detect_drift_extra"
+
+[[tests]]
+upstream_test = "plugin/sync/sync_test.go::TestEmptyName"
+local_test    = "test_validate_empty_name"
+
+[[tests]]
+upstream_test = "plugin/sync/sync_test.go::TestZeroTTL"
+local_test    = "test_validate_zero_ttl"
+
+[[tests]]
+upstream_test = "plugin/sync/sync_test.go::TestSyncCreates"
+local_test    = "test_sync_creates_change"
+
+[[tests]]
+upstream_test = "plugin/sync/sync_test.go::TestSyncDryRun"
+local_test    = "test_sync_dry_run_no_store"
+
+[[tests]]
+upstream_test = "plugin/sync/sync_test.go::TestApplyChanges"
+local_test    = "test_apply_changes"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "DoH /dns-query"
+local_path    = "/dns-query"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/zones"
+local_path    = "/api/v1/zones"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/zones/{zone}"
+local_path    = "/api/v1/zones/{zone}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/zones/{zone}/export"
+local_path    = "/api/v1/zones/{zone}/export"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v1/zones/{zone}/records/batch"
+local_path    = "/api/v1/zones/{zone}/records/batch"
+
+[portal_ui]
+upstream_ui  = "(config-only)"
+upstream_url = "https://coredns.io/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "CoreDNS is corefile-only"
+last_audit   = "2026-05-11"

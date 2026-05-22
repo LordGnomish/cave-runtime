@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  cave-upstream-watchd auto-port dispatcher launchd plist (macOS).
+
+  Runs `cave-upstream-watchd dispatch` every 15 minutes. The
+  dispatcher is idempotent — re-running picks up where the last
+  run left off via the on-disk `dispatched.jsonl` state.
+
+  Install:
+    cp scripts/com.cave.auto-port-dispatcher.plist ~/Library/LaunchAgents/
+    launchctl load -w ~/Library/LaunchAgents/com.cave.auto-port-dispatcher.plist
+
+  Uninstall:
+    launchctl unload -w ~/Library/LaunchAgents/com.cave.auto-port-dispatcher.plist
+
+  Kill switch (without unloading):
+    launchctl setenv CAVE_AUTOPORT_DISABLE 1
+    # Re-enable:
+    launchctl unsetenv CAVE_AUTOPORT_DISABLE
+
+  Backend selection:
+    The default below is `claude-cli` so the dispatcher uses the
+    operator's locally-installed Claude Code binary (no external
+    API key required — the CLI carries the existing session).
+    Alternatives:
+      --backend dryrun    — record submissions to JSONL, no side-effects
+      --backend pump      — local LLM via the qwen-pump queue dir
+      --backend opus      — Anthropic Messages API direct (requires
+                            ANTHROPIC_API_KEY in launchd's env; legacy)
+    Edit the ProgramArguments below to flip backends.
+
+  Binary path:
+    Defaults to ~/.local/bin/cave-upstream-watchd (workspace cargo
+    install) — adjust for your install. The Claude Code `claude`
+    binary is auto-discovered via PATH and $HOME/.local/bin.
+
+  Logs:
+    ~/Library/Application Support/cave-runtime/watchd/dispatch.{log,err}
+    State files live alongside the events.jsonl that
+    cave-upstream-watchd's poll subcommand writes:
+      ~/Library/Application Support/cave-runtime/watchd/events.jsonl
+      ~/Library/Application Support/cave-runtime/watchd/dispatched.jsonl
+      ~/Library/Application Support/cave-runtime/watchd/audit.jsonl
+
+  Cadence:
+    StartInterval = 900 (15 minutes). Longer than the poll plist
+    (5 min) because each dispatch run may shell out to a slow LLM
+    backend; 15 min keeps tail latency tolerable without saturating
+    the disk-pressure ceiling.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.cave.auto-port-dispatcher</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/cave-upstream-watchd</string>
+    <string>dispatch</string>
+    <string>--backend</string>
+    <string>claude-cli</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- ClaudeCliTaskQueue::locate_binary walks PATH then
+         $HOME/.local/bin then /usr/local/bin. Make sure both
+         the watchd binary AND the `claude` binary are reachable. -->
+    <key>PATH</key>
+    <string>/Users/gnomish/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HOME</key>
+    <string>/Users/gnomish</string>
+  </dict>
+
+  <key>StartInterval</key>
+  <integer>900</integer>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/gnomish/Library/Application Support/cave-runtime/watchd/dispatch.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/gnomish/Library/Application Support/cave-runtime/watchd/dispatch.err</string>
+
+  <!-- ANTHROPIC_API_KEY block removed 2026-05-14: ClaudeCliTaskQueue
+       uses the operator's local Claude Code session (no external key
+       required). If you flip back to `--backend opus`, re-add an
+       EnvironmentVariables entry with ANTHROPIC_API_KEY. -->
+
+  <key>LowPriorityIO</key>
+  <true/>
+  <key>Nice</key>
+  <integer>10</integer>
+</dict>
+</plist>

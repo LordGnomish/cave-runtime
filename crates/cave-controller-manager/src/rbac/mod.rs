@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
+//! RBAC controllers — `pkg/controller/clusterroleaggregation`.
+//!
+//! Currently implemented:
+//!
+//! * [`cluster_role_aggregation`] — composes a parent ClusterRole's
+//!   `rules[]` from the rules of every ClusterRole matching its
+//!   `aggregationRule.clusterRoleSelectors[]` selector.
+
+pub mod aggregation_conflict;
+pub mod cluster_role_aggregation;
+pub mod match_expressions;

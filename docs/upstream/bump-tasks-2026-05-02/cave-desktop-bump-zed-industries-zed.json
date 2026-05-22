@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "cave_module": "cave-desktop",
+  "upstream_repo": "zed-industries/zed",
+  "old_tag": null,
+  "new_tag": "v1.0.0",
+  "release_url": "https://github.com/zed-industries/zed/releases/tag/v1.0.0",
+  "release_name": null,
+  "release_body": null,
+  "published_at": null,
+  "surfaces_added": [],
+  "surfaces_removed": [],
+  "surfaces_changed": [],
+  "priority": "high",
+  "created_at": "2026-05-02T17:03:51Z",
+  "origin": {
+    "daemon": "version-audit-2026-05-02",
+    "run_id": "manual-burak-bump-plan"
+  },
+  "audit_status": "UNPINNED",
+  "audit_note": "n/a manifest pinned to branch, not tag",
+  "audit_action_recommendation": "Pin manifest [upstream].version to a real tag instead of branch name."
+}

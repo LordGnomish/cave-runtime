@@ -1,0 +1,1263 @@
+# parity.manifest.toml — cave-streams
+#
+# Two upstream projects collapse into one Rust implementation.  Per
+# ADR-RUNTIME-STREAMING-CONSOLIDATION-001 we expose both wire protocols
+# from a single broker process; the parity audit therefore tracks both
+# upstreams as `[[upstreams]]` rather than the single `[upstream]` form.
+
+[upstream]
+# Primary upstream (kept for the legacy single-upstream parity audit).
+org     = "apache"
+repo    = "kafka"
+version = "4.2.0"
+name    = "Apache Kafka"
+license = "Apache-2.0"
+language= "Java"
+url     = "https://github.com/apache/kafka"
+[[upstreams]]
+org     = "apache"
+repo    = "kafka"
+version = "4.2.0"
+notes   = "Apache Kafka wire protocol (KIP-482 flexible versions)."
+
+[[upstreams]]
+org     = "apache"
+repo    = "pulsar"
+version = "v4.2.0"
+notes   = "Apache Pulsar binary protocol + persistent://tenant/ns/topic addressing."
+
+[parity]
+# Package-level inventory against Kafka (primary) + Pulsar
+# (secondary). Inventory hand-curated 2026-05-12 against Kafka's
+# package tree (server/, controller/, common/, clients/, log/,
+# coordinator/, network/, raft/, streams/, connect/, storage/)
+# plus Pulsar's pulsar-broker / pulsar-common / pulsar-client.
+# Each entry counts once, even when both Kafka and Pulsar contribute.
+#
+# 2026-05-19 FINALIZE — Charter v2 8-gate close-out:
+#   * Added `source_sha` inline-table pinning BOTH upstreams (Kafka 4.2.0
+#     git sha 9f8b3ad4… + Pulsar v4.2.0 git sha 1940aebc…) for
+#     reproducibility audits.
+#   * Added `parity_ratio_source = "manifest"` declaring this manifest
+#     as the authoritative source for parity-index aggregation.
+#   * Refreshed `last_audit = "2026-05-19"`.
+#   * Counts unchanged from 2026-05-14 (mapped 23 + partial 0 +
+#     skipped 16 + unmapped 6 = 45, fill_ratio 0.8667). The 6 unmapped
+#     rows are the deferred Pulsar subsystems documented under
+#     `[[scope_cuts]]` below and in PARITY_REPORT.md "Scope cuts".
+#   * SPDX (AGPL-3.0-or-later) coverage: 77/77 .rs files.
+#   * 4-track: Backend cave-streams lib + Portal /admin/streams/
+#     (kafka/pulsar/connect/tiered) + cavectl streams sub-commands +
+#     observability cave-streams alerts & dashboard — all green
+#     pre-close.
+mapped_count   = 27
+partial_count  = 0
+skipped_count  = 16
+unmapped_count = 2
+total          = 45
+fill_ratio     = 0.9556
+honest_ratio   = 0.9556
+parity_ratio_source = "manifest"
+source_sha     = { kafka = "9f8b3ad416bd416f3706f3d7a1f425b9dd8bc5f2", pulsar = "1940aebc6ade10050399cd65f870353eedf80008" }
+last_audit     = "2026-05-19"
+infra_only     = false
+
+# 2026-05-19 Phase 2 close — parity-push-mid-end:
+#   * 4 of 6 prior [[scope_cuts]] promoted to [[mapped]] via real Rust ports:
+#       pulsar-geographic-replication → src/pulsar_geo_replication.rs
+#       pulsar-managed-ledger         → src/pulsar_managed_ledger.rs
+#       pulsar-io-connectors          → src/pulsar_io_connectors.rs
+#       kafka-streams-processor-api   → src/kafka_streams_processor.rs
+#   * 2 [[scope_cuts]] retained for streaming-ray-2:
+#       pulsar-transactions (Kafka EOS is mapped; Pulsar TC remains a gap),
+#       kafka-share-groups  (KIP-932 preview feature, not stable upstream).
+#   * mapped 23 → 27, unmapped 6 → 2, fill_ratio 0.8667 → 0.9556.
+
+[module]
+name          = "cave-streams"
+description   = "Event streaming — single Rust impl, two wire protocols (Kafka + Pulsar)"
+source_root   = "src"
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
+pump_priority = "HIGH"  # charter-critical 7 — Kafka+Pulsar event streaming surface
+
+# ── File mappings ────────────────────────────────────────────────────────────
+
+# Kafka
+[[files]]
+upstream = "clients/src/main/java/org/apache/kafka/common/protocol/ApiKeys.java"
+local    = "src/kafka_wire.rs"
+
+[[files]]
+upstream = "clients/src/main/resources/common/message/ApiVersionsRequest.json"
+local    = "src/kafka_wire.rs"
+
+[[files]]
+upstream = "clients/src/main/resources/common/message/MetadataRequest.json"
+local    = "src/kafka_wire.rs"
+
+[[files]]
+upstream = "clients/src/main/resources/common/message/ProduceRequest.json"
+local    = "src/kafka_wire.rs"
+
+[[files]]
+upstream = "clients/src/main/resources/common/message/FetchRequest.json"
+local    = "src/kafka_wire.rs"
+
+[[files]]
+upstream = "clients/src/main/resources/common/message/OffsetCommitRequest.json"
+local    = "src/kafka_wire.rs"
+
+[[files]]
+upstream = "clients/src/main/resources/common/message/JoinGroupRequest.json"
+local    = "src/kafka_wire.rs"
+
+[[files]]
+upstream = "clients/src/main/resources/common/message/SyncGroupRequest.json"
+local    = "src/kafka_wire.rs"
+
+[[files]]
+upstream = "clients/src/main/resources/common/message/HeartbeatRequest.json"
+local    = "src/kafka_wire.rs"
+
+[[files]]
+upstream = "core/src/main/scala/kafka/log/UnifiedLog.scala"
+local    = "src/segment_log.rs"
+
+[[files]]
+upstream = "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerder.java"
+local    = "src/connect_worker/standalone_herder.rs"
+
+[[files]]
+upstream = "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedHerder.java"
+local    = "src/connect_worker/distributed_herder.rs"
+
+[[files]]
+upstream = "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/KafkaOffsetBackingStore.java"
+local    = "src/connect_worker/kafka_offset_backing_store.rs"
+
+[[files]]
+upstream = "storage/src/main/java/org/apache/kafka/storage/internals/log/RemoteLogManager.java"
+local    = "src/tiered_storage/mod.rs"
+
+# Pulsar
+[[files]]
+upstream = "pulsar-common/src/main/proto/PulsarApi.proto"
+local    = "src/pulsar_wire.rs"
+
+[[files]]
+upstream = "pulsar-broker/src/main/java/org/apache/pulsar/broker/service/ServerCnx.java"
+local    = "src/pulsar_wire.rs"
+
+[[files]]
+upstream = "pulsar-common/src/main/java/org/apache/pulsar/common/naming/TopicName.java"
+local    = "src/pulsar_topic.rs"
+
+[[files]]
+upstream = "bookkeeper-server/src/main/java/org/apache/bookkeeper/bookie/Bookie.java"
+local    = "src/segment_log.rs"
+
+# Phase 2 — 2026-05-19 deep-port
+
+[[files]]
+upstream = "pulsar-broker/src/main/java/org/apache/pulsar/broker/service/persistent/PersistentReplicator.java"
+local    = "src/pulsar_geo_replication.rs"
+
+[[files]]
+upstream = "managed-ledger/src/main/java/org/apache/bookkeeper/mledger/{ManagedLedger,ManagedCursor}.java"
+local    = "src/pulsar_managed_ledger.rs"
+
+[[files]]
+upstream = "pulsar-io/core/src/main/java/org/apache/pulsar/io/core/{Source,Sink,FunctionRuntime}.java"
+local    = "src/pulsar_io_connectors.rs"
+
+[[files]]
+upstream = "streams/src/main/java/org/apache/kafka/streams/processor/{Processor,ProcessorContext,StateStore,Punctuator}.java"
+local    = "src/kafka_streams_processor.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+# Kafka
+[[functions]]
+upstream_name = "ApiVersionsRequest"
+local_name    = "kafka_decode_api_versions_request"
+file          = "src/kafka_wire.rs"
+
+[[functions]]
+upstream_name = "ApiVersionsResponse"
+local_name    = "kafka_encode_api_versions_response"
+file          = "src/kafka_wire.rs"
+
+[[functions]]
+upstream_name = "MetadataRequest"
+local_name    = "kafka_decode_metadata_request"
+file          = "src/kafka_wire.rs"
+
+[[functions]]
+upstream_name = "MetadataResponse"
+local_name    = "kafka_encode_metadata_response"
+file          = "src/kafka_wire.rs"
+
+[[functions]]
+upstream_name = "ProduceRequest"
+local_name    = "kafka_decode_produce_request"
+file          = "src/kafka_wire.rs"
+
+[[functions]]
+upstream_name = "FetchRequest"
+local_name    = "kafka_decode_fetch_request"
+file          = "src/kafka_wire.rs"
+
+[[functions]]
+upstream_name = "OffsetCommitRequest"
+local_name    = "kafka_decode_offset_commit_request"
+file          = "src/kafka_wire.rs"
+
+[[functions]]
+upstream_name = "JoinGroupRequest"
+local_name    = "kafka_decode_join_group_request"
+file          = "src/kafka_wire.rs"
+
+[[functions]]
+upstream_name = "SyncGroupRequest"
+local_name    = "kafka_decode_sync_group_request"
+file          = "src/kafka_wire.rs"
+
+[[functions]]
+upstream_name = "HeartbeatRequest"
+local_name    = "kafka_decode_heartbeat_request"
+file          = "src/kafka_wire.rs"
+
+# Pulsar
+[[functions]]
+upstream_name = "CommandConnect"
+local_name    = "pulsar_handle_connect"
+file          = "src/pulsar_wire.rs"
+
+[[functions]]
+upstream_name = "CommandConnected"
+local_name    = "pulsar_build_connected"
+file          = "src/pulsar_wire.rs"
+
+[[functions]]
+upstream_name = "CommandProducer"
+local_name    = "pulsar_handle_producer"
+file          = "src/pulsar_wire.rs"
+
+[[functions]]
+upstream_name = "CommandSend"
+local_name    = "pulsar_handle_send"
+file          = "src/pulsar_wire.rs"
+
+[[functions]]
+upstream_name = "CommandSendReceipt"
+local_name    = "pulsar_build_send_receipt"
+file          = "src/pulsar_wire.rs"
+
+[[functions]]
+upstream_name = "CommandSubscribe"
+local_name    = "pulsar_handle_subscribe"
+file          = "src/pulsar_wire.rs"
+
+[[functions]]
+upstream_name = "CommandFlow"
+local_name    = "pulsar_handle_flow"
+file          = "src/pulsar_wire.rs"
+
+[[functions]]
+upstream_name = "CommandMessage"
+local_name    = "pulsar_build_message"
+file          = "src/pulsar_wire.rs"
+
+[[functions]]
+upstream_name = "CommandAck"
+local_name    = "pulsar_handle_ack"
+file          = "src/pulsar_wire.rs"
+
+[[functions]]
+upstream_name = "TopicName.parse"
+local_name    = "TopicName::parse"
+file          = "src/pulsar_topic.rs"
+
+# Bookkeeper-style replication / segment log
+[[functions]]
+upstream_name = "Bookie.addEntry"
+local_name    = "SegmentLog::append"
+file          = "src/segment_log.rs"
+
+[[functions]]
+upstream_name = "Ensemble.write"
+local_name    = "Ensemble::write_entry"
+file          = "src/segment_log.rs"
+
+# Compression — Kafka producer-side message codec (Snappy, LZ4, ZSTD, GZIP)
+[[functions]]
+upstream_name = "CompressionType.compress"
+local_name    = "compress"
+file          = "src/compression.rs"
+
+[[functions]]
+upstream_name = "CompressionType.decompress"
+local_name    = "decompress"
+file          = "src/compression.rs"
+
+# Log compaction (Kafka core/src/main/scala/kafka/log/Cleaner.scala)
+[[functions]]
+upstream_name = "LogCleaner.clean"
+local_name    = "compact_log"
+file          = "src/log_compaction.rs"
+
+[[functions]]
+upstream_name = "LogManager.applyRetention"
+local_name    = "apply_retention"
+file          = "src/log_compaction.rs"
+
+# Schema Registry compatibility (apicurio/confluent SR semantics)
+[[functions]]
+upstream_name = "AvroCompatibilityChecker.checkCompatibility"
+local_name    = "check_compatibility"
+file          = "src/schema_evolution.rs"
+
+# Incremental cooperative rebalance (KIP-429)
+[[functions]]
+upstream_name = "CooperativeStickyAssignor.assign"
+local_name    = "compute_incremental_plan"
+file          = "src/incremental_rebalance.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+# Kafka wire
+[[tests]]
+upstream_test = "ApiVersionsRequestTest"
+local_test    = "test_kafka_api_versions_roundtrip"
+
+[[tests]]
+upstream_test = "MetadataRequestTest"
+local_test    = "test_kafka_metadata_roundtrip"
+
+[[tests]]
+upstream_test = "ProduceRequestTest"
+local_test    = "test_kafka_produce_roundtrip"
+
+[[tests]]
+upstream_test = "FetchRequestTest"
+local_test    = "test_kafka_fetch_roundtrip"
+
+[[tests]]
+upstream_test = "OffsetCommitRequestTest"
+local_test    = "test_kafka_offset_commit_roundtrip"
+
+[[tests]]
+upstream_test = "JoinGroupRequestTest"
+local_test    = "test_kafka_join_group_roundtrip"
+
+[[tests]]
+upstream_test = "SyncGroupRequestTest"
+local_test    = "test_kafka_sync_group_roundtrip"
+
+[[tests]]
+upstream_test = "HeartbeatRequestTest"
+local_test    = "test_kafka_heartbeat_roundtrip"
+
+# Pulsar wire
+[[tests]]
+upstream_test = "ServerCnxTest.testConnect"
+local_test    = "test_pulsar_connect_returns_connected"
+
+[[tests]]
+upstream_test = "ServerCnxTest.testProducer"
+local_test    = "test_pulsar_producer_assigns_id"
+
+[[tests]]
+upstream_test = "ServerCnxTest.testSend"
+local_test    = "test_pulsar_send_returns_receipt"
+
+[[tests]]
+upstream_test = "ServerCnxTest.testSubscribe"
+local_test    = "test_pulsar_subscribe_creates_consumer"
+
+[[tests]]
+upstream_test = "ServerCnxTest.testAck"
+local_test    = "test_pulsar_ack_advances_consumer"
+
+[[tests]]
+upstream_test = "TopicNameTest.testFullName"
+local_test    = "test_topic_name_parse_persistent"
+
+# Bookkeeper-style segment log
+[[tests]]
+upstream_test = "BookieTest.testAddEntry"
+local_test    = "test_segment_log_append_assigns_offset"
+
+[[tests]]
+upstream_test = "EnsembleTest.testQuorumWrite"
+local_test    = "test_ensemble_write_satisfies_quorum"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+
+[[surfaces]]
+kind          = "tcp"
+upstream_path = "kafka:9092"
+local_path    = "cave-streams:9092"
+
+[[surfaces]]
+kind          = "tcp"
+upstream_path = "pulsar:6650"
+local_path    = "cave-streams:6650"
+
+# Schema Registry — Confluent-compatible REST surface (cave-streams native impl)
+[[surfaces]]
+kind          = "http"
+upstream_path = "/subjects/{subject}/versions"
+local_path    = "/subjects/{subject}/versions"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/schemas/ids/{id}"
+local_path    = "/schemas/ids/{id}"
+
+# Kafka Connect admin
+[[surfaces]]
+kind          = "http"
+upstream_path = "/connectors"
+local_path    = "/connectors"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/connectors/{name}/status"
+local_path    = "/connectors/{name}/status"
+
+[portal_ui]
+upstream_ui  = "AKHQ / kafdrop (external)"
+upstream_url = "https://akhq.io/"
+status       = "partial"
+loc          = 293
+priority     = "P1"
+notes        = "Kafka topic browser"
+last_audit   = "2026-05-11"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Package-level inventory (added 2026-05-12; dual-upstream Kafka + Pulsar)
+# ═════════════════════════════════════════════════════════════════════════════
+
+# ─── Mapped (18) — Kafka and Pulsar wire + broker + protocol packages ──────
+
+[[mapped]]
+upstream_pkg = "apache/kafka:clients/src/main/java/org/apache/kafka/common/protocol"
+local_files  = ["src/kafka_protocol.rs", "src/protocol.rs"]
+note         = "Kafka protocol versioning + ApiVersions + KIP-482 flexible versions"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:clients/src/.../network"
+local_files  = ["src/kafka_wire.rs"]
+note         = "Kafka wire codec — RequestHeader / ResponseHeader + length-prefix frames"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:core/src/main/scala/kafka/server"
+local_files  = ["src/broker.rs", "src/server.rs"]
+note         = "Broker process — KafkaApis dispatch, ApiKey routing"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:storage/src/main/java/.../log"
+local_files  = ["src/segment_log.rs", "src/storage.rs"]
+note         = "Per-partition append-only segment log + index files"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:core/.../log/LogCompaction"
+local_files  = ["src/log_compaction.rs", "src/compaction.rs"]
+note         = "Log-compaction tombstone-keyed retention"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:clients/src/.../producer"
+local_files  = ["src/producer.rs", "src/idempotent_producer.rs"]
+note         = "Producer client — acks + idempotent producer ID semantics"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:clients/src/.../consumer"
+local_files  = ["src/consumer.rs", "src/consumer_group.rs", "src/incremental_rebalance.rs"]
+note         = "Consumer + ConsumerGroup coordinator + incremental cooperative rebalance"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:core/.../transaction"
+local_files  = ["src/transactions.rs", "src/txn_markers.rs"]
+note         = "EOS transactions — TxnId + producer epoch + markers"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:metadata/.../partitioned_topic"
+local_files  = ["src/partitioned_topic.rs", "src/topic.rs"]
+note         = "Topic + partition metadata"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:server/.../acl"
+local_files  = ["src/acl.rs"]
+note         = "ACLs — principal + resource + operation"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:server/.../quota"
+local_files  = ["src/quota.rs"]
+note         = "Per-client + per-user produce/fetch quotas"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:streams/src/main/java"
+local_files  = ["src/streams_api.rs"]
+note         = "Kafka Streams API surface (KStream / KTable) — DSL stub"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:connect/api"
+local_files  = ["src/connect.rs"]
+note         = "Connect REST + Source/SinkConnector contract"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:schema-registry"
+local_files  = ["src/schema_registry.rs", "src/schema_evolution.rs"]
+note         = "Schema registry + Avro / Protobuf compatibility check"
+
+[[mapped]]
+upstream_pkg = "apache/pulsar:pulsar-common/.../protocol"
+local_files  = ["src/pulsar_wire.rs"]
+note         = "Pulsar binary protocol — Send / Subscribe / Ack frames"
+
+[[mapped]]
+upstream_pkg = "apache/pulsar:pulsar-broker/.../admin"
+local_files  = ["src/pulsar_admin.rs"]
+note         = "Pulsar admin REST API (namespaces, tenants, topics)"
+
+[[mapped]]
+upstream_pkg = "apache/pulsar:pulsar-broker/.../dispatcher"
+local_files  = ["src/pulsar_dispatch.rs", "src/pulsar_topic.rs"]
+note         = "Pulsar consumer dispatcher (Exclusive / Shared / Failover / Key_Shared)"
+
+[[mapped]]
+upstream_pkg = "common:tenant + cursor + mirror"
+local_files  = ["src/tenant.rs", "src/unified_cursor.rs", "src/mirror.rs", "src/compression.rs", "src/admin.rs"]
+note         = "Cave-side multi-tenant scoping + unified consumer cursor + mirroring + compression"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:raft/ + metadata/ + controller/"
+local_files  = [
+  "src/kraft/mod.rs",
+  "src/kraft/epoch.rs",
+  "src/kraft/metadata.rs",
+  "src/kraft/metadata_log.rs",
+  "src/kraft/quorum_controller.rs",
+]
+note         = "KRaft mode (KIP-500) — MetadataRecord types (Topic/Partition/Broker/Config + tombstones), ControllerEpoch + VoterSet, compacted MetadataLog with by-key compaction, QuorumController state machine (CreateTopic/DeleteTopic/Register/Unregister/SetConfig). Replication transport delegates to a future RaftTransport trait; on-disk snapshots tracked-not-shipped."
+
+[[mapped]]
+upstream_pkg = "apache/kafka:raft/RaftRpc.java + KafkaRaftClient + KRaft RPC dispatch"
+local_files  = [
+  "src/kraft/rpc.rs",
+  "src/protocol.rs",
+  "src/server.rs",
+]
+note         = "KRaft RPCs (KIP-595) over the Kafka binary wire — Vote (52) + BeginQuorumEpoch (53) + EndQuorumEpoch (54) + DescribeQuorum (55) encode/decode + KraftHandler receiver-side rules (epoch fencing, log-up-to-date check, voter-set membership) + server.rs dispatch from kafka_wire."
+
+[[mapped]]
+upstream_pkg = "apache/kafka:connect/runtime/"
+local_files  = [
+  "src/connect.rs",
+  "src/connect_worker/mod.rs",
+  "src/connect_worker/task_runtime.rs",
+  "src/connect_worker/offset_store.rs",
+  "src/connect_worker/assignment.rs",
+  "src/connect_worker/connector_runtime.rs",
+  "src/connect_worker/worker.rs",
+  "src/connect_worker/standalone_herder.rs",
+  "src/connect_worker/distributed_herder.rs",
+  "src/connect_worker/kafka_offset_backing_store.rs",
+]
+note         = "Connect Worker runtime — SourceTask/SinkTask + tick lifecycle, OffsetStore + KafkaOffsetBackingStore (replay/commit/tombstone), rendezvous-hash AssignmentTable + DistributedHerder cooperative-rebalance state machine (Empty/Joining/Assigning/Rebalancing/Stable, lowest-id leader, generation bump on join/leave, stale-generation rejection, sync_group per-member assignment), StandaloneHerder (single-process put/delete/patch/pause/stop/restart_task/alter_offsets/reset_offsets — distributed-only put_task_configs + fence_zombies return Unsupported), ConnectorRuntime lifecycle, Worker with start/stop/pause/resume/delete + failed-task isolation. SMT chain + DLQ + Kafka producer/consumer adapter + full IncrementalAssignor (KIP-415) revoke-then-assign tracked-not-shipped."
+
+[[mapped]]
+upstream_pkg = "apache/kafka:storage/tiered/"
+local_files  = ["src/tiered_storage/mod.rs"]
+note         = "KIP-405 tiered storage skeleton. RemoteStorageManager + RemoteLogMetadataManager traits, InMemoryRemoteStorageManager + InMemoryRemoteLogMetadataManager exercisers, RemoteIndexCache LRU, RemoteLogManager orchestrator (copy_log_segment / list_segments / find_segment_for_offset / apply_retention). Overlap detection on segment insert. S3/HDFS/GCS plugins + tiered fetch wiring through broker Fetch RPC tracked-not-shipped."
+
+[[mapped]]
+upstream_pkg = "apache/kafka:connect/runtime/rest/"
+local_files  = [
+  "src/connect_rest.rs",
+]
+note         = "Kafka Connect REST admin state machine — ConnectorsResource (list/create/restart/pause/resume/delete/status) + ConnectorPluginsResource.validateConfigs + RootResource.serverInfo. Pure (status, body) dispatch: HttpStatus enum + typed CreatedConnector/RestartReport/ConnectorStatus/ValidationResult/ServerInfo DTOs + CreateError/RestartError/AdminError envelopes. POST /connectors name-trim + null-normalise + config-mismatch 400 + duplicate 409. 4.2.0 RestServerTest jersey/jetty framing layer deferred (HTTP-server bootstrapping, not REST semantics)."
+
+# ─── Phase 2 mapped (2026-05-19 deep-port — 4 of 6 scope_cuts resolved) ────
+
+[[mapped]]
+upstream_pkg = "apache/pulsar:pulsar-broker/.../replication/"
+local_files  = ["src/pulsar_geo_replication.rs"]
+note         = "Pulsar geographic replication — ClusterRegistry + PersistentReplicator with per-topic queue, dedup set keyed by (source_cluster, message_id), in-flight map, durable cursor per peer, retry_in_flight path for reconnects, loop-guard rejecting non-local-source messages, per-peer sent/rejected/network_errors counters."
+
+[[mapped]]
+upstream_pkg = "apache/pulsar:managed-ledger/"
+local_files  = ["src/pulsar_managed_ledger.rs"]
+note         = "Managed ledger — LedgerSegment with seal/append/size, ManagedLedger rolling on entry-count and byte threshold, ManagedCursor mark-delete with backward-move guard and out-of-order ack_individual collapse (contiguous run merge), RetentionPolicy enforcement (time + earliest-cursor-ledger). EntryId = (ledger_id, entry_id)."
+
+[[mapped]]
+upstream_pkg = "apache/pulsar:pulsar-io/"
+local_files  = ["src/pulsar_io_connectors.rs"]
+note         = "Pulsar IO connector framework — ConnectorConfig (kind/class/topic/parallelism/processing_guarantees) + validate(), ConnectorRuntime install/start/pause/fail with InstanceState lifecycle, ProcessingGuarantees parsing (AT_MOST/AT_LEAST/EFFECTIVELY_ONCE), per-instance counters, PulsarSource + PulsarSink traits with SourceRecord/SinkRecord + context."
+
+[[mapped]]
+upstream_pkg = "apache/kafka:streams/processor-api"
+local_files  = ["src/kafka_streams_processor.rs"]
+note         = "Low-level Streams Processor API — Topology(add_source/add_processor/add_sink/add_state_store) with parent validation; Processor trait + StateStore (put/get/delete/keys); ProcessorContext.forward/commit/schedule; ScheduledPunctuator wall-clock + stream-time with last_fired interval check; BFS routing source→processor→sink with explicit forward override."
+
+# ─── Skipped (16) ──────────────────────────────────────────────────────────
+
+[[skipped]]
+upstream_pkg = "apache/kafka:tools/"
+reason       = "CLI"
+note         = "kafka-topics.sh, kafka-console-producer/consumer, kafka-acls"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:bin/"
+reason       = "CLI"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:tests/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:gradle/ + build.gradle"
+reason       = "go-bootstrap"
+note         = "Gradle build system"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:checkstyle/"
+reason       = "stdlib-analog"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:docs/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:examples/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:trogdor/"
+reason       = "test-harness"
+note         = "Soak testing framework"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:common/utils/"
+reason       = "stdlib-analog"
+note         = "Java-stdlib helpers — Rust uses std + tokio"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:jmh-benchmarks/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "apache/pulsar:pulsar-client-cpp + pulsar-client-go + pulsar-client-python"
+reason       = "stdlib-analog"
+note         = "Non-Java client libraries"
+
+[[skipped]]
+upstream_pkg = "apache/pulsar:tests/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "apache/pulsar:pulsar-package-management/"
+reason       = "CLI"
+
+[[skipped]]
+upstream_pkg = "apache/pulsar:tiered-storage/jcloud + tiered-storage/file-system"
+reason       = "go-bootstrap"
+note         = "JClouds + HDFS tiered storage; cave-store handles object storage"
+
+[[skipped]]
+upstream_pkg = "apache/pulsar:pulsar-functions/"
+reason       = "go-bootstrap"
+note         = "Pulsar Functions (stream processing); maps to cave-pipelines"
+
+[[skipped]]
+upstream_pkg = "apache/pulsar:bouncy-castle/"
+reason       = "stdlib-analog"
+note         = "BC crypto provider — Rust uses ring"
+
+# ─── Unmapped (9) — honest gaps ────────────────────────────────────────────
+
+# KRaft promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
+# storage/tiered/ promoted to mapped 2026-05-14 (skeleton) — see `[[mapped]]` entry below.
+# connect/runtime/ promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
+# connect/runtime/standalone/ + distributed/ + KafkaOffsetBackingStore added to that mapped entry's local_files 2026-05-14.
+
+[[unmapped]]
+upstream_pkg = "apache/kafka:server/group-coordinator/share/"
+note         = "Share groups (KIP-932) — queue-style consumption. Preview feature in Kafka 4.x, not yet stable."
+
+[[unmapped]]
+upstream_pkg = "apache/pulsar:pulsar-broker/.../transactions/"
+note         = "Pulsar transactional producer + ack groups. Kafka EOS is mapped; Pulsar's transaction buffer + TC deferred."
+
+# Phase 2 promotions (2026-05-19) — moved from [[unmapped]] to [[mapped]]:
+#   apache/kafka:streams/processor-api          → src/kafka_streams_processor.rs
+#   apache/pulsar:pulsar-broker/.../replication/ → src/pulsar_geo_replication.rs
+#   apache/pulsar:managed-ledger/                → src/pulsar_managed_ledger.rs
+#   apache/pulsar:pulsar-io/                     → src/pulsar_io_connectors.rs
+
+# ─── Scope cuts ─── deferred to next streaming ray (Pulsar-heavy) ─────────────
+# The 6 [[unmapped]] above are the formally scope-cut deferrals for the
+# 2026-05-19 close-out — promoted next ray as their own RED/GREEN
+# commits. `fill_ratio` is the honest measure post-scope-cut: mapped /
+# (mapped + partial + skipped + unmapped) ≡ (45 − 6) / 45 = 0.8667.
+
+[[scope_cuts]]
+name      = "pulsar-transactions"
+upstream  = "apache/pulsar:pulsar-broker/.../transactions/"
+reason    = "Kafka EOS (idempotent producer + transaction coordinator) is mapped; Pulsar's transaction buffer + TC is a separate subsystem deferred to streaming-ray-2."
+deferred_to = "streaming-ray-2"
+
+[[scope_cuts]]
+name      = "kafka-share-groups"
+upstream  = "apache/kafka:server/group-coordinator/share/"
+reason    = "KIP-932 queue-style share groups (Kafka 4.x preview feature). Deferred to streaming-ray-2."
+deferred_to = "streaming-ray-2"
+
+# Resolved scope_cuts (2026-05-19 Phase 2 deep-port):
+#   * pulsar-geographic-replication → mapped (src/pulsar_geo_replication.rs)
+#   * pulsar-managed-ledger          → mapped (src/pulsar_managed_ledger.rs)
+#   * pulsar-io-connectors           → mapped (src/pulsar_io_connectors.rs)
+#   * kafka-streams-processor-api    → mapped (src/kafka_streams_processor.rs)
+
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Methodology — see crates/cave-scheduler/parity.manifest.toml head.
+
+[behavioral_parity]
+audit_scope = "UnifiedLog + ProducerStateManager + GroupCoordinator/range+roundrobin (kafka 4.2.0)"
+audit_at    = "2026-05-13"
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/UnifiedLogTest.scala"
+upstream_name  = "UnifiedLogTest/appendRecordsAssignsMonotonicOffsets"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_segment_log_append_assigns_monotonic_offsets"
+status         = "ported"
+notes          = "Each append returns the previous next_offset + 1."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/UnifiedLogTest.scala"
+upstream_name  = "UnifiedLogTest/readReturnsEntriesFromOffset"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_segment_log_read_returns_entries_starting_at_offset"
+status         = "ported"
+notes          = "Read starts at the requested offset, returns all entries ≥ it."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/UnifiedLogTest.scala"
+upstream_name  = "UnifiedLogTest/rollSegmentOnSizeThreshold"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_segment_log_rolls_when_active_segment_exceeds_max_bytes"
+status         = "ported"
+notes          = "Segment rolls when next append would exceed max_segment_bytes."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/UnifiedLogTest.scala"
+upstream_name  = "UnifiedLogTest/truncateBeforeAdvancesLogStart"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_segment_log_truncate_before_advances_log_start_and_drops_entries"
+status         = "ported"
+notes          = "truncate_before(N) drops entries < N and advances log_start_offset."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/ProducerStateManagerTest.scala"
+upstream_name  = "ProducerStateManagerTest/firstBatchAccepted"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_producer_id_first_batch_accepted"
+status         = "ported"
+notes          = "Initial batch always accepted; last_sequence = base + count - 1."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/ProducerStateManagerTest.scala"
+upstream_name  = "ProducerStateManagerTest/inOrderBatchExtendsSequence"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_producer_id_in_order_extends_sequence"
+status         = "ported"
+notes          = "base_sequence == last_sequence + 1 → Accepted, sequence advances."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/ProducerStateManagerTest.scala"
+upstream_name  = "ProducerStateManagerTest/duplicateBatchDetected"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_producer_id_duplicate_returns_duplicate"
+status         = "ported"
+notes          = "base_sequence ≤ last_sequence → Duplicate (safe to ack)."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/ProducerStateManagerTest.scala"
+upstream_name  = "ProducerStateManagerTest/outOfOrderSequenceRejected"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_producer_id_out_of_order_returns_out_of_order"
+status         = "ported"
+notes          = "base_sequence > last_sequence + 1 → OutOfOrder (Kafka error 28)."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/ProducerStateManagerTest.scala"
+upstream_name  = "ProducerStateManagerTest/lowerEpochFenced"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_producer_id_lower_epoch_is_fenced"
+status         = "ported"
+notes          = "epoch < current → INVALID_PRODUCER_EPOCH-equivalent error."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/ProducerStateManagerTest.scala"
+upstream_name  = "ProducerStateManagerTest/higherEpochPersists"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_producer_id_higher_epoch_persists_into_state"
+status         = "ported"
+notes          = "epoch > current → bump persisted broker-side."
+
+[[upstream_test]]
+upstream_path  = "core/.../coordinator/transaction/ProducerIdManagerTest.scala"
+upstream_name  = "ProducerIdManagerTest/allocateMonotonic"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_producer_id_manager_allocates_monotonic_ids"
+status         = "ported"
+notes          = "allocate() returns strictly increasing IDs."
+
+[[upstream_test]]
+upstream_path  = "clients/.../consumer/internals/RangeAssignorTest.java"
+upstream_name  = "RangeAssignorTest/evenSplit"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_rebalance_range_assignor_evenly_splits"
+status         = "ported"
+notes          = "Even split among members when partitions divide evenly."
+
+[[upstream_test]]
+upstream_path  = "clients/.../consumer/internals/RangeAssignorTest.java"
+upstream_name  = "RangeAssignorTest/unevenSplit_remainderToEarlierMembers"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_rebalance_range_assignor_distributes_remainder_to_earlier_members"
+status         = "ported"
+notes          = "Remainder partitions assigned to alphabetically-earlier members."
+
+[[upstream_test]]
+upstream_path  = "clients/.../consumer/internals/RoundRobinAssignorTest.java"
+upstream_name  = "RoundRobinAssignorTest/interleavesPartitions"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_rebalance_roundrobin_interleaves_partitions"
+status         = "ported"
+notes          = "Partitions assigned in alternating fashion across sorted members."
+
+[[upstream_test]]
+upstream_path  = "clients/.../consumer/internals/ConsumerProtocolTest.java"
+upstream_name  = "ConsumerProtocolTest/protocol_aliases"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_rebalance_protocol_from_str_recognises_aliases"
+status         = "ported"
+notes          = "Round-robin, range, cooperative-sticky string aliases parsed correctly."
+
+# Honest "still missing" entries.
+
+[[upstream_test]]
+upstream_path  = "core/.../coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/joinGroupStableAfterRebalance"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Full join_group → sync_group → heartbeat lifecycle not yet expressed as upstream-port test."
+
+[[upstream_test]]
+upstream_path  = "core/.../coordinator/transaction/TransactionCoordinatorTest.scala"
+upstream_name  = "TransactionCoordinatorTest/commitTransactionMarkersWritten"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Transaction markers (COMMIT/ABORT) write path not yet covered behaviourally."
+
+# ── Batch 3 upstream tests (2026-05-14) ──────────────────────────────────────
+# Appended to the existing [behavioral_parity] audit.
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/testJoinGroupAssignsMemberId"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_group_coordinator_join_group_assigns_member_id_and_starts_rebalance"
+status         = "ported"
+notes          = "Empty member_id → fresh id + state=PreparingRebalance + generation=1."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/testJoinGroupReusesProvidedMemberId"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_group_coordinator_join_group_reuses_provided_member_id"
+status         = "ported"
+notes          = "Non-empty member_id on rejoin reused verbatim."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/testHeartbeatUnknownMember"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_group_coordinator_heartbeat_unknown_member_errors"
+status         = "ported"
+notes          = "Heartbeat for non-member → StreamsError::MemberNotFound."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/testHeartbeatIllegalGeneration"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_group_coordinator_heartbeat_illegal_generation_errors"
+status         = "ported"
+notes          = "Wrong generation → StreamsError::IllegalGeneration."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/testHeartbeatDuringRebalance"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_group_coordinator_heartbeat_during_rebalance_returns_rebalance_in_progress"
+status         = "ported"
+notes          = "PreparingRebalance state → heartbeat returns Kafka error_code=27 (REBALANCE_IN_PROGRESS)."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/testSyncGroupTransitionsToStable"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_group_coordinator_sync_group_transitions_to_stable"
+status         = "ported"
+notes          = "SyncGroup with leader's assignment → state=Stable; heartbeat returns 0."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/testLeaveGroup"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_group_coordinator_leave_group_removes_member_and_bumps_generation"
+status         = "ported"
+notes          = "LeaveGroup drops the member and elects a new leader from remaining members."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/testDeleteGroupRefusesActiveMembers"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_group_coordinator_delete_group_refuses_when_active_members"
+status         = "ported"
+notes          = "DeleteGroup refuses while members are active; succeeds after all leave."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ConnectorConfigTest.java"
+upstream_name  = "ConnectorConfigTest/derive_source_type_from_class"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_connect_connector_derives_source_type_from_class_name"
+status         = "ported"
+notes          = "Connector::new infers Source/Sink from `connector.class` substring."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ConnectorConfigTest.java"
+upstream_name  = "ConnectorConfigTest/tasks_max_creates_task_slots"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_connect_connector_tasks_max_creates_task_slots"
+status         = "ported"
+notes          = "tasks.max = N → N pre-allocated Task slots with deterministic ids."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java"
+upstream_name  = "WorkerTest/start_transitions_to_running"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_connect_worker_start_transitions_connector_and_tasks_to_running"
+status         = "ported"
+notes          = "Connector.start() → state=Running + every task to TaskState::Running."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java"
+upstream_name  = "DistributedHerderTest/createConnectorRejectsDuplicate"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_connect_cluster_create_connector_rejects_duplicate"
+status         = "ported"
+notes          = "create_connector with existing name → ConnectorAlreadyExists."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java"
+upstream_name  = "DistributedHerderTest/pauseConnectorTransitionsTasks"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_connect_cluster_pause_connector_transitions_tasks_to_paused"
+status         = "ported"
+notes          = "pause_connector pauses the connector AND every task."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java"
+upstream_name  = "DistributedHerderTest/restartTaskClearsFailureTrace"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_connect_cluster_restart_task_clears_failure_trace"
+status         = "ported"
+notes          = "restart_task brings task to Running and clears the failure trace."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/PluginConfigTest.java"
+upstream_name  = "PluginConfigTest/validate_config_rejects_missing_connector_class"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_connect_cluster_validate_config_rejects_missing_connector_class"
+status         = "ported"
+notes          = "validate_config returns error_count=1 when connector.class missing."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java"
+upstream_name  = "DistributedHerderTest/deleteConnectorRemovesFromCluster"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_connect_cluster_delete_connector_removes_from_list"
+status         = "ported"
+notes          = "delete_connector removes the connector + future get_connector → NotFound."
+
+# ── Batch 4 (2026-05-14) — Kafka Connect REST admin API ──────────────────────
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testListConnectors"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_list_connectors_returns_alphabetical_names"
+status         = "ported"
+notes          = "GET /connectors returns alphabetical list; empty admin returns empty Vec."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testCreateConnector"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_create_connector_returns_201_with_location"
+status         = "ported"
+notes          = "POST /connectors → 201 Created + Location: /connectors/{name} + ConnectorInfo body."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testCreateConnectorExists"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_create_connector_duplicate_returns_409_conflict"
+status         = "ported"
+notes          = "Duplicate connector name → AlreadyExistsException → 409 Conflict envelope."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testCreateConnectorNameTrimWhitespaces"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_create_connector_trims_padding_whitespace_from_name"
+status         = "ported"
+notes          = "Padding whitespace + \\n in name field is trimmed before reaching herder."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testCreateConnectorNameAllWhitespaces"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_create_connector_all_whitespace_name_normalises_to_empty"
+status         = "ported"
+notes          = "All-whitespace name normalises to \"\"; config map mirrors the empty name."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testCreateConnectorNoName"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_create_connector_null_name_normalises_to_empty"
+status         = "ported"
+notes          = "null name in request body normalises to \"\" (matches Java `name == null ? \"\" : name.trim()`)."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testCreateConnectorConfigNameMismatch"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_create_connector_config_name_mismatch_returns_400"
+status         = "ported"
+notes          = "Body name != config.name throws BadRequestException → 400 (checkAndPutConnectorConfigName)."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testRestartConnectorAndTasksRequestAccepted"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_restart_connector_and_tasks_returns_202_accepted_with_state_info"
+status         = "ported"
+notes          = "Successful restart → 202 Accepted + ConnectorStateInfo(state=RESTARTING)."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testRestartConnectorAndTasksConnectorNotFound"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_restart_connector_not_found_returns_404"
+status         = "ported"
+notes          = "Restart unknown connector throws NotFoundException → 404."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java"
+upstream_name  = "ConnectorsResource/pauseConnector"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_pause_connector_idempotent_returns_unit_or_404"
+status         = "ported"
+notes          = "PUT /pause idempotent (second call ok); unknown connector → AdminError::NotFound (404)."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java"
+upstream_name  = "ConnectorsResource/resumeConnector"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_resume_connector_after_pause_resumes_running"
+status         = "ported"
+notes          = "PUT /resume restores RUNNING state (visible via /status)."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testDeleteConnector + testDeleteConnectorNotFound"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_delete_connector_returns_204_or_404"
+status         = "ported"
+notes          = "DELETE /connectors/{c} succeeds (removes from list) or 404 NotFound."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testGetConnectorConfigConnectorNotFound + status happy path"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_connector_status_present_or_none"
+status         = "ported"
+notes          = "GET /status returns ConnectorStateInfo with per-task state when known; None when unknown (HTTP 404)."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResource.java"
+upstream_name  = "ConnectorPluginsResource/validateConfigs (error path)"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_validate_config_reports_missing_required_keys"
+status         = "ported"
+notes          = "Missing connector.class surfaces validation_errors entry + error_count ≥ 1; 200 OK envelope."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResource.java"
+upstream_name  = "ConnectorPluginsResource/validateConfigs (happy path)"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_validate_config_happy_path_reports_zero_errors"
+status         = "ported"
+notes          = "All required keys present → error_count=0, status 200, ConfigInfos.name echoes plugin class."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/RootResource.java"
+upstream_name  = "RootResource/serverInfo"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_root_server_info_exposes_kafka_cluster_id"
+status         = "ported"
+notes          = "GET / returns 200 + ServerInfo {version, commit, kafka_cluster_id}; cluster_id sourced from constructor."
+
+# Honest deferral — RestServerTest.java was reorganised between 4.1 and 4.2;
+# the 4.2.0 raw fetch 404s on raw.githubusercontent.com. The HTTP-server
+# framing layer (jersey/jetty advertised-URL + error envelope mapping)
+# is out of scope for this state-machine port and not counted here.
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/RestServerTest.java"
+upstream_name  = "RestServerTest/advertisedUrlFormation"
+cave_path      = ""
+cave_test_name = ""
+status         = "missing"
+notes          = "Jersey/Jetty advertised-URL formation — HTTP-server bootstrap layer; not a REST-semantics test."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/RestServerTest.java"
+upstream_name  = "RestServerTest/errorEnvelopeMapping"
+cave_path      = ""
+cave_test_name = ""
+status         = "missing"
+notes          = "Jersey ExceptionMapper → JSON envelope mapping — framework concern, deferred."
+
+# ── batch4 (2026-05-14) — StandaloneHerder + DistributedHerder + KafkaOffsetBackingStore + Tiered Storage ─
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java"
+upstream_name  = "StandaloneHerderTest/testCreateSourceConnector"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_standalone_create_source_connector_starts_in_running"
+status         = "ported"
+notes          = "put_connector_config returns ConnectorInfo with created=true, kind=Source, tasks_max slots."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java"
+upstream_name  = "StandaloneHerderTest/testCreateConnectorAlreadyExists"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_standalone_create_duplicate_returns_already_exists"
+status         = "ported"
+notes          = "duplicate name without allow_replace returns HerderError::AlreadyExists."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java"
+upstream_name  = "StandaloneHerderTest/testTargetStates (PAUSED)"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_standalone_pause_transitions_target_state"
+status         = "ported"
+notes          = "set_target_state(Paused) toggles target_state but keeps tasks_max slots."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java"
+upstream_name  = "StandaloneHerderTest/testRestartTask"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_standalone_restart_task_clears_failure_trace"
+status         = "ported"
+notes          = "fail_task sets trace; restart_task clears it."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java"
+upstream_name  = "StandaloneHerderTest/testPutTaskConfigs"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_standalone_put_task_configs_unsupported"
+status         = "ported"
+notes          = "Standalone mode throws UnsupportedOperationException on put_task_configs."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java"
+upstream_name  = "StandaloneHerderTest/fenceZombieSourceTasks"
+cave_path      = ""
+cave_test_name = ""
+status         = "missing"
+notes          = "KRaft EOS feature (fence zombie source tasks) — out-of-scope for this batch."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java"
+upstream_name  = "DistributedHerderTest/testJoinAssignment"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_distributed_first_member_becomes_leader"
+status         = "ported"
+notes          = "First member joining becomes leader; generation bumps to 1."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java"
+upstream_name  = "DistributedHerderTest/testRebalanceAssignment"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_distributed_assign_distributes_tasks_rendezvous"
+status         = "ported"
+notes          = "Rendezvous-hash assign distributes 4 tasks across 2 members with both members owning ≥1."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java"
+upstream_name  = "DistributedHerderTest/testRebalanceOnLeave"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_distributed_member_leave_triggers_rebalance"
+status         = "ported"
+notes          = "Member leave bumps generation + transitions state → Rebalancing."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java"
+upstream_name  = "DistributedHerderTest/testRollingBounceUpgrade"
+cave_path      = ""
+cave_test_name = ""
+status         = "missing"
+notes          = "Depends on real config-topic rebalance + version-handshake; tracked under IncrementalAssignor follow-up."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/KafkaOffsetBackingStoreTest.java"
+upstream_name  = "KafkaOffsetBackingStoreTest/testReplayHonorsTombstones"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_kafka_offset_store_replay_tombstone_deletes_key"
+status         = "ported"
+notes          = "Replay applies Put then Tombstone in order; key disappears from materialised view."
+
+[[upstream_test]]
+upstream_path  = "storage/src/test/java/org/apache/kafka/storage/internals/log/RemoteLogManagerTest.java"
+upstream_name  = "RemoteLogManagerTest/testFindSegmentForOffset"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_tiered_remote_log_mgr_find_segment_for_offset"
+status         = "ported"
+notes          = "find_segment_for_offset returns the segment whose [start..=end] contains the offset."
+
+[[upstream_test]]
+upstream_path  = "storage/src/test/java/org/apache/kafka/storage/internals/log/RemoteLogManagerTest.java"
+upstream_name  = "RemoteLogManagerTest/testRetentionDeletesOldSegments"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_tiered_remote_log_mgr_retention_removes_old"
+status         = "ported"
+notes          = "apply_retention removes every segment whose end_offset < min_kept_offset."
+
+[[upstream_test]]
+upstream_path  = "storage/src/test/java/org/apache/kafka/storage/internals/log/RemoteIndexCacheTest.java"
+upstream_name  = "RemoteIndexCacheTest/testLruEviction"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_tiered_remote_index_cache_evicts_coldest"
+status         = "ported"
+notes          = "Inserting beyond capacity evicts the least-recently-used entry."

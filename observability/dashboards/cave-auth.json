@@ -1,0 +1,334 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "cave-auth — login flow health, token issuance, OIDC/Keycloak round-trips, passkey usage, security signals, mTLS, PQC. Source crate: cave-auth (keycloak module from feat/cave-auth-keycloak-mvp).",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "tags": ["cave", "cave-auth", "security", "tier-1", "keycloak", "pqc"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": true, "text": "Prometheus", "value": "Prometheus" },
+        "label": "Datasource",
+        "name": "DS_PROM",
+        "query": "prometheus",
+        "type": "datasource"
+      },
+      {
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+        "definition": "label_values(cave_auth_login_total, realm)",
+        "includeAll": true,
+        "multi": true,
+        "name": "realm",
+        "query": { "query": "label_values(cave_auth_login_total, realm)", "refId": "Prom-realm" },
+        "refresh": 2,
+        "type": "query"
+      },
+      {
+        "current": { "selected": true, "text": "$__all", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+        "definition": "label_values(cave_auth_login_total, method)",
+        "includeAll": true,
+        "multi": true,
+        "name": "method",
+        "query": { "query": "label_values(cave_auth_login_total, method)", "refId": "Prom-method" },
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "cave-auth — Authentication & Authorization",
+  "uid": "cave-auth-overview",
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Login rate by method",
+      "description": "QPS of /protocol/openid-connect/token attempts split by auth method (token, userpass, oidc, cert, passkey). Source: cave_auth_login_total{method=…}.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+          "expr": "sum by (method) (rate(cave_auth_login_total{realm=~\"$realm\", method=~\"$method\"}[1m]))",
+          "legendFormat": "{{method}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Login success ratio (last 5m)",
+      "description": "Success / (success + failure) for the selected realm + method. Below 0.95 fires AuthHighFailureRate.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.9 },
+              { "color": "green", "value": 0.95 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" },
+      "targets": [
+        {
+          "expr": "sum(rate(cave_auth_login_total{outcome=\"success\", realm=~\"$realm\", method=~\"$method\"}[5m])) / clamp_min(sum(rate(cave_auth_login_total{realm=~\"$realm\", method=~\"$method\"}[5m])), 1e-9)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Failed login attempts (security signal)",
+      "description": "Per-minute count of failures grouped by reason (bad_credentials, locked, expired_credentials, mfa_failed). Spike ≥ AuthLockoutSpike alert.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum by (reason) (rate(cave_auth_login_total{outcome=\"failure\", realm=~\"$realm\"}[1m]))",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Token issuance rate",
+      "description": "Access tokens minted per second. Source: cave_auth_token_issued_total (incremented in cave-auth/keycloak/provider.rs:issue_tokens).",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum by (token_type) (rate(cave_auth_token_issued_total{realm=~\"$realm\"}[1m]))",
+          "legendFormat": "{{token_type}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Active token count",
+      "description": "Live access + refresh tokens (cave_auth_tokens_active gauge, scraped from RealmState.refresh_tokens cardinality).",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "area" },
+      "targets": [
+        { "expr": "sum(cave_auth_tokens_active{realm=~\"$realm\"})", "refId": "A" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Realm health (Keycloak admin ping)",
+      "description": "1 if /admin/realms/{realm} responded within 1s in the last scrape; 0 otherwise. Drives KeycloakRealmDown.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "text": "DOWN", "color": "red" } }, "type": "value" },
+            { "options": { "1": { "text": "UP", "color": "green" } }, "type": "value" }
+          ]
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        { "expr": "min by (realm) (cave_auth_realm_up{realm=~\"$realm\"})", "refId": "A" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "OIDC round-trip latency (p50 / p95 / p99)",
+      "description": "End-to-end latency for /token, /userinfo, /logout. Histogram bucket: cave_auth_oidc_request_duration_seconds_bucket.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (le, endpoint) (rate(cave_auth_oidc_request_duration_seconds_bucket{realm=~\"$realm\"}[5m])))", "legendFormat": "p50 {{endpoint}}", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum by (le, endpoint) (rate(cave_auth_oidc_request_duration_seconds_bucket{realm=~\"$realm\"}[5m])))", "legendFormat": "p95 {{endpoint}}", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, sum by (le, endpoint) (rate(cave_auth_oidc_request_duration_seconds_bucket{realm=~\"$realm\"}[5m])))", "legendFormat": "p99 {{endpoint}}", "refId": "C" }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Passkey / WebAuthn enrollment + use rate",
+      "description": "Top: enrollments per minute. Bottom: passkey-backed authentications.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(cave_auth_passkey_enrolled_total{realm=~\"$realm\"}[5m]))", "legendFormat": "enrollments", "refId": "A" },
+        { "expr": "sum(rate(cave_auth_login_total{method=\"passkey\", outcome=\"success\", realm=~\"$realm\"}[5m]))", "legendFormat": "successful logins", "refId": "B" }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Unauthorized attempts burst (HTTP 401/403)",
+      "description": "Per-second count of admin/OIDC requests that returned 401 or 403, by endpoint. UnauthorizedAttemptsBurst alert source.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 24 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (endpoint, status) (rate(cave_auth_http_requests_total{status=~\"401|403\", realm=~\"$realm\"}[1m]))", "legendFormat": "{{status}} {{endpoint}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Audit event volume by type",
+      "description": "Stacked rate of audit events from cave-auth/audit.rs: login, logout, role_assigned, password_reset, token_revoked, realm_changed, user_created, user_deleted.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 24 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (event) (rate(cave_auth_audit_events_total{realm=~\"$realm\"}[1m]))", "legendFormat": "{{event}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Session duration histogram",
+      "description": "Distribution of session lengths (seconds between login and logout/expiry). Heatmap of cave_auth_session_duration_seconds_bucket.",
+      "type": "heatmap",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": { "calculate": false, "yAxis": { "unit": "s" } },
+      "targets": [
+        { "expr": "sum by (le) (rate(cave_auth_session_duration_seconds_bucket{realm=~\"$realm\"}[5m]))", "format": "heatmap", "refId": "A" }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Top users by activity",
+      "description": "Top-10 users by /token + /userinfo request count over the panel time range.",
+      "type": "table",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "showHeader": true },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (preferred_username, realm) (increase(cave_auth_user_requests_total{realm=~\"$realm\"}[$__range])))",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "mTLS handshake rate + failure %",
+      "description": "Rate of completed mTLS handshakes on the auth admin/OIDC ports + percentage that failed (cave_auth_mtls_handshake_total{outcome=…}).",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 39 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(cave_auth_mtls_handshake_total[1m]))", "legendFormat": "handshakes/s", "refId": "A" },
+        { "expr": "sum(rate(cave_auth_mtls_handshake_total{outcome=\"failure\"}[5m])) / clamp_min(sum(rate(cave_auth_mtls_handshake_total[5m])), 1e-9)", "legendFormat": "failure ratio", "refId": "B" }
+      ]
+    },
+    {
+      "id": 14,
+      "title": "PQC keygen + sign rate (ML-DSA-65 / Ed25519)",
+      "description": "Counts post-quantum-hybrid signing operations from cave-auth/keycloak/pqc.rs::HybridSigner. ML-DSA-65 is 0 until the FIPS-204 backend lands; Ed25519 is the live primary.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 39 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (alg) (rate(cave_auth_pqc_sign_total[1m]))", "legendFormat": "sign {{alg}}", "refId": "A" },
+        { "expr": "sum by (alg) (rate(cave_auth_pqc_keygen_total[5m]))", "legendFormat": "keygen {{alg}}", "refId": "B" }
+      ]
+    },
+    {
+      "id": 15,
+      "title": "SAML AuthnRequest/Response",
+      "description": "SAML 2.0 broker traffic — rate of AuthnRequest received from SPs and Response emitted from the IdP. Source: cave_auth/saml/broker.rs. Failure ratio is the AuthnRequest rejection rate (malformed XML, bad signature, replay).",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 47 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(cave_auth_saml_authn_requests_total[1m]))", "legendFormat": "AuthnRequest/s", "refId": "A" },
+        { "expr": "sum(rate(cave_auth_saml_responses_total[1m]))", "legendFormat": "Response/s", "refId": "B" },
+        { "expr": "sum(rate(cave_auth_saml_authn_failures_total[5m])) / clamp_min(sum(rate(cave_auth_saml_authn_requests_total[5m])), 1e-9)", "legendFormat": "failure ratio", "refId": "C" }
+      ]
+    },
+    {
+      "id": 16,
+      "title": "SAML Assertion signature verify failures",
+      "description": "Rate of SAML 2.0 Assertion signatures rejected at the broker. Non-zero is always notable — either the IdP rotated keys without metadata refresh, an attacker is replaying, or our canonicalisation has drifted. Linked to alert SamlAssertionSignatureVerifyFailures.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 47 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (reason) (rate(cave_auth_saml_assertion_signature_verify_failures_total[5m]))", "legendFormat": "fail {{reason}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 17,
+      "title": "WebAuthn registration ceremony rate (success / failure)",
+      "description": "Outcomes of WebAuthn registration ceremonies from cave-auth/webauthn/registration.rs. Counter: cave_auth_webauthn_registration_total{outcome=success|failure}.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 55 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (outcome) (rate(cave_auth_webauthn_registration_total[1m]))", "legendFormat": "{{outcome}}", "refId": "A" },
+        { "expr": "sum(rate(cave_auth_webauthn_registration_total{outcome=\"failure\"}[5m])) / clamp_min(sum(rate(cave_auth_webauthn_registration_total[5m])), 1e-9)", "legendFormat": "failure ratio", "refId": "B" }
+      ]
+    },
+    {
+      "id": 18,
+      "title": "WebAuthn assertion: total vs signature-verify failures",
+      "description": "Healthy ratio between assertion ceremonies and signature-verify rejections from cave-auth/webauthn/authentication.rs. Two distinct counters: cave_auth_webauthn_assertion_total and cave_auth_webauthn_assertion_signature_verify_failure_total.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 55 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(cave_auth_webauthn_assertion_total[1m]))", "legendFormat": "assertions/s", "refId": "A" },
+        { "expr": "sum(rate(cave_auth_webauthn_assertion_signature_verify_failure_total[1m]))", "legendFormat": "sig-verify failures/s", "refId": "B" }
+      ]
+    }
+  ]
+}

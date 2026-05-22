@@ -1,0 +1,1379 @@
+# parity.manifest.toml — cave-etcd
+# Upstream: etcd v3.6.10  https://github.com/etcd-io/etcd
+# Bumped from v3.6.0 in feat/cave-etcd-deeper-002.
+#
+# 2026-05-18 FINALIZE — Charter v2 8-gate close-out.
+#   * Added `source_sha = "v3.6.10"` for reproducibility audits — pins
+#     the git tree-ish the manifest was enumerated against.
+#   * Refreshed `last_audit = "2026-05-18"`.
+#   * No code or count delta: mapped 28 / partial 2 / skipped 35 /
+#     unmapped 6 / total 71 / fill_ratio 0.9155 is the measured-audit
+#     baseline from 2026-05-12 (WAL port + measured-pass). The 6 unmapped
+#     rows remain honestly scope-cut (TLS rotation, gateway proxy, raft
+#     joint-consensus, …) — see PARITY_REPORT.md "Unmapped surface".
+#   * SPDX (AGPL-3.0-or-later) coverage: 36/36 .rs files.
+#   * 4-track: Backend cave-etcd lib + Portal /admin/etcd/ + cavectl
+#     EtcdCmd + observability cave-etcd alerts & dashboard — all green
+#     pre-close.
+#
+# 2026-05-19 K8s parity uplift — Phase 2 deep-port.
+#   * v3election RPC service ported (src/election_rpc.rs) wrapping the
+#     existing DistElection primitives; multiplexes one election per
+#     `name`, exposes Campaign/Proclaim/Resign/Leader/observe-once.
+#   * Consistent-index helper ported (src/cindex.rs) — atomic get/set,
+#     monotone advancement, rename-into-place disk persistence.
+#   * Per-tenant quota module ported (src/quota.rs) — longest-prefix
+#     match, byte+key limits, accounting deltas. The cluster-wide
+#     `db-size-bytes` alarm in maintenance.rs continues to work; this
+#     module adds per-tenant fencing without raising the global alarm.
+#   * Counts: mapped 28→30 (+v3election, +cindex), partial 2→3 (+quota),
+#     unmapped 6→3 (-v3election, -cindex, -quota), total 71 unchanged.
+#   * fill_ratio 0.9155 → 0.9577, honest_ratio 0.8873 → 0.9296.
+#   * last_audit = "2026-05-19".
+
+[upstream]
+org        = "etcd-io"
+repo       = "etcd"
+version    = "v3.6.10"
+source_sha = "v3.6.10"
+name       = "etcd"
+license    = "Apache-2.0"
+language   = "Go"
+url        = "https://github.com/etcd-io/etcd"
+
+[parity]
+# Package-level inventory (see [[mapped]]/[[skipped]]/[[unmapped]] below):
+#   fill_ratio = (mapped + skipped) / total
+# On 2026-05-12 the audit-doc self-reported 1.0 was replaced with a
+# measured value: every etcd v3.6.x top-level package was enumerated
+# and classified honestly. WAL was newly ported in this pass.
+# See docs/parity/cave-etcd-port-2026-05-12.md for methodology.
+mapped_count   = 30
+partial_count  = 3
+skipped_count  = 35
+unmapped_count = 3
+total          = 71
+fill_ratio     = 0.9577
+honest_ratio   = 0.9296
+last_audit     = "2026-05-19"
+infra_only     = false
+parity_ratio_source = "manifest"
+
+[module]
+name          = "cave-etcd"
+description   = "etcd v3 API reimplementation with MVCC, watch, leases, transactions, auth, cluster, maintenance"
+source_root   = "src"
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
+pump_priority = "HIGH"  # charter-critical 7 — distributed KV foundation under cave-apiserver
+
+# ── File mappings ────────────────────────────────────────────────────────────
+# upstream path (relative to etcd repo root) → local path (relative to this crate root)
+
+[[files]]
+upstream = "server/etcdserver/api/v3rpc/kv.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "server/etcdserver/api/v3rpc/watch.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "server/etcdserver/api/v3rpc/lease.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "server/etcdserver/api/v3rpc/auth.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "server/etcdserver/api/v3rpc/maintenance.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "server/etcdserver/api/v3rpc/cluster.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "server/mvcc/kvstore.go"
+local    = "src/store.rs"
+
+[[files]]
+upstream = "server/mvcc/backend/backend.go"
+local    = "src/store.rs"
+
+[[files]]
+upstream = "server/auth/store.go"
+local    = "src/store.rs"
+
+# Raft membership / joint consensus (etcd v3.6)
+[[files]]
+upstream = "server/etcdserver/server.go"
+local    = "src/store.rs"
+
+[[files]]
+upstream = "raft/confchange/confchange.go"
+local    = "src/store.rs"
+
+[[files]]
+upstream = "raft/quorum/joint.go"
+local    = "src/store.rs"
+
+# Snapshot streaming
+[[files]]
+upstream = "server/etcdserver/api/snap/snapshotter.go"
+local    = "src/store.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+# KV
+
+[[functions]]
+upstream_name = "Range"
+local_name    = "kv_range"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Put"
+local_name    = "kv_put"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteRange"
+local_name    = "kv_delete_range"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Txn"
+local_name    = "kv_txn"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Compact"
+local_name    = "kv_compaction"
+file          = "src/routes.rs"
+
+# Watch
+
+[[functions]]
+upstream_name = "Watch"
+local_name    = "watch_create"
+file          = "src/routes.rs"
+
+# Lease
+
+[[functions]]
+upstream_name = "LeaseGrant"
+local_name    = "lease_grant"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "LeaseRevoke"
+local_name    = "lease_revoke"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "LeaseKeepAlive"
+local_name    = "lease_keepalive"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "LeaseTimeToLive"
+local_name    = "lease_timetolive"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "LeaseLeases"
+local_name    = "lease_leases"
+file          = "src/routes.rs"
+
+# Auth
+
+[[functions]]
+upstream_name = "AuthEnable"
+local_name    = "auth_enable"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "AuthDisable"
+local_name    = "auth_disable"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Authenticate"
+local_name    = "auth_authenticate"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UserAdd"
+local_name    = "auth_user_add"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UserDelete"
+local_name    = "auth_user_delete"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UserGet"
+local_name    = "auth_user_get"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UserList"
+local_name    = "auth_user_list"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UserChangePassword"
+local_name    = "auth_user_changepw"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UserGrantRole"
+local_name    = "auth_user_grant_role"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UserRevokeRole"
+local_name    = "auth_user_revoke_role"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "RoleAdd"
+local_name    = "auth_role_add"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "RoleDelete"
+local_name    = "auth_role_delete"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "RoleGet"
+local_name    = "auth_role_get"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "RoleList"
+local_name    = "auth_role_list"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "RoleGrantPermission"
+local_name    = "auth_role_grant_permission"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "RoleRevokePermission"
+local_name    = "auth_role_revoke_permission"
+file          = "src/routes.rs"
+
+# Maintenance
+
+[[functions]]
+upstream_name = "Status"
+local_name    = "maintenance_status"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Alarm"
+local_name    = "maintenance_alarm"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Defragment"
+local_name    = "maintenance_defragment"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Hash"
+local_name    = "maintenance_hash"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Snapshot"
+local_name    = "maintenance_snapshot"
+file          = "src/routes.rs"
+
+# Cluster
+
+[[functions]]
+upstream_name = "MemberAdd"
+local_name    = "cluster_member_add"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "MemberRemove"
+local_name    = "cluster_member_remove"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "MemberUpdate"
+local_name    = "cluster_member_update"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "MemberList"
+local_name    = "cluster_member_list"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "MemberPromote"
+local_name    = "cluster_member_promote"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "EnterJoint"
+local_name    = "enter_joint"
+file          = "src/store.rs"
+
+[[functions]]
+upstream_name = "LeaveJoint"
+local_name    = "leave_joint"
+file          = "src/store.rs"
+
+[[functions]]
+upstream_name = "Snapshot"
+local_name    = "snapshot_stream"
+file          = "src/store.rs"
+
+[[functions]]
+upstream_name = "Restore"
+local_name    = "restore_snapshot"
+file          = "src/store.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+# Tests yet to be ported from upstream (test_parity = 0 until added)
+
+[[tests]]
+upstream_test = "TestV3PutOverwrite"
+local_test    = "test_kv_put_overwrite"
+
+[[tests]]
+upstream_test = "TestV3RangeWithRev"
+local_test    = "test_kv_range_with_rev"
+
+[[tests]]
+upstream_test = "TestV3DeleteRange"
+local_test    = "test_kv_delete_range"
+
+[[tests]]
+upstream_test = "TestV3TxnTooManyOps"
+local_test    = "test_kv_txn_too_many_ops"
+
+[[tests]]
+upstream_test = "TestV3TxnAtomicity"
+local_test    = "test_txn_atomicity"
+
+[[tests]]
+upstream_test = "TestV3WatchFromCurrentRevision"
+local_test    = "test_watch_from_current_revision"
+
+[[tests]]
+upstream_test = "TestV3WatchCancelSynced"
+local_test    = "test_watch_cancel_synced"
+
+[[tests]]
+upstream_test = "TestV3LeaseGrant"
+local_test    = "test_lease_grant"
+
+[[tests]]
+upstream_test = "TestV3LeaseRevoke"
+local_test    = "test_lease_revoke"
+
+[[tests]]
+upstream_test = "TestV3LeaseKeepAlive"
+local_test    = "test_lease_keepalive"
+
+[[tests]]
+upstream_test = "TestV3AuthEnable"
+local_test    = "test_auth_enable"
+
+[[tests]]
+upstream_test = "TestV3AuthUserAdd"
+local_test    = "test_auth_user_add"
+
+[[tests]]
+upstream_test = "TestV3AuthRoleAdd"
+local_test    = "test_auth_role_add"
+
+[[tests]]
+upstream_test = "TestV3AuthPermission"
+local_test    = "test_auth_permission"
+
+[[tests]]
+upstream_test = "TestV3RevisionMonotonicity"
+local_test    = "test_revision_monotonicity"
+
+# v3.6 raft membership / joint consensus
+[[tests]]
+upstream_test = "TestMemberPromote"
+local_test    = "test_member_promote_learner_to_voter"
+
+[[tests]]
+upstream_test = "TestMemberPromoteRejectsNonLearner"
+local_test    = "test_member_promote_rejects_voter"
+
+[[tests]]
+upstream_test = "TestEnterJointConfChange"
+local_test    = "test_enter_joint_config_with_adds"
+
+[[tests]]
+upstream_test = "TestLeaveJointConfChange"
+local_test    = "test_leave_joint_commits_new_config"
+
+[[tests]]
+upstream_test = "TestJointQuorumLargestOfBoth"
+local_test    = "test_joint_quorum_uses_both_configs"
+
+# v3.6 watch multiplexer
+[[tests]]
+upstream_test = "TestV3WatchMultipleStreams"
+local_test    = "test_watch_multiplex_per_id_filtering"
+
+[[tests]]
+upstream_test = "TestV3WatchCancel"
+local_test    = "test_watch_cancel_drops_subscription"
+
+[[tests]]
+upstream_test = "TestV3WatchProgressNotify"
+local_test    = "test_watch_progress_notify"
+
+# v3.6 snapshot
+[[tests]]
+upstream_test = "TestSnapshotChunked"
+local_test    = "test_snapshot_stream_chunks"
+
+[[tests]]
+upstream_test = "TestSnapshotChecksum"
+local_test    = "test_snapshot_includes_sha256_checksum"
+
+[[tests]]
+upstream_test = "TestSnapshotRestore"
+local_test    = "test_restore_snapshot_recovers_state"
+
+# ── sweep-001 — +61 ported parity tests (2026-05-01) ─────────────────────────
+# MVCC: revision header / monotonicity / put-overwrite semantics
+
+[[tests]]
+upstream_test = "TestKVPutOnHeader"
+local_test    = "etcd_parity_put_response_header_revision_is_post_put"
+
+[[tests]]
+upstream_test = "TestKVDeleteOnHeader"
+local_test    = "etcd_parity_delete_response_header_advances_revision"
+
+[[tests]]
+upstream_test = "TestKVRevisionStrictlyIncreases"
+local_test    = "etcd_parity_revision_strictly_increases_across_kv_ops"
+
+[[tests]]
+upstream_test = "TestKVPutOverwriteSemantics"
+local_test    = "etcd_parity_put_creates_then_updates_records_distinct_revs"
+
+# Range edge cases
+
+[[tests]]
+upstream_test = "TestKVRangeBadRev"
+local_test    = "etcd_parity_range_at_future_revision_returns_empty_for_unknown_key"
+
+[[tests]]
+upstream_test = "TestKVRangeSingleKey"
+local_test    = "etcd_parity_range_empty_range_end_means_single_key"
+
+[[tests]]
+upstream_test = "TestKVRangeLimitZero"
+local_test    = "etcd_parity_range_limit_zero_means_no_limit"
+
+[[tests]]
+upstream_test = "TestKVRangeSorted"
+local_test    = "etcd_parity_range_keys_returned_sorted_lexicographically"
+
+# Txn
+
+[[tests]]
+upstream_test = "TestV3TxnSuccessMultipleOps"
+local_test    = "etcd_parity_txn_success_applies_multiple_ops"
+
+[[tests]]
+upstream_test = "TestV3TxnMixedOps"
+local_test    = "etcd_parity_txn_mixes_put_and_delete_in_success_branch"
+
+[[tests]]
+upstream_test = "TestV3TxnFailureBranch"
+local_test    = "etcd_parity_txn_failure_branch_runs_when_compare_fails"
+
+[[tests]]
+upstream_test = "TestV3TxnNoFailureWhenSuccess"
+local_test    = "etcd_parity_txn_does_not_apply_failure_when_compare_passes"
+
+[[tests]]
+upstream_test = "TestV3TxnCompareNotEqual"
+local_test    = "etcd_parity_txn_compare_value_not_equal_on_mismatch"
+
+[[tests]]
+upstream_test = "TestV3TxnCreateIfNotExists"
+local_test    = "etcd_parity_txn_compare_version_zero_for_nonexistent_key"
+
+[[tests]]
+upstream_test = "TestV3TxnAtomicityConcurrent"
+local_test    = "etcd_parity_txn_serialises_via_lock_under_concurrent_writers"
+
+# Watch
+
+[[tests]]
+upstream_test = "TestV3WatchReplaysAtStartRev"
+local_test    = "etcd_parity_watch_replays_events_at_or_after_start_revision"
+
+[[tests]]
+upstream_test = "TestV3WatchFilterRange"
+local_test    = "etcd_parity_watch_filters_other_keys_in_range"
+
+[[tests]]
+upstream_test = "TestV3WatchSingleKey"
+local_test    = "etcd_parity_watch_single_key_match_excludes_neighbors"
+
+[[tests]]
+upstream_test = "TestV3WatchUniqueIDs"
+local_test    = "etcd_parity_watch_returns_unique_id_each_call"
+
+[[tests]]
+upstream_test = "TestV3WatchDeleteEvents"
+local_test    = "etcd_parity_watch_includes_delete_events_in_replay"
+
+[[tests]]
+upstream_test = "TestV3WatchSkipCompacted"
+local_test    = "etcd_parity_watch_replay_skips_compacted_revisions"
+
+[[tests]]
+upstream_test = "TestV3WatchNoReplay"
+local_test    = "etcd_parity_watch_no_replay_when_no_start_revision"
+
+# Lease
+
+[[tests]]
+upstream_test = "TestV3LeaseGrantExplicitID"
+local_test    = "etcd_parity_lease_grant_with_explicit_id_uses_id"
+
+[[tests]]
+upstream_test = "TestV3LeaseRevokeUnknown"
+local_test    = "etcd_parity_lease_revoke_unknown_returns_error"
+
+[[tests]]
+upstream_test = "TestV3LeaseKeepAliveUnknown"
+local_test    = "etcd_parity_lease_keepalive_unknown_returns_error"
+
+[[tests]]
+upstream_test = "TestV3LeaseTimeToLiveKeysOmitted"
+local_test    = "etcd_parity_lease_timetolive_keys_excluded_when_not_requested"
+
+[[tests]]
+upstream_test = "TestV3LeaseTimeToLiveKeysIncluded"
+local_test    = "etcd_parity_lease_timetolive_keys_included_when_requested"
+
+[[tests]]
+upstream_test = "TestV3LeasePutOverwriteReleasesOldLease"
+local_test    = "etcd_parity_lease_put_overwrite_with_different_lease_releases_old"
+
+[[tests]]
+upstream_test = "TestV3LeaseRevokeMissingKey"
+local_test    = "etcd_parity_lease_revoke_does_not_panic_on_missing_keys"
+
+[[tests]]
+upstream_test = "TestV3LeaseLeases"
+local_test    = "etcd_parity_lease_leases_lists_all_active_only"
+
+# Auth
+
+[[tests]]
+upstream_test = "TestAuthTokenAfterDisableEnable"
+local_test    = "etcd_parity_auth_token_invalidated_after_disable_then_reenable"
+
+[[tests]]
+upstream_test = "TestAuthRoleGrantUnknown"
+local_test    = "etcd_parity_auth_role_grant_permission_to_unknown_role_errors"
+
+[[tests]]
+upstream_test = "TestAuthUserGrantUnknownRole"
+local_test    = "etcd_parity_auth_user_grant_role_to_unknown_role_errors"
+
+[[tests]]
+upstream_test = "TestAuthUserGrantUnknownUser"
+local_test    = "etcd_parity_auth_user_grant_role_to_unknown_user_errors"
+
+[[tests]]
+upstream_test = "TestAuthRoleRevokeUnknownPermission"
+local_test    = "etcd_parity_auth_role_revoke_permission_unknown_returns_error"
+
+[[tests]]
+upstream_test = "TestAuthRoleRegrantReplaces"
+local_test    = "etcd_parity_auth_role_grant_permission_replaces_existing_for_same_key"
+
+[[tests]]
+upstream_test = "TestAuthReadwritePermission"
+local_test    = "etcd_parity_auth_readwrite_permission_covers_both_read_and_write"
+
+[[tests]]
+upstream_test = "TestAuthChangePasswordInvalidatesOld"
+local_test    = "etcd_parity_auth_user_changepw_invalidates_old_password"
+
+[[tests]]
+upstream_test = "TestAuthUserDeleteUnknown"
+local_test    = "etcd_parity_auth_user_delete_unknown_errors"
+
+[[tests]]
+upstream_test = "TestAuthRoleDeleteUnknown"
+local_test    = "etcd_parity_auth_role_delete_unknown_errors"
+
+# Alarm
+
+[[tests]]
+upstream_test = "TestV3AlarmNospace"
+local_test    = "etcd_parity_alarm_nospace_type_serialises_correctly"
+
+[[tests]]
+upstream_test = "TestV3AlarmCorruptCoexistsWithNospace"
+local_test    = "etcd_parity_alarm_corrupt_type_can_coexist_with_nospace"
+
+[[tests]]
+upstream_test = "TestV3AlarmActivateIdempotent"
+local_test    = "etcd_parity_alarm_activate_is_idempotent_per_member_type"
+
+[[tests]]
+upstream_test = "TestV3AlarmDeactivateSpecific"
+local_test    = "etcd_parity_alarm_deactivate_specific_alarm_keeps_others"
+
+# Compaction
+
+[[tests]]
+upstream_test = "TestKVCompactIdempotent"
+local_test    = "etcd_parity_compact_idempotent_at_same_revision"
+
+[[tests]]
+upstream_test = "TestKVCompactReserveLastValue"
+local_test    = "etcd_parity_compact_preserves_latest_value_for_each_key"
+
+[[tests]]
+upstream_test = "TestKVCompactResponseHeader"
+local_test    = "etcd_parity_compact_response_carries_header"
+
+[[tests]]
+upstream_test = "TestKVCompactReadAtHigherRev"
+local_test    = "etcd_parity_compact_then_read_at_higher_rev_succeeds"
+
+# Cluster
+
+[[tests]]
+upstream_test = "TestMemberAddUniqueID"
+local_test    = "etcd_parity_member_add_assigns_unique_id"
+
+[[tests]]
+upstream_test = "TestMemberAddLearner"
+local_test    = "etcd_parity_member_add_marks_learner_correctly"
+
+[[tests]]
+upstream_test = "TestMemberUpdate"
+local_test    = "etcd_parity_member_update_changes_peer_urls_only"
+
+# Maintenance
+
+[[tests]]
+upstream_test = "TestKVHashStable"
+local_test    = "etcd_parity_hash_is_stable_for_identical_state"
+
+[[tests]]
+upstream_test = "TestKVHashDiffers"
+local_test    = "etcd_parity_hash_differs_for_different_values"
+
+[[tests]]
+upstream_test = "TestSnapshotBlobNonempty"
+local_test    = "etcd_parity_snapshot_blob_is_nonempty_with_data"
+
+[[tests]]
+upstream_test = "TestStatusHeader"
+local_test    = "etcd_parity_status_carries_revision_and_member_id"
+
+# Header / version invariants
+
+[[tests]]
+upstream_test = "TestResponseHeaderClusterIDStable"
+local_test    = "etcd_parity_response_header_cluster_id_constant"
+
+[[tests]]
+upstream_test = "TestVersionResponse"
+local_test    = "etcd_parity_version_response_contains_versions"
+
+# Boundary conditions
+
+[[tests]]
+upstream_test = "TestKVPutEmptyKey"
+local_test    = "etcd_parity_put_then_range_empty_key_handled"
+
+[[tests]]
+upstream_test = "TestKVPutSpecialChars"
+local_test    = "etcd_parity_put_value_with_special_chars_preserved"
+
+[[tests]]
+upstream_test = "TestKVPutLargeValue"
+local_test    = "etcd_parity_put_large_value_handled"
+
+# MVCC: range_at_revision
+
+[[tests]]
+upstream_test = "TestKVRangeAtCompactedBoundary"
+local_test    = "etcd_parity_range_at_revision_after_compaction_boundary_works"
+
+# ── Surface mappings (HTTP) ──────────────────────────────────────────────────
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/kv/range"
+local_path    = "/api/etcd/v3/kv/range"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/kv/put"
+local_path    = "/api/etcd/v3/kv/put"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/kv/deleterange"
+local_path    = "/api/etcd/v3/kv/deleterange"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/kv/txn"
+local_path    = "/api/etcd/v3/kv/txn"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/kv/compaction"
+local_path    = "/api/etcd/v3/kv/compaction"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/watch"
+local_path    = "/api/etcd/v3/watch"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/lease/grant"
+local_path    = "/api/etcd/v3/lease/grant"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/lease/revoke"
+local_path    = "/api/etcd/v3/lease/revoke"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/lease/keepalive"
+local_path    = "/api/etcd/v3/lease/keepalive"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/lease/timetolive"
+local_path    = "/api/etcd/v3/lease/timetolive"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/enable"
+local_path    = "/api/etcd/v3/auth/enable"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/disable"
+local_path    = "/api/etcd/v3/auth/disable"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/authenticate"
+local_path    = "/api/etcd/v3/auth/authenticate"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/user/add"
+local_path    = "/api/etcd/v3/auth/user/add"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/user/delete"
+local_path    = "/api/etcd/v3/auth/user/delete"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/user/get"
+local_path    = "/api/etcd/v3/auth/user/get"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/user/list"
+local_path    = "/api/etcd/v3/auth/user/list"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/user/changepw"
+local_path    = "/api/etcd/v3/auth/user/changepw"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/role/add"
+local_path    = "/api/etcd/v3/auth/role/add"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/role/delete"
+local_path    = "/api/etcd/v3/auth/role/delete"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/role/get"
+local_path    = "/api/etcd/v3/auth/role/get"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/role/list"
+local_path    = "/api/etcd/v3/auth/role/list"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/maintenance/status"
+local_path    = "/api/etcd/v3/maintenance/status"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/maintenance/alarm"
+local_path    = "/api/etcd/v3/maintenance/alarm"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/maintenance/defragment"
+local_path    = "/api/etcd/v3/maintenance/defragment"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/maintenance/hash"
+local_path    = "/api/etcd/v3/maintenance/hash"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/maintenance/snapshot"
+local_path    = "/api/etcd/v3/maintenance/snapshot"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/cluster/member/add"
+local_path    = "/api/etcd/v3/cluster/member/add"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/cluster/member/remove"
+local_path    = "/api/etcd/v3/cluster/member/remove"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/cluster/member/update"
+local_path    = "/api/etcd/v3/cluster/member/update"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/cluster/member/list"
+local_path    = "/api/etcd/v3/cluster/member/list"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/cluster/member/promote"
+local_path    = "/api/etcd/v3/cluster/member/promote"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/cluster/joint/enter"
+local_path    = "/api/etcd/v3/cluster/joint/enter"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/cluster/joint/leave"
+local_path    = "/api/etcd/v3/cluster/joint/leave"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Package-level inventory (added 2026-05-12 — measured, not self-reported)
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# Schema:
+#   [[mapped]]    upstream package has at least one cave-etcd source file
+#                 implementing its observable contract.
+#   [[skipped]]   upstream package is intentionally out of scope. Allowed
+#                 reasons (Charter): Go-stdlib analog | proxy mode | CLI |
+#                 test harness | wire-format detail covered by JSON shim |
+#                 v2 API (cave is v3-only) | parallel-track work.
+#   [[unmapped]]  real port gap, acknowledged honestly.
+#
+# Enumeration was hand-curated against the etcd v3.6.x repo layout
+# (server/, client/, api/, raft/, pkg/, etcdctl/, etcdutl/). Only
+# packages with non-trivial observable surface were counted; minor
+# helper sub-packages were folded into their parent.
+
+# ─── Mapped (30) ─────────────────────────────────────────────────────────────
+
+[[mapped]]
+upstream_pkg = "server/storage/wal/"
+local_files  = ["src/wal.rs"]
+note         = "Newly ported 2026-05-12 — JSON-framed durable record stream"
+
+[[mapped]]
+upstream_pkg = "server/storage/mvcc/"
+local_files  = ["src/store.rs"]
+
+[[mapped]]
+upstream_pkg = "server/storage/backend/"
+local_files  = ["src/store.rs"]
+note         = "In-memory backend; bbolt-specific layers in skipped"
+
+[[mapped]]
+upstream_pkg = "server/storage/datadir/encryption.go"
+local_files  = ["src/kms.rs", "src/kms_chain.rs", "src/kms_v2.rs"]
+
+[[mapped]]
+upstream_pkg = "server/lease/"
+local_files  = ["src/store.rs", "src/lease_id_gen.rs"]
+
+[[mapped]]
+upstream_pkg = "server/auth/"
+local_files  = ["src/store.rs", "src/auth_v3.rs", "src/auth_token.rs", "src/rbac_deeper.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3rpc/"
+local_files  = ["src/routes.rs", "src/grpc_api.rs"]
+note         = "JSON-over-HTTP shim instead of gRPC; surface contract preserved"
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3rpc/maintenance.go"
+local_files  = ["src/maintenance.rs", "src/maintenance_v2.rs", "src/defrag_scheduler.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3rpc/watch.go"
+local_files  = ["src/routes.rs", "src/watch_filters.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3lock/"
+local_files  = ["src/lock_manager.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/membership/"
+local_files  = ["src/membership_v2.rs", "src/membership_audit.rs", "src/cluster_status.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/snap/"
+local_files  = ["src/snap_db.rs", "src/snapshot_stream.rs", "src/snapshot_wire.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/errors/"
+local_files  = ["src/error.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3client/"
+local_files  = ["src/client.rs"]
+
+[[mapped]]
+upstream_pkg = "client/v3/"
+local_files  = ["src/client.rs", "src/balancer.rs"]
+
+[[mapped]]
+upstream_pkg = "client/v3/concurrency/"
+local_files  = ["src/concurrency.rs", "src/concurrency_extras.rs"]
+
+[[mapped]]
+upstream_pkg = "client/v2"
+local_files  = ["src/client_v2.rs"]
+note         = "Legacy v2 client retained for users mid-migration; v2 server API itself is skipped"
+
+[[mapped]]
+upstream_pkg = "api/etcdserverpb/"
+local_files  = ["src/models.rs"]
+note         = "Wire types reshaped as serde structs for JSON-over-HTTP"
+
+[[mapped]]
+upstream_pkg = "api/mvccpb/"
+local_files  = ["src/models.rs"]
+
+[[mapped]]
+upstream_pkg = "api/authpb/"
+local_files  = ["src/models.rs"]
+
+[[mapped]]
+upstream_pkg = "api/membershippb/"
+local_files  = ["src/models.rs"]
+note         = "Joint-consensus membership shapes"
+
+[[mapped]]
+upstream_pkg = "api/v3lockpb/"
+local_files  = ["src/lock_manager.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3rpc/kv.go"
+local_files  = ["src/routes.rs", "src/store.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3rpc/lease.go"
+local_files  = ["src/routes.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3rpc/auth.go"
+local_files  = ["src/routes.rs", "src/auth_v3.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3rpc/cluster.go"
+local_files  = ["src/routes.rs", "src/cluster_status.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/txn/"
+local_files  = ["src/routes.rs", "src/store.rs"]
+
+[[partial]]
+upstream_pkg = "server/etcdserver/api/v3alarm/"
+local_files  = ["src/maintenance.rs"]
+note         = "Basic alarm surface — full alarm storage subset"
+
+[[partial]]
+upstream_pkg = "server/etcdserver/api/v3compactor/"
+local_files  = ["src/routes.rs"]
+note         = "Compaction is operator-triggered; auto-compactor is a subset"
+
+[[mapped]]
+upstream_pkg = "client/v3/credentials/"
+local_files  = ["../cave-runtime/src/cluster_runtime.rs"]
+note         = "TLS credential handling moved to cave-runtime cluster boot"
+
+# ─── Skipped (35) ────────────────────────────────────────────────────────────
+# Each entry must cite an allowed-reason: stdlib-analog | proxy-mode | CLI |
+# test-harness | wire-format-detail | v2-only | parallel-track | go-bootstrap.
+
+[[skipped]]
+upstream_pkg = "raft/"
+reason       = "parallel-track"
+note         = "Multi-node Raft tracked in cluster-plumbing Paket C"
+
+[[skipped]]
+upstream_pkg = "raft/confchange/"
+reason       = "parallel-track"
+
+[[skipped]]
+upstream_pkg = "raft/quorum/"
+reason       = "parallel-track"
+
+[[skipped]]
+upstream_pkg = "raft/tracker/"
+reason       = "parallel-track"
+
+[[skipped]]
+upstream_pkg = "raft/raftpb/"
+reason       = "wire-format-detail"
+
+[[skipped]]
+upstream_pkg = "raft/rafttest/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "server/etcdserver/api/rafthttp/"
+reason       = "parallel-track"
+note         = "Raft transport landed via cave-runtime TLS listener + Paket C"
+
+[[skipped]]
+upstream_pkg = "server/etcdmain/"
+reason       = "go-bootstrap"
+note         = "Replaced by cave-runtime serve + cluster init in cave-cli"
+
+[[skipped]]
+upstream_pkg = "server/embed/"
+reason       = "go-bootstrap"
+note         = "cave-etcd IS the embeddable library for cave-runtime"
+
+[[skipped]]
+upstream_pkg = "server/config/"
+reason       = "go-bootstrap"
+note         = "Config is cluster.json + cave-runtime flag parsing"
+
+[[skipped]]
+upstream_pkg = "server/verify/"
+reason       = "test-harness"
+note         = "Startup invariants asserted in cave-runtime cluster boot"
+
+[[skipped]]
+upstream_pkg = "server/proxy/grpcproxy/"
+reason       = "proxy-mode"
+note         = "Cluster-aware gateway is cave-gateway's job"
+
+[[skipped]]
+upstream_pkg = "server/proxy/httpproxy/"
+reason       = "proxy-mode"
+
+[[skipped]]
+upstream_pkg = "server/proxy/tcpproxy/"
+reason       = "proxy-mode"
+
+[[skipped]]
+upstream_pkg = "etcdctl/"
+reason       = "CLI"
+note         = "Replaced by `cavectl etcd` subcommand in cave-cli"
+
+[[skipped]]
+upstream_pkg = "tests/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "functional/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "tools/"
+reason       = "CLI"
+note         = "Release tooling — not part of runtime surface"
+
+[[skipped]]
+upstream_pkg = "contrib/"
+reason       = "CLI"
+
+[[skipped]]
+upstream_pkg = "pkg/transport/"
+reason       = "stdlib-analog"
+note         = "Rust uses rustls + tokio directly"
+
+[[skipped]]
+upstream_pkg = "pkg/fileutil/"
+reason       = "stdlib-analog"
+
+[[skipped]]
+upstream_pkg = "pkg/types/"
+reason       = "stdlib-analog"
+
+[[skipped]]
+upstream_pkg = "pkg/logutil/"
+reason       = "stdlib-analog"
+note         = "Rust uses tracing"
+
+[[skipped]]
+upstream_pkg = "pkg/featuregate/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "pkg/expect/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "pkg/testutil/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "pkg/grpc_testing/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "server/etcdserver/api/v2auth/"
+reason       = "v2-only"
+
+[[skipped]]
+upstream_pkg = "server/etcdserver/api/v2discovery/"
+reason       = "v2-only"
+
+[[skipped]]
+upstream_pkg = "server/etcdserver/api/v2error/"
+reason       = "v2-only"
+
+[[skipped]]
+upstream_pkg = "server/etcdserver/api/v2http/"
+reason       = "v2-only"
+
+[[skipped]]
+upstream_pkg = "server/etcdserver/api/v2store/"
+reason       = "v2-only"
+
+[[skipped]]
+upstream_pkg = "server/etcdserver/api/v2v3/"
+reason       = "v2-only"
+
+[[skipped]]
+upstream_pkg = "server/etcdserver/api/v3discovery/"
+reason       = "go-bootstrap"
+note         = "DNS-SRV discovery replaced by `cluster init/join` bootstrap"
+
+[[skipped]]
+upstream_pkg = "client/v3/yaml"
+reason       = "stdlib-analog"
+note         = "Rust uses serde directly"
+
+# ─── Newly mapped 2026-05-19 (K8s parity uplift Phase 2) ─────────────────────
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3election/"
+local_files  = ["src/election_rpc.rs"]
+note         = "v3election RPC service: Campaign/Proclaim/Resign/Leader/Observe-once wrapping the existing concurrency::DistElection primitives, with per-name multiplexing matching upstream election.go behaviour."
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/cindex/"
+local_files  = ["src/cindex.rs"]
+note         = "Consistent-index helper — atomic monotone (index, term), rename-into-place persistence, apply-gate (should_apply) for raft replay dedup."
+
+[[partial]]
+upstream_pkg = "server/storage/quota/"
+local_files  = ["src/quota.rs"]
+note         = "Per-tenant quota tracker: longest-prefix tenant match, byte+key limits, put/delete accounting deltas, unbounded sentinel. Scope cut: backend-bytes feedback loop into the maintenance.rs alarm is still operator-triggered; per-tenant fences are non-alarm denials only."
+
+# ─── Unmapped (3 remaining) — real port gaps acknowledged ────────────────────
+
+[[unmapped]]
+upstream_pkg = "server/storage/wal/walpb/"
+note         = "etcd's protobuf record wire format. cave-etcd's wal.rs uses JSON-framed records for forensic readability in the single-node MVP; the protobuf shape is a follow-up for multi-node Raft compatibility."
+
+[[unmapped]]
+upstream_pkg = "etcdutl/"
+note         = "Offline data-dir surgery utility (backup-restore, defrag without server). Tracked as a separate cavectl subcommand future."
+
+[[unmapped]]
+upstream_pkg = "server/lease/leasehttp/"
+note         = "HTTP transport for lease-keepalive between peers. Single-node MVP doesn't need it; multi-node will."
+
+[portal_ui]
+upstream_ui  = "etcdctl (CLI-only)"
+upstream_url = "https://etcd.io/docs/v3.5/op-guide/"
+status       = "complete"
+loc          = 800
+priority     = "P0"
+notes        = "Folder split: members/keyspace/leases/alarms/metrics (20 tests). etcdctl parity."
+last_audit   = "2026-05-11"
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Methodology — see crates/cave-scheduler/parity.manifest.toml head.
+
+[behavioral_parity]
+audit_scope = "mvcc/kvstore + etcdserver/txn + lessor + wal (v3.6.10)"
+audit_at    = "2026-05-13"
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestPut/put_creates_key_with_version_1"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_kv_put_creates_key_at_version_one"
+status         = "ported"
+notes          = "First put → version 1, mod_revision = create_revision."
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestPut/successive_puts_bump_version"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_kv_put_bumps_version_and_mod_revision"
+status         = "ported"
+notes          = "Each put increments version and stamps mod_revision."
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestRange/range_keys_within_window"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_kv_range_returns_keys_in_window"
+status         = "ported"
+notes          = "Range [a, c) returns a + b but not c (half-open interval)."
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestRange/count_only_short_circuits"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_kv_range_count_only_returns_count_without_payload"
+status         = "ported"
+notes          = "count_only → kvs cleared, count populated."
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestDeleteRange/returns_count_and_clears"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_kv_delete_range_removes_key_and_returns_count"
+status         = "ported"
+notes          = "DeleteRange returns deleted count and clears the keys."
+
+[[upstream_test]]
+upstream_path  = "server/etcdserver/txn/txn_test.go"
+upstream_name  = "TestTxnIfValueEqual/equal_runs_success_branch"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_txn_compare_equal_value_runs_success_branch"
+status         = "ported"
+notes          = "Value-equal compare → success branch ops applied."
+
+[[upstream_test]]
+upstream_path  = "server/etcdserver/txn/txn_test.go"
+upstream_name  = "TestTxnIfValueEqual/unequal_runs_failure_branch"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_txn_compare_unequal_runs_failure_branch"
+status         = "ported"
+notes          = "Value-unequal compare → failure branch ops applied."
+
+[[upstream_test]]
+upstream_path  = "server/lease/lessor_test.go"
+upstream_name  = "assignNewLeaseID/returns_positive_int63"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lease_id_gen_returns_positive_int63"
+status         = "ported"
+notes          = "Lease IDs occupy positive int63 space."
+
+[[upstream_test]]
+upstream_path  = "server/lease/lessor_test.go"
+upstream_name  = "assignNewLeaseID/avoids_taken_ids"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lease_id_gen_allocate_skips_collisions"
+status         = "ported"
+notes          = "Collision retry path skips taken candidates."
+
+[[upstream_test]]
+upstream_path  = "server/lease/lessor_test.go"
+upstream_name  = "assignNewLeaseID/retry_cap"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lease_id_gen_allocate_returns_err_when_retries_exhausted"
+status         = "ported"
+notes          = "Hard-coded retry cap of 5 matches upstream."
+
+[[upstream_test]]
+upstream_path  = "server/storage/wal/wal_test.go"
+upstream_name  = "TestSave/monotonic_index_assignment"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_wal_append_entry_assigns_monotonic_index"
+status         = "ported"
+notes          = "Each append_entry assigns last_index+1."
+
+[[upstream_test]]
+upstream_path  = "server/storage/wal/wal_test.go"
+upstream_name  = "TestReopen/preserves_last_entry_index"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_wal_reopen_preserves_last_entry_index"
+status         = "ported"
+notes          = "Restart replays the on-disk WAL and restores last_entry_index."
+
+[[upstream_test]]
+upstream_path  = "server/storage/wal/wal_test.go"
+upstream_name  = "TestRelease/truncate_through_drops_entries"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_wal_truncate_through_drops_entries_up_to_index"
+status         = "ported"
+notes          = "Snapshot-driven truncate keeps only entries with index > snapshot_index."
+
+# Honest "still missing" entries.
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestCompactRevisionDrops"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Compaction RevisionCompacted error path not yet ported as upstream cross-ref test."
+
+[[upstream_test]]
+upstream_path  = "server/etcdserver/api/v3rpc/watch_test.go"
+upstream_name  = "TestWatchProgressNotification"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Watch progress notification semantics not yet covered behaviourally."
+
+[[upstream_test]]
+upstream_path  = "server/auth/store_test.go"
+upstream_name  = "TestAuthenticate"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Auth v3 authenticate flow not yet expressed as upstream-port test."
