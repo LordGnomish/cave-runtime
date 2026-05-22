@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright 2026 Cave Runtime contributors
+#
+# cave-llm-tracker — daily always-latest tracker for the local-LLM seat.
+# Upstream is multi-source (no single Git pin); see parity.manifest.toml
+# [upstream] source_sha for the per-source pin table.
+
+[package]
+name = "cave-llm-tracker"
+description = "Daily local-LLM tracker — polls HuggingFace / Ollama library / LMSys leaderboard / backend (vLLM, llama.cpp, MLX-LM) releases, benches candidates against cave-specific prompts, emits md+JSON report (Phase 0: report only, no auto-swap)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+clap = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
+
+[[bin]]
+name = "cave-llm-tracker"
+path = "src/bin/cave-llm-tracker.rs"
