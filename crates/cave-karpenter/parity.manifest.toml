@@ -413,3 +413,65 @@ loc          = 219
 priority     = "P2"
 notes        = "Karpenter is CRD-only upstream; admin/karpenter Phase 3 alongside cave-ccm."
 last_audit   = "2026-05-19"
+
+# Qwen-pump B-prime cycle 1779441287 (model=qwen3.6:35b-a3b-coding-mxfp8, success_at_retry=2)
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_module_name_20231027_001"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_upstream_repo_20231027_002"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_upstream_version_20231027_003"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_store_creation_20231027_004"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_batcher_type_exists_20231027_005"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_binpack_result_enum_20231027_006"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_instance_type_struct_20231027_007"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_instance_assignment_struct_20231027_008"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_decision_enum_20231027_009"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_disruption_reason_enum_20231027_010"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_parse_duration_valid_20231027_011"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_parse_duration_invalid_20231027_012"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_drain_status_enum_20231027_013"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_eviction_decision_enum_20231027_014"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_schedule_outcome_enum_20231027_015"
