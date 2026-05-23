@@ -458,6 +458,15 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .cave-pagination button[disabled] { opacity: 0.4; cursor: not-allowed; }
 .cave-pagination [data-current] { font-weight: 600; color: var(--blue-700); }
 
+/* ── accessibility helper ────────────────────────────────────────── */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
+}
+
 /* ── markdown render (ADR detail) ────────────────────────────────── */
 .cave-md h1 { font-size: 1.5rem; font-weight: 600; margin: 1.25rem 0 0.75rem; line-height: 1.3; }
 .cave-md h2 { font-size: 1.25rem; font-weight: 600; margin: 1rem 0 0.5rem; line-height: 1.3; }

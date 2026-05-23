@@ -20,7 +20,10 @@
 //!    with status badges + Dispatch Now controls.
 
 use crate::admin::permission::{Permission, Persona, RequestCtx};
-use crate::admin::render::{escape, page_shell_full, table, table_html as render_table_html};
+use crate::admin::render::{
+    badge, empty_state, escape, page_shell_full, search_box, sortable_table, table,
+    table_html as render_table_html,
+};
 use crate::admin::state::{AdminState, UpstreamProject, scope};
 use crate::admin::types::Cite;
 use cave_kernel::parity::DiscoveredReport;
@@ -184,7 +187,11 @@ pub fn render_watchd_panel_in(
     };
 
     let table_block = if events.is_empty() {
-        "<p class=\"text-xs text-zinc-500\">No GAP_OPENED events recorded yet — the daemon emits one per upstream release that moves past our pin.</p>".to_string()
+        empty_state(
+            "📡",
+            "No GAP events recorded yet",
+            "The watch daemon emits one event per upstream release that moves past our pin. Either no releases since the daemon last ran or the daemon hasn't started — see /admin/upstream/dispatched for last-run timing.",
+        )
     } else {
         // 2026-05-13: the `severity` cell is a pre-formatted
         // `<span class="...">label</span>` badge built upstream; use
@@ -316,7 +323,7 @@ pub fn render_tracker_section(ctx: &RequestCtx, rows: &[TrackerRow]) -> String {
     let behind = rows.iter().filter(|r| r.parity_status == "behind").count();
     let pending = rows.iter().filter(|r| r.parity_status == "pending").count();
 
-    let body_rows: String = rows
+    let table_rows: Vec<Vec<String>> = rows
         .iter()
         .map(|r| {
             let pct_text = if r.parity_overall < 0.0 {
@@ -348,55 +355,81 @@ pub fn render_tracker_section(ctx: &RequestCtx, rows: &[TrackerRow]) -> String {
                     .collect()
             };
             let status_cls = status_cell_class(&r.parity_status);
-            format!(
-                r#"<tr class="border-t">
-  <td class="px-3 py-2"><a class="text-blue-700 underline" href="https://github.com/{repo}" target="_blank" rel="noopener">{repo}</a><div class="text-[11px] text-gray-500">{name}</div></td>
-  <td class="px-3 py-2"><a class="text-blue-700 underline" href="/admin/compliance/{crate_name}?tenant_id={tenant}">{crate_name}</a></td>
-  <td class="px-3 py-2 text-xs">{category}</td>
-  <td class="px-3 py-2">{adrs}</td>
-  <td class="px-3 py-2"><div class="flex items-center gap-2"><div class="w-24 h-2 bg-gray-200 rounded"><div class="h-full rounded {bar_color}" style="width:{bar_width}%"></div></div><span class="text-xs">{pct}</span></div></td>
-  <td class="px-3 py-2"><span class="px-2 py-1 rounded text-xs {status_cls}">{status}</span></td>
-</tr>"#,
+            // Parity cell — numeric sort hint goes first (raw integer
+            // percent so localeCompare/parseFloat ranks correctly),
+            // then the visible bar + label.
+            let pct_raw = if r.parity_overall < 0.0 {
+                -1
+            } else {
+                (r.parity_overall * 100.0).round() as i32
+            };
+            let upstream_cell = format!(
+                r#"<a class="text-blue-700 underline" href="https://github.com/{repo}" target="_blank" rel="noopener">{repo}</a><div class="text-[11px] text-gray-500">{name}</div>"#,
                 repo = escape(&r.upstream_repo),
                 name = escape(&r.upstream_name),
+            );
+            let crate_cell = format!(
+                r#"<a class="text-blue-700 underline" href="/admin/compliance/{crate_name}?tenant_id={tenant}">{crate_name}</a>"#,
                 crate_name = escape(&r.cave_crate),
                 tenant = escape(ctx.tenant.as_str()),
-                category = escape(&r.category),
-                adrs = adr_chips,
+            );
+            let parity_cell = format!(
+                r#"<span class="sr-only">{pct_raw}</span><div class="flex items-center gap-2"><div class="w-24 h-2 bg-gray-200 rounded"><div class="h-full rounded {bar_color}" style="width:{bar_width}%"></div></div><span class="text-xs">{pct}</span></div>"#,
+                pct_raw = pct_raw,
                 bar_color = bar_color,
                 bar_width = bar_width,
                 pct = pct_text,
+            );
+            let status_cell = format!(
+                r#"<span class="px-2 py-1 rounded text-xs {status_cls}">{status}</span>"#,
                 status_cls = status_cls,
                 status = escape(&r.parity_status),
-            )
+            );
+            vec![
+                upstream_cell,
+                crate_cell,
+                format!(r#"<span class="text-xs">{}</span>"#, escape(&r.category)),
+                adr_chips,
+                parity_cell,
+                status_cell,
+            ]
         })
         .collect();
+
+    let table_html = sortable_table(
+        "upstream-tracker",
+        &[
+            ("Upstream", "text"),
+            ("Cave crate", "text"),
+            ("Category", "text"),
+            ("ADR", "text"),
+            ("Parity", "num"),
+            ("Status", "text"),
+        ],
+        &table_rows,
+    );
+
+    let search = search_box("#upstream-tracker", "Filter by repo, crate, ADR…");
 
     format!(
         r#"<section class="mb-6">
   <div class="flex items-baseline justify-between mb-2">
     <h2 class="text-lg font-semibold">Upstream Parity Tracker ({total})</h2>
     <div class="flex gap-2 text-xs">
-      <span class="px-2 py-1 rounded bg-green-100 text-green-900">{synced} synced</span>
-      <span class="px-2 py-1 rounded bg-yellow-100 text-yellow-900">{behind} behind</span>
-      <span class="px-2 py-1 rounded bg-red-100 text-red-900">{pending} pending</span>
+      {ok}
+      {warn}
+      {bad}
     </div>
   </div>
-  <p class="text-xs text-gray-500 mb-3">ADR-aware view of the upstream OSS projects re-implemented inside cave-runtime. Source: <code>cave_upstream::TRACKED_PROJECTS</code> joined with parity manifests.</p>
-  <table class="min-w-full text-sm border-collapse">
-    <thead class="bg-gray-100">
-      <tr>
-        <th class="px-3 py-2 text-left">Upstream</th>
-        <th class="px-3 py-2 text-left">Cave crate</th>
-        <th class="px-3 py-2 text-left">Category</th>
-        <th class="px-3 py-2 text-left">ADR</th>
-        <th class="px-3 py-2 text-left">Parity</th>
-        <th class="px-3 py-2 text-left">Status</th>
-      </tr>
-    </thead>
-    <tbody>{body_rows}</tbody>
-  </table>
-</section>"#
+  <p class="text-xs text-gray-500 mb-3">ADR-aware view of the upstream OSS projects re-implemented inside cave-runtime. Click a column header to sort. Source: <code>cave_upstream::TRACKED_PROJECTS</code> joined with parity manifests.</p>
+  {search}
+  {tbl}
+</section>"#,
+        ok = badge("ok", &format!("{synced} synced")),
+        warn = badge("warn", &format!("{behind} behind")),
+        bad = badge("bad", &format!("{pending} pending")),
+        search = search,
+        tbl = table_html,
     )
 }
 
@@ -545,7 +578,11 @@ pub fn render_auto_port_panel_in(
     };
 
     let table_block = if records.is_empty() {
-        "<p class=\"text-xs text-zinc-500\">No auto-port records yet — the dispatcher writes one row per dispatched gap (see <code>cave-upstream-watchd dispatch</code>).</p>".to_string()
+        empty_state(
+            "🛰️",
+            "No auto-port records yet",
+            "The dispatcher writes one row per dispatched gap. Run `cave-upstream-watchd dispatch` (or check the LaunchAgent at com.cave.upstream-watchd) to populate this.",
+        )
     } else {
         // 2026-05-13: `status` cell is a pre-formatted `<span>` badge;
         // use table_html so it renders styled instead of as literal text.
@@ -899,7 +936,12 @@ mod tests {
             Persona::PlatformAdmin,
         );
         let html = render_watchd_panel_in(&plat_ctx, &path, 10);
-        assert!(html.contains("No GAP_OPENED events"));
+        // 2026-05-22 — moved from inline `<p>` copy to the `empty_state`
+        // primitive; assert on the shared role+class so the visual
+        // treatment is locked in.
+        assert!(html.contains(r#"class="cave-empty""#));
+        assert!(html.contains(r#"role="status""#));
+        assert!(html.contains("No GAP events recorded yet"));
     }
 
     #[test]
