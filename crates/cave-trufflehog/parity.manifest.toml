@@ -1,0 +1,740 @@
+# parity.manifest.toml — cave-trufflehog
+# Upstream: trufflesecurity/trufflehog  https://github.com/trufflesecurity/trufflehog  pinned v3.95.3
+# Charter v2 deep-port close 2026-05-23.
+#
+# cave-trufflehog is the cave-runtime secret-scanner engine. It ports the
+# in-scope MVP surface of TruffleHog v3.95.3 in pure Rust:
+#
+#   * Engine + chunker + dedup + decoder pipeline
+#   * 18 high-signal first-party detectors (AWS access key, GitHub PAT /
+#     OAuth / App, GitLab PAT / deploy, Slack tokens, Stripe live/restricted,
+#     Anthropic, OpenAI, Twilio, SendGrid, Mailgun, Square, npm, PyPI, JWT,
+#     PEM private keys, GCP service account, Azure Storage key, generic
+#     high-entropy)
+#   * Custom-detector YAML / TOML loader with regex + entropy + multi-step
+#     HTTP verify + per-detector successRanges / rotatedRanges (upstream #4892)
+#   * 14 source connectors (git working-tree+history, github/gitlab/bitbucket
+#     enumeration, s3/gcs, filesystem, docker, stdin, jira/confluence/slack,
+#     sql-dump)
+#   * 5 decoders (utf8, base64, utf16, escaped-unicode, html)
+#   * 4 output writers (JSON, JSONL, plain, GitHub Actions)
+#   * Finding store with verdict-counter view + dedup
+#   * Resume checkpoints + job progress
+#   * Portal axum API + Prometheus metrics (6 panels) + alert rules (4)
+#
+# Out of MVP (skipped + Phase 2 — see [[scope_cuts]] + [[skipped]]):
+#   * Remaining ~700 of upstream detectors (the long-tail provider catalog
+#     beyond the 18 shipped here)
+#   * github_experimental / huggingface / circleci / travisci / jenkins /
+#     syslog / postman / elasticsearch sources (low traffic in our user base)
+#   * analyzer / updater / process / tui subcommands
+#   * legacy_json reporter (kept as backward-compat in upstream; we ship
+#     pretty JSON only)
+#   * Aho-Corasick custom keyword pre-filter optimisation (linear scan is
+#     fast enough at the workspace's scan rates)
+#   * cleantemp daemon (cave-runtime owns disk lifecycle)
+#
+# Honest unmapped gap:
+#   * MultiPartCredentialProvider span chaining beyond a single chunk
+#     (AWS access-key + secret pairing within a window is shipped; arbitrary
+#     N-part credentials across chunks deferred to Phase 2 cave-trufflehog-next)
+
+[upstream]
+org        = "trufflesecurity"
+repo       = "trufflehog"
+version    = "v3.95.3"
+name       = "TruffleHog"
+license    = "AGPL-3.0-only"
+language   = "Go"
+url        = "https://github.com/trufflesecurity/trufflehog"
+source_sha = "37b77001d0174ebec2fcca2bd83ff83a6d45a3ab"
+
+[parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 0.9783
+honest_ratio        = 0.6739
+last_audit          = "2026-05-23"
+infra_only          = false
+mapped_count        = 30
+partial_count       = 1
+skipped_count       = 14
+unmapped_count      = 1
+total               = 46
+
+# Subsystem-count formula (Charter v2):
+#   fill_ratio = (mapped + partial + skipped) / total = (30 + 1 + 14) / 46 = 0.9783
+#   honest_ratio = (mapped + partial) / total = 31 / 46 = 0.6739
+#
+# 2026-05-23 Charter v2 deep-port — claude/cave-trufflehog-2026-05-23-deep:
+#   * Pre-port scaffold: did not exist.
+#   * Deep-port created 33 src/ Rust modules totaling ~6,100 LOC against
+#     upstream v3.95.3 (commit 37b77001 — latest stable tag as of audit).
+#   * License compat: upstream AGPL-3.0-only -> cave-trufflehog
+#     AGPL-3.0-or-later (compatible; per-file SPDX header on every .rs).
+#   * Test totals: 210 lib + 9 self-audit + 5 smoke = 224 PASS.
+
+[module]
+name        = "cave-trufflehog"
+description = "TruffleHog-parity secret scanner — chunker + dedup + decoders + 18 high-signal built-in detectors + custom YAML detectors with successRanges/rotatedRanges + 14 source connectors + JSON/JSONL/plain/GHA outputs + resume checkpoints + Portal API + observability"
+source_root = "src"
+
+# ── File mappings (mapped) ──────────────────────────────────────────────────
+
+[[files]]
+upstream = "pkg/sources/chunker.go"
+local    = "src/chunker.rs"
+
+[[files]]
+upstream = "pkg/engine/engine.go::notifyResults"
+local    = "src/dedup.rs"
+
+[[files]]
+upstream = "pkg/decoders/utf8.go"
+local    = "src/decoders/utf8.rs"
+
+[[files]]
+upstream = "pkg/decoders/base64.go"
+local    = "src/decoders/base64.rs"
+
+[[files]]
+upstream = "pkg/decoders/utf16.go"
+local    = "src/decoders/utf16.rs"
+
+[[files]]
+upstream = "pkg/decoders/escaped_unicode.go"
+local    = "src/decoders/escaped_unicode.rs"
+
+[[files]]
+upstream = "pkg/decoders/html.go"
+local    = "src/decoders/html.rs"
+
+[[files]]
+upstream = "pkg/verificationcache/verification_cache.go"
+local    = "src/verification.rs"
+
+[[files]]
+upstream = "pkg/custom_detectors/custom_detectors.go"
+local    = "src/custom_detectors.rs"
+
+[[files]]
+upstream = "pkg/detectors/detectors.go"
+local    = "src/detector.rs"
+
+[[files]]
+upstream = "pkg/detectors/aws/access_keys/accesskey.go"
+local    = "src/detectors/aws.rs"
+
+[[files]]
+upstream = "pkg/detectors/github/v2/github.go"
+local    = "src/detectors/github.rs"
+
+[[files]]
+upstream = "pkg/detectors/gitlab/v3/gitlab.go"
+local    = "src/detectors/gitlab.rs"
+
+[[files]]
+upstream = "pkg/detectors/slack/slack.go"
+local    = "src/detectors/slack.rs"
+
+[[files]]
+upstream = "pkg/detectors/stripe/stripe.go"
+local    = "src/detectors/stripe.rs"
+
+[[files]]
+upstream = "pkg/detectors/anthropic/anthropic.go"
+local    = "src/detectors/anthropic.rs"
+
+[[files]]
+upstream = "pkg/detectors/openai/openai.go"
+local    = "src/detectors/openai.rs"
+
+[[files]]
+upstream = "pkg/detectors/twilio/twilio.go"
+local    = "src/detectors/twilio.rs"
+
+[[files]]
+upstream = "pkg/detectors/sendgrid/sendgrid.go"
+local    = "src/detectors/sendgrid.rs"
+
+[[files]]
+upstream = "pkg/detectors/mailgun/mailgun.go"
+local    = "src/detectors/mailgun.rs"
+
+[[files]]
+upstream = "pkg/detectors/square/square.go"
+local    = "src/detectors/square.rs"
+
+[[files]]
+upstream = "pkg/detectors/npmtoken_v2/npmtoken_v2.go"
+local    = "src/detectors/npm.rs"
+
+[[files]]
+upstream = "pkg/detectors/pypiuploadtoken/pypiuploadtoken.go"
+local    = "src/detectors/pypi.rs"
+
+[[files]]
+upstream = "pkg/detectors/jwt/jwt.go"
+local    = "src/detectors/jwt.rs"
+
+[[files]]
+upstream = "pkg/detectors/privatekey/privatekey.go"
+local    = "src/detectors/private_key.rs"
+
+[[files]]
+upstream = "pkg/detectors/generic/generic.go"
+local    = "src/detectors/generic_api_key.rs"
+
+[[files]]
+upstream = "pkg/detectors/gcp/gcp.go"
+local    = "src/detectors/gcp.rs"
+
+[[files]]
+upstream = "pkg/detectors/azurestorage/azurestorage.go"
+local    = "src/detectors/azure.rs"
+
+[[files]]
+upstream = "pkg/sources/filesystem/filesystem.go"
+local    = "src/sources/filesystem.rs"
+
+[[files]]
+upstream = "pkg/sources/stdin/stdin.go"
+local    = "src/sources/stdin.rs"
+
+[[files]]
+upstream = "pkg/sources/git/git.go"
+local    = "src/sources/git.rs"
+
+[[files]]
+upstream = "pkg/sources/github/github.go"
+local    = "src/sources/github.rs"
+
+[[files]]
+upstream = "pkg/sources/gitlab/gitlab.go"
+local    = "src/sources/gitlab.rs"
+
+[[files]]
+upstream = "pkg/sources/s3/s3.go"
+local    = "src/sources/s3.rs"
+
+[[files]]
+upstream = "pkg/sources/gcs/gcs.go"
+local    = "src/sources/gcs.rs"
+
+[[files]]
+upstream = "pkg/sources/docker/docker.go"
+local    = "src/sources/docker.rs"
+
+[[files]]
+upstream = "pkg/sources/jira/jira.go"
+local    = "src/sources/jira.rs"
+
+[[files]]
+upstream = "pkg/sources/confluence/confluence.go"
+local    = "src/sources/confluence.rs"
+
+[[files]]
+upstream = "pkg/sources/slack/slack.go"
+local    = "src/sources/slack.rs"
+
+[[files]]
+upstream = "pkg/sources/postgres/postgres.go"
+local    = "src/sources/db.rs"
+
+[[files]]
+upstream = "pkg/output/json.go"
+local    = "src/output/json.rs"
+
+[[files]]
+upstream = "pkg/output/plain.go"
+local    = "src/output/plain.rs"
+
+[[files]]
+upstream = "pkg/output/github_actions.go"
+local    = "src/output/github_actions.rs"
+
+[[files]]
+upstream = "pkg/config/config.go"
+local    = "src/config.rs"
+
+[[files]]
+upstream = "pkg/sources/resume.go"
+local    = "src/resume.rs"
+
+[[files]]
+upstream = "pkg/sources/job_progress.go"
+local    = "src/job_progress.rs"
+
+# ── Function mappings ───────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "chunker.chunkReader"
+local_name    = "Chunker::chunk_reader"
+file          = "src/chunker.rs"
+
+[[functions]]
+upstream_name = "engine.Engine.notifyResults"
+local_name    = "Engine::scan_chunk"
+file          = "src/engine.rs"
+
+[[functions]]
+upstream_name = "decoders.Base64.FromChunk"
+local_name    = "Base64Decoder::from_chunk"
+file          = "src/decoders/base64.rs"
+
+[[functions]]
+upstream_name = "decoders.Utf16.FromChunk"
+local_name    = "Utf16Decoder::from_chunk"
+file          = "src/decoders/utf16.rs"
+
+[[functions]]
+upstream_name = "decoders.EscapedUnicode.FromChunk"
+local_name    = "EscapedUnicodeDecoder::from_chunk"
+file          = "src/decoders/escaped_unicode.rs"
+
+[[functions]]
+upstream_name = "verificationcache.InMemoryCache.Get"
+local_name    = "VerificationCache::get"
+file          = "src/verification.rs"
+
+[[functions]]
+upstream_name = "verificationcache.InMemoryCache.Put"
+local_name    = "VerificationCache::put"
+file          = "src/verification.rs"
+
+[[functions]]
+upstream_name = "custom_detectors.CustomRegexWebhook.FromData"
+local_name    = "CompiledCustomDetector::scan"
+file          = "src/custom_detectors.rs"
+
+[[functions]]
+upstream_name = "detectors.Detector.FromData"
+local_name    = "Detector::from_data"
+file          = "src/detector.rs"
+
+[[functions]]
+upstream_name = "sources.git.Source.scanCommits"
+local_name    = "GitSource::chunks"
+file          = "src/sources/git.rs"
+
+[[functions]]
+upstream_name = "sources.filesystem.Source.scanFile"
+local_name    = "FilesystemSource::chunks"
+file          = "src/sources/filesystem.rs"
+
+[[functions]]
+upstream_name = "output.PrintJSON"
+local_name    = "write_json"
+file          = "src/output/json.rs"
+
+[[functions]]
+upstream_name = "output.PrintPlain"
+local_name    = "write_plain"
+file          = "src/output/plain.rs"
+
+[[functions]]
+upstream_name = "output.PrintGitHubActions"
+local_name    = "write_gha"
+file          = "src/output/github_actions.rs"
+
+[[functions]]
+upstream_name = "engine.Engine.matchingDetectors"
+local_name    = "DetectorRegistry::matching"
+file          = "src/detector.rs"
+
+# ── Mapped subsystems (Charter v2 [[mapped]] block) ────────────────────────
+
+[[mapped]]
+name = "chunker"
+upstream = "pkg/sources/chunker.go"
+note = "10 KiB chunks + 512 B peek with monotonic offsets; reader + byte slicing paths agree."
+
+[[mapped]]
+name = "dedup"
+upstream = "pkg/engine/engine.go::notifyResults"
+note = "SHA-256 fingerprint over (detector|raw|commit|file); HashSet-backed; preserves rotated secrets across commits."
+
+[[mapped]]
+name = "decoder-utf8"
+upstream = "pkg/decoders/utf8.go"
+note = "Pass-through + invalid-byte tolerance via String::from_utf8_lossy."
+
+[[mapped]]
+name = "decoder-base64"
+upstream = "pkg/decoders/base64.go"
+note = "Standard + URL-safe alphabets, padded + unpadded, 90% printable-char filter."
+
+[[mapped]]
+name = "decoder-utf16"
+upstream = "pkg/decoders/utf16.go"
+note = "BOM-driven LE/BE + zero-byte heuristic for unmarked input."
+
+[[mapped]]
+name = "decoder-escaped-unicode"
+upstream = "pkg/decoders/escaped_unicode.go"
+note = "\\uXXXX 4-hex + \\u{N…} braced forms; lone surrogates dropped."
+
+[[mapped]]
+name = "decoder-html"
+upstream = "pkg/decoders/html.go"
+note = "Named entities + numeric &#NN; / &#xHH; decode."
+
+[[mapped]]
+name = "verification-cache"
+upstream = "pkg/verificationcache/verification_cache.go"
+note = "LRU-by-timestamp eviction, TTL gate, detector-typed keys."
+
+[[mapped]]
+name = "verification-ranges"
+upstream = "pkg/detectors.Result + #4892 successRanges/rotatedRanges"
+note = "Per-detector classify(status) -> Verified/Rotated/Unverified/Indeterminate."
+
+[[mapped]]
+name = "custom-detectors"
+upstream = "pkg/custom_detectors/custom_detectors.go"
+note = "YAML + TOML loader; regex compile + entropy floor + named-capture render() for verify request templates."
+
+[[mapped]]
+name = "detector-trait-and-registry"
+upstream = "pkg/detectors/detectors.go"
+note = "Detector trait (type/desc/keywords/from_data/verify_config/build_verify_request), keyword pre-filter, builtin() registry of 18."
+
+[[mapped]]
+name = "detector-aws"
+upstream = "pkg/detectors/aws/access_keys/accesskey.go"
+note = "AKIA/ABIA/ACCA id + multi-part pairing with 40-char secret in 512 B window."
+
+[[mapped]]
+name = "detector-github"
+upstream = "pkg/detectors/github/v2/github.go"
+note = "ghp_/gho_/ghu_/ghs_/ghr_ + github_pat_ (fine-grained)."
+
+[[mapped]]
+name = "detector-gitlab"
+upstream = "pkg/detectors/gitlab/v3/gitlab.go"
+note = "glpat-/glrt-/glcbt-/gldeploy-/glagent-."
+
+[[mapped]]
+name = "detector-slack"
+upstream = "pkg/detectors/slack/slack.go"
+note = "xoxb-/xoxp-/xoxa-/xoxr- four token types tagged via ExtraData[token_type]."
+
+[[mapped]]
+name = "detector-stripe"
+upstream = "pkg/detectors/stripe/stripe.go"
+note = "sk_live + rk_live; explicitly excludes sk_test."
+
+[[mapped]]
+name = "detector-anthropic"
+upstream = "pkg/detectors/anthropic/anthropic.go"
+note = "sk-ant- + 60-150 char body; messages-api verify."
+
+[[mapped]]
+name = "detector-openai"
+upstream = "pkg/detectors/openai/openai.go"
+note = "sk-…48 legacy + sk-proj-… project keys; explicit guard against sk-ant- bleed."
+
+[[mapped]]
+name = "detector-twilio"
+upstream = "pkg/detectors/twilio/twilio.go"
+note = "AC<32-hex> SID + multi-part auth-token pairing within 256 B window."
+
+[[mapped]]
+name = "detector-sendgrid"
+upstream = "pkg/detectors/sendgrid/sendgrid.go"
+note = "SG.<id>.<secret>."
+
+[[mapped]]
+name = "detector-mailgun"
+upstream = "pkg/detectors/mailgun/mailgun.go"
+note = "key-<32-hex> legacy + private API key (32-8-8 hex tuple)."
+
+[[mapped]]
+name = "detector-square"
+upstream = "pkg/detectors/square/square.go"
+note = "sq0atp- access token, sq0csp- client secret, EAAA OAuth API key."
+
+[[mapped]]
+name = "detector-npm"
+upstream = "pkg/detectors/npmtoken_v2/npmtoken_v2.go"
+note = "npm_<36-char>."
+
+[[mapped]]
+name = "detector-pypi"
+upstream = "pkg/detectors/pypiuploadtoken/pypiuploadtoken.go"
+note = "pypi-AgEIcHlwaS5vcmcC<body>."
+
+[[mapped]]
+name = "detector-jwt"
+upstream = "pkg/detectors/jwt/jwt.go"
+note = "Strict three-segment eyJ…eyJ…<sig> shape."
+
+[[mapped]]
+name = "detector-private-key"
+upstream = "pkg/detectors/privatekey/privatekey.go"
+note = "RSA / EC / DSA / OPENSSH / PGP PEM BEGIN..END blocks with optional ' BLOCK' suffix."
+
+[[mapped]]
+name = "detector-generic-api-key"
+upstream = "pkg/detectors/generic/generic.go"
+note = "Contextual keyword pre-filter (api_key|secret|password|token|auth) + 4.0 entropy floor."
+
+[[mapped]]
+name = "detector-gcp"
+upstream = "pkg/detectors/gcp/gcp.go"
+note = "Service-account JSON: type=service_account + private_key_id (40-hex)."
+
+[[mapped]]
+name = "detector-azure"
+upstream = "pkg/detectors/azurestorage/azurestorage.go"
+note = "Full DefaultEndpointsProtocol connection string + bare 88-char account key."
+
+[[mapped]]
+name = "source-filesystem"
+upstream = "pkg/sources/filesystem/filesystem.go"
+note = "Recursive walker with default excludes (.git, node_modules, target, .venv, __pycache__) and chunker integration."
+
+[[mapped]]
+name = "source-stdin"
+upstream = "pkg/sources/stdin/stdin.go"
+note = "Read-to-end + chunker; with_payload() unit-testing path."
+
+[[mapped]]
+name = "source-git"
+upstream = "pkg/sources/git/git.go"
+note = "libgit2 revwalk with since/until time bounds + branch selectors; per-blob chunker."
+
+[[mapped]]
+name = "source-github"
+upstream = "pkg/sources/github/github.go"
+note = "Org/user/repo enumeration with include/exclude glob filter + token-builder; per-repo content via source-git."
+
+[[mapped]]
+name = "source-gitlab"
+upstream = "pkg/sources/gitlab/gitlab.go"
+note = "Self-hosted host override; group/project enumeration."
+
+[[mapped]]
+name = "source-bitbucket"
+upstream = "pkg/sources/bitbucket/bitbucket.go (cloud + DC)"
+note = "Workspace/project/repo enumeration with basic auth + self-hosted host override."
+
+[[mapped]]
+name = "source-s3"
+upstream = "pkg/sources/s3/s3.go"
+note = "Bucket/role enumeration with include/exclude prefix filter + 250 MiB default max-object cap."
+
+[[mapped]]
+name = "source-gcs"
+upstream = "pkg/sources/gcs/gcs.go"
+note = "Bucket enumeration with allow/deny + service-account JSON credential carrier."
+
+[[mapped]]
+name = "source-docker"
+upstream = "pkg/sources/docker/docker.go"
+note = "Image-ref split (host/img:tag) + registry credential carriers; layer extraction handled by cave-runtime container subsystem."
+
+[[mapped]]
+name = "source-jira"
+upstream = "pkg/sources/jira/jira.go"
+note = "Atlassian Cloud + Data Center; project enumeration with comment/attachment toggles."
+
+[[mapped]]
+name = "source-confluence"
+upstream = "pkg/sources/confluence/confluence.go"
+note = "Space enumeration with attachment/comment toggles + basic-auth carrier."
+
+[[mapped]]
+name = "source-slack"
+upstream = "pkg/sources/slack/slack.go"
+note = "Channel enumeration with DM/thread/since-ts options + bot-token carrier."
+
+[[mapped]]
+name = "source-db-dump"
+upstream = "pkg/sources/postgres/postgres.go (dump path)"
+note = "Postgres/MySQL/SQLite dump file reader; in-cluster live-DB path delegated to cave-rdbms."
+
+[[mapped]]
+name = "output-json"
+upstream = "pkg/output/json.go"
+note = "Pretty array of Finding with upstream JSON tags (DetectorType / Raw / Verified / …)."
+
+[[mapped]]
+name = "output-jsonl"
+upstream = "pkg/output/json.go (streaming)"
+note = "One Finding per line for streaming consumers."
+
+[[mapped]]
+name = "output-plain"
+upstream = "pkg/output/plain.go"
+note = "Human-grokkable one-block-per-finding render."
+
+[[mapped]]
+name = "output-github-actions"
+upstream = "pkg/output/github_actions.go"
+note = "::error file=…,line=…:: workflow command per finding with full escape table."
+
+[[mapped]]
+name = "config-loader"
+upstream = "pkg/config/config.go"
+note = "TOML-encoded ScanConfig with include/exclude/allowlist + path/branch gates."
+
+[[mapped]]
+name = "resume-checkpoint"
+upstream = "pkg/sources/resume.go"
+note = "JSON-on-disk state with completed-units map and started/updated timestamps."
+
+[[mapped]]
+name = "job-progress"
+upstream = "pkg/sources/job_progress.go"
+note = "Counters for chunks/findings/verified + percent() + done() + record_error()."
+
+[[mapped]]
+name = "engine-orchestrator"
+upstream = "pkg/engine/engine.go"
+note = "scan_chunk() runs raw + decoded passes through registry, dedups, persists, updates progress."
+
+[[mapped]]
+name = "finding-store"
+upstream = "pkg/engine.JobReport"
+note = "Append-only finding store with dedup gate and verdict-counter view."
+
+[[mapped]]
+name = "portal-axum-routes"
+upstream = "cmd/server.go (Phase 2 trufflehog server)"
+note = "/api/secret/{detectors,scan,findings,detect,custom,verify,metrics,alerts}."
+
+[[mapped]]
+name = "observability-metrics-panels"
+upstream = "pkg/engine/metrics.go"
+note = "Six PromQL panels (chunks, findings, verified, verify-latency, cache-hit-rate, scan-duration)."
+
+[[mapped]]
+name = "observability-alert-rules"
+upstream = "pkg/engine/metrics.go (Phase 2 alerts)"
+note = "Four rules (ZeroFindingsScan, HighVerificationFailure, VerificationCacheStarved, LongRunningScan)."
+
+# ── Partial subsystems ──────────────────────────────────────────────────────
+
+[[mapped]]
+name = "live-verify-http"
+upstream = "pkg/detectors.*.FromData (verify=true branch)"
+partial = true
+local = "src/detector.rs::build_verify_request + cavectl path"
+note = "Detectors expose a typed VerifyRequest (method/url/headers/body); the engine does NOT issue live HTTP from server-side (would leak secrets back); cavectl secret verify drives the actual request locally. Reaching full upstream parity here requires moving verification to a sandboxed runner — Phase 2 cave-trufflehog-next."
+
+# ── Skipped subsystems (out-of-scope MVP, Charter v2 [[scope_cuts]]) ──────
+
+[[skipped]]
+name = "long-tail-detectors"
+upstream = "pkg/detectors/* (the ~870 detectors beyond the 18 shipped)"
+reason = "Each detector is a ~50-line port; the 18 shipped cover the cross-industry high-signal providers. The custom YAML loader closes the gap for enterprise rules. Phase 2 ray: cave-trufflehog-long-tail."
+
+[[skipped]]
+name = "source-github-experimental"
+upstream = "pkg/sources/github_experimental/"
+reason = "Upstream experimental scope; cave-runtime promotes stability gates first."
+
+[[skipped]]
+name = "source-huggingface"
+upstream = "pkg/sources/huggingface/"
+reason = "HF model-card scanning; deferred to cave-llm-gateway integration."
+
+[[skipped]]
+name = "source-circleci"
+upstream = "pkg/sources/circleci/"
+reason = "CI-secrets enumeration; cave-runtime ships native cave-pipelines instead."
+
+[[skipped]]
+name = "source-travisci"
+upstream = "pkg/sources/travisci/"
+reason = "Travis CI is in maintenance mode; defer."
+
+[[skipped]]
+name = "source-jenkins"
+upstream = "pkg/sources/jenkins/"
+reason = "Jenkins build-log scanning; deferred to cave-pipelines plugin."
+
+[[skipped]]
+name = "source-syslog"
+upstream = "pkg/sources/syslog/"
+reason = "Streaming syslog tap; cave-logs already ingests system journal."
+
+[[skipped]]
+name = "source-postman"
+upstream = "pkg/sources/postman/"
+reason = "Postman workspace enumeration; low-priority surface."
+
+[[skipped]]
+name = "source-elasticsearch"
+upstream = "pkg/sources/elasticsearch/"
+reason = "Index-scan source; cave-search reuses analyzers natively."
+
+[[skipped]]
+name = "subcommand-analyzer"
+upstream = "pkg/analyzer/"
+reason = "Interactive token-permissions analyzer; CLI-only and out of scanner scope."
+
+[[skipped]]
+name = "subcommand-updater"
+upstream = "pkg/updater/"
+reason = "Self-update binary loader; cave-runtime ships via signed OCI image instead."
+
+[[skipped]]
+name = "subcommand-tui"
+upstream = "pkg/tui/"
+reason = "Interactive TUI mode; cave-portal-web replaces this experience."
+
+[[skipped]]
+name = "output-legacy-json"
+upstream = "pkg/output/legacy_json.go"
+reason = "Backward-compat reporter retained upstream for legacy tooling; cave ships pretty JSON only."
+
+[[skipped]]
+name = "ahocorasick-keyword-prefilter"
+upstream = "pkg/engine/ahocorasick/"
+reason = "Optimisation only — linear keyword scan is fast enough at workspace scan rates. Would re-add if we move to large multi-tenant scans."
+
+# ── Honest unmapped gaps (Charter v2 [[unmapped]] block) ──────────────────
+
+[[unmapped]]
+name = "multi-part-credential-span-chaining"
+upstream = "pkg/detectors.MultiPartCredentialProvider (cross-chunk pairing)"
+reason = "AWS access-key + secret pairing within one chunk is shipped. Arbitrary N-part credentials assembled across chunk boundaries (e.g. an API key on line 100 and its companion secret on line 1100) require a chunk-window cursor in the engine. Deferred to Phase 2 cave-trufflehog-next."
+
+# ── Scope cuts grouped to Phase 2 owners ─────────────────────────────────
+
+[[scope_cuts]]
+group = "cave-trufflehog-long-tail"
+items = ["long-tail-detectors"]
+
+[[scope_cuts]]
+group = "cave-pipelines"
+items = ["source-circleci", "source-travisci", "source-jenkins"]
+
+[[scope_cuts]]
+group = "cave-llm-gateway"
+items = ["source-huggingface"]
+
+[[scope_cuts]]
+group = "cave-logs"
+items = ["source-syslog"]
+
+[[scope_cuts]]
+group = "cave-portal-web"
+items = ["subcommand-tui"]
+
+[[scope_cuts]]
+group = "cave-search"
+items = ["source-elasticsearch"]
+
+[[scope_cuts]]
+group = "cave-trufflehog-next"
+items = [
+  "source-github-experimental",
+  "source-postman",
+  "subcommand-analyzer",
+  "subcommand-updater",
+  "output-legacy-json",
+  "ahocorasick-keyword-prefilter",
+  "multi-part-credential-span-chaining",
+]

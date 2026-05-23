@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright 2026 Cave Runtime contributors
+#
+# cave-trufflehog — secret scanner (TruffleHog v3.95.3 deep-port)
+# Upstream: trufflesecurity/trufflehog v3.95.3 (commit 37b77001d0174ebec2fcca2bd83ff83a6d45a3ab)
+# Upstream license: AGPL-3.0-only (Truffle Security Co.); cave-trufflehog is AGPL-3.0-or-later.
+
+[package]
+name = "cave-trufflehog"
+description = "Secret scanner — TruffleHog parity: 18 high-signal first-party detectors + YAML custom-detector loader (regex+entropy+multi-step HTTP verify+successRanges/rotatedRanges), 14 source connectors (git working-tree+history, github/gitlab/bitbucket, s3/gcs, filesystem, docker, stdin, jira/confluence/slack, sql dumps), worker-pool engine with dedup + chunker + decoders (base64/utf16/utf8/escaped-unicode/html), JSON/JSONL/GitHub-Actions/plain reporters, resume checkpoints, Portal axum API + Prometheus metrics + alert rules"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+cave-auth = { path = "../cave-auth" }
+
+# Web
+axum = { workspace = true }
+tower = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+toml = { workspace = true }
+
+# Scanning primitives
+regex = { workspace = true }
+aho-corasick = { workspace = true }
+
+# Crypto / hashing for dedup + entropy
+sha2 = { workspace = true }
+hex = { workspace = true }
+base64 = { workspace = true }
+
+# Git source
+git2 = { version = "0.19", default-features = false }
+
+# HTTP verify
+reqwest = { workspace = true }
+
+# Utilities
+chrono = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { workspace = true }
