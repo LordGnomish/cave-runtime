@@ -1516,15 +1516,19 @@
     },
     "cave-sign": {
       "cave_src_loc": 183,
-      "honest_ratio": 0.0,
-      "infra_only": true,
-      "last_audit_disk": "2026-05-12",
+      "honest_ratio": 0.5385,
+      "last_audit_disk": "2026-05-22",
       "manifest_filled": true,
+      "mapped_count": 20,
       "note": "skeleton \u2014 needs real impl",
-      "parity_ratio": 0.0,
+      "parity_ratio": 0.9487,
       "parity_ratio_source": "manifest",
+      "partial_count": 1,
+      "skipped_count": 16,
       "stubs": null,
       "tier": "D1",
+      "total_count": 39,
+      "unmapped_count": 2,
       "upstream": "sigstore/sigstore",
       "upstream_version": "v1.8.0"
     },
@@ -1761,7 +1765,7 @@
     "injected": 10,
     "new_filled": 95,
     "phantoms": 0,
-    "ratio_overrides": 57
+    "ratio_overrides": 58
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"

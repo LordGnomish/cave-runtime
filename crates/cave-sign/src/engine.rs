@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+//! Engine — pure-function helpers over `Vec<SignedArtifact>`.
+//!
+//! Kept for backwards compatibility with the scaffold; new callers should
+//! use `SignedArtifactStore` (src/store.rs).
+
 use crate::models::{ArtifactType, SignedArtifact, VerifyResult};
 
 pub fn is_valid_digest(digest: &str) -> bool {
@@ -38,6 +43,21 @@ pub fn filter_by_type<'a>(
 
 pub fn count_verified(artifacts: &[SignedArtifact]) -> usize {
     artifacts.iter().filter(|a| a.verified).count()
+}
+
+/// Build a VerifyResult struct from a verification outcome.
+pub fn result_for(
+    digest: &str,
+    signer: Option<&str>,
+    valid: bool,
+    reason: Option<&str>,
+) -> VerifyResult {
+    VerifyResult {
+        artifact_digest: digest.to_string(),
+        valid,
+        signer: signer.map(str::to_string),
+        reason: reason.map(str::to_string),
+    }
 }
 
 #[cfg(test)]
@@ -84,6 +104,12 @@ mod tests {
     }
 
     #[test]
+    fn test_invalid_digest_nonhex() {
+        let bad = format!("sha256:{}", "z".repeat(64));
+        assert!(!is_valid_digest(&bad));
+    }
+
+    #[test]
     fn test_find_signatures_by_digest() {
         let artifacts = vec![
             make_artifact(
@@ -117,6 +143,17 @@ mod tests {
     }
 
     #[test]
+    fn test_filter_by_type() {
+        let artifacts = vec![
+            make_artifact(VALID_DIGEST, "a", true, ArtifactType::Sbom),
+            make_artifact(VALID_DIGEST, "b", true, ArtifactType::Binary),
+            make_artifact(VALID_DIGEST, "c", true, ArtifactType::Sbom),
+        ];
+        let sboms = filter_by_type(&artifacts, &ArtifactType::Sbom);
+        assert_eq!(sboms.len(), 2);
+    }
+
+    #[test]
     fn test_count_verified() {
         let artifacts = vec![
             make_artifact(
@@ -129,5 +166,15 @@ mod tests {
             make_artifact(VALID_DIGEST, "carol@example.com", true, ArtifactType::Chart),
         ];
         assert_eq!(count_verified(&artifacts), 2);
+    }
+
+    #[test]
+    fn test_result_for() {
+        let r = result_for(VALID_DIGEST, Some("alice"), true, None);
+        assert!(r.valid);
+        assert_eq!(r.signer.as_deref(), Some("alice"));
+        let r2 = result_for(VALID_DIGEST, None, false, Some("bad sig"));
+        assert!(!r2.valid);
+        assert_eq!(r2.reason.as_deref(), Some("bad sig"));
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "cave-sign"
-description = "Image signing & verification — compatible with Sigstore Policy Controller"
+description = "Artifact signing & verification — Sigstore Cosign reimplementation (keypair + keyless + Fulcio + Rekor + SLSA attestation + policy)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,13 +9,34 @@ license.workspace = true
 cave-core = { path = "../cave-core" }
 cave-auth = { path = "../cave-auth" }
 cave-db = { path = "../cave-db" }
+
+# Web
 axum = { workspace = true }
+tower = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+
+# Serialization
 serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
+
+# Utilities
 uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
+
+# Crypto
 ring = { workspace = true }
 ed25519-dalek = { workspace = true }
+p256 = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+base64 = { workspace = true }
+
+# Rekor / Fulcio HTTP clients
+reqwest = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
