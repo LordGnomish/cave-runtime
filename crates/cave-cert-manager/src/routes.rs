@@ -10,7 +10,9 @@
 
 use crate::controller::{CertControlPlane, ReconcileResult};
 use crate::error::CertManagerError;
+use crate::metrics::CertManagerMetrics;
 use crate::models::{Certificate, CertificateRequest, ClusterIssuer, IssuerResource};
+use crate::revocation::{RevocationLedger, RevocationReason, RevocationRecord};
 use axum::{
     Json, Router,
     extract::{Path, State},
@@ -19,14 +21,46 @@ use axum::{
     routing::{get, post},
 };
 use chrono::Utc;
+use serde::Deserialize;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
-pub type CertState = Arc<Mutex<CertControlPlane>>;
+/// Application state for the cert-manager HTTP surface.
+///
+/// Wraps the in-memory control plane, a revocation ledger, and a
+/// metrics registry behind a single Mutex so axum's `State` extractor
+/// can hand a clone to every handler. Production wiring threads the
+/// same `Arc<Mutex<RuntimeState>>` through the reconcile loop +
+/// background renewal scheduler so concurrent operators see a
+/// coherent snapshot.
+pub struct RuntimeState {
+    pub plane: CertControlPlane,
+    pub revocations: RevocationLedger,
+    pub metrics: CertManagerMetrics,
+}
+
+impl RuntimeState {
+    pub fn new() -> Self {
+        Self {
+            plane: CertControlPlane::new(),
+            revocations: RevocationLedger::new(),
+            metrics: CertManagerMetrics::new(),
+        }
+    }
+}
+
+impl Default for RuntimeState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub type CertState = Arc<Mutex<RuntimeState>>;
 
 pub fn create_router(state: CertState) -> Router {
     Router::new()
         .route("/api/cert/health", get(health))
+        .route("/metrics", get(metrics_exposition))
         .route(
             "/api/cert/{tenant}/certificates",
             get(list_certificates).post(create_certificate),
@@ -42,6 +76,14 @@ pub fn create_router(state: CertState) -> Router {
         .route(
             "/api/cert/{tenant}/certificates/{id}/renew",
             post(renew_certificate),
+        )
+        .route(
+            "/api/cert/{tenant}/certificates/{id}/verify",
+            get(verify_certificate),
+        )
+        .route(
+            "/api/cert/{tenant}/certificates/{id}/revoke",
+            post(revoke_certificate),
         )
         .route(
             "/api/cert/{tenant}/certificate-requests",
@@ -72,7 +114,8 @@ async fn list_certificates(
     Path(tenant): Path<String>,
     State(state): State<CertState>,
 ) -> impl IntoResponse {
-    let cp = state.lock().unwrap();
+    let rs = state.lock().unwrap();
+    let cp = &rs.plane;
     let certs: Vec<Certificate> = cp
         .store
         .list_certificates(&tenant)
@@ -95,7 +138,8 @@ async fn create_certificate(
     if let Err(e) = cert.spec.validate() {
         return (StatusCode::BAD_REQUEST, Json(error_body(&e))).into_response();
     }
-    let mut cp = state.lock().unwrap();
+    let mut rs = state.lock().unwrap();
+    let cp = &mut rs.plane;
     let id = cp.store.put_certificate(cert);
     (StatusCode::CREATED, Json(serde_json::json!({"id": id}))).into_response()
 }
@@ -104,7 +148,8 @@ async fn get_certificate(
     Path((tenant, id)): Path<(String, Uuid)>,
     State(state): State<CertState>,
 ) -> impl IntoResponse {
-    let cp = state.lock().unwrap();
+    let rs = state.lock().unwrap();
+    let cp = &rs.plane;
     match cp.store.certificate(&tenant, id) {
         Ok(c) => (StatusCode::OK, Json(c.clone())).into_response(),
         Err(e) => (status_for(&e), Json(error_body(&e))).into_response(),
@@ -115,7 +160,8 @@ async fn issue_certificate(
     Path((tenant, id)): Path<(String, Uuid)>,
     State(state): State<CertState>,
 ) -> impl IntoResponse {
-    let mut cp = state.lock().unwrap();
+    let mut rs = state.lock().unwrap();
+    let cp = &mut rs.plane;
     match cp.controller().reconcile(&tenant, id) {
         Ok(r) => (StatusCode::OK, Json(serialise_result(&r))).into_response(),
         Err(e) => (status_for(&e), Json(error_body(&e))).into_response(),
@@ -130,11 +176,139 @@ async fn renew_certificate(
     issue_certificate(Path((tenant, id)), State(state)).await
 }
 
+/// Verify a Certificate against:
+///   * the RevocationLedger (any revocation record blocks the read)
+///   * the materialised Secret's notAfter (must be in the future)
+///   * the Ready condition (must be `True`)
+///
+/// Returns a structured report. Idempotent + read-only — safe to poll
+/// from `cavectl cert verify` or a cron probe.
+async fn verify_certificate(
+    Path((tenant, id)): Path<(String, Uuid)>,
+    State(state): State<CertState>,
+) -> impl IntoResponse {
+    let rs = state.lock().unwrap();
+    let cp = &rs.plane;
+    let cert = match cp.store.certificate(&tenant, id) {
+        Ok(c) => c,
+        Err(e) => return (status_for(&e), Json(error_body(&e))).into_response(),
+    };
+    let revision = cert.status.as_ref().map(|s| s.revision).unwrap_or(0);
+    let revoked = rs
+        .revocations
+        .get(&tenant, id, revision)
+        .ok()
+        .flatten()
+        .cloned();
+    let not_after = cert.status.as_ref().and_then(|s| s.not_after);
+    let ready = cert
+        .status
+        .as_ref()
+        .and_then(|s| {
+            s.conditions
+                .iter()
+                .find(|c| {
+                    c.kind == crate::models::CertificateConditionType::Ready
+                })
+                .map(|c| c.status)
+        });
+    let now = Utc::now();
+    let expired = not_after.map(|na| na <= now).unwrap_or(false);
+    let valid = !expired
+        && revoked.is_none()
+        && matches!(ready, Some(crate::models::ConditionStatus::True));
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "tenant": tenant,
+            "certificate_id": id,
+            "revision": revision,
+            "ready": ready.map(|s| format!("{:?}", s)),
+            "not_after": not_after,
+            "expired": expired,
+            "revoked": revoked.is_some(),
+            "revocation_reason": revoked.as_ref().map(|r| format!("{:?}", r.reason)),
+            "valid": valid,
+        })),
+    )
+        .into_response()
+}
+
+#[derive(Deserialize)]
+struct RevokeBody {
+    /// One of: Unspecified|KeyCompromise|CaCompromise|AffiliationChanged|
+    /// Superseded|CessationOfOperation|CertificateHold|RemoveFromCrl|
+    /// PrivilegeWithdrawn|AaCompromise — anything else is rejected with 400.
+    reason: RevocationReason,
+    revoked_by: String,
+    #[serde(default)]
+    note: Option<String>,
+}
+
+async fn revoke_certificate(
+    Path((tenant, id)): Path<(String, Uuid)>,
+    State(state): State<CertState>,
+    Json(body): Json<RevokeBody>,
+) -> impl IntoResponse {
+    let mut rs = state.lock().unwrap();
+    let cert = match rs.plane.store.certificate(&tenant, id) {
+        Ok(c) => c.clone(),
+        Err(e) => return (status_for(&e), Json(error_body(&e))).into_response(),
+    };
+    let revision = cert.status.as_ref().map(|s| s.revision).unwrap_or(0);
+    let serial = cert
+        .status
+        .as_ref()
+        .and_then(|s| s.serial.clone())
+        .unwrap_or_else(|| "pending".into());
+    let rec = RevocationRecord {
+        tenant_id: tenant.clone(),
+        certificate_id: id,
+        revision,
+        serial,
+        reason: body.reason,
+        revoked_at: Utc::now(),
+        revoked_by: body.revoked_by,
+        note: body.note,
+    };
+    let RuntimeState {
+        revocations,
+        metrics,
+        ..
+    } = &mut *rs;
+    match revocations.revoke_with_metrics(rec, metrics) {
+        Ok(r) => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "tenant": r.tenant_id,
+                "certificate_id": r.certificate_id,
+                "revision": r.revision,
+                "reason_code": r.reason.reason_code(),
+                "reason": format!("{:?}", r.reason),
+                "revoked_at": r.revoked_at,
+            })),
+        )
+            .into_response(),
+        Err(e) => (status_for(&e), Json(error_body(&e))).into_response(),
+    }
+}
+
+async fn metrics_exposition(State(state): State<CertState>) -> impl IntoResponse {
+    let rs = state.lock().unwrap();
+    let body = rs.metrics.render_prometheus();
+    (
+        StatusCode::OK,
+        [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+        body,
+    )
+}
+
 async fn list_requests(
     Path(tenant): Path<String>,
     State(state): State<CertState>,
 ) -> impl IntoResponse {
-    let cp = state.lock().unwrap();
+    let rs = state.lock().unwrap();
+    let cp = &rs.plane;
     let mut all: Vec<CertificateRequest> = Vec::new();
     for cert in cp.store.list_certificates(&tenant) {
         for r in cp.store.list_requests_for(&tenant, cert.id) {
@@ -150,7 +324,8 @@ async fn list_issuers(
 ) -> impl IntoResponse {
     // No direct list method on store — derive from the inner map via
     // count; tests stay focused on the controller.
-    let cp = state.lock().unwrap();
+    let rs = state.lock().unwrap();
+    let cp = &rs.plane;
     (StatusCode::OK, Json(serde_json::json!({"count": cp.store.issuer_count(), "tenant": tenant})))
 }
 
@@ -162,7 +337,8 @@ async fn create_issuer(
     issuer.tenant_id = tenant;
     issuer.id = Uuid::new_v4();
     issuer.created_at = Utc::now();
-    let mut cp = state.lock().unwrap();
+    let mut rs = state.lock().unwrap();
+    let cp = &mut rs.plane;
     let id = cp.store.put_issuer(issuer);
     (StatusCode::CREATED, Json(serde_json::json!({"id": id})))
 }
@@ -171,7 +347,8 @@ async fn list_cluster_issuers(
     Path(tenant): Path<String>,
     State(state): State<CertState>,
 ) -> impl IntoResponse {
-    let cp = state.lock().unwrap();
+    let rs = state.lock().unwrap();
+    let cp = &rs.plane;
     (
         StatusCode::OK,
         Json(serde_json::json!({"count": cp.store.cluster_issuer_count(), "tenant": tenant})),
@@ -186,7 +363,8 @@ async fn create_cluster_issuer(
     issuer.tenant_id = tenant;
     issuer.id = Uuid::new_v4();
     issuer.created_at = Utc::now();
-    let mut cp = state.lock().unwrap();
+    let mut rs = state.lock().unwrap();
+    let cp = &mut rs.plane;
     let id = cp.store.put_cluster_issuer(issuer);
     (StatusCode::CREATED, Json(serde_json::json!({"id": id})))
 }
@@ -243,7 +421,7 @@ mod tests {
     use tower::ServiceExt;
 
     fn fresh_state() -> CertState {
-        Arc::new(Mutex::new(CertControlPlane::new()))
+        Arc::new(Mutex::new(RuntimeState::new()))
     }
 
     fn cert_body() -> Certificate {
@@ -399,6 +577,232 @@ mod tests {
                 Request::builder()
                     .uri(format!("/api/cert/t-1/certificates/{}", Uuid::new_v4()))
                     .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn metrics_endpoint_exposes_prometheus_content_type() {
+        let app = create_router(fresh_state());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/metrics")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let ct = resp
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        assert!(ct.starts_with("text/plain"), "got content-type {ct}");
+    }
+
+    #[tokio::test]
+    async fn metrics_endpoint_includes_upstream_families_after_traffic() {
+        let state = fresh_state();
+        let app = create_router(state.clone());
+        // Trigger a sync event by issuing nothing — register a sync counter manually.
+        {
+            let mut rs = state.lock().unwrap();
+            rs.metrics.record_sync("certificates");
+        }
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/metrics")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body = to_bytes(resp.into_body(), 16384).await.unwrap();
+        let text = String::from_utf8_lossy(&body);
+        assert!(text.contains("certmanager_controller_sync_call_count"));
+    }
+
+    async fn seed_issued_cert(app: &Router, state: &CertState, tenant: &str) -> Uuid {
+        let mut ci = cluster_issuer_body();
+        ci.tenant_id = tenant.into();
+        let body = serde_json::to_vec(&ci).unwrap();
+        app.clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/cert/{}/cluster-issuers", tenant))
+                    .header("content-type", "application/json")
+                    .body(axum::body::Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body = serde_json::to_vec(&cert_body()).unwrap();
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/cert/{}/certificates", tenant))
+                    .header("content-type", "application/json")
+                    .body(axum::body::Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let bytes = to_bytes(resp.into_body(), 4096).await.unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let id: Uuid = serde_json::from_value(v["id"].clone()).unwrap();
+        // Reconcile to materialise the Ready=True condition.
+        let _ = state.lock().unwrap().plane.controller().reconcile(tenant, id);
+        id
+    }
+
+    #[tokio::test]
+    async fn verify_endpoint_returns_valid_for_freshly_issued_cert() {
+        let state = fresh_state();
+        let app = create_router(state.clone());
+        let id = seed_issued_cert(&app, &state, "t-1").await;
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/api/cert/t-1/certificates/{}/verify", id))
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let bytes = to_bytes(resp.into_body(), 4096).await.unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v["valid"], true);
+        assert_eq!(v["revoked"], false);
+        assert_eq!(v["expired"], false);
+    }
+
+    #[tokio::test]
+    async fn revoke_endpoint_records_revocation_then_verify_flips_invalid() {
+        let state = fresh_state();
+        let app = create_router(state.clone());
+        let id = seed_issued_cert(&app, &state, "t-1").await;
+
+        // Revoke.
+        let body = serde_json::json!({
+            "reason": "KeyCompromise",
+            "revoked_by": "ops@example.com",
+            "note": "lost laptop"
+        });
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/cert/t-1/certificates/{}/revoke", id))
+                    .header("content-type", "application/json")
+                    .body(axum::body::Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let bytes = to_bytes(resp.into_body(), 4096).await.unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v["reason_code"], 1); // RFC 5280 keyCompromise
+
+        // Verify must now report revoked + invalid.
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/api/cert/t-1/certificates/{}/verify", id))
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let bytes = to_bytes(resp.into_body(), 4096).await.unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v["revoked"], true);
+        assert_eq!(v["valid"], false);
+        assert_eq!(v["revocation_reason"], "KeyCompromise");
+    }
+
+    #[tokio::test]
+    async fn revoke_endpoint_records_metric_counter() {
+        let state = fresh_state();
+        let app = create_router(state.clone());
+        let id = seed_issued_cert(&app, &state, "t-1").await;
+
+        let body = serde_json::json!({
+            "reason": "Superseded",
+            "revoked_by": "ops"
+        });
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/cert/t-1/certificates/{}/revoke", id))
+                    .header("content-type", "application/json")
+                    .body(axum::body::Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Metrics exposition must now carry the revocation counter row.
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/metrics")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let bytes = to_bytes(resp.into_body(), 16384).await.unwrap();
+        let text = String::from_utf8_lossy(&bytes);
+        assert!(text.contains("certmanager_certificate_revocation_total"));
+        assert!(text.contains("reason=\"superseded\""));
+    }
+
+    #[tokio::test]
+    async fn verify_unknown_certificate_returns_404() {
+        let app = create_router(fresh_state());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!(
+                        "/api/cert/t-1/certificates/{}/verify",
+                        Uuid::new_v4()
+                    ))
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn revoke_unknown_certificate_returns_404() {
+        let app = create_router(fresh_state());
+        let body = serde_json::json!({"reason": "Unspecified", "revoked_by": "ops"});
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!(
+                        "/api/cert/t-1/certificates/{}/revoke",
+                        Uuid::new_v4()
+                    ))
+                    .header("content-type", "application/json")
+                    .body(axum::body::Body::from(serde_json::to_vec(&body).unwrap()))
                     .unwrap(),
             )
             .await

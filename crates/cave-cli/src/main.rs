@@ -741,8 +741,15 @@ enum CertCmd {
         tenant: String,
         id: String,
     },
+    /// Verify a Certificate's chain + expiry + revocation status.
+    Verify {
+        tenant: String,
+        id: String,
+    },
     /// Surface cert-manager control-plane health.
     Health,
+    /// Dump the Prometheus exposition for cert-manager metrics.
+    Metrics,
 }
 #[derive(Subcommand)]
 enum CertIssuerCmd {
@@ -4839,6 +4846,11 @@ source_root = "src"
                 )
                 .await
             }
+            CertCmd::Verify { tenant, id } => {
+                c.get(&format!("/api/cert/{}/certificates/{}/verify", tenant, id))
+                    .await
+            }
+            CertCmd::Metrics => c.get("/metrics").await,
         },
         Commands::Crm { cmd } => match cmd {
             CrmCmd::Accounts      => c.get("/api/crm/accounts").await,
