@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! Composition store with revision history.
+//! Composition store with revision history (preserved from pre-port scaffold).
 
 use crate::error::{CrossplaneError, CrossplaneResult};
 use crate::models::{Composition, CompositionStatus, CreateCompositionRequest};
@@ -60,13 +60,11 @@ impl CompositionStore {
             created_at: Utc::now(),
         };
 
-        // Update type index
         self.type_index
             .entry(type_key)
             .or_default()
             .push(req.name.clone());
 
-        // Initialize revision history
         let mut history = VecDeque::new();
         history.push_back(composition.clone());
         self.revision_history.insert(req.name.clone(), history);
@@ -126,8 +124,8 @@ impl CompositionStore {
             .ok_or_else(|| CrossplaneError::CompositionNotFound(name.to_owned()))
     }
 
-    #[allow(dead_code)]
-    fn push_revision(&self, name: &str, composition: Composition) {
+    /// Push a new revision snapshot, capped at MAX_REVISIONS.
+    pub fn push_revision(&self, name: &str, composition: Composition) {
         if let Some(mut history) = self.revision_history.get_mut(name) {
             history.push_back(composition);
             let len = history.len();
@@ -137,10 +135,92 @@ impl CompositionStore {
             }
         }
     }
+
+    /// Number of compositions currently registered.
+    pub fn len(&self) -> usize {
+        self.compositions.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.compositions.is_empty()
+    }
 }
 
 impl Default for CompositionStore {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{CompositionMode, TypeRef};
+
+    fn req(name: &str) -> CreateCompositionRequest {
+        CreateCompositionRequest {
+            name: name.into(),
+            composite_type_ref: TypeRef {
+                api_version: "ex.cave.io/v1".into(),
+                kind: "XDb".into(),
+            },
+            resources: vec![],
+            pipeline: vec![],
+            mode: CompositionMode::Pipeline,
+            patch_sets: vec![],
+        }
+    }
+
+    #[test]
+    fn create_then_get() {
+        let s = CompositionStore::new();
+        let _ = s.create(req("c1")).unwrap();
+        assert_eq!(s.get("c1").unwrap().name, "c1");
+    }
+
+    #[test]
+    fn empty_name_rejected() {
+        let s = CompositionStore::new();
+        assert!(s.create(req("")).is_err());
+    }
+
+    #[test]
+    fn duplicate_rejected() {
+        let s = CompositionStore::new();
+        s.create(req("dup")).unwrap();
+        assert!(s.create(req("dup")).is_err());
+    }
+
+    #[test]
+    fn list_for_type() {
+        let s = CompositionStore::new();
+        s.create(req("a")).unwrap();
+        s.create(req("b")).unwrap();
+        assert_eq!(s.list_for_type("ex.cave.io/v1", "XDb").len(), 2);
+    }
+
+    #[test]
+    fn delete_removes() {
+        let s = CompositionStore::new();
+        s.create(req("c1")).unwrap();
+        s.delete("c1").unwrap();
+        assert!(s.get("c1").is_err());
+    }
+
+    #[test]
+    fn revisions_initial() {
+        let s = CompositionStore::new();
+        s.create(req("c1")).unwrap();
+        assert_eq!(s.get_revisions("c1").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn push_revision_history_cap() {
+        let s = CompositionStore::new();
+        let c = s.create(req("c1")).unwrap();
+        for _ in 0..15 {
+            s.push_revision("c1", c.clone());
+        }
+        assert_eq!(s.get_revisions("c1").unwrap().len(), MAX_REVISIONS);
     }
 }

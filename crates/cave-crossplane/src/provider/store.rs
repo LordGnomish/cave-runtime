@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! Provider store.
+//! Provider store (preserved from pre-port scaffold).
 
 use crate::error::{CrossplaneError, CrossplaneResult};
 use crate::models::{CreateProviderRequest, Provider, ProviderStatus, ProviderType};
@@ -22,7 +22,6 @@ impl ProviderStore {
         }
     }
 
-    /// Seed known managed resource types based on provider name patterns.
     fn seed_managed_types(name: &str) -> Vec<String> {
         if name.contains("aws") {
             vec![
@@ -84,7 +83,6 @@ impl ProviderStore {
             created_at: Utc::now(),
         };
 
-        // Index managed types by api_group (prefix before '/')
         for mrt in &managed_types {
             if let Some(group) = mrt.split('/').next() {
                 self.managed_type_index
@@ -135,7 +133,6 @@ impl ProviderStore {
         }
     }
 
-    /// Return well-known providers as a catalog.
     pub fn catalog(&self) -> Vec<Provider> {
         let catalog_entries = vec![
             (
@@ -182,10 +179,68 @@ impl ProviderStore {
             })
             .collect()
     }
+
+    pub fn len(&self) -> usize {
+        self.providers.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.providers.is_empty()
+    }
 }
 
 impl Default for ProviderStore {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn req(name: &str) -> CreateProviderRequest {
+        CreateProviderRequest {
+            name: name.into(),
+            package: format!("xpkg.upbound.io/{}:v0.1", name),
+            provider_type: ProviderType::Community,
+        }
+    }
+
+    #[test]
+    fn install_aws_seeds_types() {
+        let s = ProviderStore::new();
+        let p = s.install(req("provider-aws")).unwrap();
+        assert!(!p.managed_resource_types.is_empty());
+        assert!(p.managed_resource_types.iter().any(|t| t.contains("s3")));
+    }
+
+    #[test]
+    fn duplicate_install_errors() {
+        let s = ProviderStore::new();
+        s.install(req("p")).unwrap();
+        assert!(s.install(req("p")).is_err());
+    }
+
+    #[test]
+    fn delete_removes_index() {
+        let s = ProviderStore::new();
+        s.install(req("provider-aws")).unwrap();
+        s.delete("provider-aws").unwrap();
+        assert!(s.get("provider-aws").is_err());
+    }
+
+    #[test]
+    fn catalog_has_known() {
+        let s = ProviderStore::new();
+        let c = s.catalog();
+        assert!(c.iter().any(|p| p.name == "provider-kubernetes"));
+    }
+
+    #[test]
+    fn mark_healthy_sets_status() {
+        let s = ProviderStore::new();
+        s.install(req("p")).unwrap();
+        s.mark_healthy("p").unwrap();
+        assert!(matches!(s.get("p").unwrap().status, ProviderStatus::Installed));
     }
 }

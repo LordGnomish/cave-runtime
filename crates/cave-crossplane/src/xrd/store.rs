@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! XRD (Composite Resource Definition) store.
+//! XRD (Composite Resource Definition) store (preserved from pre-port scaffold).
 
 use crate::error::{CrossplaneError, CrossplaneResult};
 use crate::models::{CreateXrdRequest, Xrd, XrdStatus};
@@ -111,10 +111,85 @@ impl XrdStore {
             .map(|r| r.clone())
             .ok_or_else(|| CrossplaneError::XrdNotFound(key))
     }
+
+    pub fn len(&self) -> usize {
+        self.xrds.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.xrds.is_empty()
+    }
 }
 
 impl Default for XrdStore {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::XrdScope;
+
+    fn req(group: &str, kind: &str, claim: Option<&str>) -> CreateXrdRequest {
+        CreateXrdRequest {
+            name: format!("{}.{}", kind.to_lowercase(), group),
+            group: group.into(),
+            kind: kind.into(),
+            claim_kind: claim.map(String::from),
+            scope: XrdScope::Cluster,
+            versions: vec![],
+        }
+    }
+
+    #[test]
+    fn create_and_get() {
+        let s = XrdStore::new();
+        s.create(req("ex.cave.io", "XDb", None)).unwrap();
+        assert!(s.get("ex.cave.io", "XDb").is_ok());
+    }
+
+    #[test]
+    fn missing_group_rejected() {
+        let s = XrdStore::new();
+        assert!(s.create(req("", "Z", None)).is_err());
+    }
+
+    #[test]
+    fn missing_kind_rejected() {
+        let s = XrdStore::new();
+        assert!(s.create(req("g", "", None)).is_err());
+    }
+
+    #[test]
+    fn duplicate_rejected() {
+        let s = XrdStore::new();
+        s.create(req("g", "K", None)).unwrap();
+        assert!(s.create(req("g", "K", None)).is_err());
+    }
+
+    #[test]
+    fn claim_index_lookup() {
+        let s = XrdStore::new();
+        s.create(req("g", "K", Some("KC"))).unwrap();
+        assert_eq!(s.get_by_claim_kind("KC").unwrap().kind, "K");
+    }
+
+    #[test]
+    fn delete_removes() {
+        let s = XrdStore::new();
+        s.create(req("g", "K", Some("KC"))).unwrap();
+        s.delete("g", "K").unwrap();
+        assert!(s.get("g", "K").is_err());
+        assert!(s.get_by_claim_kind("KC").is_err());
+    }
+
+    #[test]
+    fn list_returns_all() {
+        let s = XrdStore::new();
+        s.create(req("g", "A", None)).unwrap();
+        s.create(req("g", "B", None)).unwrap();
+        assert_eq!(s.list().len(), 2);
     }
 }

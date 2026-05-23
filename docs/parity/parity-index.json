@@ -405,14 +405,19 @@
     },
     "cave-crossplane": {
       "cave_src_loc": 2328,
-      "honest_ratio": 0.0,
-      "last_audit_disk": "2026-05-12",
+      "honest_ratio": 0.675,
+      "last_audit_disk": "2026-05-23",
       "manifest_filled": true,
+      "mapped_count": 26,
       "note": null,
-      "parity_ratio": 0.0,
+      "parity_ratio": 0.975,
       "parity_ratio_source": "manifest",
+      "partial_count": 1,
+      "skipped_count": 12,
       "stubs": null,
       "tier": "C",
+      "total_count": 40,
+      "unmapped_count": 1,
       "upstream": "crossplane/crossplane",
       "upstream_version": "v1.14.0"
     },
@@ -1765,7 +1770,7 @@
     "injected": 10,
     "new_filled": 95,
     "phantoms": 0,
-    "ratio_overrides": 58
+    "ratio_overrides": 59
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
