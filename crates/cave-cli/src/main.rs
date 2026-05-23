@@ -91,6 +91,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: GatewayCmd,
     },
+    /// Kong + Envoy reimplementation gateway (cave-apigw)
+    Gw {
+        #[command(subcommand)]
+        cmd: GwCmd,
+    },
     /// PostgreSQL management
     Pg {
         #[command(subcommand)]
@@ -1378,6 +1383,71 @@ enum GatewayCmd {
         #[command(subcommand)]
         cmd: GraviteeCmd,
     },
+}
+
+/// cave-apigw (Kong + Envoy reimplementation) subcommands.
+#[derive(Subcommand)]
+enum GwCmd {
+    /// Route operations
+    Route {
+        #[command(subcommand)]
+        cmd: GwRouteCmd,
+    },
+    /// Service operations
+    Service {
+        #[command(subcommand)]
+        cmd: GwServiceCmd,
+    },
+    /// Upstream operations
+    Upstream {
+        #[command(subcommand)]
+        cmd: GwUpstreamCmd,
+    },
+    /// Plugin operations
+    Plugin {
+        #[command(subcommand)]
+        cmd: GwPluginCmd,
+    },
+    /// Consumer operations
+    Consumer {
+        #[command(subcommand)]
+        cmd: GwConsumerCmd,
+    },
+    /// Aggregate status
+    Status,
+}
+
+#[derive(Subcommand)]
+enum GwRouteCmd {
+    List,
+    Create { name: String, #[arg(long)] paths: Vec<String>, #[arg(long)] service: Option<String> },
+    Delete { name: String },
+}
+
+#[derive(Subcommand)]
+enum GwServiceCmd {
+    List,
+    Create { name: String, host: String, port: u16 },
+    Delete { name: String },
+}
+
+#[derive(Subcommand)]
+enum GwUpstreamCmd {
+    List,
+    Create { name: String, #[arg(long, default_value = "round-robin")] algorithm: String },
+    Delete { name: String },
+}
+
+#[derive(Subcommand)]
+enum GwPluginCmd {
+    List,
+    Create { name: String, kind: String },
+}
+
+#[derive(Subcommand)]
+enum GwConsumerCmd {
+    List,
+    Create { username: String },
 }
 
 #[derive(Subcommand)]
@@ -3478,6 +3548,44 @@ async fn run(cli: Cli) -> Result<()> {
                 GraviteeCmd::Applications => c.get("/api/gateway/gravitee/applications").await,
                 GraviteeCmd::Subscriptions => c.get("/api/gateway/gravitee/subscriptions").await,
                 GraviteeCmd::Portal => c.get("/api/gateway/gravitee/portal/apis").await,
+            },
+        },
+
+        // ── Gw (cave-apigw: Kong + Envoy reimplementation) ────────────────────
+        Commands::Gw { cmd } => match cmd {
+            GwCmd::Status => c.get("/api/apigw/status").await,
+            GwCmd::Route { cmd } => match cmd {
+                GwRouteCmd::List => c.get("/api/apigw/routes").await,
+                GwRouteCmd::Create { name, paths, service } => {
+                    c.post("/api/apigw/routes", json!({ "name": name, "paths": paths, "service": service })).await
+                }
+                GwRouteCmd::Delete { name } => c.delete(&format!("/api/apigw/routes/{name}")).await,
+            },
+            GwCmd::Service { cmd } => match cmd {
+                GwServiceCmd::List => c.get("/api/apigw/services").await,
+                GwServiceCmd::Create { name, host, port } => {
+                    c.post("/api/apigw/services", json!({ "name": name, "host": host, "port": port })).await
+                }
+                GwServiceCmd::Delete { name } => c.delete(&format!("/api/apigw/services/{name}")).await,
+            },
+            GwCmd::Upstream { cmd } => match cmd {
+                GwUpstreamCmd::List => c.get("/api/apigw/upstreams").await,
+                GwUpstreamCmd::Create { name, algorithm } => {
+                    c.post("/api/apigw/upstreams", json!({ "name": name, "algorithm": algorithm })).await
+                }
+                GwUpstreamCmd::Delete { name } => c.delete(&format!("/api/apigw/upstreams/{name}")).await,
+            },
+            GwCmd::Plugin { cmd } => match cmd {
+                GwPluginCmd::List => c.get("/api/apigw/plugins").await,
+                GwPluginCmd::Create { name, kind } => {
+                    c.post("/api/apigw/plugins", json!({ "name": name, "kind": kind })).await
+                }
+            },
+            GwCmd::Consumer { cmd } => match cmd {
+                GwConsumerCmd::List => c.get("/api/apigw/consumers").await,
+                GwConsumerCmd::Create { username } => {
+                    c.post("/api/apigw/consumers", json!({ "username": username })).await
+                }
             },
         },
 
