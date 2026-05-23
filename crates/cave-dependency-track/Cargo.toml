@@ -1,0 +1,40 @@
+[package]
+name = "cave-dependency-track"
+description = "SBOM / SCA platform — Dependency-Track v4.14.2 deep-port (CycloneDX + SPDX + NVD + OSV + GHSA + Snyk + OSS Index + policy + audit + VEX + BOV + notifications + integrations)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+cave-auth = { path = "../cave-auth" }
+cave-db   = { path = "../cave-db" }
+
+# Web
+axum  = { workspace = true }
+tower = { workspace = true }
+
+# Async
+tokio       = { workspace = true }
+async-trait = { workspace = true }
+
+# Serialization
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+
+# Utilities
+uuid      = { workspace = true }
+chrono    = { workspace = true }
+thiserror = { workspace = true }
+tracing   = { workspace = true }
+regex     = { workspace = true }
+
+# Crypto
+sha2 = { workspace = true }
+hex  = { workspace = true }
+
+# HTTP (vuln-intel mirrors)
+reqwest = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

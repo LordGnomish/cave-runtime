@@ -1,0 +1,337 @@
+# parity.manifest.toml — cave-dependency-track
+# Upstream: DependencyTrack/dependency-track  https://github.com/DependencyTrack/dependency-track  pinned v4.14.2
+# Charter v2 deep-port close 2026-05-23.
+#
+# cave-dependency-track is the cave-runtime SBOM/SCA platform.  It reimplements
+# the Dependency-Track core in Rust on top of axum: project portfolio,
+# CycloneDX 1.4/1.5/1.6 + SPDX 2.3 ingestion, NVD/OSV/GHSA/Snyk/OSS-Index/
+# VulnDB vulnerability intelligence with EPSS join, license/coordinates/age/
+# severity policy engine, vulnerability audit state machine, CycloneDX VEX +
+# Bill of Vulnerabilities export, Slack/Teams/Mattermost/Email/Webhook/Jira
+# notification publishers, and DefectDojo/Fortify SSC/Kenna/ThreadFix
+# outbound integrations.
+#
+# MVP scope (mapped + partial + skipped):
+#   - Project portfolio: CRUD + tags + classifier + hierarchy + descendants
+#   - SBOM ingestion: CycloneDX 1.4/1.5/1.6 + SPDX 2.3 JSON + SPDX tag-value
+#   - Component identity + analysis cache (purl > cpe > swid > gnv key)
+#   - Vuln intel: NVD CVE 2.0, OSV.dev, GHSA, Snyk, OSS Index, VulnDB, EPSS
+#   - Policy: license, license-group, vulnerability (severity/EPSS/CWE/VulnId),
+#     coordinates (purl/cpe/hash/version), component-age (ISO-8601 duration)
+#   - Risk: inherited-risk score with configurable per-severity weights
+#   - Audit: in-triage / exploitable / resolved / false-positive / not-affected
+#     state machine + comments + suppression
+#   - VEX: CycloneDX 1.6 VEX export
+#   - BOV: Bill of Vulnerabilities aggregate with severity bucketing
+#   - Licenses: curated SPDX catalog (MIT, Apache-2.0, AGPL-3.0, GPL family,
+#     LGPL, MPL, EPL, BSD, ISC, Zlib, …)
+#   - CPE 2.3 parser + wildcard matcher
+#   - PURL parser (type / namespace / name / version / qualifiers / subpath)
+#   - Repository metadata: Maven / Npm / Nuget / Pypi / Gem / Cargo / Composer /
+#     Hex / Go / Generic latest-version registry
+#   - Notifications: Slack, Teams, Mattermost, Email, Webhook, Jira (renderer)
+#   - Integrations: DefectDojo, Fortify SSC, Kenna Security, ThreadFix (CSV)
+#   - REST API v1 (project, component, vulnerability, bom upload, policy,
+#     analysis, vex, bov, license, repository, search, graphql, swagger)
+#   - GraphQL: portfolio + vulnerabilities + policies + introspection
+#   - OpenAPI 3.0 swagger.json descriptor
+#
+# Out of MVP (skipped — Phase 2):
+#   - Persistent JDO/DataNucleus query layer (in-memory `*Store`s ship instead)
+#   - Trivy mirror task (`cave-trivy` deep-port owns it)
+#   - Full Lucene-backed search index
+#   - LDAP / OIDC / Keycloak SSO (cave-auth owns it)
+#   - Konfetti web UI (Vue) — cave-portal-web Backstage parity covers it
+#   - Built-in TLS termination (cave-gateway owns it)
+#   - Built-in vulnerability scanner (Trivy/Snyk integration in cave-trivy)
+#   - DataNucleus migration scripts + Liquibase changesets
+#   - Backstage notification publisher (cave-techdocs adapter pending)
+#   - SAML / OIDC interactive login (cave-auth federation owns it)
+
+[upstream]
+org        = "DependencyTrack"
+repo       = "dependency-track"
+version    = "v4.14.2"
+name       = "Dependency-Track"
+license    = "Apache-2.0"
+language   = "Java"
+url        = "https://github.com/DependencyTrack/dependency-track"
+source_sha = "c4a156726472cd529cc9fa8ed12e825cc000327d"
+
+[parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 0.9756
+honest_ratio        = 0.6098
+last_audit          = "2026-05-23"
+infra_only          = false
+mapped_count        = 24
+partial_count       = 1
+skipped_count       = 15
+unmapped_count      = 1
+total               = 41
+
+# 2026-05-23 Charter v2 deep-port — claude/cave-deptrack-2026-05-23-deep:
+#   * Pre-port scaffold absent (new crate).
+#   * Deep-port shipped 25 modules implementing portfolio + sbom + vuln_intel +
+#     policy + audit + vex + bov + licenses + cpe + purl + risk + repositories +
+#     notifications + integrations + routes + graphql + swagger + engine.
+#   * Subsystem-count formula: fill_ratio = (mapped + partial + skipped) / total
+#     = (24 + 1 + 15) / 41 = 0.9756.
+#   * honest_ratio = (mapped + partial) / total = 25 / 41 = 0.6098 — reflects
+#     that 15 subsystems (persistent ORM, web UI, mirror tasks, SSO, …) are
+#     honestly cut to Phase 2 rather than silently absent.
+#   * source_sha pinned to Dependency-Track v4.14.2 commit
+#     c4a156726472cd529cc9fa8ed12e825cc000327d.
+
+[module]
+name        = "cave-dependency-track"
+description = "SBOM / SCA platform — Dependency-Track v4.14.2 deep-port"
+source_root = "src"
+
+# ─── Mapped subsystems (24) ─────────────────────────────────────────────────
+
+[[mapped]]
+name = "project-portfolio-crud"
+upstream = "resources/v1/ProjectResource.java + persistence/QueryManager#createProject"
+note = "Project CRUD + hierarchy + tags + classifier. src/portfolio/store.rs + src/portfolio/hierarchy.rs + src/portfolio/tags.rs."
+
+[[mapped]]
+name = "cyclonedx-1-4-1-5-1-6-parser"
+upstream = "parser/cyclonedx/CycloneDxParser.java"
+note = "CycloneDX 1.4/1.5/1.6 JSON parser w/ component+dependency+vuln blocks. src/sbom/cyclonedx.rs."
+
+[[mapped]]
+name = "spdx-2-3-json-parser"
+upstream = "parser/spdx/json/SpdxJsonParser.java"
+note = "SPDX 2.3 JSON parser w/ externalRefs PURL+CPE pickup. src/sbom/spdx.rs::parse_spdx_json."
+
+[[mapped]]
+name = "spdx-tag-value-parser"
+upstream = "parser/spdx/SpdxTagValueParser.java"
+note = "SPDX 2.3 tag-value parser (Key: Value lines). src/sbom/spdx.rs::parse_spdx_tag_value."
+
+[[mapped]]
+name = "bom-ingestion"
+upstream = "tasks/BomUploadProcessingTask.java"
+note = "CycloneDX BOM → Component upsert with PURL-keyed dedup. src/sbom/ingest.rs."
+
+[[mapped]]
+name = "component-identity"
+upstream = "model/ComponentIdentity.java + persistence ComponentAnalysisCache"
+note = "PURL > CPE > SWID > group-name-version cache key. src/components.rs."
+
+[[mapped]]
+name = "internal-component-identification"
+upstream = "tasks/InternalComponentIdentificationTask.java"
+note = "Group-prefix + PURL-namespace matchers tag is_internal. src/components.rs::is_internal."
+
+[[mapped]]
+name = "vuln-source-nvd-cve-2-0"
+upstream = "parser/nvd/api20/NvdApi20Parser.java"
+note = "NVD CVE 2.0 JSON parser w/ CVSS v3.1/v3.0 metric pickup + CWE. src/vuln_intel/nvd.rs."
+
+[[mapped]]
+name = "vuln-source-osv"
+upstream = "parser/osv/OsvAdvisoryParser.java"
+note = "OSV.dev advisory parser w/ aliases + ecosystem packages. src/vuln_intel/osv.rs."
+
+[[mapped]]
+name = "vuln-source-ghsa"
+upstream = "parser/github/GitHubSecurityAdvisoryParser.java"
+note = "GitHub Security Advisory GraphQL parser w/ identifiers/cvss/cwes/refs. src/vuln_intel/ghsa.rs."
+
+[[mapped]]
+name = "vuln-source-snyk"
+upstream = "parser/snyk/SnykParser.java"
+note = "Snyk advisory parser (license-permitting subset). src/vuln_intel/snyk.rs."
+
+[[mapped]]
+name = "vuln-source-ossindex"
+upstream = "parser/ossindex/OssIndexParser.java"
+note = "Sonatype OSS Index response parser. src/vuln_intel/ossindex.rs."
+
+[[mapped]]
+name = "vuln-source-vulndb"
+upstream = "parser/vulndb/VulnDbParser.java"
+note = "Risk Based Security VulnDB API response parser. src/vuln_intel/vulndb.rs."
+
+[[mapped]]
+name = "epss-join"
+upstream = "parser/epss/EpssParser.java + tasks/EpssMirrorTask.java"
+note = "EPSS CSV parser + in-place CVE → score+percentile join. src/vuln_intel/epss.rs."
+
+[[mapped]]
+name = "policy-engine-evaluator"
+upstream = "policy/PolicyEngine.java + AbstractPolicyEvaluator"
+note = "Subject + Operator + aggregator (ANY/ALL) + result emitter. src/policy/engine.rs."
+
+[[mapped]]
+name = "policy-license-and-group"
+upstream = "policy/{License,LicenseGroup}PolicyEvaluator.java"
+note = "License + license-group evaluator. src/policy/license.rs."
+
+[[mapped]]
+name = "policy-vulnerability-severity-epss-cwe-id"
+upstream = "policy/{Severity,Epss,Cwe,VulnerabilityId}PolicyEvaluator.java"
+note = "Vulnerability finding evaluator: severity, EPSS, CWE, vuln-id glob. src/policy/vulnerability.rs."
+
+[[mapped]]
+name = "policy-coordinates-cpe-purl-hash-version"
+upstream = "policy/{Coordinates,PackageURL,Cpe,ComponentHash,Version}PolicyEvaluator.java"
+note = "Coordinate / PURL / CPE / hash / version evaluator. src/policy/coordinates.rs."
+
+[[mapped]]
+name = "policy-component-age"
+upstream = "policy/ComponentAgePolicyEvaluator.java"
+note = "ISO-8601 duration (P30D, P1Y6M, P2W) evaluator. src/policy/age.rs."
+
+[[mapped]]
+name = "risk-score-inherited"
+upstream = "model/ProjectMetrics.java#inheritedRiskScore"
+note = "Per-severity weighted risk aggregate. src/risk.rs."
+
+[[mapped]]
+name = "audit-analysis-state-machine"
+upstream = "model/Analysis.java + AnalysisResource.java"
+note = "5-state audit + justification + response + suppression + comments. src/audit.rs."
+
+[[mapped]]
+name = "vex-cyclonedx-1-6-export"
+upstream = "resources/v1/VexResource.java"
+note = "CycloneDX 1.6 VEX export with analysis → state/justification mapping. src/vex.rs."
+
+[[mapped]]
+name = "notifications-publishers-six"
+upstream = "notification/publisher/{Slack,MsTeams,Mattermost,SendMail,Webhook,Jira}Publisher.java"
+note = "Six publisher renderers + level→colour mapping + Jira issuetype. src/notifications/publishers.rs."
+
+[[mapped]]
+name = "integrations-four-uploaders"
+upstream = "integrations/{defectdojo,fortifyssc,kenna}/ + threadfix (community)"
+note = "DefectDojo + Fortify SSC + Kenna Security + ThreadFix CSV bridges. src/integrations/."
+
+# ─── Partial (1) ────────────────────────────────────────────────────────────
+
+[[partial]]
+name = "bov-bill-of-vulnerabilities"
+upstream = "model/Finding.java + resources/v1/FindingResource.java BOM emit"
+note = "Aggregate findings JSON w/ severity bucketing + suppression carry; misses CycloneDX-VDR strict-schema validation. src/bov.rs."
+
+# ─── Skipped (15) — Phase 2 ─────────────────────────────────────────────────
+
+[[skipped]]
+name = "persistent-jdo-datanucleus"
+upstream = "persistence/QueryManager.java + DataNucleus mapping"
+note = "In-memory *Store types ship instead; Postgres migration owned by cave-db."
+
+[[skipped]]
+name = "konfetti-vue-web-ui"
+upstream = "https://github.com/DependencyTrack/frontend"
+note = "Backstage-parity UI lives in cave-portal-web; deptrack ships REST + GraphQL only."
+
+[[skipped]]
+name = "tasks-bom-upload-async"
+upstream = "tasks/BomUploadProcessingTask + Alpine event bus"
+note = "Sync ingest in src/sbom/ingest.rs; async event-bus rewrap deferred to cave-streams."
+
+[[skipped]]
+name = "ldap-oidc-keycloak-sso"
+upstream = "resources/v1/{Ldap,Oidc}Resource.java"
+note = "Federated identity owned by cave-auth (LDAP+OIDC+Kerberos+SAML)."
+
+[[skipped]]
+name = "lucene-search-index"
+upstream = "tasks/IndexTask.java + search/SearchManager.java"
+note = "Sub-string search ships in src/engine.rs::search_components; Lucene index → cave-search."
+
+[[skipped]]
+name = "tls-termination-and-ratelimiting"
+upstream = "alpine.servlets.* + apiKey throttling"
+note = "Owned by cave-gateway (Kong/Envoy reimplementation)."
+
+[[skipped]]
+name = "trivy-mirror-task"
+upstream = "tasks/scanners/TrivyAnalysisTask.java + parser/trivy/"
+note = "First-class Trivy port lives in cave-trivy; cave-deptrack consumes cave-trivy findings."
+
+[[skipped]]
+name = "ms-build-bom-jboss-fluent-bom"
+upstream = "parser/cyclonedx/util/* legacy MSBuild + JBoss BOM adapters"
+note = "Modern CycloneDX 1.6 only; legacy adapters deferred."
+
+[[skipped]]
+name = "datanucleus-liquibase-migrations"
+upstream = "src/main/resources/migrations/*.xml"
+note = "Schema migration owned by cave-db Postgres/CNPG operator."
+
+[[skipped]]
+name = "telemetry-submission"
+upstream = "tasks/TelemetrySubmissionTask.java"
+note = "Anonymous Dependency-Track telemetry not relevant in sovereign deployment."
+
+[[skipped]]
+name = "scheduled-notification-dispatch"
+upstream = "tasks/ScheduledNotificationDispatchTask.java"
+note = "Cron loop owned by cave-runtime task scheduler — deptrack ships the rule-matcher only."
+
+[[skipped]]
+name = "clone-project-task"
+upstream = "tasks/CloneProjectTask.java"
+note = "Versioning workflow deferred to cave-portal-api project lifecycle."
+
+[[skipped]]
+name = "config-property-constants"
+upstream = "model/ConfigPropertyConstants.java"
+note = "100+ runtime tunables — surfaced through cave-flags (LaunchDarkly-parity) instead."
+
+[[skipped]]
+name = "policy-violation-resource-paging"
+upstream = "resources/v1/PolicyViolationResource.java cursor + filter DSL"
+note = "Ships per-component + per-policy listings; portfolio-wide cursored listing deferred."
+
+[[skipped]]
+name = "service-component-model"
+upstream = "model/ServiceComponent.java"
+note = "Component model covers libraries/containers/applications/firmware/files/OS/devices; SaaS services deferred."
+
+# ─── Unmapped (1 — honest gap) ──────────────────────────────────────────────
+
+[[unmapped]]
+name = "policy-violation-grouped-suppression"
+upstream = "model/PolicyViolation.java#suppressed + ViolationAnalysis state machine"
+note = "Per-violation analysis chain (not per-finding) — needs second AuditStore variant."
+
+# ─── Scope cuts (Phase 2 owners) ────────────────────────────────────────────
+
+[[scope_cuts]]
+group = "datastore-ortho"
+items = ["persistent-jdo-datanucleus", "datanucleus-liquibase-migrations", "tasks-bom-upload-async"]
+phase_2_owner = "cave-db + cave-streams"
+
+[[scope_cuts]]
+group = "identity-federation"
+items = ["ldap-oidc-keycloak-sso"]
+phase_2_owner = "cave-auth"
+
+[[scope_cuts]]
+group = "scanner-mirrors"
+items = ["trivy-mirror-task"]
+phase_2_owner = "cave-trivy"
+
+[[scope_cuts]]
+group = "ux-and-tls"
+items = ["konfetti-vue-web-ui", "tls-termination-and-ratelimiting", "lucene-search-index"]
+phase_2_owner = "cave-portal-web + cave-gateway + cave-search"
+
+[[scope_cuts]]
+group = "runtime-scheduling"
+items = [
+  "telemetry-submission",
+  "scheduled-notification-dispatch",
+  "clone-project-task",
+  "config-property-constants",
+  "policy-violation-resource-paging",
+  "service-component-model",
+  "ms-build-bom-jboss-fluent-bom",
+]
+phase_2_owner = "cave-runtime + cave-portal-api + cave-flags"

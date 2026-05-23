@@ -232,6 +232,16 @@ enum Commands {
         #[command(subcommand)]
         cmd: SignCmd,
     },
+    /// SBOM / SCA platform (Dependency-Track v4.14.2 reimplementation)
+    Deptrack {
+        #[command(subcommand)]
+        cmd: DeptrackCmd,
+    },
+    /// Secret scanner (TruffleHog parity — regex+entropy+live verify)
+    Secret {
+        #[command(subcommand)]
+        cmd: SecretCmd,
+    },
     /// Overall system status
     Status {
         #[command(subcommand)]
@@ -419,6 +429,11 @@ enum Commands {
     Trace {
         #[command(subcommand)]
         cmd: TraceCmd,
+    },
+    /// cave-trivy CLI parity (vulnerability scanner)
+    Trivy {
+        #[command(subcommand)]
+        cmd: TrivyCmd,
     },
     /// cave-tracker CLI parity
     Tracker {
@@ -2601,6 +2616,177 @@ enum StatusCmd {
     Health,
 }
 
+// ── SBOM / SCA (cave-dependency-track parity) ─────────────────────────────────
+
+#[derive(Subcommand)]
+enum DeptrackCmd {
+    /// Project portfolio (CRUD + tags + hierarchy).
+    Project {
+        #[command(subcommand)]
+        cmd: DeptrackProjectCmd,
+    },
+    /// SBOM upload (CycloneDX 1.4/1.5/1.6 + SPDX 2.3).
+    Sbom {
+        #[command(subcommand)]
+        cmd: DeptrackSbomCmd,
+    },
+    /// Vulnerability intel + listings.
+    Vuln {
+        #[command(subcommand)]
+        cmd: DeptrackVulnCmd,
+    },
+    /// Policy CRUD (license / vulnerability / age / coordinates).
+    Policy {
+        #[command(subcommand)]
+        cmd: DeptrackPolicyCmd,
+    },
+    /// Vulnerability audit (in-triage → exploitable / resolved / FP / not-affected).
+    Audit {
+        #[command(subcommand)]
+        cmd: DeptrackAuditCmd,
+    },
+    /// Exports (CycloneDX VEX + Bill of Vulnerabilities + SPDX).
+    Export {
+        #[command(subcommand)]
+        cmd: DeptrackExportCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum DeptrackProjectCmd {
+    List,
+    Get {
+        #[arg(long)]
+        uuid: String,
+    },
+    Create {
+        #[arg(long)]
+        name: String,
+        #[arg(long, default_value = "APPLICATION")]
+        classifier: String,
+        #[arg(long)]
+        version: Option<String>,
+    },
+    Delete {
+        #[arg(long)]
+        uuid: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum DeptrackSbomCmd {
+    /// Upload a CycloneDX JSON BOM to a project.
+    UploadCdx {
+        #[arg(long)]
+        project: String,
+        #[arg(long)]
+        file: String,
+    },
+    /// Upload an SPDX 2.3 JSON BOM to a project.
+    UploadSpdx {
+        #[arg(long)]
+        project: String,
+        #[arg(long)]
+        file: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum DeptrackVulnCmd {
+    List,
+}
+
+#[derive(Subcommand)]
+enum DeptrackPolicyCmd {
+    List,
+    Get {
+        #[arg(long)]
+        uuid: String,
+    },
+    Delete {
+        #[arg(long)]
+        uuid: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum DeptrackAuditCmd {
+    /// Upsert an Analysis row (state ∈ {EXPLOITABLE, IN_TRIAGE, RESOLVED, FALSE_POSITIVE, NOT_AFFECTED}).
+    Upsert {
+        #[arg(long)]
+        component: String,
+        #[arg(long)]
+        vulnerability: String,
+        #[arg(long)]
+        state: String,
+    },
+    /// List analyses for a component.
+    List {
+        #[arg(long)]
+        component: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum DeptrackExportCmd {
+    /// CycloneDX 1.6 VEX for a project.
+    Vex {
+        #[arg(long)]
+        project: String,
+    },
+    /// Bill of Vulnerabilities for a project.
+    Bov {
+        #[arg(long)]
+        project: String,
+    },
+    /// SPDX license catalog.
+    Licenses,
+}
+
+// ── secret scanner (cave-trufflehog parity) ──────────────────────────────────
+
+#[derive(Subcommand)]
+enum SecretCmd {
+    /// Scan a payload (file or inline string) for secrets.
+    Scan {
+        /// Inline payload (use --file for a path)
+        #[arg(long, default_value = "")]
+        data: String,
+        /// File whose contents to scan (overrides --data when set)
+        #[arg(long)]
+        file: Option<String>,
+        /// Source label (filesystem, stdin, git, …)
+        #[arg(long, default_value = "cavectl")]
+        source: String,
+    },
+    /// Pre-flight check: count detectors that match the payload's keyword
+    /// pre-filter (no regex compile, no verify).
+    Detect {
+        #[arg(long, default_value = "")]
+        data: String,
+    },
+    /// Compile a custom YAML detector and apply it to a sample payload.
+    Custom {
+        /// Path to a YAML file with `detectors:` array
+        #[arg(long)]
+        yaml: String,
+        /// Sample payload (inline)
+        #[arg(long, default_value = "")]
+        sample: String,
+    },
+    /// Verify a candidate secret against the engine (returns indeterminate
+    /// on the server side; cavectl issues the actual HTTP probe locally
+    /// in a follow-up — see PARITY_REPORT.md).
+    Verify {
+        /// Detector name (Stripe, Github, Slack, …)
+        #[arg(long)]
+        detector: String,
+        /// Raw secret value
+        #[arg(long)]
+        raw: String,
+    },
+}
+
 // ── etcd (etcdctl parity) ─────────────────────────────────────────────────────
 
 #[derive(Subcommand)]
@@ -4146,6 +4332,112 @@ source_root = "src"
                     url.push_str(&format!("digest={}", d));
                 }
                 c.get(&url).await
+            }
+        },
+
+        // ── Deptrack (cave-dependency-track parity) ───────────────────────
+        Commands::Deptrack { cmd } => match cmd {
+            DeptrackCmd::Project { cmd } => match cmd {
+                DeptrackProjectCmd::List => c.get("/api/v1/project").await,
+                DeptrackProjectCmd::Get { uuid } => {
+                    c.get(&format!("/api/v1/project/{}", uuid)).await
+                }
+                DeptrackProjectCmd::Create { name, classifier, version } => {
+                    c.post(
+                        "/api/v1/project",
+                        json!({"name": name, "classifier": classifier, "version": version}),
+                    )
+                    .await
+                }
+                DeptrackProjectCmd::Delete { uuid } => {
+                    c.delete(&format!("/api/v1/project/{}", uuid)).await
+                }
+            },
+            DeptrackCmd::Sbom { cmd } => match cmd {
+                DeptrackSbomCmd::UploadCdx { project, file } => {
+                    let body = std::fs::read_to_string(&file).unwrap_or_default();
+                    let parsed: serde_json::Value =
+                        serde_json::from_str(&body).unwrap_or(json!({}));
+                    c.post(&format!("/api/v1/bom/cyclonedx/{}", project), parsed)
+                        .await
+                }
+                DeptrackSbomCmd::UploadSpdx { project, file } => {
+                    let body = std::fs::read_to_string(&file).unwrap_or_default();
+                    let parsed: serde_json::Value =
+                        serde_json::from_str(&body).unwrap_or(json!({}));
+                    c.post(&format!("/api/v1/bom/spdx/{}", project), parsed).await
+                }
+            },
+            DeptrackCmd::Vuln { cmd } => match cmd {
+                DeptrackVulnCmd::List => c.get("/api/v1/vulnerability").await,
+            },
+            DeptrackCmd::Policy { cmd } => match cmd {
+                DeptrackPolicyCmd::List => c.get("/api/v1/policy").await,
+                DeptrackPolicyCmd::Get { uuid } => {
+                    c.get(&format!("/api/v1/policy/{}", uuid)).await
+                }
+                DeptrackPolicyCmd::Delete { uuid } => {
+                    c.delete(&format!("/api/v1/policy/{}", uuid)).await
+                }
+            },
+            DeptrackCmd::Audit { cmd } => match cmd {
+                DeptrackAuditCmd::Upsert { component, vulnerability, state } => {
+                    c.post(
+                        "/api/v1/analysis",
+                        json!({
+                            "component": component,
+                            "vulnerability": vulnerability,
+                            "state": state,
+                        }),
+                    )
+                    .await
+                }
+                DeptrackAuditCmd::List { component } => {
+                    c.get(&format!("/api/v1/analysis/{}", component)).await
+                }
+            },
+            DeptrackCmd::Export { cmd } => match cmd {
+                DeptrackExportCmd::Vex { project } => {
+                    c.get(&format!("/api/v1/vex/{}", project)).await
+                }
+                DeptrackExportCmd::Bov { project } => {
+                    c.get(&format!("/api/v1/bov/{}", project)).await
+                }
+                DeptrackExportCmd::Licenses => c.get("/api/v1/license").await,
+            },
+        },
+
+        // ── Secret scanner (cave-trufflehog parity) ───────────────────────
+        Commands::Secret { cmd } => match cmd {
+            SecretCmd::Scan { data, file, source } => {
+                let payload = if let Some(path) = file {
+                    std::fs::read_to_string(&path).unwrap_or_default()
+                } else {
+                    data
+                };
+                c.post(
+                    "/api/secret/scan",
+                    json!({ "data": payload, "source": source }),
+                )
+                .await
+            }
+            SecretCmd::Detect { data } => {
+                c.post("/api/secret/detect", json!({ "data": data })).await
+            }
+            SecretCmd::Custom { yaml, sample } => {
+                let yaml_body = std::fs::read_to_string(&yaml).unwrap_or(yaml);
+                c.post(
+                    "/api/secret/custom",
+                    json!({ "yaml": yaml_body, "sample": sample }),
+                )
+                .await
+            }
+            SecretCmd::Verify { detector, raw } => {
+                c.post(
+                    "/api/secret/verify",
+                    json!({ "detector": detector, "raw": raw }),
+                )
+                .await
             }
         },
 
