@@ -146,6 +146,12 @@ members = [
     "crates/cave-hermes",
     # === LLM Tracker (daily always-latest, Phase 0 report-only) ===
     "crates/cave-llm-tracker",
+    # === API Gateway (Kong + Envoy reimplementation) ===
+    "crates/cave-apigw",
+    # === TruffleHog-parity secret scanner ===
+    "crates/cave-trufflehog",
+    # === Cilium CNI / eBPF datapath / BGP / Hubble ===
+    "crates/cave-cilium",
 ]
 
 [workspace.package]
