@@ -22,6 +22,7 @@ members = [
     "crates/cave-uptime",
     "crates/cave-cost",
     "crates/cave-sign",
+    "crates/cave-keycloak",
     "crates/cave-forensics",
     # === Phase 3: Platform Intelligence ===
     "crates/cave-devlake",
