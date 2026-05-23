@@ -6,9 +6,10 @@ use crate::plugins::PluginContext;
 use serde_json::Value;
 
 fn list(cfg: &Value, kind: &str, what: &str) -> Vec<(String, String)> {
+    let sep = if what == "querystring" { '=' } else { ':' };
     cfg.get(kind).and_then(|c| c.get(what)).and_then(|v| v.as_array())
         .map(|arr| arr.iter().filter_map(|x| x.as_str())
-            .filter_map(|s| s.split_once(':').map(|(k, v)| (k.trim().into(), v.trim().into()))).collect())
+            .filter_map(|s| s.split_once(sep).map(|(k, v)| (k.trim().into(), v.trim().into()))).collect())
         .unwrap_or_default()
 }
 fn remove_list(cfg: &Value, kind: &str, what: &str) -> Vec<String> {

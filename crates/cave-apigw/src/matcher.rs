@@ -34,6 +34,8 @@ pub fn path_matches(expected: &[String], actual: &str) -> PathMatch {
             hit = true; if p.len() > best { best = p.len(); }
         } else if actual.starts_with(&format!("{p}/")) {
             hit = true; if p.len() > best { best = p.len(); }
+        } else if p == "/" && actual.starts_with('/') {
+            hit = true;
         }
     }
     PathMatch { matched: hit, matched_prefix_len: best }

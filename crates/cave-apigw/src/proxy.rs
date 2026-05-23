@@ -109,7 +109,7 @@ impl Proxy {
                         crate::plugins::header_filter(plugin, &mut ctx)?;
                         crate::plugins::body_filter(plugin, &mut ctx)?;
                     }
-                    let response = ctx.response.unwrap_or(resp);
+                    let response = ctx.response.clone().unwrap_or(resp);
                     for plugin in &plugin_list { crate::plugins::log_phase(plugin, &ctx); }
                     return Ok(ProxyOutcome {
                         response, matched_route: route.clone(), picked_target: picked,
