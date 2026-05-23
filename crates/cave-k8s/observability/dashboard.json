@@ -1,0 +1,115 @@
+{
+  "uid": "cave-k8s-control-plane",
+  "title": "Cave-K8s — Control Plane Overview",
+  "tags": ["cave-k8s", "kubernetes", "control-plane"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Cluster phase",
+      "type": "stat",
+      "targets": [{"expr": "sum by (phase) (cave_k8s_cluster_phase)"}],
+      "gridPos": {"x": 0, "y": 0, "w": 4, "h": 4}
+    },
+    {
+      "id": 2,
+      "title": "Healthy components",
+      "type": "stat",
+      "targets": [{"expr": "sum(cave_k8s_component_healthy)"}],
+      "gridPos": {"x": 4, "y": 0, "w": 4, "h": 4}
+    },
+    {
+      "id": 3,
+      "title": "Total pods by phase",
+      "type": "timeseries",
+      "targets": [{"expr": "sum by (phase) (cave_k8s_pod_count)"}],
+      "gridPos": {"x": 8, "y": 0, "w": 8, "h": 6}
+    },
+    {
+      "id": 4,
+      "title": "Apiserver request rate by verb",
+      "type": "timeseries",
+      "targets": [{"expr": "sum by (verb) (rate(cave_k8s_apiserver_request_total[5m]))"}],
+      "gridPos": {"x": 0, "y": 4, "w": 8, "h": 6}
+    },
+    {
+      "id": 5,
+      "title": "Scheduler pending pods",
+      "type": "timeseries",
+      "targets": [{"expr": "cave_k8s_scheduler_pending_pods"}],
+      "gridPos": {"x": 8, "y": 6, "w": 8, "h": 6}
+    },
+    {
+      "id": 6,
+      "title": "etcd commit-to-apply lag",
+      "type": "timeseries",
+      "targets": [{"expr": "cave_k8s_etcd_lag_seconds"}],
+      "gridPos": {"x": 0, "y": 10, "w": 8, "h": 6}
+    },
+    {
+      "id": 7,
+      "title": "Node ready",
+      "type": "stat",
+      "targets": [{"expr": "sum(cave_k8s_node_ready)"}],
+      "gridPos": {"x": 8, "y": 12, "w": 4, "h": 4}
+    },
+    {
+      "id": 8,
+      "title": "Admission rejections per plugin (5m)",
+      "type": "bargauge",
+      "targets": [{"expr": "sum by (plugin) (rate(cave_k8s_admission_denied_total[5m]))"}],
+      "gridPos": {"x": 12, "y": 12, "w": 8, "h": 6}
+    },
+    {
+      "id": 9,
+      "title": "ResourceQuota exceeded (5m)",
+      "type": "bargauge",
+      "targets": [{"expr": "sum by (quota) (rate(cave_k8s_quota_exceeded_total[5m]))"}],
+      "gridPos": {"x": 0, "y": 16, "w": 8, "h": 6}
+    },
+    {
+      "id": 10,
+      "title": "CRDs installed",
+      "type": "stat",
+      "targets": [{"expr": "cave_k8s_crd_count"}],
+      "gridPos": {"x": 8, "y": 16, "w": 4, "h": 4}
+    },
+    {
+      "id": 11,
+      "title": "APIServices available",
+      "type": "stat",
+      "targets": [{"expr": "cave_k8s_apiservice_available"}],
+      "gridPos": {"x": 12, "y": 16, "w": 4, "h": 4}
+    },
+    {
+      "id": 12,
+      "title": "Pod scheduling latency (p99)",
+      "type": "timeseries",
+      "targets": [{"expr": "histogram_quantile(0.99, sum by (le) (rate(cave_k8s_scheduling_duration_seconds_bucket[5m])))"}],
+      "gridPos": {"x": 16, "y": 16, "w": 8, "h": 6}
+    },
+    {
+      "id": 13,
+      "title": "kube-proxy backends by mode",
+      "type": "table",
+      "targets": [{"expr": "sum by (mode) (cave_k8s_kubeproxy_backend_count)"}],
+      "gridPos": {"x": 0, "y": 22, "w": 8, "h": 6}
+    },
+    {
+      "id": 14,
+      "title": "PV / PVC binding state",
+      "type": "table",
+      "targets": [{"expr": "sum by (phase) (cave_k8s_pvc_phase_count)"}],
+      "gridPos": {"x": 8, "y": 22, "w": 8, "h": 6}
+    },
+    {
+      "id": 15,
+      "title": "Image GC bytes reclaimed (1h)",
+      "type": "timeseries",
+      "targets": [{"expr": "rate(cave_k8s_image_gc_bytes_reclaimed_total[1h])"}],
+      "gridPos": {"x": 16, "y": 22, "w": 8, "h": 6}
+    }
+  ]
+}

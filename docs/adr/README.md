@@ -48,6 +48,8 @@ and are **not** carried by this OSS Cave Runtime catalogue.
 | [ADR-152](ADR-152_LLM_Tracker_Daily_Always_Latest.md) | cave-llm-tracker — daily always-latest tracker |
 | [ADR-153](ADR-153_LLM_Gateway_MVP.md) | cave-llm-gateway — MVP |
 | [ADR-154](ADR-154_ArgoCD_GitOps_Adoption.md) | cave-deploy — ArgoCD GitOps adoption |
+| [ADR-157](ADR-157_Sigstore_Cosign_Adoption.md) | cave-sign — Sigstore Cosign adoption |
+| [ADR-158](ADR-158_Cave_K8s_Umbrella.md) | cave-k8s — Kubernetes control-plane umbrella |
 
 ### Portal
 

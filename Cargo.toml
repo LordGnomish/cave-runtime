@@ -130,6 +130,8 @@ members = [
     "crates/cave-controller-manager",
     # === Kubernetes Cloud Controller Manager ===
     "crates/cave-cloud-controller-manager",
+    # === Kubernetes Control Plane Umbrella ===
+    "crates/cave-k8s",
     # === Search Engine ===
     "crates/cave-search",
     # === Serverless (Knative) ===

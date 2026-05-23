@@ -1,0 +1,102 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright 2026 Cave Runtime contributors
+# 10 alert rules for the cave-k8s control-plane umbrella.
+
+groups:
+- name: cave-k8s-control-plane
+  interval: 30s
+  rules:
+  - alert: CaveK8sControlPlaneDegraded
+    expr: sum(cave_k8s_component_healthy) < 7
+    for: 2m
+    labels:
+      severity: critical
+      runbook: cave-k8s/control-plane-degraded
+    annotations:
+      summary: "cave-k8s control plane has fewer than 7 healthy components"
+      description: "Components healthy: {{ $value }}. Expected: >= 7."
+
+  - alert: CaveK8sSchedulerBacklogHigh
+    expr: cave_k8s_scheduler_pending_pods > 50
+    for: 5m
+    labels:
+      severity: warning
+      runbook: cave-k8s/scheduler-backlog
+    annotations:
+      summary: "Scheduler has > 50 pending pods for 5+ minutes"
+      description: "{{ $value }} pods awaiting placement."
+
+  - alert: CaveK8sApiserverHighLatency
+    expr: histogram_quantile(0.99, sum by (le) (rate(cave_k8s_apiserver_duration_seconds_bucket[5m]))) > 1.0
+    for: 5m
+    labels:
+      severity: warning
+      runbook: cave-k8s/apiserver-latency
+    annotations:
+      summary: "Apiserver p99 request latency > 1s"
+      description: "p99 = {{ $value }}s"
+
+  - alert: CaveK8sEtcdLagHigh
+    expr: cave_k8s_etcd_lag_seconds > 1.0
+    for: 3m
+    labels:
+      severity: critical
+      runbook: cave-k8s/etcd-lag
+    annotations:
+      summary: "etcd commit-to-apply lag exceeded 1s"
+      description: "Current lag: {{ $value }}s"
+
+  - alert: CaveK8sNodeNotReady
+    expr: cave_k8s_node_ready < 1
+    for: 5m
+    labels:
+      severity: warning
+      runbook: cave-k8s/node-not-ready
+    annotations:
+      summary: "Node {{ $labels.node }} is not Ready"
+
+  - alert: CaveK8sAdmissionDenyStorm
+    expr: sum by (plugin) (rate(cave_k8s_admission_denied_total[5m])) > 10
+    for: 5m
+    labels:
+      severity: warning
+      runbook: cave-k8s/admission-storm
+    annotations:
+      summary: "Admission plugin {{ $labels.plugin }} is rejecting > 10 req/s"
+
+  - alert: CaveK8sResourceQuotaExceeded
+    expr: rate(cave_k8s_quota_exceeded_total[15m]) > 0
+    for: 15m
+    labels:
+      severity: info
+      runbook: cave-k8s/quota-exceeded
+    annotations:
+      summary: "Sustained ResourceQuota rejections on {{ $labels.quota }}"
+
+  - alert: CaveK8sCrdInstallFailures
+    expr: increase(cave_k8s_crd_install_error_total[1h]) > 0
+    for: 0m
+    labels:
+      severity: info
+      runbook: cave-k8s/crd-install-failed
+    annotations:
+      summary: "CRD installation rejected in past hour ({{ $value }} times)"
+
+  - alert: CaveK8sPvcPending
+    expr: sum by (namespace) (cave_k8s_pvc_phase_count{phase="Pending"}) > 5
+    for: 10m
+    labels:
+      severity: warning
+      runbook: cave-k8s/pvc-pending
+    annotations:
+      summary: "Namespace {{ $labels.namespace }} has > 5 pending PVCs"
+
+  - alert: CaveK8sControlPlaneDown
+    expr: cave_k8s_cluster_phase{phase="Failed"} == 1
+    for: 1m
+    labels:
+      severity: page
+      runbook: cave-k8s/control-plane-down
+    annotations:
+      summary: "cave-k8s cluster has entered Failed phase"
+      description: "Bootstrap or runtime failure — control plane unavailable."

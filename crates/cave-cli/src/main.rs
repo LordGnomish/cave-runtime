@@ -258,6 +258,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: CriCmd,
     },
+    /// Kubernetes control-plane umbrella (cave-k8s)
+    K8s {
+        #[command(subcommand)]
+        cmd: K8sCmd,
+    },
     /// Kubernetes API server (kube-apiserver replacement; kubectl parity)
     Apiserver {
         #[command(subcommand)]
@@ -2782,6 +2787,103 @@ enum CriCmd {
     Parity,
 }
 
+// ── cave-k8s (control-plane umbrella) ────────────────────────────────────────
+
+#[derive(Subcommand)]
+enum K8sCmd {
+    /// Show cluster overview — phase + per-component health
+    Cluster,
+    /// Show kubernetes + cave-k8s version pin (calls /version)
+    Version,
+    /// Liveness probe — /healthz
+    Healthz,
+    /// Readiness probe — /readyz
+    Readyz,
+    /// API group discovery — /apis
+    Discovery,
+    /// OpenAPI v3 schema — /openapi/v3
+    Openapi,
+    /// Prometheus-format metrics — /metrics
+    Metrics,
+    /// Apply a JSON or YAML manifest (kubectl apply -f equivalent)
+    Apply {
+        /// Manifest file path (- for stdin)
+        #[arg(long, short = 'f')]
+        file: String,
+    },
+    /// Scale a workload (kubectl scale)
+    Scale {
+        /// Workload kind: Deployment, StatefulSet, DaemonSet
+        kind: String,
+        /// Workload name
+        name: String,
+        /// Target replica count
+        #[arg(long)]
+        replicas: u32,
+        /// Namespace
+        #[arg(long, short = 'n', default_value = "default")]
+        namespace: String,
+    },
+    /// Trigger rollout restart on a workload
+    Rollout {
+        /// Workload kind: Deployment, StatefulSet, DaemonSet
+        kind: String,
+        /// Workload name
+        name: String,
+        /// Namespace
+        #[arg(long, short = 'n', default_value = "default")]
+        namespace: String,
+    },
+    /// Inspect node resource usage (kubectl top nodes)
+    TopNodes,
+    /// Inspect pod resource usage (kubectl top pods)
+    TopPods {
+        /// Namespace (default: all)
+        #[arg(long, short = 'n')]
+        namespace: Option<String>,
+    },
+    /// Stream pod logs (kubectl logs)
+    Logs {
+        /// Pod name
+        pod: String,
+        /// Container name (default: first container)
+        #[arg(long, short = 'c')]
+        container: Option<String>,
+        /// Namespace
+        #[arg(long, short = 'n', default_value = "default")]
+        namespace: String,
+        /// Follow stream
+        #[arg(long, short = 'f')]
+        follow: bool,
+    },
+    /// Open exec session into a pod (kubectl exec)
+    Exec {
+        /// Pod name
+        pod: String,
+        /// Command and args
+        command: Vec<String>,
+        /// Namespace
+        #[arg(long, short = 'n', default_value = "default")]
+        namespace: String,
+        /// Container name (default: first container)
+        #[arg(long, short = 'c')]
+        container: Option<String>,
+        /// Allocate TTY
+        #[arg(long, short = 't')]
+        tty: bool,
+    },
+    /// Port-forward a local port to a pod
+    PortForward {
+        /// Pod name
+        pod: String,
+        /// `<local-port>:<remote-port>` or `<remote-port>` for matching pair
+        ports: String,
+        /// Namespace
+        #[arg(long, short = 'n', default_value = "default")]
+        namespace: String,
+    },
+}
+
 // ── apiserver (kubectl parity) ────────────────────────────────────────────────
 
 #[derive(Subcommand)]
@@ -4341,6 +4443,81 @@ source_root = "src"
             CriCmd::Info => c.get("/api/cri/status").await,
             CriCmd::Version => c.get("/api/cri/version").await,
             CriCmd::Parity => c.get("/api/cri/parity").await,
+        },
+
+        // ── cave-k8s control-plane umbrella ──────────────────────────────────
+        Commands::K8s { cmd } => match cmd {
+            K8sCmd::Cluster => c.get("/api/cluster").await,
+            K8sCmd::Version => c.get("/version").await,
+            K8sCmd::Healthz => c.get("/healthz").await,
+            K8sCmd::Readyz => c.get("/readyz").await,
+            K8sCmd::Discovery => c.get("/apis").await,
+            K8sCmd::Openapi => c.get("/openapi/v3").await,
+            K8sCmd::Metrics => c.get("/metrics").await,
+            K8sCmd::Apply { file } => {
+                let body = if file == "-" {
+                    let mut s = String::new();
+                    std::io::Read::read_to_string(&mut std::io::stdin(), &mut s)?;
+                    s
+                } else {
+                    std::fs::read_to_string(&file)?
+                };
+                let parsed: serde_json::Value = serde_json::from_str(&body)
+                    .map_err(|e| anyhow::anyhow!("manifest must be JSON (YAML pending): {e}"))?;
+                c.post("/api/k8s/apply", parsed).await
+            }
+            K8sCmd::Scale { kind, name, replicas, namespace } => {
+                c.post(
+                    &format!("/api/k8s/scale/{namespace}/{kind}/{name}"),
+                    json!({ "replicas": replicas }),
+                )
+                .await
+            }
+            K8sCmd::Rollout { kind, name, namespace } => {
+                c.post(
+                    &format!("/api/k8s/rollout/{namespace}/{kind}/{name}"),
+                    json!({ "trigger": "restart" }),
+                )
+                .await
+            }
+            K8sCmd::TopNodes => c.get("/api/k8s/top/nodes").await,
+            K8sCmd::TopPods { namespace } => {
+                let path = match namespace {
+                    Some(ns) => format!("/api/k8s/top/pods?namespace={ns}"),
+                    None => "/api/k8s/top/pods".into(),
+                };
+                c.get(&path).await
+            }
+            K8sCmd::Logs { pod, container, namespace, follow } => {
+                let mut path = format!("/api/k8s/logs/{namespace}/{pod}");
+                let mut qs: Vec<String> = Vec::new();
+                if let Some(c) = container {
+                    qs.push(format!("container={c}"));
+                }
+                if follow {
+                    qs.push("follow=true".into());
+                }
+                if !qs.is_empty() {
+                    path.push('?');
+                    path.push_str(&qs.join("&"));
+                }
+                c.get(&path).await
+            }
+            K8sCmd::Exec { pod, command, namespace, container, tty } => {
+                let body = json!({
+                    "command": command,
+                    "container": container,
+                    "tty": tty,
+                });
+                c.post(&format!("/api/k8s/exec/{namespace}/{pod}"), body).await
+            }
+            K8sCmd::PortForward { pod, ports, namespace } => {
+                c.post(
+                    &format!("/api/k8s/port-forward/{namespace}/{pod}"),
+                    json!({ "ports": ports }),
+                )
+                .await
+            }
         },
 
         // ── apiserver ─────────────────────────────────────────────────────────

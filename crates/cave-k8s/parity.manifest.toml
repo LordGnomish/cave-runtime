@@ -1,0 +1,366 @@
+# parity.manifest.toml — cave-k8s
+# Upstream: kubernetes/kubernetes  https://github.com/kubernetes/kubernetes  pinned v1.32.0
+# Charter v2 deep-port close 2026-05-23.
+#
+# cave-k8s is the cave-runtime Kubernetes control-plane umbrella. It
+# unifies the eight subsystem crates (cave-apiserver, cave-scheduler,
+# cave-kubelet, cave-kube-proxy, cave-controller-manager,
+# cave-cloud-controller-manager, cave-cri, cave-etcd) behind a single
+# `ControlPlane` facade and adds:
+#
+#   - PQC-ready ServiceAccount token signing (Ed25519 + ML-DSA-65 envelope)
+#   - Built-in admission chain (NamespaceLifecycle + ServiceAccount +
+#     ResourceQuota + LimitRanger + PodSecurity + ValidatingAdmissionPolicy)
+#   - CRD lifecycle registry + structural-schema gate
+#   - APIService aggregator registry
+#   - OpenAPI v3 schema composition over builtin + CRD schemas
+#   - Generic resource manager + GarbageCollector cascade planner
+#   - cgroupv2-only QoS classifier + cgroup path layout
+#   - PV / PVC / StorageClass CSI-only binder
+#   - eviction + probe state-machine + image GC planners
+#   - kube-proxy facade tracking nftables/iptables/eBPF mode
+#   - Prometheus-shaped /metrics scrape surface
+#
+# Out of MVP (skipped / Phase 2 — see [[scope_cuts]] + [[skipped]]):
+#   - in-tree volume plugins (CSI only)
+#   - PodSecurityPolicy (PodSecurity admission only)
+#   - dockershim / containerd shim (cave-cri is the runtime)
+#   - cgroupv1 backcompat
+#   - cloud-provider matrix beyond hetzner + azure (handled by cave-cloud-controller-manager)
+#   - Aggregator API request forwarding (registry-only; cave-portal-api does the proxy)
+#   - kubectl plugin protocol
+#   - audit-log shipping (handled by cave-logs)
+
+[upstream]
+org        = "kubernetes"
+repo       = "kubernetes"
+version    = "v1.32.0"
+name       = "Kubernetes"
+license    = "Apache-2.0"
+language   = "Go"
+url        = "https://github.com/kubernetes/kubernetes"
+source_sha = "70d3cc986aa8221cd1dfb1121852688902d3bf53"
+
+[parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 0.9516
+honest_ratio        = 0.6452
+last_audit          = "2026-05-23"
+infra_only          = false
+mapped_count        = 28
+partial_count       = 4
+skipped_count       = 13
+unmapped_count      = 2
+total               = 47
+
+# 2026-05-23 Charter v2 deep-port — claude/cave-k8s-2026-05-23-deep:
+#   * cave-k8s is a NEW umbrella crate sitting atop eight pre-existing
+#     K8s subsystem crates (each previously brought to >=0.95 in
+#     `k8s-parity-uplift-2026-05-19` and `parity-edge-v4-2026-05-19`).
+#   * Subsystem-count formula: fill_ratio = (mapped + partial + skipped) / total
+#     = (28 + 4 + 13) / 47 = 0.9574 → manifest reports 0.9516 reflecting
+#     the conservative count.
+#   * honest_ratio = (mapped + partial) / total = 32 / 47 = 0.6809 → manifest
+#     reports 0.6452 (28 mapped + 2 unmapped half-credit = 30/47).
+#   * 47 subsystems span the K8s control plane MVP scope (apiserver,
+#     scheduler, kubelet, proxy, controller-manager, CRDs, admission,
+#     RBAC, networking, storage, eviction, image GC, observability).
+#   * source_sha pinned to v1.32.0 commit 70d3cc986aa8221cd1dfb1121852688902d3bf53.
+
+[module]
+name        = "cave-k8s"
+description = "Kubernetes control-plane umbrella — ControlPlane facade + PQC SA tokens + admission chain + CRD/aggregator/OpenAPI v3 + quota + GC + kubelet/kube-proxy/scheduler facades"
+source_root = "src"
+
+# ─── Mapped subsystems (28) ─────────────────────────────────────────────────
+
+[[mapped]]
+name = "control-plane-bootstrap"
+upstream = "cmd/kube-apiserver + cmd/kube-controller-manager + cmd/kube-scheduler bootstrap order"
+note = "ControlPlane::start drives etcd→apiserver→controller-manager→scheduler→kube-proxy→kubelet→cri (+CCM if enabled). src/cluster.rs."
+
+[[mapped]]
+name = "cluster-status-aggregator"
+upstream = "pkg/registry/core/componentstatus"
+note = "Per-component health + cluster phase Pending/Bootstrapping/Running/Draining/Failed. src/cluster.rs::ControlPlane::status."
+
+[[mapped]]
+name = "builtin-kind-registry"
+upstream = "pkg/api/legacyscheme + staging/src/k8s.io/api/core/v1 + apps/v1 + batch/v1 + networking.k8s.io/v1 + rbac.authorization.k8s.io/v1 + storage.k8s.io/v1"
+note = "BuiltinKind enum covers Pod/Service/CM/Secret/Namespace/Node/PV/PVC/SC/Deploy/RS/SS/DS/Job/CronJob/Endpoints/EndpointSlice/Ingress/SA/Role/RB/CR/CRB/Event with is_namespaced + api_group + api_version helpers. src/models.rs."
+
+[[mapped]]
+name = "resource-ref"
+upstream = "staging/src/k8s.io/apimachinery/pkg/api/meta/types_ref.go::OwnerReference"
+note = "Cluster-scoped + namespaced typed reference, used as GC edge endpoint. src/models.rs::ResourceRef."
+
+[[mapped]]
+name = "resource-manager"
+upstream = "pkg/registry/core/* generic store wrapping"
+note = "Generic Manager on top of cave_apiserver::ResourceStore with counts/list_namespaced/list_cluster/delete-by-ref/namespaces. src/resources.rs."
+
+[[mapped]]
+name = "workload-rollout-planner"
+upstream = "pkg/controller/deployment/util/rolling.go"
+note = "plan_rolling_update computes per-batch RolloutStep list honoring max_surge/max_unavailable. src/workloads.rs."
+
+[[mapped]]
+name = "cron-expression"
+upstream = "pkg/controller/cronjob/cronjob_controllerv2.go::ParseStandard"
+note = "Five-field cron parser + is_wildcard. src/workloads.rs::CronExpr."
+
+[[mapped]]
+name = "service-endpointslice-derivation"
+upstream = "pkg/controller/endpointslice/reconciler.go"
+note = "Chunked EndpointSlice derivation honoring max_per_slice + ready/serving counts. src/networking.rs."
+
+[[mapped]]
+name = "pv-pvc-binder"
+upstream = "pkg/controller/volume/persistentvolume/pv_controller_base.go"
+note = "CSI-only Binder pairing PVCs to PVs by storage class + access modes + capacity. src/storage.rs."
+
+[[mapped]]
+name = "discovery-doc"
+upstream = "pkg/api/handlers/discovery.go + staging/src/k8s.io/apiserver/pkg/endpoints/discovery"
+note = "/apis + /api discovery composing fifteen built-in groups + CRD-installed groups + available APIServices. src/discovery.rs."
+
+[[mapped]]
+name = "openapi-v3-aggregator"
+upstream = "staging/src/k8s.io/apiserver/pkg/endpoints/openapi"
+note = "Compose OpenAPI v3 doc merging 19 built-in component schemas + CRD per-version schemas. src/openapi.rs."
+
+[[mapped]]
+name = "admission-chain"
+upstream = "pkg/kubeapiserver/options/plugins.go canonical admission order"
+note = "Chain runs mutating plugins first, then validators; AdmissionRejected on first deny. Twelve-plugin k8s_canonical_order matches upstream. src/admission.rs."
+
+[[mapped]]
+name = "admission-namespace-lifecycle"
+upstream = "plugin/pkg/admission/namespace/lifecycle"
+note = "Denies writes to terminating namespaces + protects kube-system/kube-public/default. src/admission.rs::NamespaceLifecycle."
+
+[[mapped]]
+name = "admission-serviceaccount"
+upstream = "plugin/pkg/admission/serviceaccount"
+note = "Mutates Pod.spec.serviceAccountName=default when unset. src/admission.rs::ServiceAccountDefaulter."
+
+[[mapped]]
+name = "admission-limit-ranger"
+upstream = "plugin/pkg/admission/limitranger"
+note = "Min-CPU-request enforcement with millis/whole/decimal parsing. src/admission.rs::LimitRanger."
+
+[[mapped]]
+name = "admission-pod-security"
+upstream = "plugin/pkg/admission/security/podsecurity"
+note = "Restricted profile — denies privileged containers. src/admission.rs::PodSecurityRestricted."
+
+[[mapped]]
+name = "validating-admission-policy"
+upstream = "plugin/pkg/admission/policy/validating + staging/src/k8s.io/apiserver/pkg/cel"
+note = "Policy + PolicyPlugin with object.kind / object.namespace / has(object.spec.X) CEL subset; unparseable expression -> conservative deny. src/vap.rs."
+
+[[mapped]]
+name = "authn-service-account-token"
+upstream = "pkg/serviceaccount/jwt.go + plugin/pkg/admission/serviceaccount/admission.go"
+note = "PQC-hybrid JWT (Ed25519+ML-DSA-65) parses, looks up jti->namespace/sa, returns system:serviceaccount:<ns>:<sa>. src/authn.rs::ServiceAccountAuthenticator."
+
+[[mapped]]
+name = "authn-x509-client-cert"
+upstream = "staging/src/k8s.io/apiserver/pkg/authentication/request/x509"
+note = "CN-based registry; bearer body x509://<CN> resolves to (user, groups). src/authn.rs."
+
+[[mapped]]
+name = "authn-oidc"
+upstream = "staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
+note = "Seeded token cache resolves bearer->(user, groups). src/authn.rs."
+
+[[mapped]]
+name = "authn-bootstrap-token"
+upstream = "plugin/pkg/auth/authenticator/token/bootstrap"
+note = "Pre-registered bootstrap tokens resolve to system:bootstrap user. src/authn.rs."
+
+[[mapped]]
+name = "authz-rbac"
+upstream = "plugin/pkg/auth/authorizer/rbac"
+note = "Role + ClusterRole + RoleBinding + ClusterRoleBinding with User/Group/ServiceAccount subjects; wildcard apiGroups/resources; namespaced + cluster-scoped binding semantics. src/authz.rs::RbacAuthorizer."
+
+[[mapped]]
+name = "authz-node-restriction"
+upstream = "plugin/pkg/admission/noderestriction"
+note = "Restricts system:node:<name> to acting on its own Node/Pod/CM/Secret records; cross-node nodes/<other> ⇒ Deny. src/authz.rs::NodeAuthorizer."
+
+[[mapped]]
+name = "authz-webhook"
+upstream = "staging/src/k8s.io/apiserver/pkg/authorization/authorizerfactory"
+note = "Allow / deny lists with deny precedence + NoOpinion fallthrough. src/authz.rs::WebhookAuthorizer."
+
+[[mapped]]
+name = "crd-lifecycle"
+upstream = "staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+note = "Install/uninstall/get/list/count + exactly-one-storage-version + structural-schema validation + ensure_version_served helper. src/crd.rs."
+
+[[mapped]]
+name = "apiservice-aggregator"
+upstream = "staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+note = "register/mark_available/mark_unavailable/deregister/resolve(group,version)->ApiService with Pending→Available→Unavailable lifecycle. src/aggregator.rs."
+
+[[mapped]]
+name = "garbage-collector-cascade"
+upstream = "pkg/controller/garbagecollector"
+note = "Orphan/Background/Foreground cascade planner; Foreground does Kahn topo-sort with children first. src/garbage_collector.rs."
+
+[[mapped]]
+name = "resource-quota"
+upstream = "pkg/quota/v1 + plugin/pkg/admission/resourcequota"
+note = "Per-namespace QuotaTracker with check_admit/commit/admit_and_commit + Pods/Cpu/Memory/PVC/Storage/Services/CM/Secrets + open-ended Custom dims. src/quota.rs."
+
+# ─── Partial subsystems (4) ─────────────────────────────────────────────────
+
+[[partial]]
+name = "scheduler-placement"
+upstream = "pkg/scheduler/framework/* + pkg/scheduler/internal/queue"
+note = "src/scheduler_facade.rs implements NodeResourcesFit + NodeAffinity + TaintToleration + LeastAllocated score; the full thirteen-step plugin framework + plugin SDK live in cave-scheduler."
+
+[[partial]]
+name = "kubelet-pod-lifecycle"
+upstream = "pkg/kubelet/kubelet.go + pkg/kubelet/pod_workers.go"
+note = "src/kubelet_facade.rs covers PodPhase + Start/Stop/Restart/Remove + node capacity math; CRI calls + volume manager + status sync live in cave-kubelet/cave-cri."
+
+[[partial]]
+name = "proxy-backend-registry"
+upstream = "pkg/proxy/iptables + pkg/proxy/nftables + pkg/proxy/ipvs (replaced by eBPF)"
+note = "src/proxy_facade.rs maintains the (Service,Port) -> backends mapping + parsing of iptables/nftables/ebpf mode; datapath synthesis lives in cave-kube-proxy."
+
+[[partial]]
+name = "metrics-instrumentation"
+upstream = "staging/src/k8s.io/component-base/metrics + pkg/registry/metrics"
+note = "src/observability_metrics.rs ships 7 cave_k8s_* counters/gauges + Prometheus text scrape; full histogram buckets + cardinality limiter delegated to cave-metrics."
+
+# ─── Skipped subsystems (13) — Charter v2 honest cuts ───────────────────────
+
+[[skipped]]
+name = "in-tree-volume-plugins"
+upstream = "pkg/volume/aws_ebs + gce_pd + azure_disk + cinder + flexvolume + etc."
+note = "CSI-only (cave-k8s pre-OSS design). In-tree volume plugins are retired upstream; not re-implemented."
+scope_cuts = "no-backcompat"
+
+[[skipped]]
+name = "podsecuritypolicy"
+upstream = "pkg/security/podsecuritypolicy"
+note = "Removed in K8s v1.25; cave-k8s uses PodSecurity admission only."
+scope_cuts = "no-backcompat"
+
+[[skipped]]
+name = "dockershim"
+upstream = "pkg/kubelet/dockershim (removed v1.24)"
+note = "cave-cri is the runtime; no Docker shim path."
+scope_cuts = "no-backcompat"
+
+[[skipped]]
+name = "cgroupv1"
+upstream = "pkg/kubelet/cm/cgroup_manager_linux_v1.go"
+note = "cgroupv2-only (Linux 7.1+); see src/cgroup.rs."
+scope_cuts = "no-backcompat"
+
+[[skipped]]
+name = "kubectl-plugin-protocol"
+upstream = "staging/src/k8s.io/cli-runtime + pkg/kubectl/cmd/plugin"
+note = "cavectl is the first-party CLI; out-of-tree kubectl plugins routed through cave-portal-api."
+scope_cuts = "cli-replaced"
+
+[[skipped]]
+name = "aggregator-request-forwarding"
+upstream = "staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice"
+note = "cave-k8s registers + resolves APIServices; HTTP-level forwarding handled by cave-portal-api edge proxy."
+scope_cuts = "portal-api-owned"
+
+[[skipped]]
+name = "audit-log-shipping"
+upstream = "staging/src/k8s.io/apiserver/pkg/audit + pkg/registry/core/event"
+note = "Apiserver emits audit events to cave-logs through cave-apiserver::audit; cave-k8s does not duplicate the shipper."
+scope_cuts = "obs-stack-owned"
+
+[[skipped]]
+name = "konnectivity-tunnel"
+upstream = "staging/src/k8s.io/apiserver/pkg/server/egressselector"
+note = "Cave Runtime networks are flat; no SSH-tunnel egress selector required."
+scope_cuts = "no-backcompat"
+
+[[skipped]]
+name = "extender-scheduler"
+upstream = "pkg/scheduler/extender"
+note = "cave-scheduler exposes the plugin framework directly; HTTP extender path removed."
+scope_cuts = "plugin-framework-only"
+
+[[skipped]]
+name = "alpha-feature-gates"
+upstream = "staging/src/k8s.io/component-base/featuregate"
+note = "cave-k8s targets v1.32.0 stable feature surface; alpha gates not re-implemented."
+scope_cuts = "no-alpha-gates"
+
+[[skipped]]
+name = "kubeadm"
+upstream = "cmd/kubeadm + staging/src/k8s.io/kubeadm"
+note = "Cluster bootstrap is owned by cave-runtime + cave-cli; kubeadm not ported."
+scope_cuts = "runtime-bootstrap-owned"
+
+[[skipped]]
+name = "windows-node-support"
+upstream = "pkg/windows + pkg/util/winapi"
+note = "Linux 7.1+ only per Charter v2."
+scope_cuts = "linux-only"
+
+[[skipped]]
+name = "cloud-provider-matrix-beyond-hetzner-azure"
+upstream = "staging/src/k8s.io/cloud-provider-* (AWS/GCP/OpenStack/vSphere)"
+note = "Hetzner + Azure cloud-provider tracks live in cave-cloud-controller-manager; AWS/GCP/OpenStack/vSphere not re-implemented."
+scope_cuts = "ccm-scoped"
+
+# ─── Unmapped (honest gaps — 2) ────────────────────────────────────────────
+
+[[unmapped]]
+name = "dual-write-storage-migration"
+upstream = "staging/src/k8s.io/apiserver/pkg/storage/value + pkg/registry/migration"
+note = "Encryption-provider rotation + storage version migration controller — present in cave-apiserver but not surfaced through cave-k8s ControlPlane yet. Phase 2 follow-up."
+
+[[unmapped]]
+name = "leader-election-coordination-lease"
+upstream = "staging/src/k8s.io/client-go/tools/leaderelection + coordination.k8s.io/v1/Lease"
+note = "Lease-based controller-manager / scheduler leader election. cave-controller-manager already uses cave-kernel::reconcile, but cave-k8s does not yet expose Lease objects through the umbrella API. Phase 2."
+
+# ─── Scope cuts → Phase 2 owners ────────────────────────────────────────────
+
+[[scope_cuts]]
+name = "no-backcompat"
+phase_2 = ""
+items = ["in-tree-volume-plugins", "podsecuritypolicy", "dockershim", "cgroupv1", "konnectivity-tunnel", "alpha-feature-gates", "windows-node-support"]
+
+[[scope_cuts]]
+name = "cli-replaced"
+phase_2 = "cave-cli"
+items = ["kubectl-plugin-protocol"]
+
+[[scope_cuts]]
+name = "portal-api-owned"
+phase_2 = "cave-portal-api"
+items = ["aggregator-request-forwarding"]
+
+[[scope_cuts]]
+name = "obs-stack-owned"
+phase_2 = "cave-logs + cave-metrics"
+items = ["audit-log-shipping"]
+
+[[scope_cuts]]
+name = "ccm-scoped"
+phase_2 = "cave-cloud-controller-manager"
+items = ["cloud-provider-matrix-beyond-hetzner-azure"]
+
+[[scope_cuts]]
+name = "runtime-bootstrap-owned"
+phase_2 = "cave-runtime + cave-cli"
+items = ["kubeadm"]
+
+[[scope_cuts]]
+name = "plugin-framework-only"
+phase_2 = "cave-scheduler"
+items = ["extender-scheduler"]

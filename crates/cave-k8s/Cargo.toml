@@ -1,0 +1,47 @@
+[package]
+name = "cave-k8s"
+description = "Kubernetes control-plane umbrella — unifies apiserver+scheduler+kubelet+kube-proxy+controller-manager+cri+etcd+cloud-controller-manager behind a single ControlPlane facade with PQC-ready ServiceAccount tokens, CRD lifecycle, ResourceQuota enforcement, OpenAPI v3 aggregation and Charter v2 parity against kubernetes/kubernetes v1.32.0."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# Cave Runtime substrate
+cave-core = { path = "../cave-core" }
+cave-kernel = { path = "../cave-kernel" }
+
+# K8s subsystem crates being unified
+cave-apiserver = { path = "../cave-apiserver" }
+cave-scheduler = { path = "../cave-scheduler" }
+cave-kubelet = { path = "../cave-kubelet" }
+cave-kube-proxy = { path = "../cave-kube-proxy" }
+cave-controller-manager = { path = "../cave-controller-manager" }
+cave-cloud-controller-manager = { path = "../cave-cloud-controller-manager" }
+cave-cri = { path = "../cave-cri" }
+cave-etcd = { path = "../cave-etcd" }
+
+# Web + async
+axum = { workspace = true }
+tower = { workspace = true }
+tokio = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+# Crypto — SA token signing (P-256 + Ed25519 + ML-DSA hybrid)
+ring = { workspace = true }
+ed25519-dalek = { workspace = true }
+p256 = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+base64 = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
