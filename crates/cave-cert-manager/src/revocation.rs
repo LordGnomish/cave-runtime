@@ -29,6 +29,7 @@ use std::collections::BTreeMap;
 use uuid::Uuid;
 
 use crate::error::{CertManagerError, CertManagerResult};
+use crate::metrics::CertManagerMetrics;
 
 /// CRL `reasonCode` values per RFC 5280 §5.3.1. Names follow the
 /// cert-manager `pkg/util/pki/crl.go::ReasonCode` mapping so YAML
@@ -59,6 +60,24 @@ pub enum RevocationReason {
 }
 
 impl RevocationReason {
+    /// Stable lowercase name suitable for Prometheus metric labels —
+    /// matches the camelCase upstream identifier minus the trailing
+    /// `CRL` suffix so dashboards group reasonably.
+    pub fn metric_label(&self) -> &'static str {
+        match self {
+            Self::Unspecified => "unspecified",
+            Self::KeyCompromise => "key_compromise",
+            Self::CaCompromise => "ca_compromise",
+            Self::AffiliationChanged => "affiliation_changed",
+            Self::Superseded => "superseded",
+            Self::CessationOfOperation => "cessation_of_operation",
+            Self::CertificateHold => "certificate_hold",
+            Self::RemoveFromCrl => "remove_from_crl",
+            Self::PrivilegeWithdrawn => "privilege_withdrawn",
+            Self::AaCompromise => "aa_compromise",
+        }
+    }
+
     /// RFC 5280 reasonCode integer — used by CRL responders.
     pub fn reason_code(&self) -> u8 {
         match self {
@@ -147,6 +166,40 @@ impl RevocationLedger {
         }
         self.records.insert(key, rec.clone());
         Ok(rec)
+    }
+
+    /// Convenience wrapper around `revoke` that also increments the
+    /// `certmanager_certificate_revocation_total{tenant_id,reason}`
+    /// counter on the supplied metrics registry. Used by the HTTP
+    /// route + cavectl driver — keeps the metric in sync with the
+    /// ledger so dashboards and alerts agree.
+    pub fn revoke_with_metrics(
+        &mut self,
+        rec: RevocationRecord,
+        metrics: &mut CertManagerMetrics,
+    ) -> CertManagerResult<RevocationRecord> {
+        let key = (rec.tenant_id.clone(), rec.certificate_id, rec.revision);
+        let prior = self.records.get(&key).cloned();
+        let out = self.revoke(rec)?;
+        // Three cases:
+        //   1. No prior record → fresh revoke, count it.
+        //   2. Prior was CertificateHold + new reason is permanent
+        //      → upgrade, count it under the new reason.
+        //   3. Otherwise → idempotent re-revoke, do NOT count.
+        let should_count = match prior {
+            None => true,
+            Some(p)
+                if p.reason == RevocationReason::CertificateHold
+                    && !out.reason.is_reversible() =>
+            {
+                true
+            }
+            _ => false,
+        };
+        if should_count {
+            metrics.record_revocation(&out.tenant_id, out.reason.metric_label());
+        }
+        Ok(out)
     }
 
     /// Tenant-scoped read — cross-tenant denied with structured error.
@@ -408,6 +461,109 @@ mod tests {
         assert!(crl.contains(":1:"), "got: {}", crl);
         assert!(crl.starts_with("01abcdef:"));
         assert!(crl.ends_with('\n'));
+    }
+
+    #[test]
+    fn metric_label_is_distinct_for_every_variant() {
+        let variants = [
+            RevocationReason::Unspecified,
+            RevocationReason::KeyCompromise,
+            RevocationReason::CaCompromise,
+            RevocationReason::AffiliationChanged,
+            RevocationReason::Superseded,
+            RevocationReason::CessationOfOperation,
+            RevocationReason::CertificateHold,
+            RevocationReason::RemoveFromCrl,
+            RevocationReason::PrivilegeWithdrawn,
+            RevocationReason::AaCompromise,
+        ];
+        let labels: std::collections::HashSet<_> =
+            variants.iter().map(|r| r.metric_label()).collect();
+        assert_eq!(
+            labels.len(),
+            variants.len(),
+            "metric labels must be distinct"
+        );
+        for l in &labels {
+            // Prometheus label values must not start with a digit and
+            // must use lower_snake_case for grouping. Both invariants
+            // are upheld by the constant table.
+            assert!(!l.is_empty());
+            assert!(!l.chars().next().unwrap().is_ascii_digit());
+            assert_eq!(l.to_string(), l.to_ascii_lowercase());
+        }
+    }
+
+    #[test]
+    fn revoke_with_metrics_increments_counter_once() {
+        let mut l = RevocationLedger::new();
+        let mut m = CertManagerMetrics::new();
+        let rec = make_record("tenant-a", RevocationReason::KeyCompromise);
+        l.revoke_with_metrics(rec, &mut m).unwrap();
+        assert_eq!(m.revocation_count("tenant-a", "key_compromise"), 1);
+    }
+
+    #[test]
+    fn revoke_with_metrics_is_idempotent_for_same_key() {
+        let mut l = RevocationLedger::new();
+        let mut m = CertManagerMetrics::new();
+        let rec = make_record("tenant-a", RevocationReason::KeyCompromise);
+        l.revoke_with_metrics(rec.clone(), &mut m).unwrap();
+        // Same key — idempotent; counter must not double.
+        l.revoke_with_metrics(rec.clone(), &mut m).unwrap();
+        assert_eq!(m.revocation_count("tenant-a", "key_compromise"), 1);
+    }
+
+    #[test]
+    fn revoke_with_metrics_counts_certificate_hold_upgrade() {
+        let mut l = RevocationLedger::new();
+        let mut m = CertManagerMetrics::new();
+        let rec = make_record("tenant-a", RevocationReason::CertificateHold);
+        l.revoke_with_metrics(rec.clone(), &mut m).unwrap();
+        assert_eq!(m.revocation_count("tenant-a", "certificate_hold"), 1);
+        // Upgrade certificateHold → keyCompromise — this is a NEW
+        // revocation from the metrics POV even though the map size
+        // does not change.
+        let upgrade = RevocationRecord {
+            reason: RevocationReason::KeyCompromise,
+            ..rec
+        };
+        l.revoke_with_metrics(upgrade, &mut m).unwrap();
+        assert_eq!(m.revocation_count("tenant-a", "key_compromise"), 1);
+    }
+
+    #[test]
+    fn revoke_with_metrics_exposition_includes_revocation_total_family() {
+        let mut l = RevocationLedger::new();
+        let mut m = CertManagerMetrics::new();
+        l.revoke_with_metrics(
+            make_record("tenant-a", RevocationReason::Superseded),
+            &mut m,
+        )
+        .unwrap();
+        let out = m.render_prometheus();
+        assert!(out.contains("certmanager_certificate_revocation_total"));
+        assert!(out.contains("tenant_id=\"tenant-a\""));
+        assert!(out.contains("reason=\"superseded\""));
+    }
+
+    #[test]
+    fn revoke_with_metrics_separates_per_tenant() {
+        let mut l = RevocationLedger::new();
+        let mut m = CertManagerMetrics::new();
+        l.revoke_with_metrics(
+            make_record("tenant-a", RevocationReason::KeyCompromise),
+            &mut m,
+        )
+        .unwrap();
+        l.revoke_with_metrics(
+            make_record("tenant-b", RevocationReason::KeyCompromise),
+            &mut m,
+        )
+        .unwrap();
+        assert_eq!(m.revocation_count("tenant-a", "key_compromise"), 1);
+        assert_eq!(m.revocation_count("tenant-b", "key_compromise"), 1);
+        assert_eq!(m.revocation_count("tenant-c", "key_compromise"), 0);
     }
 
     #[test]

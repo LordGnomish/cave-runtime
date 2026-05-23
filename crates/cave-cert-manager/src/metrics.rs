@@ -77,6 +77,11 @@ pub struct CertManagerMetrics {
     renewal_seconds: BTreeMap<CertLabels, i64>,
     acme_request_count: BTreeMap<AcmeRequestLabels, u64>,
     sync_call_count: BTreeMap<String, u64>,
+    /// `certmanager_certificate_revocation_total{tenant_id,reason}` —
+    /// upstream cert-manager does not export this gauge directly
+    /// (revocation runs through cmctl), but Cave needs it to drive the
+    /// CertManagerRevocationSpike alert.
+    revocation_count: BTreeMap<(String, String), u64>,
     /// Last emit timestamp (driven by reconcile loop) — surfaced in
     /// debug output for parity_self_audit.
     pub last_emit_at: Option<DateTime<Utc>>,
@@ -166,6 +171,22 @@ impl CertManagerMetrics {
             .or_insert(0) += 1;
     }
 
+    /// Increment the per-(tenant, reason) revocation counter — called
+    /// from the RevocationLedger after a successful revoke.
+    pub fn record_revocation(&mut self, tenant_id: &str, reason: &str) {
+        *self
+            .revocation_count
+            .entry((tenant_id.to_string(), reason.to_string()))
+            .or_insert(0) += 1;
+    }
+
+    pub fn revocation_count(&self, tenant_id: &str, reason: &str) -> u64 {
+        self.revocation_count
+            .get(&(tenant_id.to_string(), reason.to_string()))
+            .copied()
+            .unwrap_or(0)
+    }
+
     pub fn ready_status_len(&self) -> usize {
         self.ready_status.len()
     }
@@ -238,6 +259,17 @@ impl CertManagerMetrics {
             out.push_str(&format!(
                 "certmanager_controller_sync_call_count{{controller=\"{}\"}} {}\n",
                 escape(controller),
+                count
+            ));
+        }
+
+        out.push_str("# HELP certmanager_certificate_revocation_total Total Certificate revocations per (tenant, RFC 5280 reason).\n");
+        out.push_str("# TYPE certmanager_certificate_revocation_total counter\n");
+        for ((tenant_id, reason), count) in &self.revocation_count {
+            out.push_str(&format!(
+                "certmanager_certificate_revocation_total{{tenant_id=\"{}\",reason=\"{}\"}} {}\n",
+                escape(tenant_id),
+                escape(reason),
                 count
             ));
         }

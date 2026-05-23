@@ -1,0 +1,179 @@
+{
+  "uid": "cave-cert-manager-v2",
+  "title": "cave-cert-manager — Charter v2",
+  "tags": ["cave-runtime", "cert-manager", "pki", "tls"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "tenant_id",
+        "type": "query",
+        "label": "Tenant",
+        "query": "label_values(certmanager_certificate_ready_status, tenant_id)",
+        "multi": false,
+        "includeAll": true,
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "label": "Namespace",
+        "query": "label_values(certmanager_certificate_ready_status{tenant_id=~\"$tenant_id\"}, namespace)",
+        "multi": true,
+        "includeAll": true,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Certificates by Ready condition",
+      "description": "Sum of certmanager_certificate_ready_status by condition (True / False / Unknown).",
+      "gridPos": { "x": 0, "y": 0, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (condition) (certmanager_certificate_ready_status{tenant_id=~\"$tenant_id\",namespace=~\"$namespace\"})",
+          "legendFormat": "{{condition}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "heatmap",
+      "title": "Cert notAfter — expiration distribution",
+      "description": "Heatmap of certmanager_certificate_expiration_timestamp_seconds bucketed into hours-until-expiry.",
+      "gridPos": { "x": 8, "y": 0, "w": 16, "h": 6 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(certmanager_certificate_expiration_timestamp_seconds{tenant_id=~\"$tenant_id\",namespace=~\"$namespace\"} - time()) / 3600"
+        }
+      ],
+      "options": {
+        "calculate": true,
+        "yAxis": { "unit": "h", "reverse": false }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Renewal queue — next renewal timestamps",
+      "description": "Sorted ascending by renewal_timestamp; the leftmost dots are next-up renewals.",
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(certmanager_certificate_renewal_timestamp_seconds{tenant_id=~\"$tenant_id\",namespace=~\"$namespace\"} - time()) / 3600",
+          "legendFormat": "{{namespace}}/{{name}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "h" } }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "ACME request rate per host",
+      "description": "rate(certmanager_acme_client_request_count[$__rate_interval]) — POSTs to the ACME directory.",
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (host) (rate(certmanager_acme_client_request_count[$__rate_interval]))",
+          "legendFormat": "{{host}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "req/s" } }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "ACME error ratio (status >=400)",
+      "description": "Share of ACME requests with HTTP status >= 400. Burn-rate indicator for the alert CertManagerAcmeErrorRateHigh.",
+      "gridPos": { "x": 0, "y": 14, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (host) (rate(certmanager_acme_client_request_count{status=~\"4..|5..\"}[$__rate_interval])) / sum by (host) (rate(certmanager_acme_client_request_count[$__rate_interval]))",
+          "legendFormat": "{{host}} error ratio"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.05 },
+              { "color": "red", "value": 0.1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Controller sync rate per controller",
+      "description": "rate(certmanager_controller_sync_call_count[$__rate_interval]) — used by CertManagerControllerStalled alert.",
+      "gridPos": { "x": 12, "y": 14, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (controller) (rate(certmanager_controller_sync_call_count[$__rate_interval]))",
+          "legendFormat": "{{controller}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops/s" } }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Revocation events per tenant",
+      "description": "rate(certmanager_certificate_revocation_total[$__rate_interval]) — feeds CertManagerRevocationSpike alert.",
+      "gridPos": { "x": 0, "y": 22, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (tenant_id, reason) (rate(certmanager_certificate_revocation_total{tenant_id=~\"$tenant_id\"}[$__rate_interval]))",
+          "legendFormat": "{{tenant_id}} / {{reason}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops/s" } }
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Issuer health — last sync per controller",
+      "description": "Snapshot of certmanager_controller_sync_call_count broken down by controller. A row of zeroes means the controller has not run since boot.",
+      "gridPos": { "x": 12, "y": 22, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "certmanager_controller_sync_call_count{tenant_id=~\"$tenant_id\"}",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    }
+  ]
+}

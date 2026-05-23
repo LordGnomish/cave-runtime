@@ -1,0 +1,98 @@
+# Prometheus alert rules — cave-cert-manager (Charter v2)
+#
+# All metrics emitted by crates/cave-cert-manager/src/metrics.rs.
+# Pin the dashboard panels in observability/grafana-dashboard.json to
+# the same metric names so an alert link-through lands the operator on
+# the panel that explains the firing condition.
+groups:
+  - name: cave-cert-manager.rules
+    interval: 30s
+    rules:
+      # ─── 1. Cert expiring within 7 days ──────────────────────────────
+      - alert: CertManagerCertExpiringSoon
+        expr: |
+          (certmanager_certificate_expiration_timestamp_seconds - time()) < 7 * 24 * 3600
+          and on(tenant_id, namespace, name)
+          (certmanager_certificate_expiration_timestamp_seconds - time()) > 0
+        for: 5m
+        labels:
+          severity: warning
+          team: pki
+          runbook: docs/runbooks/cert-expiring-soon.md
+        annotations:
+          summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in < 7d (tenant {{ $labels.tenant_id }})"
+          description: |
+            cert-manager has not renewed this Certificate yet, and notAfter
+            is less than 7 days away. Check the issuer status + ACME
+            backend availability. Dashboard panel: "Renewal queue".
+
+      # ─── 2. Cert already expired ─────────────────────────────────────
+      - alert: CertManagerCertExpired
+        expr: |
+          (certmanager_certificate_expiration_timestamp_seconds - time()) < 0
+        for: 1m
+        labels:
+          severity: critical
+          team: pki
+          runbook: docs/runbooks/cert-expired.md
+        annotations:
+          summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} has EXPIRED (tenant {{ $labels.tenant_id }})"
+          description: |
+            notAfter is in the past. TLS handshakes for the materialised
+            Secret are likely failing. Force a renewal via
+            `cavectl cert renew {{ $labels.tenant_id }} <cert-id>` or
+            patch the Certificate to trigger a new revision.
+
+      # ─── 3. ACME backend error ratio > 10% over 10 min ───────────────
+      - alert: CertManagerAcmeErrorRateHigh
+        expr: |
+          (
+            sum by (host) (rate(certmanager_acme_client_request_count{status=~"4..|5.."}[10m]))
+            /
+            sum by (host) (rate(certmanager_acme_client_request_count[10m]))
+          ) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+          team: pki
+          runbook: docs/runbooks/acme-error-rate.md
+        annotations:
+          summary: "ACME error rate at {{ $labels.host }} > 10% (10m)"
+          description: |
+            The cave-acme client is seeing > 10% non-2xx responses from
+            the directory at {{ $labels.host }}. Check upstream ACME
+            provider status; if it is local cave-acme, check the
+            authorisation publish pipeline (cave-net for HTTP-01 /
+            cave-dns for DNS-01).
+
+      # ─── 4. Controller sync stalled ──────────────────────────────────
+      - alert: CertManagerControllerStalled
+        expr: |
+          rate(certmanager_controller_sync_call_count[15m]) < 1 / 3600
+        for: 30m
+        labels:
+          severity: critical
+          team: pki
+          runbook: docs/runbooks/controller-stalled.md
+        annotations:
+          summary: "cert-manager controller {{ $labels.controller }} stalled (< 1 sync/hr)"
+          description: |
+            The {{ $labels.controller }} reconciler has not synced in the
+            last hour. Check the cave-cert-manager process is running
+            and the reconcile loop has not deadlocked.
+
+      # ─── 5. Revocation spike — likely incident response ──────────────
+      - alert: CertManagerRevocationSpike
+        expr: |
+          sum by (tenant_id) (rate(certmanager_certificate_revocation_total[1m])) > 5
+        for: 2m
+        labels:
+          severity: warning
+          team: pki
+          runbook: docs/runbooks/revocation-spike.md
+        annotations:
+          summary: "Revocation rate > 5/min for tenant {{ $labels.tenant_id }}"
+          description: |
+            More than 5 certificate revocations per minute for tenant
+            {{ $labels.tenant_id }}. Likely incident response in progress.
+            Cross-check with cave-oncall + cave-security feeds.
