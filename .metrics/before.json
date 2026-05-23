@@ -1,0 +1,78 @@
+{"header" : {
+  "cloc_url"           : "github.com/AlDanial/cloc",
+  "cloc_version"       : "2.08",
+  "elapsed_seconds"    : 6.45020699501038,
+  "n_files"            : 3658,
+  "n_lines"            : 1007515,
+  "files_per_second"   : 567.113582995039,
+  "lines_per_second"   : 156198.863196076},
+"Rust" :{
+  "nFiles": 2811,
+  "blank": 74612,
+  "comment": 72892,
+  "code": 701838},
+"JSON" :{
+  "nFiles": 161,
+  "blank": 0,
+  "comment": 0,
+  "code": 45379},
+"Markdown" :{
+  "nFiles": 290,
+  "blank": 9276,
+  "comment": 111,
+  "code": 33560},
+"TOML" :{
+  "nFiles": 225,
+  "blank": 7829,
+  "comment": 3567,
+  "code": 30140},
+"YAML" :{
+  "nFiles": 116,
+  "blank": 238,
+  "comment": 192,
+  "code": 13904},
+"HTML" :{
+  "nFiles": 7,
+  "blank": 220,
+  "comment": 11,
+  "code": 3632},
+"Bourne Shell" :{
+  "nFiles": 24,
+  "blank": 539,
+  "comment": 699,
+  "code": 3384},
+"Python" :{
+  "nFiles": 10,
+  "blank": 355,
+  "comment": 656,
+  "code": 2521},
+"TypeScript" :{
+  "nFiles": 2,
+  "blank": 59,
+  "comment": 27,
+  "code": 686},
+"Protocol Buffers" :{
+  "nFiles": 3,
+  "blank": 87,
+  "comment": 6,
+  "code": 433},
+"XML" :{
+  "nFiles": 6,
+  "blank": 79,
+  "comment": 214,
+  "code": 227},
+"Bourne Again Shell" :{
+  "nFiles": 2,
+  "blank": 14,
+  "comment": 43,
+  "code": 61},
+"Dockerfile" :{
+  "nFiles": 1,
+  "blank": 9,
+  "comment": 3,
+  "code": 12},
+"SUM": {
+  "blank": 93317,
+  "comment": 78421,
+  "code": 835777,
+  "nFiles": 3658} }

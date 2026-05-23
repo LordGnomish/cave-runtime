@@ -1,0 +1,1427 @@
+cave-acme v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-acme)
+├── base64 v0.22.1
+├── chrono v0.4.44
+├── hex v0.4.3
+├── serde v1.0.228
+├── serde_json v1.0.149
+├── sha2 v0.10.9
+├── thiserror v2.0.18
+└── uuid v1.23.0
+[dev-dependencies]
+└── serde_json v1.0.149 (*)
+
+cave-admission v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-admission)
+├── axum v0.8.8
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core)
+│   [dev-dependencies]
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1
+├── tracing v0.1.44
+└── uuid v1.23.0 (*)
+
+cave-ai-obs v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-ai-obs)
+├── axum v0.8.8 (*)
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth)
+│   [dev-dependencies]
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-alerts v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-alerts)
+├── async-trait v0.1.89 (proc-macro)
+├── axum v0.8.8 (*)
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── hex v0.4.3
+├── parking_lot v0.12.5
+├── regex v1.12.3
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── serde_yaml v0.9.34+deprecated
+├── sha2 v0.10.9 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tower v0.5.3
+
+cave-apiserver v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-apiserver)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── axum v0.8.8 (*)
+├── base64 v0.22.1
+├── cave-etcd v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-etcd)
+│   [dev-dependencies]
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel)
+│   [dev-dependencies]
+├── cel-interpreter v0.9.1
+├── chrono v0.4.44 (*)
+├── dashmap v6.1.0
+├── jsonwebtoken v9.3.1
+├── ring v0.17.14
+│   [build-dependencies]
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── sha2 v0.10.9 (*)
+├── thiserror v1.0.69
+├── tokio v1.51.1 (*)
+├── tokio-stream v0.1.18
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── reqwest v0.12.28
+
+cave-artifacts v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-artifacts)
+├── anyhow v1.0.102
+├── axum v0.8.8 (*)
+├── base64 v0.22.1
+├── bytes v1.11.1
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-certs v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-certs)
+│   [dev-dependencies]
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── cave-scan v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-scan)
+├── chrono v0.4.44 (*)
+├── ed25519-dalek v2.2.0
+├── futures v0.3.32
+├── hex v0.4.3
+├── p256 v0.13.2
+├── rand v0.8.5
+├── regex v1.12.3 (*)
+├── reqwest v0.12.28 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── sha2 v0.10.9 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+├── url v2.5.8
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tower v0.5.3 (*)
+
+cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+
+cave-backup v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-backup)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── serde_yaml v0.9.34+deprecated (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tower v0.5.3 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-cache v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-cache)
+├── bytes v1.11.1
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+├── chrono v0.4.44 (*)
+├── rand v0.8.5 (*)
+├── regex v1.12.3 (*)
+├── ring v0.17.14 (*)
+├── rustls-pemfile v2.2.0
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+├── rcgen v0.13.2
+├── tempfile v3.27.0
+└── tokio v1.51.1 (*)
+
+cave-cdc v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-cdc)
+├── bytes v1.11.1
+├── chrono v0.4.44 (*)
+├── hex v0.4.3
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── sha2 v0.10.9 (*)
+├── thiserror v2.0.18 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── serde_json v1.0.149 (*)
+
+cave-certs v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-certs) (*)
+
+cave-changelog v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-changelog)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-chaos v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-chaos)
+├── axum v0.8.8 (*)
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-chat v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-chat)
+├── axum v0.8.8 (*)
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-cloud-controller-manager v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-cloud-controller-manager)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── toml v0.8.23
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-cluster v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-cluster)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── axum v0.8.8 (*)
+├── base64 v0.22.1
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── dashmap v6.1.0 (*)
+├── k8s-openapi v0.23.0
+├── kube v0.97.0
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── serde_yaml v0.9.34+deprecated (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tokio v1.51.1 (*)
+
+cave-compliance v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-compliance)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── regex v1.12.3 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tower v0.5.3 (*)
+
+cave-container-scan v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-container-scan)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── regex v1.12.3 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tokio v1.51.1 (*)
+
+cave-controller-manager v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-controller-manager)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tokio-util v0.7.18
+├── toml v0.8.23 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+
+cave-cost v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-cost)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-cost-alloc v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-cost-alloc)
+├── axum v0.8.8 (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-cri v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-cri)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── axum v0.8.8 (*)
+├── bytes v1.11.1
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+├── chrono v0.4.44 (*)
+├── dashmap v6.1.0 (*)
+├── flate2 v1.1.9
+├── hex v0.4.3
+├── nix v0.29.0
+│   [build-dependencies]
+├── reqwest v0.12.28 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── sha2 v0.10.9 (*)
+├── tar v0.4.45
+├── thiserror v1.0.69 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+├── tempfile v3.27.0 (*)
+└── tower v0.5.3 (*)
+
+cave-crm v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-crm)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── sha2 v0.10.9 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tower v0.5.3 (*)
+
+cave-crossplane v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-crossplane)
+├── anyhow v1.0.102
+├── async-trait v0.1.89 (proc-macro) (*)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── dashmap v6.1.0 (*)
+├── futures v0.3.32 (*)
+├── parking_lot v0.12.5 (*)
+├── regex v1.12.3 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── serde_yaml v0.9.34+deprecated (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tokio v1.51.1 (*)
+
+cave-dashboard v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-dashboard)
+├── anyhow v1.0.102
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── regex v1.12.3 (*)
+├── reqwest v0.12.28 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── serde_yaml v0.9.34+deprecated (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tower v0.5.3 (*)
+├── tower-http v0.6.8
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-dast v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-dast)
+├── axum v0.8.8 (*)
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── regex v1.12.3 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-datafusion v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-datafusion)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+└── tracing v0.1.44 (*)
+
+cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+
+cave-deploy v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-deploy)
+├── anyhow v1.0.102
+├── axum v0.8.8 (*)
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── regex v1.12.3 (*)
+├── reqwest v0.12.28 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── serde_yaml v0.9.34+deprecated (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-desktop v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-desktop)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+└── tokio v1.51.1 (*)
+
+cave-devlake v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-devlake)
+├── axum v0.8.8 (*)
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-dns v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-dns)
+├── anyhow v1.0.102
+├── arc-swap v1.9.1
+├── async-trait v0.1.89 (proc-macro) (*)
+├── axum v0.8.8 (*)
+├── base64 v0.22.1
+├── bytes v1.11.1
+├── chrono v0.4.44 (*)
+├── dashmap v6.1.0 (*)
+├── etcd-client v0.13.0
+│   [build-dependencies]
+├── futures v0.3.32 (*)
+├── hickory-proto v0.24.4
+├── hickory-resolver v0.24.4
+├── ipnet v2.12.0
+├── k8s-openapi v0.23.0 (*)
+├── kube v0.97.0 (*)
+├── notify v6.1.1
+├── prometheus-client v0.23.1
+├── regex v1.12.3 (*)
+├── reqwest v0.12.28 (*)
+├── rustls v0.23.38
+├── rustls-pemfile v2.2.0 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tokio-rustls v0.26.4
+├── tokio-util v0.7.18 (*)
+├── tower v0.5.3 (*)
+├── tower-http v0.6.8 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tokio v1.51.1 (*)
+
+cave-docdb v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-docdb)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── axum v0.8.8 (*)
+├── bytes v1.11.1
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+├── chrono v0.4.44 (*)
+├── hex v0.4.3
+├── regex v1.12.3 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── sha2 v0.10.9 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tokio v1.51.1 (*)
+
+cave-docs v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-docs)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-docs-site v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-docs-site)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── pulldown-cmark v0.12.2
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tokio v1.51.1 (*)
+
+cave-ebpf-common v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-ebpf-common)
+└── serde v1.0.228 (*)
+[dev-dependencies]
+└── serde_json v1.0.149 (*)
+
+cave-erp v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-erp)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tower v0.5.3 (*)
+
+cave-etcd v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-etcd) (*)
+
+cave-flags v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-flags)
+├── axum v0.8.8 (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── deadpool-postgres v0.14.1
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── sha2 v0.10.9 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tokio-postgres v0.7.17
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-forensics v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-forensics)
+├── axum v0.8.8 (*)
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-gateway v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-gateway)
+├── anyhow v1.0.102
+├── async-trait v0.1.89 (proc-macro) (*)
+├── axum v0.8.8 (*)
+├── base64 v0.22.1
+├── bytes v1.11.1
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+├── chrono v0.4.44 (*)
+├── dashmap v6.1.0 (*)
+├── flate2 v1.1.9 (*)
+├── futures v0.3.32 (*)
+├── h2 v0.4.13
+├── hex v0.4.3
+├── hmac v0.12.1
+├── http v1.4.0
+├── http-body-util v0.1.3
+├── hyper v1.9.0
+├── hyper-util v0.1.20
+├── ipnet v2.12.0
+├── jsonwebtoken v9.3.1 (*)
+├── lru v0.12.5
+├── md-5 v0.10.6
+├── pin-project-lite v0.2.17
+├── prometheus-client v0.23.1 (*)
+├── prost v0.13.5
+├── prost-types v0.13.5
+├── rand v0.8.5 (*)
+├── regex v1.12.3 (*)
+├── reqwest v0.12.28 (*)
+├── ring v0.17.14 (*)
+├── rustls v0.23.38 (*)
+├── rustls-pemfile v2.2.0 (*)
+├── rustls-pki-types v1.14.0
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── sha1 v0.10.6
+├── sha2 v0.10.9 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tokio-rustls v0.26.4 (*)
+├── tokio-tungstenite v0.24.0
+├── tower v0.5.3 (*)
+├── tower-http v0.6.8 (*)
+├── tracing v0.1.44 (*)
+├── url v2.5.8 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tokio v1.51.1 (*)
+
+cave-gitleaks v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-gitleaks)
+├── flate2 v1.1.9 (*)
+├── git2 v0.19.0
+├── regex v1.12.3 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── toml v0.8.23 (*)
+└── tracing v0.1.44 (*)
+[dev-dependencies]
+├── flate2 v1.1.9 (*)
+└── tempfile v3.27.0 (*)
+
+cave-gitops-config v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-gitops-config)
+├── anyhow v1.0.102
+├── axum v0.8.8 (*)
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-ha v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-ha)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+├── chrono v0.4.44 (*)
+├── prometheus-client v0.23.1 (*)
+├── rand v0.8.5 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+├── futures v0.3.32 (*)
+└── tokio v1.51.1 (*)
+
+cave-hermes v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-hermes)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── chrono v0.4.44 (*)
+├── hex v0.4.3
+├── parking_lot v0.12.5 (*)
+├── regex v1.12.3 (*)
+├── reqwest v0.12.28 (*)
+├── rusqlite v0.32.1
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── sha2 v0.10.9 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── toml v0.8.23 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tempfile v3.27.0 (*)
+
+cave-iceberg v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-iceberg)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-incidents v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-incidents)
+├── axum v0.8.8 (*)
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-infra v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-infra)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── dashmap v6.1.0 (*)
+├── petgraph v0.6.5
+├── reqwest v0.12.28 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── serde_yaml v0.9.34+deprecated (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tokio v1.51.1 (*)
+
+cave-kamaji v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kamaji)
+├── axum v0.8.8 (*)
+├── chrono v0.4.44 (*)
+├── dashmap v6.1.0 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-karpenter v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-karpenter)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+└── tokio v1.51.1 (*)
+
+cave-keda v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-keda)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── thiserror v2.0.18 (*)
+└── tokio v1.51.1 (*)
+
+cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+
+cave-knative v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-knative)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── serde v1.0.228 (*)
+├── thiserror v2.0.18 (*)
+└── tokio v1.51.1 (*)
+
+cave-kube-proxy v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kube-proxy)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+└── tracing v0.1.44 (*)
+[dev-dependencies]
+└── serde_json v1.0.149 (*)
+
+cave-kubelet v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kubelet)
+├── axum v0.8.8 (*)
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+├── chrono v0.4.44 (*)
+├── dashmap v6.1.0 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v1.0.69 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-kubevirt v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kubevirt)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+└── tokio v1.51.1 (*)
+
+cave-lakehouse v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-lakehouse)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v1.0.69 (*)
+└── uuid v1.23.0 (*)
+
+cave-ledger v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-ledger)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── hex v0.4.3
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── sha2 v0.10.9 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-lint v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-lint)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+└── tracing v0.1.44 (*)
+
+cave-llm-gateway v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-llm-gateway)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── axum v0.8.8 (*)
+├── bytes v1.11.1
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+├── chrono v0.4.44 (*)
+├── dashmap v6.1.0 (*)
+├── futures v0.3.32 (*)
+├── parking_lot v0.12.5 (*)
+├── reqwest v0.12.28 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tower v0.5.3 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tokio v1.51.1 (*)
+
+cave-llm-tracker v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-llm-tracker)
+├── chrono v0.4.44 (*)
+├── clap v4.6.0
+├── hex v0.4.3
+├── reqwest v0.12.28 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── sha2 v0.10.9 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── toml v0.8.23 (*)
+└── tracing v0.1.44 (*)
+[dev-dependencies]
+└── tempfile v3.27.0 (*)
+
+cave-local-llm v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-local-llm)
+├── anyhow v1.0.102
+├── bytes v1.11.1
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+├── chrono v0.4.44 (*)
+├── clap v4.6.0 (*)
+├── fs2 v0.4.3
+├── futures v0.3.32 (*)
+├── prometheus-client v0.23.1 (*)
+├── reqwest v0.12.28 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── serde_yaml v0.9.34+deprecated (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tokio-util v0.7.18 (*)
+├── toml v0.8.23 (*)
+├── tracing v0.1.44 (*)
+├── tracing-subscriber v0.3.23
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+├── axum v0.8.8 (*)
+├── serde_json v1.0.149 (*)
+├── tempfile v3.27.0 (*)
+└── tokio v1.51.1 (*)
+
+cave-logs v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-logs)
+├── anyhow v1.0.102
+├── axum v0.8.8 (*)
+├── base64 v0.22.1
+├── bloomfilter v1.0.16
+├── byteorder v1.5.0
+├── bytes v1.11.1
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── dashmap v6.1.0 (*)
+├── flate2 v1.1.9 (*)
+├── futures-util v0.3.32
+├── indexmap v2.14.0
+├── lz4_flex v0.11.6
+├── parking_lot v0.12.5 (*)
+├── prometheus-client v0.23.1 (*)
+├── prost v0.13.5 (*)
+├── regex v1.12.3 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── smallvec v1.15.1
+├── snap v1.1.1
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tokio-tungstenite v0.24.0 (*)
+├── tower v0.5.3 (*)
+├── tower-http v0.6.8 (*)
+├── tracing v0.1.44 (*)
+├── uuid v1.23.0 (*)
+└── zstd v0.13.3
+[dev-dependencies]
+├── serde_json v1.0.149 (*)
+└── tokio v1.51.1 (*)
+
+cave-mesh v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-mesh)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+├── chrono v0.4.44 (*)
+├── jsonwebtoken v9.3.1 (*)
+├── prometheus-client v0.23.1 (*)
+├── rand v0.8.5 (*)
+├── rcgen v0.13.2 (*)
+├── regex v1.12.3 (*)
+├── reqwest v0.12.28 (*)
+├── ring v0.17.14 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tower v0.5.3 (*)
+├── tower-http v0.6.8 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-metrics v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-metrics)
+├── anyhow v1.0.102
+├── axum v0.8.8 (*)
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── dashmap v6.1.0 (*)
+├── ordered-float v4.6.0
+├── parking_lot v0.12.5 (*)
+├── prost v0.13.5 (*)
+├── regex v1.12.3 (*)
+├── reqwest v0.12.28 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── snap v1.1.1
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tower v0.5.3 (*)
+├── tower-http v0.6.8 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+├── tempfile v3.27.0 (*)
+└── tokio v1.51.1 (*)
+
+cave-net v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-net)
+├── axum v0.8.8 (*)
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+├── chrono v0.4.44 (*)
+├── dashmap v6.1.0 (*)
+├── ipnet v2.12.0
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v1.0.69 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-oncall v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-oncall)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-pam v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-pam)
+├── axum v0.8.8 (*)
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-permission v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-permission)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+├── tokio v1.51.1 (*)
+└── tower v0.5.3 (*)
+
+cave-pii v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-pii)
+├── aho-corasick v1.1.4
+├── axum v0.8.8 (*)
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── regex v1.12.3 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-pipelines v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-pipelines)
+├── anyhow v1.0.102
+├── axum v0.8.8 (*)
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── regex v1.12.3 (*)
+├── reqwest v0.12.28 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── serde_yaml v0.9.34+deprecated (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-pki v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-pki)
+├── base64 v0.22.1
+├── chrono v0.4.44 (*)
+├── hex v0.4.3
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── sha2 v0.10.9 (*)
+├── thiserror v2.0.18 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── serde_json v1.0.149 (*)
+
+cave-policy v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-policy)
+├── axum v0.8.8 (*)
+├── base64 v0.22.1
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── hex v0.4.3
+├── json-patch v3.0.1
+├── jsonwebtoken v9.3.1 (*)
+├── k8s-openapi v0.23.0 (*)
+├── kube v0.97.0 (*)
+├── regex v1.12.3 (*)
+├── reqwest v0.12.28 (*)
+├── ring v0.17.14 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── serde_yaml v0.9.34+deprecated (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tokio-postgres v0.7.17 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tokio v1.51.1 (*)
+
+cave-portal v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-portal)
+├── async-stream v0.3.6
+├── async-trait v0.1.89 (proc-macro) (*)
+├── axum v0.8.8 (*)
+├── base64 v0.22.1
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+├── cave-upstream v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-upstream)
+│   [dev-dependencies]
+├── cave-upstream-watchd v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-upstream-watchd)
+│   [dev-dependencies]
+├── chrono v0.4.44 (*)
+├── futures v0.3.32 (*)
+├── reqwest v0.12.28 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── serde_yaml v0.9.34+deprecated (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+├── httpmock v0.7.0
+├── tempfile v3.27.0 (*)
+├── tokio v1.51.1 (*)
+└── tower v0.5.3 (*)
+
+cave-portal-api v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-portal-api)
+├── anyhow v1.0.102
+├── axum v0.8.8 (*)
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+├── cave-portal v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-portal) (*)
+├── cave-upstream v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-upstream) (*)
+├── chrono v0.4.44 (*)
+├── prometheus-client v0.23.1 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+└── tracing v0.1.44 (*)
+[dev-dependencies]
+├── tempfile v3.27.0 (*)
+└── tower v0.5.3 (*)
+
+cave-portal-web v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-portal-web)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── axum v0.8.8 (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tokio v1.51.1 (*)
+
+cave-profiler v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-profiler)
+├── axum v0.8.8 (*)
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-rdbms v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-rdbms)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── axum v0.8.8 (*)
+├── base64 v0.22.1
+├── bytes v1.11.1
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+├── chrono v0.4.44 (*)
+├── md-5 v0.10.6 (*)
+├── regex v1.12.3 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tokio v1.51.1 (*)
+
+cave-rdbms-operator v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-rdbms-operator)
+├── axum v0.8.8 (*)
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── deadpool-postgres v0.14.1 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tokio-postgres v0.7.17 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-registry v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-registry)
+└── cave-artifacts v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-artifacts) (*)
+
+cave-rollouts v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-rollouts)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── chrono v0.4.44 (*)
+├── reqwest v0.12.28 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+
+cave-runbook v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-runbook)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── serde_yaml v0.9.34+deprecated (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+└── tower v0.5.3 (*)
+
+cave-runtime v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-runtime)
+├── anyhow v1.0.102
+├── async-trait v0.1.89 (proc-macro) (*)
+├── axum v0.8.8 (*)
+├── axum-server v0.7.3
+├── base64 v0.22.1
+├── cave-admission v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-admission) (*)
+├── cave-ai-obs v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-ai-obs) (*)
+├── cave-alerts v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-alerts) (*)
+├── cave-apiserver v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-apiserver) (*)
+├── cave-artifacts v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-artifacts) (*)
+├── cave-auth v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-auth) (*)
+├── cave-backup v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-backup) (*)
+├── cave-cache v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-cache) (*)
+├── cave-certs v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-certs) (*)
+├── cave-changelog v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-changelog) (*)
+├── cave-chaos v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-chaos) (*)
+├── cave-chat v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-chat) (*)
+├── cave-cloud-controller-manager v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-cloud-controller-manager) (*)
+├── cave-cluster v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-cluster) (*)
+├── cave-compliance v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-compliance) (*)
+├── cave-container-scan v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-container-scan) (*)
+├── cave-controller-manager v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-controller-manager) (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── cave-cost v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-cost) (*)
+├── cave-cost-alloc v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-cost-alloc) (*)
+├── cave-cri v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-cri) (*)
+├── cave-crm v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-crm) (*)
+├── cave-dashboard v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-dashboard) (*)
+├── cave-dast v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-dast) (*)
+├── cave-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-db) (*)
+├── cave-deploy v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-deploy) (*)
+├── cave-devlake v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-devlake) (*)
+├── cave-dns v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-dns) (*)
+├── cave-docdb v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-docdb) (*)
+├── cave-docs v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-docs) (*)
+├── cave-docs-site v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-docs-site) (*)
+├── cave-erp v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-erp) (*)
+├── cave-etcd v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-etcd) (*)
+├── cave-flags v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-flags) (*)
+├── cave-forensics v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-forensics) (*)
+├── cave-gateway v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-gateway) (*)
+├── cave-gitops-config v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-gitops-config) (*)
+├── cave-ha v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-ha) (*)
+├── cave-incidents v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-incidents) (*)
+├── cave-infra v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-infra) (*)
+├── cave-kamaji v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kamaji) (*)
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+├── cave-kubelet v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kubelet) (*)
+├── cave-lint v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-lint) (*)
+├── cave-llm-gateway v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-llm-gateway) (*)
+├── cave-logs v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-logs) (*)
+├── cave-mesh v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-mesh) (*)
+├── cave-metrics v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-metrics) (*)
+├── cave-net v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-net) (*)
+├── cave-oncall v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-oncall) (*)
+├── cave-pam v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-pam) (*)
+├── cave-pii v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-pii) (*)
+├── cave-pipelines v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-pipelines) (*)
+├── cave-policy v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-policy) (*)
+├── cave-portal v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-portal) (*)
+├── cave-portal-api v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-portal-api) (*)
+├── cave-profiler v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-profiler) (*)
+├── cave-rdbms v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-rdbms) (*)
+├── cave-rdbms-operator v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-rdbms-operator) (*)
+├── cave-registry v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-registry) (*)
+├── cave-rollouts v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-rollouts) (*)
+├── cave-runbook v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-runbook) (*)
+├── cave-sbom v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-sbom)
+│   [dev-dependencies]
+├── cave-scaffold v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-scaffold)
+├── cave-scan v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-scan) (*)
+├── cave-scheduler v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-scheduler)
+├── cave-secrets v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-secrets)
+├── cave-security v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-security)
+├── cave-sign v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-sign)
+│   [dev-dependencies]
+├── cave-slo v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-slo)
+├── cave-status v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-status)
+├── cave-store v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-store)
+│   [dev-dependencies]
+├── cave-streams v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-streams)
+│   [dev-dependencies]
+├── cave-trace v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-trace)
+│   [dev-dependencies]
+├── cave-tracker v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-tracker)
+│   [dev-dependencies]
+├── cave-upstream v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-upstream) (*)
+├── cave-uptime v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-uptime)
+├── cave-vault v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-vault)
+│   [dev-dependencies]
+├── cave-vulns v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-vulns)
+│   [dev-dependencies]
+├── cave-workflows v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-workflows)
+├── chrono v0.4.44 (*)
+├── clap v4.6.0 (*)
+├── dashmap v6.1.0 (*)
+├── jsonwebtoken v9.3.1 (*)
+├── pulldown-cmark v0.12.2 (*)
+├── rcgen v0.13.2 (*)
+├── reqwest v0.12.28 (*)
+├── rustls v0.23.38 (*)
+├── rustls-pemfile v2.2.0 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── serde_yaml v0.9.34+deprecated (*)
+├── thiserror v1.0.69 (*)
+├── time v0.3.47
+├── tokio v1.51.1 (*)
+├── tower-http v0.6.8 (*)
+├── tracing v0.1.44 (*)
+├── tracing-subscriber v0.3.23 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+├── http-body-util v0.1.3 (*)
+├── tempfile v3.27.0 (*)
+└── tower v0.5.3 (*)
+
+cave-sbom v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-sbom) (*)
+
+cave-scaffold v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-scaffold) (*)
+
+cave-scan v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-scan) (*)
+
+cave-scan-db v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-scan-db)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── sled v0.34.7
+└── thiserror v2.0.18 (*)
+[dev-dependencies]
+└── tempfile v3.27.0 (*)
+
+cave-scheduler v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-scheduler) (*)
+
+cave-search v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-search)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── cave-kernel v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-kernel) (*)
+├── fnv v1.0.7
+├── regex v1.12.3 (*)
+├── serde v1.0.228 (*)
+├── thiserror v2.0.18 (*)
+└── tokio v1.51.1 (*)
+
+cave-secrets v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-secrets) (*)
+
+cave-security v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-security) (*)
+
+cave-sign v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-sign) (*)
+
+cave-slo v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-slo) (*)
+
+cave-status v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-status) (*)
+
+cave-store v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-store) (*)
+
+cave-streams v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-streams) (*)
+
+cave-techdocs v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-techdocs)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── axum v0.8.8 (*)
+├── cave-core v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-core) (*)
+├── chrono v0.4.44 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+├── tracing v0.1.44 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+├── tempfile v3.27.0 (*)
+├── tokio v1.51.1 (*)
+└── tower v0.5.3 (*)
+
+cave-trace v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-trace) (*)
+
+cave-tracing v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-tracing)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── chrono v0.4.44 (*)
+├── futures v0.3.32 (*)
+├── hex v0.4.3
+├── parking_lot v0.12.5 (*)
+├── reqwest v0.12.28 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── sha2 v0.10.9 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.51.1 (*)
+└── tracing v0.1.44 (*)
+[dev-dependencies]
+└── tokio v1.51.1 (*)
+
+cave-tracker v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-tracker) (*)
+
+cave-upstream v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-upstream) (*)
+
+cave-upstream-watchd v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-upstream-watchd) (*)
+
+cave-uptime v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-uptime) (*)
+
+cave-vault v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-vault) (*)
+
+cave-vulns v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-vulns) (*)
+
+cave-workflows v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-workflows) (*)
+
+cavectl v0.1.0 (/Users/gnomish/Code/cave-runtime/crates/cave-cli)
+├── anyhow v1.0.102
+├── async-trait v0.1.89 (proc-macro) (*)
+├── base64 v0.22.1
+├── chrono v0.4.44 (*)
+├── clap v4.6.0 (*)
+├── colored v2.2.0
+├── crossterm v0.28.1
+├── futures v0.3.32 (*)
+├── parking_lot v0.12.5 (*)
+├── ratatui v0.29.0
+├── reqwest v0.12.28 (*)
+├── serde v1.0.228 (*)
+├── serde_json v1.0.149 (*)
+├── serde_yaml v0.9.34+deprecated (*)
+├── tokio v1.51.1 (*)
+└── uuid v1.23.0 (*)
+[dev-dependencies]
+├── axum v0.8.8 (*)
+├── httpmock v0.7.0 (*)
+└── tokio v1.51.1 (*)

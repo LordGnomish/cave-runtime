@@ -20,6 +20,8 @@ pub mod circuitbreaker;
 pub mod codec;
 pub mod consensus;
 pub mod eventbus;
+#[cfg(feature = "http")]
+pub mod http;
 pub mod identity;
 pub mod lease;
 pub mod ns;
