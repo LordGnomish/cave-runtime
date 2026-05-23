@@ -17,7 +17,9 @@
 //! `render` runs, but `list_records` also re-checks defensively.
 
 use crate::admin::permission::{AuthError, Persona, RequestCtx};
-use crate::admin::render::{escape, page_shell_full, table};
+use crate::admin::render::{
+    badge, empty_state, escape, markdown_lite, page_shell_full, search_box, sortable_table,
+};
 use crate::admin::types::Cite;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -48,6 +50,22 @@ pub struct AdrEntry {
     /// Status: Accepted / Proposed / Superseded — parsed from the
     /// document body when present, defaults to "Unknown".
     pub status: AdrStatus,
+    /// True when this ADR affects the runtime (control plane, security,
+    /// data plane, cross-tenant infra). False when it documents a
+    /// deployment-specific or process-only decision (vendor branding,
+    /// release process, doc layout) that should be hidden from the
+    /// portal's runtime-focused view.
+    ///
+    /// 2026-05-22 — pairs with the parallel `c110135a` ADR cleanup ray
+    /// to keep the public ADR Browser focused on decisions that affect
+    /// the running system. Heuristic-derived from a `Scope:` line in
+    /// the document body; see [`extract_is_runtime`] for the rules.
+    #[serde(default = "default_is_runtime")]
+    pub is_runtime: bool,
+}
+
+fn default_is_runtime() -> bool {
+    true
 }
 
 /// ADR lifecycle phase mirroring upstream Backstage ADR plugin.
@@ -150,6 +168,7 @@ pub fn list_records_in(dir: &Path) -> Result<Vec<AdrEntry>, AdrViewError> {
             title: extract_title(&body, &stem),
             stem: stem.clone(),
             status: extract_status(&body),
+            is_runtime: extract_is_runtime(&body, &stem),
         });
     }
 
@@ -211,6 +230,74 @@ fn extract_title(body: &str, fallback_stem: &str) -> String {
     after_id.replace('_', " ")
 }
 
+/// Decide whether an ADR documents a runtime decision (control plane,
+/// security, data plane, charter parity) versus a process / branding /
+/// deployment-vendor concern that should be hidden from the portal's
+/// runtime-focused list view.
+///
+/// Heuristic, in order of precedence:
+///   1. Explicit `Scope: runtime` / `Scope: process` line in the
+///      document body — case-insensitive prefix match, just like
+///      `Status:`. `runtime` wins, `process` / `branding` / `vendor` /
+///      `deployment` / `oss-launch` lose.
+///   2. File name heuristics — stems containing `_branding_`,
+///      `_oss_launch_`, `_release_process_`, `_internal_` are
+///      classified non-runtime. The `internal/` directory is already
+///      stripped by `list_records_in`; this is a belt-and-braces guard
+///      for files that slipped to the top level by accident.
+///   3. Default true — when the ADR doesn't declare scope, assume
+///      runtime so existing decisions don't disappear. Authors opting
+///      a process-only ADR out of the runtime list must add an
+///      explicit `Scope: process` line.
+pub fn extract_is_runtime(body: &str, stem: &str) -> bool {
+    for line in body.lines().take(120) {
+        let lower = line.to_lowercase();
+        let value = if let Some(v) = lower.strip_prefix("scope:") {
+            v
+        } else if let Some(v) = lower.strip_prefix("**scope:**") {
+            v
+        } else if let Some(v) = lower.strip_prefix("scope :") {
+            v
+        } else {
+            continue;
+        };
+        let t = value.trim();
+        if t.starts_with("runtime") || t.starts_with("control-plane") || t.starts_with("data-plane")
+        {
+            return true;
+        }
+        for bad in [
+            "process",
+            "branding",
+            "vendor",
+            "deployment",
+            "oss-launch",
+            "oss_launch",
+            "release-process",
+            "release_process",
+            "internal",
+        ] {
+            if t.starts_with(bad) {
+                return false;
+            }
+        }
+    }
+    let lower_stem = stem.to_lowercase();
+    for marker in [
+        "_branding_",
+        "_oss_launch_",
+        "_oss-launch_",
+        "_release_process_",
+        "_release-process_",
+        "_internal_",
+    ] {
+        if lower_stem.contains(marker) {
+            return false;
+        }
+    }
+    true
+}
+
 fn extract_status(body: &str) -> AdrStatus {
     // Scan first 80 lines for "Status: …" or "**Status:** …".
     for line in body.lines().take(80) {
@@ -239,86 +326,192 @@ fn extract_status(body: &str) -> AdrStatus {
 }
 
 pub fn render(ctx: &RequestCtx) -> Result<String, AdrViewError> {
-    render_in(ctx, &adr_dir())
+    render_in_filtered(ctx, &adr_dir(), false)
 }
 
 /// Test-friendly variant — render against an explicit directory so
 /// unit tests don't rely on the `CAVE_ADR_DIR` env var (which is
 /// process-global and races under parallel `cargo test`).
 pub fn render_in(ctx: &RequestCtx, dir: &Path) -> Result<String, AdrViewError> {
+    render_in_filtered(ctx, dir, false)
+}
+
+/// Render the ADR Browser, optionally including non-runtime ADRs.
+///
+/// `include_non_runtime = false` (the default surface for /admin/adr)
+/// filters out ADRs classified as process-only / branding / vendor.
+/// `include_non_runtime = true` is reached by appending `?show=all` to
+/// the URL — useful for the rare audit moments where someone wants the
+/// full surface. The toggle link is rendered above the table so users
+/// can flip without typing in the URL.
+pub fn render_in_filtered(
+    ctx: &RequestCtx,
+    dir: &Path,
+    include_non_runtime: bool,
+) -> Result<String, AdrViewError> {
     ctx.require_persona(Persona::PlatformAdmin)?;
-    let rows = list_records_in(dir)?;
+    let all_rows = list_records_in(dir)?;
+    let total_disk = all_rows.len();
+    let rows: Vec<&AdrEntry> = all_rows
+        .iter()
+        .filter(|r| include_non_runtime || r.is_runtime)
+        .collect();
+    let hidden = total_disk - rows.len();
     let n = rows.len();
+
     let table_rows: Vec<Vec<String>> = rows
         .iter()
         .map(|r| {
+            let status_tone = match r.status {
+                AdrStatus::Accepted => "ok",
+                AdrStatus::Proposed => "warn",
+                AdrStatus::Superseded => "bad",
+                AdrStatus::Unknown => "neutral",
+            };
+            let title_link = format!(
+                r#"<a href="/admin/adr/{}?tenant_id={}">{}</a>"#,
+                escape(&r.stem),
+                escape(ctx.tenant.as_str()),
+                escape(&r.title),
+            );
+            let scope_badge = if r.is_runtime {
+                badge("info", "runtime")
+            } else {
+                badge("neutral", "process")
+            };
             vec![
-                escape(&r.id),
-                format!(
-                    r#"<a class="text-blue-500 underline" href="/admin/adr/{}?tenant_id={}">{}</a>"#,
-                    escape(&r.stem),
-                    escape(ctx.tenant.as_str()),
-                    escape(&r.title),
-                ),
-                r.status.as_str().into(),
+                format!("<code>{}</code>", escape(&r.id)),
+                title_link,
+                scope_badge,
+                badge(status_tone, r.status.as_str()),
             ]
         })
         .collect();
 
-    let body = format!(
+    let body = if rows.is_empty() {
+        empty_state(
+            "🗂",
+            "No ADRs to show",
+            if total_disk == 0 {
+                "Nothing in docs/adr/ — drop a Markdown file named ADR-XXX_…md to get started."
+            } else {
+                "All ADRs are tagged non-runtime in their Scope: line. Click \"Show non-runtime\" to see them."
+            },
+        )
+    } else {
+        sortable_table(
+            "adr-list",
+            &[
+                ("id", "text"),
+                ("title", "text"),
+                ("scope", "text"),
+                ("status", "text"),
+            ],
+            &table_rows,
+        )
+    };
+
+    let toggle = if include_non_runtime {
+        format!(
+            r#"<a class="text-xs" href="/admin/adr?tenant_id={t}">Hide non-runtime</a>"#,
+            t = escape(ctx.tenant.as_str()),
+        )
+    } else {
+        let hidden_note = if hidden > 0 {
+            format!(" ({hidden} hidden)")
+        } else {
+            String::new()
+        };
+        format!(
+            r#"<a class="text-xs" href="/admin/adr?tenant_id={t}&amp;show=all">Show non-runtime{hint}</a>"#,
+            t = escape(ctx.tenant.as_str()),
+            hint = hidden_note,
+        )
+    };
+
+    let body_html = format!(
         r#"<section>
-            <div class="flex items-center justify-between mb-2">
+            <div class="flex items-baseline justify-between mb-2">
                 <h2 class="text-lg font-semibold">ADR Browser ({n})</h2>
+                {toggle}
             </div>
             <p class="text-xs text-zinc-500 mb-3">
-                Platform-public Architecture Decision Records.
-                Vendor-branded ADRs live under
-                <code>docs/adr/internal/</code> and are not surfaced
-                here.
+                Architecture Decision Records that affect the running
+                runtime. Vendor-branded ADRs live under
+                <code>docs/adr/internal/</code> and are never surfaced
+                here. Process-only ADRs (release process, branding,
+                OSS-launch checklists) are filtered out unless you
+                ask for them — see the toggle above.
             </p>
-            {tbl}
+            {search}
+            {body}
         </section>"#,
-        tbl = table(&["id", "title", "status"], &table_rows),
+        search = if rows.is_empty() {
+            String::new()
+        } else {
+            search_box("#adr-list", "Filter by id, title, scope, status…")
+        },
+        body = body,
     );
 
     Ok(page_shell_full(
         ctx,
         "/admin/adr",
         &format!("ADR Browser · {}", escape(ctx.tenant.as_str())),
-        &body,
+        &body_html,
     ))
 }
 
 pub fn render_detail(ctx: &RequestCtx, stem: &str) -> Result<String, AdrViewError> {
     let body = load_body(ctx, stem)?;
-    // Very light markdown affordance — we render the raw body in a
-    // <pre> so admins can verify the on-disk content without trusting
-    // an embedded MD parser. The list view links here.
-    let escaped = escape(&body);
     let id = extract_id(stem);
     let title = extract_title(&body, stem);
     let status = extract_status(&body);
+    let is_runtime = extract_is_runtime(&body, stem);
+    let status_tone = match status {
+        AdrStatus::Accepted => "ok",
+        AdrStatus::Proposed => "warn",
+        AdrStatus::Superseded => "bad",
+        AdrStatus::Unknown => "neutral",
+    };
+    // 2026-05-22 — the previous detail surface rendered the raw markdown
+    // inside a `<pre>` because the team didn't trust an MD parser. The
+    // new `markdown_lite` is a hand-rolled, pure-Rust, escape-first
+    // converter (input is XML-escaped first, then a closed grammar of
+    // headings / lists / inline `code` / bold / italic / fenced code /
+    // links is upgraded back) so the round-trip is auditable and the
+    // detail view becomes readable.
+    let md_html = markdown_lite(&body);
+    let scope_badge = if is_runtime {
+        badge("info", "runtime")
+    } else {
+        badge("neutral", "process")
+    };
     let html = format!(
         r#"<section>
-            <div class="flex items-center justify-between mb-3">
+            <div class="flex items-baseline justify-between mb-3">
                 <h2 class="text-lg font-semibold">{id} · {title}</h2>
-                <span class="text-xs px-2 py-1 rounded bg-zinc-100">{status}</span>
+                <div class="flex gap-2">
+                    {scope}
+                    {status_badge}
+                </div>
             </div>
             <p class="text-xs text-zinc-500 mb-2">
-                <a class="text-blue-500 underline" href="/admin/adr?tenant_id={tenant}">← back to list</a>
+                <a href="/admin/adr?tenant_id={tenant}">← back to list</a>
             </p>
-            <pre class="text-xs whitespace-pre-wrap p-3 bg-zinc-50 border rounded">{escaped}</pre>
+            <div class="cave-md">{md}</div>
         </section>"#,
         id = escape(&id),
         title = escape(&title),
-        status = status.as_str(),
+        scope = scope_badge,
+        status_badge = badge(status_tone, status.as_str()),
         tenant = escape(ctx.tenant.as_str()),
-        escaped = escaped,
+        md = md_html,
     );
     Ok(page_shell_full(
         ctx,
         "/admin/adr",
-        &format!("{id} · ADR Browser"),
+        &format!("{id} · ADR Browser", id = escape(&id)),
         &html,
     ))
 }
@@ -516,5 +709,126 @@ mod tests {
         assert_eq!(extract_status("**Status:** Proposed"), AdrStatus::Proposed);
         assert_eq!(extract_status("status: Superseded"), AdrStatus::Superseded);
         assert_eq!(extract_status("no status line"), AdrStatus::Unknown);
+    }
+
+    // ── is_runtime + filtered list view (2026-05-22) ───────────────
+
+    #[test]
+    fn extract_is_runtime_defaults_to_true_when_no_scope_line() {
+        assert!(extract_is_runtime("just body content", "ADR-001_anything"));
+    }
+
+    #[test]
+    fn extract_is_runtime_honours_explicit_runtime_scope() {
+        assert!(extract_is_runtime("Status: Accepted\nScope: runtime", "x"));
+        assert!(extract_is_runtime(
+            "**Scope:** control-plane",
+            "x"
+        ));
+    }
+
+    #[test]
+    fn extract_is_runtime_returns_false_for_process_and_branding_scopes() {
+        assert!(!extract_is_runtime("Scope: process", "x"));
+        assert!(!extract_is_runtime("Scope: branding", "x"));
+        assert!(!extract_is_runtime("scope: deployment", "x"));
+        assert!(!extract_is_runtime("scope: oss-launch", "x"));
+        assert!(!extract_is_runtime("scope: release-process", "x"));
+    }
+
+    #[test]
+    fn extract_is_runtime_uses_stem_heuristic_when_no_scope_line() {
+        assert!(!extract_is_runtime("no scope line", "ADR-099_branding_polish"));
+        assert!(!extract_is_runtime(
+            "no scope line",
+            "ADR-100_oss_launch_metadata"
+        ));
+        assert!(!extract_is_runtime(
+            "no scope line",
+            "ADR-101_release_process_v2"
+        ));
+        assert!(extract_is_runtime(
+            "no scope line",
+            "ADR-102_kubelet_pid_namespace"
+        ));
+    }
+
+    #[test]
+    fn render_filtered_hides_non_runtime_by_default() {
+        let d = tempfile::TempDir::new().unwrap();
+        write(
+            d.path(),
+            "ADR-001_runtime_thing.md",
+            "# Runtime thing\n\nStatus: Accepted\nScope: runtime",
+        );
+        write(
+            d.path(),
+            "ADR-099_branding_polish.md",
+            "# Branding polish\n\nStatus: Accepted\nScope: branding",
+        );
+        let html = render_in_filtered(&platform_ctx(), d.path(), false).unwrap();
+        assert!(html.contains("Runtime thing"));
+        assert!(!html.contains("Branding polish"));
+        // Toggle to show non-runtime ADRs appears with the hidden count.
+        assert!(html.contains("Show non-runtime"));
+        assert!(html.contains("(1 hidden)"));
+        assert!(html.contains("ADR Browser (1)"));
+    }
+
+    #[test]
+    fn render_filtered_shows_all_when_include_non_runtime_true() {
+        let d = tempfile::TempDir::new().unwrap();
+        write(
+            d.path(),
+            "ADR-001_runtime_thing.md",
+            "# Runtime thing\n\nStatus: Accepted",
+        );
+        write(
+            d.path(),
+            "ADR-099_branding_polish.md",
+            "# Branding polish\n\nStatus: Accepted\nScope: branding",
+        );
+        let html = render_in_filtered(&platform_ctx(), d.path(), true).unwrap();
+        assert!(html.contains("Runtime thing"));
+        assert!(html.contains("Branding polish"));
+        assert!(html.contains("Hide non-runtime"));
+        assert!(html.contains("ADR Browser (2)"));
+    }
+
+    #[test]
+    fn render_filtered_empty_state_when_no_runtime_adrs_after_filter() {
+        let d = tempfile::TempDir::new().unwrap();
+        write(
+            d.path(),
+            "ADR-099_branding_polish.md",
+            "# Branding polish\n\nStatus: Accepted\nScope: branding",
+        );
+        let html = render_in_filtered(&platform_ctx(), d.path(), false).unwrap();
+        assert!(html.contains("cave-empty"));
+        assert!(html.contains("non-runtime"));
+        assert!(html.contains("ADR Browser (0)"));
+    }
+
+    #[test]
+    fn render_detail_renders_markdown_not_raw_pre() {
+        let d = tempfile::TempDir::new().unwrap();
+        write(
+            d.path(),
+            "ADR-042_demo.md",
+            "# Demo title\n\nStatus: Accepted\n\n## Context\n\nA paragraph.\n\n- item 1\n- item 2\n",
+        );
+        unsafe {
+            std::env::set_var("CAVE_ADR_DIR", d.path());
+        }
+        let html = render_detail(&platform_ctx(), "ADR-042_demo").unwrap();
+        // Markdown was upgraded to HTML — not wrapped in a literal <pre>.
+        assert!(html.contains("cave-md"));
+        assert!(html.contains("<h2>Context</h2>"));
+        assert!(html.contains("<ul><li>item 1</li>"));
+        // Scope badge is present (runtime by default — no Scope: line).
+        assert!(html.contains(">runtime</span>"));
+        unsafe {
+            std::env::remove_var("CAVE_ADR_DIR");
+        }
     }
 }

@@ -799,14 +799,30 @@ async fn compliance_refresh_handler(
 // route handler builds the persona-aware ctx, the module re-checks
 // the persona inside its `render` so misconfiguration anywhere up
 // the chain fails closed.
+#[derive(Debug, serde::Deserialize)]
+struct AdrListQuery {
+    tenant_id: String,
+    /// 2026-05-22 — `?show=all` opts in to non-runtime ADRs. Any other
+    /// value (or absence) keeps the filtered default.
+    #[serde(default)]
+    show: Option<String>,
+}
+
 async fn adr_handler(
-    Query(q): Query<AdminQuery>,
+    Query(q): Query<AdrListQuery>,
     claims: Option<axum::Extension<JwtClaims>>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
-    let ctx = extract_ctx_from_query_with_claims(q, claims.as_ref().map(|axum::Extension(c)| c));
+    let include_non_runtime = matches!(q.show.as_deref(), Some("all"));
+    let admin_q = AdminQuery { tenant_id: q.tenant_id };
+    let ctx = extract_ctx_from_query_with_claims(
+        admin_q,
+        claims.as_ref().map(|axum::Extension(c)| c),
+    );
     ctx.require_persona(Persona::PlatformAdmin)
         .map_err(err_to_response)?;
-    adr::render(&ctx).map(Html).map_err(err_to_response)
+    adr::render_in_filtered(&ctx, &adr::adr_dir(), include_non_runtime)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn adr_detail_handler(
