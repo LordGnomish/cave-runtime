@@ -146,6 +146,10 @@ members = [
     "crates/cave-hermes",
     # === LLM Tracker (daily always-latest, Phase 0 report-only) ===
     "crates/cave-llm-tracker",
+    # === API Gateway (Kong + Envoy reimplementation) ===
+    "crates/cave-apigw",
+    # === SBOM / SCA platform (Dependency-Track v4.14.2) ===
+    "crates/cave-dependency-track",
 ]
 
 [workspace.package]
