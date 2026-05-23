@@ -232,6 +232,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: SignCmd,
     },
+    /// Identity and access management (Keycloak replacement — realms / users / roles / clients / sessions / events)
+    Iam {
+        #[command(subcommand)]
+        cmd: IamCmd,
+    },
     /// Overall system status
     Status {
         #[command(subcommand)]
@@ -2601,6 +2606,88 @@ enum StatusCmd {
     Health,
 }
 
+// ── IAM (Keycloak parity — cave-keycloak) ─────────────────────────────────────
+
+#[derive(Subcommand)]
+enum IamCmd {
+    /// Realm CRUD
+    Realm {
+        #[command(subcommand)]
+        cmd: IamRealmCmd,
+    },
+    /// User CRUD
+    User {
+        #[command(subcommand)]
+        cmd: IamUserCmd,
+    },
+    /// Realm + client role CRUD
+    Role {
+        #[command(subcommand)]
+        cmd: IamRoleCmd,
+    },
+    /// Client (OAuth2 / OIDC RP / SAML SP) CRUD
+    Client {
+        #[command(subcommand)]
+        cmd: IamClientCmd,
+    },
+    /// Active SSO + offline sessions
+    Session {
+        #[command(subcommand)]
+        cmd: IamSessionCmd,
+    },
+    /// Realm audit-event listener
+    Event {
+        #[command(subcommand)]
+        cmd: IamEventCmd,
+    },
+    /// `/api/iam/health` — status + upstream pin
+    Health,
+}
+
+#[derive(Subcommand)]
+enum IamRealmCmd {
+    /// List realms for the current tenant
+    List,
+    /// Show a single realm
+    Get { realm: String },
+}
+
+#[derive(Subcommand)]
+enum IamUserCmd {
+    /// List users in a realm
+    List { realm: String },
+    /// Show a single user
+    Get { realm: String, user_id: String },
+}
+
+#[derive(Subcommand)]
+enum IamRoleCmd {
+    /// List roles in a realm
+    List { realm: String },
+}
+
+#[derive(Subcommand)]
+enum IamClientCmd {
+    /// List clients in a realm
+    List { realm: String },
+    /// Show OIDC discovery for a realm
+    Discovery { realm: String },
+    /// Show JWKS for a realm
+    Jwks { realm: String },
+}
+
+#[derive(Subcommand)]
+enum IamSessionCmd {
+    /// List active sessions for a user
+    List { realm: String, user_id: String },
+}
+
+#[derive(Subcommand)]
+enum IamEventCmd {
+    /// Drain the audit event buffer for a realm
+    Drain { realm: String },
+}
+
 // ── etcd (etcdctl parity) ─────────────────────────────────────────────────────
 
 #[derive(Subcommand)]
@@ -4153,6 +4240,49 @@ source_root = "src"
         Commands::Status { cmd } => match cmd {
             StatusCmd::Services => c.get("/api/status/services").await,
             StatusCmd::Health => c.get("/health").await,
+        },
+
+        // ── IAM (cave-keycloak) ───────────────────────────────────────────────
+        Commands::Iam { cmd } => match cmd {
+            IamCmd::Health => c.get("/api/iam/health").await,
+            IamCmd::Realm { cmd } => match cmd {
+                IamRealmCmd::List => c.get("/api/iam/realms").await,
+                IamRealmCmd::Get { realm } => c.get(&format!("/api/iam/realms/{}", realm)).await,
+            },
+            IamCmd::User { cmd } => match cmd {
+                IamUserCmd::List { realm } => c.get(&format!("/api/iam/realms/{}/users", realm)).await,
+                IamUserCmd::Get { realm, user_id } => {
+                    c.get(&format!("/api/iam/realms/{}/users/{}", realm, user_id)).await
+                }
+            },
+            IamCmd::Role { cmd } => match cmd {
+                IamRoleCmd::List { realm } => c.get(&format!("/api/iam/realms/{}/roles", realm)).await,
+            },
+            IamCmd::Client { cmd } => match cmd {
+                IamClientCmd::List { realm } => c.get(&format!("/api/iam/realms/{}/clients", realm)).await,
+                IamClientCmd::Discovery { realm } => {
+                    c.get(&format!(
+                        "/api/iam/realms/{}/.well-known/openid-configuration",
+                        realm
+                    ))
+                    .await
+                }
+                IamClientCmd::Jwks { realm } => {
+                    c.get(&format!(
+                        "/api/iam/realms/{}/protocol/openid-connect/certs",
+                        realm
+                    ))
+                    .await
+                }
+            },
+            IamCmd::Session { cmd } => match cmd {
+                IamSessionCmd::List { realm, user_id } => {
+                    c.get(&format!("/api/iam/realms/{}/users/{}/sessions", realm, user_id)).await
+                }
+            },
+            IamCmd::Event { cmd } => match cmd {
+                IamEventCmd::Drain { realm } => c.get(&format!("/api/iam/realms/{}/events", realm)).await,
+            },
         },
 
         // ── Local LLM ─────────────────────────────────────────────────────────

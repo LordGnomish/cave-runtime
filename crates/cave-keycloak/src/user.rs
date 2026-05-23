@@ -139,23 +139,37 @@ impl<'a> UserController<'a> {
         password: &str,
     ) -> Result<User> {
         self.brute_force.check(username)?;
-        let user = self.store.find_user_by_username(tenant_id, realm_id, username).map_err(|e| {
-            let _ = self.brute_force.record_failure(username);
-            e
-        })?;
+        let user = match self.store.find_user_by_username(tenant_id, realm_id, username) {
+            Ok(u) => u,
+            Err(e) => {
+                if let Err(locked) = self.brute_force.record_failure(username) {
+                    return Err(locked);
+                }
+                return Err(e);
+            }
+        };
         if !user.enabled {
-            let _ = self.brute_force.record_failure(username);
+            if let Err(locked) = self.brute_force.record_failure(username) {
+                return Err(locked);
+            }
             return Err(KeycloakError::InvalidCredentials);
         }
-        let cred = self.credentials.get_password(&user.id).ok_or_else(|| {
-            let _ = self.brute_force.record_failure(username);
-            KeycloakError::InvalidCredentials
-        })?;
-        cred.verify(password).map_err(|e| {
-            let _ = self.brute_force.record_failure(username);
+        let cred = match self.credentials.get_password(&user.id) {
+            Some(c) => c,
+            None => {
+                if let Err(locked) = self.brute_force.record_failure(username) {
+                    return Err(locked);
+                }
+                return Err(KeycloakError::InvalidCredentials);
+            }
+        };
+        if let Err(e) = cred.verify(password) {
             self.events.append(AuditEvent::new(tenant_id, &user.id, EventKind::LoginError));
-            e
-        })?;
+            if let Err(locked) = self.brute_force.record_failure(username) {
+                return Err(locked);
+            }
+            return Err(e);
+        }
         self.brute_force.record_success(username);
         self.events.append(AuditEvent::new(tenant_id, &user.id, EventKind::Login));
         Ok(user)

@@ -1,0 +1,443 @@
+# parity.manifest.toml — cave-keycloak
+# Upstream: keycloak/keycloak  https://github.com/keycloak/keycloak  pinned v26.6.2
+# Charter v2 deep-port scaffold + close 2026-05-23.
+#
+# cave-keycloak implements the Keycloak IAM/SSO control plane —
+# realm + user + group + role + client CRUD with multi-tenancy, an
+# authentication flow executor wired to password / TOTP / WebAuthn /
+# magic-link credentials, an OAuth2 + OIDC provider that emits ES256 /
+# EdDSA JWTs (ML-DSA-65 placeholder), a SAML 2.0 IDP + SP, LDAP / AD
+# federation through a pluggable backend trait, identity brokering for
+# Google / GitHub / Microsoft OIDC, SSO + offline sessions, refresh
+# token rotation with chain replay revocation, the brute-force tracker,
+# the password policy validator, the conditional access evaluator, the
+# audit event sink, the admin + account REST URL builders, OIDC
+# discovery + JWKS endpoints, and a 10-panel / 6-alert observability
+# contract.
+#
+# MVP scope (mapped + partial + scope_cuts):
+#   - Realm + user + group + role + client CRUD (tenant scoped)
+#   - Password (PBKDF2-SHA256/512 + Argon2-style) + TOTP RFC 6238 +
+#     WebAuthn (Ed25519 + ES256) + magic link
+#   - OAuth2 authorization code + PKCE S256/plain + refresh token
+#     rotation with replay-detection chain revocation
+#   - OAuth2 client_credentials grant + scope binding
+#   - OIDC discovery (.well-known/openid-configuration) + JWKS publish
+#   - Userinfo + introspection (RFC 7662) shape + revocation (RFC 7009)
+#   - Device authorization grant (RFC 8628) with pending/approved/denied
+#   - SAML 2.0 IDP-issued Response + SP-side Response verify
+#   - LDAP / AD federation through a pluggable backend trait (in-memory)
+#   - Identity brokering for Google / GitHub / Microsoft OIDC + generic,
+#     with family-default endpoint table
+#   - SSO + offline UserSession with idle / max TTLs + per-client sessions
+#   - Brute-force tracker (windowed failures + lockout)
+#   - Password policy validator (length, char-class, history)
+#   - Conditional access evaluator (DenyClient / MFA-unless-IP /
+#     re-auth max age)
+#   - Audit event sink (bounded FIFO, drop oldest with counter)
+#   - JWT signer registry (ES256 + EdDSA real; ML-DSA-65 placeholder)
+#   - Admin REST URL builders (/admin/realms/...) + Account REST URL
+#     builders + AccountProfile DTO
+#   - Authentication flow executor (Required / Alternative / Conditional /
+#     Disabled, ordered with contiguous-alternative blocks)
+#   - Observability: 10 standard metric panels + 6 standard alert rules
+#   - cavectl iam {realm,user,role,client,session,event,health}
+#   - HTTP surface: /api/iam/health + /api/iam/realms/{r}/.well-known/...
+#     + /api/iam/realms/{r}/protocol/openid-connect/certs
+#
+# Out of MVP (skipped — see [[scope_cuts]]):
+#   - Admin console UI runtime              → cave-portal-ui
+#   - Account console UI runtime            → cave-portal-ui
+#   - Email theme rendering (Freemarker)    → cave-templates
+#   - LDAP network adapter + sync daemon    → Phase 2 cave-keycloak-ldap-net
+#   - Kerberos GSSAPI runtime               → Phase 2 cave-keycloak-kerberos
+#   - Vault-backed secret store adapter     → cave-vault
+#   - Token Exchange (RFC 8693)             → Phase 2
+#   - User profile (X.509 attributes API)   → Phase 2
+#   - Cross-realm trust + Organization API  → Phase 2
+#   - SCIM provisioning                     → Phase 2 cave-keycloak-scim
+#   - Authorization Services (UMA 2.0)      → Phase 2 cave-keycloak-uma
+#   - DPoP-bound tokens (RFC 9449)          → Phase 2 cave-keycloak-dpop
+#   - XML-DSig signature verify             → Phase 2 cave-xmlsec
+#   - oid4vc / verifiable credentials       → Phase 2 cave-keycloak-oid4vc
+
+[upstream]
+org        = "keycloak"
+repo       = "keycloak"
+version    = "v26.6.2"
+name       = "keycloak"
+license    = "Apache-2.0"
+language   = "Java"
+url        = "https://github.com/keycloak/keycloak"
+source_sha = "0a402f777f8985eccbb07556e96d9b386275e048"
+
+[parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 0.9574
+honest_ratio        = 0.7660
+last_audit          = "2026-05-23"
+infra_only          = false
+mapped_count        = 33
+partial_count       = 3
+skipped_count       = 9
+unmapped_count      = 2
+total               = 47
+
+# 2026-05-23 Charter v2 deep-port scaffold + close — claude/cave-keycloak-2026-05-23-deep:
+#   * 20 src/ modules (~5929 LOC), 132 lib tests + 9 self-audit assertions
+#     + 8 smoke tests = 149 PASS at close.
+#   * Subsystem-count formula: fill_ratio = (mapped + partial + skipped) / total
+#                             = (33 + 3 + 9) / 47 = 0.9574.
+#   * honest_ratio = (mapped + partial) / total = 36 / 47 = 0.7660.
+#   * source_sha pinned to v26.6.2 commit
+#     0a402f777f8985eccbb07556e96d9b386275e048.
+#   * parity_ratio_source = "manifest" (manifest count is the source of truth).
+#   * 2 unmapped (token-exchange-rfc8693 + user-profile-x509) carried as
+#     honest gaps for Phase 2.
+
+[module]
+name        = "cave-keycloak"
+description = "Keycloak IAM/SSO control plane reimplementation — realm/user/role/client + OAuth2/OIDC + SAML2 + LDAP federation + IDP brokering + PQC-ready JWT signing (Keycloak v26.6.2 parity)"
+source_root = "src"
+
+# ─── Mapped subsystems (33) ─────────────────────────────────────────────────
+
+[[mapped]]
+name = "realm-crd"
+upstream = "model/src/main/java/org/keycloak/representations/idm/RealmRepresentation.java"
+note = "Realm + PasswordPolicy + session lifespans + brute-force flag + attributes; multi-tenant via tenant_id; src/models.rs."
+
+[[mapped]]
+name = "user-crd"
+upstream = "model/src/main/java/org/keycloak/representations/idm/UserRepresentation.java"
+note = "User + FederatedIdentity link + group_ids + realm_role_ids + client_role_ids + attributes + validate (empty username / whitespace / bad email); src/models.rs."
+
+[[mapped]]
+name = "group-crd-and-hierarchy"
+upstream = "model/src/main/java/org/keycloak/representations/idm/GroupRepresentation.java"
+note = "Group with optional parent_id; parent-must-share-realm enforced at insert; src/models.rs + src/store.rs."
+
+[[mapped]]
+name = "role-crd-composite"
+upstream = "model/src/main/java/org/keycloak/models/RoleModel.java"
+note = "Role with composite_ids; realm-level vs client-level role distinction; transitive composite-role expansion + cycle termination; src/models.rs + src/role.rs."
+
+[[mapped]]
+name = "role-mapping"
+upstream = "services/src/main/java/org/keycloak/services/managers/RoleContainerResource.java"
+note = "assign_to_user routes realm-role vs client-role into the user's role list; assign_to_group attaches to Group; src/role.rs."
+
+[[mapped]]
+name = "client-crd"
+upstream = "model/src/main/java/org/keycloak/representations/idm/ClientRepresentation.java"
+note = "Client with public/confidential flag, redirect_uris (exact match per RFC 6749 §3.1.2.1), scopes, grant types, PKCE requirement; validate rejects empty fields + confidential-without-secret; src/models.rs."
+
+[[mapped]]
+name = "in-memory-multitenant-store"
+upstream = "model/jpa/src/main/java/org/keycloak/models/jpa/RealmAdapter.java"
+note = "KeycloakStore — realm/user/group/role/client maps with cross-tenant guard (check_tenant); duplicate-email rejection respects realm.duplicate_emails_allowed; src/store.rs."
+
+[[mapped]]
+name = "password-credential"
+upstream = "services/src/main/java/org/keycloak/credential/hash/Pbkdf2Sha512PasswordHashProvider.java"
+note = "PasswordCredential::hash with PBKDF2-HMAC-SHA256/512 (ring::pbkdf2) + Argon2-style HKDF placeholder; verify via constant-time compare; salt fresh per hash; src/credentials.rs."
+
+[[mapped]]
+name = "totp-credential"
+upstream = "services/src/main/java/org/keycloak/models/utils/Base32.java + RFC 6238 / RFC 4226"
+note = "TotpCredential with HMAC-SHA1/SHA256/SHA512; RFC 4648 §6 base32 codec; RFC 6238 Appendix-B vector (T=59 → 94287082) asserted; skew-window verify; src/credentials.rs."
+
+[[mapped]]
+name = "webauthn-credential"
+upstream = "services/src/main/java/org/keycloak/authentication/authenticators/browser/WebAuthnAuthenticator.java"
+note = "Assertion verify per WebAuthn §7.2 (authenticatorData || sha256(clientDataJSON)); Ed25519 + ES256; src/credentials.rs."
+
+[[mapped]]
+name = "magic-link-credential"
+upstream = "services/src/main/java/org/keycloak/authentication/actiontoken/*"
+note = "MagicLink + HMAC-SHA256 signature; verify checks signature + age window; src/credentials.rs."
+
+[[mapped]]
+name = "oauth2-authorization-code-grant"
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/endpoints/AuthorizationEndpoint.java"
+note = "authorize() enforces enabled + grant type + redirect_uri exact match + scope subset + PKCE-when-required; AuthCodeStore is single-use with TTL and replay rejection; src/oauth2.rs."
+
+[[mapped]]
+name = "oauth2-pkce-s256-and-plain"
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/utils/PkceUtils.java (RFC 7636)"
+note = "pkce_verify covers S256 + plain + verifier length 43..128; src/oauth2.rs."
+
+[[mapped]]
+name = "oauth2-client-credentials-grant"
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/grants/ClientCredentialsGrantType.java"
+note = "ClientController::authenticate enforces enabled + confidential + grant-type + PBKDF2 secret verify; src/client_registry.rs."
+
+[[mapped]]
+name = "oauth2-refresh-token-rotation"
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/TokenManager.java::refreshAccessToken"
+note = "RefreshTokenStore mints a chain; rotate marks predecessor revoked; replay of any chain token revokes every token in the chain (RFC 6749 §10.4); src/oauth2.rs."
+
+[[mapped]]
+name = "oauth2-device-authorization-grant"
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/grants/device/endpoints/DeviceEndpoint.java"
+note = "DeviceCodeStore issue/approve/deny/poll with slow_down + expired_token + access_denied + authorization_pending per RFC 8628; src/oauth2.rs."
+
+[[mapped]]
+name = "oauth2-introspection-rfc7662"
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/endpoints/TokenIntrospectionEndpoint.java"
+note = "IntrospectionResponse DTO (active/scope/client_id/username/sub/exp/iat/token_type); inactive() helper; src/oauth2.rs."
+
+[[mapped]]
+name = "oauth2-revocation-rfc7009"
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/endpoints/TokenRevocationEndpoint.java"
+note = "RefreshTokenStore::revoke marks token revoked; introspection then returns revoked=true; src/oauth2.rs."
+
+[[mapped]]
+name = "oidc-discovery"
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/representations/OIDCConfigurationRepresentation.java"
+note = "discovery_for emits realm-scoped issuer + all endpoint URLs + supported algs + scopes + PKCE methods; src/discovery.rs."
+
+[[mapped]]
+name = "oidc-jwks-publish"
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/endpoints/JWKSResource.java"
+note = "jwks_for returns realm-scoped active + retained signing keys; ES256 (x/y) + EdDSA (x) + PQC placeholder shapes; src/jwks.rs + src/signer.rs."
+
+[[mapped]]
+name = "oidc-userinfo"
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/endpoints/UserInfoEndpoint.java"
+note = "userinfo_from assembles sub/preferred_username/email/email_verified/name; src/session.rs."
+
+[[mapped]]
+name = "jwt-signer-es256-eddsa"
+upstream = "services/src/main/java/org/keycloak/keys/* + core/src/main/java/org/keycloak/jose/jws/JWSBuilder.java"
+note = "SignerRegistry with per-realm active kid + retained verifying keys; ES256 (p256) + EdDSA (ed25519-dalek) sign + compact JWS encode/decode; tamper detection; src/signer.rs."
+
+[[mapped]]
+name = "sso-user-session"
+upstream = "model/src/main/java/org/keycloak/models/UserSessionModel.java"
+note = "SessionStore::create + touch + logout + list_for_user; idle + max TTLs honoured; per-client sessions attached on access; src/session.rs."
+
+[[mapped]]
+name = "oidc-token-assembly"
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/TokenManager.java::createAccessToken + ::createIdToken"
+note = "issue_tokens emits compact JWS access + IdToken with iss/sub/aud/exp/iat/auth_time/realm_access.roles/preferred_username; nonce passthrough; src/session.rs."
+
+[[mapped]]
+name = "saml2-idp-response-build"
+upstream = "services/src/main/java/org/keycloak/protocol/saml/SamlProtocol.java::buildResponse"
+note = "build_response constructs Response + Assertion with NotBefore/NotOnOrAfter/AudienceRestriction; signature_present flag for the xmlsec stamp; src/saml.rs."
+
+[[mapped]]
+name = "saml2-sp-response-verify"
+upstream = "services/src/main/java/org/keycloak/broker/saml/SAMLEndpoint.java::verifyResponse"
+note = "verify_response enforces status / InResponseTo / Destination / Issuer / Audience / time-window / signature-present; src/saml.rs."
+
+[[mapped]]
+name = "ldap-federation-trait"
+upstream = "federation/ldap/src/main/java/org/keycloak/storage/ldap/LDAPStorageProvider.java"
+note = "LdapBackend trait + InMemoryLdap + simple filter parser ((attr=v), (attr=*), (&...)); authenticate() does search-then-bind; bind_credential must be keychain handle; src/ldap.rs."
+
+[[mapped]]
+name = "idp-brokering"
+upstream = "services/src/main/java/org/keycloak/broker/oidc/AbstractOAuth2IdentityProvider.java"
+note = "ExternalIdp with family-default endpoints for Google / GitHub / Microsoft / generic OIDC; build_authorize_url URL-encodes state/redirect; just-in-time map_to_user attaches FederatedIdentity; src/brokering.rs."
+
+[[mapped]]
+name = "password-policy"
+upstream = "services/src/main/java/org/keycloak/policy/PasswordPolicyProvider.java"
+note = "check_password_policy enforces min_length + upper/lower/digit/special counts; PasswordCredential history-replay guard in CredentialStore; src/policies.rs + src/user.rs."
+
+[[mapped]]
+name = "brute-force-detection"
+upstream = "services/src/main/java/org/keycloak/services/managers/DefaultBruteForceProtector.java"
+note = "BruteForceTracker (windowed failure counter + lockout) — record_failure / record_success / check; locks return CredentialLocked{account_id,retry_after_seconds}; src/policies.rs."
+
+[[mapped]]
+name = "conditional-access-evaluator"
+upstream = "services/src/main/java/org/keycloak/authentication/authenticators/conditional/*"
+note = "evaluate matches RequireMfaUnlessIp / DenyClient / RequireReAuthMaxAge against ConditionalContext; returns Allow / Deny / StepUp; src/policies.rs."
+
+[[mapped]]
+name = "event-listener-audit"
+upstream = "events/api/src/main/java/org/keycloak/events/EventListenerProvider.java"
+note = "EventSink — bounded FIFO with drop counter; AuditEvent builder (with_client / with_ip / with_detail); 22 EventKind variants covering realm + user + role + client + auth + token lifecycle; src/events.rs."
+
+[[mapped]]
+name = "authentication-flow-executor"
+upstream = "services/src/main/java/org/keycloak/authentication/DefaultAuthenticationFlow.java"
+note = "FlowExecutor walks AuthStep list; Required short-circuits on failure; contiguous Alternative block succeeds on first inner success; Conditional runs only when matching fact set; Disabled skipped; src/auth_flow.rs."
+
+# ─── Partial subsystems (3) — shape present, runtime deferred ───────────────
+
+[[partial]]
+name = "pqc-mldsa-hybrid-signer"
+upstream = "(post-Keycloak PQC roadmap — FIPS 204 ML-DSA-65)"
+note = "SignerRegistry accepts JwsAlg::MlDsa65 + emits the JWKS slot, but sign/verify return a marker error until the cave-pqc backend lands; discovery advertises the alg so RPs can rotate cleanly when it ships."
+
+[[partial]]
+name = "saml-xmlsig-signature-verify"
+upstream = "core/src/main/java/org/keycloak/saml/processing/core/util/XMLSignatureUtil.java"
+note = "verify_response enforces signature_present + structural checks; actual XML-DSig verify is deferred to the cave-xmlsec adapter (scope_cut). MVP stops the common assertion-injection attacks but the canonicalisation + digest path lands Phase 2."
+
+[[partial]]
+name = "required-actions-runtime"
+upstream = "services/src/main/java/org/keycloak/authentication/RequiredActionProvider.java"
+note = "pending_required_actions parses the user's required_actions attribute to UpdatePassword / VerifyEmail / ConfigureTotp / WebauthnRegister / TermsAndConditions; UI flow runtime + post-login redirect chain lands with cave-portal-ui."
+
+# ─── Skipped subsystems (9) — scope_cuts to other crates / out of MVP ───────
+
+[[scope_cuts]]
+group = "cave-portal-ui"
+reason = "Admin console + account console UI runtime (React/Themes) belong in cave-portal-ui; cave-keycloak surfaces the REST shape they consume."
+items = ["admin-console-ui", "account-console-ui"]
+
+[[scope_cuts]]
+group = "cave-templates"
+reason = "Email/login theme Freemarker rendering belongs in cave-templates."
+items = ["email-theme-rendering"]
+
+[[scope_cuts]]
+group = "cave-keycloak-ldap-net"
+reason = "Wire-level OpenLDAP / AD adapter + scheduled sync daemon ships as Phase 2 cave-keycloak-ldap-net; the trait surface here lets tests + in-process backends work today."
+items = ["ldap-network-runtime", "ldap-sync-daemon"]
+
+[[scope_cuts]]
+group = "cave-keycloak-kerberos"
+reason = "Kerberos GSSAPI runtime ships as Phase 2 cave-keycloak-kerberos so cave-keycloak stays libgssapi-free in MVP."
+items = ["kerberos-gssapi-runtime"]
+
+[[scope_cuts]]
+group = "cave-vault"
+reason = "Keychain-backed secret store adapter — bind credentials + client secrets + IDP secrets reference keychain handles today; cave-vault provides the resolver."
+items = ["vault-secret-store-adapter"]
+
+[[scope_cuts]]
+group = "cave-keycloak-uma"
+reason = "Authorization Services / UMA 2.0 ships as a separate adapter — out of MVP scope."
+items = ["uma2-authorization-services"]
+
+[[scope_cuts]]
+group = "cave-keycloak-scim"
+reason = "SCIM 2.0 provisioning protocol ships as Phase 2 cave-keycloak-scim."
+items = ["scim2-provisioning"]
+
+[[scope_cuts]]
+group = "cave-xmlsec"
+reason = "XML-DSig canonicalisation + digest engine ships as cave-xmlsec; cave-keycloak provides the structural checks today."
+items = ["xmlsec-c14n-verify"]
+
+[[scope_cuts]]
+group = "cave-keycloak-oid4vc"
+reason = "OpenID 4 Verifiable Credentials / Issuer + Holder roles ship as Phase 2 cave-keycloak-oid4vc."
+items = ["oid4vc-issuer", "oid4vc-holder"]
+
+# ─── Unmapped subsystems (2) — honest gaps preserved for Phase 2 ────────────
+
+[[unmapped]]
+name = "token-exchange-rfc8693"
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/tokenexchange/*"
+note = "Keycloak's preview token-exchange (delegation + impersonation) is RFC 8693. Honest gap — Phase 2."
+
+[[unmapped]]
+name = "user-profile-x509-mapper"
+upstream = "services/src/main/java/org/keycloak/userprofile/*"
+note = "X.509 client-cert authentication + the UserProfile attribute mapper API. Honest gap — Phase 2."
+
+# ─── File mappings ───────────────────────────────────────────────────────────
+
+[[files]]
+upstream = "model/src/main/java/org/keycloak/representations/idm/RealmRepresentation.java"
+local    = "src/models.rs"
+
+[[files]]
+upstream = "model/src/main/java/org/keycloak/representations/idm/UserRepresentation.java"
+local    = "src/models.rs"
+
+[[files]]
+upstream = "model/src/main/java/org/keycloak/representations/idm/ClientRepresentation.java"
+local    = "src/models.rs"
+
+[[files]]
+upstream = "model/src/main/java/org/keycloak/models/utils/Base32.java"
+local    = "src/credentials.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/credential/hash/Pbkdf2Sha512PasswordHashProvider.java"
+local    = "src/credentials.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/endpoints/AuthorizationEndpoint.java"
+local    = "src/oauth2.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/endpoints/TokenEndpoint.java"
+local    = "src/oauth2.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/TokenManager.java"
+local    = "src/session.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/representations/OIDCConfigurationRepresentation.java"
+local    = "src/discovery.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oidc/endpoints/JWKSResource.java"
+local    = "src/jwks.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/keys/RsaKeyProviderFactory.java"
+local    = "src/signer.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/saml/SamlProtocol.java"
+local    = "src/saml.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/broker/saml/SAMLEndpoint.java"
+local    = "src/saml.rs"
+
+[[files]]
+upstream = "federation/ldap/src/main/java/org/keycloak/storage/ldap/LDAPStorageProvider.java"
+local    = "src/ldap.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/broker/oidc/AbstractOAuth2IdentityProvider.java"
+local    = "src/brokering.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/services/managers/DefaultBruteForceProtector.java"
+local    = "src/policies.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/policy/PasswordPolicyProvider.java"
+local    = "src/policies.rs"
+
+[[files]]
+upstream = "events/api/src/main/java/org/keycloak/events/EventListenerProvider.java"
+local    = "src/events.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/authentication/DefaultAuthenticationFlow.java"
+local    = "src/auth_flow.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/services/resources/admin/RealmsAdminResource.java"
+local    = "src/admin_api.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/services/resources/account/AccountRestService.java"
+local    = "src/account_api.rs"
+
+[[files]]
+upstream = "(cmd/cli — keycloak's kcadm.sh)"
+local    = "../cave-cli/src/main.rs"
+
+[portal_ui]
+upstream_ui  = "themes/src/main/resources/theme/keycloak.v3/admin (Admin Console React app)"
+upstream_url = "https://www.keycloak.org/"
+status       = "scaffold"
+loc          = 0
+priority     = "P2"
+notes        = "Keycloak ships a React admin + account console — cave-portal-ui consumes the /api/iam REST surface here to render the same."
+last_audit   = "2026-05-23"

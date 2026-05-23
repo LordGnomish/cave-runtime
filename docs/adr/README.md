@@ -48,6 +48,7 @@ and are **not** carried by this OSS Cave Runtime catalogue.
 | [ADR-152](ADR-152_LLM_Tracker_Daily_Always_Latest.md) | cave-llm-tracker — daily always-latest tracker |
 | [ADR-153](ADR-153_LLM_Gateway_MVP.md) | cave-llm-gateway — MVP |
 | [ADR-154](ADR-154_ArgoCD_GitOps_Adoption.md) | cave-deploy — ArgoCD GitOps adoption |
+| [ADR-158](ADR-158_Keycloak_Adoption.md) | cave-keycloak — Keycloak adoption (IAM / SSO) |
 
 ### Portal
 
