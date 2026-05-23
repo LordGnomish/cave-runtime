@@ -146,6 +146,10 @@ members = [
     "crates/cave-hermes",
     # === LLM Tracker (daily always-latest, Phase 0 report-only) ===
     "crates/cave-llm-tracker",
+    # === TruffleHog-parity secret scanner ===
+    "crates/cave-trufflehog",
+    # === Trivy-parity vulnerability scanner ===
+    "crates/cave-trivy",
 ]
 
 [workspace.package]

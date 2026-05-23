@@ -1,0 +1,91 @@
+# portal-page.toml — cave-trivy
+# Portal UX entry consumed by cave-portal's admin shell. The Portal renders
+# a 4-card overview (scan throughput, vuln distribution, secrets, misconfig)
+# plus a paginated table of stored reports backed by GET /trivy/reports.
+
+[page]
+slug         = "trivy"
+title        = "Vulnerability Scanner"
+icon         = "shield-alert"
+nav_section  = "Security"
+backend_api  = "/trivy"
+description  = "Aqua Trivy parity — image / fs / repo / k8s / sbom / secret / config scans, offline CVE+GHSA+OSV DB, IaC misconfig, OpenVEX 0.2.0 suppression."
+
+# ── Hero cards ──────────────────────────────────────────────────────────────
+
+[[card]]
+id    = "scans_today"
+label = "Scans (24h)"
+query = "sum(increase(cave_trivy_scans_total[24h]))"
+unit  = "count"
+
+[[card]]
+id    = "critical_open"
+label = "Critical / High open"
+query = "sum(cave_trivy_vulns_found_total{severity=~\"CRITICAL|HIGH\"})"
+unit  = "count"
+trend = "down-is-good"
+
+[[card]]
+id    = "secrets_today"
+label = "Secrets detected (24h)"
+query = "sum(increase(cave_trivy_secrets_found_total[24h]))"
+unit  = "count"
+trend = "down-is-good"
+
+[[card]]
+id    = "vex_coverage"
+label = "VEX coverage"
+query = "cave_trivy_vex_suppressed_total / clamp_min(cave_trivy_vex_suppressed_total + cave_trivy_vulns_found_total, 1)"
+unit  = "ratio"
+trend = "up-is-good"
+
+# ── Tables ──────────────────────────────────────────────────────────────────
+
+[[table]]
+id       = "recent_reports"
+title    = "Recent reports"
+endpoint = "/trivy/reports"
+columns  = [
+  { field = "artifact_name", label = "Artifact",  width = "30%" },
+  { field = "artifact_type", label = "Type",      width = "15%" },
+  { field = "total_vulns",   label = "Vulns",     width = "10%", numeric = true },
+  { field = "total_misconfigs", label = "Misconfigs", width = "12%", numeric = true },
+  { field = "total_secrets", label = "Secrets",   width = "10%", numeric = true },
+  { field = "created_at",    label = "When",      width = "23%" },
+]
+
+# ── Quick actions ───────────────────────────────────────────────────────────
+
+[[action]]
+id     = "scan_image"
+label  = "Scan image…"
+method = "POST"
+url    = "/trivy/scan"
+form   = { target = "image", artifact_name = "" }
+
+[[action]]
+id     = "scan_repo"
+label  = "Scan repo…"
+method = "POST"
+url    = "/trivy/scan"
+form   = { target = "repo", artifact_name = "" }
+
+[[action]]
+id     = "scan_sbom"
+label  = "Scan SBOM…"
+method = "POST"
+url    = "/trivy/scan"
+form   = { target = "sbom", artifact_name = "", body = "" }
+
+# ── Links to companion CRDs (rendered on the workload detail page) ─────────
+
+[[link]]
+kind  = "VulnerabilityReport"
+api   = "aquasecurity.github.io/v1alpha1"
+notes = "Per-workload vulnerability summary populated by cave-trivy K8s operator path."
+
+[[link]]
+kind  = "ConfigAuditReport"
+api   = "aquasecurity.github.io/v1alpha1"
+notes = "Per-workload misconfig audit populated by cave-trivy K8s operator path."

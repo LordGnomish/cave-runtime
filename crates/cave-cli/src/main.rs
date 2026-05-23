@@ -420,6 +420,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: TraceCmd,
     },
+    /// cave-trivy CLI parity (vulnerability scanner)
+    Trivy {
+        #[command(subcommand)]
+        cmd: TrivyCmd,
+    },
     /// cave-tracker CLI parity
     Tracker {
         #[command(subcommand)]
@@ -680,6 +685,49 @@ enum TraceCmd {
     Services,
     TraceId,
     Search,
+}
+
+#[derive(Subcommand)]
+enum TrivyCmd {
+    /// Scan a container image — `cavectl trivy image --name alpine:3.19`.
+    Image {
+        #[arg(long)]
+        name: String,
+    },
+    /// Scan a filesystem path.
+    Fs {
+        #[arg(long)]
+        path: String,
+    },
+    /// Scan a git repository (materialised checkout).
+    Repo {
+        #[arg(long)]
+        url: String,
+    },
+    /// Scan a Kubernetes cluster snapshot.
+    K8s {
+        #[arg(long)]
+        context: String,
+    },
+    /// Scan an existing SBOM file (CycloneDX or SPDX).
+    Sbom {
+        #[arg(long)]
+        path: String,
+    },
+    /// Run secret detection over a filesystem.
+    Secret {
+        #[arg(long)]
+        path: String,
+    },
+    /// Run IaC misconfig checks (Terraform / K8s / Dockerfile / Helm).
+    Config {
+        #[arg(long)]
+        path: String,
+    },
+    /// List stored scan reports.
+    Reports,
+    /// Print the current vuln-db snapshot.
+    DbStats,
 }
 
 #[derive(Subcommand)]
@@ -4735,6 +4783,31 @@ source_root = "src"
             TraceCmd::Services => c.get("/api/trace/services").await,
             TraceCmd::TraceId => c.get("/api/trace/trace-id").await,
             TraceCmd::Search => c.get("/api/trace/search").await,
+        },
+        Commands::Trivy { cmd } => match cmd {
+            TrivyCmd::Image { name } => {
+                c.post("/trivy/scan", json!({"target":"image","artifact_name":name})).await
+            }
+            TrivyCmd::Fs { path } => {
+                c.post("/trivy/scan", json!({"target":"fs","artifact_name":path})).await
+            }
+            TrivyCmd::Repo { url } => {
+                c.post("/trivy/scan", json!({"target":"repo","artifact_name":url})).await
+            }
+            TrivyCmd::K8s { context } => {
+                c.post("/trivy/scan", json!({"target":"k8s","artifact_name":context})).await
+            }
+            TrivyCmd::Sbom { path } => {
+                c.post("/trivy/scan", json!({"target":"sbom","artifact_name":path})).await
+            }
+            TrivyCmd::Secret { path } => {
+                c.post("/trivy/scan", json!({"target":"secret","artifact_name":path})).await
+            }
+            TrivyCmd::Config { path } => {
+                c.post("/trivy/scan", json!({"target":"config","artifact_name":path})).await
+            }
+            TrivyCmd::Reports => c.get("/trivy/reports").await,
+            TrivyCmd::DbStats => c.get("/trivy/healthz").await,
         },
         Commands::Tracker { cmd } => match cmd {
             TrackerCmd::Issues => c.get("/api/tracker/issues").await,

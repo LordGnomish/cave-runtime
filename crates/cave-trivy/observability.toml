@@ -1,0 +1,128 @@
+# observability.toml — cave-trivy
+# Dashboard + alert manifest for cave-dashboard / cave-alerts.
+# 4-track deliverable: observability (8 panels + 5 alerts).
+
+[dashboard]
+title       = "cave-trivy / vulnerability scanner"
+description = "Scan throughput, severity distribution, vuln DB age, VEX coverage, secret detections, misconfig hits."
+uid         = "cave-trivy"
+slug        = "cave-trivy"
+tags        = ["security", "scan", "trivy", "cve", "iac", "secrets"]
+
+# ── 8 panels ────────────────────────────────────────────────────────────────
+
+[[panel]]
+id        = 1
+title     = "Scan rate by target (image/fs/repo/k8s/sbom/secret/config)"
+type      = "timeseries"
+expr      = "sum by (target) (rate(cave_trivy_scans_total[5m]))"
+unit      = "scans/sec"
+gridPos   = { x = 0, y = 0, w = 12, h = 8 }
+
+[[panel]]
+id        = 2
+title     = "Vulnerabilities found by severity"
+type      = "barchart"
+expr      = "sum by (severity) (cave_trivy_vulns_found_total)"
+unit      = "count"
+gridPos   = { x = 12, y = 0, w = 12, h = 8 }
+
+[[panel]]
+id        = 3
+title     = "Scan duration p99 by target"
+type      = "timeseries"
+expr      = "histogram_quantile(0.99, sum by (le, target) (rate(cave_trivy_scan_duration_seconds_bucket[5m])))"
+unit      = "seconds"
+gridPos   = { x = 0, y = 8, w = 12, h = 8 }
+
+[[panel]]
+id        = 4
+title     = "Misconfigurations by IaC type"
+type      = "barchart"
+expr      = "sum by (iac_type) (cave_trivy_misconfigs_found_total)"
+unit      = "count"
+gridPos   = { x = 12, y = 8, w = 12, h = 8 }
+
+[[panel]]
+id        = 5
+title     = "Secrets detected by category"
+type      = "barchart"
+expr      = "sum by (category) (cave_trivy_secrets_found_total)"
+unit      = "count"
+gridPos   = { x = 0, y = 16, w = 12, h = 8 }
+
+[[panel]]
+id        = 6
+title     = "Vuln-DB age (hours since last refresh)"
+type      = "stat"
+expr      = "(time() - cave_trivy_vulndb_built_at_seconds) / 3600"
+unit      = "hours"
+gridPos   = { x = 12, y = 16, w = 6, h = 4 }
+
+[[panel]]
+id        = 7
+title     = "VEX coverage (suppression fraction)"
+type      = "gauge"
+expr      = "cave_trivy_vex_suppressed_total / clamp_min(cave_trivy_vex_suppressed_total + cave_trivy_vulns_found_total, 1)"
+unit      = "ratio"
+gridPos   = { x = 18, y = 16, w = 6, h = 4 }
+
+[[panel]]
+id        = 8
+title     = "Cache hit ratio"
+type      = "gauge"
+expr      = "cave_trivy_cache_hits_total / clamp_min(cave_trivy_cache_hits_total + cave_trivy_cache_misses_total, 1)"
+unit      = "ratio"
+gridPos   = { x = 12, y = 20, w = 12, h = 4 }
+
+# ── 5 alerts ────────────────────────────────────────────────────────────────
+
+[[alert]]
+name      = "TrivyCriticalVulnsHigh"
+expr      = "sum(rate(cave_trivy_vulns_found_total{severity=\"CRITICAL\"}[15m])) > 5"
+severity  = "page"
+for       = "10m"
+summary   = "Critical-severity vulnerabilities detected at > 5/sec"
+runbook   = "https://github.com/cave-runtime/cave-runtime/blob/main/docs/runbooks/trivy-critical-burst.md"
+
+[[alert]]
+name      = "TrivyScanFailureRate"
+expr      = "rate(cave_trivy_scans_failed_total[5m]) / clamp_min(rate(cave_trivy_scans_total[5m]), 0.01) > 0.05"
+severity  = "ticket"
+for       = "15m"
+summary   = "More than 5% of scan requests failed in last 5m"
+
+[[alert]]
+name      = "TrivyVulnDbStale"
+expr      = "(time() - cave_trivy_vulndb_built_at_seconds) / 3600 > 24"
+severity  = "ticket"
+for       = "30m"
+summary   = "Vulnerability database is older than 24 hours"
+runbook   = "https://github.com/cave-runtime/cave-runtime/blob/main/docs/runbooks/trivy-db-stale.md"
+
+[[alert]]
+name      = "TrivyScanDurationP99High"
+expr      = "histogram_quantile(0.99, sum by (le) (rate(cave_trivy_scan_duration_seconds_bucket[5m]))) > 60"
+severity  = "ticket"
+for       = "10m"
+summary   = "Scan p99 latency > 60s — check vuln DB index, secret regex set"
+
+[[alert]]
+name      = "TrivyVexCoverageDrop"
+expr      = "cave_trivy_vex_suppressed_total / clamp_min(cave_trivy_vex_suppressed_total + cave_trivy_vulns_found_total, 1) < 0.10"
+severity  = "info"
+for       = "1h"
+summary   = "VEX suppression fraction dropped below 10% — review OpenVEX feed"
+
+# ── Metrics emitted by cave-trivy (Prometheus text format) ──────────────────
+#
+#  cave_trivy_scans_total{target="image|fs|repo|k8s|sbom|secret|config"}
+#  cave_trivy_scans_failed_total{target}
+#  cave_trivy_scan_duration_seconds_bucket{le, target}
+#  cave_trivy_vulns_found_total{severity, ecosystem}
+#  cave_trivy_misconfigs_found_total{iac_type, severity}
+#  cave_trivy_secrets_found_total{category, severity}
+#  cave_trivy_vex_suppressed_total{}
+#  cave_trivy_cache_hits_total{}
+#  cave_trivy_cache_misses_total{}
+#  cave_trivy_vulndb_built_at_seconds (gauge, unix epoch of last DB build)
