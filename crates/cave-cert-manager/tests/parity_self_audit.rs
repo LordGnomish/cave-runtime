@@ -3,19 +3,22 @@
 //
 //! Charter v2 self-audit — cave-cert-manager must carry an honest,
 //! measured `fill_ratio` against upstream cert-manager/cert-manager
-//! v1.20.2, a pinned `source_sha`, the 2026-05-22 close-out audit
+//! v1.20.2, a pinned `source_sha`, the 2026-05-23 v2 re-run audit
 //! date, `parity_ratio_source = "manifest"`, 100% AGPL SPDX header
 //! coverage, no stub macros in `src/`, mapped+partial+skipped+unmapped
-//! summing to total, and the full cert-manager public surface
-//! reachable through `cave_cert_manager`.
+//! summing to total, the full cert-manager public surface reachable
+//! through `cave_cert_manager`, the metrics exposition emits the
+//! upstream 5-family registry, and the revocation ledger round-trips
+//! every RFC 5280 reasonCode.
 //!
-//! 9 assertions — one per gate of the close-out checklist.
+//! 11 assertions — one per gate of the close-out checklist, plus
+//! one each for the two v2 add-ons (metrics + revocation).
 
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-22";
-const FLOOR_FILL_RATIO: f64 = 0.65;
+const TODAY: &str = "2026-05-23";
+const FLOOR_FILL_RATIO: f64 = 0.95;
 const PINNED_VERSION: &str = "v1.20.2";
 const PINNED_SHA: &str = "e5b7b18450dd2c4b993b95bcd680b1a057205b00";
 
@@ -173,8 +176,8 @@ fn assertion_7_agpl_spdx_header_coverage() {
         missing
     );
     assert!(
-        total >= 13,
-        "expected >= 13 .rs files in cave-cert-manager; got {}",
+        total >= 15,
+        "expected >= 15 .rs files in cave-cert-manager (14 modules + ≥1 test); got {}",
         total
     );
 }
@@ -367,6 +370,55 @@ fn assertion_9_cert_manager_surface_intact() {
         Err(CertManagerError::CertificateNotFound(_))
     ));
     let _ = secrets.len();
+}
+
+// ─── Assertion 10: metrics exposition emits the 5 upstream families ────────
+
+#[test]
+fn assertion_10_metrics_exposition_includes_all_upstream_families() {
+    use cave_cert_manager::metrics::{AcmeRequestLabels, CertManagerMetrics};
+    let mut m = CertManagerMetrics::new();
+    m.record_sync("certificates");
+    m.record_acme_request(AcmeRequestLabels {
+        scheme: "https".into(),
+        host: "acme.example.com".into(),
+        method: "POST".into(),
+        status: 200,
+    });
+    let out = m.render_prometheus();
+    for family in [
+        "certmanager_certificate_ready_status",
+        "certmanager_certificate_expiration_timestamp_seconds",
+        "certmanager_certificate_renewal_timestamp_seconds",
+        "certmanager_acme_client_request_count",
+        "certmanager_controller_sync_call_count",
+    ] {
+        assert!(
+            out.contains(family),
+            "metrics exposition missing upstream family `{family}` — Charter v2 observability gate"
+        );
+    }
+}
+
+// ─── Assertion 11: revocation ledger round-trips every RFC 5280 reason ─────
+
+#[test]
+fn assertion_11_revocation_ledger_round_trips_rfc5280_reasoncodes() {
+    use cave_cert_manager::revocation::RevocationReason;
+    let valid = [0u8, 1, 2, 3, 4, 5, 6, 8, 9, 10];
+    for code in valid {
+        let r = RevocationReason::from_reason_code(code)
+            .unwrap_or_else(|_| panic!("RFC 5280 reasonCode {code} must round-trip"));
+        assert_eq!(r.reason_code(), code);
+    }
+    assert!(
+        RevocationReason::from_reason_code(7).is_err(),
+        "reasonCode 7 is RFC 5280 reserved — must NOT round-trip"
+    );
+    assert!(
+        RevocationReason::from_reason_code(42).is_err(),
+        "reasonCode 42 is outside the RFC 5280 enumeration — must NOT round-trip"
+    );
 }
 
 fn cert_with_no_status() -> cave_cert_manager::models::Certificate {

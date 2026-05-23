@@ -62,15 +62,15 @@ source_sha = "e5b7b18450dd2c4b993b95bcd680b1a057205b00"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.9474
-honest_ratio        = 0.6842
-last_audit          = "2026-05-22"
+fill_ratio          = 0.9500
+honest_ratio        = 0.7000
+last_audit          = "2026-05-23"
 infra_only          = false
-mapped_count        = 21
+mapped_count        = 23
 partial_count       = 5
 skipped_count       = 10
 unmapped_count      = 2
-total               = 38
+total               = 40
 
 # 2026-05-22 Charter v2 deep-port scaffold + close — claude/cave-cert-manager-2026-05-22:
 #   * 14 src/ modules (~4 000 LOC), 78 lib tests + 9 self-audit assertions
@@ -78,8 +78,15 @@ total               = 38
 #   * Subsystem-count formula:  fill_ratio = (mapped + partial + skipped) / total
 #                              = (21 + 5 + 10) / 38 = 0.9474.
 #   * honest_ratio = (mapped + partial) / total = 26 / 38 = 0.6842.
-#   * source_sha pinned to v1.20.2 commit
-#     e5b7b18450dd2c4b993b95bcd680b1a057205b00.
+# 2026-05-23 Charter v2 deep-port re-run (v2) — claude/cave-cert-manager-2026-05-22-v2:
+#   * +2 new mapped modules (src/metrics.rs + src/revocation.rs) — Prometheus
+#     exposition (`certmanager_*` counters/gauges) + RFC 5280 revocation ledger.
+#   * Subsystem-count formula:  fill_ratio = (mapped + partial + skipped) / total
+#                              = (23 + 5 + 10) / 40 = 0.9500.
+#   * honest_ratio = (mapped + partial) / total = 28 / 40 = 0.7000.
+#   * source_sha still pinned to v1.20.2 commit
+#     e5b7b18450dd2c4b993b95bcd680b1a057205b00 — no upstream version bump
+#     (verified via `gh release view`, latest stable still v1.20.2 / 2026-04-11).
 #   * parity_ratio_source = "manifest" (manifest count is the source of truth).
 #   * 2 unmapped (multi-issuer-failover + experimental-clusterscoped-secret-rotation)
 #     carried as honest gaps for Phase 2.
@@ -195,6 +202,16 @@ note = "Empty-identifier rejection (EmptyDnsNames), per-dnsName checks (no `/`, 
 name = "tenant-scoping"
 upstream = "(cave invariant — not in upstream)"
 note = "Every store op + every controller op + every keychain entry is scoped to a tenant_id; cross-tenant reads return CertManagerError::CrossTenantDenied {owner_tenant, request_tenant} with both ids surfaced for audit; src/store.rs + src/error.rs."
+
+[[mapped]]
+name = "prometheus-metrics"
+upstream = "pkg/metrics/metrics.go"
+note = "CertManagerMetrics emits the upstream 5-family exposition: certmanager_certificate_ready_status (gauge per Ready ConditionStatus), certmanager_certificate_expiration_timestamp_seconds (gauge), certmanager_certificate_renewal_timestamp_seconds (gauge), certmanager_acme_client_request_count (counter per (scheme,host,method,status)), certmanager_controller_sync_call_count (counter per controller). Deterministic BTreeMap ordering for golden tests; per-tenant cardinality bounded by forget_certificate(); src/metrics.rs."
+
+[[mapped]]
+name = "certificate-revocation"
+upstream = "pkg/util/pki/crl.go + pkg/controller/certificates/revisionmanager/revisionmanager_controller.go + cmd/cmctl/pkg/revoke"
+note = "RevocationLedger records (tenant_id, certificate_id, revision) → RevocationRecord {reason: RFC 5280 §5.3.1 reasonCode 0|1|2|3|4|5|6|8|9|10 (7 reserved), serial, revoked_at, revoked_by, note?}; idempotent revoke; certificateHold→permanent upgrade path; unhold reverses only reversible reasons; CRL-line render for downstream responders; cross-tenant lookup denied; src/revocation.rs."
 
 # ─── Partial subsystems (5) — shape present, runtime deferred ───────────────
 

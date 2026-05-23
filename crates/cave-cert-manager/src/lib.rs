@@ -22,8 +22,10 @@ pub mod cli;
 pub mod controller;
 pub mod error;
 pub mod issuer;
+pub mod metrics;
 pub mod models;
 pub mod renewal;
+pub mod revocation;
 pub mod routes;
 pub mod secret;
 pub mod selfsigned_issuer;
@@ -31,6 +33,7 @@ pub mod store;
 pub mod vault_issuer;
 
 pub use error::{CertManagerError, CertManagerResult};
+pub use metrics::{AcmeRequestLabels, CertLabels, CertManagerMetrics};
 pub use models::{
     Certificate, CertificateCondition, CertificateConditionType, CertificateRequest,
     CertificateRequestCondition, CertificateRequestStatus, CertificateSpec, CertificateStatus,
@@ -39,6 +42,7 @@ pub use models::{
 };
 pub use issuer::{IssuerRegistry, IssueOutcome};
 pub use renewal::{RenewalPlan, RenewalScheduler};
+pub use revocation::{RevocationLedger, RevocationReason, RevocationRecord};
 pub use secret::{SecretMaterializer, SecretRecord};
 pub use store::CertManagerStore;
 
