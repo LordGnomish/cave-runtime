@@ -98,13 +98,16 @@ mod tests {
 
     #[test]
     fn tls_rejects_cert_without_key() {
-        let err = TlsPlugin::new(TlsConfig {
+        let result = TlsPlugin::new(TlsConfig {
             cert_path: Some("/cert.pem".into()),
             key_path: None,
             ..Default::default()
-        })
-        .unwrap_err();
-        assert!(matches!(err, DnsError::Config(_)));
+        });
+        match result {
+            Ok(_) => panic!("expected Err when cert_path set without key_path"),
+            Err(DnsError::Config(_)) => {}
+            Err(other) => panic!("unexpected error variant: {other:?}"),
+        }
     }
 
     #[test]

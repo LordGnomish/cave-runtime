@@ -10,6 +10,7 @@
 
 pub mod api;
 pub mod config;
+pub mod dnssec;
 pub mod error;
 pub mod plugins;
 pub mod protocol;

@@ -94,11 +94,14 @@ mod tests {
 
     #[test]
     fn root_rejects_empty_directory() {
-        let err = RootPlugin::new(RootConfig {
+        let result = RootPlugin::new(RootConfig {
             directory: String::new(),
-        })
-        .unwrap_err();
-        assert!(matches!(err, DnsError::Config(_)));
+        });
+        match result {
+            Ok(_) => panic!("expected Err for empty directory"),
+            Err(DnsError::Config(_)) => {}
+            Err(other) => panic!("unexpected error variant: {other:?}"),
+        }
     }
 
     #[test]
