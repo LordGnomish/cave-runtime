@@ -16,12 +16,16 @@ pub mod loadbalance;
 pub mod log;
 pub mod loop_detect;
 pub mod metrics;
+pub mod prometheus;
 pub mod ready;
 pub mod reload;
 pub mod rewrite;
+pub mod root;
 pub mod route53;
 pub mod secondary;
 pub mod template;
+pub mod tls;
+pub mod trace;
 pub mod whoami;
 
 use std::net::SocketAddr;
