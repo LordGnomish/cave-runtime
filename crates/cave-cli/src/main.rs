@@ -2535,7 +2535,7 @@ enum ScaffoldCmd {
 
 #[derive(Subcommand)]
 enum SignCmd {
-    /// Sign an artifact
+    /// Sign an artifact (blob, file, or OCI ref).
     Sign {
         /// Artifact path or reference
         #[arg(long)]
@@ -2544,14 +2544,52 @@ enum SignCmd {
         #[arg(long)]
         key_id: Option<String>,
     },
-    /// Verify an artifact signature
+    /// Verify an artifact signature.
     Verify {
         /// Artifact path or reference
         #[arg(long)]
         artifact: String,
-        /// Expected signer identity
+        /// Expected signer identity (glob, matched against the cert SAN)
         #[arg(long)]
         identity: Option<String>,
+        /// Cosign bundle JSON (passed inline; future: --bundle-file)
+        #[arg(long, default_value = "")]
+        bundle: String,
+    },
+    /// Attach an in-toto / SLSA / VEX attestation to an artifact.
+    Attest {
+        /// Subject artifact name (e.g. ghcr.io/cave/runtime)
+        #[arg(long)]
+        subject: String,
+        /// sha256 hex digest of the subject (no `sha256:` prefix)
+        #[arg(long)]
+        digest: String,
+        /// Predicate type URI (default: SLSA Provenance v1)
+        #[arg(long, default_value = "https://slsa.dev/provenance/v1")]
+        predicate_type: String,
+        /// Predicate JSON body
+        #[arg(long, default_value = "{}")]
+        predicate: String,
+    },
+    /// CRUD the verification policy (cert-identity / cert-issuer / rekor rules).
+    Policy {
+        /// `get` (default) or `set`
+        #[arg(long, default_value = "get")]
+        action: String,
+        /// Policy JSON body (used by `set`)
+        #[arg(long, default_value = "")]
+        body: String,
+    },
+    /// Fulcio CA status — base URL + reachability.
+    Fulcio,
+    /// Rekor transparency log query: tree state, by-index, or by-digest.
+    Rekor {
+        /// log index (uint)
+        #[arg(long)]
+        index: Option<u64>,
+        /// `sha256:<hex>` digest
+        #[arg(long)]
+        digest: Option<String>,
     },
 }
 
@@ -4060,12 +4098,54 @@ source_root = "src"
             SignCmd::Sign { artifact, key_id } => {
                 c.post("/api/sign/sign", json!({ "artifact": artifact, "key_id": key_id })).await
             }
-            SignCmd::Verify { artifact, identity } => {
+            SignCmd::Verify { artifact, identity, bundle } => {
                 c.post(
                     "/api/sign/verify",
-                    json!({ "artifact": artifact, "identity": identity }),
+                    json!({
+                        "artifact": artifact,
+                        "identity": identity,
+                        "bundle_json": bundle,
+                    }),
                 )
                 .await
+            }
+            SignCmd::Attest { subject, digest, predicate_type, predicate } => {
+                let predicate_value: serde_json::Value =
+                    serde_json::from_str(&predicate).unwrap_or(json!({}));
+                c.post(
+                    "/api/sign/attest",
+                    json!({
+                        "subject_name": subject,
+                        "subject_digest": digest,
+                        "predicate_type": predicate_type,
+                        "predicate": predicate_value,
+                    }),
+                )
+                .await
+            }
+            SignCmd::Policy { action, body } => {
+                if action == "set" {
+                    let parsed: serde_json::Value =
+                        serde_json::from_str(&body).unwrap_or(json!({}));
+                    c.post("/api/sign/policy", parsed).await
+                } else {
+                    c.get("/api/sign/policy").await
+                }
+            }
+            SignCmd::Fulcio => c.get("/api/sign/fulcio").await,
+            SignCmd::Rekor { index, digest } => {
+                let mut url = "/api/sign/rekor".to_string();
+                let mut sep = '?';
+                if let Some(i) = index {
+                    url.push(sep);
+                    url.push_str(&format!("log_index={}", i));
+                    sep = '&';
+                }
+                if let Some(d) = digest {
+                    url.push(sep);
+                    url.push_str(&format!("digest={}", d));
+                }
+                c.get(&url).await
             }
         },
 
