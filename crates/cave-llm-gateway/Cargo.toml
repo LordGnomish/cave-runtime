@@ -14,11 +14,9 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-cave-core = { path = "../cave-core" }
 cave-kernel = { path = "../cave-kernel" }
 axum = { workspace = true }
 tokio = { workspace = true }
-tower = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
@@ -29,7 +27,6 @@ dashmap = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 reqwest = { workspace = true }
-bytes = { workspace = true }
 parking_lot = { workspace = true }
 
 [dev-dependencies]

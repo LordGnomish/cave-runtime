@@ -6,7 +6,6 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-cave-core = { path = "../cave-core" }
 axum = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
@@ -14,7 +13,4 @@ serde_json = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
-anyhow = { workspace = true }
 tracing = { workspace = true }
-cave-auth = { path = "../cave-auth" }
-cave-db = { path = "../cave-db" }

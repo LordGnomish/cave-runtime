@@ -14,15 +14,12 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-cave-core = { path = "../cave-core" }
 axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
-tracing = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v4"] }
 chrono = { workspace = true, features = ["serde"] }
-thiserror = { workspace = true }
 sha2 = { workspace = true }
 
 [dev-dependencies]

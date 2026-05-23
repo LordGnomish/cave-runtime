@@ -27,10 +27,8 @@ cave-scheduler = { path = "../cave-scheduler" }
 cave-controller-manager = { path = "../cave-controller-manager" }
 cave-cloud-controller-manager = { path = "../cave-cloud-controller-manager" }
 cave-cri = { path = "../cave-cri" }
-cave-core = { path = "../cave-core" }
 cave-kernel = { path = "../cave-kernel" }
 cave-auth = { path = "../cave-auth" }
-cave-db = { path = "../cave-db" }
 cave-upstream = { path = "../cave-upstream" }
 # GitOps
 cave-deploy = { path = "../cave-deploy" }
@@ -53,9 +51,6 @@ cave-mesh = { path = "../cave-mesh" }
 cave-metrics = { path = "../cave-metrics" }
 # FinOps
 cave-cost-alloc = { path = "../cave-cost-alloc" }
-# Phase 5 modules
-# HA & DR
-cave-ha = { path = "../cave-ha" }
 # Phase 1 modules
 cave-trace = { path = "../cave-trace" }
 cave-compliance = { path = "../cave-compliance" }
@@ -65,7 +60,6 @@ cave-docs-site = { path = "../cave-docs-site" }
 cave-dns = { path = "../cave-dns" }
 # Observability stack (Prometheus / Loki / OTLP compat)
 cave-logs     = { path = "../cave-logs" }
-cave-registry = { path = "../cave-registry" }
 # Phase 3 modules
 cave-llm-gateway = { path = "../cave-llm-gateway" }
 cave-secrets = { path = "../cave-secrets" }
@@ -94,7 +88,6 @@ cave-profiler = { path = "../cave-profiler" }
 cave-workflows = { path = "../cave-workflows" }
 cave-scan = { path = "../cave-scan" }
 cave-portal = { path = "../cave-portal" }
-cave-portal-api = { path = "../cave-portal-api" }
 cave-scaffold = { path = "../cave-scaffold" }
 cave-chaos = { path = "../cave-chaos" }
 cave-policy = { path = "../cave-policy" }

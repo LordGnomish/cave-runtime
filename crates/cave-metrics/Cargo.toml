@@ -7,13 +7,9 @@ license.workspace = true
 
 [dependencies]
 cave-core = { path = "../cave-core" }
-cave-auth = { path = "../cave-auth" }
-cave-db   = { path = "../cave-db" }
 
 # HTTP framework
 axum        = { workspace = true }
-tower       = { workspace = true }
-tower-http  = { workspace = true }
 
 # Async
 tokio = { workspace = true }
@@ -27,7 +23,6 @@ tracing = { workspace = true }
 
 # Error handling
 thiserror = { workspace = true }
-anyhow    = { workspace = true }
 
 # Time
 chrono = { workspace = true }
@@ -49,10 +44,6 @@ snap = "1"
 
 # Concurrency
 parking_lot = "0.12"
-dashmap     = "6"
-
-# Float utilities
-ordered-float = "4"
 
 [dev-dependencies]
 tokio = { workspace = true }

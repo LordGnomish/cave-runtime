@@ -14,8 +14,6 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-cave-core = { path = "../cave-core" }
-cave-auth = { path = "../cave-auth" }
 cave-db = { path = "../cave-db" }
 axum = { workspace = true }
 serde = { workspace = true }

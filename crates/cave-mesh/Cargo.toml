@@ -14,14 +14,10 @@ keywords = ["service-mesh", "istio", "xds", "spiffe", "networking"]
 categories = ["network-programming", "api-bindings", "authentication"]
 
 [dependencies]
-cave-core    = { path = "../cave-core" }
 cave-db      = { path = "../cave-db" }
 cave-kernel = { path = "../cave-kernel" }
 
 axum               = { workspace = true }
-tokio              = { workspace = true }
-tower              = { workspace = true }
-tower-http         = { workspace = true }
 serde              = { workspace = true }
 serde_json         = { workspace = true }
 uuid               = { workspace = true }
@@ -30,8 +26,5 @@ thiserror          = { workspace = true }
 tracing            = { workspace = true }
 prometheus-client = { workspace = true }
 jsonwebtoken       = { workspace = true }
-reqwest            = { workspace = true }
 regex              = { workspace = true }
-ring               = { workspace = true }
 rcgen              = "0.13"
-rand               = { workspace = true }

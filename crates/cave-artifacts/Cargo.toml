@@ -26,8 +26,6 @@ hex = { workspace = true }
 bytes = { workspace = true }
 base64 = { workspace = true }
 regex = { workspace = true }
-futures = { workspace = true }
-url = "2"
 # Cosign module: reuse cave-certs hybrid container (Ed25519 + ML-DSA-65 fixture).
 cave-certs = { path = "../cave-certs" }
 ed25519-dalek = { workspace = true }

@@ -14,9 +14,3 @@ categories = ["command-line-utilities", "api-bindings"]
 
 [dependencies]
 cave-kernel = { path = "../cave-kernel" }
-serde = { workspace = true }
-tokio = { workspace = true }
-async-trait = { workspace = true }
-regex = { workspace = true }
-thiserror = { workspace = true }
-fnv = "1"

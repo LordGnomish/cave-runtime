@@ -6,7 +6,6 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-cave-core = { path = "../cave-core" }
 axum = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
@@ -17,9 +16,6 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 dashmap = { workspace = true }
-async-trait = { workspace = true }
-kube = { workspace = true }
-k8s-openapi = { workspace = true }
 base64 = "0.22"
 
 [dev-dependencies]

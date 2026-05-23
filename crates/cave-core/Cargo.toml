@@ -12,10 +12,7 @@ serde_yaml = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
 thiserror = { workspace = true }
-anyhow = { workspace = true }
-tokio-postgres = { workspace = true }
 config = { workspace = true }
-tracing = { workspace = true }
 crc32fast = "1"
 
 [dev-dependencies]

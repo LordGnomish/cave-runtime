@@ -6,9 +6,6 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-cave-core = { path = "../cave-core" }
-cave-auth = { path = "../cave-auth" }
-cave-db = { path = "../cave-db" }
 
 # Web
 axum = { workspace = true }
@@ -25,7 +22,6 @@ serde_json = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
-tracing = { workspace = true }
 
 # Crypto
 ring = { workspace = true }

@@ -14,9 +14,6 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-tokio = { workspace = true, features = ["full"] }
-serde = { workspace = true }
-serde_json = { workspace = true }
 
 # TODO(adr-portal-desktop-001): GPUI dependency parked.
 # The intended dep is:

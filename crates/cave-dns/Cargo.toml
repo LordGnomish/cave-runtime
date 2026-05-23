@@ -15,12 +15,9 @@ serde        = { workspace = true }
 serde_json   = { workspace = true }
 tracing      = { workspace = true }
 thiserror    = { workspace = true }
-anyhow       = { workspace = true }
 uuid         = { workspace = true }
 chrono       = { workspace = true }
 reqwest      = { workspace = true }
-tower        = { workspace = true }
-tower-http   = { workspace = true }
 kube         = { workspace = true }
 k8s-openapi  = { workspace = true }
 prometheus-client = { workspace = true }
@@ -44,9 +41,6 @@ arc-swap = "1"
 
 # File watching (zone reload)
 notify = "6"
-
-# TCP codec (length-delimited DNS framing)
-tokio-util = { version = "0.7", features = ["codec"] }
 
 # TLS stack
 rustls        = { version = "0.23", default-features = false, features = ["ring"] }

@@ -6,13 +6,10 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-cave-core = { path = "../cave-core" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
-uuid = { workspace = true }
 sha2 = { workspace = true }
 tokio = { workspace = true }
 axum = { workspace = true }
-tracing = { workspace = true }
 hex = { workspace = true }

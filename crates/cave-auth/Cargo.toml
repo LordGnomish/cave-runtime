@@ -30,7 +30,6 @@ tower = { workspace = true }
 ring = { workspace = true }
 base64 = { workspace = true }
 rand = { workspace = true }
-anyhow = { workspace = true }
 # SAML 2.0 protocol parsing — Keycloak `saml-core` port (src/saml/)
 quick-xml = "0.37"
 flate2    = "1.0"
@@ -38,7 +37,6 @@ flate2    = "1.0"
 byteorder = { workspace = true }
 # WebAuthn / FIDO2 — webauthn4j + Keycloak `webauthn` port (src/webauthn/)
 ciborium      = "0.2"
-coset         = "0.3"
 bitflags      = "2"
 p256          = { workspace = true }
 # ECDSA XML signing — XMLDSig ECDSA-SHA{256,384,512} per RFC 4051 §2.2.3
@@ -56,7 +54,6 @@ aes     = "0.8"
 cbc     = { version = "0.1", features = ["alloc"] }
 cipher  = { version = "0.4", features = ["block-padding", "alloc"] }
 hmac    = "0.12"
-hkdf    = "0.12"
 # OAuth/OIDC endpoints (oauth_endpoints/): URL-encoding + form deser for /auth + /par + /token
 urlencoding      = "2.1"
 serde_urlencoded = "0.7"

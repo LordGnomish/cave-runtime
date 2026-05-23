@@ -6,7 +6,6 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-cave-core = { path = "../cave-core" }
 cave-kernel = { path = "../cave-kernel" }
 cave-auth = { path = "../cave-auth" }
 cave-db = { path = "../cave-db" }
