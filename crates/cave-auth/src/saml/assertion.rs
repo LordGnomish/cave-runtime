@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 // Source: keycloak/keycloak@v22.0.0 saml-core-api/src/main/java/org/keycloak/dom/saml/v2/assertion/AssertionType.java + AuthnContextClassRefType.java + ConditionsType.java
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
