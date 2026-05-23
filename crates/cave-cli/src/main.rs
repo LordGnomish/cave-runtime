@@ -445,6 +445,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: CertsCmd,
     },
+    /// cave-cert-manager CLI parity (cert-manager.io control plane)
+    Cert {
+        #[command(subcommand)]
+        cmd: CertCmd,
+    },
     /// cave-crm CLI parity
     Crm {
         #[command(subcommand)]
@@ -713,6 +718,50 @@ enum CertsCmd {
     List,
     Issue,
     Renew,
+}
+#[derive(Subcommand)]
+enum CertCmd {
+    /// Manage Issuer / ClusterIssuer resources.
+    Issuer {
+        #[command(subcommand)]
+        cmd: CertIssuerCmd,
+    },
+    /// Manage Certificate resources.
+    Cert {
+        #[command(subcommand)]
+        cmd: CertCertCmd,
+    },
+    /// Inspect CertificateRequest resources.
+    Request {
+        /// Tenant id to scope the listing.
+        tenant: String,
+    },
+    /// Force-renew a Certificate by id.
+    Renew {
+        tenant: String,
+        id: String,
+    },
+    /// Surface cert-manager control-plane health.
+    Health,
+}
+#[derive(Subcommand)]
+enum CertIssuerCmd {
+    /// List ClusterIssuer count for a tenant.
+    List {
+        tenant: String,
+    },
+}
+#[derive(Subcommand)]
+enum CertCertCmd {
+    /// List Certificate resources for a tenant.
+    List {
+        tenant: String,
+    },
+    /// Trigger an issuance for an existing Certificate id.
+    Issue {
+        tenant: String,
+        id: String,
+    },
 }
 #[derive(Subcommand)]
 enum CrmCmd {
@@ -4760,6 +4809,36 @@ source_root = "src"
             CertsCmd::List => c.get("/api/certs/list").await,
             CertsCmd::Issue => c.get("/api/certs/issue").await,
             CertsCmd::Renew => c.get("/api/certs/renew").await,
+        },
+        Commands::Cert { cmd } => match cmd {
+            CertCmd::Health => c.get("/api/cert/health").await,
+            CertCmd::Issuer { cmd } => match cmd {
+                CertIssuerCmd::List { tenant } => {
+                    c.get(&format!("/api/cert/{}/cluster-issuers", tenant)).await
+                }
+            },
+            CertCmd::Cert { cmd } => match cmd {
+                CertCertCmd::List { tenant } => {
+                    c.get(&format!("/api/cert/{}/certificates", tenant)).await
+                }
+                CertCertCmd::Issue { tenant, id } => {
+                    c.post(
+                        &format!("/api/cert/{}/certificates/{}/issue", tenant, id),
+                        json!({}),
+                    )
+                    .await
+                }
+            },
+            CertCmd::Request { tenant } => {
+                c.get(&format!("/api/cert/{}/certificate-requests", tenant)).await
+            }
+            CertCmd::Renew { tenant, id } => {
+                c.post(
+                    &format!("/api/cert/{}/certificates/{}/renew", tenant, id),
+                    json!({}),
+                )
+                .await
+            }
         },
         Commands::Crm { cmd } => match cmd {
             CrmCmd::Accounts      => c.get("/api/crm/accounts").await,

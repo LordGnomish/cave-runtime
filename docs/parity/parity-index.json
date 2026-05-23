@@ -170,6 +170,24 @@
       "upstream": null,
       "upstream_version": null
     },
+    "cave-cert-manager": {
+      "cave_src_loc": null,
+      "honest_ratio": 0.6842,
+      "last_audit_disk": "2026-05-22",
+      "manifest_filled": true,
+      "mapped_count": 21,
+      "note": "added by disk-overlay; not in audit doc",
+      "parity_ratio": 0.9474,
+      "parity_ratio_source": "manifest",
+      "partial_count": 5,
+      "skipped_count": 10,
+      "stubs": null,
+      "tier": "C",
+      "total_count": 38,
+      "unmapped_count": 2,
+      "upstream": null,
+      "upstream_version": null
+    },
     "cave-certs": {
       "cave_src_loc": 914,
       "honest_ratio": 0.0,
@@ -1761,11 +1779,11 @@
   },
   "disk_overlay_at": "2026-05-12",
   "disk_overlay_stats": {
-    "flipped": 95,
-    "injected": 10,
-    "new_filled": 95,
+    "flipped": 96,
+    "injected": 11,
+    "new_filled": 96,
     "phantoms": 0,
-    "ratio_overrides": 58
+    "ratio_overrides": 59
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"

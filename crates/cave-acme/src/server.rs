@@ -144,6 +144,28 @@ impl AcmeServer {
         Ok(order_id)
     }
 
+    /// Cite: RFC 8555 §7.5 — authorisations are queryable by id once
+    /// `newOrder` has created them. Required by external solvers
+    /// (e.g. cave-cert-manager) that must inspect the per-identifier
+    /// Challenge list to publish HTTP-01 tokens or DNS-01 digests.
+    pub fn authorization(
+        &self,
+        requesting_tenant: &str,
+        id: &str,
+    ) -> AcmeResult<&Authorization> {
+        let authz = self
+            .authorizations
+            .get(id)
+            .ok_or_else(|| AcmeError::Malformed(format!("authorization {} not found", id)))?;
+        if authz.tenant_id != requesting_tenant {
+            return Err(AcmeError::CrossTenantDenied {
+                store: authz.tenant_id.clone(),
+                req: requesting_tenant.to_string(),
+            });
+        }
+        Ok(authz)
+    }
+
     pub fn order(&self, requesting_tenant: &str, id: &str) -> AcmeResult<&Order> {
         let order = self
             .orders

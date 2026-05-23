@@ -1,0 +1,351 @@
+# parity.manifest.toml — cave-cert-manager
+# Upstream: cert-manager/cert-manager  https://github.com/cert-manager/cert-manager  pinned v1.20.2
+# Charter v2 deep-port scaffold + close 2026-05-22.
+#
+# cave-cert-manager implements the cert-manager.io control-plane —
+# Certificate / CertificateRequest / Issuer / ClusterIssuer CRDs, an
+# issuer registry covering ACME (HTTP-01 + DNS-01 via cave-dns or
+# webhook-Phase-2), CA (self-signed root + platform-intermediate +
+# per-tenant intermediate via cave-pki), Vault (keychain-read token,
+# never in process memory), and SelfSigned, a renewal scheduler that
+# obeys `renewBefore`, a secret reconciler that materialises
+# Kubernetes `tls.crt + ca.crt + tls.key (keychain handle)` secrets, an
+# HTTP API surface under `/api/cert/*`, and a `cavectl cert` driver.
+#
+# MVP scope (mapped + partial + scope_cuts):
+#   - Certificate + CertificateRequest CRDs
+#   - Issuer + ClusterIssuer CRDs
+#   - ACME issuer (HTTP-01 + DNS-01 + RFC 8555 key_authorization +
+#     longest-zone solver pick + cave-dns provider; webhook DNS
+#     deferred to Phase 2)
+#   - CA issuer (3-tier hierarchy via cave-pki, one tenant
+#     intermediate per tenant_id)
+#   - Vault issuer (keychain-handle ONLY, token never in process
+#     memory, never in emitted PEM)
+#   - SelfSigned issuer
+#   - Issuer registry + IssueOutcome routing
+#   - Renewal scheduler (renewBefore + Initial / NotReady / Expired
+#     state machine, sorted plan)
+#   - Secret materializer (kubernetes.io/tls shape + secretTemplate
+#     labels + annotations)
+#   - In-memory store w/ tenant scoping (cross-tenant denied)
+#   - Reconcile loop (project → resolve → dispatch → materialise → stamp)
+#   - HTTP API surface under /api/cert/*
+#   - cavectl cert {issuer,cert,request,renew,health} URL builders
+#   - Status conditions (Ready/Issuing) + CertificateRequest
+#     conditions (Ready/Denied/Approved/InvalidRequest)
+#   - dnsNames validation (empty + slash/whitespace + 253-char RFC 1035)
+#   - ReconcileEvent emitter (Issued / Renewed / Failed)
+#
+# Out of MVP (skipped — see [[scope_cuts]]):
+#   - Venafi issuer runtime           → Phase 2 (model present)
+#   - AWS PCA issuer                  → cave-cert-manager-aws Phase 2
+#   - Google CloudKMS issuer          → cave-cert-manager-gcp Phase 2
+#   - Webhook DNS provider runtime    → Phase 2
+#   - Gateway-API integration         → cave-gateway
+#   - istio-csr (gRPC SVID issuance)  → cave-mesh
+#   - mTLS certificate distribution   → cave-net
+#   - Webhook validation deep         → cave-admission
+#   - Prometheus metrics exporter     → cave-metrics
+#   - cmctl binary                    → cavectl already covers it
+#   - Helm chart installer            → cave-deploy/Helm runtime
+
+[upstream]
+org        = "cert-manager"
+repo       = "cert-manager"
+version    = "v1.20.2"
+name       = "cert-manager"
+license    = "Apache-2.0"
+language   = "Go"
+url        = "https://github.com/cert-manager/cert-manager"
+source_sha = "e5b7b18450dd2c4b993b95bcd680b1a057205b00"
+
+[parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 0.9474
+honest_ratio        = 0.6842
+last_audit          = "2026-05-22"
+infra_only          = false
+mapped_count        = 21
+partial_count       = 5
+skipped_count       = 10
+unmapped_count      = 2
+total               = 38
+
+# 2026-05-22 Charter v2 deep-port scaffold + close — claude/cave-cert-manager-2026-05-22:
+#   * 14 src/ modules (~4 000 LOC), 78 lib tests + 9 self-audit assertions
+#     pre-merge.
+#   * Subsystem-count formula:  fill_ratio = (mapped + partial + skipped) / total
+#                              = (21 + 5 + 10) / 38 = 0.9474.
+#   * honest_ratio = (mapped + partial) / total = 26 / 38 = 0.6842.
+#   * source_sha pinned to v1.20.2 commit
+#     e5b7b18450dd2c4b993b95bcd680b1a057205b00.
+#   * parity_ratio_source = "manifest" (manifest count is the source of truth).
+#   * 2 unmapped (multi-issuer-failover + experimental-clusterscoped-secret-rotation)
+#     carried as honest gaps for Phase 2.
+
+[module]
+name        = "cave-cert-manager"
+description = "Cert-Manager control plane — Certificate + CertificateRequest + Issuer + ClusterIssuer CRDs (cert-manager.io parity) — ACME / CA / Vault / SelfSigned issuers, renewal scheduler, secret reconciler"
+source_root = "src"
+
+# ─── Mapped subsystems (21) ──────────────────────────────────────────────────
+
+[[mapped]]
+name = "certificate-crd"
+upstream = "pkg/apis/certmanager/v1/types_certificate.go"
+note = "Certificate + CertificateSpec (secretName / issuerRef / dnsNames / ipAddresses / uris / emailAddresses / commonName / duration / renewBefore / usages / privateKey policy / isCA / subject / secretTemplate labels + annotations) + CertificateStatus (conditions / serial / not_before / not_after / renewal_time / revision); src/models.rs."
+
+[[mapped]]
+name = "certificate-request-crd"
+upstream = "pkg/apis/certmanager/v1/types_certificaterequest.go"
+note = "CertificateRequest + CertificateRequestStatus (Ready / Denied / Approved / InvalidRequest) + chain_pem + ca_pem + failure_time; src/models.rs."
+
+[[mapped]]
+name = "issuer-crd"
+upstream = "pkg/apis/certmanager/v1/types_issuer.go (Issuer)"
+note = "IssuerResource + IssuerSpec sum type (Acme / Ca / Vault / SelfSigned / Venafi) — exactly-one enforced by the Rust type system; src/models.rs."
+
+[[mapped]]
+name = "clusterissuer-crd"
+upstream = "pkg/apis/certmanager/v1/types_issuer.go (ClusterIssuer)"
+note = "ClusterIssuer (cluster-scoped, no namespace) — same IssuerSpec sum type; src/models.rs."
+
+[[mapped]]
+name = "status-conditions"
+upstream = "internal/apis/certmanager/v1/types_certificate.go (CertificateCondition + CertificateRequestCondition)"
+note = "Ready + Issuing for Certificate; Ready + Denied + Approved + InvalidRequest for CertificateRequest; True/False/Unknown ConditionStatus; src/models.rs."
+
+[[mapped]]
+name = "acme-issuer"
+upstream = "pkg/issuer/acme/setup.go + pkg/issuer/acme/sign.go"
+note = "AcmeIssuer drives the cave-acme AcmeServer through newAccount → newOrder → solve authorisations → finalize; deterministic synthetic_jwk so distinct keychain handles map to distinct thumbprints; src/acme_issuer.rs."
+
+[[mapped]]
+name = "acme-http01-challenge"
+upstream = "pkg/issuer/acme/http/http.go"
+note = "HTTP-01 solver publishes per-(domain,challenge) Http01Plan records (token + key_authorization per RFC 8555 §8.1); cave-net Ingress controller picks them up at /.well-known/acme-challenge; src/acme_issuer.rs."
+
+[[mapped]]
+name = "acme-dns01-challenge"
+upstream = "pkg/issuer/acme/dns/dns.go"
+note = "DNS-01 solver emits per-zone Dns01Plan (record_name=_acme-challenge.<domain>, digest=base64url(SHA-256(key_auth))) — RFC 8555 §8.4; cave-dns provider only (webhook deferred Phase 2); src/acme_issuer.rs."
+
+[[mapped]]
+name = "ca-issuer"
+upstream = "pkg/issuer/ca/sign.go"
+note = "CaIssuer lazily bootstraps Cave Sovereign Root + Platform Intermediate then reuses or generates per-tenant intermediates via cave_pki::Ca (one per tenant_id, cave invariant); leaf chain emits leaf → tenant intermediate; src/ca_issuer.rs."
+
+[[mapped]]
+name = "vault-issuer"
+upstream = "pkg/issuer/vault/sign.go"
+note = "VaultIssuer rejects handles without `keychain:` scheme + requires the entry to be present; mixes the resolved token into the synthetic serial without leaking it into the emitted PEM (token-value scrub test); src/vault_issuer.rs."
+
+[[mapped]]
+name = "selfsigned-issuer"
+upstream = "pkg/issuer/selfsigned/sign.go"
+note = "SelfSignedIssuer signs against its own request — synthetic serial = sha256(name|revision|first-SAN); CRL distribution points carried into the emitted PEM body; isCA flag round-trips; src/selfsigned_issuer.rs."
+
+[[mapped]]
+name = "issuer-registry"
+upstream = "pkg/controller/issuers/sync.go"
+note = "IssuerRegistry routes by IssuerSpec variant — Venafi runtime is rejected at the dispatcher (model-only); cross-spec mismatch (e.g. CaIssuer called with SelfSigned spec) returns InvalidSpec; src/issuer.rs."
+
+[[mapped]]
+name = "renewal-controller"
+upstream = "pkg/controller/certificates/trigger/trigger.go::shouldReissue"
+note = "RenewalScheduler computes RenewalPlan per Certificate: InitialIssuance (no status) / NotReady (Ready=False or no not_after) / Expired (now >= not_after) / RenewBeforeReached (now >= not_after - renewBefore); plan sorted by renew_at; next_renewal_at helper; src/renewal.rs."
+
+[[mapped]]
+name = "secret-reconciler"
+upstream = "pkg/controller/certificates/issuing/issuing_controller.go::reconcile"
+note = "SecretMaterializer emits kubernetes.io/tls Secret with tls.crt (chain) + ca.crt + tls.key (KEYCHAIN HANDLE, never raw bytes); propagates secretTemplate labels + annotations; stamps cert-manager.io/serial annotation; src/secret.rs."
+
+[[mapped]]
+name = "in-memory-store"
+upstream = "pkg/controller/util/store.go"
+note = "CertManagerStore — namespaced indexers for Certificate / CertificateRequest / Issuer / ClusterIssuer; every read passes through check_tenant (cross-tenant denied with structured error); src/store.rs."
+
+[[mapped]]
+name = "reconcile-loop"
+upstream = "pkg/controller/certificates/issuing/issuing_controller.go"
+note = "CertificateController.reconcile drives project → resolve_issuer → dispatch → materialise → stamp; failure paths stamp Failed on both the CertificateRequest and the Certificate status; emits Issued vs Renewed event based on previous revision; src/controller.rs."
+
+[[mapped]]
+name = "http-api-surface"
+upstream = "(cert-manager has no HTTP API — surfaced through Kubernetes apiserver)"
+note = "8 endpoints under /api/cert/{health, {tenant}/certificates, {tenant}/certificates/{id}, {tenant}/certificates/{id}/issue, {tenant}/certificates/{id}/renew, {tenant}/certificate-requests, {tenant}/issuers, {tenant}/cluster-issuers}; health endpoint reports pinned source_sha + version for parity-self-audit cross-check; src/routes.rs."
+
+[[mapped]]
+name = "cavectl-cert-subcommands"
+upstream = "cmd/cmctl"
+note = "URL builders for `cavectl cert {issuer list, cert list, cert issue, request, renew, health}`; cave-cli main wires the Cert subcommand against these; src/cli.rs + crates/cave-cli/src/main.rs."
+
+[[mapped]]
+name = "reconcile-event-emitter"
+upstream = "pkg/controller/certificates/issuing/issuing_controller.go (k8s event recorder)"
+note = "ReconcileEvent {Issued, Renewed, Failed} returned from reconcile() so cave-runtime can fan out to the event bus / cave-oncall pipeline; src/controller.rs."
+
+[[mapped]]
+name = "dnsnames-validation"
+upstream = "internal/apis/certmanager/validation/certificate.go::ValidateCertificate"
+note = "Empty-identifier rejection (EmptyDnsNames), per-dnsName checks (no `/`, no whitespace, max 253 chars per RFC 1035), renewBefore < duration, duration > 0; src/models.rs::CertificateSpec::validate."
+
+[[mapped]]
+name = "tenant-scoping"
+upstream = "(cave invariant — not in upstream)"
+note = "Every store op + every controller op + every keychain entry is scoped to a tenant_id; cross-tenant reads return CertManagerError::CrossTenantDenied {owner_tenant, request_tenant} with both ids surfaced for audit; src/store.rs + src/error.rs."
+
+# ─── Partial subsystems (5) — shape present, runtime deferred ───────────────
+
+[[partial]]
+name = "venafi-issuer"
+upstream = "pkg/issuer/venafi/setup.go"
+note = "IssuerSpec::Venafi {zone, token_keychain_handle} model is reachable, but the issuance runtime returns InvalidSpec — Venafi TPP / Cloud SDK lands as cave-cert-manager-venafi Phase 2."
+
+[[partial]]
+name = "acme-tls-alpn-01"
+upstream = "pkg/issuer/acme/tlsalpn/tlsalpn.go (RFC 8737)"
+note = "cave-acme generates the TLS-ALPN-01 challenge alongside HTTP-01 and DNS-01 in newOrder; cave-cert-manager solver registry covers HTTP-01 + DNS-01 only — the TLS-ALPN-01 solver (presenting the cert on :443) lands when cave-gateway grows the listener; Phase 2."
+
+[[partial]]
+name = "acme-external-account-binding"
+upstream = "pkg/issuer/acme/eab.go"
+note = "cave-acme accounts accept ExternalAccountBinding; AcmeIssuer currently passes None — wiring EAB requires the directory's HMAC key flowing through the keychain handle alongside the account key. Phase 2."
+
+[[partial]]
+name = "secret-reconciler-private-key-bytes"
+upstream = "pkg/controller/certificates/keymanager/keymanager.go"
+note = "tls.key is emitted as a `keychain:` reference rather than raw bytes — operationally identical for cave-net, but TLS termination outside cave-runtime needs the keychain bridge; Phase 2 closes the bytes path."
+
+[[partial]]
+name = "rotation-policy-always"
+upstream = "pkg/controller/certificates/keymanager/keymanager.go (RotateOnRenewal)"
+note = "PrivateKeyPolicy::rotation field is honoured by the validator + lives in the spec, but the keymanager that swaps the key every renewal lands when the keychain bridge does — Phase 2."
+
+# ─── Skipped subsystems (10) — scope_cuts to other crates / out of MVP ──────
+
+[[scope_cuts]]
+group = "cave-cert-manager-cloud-issuers"
+reason = "AWS PCA + Google CloudKMS issuers ship as separate adapters (cave-cert-manager-aws / cave-cert-manager-gcp Phase 2 crates) so the core MVP stays cloud-agnostic and dependency-light."
+items = ["aws-pca-issuer", "google-cloudkms-issuer"]
+
+[[scope_cuts]]
+group = "cave-cert-manager-venafi-runtime"
+reason = "Venafi TPP + Cloud SDKs are GPL/commercial — see [[partial]] venafi-issuer for the model + Phase 2 scope."
+items = ["venafi-issuer-runtime"]
+
+[[scope_cuts]]
+group = "cave-gateway"
+reason = "Gateway-API HTTPRoute + Listener cert binding belongs in cave-gateway; cave-cert-manager exposes Certificate-with-Gateway annotations only."
+items = ["gateway-api-integration"]
+
+[[scope_cuts]]
+group = "cave-mesh"
+reason = "istio-csr (gRPC SVID issuance over Istio's SDS) lands in cave-mesh alongside the existing Ambient + L7 policy machinery."
+items = ["istio-csr-grpc"]
+
+[[scope_cuts]]
+group = "cave-net"
+reason = "mTLS certificate distribution + TLS-ALPN-01 listener bind belong in cave-net's data-plane runtime; cave-cert-manager hands off via the keychain bridge."
+items = ["mtls-certificate-distribution"]
+
+[[scope_cuts]]
+group = "cave-admission"
+reason = "Deep validating + mutating webhook (cert-manager-webhook) wiring belongs in cave-admission; cave-cert-manager performs structural validation on every create_certificate / create_issuer route."
+items = ["webhook-validation-deep"]
+
+[[scope_cuts]]
+group = "cave-metrics"
+reason = "Prometheus metrics exporter + Grafana dashboards live in cave-metrics + cave-dashboard."
+items = ["prometheus-metrics-exporter"]
+
+[[scope_cuts]]
+group = "cavectl"
+reason = "cert-manager's cmctl is a standalone binary — cavectl absorbs the same surface through the `cavectl cert` subcommand."
+items = ["cmctl-binary"]
+
+[[scope_cuts]]
+group = "cave-deploy"
+reason = "cert-manager Helm chart installer + bundle pkg lands in cave-deploy alongside the existing Helm runtime."
+items = ["helm-chart-installer"]
+
+[[scope_cuts]]
+group = "cave-cert-manager-acme-webhook-dns"
+reason = "Out-of-tree DNS solver gRPC webhook protocol — Phase 2 once cave-net carries the gRPC server scaffold."
+items = ["acme-webhook-dns-provider-runtime"]
+
+# ─── Unmapped subsystems (2) — honest gaps preserved for Phase 2 ────────────
+
+[[unmapped]]
+name = "multi-issuer-failover"
+upstream = "(cert-manager has no first-party multi-issuer; community CRDs)"
+note = "Operator-requested behaviour: if Issuer A fails, fall through to Issuer B on the next reconcile attempt. Not in cert-manager upstream — honest gap for Phase 2."
+
+[[unmapped]]
+name = "experimental-clusterscoped-secret-rotation"
+upstream = "(cert-manager experimental alpha — internal/feature-gates)"
+note = "Cluster-scoped Secret rotation across namespaces (alpha gate `--feature-gates=ExperimentalClusterScopedSecrets=true` in cert-manager v1.20). Honest gap — Phase 2."
+
+# ─── File mappings ───────────────────────────────────────────────────────────
+
+[[files]]
+upstream = "pkg/apis/certmanager/v1/types_certificate.go"
+local    = "src/models.rs"
+
+[[files]]
+upstream = "pkg/apis/certmanager/v1/types_certificaterequest.go"
+local    = "src/models.rs"
+
+[[files]]
+upstream = "pkg/apis/certmanager/v1/types_issuer.go"
+local    = "src/models.rs"
+
+[[files]]
+upstream = "pkg/issuer/acme/sign.go"
+local    = "src/acme_issuer.rs"
+
+[[files]]
+upstream = "pkg/issuer/ca/sign.go"
+local    = "src/ca_issuer.rs"
+
+[[files]]
+upstream = "pkg/issuer/vault/sign.go"
+local    = "src/vault_issuer.rs"
+
+[[files]]
+upstream = "pkg/issuer/selfsigned/sign.go"
+local    = "src/selfsigned_issuer.rs"
+
+[[files]]
+upstream = "pkg/controller/issuers/sync.go"
+local    = "src/issuer.rs"
+
+[[files]]
+upstream = "pkg/controller/certificates/trigger/trigger.go"
+local    = "src/renewal.rs"
+
+[[files]]
+upstream = "pkg/controller/certificates/issuing/issuing_controller.go"
+local    = "src/controller.rs"
+
+[[files]]
+upstream = "pkg/controller/certificates/issuing/issuing_controller.go"
+local    = "src/secret.rs"
+
+[[files]]
+upstream = "pkg/controller/util/store.go"
+local    = "src/store.rs"
+
+[[files]]
+upstream = "(cmd/cmctl)"
+local    = "src/cli.rs"
+
+[portal_ui]
+upstream_ui  = "(CRD-only)"
+upstream_url = "https://cert-manager.io/"
+status       = "scaffold"
+loc          = 0
+priority     = "P2"
+notes        = "cert-manager has no first-party UI — cave-portal-ui surfaces Certificate / Issuer through the /api/cert REST surface."
+last_audit   = "2026-05-22"
