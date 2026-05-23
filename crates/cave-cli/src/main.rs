@@ -566,9 +566,96 @@ enum DashboardCmd {
 
 #[derive(Subcommand)]
 enum DeployCmd {
+    /// Application CRUD — list / get / diff / history / refresh / delete (ArgoCD parity).
+    App {
+        #[command(subcommand)]
+        cmd: DeployAppCmd,
+    },
+    /// Trigger a sync operation for an application.
+    Sync {
+        /// Application name.
+        name: String,
+        /// Optional target revision (commit SHA, tag, branch).
+        #[arg(long)]
+        revision: Option<String>,
+        /// Render the plan without applying.
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
+        /// Delete resources that are no longer in git.
+        #[arg(long, default_value_t = false)]
+        prune: bool,
+        /// Override conflicts on apply.
+        #[arg(long, default_value_t = false)]
+        force: bool,
+    },
+    /// Roll an application back to a previous revision-history entry.
+    Rollback {
+        /// Application name.
+        name: String,
+        /// Revision-history id (see `cavectl deploy app history <name>`).
+        #[arg(long)]
+        history_id: u64,
+        /// Delete pruned resources after rollback.
+        #[arg(long, default_value_t = false)]
+        prune: bool,
+        /// Render the plan without applying.
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
+    },
+    /// Module health probe.
+    Health,
+    /// AppProject management — list / get / delete.
+    Project {
+        #[command(subcommand)]
+        cmd: DeployProjectCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum DeployAppCmd {
+    /// List all applications.
     List,
-    Get,
-    Rollback,
+    /// Get a single application by name.
+    Get {
+        /// Application name.
+        name: String,
+    },
+    /// Inspect a single application's pending diff.
+    Diff {
+        /// Application name.
+        name: String,
+    },
+    /// Inspect the revision history of an application.
+    History {
+        /// Application name.
+        name: String,
+    },
+    /// Trigger a refresh (re-pull manifests + recompute drift).
+    Refresh {
+        /// Application name.
+        name: String,
+    },
+    /// Delete an application.
+    Delete {
+        /// Application name.
+        name: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum DeployProjectCmd {
+    /// List all AppProjects.
+    List,
+    /// Get a single AppProject by name.
+    Get {
+        /// Project name.
+        name: String,
+    },
+    /// Delete an AppProject.
+    Delete {
+        /// Project name.
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -4565,9 +4652,65 @@ source_root = "src"
             DashboardCmd::Import => c.get("/api/dashboard/import").await,
         },
         Commands::Deploy { cmd } => match cmd {
-            DeployCmd::List => c.get("/api/deploy/list").await,
-            DeployCmd::Get => c.get("/api/deploy/get").await,
-            DeployCmd::Rollback => c.get("/api/deploy/rollback").await,
+            DeployCmd::App { cmd } => match cmd {
+                DeployAppCmd::List => c.get("/api/deploy/apps").await,
+                DeployAppCmd::Get { name } => {
+                    c.get(&format!("/api/deploy/apps/{name}")).await
+                }
+                DeployAppCmd::Diff { name } => {
+                    c.get(&format!("/api/deploy/apps/{name}/diff")).await
+                }
+                DeployAppCmd::History { name } => {
+                    c.get(&format!("/api/deploy/apps/{name}/history")).await
+                }
+                DeployAppCmd::Refresh { name } => {
+                    c.post(&format!("/api/deploy/apps/{name}/refresh"), json!({}))
+                        .await
+                }
+                DeployAppCmd::Delete { name } => {
+                    c.delete(&format!("/api/deploy/apps/{name}")).await
+                }
+            },
+            DeployCmd::Sync {
+                name,
+                revision,
+                dry_run,
+                prune,
+                force,
+            } => {
+                let mut body = json!({
+                    "dry_run": dry_run,
+                    "prune": prune,
+                    "force": force,
+                });
+                if let Some(r) = revision {
+                    body["revision"] = json!(r);
+                }
+                c.post(&format!("/api/deploy/apps/{name}/sync"), body).await
+            }
+            DeployCmd::Rollback {
+                name,
+                history_id,
+                prune,
+                dry_run,
+            } => {
+                let body = json!({
+                    "history_id": history_id,
+                    "prune": prune,
+                    "dry_run": dry_run,
+                });
+                c.post(&format!("/api/deploy/apps/{name}/rollback"), body).await
+            }
+            DeployCmd::Health => c.get("/api/deploy/health").await,
+            DeployCmd::Project { cmd } => match cmd {
+                DeployProjectCmd::List => c.get("/api/deploy/projects").await,
+                DeployProjectCmd::Get { name } => {
+                    c.get(&format!("/api/deploy/projects/{name}")).await
+                }
+                DeployProjectCmd::Delete { name } => {
+                    c.delete(&format!("/api/deploy/projects/{name}")).await
+                }
+            },
         },
         Commands::Dns { cmd } => match cmd {
             DnsCmd::Zones => c.get("/api/dns/zones").await,
