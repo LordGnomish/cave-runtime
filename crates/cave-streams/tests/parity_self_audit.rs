@@ -18,8 +18,8 @@
 use std::fs;
 use std::path::PathBuf;
 
-const TODAY: &str = "2026-05-19";
-const FLOOR_FILL_RATIO: f64 = 0.0;
+const TODAY: &str = "2026-05-23";
+const FLOOR_FILL_RATIO: f64 = 0.95;
 
 fn workspace_root() -> PathBuf {
     let mut p: PathBuf = [env!("CARGO_MANIFEST_DIR")].iter().collect();
@@ -262,6 +262,126 @@ fn assertion_9_parity_index_json_consistency() {
     assert!(
         block.contains("\"parity_ratio_source\": \"manifest\""),
         "parity-index.json cave-streams entry must declare parity_ratio_source = \"manifest\""
+    );
+}
+
+// ─── 2026-05-23 deep-port additions ───────────────────────────────────────────
+//
+// The 2026-05-19 close-out left two honest gaps (`pulsar-transactions` +
+// `kafka-share-groups`) as `[[unmapped]]`.  The 2026-05-23 deep-port resolves
+// both with real Rust modules; the assertions below RED-fail until that lands.
+
+// ─── Assertion 10: pulsar_transactions module exists + carries TC symbols ────
+
+#[test]
+fn assertion_10_pulsar_transactions_module_exists() {
+    let p: PathBuf = [env!("CARGO_MANIFEST_DIR"), "src", "pulsar_transactions.rs"]
+        .iter()
+        .collect();
+    let body = fs::read_to_string(&p).unwrap_or_else(|e| panic!("read {:?}: {}", p, e));
+    for symbol in [
+        "pub struct TxnId",
+        "pub enum TxnStatus",
+        "pub struct TxnMeta",
+        "pub struct TransactionCoordinator",
+        "pub struct TransactionBuffer",
+        "pub struct PendingAckHandle",
+    ] {
+        assert!(
+            body.contains(symbol),
+            "src/pulsar_transactions.rs must define `{}`",
+            symbol
+        );
+    }
+}
+
+// ─── Assertion 11: kafka_share_groups module exists + carries KIP-932 symbols
+
+#[test]
+fn assertion_11_kafka_share_groups_module_exists() {
+    let p: PathBuf = [env!("CARGO_MANIFEST_DIR"), "src", "kafka_share_groups.rs"]
+        .iter()
+        .collect();
+    let body = fs::read_to_string(&p).unwrap_or_else(|e| panic!("read {:?}: {}", p, e));
+    for symbol in [
+        "pub enum RecordState",
+        "pub enum AcknowledgeType",
+        "pub struct InFlightBatch",
+        "pub struct SharePartition",
+        "pub struct SharePartitionManager",
+        "pub struct ShareGroup",
+    ] {
+        assert!(
+            body.contains(symbol),
+            "src/kafka_share_groups.rs must define `{}`",
+            symbol
+        );
+    }
+}
+
+// ─── Assertion 12: both new modules wired into lib.rs ────────────────────────
+
+#[test]
+fn assertion_12_new_modules_wired_in_lib_rs() {
+    let p: PathBuf = [env!("CARGO_MANIFEST_DIR"), "src", "lib.rs"].iter().collect();
+    let body = fs::read_to_string(&p).unwrap_or_else(|e| panic!("read {:?}: {}", p, e));
+    assert!(
+        body.contains("pub mod pulsar_transactions;"),
+        "lib.rs must export `pub mod pulsar_transactions;`"
+    );
+    assert!(
+        body.contains("pub mod kafka_share_groups;"),
+        "lib.rs must export `pub mod kafka_share_groups;`"
+    );
+}
+
+// ─── Assertion 13: fill_ratio ≥ 0.95 after deep-port promotions ─────────────-
+
+#[test]
+fn assertion_13_fill_ratio_meets_charter_v2_floor() {
+    let m = manifest_text();
+    let raw = extract_after(&m, "\nfill_ratio ")
+        .or_else(|| extract_after(&m, "\nfill_ratio="))
+        .expect("[parity] fill_ratio must be present");
+    let ratio: f64 = raw.parse().expect("fill_ratio must parse as float");
+    assert!(
+        ratio >= 0.95,
+        "Charter v2 workspace floor — fill_ratio must be ≥ 0.95 (got {})",
+        ratio
+    );
+}
+
+// ─── Assertion 14: manifest [[mapped]] count reflects 2 new promotions ──────
+
+#[test]
+fn assertion_14_manifest_has_pulsar_transactions_and_share_groups_mapped() {
+    let m = manifest_text();
+    assert!(
+        m.contains("pulsar_transactions.rs") && m.contains("[[mapped]]"),
+        "manifest must contain a `[[mapped]]` row pointing to src/pulsar_transactions.rs"
+    );
+    assert!(
+        m.contains("kafka_share_groups.rs"),
+        "manifest must contain a `[[mapped]]` row pointing to src/kafka_share_groups.rs"
+    );
+    // The two previously-unmapped scope_cuts must be removed from [[unmapped]].
+    // We tolerate them appearing in commentary or in [[mapped]] notes; what we
+    // forbid is a remaining live [[unmapped]] block.  Detect by checking the
+    // immediate package label after each `[[unmapped]]` header.
+    let mut cursor = 0usize;
+    let mut live_unmapped = 0usize;
+    while let Some(idx) = m[cursor..].find("\n[[unmapped]]") {
+        cursor += idx + "\n[[unmapped]]".len();
+        // Inspect the next ~200 bytes for upstream_pkg.
+        let slice = &m[cursor..(cursor + 400).min(m.len())];
+        if slice.contains("group-coordinator/share") || slice.contains("transactions/") {
+            live_unmapped += 1;
+        }
+    }
+    assert_eq!(
+        live_unmapped, 0,
+        "[[unmapped]] blocks for share-groups + pulsar-transactions must be promoted to [[mapped]] (still found {} live)",
+        live_unmapped
     );
 }
 
