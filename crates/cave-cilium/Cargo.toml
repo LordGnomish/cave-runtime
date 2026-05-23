@@ -1,0 +1,38 @@
+[package]
+name = "cave-cilium"
+description = "CNI / eBPF datapath / BGP / Hubble / NetworkPolicy — Cilium reimplementation (userspace datapath approximation)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core  = { path = "../cave-core" }
+cave-auth  = { path = "../cave-auth" }
+
+# Web
+axum  = { workspace = true }
+tower = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+
+# Serialization
+serde      = { workspace = true }
+serde_json = { workspace = true }
+
+# Utilities
+uuid      = { workspace = true }
+chrono    = { workspace = true }
+thiserror = { workspace = true }
+tracing   = { workspace = true }
+
+# Crypto (identity, WireGuard key derivation)
+sha2   = { workspace = true }
+hex    = { workspace = true }
+base64 = { workspace = true }
+
+# RNG (identity allocator, WireGuard ephemeral private-key seed)
+rand = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
