@@ -6,7 +6,8 @@ use crate::State;
 use axum::{
     Json, Router,
     extract::{Path, Query, State as AxumState},
-    http::StatusCode,
+    http::{StatusCode, header},
+    response::{IntoResponse, Response},
     routing::{get, post},
 };
 use serde::Deserialize;
@@ -30,7 +31,52 @@ pub fn create_router(state: Arc<State>) -> Router {
         .route("/portal/tracker", get(serve_tracker_ui))
         .route("/portal/registry", get(serve_registry_ui))
         .route("/portal/scan", get(serve_scan_ui))
+        .route("/static/{file}", get(static_asset))
         .with_state(state)
+}
+
+// ── Static assets ─────────────────────────────────────────────────────────────
+//
+// Embedded admin-shell assets — tailwind-light.css, cave-brand.css, htmx.min.js.
+// Without this route the admin pages reference `/static/tailwind-light.css` and
+// `/static/htmx.min.js` but axum has no handler, every admin page renders as
+// raw unstyled HTML with no client-side behaviour. See the audit note in
+// docs/runbooks/portal-ux.md (2026-05-22) — fixing this single route is the
+// largest single contributor to the visual polish of the admin surface.
+
+const TAILWIND_LIGHT_CSS: &str = include_str!("../assets/tailwind-light.css");
+const CAVE_BRAND_CSS: &str = include_str!("../assets/cave-brand.css");
+const HTMX_MIN_JS: &str = include_str!("../assets/htmx.min.js");
+
+/// Look up an embedded asset by exact filename. Returns `(content_type, body)`
+/// or `None` if the requested name is not in the allowlist. The allowlist is
+/// intentional — every served file is reviewed at build time, no filesystem
+/// reads happen at request time (so the route is immune to path-traversal).
+pub fn static_asset_lookup(name: &str) -> Option<(&'static str, &'static str)> {
+    match name {
+        "tailwind-light.css" => Some(("text/css; charset=utf-8", TAILWIND_LIGHT_CSS)),
+        "cave-brand.css" => Some(("text/css; charset=utf-8", CAVE_BRAND_CSS)),
+        "htmx.min.js" => Some(("application/javascript; charset=utf-8", HTMX_MIN_JS)),
+        _ => None,
+    }
+}
+
+async fn static_asset(Path(file): Path<String>) -> Response {
+    match static_asset_lookup(&file) {
+        Some((content_type, body)) => (
+            StatusCode::OK,
+            [
+                (header::CONTENT_TYPE, content_type),
+                // 1-hour browser cache — long enough to avoid the round-trip
+                // cost on every page nav, short enough that a server upgrade
+                // ships fresh CSS within an hour for everyone.
+                (header::CACHE_CONTROL, "public, max-age=3600"),
+            ],
+            body,
+        )
+            .into_response(),
+        None => (StatusCode::NOT_FOUND, "static asset not found").into_response(),
+    }
 }
 
 // ── Parity ────────────────────────────────────────────────────────────────────

@@ -1,0 +1,204 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+ * Copyright 2026 Cave Runtime contributors
+ *
+ * cave-brand.css — sovereign palette + typography polish that sits
+ * on top of tailwind-light.css. Loaded after the utilities sheet, so
+ * the brand tokens override default zinc/blue ramps when applied.
+ *
+ * Brand decisions: deep slate / sand / amber accent — neutral enough
+ * for an admin tool, distinguishable from generic Tailwind defaults
+ * so the portal does not feel like an unstyled tw-starter.
+ */
+
+/* Brand tokens */
+:root {
+  --cave-bg: #f6f6f4;          /* warm sand */
+  --cave-fg: #1c1c20;
+  --cave-fg-soft: #4a4a52;
+  --cave-line: #e2e1dc;
+  --cave-card: #ffffff;
+  --cave-accent: #b45309;       /* amber-700 sovereign accent */
+  --cave-accent-soft: #fffbeb;
+  --cave-rail: #1f1f23;
+  --cave-rail-fg: #e7e6df;
+  --cave-link: #1d4ed8;
+}
+.dark, html.dark {
+  --cave-bg: #0d0d10;
+  --cave-fg: #ececec;
+  --cave-fg-soft: #b5b5b8;
+  --cave-line: #27272a;
+  --cave-card: #15151a;
+  --cave-accent: #f59e0b;
+  --cave-accent-soft: #2a1c08;
+  --cave-rail: #06060a;
+  --cave-rail-fg: #e7e6df;
+  --cave-link: #93c5fd;
+}
+
+/* Body + base typography polish */
+body {
+  background: var(--cave-bg);
+  color: var(--cave-fg);
+  font-feature-settings: "kern", "liga", "calt";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Headings — tighter tracking, bolder hierarchy */
+main > h1 {
+  font-size: 1.5rem;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--cave-fg);
+  border-bottom: 1px solid var(--cave-line);
+  padding-bottom: 0.6rem;
+  margin-bottom: 1.25rem !important;
+}
+h2 { letter-spacing: -0.01em; }
+
+/* Cards / sections */
+main section,
+main .cave-card {
+  background: var(--cave-card);
+  border: 1px solid var(--cave-line);
+  border-radius: 0.625rem;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 0 rgba(20,20,20,0.02);
+}
+main section + section { margin-top: 1rem; }
+
+/* Inline links inside body content (not nav/badges) */
+main a:not(.btn):not([class*="bg-"]):not([class*="rounded"]):not(nav a) {
+  color: var(--cave-link);
+  text-underline-offset: 2px;
+}
+main a:not(.btn):not([class*="bg-"]):not([class*="rounded"]):not(nav a):hover {
+  text-decoration: underline;
+}
+
+/* Topbar polish */
+header {
+  background: var(--cave-rail) !important;
+  color: var(--cave-rail-fg);
+  border-color: transparent !important;
+}
+header a, header button { color: var(--cave-rail-fg); }
+header a:hover, header button:hover { color: #fff; background: rgba(255,255,255,0.06); }
+header code { color: var(--cave-rail-fg); opacity: 0.85; }
+
+/* Brand wordmark */
+header a[href="/"] {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  font-size: 1.05rem;
+}
+header a[href="/"]::before {
+  content: "▲ ";
+  color: var(--cave-accent);
+  font-weight: 700;
+}
+
+/* Sidebar polish */
+#cave-sidebar {
+  background: transparent !important;
+  border-color: var(--cave-line) !important;
+  font-size: 0.875rem;
+}
+#cave-sidebar a {
+  display: block;
+  padding: 0.35rem 0.625rem;
+  border-radius: 0.375rem;
+  color: var(--cave-fg-soft);
+  margin: 0.0625rem 0;
+}
+#cave-sidebar a:hover { background: rgba(0,0,0,0.04); color: var(--cave-fg); }
+.dark #cave-sidebar a:hover { background: rgba(255,255,255,0.05); }
+#cave-sidebar a[aria-current="page"] {
+  background: var(--cave-accent-soft);
+  color: var(--cave-accent);
+  font-weight: 600;
+  border-left: 3px solid var(--cave-accent);
+  padding-left: calc(0.625rem - 3px);
+}
+
+/* Table polish — applied via .cave-table-wrap or vanilla table */
+main table {
+  width: 100%;
+  font-size: 0.85rem;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+main thead th {
+  background: var(--cave-bg) !important;
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cave-fg-soft);
+  border-bottom: 1px solid var(--cave-line);
+  padding: 0.55rem 0.75rem;
+}
+main tbody td { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--cave-line); }
+main tbody tr:last-child td { border-bottom: 0; }
+main tbody tr:hover { background: rgba(180,83,9,0.04); }
+.dark main tbody tr:hover { background: rgba(245,158,11,0.06); }
+
+/* Breadcrumb polish */
+nav[aria-label="Breadcrumb"], nav.cave-breadcrumb {
+  font-size: 0.75rem;
+  color: var(--cave-fg-soft);
+  margin-bottom: 0.75rem;
+}
+nav[aria-label="Breadcrumb"] a, nav.cave-breadcrumb a { color: var(--cave-link); }
+nav[aria-label="Breadcrumb"] a:hover, nav.cave-breadcrumb a:hover { text-decoration: underline; }
+
+/* Buttons — used for hx-* actions */
+button.btn-primary,
+button[hx-get].btn,
+button[hx-post].btn {
+  background: var(--cave-accent);
+  color: #fff;
+  border-radius: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+button.btn-primary:hover,
+button[hx-get].btn:hover,
+button[hx-post].btn:hover { background: #92400e; }
+
+/* Code blocks */
+code, pre {
+  font-feature-settings: "kern" off;
+}
+main code:not(pre code) {
+  background: var(--cave-line);
+  padding: 0.1em 0.35em;
+  border-radius: 0.25rem;
+  font-size: 0.85em;
+}
+
+/* Mobile responsive: collapse main margin when sidebar hidden on small screens */
+@media (max-width: 767px) {
+  main { padding-left: 1rem; padding-right: 1rem; }
+  main section { padding: 0.875rem; }
+  main > h1 { font-size: 1.25rem; }
+  main table { font-size: 0.8rem; }
+  main thead th, main tbody td { padding: 0.4rem 0.5rem; }
+  /* Wrap tables in a horizontal scroller so columns never blow out */
+  main table { display: block; overflow-x: auto; max-width: 100%; }
+}
+
+/* Reduce motion respects user preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* Print: hide chrome */
+@media print {
+  header, #cave-sidebar, footer, #cave-cmdk, #cave-help, #cave-toasts { display: none !important; }
+  main { margin-left: 0 !important; padding-top: 0 !important; }
+}

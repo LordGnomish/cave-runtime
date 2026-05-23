@@ -121,6 +121,7 @@ pub fn shell_v2(opts: ShellOptions<'_>) -> String {
   <title>{title} — cave admin</title>
   <script src="/static/htmx.min.js" defer></script>
   <link rel="stylesheet" href="/static/tailwind-light.css">
+  <link rel="stylesheet" href="/static/cave-brand.css">
   <style>
     :focus-visible {{ outline: 2px solid #3b82f6; outline-offset: 2px; }}
     [data-list-row][data-active] {{ background: rgba(59, 130, 246, 0.1); }}
