@@ -53,6 +53,8 @@ source_sha = "41c6f9c4729175cf0f953cbf267378b8734e8d27"
 parity_ratio_source = "manifest"
 fill_ratio          = 0.9750
 honest_ratio        = 0.6750
+adr_justified_ratio = 1.0     # 12 skipped scope_cut to siblings (cave-artifacts OCI / cave-apiserver apply+finalizers / cave-cert webhook TLS / cave-kcl Phase 2 / cave-llm-gateway sidecar / cave-cli crank / cave-cloud real providers / cave-sign cosign) = out-of-scope-subsystem; 1 partial (Healthy condition back-off) + 1 unmapped (composition-revision-GC daemon Phase 2) = out-of-launch-scope.
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001"
 last_audit          = "2026-05-23"
 infra_only          = false
 mapped_count        = 26
