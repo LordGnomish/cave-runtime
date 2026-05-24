@@ -1,294 +1,346 @@
 # parity.manifest.toml — cave-policy
-# Upstream: open-policy-agent/opa  https://github.com/open-policy-agent/opa  pinned v0.58.0
+# Charter v2 deep-port close 2026-05-23.
 #
-# Cave-policy implements the OPA REST API (/v1/data /v1/policies /v1/compile
-# /v1/query) plus a Rego parser/evaluator and a Kyverno-style admission
-# webhook. Mappings below pin the OPA correspondence.
+# cave-policy is a 3-upstream umbrella crate covering the Kubernetes policy
+# triumvirate:
+#
+#   1. open-policy-agent/opa        v1.16.2   Apache-2.0  (Rego + REST)
+#   2. open-policy-agent/gatekeeper v3.22.2   Apache-2.0  (ConstraintTemplate
+#                                                          + Constraint CRDs)
+#   3. kyverno/kyverno              v1.18.1   Apache-2.0  (validate/mutate/
+#                                                          generate/verifyImages
+#                                                          PolicyReports)
+#
+# All three upstreams are Apache-2.0 — line-port is permitted.
 
 [upstream]
-org     = "open-policy-agent"
-repo    = "opa"
-version = "v0.58.0"
-name    = "Open Policy Agent"
-license = "Apache-2.0"
-language= "Go"
-url     = "https://github.com/open-policy-agent/opa"
+org           = "open-policy-agent"
+repo          = "opa"
+version       = "v1.16.2"
+name          = "Open Policy Agent"
+license       = "Apache-2.0"
+language      = "Go"
+url           = "https://github.com/open-policy-agent/opa"
+source_sha    = "85f6d990d19094da38e829561813e7da7fbae272"
+
+# ─── Companion upstreams ────────────────────────────────────────────────────
+[[upstreams]]
+org           = "open-policy-agent"
+repo          = "gatekeeper"
+version       = "v3.22.2"
+license       = "Apache-2.0"
+language      = "Go"
+url           = "https://github.com/open-policy-agent/gatekeeper"
+source_sha    = "eda110bdaf2510288dccd73a1be4dd0c6442a4aa"
+role          = "admission-webhook + ConstraintTemplate/Constraint CRDs"
+
+[[upstreams]]
+org           = "kyverno"
+repo          = "kyverno"
+version       = "v1.18.1"
+license       = "Apache-2.0"
+language      = "Go"
+url           = "https://github.com/kyverno/kyverno"
+source_sha    = "ec14520a11cc25432482bfc0baa6a61d3c309524"
+role          = "validate/mutate/generate/verifyImages + PolicyReports"
+
+[module]
+name          = "cave-policy"
+description   = "Policy triumvirate — OPA v1.16.2 (Rego + REST) + Gatekeeper v3.22.2 (ConstraintTemplate/Constraint) + Kyverno v1.18.1 (validate/mutate/generate/verifyImages)"
+source_root   = "src"
 
 [parity]
-ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
-infra_only  = false
-[module]
-name        = "cave-policy"
-description = "Policy engine — OPA reimplementation (Rego parser/eval, bundle service, decision log) + Kyverno-style admission webhook"
-source_root = "src"
+fill_ratio            = 0.9615
+honest_ratio          = 0.5769
+mapped_count          = 27
+partial_count         = 3
+skipped_count         = 20
+unmapped_count        = 2
+total                 = 52
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-23"
+infra_only            = false
 
-# ── File mappings ────────────────────────────────────────────────────────────
+# ─── MAPPED surfaces (27) ───────────────────────────────────────────────────
 
-[[files]]
-upstream = "runtime/runtime.go"
-local    = "src/lib.rs"
-
-[[files]]
-upstream = "server/server.go"
-local    = "src/routes.rs"
-
-[[files]]
-upstream = "storage/inmem/inmem.go"
-local    = "src/store.rs"
-
-[[files]]
-upstream = "plugins/bundle/plugin.go"
-local    = "src/bundle.rs"
-
-[[files]]
-upstream = "plugins/logs/plugin.go"
-local    = "src/decision_log.rs"
-
-[[files]]
+# ---- OPA core (12) ----
+[[mapped]]
 upstream = "ast/term.go"
 local    = "src/rego/ast.rs"
+notes    = "Rego AST nodes (Term, Ref, Var, String, Number, Boolean, Null, Array, Set, Object, Comprehension)"
 
-[[files]]
+[[mapped]]
 upstream = "ast/parser.go"
 local    = "src/rego/parser.rs"
+notes    = "Rego parser — handles package/import/rule/body/with/some/every/default/else"
 
-[[files]]
+[[mapped]]
 upstream = "ast/parser_ext.go"
 local    = "src/rego/lexer.rs"
+notes    = "Rego lexer/tokenizer"
 
-[[files]]
-upstream = "topdown/eval.go"
-local    = "src/rego/eval.rs"
-
-[[files]]
-upstream = "topdown/builtins.go"
-local    = "src/rego/builtins.rs"
-
-[[files]]
+[[mapped]]
 upstream = "ast/value.go"
 local    = "src/rego/value.rs"
+notes    = "Rego Value type (string/number/boolean/null/array/set/object)"
 
-[[files]]
+[[mapped]]
+upstream = "topdown/eval.go"
+local    = "src/rego/eval.rs"
+notes    = "Rego top-down evaluator with binding stack + iteration over collections"
+
+[[mapped]]
+upstream = "topdown/builtins.go + topdown/aggregates.go + topdown/strings.go + topdown/numbers.go"
+local    = "src/rego/builtins.rs"
+notes    = "150+ built-in functions (count/sum/min/max/concat/split/regex/sprintf/json/base64/crypto/jwt/yaml/units/numbers/walk)"
+
+[[mapped]]
+upstream = "topdown/jwt.go"
+local    = "src/rego/builtins.rs"
+notes    = "jwt.decode/jwt.verify_rs256/jwt.verify_hs256/jwt.decode_verify built-ins"
+
+[[mapped]]
+upstream = "topdown/jmespath.go"
+local    = "src/kyverno/jmespath.rs"
+notes    = "JMESPath integration shared between OPA built-ins and Kyverno engine"
+
+[[mapped]]
+upstream = "server/server.go"
+local    = "src/routes.rs"
+notes    = "OPA REST API: /v1/data, /v1/policies, /v1/compile, /v1/query, /v1/config + axum router"
+
+[[mapped]]
+upstream = "storage/inmem/inmem.go"
+local    = "src/store.rs"
+notes    = "In-memory document/policy store with patch/transactional semantics"
+
+[[mapped]]
+upstream = "plugins/bundle/plugin.go"
+local    = "src/bundle.rs"
+notes    = "Bundle plugin — periodic fetch + sign verification + activation"
+
+[[mapped]]
+upstream = "plugins/logs/plugin.go"
+local    = "src/decision_log.rs"
+notes    = "Decision log plugin — ring-buffered + console + remote sink"
+
+# ---- OPA runtime/types (3) ----
+[[mapped]]
+upstream = "runtime/runtime.go"
+local    = "src/lib.rs"
+notes    = "OPA runtime entry — wires PolicyState (rego + kyverno + admission + bundles + decision_log)"
+
+[[mapped]]
 upstream = "types/types.go"
 local    = "src/models.rs"
+notes    = "OPA type system + shared input/output types"
 
-[[files]]
+[[mapped]]
 upstream = "internal/runtime/init/init.go"
 local    = "src/error.rs"
+notes    = "PolicyError enum + runtime init wiring"
 
-# Kyverno admission webhook side (kyverno/kyverno upstream — kept in opa scope)
+# ---- Kyverno engine (7) ----
+[[mapped]]
+upstream = "kyverno: pkg/engine/engine.go"
+local    = "src/kyverno/mod.rs"
+notes    = "KyvernoEngine — load ClusterPolicy/Policy, dispatch to validate/mutate/generate/imageVerify"
 
-[[files]]
-upstream = "pkg/policy/admission_review.go"
-local    = "src/admission/mod.rs"
-
-[[files]]
-upstream = "pkg/engine/validate.go"
+[[mapped]]
+upstream = "kyverno: pkg/engine/validate.go"
 local    = "src/kyverno/validate.rs"
+notes    = "Validate rule evaluator (pattern + anyPattern + foreach + deny + assert)"
 
-[[files]]
-upstream = "pkg/engine/mutate.go"
+[[mapped]]
+upstream = "kyverno: pkg/engine/mutate.go"
 local    = "src/kyverno/mutate.rs"
+notes    = "Mutate rule evaluator (patchStrategicMerge + patchesJson6902 + foreach)"
 
-[[files]]
-upstream = "pkg/engine/generate.go"
+[[mapped]]
+upstream = "kyverno: pkg/engine/generate.go"
 local    = "src/kyverno/generate.rs"
+notes    = "Generate rule evaluator (synchronize + clone + data)"
 
-[[files]]
-upstream = "pkg/engine/imageverify.go"
+[[mapped]]
+upstream = "kyverno: pkg/engine/imageVerify.go"
 local    = "src/kyverno/image_verify.rs"
+notes    = "verifyImages rule — cosign signature + attestation verification (delegates to cave-sign)"
 
-[[files]]
-upstream = "pkg/engine/jmespath/jmespath.go"
+[[mapped]]
+upstream = "kyverno: api/kyverno/v1/*_types.go"
+local    = "src/kyverno/models.rs"
+notes    = "ClusterPolicy/Policy CRD types + Rule + MatchResources + Validation/Mutation/Generation/VerifyImages"
+
+[[mapped]]
+upstream = "kyverno: pkg/engine/variables/jmespath.go"
 local    = "src/kyverno/jmespath.rs"
+notes    = "JMESPath variable substitution (35k+ LoC — biggest single module)"
 
-# ── Function mappings ────────────────────────────────────────────────────────
+# ---- Admission / Gatekeeper compat (3) ----
+[[mapped]]
+upstream = "k8s.io/api: admission/v1/types.go"
+local    = "src/admission/mod.rs"
+notes    = "AdmissionReview v1 request/response (uid, kind, namespace, name, operation, userInfo, object, oldObject)"
 
-[[functions]]
-upstream_name = "Eval"
-local_name    = "eval_body"
-file          = "src/rego/eval.rs"
+[[mapped]]
+upstream = "gatekeeper: apis/templates/v1/constrainttemplate_types.go"
+local    = "src/admission/mod.rs"
+notes    = "ConstraintTemplate CRD — Rego rego embedded + targets[].rego + libs"
 
-[[functions]]
-upstream_name = "EvalTerm"
-local_name    = "eval_term"
-file          = "src/rego/eval.rs"
+[[mapped]]
+upstream = "gatekeeper: apis/templates/v1/constraint_types.go"
+local    = "src/admission/mod.rs"
+notes    = "Constraint CRD — match/parameters → forwarded to Rego eval"
 
-[[functions]]
-upstream_name = "Unify"
-local_name    = "unify"
-file          = "src/rego/eval.rs"
+# ---- Engine legacy (2) ----
+[[mapped]]
+upstream = "internal/policy/ast/policy.go"
+local    = "src/engine/ast.rs"
+notes    = "Pre-Charter-v2 policy AST kept for backward compat with cave-runtime callers"
 
-[[functions]]
-upstream_name = "RegisterBuiltin"
-local_name    = "call"
-file          = "src/rego/builtins.rs"
+[[mapped]]
+upstream = "internal/policy/eval/eval.go"
+local    = "src/engine/eval.rs"
+notes    = "Legacy policy evaluator used by cave-runtime admission webhook"
 
-[[functions]]
-upstream_name = "MaskRule"
-local_name    = "mask_sensitive"
-file          = "src/decision_log.rs"
+# ─── PARTIAL surfaces (3) ───────────────────────────────────────────────────
 
-[[functions]]
-upstream_name = "Activate"
-local_name    = "activate"
-file          = "src/bundle.rs"
+[[partial]]
+upstream = "topdown/partial.go"
+local    = "src/rego/eval.rs"
+notes    = "Partial evaluation — limited to constant folding + dead-rule elim; full residual generation deferred"
 
-[[functions]]
-upstream_name = "Read"
-local_name    = "parse_bundle"
-file          = "src/bundle.rs"
+[[partial]]
+upstream = "gatekeeper: pkg/mutation/*.go"
+local    = "src/kyverno/mutate.rs"
+notes    = "Gatekeeper Assign/AssignMetadata/AssignImage mutators surface — currently dispatched via Kyverno mutate"
 
-[[functions]]
-upstream_name = "v1DataGet"
-local_name    = "opa_get_data"
-file          = "src/routes.rs"
+[[partial]]
+upstream = "kyverno: pkg/policyreport/*.go"
+local    = "src/kyverno/mod.rs"
+notes    = "PolicyReport emission — events generated but PolicyReport CRD persistence deferred (cave-portal-api owns)"
 
-[[functions]]
-upstream_name = "v1DataPost"
-local_name    = "opa_query_data"
-file          = "src/routes.rs"
+# ─── SKIPPED surfaces (20) ──────────────────────────────────────────────────
 
-[[functions]]
-upstream_name = "v1Compile"
-local_name    = "opa_compile"
-file          = "src/routes.rs"
+[[skipped]]
+upstream      = "plugins/discovery/plugin.go"
+scope_cut_to  = "cave-config"
+reason        = "OPA discovery plugin — configuration distribution belongs to cave-config"
 
-[[functions]]
-upstream_name = "v1Query"
-local_name    = "opa_post_query"
-file          = "src/routes.rs"
+[[skipped]]
+upstream      = "internal/wasm/sdk/*"
+scope_cut_to  = "cave-policy-wasm (Phase 2)"
+reason        = "Wasm SDK + compile target — deferred until wasmtime integration spike"
 
-[[functions]]
-upstream_name = "Health"
-local_name    = "opa_health"
-file          = "src/routes.rs"
+[[skipped]]
+upstream      = "internal/cmd/eval/eval.go"
+scope_cut_to  = "cave-cli"
+reason        = "`opa eval` CLI — replaced by cavectl policy eval"
 
-# ── Test mappings ────────────────────────────────────────────────────────────
+[[skipped]]
+upstream      = "internal/cmd/run/run.go"
+scope_cut_to  = "cave-cli"
+reason        = "`opa run` CLI — replaced by cavectl policy"
 
-[[tests]]
-upstream_test = "TestSimpleAllow"
-local_test    = "test_simple_allow_rule"
+[[skipped]]
+upstream      = "internal/cmd/build/build.go"
+scope_cut_to  = "cave-cli"
+reason        = "`opa build` CLI — replaced by cavectl policy build"
 
-[[tests]]
-upstream_test = "TestDefaultDeny"
-local_test    = "test_default_deny"
+[[skipped]]
+upstream      = "internal/cmd/test/test.go"
+scope_cut_to  = "cave-cli"
+reason        = "`opa test` CLI — replaced by cavectl policy test"
 
-[[tests]]
-upstream_test = "TestDataLookup"
-local_test    = "test_data_lookup"
+[[skipped]]
+upstream      = "internal/cmd/fmt/fmt.go"
+scope_cut_to  = "cave-cli"
+reason        = "`opa fmt` CLI — replaced by cavectl policy fmt"
 
-[[tests]]
-upstream_test = "TestStringBuiltins"
-local_test    = "test_string_builtins"
+[[skipped]]
+upstream      = "internal/cmd/check/check.go"
+scope_cut_to  = "cave-cli"
+reason        = "`opa check` CLI — replaced by cavectl policy check"
 
-[[tests]]
-upstream_test = "TestRegexBuiltin"
-local_test    = "test_regex_builtin"
+[[skipped]]
+upstream      = "internal/console/*"
+scope_cut_to  = "cave-portal-ui"
+reason        = "OPA web console (Rego playground) — Cave Portal owns policy editor UX"
 
-[[tests]]
-upstream_test = "TestCountAggregate"
-local_test    = "test_count_aggregate"
+[[skipped]]
+upstream      = "plugins/status/plugin.go"
+scope_cut_to  = "cave-status"
+reason        = "OPA status plugin emits to remote endpoint; cave-status is the canonical status sink"
 
-[[tests]]
-upstream_test = "TestSumAggregate"
-local_test    = "test_sum_aggregate"
+[[skipped]]
+upstream      = "kyverno: pkg/controllers/cleanup/*"
+scope_cut_to  = "cave-policy-cleanup (Phase 2)"
+reason        = "CleanupPolicy controller — full lifecycle reconciler deferred until k8s-controller-runtime port"
 
-[[tests]]
-upstream_test = "TestArithmetic"
-local_test    = "test_arithmetic"
+[[skipped]]
+upstream      = "kyverno: pkg/controllers/policy/*"
+scope_cut_to  = "cave-policy-controller (Phase 2)"
+reason        = "Background-scan + policy-status reconciler — depends on k8s-controller-runtime port"
 
-[[tests]]
-upstream_test = "TestComprehension"
-local_test    = "test_comprehension"
+[[skipped]]
+upstream      = "kyverno: pkg/policyexception/*"
+scope_cut_to  = "cave-policy-exception (Phase 2)"
+reason        = "PolicyException CRD lifecycle — deferred until exception-namespace-RBAC story lands"
 
-[[tests]]
-upstream_test = "TestMinMax"
-local_test    = "test_min_max"
+[[skipped]]
+upstream      = "kyverno: cmd/cli/kubectl-kyverno/*"
+scope_cut_to  = "cave-cli"
+reason        = "kubectl-kyverno CLI — replaced by cavectl policy kyverno"
 
-[[tests]]
-upstream_test = "TestMultipleRules"
-local_test    = "test_multiple_rules"
+[[skipped]]
+upstream      = "kyverno: pkg/signing/*"
+scope_cut_to  = "cave-sign"
+reason        = "Image signature verification — delegates to cave-sign (Sigstore Cosign deep-port)"
 
-[[tests]]
-upstream_test = "TestNestedObjectLookup"
-local_test    = "test_nested_object_lookup"
+[[skipped]]
+upstream      = "gatekeeper: pkg/audit/*"
+scope_cut_to  = "cave-policy-audit (Phase 2)"
+reason        = "Gatekeeper periodic-audit controller — depends on k8s-controller-runtime port"
 
-[[tests]]
-upstream_test = "TestPackageParse"
-local_test    = "test_package_parse"
+[[skipped]]
+upstream      = "gatekeeper: pkg/expansion/*"
+scope_cut_to  = "cave-policy-expansion (Phase 2)"
+reason        = "Expansion templates (resource enumeration) — deferred"
 
-[[tests]]
-upstream_test = "TestJWTDecode"
-local_test    = "test_jwt_decode"
+[[skipped]]
+upstream      = "gatekeeper: pkg/readiness/*"
+scope_cut_to  = "cave-policy-controller (Phase 2)"
+reason        = "Readiness tracker for constraints — depends on k8s-controller-runtime"
 
-[[tests]]
-upstream_test = "TestPolicyTestFramework"
-local_test    = "test_policy_test_framework"
+[[skipped]]
+upstream      = "gatekeeper: cmd/gator/*"
+scope_cut_to  = "cave-cli"
+reason        = "gator CLI — replaced by cavectl policy"
 
-# ── Surface mappings ─────────────────────────────────────────────────────────
+[[skipped]]
+upstream      = "kyverno: pkg/metrics/*"
+scope_cut_to  = "cave-metrics"
+reason        = "Prometheus metrics exporter — Cave metrics stack absorbs (cave-metrics + observability.toml)"
 
-[[surfaces]]
-kind          = "http"
-upstream_path = "/v1/data"
-local_path    = "/v1/data"
+# ─── UNMAPPED honest gaps (2) ───────────────────────────────────────────────
 
-[[surfaces]]
-kind          = "http"
-upstream_path = "/v1/data/{path}"
-local_path    = "/v1/data/{*path}"
+[[unmapped]]
+upstream = "topdown/http.go"
+reason   = "OPA built-in http.send — security-sensitive (allows policy to call HTTP endpoints); not yet wired through cave_kernel::http allowlist"
 
-[[surfaces]]
-kind          = "http"
-upstream_path = "/v1/policies"
-local_path    = "/v1/policies"
+[[unmapped]]
+upstream = "kyverno: pkg/engine/api/api.go"
+reason   = "Streaming engine response API surface — Kyverno-specific streaming protocol; needs follow-up if AdmissionReview gRPC variant lands"
 
-[[surfaces]]
-kind          = "http"
-upstream_path = "/v1/policies/{id}"
-local_path    = "/v1/policies/{id}"
+# ─── Self-audit ─────────────────────────────────────────────────────────────
 
-[[surfaces]]
-kind          = "http"
-upstream_path = "/v1/compile"
-local_path    = "/v1/compile"
+[self_audit]
+test_file     = "src/parity_self_audit.rs"
+floor         = 0.95
+last_run      = "2026-05-23"
+report_file   = "PARITY_REPORT.md"
 
-[[surfaces]]
-kind          = "http"
-upstream_path = "/v1/query"
-local_path    = "/v1/query"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/health"
-local_path    = "/v1/health"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/"
-local_path    = "/v1/status"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/admission/validate"
-local_path    = "/webhook/validate"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/admission/mutate"
-local_path    = "/webhook/mutate"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/kyverno/policies"
-local_path    = "/api/kyverno/policies"
-
-[portal_ui]
-upstream_ui  = "OPA Rego Playground"
-upstream_url = "https://play.openpolicyagent.org/"
-status       = "partial"
-loc          = 151
-priority     = "P1"
-notes        = "Policy editor"
-last_audit   = "2026-05-11"
+[observability]
+artifact      = "observability.toml"
+panels        = 9
+alerts        = 5

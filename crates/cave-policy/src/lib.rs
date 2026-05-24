@@ -24,6 +24,9 @@ pub mod rego;
 pub mod routes;
 pub mod store;
 
+#[cfg(test)]
+mod parity_self_audit;
+
 use axum::Router;
 use cave_db::CavePool;
 use std::sync::{Arc, RwLock};
