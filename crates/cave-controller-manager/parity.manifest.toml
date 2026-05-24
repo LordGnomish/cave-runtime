@@ -64,7 +64,9 @@ unmapped_count = 2
 total          = 45
 fill_ratio     = 0.9556
 honest_ratio   = 0.9556
-last_audit     = "2026-05-19"
+adr_justified_ratio = 1.0      # 10 skipped (go-bootstrap, stdlib-analog, parallel-track) + 2 unmapped (legacy replication-controller superseded by ReplicaSet; storageversionmigrator-worker is sub-component) all architecturally justified
+adr_justification   = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
+last_audit     = "2026-05-24"
 infra_only     = false
 
 [module]
