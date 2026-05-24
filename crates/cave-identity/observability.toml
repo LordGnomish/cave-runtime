@@ -1,0 +1,148 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# cave-identity — Charter v2 observability artifact
+# Upstream parity: spiffe/spire v1.15.0 metrics surface
+# (telemetry exported from pkg/server + pkg/agent via telemetry.io).
+
+[dashboard]
+name        = "Workload Identity (SPIRE)"
+description = "SPIRE-style workload identity health: registration entries, SVID issuance, CA rotation, federation, OIDC, attestation."
+uid         = "cave-identity"
+refresh     = "30s"
+
+# ─── Panels (10 — gate floor: 8) ────────────────────────────────────────────
+
+[[panel]]
+id          = "p1"
+title       = "Registration entry count"
+description = "Total registered entries in the entry store, partitioned by parent SPIFFE ID."
+query       = "sum by (parent_id) (cave_identity_entries_total)"
+unit        = "entries"
+type        = "stat"
+
+[[panel]]
+id          = "p2"
+title       = "SVID issuance latency (P50/P95/P99)"
+description = "End-to-end latency for X.509-SVID + JWT-SVID issue() calls. SPIRE telemetry equivalent: `spire_server_svid_x509_issue_seconds`."
+query       = "histogram_quantile(0.95, sum by (le, kind) (rate(cave_identity_svid_issue_seconds_bucket[5m])))"
+unit        = "seconds"
+type        = "graph"
+
+[[panel]]
+id          = "p3"
+title       = "SVID rotation rate"
+description = "Per-second rate of SVIDs rotated by AgentManager::tick — proxy for cluster-wide rotation pressure."
+query       = "rate(cave_identity_svid_rotated_total[5m])"
+unit        = "ops/s"
+type        = "graph"
+
+[[panel]]
+id          = "p4"
+title       = "Attestation failure rate"
+description = "Per-attestor-kind failure rate (k8s / unix / docker / x509_pop). Spikes ⇒ misconfigured selectors or banned agents."
+query       = "rate(cave_identity_attestation_failures_total[5m])"
+unit        = "ops/s"
+type        = "graph"
+
+[[panel]]
+id          = "p5"
+title       = "Trust-bundle refresh"
+description = "Time since the last trust-bundle sequence-number increment, partitioned by federation peer."
+query       = "time() - cave_identity_bundle_last_refresh_timestamp"
+unit        = "seconds"
+type        = "stat"
+
+[[panel]]
+id          = "p6"
+title       = "Federation peer health"
+description = "Boolean health gauge per federation relationship — 1 = last refresh < refresh_hint, 0 = stale."
+query       = "cave_identity_federation_peer_healthy"
+unit        = "bool"
+type        = "stat"
+
+[[panel]]
+id          = "p7"
+title       = "Active agent connections"
+description = "AttestedNode rows + SDS-fetch round-trip count, mirrors SPIRE `spire_server_node_connections`."
+query       = "cave_identity_agent_active_connections"
+unit        = "agents"
+type        = "stat"
+
+[[panel]]
+id          = "p8"
+title       = "OIDC JWKS request rate"
+description = "Per-second rate of /oidc/keys + /oidc/.well-known/openid-configuration fetches."
+query       = "rate(cave_identity_oidc_requests_total[5m])"
+unit        = "req/s"
+type        = "graph"
+
+[[panel]]
+id          = "p9"
+title       = "CA intermediate TTL remaining"
+description = "Time until the current intermediate cert expires; should never drop below `intermediate_ttl/2`."
+query       = "cave_identity_ca_intermediate_not_after - time()"
+unit        = "seconds"
+type        = "graph"
+
+[[panel]]
+id          = "p10"
+title       = "Registration-entry admission failures"
+description = "Per-second rate of policy violations (TTL out-of-bounds, foreign trust-domain, empty selectors, downstream-by-nonadmin)."
+query       = "rate(cave_identity_policy_violations_total[5m])"
+unit        = "ops/s"
+type        = "graph"
+
+# ─── Alerts (6 — gate floor: 5) ─────────────────────────────────────────────
+
+[[alert]]
+id          = "a1"
+name        = "IdentitySvidIssuanceLatencyHigh"
+expression  = "histogram_quantile(0.95, sum by (le) (rate(cave_identity_svid_issue_seconds_bucket[5m]))) > 0.5"
+for         = "10m"
+severity    = "warning"
+summary     = "X.509-SVID issuance P95 > 500 ms — CA backend may be saturated"
+runbook     = "docs/runbooks/cave-identity-svid-latency.md"
+
+[[alert]]
+id          = "a2"
+name        = "IdentityCaIntermediateExpiringSoon"
+expression  = "cave_identity_ca_intermediate_not_after - time() < 7200"
+for         = "5m"
+severity    = "critical"
+summary     = "SPIRE intermediate CA cert expires in < 2 h — rotation loop wedged"
+runbook     = "docs/runbooks/cave-identity-ca-rotation.md"
+
+[[alert]]
+id          = "a3"
+name        = "IdentityAttestationFailureRateHigh"
+expression  = "sum by (attestor) (rate(cave_identity_attestation_failures_total[5m])) > 5"
+for         = "5m"
+severity    = "warning"
+summary     = "Workload attestation failures > 5/s for {{ $labels.attestor }} — selectors out of sync or agent banned"
+runbook     = "docs/runbooks/cave-identity-attestation.md"
+
+[[alert]]
+id          = "a4"
+name        = "IdentityFederationPeerStale"
+expression  = "cave_identity_federation_peer_healthy == 0"
+for         = "15m"
+severity    = "warning"
+summary     = "Federation peer bundle stale for > 15 min — federated SVIDs may be rejected"
+runbook     = "docs/runbooks/cave-identity-federation.md"
+
+[[alert]]
+id          = "a5"
+name        = "IdentityOidcJwksUnavailable"
+expression  = "rate(cave_identity_oidc_requests_total[5m]) > 0 and rate(cave_identity_oidc_errors_total[5m]) / rate(cave_identity_oidc_requests_total[5m]) > 0.1"
+for         = "5m"
+severity    = "critical"
+summary     = "OIDC JWKS endpoint error rate > 10% — JWT-SVID verifiers losing trust anchors"
+runbook     = "docs/runbooks/cave-identity-oidc.md"
+
+[[alert]]
+id          = "a6"
+name        = "IdentityPolicyViolationsSpike"
+expression  = "rate(cave_identity_policy_violations_total[5m]) > 1"
+for         = "10m"
+severity    = "info"
+summary     = "Registration-entry policy violations > 1/s — possible misconfigured cavectl client"
+runbook     = "docs/runbooks/cave-identity-policy.md"
