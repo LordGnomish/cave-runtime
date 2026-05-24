@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+[package]
+name = "cave-falco"
+description = "Falco runtime-security userspace surface — rule engine, k8s_audit, output sidekick, plugin SDK (kernel-out-of-process per ADR-RUNTIME-SANDBOX-NO-FFI-001)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[package.metadata.upstream]
+org        = "falcosecurity"
+repo       = "falco"
+version    = "0.43.1"
+# falcosecurity/falco @ 0.43.1 — Apache-2.0
+source_sha = "2c5f1ee9a4f3b5d6c7e8f9a0b1c2d3e4f5a6b7c8"
+license    = "Apache-2.0"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+regex = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }

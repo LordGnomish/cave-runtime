@@ -38,6 +38,7 @@ uuid.workspace = true
 
 # In-process dispatchers (eksik-sweep 2026-05-24):
 cave-bench = { path = "../cave-bench" }
+cave-falco = { path = "../cave-falco" }
 
 [dev-dependencies]
 axum.workspace = true

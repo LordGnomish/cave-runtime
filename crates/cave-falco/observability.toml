@@ -1,0 +1,81 @@
+# observability.toml — cave-falco dashboards + alerts
+# Charter v2 close 2026-05-24.
+
+[dashboard]
+title = "cave-falco — runtime security"
+description = "Falco alert volume, engine compile latency, k8s_audit backlog, output sink health."
+
+[[dashboard.panel]]
+title = "Falco alerts/min — Critical+"
+unit  = "alerts/min"
+query = 'sum(rate(falco_alerts_total{priority=~"CRITICAL|ALERT|EMERGENCY"}[1m]))'
+
+[[dashboard.panel]]
+title = "Falco alerts/min — Warning"
+unit  = "alerts/min"
+query = 'sum(rate(falco_alerts_total{priority="WARNING"}[1m]))'
+
+[[dashboard.panel]]
+title = "Engine rule load duration p95"
+unit  = "seconds"
+query = "histogram_quantile(0.95, falco_engine_compile_seconds_bucket)"
+
+[[dashboard.panel]]
+title = "Events evaluated/sec by source"
+unit  = "events/sec"
+query = "sum by (source) (rate(falco_events_total[1m]))"
+
+[[dashboard.panel]]
+title = "Top-10 firing rules (5m)"
+unit  = "alerts"
+query = "topk(10, sum by (rule) (rate(falco_alerts_total[5m])))"
+
+[[dashboard.panel]]
+title = "k8s_audit projection latency p95"
+unit  = "seconds"
+query = "histogram_quantile(0.95, falco_k8saudit_project_seconds_bucket)"
+
+[[dashboard.panel]]
+title = "Plugin extraction calls/sec"
+unit  = "calls/sec"
+query = "sum(rate(falco_plugin_extract_total[1m]))"
+
+[[dashboard.panel]]
+title = "Output sidekick send failures"
+unit  = "failures/min"
+query = "sum(rate(falco_output_send_failures_total[5m]))"
+
+[[alert]]
+name     = "FalcoCriticalAlertSurge"
+expr     = 'sum(rate(falco_alerts_total{priority=~"CRITICAL|ALERT|EMERGENCY"}[5m])) > 10'
+for      = "5m"
+severity = "page"
+summary  = "Falco critical-tier alerts > 10/min for 5m"
+
+[[alert]]
+name     = "FalcoEngineCompileStalled"
+expr     = "histogram_quantile(0.95, falco_engine_compile_seconds_bucket) > 5"
+for      = "10m"
+severity = "ticket"
+summary  = "Falco rule compile p95 > 5s — likely runaway macro expansion"
+
+[[alert]]
+name     = "FalcoK8sAuditBacklog"
+expr     = "falco_k8saudit_queue_depth > 1000"
+for      = "5m"
+severity = "ticket"
+summary  = "k8s_audit ingestion queue > 1000 events"
+
+[[alert]]
+name     = "FalcoOutputSendFailures"
+expr     = "sum(rate(falco_output_send_failures_total[5m])) > 0.5"
+for      = "10m"
+severity = "ticket"
+summary  = "Falco output sink failures sustained > 0.5/sec"
+
+[[alert]]
+name     = "FalcoRulesStaleness"
+expr     = "time() - falco_engine_rules_loaded_timestamp_seconds > 86400 * 7"
+for      = "1h"
+severity = "info"
+summary  = "Falco rules not refreshed in > 7 days"

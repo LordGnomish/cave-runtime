@@ -517,6 +517,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: BenchCmd,
     },
+    /// cave-falco (runtime security) CLI parity — rule pack parse + observability (in-process).
+    Falco {
+        #[command(subcommand)]
+        cmd: FalcoCmd,
+    },
 }
 
 // ── Per-module subcommand enums ───────────────────────────────────────────────
@@ -909,6 +914,21 @@ enum BenchCmd {
     Schedules,
     /// Print observability dashboards + alert rules.
     Observability,
+}
+
+#[derive(Subcommand)]
+enum FalcoCmd {
+    /// Parse a Falco rule pack YAML and print rule/macro/list counts.
+    RulesParse {
+        #[arg(long)]
+        path: String,
+    },
+    /// List built-in rules shipped by cave-falco (none — packs loaded at runtime).
+    RulesListBuiltin,
+    /// Print observability dashboards + alert YAML.
+    Observability,
+    /// Print cave-falco upstream version.
+    Version,
 }
 #[derive(Subcommand)]
 enum CrossplaneCmd {
@@ -4959,6 +4979,18 @@ source_root = "src"
                 BenchCmd::Observability => BenchSubcommand::Observability,
             };
             let out = bench_dispatch(sub).map_err(|e| anyhow::anyhow!("cave-bench: {e}"))?;
+            print!("{out}");
+            Ok(())
+        }
+        Commands::Falco { cmd } => {
+            use cave_falco::cli::{FalcoSubcommand, dispatch as falco_dispatch};
+            let sub = match cmd {
+                FalcoCmd::RulesParse { path } => FalcoSubcommand::RulesParse { path },
+                FalcoCmd::RulesListBuiltin => FalcoSubcommand::RulesListBuiltin,
+                FalcoCmd::Observability => FalcoSubcommand::Observability,
+                FalcoCmd::Version => FalcoSubcommand::Version,
+            };
+            let out = falco_dispatch(sub).map_err(|e| anyhow::anyhow!("cave-falco: {e}"))?;
             print!("{out}");
             Ok(())
         }
