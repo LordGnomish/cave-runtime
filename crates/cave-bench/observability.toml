@@ -1,0 +1,99 @@
+# observability.toml — cave-bench
+# Charter v2 gate G6: ≥8 dashboard panels + ≥5 alert rules.
+# Mirrors src/observability.rs constants; kept in sync by hand.
+
+[module]
+name        = "cave-bench"
+upstream    = "kube-bench v0.15.5 + kubescape v4.0.8"
+last_audit  = "2026-05-23"
+
+# ─── Metric names emitted by cave-bench ─────────────────────────────────────
+[metrics]
+scan_total              = "cave_bench_scan_total"
+control_fail_total      = "cave_bench_control_fail_total"
+cis_score               = "cave_bench_cis_score"
+nsa_control_gaps        = "cave_bench_nsa_control_gaps"
+mitre_tactic_coverage   = "cave_bench_mitre_tactic_coverage"
+top_failing_nodes       = "cave_bench_top_failing_nodes"
+scan_duration_seconds   = "cave_bench_scan_duration_seconds"
+scan_queue_depth        = "cave_bench_scan_queue_depth"
+check_skip_error_total  = "cave_bench_check_skip_error_total"
+
+# ─── 8 dashboard panels ─────────────────────────────────────────────────────
+
+[[panels]]
+title  = "Control failure rate (1m)"
+metric = "cave_bench_control_fail_total"
+query  = "sum by (framework) (rate(cave_bench_control_fail_total[1m]))"
+
+[[panels]]
+title  = "CIS score trend"
+metric = "cave_bench_cis_score"
+query  = "avg by (profile) (cave_bench_cis_score)"
+
+[[panels]]
+title  = "NSA control gaps"
+metric = "cave_bench_nsa_control_gaps"
+query  = "cave_bench_nsa_control_gaps"
+
+[[panels]]
+title  = "MITRE ATT&CK tactic coverage"
+metric = "cave_bench_mitre_tactic_coverage"
+query  = "avg by (tactic) (cave_bench_mitre_tactic_coverage)"
+
+[[panels]]
+title  = "Top failing nodes"
+metric = "cave_bench_top_failing_nodes"
+query  = "topk(10, cave_bench_top_failing_nodes)"
+
+[[panels]]
+title  = "Profile execution duration (P95)"
+metric = "cave_bench_scan_duration_seconds"
+query  = "histogram_quantile(0.95, rate(cave_bench_scan_duration_seconds_bucket[5m]))"
+
+[[panels]]
+title  = "Scan queue depth"
+metric = "cave_bench_scan_queue_depth"
+query  = "cave_bench_scan_queue_depth"
+
+[[panels]]
+title  = "Checks skipped due to error"
+metric = "cave_bench_check_skip_error_total"
+query  = "rate(cave_bench_check_skip_error_total[5m])"
+
+# ─── 5 alert rules ──────────────────────────────────────────────────────────
+
+[[alerts]]
+name        = "BenchControlFailureSpike"
+expr        = "rate(cave_bench_control_fail_total[5m]) > 10"
+for         = "10m"
+severity    = "critical"
+description = "Bench control-fail rate > 10/s for 10 minutes — likely a regression in cluster posture or a new failing control deployed."
+
+[[alerts]]
+name        = "BenchCisScoreRegression"
+expr        = "avg_over_time(cave_bench_cis_score[1h]) < 0.85"
+for         = "1h"
+severity    = "warning"
+description = "Average CIS score over 1 hour dropped below 85% — review the latest scan diff."
+
+[[alerts]]
+name        = "BenchNsaGapsHigh"
+expr        = "cave_bench_nsa_control_gaps > 5"
+for         = "30m"
+severity    = "warning"
+description = "More than 5 NSA hardening-guide control gaps for 30 minutes — operational hardening drift."
+
+[[alerts]]
+name        = "BenchScanQueueStalled"
+expr        = "cave_bench_scan_queue_depth > 100"
+for         = "15m"
+severity    = "critical"
+description = "Scan queue depth > 100 — runner stalled or scheduled scans piling up."
+
+[[alerts]]
+name        = "BenchCheckErrorsHigh"
+expr        = "rate(cave_bench_check_skip_error_total[10m]) > 1"
+for         = "20m"
+severity    = "warning"
+description = "Checks erroring (>1/s) for 20 minutes — environment is mis-mounted or upstream context fetch failing."
