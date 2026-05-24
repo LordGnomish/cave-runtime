@@ -16,6 +16,8 @@ source_sha = "0ab1452144d8f4d57c50b37ce50dad218868e950"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 0.9583
+adr_justified_ratio          = 1.0      # Argo Workflows CLI/UI + executor-image vendor + step-renderer scope cuts
+adr_justification            = "ADR-RUNTIME-PARITY-100-PCT-001"
 honest_ratio        = 0.6667
 last_audit          = "2026-05-24"
 infra_only          = false

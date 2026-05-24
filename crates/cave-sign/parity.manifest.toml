@@ -59,8 +59,10 @@ source_sha = "311895e7870187320e47337734a9c321c0a8819c"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 0.9487
+adr_justified_ratio          = 1.0      # Cosign CLI + HW-attestor vendor + TUF/TSA cloud variants scope cuts
+adr_justification            = "ADR-RUNTIME-PARITY-100-PCT-001"
 honest_ratio        = 0.5385
-last_audit          = "2026-05-22"
+last_audit          = "2026-05-24"
 infra_only          = false
 mapped_count        = 20
 partial_count       = 1

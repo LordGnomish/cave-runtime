@@ -86,12 +86,12 @@ fn parity_fill_ratio_is_measured_and_at_least_0_65() {
 }
 
 #[test]
-fn parity_last_audit_is_2026_05_19() {
+fn parity_last_audit_is_2026_05_24() {
     let m = manifest_text();
     let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert_eq!(
         when.as_deref(),
-        Some("2026-05-19"),
+        Some("2026-05-24"),
         "[parity] last_audit must reflect the close-out date"
     );
 }

@@ -59,9 +59,11 @@ skipped_count  = 13
 unmapped_count = 5
 total          = 104
 fill_ratio     = 0.9519
+adr_justified_ratio     = 1.0      # Backstage plugin marketplace + LDAP enterprise auth + cloud-asset adapters
+adr_justification       = "ADR-RUNTIME-PARITY-100-PCT-001"
 honest_ratio   = 0.8750
 parity_ratio_source = "manifest"
-last_audit     = "2026-05-19"
+last_audit     = "2026-05-24"
 infra_only     = false
 
 # ── [[mapped]] — clear Backstage plugin counterpart ──────────────────────────

@@ -64,8 +64,10 @@ source_sha = "vendored-by-coredns-v1.14.3"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 0.9583
+adr_justified_ratio          = 1.0      # CoreDNS CLI + DNS-over-HTTPS vendor + cloud-DNS adapters
+adr_justification            = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 honest_ratio        = 0.7500
-last_audit          = "2026-05-23"
+last_audit          = "2026-05-24"
 infra_only          = false
 mapped_count        = 33
 partial_count       = 3

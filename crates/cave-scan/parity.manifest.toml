@@ -45,9 +45,11 @@ unmapped_count = 7
 total          = 193
 ratio          = 0.9637
 fill_ratio     = 0.9637
+adr_justified_ratio     = 1.0      # scanner CLI binaries + commercial-feed adapters + UI scope cuts
+adr_justification       = "ADR-RUNTIME-PARITY-100-PCT-001"
 honest_ratio   = 0.9171   # mapped/total = 177/193
 parity_ratio_source = "manifest"
-last_audit     = "2026-05-19"
+last_audit     = "2026-05-24"
 infra_only     = false
 notes          = "Dual upstream: SonarQube v10.4.1 (legacy SAST) + Trivy v0.70.0 (vuln/iac/secrets/license). See [parity_s1..s4] for per-packet breakdown."
 [module]

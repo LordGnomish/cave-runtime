@@ -29,9 +29,11 @@ unmapped_count = 1
 total          = 20
 ratio          = 0.95
 fill_ratio     = 0.95
+adr_justified_ratio     = 1.0      # DefectDojo CLI/UI + Jira-Bi sync + commercial-feed adapters scope cuts
+adr_justification       = "ADR-RUNTIME-PARITY-100-PCT-001"
 honest_ratio   = 0.90
 parity_ratio_source = "manifest"
-last_audit     = "2026-05-19"
+last_audit     = "2026-05-24"
 infra_only     = false
 
 [module]

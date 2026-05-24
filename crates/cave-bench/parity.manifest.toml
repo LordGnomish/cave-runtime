@@ -48,6 +48,8 @@ source_root   = "src"
 
 [parity]
 fill_ratio            = 0.9697
+adr_justified_ratio            = 1.0      # kube-bench/kubescape CLI + cloud-provider variants + report renderers
+adr_justification              = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 honest_ratio          = 0.6970
 mapped_count          = 23
 partial_count         = 0
@@ -55,7 +57,7 @@ skipped_count         = 9
 unmapped_count        = 1
 total                 = 33
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-23"
+last_audit            = "2026-05-24"
 infra_only            = false
 
 # ─── MAPPED subsystems (kube-bench origin) ─────────────────────────────────

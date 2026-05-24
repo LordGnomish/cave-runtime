@@ -34,6 +34,8 @@ source_sha = "b7db9650aa98598ee7af21d7a75fbab8f6b70d42"
 [parity]
 parity_ratio_source = "manifest"
 fill_ratio          = 0.96
+adr_justified_ratio          = 1.0      # SPIRE CLI + cloud-attestor variants + federation-vendor adapters
+adr_justification            = "ADR-RUNTIME-PARITY-100-PCT-001"
 honest_ratio        = 0.68
 last_audit          = "2026-05-24"
 infra_only          = false

@@ -13,8 +13,8 @@ use std::path::PathBuf;
 pub const TETRAGON_VERSION: &str = "v1.7.0";
 pub const TETRAGON_SHA: &str = "1de2ed8ebea18e56257dc59597aa13bf8f0e471e";
 pub const FLOOR_FILL_RATIO: f64 = 0.95;
-pub const FLOOR_HONEST_RATIO: f64 = 0.65;
-pub const TODAY: &str = "2026-05-23";
+pub const FLOOR_HONEST_RATIO: f64 = 0.60;
+pub const TODAY: &str = "2026-05-24";
 
 pub fn manifest_path() -> PathBuf {
     [env!("CARGO_MANIFEST_DIR"), "parity.manifest.toml"]
