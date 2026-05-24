@@ -20,10 +20,15 @@
 //! ## Notifications
 //! - Slack webhook, generic webhook, Teams, PagerDuty
 
+pub mod analysis;
 pub mod engine;
+pub mod experiment;
 pub mod models;
+pub mod notifications;
 pub mod routes;
 pub mod store;
+pub mod traffic_router;
+pub mod types;
 
 use axum::Router;
 use cave_db::CavePool;

@@ -146,6 +146,12 @@ members = [
     "crates/cave-hermes",
     # === LLM Tracker (daily always-latest, Phase 0 report-only) ===
     "crates/cave-llm-tracker",
+    # === Workload identity (SPIRE v1.15.0) ===
+    "crates/cave-identity",
+    # === K8s security benchmarks (kube-bench + kubescape) ===
+    "crates/cave-bench",
+    # === Sandbox runtime triumvirate (gVisor + Kata + Firecracker) ===
+    "crates/cave-sandbox",
 ]
 
 [workspace.package]
