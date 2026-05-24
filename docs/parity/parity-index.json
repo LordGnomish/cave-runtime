@@ -1934,6 +1934,8 @@
       "upstream_version": "v2.28.0"
     },
     "cave-workflows": {
+      "adr_justification": "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001",
+      "adr_justified_ratio": 1.0,
       "cave_src_loc": 666,
       "honest_ratio": 0.6667,
       "last_audit_disk": "2026-05-24",
