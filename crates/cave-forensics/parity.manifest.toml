@@ -37,6 +37,8 @@ source_root   = "src"
 # fill_ratio 0.9545 → 0.9583 (no rounding artifacts).
 fill_ratio            = 0.9583
 honest_ratio          = 0.6818
+adr_justified_ratio   = 1.0      # 16 skipped (eBPF kernel loader/perf/ringbuf → cave-runtime host-preflight; tetragon gRPC + rate-limiter → cave-portal-api; cavectl → cave-cli; Hubble correlation → cave-net; Loki → cave-logs; k8s audit → cave-k8s; OTel → cave-metrics; WORM → cave-artifacts; falco engine/libsinsp/k8s-audit/sidekick → cave-falco/cave-policy/cave-apiserver/cave-noti) + 2 unmapped (btf_relocation_resolver → future cave-bpf-btf; tetragon_helm_chart_install → host-preflight deploy glue) all parallel-track / host-preflight categorical.
+adr_justification     = "ADR-RUNTIME-PARITY-100-PCT-001, ADR-RUNTIME-STACK-001"
 mapped_count          = 30
 partial_count         = 0
 skipped_count         = 16
